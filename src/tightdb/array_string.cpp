@@ -11,6 +11,8 @@ using namespace std;
 
 namespace {
 
+const int max_width = 64;
+
 // When len = 0 returns 0
 // When len = 1 returns 4
 // When 2 <= len < 256, returns 2**ceil(log2(len+1)).
@@ -34,52 +36,66 @@ namespace tightdb {
 void ArrayString::set(size_t ndx, const char* data, size_t size)
 {
     TIGHTDB_ASSERT(ndx < m_len);
-    TIGHTDB_ASSERT(data);
-    TIGHTDB_ASSERT(size < 64); // otherwise we have to use another column type
+    TIGHTDB_ASSERT(size < size_t(max_width)); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
     CopyOnWrite(); // Throws
 
-    // Calc min column width (incl trailing zero-byte)
-    size_t min_width = ::round_up(size);
+    // Make room for the new value plus a zero-termination
+    if (m_width <= size) {
+        if (size == 0 && m_width == 0) return;
 
-    // Make room for the new value
-    if (m_width < min_width) {
+        TIGHTDB_ASSERT(0 < size);
+
+        // Calc min column width
+        size_t new_width = ::round_up(size);
+
+        TIGHTDB_ASSERT(size < new_width);
+
         // FIXME: Should we try to avoid double copying when realloc fails to preserve the address?
-        Alloc(m_len, min_width); // Throws
+        Alloc(m_len, new_width); // Throws
 
         // Expand the old values in reverse order
-        char* base = m_data;
-        const char* old_end = base + m_len*m_width;
-        char*       new_end = base + m_len*min_width;
-        while (new_end != base) {
-            {
-              char* new_begin = new_end - (min_width-m_width);
-              fill(new_begin, new_end, 0); // Extra zero-padding is needed
-              new_end = new_begin;
-            }
-            {
-              const char* old_begin = old_end - m_width;
-              new_end = copy_backward(old_begin, old_end, new_end);
-              old_end = old_begin;
+        if (0 < m_width) {
+            char* base = m_data;
+            const char* old_end = base + m_len*m_width;
+            char*       new_end = base + m_len*new_width;
+            while (new_end != base) {
+                *--new_end = char(*--old_end + (new_width-m_width));
+                {
+                    char* new_begin = new_end - (new_width-m_width);
+                    fill(new_begin, new_end, 0); // Fill unused bytes with zero
+                    new_end = new_begin;
+                }
+                {
+                    const char* old_begin = old_end - (m_width-1);
+                    new_end = copy_backward(old_begin, old_end, new_end);
+                    old_end = old_begin;
+                }
             }
         }
-        m_width = min_width;
+
+        m_width = new_width;
     }
+
+    TIGHTDB_ASSERT(0 < m_width);
 
     // Set the value
     char* begin = m_data + (ndx * m_width);
-    char* end   = begin + m_width;
+    char* end   = begin + (m_width-1);
     begin = copy(data, data+size, begin);
-    fill(begin, end, 0); // Pad with zeroes
+    fill(begin, end, 0); // Fill unused bytes with zero
+    int num_unused = int(end - begin);
+    TIGHTDB_ASSERT(num_unused < max_width);
+    TIGHTDB_STATIC_ASSERT(max_width <= 128);
+    *end = char(num_unused);
 }
 
 
 void ArrayString::insert(size_t ndx, const char* data, size_t size)
 {
     TIGHTDB_ASSERT(ndx <= m_len);
-    TIGHTDB_ASSERT(data);
-    TIGHTDB_ASSERT(size < 64); // otherwise we have to use another column type
+    TIGHTDB_ASSERT(size < size_t(max_width)); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
     CopyOnWrite(); // Throws
@@ -94,7 +110,7 @@ void ArrayString::insert(size_t ndx, const char* data, size_t size)
     const char* old_end = base + m_len*m_width;
     char*       new_end = base + m_len*new_width + new_width;
 
-    // Move values beyond insertion point (may expand)
+    // Move values after insertion point (may expand)
     if (ndx != m_len) {
         if (TIGHTDB_UNLIKELY(m_width < new_width)) {
             // Expand the old values
