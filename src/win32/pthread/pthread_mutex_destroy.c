@@ -2,7 +2,7 @@
  * pthread_mutex_destroy.c
  *
  * Description:
- * This translation unit implements mutual exclusion (mutex) primitives.
+ * This translation unit implements mutual exclusion (mutex->original) primitives.
  *
  * --------------------------------------------------------------------------
  *
@@ -44,6 +44,20 @@ pthread_mutex_destroy (pthread_mutex_t * mutex)
   int result = 0;
   pthread_mutex_t mx;
 
+  if(mutex->is_shared)
+  {
+      int b;
+      HANDLE h = OpenMutexA(MUTEX_ALL_ACCESS, 1, mutex->shared_name);
+      if(h == NULL)
+          return 1;
+
+      b = ReleaseMutex(h);
+      if(b == 0)
+          return 1;
+
+      return 0;
+  }
+
   /*
    * Let the system deal with invalid pointers.
    */
@@ -51,95 +65,98 @@ pthread_mutex_destroy (pthread_mutex_t * mutex)
   /*
    * Check to see if we have something to delete.
    */
-  if (*mutex < PTHREAD_ERRORCHECK_MUTEX_INITIALIZER)
+  if ((void*)mutex->original < PTHREAD_ERRORCHECK_MUTEX)
     {
-      mx = *mutex;
+      mx.original = mutex->original;
+      mx.is_shared = mutex->is_shared;
 
       result = pthread_mutex_trylock (&mx);
 
       /*
-       * If trylock succeeded and the mutex is not recursively locked it
+       * If trylock succeeded and the mutex->original is not recursively locked it
        * can be destroyed.
        */
-      if (result == 0)
+      if (0 == result || ENOTRECOVERABLE == result)
 	{
-	  if (mx->kind != PTHREAD_MUTEX_RECURSIVE || 1 == mx->recursive_count)
+	  if (mx.original->kind != PTHREAD_MUTEX_RECURSIVE || 1 == mx.original->recursive_count)
 	    {
 	      /*
 	       * FIXME!!!
-	       * The mutex isn't held by another thread but we could still
-	       * be too late invalidating the mutex below since another thread
+	       * The mutex->original isn't held by another thread but we could still
+	       * be too late invalidating the mutex->original below since another thread
 	       * may already have entered mutex_lock and the check for a valid
-	       * *mutex != NULL.
-	       *
-	       * Note that this would be an unusual situation because it is not
-	       * common that mutexes are destroyed while they are still in
-	       * use by other threads.
+	       * *mutex->original != NULL.
 	       */
-	      *mutex = NULL;
+	      mutex->original = NULL;
 
-	      result = pthread_mutex_unlock (&mx);
+	      result = (0 == result)?pthread_mutex_unlock(&mx):0;
 
-	      if (result == 0)
+	      if (0 == result)
 		{
-		  if (!CloseHandle (mx->event))
+                  if (mx.original->robustNode != NULL)
+                    {
+                      free(mx.original->robustNode);
+                    }
+		  if (!CloseHandle (mx.original->event))
 		    {
-		      *mutex = mx;
+		      mutex->original = mx.original;
 		      result = EINVAL;
 		    }
 		  else
 		    {
-		      free (mx);
+		      free (mx.original);
 		    }
 		}
 	      else
 		{
 		  /*
-		   * Restore the mutex before we return the error.
+		   * Restore the mutex->original before we return the error.
 		   */
-		  *mutex = mx;
+		  mutex->original = mx.original;
 		}
 	    }
-	  else			/* mx->recursive_count > 1 */
+	  else			/* mx.original->recursive_count > 1 */
 	    {
 	      /*
-	       * The mutex must be recursive and already locked by us (this thread).
+	       * The mutex->original must be recursive and already locked by us (this thread).
 	       */
-	      mx->recursive_count--;	/* Undo effect of pthread_mutex_trylock() above */
+	      mx.original->recursive_count--;	/* Undo effect of pthread_mutex_trylock() above */
 	      result = EBUSY;
 	    }
 	}
     }
   else
     {
+      ptw32_mcs_local_node_t node;
+
       /*
        * See notes in ptw32_mutex_check_need_init() above also.
        */
-      EnterCriticalSection (&ptw32_mutex_test_init_lock);
+
+      ptw32_mcs_lock_acquire(&ptw32_mutex_test_init_lock, &node);
 
       /*
        * Check again.
        */
-      if (*mutex >= PTHREAD_ERRORCHECK_MUTEX_INITIALIZER)
+      if ((void*)mutex->original >= PTHREAD_ERRORCHECK_MUTEX)
 	{
 	  /*
 	   * This is all we need to do to destroy a statically
-	   * initialised mutex that has not yet been used (initialised).
+	   * initialised mutex->original that has not yet been used (initialised).
 	   * If we get to here, another thread
-	   * waiting to initialise this mutex will get an EINVAL.
+	   * waiting to initialise this mutex->original will get an EINVAL.
 	   */
-	  *mutex = NULL;
+	  mutex->original = NULL;
 	}
       else
 	{
 	  /*
-	   * The mutex has been initialised while we were waiting
+	   * The mutex->original has been initialised while we were waiting
 	   * so assume it's in use.
 	   */
 	  result = EBUSY;
 	}
-
-      LeaveCriticalSection (&ptw32_mutex_test_init_lock);
+      ptw32_mcs_lock_release(&node);
     }
 
   return (result);

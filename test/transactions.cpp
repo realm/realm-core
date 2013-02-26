@@ -419,7 +419,7 @@ private:
 } // anonymous namespace
 
 
-#ifndef _WIN32 // Shared PTHREAD mutexes appear not to work on Windows
+//#ifndef _WIN32 // Shared PTHREAD mutexes appear not to work on Windows
 
 TEST(Transactions)
 {
@@ -550,4 +550,4 @@ TEST(Transactions)
     // End of read transaction
 }
 
-#endif // Shared PTHREAD mutexes appear not to work on Windows
+//#endif // Shared PTHREAD mutexes appear not to work on Windows

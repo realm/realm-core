@@ -17,7 +17,7 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 } // anonymous namespace
 
-#ifndef _WIN32 // Shared PTHREAD mutexes appear not to work on Windows
+//#ifndef _WIN32 // Shared PTHREAD mutexes appear not to work on Windows
 
 TEST(Shared_Initial)
 {
@@ -860,4 +860,4 @@ TEST(StringIndex_Bug)
     }
 }
 
-#endif // Shared PTHREAD mutexes appear not to work on Windows
+//#endif // Shared PTHREAD mutexes appear not to work on Windows
