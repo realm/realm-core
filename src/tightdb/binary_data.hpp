@@ -24,6 +24,8 @@
 #include <algorithm>
 #include <ostream>
 
+#include <tightdb/config.h>
+
 namespace tightdb {
 
 class BinaryData {

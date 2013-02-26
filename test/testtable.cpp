@@ -1,11 +1,17 @@
 #include <algorithm>
+#include <string>
 #include <sstream>
-#include <UnitTest++.h>
-#include <tightdb/table_macros.hpp>
-
-#include <ostream>
 #include <fstream>
+#include <ostream>
 
+#include <UnitTest++.h>
+
+#include <tightdb/table_macros.hpp>
+#include <tightdb/lang_bind_helper.hpp>
+#include <tightdb/alloc_slab.hpp>
+#include <tightdb/group.hpp>
+
+using namespace std;
 using namespace tightdb;
 
 TEST(Table1)
@@ -44,7 +50,7 @@ TEST(Table1)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Table_floats)
@@ -83,7 +89,7 @@ TEST(Table_floats)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 namespace {
@@ -118,7 +124,7 @@ TEST(Table2)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Table3)
@@ -146,7 +152,7 @@ TEST(Table3)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 namespace {
@@ -171,7 +177,7 @@ TEST(Table4)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 namespace {
@@ -193,7 +199,7 @@ TEST(Table_float2)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 
@@ -219,7 +225,7 @@ TEST(Table_Delete)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Delete all items one at a time
     for (size_t i = 0; i < 7; ++i) {
@@ -231,8 +237,72 @@ TEST(Table_Delete)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
+
+
+TEST(Table_LowLevelCopy)
+{
+    Table table;
+    table.add_column(type_Int, "i1");
+    table.add_column(type_Int, "i2");
+
+    table.insert_int(0, 0, 10);
+    table.insert_int(1, 0, 120);
+    table.insert_done();
+    table.insert_int(0, 1, 12);
+    table.insert_int(1, 1, 100);
+    table.insert_done();
+
+#ifdef TIGHTDB_DEBUG
+    table.Verify();
+#endif
+
+    Table table2 = table;
+
+#ifdef TIGHTDB_DEBUG
+    table2.Verify();
+#endif
+
+    CHECK(table2 == table);
+
+    TableRef table3 = table.copy();
+
+#ifdef TIGHTDB_DEBUG
+    table3->Verify();
+#endif
+
+    CHECK(*table3 == table);
+}
+
+
+TEST(Table_HighLevelCopy)
+{
+    TestTable table;
+    table.add(10, 120, false, Mon);
+    table.add(12, 100, true,  Tue);
+
+#ifdef TIGHTDB_DEBUG
+    table.Verify();
+#endif
+
+    TestTable table2 = table;
+
+#ifdef TIGHTDB_DEBUG
+    table2.Verify();
+#endif
+
+    CHECK(table2 == table);
+
+    TestTable::Ref table3 = table.copy();
+
+#ifdef TIGHTDB_DEBUG
+    table3->Verify();
+#endif
+
+    CHECK(*table3 == table);
+}
+
 
 // Pre-declare free standing function
 void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows);
@@ -260,7 +330,7 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
         table.insert_bool(1, i, (i % 2 ? true : false));
         table.insert_date(2, i, 12345);
 
-        std::stringstream ss;
+        stringstream ss;
         ss << "string" << i;
         table.insert_string(3, i, ss.str().c_str());
 
@@ -349,7 +419,7 @@ TEST(Table_Delete_All_Types)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Test Clear
     table.clear();
@@ -357,7 +427,7 @@ TEST(Table_Delete_All_Types)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Table_test_to_string)
@@ -365,20 +435,20 @@ TEST(Table_test_to_string)
     Table table;
     setup_multi_table(table, 15, 2);
 
-    std::stringstream ss;
+    stringstream ss;
     table.to_string(ss);
-    const std::string result = ss.str();
+    const string result = ss.str();
     if (0) {
-        std::cerr << "to_string:" << "\n" << result << "\n";
-        std::ofstream testFile("expect_string.txt", std::ios::out | std::ios::binary);
+        cerr << "to_string:" << "\n" << result << "\n";
+        ofstream testFile("expect_string.txt", ios::out | ios::binary);
         testFile << result;
     }
     else {
-        std::ifstream testFile("expect_string.txt", std::ios::in | std::ios::binary);
+        ifstream testFile("expect_string.txt", ios::in | ios::binary);
         CHECK(!testFile.fail());
-        std::string expected;
-        expected.assign( std::istreambuf_iterator<char>(testFile),
-                         std::istreambuf_iterator<char>() );
+        string expected;
+        expected.assign( istreambuf_iterator<char>(testFile),
+                         istreambuf_iterator<char>() );
         CHECK_EQUAL(true, result == expected);
     }
 }
@@ -388,22 +458,22 @@ TEST(Table_test_json_all_data)
     Table table;
     setup_multi_table(table, 15, 2);
 
-    std::stringstream ss;
+    stringstream ss;
     table.to_json(ss);
-    const std::string json = ss.str();
+    const string json = ss.str();
     if (0) {
         // Generate the testdata to compare. After doing this,
         // verify that the output is correct with a json validator:
         // http://jsonformatter.curiousconcept.com/
-        std::cerr << "JSON:" << json << "\n";
-        std::ofstream testFile("expect_json.json", std::ios::out | std::ios::binary);
+        cerr << "JSON:" << json << "\n";
+        ofstream testFile("expect_json.json", ios::out | ios::binary);
         testFile << json;
     }
     else {
-        std::string expected;
-        std::ifstream testFile("expect_json.json", std::ios::in | std::ios::binary);
+        string expected;
+        ifstream testFile("expect_json.json", ios::in | ios::binary);
         CHECK(!testFile.fail());
-        std::getline(testFile,expected);
+        getline(testFile,expected);
         CHECK_EQUAL(true, json == expected);
     }
 }
@@ -432,11 +502,11 @@ TEST(Table_test_json_simple)
         table.insert_done();
     }
 
-     std::stringstream ss;
+     stringstream ss;
      table.to_json(ss);
-     const std::string json = ss.str();
+     const string json = ss.str();
      CHECK_EQUAL(true, json.length() > 0);
-     //std::cerr << "JSON:" << json << "\n";
+     //cerr << "JSON:" << json << "\n";
 }
 
 
@@ -454,7 +524,7 @@ TEST(Table_Find_Int)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 
@@ -481,7 +551,7 @@ TEST(Table6)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 */
 
@@ -517,7 +587,7 @@ TEST(Table_FindAll_Int)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Table_Sorted_Int)
@@ -552,7 +622,7 @@ TEST(Table_Sorted_Int)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Table_Index_String)
@@ -752,7 +822,7 @@ TEST(Table_Index_Int)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 */
 
@@ -844,7 +914,79 @@ TEST(TableAutoEnumerationFindFindAll)
     CHECK_EQUAL("eftg", static_cast<const char*>(tv[4].second));
 }
 
-#include <tightdb/alloc_slab.hpp>
+namespace {
+TIGHTDB_TABLE_1(TestSubtabEnum2,
+                str, String)
+TIGHTDB_TABLE_1(TestSubtabEnum1,
+                subtab, Subtable<TestSubtabEnum2>)
+}
+
+TEST(Table_OptimizeSubtable)
+{
+    TestSubtabEnum1 t;
+    t.add();
+    t.add();
+
+    {
+        // Non-enumerable
+        TestSubtabEnum2::Ref r = t[0].subtab;
+        string s;
+        for (int i=0; i<100; ++i) {
+            r->add(s.c_str());
+            s += 'x';
+        }
+    }
+
+    {
+        // Enumerable
+        TestSubtabEnum2::Ref r = t[1].subtab;
+        for (int i=0; i<100; ++i) {
+            r->add("foo");
+        }
+        r->optimize();
+    }
+
+    // Verify
+    {
+        // Non-enumerable
+        TestSubtabEnum2::Ref r = t[0].subtab;
+        string s;
+        for (int i = 0; i < r->size(); ++i) {
+            CHECK_EQUAL(s.c_str(), r[i].str);
+            s += 'x';
+        }
+    }
+    {
+        // Non-enumerable
+        TestSubtabEnum2::Ref r = t[1].subtab;
+        for (int i = 0; i < r->size(); ++i) {
+            CHECK_EQUAL("foo", r[i].str);
+        }
+    }
+}
+
+TEST(Table_OptimizeCompare)
+{
+    TestSubtabEnum2 t1, t2;
+    for (int i=0; i<100; ++i) {
+        t1.add("foo");
+    }
+    for (int i=0; i<100; ++i) {
+        t2.add("foo");
+    }
+    t1.optimize();
+    CHECK(t1 == t2);
+    t1[50].str = "bar";
+    CHECK(t1 != t2);
+    t1[50].str = "foo";
+    CHECK(t1 == t2);
+    t2[50].str = "bar";
+    CHECK(t1 != t2);
+    t2[50].str = "foo";
+    CHECK(t1 == t2);
+}
+
+
 TEST(Table_SlabAlloc)
 {
     SlabAlloc alloc;
@@ -871,10 +1013,8 @@ TEST(Table_SlabAlloc)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
-
-#include <tightdb/group.hpp>
 
 
 TEST(Table_Spec)
@@ -1083,7 +1223,7 @@ TEST(Table_Spec_DeleteColumns)
 
 #ifdef TIGHTDB_DEBUG
     table->Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Table_Spec_AddColumns)
@@ -1202,14 +1342,13 @@ TEST(Table_Spec_AddColumns)
 
 #ifdef TIGHTDB_DEBUG
     table->Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 
 TEST(Table_Spec_DeleteColumnsBug)
 {
-    TableRef table;
-    table = Table::create();
+    TableRef table = Table::create();
 
     // Create specification with sub-table
     table->add_column(type_String, "name");
@@ -1274,9 +1413,7 @@ TEST(Table_Spec_DeleteColumnsBug)
 
 #ifdef TIGHTDB_DEBUG
     table->Verify();
-#endif // TIGHTDB_DEBUG
-
-    table.reset();
+#endif
 }
 
 TEST(Table_Mixed)
@@ -1429,7 +1566,7 @@ TEST(Table_Mixed)
 
 #ifdef TIGHTDB_DEBUG
     table.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 
@@ -1533,6 +1670,9 @@ namespace
 
     TIGHTDB_TABLE_1(MyTable3,
                     subtab, Subtable<MyTable2>)
+
+    TIGHTDB_TABLE_1(MyTable4,
+                    mix, Mixed)
 }
 
 
@@ -1679,6 +1819,22 @@ TEST(Table_HighLevelSubtables)
 }
 
 
+TEST(Table_SubtableCopyOnSetAndInsert)
+{
+    MyTable1 t1;
+    t1.add(7, 8);
+    MyTable2 t2;
+    t2.add(9, &t1);
+    MyTable1::Ref r1 = t2[0].subtab;
+    CHECK(t1 == *r1);
+    MyTable4 t4;
+    t4.add();
+    t4[0].mix.set_subtable(t2);
+    MyTable2::Ref r2 = unchecked_cast<MyTable2>(t4[0].mix.get_subtable());
+    CHECK(t2 == *r2);
+}
+
+
 namespace
 {
     TIGHTDB_TABLE_2(TableDateAndBinary,
@@ -1696,7 +1852,7 @@ TEST(Table_DateAndBinary)
     t.add(8, BinaryData(data, size));
     CHECK_EQUAL(t[0].date, 8);
     CHECK_EQUAL(t[0].bin.get_len(), size);
-    CHECK(std::equal(t[0].bin.get_pointer(), t[0].bin.get_pointer()+size, data));
+    CHECK(equal(t[0].bin.get_pointer(), t[0].bin.get_pointer()+size, data));
 }
 
 // Test for a specific bug found: Calling clear on a group with a table with a subtable
@@ -1795,14 +1951,13 @@ TEST(Table_HasSharedSpec)
 }
 
 
-namespace
-{
-    TIGHTDB_TABLE_3(TableAgg,
-                    c_int,   Int,
-                    c_float, Float,
-                    c_double, Double)
+namespace {
+TIGHTDB_TABLE_3(TableAgg,
+                c_int,   Int,
+                c_float, Float,
+                c_double, Double)
 
-                    // TODO: Bool? Date
+                // TODO: Bool? Date
 }
 
 #if TEST_DURATION > 0
@@ -1872,11 +2027,22 @@ TEST(Table_Aggregates2)
     CHECK_EQUAL(s, table.column().c_count.sum());
 }
 
-#include <tightdb/lang_bind_helper.hpp>
-
 TEST(Table_LanguageBindings)
 {
    Table* table = LangBindHelper::new_table();
    CHECK(table->is_valid());
+
+   table->add_column(type_Int, "i");
+   table->insert_int(0, 0, 10);
+   table->insert_done();
+   table->insert_int(0, 1, 12);
+   table->insert_done();
+
+   Table* table2 = LangBindHelper::copy_table(*table);
+   CHECK(table2->is_valid());
+
+   CHECK(*table == *table2);
+
    LangBindHelper::unbind_table_ref(table);
+   LangBindHelper::unbind_table_ref(table2);
 }

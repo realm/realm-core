@@ -100,7 +100,7 @@ public:
     void set_double(size_t ndx, double value);
     void set_string(size_t ndx, const char* value);
     void set_binary(size_t ndx, const char* value, size_t len);
-    void set_subtable(size_t ndx);
+    void set_subtable(size_t ndx, const Table*);
 
     void insert_int(size_t ndx, int64_t value);
     void insert_bool(size_t ndx, bool value);
@@ -109,7 +109,7 @@ public:
     void insert_double(size_t ndx, double value);
     void insert_string(size_t ndx, const char* value);
     void insert_binary(size_t ndx, const char* value, size_t len);
-    void insert_subtable(size_t ndx);
+    void insert_subtable(size_t ndx, const Table*);
 
     void add() TIGHTDB_OVERRIDE { insert_int(Size(), 0); }
     void insert(size_t ndx) TIGHTDB_OVERRIDE { insert_int(ndx, 0); invalidate_subtables(); }
@@ -125,7 +125,7 @@ public:
     size_t GetRef() const {return m_array->GetRef();}
 
     /// Compare two mixed columns for equality.
-    bool Compare(const ColumnMixed&) const;
+    bool compare(const ColumnMixed&) const;
 
     void invalidate_subtables();
 
@@ -187,8 +187,7 @@ private:
 };
 
 
-class ColumnMixed::RefsColumn: public ColumnSubtableParent
-{
+class ColumnMixed::RefsColumn: public ColumnSubtableParent {
 public:
     RefsColumn(Allocator& alloc, const Table* table, std::size_t column_ndx):
         ColumnSubtableParent(alloc, table, column_ndx) {}
