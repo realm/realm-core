@@ -55,22 +55,33 @@ void ArrayString::set(size_t ndx, const char* data, size_t size)
         // FIXME: Should we try to avoid double copying when realloc fails to preserve the address?
         Alloc(m_len, new_width); // Throws
 
+        char* base = m_data;
+        char* new_end = base + m_len*new_width;
+
         // Expand the old values in reverse order
         if (0 < m_width) {
-            char* base = m_data;
             const char* old_end = base + m_len*m_width;
-            char*       new_end = base + m_len*new_width;
             while (new_end != base) {
                 *--new_end = char(*--old_end + (new_width-m_width));
                 {
                     char* new_begin = new_end - (new_width-m_width);
-                    fill(new_begin, new_end, 0); // Fill unused bytes with zero
+                    fill(new_begin, new_end, 0); // Extend padding with zero bytes
                     new_end = new_begin;
                 }
                 {
                     const char* old_begin = old_end - (m_width-1);
                     new_end = copy_backward(old_begin, old_end, new_end);
                     old_end = old_begin;
+                }
+            }
+        }
+        else {
+            while (new_end != base) {
+                *--new_end = char(new_width-1);
+                {
+                    char* new_begin = new_end - (new_width-1);
+                    fill(new_begin, new_end, 0); // Fill with zero bytes
+                    new_end = new_begin;
                 }
             }
         }
@@ -84,11 +95,11 @@ void ArrayString::set(size_t ndx, const char* data, size_t size)
     char* begin = m_data + (ndx * m_width);
     char* end   = begin + (m_width-1);
     begin = copy(data, data+size, begin);
-    fill(begin, end, 0); // Fill unused bytes with zero
-    int num_unused = int(end - begin);
-    TIGHTDB_ASSERT(num_unused < max_width);
-    TIGHTDB_STATIC_ASSERT(max_width <= 128);
-    *end = char(num_unused);
+    fill(begin, end, 0); // Pad with zero bytes
+    TIGHTDB_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
+    TIGHTDB_ASSERT(end - begin < max_width);
+    int pad_size = int(end - begin);
+    *end = char(pad_size);
 }
 
 
@@ -106,62 +117,96 @@ void ArrayString::insert(size_t ndx, const char* data, size_t size)
     // Make room for the new value
     Alloc(m_len+1, new_width); // Throws
 
-    char* base = m_data;
-    const char* old_end = base + m_len*m_width;
-    char*       new_end = base + m_len*new_width + new_width;
+    if (0 < size || 0 < m_width) {
+        char* base = m_data;
+        const char* old_end = base + m_len*m_width;
+        char*       new_end = base + m_len*new_width + new_width;
 
-    // Move values after insertion point (may expand)
-    if (ndx != m_len) {
+        // Move values after insertion point (may expand)
+        if (ndx != m_len) {
+            if (TIGHTDB_UNLIKELY(m_width < new_width)) {
+                char* const new_begin = base + ndx*new_width + new_width;
+                if (0 < m_width) {
+                    // Expand the old values
+                    do {
+                        *--new_end = char(*--old_end + (new_width-m_width));
+                        {
+                            char* new_begin2 = new_end - (new_width-m_width);
+                            fill(new_begin2, new_end, 0); // Extend padding with zero bytes
+                            new_end = new_begin2;
+                        }
+                        {
+                            const char* old_begin = old_end - (m_width-1);
+                            new_end = copy_backward(old_begin, old_end, new_end);
+                            old_end = old_begin;
+                        }
+                    }
+                    while (new_end != new_begin);
+                }
+                else {
+                    do {
+                        *--new_end = char(new_width-1);
+                        {
+                            char* new_begin2 = new_end - (new_width-1);
+                            fill(new_begin2, new_end, 0); // Fill with zero bytes
+                            new_end = new_begin2;
+                        }
+                    }
+                    while (new_end != new_begin);
+                }
+            }
+            else {
+                // when no expansion just move the following entries forward
+                const char* old_begin = base + ndx*m_width;
+                new_end = copy_backward(old_begin, old_end, new_end);
+                old_end = old_begin;
+            }
+        }
+
+        // Set the value
+        {
+            char* new_begin = new_end - new_width;
+            char* pad_begin = copy(data, data+size, new_begin);
+            --new_end;
+            fill(pad_begin, new_end, 0); // Pad with zero bytes
+            TIGHTDB_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
+            TIGHTDB_ASSERT(new_end - pad_begin < max_width);
+            int pad_size = int(new_end - pad_begin);
+            *new_end = char(pad_size);
+            new_end = new_begin;
+        }
+
+        // Expand values before insertion point
         if (TIGHTDB_UNLIKELY(m_width < new_width)) {
-            // Expand the old values
-            char* const new_begin = base + ndx*new_width + new_width;
-            do {
-                {
-                    char* new_begin2 = new_end - (new_width-m_width);
-                    fill(new_begin2, new_end, 0); // Extra zero-padding is needed
-                    new_end = new_begin2;
+            if (0 < m_width) {
+                while (new_end != base) {
+                    *--new_end = char(*--old_end + (new_width-m_width));
+                    {
+                        char* new_begin = new_end - (new_width-m_width);
+                        fill(new_begin, new_end, 0); // Extend padding with zero bytes
+                        new_end = new_begin;
+                    }
+                    {
+                        const char* old_begin = old_end - (m_width-1);
+                        new_end = copy_backward(old_begin, old_end, new_end);
+                        old_end = old_begin;
+                    }
                 }
-                {
-                    const char* old_begin = old_end - m_width;
-                    new_end = copy_backward(old_begin, old_end, new_end);
-                    old_end = old_begin;
+            }
+            else {
+                while (new_end != base) {
+                    *--new_end = char(new_width-1);
+                    {
+                        char* new_begin = new_end - (new_width-1);
+                        fill(new_begin, new_end, 0); // Fill with zero bytes
+                        new_end = new_begin;
+                    }
                 }
             }
-            while (new_end != new_begin);
-        }
-        else {
-            // when no expansion just move the following entries forward
-            const char* old_begin = base + ndx*m_width;
-            new_end = copy_backward(old_begin, old_end, new_end);
-            old_end = old_begin;
+            m_width = new_width;
         }
     }
 
-    // Set the value
-    {
-        char* new_begin = new_end - new_width;
-        char* pad_begin = copy(data, data+size, new_begin);
-        fill(pad_begin, new_end, 0); // Pad with zeroes
-        new_end = new_begin;
-    }
-
-    // Expand values before insertion point
-    if (TIGHTDB_UNLIKELY(m_width < new_width)) {
-        while (new_end != base) {
-            {
-              char* new_begin = new_end - (new_width-m_width);
-              fill(new_begin, new_end, 0); // Extra zero-padding is needed
-              new_end = new_begin;
-            }
-            {
-              const char* old_begin = old_end - m_width;
-              new_end = copy_backward(old_begin, old_end, new_end);
-              old_end = old_begin;
-            }
-        }
-    }
-
-    m_width = new_width;
     ++m_len;
 }
 
@@ -264,7 +309,7 @@ bool ArrayString::Compare(const ArrayString& c) const
     if (c.size() != size()) return false;
 
     for (size_t i = 0; i < size(); ++i) {
-        if (strcmp(get(i), c.get(i)) != 0) return false;
+        if (get(i) != c.get(i)) return false;
     }
 
     return true;
@@ -279,7 +324,7 @@ void ArrayString::StringStats() const
     size_t longest = 0;
 
     for (size_t i = 0; i < m_len; ++i) {
-        const char* str = get(i);
+        const char* str = get_c_str(i);
         const size_t len = strlen(str)+1;
 
         total += len;
@@ -310,7 +355,7 @@ void ArrayString::ToDot(FILE* f) const
     for (size_t i = 0; i < m_len; ++i) {
         if (i > 0) fprintf(f, " | ");
 
-        fprintf(f, "%s", get(i));
+        fprintf(f, "%s", get_c_str(i));
     }
 
     fprintf(f, "\"];\n");
@@ -335,7 +380,7 @@ void ArrayString::ToDot(ostream& out, const char* title) const
     out << "0x" << hex << ref << dec << "</FONT></TD>" << endl;
 
     for (size_t i = 0; i < m_len; ++i) {
-        out << "<TD>\"" << get(i) << "\"</TD>" << endl;
+        out << "<TD>\"" << get_c_str(i) << "\"</TD>" << endl;
     }
 
     out << "</TR></TABLE>>];" << endl;

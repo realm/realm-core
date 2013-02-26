@@ -391,7 +391,7 @@ void Spec::set_column_attr(size_t ndx, ColumnType attr)
 const char* Spec::get_column_name(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
-    return m_names.get(ndx);
+    return m_names.get_c_str(ndx);
 }
 
 size_t Spec::get_column_index(const char* name) const

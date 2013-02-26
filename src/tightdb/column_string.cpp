@@ -297,7 +297,7 @@ const char* AdaptiveStringColumn::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
         return static_cast<ArrayStringLong*>(m_array)->Get(ndx);
     }
     else {
-        return static_cast<ArrayString*>(m_array)->get(ndx);
+        return static_cast<ArrayString*>(m_array)->get_c_str(ndx);
     }
 }
 
@@ -321,7 +321,7 @@ void AdaptiveStringColumn::LeafSet(size_t ndx, const char* value)
     // Copy strings to new array
     ArrayString* const oldarray = static_cast<ArrayString*>(m_array);
     for (size_t i = 0; i < oldarray->size(); ++i) {
-        newarray->add(oldarray->get(i));
+        newarray->add(oldarray->get_c_str(i));
     }
     newarray->Set(ndx, value, len);
 
@@ -360,7 +360,7 @@ void AdaptiveStringColumn::LeafInsert(size_t ndx, const char* value)
     ArrayString* const oldarray = static_cast<ArrayString*>(m_array);
     const size_t n = oldarray->size();
     for (size_t i=0; i<n; ++i) {
-        newarray->add(oldarray->get(i));
+        newarray->add(oldarray->get_c_str(i));
     }
     newarray->Insert(ndx, value, len);
 
@@ -418,6 +418,9 @@ bool AdaptiveStringColumn::FindKeyPos(const char* target, size_t& pos) const
     // Finds position of closest value BIGGER OR EQUAL to the target (for
     // lookups in indexes)
     while (high - low > 1) {
+        // FIXME: Doing integer mean this way is prone to
+        // overflow. See lower_bound() in "tightdb/array.cpp" for a
+        // solution.
         const ssize_t probe = (size_t(low) + size_t(high)) >> 1;
         const char* v = Get(probe);
 

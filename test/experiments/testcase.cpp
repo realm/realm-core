@@ -3,6 +3,7 @@
 #include <tightdb/column.hpp>
 #include <tightdb.hpp>
 #include <tightdb/group_shared.hpp>
+#include <tightdb/column_string.hpp>
 
 #define CHECK(v) do { if (v) break; cerr << __LINE__ << ": CHECK failed" << endl; } while(false)
 #define CHECK_EQUAL(a, b) do { if (check_equal((a),(b))) break; cerr << __LINE__ << ": CHECK_EQUAL failed: " << (a) << " vs " << (b) << endl; } while(false)
@@ -27,11 +28,12 @@ namespace {
 
 int main()
 {
-    Column c;
-    c.add(0);
-    c.add(1);
-    c.add(2);
-    c.add(3);
-    c.add(4);
-    CHECK_EQUAL(c.Get(4), 4);
+    AdaptiveStringColumn c;
+    c.add("");
+    c.add("");
+    c.add("");
+    c.add("");
+    c.add("");
+    c.add("");
+    CHECK_EQUAL(6u, c.Size());
 }

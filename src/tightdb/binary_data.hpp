@@ -49,6 +49,7 @@ public:
 };
 
 
+
 // Implementation:
 
 template<class Ch, class Tr>
