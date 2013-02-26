@@ -39,12 +39,12 @@
 
 
 /* TLS_OUT_OF_INDEXES not defined on WinCE */
-#ifndef TLS_OUT_OF_INDEXES
+#if !defined(TLS_OUT_OF_INDEXES)
 #define TLS_OUT_OF_INDEXES 0xffffffff
 #endif
 
 int
-pthread_key_create (pthread_key_t * key, void (*destructor) (void *))
+pthread_key_create (pthread_key_t * key, void (PTW32_CDECL *destructor) (void *))
      /*
       * ------------------------------------------------------
       * DOCPUBLIC
@@ -93,12 +93,12 @@ pthread_key_create (pthread_key_t * key, void (*destructor) (void *))
     {
       /*
        * Have to manage associations between thread and key;
-       * Therefore, need a lock that allows multiple threads
+       * Therefore, need a lock that allows competing threads
        * to gain exclusive access to the key->threads list.
        *
        * The mutex will only be created when it is first locked.
        */
-      newkey->keyLock = PTHREAD_MUTEX_INITIALIZER;
+      newkey->keyLock = 0;
       newkey->destructor = destructor;
     }
 
