@@ -24,7 +24,7 @@ namespace tightdb {
 
 // Note: Value assignments must be kept in sync with <tightdb/column_type.h>
 // Note: Value assignments must be kept in sync with <tightdb/c/column_type.h>
-// Note: Value assignments must be kept in sync with <tightdb/objc/column_type.h>
+// Note: Value assignments must be kept in sync with <tightdb/objc/type.h>
 // Note: Value assignments must be kept in sync with "com/tightdb/ColumnType.java"
 enum DataType {
     type_Int    =  0,
