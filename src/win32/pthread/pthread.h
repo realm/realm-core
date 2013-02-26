@@ -586,7 +586,15 @@ typedef ptw32_handle_t pthread_t;
 typedef struct pthread_attr_t_ * pthread_attr_t;
 typedef struct pthread_once_t_ pthread_once_t;
 typedef struct pthread_key_t_ * pthread_key_t;
-typedef struct pthread_mutex_t_ * pthread_mutex_t;
+
+//typedef struct pthread_mutex_t_ * pthread_mutex_t;
+
+typedef struct  { 
+    struct pthread_mutex_t_ * original;
+    int is_shared;
+    char shared_name[33 + 1];
+} pthread_mutex_t;
+
 typedef struct pthread_mutexattr_t_ * pthread_mutexattr_t;
 typedef struct pthread_cond_t_ * pthread_cond_t;
 typedef struct pthread_condattr_t_ * pthread_condattr_t;
@@ -690,9 +698,13 @@ struct pthread_once_t_
  * ====================
  * ====================
  */
-#define PTHREAD_MUTEX_INITIALIZER ((pthread_mutex_t)(size_t) -1)
-#define PTHREAD_RECURSIVE_MUTEX_INITIALIZER ((pthread_mutex_t)(size_t) -2)
-#define PTHREAD_ERRORCHECK_MUTEX_INITIALIZER ((pthread_mutex_t)(size_t) -3)
+#define PTHREAD_MUTEX ((void*)-1)
+#define PTHREAD_RECURSIVE_MUTEX ((void*)-2)
+#define PTHREAD_ERRORCHECK_MUTEX ((void*)-3)
+
+#define PTHREAD_MUTEX_INITIALIZER {(pthread_mutex_t_*)PTHREAD_MUTEX, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}
+#define PTHREAD_RECURSIVE_MUTEX_INITIALIZER {(pthread_mutex_t_*)PTHREAD_RECURSIVE_MUTEX, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}
+#define PTHREAD_ERRORCHECK_MUTEX_INITIALIZER {(pthread_mutex_t_*)PTHREAD_ERRORCHECK_MUTEX, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}
 
 /*
  * Compatibility with LinuxThreads

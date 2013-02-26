@@ -51,14 +51,27 @@ pthread_mutex_unlock (pthread_mutex_t * mutex)
 
   mx = *mutex;
 
+  if(mx.is_shared) {  
+      int b;
+      HANDLE h = OpenMutexA(MUTEX_ALL_ACCESS, 1, mutex->shared_name);
+      if(h == NULL)
+        return EINVAL;
+
+    b = ReleaseMutex(h);
+    if(b == 0)
+        return 0;
+    else
+        return EPERM; // Best probability why ReleaseMutex would fail on valid mutex
+  }
+
   /*
    * If the thread calling us holds the mutex then there is no
    * race condition. If another thread holds the
    * lock then we shouldn't be in here.
    */
-  if (mx < PTHREAD_ERRORCHECK_MUTEX_INITIALIZER)
+  if ((void*)mx.original < PTHREAD_ERRORCHECK_MUTEX)
     {
-      kind = mx->kind;
+      kind = mx.original->kind;
 
       if (kind >= 0)
         {
@@ -66,7 +79,7 @@ pthread_mutex_unlock (pthread_mutex_t * mutex)
 	    {
 	      LONG idx;
 
-	      idx = (LONG) PTW32_INTERLOCKED_EXCHANGE_LONG ((PTW32_INTERLOCKED_LONGPTR)&mx->lock_idx,
+	      idx = (LONG) PTW32_INTERLOCKED_EXCHANGE_LONG ((PTW32_INTERLOCKED_LONGPTR)&mx.original->lock_idx,
 							    (PTW32_INTERLOCKED_LONG)0);
 	      if (idx != 0)
 	        {
@@ -75,7 +88,7 @@ pthread_mutex_unlock (pthread_mutex_t * mutex)
 		      /*
 		       * Someone may be waiting on that mutex.
 		       */
-		      if (SetEvent (mx->event) == 0)
+		      if (SetEvent (mx.original->event) == 0)
 		        {
 		          result = EINVAL;
 		        }
@@ -84,18 +97,18 @@ pthread_mutex_unlock (pthread_mutex_t * mutex)
 	    }
           else
 	    {
-	      if (pthread_equal (mx->ownerThread, pthread_self()))
+	      if (pthread_equal (mx.original->ownerThread, pthread_self()))
 	        {
 	          if (kind != PTHREAD_MUTEX_RECURSIVE
-		      || 0 == --mx->recursive_count)
+		      || 0 == --mx.original->recursive_count)
 		    {
-		      mx->ownerThread.p = NULL;
+		      mx.original->ownerThread.p = NULL;
 
-		      if ((LONG) PTW32_INTERLOCKED_EXCHANGE_LONG ((PTW32_INTERLOCKED_LONGPTR)&mx->lock_idx,
+		      if ((LONG) PTW32_INTERLOCKED_EXCHANGE_LONG ((PTW32_INTERLOCKED_LONGPTR)&mx.original->lock_idx,
 							          (PTW32_INTERLOCKED_LONG)0) < 0L)
 		        {
 		          /* Someone may be waiting on that mutex */
-		          if (SetEvent (mx->event) == 0)
+		          if (SetEvent (mx.original->event) == 0)
 			    {
 			      result = EINVAL;
 			    }
@@ -118,22 +131,22 @@ pthread_mutex_unlock (pthread_mutex_t * mutex)
            * The thread must own the lock regardless of type if the mutex
            * is robust.
            */
-          if (pthread_equal (mx->ownerThread, self))
+          if (pthread_equal (mx.original->ownerThread, self))
             {
-              PTW32_INTERLOCKED_COMPARE_EXCHANGE_LONG((PTW32_INTERLOCKED_LONGPTR) &mx->robustNode->stateInconsistent,
+              PTW32_INTERLOCKED_COMPARE_EXCHANGE_LONG((PTW32_INTERLOCKED_LONGPTR) &mx.original->robustNode->stateInconsistent,
                                                       (PTW32_INTERLOCKED_LONG)PTW32_ROBUST_NOTRECOVERABLE,
                                                       (PTW32_INTERLOCKED_LONG)PTW32_ROBUST_INCONSISTENT);
               if (PTHREAD_MUTEX_NORMAL == kind)
                 {
                   ptw32_robust_mutex_remove(mutex, NULL);
 
-                  if ((LONG) PTW32_INTERLOCKED_EXCHANGE_LONG((PTW32_INTERLOCKED_LONGPTR) &mx->lock_idx,
+                  if ((LONG) PTW32_INTERLOCKED_EXCHANGE_LONG((PTW32_INTERLOCKED_LONGPTR) &mx.original->lock_idx,
                                                              (PTW32_INTERLOCKED_LONG) 0) < 0)
                     {
                       /*
                        * Someone may be waiting on that mutex.
                        */
-                      if (SetEvent (mx->event) == 0)
+                      if (SetEvent (mx.original->event) == 0)
                         {
                           result = EINVAL;
                         }
@@ -142,17 +155,17 @@ pthread_mutex_unlock (pthread_mutex_t * mutex)
               else
                 {
                   if (kind != PTHREAD_MUTEX_RECURSIVE
-                      || 0 == --mx->recursive_count)
+                      || 0 == --mx.original->recursive_count)
                     {
                       ptw32_robust_mutex_remove(mutex, NULL);
 
-                      if ((LONG) PTW32_INTERLOCKED_EXCHANGE_LONG((PTW32_INTERLOCKED_LONGPTR) &mx->lock_idx,
+                      if ((LONG) PTW32_INTERLOCKED_EXCHANGE_LONG((PTW32_INTERLOCKED_LONGPTR) &mx.original->lock_idx,
                                                                  (PTW32_INTERLOCKED_LONG) 0) < 0)
                         {
                           /*
                            * Someone may be waiting on that mutex.
                            */
-                          if (SetEvent (mx->event) == 0)
+                          if (SetEvent (mx.original->event) == 0)
                             {
                               result = EINVAL;
                             }
@@ -166,7 +179,7 @@ pthread_mutex_unlock (pthread_mutex_t * mutex)
             }
         }
     }
-  else if (mx != PTHREAD_MUTEX_INITIALIZER)
+  else if ((void*)mx.original != PTHREAD_MUTEX)
     {
       result = EINVAL;
     }

@@ -64,19 +64,19 @@ ptw32_mutex_check_need_init (pthread_mutex_t * mutex)
    */
   mtx = *mutex;
 
-  if (mtx == PTHREAD_MUTEX_INITIALIZER)
+  if ((void*)mtx.original == PTHREAD_MUTEX)
     {
       result = pthread_mutex_init (mutex, NULL);
     }
-  else if (mtx == PTHREAD_RECURSIVE_MUTEX_INITIALIZER)
+  else if ((void*)mtx.original == PTHREAD_RECURSIVE_MUTEX) 
     {
       result = pthread_mutex_init (mutex, &ptw32_recursive_mutexattr);
     }
-  else if (mtx == PTHREAD_ERRORCHECK_MUTEX_INITIALIZER)
+  else if ((void*)mtx.original == PTHREAD_ERRORCHECK_MUTEX)
     {
       result = pthread_mutex_init (mutex, &ptw32_errorcheck_mutexattr);
     }
-  else if (mtx == NULL)
+  else if (mtx.original == NULL)
     {
       /*
        * The mutex has been destroyed while we were waiting to
