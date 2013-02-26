@@ -126,7 +126,8 @@ pthread_cond_destroy (pthread_cond_t * cond)
 
   if (*cond != PTHREAD_COND_INITIALIZER)
     {
-      EnterCriticalSection (&ptw32_cond_list_lock);
+      ptw32_mcs_local_node_t node;
+      ptw32_mcs_lock_acquire(&ptw32_cond_list_lock, &node);
 
       cv = *cond;
 
@@ -135,21 +136,28 @@ pthread_cond_destroy (pthread_cond_t * cond)
        * all already signaled waiters to let them retract their
        * waiter status - SEE NOTE 1 ABOVE!!!
        */
-      if (sem_wait (&(cv->semBlockLock)) != 0)
+      if (ptw32_semwait (&(cv->semBlockLock)) != 0) /* Non-cancelable */
 	{
-	  return errno;
+	  result = errno;
 	}
-
-      /*
-       * !TRY! lock mtxUnblockLock; try will detect busy condition
-       * and will not cause a deadlock with respect to concurrent
-       * signal/broadcast.
-       */
-      if ((result = pthread_mutex_trylock (&(cv->mtxUnblockLock))) != 0)
-	{
-	  (void) sem_post (&(cv->semBlockLock));
-	  return result;
+      else
+        {
+          /*
+           * !TRY! lock mtxUnblockLock; try will detect busy condition
+           * and will not cause a deadlock with respect to concurrent
+           * signal/broadcast.
+           */
+          if ((result = pthread_mutex_trylock (&(cv->mtxUnblockLock))) != 0)
+	    {
+	      (void) sem_post (&(cv->semBlockLock));
+	    }
 	}
+	
+      if (result != 0)
+        {
+          ptw32_mcs_lock_release(&node);
+          return result;
+        }
 
       /*
        * Check whether cv is still busy (still has waiters)
@@ -206,14 +214,15 @@ pthread_cond_destroy (pthread_cond_t * cond)
 	  (void) free (cv);
 	}
 
-      LeaveCriticalSection (&ptw32_cond_list_lock);
+      ptw32_mcs_lock_release(&node);
     }
   else
     {
+      ptw32_mcs_local_node_t node;
       /*
        * See notes in ptw32_cond_check_need_init() above also.
        */
-      EnterCriticalSection (&ptw32_cond_test_init_lock);
+      ptw32_mcs_lock_acquire(&ptw32_cond_test_init_lock, &node);
 
       /*
        * Check again.
@@ -237,7 +246,7 @@ pthread_cond_destroy (pthread_cond_t * cond)
 	  result = EBUSY;
 	}
 
-      LeaveCriticalSection (&ptw32_cond_test_init_lock);
+      ptw32_mcs_lock_release(&node);
     }
 
   return ((result != 0) ? result : ((result1 != 0) ? result1 : result2));

@@ -37,7 +37,6 @@
 #include "pthread.h"
 #include "implement.h"
 
-#pragma warning(disable:4273)
 
 int
 pthread_attr_setdetachstate (pthread_attr_t * attr, int detachstate)

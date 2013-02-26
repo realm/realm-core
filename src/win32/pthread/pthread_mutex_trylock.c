@@ -41,8 +41,23 @@
 int
 pthread_mutex_trylock (pthread_mutex_t * mutex)
 {
-  int result = 0;
   pthread_mutex_t mx;
+  int kind;
+  int result = 0;
+
+  if(mutex->is_shared) 
+  {
+    DWORD d;
+    HANDLE h = OpenMutexA(MUTEX_ALL_ACCESS, 1, mutex->shared_name);
+    if(h == NULL)
+        return EINVAL;
+
+    d = WaitForSingleObject(h, 0);
+    if(d == WAIT_OBJECT_0)
+      return 0;
+    else 
+      return EBUSY; // Best probability why WaitForSingleObject would fail in this case
+  }
 
   /*
    * Let the system deal with invalid pointers.
@@ -54,7 +69,7 @@ pthread_mutex_trylock (pthread_mutex_t * mutex)
    * again inside the guarded section of ptw32_mutex_check_need_init()
    * to avoid race conditions.
    */
-  if (*mutex >= PTHREAD_ERRORCHECK_MUTEX_INITIALIZER)
+  if ((void*)mutex->original >= PTHREAD_ERRORCHECK_MUTEX)
     {
       if ((result = ptw32_mutex_check_need_init (mutex)) != 0)
 	{
@@ -63,29 +78,90 @@ pthread_mutex_trylock (pthread_mutex_t * mutex)
     }
 
   mx = *mutex;
+  kind = mx.original->kind;
 
-  if (0 == (LONG) PTW32_INTERLOCKED_COMPARE_EXCHANGE (
-		     (PTW32_INTERLOCKED_LPLONG) &mx->lock_idx,
-		     (PTW32_INTERLOCKED_LONG) 1,
-		     (PTW32_INTERLOCKED_LONG) 0))
+  if (kind >= 0)
     {
-      if (mx->kind != PTHREAD_MUTEX_NORMAL)
-	{
-	  mx->recursive_count = 1;
-	  mx->ownerThread = pthread_self ();
-	}
+      /* Non-robust */
+      if (0 == (PTW32_INTERLOCKED_LONG) PTW32_INTERLOCKED_COMPARE_EXCHANGE_LONG (
+		         (PTW32_INTERLOCKED_LONGPTR) &mx.original->lock_idx,
+		         (PTW32_INTERLOCKED_LONG) 1,
+		         (PTW32_INTERLOCKED_LONG) 0))
+        {
+          if (kind != PTHREAD_MUTEX_NORMAL)
+	    {
+	      mx.original->recursive_count = 1;
+	      mx.original->ownerThread = pthread_self ();
+	    }
+        }
+      else
+        {
+          if (kind == PTHREAD_MUTEX_RECURSIVE &&
+	      pthread_equal (mx.original->ownerThread, pthread_self ()))
+	    {
+	      mx.original->recursive_count++;
+	    }
+          else
+	    {
+	      result = EBUSY;
+	    }
+        }
     }
   else
     {
-      if (mx->kind == PTHREAD_MUTEX_RECURSIVE &&
-	  pthread_equal (mx->ownerThread, pthread_self ()))
-	{
-	  mx->recursive_count++;
-	}
+      /*
+       * Robust types
+       * All types record the current owner thread.
+       * The mutex is added to a per thread list when ownership is acquired.
+       */
+      pthread_t self;
+      ptw32_robust_state_t* statePtr = &mx.original->robustNode->stateInconsistent;
+
+      if ((PTW32_INTERLOCKED_LONG)PTW32_ROBUST_NOTRECOVERABLE ==
+                  PTW32_INTERLOCKED_EXCHANGE_ADD_LONG(
+                    (PTW32_INTERLOCKED_LONGPTR)statePtr,
+                    (PTW32_INTERLOCKED_LONG)0))
+        {
+          return ENOTRECOVERABLE;
+        }
+
+      self = pthread_self();
+      kind = -kind - 1; /* Convert to non-robust range */
+
+      if (0 == (PTW32_INTERLOCKED_LONG) PTW32_INTERLOCKED_COMPARE_EXCHANGE_LONG (
+        	         (PTW32_INTERLOCKED_LONGPTR) &mx.original->lock_idx,
+        	         (PTW32_INTERLOCKED_LONG) 1,
+        	         (PTW32_INTERLOCKED_LONG) 0))
+        {
+          if (kind != PTHREAD_MUTEX_NORMAL)
+            {
+              mx.original->recursive_count = 1;
+            }
+          ptw32_robust_mutex_add(mutex, self);
+        }
       else
-	{
-	  result = EBUSY;
-	}
+        {
+          if (PTHREAD_MUTEX_RECURSIVE == kind &&
+              pthread_equal (mx.original->ownerThread, pthread_self ()))
+            {
+              mx.original->recursive_count++;
+            }
+          else
+            {
+              if (EOWNERDEAD == (result = ptw32_robust_mutex_inherit(mutex)))
+                {
+                  mx.original->recursive_count = 1;
+                  ptw32_robust_mutex_add(mutex, self);
+                }
+              else
+                {
+                  if (0 == result)
+                    { 
+	              result = EBUSY;
+                    }
+                }
+	    }
+        }
     }
 
   return (result);
