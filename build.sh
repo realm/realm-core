@@ -74,7 +74,7 @@ if [ "$OS" = "Darwin" ]; then
     LIB_SUFFIX_SHARED=".dylib"
     LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
 fi
-if ! printf "%s\n" "$MODE" | grep -q '^dist'; then
+if ! printf "%s\n" "$MODE" | grep -q '^\(src-\|bin-\)\?dist'; then
     NUM_PROCESSORS=""
     if [ "$OS" = "Darwin" ]; then
         NUM_PROCESSORS="$(sysctl -n hw.ncpu)" || exit 1
@@ -212,8 +212,8 @@ case "$MODE" in
         exit 0
         ;;
 
-    "dist"|"src-dist")
-        if [ "$MODE" = "dist" ]; then
+    "src-dist"|"bin-dist")
+        if [ "$MODE" = "bin-dist" ]; then
             PREBUILT_CORE="1"
         fi
 
@@ -907,7 +907,7 @@ EOF
     *)
         echo "Unspecified or bad mode '$MODE'" 1>&2
         echo "Available modes are: clean build test install test-installed" 1>&2
-        echo "As well as: dist src-dist dist-clean dist-build dist-install dist-test-installed dist-status dist-pull dist-checkout dist-copy" 1>&2
+        echo "As well as: src-dist bin-dist dist-clean dist-build dist-install dist-test-installed dist-status dist-pull dist-checkout dist-copy" 1>&2
         exit 1
         ;;
 
