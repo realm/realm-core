@@ -974,7 +974,7 @@ TEST(Table_OptimizeSubtable)
         // Non-enumerable
         TestSubtabEnum2::Ref r = t[0].subtab;
         string s;
-        for (int i = 0; i < r->size(); ++i) {
+        for (size_t i = 0; i < r->size(); ++i) {
             CHECK_EQUAL(s.c_str(), r[i].str);
             s += 'x';
         }
@@ -982,7 +982,7 @@ TEST(Table_OptimizeSubtable)
     {
         // Non-enumerable
         TestSubtabEnum2::Ref r = t[1].subtab;
-        for (int i = 0; i < r->size(); ++i) {
+        for (size_t i = 0; i < r->size(); ++i) {
             CHECK_EQUAL("foo", r[i].str);
         }
     }
