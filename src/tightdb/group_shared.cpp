@@ -44,6 +44,29 @@ struct SharedGroup::SharedInfo {
     ReadCount readers[32]; // has to be power of two
 };
 
+class ScopedMutexLock {
+public:
+    ScopedMutexLock(pthread_mutex_t* mutex) TIGHTDB_NOEXCEPT : m_mutex(mutex)
+    {
+        pthread_mutex_lock(m_mutex);
+    }
+
+    ~ScopedMutexLock() TIGHTDB_NOEXCEPT
+    {
+        const int r = pthread_mutex_unlock(m_mutex);
+        TIGHTDB_ASSERT(r == 0);
+        static_cast<void>(r);
+    }
+
+    void update(pthread_mutex_t* mutex) TIGHTDB_NOEXCEPT
+    {
+        m_mutex = mutex; // Update mutex pointer after remap
+    }
+
+private:
+    pthread_mutex_t* m_mutex;
+};
+
 
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
 //
@@ -241,10 +264,16 @@ const Group& SharedGroup::begin_read()
     size_t new_topref = 0;
     size_t new_filesize = 0;
 
-    SharedInfo* const info = m_file_map.get_addr();
-
-    pthread_mutex_lock(&info->readmutex);
     {
+        SharedInfo* info = m_file_map.get_addr();
+        ScopedMutexLock lock(&info->readmutex);
+
+        if (TIGHTDB_UNLIKELY(info->infosize > m_file_map.get_size())) {
+            m_file_map.remap(m_file, File::access_ReadWrite, info->infosize);
+            info = m_file_map.get_addr();
+            lock.update(&info->readmutex);
+        }
+
         // Get the current top ref
         new_topref   = info->current_top;
         new_filesize = info->filesize;
@@ -265,7 +294,6 @@ const Group& SharedGroup::begin_read()
             }
         }
     }
-    pthread_mutex_unlock(&info->readmutex);
 
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
@@ -284,10 +312,10 @@ void SharedGroup::end_read()
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
-    SharedInfo* const info = m_file_map.get_addr();
-
-    pthread_mutex_lock(&info->readmutex);
     {
+        SharedInfo* const info = m_file_map.get_addr();
+        ScopedMutexLock lock(&info->readmutex);
+
         // FIXME: m_version may well be a 64-bit integer so this cast
         // to uint32_t seems quite dangerous. Should the type of
         // m_version be changed to uint32_t? The problem with uint32_t
@@ -311,7 +339,6 @@ void SharedGroup::end_read()
             --r.count;
         }
     }
-    pthread_mutex_unlock(&info->readmutex);
 
     // The read may have allocated some temporary state
     m_group.invalidate();
@@ -357,13 +384,20 @@ void SharedGroup::commit()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
-    SharedInfo* const info = m_file_map.get_addr();
+    SharedInfo* info = m_file_map.get_addr();
 
     // Get version info
     size_t current_version;
     size_t readlock_version;
-    pthread_mutex_lock(&info->readmutex);
     {
+        ScopedMutexLock lock(&info->readmutex);
+
+        if (TIGHTDB_UNLIKELY(info->infosize > m_file_map.get_size())) {
+            m_file_map.remap(m_file, File::access_ReadWrite, info->infosize);
+            info = m_file_map.get_addr();
+            lock.update(&info->readmutex);
+        }
+
         current_version = info->current_version + 1;
 
         if (ringbuf_is_empty())
@@ -373,7 +407,6 @@ void SharedGroup::commit()
             readlock_version = r.version;
         }
     }
-    pthread_mutex_unlock(&info->readmutex);
 
     // Reset version tracking in group if we are
     // starting from a new lock file
@@ -390,13 +423,13 @@ void SharedGroup::commit()
     const size_t new_filesize = alloc.GetFileLen();
 
     // Update reader info
-    pthread_mutex_lock(&info->readmutex);
     {
+        ScopedMutexLock lock(&info->readmutex);
+
         info->current_top = new_topref;
         info->filesize    = new_filesize;
         ++info->current_version;
     }
-    pthread_mutex_unlock(&info->readmutex);
 
     // Release write lock
     pthread_mutex_unlock(&info->writemutex);
@@ -442,49 +475,49 @@ void SharedGroup::rollback()
 #endif
 }
 
-bool SharedGroup::ringbuf_is_empty() const
+bool SharedGroup::ringbuf_is_empty() const TIGHTDB_NOEXCEPT
 {
     return (ringbuf_size() == 0);
 }
 
-size_t SharedGroup::ringbuf_size() const
+size_t SharedGroup::ringbuf_size() const TIGHTDB_NOEXCEPT
 {
     SharedInfo* const info = m_file_map.get_addr();
     return ((info->put_pos - info->get_pos) & info->capacity);
 }
 
-size_t SharedGroup::ringbuf_capacity() const
+size_t SharedGroup::ringbuf_capacity() const TIGHTDB_NOEXCEPT
 {
     SharedInfo* const info = m_file_map.get_addr();
     return info->capacity+1;
 }
 
-bool SharedGroup::ringbuf_is_first(size_t ndx) const
+bool SharedGroup::ringbuf_is_first(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     SharedInfo* const info = m_file_map.get_addr();
     return (ndx == info->get_pos);
 }
 
-SharedGroup::ReadCount& SharedGroup::ringbuf_get(size_t ndx)
+SharedGroup::ReadCount& SharedGroup::ringbuf_get(size_t ndx) TIGHTDB_NOEXCEPT
 {
     SharedInfo* const info = m_file_map.get_addr();
     return info->readers[ndx];
 }
 
-SharedGroup::ReadCount& SharedGroup::ringbuf_get_first()
+SharedGroup::ReadCount& SharedGroup::ringbuf_get_first() TIGHTDB_NOEXCEPT
 {
     SharedInfo* const info = m_file_map.get_addr();
     return info->readers[info->get_pos];
 }
 
-SharedGroup::ReadCount& SharedGroup::ringbuf_get_last()
+SharedGroup::ReadCount& SharedGroup::ringbuf_get_last() TIGHTDB_NOEXCEPT
 {
     SharedInfo* const info = m_file_map.get_addr();
     const uint32_t lastPos = (info->put_pos - 1) & info->capacity;
     return info->readers[lastPos];
 }
 
-void SharedGroup::ringbuf_remove_first()
+void SharedGroup::ringbuf_remove_first() TIGHTDB_NOEXCEPT
 {
     SharedInfo* const info = m_file_map.get_addr();
     info->get_pos = (info->get_pos + 1) & info->capacity;
@@ -499,7 +532,7 @@ void SharedGroup::ringbuf_put(const ReadCount& v)
     const size_t size = ringbuf_size();
     const bool isFull = (size == (info->capacity));
 
-    if (isFull) {
+    if (TIGHTDB_UNLIKELY(isFull)) {
         ringbuf_expand();
         info = m_file_map.get_addr();
     }
@@ -510,12 +543,13 @@ void SharedGroup::ringbuf_put(const ReadCount& v)
 
 void SharedGroup::ringbuf_expand()
 {
-    SharedInfo* const info = m_file_map.get_addr();
+    const SharedInfo* const info = m_file_map.get_addr();
 
-    // Calculate size of file with 32 more entries
+    // Calculate size of file with more entries
     const size_t current_entry_count = info->capacity + 1;
-    const size_t new_entry_count = current_entry_count + 32;
-    const size_t base_filesize = sizeof(SharedInfo) - sizeof(ReadCount[32]);
+    const size_t excount = current_entry_count; // Always double we can mask for index
+    const size_t new_entry_count = current_entry_count + excount;
+    const size_t base_filesize = sizeof(SharedInfo) - sizeof(ReadCount[excount]);
     const size_t new_filesize = base_filesize + (sizeof(ReadCount) * new_entry_count);
 
     // Extend file
@@ -525,21 +559,29 @@ void SharedGroup::ringbuf_expand()
 
     // Move existing entries (if there is a split)
     if (info2->put_pos < info2->get_pos) {
-        ReadCount* const low_start = &info2->readers[info2->get_pos];
-        ReadCount* const low_end   = &info2->readers[current_entry_count];
-        ReadCount* const new_start = &info2->readers[info2->get_pos + 32];
+        const ReadCount* const low_start = &info2->readers[info2->get_pos];
+        const ReadCount* const low_end   = &info2->readers[current_entry_count];
+        const bool has_overlap = (current_entry_count - info2->get_pos) > excount;
 
-        copy(low_start, low_end, new_start);
+        if (has_overlap) {
+            ReadCount* const new_end = &info2->readers[new_entry_count];
+            copy_backward(low_start, low_end, new_end);
+        }
+        else {
+            ReadCount* const new_start = &info2->readers[info2->get_pos + excount];
+            copy(low_start, low_end, new_start);
+        }
 
-        info2->get_pos += 32;
+        info2->get_pos += excount;
     }
 
+    info2->infosize = (uint32_t)new_filesize; // notify other processes of expansion
     info2->capacity = (uint32_t)new_entry_count - 1;
 }
 
-size_t SharedGroup::ringbuf_find(uint32_t version) const
+size_t SharedGroup::ringbuf_find(uint32_t version) const TIGHTDB_NOEXCEPT
 {
-    SharedInfo* const info = m_file_map.get_addr();
+    const SharedInfo* const info = m_file_map.get_addr();
     uint32_t pos = info->get_pos;
     while (pos != info->put_pos) {
         const ReadCount& r = info->readers[pos];
@@ -549,7 +591,7 @@ size_t SharedGroup::ringbuf_find(uint32_t version) const
         pos = (pos + 1) & info->capacity;
     }
 
-    return (size_t)-1;
+    return not_found;
 }
 
 #ifdef TIGHTDB_DEBUG
@@ -603,7 +645,22 @@ void SharedGroup::test_ringbuf()
     TIGHTDB_ASSERT(ringbuf_is_empty());
 
     // Fill buffer above capacity (forcing it to expand)
-    const size_t capacity_plus = ringbuf_capacity() + 16;
+    size_t capacity_plus = ringbuf_capacity() + 16;
+    for (size_t i = 0; i < capacity_plus; ++i) {
+        const ReadCount r = {1, (uint32_t)i};
+        ringbuf_put(r);
+        TIGHTDB_ASSERT(ringbuf_get_last().count == i);
+    }
+    for (size_t i = 0; i < capacity_plus; ++i) {
+        const ReadCount& r = ringbuf_get_first();
+        TIGHTDB_ASSERT(r.count == i);
+
+        ringbuf_remove_first();
+    }
+    TIGHTDB_ASSERT(ringbuf_is_empty());
+
+    // Fill buffer above capacity again (forcing it to expand with overlap)
+    capacity_plus = ringbuf_capacity() + 16;
     for (size_t i = 0; i < capacity_plus; ++i) {
         const ReadCount r = {1, (uint32_t)i};
         ringbuf_put(r);
