@@ -244,6 +244,8 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
     s.add_column(type_Int,    "int");
     s.add_column(type_Bool,   "bool");
     s.add_column(type_Date,   "date");
+    s.add_column(type_Float,  "float");
+    s.add_column(type_Double, "double");
     s.add_column(type_String, "string");
     s.add_column(type_String, "string_long");
     s.add_column(type_String, "string_enum"); // becomes ColumnStringEnum
@@ -256,67 +258,76 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
 
     // Add some rows
     for (size_t i = 0; i < rows; ++i) {
-        table.insert_int(0, i, i);
+        int64_t sign = (i%2 == 0) ? 1 : -1;
+        table.insert_int(0, i, int64_t(i*sign));
         table.insert_bool(1, i, (i % 2 ? true : false));
         table.insert_date(2, i, 12345);
+        table.insert_float(3, i, 123.456f*sign);
+        table.insert_double(4, i, 9876.54321*sign);
 
         std::stringstream ss;
         ss << "string" << i;
-        table.insert_string(3, i, ss.str().c_str());
+        table.insert_string(5, i, ss.str().c_str());
 
         ss << " very long string.........";
-        table.insert_string(4, i, ss.str().c_str());
+        table.insert_string(6, i, ss.str().c_str());
 
         switch (i % 3) {
             case 0:
-                table.insert_string(5, i, "enum1");
+                table.insert_string(7, i, "enum1");
                 break;
             case 1:
-                table.insert_string(5, i, "enum2");
+                table.insert_string(7, i, "enum2");
                 break;
             case 2:
-                table.insert_string(5, i, "enum3");
+                table.insert_string(7, i, "enum3");
                 break;
         }
 
-        table.insert_binary(6, i, "binary", 7);
+        table.insert_binary(8, i, "binary", 7);
 
-        switch (i % 6) {
+        switch (i % 8) {
             case 0:
-                table.insert_mixed(7, i, (bool)false);
+                table.insert_mixed(9, i, (bool)false);
                 break;
             case 1:
-                table.insert_mixed(7, i, (int64_t)(i*i));
+                table.insert_mixed(9, i, (int64_t)(i*i*sign));
                 break;
             case 2:
-                table.insert_mixed(7, i, "string");
+                table.insert_mixed(9, i, "string");
                 break;
             case 3:
-                table.insert_mixed(7, i, Date(123456789));
+                table.insert_mixed(9, i, Date(123456789));
                 break;
             case 4:
-                table.insert_mixed(7, i, Mixed(BinaryData("binary", 7)));
+                table.insert_mixed(9, i, Mixed(BinaryData("binary", 7)));
                 break;
             case 5:
             {
                 // Add subtable to mixed column
                 // We can first set schema and contents when the entire
                 // row has been inserted
-                table.insert_mixed(7, i, Mixed::subtable_tag());
+                table.insert_mixed(9, i, Mixed::subtable_tag());
                 break;
             }
+            case 6:
+                table.insert_mixed(9, i, float(123.1*i*sign));
+                break;
+            case 7:
+                table.insert_mixed(9, i, double(987.65*i*sign));
+                break;
         }
 
-        table.insert_subtable(8, i);
+        table.insert_subtable(10, i);
         table.insert_done();
 
         // Add subtable to mixed column
-        if (i % 6 == 5) {
-            TableRef subtable = table.get_subtable(7, i);
+        if (i % 8 == 5) {
+            TableRef subtable = table.get_subtable(9, i);
             subtable->add_column(type_Int,    "first");
             subtable->add_column(type_String, "second");
             for (size_t j=0; j<2; j++) {
-                subtable->insert_int(0, j, i*i*j);
+                subtable->insert_int(0, j, i*i*j*sign);
                 subtable->insert_string(1, j, "mixed sub");
                 subtable->insert_done();
             }
@@ -324,8 +335,9 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
 
         // Add sub-tables to table column
         for (size_t j=0; j<sub_rows; j++) {
-            TableRef subtable = table.get_subtable(8, i);
-            subtable->insert_int(0, j, 42+i*i*j*1234567890);
+            TableRef subtable = table.get_subtable(10, i);
+            int64_t val = -123+i*j*1234*sign;
+            subtable->insert_int(0, j, val);
             subtable->insert_string(1, j, "sub");
             subtable->insert_done();
         }
@@ -360,6 +372,9 @@ TEST(Table_Delete_All_Types)
 #endif // TIGHTDB_DEBUG
 }
 
+// enable to generate testfiles for to_string and json below
+#define GENERATE 0
+
 TEST(Table_test_to_string)
 {
     Table table;
@@ -368,19 +383,24 @@ TEST(Table_test_to_string)
     std::stringstream ss;
     table.to_string(ss);
     const std::string result = ss.str();
-    if (0) {
-        std::cerr << "to_string:" << "\n" << result << "\n";
-        std::ofstream testFile("expect_string.txt", std::ios::out | std::ios::binary);
+
+#if GENERATE   // enable to generate testfile - check it manually
+    std::cerr << "to_string:" << "\n" << result << "\n";
+    std::ofstream testFile("expect_string.txt", std::ios::out | std::ios::binary);
+    testFile << result;
+#else
+    std::ifstream testFile("expect_string.txt", std::ios::in | std::ios::binary);
+    CHECK(!testFile.fail());
+    std::string expected;
+    expected.assign( std::istreambuf_iterator<char>(testFile),
+                     std::istreambuf_iterator<char>() );
+    CHECK_EQUAL(true, result == expected);
+    if (result != expected) {
+        std::ofstream testFile("expect_string.error.txt", std::ios::out | std::ios::binary);
         testFile << result;
+        std::cerr << "\n error result in expect_string.error.txt\n";
     }
-    else {
-        std::ifstream testFile("expect_string.txt", std::ios::in | std::ios::binary);
-        CHECK(!testFile.fail());
-        std::string expected;
-        expected.assign( std::istreambuf_iterator<char>(testFile),
-                         std::istreambuf_iterator<char>() );
-        CHECK_EQUAL(true, result == expected);
-    }
+#endif
 }
 
 TEST(Table_test_json_all_data)
@@ -391,21 +411,25 @@ TEST(Table_test_json_all_data)
     std::stringstream ss;
     table.to_json(ss);
     const std::string json = ss.str();
-    if (0) {
+#if GENERATE
         // Generate the testdata to compare. After doing this,
         // verify that the output is correct with a json validator:
         // http://jsonformatter.curiousconcept.com/
-        std::cerr << "JSON:" << json << "\n";
-        std::ofstream testFile("expect_json.json", std::ios::out | std::ios::binary);
+    std::cerr << "JSON:" << json << "\n";
+    std::ofstream testFile("expect_json.json", std::ios::out | std::ios::binary);
+    testFile << json;
+#else
+    std::string expected;
+    std::ifstream testFile("expect_json.json", std::ios::in | std::ios::binary);
+    CHECK(!testFile.fail());
+    std::getline(testFile,expected);
+    CHECK_EQUAL(true, json == expected);
+    if (json != expected) {
+        std::ofstream testFile("expect_json.error.json", std::ios::out | std::ios::binary);
         testFile << json;
+        std::cerr << "\n error result in expect_json.error.json\n";
     }
-    else {
-        std::string expected;
-        std::ifstream testFile("expect_json.json", std::ios::in | std::ios::binary);
-        CHECK(!testFile.fail());
-        std::getline(testFile,expected);
-        CHECK_EQUAL(true, json == expected);
-    }
+#endif
 }
 
 TEST(Table_test_json_simple)
