@@ -80,17 +80,17 @@ public:
 
     BasicTable(Allocator& alloc = Allocator::get_default()): Table(alloc) { set_dynamic_spec(); }
 
+    BasicTable(const BasicTable& t, Allocator& alloc = Allocator::get_default()): Table(t, alloc) {}
+
+    static Ref create(Allocator& = Allocator::get_default());
+
+    Ref copy(Allocator& = Allocator::get_default()) const;
+
     static int get_column_count() { return TypeCount<typename Spec::Columns>::value; }
 
-    BasicTableRef<BasicTable> get_table_ref()
-    {
-        return BasicTableRef<BasicTable>(this);
-    }
+    Ref get_table_ref() { return Ref(this); }
 
-    BasicTableRef<const BasicTable> get_table_ref() const
-    {
-        return BasicTableRef<const BasicTable>(this);
-    }
+    ConstRef get_table_ref() const { return ConstRef(this); }
 
 private:
     template<int col_idx> struct Col {
@@ -251,12 +251,12 @@ private:
     Table* get_impl() TIGHTDB_NOEXCEPT { return this; }
     const Table* get_impl() const TIGHTDB_NOEXCEPT { return this; }
 
-    template<class Subtab> Subtab* get_subtable_ptr(size_t col_idx, std::size_t row_idx)
+    template<class Subtab> Subtab* get_subtable_ptr(std::size_t col_idx, std::size_t row_idx)
     {
         return static_cast<Subtab*>(Table::get_subtable_ptr(col_idx, row_idx));
     }
 
-    template<class Subtab> const Subtab* get_subtable_ptr(size_t col_idx, std::size_t row_idx) const
+    template<class Subtab> const Subtab* get_subtable_ptr(std::size_t col_idx, std::size_t row_idx) const
     {
         return static_cast<const Subtab*>(Table::get_subtable_ptr(col_idx, row_idx));
     }
@@ -293,6 +293,7 @@ private:
     friend class BasicTableView<const BasicTable>;
 
     template<class, int> friend struct _impl::DiffColType;
+    template<class, int> friend struct _impl::InsertIntoCol;
     template<class, int, class, bool> friend class _impl::FieldAccessor;
     template<class, int, class> friend class _impl::MixedFieldAccessorBase;
     template<class, int, class> friend class _impl::ColumnAccessorBase;
@@ -534,9 +535,7 @@ namespace _impl
     template<class T, int col_idx> struct InsertIntoCol<SpecBase::Subtable<T>, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
-            t->insert_subtable(col_idx, row_idx);
-            TIGHTDB_ASSERT(!static_cast<const T*>(at<col_idx>(tuple))); // FIXME: Implement table copy when specified!
-            static_cast<void>(tuple);
+            static_cast<const T*>(at<col_idx>(tuple))->insert_into(t, col_idx, row_idx);
         }
     };
 
@@ -636,16 +635,34 @@ namespace _impl
 }
 
 
+template<class Spec>
+inline typename BasicTable<Spec>::Ref BasicTable<Spec>::create(Allocator& alloc)
+{
+    TableRef ref = Table::create(alloc);
+    static_cast<BasicTable&>(*ref)->set_dynamic_spec();
+    return unchecked_cast<BasicTable<Spec> >(move(ref));
+}
+
+
+template<class Spec>
+inline typename BasicTable<Spec>::Ref BasicTable<Spec>::copy(Allocator& alloc) const
+{
+    return unchecked_cast<BasicTable<Spec> >(Table::copy(alloc));
+}
+
+
 template<class T> inline bool is_a(const Table& t)
 {
     return T::matches_dynamic_spec(&t.get_spec());
 }
+
 
 template<class T> inline BasicTableRef<T> checked_cast(TableRef t)
 {
     if (!is_a<T>(*t)) return BasicTableRef<T>(); // Null
     return unchecked_cast<T>(t);
 }
+
 
 template<class T> inline BasicTableRef<const T> checked_cast(ConstTableRef t)
 {

@@ -44,8 +44,8 @@ public:
 
     virtual size_t Size() const TIGHTDB_NOEXCEPT = 0;
 
-    virtual void add() = 0;
-    virtual void insert(size_t ndx) = 0;
+    virtual void add() = 0; // Add an entry to this column using the columns default value
+    virtual void insert(size_t ndx) = 0; // Insert an entry into this column using the columns default value
     virtual void Clear() = 0;
     virtual void Delete(size_t ndx) = 0;
     void Resize(size_t ndx) {m_array->Resize(ndx);}
@@ -63,6 +63,8 @@ public:
     virtual void UpdateFromParent() {m_array->UpdateFromParent();}
 
     virtual void invalidate_subtables_virtual() {}
+
+    const Array* get_root_array() const TIGHTDB_NOEXCEPT { return m_array; }
 
 #ifdef TIGHTDB_DEBUG
     virtual void Verify() const = 0; // Must be upper case to avoid conflict with macro in ObjC
@@ -122,7 +124,7 @@ protected:
 #endif // TIGHTDB_DEBUG
 
     // Member variables
-    mutable Array* m_array; // FIXME: This should not be mutable
+    mutable Array* m_array; // FIXME: This should not be mutable, the problem is again the const-violating moving copy constructor
 };
 
 
@@ -187,7 +189,8 @@ public:
 
     // Query support methods
     void LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const;
-    const Array* GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval = false) const {
+    const Array* GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval = false) const
+    {
         return m_array->GetBlock(ndx, arr, off, use_retval);
     }
 
@@ -205,7 +208,7 @@ public:
     void sort();
 
     /// Compare two columns for equality.
-    bool Compare(const Column&) const;
+    bool compare(const Column&) const;
 
     // Debug
 #ifdef TIGHTDB_DEBUG
@@ -245,7 +248,7 @@ private:
 
 inline int64_t Column::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    return m_array->ColumnGet(ndx);
+    return m_array->column_get(ndx);
 }
 
 inline std::size_t Column::GetAsRef(std::size_t ndx) const TIGHTDB_NOEXCEPT

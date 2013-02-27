@@ -72,7 +72,7 @@ public:
     bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;
 
     /// Compare two string columns for equality.
-    bool Compare(const AdaptiveStringColumn&) const;
+    bool compare(const AdaptiveStringColumn&) const;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
@@ -114,7 +114,12 @@ private:
 inline const char* AdaptiveStringColumn::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < Size());
-    return m_array->ColumnStringGet(ndx);
+    return m_array->string_column_get(ndx);
+}
+
+inline void AdaptiveStringColumn::add(const char* value)
+{
+    Insert(Size(), value);
 }
 
 

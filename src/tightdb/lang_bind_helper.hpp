@@ -43,8 +43,12 @@ namespace tightdb {
 /// access to that table.
 class LangBindHelper {
 public:
-    /// Construct a freestanding table.
+    /// Construct a new freestanding table.
     static Table* new_table();
+
+    /// Construct a new freestanding table as a copy of the specified
+    /// one.
+    static Table* copy_table(const Table&);
 
     static Table* get_subtable_ptr(Table*, std::size_t column_ndx, std::size_t row_ndx);
     static const Table* get_subtable_ptr(const Table*, std::size_t column_ndx,
@@ -66,6 +70,20 @@ public:
 
     static void unbind_table_ref(const Table*);
     static void bind_table_ref(const Table*);
+
+    /// Calls parent.insert_subtable(col_ndx, row_ndx, &source). Note
+    /// that the source table must have a spec that is compatible with
+    /// the target subtable column.
+    static void insert_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
+                                const Table& source);
+
+    /// Calls parent.insert_mixed_subtable(col_ndx, row_ndx, &source).
+    static void insert_mixed_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
+                                      const Table& source);
+
+    /// Calls parent.set_mixed_subtable(col_ndx, row_ndx, &source).
+    static void set_mixed_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
+                                   const Table& source);
 };
 
 
@@ -74,7 +92,16 @@ public:
 inline Table* LangBindHelper::new_table()
 {
     Allocator& alloc = Allocator::get_default();
-    const std::size_t ref = Table::create_empty_table(alloc); // Throws
+    std::size_t ref = Table::create_empty_table(alloc); // Throws
+    Table* const table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
+    table->bind_ref();
+    return table;
+}
+
+inline Table* LangBindHelper::copy_table(const Table& t)
+{
+    Allocator& alloc = Allocator::get_default();
+    std::size_t ref = t.clone(alloc); // Throws
     Table* const table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
     table->bind_ref();
     return table;
@@ -143,6 +170,24 @@ inline void LangBindHelper::unbind_table_ref(const Table* t)
 inline void LangBindHelper::bind_table_ref(const Table* t)
 {
    t->bind_ref();
+}
+
+inline void LangBindHelper::insert_subtable(Table& parent, std::size_t col_ndx,
+                                            std::size_t row_ndx, const Table& source)
+{
+    parent.insert_subtable(col_ndx, row_ndx, &source);
+}
+
+inline void LangBindHelper::insert_mixed_subtable(Table& parent, std::size_t col_ndx,
+                                                  std::size_t row_ndx, const Table& source)
+{
+    parent.insert_mixed_subtable(col_ndx, row_ndx, &source);
+}
+
+inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_ndx,
+                                               std::size_t row_ndx, const Table& source)
+{
+    parent.set_mixed_subtable(col_ndx, row_ndx, &source);
 }
 
 

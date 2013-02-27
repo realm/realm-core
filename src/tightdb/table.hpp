@@ -20,6 +20,8 @@
 #ifndef TIGHTDB_TABLE_HPP
 #define TIGHTDB_TABLE_HPP
 
+#include <utility>
+
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/table_ref.hpp>
 #include <tightdb/spec.hpp>
@@ -61,26 +63,41 @@ class StringIndex;
 /// mixed column to group level). This could be done in a very
 /// efficient manner.
 ///
-/// FIXME: When compiling in debug mode, all table methods should
-/// should TIGHTDB_ASSERT(is_valid()).
+/// FIXME: When compiling in debug mode, all public table methods
+/// should should TIGHTDB_ASSERT(is_valid()).
 class Table {
 public:
     /// Construct a new freestanding top-level table with static
     /// lifetime.
     ///
-    /// This constructor should be used only when placing table
-    /// variables on the stack, and it is then the responsibility of
+    /// This constructor should be used only when placing a table
+    /// instance on the stack, and it is then the responsibility of
     /// the application that there are no objects of type TableRef or
     /// ConstTableRef that refer to it, or to any of its subtables,
     /// when it goes out of scope. To create a top-level table with
     /// dynamic lifetime, use Table::create() instead.
-    Table(Allocator& alloc = Allocator::get_default());
+    Table(Allocator& = Allocator::get_default());
+
+    /// Construct a copy of the specified table as a new freestanding
+    /// top-level table with static lifetime.
+    ///
+    /// This constructor should be used only when placing a table
+    /// instance on the stack, and it is then the responsibility of
+    /// the application that there are no objects of type TableRef or
+    /// ConstTableRef that refer to it, or to any of its subtables,
+    /// when it goes out of scope. To create a top-level table with
+    /// dynamic lifetime, use Table::copy() instead.
+    Table(const Table&, Allocator& = Allocator::get_default());
 
     ~Table();
 
     /// Construct a new freestanding top-level table with dynamic
     /// lifetime.
-    static TableRef create(Allocator& alloc = Allocator::get_default());
+    static TableRef create(Allocator& = Allocator::get_default());
+
+    /// Construct a copy of the specified table as a new freestanding
+    /// top-level table with dynamic lifetime.
+    TableRef copy(Allocator& = Allocator::get_default()) const;
 
     /// An invalid table must not be accessed in any way except by
     /// calling is_valid(). A table that is obtained from a Group
@@ -162,11 +179,11 @@ public:
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     bool        get_bool(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     time_t      get_date(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    float       get_float(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
-    double      get_double(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
+    float       get_float(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    double      get_double(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     const char* get_string(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     size_t      get_string_length(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
+    BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
@@ -374,22 +391,37 @@ protected:
     ///
     /// The returned table pointer must always end up being wrapped in
     /// a TableRef.
-    Table *get_subtable_ptr(size_t col_idx, size_t row_idx);
+    Table* get_subtable_ptr(size_t col_idx, size_t row_idx);
 
     /// Get the subtable at the specified column and row index.
     ///
     /// The returned table pointer must always end up being wrapped in
     /// a ConstTableRef.
-    const Table *get_subtable_ptr(size_t col_idx, size_t row_idx) const;
+    const Table* get_subtable_ptr(size_t col_idx, size_t row_idx) const;
 
     /// Compare the rows of two tables under the assumption that the
     /// two tables have the same spec, and therefore the same sequence
     /// of columns.
     bool compare_rows(const Table&) const;
 
+    /// Assumes that the specified column is a subtable column (in
+    /// particular, not a mixed column) and that the specified table
+    /// has a spec that is compatible with that column, that is, the
+    /// number of columns must be the same, and corresponding columns
+    /// must have identical data types (as returned by
+    /// get_column_type()).
+    void insert_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
+
+    void insert_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
+
+    void set_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
+
+    void insert_into(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
+
+    void set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
+
 private:
-    Table(Table const &); // Disable copy construction
-    Table &operator=(Table const &); // Disable copying assignment
+    Table& operator=(const Table&); // Disable copying assignment
 
     /// Put this table wrapper into the invalid state, which detaches
     /// it from the underlying structure of arrays. Also do this
@@ -415,13 +447,29 @@ private:
 
     struct UnbindGuard;
 
+    const Array* get_column_root(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
+    std::pair<const Array*, const Array*> get_string_column_roots(std::size_t col_ndx) const
+        TIGHTDB_NOEXCEPT;
+
     ColumnBase& GetColumnBase(size_t column_ndx);
     void InstantiateBeforeChange();
     void validate_column_type(const ColumnBase& column, ColumnType expected_type, size_t ndx) const;
 
     /// Construct an empty table with independent spec and return just
     /// the reference to the underlying memory.
-    static size_t create_empty_table(Allocator&);
+    static std::size_t create_empty_table(Allocator&);
+
+    /// Construct a copy of the columns array of this table using the
+    /// specified allocator and return just the ref to that array.
+    ///
+    /// In the clone, no string column will be of the enumeration
+    /// type.
+    std::size_t clone_columns(Allocator&) const;
+
+    /// Construct a complete copy of this table (including its spec)
+    /// using the specified allocator and return just the ref to that
+    /// array.
+    std::size_t clone(Allocator&) const;
 
     // Experimental
     TableView find_all_hamming(size_t column_ndx, uint64_t value, size_t max);
@@ -537,7 +585,7 @@ private:
     Table* m_table;
 };
 
-inline size_t Table::create_empty_table(Allocator& alloc)
+inline std::size_t Table::create_empty_table(Allocator& alloc)
 {
     Array top(coldef_HasRefs, 0, 0, alloc);
     top.add(Spec::create_empty_spec(alloc));
@@ -548,7 +596,14 @@ inline size_t Table::create_empty_table(Allocator& alloc)
 inline Table::Table(Allocator& alloc):
     m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1), m_lookup_index(NULL)
 {
-    const size_t ref = create_empty_table(alloc); // Throws
+    size_t ref = create_empty_table(alloc); // Throws
+    init_from_ref(ref, 0, 0);
+}
+
+inline Table::Table(const Table& t, Allocator& alloc):
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1), m_lookup_index(NULL)
+{
+    size_t ref = t.clone(alloc); // Throws
     init_from_ref(ref, 0, 0);
 }
 
@@ -568,7 +623,14 @@ inline Table::Table(RefCountTag, Allocator& alloc, size_t spec_ref, size_t colum
 
 inline TableRef Table::create(Allocator& alloc)
 {
-    const size_t ref = Table::create_empty_table(alloc); // Throws
+    std::size_t ref = create_empty_table(alloc); // Throws
+    Table* const table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
+    return table->get_table_ref();
+}
+
+inline TableRef Table::copy(Allocator& alloc) const
+{
+    std::size_t ref = clone(alloc); // Throws
     Table* const table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
     return table->get_table_ref();
 }
@@ -587,6 +649,11 @@ inline void Table::insert_date(size_t column_ndx, size_t row_ndx, time_t value)
 template<class E> inline void Table::insert_enum(size_t column_ndx, size_t row_ndx, E value)
 {
     insert_int(column_ndx, row_ndx, value);
+}
+
+inline void Table::insert_subtable(size_t col_ndx, size_t row_ndx)
+{
+    insert_subtable(col_ndx, row_ndx, 0); // Null stands for an empty table
 }
 
 template<class E> inline void Table::set_enum(size_t column_ndx, size_t row_ndx, E value)
@@ -612,6 +679,16 @@ inline bool Table::operator==(const Table& t) const
 inline bool Table::operator!=(const Table& t) const
 {
     return m_spec_set != t.m_spec_set || !compare_rows(t);
+}
+
+inline void Table::insert_into(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const
+{
+    parent->insert_subtable(col_ndx, row_ndx, this);
+}
+
+inline void Table::set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const
+{
+    parent->insert_mixed_subtable(col_ndx, row_ndx, this);
 }
 
 

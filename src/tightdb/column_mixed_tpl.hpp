@@ -149,9 +149,8 @@ inline const char* ColumnMixed::get_string(size_t ndx) const
     TIGHTDB_ASSERT(m_types->Get(ndx) == mixcol_String);
     TIGHTDB_ASSERT(m_data);
 
-    const size_t ref = m_refs->GetAsRef(ndx) >> 1;
-    const char* value = static_cast<const char*>(m_data->GetData(ref));
-    return value;
+    const size_t offset = m_refs->GetAsRef(ndx) >> 1;
+    return m_data->get_data(offset);
 }
 
 inline BinaryData ColumnMixed::get_binary(size_t ndx) const
@@ -160,8 +159,8 @@ inline BinaryData ColumnMixed::get_binary(size_t ndx) const
     TIGHTDB_ASSERT(m_types->Get(ndx) == mixcol_Binary);
     TIGHTDB_ASSERT(m_data);
 
-    const size_t ref = m_refs->GetAsRef(ndx) >> 1;
-    return m_data->Get(ref);
+    const size_t offset = m_refs->GetAsRef(ndx) >> 1;
+    return m_data->Get(offset);
 }
 
 //
@@ -226,10 +225,16 @@ inline void ColumnMixed::set_date(size_t ndx, time_t value)
     set_value(ndx, static_cast<const int64_t>(value), mixcol_Date);
 }
 
-inline void ColumnMixed::set_subtable(std::size_t ndx)
+inline void ColumnMixed::set_subtable(std::size_t ndx, const Table* t)
 {
     TIGHTDB_ASSERT(ndx < m_types->Size());
-    const std::size_t ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
+    std::size_t ref;
+    if (t) {
+        ref = t->clone(m_array->GetAllocator()); // Throws
+    }
+    else {
+        ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
+    }
     clear_value(ndx, mixcol_Table); // Remove any previous refs or binary data
     m_refs->Set(ndx, ref);
 }
@@ -333,10 +338,16 @@ inline void ColumnMixed::insert_binary(size_t ndx, const char* value, size_t len
     m_refs->Insert(ndx, v);
 }
 
-inline void ColumnMixed::insert_subtable(std::size_t ndx)
+inline void ColumnMixed::insert_subtable(std::size_t ndx, const Table* t)
 {
     TIGHTDB_ASSERT(ndx <= m_types->Size());
-    const std::size_t ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
+    std::size_t ref;
+    if (t) {
+        ref = t->clone(m_array->GetAllocator()); // Throws
+    }
+    else {
+        ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
+    }
     m_types->Insert(ndx, mixcol_Table);
     m_refs->Insert(ndx, ref);
 }

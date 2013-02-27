@@ -68,14 +68,14 @@
 #endif
 
 #if defined(TIGHTDB_PTR_64) && defined(TIGHTDB_X86_OR_X64)
-    #define TIGHTDB_COMPILER_SSE  // Compiler supports SSE 4.2 thorugh __builtin_ accessors or back-end assembler
+    #define TIGHTDB_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
 #endif
 
 namespace tightdb {
 
 extern signed char sse_support;
 
-template <int version>TIGHTDB_FORCEINLINE bool cpuid_sse()
+template<int version> TIGHTDB_FORCEINLINE bool cpuid_sse()
 {
 /*
     Return wether or not SSE 3.0 (if version = 30) or 4.2 (for version = 42) is supported. Return value
