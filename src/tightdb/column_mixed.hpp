@@ -20,6 +20,8 @@
 #ifndef TIGHTDB_COLUMN_MIXED_HPP
 #define TIGHTDB_COLUMN_MIXED_HPP
 
+#include <limits>
+
 #include <tightdb/column.hpp>
 #include <tightdb/column_type.hpp>
 #include <tightdb/column_table.hpp>
@@ -27,7 +29,6 @@
 #include <tightdb/table.hpp>
 #include <tightdb/index.hpp>
 #include <tightdb/utilities.hpp>
-#include <limits>
 
 
 namespace tightdb {
