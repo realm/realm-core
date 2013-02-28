@@ -2005,6 +2005,27 @@ TEST(Table_Aggregates)
     CHECK_EQUAL(double(d_sum)/size, table.column().c_double.average());
 }
 
+namespace {
+TIGHTDB_TABLE_1(TableAgg2,
+                c_count, Int)
+}
+
+
+TEST(Table_Aggregates2)
+{
+    TableAgg2 table;
+    int c = -420;
+    int s = 0;
+    while (c < -20) {
+        table.add(c);
+        s += c;
+        c++;
+    }
+
+    CHECK_EQUAL(-420, table.column().c_count.minimum());
+    CHECK_EQUAL(-21, table.column().c_count.maximum());
+    CHECK_EQUAL(s, table.column().c_count.sum());
+}
 
 TEST(Table_LanguageBindings)
 {
