@@ -109,7 +109,7 @@ public:
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
     // Has db been modified since last transaction?
-    bool has_changed() const;
+    bool has_changed() const TIGHTDB_NOEXCEPT;
 
     // Read transactions
     const Group& begin_read();

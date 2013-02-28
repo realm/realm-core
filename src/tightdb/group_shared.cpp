@@ -246,7 +246,7 @@ SharedGroup::~SharedGroup()
     remove(m_file_path.c_str());
 }
 
-bool SharedGroup::has_changed() const
+bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 {
     // Have we changed since last transaction?
     // Visibility of changes can be delayed when using has_changed() because m_info->current_version is tested
@@ -255,7 +255,7 @@ bool SharedGroup::has_changed() const
     // system bus and make cache controllers invalidate caches of reader). Some excotic architectures may need
     // explicit synchronization which isn't implemented yet.
     TIGHTDB_SYNC_IF_NO_CACHE_COHERENCE
-    SharedInfo* const info = m_file_map.get_addr();
+    const SharedInfo* const info = m_file_map.get_addr();
     const bool is_changed = (m_version != info->current_version);
     return is_changed;
 }
