@@ -149,11 +149,11 @@ void ColumnMixed::Clear()
 DataType ColumnMixed::get_type(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_types->Size());
-    MixedColType coltype = static_cast<MixedColType>(m_types->Get(ndx));
+    MixedColType coltype = MixedColType(m_types->Get(ndx));
     switch (coltype) {
         case mixcol_IntNeg:    return type_Int;
         case mixcol_DoubleNeg: return type_Double;
-        default: return static_cast<DataType>(coltype);   // all others must be in sync with ColumnType
+        default: return DataType(coltype);   // all others must be in sync with ColumnType
     }
 }
 

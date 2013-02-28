@@ -128,10 +128,12 @@ CATEGORIES:
   METHODS:
   - g_group_size:
       NAMES    : size
-      DESCR    : >
+      DESCR    : &g_group_table_count_descr
+                 >
                  A group can be a container for many tables, and this method counts
                  the number of tables currently stored in the group.
-      SUMMARY  : The number of tables in the group.
+      SUMMARY  : &g_group_table_count_summary
+                 The number of tables in the group.
       CONST    : true
       RETURN:
         TYPES  : size_t
@@ -216,8 +218,10 @@ CATEGORIES:
         CODE   : ex_cpp_group_optional_table
   - g_group_get_table_name:
       NAMES    : get_table_name
-      DESCR    : This method will find the name of a table stored in the group.
-      SUMMARY  : Get the name of a table.
+      DESCR    : &g_group_get_table_name_descr
+                 This method will find the name of a table stored in the group.
+      SUMMARY  : &g_group_get_table_name_summary
+                 Get the name of a table.
       CONST    : true
       PARAMS:
       - NAME   : table_ndx

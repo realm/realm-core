@@ -74,7 +74,7 @@ if [ "$OS" = "Darwin" ]; then
     LIB_SUFFIX_SHARED=".dylib"
     LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
 fi
-if ! printf "%s\n" "$MODE" | grep -q '^dist'; then
+if ! printf "%s\n" "$MODE" | grep -q '^\(src-\|bin-\)\?dist'; then
     NUM_PROCESSORS=""
     if [ "$OS" = "Darwin" ]; then
         NUM_PROCESSORS="$(sysctl -n hw.ncpu)" || exit 1
@@ -212,8 +212,8 @@ case "$MODE" in
         exit 0
         ;;
 
-    "dist"|"src-dist")
-        if [ "$MODE" = "dist" ]; then
+    "src-dist"|"bin-dist")
+        if [ "$MODE" = "bin-dist" ]; then
             PREBUILT_CORE="1"
         fi
 
@@ -399,9 +399,15 @@ case "$MODE" in
         mkdir "$INSTALL_ROOT" || exit 1
         mkdir "$INSTALL_ROOT/include" "$INSTALL_ROOT/lib" "$INSTALL_ROOT/lib64" "$INSTALL_ROOT/bin" || exit 1
 
-#        path_list_prepend CPATH                   "$TIGHTDB_HOME/src"         || exit 1
-#        path_list_prepend LIBRARY_PATH            "$TIGHTDB_HOME/src/tightdb" || exit 1
-#        path_list_prepend PATH                    "$TIGHTDB_HOME/src/tightdb" || exit 1
+        # These three were added because when building for iOS on
+        # Darwin, the binary targets are not installed.
+        path_list_prepend LIBRARY_PATH            "$TIGHTDB_HOME/src/tightdb" || exit 1
+        path_list_prepend PATH                    "$TIGHTDB_HOME/src/tightdb" || exit 1
+        # FIXME: The problem with these is that they partially destroy
+        # the value of the build test. We should instead transfer the
+        # iOS target files to a special temporary proforma directory,
+        # and add that diretory to LIBRARY_PATH and PATH above.
+
         path_list_prepend CPATH                   "$INSTALL_ROOT/include"     || exit 1
         path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib"         || exit 1
         path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib64"       || exit 1
@@ -409,7 +415,6 @@ case "$MODE" in
         path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib64"       || exit 1
         path_list_prepend PATH                    "$INSTALL_ROOT/bin"         || exit 1
         export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME" PATH
-
 
         if (
                 BIN_CORE_ARG=""
@@ -907,7 +912,7 @@ EOF
     *)
         echo "Unspecified or bad mode '$MODE'" 1>&2
         echo "Available modes are: clean build test install test-installed" 1>&2
-        echo "As well as: dist src-dist dist-clean dist-build dist-install dist-test-installed dist-status dist-pull dist-checkout dist-copy" 1>&2
+        echo "As well as: src-dist bin-dist dist-clean dist-build dist-install dist-test-installed dist-status dist-pull dist-checkout dist-copy" 1>&2
         exit 1
         ;;
 
