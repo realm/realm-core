@@ -455,9 +455,9 @@ TEST(Table_test_to_string)
     const string result = ss.str();
 
 #if _MSC_VER
-    string filename = "expect_string-win.txt";
+    const char* filename = "expect_string-win.txt";
 #else
-    string filename = "expect_string.txt";
+    const char* filename = "expect_string.txt";
 #endif
 #if GENERATE   // enable to generate testfile - check it manually
     ofstream testFile(filename, ios::out | ios::binary);
@@ -486,9 +486,9 @@ TEST(Table_test_json_all_data)
     table.to_json(ss);
     const string json = ss.str();
 #if _MSC_VER
-    string filename = "expect_json-win.json";
+    const char* filename = "expect_json-win.json";
 #else
-    string filename = "expect_json.json";
+    const char* filename = "expect_json.json";
 #endif
 #if GENERATE
         // Generate the testdata to compare. After doing this,
