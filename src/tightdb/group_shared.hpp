@@ -109,7 +109,7 @@ public:
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
     // Has db been modified since last transaction?
-    bool has_changed() const;
+    bool has_changed() const TIGHTDB_NOEXCEPT;
 
     // Read transactions
     const Group& begin_read();
@@ -156,6 +156,7 @@ private:
     size_t                m_version;
     File                  m_file;
     File::Map<SharedInfo> m_file_map;
+    File::Map<SharedInfo> m_reader_map;
     std::string           m_file_path;
 
 #ifdef TIGHTDB_DEBUG
@@ -175,16 +176,17 @@ private:
     struct ReadCount;
 
     // Ring buffer managment
-    bool       ringbuf_is_empty() const;
-    size_t     ringbuf_size() const;
-    size_t     ringbuf_capacity() const;
-    bool       ringbuf_is_first(size_t ndx) const;
+    bool       ringbuf_is_empty() const TIGHTDB_NOEXCEPT;
+    size_t     ringbuf_size() const TIGHTDB_NOEXCEPT;
+    size_t     ringbuf_capacity() const TIGHTDB_NOEXCEPT;
+    bool       ringbuf_is_first(size_t ndx) const TIGHTDB_NOEXCEPT;
+    void       ringbuf_remove_first() TIGHTDB_NOEXCEPT;
+    size_t     ringbuf_find(uint32_t version) const TIGHTDB_NOEXCEPT;
+    ReadCount& ringbuf_get(size_t ndx) TIGHTDB_NOEXCEPT;
+    ReadCount& ringbuf_get_first() TIGHTDB_NOEXCEPT;
+    ReadCount& ringbuf_get_last() TIGHTDB_NOEXCEPT;
     void       ringbuf_put(const ReadCount& v);
-    void       ringbuf_remove_first();
-    size_t     ringbuf_find(uint32_t version) const;
-    ReadCount& ringbuf_get(size_t ndx);
-    ReadCount& ringbuf_get_first();
-    ReadCount& ringbuf_get_last();
+    void       ringbuf_expand();
 
     friend class ReadTransaction;
     friend class WriteTransaction;
