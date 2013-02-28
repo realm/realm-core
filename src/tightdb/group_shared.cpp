@@ -20,7 +20,6 @@
 using namespace std;
 using namespace tightdb;
 
-
 struct SharedGroup::ReadCount {
     uint32_t version;
     uint32_t count;
@@ -44,6 +43,8 @@ struct SharedGroup::SharedInfo {
     ReadCount readers[32]; // has to be power of two
 };
 
+namespace {
+
 class ScopedMutexLock {
 public:
     ScopedMutexLock(pthread_mutex_t* mutex) TIGHTDB_NOEXCEPT : m_mutex(mutex)
@@ -58,14 +59,11 @@ public:
         static_cast<void>(r);
     }
 
-    void update(pthread_mutex_t* mutex) TIGHTDB_NOEXCEPT
-    {
-        m_mutex = mutex; // Update mutex pointer after remap
-    }
-
 private:
     pthread_mutex_t* m_mutex;
 };
+
+} // anonymous namespace
 
 
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
@@ -271,13 +269,11 @@ const Group& SharedGroup::begin_read()
     size_t new_filesize = 0;
 
     {
-        SharedInfo* info = m_file_map.get_addr();
+        SharedInfo* const info = m_file_map.get_addr();
         ScopedMutexLock lock(&info->readmutex);
 
-        if (TIGHTDB_UNLIKELY(info->infosize > m_file_map.get_size())) {
-            m_file_map.remap(m_file, File::access_ReadWrite, info->infosize);
-            info = m_file_map.get_addr();
-            lock.update(&info->readmutex);
+        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size())) {
+            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
         }
 
         // Get the current top ref
@@ -390,7 +386,7 @@ void SharedGroup::commit()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
-    SharedInfo* info = m_file_map.get_addr();
+    SharedInfo* const info = m_file_map.get_addr();
 
     // Get version info
     size_t current_version;
@@ -398,10 +394,8 @@ void SharedGroup::commit()
     {
         ScopedMutexLock lock(&info->readmutex);
 
-        if (TIGHTDB_UNLIKELY(info->infosize > m_file_map.get_size())) {
-            m_file_map.remap(m_file, File::access_ReadWrite, info->infosize);
-            info = m_file_map.get_addr();
-            lock.update(&info->readmutex);
+        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size())) {
+            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
         }
 
         current_version = info->current_version + 1;
