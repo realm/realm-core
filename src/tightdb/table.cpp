@@ -1131,8 +1131,7 @@ void Table::set_float(size_t column_ndx, size_t ndx, float value)
     column.Set(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().set_value(column_ndx, ndx, value);
-    if (err) throw_error(err);
+    transact_log().set_value(column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1145,8 +1144,7 @@ void Table::insert_float(size_t column_ndx, size_t ndx, float value)
     column.Insert(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().insert_value(column_ndx, ndx, value);
-    if (err) throw_error(err);
+    transact_log().insert_value(column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1169,8 +1167,7 @@ void Table::set_double(size_t column_ndx, size_t ndx, double value)
     column.Set(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().set_value(column_ndx, ndx, value);
-    if (err) throw_error(err);
+    transact_log().set_value(column_ndx, ndx, value); // Throws
 #endif
 }
 
@@ -1183,8 +1180,7 @@ void Table::insert_double(size_t column_ndx, size_t ndx, double value)
     column.Insert(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    error_code err = get_local_transact_log().insert_value(column_ndx, ndx, value);
-    if (err) throw_error(err);
+    transact_log().insert_value(column_ndx, ndx, value); // Throws
 #endif
 }
 
