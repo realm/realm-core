@@ -84,8 +84,8 @@ inline int64_t ColumnMixed::get_value(size_t ndx) const
 
     // Shift the unsigned value right - ensuring 0 gets in from left.
     // Shifting signed integers right doesn't ensure 0's.
-    const uint64_t value = static_cast<uint64_t>(m_refs->Get(ndx)) >> 1;
-    return static_cast<int64_t>(value);
+    const uint64_t value = uint64_t(m_refs->Get(ndx)) >> 1;
+    return int64_t(value);
 }
 
 inline int64_t ColumnMixed::get_int(size_t ndx) const
@@ -94,7 +94,7 @@ inline int64_t ColumnMixed::get_int(size_t ndx) const
     int64_t value = get_value(ndx);
 
     // restore 'sign'-bit from the column-type
-    const MixedColType coltype = static_cast<MixedColType>(m_types->Get(ndx));
+    const MixedColType coltype = MixedColType(m_types->Get(ndx));
     if (coltype == mixcol_IntNeg)
         value |= TIGHTDB_BIT63; // set sign bit (63)
     else {
@@ -114,7 +114,7 @@ inline time_t ColumnMixed::get_date(size_t ndx) const
 {
     TIGHTDB_ASSERT(m_types->Get(ndx) == mixcol_Date);
 
-    return static_cast<time_t>(get_value(ndx));
+    return time_t(get_value(ndx));
 }
 
 inline float ColumnMixed::get_float(size_t ndx) const
@@ -134,7 +134,7 @@ inline double ColumnMixed::get_double(size_t ndx) const
     int64_t intval = get_value(ndx);
 
     // restore 'sign'-bit from the column-type
-    const MixedColType coltype = static_cast<MixedColType>(m_types->Get(ndx));
+    const MixedColType coltype = MixedColType(m_types->Get(ndx));
     if (coltype == mixcol_DoubleNeg)
         intval |= TIGHTDB_BIT63; // set sign bit (63)
     else {
@@ -210,9 +210,8 @@ inline void ColumnMixed::set_value(size_t ndx, int64_t value, MixedColType colty
 
 inline void ColumnMixed::set_float(size_t ndx, float value)
 {
-    const void* vptr = reinterpret_cast<const void*>(&value);
-    const int32_t val32 = * reinterpret_cast<const int32_t*>(vptr);
-    set_value(ndx, static_cast<const int64_t>(val32), mixcol_Float);
+    const int64_t val64 = TypePunning<int64_t>( value );
+    set_value(ndx, val64, mixcol_Float);
 }
 
 inline void ColumnMixed::set_bool(size_t ndx, bool value)
@@ -222,7 +221,7 @@ inline void ColumnMixed::set_bool(size_t ndx, bool value)
 
 inline void ColumnMixed::set_date(size_t ndx, time_t value)
 {
-    set_value(ndx, static_cast<const int64_t>(value), mixcol_Date);
+    set_value(ndx, int64_t(value), mixcol_Date);
 }
 
 inline void ColumnMixed::set_subtable(std::size_t ndx, const Table* t)
@@ -280,7 +279,7 @@ inline void ColumnMixed::insert_float(size_t ndx, float value)
     const int32_t val32 = TypePunning<int32_t>( value );
 
     // Shift value one bit and set lowest bit to indicate that this is not a ref
-    const int64_t val64 = (static_cast<int64_t>(val32) << 1) + 1;
+    const int64_t val64 = (int64_t(val32) << 1) + 1;
     m_refs->Insert(ndx, val64);
     m_types->Insert(ndx, mixcol_Float);
 }
