@@ -48,13 +48,24 @@ pthread_mutex_lock (pthread_mutex_t * mutex)
   int result = 0;
 
   if (mutex->is_shared) {
-    DWORD r;
-    HANDLE h = OpenMutexA(MUTEX_ALL_ACCESS, 1, mutex->shared_name);
+    DWORD d;
+    HANDLE h;
+    int pid = getpid();
+
+    if(mutex->cached_pid != pid)
+        h = OpenMutexA(MUTEX_ALL_ACCESS, 1, mutex->shared_name);
+    else
+        h = mutex->cached_handle;
+
     if(h == NULL)
         return EINVAL;
 
-    r = WaitForSingleObject(h, INFINITE);
-    if(r == (DWORD)0xFFFFFFFF)
+    d = WaitForSingleObject(h, INFINITE);
+
+    if(mutex->cached_pid != pid)
+        CloseHandle(h);    
+
+    if(d == (DWORD)0xFFFFFFFF)
         return EDEADLK;  // Highest probability why WaitForSingleObject would fail on valid mutex
 
     return 0;

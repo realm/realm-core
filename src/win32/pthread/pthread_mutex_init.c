@@ -37,6 +37,7 @@
 #include "pthread.h"
 #include "implement.h"
 #include <Objbase.h>
+#include <assert.h>
 
 int
 pthread_mutex_init (pthread_mutex_t * mutex, const pthread_mutexattr_t * attr)
@@ -55,6 +56,8 @@ pthread_mutex_init (pthread_mutex_t * mutex, const pthread_mutexattr_t * attr)
         {
            GUID guid;
            HANDLE h;  
+           DWORD wpid;
+
             /*
            * Creating mutex that can be shared between
            * processes.
@@ -78,7 +81,11 @@ pthread_mutex_init (pthread_mutex_t * mutex, const pthread_mutexattr_t * attr)
 
           h = CreateMutexA(NULL, 0, mutex->shared_name);
           if(h == NULL)
-              return EAGAIN; // todo, not correct error code
+              return EAGAIN;
+
+          mutex->cached_handle = h;
+          mutex->cached_pid = getpid();
+          mutex->cached_windows_pid = GetCurrentProcessId();
 
           return 0;
 

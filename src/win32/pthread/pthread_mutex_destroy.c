@@ -46,16 +46,32 @@ pthread_mutex_destroy (pthread_mutex_t * mutex)
 
   if(mutex->is_shared)
   {
-      int b;
-      HANDLE h = OpenMutexA(MUTEX_ALL_ACCESS, 1, mutex->shared_name);
-      if(h == NULL)
-          return 1;
+    BOOL d;
+    HANDLE h;
+    int pid = getpid();
 
-      b = ReleaseMutex(h);
-      if(b == 0)
-          return 1;
+    if(mutex->cached_pid != pid)
+    {
+        // Mutex destroyed by other process than process who called init. So duplicate handle and destroy mutex through that
+        BOOL d2;
+        HANDLE owner;
 
-      return 0;
+        // Get handle to process that called init
+        owner = OpenProcess(PROCESS_ALL_ACCESS, 0, mutex->cached_windows_pid); 
+        d2 = DuplicateHandle(owner, mutex->cached_handle, GetCurrentProcess(), &mutex->cached_handle, 0, FALSE, DUPLICATE_CLOSE_SOURCE); // Get handle to mutex, close owner's handle
+        CloseHandle(owner); 
+
+        if(d2 == 0)
+            return 1;
+    }
+
+    // Close handle to mutex. Mutex should now be automatically destroyed by Windows because it has no open handles
+    d = CloseHandle(mutex->cached_handle); 
+
+    if(d == 0)
+      return 1;
+
+    return 0;
   }
 
   /*

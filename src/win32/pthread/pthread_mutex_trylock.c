@@ -48,11 +48,22 @@ pthread_mutex_trylock (pthread_mutex_t * mutex)
   if(mutex->is_shared) 
   {
     DWORD d;
-    HANDLE h = OpenMutexA(MUTEX_ALL_ACCESS, 1, mutex->shared_name);
+    HANDLE h;
+    int pid = getpid();
+
+    if(mutex->cached_pid != pid)
+        h = OpenMutexA(MUTEX_ALL_ACCESS, 1, mutex->shared_name);
+    else
+        h = mutex->cached_handle;
+
     if(h == NULL)
         return EINVAL;
 
     d = WaitForSingleObject(h, 0);
+
+    if(mutex->cached_pid != pid)
+        CloseHandle(h);
+
     if(d == WAIT_OBJECT_0)
       return 0;
     else 

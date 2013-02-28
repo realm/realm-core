@@ -591,6 +591,12 @@ typedef struct pthread_key_t_ * pthread_key_t;
 
 typedef struct  { 
     struct pthread_mutex_t_ * original;
+
+    // Handle to Windows mutex and process information of caller to init who owns that handle
+    HANDLE cached_handle;
+    int cached_pid;
+    DWORD cached_windows_pid;
+
     int is_shared;
     char shared_name[33 + 1];
 } pthread_mutex_t;

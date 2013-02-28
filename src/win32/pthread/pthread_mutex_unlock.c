@@ -52,16 +52,27 @@ pthread_mutex_unlock (pthread_mutex_t * mutex)
   mx = *mutex;
 
   if(mx.is_shared) {  
-      int b;
-      HANDLE h = OpenMutexA(MUTEX_ALL_ACCESS, 1, mutex->shared_name);
-      if(h == NULL)
+    BOOL d;
+    HANDLE h;
+    int pid = getpid();
+
+    if(mutex->cached_pid != pid)
+        h = OpenMutexA(MUTEX_ALL_ACCESS, 1, mutex->shared_name);
+    else
+        h = mutex->cached_handle;
+
+    if(h == NULL)
         return EINVAL;
 
-    b = ReleaseMutex(h);
-    if(b == 0)
-        return 0;
-    else
-        return EPERM; // Best probability why ReleaseMutex would fail on valid mutex
+    d = ReleaseMutex(h);
+
+    if(mutex->cached_pid != pid)
+        CloseHandle(h);  
+
+    if(d == 0)
+        return EPERM;   // Best probability why ReleaseMutex would fail on valid mutex
+
+    return 0;
   }
 
   /*
