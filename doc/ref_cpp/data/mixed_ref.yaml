@@ -78,7 +78,7 @@ CATEGORIES:
                  int64_t     get_int()    const;
                  std::time_t get_date()   const;
                  float       get_float()  const;
-                 doubl       get_double() const;                 
+                 double      get_double() const;                 
                  const char* get_string() const;
                  BinaryData  get_binary() const;
       CONST    : True
