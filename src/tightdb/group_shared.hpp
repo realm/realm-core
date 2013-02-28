@@ -156,6 +156,7 @@ private:
     size_t                m_version;
     File                  m_file;
     File::Map<SharedInfo> m_file_map;
+    File::Map<SharedInfo> m_reader_map;
     std::string           m_file_path;
 
 #ifdef TIGHTDB_DEBUG

@@ -202,6 +202,12 @@ retry:
             m_group.create_from_file(file, Group::mode_NoCreate, false);
         }
 
+        // We need to map the info file once more for the readers part
+        // since that part can be resized and as such remapped which
+        // could move our mutexes (which we don't want to risk moving while
+        // they are locked)
+        m_reader_map.map(m_file, File::access_ReadWrite, File::map_NoSync);
+
         fug.release(); // Do not unmap
         fcg.release(); // Do not close
     }
@@ -482,50 +488,50 @@ bool SharedGroup::ringbuf_is_empty() const TIGHTDB_NOEXCEPT
 
 size_t SharedGroup::ringbuf_size() const TIGHTDB_NOEXCEPT
 {
-    SharedInfo* const info = m_file_map.get_addr();
+    SharedInfo* const info = m_reader_map.get_addr();
     return ((info->put_pos - info->get_pos) & info->capacity);
 }
 
 size_t SharedGroup::ringbuf_capacity() const TIGHTDB_NOEXCEPT
 {
-    SharedInfo* const info = m_file_map.get_addr();
+    SharedInfo* const info = m_reader_map.get_addr();
     return info->capacity+1;
 }
 
 bool SharedGroup::ringbuf_is_first(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    SharedInfo* const info = m_file_map.get_addr();
+    SharedInfo* const info = m_reader_map.get_addr();
     return (ndx == info->get_pos);
 }
 
 SharedGroup::ReadCount& SharedGroup::ringbuf_get(size_t ndx) TIGHTDB_NOEXCEPT
 {
-    SharedInfo* const info = m_file_map.get_addr();
+    SharedInfo* const info = m_reader_map.get_addr();
     return info->readers[ndx];
 }
 
 SharedGroup::ReadCount& SharedGroup::ringbuf_get_first() TIGHTDB_NOEXCEPT
 {
-    SharedInfo* const info = m_file_map.get_addr();
+    SharedInfo* const info = m_reader_map.get_addr();
     return info->readers[info->get_pos];
 }
 
 SharedGroup::ReadCount& SharedGroup::ringbuf_get_last() TIGHTDB_NOEXCEPT
 {
-    SharedInfo* const info = m_file_map.get_addr();
+    SharedInfo* const info = m_reader_map.get_addr();
     const uint32_t lastPos = (info->put_pos - 1) & info->capacity;
     return info->readers[lastPos];
 }
 
 void SharedGroup::ringbuf_remove_first() TIGHTDB_NOEXCEPT
 {
-    SharedInfo* const info = m_file_map.get_addr();
+    SharedInfo* const info = m_reader_map.get_addr();
     info->get_pos = (info->get_pos + 1) & info->capacity;
 }
 
 void SharedGroup::ringbuf_put(const ReadCount& v)
 {
-    SharedInfo* info = m_file_map.get_addr();
+    SharedInfo* info = m_reader_map.get_addr();
 
     // Check if the ringbuf is full
     // (there should always be one empty entry)
@@ -534,7 +540,7 @@ void SharedGroup::ringbuf_put(const ReadCount& v)
 
     if (TIGHTDB_UNLIKELY(isFull)) {
         ringbuf_expand();
-        info = m_file_map.get_addr();
+        info = m_reader_map.get_addr();
     }
 
     info->readers[info->put_pos] = v;
@@ -543,7 +549,7 @@ void SharedGroup::ringbuf_put(const ReadCount& v)
 
 void SharedGroup::ringbuf_expand()
 {
-    const SharedInfo* const info = m_file_map.get_addr();
+    const SharedInfo* const info = m_reader_map.get_addr();
 
     // Calculate size of file with more entries
     const size_t current_entry_count = info->capacity + 1;
@@ -554,8 +560,8 @@ void SharedGroup::ringbuf_expand()
 
     // Extend file
     m_file.alloc(0, new_filesize);
-    m_file_map.remap(m_file, File::access_ReadWrite, new_filesize);
-    SharedInfo* const info2 = m_file_map.get_addr();
+    m_reader_map.remap(m_file, File::access_ReadWrite, new_filesize);
+    SharedInfo* const info2 = m_reader_map.get_addr();
 
     // Move existing entries (if there is a split)
     if (info2->put_pos < info2->get_pos) {
@@ -581,7 +587,7 @@ void SharedGroup::ringbuf_expand()
 
 size_t SharedGroup::ringbuf_find(uint32_t version) const TIGHTDB_NOEXCEPT
 {
-    const SharedInfo* const info = m_file_map.get_addr();
+    const SharedInfo* const info = m_reader_map.get_addr();
     uint32_t pos = info->get_pos;
     while (pos != info->put_pos) {
         const ReadCount& r = info->readers[pos];
