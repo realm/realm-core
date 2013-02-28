@@ -35,13 +35,15 @@ CATEGORIES:
       SIGNATURE: |
                  Mixed(bool v)
                  Mixed(int64_t v)
+                 Mixed(float v)
+                 Mixed(double v)
                  Mixed(Date v)
                  Mixed(const char* v)
                  Mixed(BinaryData v)
                  Mixed(subtable_tag)
       PARAMS:
       - NAME   : v
-        TYPES  : [bool, int64_t, Date, const char*, BinaryData]
+        TYPES  : [bool, int64_t, float, double, Date, const char*, BinaryData]
         DESCR  : The value.
       EXAMPLES:
       - CODE   : ex_cpp_mixed_constructor
@@ -75,11 +77,13 @@ CATEGORIES:
                  bool        get_bool()   const;
                  int64_t     get_int()    const;
                  std::time_t get_date()   const;
+                 float       get_float()  const;
+                 doubl       get_double() const;                 
                  const char* get_string() const;
                  BinaryData  get_binary() const;
       CONST    : True
       RETURN:
-        TYPES  : [bool, int64_t, time_t, const char*, BinaryData]
+        TYPES  : [bool, int64_t, float, double, time_t, const char*, BinaryData]
         DESCR  : The value.
       EXAMPLES:
       - CODE   : ex_cpp_mixed_get_value
