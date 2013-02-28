@@ -86,8 +86,8 @@ public:
     /// an open file.
     void close() TIGHTDB_NOEXCEPT;
 
-    /// Check whether this File instance currently attached to an open
-    /// file.
+    /// Check whether this File instance is currently attached to an
+    /// open file.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
     enum AccessMode {
@@ -221,6 +221,9 @@ public:
     /// This File instance does not need to remain in existence after
     /// the mapping is established.
     ///
+    /// Multiple concurrent mappings may be created from the same File
+    /// instance.
+    ///
     /// Specifying access_ReadWrite for a file that is opened in
     /// read-only mode, is an error.
     ///
@@ -349,16 +352,19 @@ private:
 /// This class provides a RAII abstraction over the concept of a
 /// memory mapped file.
 ///
-/// Once create, the Map instance makes no reference to the File
+/// Once created, the Map instance makes no reference to the File
 /// instance that it was based upon, and that File instance may be
 /// destroyed before the Map instance is destroyed.
+///
+/// Multiple concurrent mappings may be created from the same File
+/// instance.
 ///
 /// You can use UnmapGuard to acheive exception-safe unmapping prior
 /// to the Map instance being detroyed.
 ///
 /// A single Map instance must never be accessed concurrently by
 /// multiple threads.
-template<class T> class File::Map: MapBase {
+template<class T> class File::Map: private MapBase {
 public:
     /// Equivalent to calling map() on a default constructed instance.
     explicit Map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
