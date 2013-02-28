@@ -1266,14 +1266,14 @@ void Array::Alloc(size_t count, size_t width)
             if (!m_data) {
                 mem_ref = m_alloc.Alloc(capacity_bytes); // Throws
                 header = static_cast<char*>(mem_ref.pointer);
-                init_header(header, m_isNode, m_hasRefs, GetWidthType(), width, count,
+                init_header(header, m_isNode, m_hasRefs, GetWidthType(), (int)width, count,
                             capacity_bytes);
             }
             else {
                 header = get_header_from_data(m_data);
                 mem_ref = m_alloc.ReAlloc(m_ref, header, capacity_bytes); // Throws
                 header = static_cast<char*>(mem_ref.pointer);
-                set_header_width(width, header);
+                set_header_width((int)width, header);
                 set_header_len(count, header);
                 set_header_capacity(capacity_bytes, header);
             }
@@ -1287,7 +1287,7 @@ void Array::Alloc(size_t count, size_t width)
         }
 
         m_capacity = CalcItemCount(capacity_bytes, width);
-        set_header_width(width);
+        set_header_width((int)width);
     }
 
     // Update header
