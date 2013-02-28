@@ -69,6 +69,8 @@ CATEGORIES:
                  </thead>
                  <tbody>
                  <tr><td>Int</td>               <td>Integer</td>      <td>(int64_t)</td></tr>
+                 <tr><td>Float</td>             <td>Floating-point</d><td>(float)</td></tr>
+                 <tr><td>Double</td>            <td>Floating-point</d><td>(double)</td></tr>
                  <tr><td>Bool</td>              <td>Boolean</td>      <td>(bool)</td></tr>
                  <tr><td>String </td>           <td>Text</td>         <td>(char*)</td></tr>
                  <tr><td>Date</td>              <td>UTC datetime</td> <td>(time_t)</td></tr>
@@ -358,6 +360,8 @@ CATEGORIES:
         DESCR  :
   - g_find_first_bool:
   - g_find_first_int:
+  - g_find_first_float:
+  - g_find_first_double:
   - g_find_first_date:
   - g_find_first_string:
       NAMES    : find_first_*
@@ -367,13 +371,15 @@ CATEGORIES:
                  The method finds the first occurence of a given value in a column.
       SIGNATURE: |
                  size_t find_first_int(int64_t value) const;
+                 size_t find_first_float(float value) const;
+                 size_t find_first_double(double value) const;
                  size_t find_first_bool(bool value) const;
                  size_t find_first_date(time_t value) const;
                  size_t find_first_string(const char* value) const;
       CONST    : True
       PARAMS:
       - NAME   : value
-        TYPES  : [bool, int64_t, time_t, const char*]
+        TYPES  : [bool, int64_t, float, double, time_t, const char*]
         DESCR  : The value.
       RETURN:
         TYPES  : size_t
@@ -383,9 +389,13 @@ CATEGORIES:
         DESCR  :
   - g_find_all_bool:
   - g_find_all_int:
+  - g_find_all_float:
+  - g_find_all_double:
   - g_find_all_date:
   - g_find_all_string:
   - g_find_all_bool_const:
+  - g_find_all_float_const:
+  - g_find_all_double_const:
   - g_find_all_int_const:
   - g_find_all_date_const:
   - g_find_all_string_const:
@@ -398,16 +408,20 @@ CATEGORIES:
       SIGNATURE: |
                  TableView      find_all_int(int64_t value);
                  TableView      find_all_bool(bool value);
+                 TableView      find_all_float(float value);
+                 TableView      find_all_double(double value);
                  TableView      find_all_date(time_t value);
                  TableView      find_all_string(const char* value);
 
                  ConstTableView find_all_int(int64_t value) const;
                  ConstTableView find_all_bool(bool value) const;
+                 ConstTableView find_all_float(float value) const;
+                 ConstTableView find_all_double(double value) const;
                  ConstTableView find_all_date(time_t value) const;
                  ConstTableView find_all_string(const char* value) const;
       PARAMS:
       - NAME   : value
-        TYPES  : [bool, int64_t, time_t, const char*]
+        TYPES  : [bool, int64_t, float, double, time_t, const char*]
         DESCR  : The value.
       RETURN:
         TYPES  : TableView

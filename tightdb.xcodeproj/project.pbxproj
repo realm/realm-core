@@ -237,7 +237,6 @@
 		3640797E15AD6687009A3A82 /* file.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = file.hpp; path = tightdb/file.hpp; sourceTree = "<group>"; };
 		3647DFF314209CE600D56FD7 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		3647DFF414209CE600D56FD7 /* Makefile */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.make; path = Makefile; sourceTree = "<group>"; };
-		3647DFF514209CE600D56FD7 /* run_tests.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = run_tests.sh; sourceTree = "<group>"; };
 		3647DFF714209CE600D56FD7 /* mem.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = mem.h; sourceTree = "<group>"; };
 		3647DFF814209CE600D56FD7 /* number_names.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = number_names.h; sourceTree = "<group>"; };
 		3647DFFA14209CE600D56FD7 /* mem.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = mem.cpp; sourceTree = "<group>"; };
@@ -561,7 +560,6 @@
 			children = (
 				3647DFF314209CE600D56FD7 /* main.cpp */,
 				3647DFF414209CE600D56FD7 /* Makefile */,
-				3647DFF514209CE600D56FD7 /* run_tests.sh */,
 				3647DFF614209CE600D56FD7 /* Support */,
 				3647DFFD14209CE600D56FD7 /* test-sqlite3 */,
 				3647E00814209CE600D56FD7 /* test-stl */,
@@ -981,7 +979,7 @@
 		3611F2FC14209B7000017263 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 0430;
+				LastUpgradeCheck = 0460;
 				ORGANIZATIONNAME = TightDB;
 			};
 			buildConfigurationList = 3611F2FF14209B7000017263 /* Build configuration list for PBXProject "tightdb" */;
@@ -1190,6 +1188,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				EXECUTABLE_PREFIX = lib;
@@ -1224,6 +1223,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = "$(ARCHS_STANDARD_64_BIT)";
+				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				EXECUTABLE_PREFIX = lib;
