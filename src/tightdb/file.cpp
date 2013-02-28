@@ -542,7 +542,7 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
 
 #else // POSIX version
 
-    // FIXME: On FreeeBSB and other systems htat support it, we should
+    // FIXME: On FreeeBSB and other systems that support it, we should
     // honor map_NoSync by specifying MAP_NOSYNC, but how do we
     // reliably detect these systems?
     static_cast<void>(map_flags);

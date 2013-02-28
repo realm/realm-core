@@ -160,8 +160,7 @@ inline std::size_t to_size_t(int64_t v) TIGHTDB_NOEXCEPT
 template<typename ReturnType, typename OriginalType>
 ReturnType TypePunning( OriginalType variable )
 {
-    union
-    {
+    union {
         OriginalType    in;
         ReturnType      out;
     };

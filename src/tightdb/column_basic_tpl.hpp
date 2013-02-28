@@ -296,16 +296,12 @@ void BasicColumn<T>::LeafFindAll(Array &result, T value, size_t add_offset, size
 template<typename T>
 size_t BasicColumn<T>::find_first(T value, size_t start, size_t end) const
 {
-    TIGHTDB_ASSERT(value);
-
     return TreeFind<T, BasicColumn<T>, Equal>(value, start, end);
 }
 
 template<typename T>
 void BasicColumn<T>::find_all(Array &result, T value, size_t start, size_t end) const
 {
-    TIGHTDB_ASSERT(value);
-
     TreeFindAll<T, BasicColumn<T> >(result, value, 0, start, end);
 }
 

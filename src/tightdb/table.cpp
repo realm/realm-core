@@ -2090,26 +2090,7 @@ void Table::update_from_spec()
 }
 
 
-
-static inline void out_date(std::ostream& out, const time_t rawtime)
-{
-    struct tm* const t = gmtime(&rawtime);
-    if (t) {
-        // We need a buffer for formatting dates (and binary to hex). Max
-        // size is 20 bytes (incl zero byte) "YYYY-MM-DD HH:MM:SS"\0
-        char buffer[30];
-        const size_t res = strftime(buffer, 30, "%Y-%m-%d %H:%M:%S", t);
-        if (res)
-            out << buffer;
-    }
-}
-
-static inline void out_binary(std::ostream& out, const BinaryData bin)
-{
-    const char* const p = (char*)bin.pointer;
-    for (size_t i = 0; i < bin.len; ++i)
-        out << setw(2) << setfill('0') << hex << (unsigned int)p[i] << dec;
-}
+// to JSON: ------------------------------------------
 
 void Table::to_json(std::ostream& out)
 {
@@ -2125,6 +2106,38 @@ void Table::to_json(std::ostream& out)
 
     out << "]";
 }
+
+namespace {
+
+inline void out_date(std::ostream& out, time_t rawtime)
+{
+    struct tm* const t = gmtime(&rawtime);
+    if (t) {
+        // We need a buffer for formatting dates (and binary to hex). Max
+        // size is 20 bytes (incl zero byte) "YYYY-MM-DD HH:MM:SS"\0
+        char buffer[30];
+        const size_t res = strftime(buffer, 30, "%Y-%m-%d %H:%M:%S", t);
+        if (res)
+            out << buffer;
+    }
+}
+
+inline void out_binary(std::ostream& out, const BinaryData bin)
+{
+    const char* const p = (char*)bin.pointer;
+    for (size_t i = 0; i < bin.len; ++i)
+        out << setw(2) << setfill('0') << hex << (unsigned int)p[i] << dec;
+}
+
+template<typename T> void out_floats(std::ostream& out, T value)
+{
+    streamsize old = out.precision();
+    out.precision(numeric_limits<T>::digits10 + 1);
+    out << scientific << value;
+    out.precision(old);
+}
+
+} // anonymous namespace
 
 void Table::to_json_row(size_t row_ndx, std::ostream& out)
 {
@@ -2144,6 +2157,12 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out)
                 break;
             case type_Bool:
                 out << (get_bool(i, row_ndx) ? "true" : "false");
+                break;
+            case type_Float:
+                out_floats<float>(out, get_float(i, row_ndx));
+                break;
+            case type_Double:
+                out_floats<double>(out, get_double(i, row_ndx));
                 break;
             case type_String:
                 out << "\"" << get_string(i, row_ndx) << "\"";
@@ -2172,6 +2191,12 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out)
                         case type_Bool:
                             out << (m.get_bool() ? "true" : "false");
                             break;
+                        case type_Float:
+                            out_floats<float>(out, m.get_float());
+                            break;
+                        case type_Double:
+                            out_floats<double>(out, m.get_double());
+                            break;
                         case type_String:
                             out << "\"" << m.get_string() << "\"";
                             break;
@@ -2195,12 +2220,17 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out)
 }
 
 
-static size_t chars_in_int(int64_t v)
+// to_string --------------------------------------------------
+
+
+namespace {
+size_t chars_in_int(int64_t v)
 {
     size_t count = 0;
     while (v /= 10)
         ++count;
     return count+1;
+}
 }
 
 void Table::to_string(std::ostream& out, size_t limit) const
@@ -2264,10 +2294,11 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                 width = chars_in_int(maximum(col));
                 break;
             case type_Float:
-                width = 12;  // FIXME
+                // max chars for scientific notation:
+                width = 14;
                 break;
             case type_Double:
-                width = 12;  // FIXME
+                width = 14;
                 break;
             case type_Table:
                 for (size_t row = 0; row < row_count; ++row) {
@@ -2289,7 +2320,8 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                     size_t len = get_string_length(col, row);
                     width = max(width, len);
                 }
-                if (width > 20) width = 23; // cut strings longer than 20 chars
+                if (width > 20) 
+                    width = 23; // cut strings longer than 20 chars
                 break;
             }
             case type_Mixed:
@@ -2314,17 +2346,18 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                             width = max(width, chars_in_int(m.get_int()));
                             break;
                         case type_Float:
-                            width = max(width, size_t(12)); // FIXME: Implement this
+                            width = max(width, size_t(14));
                             break;
                         case type_Double:
-                            width = max(width, size_t(12)); // FIXME: Implement this
+                            width = max(width, size_t(14));
                             break;
                         case type_Binary:
                             width = max(width, chars_in_int(m.get_binary().len) + 6);
                             break;
                         case type_String: {
                             size_t len = strlen(m.get_string());
-                            if (len > 20) len = 23;
+                            if (len > 20)
+                                len = 23;
                             width = max(width, len);
                             break;
                         }
@@ -2376,6 +2409,7 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
     const size_t column_count  = get_column_count();
     const size_t row_ndx_width = widths[0];
 
+    out << scientific;          // for float/double
     out.width(row_ndx_width);
     out << row_ndx << ":";
 
@@ -2453,6 +2487,8 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
     }
     out << "\n";
 }
+
+
 
 bool Table::compare_rows(const Table& t) const
 {
