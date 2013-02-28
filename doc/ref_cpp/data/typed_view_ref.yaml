@@ -3,7 +3,7 @@
 #
 
 ID         : class_typed_tableview
-TITLE      : TableView
+TITLE      : TableView (typed)
 SUMMARY    : &g_typed_view_intro_summary
              The TableView class.
 DESCR      : &g_typed_view_intro_descr

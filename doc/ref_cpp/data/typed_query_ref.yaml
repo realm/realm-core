@@ -3,7 +3,7 @@
 #
 
 ID         : class_typed_query
-TITLE      : Typed Query
+TITLE      : Query (typed)
 SUMMARY    : &g_typed_query_intro_summary
              Query your TightDB table.
 DESCR      : &g_typed_query_intro_descr
