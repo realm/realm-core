@@ -1786,8 +1786,8 @@ TEST(TestQuery_AllTypes)
     Mixed mix_int_1(int64_t(1));
 //    Mixed mix_subtab(subtab2);
 
-    table.add(false,  54, 0.7, 0.8, "foo",    bin1, 0,        0,        mix_int_1);
-    table.add(true,  506, 7.7, 8.8, "banach", bin2, time_now, &subtab2, mix_int_1);
+    table.add(false,  54, 0.7f, 0.8, "foo",    bin1, 0,        0,        mix_int_1);
+    table.add(true,  506, 7.7f, 8.8, "banach", bin2, time_now, &subtab2, mix_int_1);
 
     CHECK_EQUAL(1, table.where().bool_col.equal(false).count());
     CHECK_EQUAL(1, table.where().int_col.equal(54).count());
