@@ -454,21 +454,25 @@ TEST(Table_test_to_string)
     table.to_string(ss);
     const string result = ss.str();
 
+#if _MSC_VER
+    string filename = "expect_string-win.txt";
+#else
+    string filename = "expect_string.txt";
+#endif
 #if GENERATE   // enable to generate testfile - check it manually
-    ofstream testFile("expect_string.txt", ios::out | ios::binary);
+    ofstream testFile(filename, ios::out | ios::binary);
     testFile << result;
 #else
-    ifstream testFile("expect_string.txt", ios::in | ios::binary);
+    ifstream testFile(filename, ios::in | ios::binary);
     CHECK(!testFile.fail());
     string expected;
     expected.assign( istreambuf_iterator<char>(testFile),
                      istreambuf_iterator<char>() );
-// TODO: ENABLE TEST (after fixing the number of characters to be output for the exponent in float/double
-//    CHECK_EQUAL(true, result == expected);
+    CHECK_EQUAL(true, result == expected);
     if (result != expected) {
         ofstream testFile("expect_string.error.txt", ios::out | ios::binary);
         testFile << result;
-        cerr << "\n error result in expect_string.error.txt\n";
+        cerr << "\n error result in 'expect_string.error.txt'\n";
     }
 #endif
 }
@@ -481,24 +485,28 @@ TEST(Table_test_json_all_data)
     stringstream ss;
     table.to_json(ss);
     const string json = ss.str();
+#if _MSC_VER
+    string filename = "expect_json-win.json";
+#else
+    string filename = "expect_json.json";
+#endif
 #if GENERATE
         // Generate the testdata to compare. After doing this,
         // verify that the output is correct with a json validator:
         // http://jsonformatter.curiousconcept.com/
     cerr << "JSON:" << json << "\n";
-    ofstream testFile("expect_json.json", ios::out | ios::binary);
+    ofstream testFile(filename, ios::out | ios::binary);
     testFile << json;
 #else
     string expected;
-    ifstream testFile("expect_json.json", ios::in | ios::binary);
+    ifstream testFile(filename, ios::in | ios::binary);
     CHECK(!testFile.fail());
     getline(testFile,expected);
-// TODO: ENABLE TEST
-//    CHECK_EQUAL(true, json == expected);
+    CHECK_EQUAL(true, json == expected);
     if (json != expected) {
         ofstream testFile("expect_json.error.json", ios::out | ios::binary);
         testFile << json;
-        cerr << "\n error result in expect_json.error.json\n";
+        cerr << "\n error result in 'expect_json.error.json'\n";
     }
 #endif
 }
