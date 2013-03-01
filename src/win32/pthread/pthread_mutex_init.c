@@ -56,7 +56,6 @@ pthread_mutex_init (pthread_mutex_t * mutex, const pthread_mutexattr_t * attr)
         {
            GUID guid;
            HANDLE h;  
-           DWORD wpid;
 
             /*
            * Creating mutex that can be shared between

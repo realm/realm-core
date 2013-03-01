@@ -47,7 +47,6 @@ pthread_mutex_destroy (pthread_mutex_t * mutex)
   if(mutex->is_shared)
   {
     BOOL d;
-    HANDLE h;
     int pid = getpid();
 
     if(mutex->cached_pid != pid)

@@ -549,7 +549,7 @@ void SharedGroup::ringbuf_expand()
     const size_t current_entry_count = info->capacity + 1;
     const size_t excount = current_entry_count; // Always double we can mask for index
     const size_t new_entry_count = current_entry_count + excount;
-    const size_t base_filesize = sizeof(SharedInfo) - sizeof(ReadCount[excount]);
+    const size_t base_filesize = sizeof(SharedInfo) - sizeof(ReadCount[32]);
     const size_t new_filesize = base_filesize + (sizeof(ReadCount) * new_entry_count);
 
     // Extend file

@@ -708,9 +708,9 @@ struct pthread_once_t_
 #define PTHREAD_RECURSIVE_MUTEX ((void*)-2)
 #define PTHREAD_ERRORCHECK_MUTEX ((void*)-3)
 
-#define PTHREAD_MUTEX_INITIALIZER {(pthread_mutex_t_*)PTHREAD_MUTEX, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}
-#define PTHREAD_RECURSIVE_MUTEX_INITIALIZER {(pthread_mutex_t_*)PTHREAD_RECURSIVE_MUTEX, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}
-#define PTHREAD_ERRORCHECK_MUTEX_INITIALIZER {(pthread_mutex_t_*)PTHREAD_ERRORCHECK_MUTEX, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}
+#define PTHREAD_MUTEX_INITIALIZER {(pthread_mutex_t_*)PTHREAD_MUTEX, 0, 0, 0, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}
+#define PTHREAD_RECURSIVE_MUTEX_INITIALIZER {(pthread_mutex_t_*)PTHREAD_RECURSIVE_MUTEX, 0, 0, 0, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}
+#define PTHREAD_ERRORCHECK_MUTEX_INITIALIZER {(pthread_mutex_t_*)PTHREAD_ERRORCHECK_MUTEX, 0, 0, 0, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}}
 
 /*
  * Compatibility with LinuxThreads
