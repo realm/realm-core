@@ -315,8 +315,8 @@ void ColumnMixed::Verify() const
     // Verify each sub-table
     const size_t count = Size();
     for (size_t i = 0; i < count; ++i) {
-        const size_t tref = m_refs->GetAsRef(i);
-        if (tref == 0 || tref & 0x1) continue;
+        const int64_t v = m_refs->Get(i);
+        if (v == 0 || v & 0x1) continue;
         ConstTableRef subtable = m_refs->get_subtable(i);
         subtable->Verify();
     }

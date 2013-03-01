@@ -370,11 +370,11 @@ void SlabAlloc::FreeAll(size_t filesize)
     const size_t count = m_slabs.size();
     for (size_t i = 0; i < count; ++i) {
         const Slabs::Cursor c = m_slabs[i];
-        const size_t size = c.offset - ref;
+        const size_t size = to_size_t(c.offset - ref);
 
         m_freeSpace.add(ref, size);
 
-        ref = c.offset;
+        ref = to_size_t(c.offset);
     }
 
     // If the file size have changed, we need to remap the readonly buffer
@@ -408,7 +408,7 @@ bool SlabAlloc::ReMap(size_t filesize)
     for (size_t i = 0; i < count; ++i) {
         FreeSpace::Cursor c = m_freeSpace[i];
         c.ref = new_offset;
-        new_offset += c.size;
+        new_offset = to_size_t(new_offset + c.size);
 
         m_slabs[i].offset = new_offset;
     }

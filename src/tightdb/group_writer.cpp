@@ -50,7 +50,7 @@ size_t GroupWriter::Commit()
 
     for (size_t i = 0; i < fcount; ++i) {
         SlabAlloc::FreeSpace::ConstCursor r = freeSpace[i];
-        add_free_space(r.ref, r.size, m_current_version);
+        add_free_space(to_size_t(r.ref), to_size_t(r.size), to_size_t(m_current_version));
     }
 
     // We now have a bit of an chicken-and-egg problem. We need to write our free
@@ -379,10 +379,10 @@ size_t GroupWriter::extend_free_space(size_t len)
 
     // See if we can merge in new space
     if (!fpositions.is_empty()) {
-        const size_t last_ndx = fpositions.size()-1;
-        const size_t last_len = flengths[last_ndx];
-        const size_t end  = fpositions[last_ndx] + last_len;
-        const size_t ver  = isShared ? fversions[last_ndx] : 0;
+        const size_t last_ndx = to_size_t(fpositions.size()-1);
+        const size_t last_len = to_size_t(flengths[last_ndx]);
+        const size_t end  = to_size_t(fpositions[last_ndx] + last_len);
+        const size_t ver  = to_size_t(isShared ? fversions[last_ndx] : 0);
         if (end == old_filesize && ver == 0) {
             flengths.Set(last_ndx, last_len + ext_len);
             return last_ndx;
