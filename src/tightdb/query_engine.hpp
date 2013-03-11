@@ -467,7 +467,7 @@ public:
 
         m_next = 0;
         if (m_size > 0)
-            m_max = m_arr.Get(m_size - 1);
+            m_max = m_arr.GetAsSizeT(m_size - 1);
         if (m_child) m_child->Init(table);
     }
 
@@ -478,7 +478,7 @@ public:
             return end;
 
         m_next = r;
-        return m_arr.Get(r);
+        return m_arr.GetAsSizeT(r);
     }
 
 protected:
@@ -1020,7 +1020,7 @@ public:
             if (m_condition_column->HasIndex()) {
                 size_t f = m_index.FindGTE(s, last_indexed);
                 if (f != not_found)
-                    s = m_index.Get(f);
+                    s = m_index.GetAsSizeT(f);
                 else
                     s = not_found;
                 last_indexed = f;

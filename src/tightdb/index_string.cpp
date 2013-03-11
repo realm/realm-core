@@ -290,7 +290,7 @@ void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
     TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
 
     // Get sublists
-    const size_t orig_ref = refs.Get(ndx);
+    const size_t orig_ref = refs.GetAsRef(ndx);
     const StringIndex orig_col(orig_ref, &refs, ndx, m_target_column, m_get_func, m_array->GetAllocator());
     const StringIndex new_col(new_ref, NULL, 0, m_target_column, m_get_func, m_array->GetAllocator());
 
@@ -455,18 +455,19 @@ void StringIndex::distinct(Array& result) const
 
             // low bit set indicate literal ref (shifted)
             if (ref & 1) {
-                const size_t r = (ref >> 1);
-                result.add(r);
+//             const size_t r = (ref >> 1); NEVER right shift signed - it's undefined and varies btw AMD/Intel/ARM
+               const size_t r = to_size_t((uint64_t(ref) >> 1)); 
+               result.add(r);
             }
             else {
                 // A real ref either points to a list or a sub-index
-                if (Array::is_index_node(ref, alloc)) {
-                    const StringIndex ndx((size_t)ref, &refs, i, m_target_column, m_get_func, alloc);
+                if (Array::is_index_node(to_size_t(ref), alloc)) {
+                    const StringIndex ndx(to_size_t(ref), &refs, i, m_target_column, m_get_func, alloc);
                     ndx.distinct(result);
                 }
                 else {
-                    const Column sub(ref, &refs, i, alloc);
-                    const size_t r = sub.Get(0); // get first match
+                    const Column sub(to_size_t(ref), &refs, i, alloc);
+                    const size_t r = to_size_t(sub.Get(0)); // get first match
                     result.add(r);
                 }
             }
@@ -495,7 +496,8 @@ void StringIndex::UpdateRefs(size_t pos, int diff)
 
             // low bit set indicate literal ref (shifted)
             if (ref & 1) {
-                const size_t r = (ref >> 1);
+                //const size_t r = (ref >> 1); Please NEVER right shift signed values - result varies btw Intel/AMD
+                const size_t r = (uint64_t(ref) >> 1); 
                 if (r >= pos) {
                     const size_t adjusted_ref = ((r + diff) << 1)+1;
                     refs.Set(i, adjusted_ref);
@@ -503,12 +505,12 @@ void StringIndex::UpdateRefs(size_t pos, int diff)
             }
             else {
                 // A real ref either points to a list or a sub-index
-                if (Array::is_index_node(ref, alloc)) {
-                    StringIndex ndx((size_t)ref, &refs, i, m_target_column, m_get_func, alloc);
+                if (Array::is_index_node(to_size_t(ref), alloc)) {
+                    StringIndex ndx(to_size_t(ref), &refs, i, m_target_column, m_get_func, alloc);
                     ndx.UpdateRefs(pos, diff);
                 }
                 else {
-                    Column sub(ref, &refs, i, alloc);
+                    Column sub(to_size_t(ref), &refs, i, alloc);
                     sub.IncrementIf(pos, diff);
                 }
             }
@@ -558,7 +560,7 @@ void StringIndex::DoDelete(size_t row_ndx, const char* value, size_t offset)
     TIGHTDB_ASSERT(pos != not_found);
 
     if (m_array->IsNode()) {
-        const size_t ref = refs.Get(pos);
+        const size_t ref = refs.GetAsRef(pos);
         StringIndex node(ref, &refs, pos, m_target_column, m_get_func, alloc);
         node.DoDelete(row_ndx, value, offset);
 
@@ -577,13 +579,13 @@ void StringIndex::DoDelete(size_t row_ndx, const char* value, size_t offset)
     else {
         const int64_t ref = refs.Get(pos);
         if (ref & 1) {
-            TIGHTDB_ASSERT((ref >> 1) == (int64_t)row_ndx);
+            TIGHTDB_ASSERT((uint64_t(ref) >> 1) == (int64_t)row_ndx);
             values.Delete(pos);
             refs.Delete(pos);
         }
         else {
             // A real ref either points to a list or a sub-index
-            if (Array::is_index_node(ref, alloc)) {
+            if (Array::is_index_node(to_size_t(ref), alloc)) {
                 StringIndex subNdx((size_t)ref, &refs, pos, m_target_column, m_get_func, alloc);
                 subNdx.DoDelete(row_ndx, value, offset+4);
 
@@ -594,7 +596,7 @@ void StringIndex::DoDelete(size_t row_ndx, const char* value, size_t offset)
                 }
             }
             else {
-                Column sub(ref, &refs, pos, alloc);
+                Column sub(to_size_t(ref), &refs, pos, alloc);
                 const size_t r = sub.find_first(row_ndx);
                 TIGHTDB_ASSERT(r != not_found);
                 sub.Delete(r);
@@ -720,7 +722,7 @@ void StringIndex::KeysToDot(std::ostream& out, const Array& array, const char* t
     // Values
     const size_t count = array.size();
     for (size_t i = 0; i < count; ++i) {
-        const int64_t v =  array.Get(i);
+        const uint64_t v =  array.Get(i); // Never right shift signed values
 
         char str[5] = "\0\0\0\0";
         str[3] = char(v & 0xFF);
