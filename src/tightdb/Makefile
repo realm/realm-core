@@ -56,9 +56,8 @@ uninstall/extra:
 	$(RM) $(DESTDIR)$(includedir)/tightdb/*.h
 	-rmdir $(DESTDIR)$(includedir)/tightdb
 
-show-inst-headers:
-	@echo $(foreach x,$(INST_HEADERS),src/tightdb/$(x))
+get-inst-headers:
+	@echo $(INST_HEADERS)
 
-show-inst-libraries:
-	@echo $(foreach x,$(filter-out libtightdb-cov.% libtightdb-dbg.a,$(TARGETS_LIB_STATIC) $(TARGETS_LIB_SHARED_ALIASES)),src/tightdb/$(x))
-
+get-inst-libraries:
+	@echo $(filter-out libtightdb-cov.% libtightdb-dbg.a,$(TARGETS_LIB_STATIC) $(TARGETS_LIB_SHARED_ALIASES))
