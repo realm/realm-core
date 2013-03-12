@@ -82,7 +82,9 @@ indicated Makefiles):
     libtightdb-c.so    (/tightdb_c/src/tightdb/c/Makefile)
     libtightdb-objc.so (/tightdb_objc/src/tightdb/objc/Makefile)
 
-When the versions are set correctly, do one of the following:
+Please note that these versions are completely independent of each
+other and of the package version. When the library versions are set
+correctly, do one of the following:
 
     sh build.sh src-dist all   # Source distribution
     sh build.sh bin-dist all   # Prebuilt core library
