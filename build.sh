@@ -68,10 +68,8 @@ path_list_prepend()
 # Setup OS specific stuff
 OS="$(uname)" || exit 1
 ARCH="$(uname -m)" || exit 1
-LIB_SUFFIX_SHARED=".so"
 LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
 if [ "$OS" = "Darwin" ]; then
-    LIB_SUFFIX_SHARED=".dylib"
     LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
 fi
 if ! printf "%s\n" "$MODE" | grep -q '^\(src-\|bin-\)\?dist'; then
@@ -513,19 +511,12 @@ EOI
                 if [ "$PREBUILT_CORE" ]; then
                     message "Building core library"
                     (sh build.sh clean && sh build.sh build) >>"$LOG_FILE" 2>&1 || exit 1
-                    mkdir "$TEMP_DIR/transfer" || exit 1
-                    mkdir "$TEMP_DIR/transfer/targets" || exit 1
-                    cp "src/tightdb/libtightdb.a" "src/tightdb/libtightdb$LIB_SUFFIX_SHARED" "src/tightdb/libtightdb-dbg$LIB_SUFFIX_SHARED" "$TEMP_DIR/transfer/targets/" || exit 1
-                    cp "src/tightdb/tightdb-config" "src/tightdb/tightdb-config-dbg" "$TEMP_DIR/transfer/targets/" || exit 1
-                    if [ "$OS" = "Darwin" ]; then
-                        cp "src/tightdb/libtightdb-ios.a" "src/tightdb/libtightdb-ios-dbg.a" "$TEMP_DIR/transfer/targets/" || exit 1
-                        cp "src/tightdb/tightdb-config-ios" "src/tightdb/tightdb-config-ios-dbg" "$TEMP_DIR/transfer/targets/" || exit 1
-                    fi
 
                     message "Running test suite for core library"
                     sh build.sh test >>"$LOG_FILE" 2>&1 || exit 1
 
                     message "Transfering prebuilt core library to package"
+                    mkdir "$TEMP_DIR/transfer" || exit 1
                     cat >"$TEMP_DIR/transfer/include" <<EOF
 /README.md
 /build.sh
@@ -535,8 +526,6 @@ EOI
 /src/Makefile
 /src/tightdb.hpp
 /src/tightdb/Makefile
-/src/tightdb/*.h
-/src/tightdb/*.hpp
 /test/Makefile
 /test-installed
 /doc
@@ -555,7 +544,15 @@ EOF
                     tar czf "$TEMP_DIR/transfer/core.tar.gz" -T "$TEMP_DIR/transfer/files3" || exit 1
                     (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/transfer/core.tar.gz") || exit 1
                     printf "\nNO_BUILD_ON_INSTALL = 1\n" >> "$PKG_DIR/tightdb/config.mk"
-                    ln "$TEMP_DIR/transfer/targets"/* "$PKG_DIR/tightdb/src/tightdb/" || exit 1
+                    INST_HEADERS="$(cd src/tightdb && make show-inst-headers)" || exit 1
+                    INST_LIBRARIES="$(cd src/tightdb && make show-inst-libraries)" || exit 1
+                    cp -R -P $INST_HEADERS $INST_LIBRARIES "$PKG_DIR/tightdb/src/tightdb/" || exit 1
+                    cp "src/tightdb/tightdb-config" "src/tightdb/tightdb-config-dbg" "$PKG_DIR/tightdb/src/tightdb/" || exit 1
+                    if [ "$OS" = "Darwin" ]; then
+                        cp "src/tightdb/libtightdb-ios.a" "src/tightdb/libtightdb-ios-dbg.a" "$PKG_DIR/tightdb/src/tightdb/" || exit 1
+                        cp "src/tightdb/tightdb-config-ios" "src/tightdb/tightdb-config-ios-dbg" "$PKG_DIR/tightdb/src/tightdb/" || exit 1
+                    fi
+
                 else
                     message "Transfering core library to package"
                     sh "$TIGHTDB_HOME/build.sh" dist-copy "$PKG_DIR/tightdb" >>"$LOG_FILE" 2>&1 || exit 1
