@@ -206,7 +206,8 @@ bool SlabAlloc::IsReadOnly(size_t ref) const TIGHTDB_NOEXCEPT
 }
 
 
-void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create)
+void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create,
+                            int* get_version)
 {
     // When 'read_only' is true, this function will throw
     // InvalidDatabase if the file exists already but is empty. This
@@ -258,7 +259,7 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
         File::Map<char> map(m_file, File::access_ReadOnly, size);
 
         // Verify the data structures
-        if (!validate_buffer(map.get_addr(), size)) goto invalid_database;
+        if (!validate_buffer(map.get_addr(), size, get_version)) goto invalid_database;
 
         m_data      = map.release();
         m_baseline  = size;
@@ -273,10 +274,10 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
 }
 
 
-void SlabAlloc::attach_buffer(const char* data, size_t size, bool take_ownership)
+void SlabAlloc::attach_buffer(const char* data, size_t size, bool take_ownership, int* get_version)
 {
     // Verify the data structures
-    if (!validate_buffer(data, size)) throw InvalidDatabase();
+    if (!validate_buffer(data, size, get_version)) throw InvalidDatabase();
 
     m_data      = data;
     m_baseline  = size;
@@ -284,7 +285,7 @@ void SlabAlloc::attach_buffer(const char* data, size_t size, bool take_ownership
 }
 
 
-bool SlabAlloc::validate_buffer(const char* data, size_t len) const
+bool SlabAlloc::validate_buffer(const char* data, size_t len, int* get_version) const
 {
     // Verify that data is 64bit aligned
     if (len < sizeof default_header || (len & 0x7) != 0)
@@ -306,15 +307,21 @@ bool SlabAlloc::validate_buffer(const char* data, size_t len) const
     const size_t valid_part = file_header[23] & 0x1;
 
     // Byte 4 and 5 (depending on valid_part) in the info block is version
-    const uint8_t version = file_header[valid_part ? 21 : 20];
-    if (version != 0)
-        return false; // unsupported version
+    const int version = static_cast<unsigned char>(file_header[20 + valid_part]);
+    if (get_version) {
+        *get_version = version;
+    }
+    else {
+        const int required_version = 0;
+        if (version != required_version) return false;
+    }
 
     // Top_ref should always point within buffer
     const uint64_t* const top_refs = reinterpret_cast<const uint64_t*>(data);
     const size_t ref = to_ref(top_refs[valid_part]);
-    if (ref >= len)
+    if (ref >= len) {
         return false; // invalid top_ref
+    }
 
     return true;
 }

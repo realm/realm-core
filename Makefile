@@ -1,5 +1,6 @@
-SUBDIRS = src test
+SUBDIRS = src test convert
 test_DEPS = src
+convert_DEPS = src
 
 include generic.mk
 

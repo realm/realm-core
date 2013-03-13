@@ -63,13 +63,18 @@ public:
     ///
     /// \param no_create Fail if the file does not already exist.
     ///
+    /// \param get_version If specified, store the file format version
+    /// number into the referenced integer. Otherwise fail if the file
+    /// format version is not exactly as expected.
+    ///
     /// \throw File::OpenError
-    void attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create);
+    void attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create,
+                     int* get_version = 0);
 
     /// Attach this allocator to the specified memory buffer.
     ///
     /// \throw InvalidDatabase
-    void attach_buffer(const char* data, size_t size, bool take_ownership);
+    void attach_buffer(const char* data, size_t size, bool take_ownership, int* get_version = 0);
 
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
@@ -123,7 +128,7 @@ private:
 #endif
 
     const FreeSpace& GetFreespace() const {return m_freeReadOnly;}
-    bool validate_buffer(const char* data, size_t len) const;
+    bool validate_buffer(const char* data, size_t len, int* get_version) const;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     void set_replication(Replication* r) { m_replication = r; }

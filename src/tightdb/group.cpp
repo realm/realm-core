@@ -109,11 +109,12 @@ void Group::create_from_file(const string& filename, OpenMode mode, bool do_init
 
     if (!do_init)  return;
 
+    const size_t top_ref = m_alloc.GetTopRef();
+
     // if we just created shared group, we have to wait with
     // actually creating it's datastructures until first write
-    if (m_is_shared && m_alloc.GetTopRef() == 0) return;
+    if (m_is_shared && top_ref == 0) return;
 
-    const size_t top_ref = m_alloc.GetTopRef();
     create_from_ref(top_ref); // FIXME: Throws and leaves the Group in peril
 }
 
