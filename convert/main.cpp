@@ -24,46 +24,204 @@ struct Converter {
 
     void convert()
     {
+        Group new_group;
         size_t top_ref = m_alloc.GetTopRef();
-        if (top_ref) convert_group(top_ref);
+        if (top_ref) convert_group(top_ref, new_group);
     }
 
 private:
     SlabAlloc& m_alloc;
     int m_version;
-    Group m_new_group;
 
-    void convert_group(size_t ref)
+    void convert_group(size_t ref, Group& new_group)
     {
         Wrap<Array> top(m_alloc);
         init(top, ref);
         Wrap<ArrayString> table_names(m_alloc);
-        Wrap<Array> table_refs(m_alloc);
+        Wrap<Array>       table_refs(m_alloc);
         init(table_names, top.get_as_ref(0));
         init(table_refs,  top.get_as_ref(1));
         size_t n = table_refs.size();
         for (size_t i=0; i<n; ++i) {
-            cout << "Converting table: '" << table_names.m_array.Get(i) << "'\n";
-            convert_table(table_refs.m_array.Get(i));
+            string name = table_names.m_array.Get(i); // FIXME: Explicit string length
+            cout << "Converting table: '" << name << "'\n";
+            TableRef new_table = new_group.get_table(name.c_str()); // FIXME: Explicit string length
+            convert_table_and_spec(table_refs.m_array.Get(i), *new_table);
         }
     }
 
-    void convert_table(size_t ref)
+    void convert_table_and_spec(size_t ref, Table& new_table)
     {
-        cerr << "table_ref = " << ref << "\n";
+        Wrap<Array> top(m_alloc);
+        init(top, ref);
+        convert_spec(top.get_as_ref(0), new_table.get_spec());
+        new_table.update_from_spec();
+        convert_columns(top.get_as_ref(0), top.get_as_ref(1), new_table);
     }
 
-    void convert_column()
+    void convert_spec(size_t ref, Spec& new_spec)
     {
+        Wrap<Array> top(m_alloc);
+        init(top, ref);
+        cout << "spec top size = " << top.size() << "\n";
+        if (top.size() != 2 && top.size() != 3)
+            throw runtime_error("Unexpected size of spec top array");
+        Wrap<Array>       column_types(m_alloc);
+        Wrap<ArrayString> column_names(m_alloc);
+        Wrap<Array>       column_subspecs(m_alloc);
+        init(column_types, top.get_as_ref(0));
+        init(column_names, top.get_as_ref(1));
+        if (2 < top.size()) init(column_subspecs, top.get_as_ref(2));
+        size_t name_ndx    = 0;
+        size_t subspec_ndx = 0;
+        size_t n = column_types.size();
+        for (size_t i=0; i<n; ++i) {
+            ColumnType type = ColumnType(column_types.m_array.Get(i));
+            cout << "col type: " << type << "\n";
+            DataType new_type;
+            switch (type) {
+                case col_type_Int:
+                case col_type_Bool:
+                case col_type_Date:
+                case col_type_Float:
+                case col_type_Double:
+                case col_type_String:
+                case col_type_Binary:
+                case col_type_Table:
+                case col_type_Mixed:
+                    new_type = DataType(type);
+                    break;
+                case col_type_StringEnum:
+                    new_type = type_String;
+                    break;
+                case col_attr_Indexed:
+                    continue;
+                case col_type_Reserved1:
+                case col_type_Reserved4:
+                case col_attr_Unique:
+                case col_attr_Sorted:
+                case col_attr_None:
+                    throw runtime_error("Unexpected column type");
+            }
+            string name = column_names.m_array.Get(name_ndx); // FIXME: Explicit string length
+            ++name_ndx;
+            cout << "col name: " << name << "\n";
+            if (new_type == type_Table) {
+                Spec subspec = new_spec.add_subtable_column(name.c_str()); // FIXME: Explicit string length
+                convert_spec(column_subspecs.get_as_ref(subspec_ndx), subspec);
+                ++subspec_ndx;
+            }
+            else {
+                new_spec.add_column(new_type, name.c_str());
+            }
+        }
+    }
+
+    void convert_columns(size_t spec_ref, size_t columns_ref, Table& new_table)
+    {
+        Wrap<Array>       column_types(m_alloc);
+        Wrap<ArrayString> column_names(m_alloc);
+        Wrap<Array>       column_subspecs(m_alloc);
+        Wrap<Array>       column_refs(m_alloc);
+        {
+            Wrap<Array> spec(m_alloc);
+            init(spec, spec_ref);
+            init(column_types, spec.get_as_ref(0));
+            init(column_names, spec.get_as_ref(1));
+            if (2 < spec.size()) init(column_subspecs, spec.get_as_ref(2));
+        }
+        init(column_refs, columns_ref);
+
+        size_t column_type_ndx    = 0;
+        size_t column_name_ndx    = 0;
+        size_t column_subspec_ndx = 0;
+        size_t n = new_table.get_column_count();
+        for (size_t i=0; i<n; ++i) {
+            ColumnType type = ColumnType(column_types.m_array.Get(i));
+            cout << "col type: " << type << "\n";
+            DataType new_type;
+            switch (type) {
+                case col_type_Int:
+                case col_type_Bool:
+                case col_type_Date:
+                case col_type_Float:
+                case col_type_Double:
+                case col_type_String:
+                case col_type_Binary:
+                case col_type_Table:
+                case col_type_Mixed:
+                    new_type = DataType(type);
+                    break;
+                case col_type_StringEnum:
+                    new_type = type_String;
+                    break;
+                case col_attr_Indexed:
+                    continue;
+                case col_type_Reserved1:
+                case col_type_Reserved4:
+                case col_attr_Unique:
+                case col_attr_Sorted:
+                case col_attr_None:
+                    throw runtime_error("Unexpected column type");
+            }
+
+/*
+        cout << "spec top size = " << spec.size() << "\n";
+        Wrap<Array>       column_types(m_alloc);
+        Wrap<ArrayString> column_names(m_alloc);
+        size_t n = new_table.get_column_count();
+        for (size_t i=0; i<n; ++i) {
+            ColumnType type = ColumnType(column_types.m_array.Get(i));
+            cout << "Col name: '" << column_names.m_array.Get(i) << "'\n";
+            size_t ref = column_refs.m_array.Get(j);
+            switch (type) {
+                case col_type_StringEnum:
+                    convert_string_enum_column(ref, column_refs.m_array.Get(j+1));
+                    j += 2;
+                    break;
+                case col_type_Table:
+                    convert_subtable_column(ref);
+                    ++j;
+                    break;
+                default:
+                    convert_column(type, ref);
+                    ++j;
+                    break;
+            }
+        }
+*/
+    }
+
+    void convert_column(ColumnType type, size_t ref)
+    {
+        cout << "column_type = " << type << "\n";
+        cout << "column_ref  = " << ref << "\n";
+    }
+
+    void convert_string_enum_column(size_t strings_ref, size_t refs_ref)
+    {
+        cout << "sring_enum_column_strings_ref = " << strings_ref << "\n";
+        cout << "sring_enum_column_refs_ref    = " << refs_ref << "\n";
+    }
+
+    void convert_subtable_column(size_t ref)
+    {
+        cout << "subtable_column_ref = " << ref << "\n";
     }
 
     template<class A> void init(Wrap<A>& array, size_t ref)
     {
+        if (init(array.m_array, ref)) array.m_must_destroy = true;
+    }
+
+    bool init(Array& array, size_t ref)
+    {
         // If conversion of the array is needed (a decision which may
         // be based on m_version) then that conversion should be done
         // here. When converting, allocate space for a new array, and
-        // set array.m_must_destroy = true.
-        array.m_array.UpdateRef(ref);
+        // return true.
+        array.UpdateRef(ref);
+        return false;
     }
 };
 
