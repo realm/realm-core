@@ -63,7 +63,6 @@ private:
     {
         Wrap<Array> top(m_alloc);
         init(top, ref);
-        cout << "spec top size = " << top.size() << "\n";
         if (top.size() != 2 && top.size() != 3)
             throw runtime_error("Unexpected size of spec top array");
         Wrap<Array>       column_types(m_alloc);
@@ -77,7 +76,6 @@ private:
         size_t n = column_types.size();
         for (size_t i=0; i<n; ++i) {
             ColumnType type = ColumnType(column_types.m_array.Get(i));
-            cout << "col type: " << type << "\n";
             DataType new_type;
             switch (type) {
                 case col_type_Int:
@@ -132,11 +130,13 @@ private:
         }
         init(column_refs, columns_ref);
 
+        size_t column_ref_ndx     = 0;
         size_t column_type_ndx    = 0;
-        size_t column_name_ndx    = 0;
         size_t column_subspec_ndx = 0;
         size_t n = new_table.get_column_count();
         for (size_t i=0; i<n; ++i) {
+            size_t column_ref = column_refs.m_array.Get(column_ref_ndx);
+            ++column_ref_ndx;
             ColumnType type;
             DataType new_type;
             bool indexed = false;
@@ -144,34 +144,41 @@ private:
             type = ColumnType(column_types.m_array.Get(column_type_ndx));
             switch (type) {
                 case col_type_Int:
-                    convert_column<int64_t>(new_table, i);
+                    convert_column<int64_t>(column_ref, new_table, i);
                     break;
                 case col_type_Bool:
-                    convert_column<bool>(new_table, i);
+                    convert_column<bool>(column_ref, new_table, i);
                     break;
                 case col_type_Date:
-                    convert_column<Date>(new_table, i);
+                    convert_column<Date>(column_ref, new_table, i);
                     break;
                 case col_type_Float:
-                    convert_column<float>(new_table, i);
+                    convert_column<float>(column_ref, new_table, i);
                     break;
                 case col_type_Double:
-                    convert_column<double>(new_table, i);
+                    convert_column<double>(column_ref, new_table, i);
                     break;
                 case col_type_String:
-                    convert_string_column(new_table, i);
+                    convert_string_column(column_ref, new_table, i);
                     break;
-                case col_type_StringEnum:
-                    convert_string_enum_column(new_table, i);
+                case col_type_StringEnum: {
+                    size_t strings_ref = column_ref;
+                    size_t refs_ref    = column_refs.m_array.Get(column_ref_ndx);;
+                    ++column_ref_ndx;
+                    convert_string_enum_column(strings_ref, refs_ref, new_table, i);
                     break;
+                }
                 case col_type_Binary:
-                    convert_column<double>(new_table, i);
+                    convert_binary_column(column_ref, new_table, i);
                     break;
-                case col_type_Table:
-                    convert_subtable_column(new_table, i);
+                case col_type_Table: {
+                    size_t subspec_ref = column_subspecs.get_as_ref(column_subspec_ndx);
+                    ++column_subspec_ndx;
+                    convert_subtable_column(subspec_ref, column_ref, new_table, i);
                     break;
+                }
                 case col_type_Mixed:
-                    convert_mixed_column(new_table, i);
+                    convert_mixed_column(column_ref, new_table, i);
                     break;
                 case col_attr_Indexed:
                     indexed = true;
@@ -184,50 +191,41 @@ private:
                 case col_attr_None:
                     throw runtime_error("Unexpected column type");
             }
+            if (indexed) new_table.set_index(i);
+            ++column_type_ndx;
         }
-
-/*
-        cout << "spec top size = " << spec.size() << "\n";
-        Wrap<Array>       column_types(m_alloc);
-        Wrap<ArrayString> column_names(m_alloc);
-        size_t n = new_table.get_column_count();
-        for (size_t i=0; i<n; ++i) {
-            ColumnType type = ColumnType(column_types.m_array.Get(i));
-            cout << "Col name: '" << column_names.m_array.Get(i) << "'\n";
-            size_t ref = column_refs.m_array.Get(j);
-            switch (type) {
-                case col_type_StringEnum:
-                    convert_string_enum_column(ref, column_refs.m_array.Get(j+1));
-                    j += 2;
-                    break;
-                case col_type_Table:
-                    convert_subtable_column(ref);
-                    ++j;
-                    break;
-                default:
-                    convert_column(type, ref);
-                    ++j;
-                    break;
-            }
-        }
-*/
     }
 
-    void convert_column(ColumnType type, size_t ref)
+    template<class T> void convert_column(size_t ref, Table& new_table, size_t col_ndx)
     {
-        cout << "column_type = " << type << "\n";
         cout << "column_ref  = " << ref << "\n";
     }
 
-    void convert_string_enum_column(size_t strings_ref, size_t refs_ref)
+    void convert_string_column(size_t ref, Table& new_table, size_t col_ndx)
+    {
+        cout << "sring_column_ref = " << ref << "\n";
+    }
+
+    void convert_string_enum_column(size_t strings_ref, size_t refs_ref, Table& new_table, size_t col_ndx)
     {
         cout << "sring_enum_column_strings_ref = " << strings_ref << "\n";
         cout << "sring_enum_column_refs_ref    = " << refs_ref << "\n";
     }
 
-    void convert_subtable_column(size_t ref)
+    void convert_binary_column(size_t ref, Table& new_table, size_t col_ndx)
     {
-        cout << "subtable_column_ref = " << ref << "\n";
+        cout << "binary_column_ref = " << ref << "\n";
+    }
+
+    void convert_subtable_column(size_t subspec_ref, size_t column_ref, Table& new_table, size_t col_ndx)
+    {
+        cout << "subtable_column_subspec_ref = " << subspec_ref << "\n";
+        cout << "subtable_column_column_ref  = " << column_ref << "\n";
+    }
+
+    void convert_mixed_column(size_t ref, Table& new_table, size_t col_ndx)
+    {
+        cout << "mixed_column_ref = " << ref << "\n";
     }
 
     template<class A> void init(Wrap<A>& array, size_t ref)
