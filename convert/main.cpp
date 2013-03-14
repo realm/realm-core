@@ -137,26 +137,46 @@ private:
         size_t column_subspec_ndx = 0;
         size_t n = new_table.get_column_count();
         for (size_t i=0; i<n; ++i) {
-            ColumnType type = ColumnType(column_types.m_array.Get(i));
-            cout << "col type: " << type << "\n";
+            ColumnType type;
             DataType new_type;
+            bool indexed = false;
+          again:
+            type = ColumnType(column_types.m_array.Get(column_type_ndx));
             switch (type) {
                 case col_type_Int:
+                    convert_column<int64_t>(new_table, i);
+                    break;
                 case col_type_Bool:
+                    convert_column<bool>(new_table, i);
+                    break;
                 case col_type_Date:
+                    convert_column<Date>(new_table, i);
+                    break;
                 case col_type_Float:
+                    convert_column<float>(new_table, i);
+                    break;
                 case col_type_Double:
+                    convert_column<double>(new_table, i);
+                    break;
                 case col_type_String:
-                case col_type_Binary:
-                case col_type_Table:
-                case col_type_Mixed:
-                    new_type = DataType(type);
+                    convert_string_column(new_table, i);
                     break;
                 case col_type_StringEnum:
-                    new_type = type_String;
+                    convert_string_enum_column(new_table, i);
+                    break;
+                case col_type_Binary:
+                    convert_column<double>(new_table, i);
+                    break;
+                case col_type_Table:
+                    convert_subtable_column(new_table, i);
+                    break;
+                case col_type_Mixed:
+                    convert_mixed_column(new_table, i);
                     break;
                 case col_attr_Indexed:
-                    continue;
+                    indexed = true;
+                    ++column_type_ndx;
+                    goto again;
                 case col_type_Reserved1:
                 case col_type_Reserved4:
                 case col_attr_Unique:
@@ -164,6 +184,7 @@ private:
                 case col_attr_None:
                     throw runtime_error("Unexpected column type");
             }
+        }
 
 /*
         cout << "spec top size = " << spec.size() << "\n";
