@@ -1,6 +1,8 @@
 #include <cstring>
 #ifdef _WIN32
-#  include <windows.h>
+	#include <windows.h>
+#else
+	#include <ctype.h>
 #endif
 
 #include <tightdb/utf8.hpp>
@@ -120,7 +122,25 @@ bool utf8case_single(const char* source, char* destination, int upper)
 
     return true;
 #else
-    memcpy(destination, source, sequence_length(source));
+
+	// On *nix we can only convert 1-byte UTF-8 characters which map to 127-bit ASCII. Multibyte UTF-8 characters
+	// are just memcopied unchanged. Warning: This may give wrong search results in case insensitive queries.
+	if(sequence_length(source) == 1) {
+		char c;
+		if(upper) {
+			c = (char)toupper(*source);
+		}
+		else {
+			c = (char)tolower(*source);			
+		}
+		*destination = c;
+	}
+	else {
+	    memcpy(destination, source, sequence_length(source));
+	}
+
+
+//    memcpy(destination, source, sequence_length(source));
     static_cast<void>(upper);
     return true;
 #endif

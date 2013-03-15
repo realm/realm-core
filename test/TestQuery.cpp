@@ -1347,12 +1347,16 @@ TEST(TestQueryEnums)
     CHECK_EQUAL(21, tv1.get_source_ndx(4));
 }
 
-#if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
 
 #define uY  "\x0CE\x0AB"              // greek capital letter upsilon with dialytika (U+03AB)
 #define uYd "\x0CE\x0A5\x0CC\x088"    // decomposed form (Y followed by two dots)
 #define uy  "\x0CF\x08B"              // greek small letter upsilon with dialytika (U+03AB)
 #define uyd "\x0cf\x085\x0CC\x088"    // decomposed form (Y followed by two dots)
+
+#define uA  "\x0c3\x085"         // danish capital A with ring above (as in BLAABAERGROED)
+#define uAd "\x041\x0cc\x08a"    // decomposed form (A (41) followed by ring)
+#define ua  "\x0c3\x0a5"         // danish lower case a with ring above (as in blaabaergroed)
+#define uad "\x061\x0cc\x08a"    // decomposed form (a (41) followed by ring)
 
 TEST(TestQueryCaseSensitivity)
 {
@@ -1367,6 +1371,8 @@ TEST(TestQueryCaseSensitivity)
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
 }
+
+#if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
 
 TEST(TestQueryUnicode2)
 {
@@ -1394,11 +1400,6 @@ TEST(TestQueryUnicode2)
     CHECK_EQUAL(1, tv3.size());
     CHECK_EQUAL(1, tv3.get_source_ndx(0));
 }
-
-#define uA  "\x0c3\x085"         // danish capital A with ring above (as in BLAABAERGROED)
-#define uAd "\x041\x0cc\x08a"    // decomposed form (A (41) followed by ring)
-#define ua  "\x0c3\x0a5"         // danish lower case a with ring above (as in blaabaergroed)
-#define uad "\x061\x0cc\x08a"    // decomposed form (a (41) followed by ring)
 
 TEST(TestQueryUnicode3)
 {
@@ -1434,6 +1435,7 @@ TEST(TestQueryUnicode3)
     CHECK_EQUAL(3, tv4.get_source_ndx(0));
 }
 
+#endif 
 
 TEST(TestQueryFindAll_BeginsUNICODE)
 {
@@ -1499,8 +1501,6 @@ TEST(TestQueryFindAll_ContainsUNICODE)
     CHECK_EQUAL(2, tv2.get_source_ndx(2));
     CHECK_EQUAL(3, tv2.get_source_ndx(3));
 }
-
-#endif
 
 TEST(TestQuerySyntaxCheck)
 {
