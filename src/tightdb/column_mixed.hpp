@@ -85,6 +85,10 @@ public:
     const char* get_string(size_t ndx) const;
     BinaryData get_binary(size_t ndx) const;
 
+    /// The returned array ref is zero if the specified row does not
+    /// contain a subtable.
+    size_t get_subtable_ref(std::size_t row_idx) const TIGHTDB_NOEXCEPT;
+
     /// The returned size is zero if the specified row does not
     /// contain a subtable.
     size_t get_subtable_size(std::size_t row_idx) const TIGHTDB_NOEXCEPT;

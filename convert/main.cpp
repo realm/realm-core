@@ -2,10 +2,13 @@
 #include <string>
 #include <iostream>
 
+#include <tightdb/column_mixed.hpp>
 #include <tightdb/group.hpp>
 
 using namespace std;
 using namespace tightdb;
+
+// FIXME: Command line switch to optimize output group
 
 namespace {
 
@@ -20,18 +23,18 @@ template<class A> struct Wrap {
 
 
 struct Converter {
-    Converter(SlabAlloc& a, int v): m_alloc(a), m_version(v) {}
+    Converter(SlabAlloc& a, int v, Group& g): m_alloc(a), m_version(v), m_new_group(g) {}
 
     void convert()
     {
-        Group new_group;
         size_t top_ref = m_alloc.GetTopRef();
-        if (top_ref) convert_group(top_ref, new_group);
+        if (top_ref) convert_group(top_ref, m_new_group);
     }
 
 private:
     SlabAlloc& m_alloc;
     int m_version;
+    Group &m_new_group;
 
     void convert_group(size_t ref, Group& new_group)
     {
@@ -130,15 +133,33 @@ private:
         }
         init(column_refs, columns_ref);
 
+        size_t num_cols = new_table.get_column_count();
+
+        // Determine number of rows
+        size_t num_rows = 0;
+        if (0 < num_cols) {
+            Wrap<Array> column_root(m_alloc);
+            init(column_root, column_refs.m_array.Get(0));
+            if (column_root.m_array.is_leaf()) {
+                num_rows = column_root.size();
+            }
+            else {
+                Wrap<Array> root_offsets(m_alloc);
+                init(root_offsets, column_root.get_as_ref(0));
+                size_t num_offsets = root_offsets.size();
+                num_rows = num_offsets  == 0 ? 0 : size_t(root_offsets.m_array.Get(num_offsets-1));
+            }
+        }
+
+        new_table.add_empty_row(num_rows);
+
         size_t column_ref_ndx     = 0;
         size_t column_type_ndx    = 0;
         size_t column_subspec_ndx = 0;
-        size_t n = new_table.get_column_count();
-        for (size_t i=0; i<n; ++i) {
+        for (size_t i=0; i<num_cols; ++i) {
             size_t column_ref = column_refs.m_array.Get(column_ref_ndx);
             ++column_ref_ndx;
             ColumnType type;
-            DataType new_type;
             bool indexed = false;
           again:
             type = ColumnType(column_types.m_array.Get(column_type_ndx));
@@ -203,13 +224,13 @@ private:
 
     void convert_string_column(size_t ref, Table& new_table, size_t col_ndx)
     {
-        cout << "sring_column_ref = " << ref << "\n";
+        cout << "string_column_ref = " << ref << "\n";
     }
 
     void convert_string_enum_column(size_t strings_ref, size_t refs_ref, Table& new_table, size_t col_ndx)
     {
-        cout << "sring_enum_column_strings_ref = " << strings_ref << "\n";
-        cout << "sring_enum_column_refs_ref    = " << refs_ref << "\n";
+        cout << "string_enum_column_strings_ref = " << strings_ref << "\n";
+        cout << "string_enum_column_refs_ref    = " << refs_ref << "\n";
     }
 
     void convert_binary_column(size_t ref, Table& new_table, size_t col_ndx)
@@ -221,11 +242,45 @@ private:
     {
         cout << "subtable_column_subspec_ref = " << subspec_ref << "\n";
         cout << "subtable_column_column_ref  = " << column_ref << "\n";
+        Column col(column_ref, 0, 0, m_alloc);
+        size_t n = col.Size();
+        if (n != new_table.size()) throw runtime_error("Unexpected column size");
+        for (size_t i=0; i<n; ++i) {
+            size_t subtable_ref = col.GetAsRef(i);
+            if (!subtable_ref) continue;
+            TableRef subtable = new_table.get_subtable(col_ndx, i);
+            convert_columns(subspec_ref, col.Get(i), *subtable);
+        }
     }
 
     void convert_mixed_column(size_t ref, Table& new_table, size_t col_ndx)
     {
         cout << "mixed_column_ref = " << ref << "\n";
+        ColumnMixed col(m_alloc, 0, 0, 0, 0, ref);
+        size_t n = col.Size();
+        if (n != new_table.size()) throw runtime_error("Unexpected column size");
+        for (size_t i=0; i<n; ++i) {
+            Mixed m;
+            switch (col.get_type(i)) {
+                case type_Int:    m.set_int(col.get_int(i));       break;
+                case type_Bool:   m.set_bool(col.get_bool(i));     break;
+                case type_Date:   m.set_date(col.get_date(i));     break;
+                case type_Float:  m.set_float(col.get_float(i));   break;
+                case type_Double: m.set_double(col.get_double(i)); break;
+                case type_String: m.set_string(col.get_string(i)); break;
+                case type_Binary: m.set_binary(col.get_binary(i)); break;
+                case type_Table: {
+                    new_table.clear_subtable(col_ndx, i);
+                    size_t subtable_ref = col.get_subtable_ref(i);
+                    TableRef subtable = new_table.get_subtable(col_ndx, i);
+                    convert_table_and_spec(subtable_ref, *subtable);
+                    continue;
+                }
+                case type_Mixed:
+                    throw runtime_error("Unexpected mixed type");
+            }
+            new_table.set_mixed(col_ndx, i, m);
+        }
     }
 
     template<class A> void init(Wrap<A>& array, size_t ref)
@@ -302,7 +357,9 @@ int main(int argc, char* argv[])
     }
     else if (version < 1) {
         cout << "Converting to version 1\n";
-        Converter cvt(alloc, version);
+        Group new_group;
+        Converter cvt(alloc, version, new_group);
         cvt.convert();
+        new_group.write(database_file+".new");
     }
 }

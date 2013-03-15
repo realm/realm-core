@@ -38,14 +38,20 @@ inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* table, std::size_
     Create(alloc, table, column_ndx, parent, ndx_in_parent, ref);
 }
 
+inline size_t ColumnMixed::get_subtable_ref(size_t row_idx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(row_idx < m_types->Size());
+    if (m_types->Get(row_idx) != type_Table) return 0;
+    return m_refs->GetAsRef(row_idx);
+}
+
 inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const TIGHTDB_NOEXCEPT
 {
     // FIXME: If the table object is cached, it is possible to get the
     // size from it. Maybe it is faster in general to check for the
     // the presence of the cached object and use it when available.
-    TIGHTDB_ASSERT(row_idx < m_types->Size());
-    if (m_types->Get(row_idx) != type_Table) return 0;
-    const size_t top_ref = m_refs->GetAsRef(row_idx);
+    const size_t top_ref = get_subtable_ref(row_idx);
+    if (!top_ref) return 0;
     const size_t columns_ref = Array(top_ref, 0, 0, m_refs->GetAllocator()).GetAsRef(1);
     const Array columns(columns_ref, 0, 0, m_refs->GetAllocator());
     if (columns.is_empty()) return 0;

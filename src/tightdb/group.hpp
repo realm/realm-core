@@ -260,6 +260,8 @@ private:
     struct shared_tag {};
     Group(shared_tag) TIGHTDB_NOEXCEPT;
 
+    Group(const Group&); // Disable copying
+
     Table* get_table_ptr(const char* name);
     Table* get_table_ptr(const char* name, bool& was_created);
     const Table* get_table_ptr(const char* name) const;
