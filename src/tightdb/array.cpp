@@ -15,6 +15,7 @@
 #include <tightdb/column.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
+#include <tightdb/utilities.hpp>
 
 using namespace std;
 
@@ -147,7 +148,7 @@ static size_t BitWidth(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan instruction and it is fast, then this function could be implemented simply as (v<2 ? v : 2<<rev_bitscan(rev_bitscan(v))).
 
-    if ((v >> 4) == 0) {
+    if ((uint64_t(v) >> 4) == 0) {
         static const int8_t bits[] = {0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
         return bits[(int8_t)v];
     }
@@ -156,7 +157,7 @@ static size_t BitWidth(int64_t v)
     if (v < 0) v = ~v;
 
     // Then check if bits 15-31 used (32b), 7-31 used (16b), else (8b)
-    return v >> 31 ? 64 : v >> 15 ? 32 : v >> 7 ? 16 : 8;
+    return uint64_t(v) >> 31 ? 64 : uint64_t(v) >> 15 ? 32 : uint64_t(v) >> 7 ? 16 : 8;
 }
 
 // Allocates space for 'count' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
@@ -215,10 +216,10 @@ void Array::Clear()
     // Make sure we don't have any dangling references
     if (m_hasRefs) {
         for (size_t i = 0; i < size(); ++i) {
-            const size_t ref = GetAsRef(i);
-            if (ref == 0 || ref & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
+            const int64_t v = Get(i);
+            if (v == 0 || v & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
 
-            Array sub(ref, this, i, m_alloc);
+            Array sub(to_ref(v), this, i, m_alloc);
             sub.Destroy();
         }
     }
@@ -604,7 +605,7 @@ size_t Array::FirstSetBit64(int64_t v) const
     return __builtin_clzll(v);
 #else
     unsigned int v0 = (unsigned int)v;
-    unsigned int v1 = (unsigned int)(v >> 32);
+    unsigned int v1 = (unsigned int)(uint64_t(v) >> 32);
     size_t r;
 
     if (v0 != 0)
@@ -1739,7 +1740,7 @@ void Array::ToDot(std::ostream& out, const char* title) const
         if (m_hasRefs) {
             // zero-refs and refs that are not 64-aligned do not point to sub-trees
             if (v == 0) out << "<TD>none";
-            else if (v & 0x1) out << "<TD BGCOLOR=\"grey90\">" << (v >> 1);
+            else if (v & 0x1) out << "<TD BGCOLOR=\"grey90\">" << (uint64_t(v) >> 1);
             else out << "<TD PORT=\"" << i << "\">";
         }
         else out << "<TD>" << v;
@@ -1898,7 +1899,6 @@ template<int width> inline size_t upper_bound(const char* header, int64_t value)
     return i;
 }
 
-
 // Find the child that contains the specified local tree index.
 // Returns (child_ndx, local_tree_offset) where 'local_tree_offset' is
 // the local tree index offset of the located child.
@@ -1907,7 +1907,7 @@ find_child_offset(const char* header, size_t local_ndx) TIGHTDB_NOEXCEPT
 {
     size_t child_ndx = upper_bound<width>(header, local_ndx);
     size_t local_tree_offset = child_ndx == 0 ? 0 :
-        get_direct<width>(tightdb::Array::get_data_from_header(header), child_ndx-1);
+        tightdb::to_ref(get_direct<width>(tightdb::Array::get_data_from_header(header), child_ndx-1));
     return make_pair(child_ndx, local_tree_offset);
 }
 
@@ -2253,10 +2253,10 @@ top:
                 // might be so many matches that it has branched into a column
                 size_t row_ref;
                 if (!sub_isnode)
-                    row_ref = get_direct(sub_data, sub_width, 0);
+                    row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
                 else {
                     const Array sub(ref, NULL, 0, m_alloc);
-                    row_ref = sub.column_get(0);
+                    row_ref = to_size_t(sub.column_get(0));
                 }
 
                 // If the last byte in the stored key is zero, we know that we have
@@ -2357,7 +2357,7 @@ top:
                 if (!sub_isnode) {
                     const size_t sub_width = get_width_from_header(sub_header);
                     const char* sub_data = get_data_from_header(sub_header);
-                    const size_t first_row_ref = get_direct(sub_data, sub_width, 0);
+                    const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
 
                     // If the last byte in the stored key is not zero, we have
                     // not yet compared against the entire (target) string
@@ -2371,13 +2371,13 @@ top:
                     const size_t sub_len  = get_len_from_header(sub_header);
 
                     for (size_t i = 0; i < sub_len; ++i) {
-                        const size_t row_ref = get_direct(sub_data, sub_width, i);
+                        const size_t row_ref = to_size_t(get_direct(sub_data, sub_width, i));
                         result.add(row_ref);
                     }
                 }
                 else {
                     const Column sub(ref, NULL, 0, m_alloc);
-                    const size_t first_row_ref = sub.Get(0);
+                    const size_t first_row_ref = to_size_t(sub.Get(0));
 
                     // If the last byte in the stored key is not zero, we have
                     // not yet compared against the entire (target) string
@@ -2391,7 +2391,7 @@ top:
                     const size_t sub_len  = sub.Size();
 
                     for (size_t i = 0; i < sub_len; ++i) {
-                        const size_t row_ref = sub.Get(i);
+                        const size_t row_ref = to_size_t(sub.Get(i));
                         result.add(row_ref);
                     }
                 }
@@ -2489,7 +2489,7 @@ top:
 
                     const char* sub_data = get_data_from_header(sub_header);
                     const size_t sub_width  = get_width_from_header(sub_header);
-                    row_ref = get_direct(sub_data, sub_width, 0);
+                    row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
                 }
                 else {
                     const Column sub(ref, NULL, 0, m_alloc);
@@ -2499,7 +2499,7 @@ top:
                     // compared against the entire (target) string
                     if (!(stored_key << 24)) return sub_count;
 
-                    row_ref = sub.Get(0);
+                    row_ref = to_size_t(sub.Get(0));
                 }
 
                 const char* const str = (*get_func)(column, row_ref);

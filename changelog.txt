@@ -13,6 +13,10 @@ Format:
 ==================
 
 
+2013-03-11 (Kristian Spangsege)
++ On Linux and OS X, installed shared libraries now carry a platform dependent API version which is computed from a platform neutral version specifier (same as GNU Libtool). This allows for multiple versions of the shared library to be concurrently installed.
+
+
 2013-02-24 (Kristian Spangsege)
 + Adding copy constructors for Table and BasicTable.
 + Adding Table::copy(), BasicTable::copy() and LangBindHelper::copy_table().

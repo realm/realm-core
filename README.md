@@ -74,10 +74,23 @@ GCC. Here is an example:
 Building a distribution package
 -------------------------------
 
+In general, it is necessary (and crucial) to properly update the
+versions of the following shared libraries (do this by editing the the
+indicated Makefiles):
+
+    libtightdb.so      (/tightdb/src/tightdb/Makefile)
+    libtightdb-c.so    (/tightdb_c/src/tightdb/c/Makefile)
+    libtightdb-objc.so (/tightdb_objc/src/tightdb/objc/Makefile)
+
+Please note that these versions are completely independent of each
+other and of the package version. When the library versions are set
+correctly, do one of the following:
+
     sh build.sh src-dist all   # Source distribution
     sh build.sh bin-dist all   # Prebuilt core library
 
-If everything went well, consider tagging and then making the package again:
+If everything went well, consider tagging and then rebuilding the
+package:
 
     git tag -a 'bNNN' -m "New tag for 'Build NNN'"
     git push --tags

@@ -277,9 +277,9 @@ const Group& SharedGroup::begin_read()
         }
 
         // Get the current top ref
-        new_topref   = info->current_top;
-        new_filesize = info->filesize;
-        m_version    = info->current_version;
+        new_topref   = to_size_t(info->current_top);
+        new_filesize = to_size_t(info->filesize);
+        m_version    = to_size_t(info->current_version); // fixme, remember to remove to_size_t when m_version becomes 64 bit
 
         // Update reader list
         if (ringbuf_is_empty()) {
@@ -367,8 +367,8 @@ Group& SharedGroup::begin_write()
     pthread_mutex_lock(&info->writemutex);
 
     // Get the current top ref
-    const size_t new_topref   = info->current_top;
-    const size_t new_filesize = info->filesize;
+    const size_t new_topref   = to_size_t(info->current_top);
+    const size_t new_filesize = to_size_t(info->filesize);
 
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
@@ -686,7 +686,7 @@ void SharedGroup::zero_free_space()
     pthread_mutex_lock(&info->readmutex);
     {
         current_version = info->current_version + 1;
-        file_size = info->filesize;
+        file_size = to_size_t(info->filesize);
 
         if (ringbuf_is_empty())
             readlock_version = current_version;
