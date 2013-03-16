@@ -56,9 +56,6 @@ public:
 private:
     Array m_offsets;
     ArrayBlob m_blob;
-
-    const char* Get(size_t ndx) const TIGHTDB_NOEXCEPT; // FIXME: Delete
-    size_t GetLen(size_t ndx) const TIGHTDB_NOEXCEPT; // FIXME: Delete
 };
 
 

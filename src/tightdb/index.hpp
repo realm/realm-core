@@ -27,7 +27,7 @@ namespace tightdb {
 class Index : public Column {
 public:
     Index();
-    Index(ColumnDef type, Array* parent=NULL, size_t pndx=0);
+    Index(Array::ColumnDef, Array* = 0, size_t pndx=0);
     Index(size_t ref);
     Index(size_t ref, Array* parent, size_t pndx);
 

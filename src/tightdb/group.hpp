@@ -296,10 +296,10 @@ private:
 // ownership of the underlying memory, causes lots of problems with
 // robustness both here and in other places.
 inline Group::Group():
-    m_top(coldef_HasRefs, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
-    m_freePositions(coldef_Normal, NULL, 0, m_alloc),
-    m_freeLengths(coldef_Normal, NULL, 0, m_alloc),
-    m_freeVersions(coldef_Normal, NULL, 0, m_alloc), m_is_shared(false)
+    m_top(Array::coldef_HasRefs, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
+    m_freePositions(Array::coldef_Normal, NULL, 0, m_alloc),
+    m_freeLengths(Array::coldef_Normal, NULL, 0, m_alloc),
+    m_freeVersions(Array::coldef_Normal, NULL, 0, m_alloc), m_is_shared(false)
 {
     // FIXME: Arrays are leaked when create() throws
     create();
@@ -385,7 +385,7 @@ inline const char* Group::get_table_name(std::size_t table_ndx) const
 {
     TIGHTDB_ASSERT(m_top.IsValid());
     TIGHTDB_ASSERT(table_ndx < m_tableNames.size());
-    return m_tableNames.Get(table_ndx);
+    return m_tableNames.get_c_str(table_ndx);
 }
 
 inline const Table* Group::get_table_ptr(std::size_t ndx) const
@@ -497,7 +497,7 @@ template<class S> size_t Group::write_to_stream(S& out)
     // When serializing to disk we dont want
     // to include free space tracking as serialized
     // files are written without any free space.
-    Array top(coldef_HasRefs, NULL, 0, m_alloc);
+    Array top(Array::coldef_HasRefs, NULL, 0, m_alloc);
     top.add(m_top.Get(0));
     top.add(m_top.Get(1));
 
@@ -509,7 +509,7 @@ template<class S> size_t Group::write_to_stream(S& out)
     // (since we initially set the last bit in the file header to
     //  zero, it is the first ref block that is valid)
     out.seek(0);
-    out.write((const char*)&topPos, 8);
+    out.write(reinterpret_cast<const char*>(&topPos), 8);
 
     // FIXME: To be 100% robust with respect to being able to detect
     // afterwards whether the file was completely written, we would
@@ -541,7 +541,7 @@ void Group::to_json(S& out) const
     out << "{";
 
     for (size_t i = 0; i < m_tables.size(); ++i) {
-        const char* const name = m_tableNames.Get(i);
+        const char* const name = m_tableNames.get_c_str(i);
         const Table* const table = get_table_ptr(i);
 
         if (i) out << ",";

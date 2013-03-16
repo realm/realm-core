@@ -20,108 +20,108 @@ TEST_FIXTURE(db_setup_string, ArrayStringMultiEmpty)
     c.add("");
     CHECK_EQUAL(6, c.size());
 
-    CHECK_EQUAL("", c.Get(0));
-    CHECK_EQUAL("", c.Get(1));
-    CHECK_EQUAL("", c.Get(2));
-    CHECK_EQUAL("", c.Get(3));
-    CHECK_EQUAL("", c.Get(4));
-    CHECK_EQUAL("", c.Get(5));
+    CHECK_EQUAL(StringRef(""), c.get(0));
+    CHECK_EQUAL(StringRef(""), c.get(1));
+    CHECK_EQUAL(StringRef(""), c.get(2));
+    CHECK_EQUAL(StringRef(""), c.get(3));
+    CHECK_EQUAL(StringRef(""), c.get(4));
+    CHECK_EQUAL(StringRef(""), c.get(5));
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringSetExpand4)
 {
-    c.Set(0, "hey");
+    c.set(0, "hey");
 
     CHECK_EQUAL(6, c.size());
-    CHECK_EQUAL("hey", c.Get(0));
-    CHECK_EQUAL("", c.Get(1));
-    CHECK_EQUAL("", c.Get(2));
-    CHECK_EQUAL("", c.Get(3));
-    CHECK_EQUAL("", c.Get(4));
-    CHECK_EQUAL("", c.Get(5));
+    CHECK_EQUAL(StringRef("hey"), c.get(0));
+    CHECK_EQUAL(StringRef(""), c.get(1));
+    CHECK_EQUAL(StringRef(""), c.get(2));
+    CHECK_EQUAL(StringRef(""), c.get(3));
+    CHECK_EQUAL(StringRef(""), c.get(4));
+    CHECK_EQUAL(StringRef(""), c.get(5));
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringSetExpand8)
 {
-    c.Set(1, "test");
+    c.set(1, "test");
 
     CHECK_EQUAL(6, c.size());
-    CHECK_EQUAL("hey", c.Get(0));
-    CHECK_EQUAL("test", c.Get(1));
-    CHECK_EQUAL("", c.Get(2));
-    CHECK_EQUAL("", c.Get(3));
-    CHECK_EQUAL("", c.Get(4));
-    CHECK_EQUAL("", c.Get(5));
+    CHECK_EQUAL(StringRef("hey"), c.get(0));
+    CHECK_EQUAL(StringRef("test"), c.get(1));
+    CHECK_EQUAL(StringRef(""), c.get(2));
+    CHECK_EQUAL(StringRef(""), c.get(3));
+    CHECK_EQUAL(StringRef(""), c.get(4));
+    CHECK_EQUAL(StringRef(""), c.get(5));
 }
 
 TEST_FIXTURE(db_setup_string, ArrayArrayStringAdd0)
 {
     c.Clear();
     c.add();
-    CHECK_EQUAL("", c.Get(0));
+    CHECK_EQUAL(StringRef(""), c.get(0));
     CHECK_EQUAL(1, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd1)
 {
     c.add("a");
-    CHECK_EQUAL("",  c.Get(0));
-    CHECK_EQUAL("a", c.Get(1));
+    CHECK_EQUAL(StringRef(""),  c.get(0));
+    CHECK_EQUAL(StringRef("a"), c.get(1));
     CHECK_EQUAL(2, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd2)
 {
     c.add("bb");
-    CHECK_EQUAL("",   c.Get(0));
-    CHECK_EQUAL("a",  c.Get(1));
-    CHECK_EQUAL("bb", c.Get(2));
+    CHECK_EQUAL(StringRef(""),   c.get(0));
+    CHECK_EQUAL(StringRef("a"),  c.get(1));
+    CHECK_EQUAL(StringRef("bb"), c.get(2));
     CHECK_EQUAL(3, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd3)
 {
     c.add("ccc");
-    CHECK_EQUAL("",    c.Get(0));
-    CHECK_EQUAL("a",   c.Get(1));
-    CHECK_EQUAL("bb",  c.Get(2));
-    CHECK_EQUAL("ccc", c.Get(3));
+    CHECK_EQUAL(StringRef(""),    c.get(0));
+    CHECK_EQUAL(StringRef("a"),   c.get(1));
+    CHECK_EQUAL(StringRef("bb"),  c.get(2));
+    CHECK_EQUAL(StringRef("ccc"), c.get(3));
     CHECK_EQUAL(4, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd4)
 {
     c.add("dddd");
-    CHECK_EQUAL("",     c.Get(0));
-    CHECK_EQUAL("a",    c.Get(1));
-    CHECK_EQUAL("bb",   c.Get(2));
-    CHECK_EQUAL("ccc",  c.Get(3));
-    CHECK_EQUAL("dddd", c.Get(4));
+    CHECK_EQUAL(StringRef(""),     c.get(0));
+    CHECK_EQUAL(StringRef("a"),    c.get(1));
+    CHECK_EQUAL(StringRef("bb"),   c.get(2));
+    CHECK_EQUAL(StringRef("ccc"),  c.get(3));
+    CHECK_EQUAL(StringRef("dddd"), c.get(4));
     CHECK_EQUAL(5, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd8)
 {
     c.add("eeeeeeee");
-    CHECK_EQUAL("",     c.Get(0));
-    CHECK_EQUAL("a",    c.Get(1));
-    CHECK_EQUAL("bb",   c.Get(2));
-    CHECK_EQUAL("ccc",  c.Get(3));
-    CHECK_EQUAL("dddd", c.Get(4));
-    CHECK_EQUAL("eeeeeeee", c.Get(5));
+    CHECK_EQUAL(StringRef(""),     c.get(0));
+    CHECK_EQUAL(StringRef("a"),    c.get(1));
+    CHECK_EQUAL(StringRef("bb"),   c.get(2));
+    CHECK_EQUAL(StringRef("ccc"),  c.get(3));
+    CHECK_EQUAL(StringRef("dddd"), c.get(4));
+    CHECK_EQUAL(StringRef("eeeeeeee"), c.get(5));
     CHECK_EQUAL(6, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd16)
 {
     c.add("ffffffffffffffff");
-    CHECK_EQUAL("",     c.Get(0));
-    CHECK_EQUAL("a",    c.Get(1));
-    CHECK_EQUAL("bb",   c.Get(2));
-    CHECK_EQUAL("ccc",  c.Get(3));
-    CHECK_EQUAL("dddd", c.Get(4));
-    CHECK_EQUAL("eeeeeeee", c.Get(5));
-    CHECK_EQUAL("ffffffffffffffff", c.Get(6));
+    CHECK_EQUAL(StringRef(""),     c.get(0));
+    CHECK_EQUAL(StringRef("a"),    c.get(1));
+    CHECK_EQUAL(StringRef("bb"),   c.get(2));
+    CHECK_EQUAL(StringRef("ccc"),  c.get(3));
+    CHECK_EQUAL(StringRef("dddd"), c.get(4));
+    CHECK_EQUAL(StringRef("eeeeeeee"), c.get(5));
+    CHECK_EQUAL(StringRef("ffffffffffffffff"), c.get(6));
     CHECK_EQUAL(7, c.size());
 }
 
@@ -129,106 +129,106 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd32)
 {
     c.add("gggggggggggggggggggggggggggggggg");
 
-    CHECK_EQUAL("",     c.Get(0));
-    CHECK_EQUAL("a",    c.Get(1));
-    CHECK_EQUAL("bb",   c.Get(2));
-    CHECK_EQUAL("ccc",  c.Get(3));
-    CHECK_EQUAL("dddd", c.Get(4));
-    CHECK_EQUAL("eeeeeeee", c.Get(5));
-    CHECK_EQUAL("ffffffffffffffff", c.Get(6));
-    CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.Get(7));
+    CHECK_EQUAL(StringRef(""),     c.get(0));
+    CHECK_EQUAL(StringRef("a"),    c.get(1));
+    CHECK_EQUAL(StringRef("bb"),   c.get(2));
+    CHECK_EQUAL(StringRef("ccc"),  c.get(3));
+    CHECK_EQUAL(StringRef("dddd"), c.get(4));
+    CHECK_EQUAL(StringRef("eeeeeeee"), c.get(5));
+    CHECK_EQUAL(StringRef("ffffffffffffffff"), c.get(6));
+    CHECK_EQUAL(StringRef("gggggggggggggggggggggggggggggggg"), c.get(7));
     CHECK_EQUAL(8, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringSet1)
 {
-    c.Set(0, "ccc");
-    c.Set(1, "bb");
-    c.Set(2, "a");
-    c.Set(3, "");
+    c.set(0, "ccc");
+    c.set(1, "bb");
+    c.set(2, "a");
+    c.set(3, "");
 
-    CHECK_EQUAL("ccc",  c.Get(0));
-    CHECK_EQUAL("bb",   c.Get(1));
-    CHECK_EQUAL("a",    c.Get(2));
-    CHECK_EQUAL("",     c.Get(3));
-    CHECK_EQUAL("dddd", c.Get(4));
-    CHECK_EQUAL("eeeeeeee", c.Get(5));
-    CHECK_EQUAL("ffffffffffffffff", c.Get(6));
-    CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.Get(7));
+    CHECK_EQUAL(StringRef("ccc"),  c.get(0));
+    CHECK_EQUAL(StringRef("bb"),   c.get(1));
+    CHECK_EQUAL(StringRef("a"),    c.get(2));
+    CHECK_EQUAL(StringRef(""),     c.get(3));
+    CHECK_EQUAL(StringRef("dddd"), c.get(4));
+    CHECK_EQUAL(StringRef("eeeeeeee"), c.get(5));
+    CHECK_EQUAL(StringRef("ffffffffffffffff"), c.get(6));
+    CHECK_EQUAL(StringRef("gggggggggggggggggggggggggggggggg"), c.get(7));
     CHECK_EQUAL(8, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringInsert1)
 {
     // Insert in middle
-    c.Insert(4, "xx", 2);
+    c.insert(4, "xx", 2);
 
-    CHECK_EQUAL("ccc",  c.Get(0));
-    CHECK_EQUAL("bb",   c.Get(1));
-    CHECK_EQUAL("a",    c.Get(2));
-    CHECK_EQUAL("",     c.Get(3));
-    CHECK_EQUAL("xx",   c.Get(4));
-    CHECK_EQUAL("dddd", c.Get(5));
-    CHECK_EQUAL("eeeeeeee", c.Get(6));
-    CHECK_EQUAL("ffffffffffffffff", c.Get(7));
-    CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.Get(8));
+    CHECK_EQUAL(StringRef("ccc"),  c.get(0));
+    CHECK_EQUAL(StringRef("bb"),   c.get(1));
+    CHECK_EQUAL(StringRef("a"),    c.get(2));
+    CHECK_EQUAL(StringRef(""),     c.get(3));
+    CHECK_EQUAL(StringRef("xx"),   c.get(4));
+    CHECK_EQUAL(StringRef("dddd"), c.get(5));
+    CHECK_EQUAL(StringRef("eeeeeeee"), c.get(6));
+    CHECK_EQUAL(StringRef("ffffffffffffffff"), c.get(7));
+    CHECK_EQUAL(StringRef("gggggggggggggggggggggggggggggggg"), c.get(8));
     CHECK_EQUAL(9, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringDelete1)
 {
     // Delete from end
-    c.Delete(8);
+    c.erase(8);
 
-    CHECK_EQUAL("ccc",  c.Get(0));
-    CHECK_EQUAL("bb",   c.Get(1));
-    CHECK_EQUAL("a",    c.Get(2));
-    CHECK_EQUAL("",     c.Get(3));
-    CHECK_EQUAL("xx",   c.Get(4));
-    CHECK_EQUAL("dddd", c.Get(5));
-    CHECK_EQUAL("eeeeeeee", c.Get(6));
-    CHECK_EQUAL("ffffffffffffffff", c.Get(7));
+    CHECK_EQUAL(StringRef("ccc"),  c.get(0));
+    CHECK_EQUAL(StringRef("bb"),   c.get(1));
+    CHECK_EQUAL(StringRef("a"),    c.get(2));
+    CHECK_EQUAL(StringRef(""),     c.get(3));
+    CHECK_EQUAL(StringRef("xx"),   c.get(4));
+    CHECK_EQUAL(StringRef("dddd"), c.get(5));
+    CHECK_EQUAL(StringRef("eeeeeeee"), c.get(6));
+    CHECK_EQUAL(StringRef("ffffffffffffffff"), c.get(7));
     CHECK_EQUAL(8, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringDelete2)
 {
     // Delete from top
-    c.Delete(0);
+    c.erase(0);
 
-    CHECK_EQUAL("bb",   c.Get(0));
-    CHECK_EQUAL("a",    c.Get(1));
-    CHECK_EQUAL("",     c.Get(2));
-    CHECK_EQUAL("xx",   c.Get(3));
-    CHECK_EQUAL("dddd", c.Get(4));
-    CHECK_EQUAL("eeeeeeee", c.Get(5));
-    CHECK_EQUAL("ffffffffffffffff", c.Get(6));
+    CHECK_EQUAL(StringRef("bb"),   c.get(0));
+    CHECK_EQUAL(StringRef("a"),    c.get(1));
+    CHECK_EQUAL(StringRef(""),     c.get(2));
+    CHECK_EQUAL(StringRef("xx"),   c.get(3));
+    CHECK_EQUAL(StringRef("dddd"), c.get(4));
+    CHECK_EQUAL(StringRef("eeeeeeee"), c.get(5));
+    CHECK_EQUAL(StringRef("ffffffffffffffff"), c.get(6));
     CHECK_EQUAL(7, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringDelete3)
 {
     // Delete from middle
-    c.Delete(3);
+    c.erase(3);
 
-    CHECK_EQUAL("bb",   c.Get(0));
-    CHECK_EQUAL("a",    c.Get(1));
-    CHECK_EQUAL("",     c.Get(2));
-    CHECK_EQUAL("dddd", c.Get(3));
-    CHECK_EQUAL("eeeeeeee", c.Get(4));
-    CHECK_EQUAL("ffffffffffffffff", c.Get(5));
+    CHECK_EQUAL(StringRef("bb"),   c.get(0));
+    CHECK_EQUAL(StringRef("a"),    c.get(1));
+    CHECK_EQUAL(StringRef(""),     c.get(2));
+    CHECK_EQUAL(StringRef("dddd"), c.get(3));
+    CHECK_EQUAL(StringRef("eeeeeeee"), c.get(4));
+    CHECK_EQUAL(StringRef("ffffffffffffffff"), c.get(5));
     CHECK_EQUAL(6, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringDeleteAll)
 {
     // Delete all items one at a time
-    c.Delete(0);
-    c.Delete(0);
-    c.Delete(0);
-    c.Delete(0);
-    c.Delete(0);
-    c.Delete(0);
+    c.erase(0);
+    c.erase(0);
+    c.erase(0);
+    c.erase(0);
+    c.erase(0);
+    c.erase(0);
 
     CHECK(c.is_empty());
     CHECK_EQUAL(0, c.size());
@@ -244,27 +244,27 @@ TEST_FIXTURE(db_setup_string, ArrayStringInsert2)
     c.add("d");
 
     // Insert in top with expansion
-    c.Insert(0, "xxxxx", 5);
+    c.insert(0, "xxxxx", 5);
 
-    CHECK_EQUAL("xxxxx", c.Get(0));
-    CHECK_EQUAL("a",     c.Get(1));
-    CHECK_EQUAL("b",     c.Get(2));
-    CHECK_EQUAL("c",     c.Get(3));
-    CHECK_EQUAL("d",     c.Get(4));
+    CHECK_EQUAL(StringRef("xxxxx"), c.get(0));
+    CHECK_EQUAL(StringRef("a"),     c.get(1));
+    CHECK_EQUAL(StringRef("b"),     c.get(2));
+    CHECK_EQUAL(StringRef("c"),     c.get(3));
+    CHECK_EQUAL(StringRef("d"),     c.get(4));
     CHECK_EQUAL(5, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringInsert3)
 {
     // Insert in middle with expansion
-    c.Insert(3, "xxxxxxxxxx", 10);
+    c.insert(3, "xxxxxxxxxx", 10);
 
-    CHECK_EQUAL("xxxxx", c.Get(0));
-    CHECK_EQUAL("a",     c.Get(1));
-    CHECK_EQUAL("b",     c.Get(2));
-    CHECK_EQUAL("xxxxxxxxxx", c.Get(3));
-    CHECK_EQUAL("c",     c.Get(4));
-    CHECK_EQUAL("d",     c.Get(5));
+    CHECK_EQUAL(StringRef("xxxxx"), c.get(0));
+    CHECK_EQUAL(StringRef("a"),     c.get(1));
+    CHECK_EQUAL(StringRef("b"),     c.get(2));
+    CHECK_EQUAL(StringRef("xxxxxxxxxx"), c.get(3));
+    CHECK_EQUAL(StringRef("c"),     c.get(4));
+    CHECK_EQUAL(StringRef("d"),     c.get(5));
     CHECK_EQUAL(6, c.size());
 }
 
@@ -362,6 +362,27 @@ TEST_FIXTURE(db_setup_string, ArrayStringCount)
 
     const size_t count = c.count("foobar");
     CHECK_EQUAL(3, count);
+}
+
+TEST_FIXTURE(db_setup_string, ArrayStringWithZeroBytes)
+{
+    c.Clear();
+
+    const char buf_1[] = { 'a', 0, 'b', 0, 'c' };
+    const char buf_2[] = { 0, 'a', 0, 'b', 0 };
+    const char buf_3[] = { 0, 0, 0, 0, 0 };
+
+    c.add(buf_1, sizeof buf_1);
+    c.add(buf_2, sizeof buf_2);
+    c.add(buf_3, sizeof buf_3);
+
+    CHECK_EQUAL(5, c.get(0).m_size);
+    CHECK_EQUAL(5, c.get(1).m_size);
+    CHECK_EQUAL(5, c.get(2).m_size);
+
+    CHECK_EQUAL(StringRef(buf_1, sizeof buf_1), c.get(0));
+    CHECK_EQUAL(StringRef(buf_2, sizeof buf_2), c.get(1));
+    CHECK_EQUAL(StringRef(buf_3, sizeof buf_3), c.get(2));
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringDestroy)

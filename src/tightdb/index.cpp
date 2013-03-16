@@ -25,16 +25,16 @@ const Index GetIndexFromRef(const Array& parent, size_t ndx)
 
 namespace tightdb {
 
-Index::Index(): Column(coldef_HasRefs)
+Index::Index(): Column(Array::coldef_HasRefs)
 {
     // Add subcolumns for leafs
-    const Array values(coldef_Normal);
-    const Array refs(coldef_Normal); // we do not own these refs (to column positions), so no COLUMN_HASREF
+    const Array values(Array::coldef_Normal);
+    const Array refs(Array::coldef_Normal); // we do not own these refs (to column positions), so no COLUMN_HASREF
     m_array->add(intptr_t(values.GetRef()));
     m_array->add(intptr_t(refs.GetRef()));
 }
 
-Index::Index(ColumnDef type, Array* parent, size_t pndx): Column(type, parent, pndx) {}
+Index::Index(Array::ColumnDef type, Array* parent, size_t pndx): Column(type, parent, pndx) {}
 
 Index::Index(size_t ref): Column(ref) {}
 
@@ -139,21 +139,21 @@ void Index::Insert(size_t ndx, int64_t value, bool isLast)
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
-            Index newNode(coldef_InnerNode);
+            Index newNode(Array::coldef_InnerNode);
             newNode.NodeAdd(nc.ref1);
             newNode.NodeAdd(GetRef());
             m_array->UpdateRef(newNode.GetRef());
             return;
         }
         case NodeChange::insert_after: {
-            Index newNode(coldef_InnerNode);
+            Index newNode(Array::coldef_InnerNode);
             newNode.NodeAdd(GetRef());
             newNode.NodeAdd(nc.ref1);
             m_array->UpdateRef(newNode.GetRef());
             return;
         }
         case NodeChange::split: {
-            Index newNode(coldef_InnerNode);
+            Index newNode(Array::coldef_InnerNode);
             newNode.NodeAdd(nc.ref1);
             newNode.NodeAdd(nc.ref2);
             m_array->UpdateRef(newNode.GetRef());
@@ -251,7 +251,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
         }
 
         // Else create new node
-        Index newNode(coldef_InnerNode);
+        Index newNode(Array::coldef_InnerNode);
         newNode.NodeAdd(nc.ref1);
 
         switch (node_ndx) {

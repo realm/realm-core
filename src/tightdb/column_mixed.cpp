@@ -35,9 +35,9 @@ void ColumnMixed::UpdateFromParent()
 
 void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx)
 {
-    m_array = new Array(coldef_HasRefs, NULL, 0, alloc);
+    m_array = new Array(Array::coldef_HasRefs, NULL, 0, alloc);
 
-    m_types = new Column(coldef_Normal, alloc);
+    m_types = new Column(Array::coldef_Normal, alloc);
     m_refs  = new RefsColumn(alloc, table, column_ndx);
 
     m_array->add(m_types->GetRef());

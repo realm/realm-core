@@ -84,7 +84,7 @@ size_t Spec::add_column(DataType type, const char* name, ColumnType attr)
     if (type == type_Table) {
         // SubSpecs array is only there when there are subtables
         if (m_specSet.size() == 2) {
-            m_subSpecs.SetType(coldef_HasRefs);
+            m_subSpecs.SetType(Array::coldef_HasRefs);
             //m_subSpecs.SetType((ColumnDef)4);
             //return;
             m_specSet.add(m_subSpecs.GetRef());
@@ -94,9 +94,9 @@ size_t Spec::add_column(DataType type, const char* name, ColumnType attr)
         Allocator& alloc = m_specSet.GetAllocator();
 
         // Create spec for new subtable
-        Array spec(coldef_Normal, NULL, 0, alloc);
+        Array spec(Array::coldef_Normal, NULL, 0, alloc);
         ArrayString names(NULL, 0, alloc);
-        Array specSet(coldef_HasRefs, NULL, 0, alloc);
+        Array specSet(Array::coldef_HasRefs, NULL, 0, alloc);
         specSet.add(spec.GetRef());
         specSet.add(names.GetRef());
 
@@ -146,7 +146,7 @@ void Spec::rename_column(size_t column_ndx, const char* newname)
 
     //TODO: Verify that new name is valid
 
-    m_names.Set(column_ndx, newname);
+    m_names.set(column_ndx, newname);
 }
 
 void Spec::rename_column(const vector<size_t>& column_ids, const char* name) {
@@ -185,7 +185,7 @@ void Spec::remove_column(size_t column_ndx)
     }
 
     // Delete the actual name and type entries
-    m_names.Delete(column_ndx);
+    m_names.erase(column_ndx);
     m_spec.Delete(type_ndx);
 
     // If there are an attribute, we have to delete that as well
@@ -391,7 +391,7 @@ void Spec::set_column_attr(size_t ndx, ColumnType attr)
 const char* Spec::get_column_name(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
-    return m_names.Get(ndx);
+    return m_names.get_c_str(ndx);
 }
 
 size_t Spec::get_column_index(const char* name) const

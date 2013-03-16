@@ -63,12 +63,12 @@ Searching: The main finding function is:
     SSE4.2: nmmintrin.h
 */
 #ifdef TIGHTDB_COMPILER_SSE
-    #include <emmintrin.h> // SSE2
-    #include <tightdb/tightdb_nmmintrin.h> // SSE42
+#  include <emmintrin.h> // SSE2
+#  include <tightdb/tightdb_nmmintrin.h> // SSE42
 #endif
 
 #ifdef TIGHTDB_DEBUG
-#include <stdio.h>
+#  include <stdio.h>
 #endif
 
 namespace tightdb {
@@ -157,12 +157,6 @@ public:
 };
 #endif
 
-enum ColumnDef {
-    coldef_Normal,
-    coldef_InnerNode, ///< Inner node of B-tree
-    coldef_HasRefs
-};
-
 
 class ArrayParent
 {
@@ -195,6 +189,12 @@ public:
 
 //    void state_init(int action, QueryState *state);
 //    bool match(int action, size_t index, int64_t value, QueryState *state);
+
+    enum ColumnDef {
+        coldef_Normal,
+        coldef_InnerNode, ///< Inner node of B-tree
+        coldef_HasRefs
+    };
 
     /// Create a new array, and if \a parent and \a ndx_in_parent are
     /// specified, update the parent to point to this new array.
@@ -416,13 +416,16 @@ public:
         wtype_Ignore   = 2
     };
 
-    static bool get_isnode_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static bool get_isleaf_from_header(const char*) TIGHTDB_NOEXCEPT;
     static bool get_hasrefs_from_header(const char*) TIGHTDB_NOEXCEPT;
     static bool get_indexflag_from_header(const char*) TIGHTDB_NOEXCEPT;
     static WidthType get_wtype_from_header(const char*) TIGHTDB_NOEXCEPT;
     static int get_width_from_header(const char*) TIGHTDB_NOEXCEPT;
     static std::size_t get_len_from_header(const char*) TIGHTDB_NOEXCEPT;
     static std::size_t get_capacity_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static bool get_isnode_from_header(const char*) TIGHTDB_NOEXCEPT; // DEPRECATED!
+
+    static ColumnDef get_coldef_from_header(const char*) TIGHTDB_NOEXCEPT;
 
     static std::size_t get_alloc_size_from_header(const char*) TIGHTDB_NOEXCEPT;
 
@@ -456,29 +459,32 @@ protected:
     virtual size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT;
     virtual WidthType GetWidthType() const { return wtype_Bits; }
 
-    bool get_isnode_from_header() const TIGHTDB_NOEXCEPT;
+    bool get_isleaf_from_header() const TIGHTDB_NOEXCEPT;
     bool get_hasrefs_from_header() const TIGHTDB_NOEXCEPT;
     bool get_indexflag_from_header() const TIGHTDB_NOEXCEPT;
     WidthType get_wtype_from_header() const TIGHTDB_NOEXCEPT;
     int get_width_from_header() const TIGHTDB_NOEXCEPT;
     std::size_t get_len_from_header() const TIGHTDB_NOEXCEPT;
     std::size_t get_capacity_from_header() const TIGHTDB_NOEXCEPT;
+    bool get_isnode_from_header() const TIGHTDB_NOEXCEPT; // DEPRECATED!
 
-    void set_header_isnode(bool value) TIGHTDB_NOEXCEPT;
+    void set_header_isleaf(bool value) TIGHTDB_NOEXCEPT;
     void set_header_hasrefs(bool value) TIGHTDB_NOEXCEPT;
     void set_header_indexflag(bool value) TIGHTDB_NOEXCEPT;
     void set_header_wtype(WidthType value) TIGHTDB_NOEXCEPT;
     void set_header_width(int value) TIGHTDB_NOEXCEPT;
     void set_header_len(std::size_t value) TIGHTDB_NOEXCEPT;
     void set_header_capacity(std::size_t value) TIGHTDB_NOEXCEPT;
+    void set_header_isnode(bool value) TIGHTDB_NOEXCEPT; // DEPRECATED!
 
-    static void set_header_isnode(bool value, char* header) TIGHTDB_NOEXCEPT;
+    static void set_header_isleaf(bool value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_hasrefs(bool value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_indexflag(bool value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_wtype(WidthType value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_width(int value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_len(std::size_t value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_capacity(std::size_t value, char* header) TIGHTDB_NOEXCEPT;
+    static void set_header_isnode(bool value, char* header) TIGHTDB_NOEXCEPT; // DEPRECATED!
 
     static void init_header(char* header, bool is_node, bool has_refs, WidthType width_type,
                             int width, std::size_t length, std::size_t capacity) TIGHTDB_NOEXCEPT;
@@ -789,10 +795,10 @@ inline bool Array::is_index_node(std::size_t ref, const Allocator& alloc)
 
 //-------------------------------------------------
 
-inline bool Array::get_isnode_from_header(const char* header) TIGHTDB_NOEXCEPT
+inline bool Array::get_isleaf_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
     const uint8_t* h = reinterpret_cast<const uint8_t*>(header);
-    return (h[0] & 0x80) != 0;
+    return (h[0] & 0x80) == 0;
 }
 inline bool Array::get_hasrefs_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
@@ -824,6 +830,10 @@ inline std::size_t Array::get_capacity_from_header(const char* header) TIGHTDB_N
     const uint8_t* h = reinterpret_cast<const uint8_t*>(header);
     return (std::size_t(h[4]) << 16) + (std::size_t(h[5]) << 8) + h[6];
 }
+inline bool Array::get_isnode_from_header(const char* header) TIGHTDB_NOEXCEPT
+{
+    return !get_isleaf_from_header(header);
+}
 
 
 inline char* Array::get_data_from_header(char* header) TIGHTDB_NOEXCEPT
@@ -840,9 +850,9 @@ inline const char* Array::get_data_from_header(const char* header) TIGHTDB_NOEXC
 }
 
 
-inline bool Array::get_isnode_from_header() const TIGHTDB_NOEXCEPT
+inline bool Array::get_isleaf_from_header() const TIGHTDB_NOEXCEPT
 {
-    return get_isnode_from_header(get_header_from_data(m_data));
+    return get_isleaf_from_header(get_header_from_data(m_data));
 }
 inline bool Array::get_hasrefs_from_header() const TIGHTDB_NOEXCEPT
 {
@@ -868,12 +878,16 @@ inline std::size_t Array::get_capacity_from_header() const TIGHTDB_NOEXCEPT
 {
     return get_capacity_from_header(get_header_from_data(m_data));
 }
+inline bool Array::get_isnode_from_header() const TIGHTDB_NOEXCEPT
+{
+    return get_isnode_from_header(get_header_from_data(m_data));
+}
 
 
-inline void Array::set_header_isnode(bool value, char* header) TIGHTDB_NOEXCEPT
+inline void Array::set_header_isleaf(bool value, char* header) TIGHTDB_NOEXCEPT
 {
     uint8_t* h = reinterpret_cast<uint8_t*>(header);
-    h[0] = (h[0] & ~0x80) | uint8_t(value << 7);
+    h[0] = (h[0] & ~0x80) | uint8_t(!value << 7);
 }
 
 inline void Array::set_header_hasrefs(bool value, char* header) TIGHTDB_NOEXCEPT
@@ -927,10 +941,16 @@ inline void Array::set_header_capacity(std::size_t value, char* header) TIGHTDB_
     h[6] =  value        & 0x000000FF;
 }
 
-
-inline void Array::set_header_isnode(bool value) TIGHTDB_NOEXCEPT
+inline void Array::set_header_isnode(bool value, char* header) TIGHTDB_NOEXCEPT
 {
-    set_header_isnode(value, get_header_from_data(m_data));
+    set_header_isleaf(!value, header);
+}
+
+
+
+inline void Array::set_header_isleaf(bool value) TIGHTDB_NOEXCEPT
+{
+    set_header_isleaf(value, get_header_from_data(m_data));
 }
 inline void Array::set_header_hasrefs(bool value) TIGHTDB_NOEXCEPT
 {
@@ -956,23 +976,17 @@ inline void Array::set_header_capacity(std::size_t value) TIGHTDB_NOEXCEPT
 {
     set_header_capacity(value, get_header_from_data(m_data));
 }
-
-
-inline void Array::init_header(char* header, bool is_node, bool has_refs, WidthType width_type,
-                               int width, std::size_t length, std::size_t capacity) TIGHTDB_NOEXCEPT
+inline void Array::set_header_isnode(bool value) TIGHTDB_NOEXCEPT
 {
-    // Note: Since the header layout contains unallocated bit and/or
-    // bytes, it is important that we put the entire 8 byte header
-    // into a well defined state initially. Note also: The C++11
-    // standard does not guarantee that int64_t is available on all
-    // platforms.
-    *reinterpret_cast<int64_t*>(header) = 0;
-    set_header_isnode(is_node, header);
-    set_header_hasrefs(has_refs, header);
-    set_header_wtype(width_type, header);
-    set_header_width(width, header);
-    set_header_len(length, header);
-    set_header_capacity(capacity, header);
+    set_header_isnode(value, get_header_from_data(m_data));
+}
+
+
+inline Array::ColumnDef Array::get_coldef_from_header(const char* header) TIGHTDB_NOEXCEPT
+{
+    if (!get_isleaf_from_header(header)) return coldef_InnerNode;
+    if (get_hasrefs_from_header(header)) return coldef_HasRefs;
+    return coldef_Normal;
 }
 
 
@@ -1005,6 +1019,24 @@ inline std::size_t Array::get_alloc_size_from_header(const char* header) TIGHTDB
     if (rest < 8) size += rest; // 64bit blocks
     size += get_data_from_header(header) - header; // include header in total
     return size;
+}
+
+
+inline void Array::init_header(char* header, bool is_node, bool has_refs, WidthType width_type,
+                               int width, std::size_t length, std::size_t capacity) TIGHTDB_NOEXCEPT
+{
+    // Note: Since the header layout contains unallocated bit and/or
+    // bytes, it is important that we put the entire 8 byte header
+    // into a well defined state initially. Note also: The C++11
+    // standard does not guarantee that int64_t is available on all
+    // platforms.
+    *reinterpret_cast<int64_t*>(header) = 0;
+    set_header_isnode(is_node, header);
+    set_header_hasrefs(has_refs, header);
+    set_header_wtype(width_type, header);
+    set_header_width(width, header);
+    set_header_len(length, header);
+    set_header_capacity(capacity, header);
 }
 
 

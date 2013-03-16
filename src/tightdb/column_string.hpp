@@ -43,10 +43,10 @@ public:
 
     const char* Get(size_t ndx) const TIGHTDB_NOEXCEPT;
     void add() TIGHTDB_OVERRIDE {return add("");}
-    void add(const char* value);
-    void Set(size_t ndx, const char* value);
+    void add(const char* c_str);
+    void Set(size_t ndx, const char* c_str);
     void insert(size_t ndx) TIGHTDB_OVERRIDE { Insert(ndx, ""); }
-    void Insert(size_t ndx, const char* value);
+    void Insert(size_t ndx, const char* c_str);
     void Delete(size_t ndx) TIGHTDB_OVERRIDE;
     void Clear() TIGHTDB_OVERRIDE;
     void Resize(size_t ndx);
@@ -117,9 +117,9 @@ inline const char* AdaptiveStringColumn::Get(std::size_t ndx) const TIGHTDB_NOEX
     return m_array->string_column_get(ndx);
 }
 
-inline void AdaptiveStringColumn::add(const char* value)
+inline void AdaptiveStringColumn::add(const char* c_str)
 {
-    Insert(Size(), value);
+    Insert(Size(), c_str);
 }
 
 
