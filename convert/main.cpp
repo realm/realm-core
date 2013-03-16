@@ -276,19 +276,41 @@ private:
 
 
     struct HandleStringsLeaf {
-        HandleStringsLeaf(Table& t, size_t c): m_new_table(t), m_col_ndx(c) {}
+        HandleStringsLeaf(const Converter& c, Table& t, size_t i):
+            m_conv(c), m_new_table(t), m_col_ndx(i), m_row_ndx(0) {}
+
         void operator()(size_t ref) const
         {
+            const char* header = static_cast<char*>(m_conv.m_alloc.Translate(ref));
+            switch (Array::get_coldef_from_header(header)) {
+                case Array::coldef_InnerNode:
+                    throw runtime_error("Unexpected leaf type");
+                case Array::coldef_HasRefs: {
+                    Wrap<ArrayStringLong> leaf(m_conv.m_alloc);
+                    m_conv.init(leaf, ref);
+                    size_t n = leaf.size();
+                    for (size_t i=0; i<n; ++i) {
+                        m_new_table.set_string(m_conv.convert_long_string();
+                    }
+                    break;
+                case Array::coldef_Normal:
+                    m_array = new ArrayString(ref, parent, pndx, alloc);
+                    break;
+            }
         }
+
     private:
+        const Converter& m_conv;
         Table& m_new_table;
-        size_t m_col_ndx;
+        const size_t m_col_ndx;
+        size_t m_row_ndx;
     };
 
     void convert_string_column(size_t ref, Table& new_table, size_t col_ndx)
     {
         cout << "string_column_ref = " << ref << "\n";
-        for_each_leaf(ref, HandleStringsLeaf(new_table, col_ndx));
+        HandleStringsLeaf handler(new_table, col_ndx)
+        for_each_leaf(ref, handler);
     }
 
 
@@ -302,7 +324,7 @@ private:
     };
 
     struct HandleEnumRefsLeaf {
-        HandleEnumRefsLeaf(const vector<string>& s, Table& t, size_t c): m_strings(s), m_new_table(t), m_col_ndx(c) {}
+        HandleEnumRefsLeaf(const vector<string>& s, Table& t, size_t i): m_strings(s), m_new_table(t), m_col_ndx(i) {}
         void operator()(size_t ref) const
         {
         }
@@ -318,8 +340,14 @@ private:
         cout << "string_enum_column_strings_ref = " << strings_ref << "\n";
         cout << "string_enum_column_refs_ref    = " << refs_ref << "\n";
         vector<string> strings;
-        for_each_leaf(strings_ref, HandleEnumStringsLeaf(strings));
-        for_each_leaf(refs_ref, HandleEnumRefsLeaf(strings, new_table, col_ndx));
+        {
+            HandleEnumStringsLeaf handler(strings);
+            for_each_leaf(strings_ref, handler);
+        }
+        {
+            HandleEnumRefsLeaf handler(strings, new_table, col_ndx)
+            for_each_leaf(refs_ref, handler);
+        }
     }
 
 
@@ -394,7 +422,7 @@ private:
         return false;
     }
 
-    template<class H> void for_each_leaf(size_t ref, H handler)
+    template<class H> void for_each_leaf(size_t ref, H& handler)
     {
         Wrap<Array> node(m_alloc);
         init(node, ref);

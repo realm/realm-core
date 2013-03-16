@@ -195,6 +195,7 @@ public:
     template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value);
     void set_double(size_t column_ndx, size_t row_ndx, double value);
+    void set_string(size_t column_ndx, size_t row_ndx, StringData value);
     void set_string(size_t column_ndx, size_t row_ndx, const char* c_str);
     void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
     void set_binary(size_t column_ndx, size_t row_ndx, const char* data, size_t size);
