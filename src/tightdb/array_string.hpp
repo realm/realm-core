@@ -22,7 +22,7 @@
 
 #include <cstring>
 
-#include <tightdb/string.hpp>
+#include <tightdb/string_data.hpp>
 #include <tightdb/array.hpp>
 
 namespace tightdb {
@@ -35,7 +35,7 @@ public:
                 Allocator& = Allocator::get_default());
     ArrayString(Allocator&);
 
-    StringRef get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     const char* get_c_str(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add();
     void add(const char* data, std::size_t size);
@@ -102,12 +102,12 @@ inline ArrayString::ArrayString(size_t ref, const ArrayParent *parent, size_t nd
 // Creates new array (but invalid, call UpdateRef to init)
 inline ArrayString::ArrayString(Allocator& alloc): Array(alloc) {}
 
-inline StringRef ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_len);
     const char* data = m_data + (ndx * m_width);
     std::size_t size = 0 < m_width ? (m_width-1) - data[m_width-1] : 0;
-    return StringRef(data, size);
+    return StringData(data, size);
 }
 
 inline const char* ArrayString::get_c_str(std::size_t ndx) const TIGHTDB_NOEXCEPT
