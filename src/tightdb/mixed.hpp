@@ -29,6 +29,7 @@
 #include <tightdb/meta.hpp>
 #include <tightdb/data_type.hpp>
 #include <tightdb/date.hpp>
+#include <tightdb/string_data.hpp>
 #include <tightdb/binary_data.hpp>
 
 namespace tightdb {
@@ -42,7 +43,8 @@ public:
     Mixed(int64_t) TIGHTDB_NOEXCEPT;
     Mixed(float) TIGHTDB_NOEXCEPT;
     Mixed(double) TIGHTDB_NOEXCEPT;
-    Mixed(const char*) TIGHTDB_NOEXCEPT;
+    Mixed(StringData) TIGHTDB_NOEXCEPT;
+    Mixed(const char* c_str) TIGHTDB_NOEXCEPT;
     Mixed(BinaryData) TIGHTDB_NOEXCEPT;
     Mixed(Date) TIGHTDB_NOEXCEPT;
 
@@ -63,7 +65,8 @@ public:
     void set_int(int64_t) TIGHTDB_NOEXCEPT;
     void set_float(float) TIGHTDB_NOEXCEPT;
     void set_double(double) TIGHTDB_NOEXCEPT;
-    void set_string(const char*) TIGHTDB_NOEXCEPT;
+    void set_string(StringData) TIGHTDB_NOEXCEPT;
+    void set_string(const char* c_str) TIGHTDB_NOEXCEPT;
     void set_binary(BinaryData) TIGHTDB_NOEXCEPT;
     void set_binary(const char* data, std::size_t size) TIGHTDB_NOEXCEPT;
     void set_date(std::time_t) TIGHTDB_NOEXCEPT;
@@ -78,10 +81,10 @@ private:
         bool         m_bool;
         float        m_float;
         double       m_double;
-        const char*  m_str;
+        const char*  m_data;
         std::time_t  m_date;
     };
-    std::size_t m_len;
+    std::size_t m_size;
 };
 
 // Note: We cannot compare two mixed values, since when the type of
@@ -174,17 +177,25 @@ inline Mixed::Mixed(double v) TIGHTDB_NOEXCEPT
    m_double = v;
 }
 
-inline Mixed::Mixed(const char* v) TIGHTDB_NOEXCEPT
+inline Mixed::Mixed(StringData v) TIGHTDB_NOEXCEPT
 {
     m_type = type_String;
-    m_str  = v;
+    m_data = v.m_data;
+    m_size = v.m_size;
+}
+
+inline Mixed::Mixed(const char* c_str) TIGHTDB_NOEXCEPT
+{
+    m_type = type_String;
+    m_data = c_str;
+    m_size = std::strlen(c_str);
 }
 
 inline Mixed::Mixed(BinaryData v) TIGHTDB_NOEXCEPT
 {
     m_type = type_Binary;
-    m_str  = v.pointer;
-    m_len  = v.len;
+    m_data = v.pointer;
+    m_size = v.len;
 }
 
 inline Mixed::Mixed(Date v) TIGHTDB_NOEXCEPT
@@ -220,13 +231,13 @@ inline double Mixed::get_double() const TIGHTDB_NOEXCEPT
 inline const char* Mixed::get_string() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_type == type_String);
-    return m_str;
+    return m_data;
 }
 
 inline BinaryData Mixed::get_binary() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_type == type_Binary);
-    return BinaryData(m_str, m_len);
+    return BinaryData(m_data, m_size);
 }
 
 inline std::time_t Mixed::get_date() const TIGHTDB_NOEXCEPT
@@ -259,10 +270,16 @@ inline void Mixed::set_double(double v) TIGHTDB_NOEXCEPT
     m_double = v;
 }
 
-inline void Mixed::set_string(const char* v) TIGHTDB_NOEXCEPT
+inline void Mixed::set_string(StringData v) TIGHTDB_NOEXCEPT
 {
     m_type = type_String;
-    m_str = v;
+    m_data = v.m_data;
+    m_size = v.m_size;
+}
+
+inline void Mixed::set_string(const char* c_str) TIGHTDB_NOEXCEPT
+{
+    set_string(StringData(c_str));
 }
 
 inline void Mixed::set_binary(BinaryData v) TIGHTDB_NOEXCEPT
@@ -273,8 +290,8 @@ inline void Mixed::set_binary(BinaryData v) TIGHTDB_NOEXCEPT
 inline void Mixed::set_binary(const char* data, std::size_t size) TIGHTDB_NOEXCEPT
 {
     m_type = type_Binary;
-    m_str = data;
-    m_len = size;
+    m_data = data;
+    m_size = size;
 }
 
 inline void Mixed::set_date(std::time_t v) TIGHTDB_NOEXCEPT
@@ -289,15 +306,15 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
 {
     out << "Mixed(";
     switch (m.m_type) {
-        case type_Bool:   out << m.m_bool;                     break;
-        case type_Int:    out << m.m_int;                      break;
-        case type_String: out << m.m_str;                      break;
-        case type_Float:  out << m.m_float;                    break;
-        case type_Double: out << m.m_double;                   break;
-        case type_Binary: out << BinaryData(m.m_str, m.m_len); break;
-        case type_Date:   out << Date(m.m_date);               break;
-        case type_Table:  out << "subtable";                   break;
-        default: TIGHTDB_ASSERT(false); break; // FIXME: Remove
+        case type_Bool:   out << m.m_bool;                       break;
+        case type_Int:    out << m.m_int;                        break;
+        case type_Float:  out << m.m_float;                      break;
+        case type_Double: out << m.m_double;                     break;
+        case type_Date:   out << Date(m.m_date);                 break;
+        case type_String: out << StringData(m.m_data, m.m_size); break;
+        case type_Binary: out << BinaryData(m.m_data, m.m_size); break;
+        case type_Table:  out << "subtable";                     break;
+        case type_Mixed:  TIGHTDB_ASSERT(false);                 break;
     }
     out << ")";
     return out;

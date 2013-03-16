@@ -29,41 +29,41 @@
 
 namespace tightdb {
 
-struct StringRef {
+struct StringData {
     const char* m_data;
     std::size_t m_size;
 
-    StringRef() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
-    StringRef(const char* d, std::size_t s) TIGHTDB_NOEXCEPT: m_data(d), m_size(s) {}
+    StringData() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
+    StringData(const char* d, std::size_t s) TIGHTDB_NOEXCEPT: m_data(d), m_size(s) {}
 
-    explicit StringRef(const char* c_str) TIGHTDB_NOEXCEPT;
+    explicit StringData(const char* c_str) TIGHTDB_NOEXCEPT;
 
-    bool operator==(const StringRef& s) const TIGHTDB_NOEXCEPT;
-    bool operator!=(const StringRef& s) const TIGHTDB_NOEXCEPT;
+    bool operator==(const StringData& s) const TIGHTDB_NOEXCEPT;
+    bool operator!=(const StringData& s) const TIGHTDB_NOEXCEPT;
 
     template<class Ch, class Tr>
-    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const StringRef&);
+    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const StringData&);
 };
 
 
 
 // Implementation:
 
-inline StringRef::StringRef(const char* c_str) TIGHTDB_NOEXCEPT:
+inline StringData::StringData(const char* c_str) TIGHTDB_NOEXCEPT:
     m_data(c_str), m_size(std::strlen(c_str)) {}
 
-inline bool StringRef::operator==(const StringRef& s) const TIGHTDB_NOEXCEPT
+inline bool StringData::operator==(const StringData& s) const TIGHTDB_NOEXCEPT
 {
     return m_size == s.m_size && std::equal(m_data, m_data + m_size, s.m_data);
 }
 
-inline bool StringRef::operator!=(const StringRef& s) const TIGHTDB_NOEXCEPT
+inline bool StringData::operator!=(const StringData& s) const TIGHTDB_NOEXCEPT
 {
     return m_size != s.m_size || !std::equal(m_data, m_data + m_size, s.m_data);
 }
 
 template<class Ch, class Tr>
-inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const StringRef& s)
+inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const StringData& s)
 {
     for (const char* i = s.m_data; i != s.m_data + s.m_size; ++i)
         out << *i;
