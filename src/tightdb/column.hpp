@@ -133,9 +133,9 @@ class Column : public ColumnBase {
 public:
     explicit Column(Allocator&);
     Column(ColumnDef type, Allocator&);
-    Column(ColumnDef type=coldef_Normal, ArrayParent* = 0, size_t pndx = 0,
+    Column(ColumnDef type=coldef_Normal, ArrayParent* = 0, size_t ndx_in_parent = 0,
            Allocator& = Allocator::get_default());
-    Column(size_t ref, ArrayParent* = 0, size_t pndx = 0,
+    Column(size_t ref, ArrayParent* = 0, size_t ndx_in_parent = 0,
            Allocator& = Allocator::get_default()); // Throws
     Column(const Column&); // FIXME: Constness violation
     ~Column();

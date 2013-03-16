@@ -169,7 +169,8 @@ public:
     template<class E> void insert_enum(size_t column_ndx, size_t row_ndx, E value);
     void insert_float(size_t column_ndx, size_t row_ndx, float value);
     void insert_double(size_t column_ndx, size_t row_ndx, double value);
-    void insert_string(size_t column_ndx, size_t row_ndx, const char* value);
+    void insert_string(size_t column_ndx, size_t row_ndx, const char* c_str);
+    void insert_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
     void insert_binary(size_t column_ndx, size_t row_ndx, const char* data, size_t size);
     void insert_subtable(size_t column_ndx, size_t row_ndx); // Insert empty table
     void insert_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
@@ -194,8 +195,9 @@ public:
     template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value);
     void set_double(size_t column_ndx, size_t row_ndx, double value);
-    void set_string(size_t column_ndx, size_t row_ndx, const char* value);
-    void set_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
+    void set_string(size_t column_ndx, size_t row_ndx, const char* c_str);
+    void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
+    void set_binary(size_t column_ndx, size_t row_ndx, const char* data, size_t size);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void add_int(size_t column_ndx, int64_t value);
 
@@ -651,6 +653,11 @@ template<class E> inline void Table::insert_enum(size_t column_ndx, size_t row_n
     insert_int(column_ndx, row_ndx, value);
 }
 
+inline void Table::insert_binary(size_t column_ndx, size_t row_ndx, BinaryData value)
+{
+    insert_binary(column_ndx, row_ndx, value.pointer, value.len);
+}
+
 inline void Table::insert_subtable(size_t col_ndx, size_t row_ndx)
 {
     insert_subtable(col_ndx, row_ndx, 0); // Null stands for an empty table
@@ -659,6 +666,11 @@ inline void Table::insert_subtable(size_t col_ndx, size_t row_ndx)
 template<class E> inline void Table::set_enum(size_t column_ndx, size_t row_ndx, E value)
 {
     set_int(column_ndx, row_ndx, value);
+}
+
+inline void Table::set_binary(size_t column_ndx, size_t row_ndx, BinaryData value)
+{
+    set_binary(column_ndx, row_ndx, value.pointer, value.len);
 }
 
 inline TableRef Table::get_subtable(size_t column_ndx, size_t row_ndx)

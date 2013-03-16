@@ -30,8 +30,8 @@ namespace tightdb {
 
 class BinaryData {
 public:
-    const char* pointer;
-    std::size_t len;
+    const char* pointer; // FIXME: Should be named 'data'
+    std::size_t len;     // FIXME: Should be named 'size'
 
     BinaryData() TIGHTDB_NOEXCEPT: pointer(0), len(0) {}
     BinaryData(const char* data, std::size_t size) TIGHTDB_NOEXCEPT: pointer(data), len(size) {}

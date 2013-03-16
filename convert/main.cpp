@@ -2,6 +2,7 @@
 #include <string>
 #include <iostream>
 
+#include <tightdb/column_basic.hpp>
 #include <tightdb/column_mixed.hpp>
 #include <tightdb/group.hpp>
 
@@ -17,6 +18,7 @@ template<class A> struct Wrap {
     bool m_must_destroy;
     Wrap(Allocator& alloc): m_array(alloc), m_must_destroy(false) {}
     ~Wrap() { if (m_must_destroy) m_array.Destroy(); }
+    bool empty() const { return m_array.is_empty(); }
     size_t size() const { return m_array.size(); }
     size_t get_as_ref(size_t i) const { return m_array.GetAsRef(i); }
 };
@@ -79,7 +81,7 @@ private:
         size_t n = column_types.size();
         for (size_t i=0; i<n; ++i) {
             ColumnType type = ColumnType(column_types.m_array.Get(i));
-            DataType new_type;
+            DataType new_type = DataType();
             switch (type) {
                 case col_type_Int:
                 case col_type_Bool:
@@ -146,8 +148,8 @@ private:
             else {
                 Wrap<Array> root_offsets(m_alloc);
                 init(root_offsets, column_root.get_as_ref(0));
-                size_t num_offsets = root_offsets.size();
-                num_rows = num_offsets  == 0 ? 0 : size_t(root_offsets.m_array.Get(num_offsets-1));
+                if (root_offsets.empty()) throw runtime_error("Unexpected empty non-leaf node");
+                num_rows = size_t(root_offsets.m_array.back());
             }
         }
 
@@ -165,19 +167,19 @@ private:
             type = ColumnType(column_types.m_array.Get(column_type_ndx));
             switch (type) {
                 case col_type_Int:
-                    convert_column<int64_t>(column_ref, new_table, i);
+                    convert_int_column(column_ref, new_table, i);
                     break;
                 case col_type_Bool:
-                    convert_column<bool>(column_ref, new_table, i);
+                    convert_bool_column(column_ref, new_table, i);
                     break;
                 case col_type_Date:
-                    convert_column<Date>(column_ref, new_table, i);
+                    convert_date_column(column_ref, new_table, i);
                     break;
                 case col_type_Float:
-                    convert_column<float>(column_ref, new_table, i);
+                    convert_float_column(column_ref, new_table, i);
                     break;
                 case col_type_Double:
-                    convert_column<double>(column_ref, new_table, i);
+                    convert_double_column(column_ref, new_table, i);
                     break;
                 case col_type_String:
                     convert_string_column(column_ref, new_table, i);
@@ -217,25 +219,119 @@ private:
         }
     }
 
-    template<class T> void convert_column(size_t ref, Table& new_table, size_t col_ndx)
+    void convert_int_column(size_t ref, Table& new_table, size_t col_ndx)
     {
         cout << "column_ref  = " << ref << "\n";
+        Column col(ref, 0, 0, m_alloc);
+        size_t n = col.Size();
+        if (n != new_table.size()) throw runtime_error("Unexpected column size");
+        for (size_t i=0; i<n; ++i) {
+            new_table.set_int(col_ndx, i, col.Get(i));
+        }
     }
+
+    void convert_bool_column(size_t ref, Table& new_table, size_t col_ndx)
+    {
+        cout << "column_ref  = " << ref << "\n";
+        Column col(ref, 0, 0, m_alloc);
+        size_t n = col.Size();
+        if (n != new_table.size()) throw runtime_error("Unexpected column size");
+        for (size_t i=0; i<n; ++i) {
+            new_table.set_bool(col_ndx, i, bool(col.Get(i)));
+        }
+    }
+
+    void convert_date_column(size_t ref, Table& new_table, size_t col_ndx)
+    {
+        cout << "column_ref  = " << ref << "\n";
+        Column col(ref, 0, 0, m_alloc);
+        size_t n = col.Size();
+        if (n != new_table.size()) throw runtime_error("Unexpected column size");
+        for (size_t i=0; i<n; ++i) {
+            new_table.set_date(col_ndx, i, time_t(col.Get(i)));
+        }
+    }
+
+    void convert_float_column(size_t ref, Table& new_table, size_t col_ndx)
+    {
+        cout << "column_ref  = " << ref << "\n";
+        ColumnFloat col(ref, 0, 0, m_alloc);
+        size_t n = col.Size();
+        if (n != new_table.size()) throw runtime_error("Unexpected column size");
+        for (size_t i=0; i<n; ++i) {
+            new_table.set_float(col_ndx, i, col.Get(i));
+        }
+    }
+
+    void convert_double_column(size_t ref, Table& new_table, size_t col_ndx)
+    {
+        cout << "column_ref  = " << ref << "\n";
+        ColumnDouble col(ref, 0, 0, m_alloc);
+        size_t n = col.Size();
+        if (n != new_table.size()) throw runtime_error("Unexpected column size");
+        for (size_t i=0; i<n; ++i) {
+            new_table.set_double(col_ndx, i, col.Get(i));
+        }
+    }
+
+
+    struct HandleStringsLeaf {
+        HandleStringsLeaf(Table& t, size_t c): m_new_table(t), m_col_ndx(c) {}
+        void operator()(size_t ref) const
+        {
+        }
+    private:
+        Table& m_new_table;
+        size_t m_col_ndx;
+    };
 
     void convert_string_column(size_t ref, Table& new_table, size_t col_ndx)
     {
         cout << "string_column_ref = " << ref << "\n";
+        for_each_leaf(ref, HandleStringsLeaf(new_table, col_ndx));
     }
+
+
+    struct HandleEnumStringsLeaf {
+        HandleEnumStringsLeaf(vector<string>& s): m_strings(s) {}
+        void operator()(size_t ref) const
+        {
+        }
+    private:
+        vector<string>& m_strings;
+    };
+
+    struct HandleEnumRefsLeaf {
+        HandleEnumRefsLeaf(const vector<string>& s, Table& t, size_t c): m_strings(s), m_new_table(t), m_col_ndx(c) {}
+        void operator()(size_t ref) const
+        {
+        }
+    private:
+        const vector<string>& m_strings;
+        Table& m_new_table;
+        size_t m_col_ndx;
+
+    };
 
     void convert_string_enum_column(size_t strings_ref, size_t refs_ref, Table& new_table, size_t col_ndx)
     {
         cout << "string_enum_column_strings_ref = " << strings_ref << "\n";
         cout << "string_enum_column_refs_ref    = " << refs_ref << "\n";
+        vector<string> strings;
+        for_each_leaf(strings_ref, HandleEnumStringsLeaf(strings));
+        for_each_leaf(refs_ref, HandleEnumRefsLeaf(strings, new_table, col_ndx));
     }
+
 
     void convert_binary_column(size_t ref, Table& new_table, size_t col_ndx)
     {
         cout << "binary_column_ref = " << ref << "\n";
+        ColumnBinary col(ref, 0, 0, m_alloc);
+        size_t n = col.Size();
+        if (n != new_table.size()) throw runtime_error("Unexpected column size");
+        for (size_t i=0; i<n; ++i) {
+            new_table.set_binary(col_ndx, i, col.Get(i));
+        }
     }
 
     void convert_subtable_column(size_t subspec_ref, size_t column_ref, Table& new_table, size_t col_ndx)
@@ -296,6 +392,24 @@ private:
         // return true.
         array.UpdateRef(ref);
         return false;
+    }
+
+    template<class H> void for_each_leaf(size_t ref, H handler)
+    {
+        Wrap<Array> node(m_alloc);
+        init(node, ref);
+        if (node.m_array.is_leaf()) {
+            handler(ref);
+            return;
+        }
+
+        if (node.size() < 2) throw runtime_error("Too few elements in non-leaf node array");
+        Wrap<Array> children(m_alloc);
+        init(children, node.get_as_ref(1));
+        size_t n = children.size();
+        for (size_t i=0; i<n; ++i) {
+            for_each_leaf(children.get_as_ref(i), handler);
+        }
     }
 };
 

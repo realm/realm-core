@@ -260,6 +260,7 @@ private:
     struct shared_tag {};
     Group(shared_tag) TIGHTDB_NOEXCEPT;
 
+    // FIXME: Implement a proper copy constructor (fairly trivial).
     Group(const Group&); // Disable copying
 
     Table* get_table_ptr(const char* name);

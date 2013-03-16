@@ -252,7 +252,8 @@ size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXC
     if (!a.IsNode())
         return a.size();
     Array offsets(a.GetAsRef(0), 0, 0, alloc);
-    return offsets.is_empty() ? 0 : size_t(offsets.back());
+    TIGHTDB_ASSERT(!offsets.is_empty());
+    return size_t(offsets.back());
 }
 
 bool ColumnBase::is_node_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT

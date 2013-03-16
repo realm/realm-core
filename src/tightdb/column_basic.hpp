@@ -40,9 +40,9 @@ template<> struct AggReturnType<float> {
 template<typename T>
 class BasicColumn : public ColumnBase {
 public:
-    BasicColumn(Allocator& alloc = Allocator::get_default());
-    BasicColumn(size_t ref, ArrayParent* parent = 0, size_t pndx = 0,
-                Allocator& alloc = Allocator::get_default());
+    BasicColumn(Allocator& = Allocator::get_default());
+    BasicColumn(size_t ref, ArrayParent* = 0, size_t ndx_in_parent = 0,
+                Allocator& = Allocator::get_default());
     ~BasicColumn();
 
     void Destroy();

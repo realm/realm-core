@@ -28,9 +28,9 @@ namespace tightdb {
 
 class ColumnBinary : public ColumnBase {
 public:
-    ColumnBinary(Allocator& alloc = Allocator::get_default());
-    ColumnBinary(size_t ref, ArrayParent* parent=NULL, size_t pndx=0,
-                 Allocator& alloc = Allocator::get_default());
+    ColumnBinary(Allocator& = Allocator::get_default());
+    ColumnBinary(size_t ref, ArrayParent* = 0, size_t ndx_in_parent = 0,
+                 Allocator& = Allocator::get_default());
     ~ColumnBinary();
 
     void Destroy();
