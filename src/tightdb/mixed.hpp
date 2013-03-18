@@ -35,6 +35,55 @@
 namespace tightdb {
 
 
+/// This class represents a polymorphic TightDB value.
+///
+/// At any particular moment an instance of this class stores a
+/// definite value of a definite type. If, for instance, that is an
+/// integer value, you may call get_int() to extract that value. You
+/// may call get_type() to discover what type of value is currently
+/// stored. Calling get_int() on an instance that does not store an
+/// integer, has undefined behavior, and likewise for all the other
+/// types that can be stored.
+///
+/// It is crucial to understand that the act of extracting a value of
+/// a particular type requires definite knowledge about the stored
+/// type. Calling a getter method for any particular type, that is not
+/// the same type as the stored value, has undefined behavior.
+///
+/// While values of numeric types are contained directly in a Mixed
+/// instance, character and binary data are merely referenced. A Mixed
+/// instance never owns the referenced data, nor does it in any other
+/// way attempt to manage its lifetime.
+///
+/// For compatibility with C style strings, when a string (character
+/// data) is stored in a TightDB table, it is always followed by a
+/// terminating zero. This is also true when strings are stored in a
+/// mixed type column. This means that if the 'mixed' value of the 8th
+/// row stores a string, then the following code is guaranteed to
+/// always see a zero terminated string:
+///
+/// \code{.cpp}
+///
+///   const char* c_str = my_table[7].mixed.data(); // Always zero terminated
+///
+/// \endcode
+///
+/// Note that this assumption does not hold in general for strings in
+/// instances of Mixed. Indeed there is nothing stopping you from
+/// constructing a new Mixed instance that refers to a string without
+/// a terminating zero.
+///
+/// At the present time a Mixed instance cannot store a table
+ // reference. You may construct
+/// a Mixed instance with value type set to type_Table, but there is
+/// still no way you can get access to to that table when all you have
+/// is the Mixed instance. The problem is that a table reference is an objects that cannot be trivially copied. that mart if we allow for a Mixed instance to store a table refernece  reason 
+///
+/// Due to efficiency concerns, a Mixed instance is not able to store a subtable reference. You may construct a Mixed instance with value type set to type_Table, but there is still no way you can get a table reference out of a Mixed instance.
+
+What happens if 
+///
+/// The reason pertains to the management of table instances, a Mixed instance cannot store a reference to a subtable.
 class Mixed {
 public:
     Mixed() TIGHTDB_NOEXCEPT;
@@ -47,7 +96,8 @@ public:
     Mixed(BinaryData) TIGHTDB_NOEXCEPT;
     Mixed(Date)       TIGHTDB_NOEXCEPT;
 
-    // Avoid unwanted implicit conversion to bool
+    // These are shortcuts for Mixed(StringData(c_str)), and are
+    // needed to avoid unwanted implicit conversion of char* to bool.
     Mixed(      char* c_str) TIGHTDB_NOEXCEPT { set_string(c_str); }
     Mixed(const char* c_str) TIGHTDB_NOEXCEPT { set_string(c_str); }
 
