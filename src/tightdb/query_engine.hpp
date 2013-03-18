@@ -88,8 +88,9 @@ AggregateState      State of the aggregate - contains a state variable that stor
 
 #include <string>
 #include <functional>
-#include "meta.hpp"
+#include <algorithm>
 
+#include <tightdb/meta.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/table_view.hpp>
 #include <tightdb/column_fwd.hpp>
@@ -793,27 +794,33 @@ public:
         return 0;
     }
 
-    StringNode(const char* v, size_t column)
+    StringNode(StringData v, size_t column)
     {
         m_condition_column_idx = column;
         m_child = 0;
         m_dT = 10.0;
 
-        // todo, see if we can store in std::string instead
-        m_value = new char[strlen(v)*6];
-        memcpy(m_value, v, strlen(v) + 1);
-        m_ucase = new char[strlen(v)*6];
-        m_lcase = new char[strlen(v)*6];
+        // FIXME: Store these in std::string instead.
+        // FIXME: Why are these sizes 6 times the required size?
+        char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
+        std::copy(v.data(), v.data()+v.size(), data);
+        m_value = StringData(data, v.size());
+        char* upper = new char[6 * v.size()];
+        char* lower = new char[6 * v.size()];
 
-        const bool b1 = utf8case(v, m_lcase, false);
-        const bool b2 = utf8case(v, m_ucase, true);
-        if (!b1 || !b2)
-            error_code = "Malformed UTF-8: " + std::string(m_value);
+        bool b1 = case_map(v, lower, false);
+        bool b2 = case_map(v, upper, true);
+        if (!b1 || !b2) error_code = "Malformed UTF-8: " + std::string(v);
+
+        m_ucase = upper;
+        m_lcase = lower;
     }
 
     ~StringNode()
     {
-        delete[] m_value; delete[] m_ucase; delete[] m_lcase;
+        delete[] m_value.data();
+        delete[] m_ucase;
+        delete[] m_lcase;
     }
 
     void Init(const Table& table)
@@ -834,14 +841,14 @@ public:
         TConditionFunction cond;
 
         for (size_t s = start; s < end; ++s) {
-            const char* t;
+            StringData t;
 
             // todo, can be optimized by placing outside loop
             if (m_column_type == col_type_String)
-                t = static_cast<const AdaptiveStringColumn*>(m_condition_column)->Get(s);
+                t = static_cast<const AdaptiveStringColumn*>(m_condition_column)->get(s);
             else {
                 //TODO: First check if string is in key list
-                t = static_cast<const ColumnStringEnum*>(m_condition_column)->Get(s);
+                t = static_cast<const ColumnStringEnum*>(m_condition_column)->get(s);
             }
 
             if (cond(m_value, m_ucase, m_lcase, t))
@@ -851,9 +858,11 @@ public:
     }
 
 protected:
-    char* m_value;
-    char* m_lcase;
-    char* m_ucase;
+private:
+    StringData m_value;
+    const char* m_lcase;
+    const char* m_ucase;
+protected:
     const ColumnBase* m_condition_column;
     ColumnType m_column_type;
 };
@@ -915,19 +924,21 @@ template <class TConditionFunction> class BinaryNode: public ParentNode {
 public:
     template <Action TAction> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}
 
-    BinaryNode(const char* v, size_t len, size_t column)
+    BinaryNode(BinaryData v, size_t column)
     {
         m_dT = 100.0;
         m_condition_column_idx = column;
         m_child = 0;
-        m_len = len;
-        m_value = (char *)malloc(len);
-        memcpy(m_value, v, len);
+
+        // FIXME: Store this in std::string instead.
+        char* data = new char[v.size()];
+        std::copy(v.data(), v.data()+v.size(), data);
+        m_value = BinaryData(data, v.size());
     }
 
     ~BinaryNode()
     {
-        free((void*)m_value);
+        delete[] m_value.data();
     }
 
     void Init(const Table& table)
@@ -944,26 +955,23 @@ public:
     size_t find_first_local(size_t start, size_t end)
     {
         TConditionFunction condition;
-
         for (size_t s = start; s < end; ++s) {
-            const char* value = m_condition_column->Get(s).pointer;
-            size_t len = m_condition_column->Get(s).len;
-
-            if (condition(m_value, m_len, value, len))
-                return s;
+            BinaryData value = m_condition_column->get(s);
+            if (condition(m_value, value)) return s;
         }
         return end;
     }
 
 protected:
-    char* m_value;
-    size_t m_len;
+private:
+    BinaryData m_value;
+protected:
     const ColumnBinary* m_condition_column;
     ColumnType m_column_type;
 };
 
 
-template <> class StringNode<Equal>: public ParentNode {
+template<> class StringNode<Equal>: public ParentNode {
 public:
     template <Action TAction>
     int64_t find_all(Array*, size_t, size_t, size_t, size_t)
@@ -972,14 +980,19 @@ public:
         return 0;
     }
 
-    StringNode(const char* v, size_t column): m_key_ndx((size_t)-1) {
+    StringNode(StringData v, size_t column): m_key_ndx(size_t(-1))
+    {
         m_condition_column_idx = column;
         m_child = 0;
-        m_value = (char *)malloc(strlen(v)*6);
-        memcpy(m_value, v, strlen(v) + 1);
+        // FIXME: Store this in std::string instead.
+        // FIXME: Why are the sizes 6 times the required size?
+        char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
+        std::copy(v.data(), v.data()+v.size(), data);
+        m_value = StringData(data, v.size());
     }
-    ~StringNode() {
-        free((void*)m_value);
+    ~StringNode()
+    {
+        delete[] m_value.data();
         m_index.Destroy();
     }
 
@@ -1046,7 +1059,8 @@ public:
     }
 
 protected:
-    char*  m_value;
+private:
+    StringData m_value;
 
 private:
     const ColumnBase* m_condition_column;

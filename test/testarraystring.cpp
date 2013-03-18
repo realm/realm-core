@@ -20,12 +20,12 @@ TEST_FIXTURE(db_setup_string, ArrayStringMultiEmpty)
     c.add("");
     CHECK_EQUAL(6, c.size());
 
-    CHECK_EQUAL(StringData(""), c.get(0));
-    CHECK_EQUAL(StringData(""), c.get(1));
-    CHECK_EQUAL(StringData(""), c.get(2));
-    CHECK_EQUAL(StringData(""), c.get(3));
-    CHECK_EQUAL(StringData(""), c.get(4));
-    CHECK_EQUAL(StringData(""), c.get(5));
+    CHECK_EQUAL("", c.get(0));
+    CHECK_EQUAL("", c.get(1));
+    CHECK_EQUAL("", c.get(2));
+    CHECK_EQUAL("", c.get(3));
+    CHECK_EQUAL("", c.get(4));
+    CHECK_EQUAL("", c.get(5));
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringSetExpand4)
@@ -33,12 +33,12 @@ TEST_FIXTURE(db_setup_string, ArrayStringSetExpand4)
     c.set(0, "hey");
 
     CHECK_EQUAL(6, c.size());
-    CHECK_EQUAL(StringData("hey"), c.get(0));
-    CHECK_EQUAL(StringData(""), c.get(1));
-    CHECK_EQUAL(StringData(""), c.get(2));
-    CHECK_EQUAL(StringData(""), c.get(3));
-    CHECK_EQUAL(StringData(""), c.get(4));
-    CHECK_EQUAL(StringData(""), c.get(5));
+    CHECK_EQUAL("hey", c.get(0));
+    CHECK_EQUAL("", c.get(1));
+    CHECK_EQUAL("", c.get(2));
+    CHECK_EQUAL("", c.get(3));
+    CHECK_EQUAL("", c.get(4));
+    CHECK_EQUAL("", c.get(5));
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringSetExpand8)
@@ -46,82 +46,82 @@ TEST_FIXTURE(db_setup_string, ArrayStringSetExpand8)
     c.set(1, "test");
 
     CHECK_EQUAL(6, c.size());
-    CHECK_EQUAL(StringData("hey"), c.get(0));
-    CHECK_EQUAL(StringData("test"), c.get(1));
-    CHECK_EQUAL(StringData(""), c.get(2));
-    CHECK_EQUAL(StringData(""), c.get(3));
-    CHECK_EQUAL(StringData(""), c.get(4));
-    CHECK_EQUAL(StringData(""), c.get(5));
+    CHECK_EQUAL("hey", c.get(0));
+    CHECK_EQUAL("test", c.get(1));
+    CHECK_EQUAL("", c.get(2));
+    CHECK_EQUAL("", c.get(3));
+    CHECK_EQUAL("", c.get(4));
+    CHECK_EQUAL("", c.get(5));
 }
 
 TEST_FIXTURE(db_setup_string, ArrayArrayStringAdd0)
 {
     c.Clear();
     c.add();
-    CHECK_EQUAL(StringData(""), c.get(0));
+    CHECK_EQUAL("", c.get(0));
     CHECK_EQUAL(1, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd1)
 {
     c.add("a");
-    CHECK_EQUAL(StringData(""),  c.get(0));
-    CHECK_EQUAL(StringData("a"), c.get(1));
+    CHECK_EQUAL("",  c.get(0));
+    CHECK_EQUAL("a", c.get(1));
     CHECK_EQUAL(2, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd2)
 {
     c.add("bb");
-    CHECK_EQUAL(StringData(""),   c.get(0));
-    CHECK_EQUAL(StringData("a"),  c.get(1));
-    CHECK_EQUAL(StringData("bb"), c.get(2));
+    CHECK_EQUAL("",   c.get(0));
+    CHECK_EQUAL("a",  c.get(1));
+    CHECK_EQUAL("bb", c.get(2));
     CHECK_EQUAL(3, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd3)
 {
     c.add("ccc");
-    CHECK_EQUAL(StringData(""),    c.get(0));
-    CHECK_EQUAL(StringData("a"),   c.get(1));
-    CHECK_EQUAL(StringData("bb"),  c.get(2));
-    CHECK_EQUAL(StringData("ccc"), c.get(3));
+    CHECK_EQUAL("",    c.get(0));
+    CHECK_EQUAL("a",   c.get(1));
+    CHECK_EQUAL("bb",  c.get(2));
+    CHECK_EQUAL("ccc", c.get(3));
     CHECK_EQUAL(4, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd4)
 {
     c.add("dddd");
-    CHECK_EQUAL(StringData(""),     c.get(0));
-    CHECK_EQUAL(StringData("a"),    c.get(1));
-    CHECK_EQUAL(StringData("bb"),   c.get(2));
-    CHECK_EQUAL(StringData("ccc"),  c.get(3));
-    CHECK_EQUAL(StringData("dddd"), c.get(4));
+    CHECK_EQUAL("",     c.get(0));
+    CHECK_EQUAL("a",    c.get(1));
+    CHECK_EQUAL("bb",   c.get(2));
+    CHECK_EQUAL("ccc",  c.get(3));
+    CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL(5, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd8)
 {
     c.add("eeeeeeee");
-    CHECK_EQUAL(StringData(""),     c.get(0));
-    CHECK_EQUAL(StringData("a"),    c.get(1));
-    CHECK_EQUAL(StringData("bb"),   c.get(2));
-    CHECK_EQUAL(StringData("ccc"),  c.get(3));
-    CHECK_EQUAL(StringData("dddd"), c.get(4));
-    CHECK_EQUAL(StringData("eeeeeeee"), c.get(5));
+    CHECK_EQUAL("",     c.get(0));
+    CHECK_EQUAL("a",    c.get(1));
+    CHECK_EQUAL("bb",   c.get(2));
+    CHECK_EQUAL("ccc",  c.get(3));
+    CHECK_EQUAL("dddd", c.get(4));
+    CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL(6, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringAdd16)
 {
     c.add("ffffffffffffffff");
-    CHECK_EQUAL(StringData(""),     c.get(0));
-    CHECK_EQUAL(StringData("a"),    c.get(1));
-    CHECK_EQUAL(StringData("bb"),   c.get(2));
-    CHECK_EQUAL(StringData("ccc"),  c.get(3));
-    CHECK_EQUAL(StringData("dddd"), c.get(4));
-    CHECK_EQUAL(StringData("eeeeeeee"), c.get(5));
-    CHECK_EQUAL(StringData("ffffffffffffffff"), c.get(6));
+    CHECK_EQUAL("",     c.get(0));
+    CHECK_EQUAL("a",    c.get(1));
+    CHECK_EQUAL("bb",   c.get(2));
+    CHECK_EQUAL("ccc",  c.get(3));
+    CHECK_EQUAL("dddd", c.get(4));
+    CHECK_EQUAL("eeeeeeee", c.get(5));
+    CHECK_EQUAL("ffffffffffffffff", c.get(6));
     CHECK_EQUAL(7, c.size());
 }
 
@@ -129,14 +129,14 @@ TEST_FIXTURE(db_setup_string, ArrayStringAdd32)
 {
     c.add("gggggggggggggggggggggggggggggggg");
 
-    CHECK_EQUAL(StringData(""),     c.get(0));
-    CHECK_EQUAL(StringData("a"),    c.get(1));
-    CHECK_EQUAL(StringData("bb"),   c.get(2));
-    CHECK_EQUAL(StringData("ccc"),  c.get(3));
-    CHECK_EQUAL(StringData("dddd"), c.get(4));
-    CHECK_EQUAL(StringData("eeeeeeee"), c.get(5));
-    CHECK_EQUAL(StringData("ffffffffffffffff"), c.get(6));
-    CHECK_EQUAL(StringData("gggggggggggggggggggggggggggggggg"), c.get(7));
+    CHECK_EQUAL("",     c.get(0));
+    CHECK_EQUAL("a",    c.get(1));
+    CHECK_EQUAL("bb",   c.get(2));
+    CHECK_EQUAL("ccc",  c.get(3));
+    CHECK_EQUAL("dddd", c.get(4));
+    CHECK_EQUAL("eeeeeeee", c.get(5));
+    CHECK_EQUAL("ffffffffffffffff", c.get(6));
+    CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(7));
     CHECK_EQUAL(8, c.size());
 }
 
@@ -147,31 +147,31 @@ TEST_FIXTURE(db_setup_string, ArrayStringSet1)
     c.set(2, "a");
     c.set(3, "");
 
-    CHECK_EQUAL(StringData("ccc"),  c.get(0));
-    CHECK_EQUAL(StringData("bb"),   c.get(1));
-    CHECK_EQUAL(StringData("a"),    c.get(2));
-    CHECK_EQUAL(StringData(""),     c.get(3));
-    CHECK_EQUAL(StringData("dddd"), c.get(4));
-    CHECK_EQUAL(StringData("eeeeeeee"), c.get(5));
-    CHECK_EQUAL(StringData("ffffffffffffffff"), c.get(6));
-    CHECK_EQUAL(StringData("gggggggggggggggggggggggggggggggg"), c.get(7));
+    CHECK_EQUAL("ccc",  c.get(0));
+    CHECK_EQUAL("bb",   c.get(1));
+    CHECK_EQUAL("a",    c.get(2));
+    CHECK_EQUAL("",     c.get(3));
+    CHECK_EQUAL("dddd", c.get(4));
+    CHECK_EQUAL("eeeeeeee", c.get(5));
+    CHECK_EQUAL("ffffffffffffffff", c.get(6));
+    CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(7));
     CHECK_EQUAL(8, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringInsert1)
 {
     // Insert in middle
-    c.insert(4, "xx", 2);
+    c.insert(4, "xx");
 
-    CHECK_EQUAL(StringData("ccc"),  c.get(0));
-    CHECK_EQUAL(StringData("bb"),   c.get(1));
-    CHECK_EQUAL(StringData("a"),    c.get(2));
-    CHECK_EQUAL(StringData(""),     c.get(3));
-    CHECK_EQUAL(StringData("xx"),   c.get(4));
-    CHECK_EQUAL(StringData("dddd"), c.get(5));
-    CHECK_EQUAL(StringData("eeeeeeee"), c.get(6));
-    CHECK_EQUAL(StringData("ffffffffffffffff"), c.get(7));
-    CHECK_EQUAL(StringData("gggggggggggggggggggggggggggggggg"), c.get(8));
+    CHECK_EQUAL("ccc",  c.get(0));
+    CHECK_EQUAL("bb",   c.get(1));
+    CHECK_EQUAL("a",    c.get(2));
+    CHECK_EQUAL("",     c.get(3));
+    CHECK_EQUAL("xx",   c.get(4));
+    CHECK_EQUAL("dddd", c.get(5));
+    CHECK_EQUAL("eeeeeeee", c.get(6));
+    CHECK_EQUAL("ffffffffffffffff", c.get(7));
+    CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(8));
     CHECK_EQUAL(9, c.size());
 }
 
@@ -180,14 +180,14 @@ TEST_FIXTURE(db_setup_string, ArrayStringDelete1)
     // Delete from end
     c.erase(8);
 
-    CHECK_EQUAL(StringData("ccc"),  c.get(0));
-    CHECK_EQUAL(StringData("bb"),   c.get(1));
-    CHECK_EQUAL(StringData("a"),    c.get(2));
-    CHECK_EQUAL(StringData(""),     c.get(3));
-    CHECK_EQUAL(StringData("xx"),   c.get(4));
-    CHECK_EQUAL(StringData("dddd"), c.get(5));
-    CHECK_EQUAL(StringData("eeeeeeee"), c.get(6));
-    CHECK_EQUAL(StringData("ffffffffffffffff"), c.get(7));
+    CHECK_EQUAL("ccc",  c.get(0));
+    CHECK_EQUAL("bb",   c.get(1));
+    CHECK_EQUAL("a",    c.get(2));
+    CHECK_EQUAL("",     c.get(3));
+    CHECK_EQUAL("xx",   c.get(4));
+    CHECK_EQUAL("dddd", c.get(5));
+    CHECK_EQUAL("eeeeeeee", c.get(6));
+    CHECK_EQUAL("ffffffffffffffff", c.get(7));
     CHECK_EQUAL(8, c.size());
 }
 
@@ -196,13 +196,13 @@ TEST_FIXTURE(db_setup_string, ArrayStringDelete2)
     // Delete from top
     c.erase(0);
 
-    CHECK_EQUAL(StringData("bb"),   c.get(0));
-    CHECK_EQUAL(StringData("a"),    c.get(1));
-    CHECK_EQUAL(StringData(""),     c.get(2));
-    CHECK_EQUAL(StringData("xx"),   c.get(3));
-    CHECK_EQUAL(StringData("dddd"), c.get(4));
-    CHECK_EQUAL(StringData("eeeeeeee"), c.get(5));
-    CHECK_EQUAL(StringData("ffffffffffffffff"), c.get(6));
+    CHECK_EQUAL("bb",   c.get(0));
+    CHECK_EQUAL("a",    c.get(1));
+    CHECK_EQUAL("",     c.get(2));
+    CHECK_EQUAL("xx",   c.get(3));
+    CHECK_EQUAL("dddd", c.get(4));
+    CHECK_EQUAL("eeeeeeee", c.get(5));
+    CHECK_EQUAL("ffffffffffffffff", c.get(6));
     CHECK_EQUAL(7, c.size());
 }
 
@@ -211,12 +211,12 @@ TEST_FIXTURE(db_setup_string, ArrayStringDelete3)
     // Delete from middle
     c.erase(3);
 
-    CHECK_EQUAL(StringData("bb"),   c.get(0));
-    CHECK_EQUAL(StringData("a"),    c.get(1));
-    CHECK_EQUAL(StringData(""),     c.get(2));
-    CHECK_EQUAL(StringData("dddd"), c.get(3));
-    CHECK_EQUAL(StringData("eeeeeeee"), c.get(4));
-    CHECK_EQUAL(StringData("ffffffffffffffff"), c.get(5));
+    CHECK_EQUAL("bb",   c.get(0));
+    CHECK_EQUAL("a",    c.get(1));
+    CHECK_EQUAL("",     c.get(2));
+    CHECK_EQUAL("dddd", c.get(3));
+    CHECK_EQUAL("eeeeeeee", c.get(4));
+    CHECK_EQUAL("ffffffffffffffff", c.get(5));
     CHECK_EQUAL(6, c.size());
 }
 
@@ -244,27 +244,27 @@ TEST_FIXTURE(db_setup_string, ArrayStringInsert2)
     c.add("d");
 
     // Insert in top with expansion
-    c.insert(0, "xxxxx", 5);
+    c.insert(0, "xxxxx");
 
-    CHECK_EQUAL(StringData("xxxxx"), c.get(0));
-    CHECK_EQUAL(StringData("a"),     c.get(1));
-    CHECK_EQUAL(StringData("b"),     c.get(2));
-    CHECK_EQUAL(StringData("c"),     c.get(3));
-    CHECK_EQUAL(StringData("d"),     c.get(4));
+    CHECK_EQUAL("xxxxx", c.get(0));
+    CHECK_EQUAL("a",     c.get(1));
+    CHECK_EQUAL("b",     c.get(2));
+    CHECK_EQUAL("c",     c.get(3));
+    CHECK_EQUAL("d",     c.get(4));
     CHECK_EQUAL(5, c.size());
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringInsert3)
 {
     // Insert in middle with expansion
-    c.insert(3, "xxxxxxxxxx", 10);
+    c.insert(3, "xxxxxxxxxx");
 
-    CHECK_EQUAL(StringData("xxxxx"), c.get(0));
-    CHECK_EQUAL(StringData("a"),     c.get(1));
-    CHECK_EQUAL(StringData("b"),     c.get(2));
-    CHECK_EQUAL(StringData("xxxxxxxxxx"), c.get(3));
-    CHECK_EQUAL(StringData("c"),     c.get(4));
-    CHECK_EQUAL(StringData("d"),     c.get(5));
+    CHECK_EQUAL("xxxxx", c.get(0));
+    CHECK_EQUAL("a",     c.get(1));
+    CHECK_EQUAL("b",     c.get(2));
+    CHECK_EQUAL("xxxxxxxxxx", c.get(3));
+    CHECK_EQUAL("c",     c.get(4));
+    CHECK_EQUAL("d",     c.get(5));
     CHECK_EQUAL(6, c.size());
 }
 
@@ -372,13 +372,13 @@ TEST_FIXTURE(db_setup_string, ArrayStringWithZeroBytes)
     const char buf_2[] = { 0, 'a', 0, 'b', 0 };
     const char buf_3[] = { 0, 0, 0, 0, 0 };
 
-    c.add(buf_1, sizeof buf_1);
-    c.add(buf_2, sizeof buf_2);
-    c.add(buf_3, sizeof buf_3);
+    c.add(StringData(buf_1, sizeof buf_1));
+    c.add(StringData(buf_2, sizeof buf_2));
+    c.add(StringData(buf_3, sizeof buf_3));
 
-    CHECK_EQUAL(5, c.get(0).m_size);
-    CHECK_EQUAL(5, c.get(1).m_size);
-    CHECK_EQUAL(5, c.get(2).m_size);
+    CHECK_EQUAL(5, c.get(0).size());
+    CHECK_EQUAL(5, c.get(1).size());
+    CHECK_EQUAL(5, c.get(2).size());
 
     CHECK_EQUAL(StringData(buf_1, sizeof buf_1), c.get(0));
     CHECK_EQUAL(StringData(buf_2, sizeof buf_2), c.get(1));

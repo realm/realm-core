@@ -1,9 +1,12 @@
 #include <cstring>
 #include <iostream>
+
 #include <tightdb/column.hpp>
 #include <tightdb.hpp>
 #include <tightdb/group_shared.hpp>
 #include <tightdb/column_string.hpp>
+#include <tightdb/column_string_enum.hpp>
+#include <tightdb/array_string_long.hpp>
 
 #define CHECK(v) do { if (v) break; cerr << __LINE__ << ": CHECK failed" << endl; } while(false)
 #define CHECK_EQUAL(a, b) do { if (check_equal((a),(b))) break; cerr << __LINE__ << ": CHECK_EQUAL failed: " << (a) << " vs " << (b) << endl; } while(false)
@@ -28,12 +31,11 @@ namespace {
 
 int main()
 {
-    AdaptiveStringColumn c;
-    c.add("");
-    c.add("");
-    c.add("");
-    c.add("");
-    c.add("");
-    c.add("");
-    CHECK_EQUAL(6u, c.Size());
+    Table t;
+    t.add_column(type_Int, "first");
+    t.insert_int(0, 0, 0);
+    t.insert_done();
+    Query q = t.where();
+    TableView tv = q.find_all();
+    tv.sort(0);
 }

@@ -1873,7 +1873,9 @@ template<int width> inline size_t lower_bound(const char* header, int64_t value)
             i = mid + 1;
             size -= half + 1;
         }
-        else size = half;
+        else {
+            size = half;
+        }
     }
     return i;
 }
@@ -1894,7 +1896,9 @@ template<int width> inline size_t upper_bound(const char* header, int64_t value)
             i = mid + 1;
             size -= half + 1;
         }
-        else size = half;
+        else {
+            size = half;
+        }
     }
     return i;
 }
@@ -2100,40 +2104,46 @@ int64_t Array::column_get(size_t ndx) const TIGHTDB_NOEXCEPT
     return get_direct(data, width, p.second);
 }
 
-const char* Array::string_column_get(size_t ndx) const TIGHTDB_NOEXCEPT
+StringData Array::string_column_get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     if (is_leaf()) {
-        if (HasRefs())
-            return static_cast<const ArrayStringLong*>(this)->Get(ndx);
-        return static_cast<const ArrayString*>(this)->get_c_str(ndx);
+        if (HasRefs()) {
+            return static_cast<const ArrayStringLong*>(this)->get(ndx);
+        }
+        return static_cast<const ArrayString*>(this)->get(ndx);
     }
 
     pair<const char*, size_t> p = find_leaf(this, ndx);
     const char* header = p.first;
     ndx = p.second;
 
-    int width = get_width_from_header(header);
     if (!get_hasrefs_from_header(header)) {
-        // short strings
-        if (width == 0) return "";
-        return get_data_from_header(header) + (ndx * width);
+        return ArrayString::get_from_header(header, ndx); // short strings
     }
 
     // long strings
+    int width = get_width_from_header(header);
     pair<size_t, size_t> p2;
     TIGHTDB_TEMPEX(p2 = ::get_two_as_size, width, (header, 0));
     const size_t offsets_ref = p2.first;
     const size_t blob_ref    = p2.second;
 
-    size_t offset = 0;
+    header = static_cast<char*>(m_alloc.Translate(offsets_ref));
+    width  = get_width_from_header(header);
+    size_t begin, end;
     if (0 < ndx) {
-        header = static_cast<char*>(m_alloc.Translate(offsets_ref));
-        width  = get_width_from_header(header);
-        offset = to_size_t(get_direct(get_data_from_header(header), width, ndx-1));
+        TIGHTDB_TEMPEX(p2 = ::get_two_as_size, width, (header, ndx-1));
+        begin = p2.first;
+        end   = p2.second;
     }
+    else {
+        begin = 0;
+        end   = to_size_t(get_direct(get_data_from_header(header), width, 0));
+    }
+    --end; // Discount the terminating zero
 
     header = static_cast<char*>(m_alloc.Translate(blob_ref));
-    return get_data_from_header(header) + offset;
+    return StringData(ArrayBlob::get_from_header(header, begin), end-begin);
 }
 
 // Find value direct through column b-tree without instatiating any Arrays.
@@ -2180,9 +2190,10 @@ size_t Array::ColumnFind(int64_t target, size_t ref, Array& cache) const
     }
 }
 
-size_t Array::IndexStringFindFirst(const char* value, void* column, StringGetter get_func) const
+size_t Array::IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const
 {
-    const char* v = value;
+    const char* v = value.data();
+    const char* v_end = v + value.size();
     const char* data   = m_data;
     const char* header;
     size_t width = m_width;
@@ -2191,10 +2202,10 @@ size_t Array::IndexStringFindFirst(const char* value, void* column, StringGetter
 top:
     // Create 4 byte index key
     int32_t key = 0;
-    if (*v) key  = (int32_t(*v++) << 24);
-    if (*v) key |= (int32_t(*v++) << 16);
-    if (*v) key |= (int32_t(*v++) << 8);
-    if (*v) key |=  int32_t(*v++);
+    if (v != v_end) key  = (int32_t(*v++) << 24);
+    if (v != v_end) key |= (int32_t(*v++) << 16);
+    if (v != v_end) key |= (int32_t(*v++) << 8);
+    if (v != v_end) key |=  int32_t(*v++);
 
     for (;;) {
         // Get subnode table
@@ -2235,8 +2246,8 @@ top:
                 // compared against the entire (target) string
                 if (!(stored_key << 24)) return row_ref;
 
-                const char* str = (*get_func)(column, row_ref);
-                if (strcmp(str, value) == 0) return row_ref;
+                StringData str = (*get_func)(column, row_ref);
+                if (str == value) return row_ref;
                 else return not_found;
             }
 
@@ -2263,8 +2274,8 @@ top:
                 // compared against the entire (target) string
                 if (!(stored_key << 24)) return row_ref;
 
-                const char* str = (*get_func)(column, row_ref);
-                if (strcmp(str, value) == 0) return row_ref;
+                StringData str = (*get_func)(column, row_ref);
+                if (str == value) return row_ref;
                 else return not_found;
             }
 
@@ -2279,9 +2290,10 @@ top:
     }
 }
 
-void Array::IndexStringFindAll(Array& result, const char* value, void* column, StringGetter get_func) const
+void Array::IndexStringFindAll(Array& result, StringData value, void* column, StringGetter get_func) const
 {
-    const char* v = value;
+    const char* v = value.data();
+    const char* v_end = v + value.size();
     const char* data = m_data;
     const char* header;
     size_t width = m_width;
@@ -2290,10 +2302,10 @@ void Array::IndexStringFindAll(Array& result, const char* value, void* column, S
 top:
     // Create 4 byte index key
     int32_t key = 0;
-    if (*v) key  = (int32_t(*v++) << 24);
-    if (*v) key |= (int32_t(*v++) << 16);
-    if (*v) key |= (int32_t(*v++) << 8);
-    if (*v) key |=  int32_t(*v++);
+    if (v != v_end) key  = (int32_t(*v++) << 24);
+    if (v != v_end) key |= (int32_t(*v++) << 16);
+    if (v != v_end) key |= (int32_t(*v++) << 8);
+    if (v != v_end) key |=  int32_t(*v++);
 
     for (;;) {
         // Get subnode table
@@ -2337,8 +2349,8 @@ top:
                     return;
                 }
 
-                const char* const str = (*get_func)(column, row_ref);
-                if (strcmp(str, value) == 0) {
+                StringData str = (*get_func)(column, row_ref);
+                if (str == value) {
                     result.add(row_ref);
                     return;
                 }
@@ -2362,8 +2374,8 @@ top:
                     // If the last byte in the stored key is not zero, we have
                     // not yet compared against the entire (target) string
                     if ((stored_key << 24)) {
-                        const char* const str = (*get_func)(column, first_row_ref);
-                        if (strcmp(str, value) != 0)
+                        StringData str = (*get_func)(column, first_row_ref);
+                        if (str != value)
                             return; // not_found
                     }
 
@@ -2377,13 +2389,13 @@ top:
                 }
                 else {
                     const Column sub(ref, NULL, 0, m_alloc);
-                    const size_t first_row_ref = to_size_t(sub.Get(0));
+                    const size_t first_row_ref = to_size_t(sub.get(0));
 
                     // If the last byte in the stored key is not zero, we have
                     // not yet compared against the entire (target) string
                     if ((stored_key << 24)) {
-                        const char* const str = (*get_func)(column, first_row_ref);
-                        if (strcmp(str, value) != 0)
+                        StringData str = (*get_func)(column, first_row_ref);
+                        if (str != value)
                             return; // not_found
                     }
 
@@ -2391,7 +2403,7 @@ top:
                     const size_t sub_len  = sub.Size();
 
                     for (size_t i = 0; i < sub_len; ++i) {
-                        const size_t row_ref = to_size_t(sub.Get(i));
+                        const size_t row_ref = to_size_t(sub.get(i));
                         result.add(row_ref);
                     }
                 }
@@ -2409,9 +2421,10 @@ top:
     }
 }
 
-size_t Array::IndexStringCount(const char* value, void* column, StringGetter get_func) const
+size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_func) const
 {
-    const char* v = value;
+    const char* v = value.data();
+    const char* v_end = v + value.size();
     const char* data   = m_data;
     const char* header;
     size_t width = m_width;
@@ -2420,10 +2433,10 @@ size_t Array::IndexStringCount(const char* value, void* column, StringGetter get
 top:
     // Create 4 byte index key
     int32_t key = 0;
-    if (*v) key  = (int32_t(*v++) << 24);
-    if (*v) key |= (int32_t(*v++) << 16);
-    if (*v) key |= (int32_t(*v++) << 8);
-    if (*v) key |=  int32_t(*v++);
+    if (v != v_end) key  = (int32_t(*v++) << 24);
+    if (v != v_end) key |= (int32_t(*v++) << 16);
+    if (v != v_end) key |= (int32_t(*v++) << 8);
+    if (v != v_end) key |=  int32_t(*v++);
 
     for (;;) {
         // Get subnode table
@@ -2464,8 +2477,8 @@ top:
                 // compared against the entire (target) string
                 if (!(stored_key << 24)) return 1;
 
-                const char* const str = (*get_func)(column, row_ref);
-                if (strcmp(str, value) == 0) return 1;
+                StringData str = (*get_func)(column, row_ref);
+                if (str == value) return 1;
                 else return 0;
             }
 
@@ -2499,11 +2512,11 @@ top:
                     // compared against the entire (target) string
                     if (!(stored_key << 24)) return sub_count;
 
-                    row_ref = to_size_t(sub.Get(0));
+                    row_ref = to_size_t(sub.get(0));
                 }
 
-                const char* const str = (*get_func)(column, row_ref);
-                if (strcmp(str, value) == 0) return sub_count;
+                StringData str = (*get_func)(column, row_ref);
+                if (str == value) return sub_count;
                 else return 0;
             }
 

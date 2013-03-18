@@ -216,31 +216,31 @@ TEST(ColumnMixed_Binary)
 {
     ColumnMixed c;
 
-    c.insert_binary(0, "aaa", 4);
-    c.insert_binary(1, "bbbbb", 6);
-    c.insert_binary(2, "ccccccc", 8);
+    c.insert_binary(0, BinaryData("aaa", 4));
+    c.insert_binary(1, BinaryData("bbbbb", 6));
+    c.insert_binary(2, BinaryData("ccccccc", 8));
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
         CHECK_EQUAL(type_Binary, c.get_type(i));
     }
 
-    CHECK_EQUAL("aaa",     (const char*)c.get_binary(0).pointer);
-    CHECK_EQUAL("bbbbb",   (const char*)c.get_binary(1).pointer);
-    CHECK_EQUAL("ccccccc", (const char*)c.get_binary(2).pointer);
+    CHECK_EQUAL("aaa",     c.get_binary(0).data());
+    CHECK_EQUAL("bbbbb",   c.get_binary(1).data());
+    CHECK_EQUAL("ccccccc", c.get_binary(2).data());
 
-    c.set_binary(0, "dd", 3);
-    c.set_binary(1, "", 1);
-    c.set_binary(2, "eeeeeeeee", 10);
+    c.set_binary(0, BinaryData("dd", 3));
+    c.set_binary(1, BinaryData("", 1));
+    c.set_binary(2, BinaryData("eeeeeeeee", 10));
     CHECK_EQUAL(3, c.Size());
 
     for (size_t i = 0; i < c.Size(); ++i) {
         CHECK_EQUAL(type_Binary, c.get_type(i));
     }
 
-    CHECK_EQUAL("dd",        (const char*)c.get_binary(0).pointer);
-    CHECK_EQUAL("",          (const char*)c.get_binary(1).pointer);
-    CHECK_EQUAL("eeeeeeeee", (const char*)c.get_binary(2).pointer);
+    CHECK_EQUAL("dd",        c.get_binary(0).data());
+    CHECK_EQUAL("",          c.get_binary(1).data());
+    CHECK_EQUAL("eeeeeeeee", c.get_binary(2).data());
 
     c.Destroy();
 }
@@ -276,7 +276,7 @@ TEST(ColumnMixed_Mixed)
     c.insert_bool(0, false);
     c.insert_date(0, 23423);
     c.insert_string(0, "Hello");
-    c.insert_binary(0, "binary", 7);
+    c.insert_binary(0, BinaryData("binary", 7));
     c.insert_subtable(0, 0);
     c.insert_float(0, 1.124f);
     c.insert_double(0, 1234.124);
@@ -296,7 +296,7 @@ TEST(ColumnMixed_Mixed)
     c.set_bool(1, false);
     c.set_date(2, 23423);
     c.set_string(3, "Hello");
-    c.set_binary(4, "binary", 7);
+    c.set_binary(4, BinaryData("binary", 7));
     c.set_subtable(5, 0);
     c.set_float(6, 1.124f);
     c.set_double(7, 1234.124);

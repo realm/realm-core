@@ -29,32 +29,39 @@ namespace tightdb {
 // Pre-declarations
 class StringIndex;
 
-class AdaptiveStringColumn : public ColumnBase {
+class AdaptiveStringColumn: public ColumnBase {
 public:
-    AdaptiveStringColumn(Allocator& alloc=Allocator::get_default());
-    AdaptiveStringColumn(size_t ref, ArrayParent* parent=NULL, size_t pndx=0,
-                         Allocator& alloc=Allocator::get_default());
+    AdaptiveStringColumn(Allocator& = Allocator::get_default());
+    AdaptiveStringColumn(std::size_t ref, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                         Allocator& = Allocator::get_default());
     ~AdaptiveStringColumn();
 
     void Destroy();
 
-    size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    std::size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
-    const char* Get(size_t ndx) const TIGHTDB_NOEXCEPT;
-    void add() TIGHTDB_OVERRIDE {return add("");}
-    void add(const char* c_str);
-    void Set(size_t ndx, const char* c_str);
-    void insert(size_t ndx) TIGHTDB_OVERRIDE { Insert(ndx, ""); }
-    void Insert(size_t ndx, const char* c_str);
-    void Delete(size_t ndx) TIGHTDB_OVERRIDE;
+    StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    void add() TIGHTDB_OVERRIDE {return add(StringData());}
+    void add(StringData);
+    void set(std::size_t ndx, StringData);
+    void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, StringData()); }
+    void insert(std::size_t ndx, StringData);
+    void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
     void Clear() TIGHTDB_OVERRIDE;
-    void Resize(size_t ndx);
-    void fill(size_t count);
+    void Resize(std::size_t ndx);
+    void fill(std::size_t count);
 
-    size_t count(const char* value) const;
-    size_t find_first(const char* value, size_t start=0 , size_t end=-1) const;
-    void find_all(Array& result, const char* value, size_t start = 0, size_t end = -1) const;
+    std::size_t count(StringData value) const;
+    std::size_t find_first(StringData value, std::size_t begin = 0 , std::size_t end = -1) const;
+    void find_all(Array& result, StringData value, std::size_t start = 0,
+                  std::size_t end = -1) const;
+
+    /// Find the lower bound for the specified value assuming that the
+    /// elements are already sorted according to
+    /// StringData::operator<(). This operation is semantically
+    /// identical to std::lower_bound().
+    std::size_t lower_bound(StringData value) const TIGHTDB_NOEXCEPT;
 
     // Index
     bool HasIndex() const {return m_index != NULL;}
@@ -82,11 +89,12 @@ protected:
     friend class ColumnBase;
     void UpdateRef(size_t ref);
 
-    const char* LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
-    void LeafSet(size_t ndx, const char* value);
-    void LeafInsert(size_t ndx, const char* value);
-    template<class F> size_t LeafFind(const char* value, size_t start, size_t end) const;
-    void LeafFindAll(Array& result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
+    StringData LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
+    void LeafSet(size_t ndx, StringData value);
+    void LeafInsert(size_t ndx, StringData value);
+    template<class F> size_t LeafFind(StringData value, size_t begin, size_t end) const;
+    void LeafFindAll(Array& result, StringData value, size_t add_offset = 0,
+                     size_t begin = 0, size_t end = -1) const;
 
     void LeafDelete(size_t ndx);
 
@@ -94,8 +102,6 @@ protected:
     // internal nodes. In this case HasRefs indicates a long string
     // array.
     bool IsLongStrings() const TIGHTDB_NOEXCEPT {return m_array->HasRefs();}
-
-    bool FindKeyPos(const char* target, size_t& pos) const;
 
 #ifdef TIGHTDB_DEBUG
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
@@ -111,15 +117,35 @@ private:
 
 // Implementation:
 
-inline const char* AdaptiveStringColumn::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline StringData AdaptiveStringColumn::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < Size());
     return m_array->string_column_get(ndx);
 }
 
-inline void AdaptiveStringColumn::add(const char* c_str)
+inline void AdaptiveStringColumn::add(StringData str)
 {
-    Insert(Size(), c_str);
+    insert(Size(), str);
+}
+
+inline std::size_t AdaptiveStringColumn::lower_bound(StringData value) const TIGHTDB_NOEXCEPT
+{
+    std::size_t i = 0;
+    std::size_t size = Size();
+
+    while (0 < size) {
+        std::size_t half = size / 2;
+        std::size_t mid = i + half;
+        StringData probe = get(mid);
+        if (probe < value) {
+            i = mid + 1;
+            size -= half + 1;
+        }
+        else {
+            size = half;
+        }
+    }
+    return i;
 }
 
 

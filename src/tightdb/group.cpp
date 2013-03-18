@@ -109,11 +109,12 @@ void Group::create_from_file(const string& filename, OpenMode mode, bool do_init
 
     if (!do_init)  return;
 
+    const size_t top_ref = m_alloc.GetTopRef();
+
     // if we just created shared group, we have to wait with
     // actually creating it's datastructures until first write
-    if (m_is_shared && m_alloc.GetTopRef() == 0) return;
+    if (m_is_shared && top_ref == 0) return;
 
-    const size_t top_ref = m_alloc.GetTopRef();
     create_from_ref(top_ref); // FIXME: Throws and leaves the Group in peril
 }
 
@@ -325,7 +326,7 @@ Table* Group::get_table_ptr(size_t ndx)
     return table;
 }
 
-Table* Group::create_new_table(const char* name)
+Table* Group::create_new_table(StringData name)
 {
     const size_t ref = Table::create_empty_table(m_alloc); // Throws
     m_tables.add(ref);
@@ -525,9 +526,8 @@ void Group::to_string(std::ostream& out) const
     size_t name_width = 6;
     size_t rows_width = 4;
     for (size_t i = 0; i < count; ++i) {
-        const char* const name = get_table_name(i);
-        const size_t len = strlen(name);
-        if (name_width < len) name_width = len;
+        StringData name = get_table_name(i);
+        if (name_width < name.size()) name_width = name.size();
 
         ConstTableRef table = get_table(name);
         const size_t row_count = table->size();
@@ -543,7 +543,7 @@ void Group::to_string(std::ostream& out) const
 
     // Print tables
     for (size_t i = 0; i < count; ++i) {
-        const char* const name = get_table_name(i);
+        StringData name = get_table_name(i);
         ConstTableRef table = get_table(name);
         const size_t row_count = table->size();
 
@@ -672,7 +672,7 @@ void Group::to_dot(std::ostream& out) const
     // Tables
     for (size_t i = 0; i < m_tables.size(); ++i) {
         const Table* table = get_table_ptr(i);
-        const char* const name = get_table_name(i);
+        StringData name = get_table_name(i);
         table->to_dot(out, name);
     }
 

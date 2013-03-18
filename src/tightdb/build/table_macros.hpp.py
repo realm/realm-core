@@ -68,14 +68,14 @@ name${j+1}%slurp
  {} \\
     }; \\
  \\
-    static const char* const* dyn_col_names() \\
+    static const StringData* dyn_col_names() \\
     { \\
-        static const char* names[] = { %slurp
+        static StringData names[] = { %slurp
 %for $j in range($num_cols)
 %if 0 < $j
 , %slurp
 %end if
-#name${j+1}%slurp
+StringData(#name${j+1}, sizeof(#name${j+1})-1)%slurp
 %end for
  }; \\
         return names; \\

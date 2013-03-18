@@ -53,7 +53,7 @@ void Index::BuildIndex(const Column& src)
     // Brute-force build-up
     // TODO: sort and merge
     for (size_t i = 0; i < src.Size(); ++i) {
-        Insert(i, src.Get(i), true);
+        Insert(i, src.get(i), true);
     }
 
 #ifdef TIGHTDB_DEBUG
@@ -63,11 +63,11 @@ void Index::BuildIndex(const Column& src)
 
 void Index::Set(size_t ndx, int64_t oldValue, int64_t newValue)
 {
-    Delete(ndx, oldValue, true); // set isLast to avoid updating refs
+    erase(ndx, oldValue, true); // set isLast to avoid updating refs
     Insert(ndx, newValue, true); // set isLast to avoid updating refs
 }
 
-void Index::Delete(size_t ndx, int64_t value, bool isLast)
+void Index::erase(size_t ndx, int64_t value, bool isLast)
 {
     DoDelete(ndx, value);
 

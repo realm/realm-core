@@ -38,6 +38,7 @@ Searching: The main finding function is:
 #ifndef TIGHTDB_ARRAY_HPP
 #define TIGHTDB_ARRAY_HPP
 
+#include <cmath>
 #include <stdint.h> // unint8_t etc
 #include <cstdlib> // size_t
 #include <cstring> // memmove
@@ -45,12 +46,12 @@ Searching: The main finding function is:
 #include <vector>
 #include <ostream>
 
+#include <tightdb/meta.hpp>
 #include <tightdb/assert.hpp>
 #include <tightdb/alloc.hpp>
 #include <tightdb/utilities.hpp>
+#include <tightdb/string_data.hpp>
 #include <tightdb/query_conditions.hpp>
-#include <tightdb/meta.hpp>
-#include <math.h>
 
 /*
     MMX: mmintrin.h
@@ -198,7 +199,7 @@ public:
 
     /// Create a new array, and if \a parent and \a ndx_in_parent are
     /// specified, update the parent to point to this new array.
-    explicit Array(ColumnDef type=coldef_Normal, ArrayParent* parent=0, size_t ndx_in_parent=0,
+    explicit Array(ColumnDef type = coldef_Normal, ArrayParent* = 0, size_t ndx_in_parent = 0,
                    Allocator& = Allocator::get_default());
 
     /// Initialize an array wrapper from the specified array.
@@ -270,12 +271,12 @@ public:
     const Array* GetBlock(size_t ndx, Array& arr, size_t& off,
                           bool use_retval = false) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array
     int64_t column_get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    const char* string_column_get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    StringData string_column_get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     size_t ColumnFind(int64_t target, size_t ref, Array& cache) const;
-    typedef const char*(*StringGetter)(void*, size_t); // Pre-declare getter function from string index
-    size_t IndexStringFindFirst(const char* value, void* column, StringGetter get_func) const;
-    void   IndexStringFindAll(Array& result, const char* value, void* column, StringGetter get_func) const;
-    size_t IndexStringCount(const char* value, void* column, StringGetter get_func) const;
+    typedef StringData (*StringGetter)(void*, size_t); // Pre-declare getter function from string index
+    size_t IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const;
+    void   IndexStringFindAll(Array& result, StringData value, void* column, StringGetter get_func) const;
+    size_t IndexStringCount(StringData value, void* column, StringGetter get_func) const;
 
     void SetAllToZero();
     void Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);

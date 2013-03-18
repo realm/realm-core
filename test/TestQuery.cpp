@@ -258,7 +258,7 @@ TEST(TestQueryStrIndexed_enum)
 {
     TupleTableType ttt;
 
-    for(size_t t = 0; t < 10; t++) {
+    for (size_t t = 0; t < 10; t++) {
         ttt.add(1, "a");
         ttt.add(4, "b");
         ttt.add(7, "c");
@@ -681,7 +681,7 @@ TEST(TestQuerySubtable)
     q1.subtable(2);
     q1.less(0, val50);
     q1.end_subtable();
-    TableView t1 = q1.find_all(0, (size_t)-1);
+    TableView t1 = q1.find_all(0, size_t(-1));
     CHECK_EQUAL(2, t1.size());
     CHECK_EQUAL(1, t1.get_source_ndx(0));
     CHECK_EQUAL(2, t1.get_source_ndx(1));
@@ -693,7 +693,7 @@ TEST(TestQuerySubtable)
     q2.Or();
     q2.less(0, val20);
     q2.end_subtable();
-    TableView t2 = q2.find_all(0, (size_t)-1);
+    TableView t2 = q2.find_all(0, size_t(-1));
     CHECK_EQUAL(2, t2.size());
     CHECK_EQUAL(0, t2.get_source_ndx(0));
     CHECK_EQUAL(3, t2.get_source_ndx(1));
@@ -706,7 +706,7 @@ TEST(TestQuerySubtable)
     q3.less(0, val20);
     q3.end_subtable();
     q3.less(0, val300);
-    TableView t3 = q3.find_all(0, (size_t)-1);
+    TableView t3 = q3.find_all(0, size_t(-1));
     CHECK_EQUAL(1, t3.size());
     CHECK_EQUAL(0, t3.get_source_ndx(0));
 
@@ -719,7 +719,7 @@ TEST(TestQuerySubtable)
     q4.Or();
     q4.less(0, val20);
     q4.end_subtable();
-    TableView t4 = q4.find_all(0, (size_t)-1);
+    TableView t4 = q4.find_all(0, size_t(-1));
 
 
 
@@ -994,7 +994,7 @@ TEST(TestQueryFindNext)
 
     CHECK_EQUAL(5, res1);
     CHECK_EQUAL(6, res2);
-    CHECK_EQUAL((size_t)-1, res3); // no more matches
+    CHECK_EQUAL(size_t(-1), res3); // no more matches
 }
 
 TEST(TestQueryFindAll1)
@@ -1545,12 +1545,14 @@ TEST(TestQuerySyntaxCheck)
 #ifdef TIGHTDB_DEBUG
     s = q6.Verify();
     CHECK(s != "");
-
 #endif
+
     TupleTableType::Query q7 = ttt.where().second.equal("\xa0", false);
-#ifdef TIGHTDB_DEBUG
+#ifdef _WIN32
+#  ifdef TIGHTDB_DEBUG
     s = q7.Verify();
     CHECK(s != "");
+#  endif
 #endif
 }
 

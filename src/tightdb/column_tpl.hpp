@@ -124,7 +124,7 @@ template<typename T, class C> void ColumnBase::TreeSet(size_t ndx, T value)
 
         // Set item
         C target = GetColumnFromRef<C>(refs, node_ndx);
-        target.Set(local_ndx, value);
+        target.set(local_ndx, value);
     }
     else {
         static_cast<C*>(this)->LeafSet(ndx, value);

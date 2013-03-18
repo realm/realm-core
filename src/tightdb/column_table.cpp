@@ -54,7 +54,7 @@ void ColumnTable::insert(size_t ndx, const Table* subtable)
     if (subtable)
         columns_ref = clone_table_columns(subtable);
 
-    Column::Insert(ndx, columns_ref);
+    Column::insert(ndx, columns_ref);
 }
 
 void ColumnTable::fill(size_t count)
@@ -69,7 +69,7 @@ void ColumnTable::fill(size_t count)
     }
 }
 
-void ColumnTable::Delete(size_t ndx)
+void ColumnTable::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < Size());
 
@@ -78,11 +78,11 @@ void ColumnTable::Delete(size_t ndx)
     // Delete sub-tree
     if (ref_columns != 0) {
         Allocator& alloc = GetAllocator();
-        Array columns(ref_columns, (Array*)NULL, 0, alloc);
+        Array columns(ref_columns, 0, 0, alloc);
         columns.Destroy();
     }
 
-    Column::Delete(ndx);
+    Column::erase(ndx);
 
     invalidate_subtables();
 }
@@ -96,11 +96,11 @@ void ColumnTable::ClearTable(size_t ndx)
 
     // Delete sub-tree
     Allocator& alloc = GetAllocator();
-    Array columns(ref_columns, (Array*)NULL, 0, alloc);
+    Array columns(ref_columns, 0, 0, alloc);
     columns.Destroy();
 
     // Mark as empty table
-    Set(ndx, 0);
+    set(ndx, 0);
 }
 
 bool ColumnTable::compare(const ColumnTable& c) const
