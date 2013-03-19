@@ -393,96 +393,105 @@ int main()
             }
         }
 
-        for (size_t i = 0; i < 3; ++i) {
-            // ColumnDirect: Do a search over entire column (sparse, only last value matches)
-            {
-                const size_t expected = 1;
+        for (size_t k = 0; k < 2; ++k) {
+            const char* const run = k == 0 ? "String" : "Index";
 
-                timer.start();
+            for (size_t i = 0; i < 3; ++i) {
+                // ColumnDirect: Do a search over entire column (sparse, only last value matches)
                 {
-                    for (size_t n = 0; n < rounds; ++n) {
-                        size_t res;
-                        if      (i == 0) res = table.column().short_str.count("bottom");
-                        else if (i == 1) res = table.column().long_str.count("long bottom");
-                        else if (i == 2) res = table.column().enum_str.count("saturday");
-                        if (res != expected) {
-                            printf("error");
+                    const size_t expected = 1;
+
+                    timer.start();
+                    {
+                        for (size_t n = 0; n < rounds; ++n) {
+                            size_t res;
+                            if      (i == 0) res = table.column().short_str.count("bottom");
+                            else if (i == 1) res = table.column().long_str.count("long bottom");
+                            else if (i == 2) res = table.column().enum_str.count("saturday");
+                            if (res != expected) {
+                                printf("error");
+                            }
                         }
                     }
+                    const double search_time = timer.get_elapsed_millis();
+                    printf("TightDB: %sColumn c %d: Sparse: %10fs\n", run, (int)i, search_time);
                 }
-                const double search_time = timer.get_elapsed_millis();
-                printf("TightDB: StringColumn c %d: Sparse: %10fs\n", (int)i, search_time);
-            }
 
-            // Query: Do a search over entire column (sparse, only last value matches)
-            {
-                TestTable::Query q = table.where();
-                if      (i == 0) q.short_str.equal("bottom");
-                else if (i == 1) q.long_str.equal("long bottom");
-                else if (i == 2) q.enum_str.equal("saturday");
-
-                const size_t expected = 1;
-
-                timer.start();
+                // Query: Do a search over entire column (sparse, only last value matches)
                 {
-                    for (size_t n = 0; n < rounds; ++n) {
-                        const size_t res = q.count();
-                        if (res != expected) {
-                            printf("error");
+                    TestTable::Query q = table.where();
+                    if      (i == 0) q.short_str.equal("bottom");
+                    else if (i == 1) q.long_str.equal("long bottom");
+                    else if (i == 2) q.enum_str.equal("saturday");
+
+                    const size_t expected = 1;
+
+                    timer.start();
+                    {
+                        for (size_t n = 0; n < rounds; ++n) {
+                            const size_t res = q.count();
+                            if (res != expected) {
+                                printf("error");
+                            }
                         }
                     }
+                    const double search_time = timer.get_elapsed_millis();
+                    printf("TightDB: %sColumn q %d: Sparse: %10fs\n", run, (int)i, search_time);
                 }
-                const double search_time = timer.get_elapsed_millis();
-                printf("TightDB: StringColumn q %d: Sparse: %10fs\n", (int)i, search_time);
-            }
 
-            // Do a search over entire column (many matches)
-            {
-                TestTable::Query q = table.where();
-                if      (i == 0) q.short_str.not_equal("bottom");
-                else if (i == 1) q.long_str.not_equal("long bottom");
-                else if (i == 2) q.enum_str.not_equal("saturday");
-
-                const size_t expected = i == 2 ? row_count / 2 : row_count;
-                const size_t len = table.size();
-
-                timer.start();
+                // Do a search over entire column (many matches)
                 {
-                    for (size_t n = 0; n < rounds; ++n) {
-                        size_t res;
-                        if      (i == 0) res = len -table.column().short_str.count("bottom");
-                        else if (i == 1) res = len -table.column().long_str.count("long bottom");
-                        else if (i == 2) res = table.column().enum_str.count("monday");
-                        if (res != expected) {
-                            printf("error");
+                    TestTable::Query q = table.where();
+                    if      (i == 0) q.short_str.not_equal("bottom");
+                    else if (i == 1) q.long_str.not_equal("long bottom");
+                    else if (i == 2) q.enum_str.not_equal("saturday");
+
+                    const size_t expected = i == 2 ? row_count / 2 : row_count;
+                    const size_t len = table.size();
+
+                    timer.start();
+                    {
+                        for (size_t n = 0; n < rounds; ++n) {
+                            size_t res;
+                            if      (i == 0) res = len -table.column().short_str.count("bottom");
+                            else if (i == 1) res = len -table.column().long_str.count("long bottom");
+                            else if (i == 2) res = table.column().enum_str.count("monday");
+                            if (res != expected) {
+                                printf("error");
+                            }
                         }
                     }
+                    const double search_time = timer.get_elapsed_millis();
+                    printf("TightDB: %sColumn c %d: Many:   %10fs\n", run, (int)i, search_time);
                 }
-                const double search_time = timer.get_elapsed_millis();
-                printf("TightDB: StringColumn c %d: Many:   %10fs\n", (int)i, search_time);
-            }
 
-            // Query: Do a search over entire column (many matches)
-            {
-                TestTable::Query q = table.where();
-                if      (i == 0) q.short_str.not_equal("bottom");
-                else if (i == 1) q.long_str.not_equal("long bottom");
-                else if (i == 2) q.enum_str.equal("monday"); // every second entry matches
-
-                const size_t expected = i == 2 ? row_count / 2 : row_count;
-
-                timer.start();
+                // Query: Do a search over entire column (many matches)
                 {
-                    for (size_t n = 0; n < rounds; ++n) {
-                        const size_t res = q.count();
-                        if (res != expected) {
-                            printf("error");
+                    TestTable::Query q = table.where();
+                    if      (i == 0) q.short_str.not_equal("bottom");
+                    else if (i == 1) q.long_str.not_equal("long bottom");
+                    else if (i == 2) q.enum_str.equal("monday"); // every second entry matches
+
+                    const size_t expected = i == 2 ? row_count / 2 : row_count;
+
+                    timer.start();
+                    {
+                        for (size_t n = 0; n < rounds; ++n) {
+                            const size_t res = q.count();
+                            if (res != expected) {
+                                printf("error");
+                            }
                         }
                     }
+                    const double search_time = timer.get_elapsed_millis();
+                    printf("TightDB: %sColumn q %d: Many:   %10fs\n", run, (int)i, search_time);
                 }
-                const double search_time = timer.get_elapsed_millis();
-                printf("TightDB: StringColumn q %d: Many:   %10fs\n", (int)i, search_time);
             }
+
+            // Set index on string columns for next run
+            table.column().short_str.set_index();
+            table.column().long_str.set_index();
+            table.column().enum_str.set_index();
         }
     }
 #endif
