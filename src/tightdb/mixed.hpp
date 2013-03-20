@@ -73,17 +73,29 @@ namespace tightdb {
 /// constructing a new Mixed instance that refers to a string without
 /// a terminating zero.
 ///
-/// At the present time a Mixed instance cannot store a table
- // reference. You may construct
-/// a Mixed instance with value type set to type_Table, but there is
-/// still no way you can get access to to that table when all you have
-/// is the Mixed instance. The problem is that a table reference is an objects that cannot be trivially copied. that mart if we allow for a Mixed instance to store a table refernece  reason 
+/// At the present time no soultion has been found that would allow
+/// for a Mixed instance to directly store a reference to a table. The
+/// problem is roughly as follows: From most points of view, the
+/// desirable thing to do, would be to store the table reference in a
+/// Mixed instance as a plain pointer without any ownership
+/// semantics. This would have no negative impact on the performance
+/// of copying and destroying Mixed instances, and it would serve just
+/// fine for passing a table as argument when setting the value of an
+/// entry in a mixed column. In that case a copy of the referenced
+/// table would inserted into the mixed column.
 ///
-/// Due to efficiency concerns, a Mixed instance is not able to store a subtable reference. You may construct a Mixed instance with value type set to type_Table, but there is still no way you can get a table reference out of a Mixed instance.
-
-What happens if 
-///
-/// The reason pertains to the management of table instances, a Mixed instance cannot store a reference to a subtable.
+/// On the other hand, when retrieving a table reference from a mixed
+/// column, storing it as a plain pointer in a Mixed instance is no
+/// longer an acceptable option. The complex rules for managing the
+/// lifetime of a Table instance, that represents a subtable,
+/// necessitates the use of a "smart pointer" such as
+/// TableRef. Enhancing the Mixed class to be able to act as a
+/// TableRef would be possible, but would also lead to several new
+/// problems. One problem is the risk of a Mixed instance outliving a
+/// stack allocated Table instance that it references. This would be a
+/// fatal error. Another problem is the impact that the nontrivial
+/// table reference has on the performance of copying and detroying
+/// Mixed instances.
 class Mixed {
 public:
     Mixed() TIGHTDB_NOEXCEPT;
