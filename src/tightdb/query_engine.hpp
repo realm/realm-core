@@ -414,8 +414,11 @@ public:
             // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
             if (m == r) {
                 TSourceColumn av = (TSourceColumn)0;
-                if (source_column != NULL)
-                    av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->GetNext(r); // todo, avoid GetNext if value not needed (if !uses_val)
+                if (source_column != NULL) {
+					TIGHTDB_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != NULL);
+					av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->GetNext(r); // todo, avoid GetNext if value not needed (if !uses_val)
+				}
+				TIGHTDB_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != NULL);
                 ((QueryState<TResult>*)st)->template match<TAction, 0>(r, 0, TResult(av), CallbackDummy());
              }
         }
@@ -1000,13 +1003,25 @@ public:
         }
 
         if (m_condition_column->HasIndex()) {
-            if (m_column_type == col_type_StringEnum)
+            if (m_column_type == col_type_StringEnum) {
                 ((ColumnStringEnum*)m_condition_column)->find_all(m_index, m_value);
+
+			}
             else {
                 ((AdaptiveStringColumn*)m_condition_column)->find_all(m_index, m_value);
             }
             last_indexed = 0;
         }
+		else if (m_column_type != col_type_String) {
+			m_cse.m_column = (ColumnStringEnum*)m_condition_column;
+			m_cse.m_leaf_end = 0;
+			m_cse.m_leaf_start = 0;
+		}
+		else if(m_column_type == col_type_String) {
+			bool b = ((AdaptiveStringColumn*)m_condition_column)->IsLongStrings();
+			std::cerr << b; // Fixme: Why does IsLongStrings() return true even if it's short strings?
+		}
+
 
         if (m_child)
             m_child->Init(table);
@@ -1019,24 +1034,49 @@ public:
         for (size_t s = start; s < end; ++s) {
             if (m_condition_column->HasIndex()) {
                 size_t f = m_index.FindGTE(s, last_indexed);
-                if (f != not_found)
+                if (f != not_found) {
                     s = m_index.GetAsSizeT(f);
+					if(s > end)
+						s = not_found;
+				}
                 else
                     s = not_found;
-                last_indexed = f;
+
+				if(s != not_found)
+	                last_indexed = f;
             }
             else {
                 // todo, can be optimized by placing outside loop
-                if (m_column_type == col_type_String)
-                    s = ((const AdaptiveStringColumn*)m_condition_column)->find_first(m_value, s, end);
-                else {
-                    if (m_key_ndx == size_t(-1))
+                if (m_column_type != col_type_String) {
+					if (m_key_ndx == size_t(-1))
                         s = end; // not in key set
                     else {
                         const ColumnStringEnum* const cse = (const ColumnStringEnum*)m_condition_column;
-                        s = cse->find_first(m_key_ndx, s, end);
+
+                        //s = cse->find_first(m_key_ndx, s, end);
+
+						m_cse.CacheNext(s);
+
+						size_t end2;
+						if (end > m_cse.m_leaf_end)
+							end2 = m_cse.m_leaf_end - m_cse.m_leaf_start;
+						else
+							end2 = end - m_cse.m_leaf_start;
+
+						s = m_cse.m_array_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, end2);
+						if(s == -1)
+							return end;
+						s += m_cse.m_leaf_start;
+
+
                     }
-                }
+				}
+                else {
+
+					s = ((const AdaptiveStringColumn*)m_condition_column)->find_first(m_value, s, end);
+					
+
+				}
             }
             if (s == (size_t)-1)
                 s = end;
@@ -1054,6 +1094,7 @@ private:
     size_t m_key_ndx;
     Array m_index;
     size_t last_indexed;
+	SequentialGetter<int64_t> m_cse;
 };
 
 

@@ -30,6 +30,15 @@ namespace tightdb {
 /// a 31-bit representation).
 long get_timer_millis();
 
+class Timer {
+public:
+    void start() { m_start = get_timer_millis(); }
+    double get_elapsed_millis() const;
+
+private:
+    long m_start;
+};
+
 
 } // namespace tightdb
 

@@ -78,6 +78,11 @@ public:
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
 #endif // TIGHTDB_DEBUG
 
+	// Assumes that this column has only a single leaf node, no
+    // internal nodes. In this case HasRefs indicates a long string
+    // array.
+    bool IsLongStrings() const TIGHTDB_NOEXCEPT {return m_array->HasRefs();}
+
 protected:
     friend class ColumnBase;
     void UpdateRef(size_t ref);
@@ -89,11 +94,6 @@ protected:
     void LeafFindAll(Array& result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
     void LeafDelete(size_t ndx);
-
-    // Assumes that this column has only a single leaf node, no
-    // internal nodes. In this case HasRefs indicates a long string
-    // array.
-    bool IsLongStrings() const TIGHTDB_NOEXCEPT {return m_array->HasRefs();}
 
     bool FindKeyPos(const char* target, size_t& pos) const;
 
