@@ -71,12 +71,13 @@ int main()
 
     timer.Start();
     size_t c1 = 0;
-    for (size_t i = 0; i < 1000; ++i) {
+    for (size_t i = 0; i < 10000; ++i) {
         c1 += t->column().country.count("US");
     }
     const int s1 = timer.GetTimeInMs();
     cout << "search time 1: " << s1 << endl;
 
+/*
     timer.Start();
     size_t c2 = 0;
     for (size_t i = 0; i < 1000; ++i) {
@@ -84,7 +85,5 @@ int main()
     }
     const int s2 = timer.GetTimeInMs();
     cout << "search time 2: " << s2 << endl;
-
-    CHECK_EQUAL(c1, t->size() * 1000);
-    CHECK_EQUAL(c1, c2);
+*/
 }
