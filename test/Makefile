@@ -1,4 +1,4 @@
-PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl performance
+PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl performance experiments
 
 TEST_PROGRAMS = tightdb-tests
 
@@ -15,6 +15,7 @@ PASSIVE_SUBDIRS      += UnitTest++
 test_tightdb_DEPS     = UnitTest++
 test_sqlite3_DEPS     = UnitTest++
 test_stl              = UnitTest++
+experiments           = UnitTest++
 tightdb_tests_CFLAGS  = -IUnitTest++/src
 tightdb_tests_LDFLAGS = -LUnitTest++ -lUnitTest++
 tightdb_tests_DEPS    = UnitTest++
@@ -37,3 +38,10 @@ benchmark: subdir/test-tightdb/default subdir/test-sqlite3/default subdir/test-s
 .PHONY: UnitTest++
 UnitTest++:
 	$(MAKE) -C UnitTest++ CXXFLAGS="-g -Wall -W -ansi" LDFLAGS= >/dev/null
+
+# Build and run whatever is in experiements/testcase.cpp
+.PHONY: testcase testcase-debug
+testcase:
+	@$(MAKE) -C experiments test
+testcase-debug:
+	@$(MAKE) -C experiments test-debug

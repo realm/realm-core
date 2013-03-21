@@ -25,3 +25,10 @@ lcov: test-cover
 .PHONY: gcovr
 gcovr: test-cover
 	gcovr -r src -x >gcovr.xml
+
+# Build and run whatever is in test/experiements/testcase.cpp
+.PHONY: testcase testcase-debug
+testcase: minimal
+	@$(MAKE) -C test testcase
+testcase-debug: debug
+	@$(MAKE) -C test testcase-debug
