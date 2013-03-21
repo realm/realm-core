@@ -430,30 +430,10 @@ public:
     operator StringData() const TIGHTDB_NOEXCEPT { return get(); }
     const FieldAccessor& operator=(StringData value) const { set(value); return *this; }
 
-/*
-    friend bool operator==(const FieldAccessor& a, const char* b) TIGHTDB_NOEXCEPT
-    {
-        return a == StringData(b);
-    }
-
-    friend bool operator!=(const FieldAccessor& a, const char* b) TIGHTDB_NOEXCEPT
-    {
-        return a != StringData(b);
-    }
-
-    friend bool operator==(const char* a, const FieldAccessor& b) TIGHTDB_NOEXCEPT
-    {
-        return StringData(a) == b;
-    }
-
-    friend bool operator!=(const char* a, const FieldAccessor& b) TIGHTDB_NOEXCEPT
-    {
-        return StringData(a) != b;
-    }
-*/
-
     const char* data() const TIGHTDB_NOEXCEPT { return get().data(); }
     std::size_t size() const TIGHTDB_NOEXCEPT { return get().size(); }
+
+    const char* c_str() const TIGHTDB_NOEXCEPT { return data(); }
 
 
     explicit FieldAccessor(typename Base::Init i) TIGHTDB_NOEXCEPT: Base(i) {}
