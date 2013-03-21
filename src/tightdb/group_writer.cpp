@@ -48,6 +48,9 @@ size_t GroupWriter::Commit()
     const SlabAlloc::FreeSpace& freeSpace = m_group.get_allocator().GetFreespace();
     const size_t fcount = freeSpace.size();
 
+    // FIXME: In some cases, m_current_version is uninitialized (has
+    // an undefined value) at this point. This is reported by
+    // valgrind.
     for (size_t i = 0; i < fcount; ++i) {
         SlabAlloc::FreeSpace::ConstCursor r = freeSpace[i];
         add_free_space(to_size_t(r.ref), to_size_t(r.size), to_size_t(m_current_version));
