@@ -57,6 +57,32 @@ TIGHTDB_TABLE_5(GATable,
 
 } // anonymous namespace
 
+
+TEST(TestQueryStrEnum)
+{
+    TupleTableType ttt;
+
+	int aa;
+	int64_t s;
+
+	aa = 0;
+	for(size_t t = 0; t < 1100; t++) {
+        if(t % 2 == 0) {
+			ttt.add(1, "AA");
+			aa++;
+		}
+		else {
+			ttt.add(1, "BB");
+		}
+    }
+
+    ttt.optimize();
+	s = ttt.where().second.equal("AA").count();
+	CHECK_EQUAL(aa, s);
+}
+
+
+
 TEST(Group_GameAnalytics)
 {
     UnitTest::Timer timer;
@@ -65,7 +91,7 @@ TEST(Group_GameAnalytics)
         Group g;
         GATable::Ref t = g.get_table<GATable>("firstevents");
 
-        for (size_t i = 0; i < 10000; ++i) {
+        for (size_t i = 0; i < 1000; ++i) {
             const int64_t r1 = rand() % 1000;
             const int64_t r2 = rand() % 1000;
 

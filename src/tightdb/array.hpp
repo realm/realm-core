@@ -425,6 +425,7 @@ public:
     static std::size_t get_capacity_from_header(const char*) TIGHTDB_NOEXCEPT;
 
     static std::size_t get_alloc_size_from_header(const char*) TIGHTDB_NOEXCEPT;
+    void init_from_ref(size_t ref) TIGHTDB_NOEXCEPT;
 
 private:
     typedef bool (*CallbackDummy)(int64_t);
@@ -447,7 +448,6 @@ protected:
 
 //    void AddPositiveLocal(int64_t value);
 
-    void init_from_ref(size_t ref) TIGHTDB_NOEXCEPT;
     void CreateFromHeader(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
     void CreateFromHeaderDirect(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
     void update_ref_in_parent();

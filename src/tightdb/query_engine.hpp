@@ -393,6 +393,8 @@ public:
 
             // Find first match in this condition node
             r = find_first_local(r + 1, end);
+			if(r > 990)
+				printf("");
             if (r == end) {
                 m_dD = double(r - start) / local_matches;
                 return end;
@@ -773,7 +775,6 @@ protected:
 
     size_t m_last_local_match;
     ColType* m_condition_column;                // Column on which search criteria is applied
-//    const Array* m_criteria_arr;
     Array m_array;
     size_t m_leaf_start;
     size_t m_leaf_end;
@@ -989,7 +990,8 @@ public:
     void Init(const Table& table)
     {
         m_dD = 10.0;
-
+//		m_end_s = 0;
+//		m_stringref = 0;
         m_table = &table;
         m_condition_column = &table.GetColumnBase(m_condition_column_idx);
         m_column_type = table.get_real_column_type(m_condition_column_idx);
@@ -1017,11 +1019,6 @@ public:
 			m_cse.m_leaf_end = 0;
 			m_cse.m_leaf_start = 0;
 		}
-		else if(m_column_type == col_type_String) {
-			bool b = ((AdaptiveStringColumn*)m_condition_column)->IsLongStrings();
-			std::cerr << b; // Fixme: Why does IsLongStrings() return true even if it's short strings?
-		}
-
 
         if (m_child)
             m_child->Init(table);
@@ -1053,7 +1050,7 @@ public:
                     else {
                         const ColumnStringEnum* const cse = (const ColumnStringEnum*)m_condition_column;
 
-                        //s = cse->find_first(m_key_ndx, s, end);
+//						s = cse->find_first(m_key_ndx, s, end);
 
 						m_cse.CacheNext(s);
 
@@ -1065,22 +1062,54 @@ public:
 
 						s = m_cse.m_array_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, end2);
 						if(s == -1)
-							return end;
-						s += m_cse.m_leaf_start;
-
-
+							s = m_cse.m_leaf_end - 1;
+						else
+							return s + m_cse.m_leaf_start;
                     }
 				}
                 else {
+					AdaptiveStringColumn* asc = (AdaptiveStringColumn*)m_condition_column;
+#if 0
+					// Have we exceeded current leaf's range?
+					if(s >= m_end_s) {
+						// Is it because we have not yet initialized any initial leaf for this query?
+						if(m_strarr == NULL) {
+							if(!asc->IsNode()) {
+								m_long = asc->IsLongStrings();
+								m_strarr = asc;
+							}
+							else {
+								size_t ref = asc->TreeGetLeafRef<AdaptiveStringColumn>(s);
+								m_as.init_from_ref(ref);
+								m_asl.init_from_ref(ref);
+							}
+						}
+					}
 
-					s = ((const AdaptiveStringColumn*)m_condition_column)->find_first(m_value, s, end);
-					
+					if(m_long)
+						s = m_asl.find_first(m_value, s - m_first_s);
+					else
+						s = m_as.find_first(m_value, s - m_first_s);
+
+					m_stringref = asc->TreeGetLeafRef<const AdaptiveStringColumn>(s);
+
+//					const char* aaa = m_as.Get(0);
+//					const char* bbb = m_asl.Get(0);
+
+//					asc->TreeGetLeafRef<AdaptiveStringColumn>(s, asc2);
+//					volatile const char* aaa = asc2.Get(0);
+//					const C orig_col = GetColumnFromRef<C>(refs, ndx);
+#endif
+					s = asc->find_first(m_value, s, end);
+					if(s == -1)
+						s = end;
+					else
+						return s;
 
 				}
             }
-            if (s == (size_t)-1)
-                s = end;
-            return s;
+        //    if (s == (size_t)-1)
+        //        s = end;
         }
         return end;
     }
@@ -1095,6 +1124,13 @@ private:
     Array m_index;
     size_t last_indexed;
 	SequentialGetter<int64_t> m_cse;
+
+	ArrayString m_as;
+	ArrayStringLong m_asl;
+	bool m_long;
+	size_t m_end_s;
+	size_t m_first_s;
+	void* m_strarr;
 };
 
 
