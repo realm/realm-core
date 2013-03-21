@@ -70,23 +70,20 @@ int main()
     Group g("ga_test.tightdb");
     GATable::Ref t = g.get_table<GATable>("firstevents");
 
-    GATable::Query q = t->where().country.equal("US");
-
     timer.Start();
     size_t c1 = 0;
     for (size_t i = 0; i < 10000; ++i) {
         c1 += t->column().country.count("US");
     }
     const int s1 = timer.GetTimeInMs();
-    cout << "search time 1: " << s1 << endl;
+    cout << "search time 1: " << s1 << " : " << c1 << endl;
 
-/*
     timer.Start();
+    GATable::Query q = t->where().country.equal("US");
     size_t c2 = 0;
     for (size_t i = 0; i < 1000; ++i) {
         c2 += q.count();
     }
     const int s2 = timer.GetTimeInMs();
-    cout << "search time 2: " << s2 << endl;
-*/
+    cout << "search time 2: " << s2 << " : " << c2 << endl;
 }
