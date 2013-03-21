@@ -677,11 +677,11 @@ void StringIndex::ArrayToDot(std::ostream& out, const Array& array) const
         }
 
         array.ToDot(out);
-        KeysToDot(out, offsets, "keys");
+//        KeysToDot(out, offsets, "keys");
 
         out << "}" << std::endl;
 
-        refs.ToDot(out, "refs");
+//        refs.ToDot(out, "refs");
 
         const size_t count = refs.size();
         for (size_t i = 0; i < count; ++i) {

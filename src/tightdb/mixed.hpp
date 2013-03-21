@@ -110,8 +110,10 @@ public:
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
-    Mixed(      char* c_str) TIGHTDB_NOEXCEPT { set_string(c_str); }
-    Mixed(const char* c_str) TIGHTDB_NOEXCEPT { set_string(c_str); }
+//    Mixed(      char* c_str) TIGHTDB_NOEXCEPT { set_string(c_str); }
+//    Mixed(const char* c_str) TIGHTDB_NOEXCEPT { set_string(c_str); }
+
+    template<class T> Mixed(T*) { typename T::viggo x; }
 
     struct subtable_tag {};
     Mixed(subtable_tag) TIGHTDB_NOEXCEPT: m_type(type_Table) {}
@@ -189,6 +191,7 @@ bool operator==(Wrap<Mixed>, StringData) TIGHTDB_NOEXCEPT;
 bool operator!=(Wrap<Mixed>, StringData) TIGHTDB_NOEXCEPT;
 bool operator==(StringData, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
 bool operator!=(StringData, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
+/*
 bool operator==(Wrap<Mixed>, const char* c_str) TIGHTDB_NOEXCEPT;
 bool operator!=(Wrap<Mixed>, const char* c_str) TIGHTDB_NOEXCEPT;
 bool operator==(const char* c_str, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
@@ -197,6 +200,7 @@ bool operator==(Wrap<Mixed>, char* c_str) TIGHTDB_NOEXCEPT;
 bool operator!=(Wrap<Mixed>, char* c_str) TIGHTDB_NOEXCEPT;
 bool operator==(char* c_str, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
 bool operator!=(char* c_str, Wrap<Mixed>) TIGHTDB_NOEXCEPT;
+*/
 
 // Compare mixed with binary data
 bool operator==(Wrap<Mixed>, BinaryData) TIGHTDB_NOEXCEPT;
@@ -493,6 +497,7 @@ inline bool operator!=(StringData a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
     return type_String != Mixed(b).get_type() || a != Mixed(b).get_string();
 }
 
+/*
 inline bool operator==(Wrap<Mixed> a, const char* b) TIGHTDB_NOEXCEPT
 {
     return a == StringData(b);
@@ -532,6 +537,7 @@ inline bool operator!=(char* a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
     return StringData(a) != b;
 }
+*/
 
 
 // Compare mixed with binary data

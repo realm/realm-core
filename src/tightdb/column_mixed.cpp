@@ -324,7 +324,7 @@ void ColumnMixed::ToDot(std::ostream& out, StringData title) const
     if (0 < title.size()) out << "\\n'" << title << "'";
     out << "\";" << std::endl;
 
-    m_array->ToDot(out, "mixed_top");
+//    m_array->ToDot(out, "mixed_top");
 
     // Write sub-tables
     const size_t count = Size();
@@ -335,11 +335,11 @@ void ColumnMixed::ToDot(std::ostream& out, StringData title) const
         subtable->to_dot(out);
     }
 
-    m_types->ToDot(out, "types");
-    m_refs->ToDot(out, "refs");
+//    m_types->ToDot(out, "types");
+//    m_refs->ToDot(out, "refs");
 
     if (m_array->size() > 2) {
-        m_data->ToDot(out, "data");
+//        m_data->ToDot(out, "data");
     }
 
     out << "}" << std::endl;
