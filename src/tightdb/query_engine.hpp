@@ -330,7 +330,7 @@ public:
     template<Action TAction, class TResult, class TSourceColumn>
     TResult aggregate(QueryState<TResult>* st, size_t start, size_t end, size_t agg_col, size_t* matchcount)
     {
-        if (end == size_t(-1))
+        if (end == not_found)
             end = m_table->size();
 
         SequentialGetter<TSourceColumn>* source_column = NULL;
@@ -396,8 +396,6 @@ public:
 
             // Find first match in this condition node
             r = find_first_local(r + 1, end);
-			if(r > 990)
-				printf("");
             if (r == end) {
                 m_dD = double(r - start) / local_matches;
                 return end;
@@ -1050,20 +1048,21 @@ public:
             else {
                 // todo, can be optimized by placing outside loop
                 if (m_column_type != col_type_String) {
-					if (m_key_ndx == size_t(-1))
+					if (m_key_ndx == not_found)
                         s = end; // not in key set
                     else {
+#if 0 // old legacy
                         const ColumnStringEnum* const cse = (const ColumnStringEnum*)m_condition_column;
-
-//						s = cse->find_first(m_key_ndx, s, end);
-
+						s = cse->find_first(m_key_ndx, s, end);
+#else
 						m_cse.CacheNext(s);
 
 						s = m_cse.m_array_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, m_cse.LocalEnd(end));
-						if(s == -1)
+						if(s == not_found)
 							s = m_cse.m_leaf_end - 1;
 						else
 							return s + m_cse.m_leaf_start;
+#endif
                     }
 				}
                 else {
@@ -1100,15 +1099,13 @@ public:
 //					const C orig_col = GetColumnFromRef<C>(refs, ndx);
 #endif
 					s = asc->find_first(m_value, s, end);
-					if(s == -1)
+					if(s == not_found)
 						s = end;
 					else
 						return s;
 
 				}
             }
-        //    if (s == (size_t)-1)
-        //        s = end;
         }
         return end;
     }
