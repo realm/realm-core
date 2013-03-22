@@ -65,10 +65,10 @@ TEST(TestQueryStrEnum)
 	int aa;
 	int64_t s;
 
-	for(int i = 0; i < 5; i++) {
+	for(int i = 0; i < 100; i++) {
 		ttt.clear();
 		aa = 0;
-		for(size_t t = 0; t < 1500; t++) {
+		for(size_t t = 0; t < 2000; t++) {
 			if(rand() % 3 == 0) {
 				ttt.add(1, "AA");
 				aa++;
@@ -78,6 +78,41 @@ TEST(TestQueryStrEnum)
 			}
 		}
 		ttt.optimize();
+		s = ttt.where().second.equal("AA").count();
+		CHECK_EQUAL(aa, s);
+	}
+
+}
+
+
+TEST(TestQueryStrIndex)
+{
+#ifdef TIGHTDB_DEBUG
+	int itera = 2;
+	int iterb = 100;
+#else
+	int itera = 100;
+	int iterb = 2000;
+#endif
+	
+	TupleTableType ttt;
+
+	int aa;
+	int64_t s;
+
+	for(int i = 0; i < itera; i++) {
+		ttt.clear();
+		aa = 0;
+		for(size_t t = 0; t < iterb; t++) {
+			if(rand() % 3 == 0) {
+				ttt.add(1, "AA");
+				aa++;
+			}
+			else {
+				ttt.add(1, "BB");
+			}
+		}
+	    ttt.column().second.set_index();
 		s = ttt.where().second.equal("AA").count();
 		CHECK_EQUAL(aa, s);
 	}

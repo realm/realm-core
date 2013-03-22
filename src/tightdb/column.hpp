@@ -77,6 +77,11 @@ public:
     template<typename T, class C, class F>
     size_t TreeFind(T value, size_t start, size_t end) const;
 
+    const Array* GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval = false) const
+    {
+        return m_array->GetBlock(ndx, arr, off, use_retval);
+    }
+
 protected:
     friend class StringIndex;
 
@@ -190,10 +195,7 @@ public:
 
     // Query support methods
     void LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const;
-    const Array* GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval = false) const
-    {
-        return m_array->GetBlock(ndx, arr, off, use_retval);
-    }
+
 
     // Index
     bool HasIndex() const {return m_index != NULL;}

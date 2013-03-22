@@ -168,24 +168,19 @@ public:
     typedef typename ColumnTypeTraits<T>::column_type ColType;
     typedef typename ColumnTypeTraits<T>::array_type ArrayType;
 
-    // We must destroy m_array immediately after its instantiation to avoid leak of what it preallocates. We cannot
-    // wait until a SequentialGetter destructor because GetBlock() maps it to data that we don't have ownership of.
-    SequentialGetter()
+    SequentialGetter() : m_array((Array::no_prealloc_tag()))
     {
-        m_array.Destroy(); // FIXME: Instead of first allocating memory and the release it immediately, why not just call the constructor that does not allocate any memory?
     }
 
-    SequentialGetter(const Table& table, size_t column_ndx)
+    SequentialGetter(const Table& table, size_t column_ndx) : m_array((Array::no_prealloc_tag()))
     {
-        m_array.Destroy(); // FIXME: Instead of first allocating memory and the release it immediately, why not just call the constructor that does not allocate any memory?
         if (column_ndx != not_found)
             m_column = (ColType *)&table.GetColumnBase(column_ndx);
         m_leaf_end = 0;
     }
 
-    SequentialGetter(ColType* column)
+    SequentialGetter(ColType* column) : m_array((Array::no_prealloc_tag()))
     {
-        m_array.Destroy(); // FIXME: Instead of first allocating memory and the release it immediately, why not just call the constructor that does not allocate any memory?
         m_column = column;
         m_leaf_end = 0;
     }
@@ -196,8 +191,8 @@ public:
         if (index >= m_leaf_end) {
             // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
             // leave m_array untouched. Else call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
-            m_array_ptr = (ArrayType*) (((Column*)m_column)->GetBlock(index, m_array, m_leaf_start, true));
-//            m_array_ptr = m_column->GetBlock(index, m_array, m_leaf_start, true);
+//            m_array_ptr = (ArrayType*) (((Column*)m_column)->GetBlock(index, m_array, m_leaf_start, true));
+		           m_array_ptr = (ArrayType*)m_column->GetBlock(index, m_array, m_leaf_start, true);
             const size_t leaf_size = m_array_ptr->size();
             m_leaf_end = m_leaf_start + leaf_size;
             return true;
@@ -211,6 +206,14 @@ public:
         T av = m_array_ptr->Get(index - m_leaf_start);
         return av;
     }
+
+	inline size_t LocalEnd(size_t global_end)
+	{
+		if (global_end > m_leaf_end)
+			return m_leaf_end - m_leaf_start;
+		else
+			return global_end - m_leaf_start;
+	}
 
     size_t m_leaf_start;
     size_t m_leaf_end;
@@ -1056,13 +1059,7 @@ public:
 
 						m_cse.CacheNext(s);
 
-						size_t end2;
-						if (end > m_cse.m_leaf_end)
-							end2 = m_cse.m_leaf_end - m_cse.m_leaf_start;
-						else
-							end2 = end - m_cse.m_leaf_start;
-
-						s = m_cse.m_array_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, end2);
+						s = m_cse.m_array_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, m_cse.LocalEnd(end));
 						if(s == -1)
 							s = m_cse.m_leaf_end - 1;
 						else
