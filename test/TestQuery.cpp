@@ -65,10 +65,10 @@ TEST(TestQueryStrEnum)
 	int aa;
 	int64_t s;
 
-	for(int i = 0; i < 5000; i++) {
+	for(int i = 0; i < 5; i++) {
 		ttt.clear();
 		aa = 0;
-		for(size_t t = 0; t < 4500; t++) {
+		for(size_t t = 0; t < 1500; t++) {
 			if(rand() % 3 == 0) {
 				ttt.add(1, "AA");
 				aa++;
