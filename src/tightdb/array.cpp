@@ -173,7 +173,7 @@ void Array::Preset(size_t bitwidth, size_t count)
 
 void Array::Preset(int64_t min, int64_t max, size_t count)
 {
-    size_t w = std::max(BitWidth(max), BitWidth(min));
+    size_t w = ::max(BitWidth(max), BitWidth(min));
     Preset(w, count);
 }
 
@@ -1531,7 +1531,7 @@ template <size_t w> void Array::sort()
 
     size_t lo = 0;
     size_t hi = m_len - 1;
-    std::vector<size_t> count;
+    vector<size_t> count;
     int64_t min;
     int64_t max;
     bool b = false;
@@ -1669,9 +1669,9 @@ template<size_t w> void Array::QuickSort(size_t lo, size_t hi)
     if (i < (int)hi) QuickSort(i, hi);
 }
 
-std::vector<int64_t> Array::ToVector() const
+vector<int64_t> Array::ToVector() const
 {
-    std::vector<int64_t> v;
+    vector<int64_t> v;
     const size_t count = size();
     for (size_t t = 0; t < count; ++t)
         v.push_back(Get(t));
@@ -1694,12 +1694,12 @@ bool Array::Compare(const Array& c) const
 
 void Array::Print() const
 {
-    std::cout << std::hex << GetRef() << std::dec << ": (" << size() << ") ";
+    cout << hex << GetRef() << dec << ": (" << size() << ") ";
     for (size_t i = 0; i < size(); ++i) {
-        if (i) std::cout << ", ";
-        std::cout << Get(i);
+        if (i) cout << ", ";
+        cout << Get(i);
     }
-    std::cout << "\n";
+    cout << "\n";
 }
 
 void Array::Verify() const
@@ -1714,25 +1714,25 @@ void Array::Verify() const
     TIGHTDB_ASSERT(ref_in_parent == (IsValid() ? m_ref : 0));
 }
 
-void Array::ToDot(std::ostream& out, const char* title) const
+void Array::ToDot(ostream& out, StringData title) const
 {
     const size_t ref = GetRef();
 
-    if (title) {
-        out << "subgraph cluster_" << ref << " {" << std::endl;
-        out << " label = \"" << title << "\";" << std::endl;
-        out << " color = white;" << std::endl;
+    if (0 < title.size()) {
+        out << "subgraph cluster_" << ref << " {" << endl;
+        out << " label = \"" << title << "\";" << endl;
+        out << " color = white;" << endl;
     }
 
-    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
+    out << "n" << hex << ref << dec << "[shape=none,label=<";
+    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << endl;
 
     // Header
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
-    out << "0x" << std::hex << ref << std::dec << "<BR/>";
+    out << "0x" << hex << ref << dec << "<BR/>";
     if (m_isNode) out << "IsNode<BR/>";
     if (m_hasRefs) out << "HasRefs<BR/>";
-    out << "</FONT></TD>" << std::endl;
+    out << "</FONT></TD>" << endl;
 
     // Values
     for (size_t i = 0; i < m_len; ++i) {
@@ -1744,23 +1744,23 @@ void Array::ToDot(std::ostream& out, const char* title) const
             else out << "<TD PORT=\"" << i << "\">";
         }
         else out << "<TD>" << v;
-        out << "</TD>" << std::endl;
+        out << "</TD>" << endl;
     }
 
-    out << "</TR></TABLE>>];" << std::endl;
-    if (title) out << "}" << std::endl;
+    out << "</TR></TABLE>>];" << endl;
+    if (0 < title.size()) out << "}" << endl;
 
     if (m_hasRefs) {
         for (size_t i = 0; i < m_len; ++i) {
             const int64_t target = Get(i);
             if (target == 0 || target & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
 
-            out << "n" << std::hex << ref << std::dec << ":" << i;
-            out << " -> n" << std::hex << target << std::dec << std::endl;
+            out << "n" << hex << ref << dec << ":" << i;
+            out << " -> n" << hex << target << dec << endl;
         }
     }
 
-    out << std::endl;
+    out << endl;
 }
 
 void Array::Stats(MemStats& stats) const

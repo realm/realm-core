@@ -397,7 +397,7 @@ public:
 #ifdef TIGHTDB_DEBUG
     void Print() const;
     void Verify() const;
-    void ToDot(std::ostream& out, const char* title=NULL) const;
+    void ToDot(std::ostream& out, StringData title = StringData()) const;
     void Stats(MemStats& stats) const;
 #endif // TIGHTDB_DEBUG
 

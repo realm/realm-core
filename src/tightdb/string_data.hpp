@@ -36,7 +36,8 @@ namespace tightdb {
 /// other way attempt to manage the lifetime of it.
 ///
 /// \sa BinaryData
-struct StringData {
+class StringData {
+public:
     StringData() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
     StringData(const char* d, std::size_t s) TIGHTDB_NOEXCEPT: m_data(d), m_size(s) {}
 
