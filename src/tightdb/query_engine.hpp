@@ -1037,10 +1037,12 @@ public:
 						s = not_found;
 				}
                 else
-                    s = not_found;
+                    return end;
 
-				if(s != not_found)
+				if(s != not_found) {
 	                last_indexed = f;
+					return s;
+				}
             }
             else {
                 // todo, can be optimized by placing outside loop

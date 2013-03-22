@@ -65,20 +65,23 @@ TEST(TestQueryStrEnum)
 	int aa;
 	int64_t s;
 
-	aa = 0;
-	for(size_t t = 0; t < 1100; t++) {
-        if(t % 2 == 0) {
-			ttt.add(1, "AA");
-			aa++;
+	for(int i = 0; i < 5000; i++) {
+		ttt.clear();
+		aa = 0;
+		for(size_t t = 0; t < 4500; t++) {
+			if(rand() % 3 == 0) {
+				ttt.add(1, "AA");
+				aa++;
+			}
+			else {
+				ttt.add(1, "BB");
+			}
 		}
-		else {
-			ttt.add(1, "BB");
-		}
-    }
+		ttt.optimize();
+		s = ttt.where().second.equal("AA").count();
+		CHECK_EQUAL(aa, s);
+	}
 
-    ttt.optimize();
-	s = ttt.where().second.equal("AA").count();
-	CHECK_EQUAL(aa, s);
 }
 
 
@@ -112,7 +115,7 @@ TEST(Group_GameAnalytics)
         c1 += t->column().country.count("US");
     }
     const int s1 = timer.GetTimeInMs();
-    std::cout << "search time 1: " << s1 << std::endl;
+//    std::cout << "search time 1: " << s1 << std::endl;
 
     timer.Start();
     size_t c2 = 0;
@@ -120,7 +123,7 @@ TEST(Group_GameAnalytics)
         c2 += q.count();
     }
     const int s2 = timer.GetTimeInMs();
-    std::cout << "search time 2: " << s2 << std::endl;
+//    std::cout << "search time 2: " << s2 << std::endl;
 
     CHECK_EQUAL(c1, t->size() * 100);
     CHECK_EQUAL(c1, c2);
