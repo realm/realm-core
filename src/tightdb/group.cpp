@@ -665,9 +665,9 @@ void Group::to_dot(std::ostream& out) const
     out << "subgraph cluster_group {" << endl;
     out << " label = \"Group\";" << endl;
 
-//    m_top.ToDot(out, "group_top");
-//    m_tableNames.ToDot(out, "table_names");
-//    m_tables.ToDot(out, "tables");
+    m_top.ToDot(out, "group_top");
+    m_tableNames.ToDot(out, "table_names");
+    m_tables.ToDot(out, "tables");
 
     // Tables
     for (size_t i = 0; i < m_tables.size(); ++i) {

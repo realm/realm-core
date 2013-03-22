@@ -256,8 +256,8 @@ void ColumnStringEnum::ToDot(std::ostream& out, StringData title) const
     if (0 < title.size()) out << "\\n'" << title << "'";
     out << "\";" << std::endl;
 
-//    m_keys.ToDot(out, "keys");
-//    Column::ToDot(out, "values");
+    m_keys.ToDot(out, "keys");
+    Column::ToDot(out, "values");
 
     out << "}" << std::endl;
 }

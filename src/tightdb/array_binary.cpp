@@ -154,9 +154,9 @@ void ArrayBinary::ToDot(ostream& out, const char* title) const
     if (title) out << "\\n'" << title << "'";
     out << "\";" << endl;
 
-//    Array::ToDot(out, "binary_top");
-//    m_offsets.ToDot(out, "offsets");
-//    m_blob.ToDot(out, "blob");
+    Array::ToDot(out, "binary_top");
+    m_offsets.ToDot(out, "offsets");
+    m_blob.ToDot(out, "blob");
 
     out << "}" << endl;
 }

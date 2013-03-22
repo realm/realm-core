@@ -2644,7 +2644,7 @@ void Table::to_dot(std::ostream& out, StringData title) const
         out << " label = \"TopLevelTable";
         if (0 < title.size()) out << "\\n'" << title << "'";
         out << "\";" << endl;
-//        m_top.ToDot(out, "table_top");
+        m_top.ToDot(out, "table_top");
         const Spec& specset = get_spec();
         specset.to_dot(out);
     }
@@ -2662,7 +2662,7 @@ void Table::to_dot(std::ostream& out, StringData title) const
 
 void Table::ToDotInternal(std::ostream& out) const
 {
-//    m_columns.ToDot(out, "columns");
+    m_columns.ToDot(out, "columns");
 
     // Columns
     const size_t column_count = get_column_count();

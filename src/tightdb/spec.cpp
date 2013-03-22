@@ -433,7 +433,7 @@ void Spec::Verify() const
     TIGHTDB_ASSERT(column_count <= m_spec.size());
 }
 
-void Spec::to_dot(std::ostream& out, StringData) const
+void Spec::to_dot(std::ostream& out, const char*) const
 {
     const size_t ref = m_specSet.GetRef();
 
