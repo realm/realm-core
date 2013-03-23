@@ -94,15 +94,7 @@ TEST(Table_floats)
 
 namespace {
 
-enum Days {
-    Mon,
-    Tue,
-    Wed,
-    Thu,
-    Fri,
-    Sat,
-    Sun
-};
+enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
 TIGHTDB_TABLE_4(TestTable,
                 first,  Int,
