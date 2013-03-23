@@ -35,7 +35,27 @@ namespace tightdb {
 /// This class does not own the referenced memory, nor does it in any
 /// other way attempt to manage the lifetime of it.
 ///
+/// For compatibility with C style strings, when a string is stored in
+/// a TightDB database, it is always followed by a terminating null
+/// character. This means that all of the following forms are
+/// guaranteed to return a pointer to a null-terminated string:
+///
+/// \code{.cpp}
+///
+///   group.get_table_name(...).data()
+///   table.get_column_name().data()
+///   table.get_string(...).data()
+///   table.get_mixed(...).get_string().data()
+///
+/// \endcode
+///
+/// Note that this assumption does not hold in general for strings
+/// referenced by instances of StringData. Indeed there is nothing
+/// stopping you from constructing a new StringData instance that
+/// refers to a string without a terminating null character.
+///
 /// \sa BinaryData
+/// \sa Mixed
 class StringData {
 public:
     StringData() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}

@@ -56,22 +56,22 @@ namespace tightdb {
 /// way attempt to manage its lifetime.
 ///
 /// For compatibility with C style strings, when a string (character
-/// data) is stored in a TightDB table, it is always followed by a
-/// terminating zero. This is also true when strings are stored in a
-/// mixed type column. This means that if the 'mixed' value of the 8th
-/// row stores a string, then the following code is guaranteed to
-/// always see a zero terminated string:
+/// data) is stored in a TightDB database, it is always followed by a
+/// terminating null character. This is also true when strings are
+/// stored in a mixed type column. This means that in the following
+/// code if the 'mixed' value of the 8th row stores a string, then \c
+/// c_str will always point to a null-terminated string:
 ///
 /// \code{.cpp}
 ///
-///   const char* c_str = my_table[7].mixed.data(); // Always zero terminated
+///   const char* c_str = my_table[7].mixed.data(); // Always null-terminated
 ///
 /// \endcode
 ///
 /// Note that this assumption does not hold in general for strings in
 /// instances of Mixed. Indeed there is nothing stopping you from
 /// constructing a new Mixed instance that refers to a string without
-/// a terminating zero.
+/// a terminating null character.
 ///
 /// At the present time no soultion has been found that would allow
 /// for a Mixed instance to directly store a reference to a table. The
@@ -96,6 +96,8 @@ namespace tightdb {
 /// fatal error. Another problem is the impact that the nontrivial
 /// table reference has on the performance of copying and detroying
 /// Mixed instances.
+///
+/// \sa StringData
 class Mixed {
 public:
     Mixed() TIGHTDB_NOEXCEPT;
