@@ -68,14 +68,14 @@ name${j+1}%slurp
  {} \\
     }; \\
  \\
-    static const StringData* dyn_col_names() \\
+    static const tightdb::StringData* dyn_col_names() \\
     { \\
-        static StringData names[] = { %slurp
+        static tightdb::StringData names[] = { %slurp
 %for $j in range($num_cols)
 %if 0 < $j
 , %slurp
 %end if
-StringData(#name${j+1}, sizeof(#name${j+1})-1)%slurp
+tightdb::StringData(#name${j+1}, sizeof(#name${j+1})-1)%slurp
 %end for
  }; \\
         return names; \\
