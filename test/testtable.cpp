@@ -2079,3 +2079,13 @@ TEST(Table_LanguageBindings)
    LangBindHelper::unbind_table_ref(table);
    LangBindHelper::unbind_table_ref(table2);
 }
+
+TEST(Table_MultipleColumn)
+{
+    
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_column(type_Int, "first");
+    CHECK_EQUAL(table.get_column_count(), 2);
+    CHECK_EQUAL(table.get_column_index("first"), 0);
+}
