@@ -155,7 +155,7 @@ int main() {
         MyTable::Ref table = tr.get_table<MyTable>("employees");
 
         // Add row to table
-        t->add("Bill", 53, true);
+        table->add("Bill", 53, true);
 
         tr.commit(); // end transaction
     }
