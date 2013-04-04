@@ -144,6 +144,18 @@ void BasicColumn<T>::Resize(size_t ndx)
 }
 
 template<typename T>
+void BasicColumn<T>::move_last_over(size_t ndx) {
+    TIGHTDB_ASSERT(ndx+1 < Size());
+
+    const size_t ndx_last = Size()-1;
+    const T v = Get(ndx_last);
+
+    Set(ndx, v);
+    Delete(ndx_last);
+}
+
+
+template<typename T>
 T BasicColumn<T>::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < Size());

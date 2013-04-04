@@ -60,6 +60,7 @@ public:
     void Clear() TIGHTDB_OVERRIDE;
     void Resize(size_t ndx);
     void fill(size_t count);
+    void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
 
     size_t count(T value) const;
 

@@ -41,6 +41,7 @@ public:
     void Delete(size_t ndx) TIGHTDB_OVERRIDE;
     void Clear() TIGHTDB_OVERRIDE;
 
+    using Column::move_last_over;
     using Column::add;
 
     size_t count(const char* value) const;

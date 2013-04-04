@@ -455,7 +455,6 @@ void StringIndex::distinct(Array& result) const
 
             // low bit set indicate literal ref (shifted)
             if (ref & 1) {
-//             const size_t r = (ref >> 1); NEVER right shift signed - it's undefined and varies btw AMD/Intel/ARM
                const size_t r = to_size_t((uint64_t(ref) >> 1)); 
                result.add(r);
             }
@@ -606,6 +605,52 @@ void StringIndex::DoDelete(size_t row_ndx, const char* value, size_t offset)
                     refs.Delete(pos);
                     sub.Destroy();
                 }
+            }
+        }
+    }
+}
+
+void StringIndex::update_ref(const char* value, size_t old_row_ndx, size_t new_row_ndx)
+{
+    do_update_ref(value, old_row_ndx, new_row_ndx, 0);
+}
+
+void StringIndex::do_update_ref(const char* value, size_t row_ndx, size_t new_row_ndx, size_t offset)
+{
+    Array values = m_array->GetSubArray(0);
+    Array refs = m_array->GetSubArray(1);
+    Allocator& alloc = m_array->GetAllocator();
+
+    // Create 4 byte index key
+    const char* const v = value + offset;
+    const int32_t key = CreateKey(v);
+
+    const size_t pos = values.FindPos2(key);
+    TIGHTDB_ASSERT(pos != not_found);
+
+    if (m_array->IsNode()) {
+        const size_t ref = refs.GetAsRef(pos);
+        StringIndex node(ref, &refs, pos, m_target_column, m_get_func, alloc);
+        node.do_update_ref(value, row_ndx, new_row_ndx, offset);
+    }
+    else {
+        const int64_t ref = refs.Get(pos);
+        if (ref & 1) {
+            TIGHTDB_ASSERT((uint64_t(ref) >> 1) == (int64_t)row_ndx);
+            const size_t shifted = (new_row_ndx << 1) + 1; // shift to indicate literal
+            refs.Set(pos, shifted);
+        }
+        else {
+            // A real ref either points to a list or a sub-index
+            if (Array::is_index_node(to_size_t(ref), alloc)) {
+                StringIndex subNdx((size_t)ref, &refs, pos, m_target_column, m_get_func, alloc);
+                subNdx.do_update_ref(value, row_ndx, new_row_ndx, offset+4);
+            }
+            else {
+                Column sub(to_size_t(ref), &refs, pos, alloc);
+                const size_t r = sub.find_first(row_ndx);
+                TIGHTDB_ASSERT(r != not_found);
+                sub.Set(r, new_row_ndx);
             }
         }
     }

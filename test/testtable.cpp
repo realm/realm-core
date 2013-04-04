@@ -298,6 +298,7 @@ TEST(Table_HighLevelCopy)
     CHECK(*table3 == table);
 }
 
+void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows); // pre-declaration
 
 void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
 {
@@ -432,6 +433,24 @@ TEST(Table_Delete_All_Types)
 #ifdef TIGHTDB_DEBUG
     table.Verify();
 #endif
+}
+
+TEST(Table_Move_All_Types)
+{
+    Table table;
+    setup_multi_table(table, 15, 2);
+    table.set_index(6);
+
+    while (table.size() > 1) {
+        const size_t len = table.size();
+        const size_t ndx = size_t(rand()) % (len-1);
+
+        table.move_last_over(ndx);
+
+#ifdef TIGHTDB_DEBUG
+        table.Verify();
+#endif
+    }
 }
 
 // enable to generate testfiles for to_string and json below

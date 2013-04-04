@@ -102,6 +102,7 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType newtype)
             {
                 // If item is in middle of the column, we just clear
                 // it to avoid having to adjust refs to following items
+                // TODO: this is a leak. We should adjust
                 const size_t ref = m_refs->GetAsRef(ndx) >> 1;
                 if (ref == m_data->Size()-1)
                     m_data->Delete(ref);
@@ -123,6 +124,7 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType newtype)
     }
     if (type != newtype)
         m_types->Set(ndx, newtype);
+    m_refs->Set(ndx, 0);
 }
 
 void ColumnMixed::Delete(size_t ndx)
@@ -136,6 +138,16 @@ void ColumnMixed::Delete(size_t ndx)
     m_refs->Delete(ndx);
 
     invalidate_subtables();
+}
+
+void ColumnMixed::move_last_over(size_t ndx) {
+    TIGHTDB_ASSERT(ndx+1 < Size());
+
+    // Remove refs or binary data
+    clear_value(ndx, mixcol_Int);
+
+    m_types->move_last_over(ndx);
+    m_refs->move_last_over(ndx);
 }
 
 void ColumnMixed::Clear()

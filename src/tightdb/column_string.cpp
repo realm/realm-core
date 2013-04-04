@@ -175,6 +175,35 @@ void AdaptiveStringColumn::Resize(size_t ndx)
 
 }
 
+void AdaptiveStringColumn::move_last_over(size_t ndx) {
+    TIGHTDB_ASSERT(ndx+1 < Size());
+
+    const size_t ndx_last = Size()-1;
+    const char* const v = Get(ndx_last);
+
+    if (m_index) {
+        // remove the value to be overwritten from index
+        const char* const oldVal = Get(ndx);
+        m_index->Delete(ndx, oldVal, true);
+
+        // update index to point to new location
+        m_index->update_ref(v, ndx_last, ndx);
+    }
+
+    TreeSet<const char*, AdaptiveStringColumn>(ndx, v);
+
+    // If the copy happened within the same array
+    // it might have moved the source data when making
+    // room for the insert. In that case we wil have to
+    // copy again from the new position
+    // TODO: manual resize before copy
+    const char* const v2 = Get(ndx_last);
+    if (v != v2)
+        TreeSet<const char*, AdaptiveStringColumn>(ndx, v2);
+
+    TreeDelete<const char*, AdaptiveStringColumn>(ndx_last);
+}
+
 void AdaptiveStringColumn::Set(size_t ndx, const char* value)
 {
     TIGHTDB_ASSERT(ndx < Size());

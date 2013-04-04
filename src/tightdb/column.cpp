@@ -599,6 +599,16 @@ void Column::Delete(size_t ndx)
     }
 }
 
+void Column::move_last_over(size_t ndx) {
+    TIGHTDB_ASSERT(ndx+1 < Size());
+
+    const size_t ndx_last = Size()-1;
+    const int64_t v = Get(ndx_last);
+
+    Set(ndx, v);
+    Delete(ndx_last);
+}
+
 void Column::Increment64(int64_t value, size_t start, size_t end)
 {
     if (!IsNode()) {

@@ -48,6 +48,7 @@ public:
     virtual void insert(size_t ndx) = 0; // Insert an entry into this column using the columns default value
     virtual void Clear() = 0;
     virtual void Delete(size_t ndx) = 0;
+    virtual void move_last_over(size_t ndx) = 0;
     void Resize(size_t ndx) {m_array->Resize(ndx);}
 
     // Indexing
@@ -176,6 +177,7 @@ public:
 
     void Clear() TIGHTDB_OVERRIDE;
     void Delete(size_t ndx) TIGHTDB_OVERRIDE;
+    void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
     //void Resize(size_t len);
 
     void Increment64(int64_t value, size_t start=0, size_t end=-1);

@@ -141,6 +141,26 @@ void ColumnBinary::Resize(size_t ndx)
     ((ArrayBinary*)m_array)->Resize(ndx);
 }
 
+void ColumnBinary::move_last_over(size_t ndx) {
+    TIGHTDB_ASSERT(ndx+1 < Size());
+
+    const size_t ndx_last = Size()-1;
+
+    const BinaryData v = Get(ndx_last);
+    Set(ndx, v.pointer, v.len);
+
+    // If the copy happened within the same array
+    // it might have moved the source data when making
+    // room for the insert. In that case we wil have to
+    // copy again from the new position
+    // TODO: manual resize before copy
+    const BinaryData v2 = Get(ndx_last);
+    if (v.pointer != v2.pointer)
+        Set(ndx, v2.pointer, v2.len);
+
+    Delete(ndx_last);
+}
+
 bool ColumnBinary::compare(const ColumnBinary& c) const
 {
     const size_t n = Size();

@@ -51,6 +51,7 @@ public:
     void Resize(size_t ndx);
     void Clear() TIGHTDB_OVERRIDE;
     void fill(size_t count);
+    void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
 
     // Index
     bool HasIndex() const {return false;}
