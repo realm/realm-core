@@ -445,6 +445,7 @@ private:
 
 protected:
     friend class GroupWriter;
+    friend class AdaptiveStringColumn;
 
 //    void AddPositiveLocal(int64_t value);
 
@@ -1742,7 +1743,6 @@ template <class cond, Action action, size_t bitwidth, class Callback> void Array
     find_optimized<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
 
 #ifdef TIGHTDB_DEBUG
-
     if (action == act_Max || action == act_Min || action == act_Sum || action == act_Count || action == act_ReturnFirst || action == act_Count) {
         find_reference<cond, action, bitwidth, Callback>(value, start, end, baseindex, &r_state, callback);
         if (action == act_FindAll)

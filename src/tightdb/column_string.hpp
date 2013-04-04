@@ -74,6 +74,39 @@ public:
     /// Compare two string columns for equality.
     bool compare(const AdaptiveStringColumn&) const;
 
+    bool GetBlock(size_t ndx, ArrayParent** ap, size_t& off) const
+    {
+		if (IsNode()) {
+		    std::pair<const char*, size_t> p = m_array->find_leaf(m_array, ndx);
+			bool longstr = m_array->get_hasrefs_from_header(p.first);
+			if(longstr) {
+				ArrayStringLong* asl2 = new ArrayStringLong(size_t(p.first), NULL, 0);
+				*ap = asl2;		
+			}
+			else {
+				ArrayString* as2 = new ArrayString(size_t(p.first), NULL, 0);
+				*ap = as2;
+			}
+			off = ndx - p.second;
+			return longstr;
+		}
+		else {
+			off = 0;
+			if(IsLongStrings()) {
+				ArrayStringLong* asl2 = new ArrayStringLong(size_t(m_array->get_header_from_data(m_array->m_data)), NULL, 0);				
+				*ap = asl2;
+				return true;
+			}
+			else {
+				ArrayString* as2 = new ArrayString(size_t(m_array->get_header_from_data(m_array->m_data)), NULL, 0);
+				*ap = as2;
+				return false;
+			}
+		}
+
+		TIGHTDB_ASSERT(false);
+    }
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
 #endif // TIGHTDB_DEBUG

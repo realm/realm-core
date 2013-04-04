@@ -88,20 +88,18 @@ TEST(TestQueryStrEnum)
 TEST(TestQueryStrIndex)
 {
 #ifdef TIGHTDB_DEBUG
-	int itera = 2;
+	int itera = 4;
 	int iterb = 100;
 #else
 	int itera = 100;
 	int iterb = 2000;
 #endif
 	
-	TupleTableType ttt;
-
 	int aa;
 	int64_t s;
 
 	for(int i = 0; i < itera; i++) {
-		ttt.clear();
+		TupleTableType ttt;
 		aa = 0;
 		for(size_t t = 0; t < iterb; t++) {
 			if(rand() % 3 == 0) {
@@ -112,14 +110,20 @@ TEST(TestQueryStrIndex)
 				ttt.add(1, "BB");
 			}
 		}
-	    ttt.column().second.set_index();
+
+		s = ttt.where().second.equal("AA").count();
+		CHECK_EQUAL(aa, s);
+
+		ttt.optimize();
+		s = ttt.where().second.equal("AA").count();
+		CHECK_EQUAL(aa, s);
+
+		ttt.column().second.set_index();
 		s = ttt.where().second.equal("AA").count();
 		CHECK_EQUAL(aa, s);
 	}
 
 }
-
-
 
 TEST(Group_GameAnalytics)
 {
@@ -149,16 +153,12 @@ TEST(Group_GameAnalytics)
     for (size_t i = 0; i < 100; ++i) {
         c1 += t->column().country.count("US");
     }
-    const int s1 = timer.GetTimeInMs();
-//    std::cout << "search time 1: " << s1 << std::endl;
 
     timer.Start();
     size_t c2 = 0;
     for (size_t i = 0; i < 100; ++i) {
         c2 += q.count();
     }
-    const int s2 = timer.GetTimeInMs();
-//    std::cout << "search time 2: " << s2 << std::endl;
 
     CHECK_EQUAL(c1, t->size() * 100);
     CHECK_EQUAL(c1, c2);
@@ -614,6 +614,22 @@ TEST(TestQueryFindAll_range_or)
 }
 
 
+TEST(TestQuerySimpleStr)
+{
+    TupleTableType ttt;
+
+    ttt.add(1, "X");
+    ttt.add(2, "a");
+    ttt.add(3, "X");
+    ttt.add(4, "a");
+    ttt.add(5, "X");
+    ttt.add(6, "X");
+    TupleTableType::Query q = ttt.where().second.equal("X");
+	size_t c = q.count();
+
+	CHECK_EQUAL(4, c);
+}
+
 TEST(TestQueryDelete)
 {
     TupleTableType ttt;
@@ -985,8 +1001,6 @@ TEST(TestQuerySort_Bools)
     CHECK(tv.get_bool(0, 2) == true);
 }
 
-
-
 TEST(TestQueryThreads)
 {
     TupleTableType ttt;
@@ -1019,6 +1033,69 @@ TEST(TestQueryThreads)
 }
 
 
+TEST(TestQueryLongString)
+{
+    TupleTableType ttt;
+
+    // Spread query search hits in an odd way to test more edge cases
+    // (thread job size is THREAD_CHUNK_SIZE = 10)
+    for (int i = 0; i < 100; i++) {
+        for (int j = 0; j < 10; j++) {
+            ttt.add(5, "aaaaaaaaaaaaaaaaaa");
+            ttt.add(j, "bbbbbbbbbbbbbbbbbb");
+            ttt.add(6, "cccccccccccccccccc");
+            ttt.add(6, "aaaaaaaaaaaaaaaaaa");
+            ttt.add(6, "bbbbbbbbbbbbbbbbbb");
+            ttt.add(6, "cccccccccccccccccc");
+            ttt.add(6, "aaaaaaaaaaaaaaaaaa");
+        }
+    }
+    TupleTableType::Query q1 = ttt.where().first.equal(2).second.equal("bbbbbbbbbbbbbbbbbb");
+
+    // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
+    //q1.set_threads(5);
+    TupleTableType::View tv = q1.find_all();
+
+    CHECK_EQUAL(100, tv.size());
+    for (int i = 0; i < 100; i++) {
+        const size_t expected = i*7*10 + 14 + 1;
+        const size_t actual   = tv.get_source_ndx(i);
+        CHECK_EQUAL(expected, actual);
+    }
+}
+
+
+TEST(TestQueryLongEnum)
+{
+    TupleTableType ttt;
+
+    // Spread query search hits in an odd way to test more edge cases
+    // (thread job size is THREAD_CHUNK_SIZE = 10)
+    for (int i = 0; i < 100; i++) {
+        for (int j = 0; j < 10; j++) {
+            ttt.add(5, "aaaaaaaaaaaaaaaaaa");
+            ttt.add(j, "bbbbbbbbbbbbbbbbbb");
+            ttt.add(6, "cccccccccccccccccc");
+            ttt.add(6, "aaaaaaaaaaaaaaaaaa");
+            ttt.add(6, "bbbbbbbbbbbbbbbbbb");
+            ttt.add(6, "cccccccccccccccccc");
+            ttt.add(6, "aaaaaaaaaaaaaaaaaa");
+        }
+    }
+	ttt.optimize();
+	TupleTableType::Query q1 = ttt.where().first.equal(2).second.not_equal("aaaaaaaaaaaaaaaaaa");
+
+    // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
+    //q1.set_threads(5);
+    TupleTableType::View tv = q1.find_all();
+
+    CHECK_EQUAL(100, tv.size());
+    for (int i = 0; i < 100; i++) {
+        const size_t expected = i*7*10 + 14 + 1;
+        const size_t actual   = tv.get_source_ndx(i);
+        CHECK_EQUAL(expected, actual);
+    }
+}
 
 TEST(TestQuerySimple2)
 {

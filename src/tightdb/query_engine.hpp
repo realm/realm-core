@@ -192,7 +192,7 @@ public:
             // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
             // leave m_array untouched. Else call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
 //            m_array_ptr = (ArrayType*) (((Column*)m_column)->GetBlock(index, m_array, m_leaf_start, true));
-		           m_array_ptr = (ArrayType*)m_column->GetBlock(index, m_array, m_leaf_start, true);
+		    m_array_ptr = (ArrayType*)m_column->GetBlock(index, m_array, m_leaf_start, true);
             const size_t leaf_size = m_array_ptr->size();
             m_leaf_end = m_leaf_start + leaf_size;
             return true;
@@ -405,6 +405,7 @@ public:
 
             // Find first match in remaining condition nodes
             size_t m = r;
+
             for (size_t c = 1; c < m_conds; c++) {
                 m = m_children[c]->find_first_local(r, r + 1);
                 if (m != r) {
@@ -417,12 +418,12 @@ public:
             // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
             if (m == r) {
                 TSourceColumn av = (TSourceColumn)0;
-                if (source_column != NULL) {
+				if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != NULL) {
 					TIGHTDB_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != NULL);
-					av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->GetNext(r); // todo, avoid GetNext if value not needed (if !uses_val)
+					av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->GetNext(r);
 				}
 				TIGHTDB_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != NULL);
-                ((QueryState<TResult>*)st)->template match<TAction, 0>(r, 0, TResult(av), CallbackDummy());
+                static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av), CallbackDummy());
              }
         }
     }
@@ -823,10 +824,11 @@ public:
 
     void Init(const Table& table)
     {
+		m_leaf = NULL;
         m_dD = 100.0;
         m_probes = 0;
         m_matches = 0;
-
+		m_end_s = 0;
         m_table = &table;
         m_condition_column = &table.GetColumnBase(m_condition_column_idx);
         m_column_type = table.get_real_column_type(m_condition_column_idx);
@@ -840,7 +842,25 @@ public:
 
         for (size_t s = start; s < end; ++s) {
             const char* t;
+#if 0
+            if (m_column_type == col_type_StringEnum) {
+				// enum
+				t = static_cast<const ColumnStringEnum*>(m_condition_column)->Get(s);
+			}
+			else {
+				// short or long 
+				const AdaptiveStringColumn* asc = static_cast<const AdaptiveStringColumn*>(m_condition_column);
+				if(s >= m_end_s) {
+					// we exceeded current leaf's range
+					free(m_leaf);
+					m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
+					m_end_s = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
+				}
+				
+				t = (m_long ? static_cast<ArrayStringLong*>(m_leaf)->Get(s - m_leaf_start) : static_cast<ArrayString*>(m_leaf)->Get(s - m_leaf_start));
+			}
 
+#else // old legacy
             // todo, can be optimized by placing outside loop
             if (m_column_type == col_type_String)
                 t = static_cast<const AdaptiveStringColumn*>(m_condition_column)->Get(s);
@@ -848,7 +868,7 @@ public:
                 //TODO: First check if string is in key list
                 t = static_cast<const ColumnStringEnum*>(m_condition_column)->Get(s);
             }
-
+#endif
             if (cond(m_value, m_ucase, m_lcase, t))
                 return s;
         }
@@ -861,6 +881,13 @@ protected:
     char* m_ucase;
     const ColumnBase* m_condition_column;
     ColumnType m_column_type;
+
+	ArrayParent *m_leaf;
+
+	bool m_long;
+	size_t m_end_s;
+	size_t m_first_s;
+	size_t m_leaf_start;
 };
 
 
@@ -982,17 +1009,18 @@ public:
         m_child = 0;
         m_value = (char *)malloc(strlen(v)*6);
         memcpy(m_value, v, strlen(v) + 1);
+		m_leaf = NULL;
     }
     ~StringNode() {
         free((void*)m_value);
+		free(m_leaf);
         m_index.Destroy();
     }
 
     void Init(const Table& table)
     {
         m_dD = 10.0;
-//		m_end_s = 0;
-//		m_stringref = 0;
+		m_leaf_end = 0;
         m_table = &table;
         m_condition_column = &table.GetColumnBase(m_condition_column_idx);
         m_column_type = table.get_real_column_type(m_condition_column_idx);
@@ -1066,44 +1094,31 @@ public:
                     }
 				}
                 else {
+#if 0 // old legacy
 					AdaptiveStringColumn* asc = (AdaptiveStringColumn*)m_condition_column;
-#if 0
-					// Have we exceeded current leaf's range?
-					if(s >= m_end_s) {
-						// Is it because we have not yet initialized any initial leaf for this query?
-						if(m_strarr == NULL) {
-							if(!asc->IsNode()) {
-								m_long = asc->IsLongStrings();
-								m_strarr = asc;
-							}
-							else {
-								size_t ref = asc->TreeGetLeafRef<AdaptiveStringColumn>(s);
-								m_as.init_from_ref(ref);
-								m_asl.init_from_ref(ref);
-							}
-						}
-					}
 
-					if(m_long)
-						s = m_asl.find_first(m_value, s - m_first_s);
-					else
-						s = m_as.find_first(m_value, s - m_first_s);
-
-					m_stringref = asc->TreeGetLeafRef<const AdaptiveStringColumn>(s);
-
-//					const char* aaa = m_as.Get(0);
-//					const char* bbb = m_asl.Get(0);
-
-//					asc->TreeGetLeafRef<AdaptiveStringColumn>(s, asc2);
-//					volatile const char* aaa = asc2.Get(0);
-//					const C orig_col = GetColumnFromRef<C>(refs, ndx);
-#endif
 					s = asc->find_first(m_value, s, end);
 					if(s == not_found)
 						s = end;
 					else
 						return s;
+#else
+					AdaptiveStringColumn* asc = (AdaptiveStringColumn*)m_condition_column;
 
+					if(s >= m_leaf_end) {
+						// we exceeded current leaf's range
+						free(m_leaf);
+						m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
+						m_leaf_end = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
+					}
+
+					size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
+					s = (m_long ? static_cast<ArrayStringLong*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2) : static_cast<ArrayString*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2));
+					if(s == not_found)
+						s = m_leaf_end - 1;
+					else
+						return s + m_leaf_start;
+#endif
 				}
             }
         }
@@ -1121,11 +1136,12 @@ private:
     size_t last_indexed;
 	SequentialGetter<int64_t> m_cse;
 
-	ArrayString m_as;
-	ArrayStringLong m_asl;
+	ArrayParent *m_leaf;
+
 	bool m_long;
-	size_t m_end_s;
+	size_t m_leaf_end;
 	size_t m_first_s;
+	size_t m_leaf_start;
 	void* m_strarr;
 };
 
