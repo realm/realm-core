@@ -346,7 +346,25 @@ void File::resize(SizeType size)
 }
 
 
-void File::alloc(SizeType offset, size_t size)
+void File::prealloc(SizeType offset, size_t size)
+{
+    TIGHTDB_ASSERT(is_attached());
+
+#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+
+    prealloc_if_supported(offset, size);
+
+#else // Non-atomic fallback
+
+    if (int_add_with_overflow_detect(offset, size))
+        throw runtime_error("File size overflow");
+    if (get_size() < offset) resize(offset);
+
+#endif
+}
+
+
+void File::prealloc_if_supported(SizeType offset, size_t size)
 {
     TIGHTDB_ASSERT(is_attached());
 
@@ -360,8 +378,6 @@ void File::alloc(SizeType offset, size_t size)
         default:     throw runtime_error(msg);
     }
 
-#else // Fallback
-
     // FIXME: OS X does not have any version of fallocate, but see
     // http://stackoverflow.com/questions/11497567/fallocate-command-equivalent-in-os-x
 
@@ -369,10 +385,6 @@ void File::alloc(SizeType offset, size_t size)
     // since it will grow the file if necessary, but never shrink it,
     // just like posix_fallocate(). The advantage would be that it
     // then becomes an atomic operation (probably).
-
-    if (int_add_with_overflow_detect(offset, size))
-        throw runtime_error("File size overflow");
-    if (get_size() < offset) resize(offset);
 
 #endif
 }

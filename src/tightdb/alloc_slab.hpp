@@ -73,6 +73,20 @@ public:
 
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
+    /// If a file is attached, reserve disk space now to avoid
+    /// fragmentation, and the performance penalty caused by it.
+    ///
+    /// A call to this method will make the file at least as big as
+    /// the specified size. If the file is already that big, or
+    /// bigger, this method will not affect the size, but it may still
+    /// cause previously unallocated disk space to be allocated.
+    ///
+    /// On systems that do not support preallocation of disk-space,
+    /// this method might have no effect at all.
+    ///
+    /// The a memory buffer is attached, this method has no effect.
+    void reserve(std::size_t);
+
     MemRef Alloc(size_t size) TIGHTDB_OVERRIDE;
     MemRef ReAlloc(size_t ref, const void* p, size_t size) TIGHTDB_OVERRIDE;
     void   Free(size_t ref, const void* p) TIGHTDB_OVERRIDE; // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
@@ -148,6 +162,11 @@ inline SlabAlloc::SlabAlloc()
 inline bool SlabAlloc::is_attached() const  TIGHTDB_NOEXCEPT
 {
     return (m_data != NULL);
+}
+
+inline void SlabAlloc::reserve(std::size_t size)
+{
+    m_file.prealloc_if_supported(0, size);
 }
 
 } // namespace tightdb

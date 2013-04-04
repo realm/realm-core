@@ -250,7 +250,7 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
         m_file.write(default_header);
 
         // Pre-alloc initial space
-        m_file.alloc(0, initial_size);
+        m_file.prealloc(0, initial_size);
         size = initial_size;
     }
 
@@ -318,6 +318,7 @@ bool SlabAlloc::validate_buffer(const char* data, size_t len) const
 
     return true;
 }
+
 
 // FIXME: We should come up with a better name than 'CanPersist'
 bool SlabAlloc::CanPersist() const

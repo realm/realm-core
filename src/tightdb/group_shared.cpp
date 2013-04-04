@@ -442,7 +442,7 @@ void SharedGroup::commit()
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // FIXME: It is essential that if
     // Replicatin::commit_write_transact() fails, then the transaction
-    // is not completed. A following call to rollback() must roll it
+    // is not completed. A subsequent call to rollback() must roll it
     // back.
     if (m_replication.is_attached()) m_replication.commit_write_transact(); // Throws
 #endif
@@ -553,7 +553,7 @@ void SharedGroup::ringbuf_expand()
     const size_t new_filesize = base_filesize + (sizeof(ReadCount) * new_entry_count);
 
     // Extend file
-    m_file.alloc(0, new_filesize);
+    m_file.prealloc(0, new_filesize);
     m_reader_map.remap(m_file, File::access_ReadWrite, new_filesize);
     SharedInfo* const info2 = m_reader_map.get_addr();
 

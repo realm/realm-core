@@ -1,5 +1,6 @@
 #include <algorithm>
 
+#include <tightdb/safe_int_ops.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -364,17 +365,53 @@ size_t GroupWriter::extend_free_space(size_t len)
     Array& fversions    = m_group.m_freeVersions;
     const bool isShared = m_group.m_is_shared;
 
-    // we always expand megabytes at a time, both for
-    // performance and to avoid excess fragmentation
-    const size_t megabyte = 1024 * 1024;
-    const size_t old_filesize = m_file_map.get_size();
-    const size_t needed_size = old_filesize + len;
-    const size_t rest = needed_size % megabyte;
-    const size_t new_filesize = rest ? (needed_size + (megabyte - rest)) : needed_size;
+    size_t old_filesize = m_file_map.get_size();
 
-    // Extend the file
-    m_alloc.m_file.alloc(0, new_filesize);
-    m_alloc.m_file.sync(); // FIXME: What does this call to  sync() achieve? Robustness with respect to abrupt process termination?
+    size_t min_filesize = old_filesize;
+    if (int_add_with_overflow_detect(min_filesize, len)) {
+        throw runtime_error("File size overflow");
+    }
+
+    // We double the size until we reach 'stop_doubling_size'. From
+    // then on we increment the size in steps of
+    // 'stop_doubling_size'. This is to achieve a reasonable
+    // compromise between minimizing fragmentation (maximizing
+    // performance) and minimizing over-allocation.
+    size_t stop_doubling_size = 128*(1024*1024L); // = 100MiB
+    TIGHTDB_ASSERT(stop_doubling_size % 8 == 0);
+
+    size_t new_filesize = old_filesize;
+    while (new_filesize < min_filesize) {
+        if (new_filesize < stop_doubling_size) {
+            // The file contains at least a header, so the size can never
+            // be zero. We need this to ensure that the number of
+            // iterations will be finite.
+            TIGHTDB_ASSERT(new_filesize != 0);
+            // Be sure that the doubling does not overflow
+            TIGHTDB_ASSERT(stop_doubling_size <= numeric_limits<size_t>::max() / 2);
+            new_filesize *= 2;
+        }
+        else {
+            if (int_add_with_overflow_detect(new_filesize, stop_doubling_size)) {
+                new_filesize = numeric_limits<size_t>::max();
+            }
+        }
+    }
+
+    // The size must be a multiple of 8 - but why? In any case this is
+    // guaranteed as long as the initial size is a multiple of 8.
+    TIGHTDB_ASSERT(new_filesize % 8 == 0);
+
+    // Note: File::alloc() may misbehave under race
+    // conditions. However, in transactional mode we hold a write lock
+    // at this time, and in non-transactional mode it is the
+    // responsibility of the user to ensure non-concurrent mutation
+    // access.
+    m_alloc.m_file.prealloc(0, new_filesize);
+
+    // FIXME: What does this call to sync() achieve? Robustness with
+    // respect to abrupt process termination?
+    m_alloc.m_file.sync();
 
     m_file_map.remap(m_alloc.m_file, File::access_ReadWrite, new_filesize);
 
