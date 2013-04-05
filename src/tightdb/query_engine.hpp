@@ -1034,6 +1034,7 @@ public:
         }
 
         if (m_condition_column->HasIndex()) {
+			m_index.Clear();
             if (m_column_type == col_type_StringEnum) {
                 ((ColumnStringEnum*)m_condition_column)->find_all(m_index, m_value);
 
