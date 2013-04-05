@@ -852,7 +852,7 @@ public:
 				const AdaptiveStringColumn* asc = static_cast<const AdaptiveStringColumn*>(m_condition_column);
 				if(s >= m_end_s) {
 					// we exceeded current leaf's range
-					free(m_leaf);
+					delete(m_leaf);
 					m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
 					m_end_s = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
 				}
@@ -1013,7 +1013,7 @@ public:
     }
     ~StringNode() {
         free((void*)m_value);
-		free(m_leaf);
+		delete(m_leaf);
         m_index.Destroy();
     }
 
@@ -1111,7 +1111,7 @@ public:
 
 					if(s >= m_leaf_end) {
 						// we exceeded current leaf's range
-						free(m_leaf);
+						delete(m_leaf);
 						m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
 						m_leaf_end = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
 					}

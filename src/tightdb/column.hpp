@@ -97,9 +97,9 @@ protected:
 public:
     template<typename T, class C> T TreeGet(size_t ndx) const; // FIXME: This one should probably be eliminated or redesiged because it throws due to dynamic memory allocation
     template<class C> size_t TreeGetLeafRef(size_t ndx) const; // FIXME: This one should probably be eliminated or redesiged because it throws due to dynamic memory allocation
-    bool IsNode() const TIGHTDB_NOEXCEPT {return m_array->IsNode();} // FIXME: This one should go away. It does not make any sense to think of a column being a node or not a node.
+
 protected:
-    template<typename T, class C> void TreeSet(size_t ndx, T value);
+	template<typename T, class C> void TreeSet(size_t ndx, T value);
     template<typename T, class C> void TreeInsert(size_t ndx, T value);
     template<typename T, class C> NodeChange DoInsert(size_t ndx, T value);
     template<typename T, class C> void TreeDelete(size_t ndx);
@@ -108,6 +108,7 @@ protected:
     template<typename T, class C, class S> size_t TreeWrite(S& out, size_t& pos) const;
 
     // Node functions
+    bool IsNode() const TIGHTDB_NOEXCEPT {return m_array->IsNode();} // FIXME: This one should go away. It does not make any sense to think of a column being a node or not a node.
     Array NodeGetOffsets() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
     Array NodeGetRefs() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
     template<class C> void NodeInsert(size_t ndx, size_t ref);

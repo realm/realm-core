@@ -498,6 +498,7 @@ protected:
     // the local index within that leaf corresponding to the specified
     // column-level index.
     static std::pair<const char*, std::size_t> find_leaf(const Array* root, std::size_t i) TIGHTDB_NOEXCEPT;
+    static std::pair<size_t, std::size_t> find_leaf_ref(const Array* root, std::size_t i) TIGHTDB_NOEXCEPT;
 
     static std::size_t get_as_size(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
 
