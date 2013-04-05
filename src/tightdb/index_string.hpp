@@ -44,10 +44,11 @@ public:
 
     using Column::Delete;
 
-    size_t count(const char* value) const;
-    size_t find_first(const char* value) const;
-    void   find_all(Array& result, const char* value) const;
-    void   distinct(Array& result) const;
+    size_t  count(const char* value) const;
+    size_t  find_first(const char* value) const;
+    void    find_all(Array& result, const char* value) const;
+    FindRes find_all(const char* value, size_t& ref) const;
+    void    distinct(Array& result) const;
 
 #ifdef TIGHTDB_DEBUG
     void verify_entries(const AdaptiveStringColumn& column) const;

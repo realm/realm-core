@@ -163,6 +163,12 @@ ReturnType TypePunning( OriginalType variable )
     return out;
 }
 
+enum FindRes {
+    FindRes_not_found,
+    FindRes_single,
+    FindRes_column
+};
+
 } // namespace tightdb
 
 #endif // TIGHTDB_UTILITIES_HPP
