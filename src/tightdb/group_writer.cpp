@@ -377,7 +377,7 @@ size_t GroupWriter::extend_free_space(size_t len)
     // 'stop_doubling_size'. This is to achieve a reasonable
     // compromise between minimizing fragmentation (maximizing
     // performance) and minimizing over-allocation.
-    size_t stop_doubling_size = 128*(1024*1024L); // = 100MiB
+    size_t stop_doubling_size = 128*(1024*1024L); // = 128MiB
     TIGHTDB_ASSERT(stop_doubling_size % 8 == 0);
 
     size_t new_filesize = old_filesize;

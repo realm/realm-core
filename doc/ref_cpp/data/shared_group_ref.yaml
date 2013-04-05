@@ -160,6 +160,30 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_shared_group_is_attached
+  - g_shared_group_reserve:
+      NAMES    : reserve
+      SUMMARY  : &g_shared_group_reserve_summary
+                 Reserve disk space now.
+      DESCR    : &g_shared_group_reserve_descr
+                 Reserve disk space now to avoid fragmentation, and
+                 the performance penalty caused by it.
+
+                 A call to this method will make the database file at
+                 least as big as the specified size. If the database
+                 file is already that big, or bigger, this method will
+                 not affect the size of the database, but it may still
+                 cause previously unallocated disk space to be
+                 allocated.
+
+                 On systems that do not support preallocation of
+                 disk-space, this method might have no effect at all.
+      PARAMS:
+      - NAME   : size
+        TYPES  : std::size_t
+        DESCR  : The total number of bytes to reserve on disk for this database.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_shared_group_reserve
   - g_shared_group_has_changed:
       NAMES    : has_changed
       SUMMARY  : &g_shared_group_has_changed_summary
