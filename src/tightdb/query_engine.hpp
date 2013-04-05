@@ -185,14 +185,14 @@ public:
         m_leaf_end = 0;
     }
 
-    inline bool CacheNext(size_t index)
+    TIGHTDB_FORCEINLINE bool CacheNext(size_t index)
     {
         // Return wether or not leaf array has changed (could be useful to know for caller)
         if (index >= m_leaf_end) {
             // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
             // leave m_array untouched. Else call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
 //            m_array_ptr = (ArrayType*) (((Column*)m_column)->GetBlock(index, m_array, m_leaf_start, true));
-		    m_array_ptr = (ArrayType*)m_column->GetBlock(index, m_array, m_leaf_start, true);
+            m_array_ptr = (ArrayType*)m_column->GetBlock(index, m_array, m_leaf_start, true);
             const size_t leaf_size = m_array_ptr->size();
             m_leaf_end = m_leaf_start + leaf_size;
             return true;
@@ -200,20 +200,20 @@ public:
         return false;
     }
 
-    inline T GetNext(size_t index)
+    TIGHTDB_FORCEINLINE T GetNext(size_t index)
     {
         CacheNext(index);
         T av = m_array_ptr->Get(index - m_leaf_start);
         return av;
     }
 
-	inline size_t LocalEnd(size_t global_end)
-	{
-		if (global_end > m_leaf_end)
-			return m_leaf_end - m_leaf_start;
-		else
-			return global_end - m_leaf_start;
-	}
+    TIGHTDB_FORCEINLINE size_t LocalEnd(size_t global_end)
+    {
+        if (global_end > m_leaf_end)
+            return m_leaf_end - m_leaf_start;
+        else
+            return global_end - m_leaf_start;
+    }
 
     size_t m_leaf_start;
     size_t m_leaf_end;
@@ -418,11 +418,11 @@ public:
             // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
             if (m == r) {
                 TSourceColumn av = (TSourceColumn)0;
-				if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != NULL) {
-					TIGHTDB_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != NULL);
-					av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->GetNext(r);
-				}
-				TIGHTDB_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != NULL);
+                if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != NULL) {
+                    TIGHTDB_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != NULL);
+                    av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->GetNext(r);
+                }
+                TIGHTDB_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != NULL);
                 static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av), CallbackDummy());
              }
         }
@@ -824,11 +824,11 @@ public:
 
     void Init(const Table& table)
     {
-		m_leaf = NULL;
+        m_leaf = NULL;
         m_dD = 100.0;
         m_probes = 0;
         m_matches = 0;
-		m_end_s = 0;
+        m_end_s = 0;
         m_table = &table;
         m_condition_column = &table.GetColumnBase(m_condition_column_idx);
         m_column_type = table.get_real_column_type(m_condition_column_idx);
@@ -844,23 +844,23 @@ public:
             const char* t;
 #if 1
             if (m_column_type == col_type_StringEnum) {
-				// enum
-				t = static_cast<const ColumnStringEnum*>(m_condition_column)->Get(s);
-			}
-			else {
-				// short or long 
-				const AdaptiveStringColumn* asc = static_cast<const AdaptiveStringColumn*>(m_condition_column);
-				if(s >= m_end_s) {
-					// we exceeded current leaf's range
-					delete(m_leaf);
-					m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
-					m_end_s = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
-				}
-				
-				t = (m_long ? static_cast<ArrayStringLong*>(m_leaf)->Get(s - m_leaf_start) : static_cast<ArrayString*>(m_leaf)->Get(s - m_leaf_start));
-			}
+                // enum
+                t = static_cast<const ColumnStringEnum*>(m_condition_column)->Get(s);
+            }
+            else {
+                // short or long 
+                const AdaptiveStringColumn* asc = static_cast<const AdaptiveStringColumn*>(m_condition_column);
+                if(s >= m_end_s) {
+                    // we exceeded current leaf's range
+                    delete(m_leaf);
+                    m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
+                    m_end_s = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
+                }
+                
+                t = (m_long ? static_cast<ArrayStringLong*>(m_leaf)->Get(s - m_leaf_start) : static_cast<ArrayString*>(m_leaf)->Get(s - m_leaf_start));
+            }
 
-#else // old legacy
+#else // old legacy, to track bugs - enable to see if bug was caused by above optimization
             // todo, can be optimized by placing outside loop
             if (m_column_type == col_type_String)
                 t = static_cast<const AdaptiveStringColumn*>(m_condition_column)->Get(s);
@@ -882,12 +882,12 @@ protected:
     const ColumnBase* m_condition_column;
     ColumnType m_column_type;
 
-	ArrayParent *m_leaf;
+    ArrayParent *m_leaf;
 
-	bool m_long;
-	size_t m_end_s;
-	size_t m_first_s;
-	size_t m_leaf_start;
+    bool m_long;
+    size_t m_end_s;
+    size_t m_first_s;
+    size_t m_leaf_start;
 };
 
 
@@ -953,13 +953,13 @@ public:
         m_condition_column_idx = column;
         m_child = 0;
         m_len = len;
-        m_value = (char *)malloc(len);
+        m_value = new char[len];
         memcpy(m_value, v, len);
     }
 
     ~BinaryNode()
     {
-        free((void*)m_value);
+        delete(m_value);
     }
 
     void Init(const Table& table)
@@ -1007,20 +1007,20 @@ public:
     StringNode(const char* v, size_t column): m_key_ndx((size_t)-1) {
         m_condition_column_idx = column;
         m_child = 0;
-        m_value = (char *)malloc(strlen(v)*6);
+        m_value = new char[strlen(v)*6];
         memcpy(m_value, v, strlen(v) + 1);
-		m_leaf = NULL;
+        m_leaf = NULL;
     }
     ~StringNode() {
-        free((void*)m_value);
-		delete(m_leaf);
+        delete(m_value);
+        delete(m_leaf);
         m_index.Destroy();
     }
 
     void Init(const Table& table)
     {
         m_dD = 10.0;
-		m_leaf_end = 0;
+        m_leaf_end = 0;
         m_table = &table;
         m_condition_column = &table.GetColumnBase(m_condition_column_idx);
         m_column_type = table.get_real_column_type(m_condition_column_idx);
@@ -1034,21 +1034,20 @@ public:
         }
 
         if (m_condition_column->HasIndex()) {
-			m_index.Clear();
+            m_index.Clear();
             if (m_column_type == col_type_StringEnum) {
-                ((ColumnStringEnum*)m_condition_column)->find_all(m_index, m_value);
-
-			}
+                static_cast<const ColumnStringEnum*>(m_condition_column)->find_all(m_index, m_value);
+            }
             else {
                 ((AdaptiveStringColumn*)m_condition_column)->find_all(m_index, m_value);
             }
             last_indexed = 0;
         }
-		else if (m_column_type != col_type_String) {
-			m_cse.m_column = (ColumnStringEnum*)m_condition_column;
-			m_cse.m_leaf_end = 0;
-			m_cse.m_leaf_start = 0;
-		}
+        else if (m_column_type != col_type_String) {
+            m_cse.m_column = (ColumnStringEnum*)m_condition_column;
+            m_cse.m_leaf_end = 0;
+            m_cse.m_leaf_start = 0;
+        }
 
         if (m_child)
             m_child->Init(table);
@@ -1063,67 +1062,67 @@ public:
                 size_t f = m_index.FindGTE(s, last_indexed);
                 if (f != not_found) {
                     s = m_index.GetAsSizeT(f);
-					if(s > end)
-						s = not_found;
-				}
+                    if(s > end)
+                        s = not_found;
+                }
                 else
                     return end;
 
-				if(s != not_found) {
-	                last_indexed = f;
-					return s;
-				}
-				else {
-					return end;
-				}
+                if(s != not_found) {
+                    last_indexed = f;
+                    return s;
+                }
+                else {
+                    return end;
+                }
             }
             else {
                 // todo, can be optimized by placing outside loop
                 if (m_column_type != col_type_String) {
-					if (m_key_ndx == not_found)
+                    if (m_key_ndx == not_found)
                         s = end; // not in key set
                     else {
-#if 0 // old legacy
+#if 0 // old legacy, to track bugs - enable to see if bug was caused by above optimization
                         const ColumnStringEnum* const cse = (const ColumnStringEnum*)m_condition_column;
-						s = cse->find_first(m_key_ndx, s, end);
+                        s = cse->find_first(m_key_ndx, s, end);
 #else
-						m_cse.CacheNext(s);
+                        m_cse.CacheNext(s);
 
-						s = m_cse.m_array_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, m_cse.LocalEnd(end));
-						if(s == not_found)
-							s = m_cse.m_leaf_end - 1;
-						else
-							return s + m_cse.m_leaf_start;
+                        s = m_cse.m_array_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, m_cse.LocalEnd(end));
+                        if(s == not_found)
+                            s = m_cse.m_leaf_end - 1;
+                        else
+                            return s + m_cse.m_leaf_start;
 #endif
                     }
-				}
+                }
                 else {
 #if 0 // old legacy
-					AdaptiveStringColumn* asc = (AdaptiveStringColumn*)m_condition_column;
+                    AdaptiveStringColumn* asc = (AdaptiveStringColumn*)m_condition_column;
 
-					s = asc->find_first(m_value, s, end);
-					if(s == not_found)
-						s = end;
-					else
-						return s;
+                    s = asc->find_first(m_value, s, end);
+                    if(s == not_found)
+                        s = end;
+                    else
+                        return s;
 #else
-					AdaptiveStringColumn* asc = (AdaptiveStringColumn*)m_condition_column;
+                    AdaptiveStringColumn* asc = (AdaptiveStringColumn*)m_condition_column;
 
-					if(s >= m_leaf_end) {
-						// we exceeded current leaf's range
-						delete(m_leaf);
-						m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
-						m_leaf_end = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
-					}
+                    if(s >= m_leaf_end) {
+                        // we exceeded current leaf's range
+                        delete(m_leaf);
+                        m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
+                        m_leaf_end = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
+                    }
 
-					size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
-					s = (m_long ? static_cast<ArrayStringLong*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2) : static_cast<ArrayString*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2));
-					if(s == not_found)
-						s = m_leaf_end - 1;
-					else
-						return s + m_leaf_start;
+                    size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
+                    s = (m_long ? static_cast<ArrayStringLong*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2) : static_cast<ArrayString*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2));
+                    if(s == not_found)
+                        s = m_leaf_end - 1;
+                    else
+                        return s + m_leaf_start;
 #endif
-				}
+                }
             }
         }
         return end;
@@ -1138,15 +1137,15 @@ private:
     size_t m_key_ndx;
     Array m_index;
     size_t last_indexed;
-	SequentialGetter<int64_t> m_cse;
+    SequentialGetter<int64_t> m_cse;
 
-	ArrayParent *m_leaf;
+    ArrayParent *m_leaf;
 
-	bool m_long;
-	size_t m_leaf_end;
-	size_t m_first_s;
-	size_t m_leaf_start;
-	void* m_strarr;
+    bool m_long;
+    size_t m_leaf_end;
+    size_t m_first_s;
+    size_t m_leaf_start;
+    void* m_strarr;
 };
 
 
