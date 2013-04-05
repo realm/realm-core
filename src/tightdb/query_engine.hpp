@@ -842,7 +842,7 @@ public:
 
         for (size_t s = start; s < end; ++s) {
             const char* t;
-#if 0
+#if 1
             if (m_column_type == col_type_StringEnum) {
 				// enum
 				t = static_cast<const ColumnStringEnum*>(m_condition_column)->Get(s);
@@ -1071,6 +1071,9 @@ public:
 				if(s != not_found) {
 	                last_indexed = f;
 					return s;
+				}
+				else {
+					return end;
 				}
             }
             else {
