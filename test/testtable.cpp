@@ -5,7 +5,7 @@
 #include <ostream>
 
 #include <UnitTest++.h>
-
+#include "testsettings.hpp"
 #include <tightdb/table_macros.hpp>
 #include <tightdb/lang_bind_helper.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -13,6 +13,22 @@
 
 using namespace std;
 using namespace tightdb;
+
+TIGHTDB_TABLE_2(TupleTableType,
+                first,  Int,
+                second, String)
+
+#ifndef TIGHTDB_BYPASS_OPTIMIZE_CRASH_BUG
+TEST(TestOptimizeCrash)
+{
+	// This will crash at the .add() method
+	TupleTableType ttt;
+	ttt.optimize();
+	ttt.column().second.set_index();
+	ttt.clear();
+	ttt.add(1, "AA");
+}
+#endif
 
 TEST(Table1)
 {

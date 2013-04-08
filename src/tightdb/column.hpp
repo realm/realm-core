@@ -77,6 +77,11 @@ public:
     template<typename T, class C, class F>
     size_t TreeFind(T value, size_t start, size_t end) const;
 
+    const Array* GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval = false) const
+    {
+        return m_array->GetBlock(ndx, arr, off, use_retval);
+    }
+
 protected:
     friend class StringIndex;
 
@@ -91,8 +96,10 @@ protected:
     // Tree functions
 public:
     template<typename T, class C> T TreeGet(size_t ndx) const; // FIXME: This one should probably be eliminated or redesiged because it throws due to dynamic memory allocation
+    template<class C> size_t TreeGetLeafRef(size_t ndx) const; // FIXME: This one should probably be eliminated or redesiged because it throws due to dynamic memory allocation
+
 protected:
-    template<typename T, class C> void TreeSet(size_t ndx, T value);
+	template<typename T, class C> void TreeSet(size_t ndx, T value);
     template<typename T, class C> void TreeInsert(size_t ndx, T value);
     template<typename T, class C> NodeChange DoInsert(size_t ndx, T value);
     template<typename T, class C> void TreeDelete(size_t ndx);
@@ -189,10 +196,7 @@ public:
 
     // Query support methods
     void LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const;
-    const Array* GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval = false) const
-    {
-        return m_array->GetBlock(ndx, arr, off, use_retval);
-    }
+
 
     // Index
     bool HasIndex() const {return m_index != NULL;}
