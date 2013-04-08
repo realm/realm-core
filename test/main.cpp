@@ -4,7 +4,7 @@
 #include <UnitTest++.h>
 #include <TestReporter.h> // Part of UnitTest++
 
-#define USE_VLD
+//#define USE_VLD
 
 #include <tightdb/utilities.hpp>
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)

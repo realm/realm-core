@@ -823,7 +823,7 @@ public:
         m_condition_column_idx = column;
         m_child = 0;
         m_dT = 10.0;
-
+        m_leaf = NULL;
         // todo, see if we can store in std::string instead
         m_value = new char[strlen(v)*6];
         memcpy(m_value, v, strlen(v) + 1);
@@ -838,7 +838,8 @@ public:
 
     ~StringNode()
     {
-        delete[] m_value; delete[] m_ucase; delete[] m_lcase; delete m_leaf;
+        delete[] m_value; delete[] m_ucase; delete[] m_lcase; 
+        m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
     }
 
     void Init(const Table& table)
@@ -871,7 +872,9 @@ public:
                 const AdaptiveStringColumn* asc = static_cast<const AdaptiveStringColumn*>(m_condition_column);
                 if(s >= m_end_s) {
                     // we exceeded current leaf's range
-                    delete(m_leaf);
+
+                    m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
+
                     m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
                     m_end_s = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
                 }
@@ -1033,7 +1036,7 @@ public:
     }
     ~StringNode() {
         delete(m_value);
-        delete(m_leaf);
+        m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
         m_index.Destroy();
     }
 
@@ -1130,7 +1133,7 @@ public:
 
                     if(s >= m_leaf_end) {
                         // we exceeded current leaf's range
-                        delete(m_leaf);
+                        m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
                         m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
                         m_leaf_end = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
                     }
