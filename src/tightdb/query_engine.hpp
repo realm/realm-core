@@ -838,7 +838,7 @@ public:
 
     ~StringNode()
     {
-        delete[] m_value; delete[] m_ucase; delete[] m_lcase;
+        delete[] m_value; delete[] m_ucase; delete[] m_lcase; delete m_leaf;
     }
 
     void Init(const Table& table)
@@ -1023,7 +1023,8 @@ public:
         return 0;
     }
 
-    StringNode(const char* v, size_t column): m_key_ndx((size_t)-1) {
+    StringNode(const char* v, size_t column): m_key_ndx((size_t)-1) 
+{
         m_condition_column_idx = column;
         m_child = 0;
         m_value = new char[strlen(v)*6];
