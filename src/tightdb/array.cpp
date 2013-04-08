@@ -2551,6 +2551,35 @@ pair<const char*, size_t> Array::find_leaf(const Array* root, size_t i) TIGHTDB_
 }
 
 
+pair<size_t, size_t> Array::find_leaf_ref(const Array* root, size_t i) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!root->is_leaf());
+    size_t offsets_ref = root->GetAsRef(0);
+    size_t refs_ref    = root->GetAsRef(1);
+    for (;;) {
+        const char* header = static_cast<char*>(root->m_alloc.Translate(offsets_ref));
+        int width = get_width_from_header(header);
+        pair<size_t, size_t> p;
+        TIGHTDB_TEMPEX(p = find_child_offset, width, (header, i));
+        size_t child_ndx         = p.first;
+        size_t local_tree_offset = p.second;
+        i -= local_tree_offset; // local index
+
+        header = static_cast<char*>(root->m_alloc.Translate(refs_ref));
+        width = get_width_from_header(header);
+        size_t child_ref = to_size_t(get_direct(get_data_from_header(header), width, child_ndx));
+
+        header = static_cast<char*>(root->m_alloc.Translate(child_ref));
+        bool child_is_leaf = !get_isnode_from_header(header);
+        if (child_is_leaf) return make_pair(child_ref, i);
+
+        width = get_width_from_header(header);
+        TIGHTDB_TEMPEX(p = ::get_two_as_size, width, (header, 0));
+        offsets_ref = p.first;
+        refs_ref    = p.second;
+    }
+}
+
 size_t Array::get_as_size(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 {
     const char* data = get_data_from_header(header);

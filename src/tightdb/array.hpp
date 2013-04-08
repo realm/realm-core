@@ -444,10 +444,10 @@ private:
 
 protected:
     friend class GroupWriter;
-
+    friend class AdaptiveStringColumn;
+    void init_from_ref(size_t ref) TIGHTDB_NOEXCEPT;
 //    void AddPositiveLocal(int64_t value);
 
-    void init_from_ref(size_t ref) TIGHTDB_NOEXCEPT;
     void CreateFromHeader(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
     void CreateFromHeaderDirect(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
     void update_ref_in_parent();
@@ -498,6 +498,7 @@ protected:
     // the local index within that leaf corresponding to the specified
     // column-level index.
     static std::pair<const char*, std::size_t> find_leaf(const Array* root, std::size_t i) TIGHTDB_NOEXCEPT;
+    static std::pair<size_t, std::size_t> find_leaf_ref(const Array* root, std::size_t i) TIGHTDB_NOEXCEPT;
 
     static std::size_t get_as_size(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
 
@@ -1742,7 +1743,6 @@ template <class cond, Action action, size_t bitwidth, class Callback> void Array
     find_optimized<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
 
 #ifdef TIGHTDB_DEBUG
-
     if (action == act_Max || action == act_Min || action == act_Sum || action == act_Count || action == act_ReturnFirst || action == act_Count) {
         find_reference<cond, action, bitwidth, Callback>(value, start, end, baseindex, &r_state, callback);
         if (action == act_FindAll)
