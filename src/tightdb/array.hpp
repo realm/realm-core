@@ -275,6 +275,7 @@ public:
     typedef const char*(*StringGetter)(void*, size_t); // Pre-declare getter function from string index
     size_t IndexStringFindFirst(const char* value, void* column, StringGetter get_func) const;
     void   IndexStringFindAll(Array& result, const char* value, void* column, StringGetter get_func) const;
+    FindRes IndexStringFindAllNoCopy(const char* value, size_t& res_ref, void* column, StringGetter get_func) const;
     size_t IndexStringCount(const char* value, void* column, StringGetter get_func) const;
 
     void SetAllToZero();
