@@ -10,6 +10,9 @@ TIGHTDB_TABLE_2(TwoIntTable,
                 first,  Int,
                 second, Int)
 
+TIGHTDB_TABLE_1(SingleStringTable,
+                first, String)
+
 TIGHTDB_TABLE_1(OneIntTable,
                 first,  Int)
 
@@ -57,6 +60,106 @@ TIGHTDB_TABLE_5(GATable,
 
 } // anonymous namespace
 
+
+TEST(TestQueryStrIndex3)
+{
+    // Create two columns where query match-density varies alot throughout the rows. This forces the query engine to 
+    // jump back and forth between the two conditions and test edge cases in these transitions. Tests combinations of
+    // linear scan, enum and index
+
+#ifdef TIGHTDB_DEBUG
+    for(int N = 0; N < 4; N++) { 
+#else
+    for(int N = 0; N < 20; N++) { 
+#endif
+        TupleTableType ttt;
+
+	    int aa;
+	    int64_t s;
+
+        size_t n = 0;
+#ifdef TIGHTDB_DEBUG
+        for(int i = 0; i < 4; i++) {
+#else
+        for(int i = 0; i < 20; i++) {
+#endif
+            // 1/500 match probability because we want possibility for a 1000 sized leaf to contain 0 matches (important
+            // edge case)
+            int f1 = rand() % 500 + 1;
+            int f2 = rand() % 500 + 1;
+            bool longstrings = (rand() % 5 == 1);
+
+            // 2200 entries with that probability to fill out two concecutive 1000 sized leafs with above probability,
+            // plus a remainder (edge case)
+            for(int j = 0; j < 2200; j++) {
+
+                if(rand() % f1 == 0)
+                    if(rand() % f2 == 0) {
+                        ttt.add(0, longstrings ? "AAAAAAAAAAAAAAAAAAAAAAAA" : "AA");
+                        if (!longstrings)
+                            n++;
+                    }
+                    else
+                        ttt.add(0, "BB");
+                else
+                    if(rand() % f2 == 0)
+                        ttt.add(1, "AA");
+                    else
+                        ttt.add(1, "BB");
+            }
+        }
+
+        s = ttt.where().second.equal("AA").first.equal(0).count();
+        CHECK_EQUAL(n, s);
+    
+        s = ttt.where().first.equal(0).second.equal("AA").count();
+        CHECK_EQUAL(n, s);
+
+        ttt.optimize();
+
+        s = ttt.where().second.equal("AA").first.equal(0).count();
+        CHECK_EQUAL(n, s);
+    
+        s = ttt.where().first.equal(0).second.equal("AA").count();
+        CHECK_EQUAL(n, s);
+
+        ttt.column().second.set_index();
+
+        s = ttt.where().second.equal("AA").first.equal(0).count();
+        CHECK_EQUAL(n, s);
+    
+        s = ttt.where().first.equal(0).second.equal("AA").count();
+        CHECK_EQUAL(n, s);
+    }
+}
+
+
+
+
+
+TEST(TestQueryStrIndex2)
+{
+    TupleTableType ttt;
+
+	int aa;
+	int64_t s;
+
+	for(int i = 0; i < 100; i++) {
+	    ttt.add(1, "AA");
+    }
+    ttt.add(1, "BB");
+    ttt.column().second.set_index();
+
+    s = ttt.where().second.equal("AA").count();
+    CHECK_EQUAL(100, s);
+
+    s = ttt.where().second.equal("BB").count();
+    CHECK_EQUAL(1, s);
+
+    s = ttt.where().second.equal("CC").count();
+    CHECK_EQUAL(0, s);
+
+}
 
 TEST(TestQueryStrEnum)
 {

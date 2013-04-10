@@ -137,6 +137,13 @@ void ColumnStringEnum::find_all(Array& res, size_t key_ndx, size_t start, size_t
     return;
 }
 
+FindRes ColumnStringEnum::find_all_indexref(const char* value, size_t& dst) const
+{
+    TIGHTDB_ASSERT(value);
+    TIGHTDB_ASSERT(m_index);
+
+    return m_index->find_all(value, dst);
+}
 
 size_t ColumnStringEnum::find_first(size_t key_ndx, size_t start, size_t end) const
 {
