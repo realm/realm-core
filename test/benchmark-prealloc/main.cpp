@@ -56,6 +56,7 @@ int main()
             }
         }
     }
+    cerr << "\n";
 
     time_t begin = time(0);
 
@@ -71,8 +72,9 @@ int main()
             }
         }
     }
+    cerr << "\n";
 
     time_t end = time(0);
 
-    cout << "Write transactions per second = " << (( 1000 / double(end - begin) )) << endl;
+    cerr << "Write transactions per second = " << (( 1000 / double(end - begin) )) << endl;
 }
