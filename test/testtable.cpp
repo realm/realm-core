@@ -5,7 +5,7 @@
 #include <ostream>
 
 #include <UnitTest++.h>
-
+#include "testsettings.hpp"
 #include <tightdb/table_macros.hpp>
 #include <tightdb/lang_bind_helper.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -13,6 +13,22 @@
 
 using namespace std;
 using namespace tightdb;
+
+TIGHTDB_TABLE_2(TupleTableType,
+                first,  Int,
+                second, String)
+
+#ifndef TIGHTDB_BYPASS_OPTIMIZE_CRASH_BUG
+TEST(TestOptimizeCrash)
+{
+	// This will crash at the .add() method
+	TupleTableType ttt;
+	ttt.optimize();
+	ttt.column().second.set_index();
+	ttt.clear();
+	ttt.add(1, "AA");
+}
+#endif
 
 TEST(Table1)
 {
@@ -93,22 +109,16 @@ TEST(Table_floats)
 }
 
 namespace {
-enum Days {
-    Mon,
-    Tue,
-    Wed,
-    Thu,
-    Fri,
-    Sat,
-    Sun
-};
+
+enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
 TIGHTDB_TABLE_4(TestTable,
                 first,  Int,
                 second, Int,
                 third,  Bool,
                 fourth, Enum<Days>)
-}
+
+} // anonymous namespace
 
 TEST(Table2)
 {
@@ -159,7 +169,8 @@ namespace {
 TIGHTDB_TABLE_2(TestTableEnum,
                 first,      Enum<Days>,
                 second,     String)
-}
+} // anonymous namespace
+
 TEST(Table4)
 {
     TestTableEnum table;
@@ -184,7 +195,7 @@ namespace {
 TIGHTDB_TABLE_2(TestTableFloats,
                 first,      Float,
                 second,     Double)
-}
+} // anonymous namespace
 
 TEST(Table_float2)
 {
@@ -695,7 +706,8 @@ namespace {
 TIGHTDB_TABLE_2(LookupTable,
                 first,  String,
                 second, Int)
-}
+} // anonymous namespace
+
 TEST(Table_Lookup)
 {
     LookupTable table;
@@ -866,7 +878,8 @@ TIGHTDB_TABLE_4(TestTableAE,
                 second, String,
                 third,  Bool,
                 fourth, Enum<Days>)
-}
+} // anonymous namespace
+
 TEST(TableAutoEnumeration)
 {
     TestTableAE table;
@@ -953,7 +966,7 @@ TIGHTDB_TABLE_1(TestSubtabEnum2,
                 str, String)
 TIGHTDB_TABLE_1(TestSubtabEnum1,
                 subtab, Subtable<TestSubtabEnum2>)
-}
+} // anonymous namespace
 
 TEST(Table_OptimizeSubtable)
 {
@@ -1607,7 +1620,7 @@ TEST(Table_Mixed)
 namespace {
 TIGHTDB_TABLE_1(TestTableMX,
                 first, Mixed)
-}
+} // anonymous namespace
 
 TEST(Table_Mixed2)
 {
@@ -1692,22 +1705,21 @@ TEST(Table_SubtableSizeAndClear)
 }
 
 
-namespace
-{
-    TIGHTDB_TABLE_2(MyTable1,
-                    val, Int,
-                    val2, Int)
+namespace {
+TIGHTDB_TABLE_2(MyTable1,
+                val, Int,
+                val2, Int)
 
-    TIGHTDB_TABLE_2(MyTable2,
-                    val, Int,
-                    subtab, Subtable<MyTable1>)
+TIGHTDB_TABLE_2(MyTable2,
+                val, Int,
+                subtab, Subtable<MyTable1>)
 
-    TIGHTDB_TABLE_1(MyTable3,
-                    subtab, Subtable<MyTable2>)
+TIGHTDB_TABLE_1(MyTable3,
+                subtab, Subtable<MyTable2>)
 
-    TIGHTDB_TABLE_1(MyTable4,
-                    mix, Mixed)
-}
+TIGHTDB_TABLE_1(MyTable4,
+                mix, Mixed)
+} // anonymous namespace
 
 
 TEST(Table_SetMethod)
@@ -1869,12 +1881,11 @@ TEST(Table_SubtableCopyOnSetAndInsert)
 }
 
 
-namespace
-{
-    TIGHTDB_TABLE_2(TableDateAndBinary,
-                    date, Date,
-                    bin, Binary)
-}
+namespace {
+TIGHTDB_TABLE_2(TableDateAndBinary,
+                date, Date,
+                bin, Binary)
+} // anonymous namespace
 
 TEST(Table_DateAndBinary)
 {
@@ -1992,7 +2003,7 @@ TIGHTDB_TABLE_3(TableAgg,
                 c_double, Double)
 
                 // TODO: Bool? Date
-}
+} // anonymous namespace
 
 #if TEST_DURATION > 0
 #define TBL_SIZE TIGHTDB_MAX_LIST_SIZE*10
@@ -2042,7 +2053,7 @@ TEST(Table_Aggregates)
 namespace {
 TIGHTDB_TABLE_1(TableAgg2,
                 c_count, Int)
-}
+} // anonymous namespace
 
 
 TEST(Table_Aggregates2)
@@ -2079,4 +2090,14 @@ TEST(Table_LanguageBindings)
 
    LangBindHelper::unbind_table_ref(table);
    LangBindHelper::unbind_table_ref(table2);
+}
+
+TEST(Table_MultipleColumn)
+{
+    
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_column(type_Int, "first");
+    CHECK_EQUAL(table.get_column_count(), 2);
+    CHECK_EQUAL(table.get_column_index("first"), 0);
 }

@@ -2,7 +2,9 @@
 #include <algorithm>
 
 #ifdef _WIN32
-#  include <windows.h>
+	#include <windows.h>
+#else
+	#include <ctype.h>
 #endif
 
 #include <tightdb/safe_int_ops.hpp>
@@ -174,12 +176,32 @@ bool case_map(StringData source, char* target, bool upper)
 
     return true;
 #else
-    // FIXME: Implement this! Note that this is trivial in C++11. In
-    // C++03 it is almost trivial if __STDC_ISO_10646__ is
-    // defined. Also consider using ICU. Maybe GNU has something to
-    // offer too.
-    copy(source.data(), source.data()+source.size(), target);
-    static_cast<void>(upper);
+    // FIXME: Implement this! Note that this is trivial in C++11 due
+    // to its built-in support for UTF-8. In C++03 it is trivial when
+    // __STDC_ISO_10646__ is defined. Also consider using ICU. Maybe
+    // GNU has something to offer too.
+
+    // For now we handle just the ASCII subset
+    typedef char_traits<char> traits;
+    if (upper) {
+        size_t n = source.size();
+        for (size_t i=0; i<n; ++i) {
+            char c = source[i];
+            if (traits::lt(0x60, c) &&
+                traits::lt(c, 0x7B)) c = traits::to_char_type(traits::to_int_type(c)-0x20);
+            target[i] = c;
+        }
+    }
+    else { // lower
+        size_t n = source.size();
+        for (size_t i=0; i<n; ++i) {
+            char c = source[i];
+            if (traits::lt(0x40, c) &&
+                traits::lt(c, 0x5B)) c = traits::to_char_type(traits::to_int_type(c)+0x20);
+            target[i] = c;
+        }
+    }
+
     return true;
 #endif
 }
@@ -198,11 +220,12 @@ bool equal_case_fold(StringData haystack, const char* needle_upper, const char* 
         if (needle_lower[i] != c && needle_upper[i] != c) return false;
     }
 
-    const char* i = haystack.data();
-    const char* end = i + haystack.size();
+    const char* begin = haystack.data();
+    const char* end   = begin + haystack.size();
+    const char* i = begin;
     while (i != end) {
-        if (!equal_sequence(i, end, needle_lower + (end - i)) &&
-            !equal_sequence(i, end, needle_upper + (end - i))) return false;
+        if (!equal_sequence(i, end, needle_lower + (i - begin)) &&
+            !equal_sequence(i, end, needle_upper + (i - begin))) return false;
     }
     return true;
 }

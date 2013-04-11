@@ -14,8 +14,8 @@ else
 PASSIVE_SUBDIRS      += UnitTest++
 test_tightdb_DEPS     = UnitTest++
 test_sqlite3_DEPS     = UnitTest++
-test_stl              = UnitTest++
-experiments           = UnitTest++
+test_stl_DEPS         = UnitTest++
+experiments_DEPS      = UnitTest++
 tightdb_tests_CFLAGS  = -IUnitTest++/src
 tightdb_tests_LDFLAGS = -LUnitTest++ -lUnitTest++
 tightdb_tests_DEPS    = UnitTest++

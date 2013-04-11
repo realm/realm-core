@@ -315,6 +315,7 @@ protected:
     const ColumnDouble& GetColumnDouble(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     AdaptiveStringColumn& GetColumnString(size_t column_ndx);
     const AdaptiveStringColumn& GetColumnString(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+
     ColumnBinary& GetColumnBinary(size_t column_ndx);
     const ColumnBinary& GetColumnBinary(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnStringEnum& GetColumnStringEnum(size_t column_ndx);

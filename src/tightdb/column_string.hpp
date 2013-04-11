@@ -81,9 +81,47 @@ public:
     /// Compare two string columns for equality.
     bool compare(const AdaptiveStringColumn&) const;
 
+    bool GetBlock(size_t ndx, ArrayParent** ap, size_t& off) const
+    {
+		if (IsNode()) {
+		    std::pair<size_t, size_t> p = m_array->find_leaf_ref(m_array, ndx);
+            bool longstr = m_array->get_hasrefs_from_header(static_cast<const char*>(m_array->GetAllocator().Translate(p.first)));
+			if(longstr) {
+                ArrayStringLong* asl2 = new ArrayStringLong(p.first, NULL, 0, m_array->GetAllocator());
+				*ap = asl2;		
+			}
+			else {
+				ArrayString* as2 = new ArrayString(p.first, NULL, 0, m_array->GetAllocator());
+				*ap = as2;
+			}
+			off = ndx - p.second;
+			return longstr;
+		}
+		else {
+			off = 0;
+			if(IsLongStrings()) {
+                ArrayStringLong* asl2 = new ArrayStringLong(m_array->GetRef(), NULL, 0, m_array->GetAllocator());				
+				*ap = asl2;
+				return true;
+			}
+			else {
+                ArrayString* as2 = new ArrayString(m_array->GetRef(), NULL, 0, m_array->GetAllocator());
+				*ap = as2;
+				return false;
+			}
+		}
+
+		TIGHTDB_ASSERT(false);
+    }
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
 #endif // TIGHTDB_DEBUG
+
+    // Assumes that this column has only a single leaf node, no
+    // internal nodes. In this case HasRefs indicates a long string
+    // array.
+    bool IsLongStrings() const TIGHTDB_NOEXCEPT {return m_array->HasRefs();}
 
 protected:
     friend class ColumnBase;
@@ -97,11 +135,6 @@ protected:
                      size_t begin = 0, size_t end = -1) const;
 
     void LeafDelete(size_t ndx);
-
-    // Assumes that this column has only a single leaf node, no
-    // internal nodes. In this case HasRefs indicates a long string
-    // array.
-    bool IsLongStrings() const TIGHTDB_NOEXCEPT {return m_array->HasRefs();}
 
 #ifdef TIGHTDB_DEBUG
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
