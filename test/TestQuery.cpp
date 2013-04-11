@@ -1,6 +1,7 @@
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
+#include <vector>
 
 using namespace tightdb;
 
@@ -73,9 +74,11 @@ TEST(TestQueryStrIndex3)
     for(int N = 0; N < 20; N++) { 
 #endif
         TupleTableType ttt;
-
+ 
 	    int aa;
 	    int64_t s;
+        std::vector<size_t> vec;
+        size_t row = 0;
 
         size_t n = 0;
 #ifdef TIGHTDB_DEBUG
@@ -92,12 +95,13 @@ TEST(TestQueryStrIndex3)
             // 2200 entries with that probability to fill out two concecutive 1000 sized leafs with above probability,
             // plus a remainder (edge case)
             for(int j = 0; j < 2200; j++) {
-
                 if(rand() % f1 == 0)
                     if(rand() % f2 == 0) {
                         ttt.add(0, longstrings ? "AAAAAAAAAAAAAAAAAAAAAAAA" : "AA");
-                        if (!longstrings)
+                        if (!longstrings) {
                             n++;
+                            vec.push_back(row);
+                        }
                     }
                     else
                         ttt.add(0, "BB");
@@ -106,30 +110,67 @@ TEST(TestQueryStrIndex3)
                         ttt.add(1, "AA");
                     else
                         ttt.add(1, "BB");
+                
+                row++;
             }
         }
-
-        s = ttt.where().second.equal("AA").first.equal(0).count();
-        CHECK_EQUAL(n, s);
     
-        s = ttt.where().first.equal(0).second.equal("AA").count();
-        CHECK_EQUAL(n, s);
+        TupleTableType::View v;
+        
+        // Both linear scans
+        v = ttt.where().second.equal("AA").first.equal(0).find_all();
+        CHECK_EQUAL(vec.size(), v.size());
+        for(size_t t = 0; t < vec.size(); t++)
+            CHECK_EQUAL(vec[t], v.get_source_ndx(t));
+        v.clear();
+        vec.clear();
+
+        v = ttt.where().first.equal(0).second.equal("AA").find_all();
+        CHECK_EQUAL(vec.size(), v.size());
+        for(size_t t = 0; t < vec.size(); t++)
+            CHECK_EQUAL(vec[t], v.get_source_ndx(t));
+        v.clear();
+        vec.clear();
 
         ttt.optimize();
 
-        s = ttt.where().second.equal("AA").first.equal(0).count();
-        CHECK_EQUAL(n, s);
-    
-        s = ttt.where().first.equal(0).second.equal("AA").count();
-        CHECK_EQUAL(n, s);
+        // Linear scan over enum, plus linear integer column scan
+        v = ttt.where().second.equal("AA").first.equal(0).find_all();
+        CHECK_EQUAL(vec.size(), v.size());
+        for(size_t t = 0; t < vec.size(); t++)
+            CHECK_EQUAL(vec[t], v.get_source_ndx(t));
+        v.clear();
+        vec.clear();
+
+        v = ttt.where().first.equal(0).second.equal("AA").find_all();
+        CHECK_EQUAL(vec.size(), v.size());
+        for(size_t t = 0; t < vec.size(); t++)
+            CHECK_EQUAL(vec[t], v.get_source_ndx(t));
+        v.clear();
+        vec.clear();
 
         ttt.column().second.set_index();
 
-        s = ttt.where().second.equal("AA").first.equal(0).count();
-        CHECK_EQUAL(n, s);
-    
-        s = ttt.where().first.equal(0).second.equal("AA").count();
-        CHECK_EQUAL(n, s);
+        // Index lookup, plus linear integer column scan
+        v = ttt.where().second.equal("AA").first.equal(0).find_all();
+        CHECK_EQUAL(vec.size(), v.size());
+        for(size_t t = 0; t < vec.size(); t++)
+            CHECK_EQUAL(vec[t], v.get_source_ndx(t));
+        v.clear();
+        vec.clear();
+
+        v = ttt.where().first.equal(0).second.equal("AA").find_all();
+        CHECK_EQUAL(vec.size(), v.size());
+        for(size_t t = 0; t < vec.size(); t++)
+            CHECK_EQUAL(vec[t], v.get_source_ndx(t));
+        v.clear();
+        vec.clear();
+
+        CHECK_EQUAL(vec.size(), v.size());
+        for(size_t t = 0; t < vec.size(); t++)
+            CHECK_EQUAL(vec[t], v.get_source_ndx(t));
+        v.clear();
+        vec.clear();
     }
 }
 
