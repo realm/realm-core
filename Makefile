@@ -32,3 +32,6 @@ testcase: minimal
 	@$(MAKE) -C test testcase
 testcase-debug: debug
 	@$(MAKE) -C test testcase-debug
+
+benchmark-prealloc: minimal
+	@$(MAKE) -C test benchmark-prealloc
