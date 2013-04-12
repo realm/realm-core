@@ -28,6 +28,8 @@ int main()
 
     int n_outer = 100;
     {
+        time_t begin = time(0);
+
         int n_inner = 100;
         for (int i=0; i<n_outer; ++i) {
             cerr << ".";
@@ -62,6 +64,9 @@ int main()
             }
         }
         cerr << "\n";
+
+        time_t end = time(0);
+        cerr << "Small write transactions per second = " << (( n_outer*n_inner*7 / double(end - begin) )) << endl;
     }
 
     {
@@ -83,7 +88,6 @@ int main()
         cerr << "\n";
 
         time_t end = time(0);
-
-        cerr << "Write transactions per second = " << (( n_outer*n_inner / double(end - begin) )) << endl;
+        cerr << "Large write transactions per second = " << (( n_outer*n_inner / double(end - begin) )) << endl;
     }
 }
