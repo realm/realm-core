@@ -36,13 +36,13 @@ namespace tightdb {
 /// \sa StringData
 class BinaryData {
 public:
-    BinaryData() TIGHTDB_NOEXCEPT: pointer(0), len(0) {}
-    BinaryData(const char* data, std::size_t size) TIGHTDB_NOEXCEPT: pointer(data), len(size) {}
+    BinaryData() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
+    BinaryData(const char* data, std::size_t size) TIGHTDB_NOEXCEPT: m_data(data), m_size(size) {}
 
-    char operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return pointer[i]; }
+    char operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
 
-    const char* data() const TIGHTDB_NOEXCEPT { return pointer; }
-    std::size_t size() const TIGHTDB_NOEXCEPT { return len; }
+    const char* data() const TIGHTDB_NOEXCEPT { return m_data; }
+    std::size_t size() const TIGHTDB_NOEXCEPT { return m_size; }
 
     friend bool operator==(const BinaryData&, const BinaryData&) TIGHTDB_NOEXCEPT;
     friend bool operator!=(const BinaryData&, const BinaryData&) TIGHTDB_NOEXCEPT;
@@ -57,14 +57,9 @@ public:
     template<class C, class T>
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const BinaryData&);
 
-    // FIXME: Deprecated. Use operator==() instead. The operator is
-    // better because it is the standard presentation of the concept
-    // of comparison and is assumed by many standard algorithms.
 private:
-    bool compare_payload(BinaryData) const TIGHTDB_NOEXCEPT; // FIXME: REENABLE ALL ALL ALL ALL THESE!
-
-    const char* pointer; // FIXME: Should be made private and be renamed to m_data
-    std::size_t len;     // FIXME: Should be made private and be renamed to m_size
+    const char* m_data;
+    std::size_t m_size;
 };
 
 
@@ -73,48 +68,40 @@ private:
 
 inline bool operator==(const BinaryData& a, const BinaryData& b) TIGHTDB_NOEXCEPT
 {
-    return a.len == b.len && std::equal(a.pointer, a.pointer + a.len, b.pointer);
+    return a.m_size == b.m_size && std::equal(a.m_data, a.m_data + a.m_size, b.m_data);
 }
 
 inline bool operator!=(const BinaryData& a, const BinaryData& b) TIGHTDB_NOEXCEPT
 {
-    return a.len != b.len || !std::equal(a.pointer, a.pointer + a.len, b.pointer);
+    return a.m_size != b.m_size || !std::equal(a.m_data, a.m_data + a.m_size, b.m_data);
 }
 
 inline bool operator<(const BinaryData& a, const BinaryData& b) TIGHTDB_NOEXCEPT
 {
-    return std::lexicographical_compare(a.pointer, a.pointer + a.len,
-                                        b.pointer, b.pointer + b.len);
+    return std::lexicographical_compare(a.m_data, a.m_data + a.m_size,
+                                        b.m_data, b.m_data + b.m_size);
 }
 
 inline bool BinaryData::begins_with(BinaryData d) const TIGHTDB_NOEXCEPT
 {
-    return d.len <= len && std::equal(pointer, pointer + d.len, d.pointer);
+    return d.m_size <= m_size && std::equal(m_data, m_data + d.m_size, d.m_data);
 }
 
 inline bool BinaryData::ends_with(BinaryData d) const TIGHTDB_NOEXCEPT
 {
-    return d.len <= len && std::equal(pointer + len - d.len, pointer + len, d.pointer);
+    return d.m_size <= m_size && std::equal(m_data + m_size - d.m_size, m_data + m_size, d.m_data);
 }
 
 inline bool BinaryData::contains(BinaryData d) const TIGHTDB_NOEXCEPT
 {
-    return std::search(pointer, pointer + len, d.pointer, d.pointer + d.len) != pointer + len;
+    return std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
 
 template<class C, class T>
 inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const BinaryData& d)
 {
-    out << "BinaryData("<<static_cast<const void*>(d.pointer)<<", "<<d.len<<")";
+    out << "BinaryData("<<static_cast<const void*>(d.m_data)<<", "<<d.m_size<<")";
     return out;
-}
-
-inline bool BinaryData::compare_payload(BinaryData b) const TIGHTDB_NOEXCEPT
-{
-    if (b.pointer == pointer && b.len == len)
-        return true;
-    bool e = std::equal(pointer, pointer + len, b.pointer);
-    return e;
 }
 
 } // namespace tightdb
