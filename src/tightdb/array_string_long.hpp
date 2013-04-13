@@ -25,46 +25,42 @@
 namespace tightdb {
 
 
-class ArrayStringLong : public Array {
+class ArrayStringLong: public Array {
 public:
-    ArrayStringLong(ArrayParent* = 0, size_t pndx = 0,
+    ArrayStringLong(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                     Allocator& = Allocator::get_default());
-    ArrayStringLong(size_t ref, ArrayParent*, size_t pndx,
+    ArrayStringLong(std::size_t ref, ArrayParent*, std::size_t ndx_in_parent,
                     Allocator& = Allocator::get_default());
-    //ArrayStringLong(Allocator& alloc);
 
     bool is_empty() const TIGHTDB_NOEXCEPT;
-    size_t size() const TIGHTDB_NOEXCEPT;
+    std::size_t size() const TIGHTDB_NOEXCEPT;
 
-    const char* Get(size_t ndx) const TIGHTDB_NOEXCEPT;
-    void add(const char* value);
-    void add(const char* value, size_t len);
-    void Set(size_t ndx, const char* value);
-    void Set(size_t ndx, const char* value, size_t len);
-    void Insert(size_t ndx, const char* value);
-    void Insert(size_t ndx, const char* value, size_t len);
-    void Delete(size_t ndx);
-    void Resize(size_t ndx);
+    StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+
+    void add(StringData value);
+    void set(std::size_t ndx, StringData value);
+    void insert(std::size_t ndx, StringData value);
+    void erase(std::size_t ndx);
+    void Resize(std::size_t ndx);
     void Clear();
 
-    size_t count(const char* value, size_t start=0, size_t end=-1) const;
-    size_t find_first(const char* value, size_t start=0 , size_t end=-1) const;
-    void find_all(Array &result, const char* value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
+    std::size_t count(StringData value, std::size_t begin = 0, std::size_t end = -1) const;
+    std::size_t find_first(StringData value, std::size_t begin = 0 , std::size_t end = -1) const;
+    void find_all(Array &result, StringData value, std::size_t add_offset = 0,
+                  std::size_t begin = 0, std::size_t end = -1) const;
 
-    void foreach(ForEachOp<const char*>*) const TIGHTDB_NOEXCEPT;
-    static void foreach(const Array*, ForEachOp<const char*>*) TIGHTDB_NOEXCEPT;
+    void foreach(ForEachOp<StringData>*) const TIGHTDB_NOEXCEPT;
+    static void foreach(const Array*, ForEachOp<StringData>*) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
     void ToDot(std::ostream& out, const char* title=NULL) const;
 #endif // TIGHTDB_DEBUG
 
 private:
-    // Member variables
     Array m_offsets;
     ArrayBlob m_blob;
 
     struct ForEachOffsetOp;
-    size_t FindWithLen(const char* value, size_t len, size_t start , size_t end) const;
 };
 
 
@@ -82,30 +78,42 @@ inline std::size_t ArrayStringLong::size() const TIGHTDB_NOEXCEPT
     return m_offsets.size();
 }
 
-inline const char* ArrayStringLong::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline StringData ArrayStringLong::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
-    const std::size_t offset = 0 < ndx ? std::size_t(m_offsets.Get(ndx-1)) : 0;
-    return m_blob.Get(offset);
+    std::size_t begin, end;
+    if (0 < ndx) {
+        // FIXME: Consider how much of a performance problem it is,
+        // that we have to issue two separate calls to read two
+        // consecutive values from an array.
+        begin = m_offsets.GetAsSizeT(ndx-1);
+        end   = m_offsets.GetAsSizeT(ndx);
+    }
+    else {
+        begin = 0;
+        end   = m_offsets.GetAsSizeT(0);
+    }
+    --end; // Discount the terminating zero
+    return StringData(m_blob.get(begin), end-begin);
 }
 
 struct ArrayStringLong::ForEachOffsetOp: ForEachOp<int64_t> {
     void handle_chunk(const int64_t* begin, const int64_t* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    ForEachOffsetOp(const ArrayBlob& b, ForEachOp<const char*>* o) TIGHTDB_NOEXCEPT:
-        m_blob(b), m_op(o), m_prev_offset(0) {}
+    ForEachOffsetOp(const ArrayBlob& b, ForEachOp<StringData>* o) TIGHTDB_NOEXCEPT:
+        m_blob(b), m_op(o), m_offset(0) {}
 private:
     const ArrayBlob& m_blob;
-    ForEachOp<const char*>* const m_op;
-    std::size_t m_prev_offset;
+    ForEachOp<StringData>* const m_op;
+    std::size_t m_offset;
 };
 
-inline void ArrayStringLong::foreach(ForEachOp<const char*>* op) const TIGHTDB_NOEXCEPT
+inline void ArrayStringLong::foreach(ForEachOp<StringData>* op) const TIGHTDB_NOEXCEPT
 {
     ForEachOffsetOp op2(m_blob, op);
     m_offsets.foreach(&op2);
 }
 
-inline void ArrayStringLong::foreach(const Array* a, ForEachOp<const char*>* op) TIGHTDB_NOEXCEPT
+inline void ArrayStringLong::foreach(const Array* a, ForEachOp<StringData>* op) TIGHTDB_NOEXCEPT
 {
     Allocator& alloc = a->GetAllocator();
     Array offsets(a->GetAsRef(0), 0, 0, alloc);

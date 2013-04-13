@@ -47,8 +47,124 @@ TIGHTDB_TABLE_3(TableViewSum,
                 col_double, Double,
                 col_int, Int)
 
+TIGHTDB_TABLE_5(GATable,
+                     user_id, String,
+                     country, String,
+                     build,   String,
+                     event_1, Int,
+                     event_2, Int)
+					 
+
 } // anonymous namespace
 
+
+TEST(TestQueryStrEnum)
+{
+    TupleTableType ttt;
+
+	int aa;
+	int64_t s;
+
+	for(int i = 0; i < 100; i++) {
+		ttt.clear();
+		aa = 0;
+		for(size_t t = 0; t < 2000; t++) {
+			if(rand() % 3 == 0) {
+				ttt.add(1, "AA");
+				aa++;
+			}
+			else {
+				ttt.add(1, "BB");
+			}
+		}
+		ttt.optimize();
+		s = ttt.where().second.equal("AA").count();
+		CHECK_EQUAL(aa, s);
+	}
+
+}
+
+
+TEST(TestQueryStrIndex)
+{
+#ifdef TIGHTDB_DEBUG
+	int itera = 4;
+	int iterb = 100;
+#else
+	int itera = 100;
+	int iterb = 2000;
+#endif
+	
+	int aa;
+	int64_t s;
+
+	for(int i = 0; i < itera; i++) {
+		TupleTableType ttt;
+		aa = 0;
+		for(size_t t = 0; t < iterb; t++) {
+			if(rand() % 3 == 0) {
+				ttt.add(1, "AA");
+				aa++;
+			}
+			else {
+				ttt.add(1, "BB");
+			}
+		}
+
+		s = ttt.where().second.equal("AA").count();
+		CHECK_EQUAL(aa, s);
+
+		ttt.optimize();
+		s = ttt.where().second.equal("AA").count();
+		CHECK_EQUAL(aa, s);
+
+		ttt.column().second.set_index();
+		s = ttt.where().second.equal("AA").count();
+		CHECK_EQUAL(aa, s);
+	}
+
+}
+
+TEST(Group_GameAnalytics)
+{
+    UnitTest::Timer timer;
+
+    {
+        Group g;
+        GATable::Ref t = g.get_table<GATable>("firstevents");
+
+        for (size_t i = 0; i < 1000; ++i) {
+            const int64_t r1 = rand() % 1000;
+            const int64_t r2 = rand() % 1000;
+
+            t->add("10", "US", "1.0", r1, r2);
+        }
+        t->optimize();
+        g.write("ga_test.tightdb");
+    }
+
+    Group g("ga_test.tightdb");
+    GATable::Ref t = g.get_table<GATable>("firstevents");
+
+    GATable::Query q = t->where().country.equal("US");
+
+    timer.Start();
+    size_t c1 = 0;
+    for (size_t i = 0; i < 100; ++i) {
+        c1 += t->column().country.count("US");
+    }
+
+    timer.Start();
+    size_t c2 = 0;
+    for (size_t i = 0; i < 100; ++i) {
+        c2 += q.count();
+    }
+
+    CHECK_EQUAL(c1, t->size() * 100);
+    CHECK_EQUAL(c1, c2);
+
+
+}
 
 TEST(TestQueryFloat3)
 {
@@ -258,7 +374,7 @@ TEST(TestQueryStrIndexed_enum)
 {
     TupleTableType ttt;
 
-    for(size_t t = 0; t < 10; t++) {
+    for (size_t t = 0; t < 10; t++) {
         ttt.add(1, "a");
         ttt.add(4, "b");
         ttt.add(7, "c");
@@ -498,6 +614,22 @@ TEST(TestQueryFindAll_range_or)
 }
 
 
+TEST(TestQuerySimpleStr)
+{
+    TupleTableType ttt;
+
+    ttt.add(1, "X");
+    ttt.add(2, "a");
+    ttt.add(3, "X");
+    ttt.add(4, "a");
+    ttt.add(5, "X");
+    ttt.add(6, "X");
+    TupleTableType::Query q = ttt.where().second.equal("X");
+	size_t c = q.count();
+
+	CHECK_EQUAL(4, c);
+}
+
 TEST(TestQueryDelete)
 {
     TupleTableType ttt;
@@ -681,7 +813,7 @@ TEST(TestQuerySubtable)
     q1.subtable(2);
     q1.less(0, val50);
     q1.end_subtable();
-    TableView t1 = q1.find_all(0, (size_t)-1);
+    TableView t1 = q1.find_all(0, size_t(-1));
     CHECK_EQUAL(2, t1.size());
     CHECK_EQUAL(1, t1.get_source_ndx(0));
     CHECK_EQUAL(2, t1.get_source_ndx(1));
@@ -693,7 +825,7 @@ TEST(TestQuerySubtable)
     q2.Or();
     q2.less(0, val20);
     q2.end_subtable();
-    TableView t2 = q2.find_all(0, (size_t)-1);
+    TableView t2 = q2.find_all(0, size_t(-1));
     CHECK_EQUAL(2, t2.size());
     CHECK_EQUAL(0, t2.get_source_ndx(0));
     CHECK_EQUAL(3, t2.get_source_ndx(1));
@@ -706,7 +838,7 @@ TEST(TestQuerySubtable)
     q3.less(0, val20);
     q3.end_subtable();
     q3.less(0, val300);
-    TableView t3 = q3.find_all(0, (size_t)-1);
+    TableView t3 = q3.find_all(0, size_t(-1));
     CHECK_EQUAL(1, t3.size());
     CHECK_EQUAL(0, t3.get_source_ndx(0));
 
@@ -719,7 +851,7 @@ TEST(TestQuerySubtable)
     q4.Or();
     q4.less(0, val20);
     q4.end_subtable();
-    TableView t4 = q4.find_all(0, (size_t)-1);
+    TableView t4 = q4.find_all(0, size_t(-1));
 
 
 
@@ -869,8 +1001,6 @@ TEST(TestQuerySort_Bools)
     CHECK(tv.get_bool(0, 2) == true);
 }
 
-
-
 TEST(TestQueryThreads)
 {
     TupleTableType ttt;
@@ -903,6 +1033,69 @@ TEST(TestQueryThreads)
 }
 
 
+TEST(TestQueryLongString)
+{
+    TupleTableType ttt;
+
+    // Spread query search hits in an odd way to test more edge cases
+    // (thread job size is THREAD_CHUNK_SIZE = 10)
+    for (int i = 0; i < 100; i++) {
+        for (int j = 0; j < 10; j++) {
+            ttt.add(5, "aaaaaaaaaaaaaaaaaa");
+            ttt.add(j, "bbbbbbbbbbbbbbbbbb");
+            ttt.add(6, "cccccccccccccccccc");
+            ttt.add(6, "aaaaaaaaaaaaaaaaaa");
+            ttt.add(6, "bbbbbbbbbbbbbbbbbb");
+            ttt.add(6, "cccccccccccccccccc");
+            ttt.add(6, "aaaaaaaaaaaaaaaaaa");
+        }
+    }
+    TupleTableType::Query q1 = ttt.where().first.equal(2).second.equal("bbbbbbbbbbbbbbbbbb");
+
+    // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
+    //q1.set_threads(5);
+    TupleTableType::View tv = q1.find_all();
+
+    CHECK_EQUAL(100, tv.size());
+    for (int i = 0; i < 100; i++) {
+        const size_t expected = i*7*10 + 14 + 1;
+        const size_t actual   = tv.get_source_ndx(i);
+        CHECK_EQUAL(expected, actual);
+    }
+}
+
+
+TEST(TestQueryLongEnum)
+{
+    TupleTableType ttt;
+
+    // Spread query search hits in an odd way to test more edge cases
+    // (thread job size is THREAD_CHUNK_SIZE = 10)
+    for (int i = 0; i < 100; i++) {
+        for (int j = 0; j < 10; j++) {
+            ttt.add(5, "aaaaaaaaaaaaaaaaaa");
+            ttt.add(j, "bbbbbbbbbbbbbbbbbb");
+            ttt.add(6, "cccccccccccccccccc");
+            ttt.add(6, "aaaaaaaaaaaaaaaaaa");
+            ttt.add(6, "bbbbbbbbbbbbbbbbbb");
+            ttt.add(6, "cccccccccccccccccc");
+            ttt.add(6, "aaaaaaaaaaaaaaaaaa");
+        }
+    }
+	ttt.optimize();
+	TupleTableType::Query q1 = ttt.where().first.equal(2).second.not_equal("aaaaaaaaaaaaaaaaaa");
+
+    // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
+    //q1.set_threads(5);
+    TupleTableType::View tv = q1.find_all();
+
+    CHECK_EQUAL(100, tv.size());
+    for (int i = 0; i < 100; i++) {
+        const size_t expected = i*7*10 + 14 + 1;
+        const size_t actual   = tv.get_source_ndx(i);
+        CHECK_EQUAL(expected, actual);
+    }
+}
 
 TEST(TestQuerySimple2)
 {
@@ -994,7 +1187,7 @@ TEST(TestQueryFindNext)
 
     CHECK_EQUAL(5, res1);
     CHECK_EQUAL(6, res2);
-    CHECK_EQUAL((size_t)-1, res3); // no more matches
+    CHECK_EQUAL(size_t(-1), res3); // no more matches
 }
 
 TEST(TestQueryFindAll1)
@@ -1347,12 +1540,16 @@ TEST(TestQueryEnums)
     CHECK_EQUAL(21, tv1.get_source_ndx(4));
 }
 
-#if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
 
 #define uY  "\x0CE\x0AB"              // greek capital letter upsilon with dialytika (U+03AB)
 #define uYd "\x0CE\x0A5\x0CC\x088"    // decomposed form (Y followed by two dots)
 #define uy  "\x0CF\x08B"              // greek small letter upsilon with dialytika (U+03AB)
 #define uyd "\x0cf\x085\x0CC\x088"    // decomposed form (Y followed by two dots)
+
+#define uA  "\x0c3\x085"         // danish capital A with ring above (as in BLAABAERGROED)
+#define uAd "\x041\x0cc\x08a"    // decomposed form (A (41) followed by ring)
+#define ua  "\x0c3\x0a5"         // danish lower case a with ring above (as in blaabaergroed)
+#define uad "\x061\x0cc\x08a"    // decomposed form (a (41) followed by ring)
 
 TEST(TestQueryCaseSensitivity)
 {
@@ -1367,6 +1564,8 @@ TEST(TestQueryCaseSensitivity)
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
 }
+
+#if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
 
 TEST(TestQueryUnicode2)
 {
@@ -1394,11 +1593,6 @@ TEST(TestQueryUnicode2)
     CHECK_EQUAL(1, tv3.size());
     CHECK_EQUAL(1, tv3.get_source_ndx(0));
 }
-
-#define uA  "\x0c3\x085"         // danish capital A with ring above (as in BLAABAERGROED)
-#define uAd "\x041\x0cc\x08a"    // decomposed form (A (41) followed by ring)
-#define ua  "\x0c3\x0a5"         // danish lower case a with ring above (as in blaabaergroed)
-#define uad "\x061\x0cc\x08a"    // decomposed form (a (41) followed by ring)
 
 TEST(TestQueryUnicode3)
 {
@@ -1434,6 +1628,7 @@ TEST(TestQueryUnicode3)
     CHECK_EQUAL(3, tv4.get_source_ndx(0));
 }
 
+#endif 
 
 TEST(TestQueryFindAll_BeginsUNICODE)
 {
@@ -1500,8 +1695,6 @@ TEST(TestQueryFindAll_ContainsUNICODE)
     CHECK_EQUAL(3, tv2.get_source_ndx(3));
 }
 
-#endif
-
 TEST(TestQuerySyntaxCheck)
 {
     TupleTableType ttt;
@@ -1545,12 +1738,14 @@ TEST(TestQuerySyntaxCheck)
 #ifdef TIGHTDB_DEBUG
     s = q6.Verify();
     CHECK(s != "");
-
 #endif
+
     TupleTableType::Query q7 = ttt.where().second.equal("\xa0", false);
-#ifdef TIGHTDB_DEBUG
+#ifdef _WIN32
+#  ifdef TIGHTDB_DEBUG
     s = q7.Verify();
     CHECK(s != "");
+#  endif
 #endif
 }
 

@@ -36,37 +36,64 @@ ArrayBinary::ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator
 // Creates new array (but invalid, call UpdateRef to init)
 //ArrayBinary::ArrayBinary(Allocator& alloc) : Array(alloc) {}
 
-void ArrayBinary::add(const char* data, size_t size)
+void ArrayBinary::add(BinaryData value)
 {
-    TIGHTDB_ASSERT(size == 0 || data);
+    TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    m_blob.add(data, size);
-    m_offsets.add(m_offsets.is_empty() ? size : m_offsets.back() + size);
+    m_blob.add(value.data(), value.size());
+    m_offsets.add(m_offsets.is_empty() ? value.size() : m_offsets.back() + value.size());
 }
 
-void ArrayBinary::Set(size_t ndx, const char* data, size_t size)
+void ArrayBinary::set(size_t ndx, BinaryData value)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
-    TIGHTDB_ASSERT(size == 0 || data);
+    TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
     const size_t start = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
     const size_t current_end = m_offsets.GetAsSizeT(ndx);
-    const ssize_t diff =  (start + size) - current_end;
+    const ssize_t diff =  (start + value.size()) - current_end;
 
-    m_blob.Replace(start, current_end, data, size);
+    m_blob.replace(start, current_end, value.data(), value.size());
     m_offsets.Adjust(ndx, diff);
 }
 
-void ArrayBinary::Insert(size_t ndx, const char* data, size_t size)
+void ArrayBinary::insert(size_t ndx, BinaryData value)
 {
     TIGHTDB_ASSERT(ndx <= m_offsets.size());
-    TIGHTDB_ASSERT(size == 0 || data);
+    TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
     const size_t pos = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
 
-    m_blob.Insert(pos, data, size);
-    m_offsets.Insert(ndx, pos + size);
-    m_offsets.Adjust(ndx+1, size);
+    m_blob.insert(pos, value.data(), value.size());
+    m_offsets.Insert(ndx, pos + value.size());
+    m_offsets.Adjust(ndx+1, value.size());
+}
+
+void ArrayBinary::set_string(size_t ndx, StringData value)
+{
+    TIGHTDB_ASSERT(ndx < m_offsets.size());
+    TIGHTDB_ASSERT(value.size() == 0 || value.data());
+
+    const size_t start = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
+    const size_t current_end = m_offsets.GetAsSizeT(ndx);
+    const ssize_t diff =  (start + value.size() + 1) - current_end;
+
+    bool add_zero_term = true;
+    m_blob.replace(start, current_end, value.data(), value.size(), add_zero_term);
+    m_offsets.Adjust(ndx, diff);
+}
+
+void ArrayBinary::insert_string(size_t ndx, StringData value)
+{
+    TIGHTDB_ASSERT(ndx <= m_offsets.size());
+    TIGHTDB_ASSERT(value.size() == 0 || value.data());
+
+    const size_t pos = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
+
+    bool add_zero_term = true;
+    m_blob.insert(pos, value.data(), value.size(), add_zero_term);
+    m_offsets.Insert(ndx, pos + value.size() + 1);
+    m_offsets.Adjust(ndx+1, value.size() + 1);
 }
 
 void ArrayBinary::Delete(size_t ndx)
@@ -76,7 +103,7 @@ void ArrayBinary::Delete(size_t ndx)
     const size_t start = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
     const size_t end = m_offsets.GetAsSizeT(ndx);
 
-    m_blob.Delete(start, end);
+    m_blob.erase(start, end);
     m_offsets.Delete(ndx);
     m_offsets.Adjust(ndx, int64_t(start) - end);
 }

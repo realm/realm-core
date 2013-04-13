@@ -48,9 +48,12 @@ size_t GroupWriter::Commit()
     const SlabAlloc::FreeSpace& freeSpace = m_group.get_allocator().GetFreespace();
     const size_t fcount = freeSpace.size();
 
+    // FIXME: In some cases, m_current_version is uninitialized (has
+    // an undefined value) at this point. This is reported by
+    // valgrind.
     for (size_t i = 0; i < fcount; ++i) {
         SlabAlloc::FreeSpace::ConstCursor r = freeSpace[i];
-        add_free_space(r.ref, r.size, m_current_version);
+        add_free_space(to_size_t(r.ref), to_size_t(r.size), to_size_t(m_current_version));
     }
 
     // We now have a bit of an chicken-and-egg problem. We need to write our free
@@ -62,7 +65,7 @@ size_t GroupWriter::Commit()
     // (64bit width + one possible ekstra entry per alloc and header)
     const size_t free_count = fpositions.size() + 5;
     const size_t top_max_size = (5 + 1) * 8;
-    const size_t flist_max_size = (free_count) * 8;
+    const size_t flist_max_size = free_count * 8;
     const size_t total_reserve = top_max_size + (flist_max_size * (isShared ? 3 : 2));
 
     // Reserve space for each block. We explicitly ask for a bigger space than
@@ -379,10 +382,10 @@ size_t GroupWriter::extend_free_space(size_t len)
 
     // See if we can merge in new space
     if (!fpositions.is_empty()) {
-        const size_t last_ndx = fpositions.size()-1;
-        const size_t last_len = flengths[last_ndx];
-        const size_t end  = fpositions[last_ndx] + last_len;
-        const size_t ver  = isShared ? fversions[last_ndx] : 0;
+        const size_t last_ndx = to_size_t(fpositions.size()-1);
+        const size_t last_len = to_size_t(flengths[last_ndx]);
+        const size_t end  = to_size_t(fpositions[last_ndx] + last_len);
+        const size_t ver  = to_size_t(isShared ? fversions[last_ndx] : 0);
         if (end == old_filesize && ver == 0) {
             flengths.Set(last_ndx, last_len + ext_len);
             return last_ndx;

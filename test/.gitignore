@@ -20,3 +20,7 @@
 
 /benchmark/x64
 /benchmark
+
+# Transient databases
+*.tightdb
+*.tightdb.lock

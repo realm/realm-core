@@ -135,9 +135,6 @@ inline std::size_t to_ref(int64_t v) TIGHTDB_NOEXCEPT
 #ifdef TIGHTDB_DEBUG
     uint64_t m = std::size_t(-1);
     TIGHTDB_ASSERT(uint64_t(v) <= m);
-    // FIXME: This misbehaves for negative v when size_t is 64-bits.
-    // FIXME: This misbehaves on architectures that do not use 2's complement represenation of negative numbers.
-    // FIXME: Should probably be TIGHTDB_ASSERT(0 <= v && uint64_t(v) <= numeric_limits<size_t>::max());
     // FIXME: Must also check that v is divisible by 8 (64-bit aligned).
 #endif
     return std::size_t(v);
@@ -149,8 +146,6 @@ inline std::size_t to_size_t(int64_t v) TIGHTDB_NOEXCEPT
 #ifdef TIGHTDB_DEBUG
     uint64_t m = std::size_t(-1);
     TIGHTDB_ASSERT(uint64_t(v) <= m);
-    // FIXME: This misbehaves for negative v when size_t is 64-bits.
-    // FIXME: This misbehaves on architectures that do not use 2's complement represenation of negative numbers.
     // FIXME: Should probably be TIGHTDB_ASSERT(0 <= v && uint64_t(v) <= numeric_limits<size_t>::max());
 #endif
     return std::size_t(v);
@@ -164,6 +159,7 @@ ReturnType TypePunning( OriginalType variable )
         OriginalType    in;
         ReturnType      out;
     };
+    out = ReturnType(); // Clear all bits in case ReturnType is larger than OriginalType
     in = variable;
     return out;
 }

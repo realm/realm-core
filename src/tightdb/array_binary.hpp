@@ -32,19 +32,21 @@ public:
                 Allocator& alloc = Allocator::get_default());
     ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx,
                 Allocator& alloc = Allocator::get_default());
-    //ArrayBinary(Allocator& alloc);
 
     bool is_empty() const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT;
 
     BinaryData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
-    void add(const char* data, std::size_t size);
-    void Set(std::size_t ndx, const char* data, std::size_t size);
-    void Insert(std::size_t ndx, const char* data, std::size_t size);
+    void add(BinaryData value);
+    void set(std::size_t ndx, BinaryData value);
+    void insert(std::size_t ndx, BinaryData value);
     void Delete(std::size_t ndx);
     void Resize(std::size_t ndx);
     void Clear();
+
+    void set_string(std::size_t ndx, StringData value);
+    void insert_string(std::size_t ndx, StringData value);
 
     static BinaryData column_get(const Array* root, std::size_t ndx) TIGHTDB_NOEXCEPT;
     static BinaryData get_direct(Allocator&, const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
@@ -56,9 +58,6 @@ public:
 private:
     Array m_offsets;
     ArrayBlob m_blob;
-
-    const char* Get(size_t ndx) const TIGHTDB_NOEXCEPT; // FIXME: Delete
-    size_t GetLen(size_t ndx) const TIGHTDB_NOEXCEPT; // FIXME: Delete
 };
 
 
@@ -83,7 +82,7 @@ inline BinaryData ArrayBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 
     std::size_t begin = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
     std::size_t end   = m_offsets.GetAsSizeT(ndx);
-    return BinaryData(m_blob.Get(begin), end-begin);
+    return BinaryData(m_blob.get(begin), end-begin);
 }
 
 inline BinaryData ArrayBinary::column_get(const Array* root, std::size_t ndx) TIGHTDB_NOEXCEPT

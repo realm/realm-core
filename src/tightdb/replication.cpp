@@ -1131,7 +1131,7 @@ void Replication::TransactLogApplier::apply()
                 if (m_dirty_spec) finalize_spec();
                 int levels = read_int<int>(); // Throws
                 size_t ndx = read_int<size_t>(); // Throws
-                if (m_group.get_table_count() <= ndx) goto bad_transact_log;
+                if (m_group.size() <= ndx) goto bad_transact_log;
                 m_table = m_group.get_table_ptr(ndx)->get_table_ref();
 #ifdef TIGHTDB_DEBUG
                 if (m_log) *m_log << "table = group->get_table_by_ndx("<<ndx<<")\n";
@@ -1188,11 +1188,11 @@ void Replication::TransactLogApplier::apply()
                 int type = read_int<int>(); // Throws
                 if (!is_valid_column_type(type)) goto bad_transact_log;
                 read_string(m_string_buffer); // Throws
-                const char* const name = m_string_buffer.c_str();
+                StringData name(m_string_buffer.data(), m_string_buffer.size());
                 if (!spec) goto bad_transact_log;
                 // FIXME: Is it legal to have multiple columns with the same name?
                 if (spec->get_column_index(name) != size_t(-1)) goto bad_transact_log;
-                spec->add_column(ColumnType(type), name);
+                spec->add_column(DataType(type), name);
 #ifdef TIGHTDB_DEBUG
                 if (m_log) *m_log << "spec->add_column("<<type<<", \""<<name<<"\")\n";
 #endif
@@ -1224,7 +1224,7 @@ void Replication::TransactLogApplier::apply()
 
             case 'N': { // New top level table
                 read_string(m_string_buffer); // Throws
-                const char* const name = m_string_buffer.c_str();
+                StringData name(m_string_buffer.data(), m_string_buffer.size());
                 if (m_group.has_table(name)) goto bad_transact_log;
                 m_group.create_new_table(name); // Throws
 #ifdef TIGHTDB_DEBUG

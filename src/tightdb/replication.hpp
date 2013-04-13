@@ -236,8 +236,8 @@ public:
 
     struct subtable_tag {};
 
-    void new_top_level_table(const char* name);
-    void add_column(const Table*, const Spec*, ColumnType, const char* name);
+    void new_top_level_table(StringData name);
+    void add_column(const Table*, const Spec*, DataType, StringData name);
 
     template<class T>
     void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
@@ -350,18 +350,24 @@ private:
     void select_spec(const Table*, const Spec*);
 
     void string_cmd(char cmd, std::size_t column_ndx, std::size_t ndx,
-                    const char* data,std::size_t size);
+                    const char* data, std::size_t size);
 
     void mixed_cmd(char cmd, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
 
-    template<class L> void simple_cmd(char cmd, const Tuple<L>& integers);
+    template<class L> void simple_cmd(char cmd, const Tuple<L>& numbers);
 
-    template<class T> struct EncodeInt { void operator()(T value, char** ptr); };
+    template<class> struct EncodeNumber;
 
     template<class T> static char* encode_int(char* ptr, T value);
 
+    static char* encode_float(char* ptr, float value);
+    static char* encode_double(char* ptr, double value);
+
     // Make sure this is in agreement with the actual integer encoding scheme
     static const int max_enc_bytes_per_int = (std::numeric_limits<int64_t>::digits+1+6)/7;
+    static const int max_enc_bytes_per_double = sizeof (double);
+    static const int max_enc_bytes_per_num = max_enc_bytes_per_int <
+        max_enc_bytes_per_double ? max_enc_bytes_per_double : max_enc_bytes_per_int;
 };
 
 
@@ -407,6 +413,7 @@ inline void Replication::transact_log_append(const char* data, std::size_t size)
 
 template<class T> inline char* Replication::encode_int(char* ptr, T value)
 {
+    TIGHTDB_STATIC_ASSERT(std::numeric_limits<T>::is_integer, "Integer required");
     bool negative = false;
     if (is_negative(value)) {
         negative = true;
@@ -426,18 +433,52 @@ template<class T> inline char* Replication::encode_int(char* ptr, T value)
 }
 
 
-template<class T> inline void Replication::EncodeInt<T>::operator()(T value, char** ptr)
+inline char* Replication::encode_float(char* ptr, float value)
 {
-    *ptr = encode_int(*ptr, value);
+    TIGHTDB_STATIC_ASSERT(std::numeric_limits<float>::is_iec559 &&
+                          sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
+                          "Unsupported 'float' representation");
+    const char* val_ptr = reinterpret_cast<char*>(&value);
+    return std::copy(val_ptr, val_ptr + sizeof value, ptr);
 }
 
 
-template<class L> inline void Replication::simple_cmd(char cmd, const Tuple<L>& integers)
+inline char* Replication::encode_double(char* ptr, double value)
+{
+    TIGHTDB_STATIC_ASSERT(std::numeric_limits<float>::is_iec559 &&
+                          sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
+                          "Unsupported 'double' representation");
+    const char* val_ptr = reinterpret_cast<char*>(&value);
+    return std::copy(val_ptr, val_ptr + sizeof value, ptr);
+}
+
+
+template<class T> struct Replication::EncodeNumber {
+    void operator()(T value, char** ptr)
+    {
+        *ptr = encode_int(*ptr, value);
+    }
+};
+template<> struct Replication::EncodeNumber<float> {
+    void operator()(float  value, char** ptr)
+    {
+        *ptr = encode_float(*ptr, value);
+    }
+};
+template<> struct Replication::EncodeNumber<double> {
+    void operator()(double value, char** ptr)
+    {
+        *ptr = encode_double(*ptr, value);
+    }
+};
+
+
+template<class L> inline void Replication::simple_cmd(char cmd, const Tuple<L>& numbers)
 {
     char* buf;
-    transact_log_reserve(&buf, 1 + TypeCount<L>::value*max_enc_bytes_per_int); // Throws
+    transact_log_reserve(&buf, 1 + TypeCount<L>::value*max_enc_bytes_per_num); // Throws
     *buf++ = cmd;
-    for_each<EncodeInt>(integers, &buf);
+    for_each<EncodeNumber>(numbers, &buf);
     transact_log_advance(buf);
 }
 
@@ -466,7 +507,7 @@ inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
                                    std::size_t ndx, const Mixed& value)
 {
     char* buf;
-    transact_log_reserve(&buf, 1 + 4*max_enc_bytes_per_int); // Throws
+    transact_log_reserve(&buf, 1 + 4*max_enc_bytes_per_num); // Throws
     *buf++ = cmd;
     buf = encode_int(buf, column_ndx);
     buf = encode_int(buf, ndx);
@@ -481,13 +522,11 @@ inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
         transact_log_advance(buf);
         break;
     case type_Float:
-        TIGHTDB_ASSERT(false);  // FIXME: IMPLEMENT
-        //buf = encode_float(buf, value.get_float()));
+        buf = encode_float(buf, value.get_float());
         transact_log_advance(buf);
         break;
     case type_Double:
-        TIGHTDB_ASSERT(false);  // FIXME: IMPLEMENT
-        //buf = encode_double(buf, value.get_double()));
+        buf = encode_double(buf, value.get_double());
         transact_log_advance(buf);
         break;
     case type_Date:
@@ -496,19 +535,18 @@ inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
         break;
     case type_String:
         {
-            const char* data = value.get_string();
-            std::size_t size = std::strlen(data);
-            buf = encode_int(buf, size);
+            StringData data = value.get_string();
+            buf = encode_int(buf, data.size());
             transact_log_advance(buf);
-            transact_log_append(data, size); // Throws
+            transact_log_append(data.data(), data.size()); // Throws
         }
         break;
     case type_Binary:
         {
             BinaryData data = value.get_binary();
-            buf = encode_int(buf, data.len);
+            buf = encode_int(buf, data.size());
             transact_log_advance(buf);
-            transact_log_append(data.pointer, data.len); // Throws
+            transact_log_append(data.data(), data.size()); // Throws
         }
         break;
     case type_Table:
@@ -520,21 +558,19 @@ inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
 }
 
 
-inline void Replication::new_top_level_table(const char* name)
+inline void Replication::new_top_level_table(StringData name)
 {
-    size_t length = std::strlen(name);
-    simple_cmd('N', tuple(length)); // Throws
-    transact_log_append(name, length); // Throws
+    simple_cmd('N', tuple(name.size())); // Throws
+    transact_log_append(name.data(), name.size()); // Throws
 }
 
 
 inline void Replication::add_column(const Table* table, const Spec* spec,
-                                    ColumnType type, const char* name)
+                                    DataType type, StringData name)
 {
     check_spec(table, spec); // Throws
-    size_t length = std::strlen(name);
-    simple_cmd('A', tuple(int(type), length)); // Throws
-    transact_log_append(name, length); // Throws
+    simple_cmd('A', tuple(int(type), name.size())); // Throws
+    transact_log_append(name.data(), name.size()); // Throws
 }
 
 
@@ -550,7 +586,7 @@ inline void Replication::set_value(const Table* t, std::size_t column_ndx,
                                    std::size_t ndx, BinaryData value)
 {
     check_table(t); // Throws
-    string_cmd('s', column_ndx, ndx, value.pointer, value.len); // Throws
+    string_cmd('s', column_ndx, ndx, value.data(), value.size()); // Throws
 }
 
 inline void Replication::set_value(const Table* t, std::size_t column_ndx,
@@ -580,7 +616,7 @@ inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
                                       std::size_t ndx, BinaryData value)
 {
     check_table(t); // Throws
-    string_cmd('i', column_ndx, ndx, value.pointer, value.len); // Throws
+    string_cmd('i', column_ndx, ndx, value.data(), value.size()); // Throws
 }
 
 inline void Replication::insert_value(const Table* t, std::size_t column_ndx,

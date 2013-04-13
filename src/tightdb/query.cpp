@@ -84,7 +84,31 @@ Query& Query::tableview(const Array &arr)
 // Binary
 Query& Query::equal(size_t column_ndx, BinaryData b)
 {
-    ParentNode* const p = new BinaryNode<Equal>(b.pointer, b.len, column_ndx);
+    ParentNode* const p = new BinaryNode<Equal>(b, column_ndx);
+    UpdatePointers(p, &p->m_child);
+    return *this;
+}
+Query& Query::not_equal(size_t column_ndx, BinaryData b)
+{
+    ParentNode* const p = new BinaryNode<NotEqual>(b, column_ndx);
+    UpdatePointers(p, &p->m_child);
+    return *this;
+}
+Query& Query::begins_with(size_t column_ndx, BinaryData b)
+{
+    ParentNode* p = new BinaryNode<BeginsWith>(b, column_ndx);
+    UpdatePointers(p, &p->m_child);
+    return *this;
+}
+Query& Query::ends_with(size_t column_ndx, BinaryData b)
+{
+    ParentNode* p = new BinaryNode<EndsWith>(b, column_ndx);
+    UpdatePointers(p, &p->m_child);
+    return *this;
+}
+Query& Query::contains(size_t column_ndx, BinaryData b)
+{
+    ParentNode* p = new BinaryNode<Contains>(b, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -219,50 +243,50 @@ Query& Query::between(size_t column_ndx, double from, double to)
 }
 
 // STRINGS
-Query& Query::equal(size_t column_ndx, const char* value, bool caseSensitive)
+Query& Query::equal(size_t column_ndx, StringData value, bool case_sensitive)
 {
     ParentNode* p;
-    if (caseSensitive)
+    if (case_sensitive)
         p = new StringNode<Equal>(value, column_ndx);
     else
         p = new StringNode<EqualIns>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
-Query& Query::begins_with(size_t column_ndx, const char* value, bool caseSensitive)
+Query& Query::begins_with(size_t column_ndx, StringData value, bool case_sensitive)
 {
     ParentNode* p;
-    if (caseSensitive)
+    if (case_sensitive)
         p = new StringNode<BeginsWith>(value, column_ndx);
     else
         p = new StringNode<BeginsWithIns>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
-Query& Query::ends_with(size_t column_ndx, const char* value, bool caseSensitive)
+Query& Query::ends_with(size_t column_ndx, StringData value, bool case_sensitive)
 {
     ParentNode* p;
-    if (caseSensitive)
+    if (case_sensitive)
         p = new StringNode<EndsWith>(value, column_ndx);
     else
         p = new StringNode<EndsWithIns>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
-Query& Query::contains(size_t column_ndx, const char* value, bool caseSensitive)
+Query& Query::contains(size_t column_ndx, StringData value, bool case_sensitive)
 {
     ParentNode* p;
-    if (caseSensitive)
+    if (case_sensitive)
         p = new StringNode<Contains>(value, column_ndx);
     else
         p = new StringNode<ContainsIns>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
-Query& Query::not_equal(size_t column_ndx, const char* value, bool caseSensitive)
+Query& Query::not_equal(size_t column_ndx, StringData value, bool case_sensitive)
 {
     ParentNode* p;
-    if (caseSensitive)
+    if (case_sensitive)
         p = new StringNode<NotEqual>(value, column_ndx);
     else
         p = new StringNode<NotEqualIns>(value, column_ndx);

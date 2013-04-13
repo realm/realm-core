@@ -28,33 +28,79 @@
 
 namespace tightdb {
 
+/// A reference to a chunk of binary data.
+///
+/// This class does not own the referenced memory, nor does it in any
+/// other way attempt to manage the lifetime of it.
+///
+/// \sa StringData
 class BinaryData {
 public:
-    const char* pointer;
-    std::size_t len;
+    BinaryData() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
+    BinaryData(const char* data, std::size_t size) TIGHTDB_NOEXCEPT: m_data(data), m_size(size) {}
 
-    BinaryData() TIGHTDB_NOEXCEPT: pointer(0), len(0) {}
-    BinaryData(const char* data, std::size_t size) TIGHTDB_NOEXCEPT: pointer(data), len(size) {}
+    char operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
 
-    bool compare_payload(const BinaryData &b) const TIGHTDB_NOEXCEPT
-    {
-        if (b.pointer == pointer && b.len == len)
-            return true;
-        bool e = std::equal(pointer, pointer + len, b.pointer);
-        return e;
-    }
+    const char* data() const TIGHTDB_NOEXCEPT { return m_data; }
+    std::size_t size() const TIGHTDB_NOEXCEPT { return m_size; }
 
-    template<class Ch, class Tr>
-    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const BinaryData&);
+    friend bool operator==(const BinaryData&, const BinaryData&) TIGHTDB_NOEXCEPT;
+    friend bool operator!=(const BinaryData&, const BinaryData&) TIGHTDB_NOEXCEPT;
+
+    /// Trivial bytewise lexicographical comparison.
+    friend bool operator<(const BinaryData&, const BinaryData&) TIGHTDB_NOEXCEPT;
+
+    bool begins_with(BinaryData) const TIGHTDB_NOEXCEPT;
+    bool ends_with(BinaryData) const TIGHTDB_NOEXCEPT;
+    bool contains(BinaryData) const TIGHTDB_NOEXCEPT;
+
+    template<class C, class T>
+    friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const BinaryData&);
+
+private:
+    const char* m_data;
+    std::size_t m_size;
 };
+
 
 
 // Implementation:
 
-template<class Ch, class Tr>
-inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const BinaryData& d)
+inline bool operator==(const BinaryData& a, const BinaryData& b) TIGHTDB_NOEXCEPT
 {
-    out << "BinaryData("<<static_cast<const void*>(d.pointer)<<", "<<d.len<<")";
+    return a.m_size == b.m_size && std::equal(a.m_data, a.m_data + a.m_size, b.m_data);
+}
+
+inline bool operator!=(const BinaryData& a, const BinaryData& b) TIGHTDB_NOEXCEPT
+{
+    return a.m_size != b.m_size || !std::equal(a.m_data, a.m_data + a.m_size, b.m_data);
+}
+
+inline bool operator<(const BinaryData& a, const BinaryData& b) TIGHTDB_NOEXCEPT
+{
+    return std::lexicographical_compare(a.m_data, a.m_data + a.m_size,
+                                        b.m_data, b.m_data + b.m_size);
+}
+
+inline bool BinaryData::begins_with(BinaryData d) const TIGHTDB_NOEXCEPT
+{
+    return d.m_size <= m_size && std::equal(m_data, m_data + d.m_size, d.m_data);
+}
+
+inline bool BinaryData::ends_with(BinaryData d) const TIGHTDB_NOEXCEPT
+{
+    return d.m_size <= m_size && std::equal(m_data + m_size - d.m_size, m_data + m_size, d.m_data);
+}
+
+inline bool BinaryData::contains(BinaryData d) const TIGHTDB_NOEXCEPT
+{
+    return std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
+}
+
+template<class C, class T>
+inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const BinaryData& d)
+{
+    out << "BinaryData("<<static_cast<const void*>(d.m_data)<<", "<<d.m_size<<")";
     return out;
 }
 

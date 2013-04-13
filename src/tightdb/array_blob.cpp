@@ -6,7 +6,7 @@ using namespace std;
 
 namespace tightdb {
 
-void ArrayBlob::Replace(size_t begin, size_t end, const char* data, size_t size)
+void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size, bool add_zero_term)
 {
     TIGHTDB_ASSERT(begin <= end);
     TIGHTDB_ASSERT(end <= m_len);
@@ -15,33 +15,36 @@ void ArrayBlob::Replace(size_t begin, size_t end, const char* data, size_t size)
     CopyOnWrite(); // Throws
 
     // Reallocate if needed
-    const size_t gapsize = end - begin;
-    const size_t newsize = m_len - gapsize + size;
+    size_t remove_size = end - begin;
+    size_t add_size = size;
+    if (add_zero_term) ++add_size;
+    size_t new_size = m_len - remove_size + add_size;
     // also updates header
-    Alloc(newsize, 1); // Throws
+    Alloc(new_size, 1); // Throws
 
-    char* const base = reinterpret_cast<char*>(m_data);
-    char* const gap_begin = base + begin;
+    char* base = reinterpret_cast<char*>(m_data);
+    char* modify_begin = base + begin;
 
     // Resize previous space to fit new data
     // (not needed if we append to end)
     if (begin != m_len) {
-        const char* const old_begin = base + end;
-        const char* const old_end   = base + m_len;
-        if (gapsize < size) { // expand gap
-            char* const new_end = base + newsize;
+        const char* old_begin = base + end;
+        const char* old_end   = base + m_len;
+        if (remove_size < add_size) { // expand gap
+            char* new_end = base + new_size;
             copy_backward(old_begin, old_end, new_end);
         }
-        else if (size < gapsize) { // shrink gap
-            char* const new_begin = gap_begin + size;
+        else if (add_size < remove_size) { // shrink gap
+            char* new_begin = modify_begin + add_size;
             copy(old_begin, old_end, new_begin);
         }
     }
 
     // Insert the data
-    copy(data, data+size, gap_begin);
+    modify_begin = copy(data, data+size, modify_begin);
+    if (add_zero_term) *modify_begin = 0;
 
-    m_len = newsize;
+    m_len = new_size;
 }
 
 #ifdef TIGHTDB_DEBUG

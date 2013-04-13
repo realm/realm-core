@@ -64,9 +64,9 @@ public:
     static const Table* get_subtable_ptr(const ConstTableView*, std::size_t column_ndx,
                                          std::size_t row_ndx);
 
-    static Table* get_table_ptr(Group* grp, const char* name);
-    static Table* get_table_ptr(Group* grp, const char* name, bool& was_created);
-    static const Table* get_table_ptr(const Group* grp, const char* name);
+    static Table* get_table_ptr(Group* grp, StringData name);
+    static Table* get_table_ptr(Group* grp, StringData name, bool& was_created);
+    static const Table* get_table_ptr(const Group* grp, StringData name);
 
     static void unbind_table_ref(const Table*);
     static void bind_table_ref(const Table*);
@@ -141,21 +141,21 @@ inline const Table* LangBindHelper::get_subtable_ptr(const ConstTableView* tv,
     return get_subtable_ptr(&tv->get_parent(), column_ndx, tv->get_source_ndx(row_ndx));
 }
 
-inline Table* LangBindHelper::get_table_ptr(Group* grp, const char* name)
+inline Table* LangBindHelper::get_table_ptr(Group* grp, StringData name)
 {
     Table* subtab = grp->get_table_ptr(name);
     subtab->bind_ref();
     return subtab;
 }
 
-inline Table* LangBindHelper::get_table_ptr(Group* grp, const char* name, bool& was_created)
+inline Table* LangBindHelper::get_table_ptr(Group* grp, StringData name, bool& was_created)
 {
     Table* subtab = grp->get_table_ptr(name, was_created);
     subtab->bind_ref();
     return subtab;
 }
 
-inline const Table* LangBindHelper::get_table_ptr(const Group* grp, const char* name)
+inline const Table* LangBindHelper::get_table_ptr(const Group* grp, StringData name)
 {
     const Table* subtab = grp->get_table_ptr(name);
     subtab->bind_ref();

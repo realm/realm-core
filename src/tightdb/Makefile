@@ -5,8 +5,8 @@ GENERATED_SOURCES = $(TABLE_MACROS_HPP)
 INST_HEADERS = config.h meta.hpp assert.hpp exceptions.hpp terminate.hpp type_list.hpp tuple.hpp \
 safe_int_ops.hpp unique_ptr.hpp bind_ptr.hpp string_buffer.hpp file.hpp pthread_helpers.hpp \
 utf8.hpp utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp data_type.hpp \
-column_type.hpp column_fwd.hpp spec.hpp date.hpp binary_data.hpp mixed.hpp table.hpp \
-table_ref.hpp table_basic_fwd.hpp table_accessors.hpp table_basic.hpp table_view.hpp \
+column_type.hpp column_fwd.hpp spec.hpp date.hpp string_data.hpp binary_data.hpp mixed.hpp \
+table.hpp table_ref.hpp table_basic_fwd.hpp table_accessors.hpp table_basic.hpp table_view.hpp \
 table_view_basic.hpp $(TABLE_MACROS_HPP) group.hpp group_shared.hpp query.hpp \
 query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h replication.hpp
 
@@ -23,6 +23,26 @@ ifneq ($(TIGHTDB_ENABLE_REPLICATION),)
 libtightdb_a_SOURCES += replication.cpp
 endif
 
+# Format: CURRENT[:REVISION[:AGE]]
+#
+# At each new public release:
+#   If the interface has changed at all:
+#     Increment CURRENT and reset REVISION to zero
+#     Let COMPAT be the least number such that the new library can
+#       be used as a drop-in replacement for all previous releases
+#       whose CURRENT is greater than or equal to COMPAT
+#     If COMPAT + AGE < CURRENT:
+#       Increment AGE
+#     Else:
+#       Reset AGE to zero
+#   Else:
+#     Increment REVISION
+#
+# The meaning of this version string is identical to the one defined
+# by GNU Libtool. See also
+# http://www.gnu.org/software/libtool/manual/libtool.html#Libtool-versioning
+libtightdb_a_VERSION = 0:0:0
+
 tightdb_config_SOURCES = config.cpp
 
 include ../../generic.mk
@@ -35,3 +55,9 @@ uninstall/extra:
 	$(RM) $(DESTDIR)$(includedir)/tightdb/*.hpp
 	$(RM) $(DESTDIR)$(includedir)/tightdb/*.h
 	-rmdir $(DESTDIR)$(includedir)/tightdb
+
+get-inst-headers:
+	@echo $(INST_HEADERS)
+
+get-inst-libraries:
+	@echo $(filter-out libtightdb-cov.% libtightdb-dbg.a,$(TARGETS_LIB_STATIC) $(TARGETS_LIB_SHARED_ALIASES))

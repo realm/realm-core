@@ -24,10 +24,10 @@
 
 namespace tightdb {
 
-class Index : public Column {
+class Index: public Column {
 public:
     Index();
-    Index(ColumnDef type, Array* parent=NULL, size_t pndx=0);
+    Index(Array::ColumnDef, Array* = 0, size_t pndx=0);
     Index(size_t ref);
     Index(size_t ref, Array* parent, size_t pndx);
 
@@ -36,10 +36,10 @@ public:
     void BuildIndex(const Column& c);
 
     void Insert(size_t ndx, int64_t value, bool isLast=false);
-    void Delete(size_t ndx, int64_t value, bool isLast=false);
+    void erase(size_t ndx, int64_t value, bool isLast=false);
     void Set(size_t ndx, int64_t oldValue, int64_t newValue);
 
-    using Column::Delete;
+    using Column::erase;
 
     size_t find_first(int64_t value) const;
     bool find_all(Column& result, int64_t value) const;

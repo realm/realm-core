@@ -38,6 +38,7 @@ Searching: The main finding function is:
 #ifndef TIGHTDB_ARRAY_HPP
 #define TIGHTDB_ARRAY_HPP
 
+#include <cmath>
 #include <stdint.h> // unint8_t etc
 #include <cstdlib> // size_t
 #include <cstring> // memmove
@@ -45,12 +46,12 @@ Searching: The main finding function is:
 #include <vector>
 #include <ostream>
 
+#include <tightdb/meta.hpp>
 #include <tightdb/assert.hpp>
 #include <tightdb/alloc.hpp>
 #include <tightdb/utilities.hpp>
+#include <tightdb/string_data.hpp>
 #include <tightdb/query_conditions.hpp>
-#include <tightdb/meta.hpp>
-#include <math.h>
 
 /*
     MMX: mmintrin.h
@@ -63,12 +64,12 @@ Searching: The main finding function is:
     SSE4.2: nmmintrin.h
 */
 #ifdef TIGHTDB_COMPILER_SSE
-    #include <emmintrin.h> // SSE2
-    #include <tightdb/tightdb_nmmintrin.h> // SSE42
+#  include <emmintrin.h> // SSE2
+#  include <tightdb/tightdb_nmmintrin.h> // SSE42
 #endif
 
 #ifdef TIGHTDB_DEBUG
-#include <stdio.h>
+#  include <stdio.h>
 #endif
 
 namespace tightdb {
@@ -157,12 +158,6 @@ public:
 };
 #endif
 
-enum ColumnDef {
-    coldef_Normal,
-    coldef_InnerNode, ///< Inner node of B-tree
-    coldef_HasRefs
-};
-
 
 class ArrayParent
 {
@@ -196,9 +191,15 @@ public:
 //    void state_init(int action, QueryState *state);
 //    bool match(int action, size_t index, int64_t value, QueryState *state);
 
+    enum ColumnDef {
+        coldef_Normal,
+        coldef_InnerNode, ///< Inner node of B-tree
+        coldef_HasRefs
+    };
+
     /// Create a new array, and if \a parent and \a ndx_in_parent are
     /// specified, update the parent to point to this new array.
-    explicit Array(ColumnDef type=coldef_Normal, ArrayParent* parent=0, size_t ndx_in_parent=0,
+    explicit Array(ColumnDef type = coldef_Normal, ArrayParent* = 0, size_t ndx_in_parent = 0,
                    Allocator& = Allocator::get_default());
 
     /// Initialize an array wrapper from the specified array.
@@ -270,12 +271,12 @@ public:
     const Array* GetBlock(size_t ndx, Array& arr, size_t& off,
                           bool use_retval = false) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array
     int64_t column_get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    const char* string_column_get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    StringData string_column_get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     size_t ColumnFind(int64_t target, size_t ref, Array& cache) const;
-    typedef const char*(*StringGetter)(void*, size_t); // Pre-declare getter function from string index
-    size_t IndexStringFindFirst(const char* value, void* column, StringGetter get_func) const;
-    void   IndexStringFindAll(Array& result, const char* value, void* column, StringGetter get_func) const;
-    size_t IndexStringCount(const char* value, void* column, StringGetter get_func) const;
+    typedef StringData (*StringGetter)(void*, size_t); // Pre-declare getter function from string index
+    size_t IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const;
+    void   IndexStringFindAll(Array& result, StringData value, void* column, StringGetter get_func) const;
+    size_t IndexStringCount(StringData value, void* column, StringGetter get_func) const;
 
     void SetAllToZero();
     void Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);
@@ -396,7 +397,7 @@ public:
 #ifdef TIGHTDB_DEBUG
     void Print() const;
     void Verify() const;
-    void ToDot(std::ostream& out, const char* title=NULL) const;
+    void ToDot(std::ostream& out, StringData title = StringData()) const;
     void Stats(MemStats& stats) const;
 #endif // TIGHTDB_DEBUG
 
@@ -416,13 +417,16 @@ public:
         wtype_Ignore   = 2
     };
 
-    static bool get_isnode_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static bool get_isleaf_from_header(const char*) TIGHTDB_NOEXCEPT;
     static bool get_hasrefs_from_header(const char*) TIGHTDB_NOEXCEPT;
     static bool get_indexflag_from_header(const char*) TIGHTDB_NOEXCEPT;
     static WidthType get_wtype_from_header(const char*) TIGHTDB_NOEXCEPT;
     static int get_width_from_header(const char*) TIGHTDB_NOEXCEPT;
     static std::size_t get_len_from_header(const char*) TIGHTDB_NOEXCEPT;
     static std::size_t get_capacity_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static bool get_isnode_from_header(const char*) TIGHTDB_NOEXCEPT; // DEPRECATED!
+
+    static ColumnDef get_coldef_from_header(const char*) TIGHTDB_NOEXCEPT;
 
     static std::size_t get_alloc_size_from_header(const char*) TIGHTDB_NOEXCEPT;
 
@@ -450,10 +454,10 @@ private:
 
 protected:
     friend class GroupWriter;
-
+    friend class AdaptiveStringColumn;
+    void init_from_ref(size_t ref) TIGHTDB_NOEXCEPT;
 //    void AddPositiveLocal(int64_t value);
 
-    void init_from_ref(size_t ref) TIGHTDB_NOEXCEPT;
     void CreateFromHeader(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
     void CreateFromHeaderDirect(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
     void update_ref_in_parent();
@@ -462,29 +466,32 @@ protected:
     virtual size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT;
     virtual WidthType GetWidthType() const { return wtype_Bits; }
 
-    bool get_isnode_from_header() const TIGHTDB_NOEXCEPT;
+    bool get_isleaf_from_header() const TIGHTDB_NOEXCEPT;
     bool get_hasrefs_from_header() const TIGHTDB_NOEXCEPT;
     bool get_indexflag_from_header() const TIGHTDB_NOEXCEPT;
     WidthType get_wtype_from_header() const TIGHTDB_NOEXCEPT;
     int get_width_from_header() const TIGHTDB_NOEXCEPT;
     std::size_t get_len_from_header() const TIGHTDB_NOEXCEPT;
     std::size_t get_capacity_from_header() const TIGHTDB_NOEXCEPT;
+    bool get_isnode_from_header() const TIGHTDB_NOEXCEPT; // DEPRECATED!
 
-    void set_header_isnode(bool value) TIGHTDB_NOEXCEPT;
+    void set_header_isleaf(bool value) TIGHTDB_NOEXCEPT;
     void set_header_hasrefs(bool value) TIGHTDB_NOEXCEPT;
     void set_header_indexflag(bool value) TIGHTDB_NOEXCEPT;
     void set_header_wtype(WidthType value) TIGHTDB_NOEXCEPT;
     void set_header_width(int value) TIGHTDB_NOEXCEPT;
     void set_header_len(std::size_t value) TIGHTDB_NOEXCEPT;
     void set_header_capacity(std::size_t value) TIGHTDB_NOEXCEPT;
+    void set_header_isnode(bool value) TIGHTDB_NOEXCEPT; // DEPRECATED!
 
-    static void set_header_isnode(bool value, char* header) TIGHTDB_NOEXCEPT;
+    static void set_header_isleaf(bool value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_hasrefs(bool value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_indexflag(bool value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_wtype(WidthType value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_width(int value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_len(std::size_t value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_capacity(std::size_t value, char* header) TIGHTDB_NOEXCEPT;
+    static void set_header_isnode(bool value, char* header) TIGHTDB_NOEXCEPT; // DEPRECATED!
 
     static void init_header(char* header, bool is_node, bool has_refs, WidthType width_type,
                             int width, std::size_t length, std::size_t capacity) TIGHTDB_NOEXCEPT;
@@ -504,6 +511,7 @@ protected:
     // the local index within that leaf corresponding to the specified
     // column-level index.
     static std::pair<const char*, std::size_t> find_leaf(const Array* root, std::size_t i) TIGHTDB_NOEXCEPT;
+    static std::pair<size_t, std::size_t> find_leaf_ref(const Array* root, std::size_t i) TIGHTDB_NOEXCEPT;
 
     static std::size_t get_as_size(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
 
@@ -795,10 +803,10 @@ inline bool Array::is_index_node(std::size_t ref, const Allocator& alloc)
 
 //-------------------------------------------------
 
-inline bool Array::get_isnode_from_header(const char* header) TIGHTDB_NOEXCEPT
+inline bool Array::get_isleaf_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
     const uint8_t* h = reinterpret_cast<const uint8_t*>(header);
-    return (h[0] & 0x80) != 0;
+    return (h[0] & 0x80) == 0;
 }
 inline bool Array::get_hasrefs_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
@@ -830,6 +838,10 @@ inline std::size_t Array::get_capacity_from_header(const char* header) TIGHTDB_N
     const uint8_t* h = reinterpret_cast<const uint8_t*>(header);
     return (std::size_t(h[4]) << 16) + (std::size_t(h[5]) << 8) + h[6];
 }
+inline bool Array::get_isnode_from_header(const char* header) TIGHTDB_NOEXCEPT
+{
+    return !get_isleaf_from_header(header);
+}
 
 
 inline char* Array::get_data_from_header(char* header) TIGHTDB_NOEXCEPT
@@ -846,9 +858,9 @@ inline const char* Array::get_data_from_header(const char* header) TIGHTDB_NOEXC
 }
 
 
-inline bool Array::get_isnode_from_header() const TIGHTDB_NOEXCEPT
+inline bool Array::get_isleaf_from_header() const TIGHTDB_NOEXCEPT
 {
-    return get_isnode_from_header(get_header_from_data(m_data));
+    return get_isleaf_from_header(get_header_from_data(m_data));
 }
 inline bool Array::get_hasrefs_from_header() const TIGHTDB_NOEXCEPT
 {
@@ -874,12 +886,16 @@ inline std::size_t Array::get_capacity_from_header() const TIGHTDB_NOEXCEPT
 {
     return get_capacity_from_header(get_header_from_data(m_data));
 }
+inline bool Array::get_isnode_from_header() const TIGHTDB_NOEXCEPT
+{
+    return get_isnode_from_header(get_header_from_data(m_data));
+}
 
 
-inline void Array::set_header_isnode(bool value, char* header) TIGHTDB_NOEXCEPT
+inline void Array::set_header_isleaf(bool value, char* header) TIGHTDB_NOEXCEPT
 {
     uint8_t* h = reinterpret_cast<uint8_t*>(header);
-    h[0] = (h[0] & ~0x80) | uint8_t(value << 7);
+    h[0] = (h[0] & ~0x80) | uint8_t(!value << 7);
 }
 
 inline void Array::set_header_hasrefs(bool value, char* header) TIGHTDB_NOEXCEPT
@@ -933,10 +949,16 @@ inline void Array::set_header_capacity(std::size_t value, char* header) TIGHTDB_
     h[6] =  value        & 0x000000FF;
 }
 
-
-inline void Array::set_header_isnode(bool value) TIGHTDB_NOEXCEPT
+inline void Array::set_header_isnode(bool value, char* header) TIGHTDB_NOEXCEPT
 {
-    set_header_isnode(value, get_header_from_data(m_data));
+    set_header_isleaf(!value, header);
+}
+
+
+
+inline void Array::set_header_isleaf(bool value) TIGHTDB_NOEXCEPT
+{
+    set_header_isleaf(value, get_header_from_data(m_data));
 }
 inline void Array::set_header_hasrefs(bool value) TIGHTDB_NOEXCEPT
 {
@@ -962,23 +984,17 @@ inline void Array::set_header_capacity(std::size_t value) TIGHTDB_NOEXCEPT
 {
     set_header_capacity(value, get_header_from_data(m_data));
 }
-
-
-inline void Array::init_header(char* header, bool is_node, bool has_refs, WidthType width_type,
-                               int width, std::size_t length, std::size_t capacity) TIGHTDB_NOEXCEPT
+inline void Array::set_header_isnode(bool value) TIGHTDB_NOEXCEPT
 {
-    // Note: Since the header layout contains unallocated bit and/or
-    // bytes, it is important that we put the entire 8 byte header
-    // into a well defined state initially. Note also: The C++11
-    // standard does not guarantee that int64_t is available on all
-    // platforms.
-    *reinterpret_cast<int64_t*>(header) = 0;
-    set_header_isnode(is_node, header);
-    set_header_hasrefs(has_refs, header);
-    set_header_wtype(width_type, header);
-    set_header_width(width, header);
-    set_header_len(length, header);
-    set_header_capacity(capacity, header);
+    set_header_isnode(value, get_header_from_data(m_data));
+}
+
+
+inline Array::ColumnDef Array::get_coldef_from_header(const char* header) TIGHTDB_NOEXCEPT
+{
+    if (!get_isleaf_from_header(header)) return coldef_InnerNode;
+    if (get_hasrefs_from_header(header)) return coldef_HasRefs;
+    return coldef_Normal;
 }
 
 
@@ -1011,6 +1027,24 @@ inline std::size_t Array::get_alloc_size_from_header(const char* header) TIGHTDB
     if (rest < 8) size += rest; // 64bit blocks
     size += get_data_from_header(header) - header; // include header in total
     return size;
+}
+
+
+inline void Array::init_header(char* header, bool is_node, bool has_refs, WidthType width_type,
+                               int width, std::size_t length, std::size_t capacity) TIGHTDB_NOEXCEPT
+{
+    // Note: Since the header layout contains unallocated bit and/or
+    // bytes, it is important that we put the entire 8 byte header
+    // into a well defined state initially. Note also: The C++11
+    // standard does not guarantee that int64_t is available on all
+    // platforms.
+    *reinterpret_cast<int64_t*>(header) = 0;
+    set_header_isnode(is_node, header);
+    set_header_hasrefs(has_refs, header);
+    set_header_wtype(width_type, header);
+    set_header_width(width, header);
+    set_header_len(length, header);
+    set_header_capacity(capacity, header);
 }
 
 
@@ -1748,7 +1782,6 @@ template <class cond, Action action, size_t bitwidth, class Callback> void Array
     find_optimized<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
 
 #ifdef TIGHTDB_DEBUG
-
     if (action == act_Max || action == act_Min || action == act_Sum || action == act_Count || action == act_ReturnFirst || action == act_Count) {
         find_reference<cond, action, bitwidth, Callback>(value, start, end, baseindex, &r_state, callback);
         if (action == act_FindAll)
