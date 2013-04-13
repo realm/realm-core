@@ -143,17 +143,17 @@ public:
     /// Returns the number of tables in this group.
     size_t size() const;
 
-    const char* get_table_name(size_t table_ndx) const;
-    bool has_table(const char* name) const;
+    StringData get_table_name(size_t table_ndx) const;
+    bool has_table(StringData name) const;
 
     /// Check whether this group has a table with the specified name
     /// and type.
-    template<class T> bool has_table(const char* name) const;
+    template<class T> bool has_table(StringData name) const;
 
-    TableRef      get_table(const char* name);
-    ConstTableRef get_table(const char* name) const;
-    template<class T> typename T::Ref      get_table(const char* name);
-    template<class T> typename T::ConstRef get_table(const char* name) const;
+    TableRef      get_table(StringData name);
+    ConstTableRef get_table(StringData name) const;
+    template<class T> typename T::Ref      get_table(StringData name);
+    template<class T> typename T::ConstRef get_table(StringData name) const;
 
     // Serialization
 
@@ -263,15 +263,15 @@ private:
     // FIXME: Implement a proper copy constructor (fairly trivial).
     Group(const Group&); // Disable copying
 
-    Table* get_table_ptr(const char* name);
-    Table* get_table_ptr(const char* name, bool& was_created);
-    const Table* get_table_ptr(const char* name) const;
-    template<class T> T* get_table_ptr(const char* name);
-    template<class T> const T* get_table_ptr(const char* name) const;
+    Table* get_table_ptr(StringData name);
+    Table* get_table_ptr(StringData name, bool& was_created);
+    const Table* get_table_ptr(StringData name) const;
+    template<class T> T* get_table_ptr(StringData name);
+    template<class T> const T* get_table_ptr(StringData name) const;
 
     Table* get_table_ptr(size_t ndx);
     const Table* get_table_ptr(size_t ndx) const;
-    Table* create_new_table(const char* name);
+    Table* create_new_table(StringData name);
 
     void clear_cache();
 
@@ -381,11 +381,11 @@ inline std::size_t Group::size() const
     return m_tableNames.size();
 }
 
-inline const char* Group::get_table_name(std::size_t table_ndx) const
+inline StringData Group::get_table_name(std::size_t table_ndx) const
 {
     TIGHTDB_ASSERT(m_top.IsValid());
     TIGHTDB_ASSERT(table_ndx < m_tableNames.size());
-    return m_tableNames.get_c_str(table_ndx);
+    return m_tableNames.get(table_ndx);
 }
 
 inline const Table* Group::get_table_ptr(std::size_t ndx) const
@@ -393,14 +393,14 @@ inline const Table* Group::get_table_ptr(std::size_t ndx) const
     return const_cast<Group*>(this)->get_table_ptr(ndx);
 }
 
-inline bool Group::has_table(const char* name) const
+inline bool Group::has_table(StringData name) const
 {
     if (!m_top.IsValid()) return false;
     const size_t i = m_tableNames.find_first(name);
     return i != size_t(-1);
 }
 
-template<class T> inline bool Group::has_table(const char* name) const
+template<class T> inline bool Group::has_table(StringData name) const
 {
     if (!m_top.IsValid()) return false;
     const size_t i = m_tableNames.find_first(name);
@@ -409,7 +409,7 @@ template<class T> inline bool Group::has_table(const char* name) const
     return T::matches_dynamic_spec(&table->get_spec());
 }
 
-inline Table* Group::get_table_ptr(const char* name)
+inline Table* Group::get_table_ptr(StringData name)
 {
     TIGHTDB_ASSERT(m_top.IsValid());
     const size_t ndx = m_tableNames.find_first(name);
@@ -421,7 +421,7 @@ inline Table* Group::get_table_ptr(const char* name)
     return create_new_table(name);
 }
 
-inline Table* Group::get_table_ptr(const char* name, bool& was_created)
+inline Table* Group::get_table_ptr(StringData name, bool& was_created)
 {
     TIGHTDB_ASSERT(m_top.IsValid());
     const size_t ndx = m_tableNames.find_first(name);
@@ -435,13 +435,13 @@ inline Table* Group::get_table_ptr(const char* name, bool& was_created)
     return create_new_table(name);
 }
 
-inline const Table* Group::get_table_ptr(const char* name) const
+inline const Table* Group::get_table_ptr(StringData name) const
 {
     TIGHTDB_ASSERT(has_table(name));
     return const_cast<Group*>(this)->get_table_ptr(name);
 }
 
-template<class T> inline T* Group::get_table_ptr(const char* name)
+template<class T> inline T* Group::get_table_ptr(StringData name)
 {
     TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
     TIGHTDB_ASSERT(!has_table(name) || has_table<T>(name));
@@ -458,28 +458,28 @@ template<class T> inline T* Group::get_table_ptr(const char* name)
     return table;
 }
 
-template<class T> inline const T* Group::get_table_ptr(const char* name) const
+template<class T> inline const T* Group::get_table_ptr(StringData name) const
 {
     TIGHTDB_ASSERT(has_table(name));
     return const_cast<Group*>(this)->get_table_ptr<T>(name);
 }
 
-inline TableRef Group::get_table(const char* name)
+inline TableRef Group::get_table(StringData name)
 {
     return get_table_ptr(name)->get_table_ref();
 }
 
-inline ConstTableRef Group::get_table(const char* name) const
+inline ConstTableRef Group::get_table(StringData name) const
 {
     return get_table_ptr(name)->get_table_ref();
 }
 
-template<class T> inline typename T::Ref Group::get_table(const char* name)
+template<class T> inline typename T::Ref Group::get_table(StringData name)
 {
     return get_table_ptr<T>(name)->get_table_ref();
 }
 
-template<class T> inline typename T::ConstRef Group::get_table(const char* name) const
+template<class T> inline typename T::ConstRef Group::get_table(StringData name) const
 {
     return get_table_ptr<T>(name)->get_table_ref();
 }
@@ -541,8 +541,8 @@ void Group::to_json(S& out) const
     out << "{";
 
     for (size_t i = 0; i < m_tables.size(); ++i) {
-        const char* const name = m_tableNames.get_c_str(i);
-        const Table* const table = get_table_ptr(i);
+        StringData name = m_tableNames.get(i);
+        const Table* table = get_table_ptr(i);
 
         if (i) out << ",";
         out << "\"" << name << "\"";

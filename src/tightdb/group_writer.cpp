@@ -48,6 +48,9 @@ size_t GroupWriter::Commit()
     const SlabAlloc::FreeSpace& freeSpace = m_group.get_allocator().GetFreespace();
     const size_t fcount = freeSpace.size();
 
+    // FIXME: In some cases, m_current_version is uninitialized (has
+    // an undefined value) at this point. This is reported by
+    // valgrind.
     for (size_t i = 0; i < fcount; ++i) {
         SlabAlloc::FreeSpace::ConstCursor r = freeSpace[i];
         add_free_space(to_size_t(r.ref), to_size_t(r.size), to_size_t(m_current_version));
@@ -62,7 +65,7 @@ size_t GroupWriter::Commit()
     // (64bit width + one possible ekstra entry per alloc and header)
     const size_t free_count = fpositions.size() + 5;
     const size_t top_max_size = (5 + 1) * 8;
-    const size_t flist_max_size = (free_count) * 8;
+    const size_t flist_max_size = free_count * 8;
     const size_t total_reserve = top_max_size + (flist_max_size * (isShared ? 3 : 2));
 
     // Reserve space for each block. We explicitly ask for a bigger space than

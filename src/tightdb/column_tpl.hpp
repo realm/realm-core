@@ -124,7 +124,7 @@ template<typename T, class C> void ColumnBase::TreeSet(size_t ndx, T value)
 
         // Set item
         C target = GetColumnFromRef<C>(refs, node_ndx);
-        target.Set(local_ndx, value);
+        target.set(local_ndx, value);
     }
     else {
         static_cast<C*>(this)->LeafSet(ndx, value);
@@ -380,6 +380,33 @@ template<typename T, class C> void ColumnBase::TreeDelete(size_t ndx)
         }
     }
 }
+
+template<class C> size_t ColumnBase::TreeGetLeafRef(size_t ndx) const
+{
+	if(IsNode())
+		return NULL;
+
+    // Get subnode table
+    const Array offsets = NodeGetOffsets();
+    Array refs = NodeGetRefs();
+
+    // Find the subnode containing the item
+    const size_t node_ndx = offsets.FindPos(ndx);
+
+    // Calc index in subnode
+    const size_t offset = node_ndx ? to_ref(offsets.Get(node_ndx-1)) : 0;
+    const size_t local_ndx = ndx - offset;
+
+    // Get item
+    const C target = GetColumnFromRef<C>(refs, node_ndx); // Throws
+
+	if(!target.IsNode()) {
+		return refs.Get(node_ndx);
+	}
+
+    return target.template TreeGetLeafRef<C>(local_ndx);
+}
+
 
 template<typename T, class C, class F>
 size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const

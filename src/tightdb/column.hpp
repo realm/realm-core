@@ -47,8 +47,8 @@ public:
     virtual void add() = 0; // Add an entry to this column using the columns default value
     virtual void insert(size_t ndx) = 0; // Insert an entry into this column using the columns default value
     virtual void Clear() = 0;
-    virtual void Delete(size_t ndx) = 0;
-    void Resize(size_t ndx) {m_array->Resize(ndx);}
+    virtual void erase(size_t ndx) = 0;
+    void Resize(size_t ndx) { m_array->Resize(ndx); }
 
     // Indexing
     virtual bool HasIndex() const = 0;
@@ -68,7 +68,7 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     virtual void Verify() const = 0; // Must be upper case to avoid conflict with macro in ObjC
-    virtual void ToDot(std::ostream& out, const char* title=NULL) const;
+    virtual void ToDot(std::ostream& out, StringData title = StringData()) const;
 #endif // TIGHTDB_DEBUG
 
     template<class C, class A>
@@ -76,6 +76,11 @@ public:
 
     template<typename T, class C, class F>
     size_t TreeFind(T value, size_t start, size_t end) const;
+
+    const Array* GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval = false) const
+    {
+        return m_array->GetBlock(ndx, arr, off, use_retval);
+    }
 
 protected:
     friend class StringIndex;
@@ -91,8 +96,10 @@ protected:
     // Tree functions
 public:
     template<typename T, class C> T TreeGet(size_t ndx) const; // FIXME: This one should probably be eliminated or redesiged because it throws due to dynamic memory allocation
+    template<class C> size_t TreeGetLeafRef(size_t ndx) const; // FIXME: This one should probably be eliminated or redesiged because it throws due to dynamic memory allocation
+
 protected:
-    template<typename T, class C> void TreeSet(size_t ndx, T value);
+	template<typename T, class C> void TreeSet(size_t ndx, T value);
     template<typename T, class C> void TreeInsert(size_t ndx, T value);
     template<typename T, class C> NodeChange DoInsert(size_t ndx, T value);
     template<typename T, class C> void TreeDelete(size_t ndx);
@@ -153,12 +160,12 @@ public:
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
     // Getting and setting values
-    int64_t Get(size_t ndx) const TIGHTDB_NOEXCEPT;
+    int64_t get(size_t ndx) const TIGHTDB_NOEXCEPT;
     size_t GetAsRef(size_t ndx) const TIGHTDB_NOEXCEPT;
-    int64_t Back() const TIGHTDB_NOEXCEPT {return Get(Size()-1);}
-    void Set(size_t ndx, int64_t value);
-    void insert(size_t ndx) TIGHTDB_OVERRIDE { Insert(ndx, 0); }
-    void Insert(size_t ndx, int64_t value);
+    int64_t Back() const TIGHTDB_NOEXCEPT {return get(Size()-1);}
+    void set(size_t ndx, int64_t value);
+    void insert(size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
+    void insert(size_t ndx, int64_t value);
     void add() TIGHTDB_OVERRIDE { add(0); }
     void add(int64_t value);
     void fill(size_t count);
@@ -172,10 +179,10 @@ public:
     void sort(size_t start, size_t end);
     void ReferenceSort(size_t start, size_t end, Column &ref);
 
-    intptr_t GetPtr(size_t ndx) const {return (intptr_t)Get(ndx);}
+    intptr_t GetPtr(size_t ndx) const {return intptr_t(get(ndx));} // FIXME: intptr_t is not guaranteed to exists, not even in C++11
 
     void Clear() TIGHTDB_OVERRIDE;
-    void Delete(size_t ndx) TIGHTDB_OVERRIDE;
+    void erase(size_t ndx) TIGHTDB_OVERRIDE;
     //void Resize(size_t len);
 
     void Increment64(int64_t value, size_t start=0, size_t end=-1);
@@ -189,10 +196,7 @@ public:
 
     // Query support methods
     void LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const;
-    const Array* GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval = false) const
-    {
-        return m_array->GetBlock(ndx, arr, off, use_retval);
-    }
+
 
     // Index
     bool HasIndex() const {return m_index != NULL;}
@@ -246,14 +250,14 @@ private:
 
 // Implementation:
 
-inline int64_t Column::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline int64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     return m_array->column_get(ndx);
 }
 
 inline std::size_t Column::GetAsRef(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    return to_ref(Get(ndx));
+    return to_ref(get(ndx));
 }
 
 

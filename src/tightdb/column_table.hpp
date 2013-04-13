@@ -184,7 +184,7 @@ public:
     void add(const Table*);
     void insert(std::size_t ndx) TIGHTDB_OVERRIDE;
     void insert(std::size_t ndx, const Table*);
-    void Delete(size_t ndx) TIGHTDB_OVERRIDE;
+    void erase(size_t ndx) TIGHTDB_OVERRIDE;
     void ClearTable(size_t ndx);
     void fill(size_t count);
 
@@ -336,7 +336,7 @@ inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
 
 inline void ColumnSubtableParent::update_child_ref(size_t subtable_ndx, size_t new_ref)
 {
-    Set(subtable_ndx, new_ref);
+    set(subtable_ndx, new_ref);
 }
 
 inline size_t ColumnSubtableParent::get_child_ref(size_t subtable_ndx) const TIGHTDB_NOEXCEPT

@@ -24,7 +24,7 @@
 
 namespace tightdb {
 
-class Index : public Column {
+class Index: public Column {
 public:
     Index();
     Index(Array::ColumnDef, Array* = 0, size_t pndx=0);
@@ -36,10 +36,10 @@ public:
     void BuildIndex(const Column& c);
 
     void Insert(size_t ndx, int64_t value, bool isLast=false);
-    void Delete(size_t ndx, int64_t value, bool isLast=false);
+    void erase(size_t ndx, int64_t value, bool isLast=false);
     void Set(size_t ndx, int64_t oldValue, int64_t newValue);
 
-    using Column::Delete;
+    using Column::erase;
 
     size_t find_first(int64_t value) const;
     bool find_all(Column& result, int64_t value) const;

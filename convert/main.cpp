@@ -293,6 +293,7 @@ private:
                         m_new_table.set_string(m_conv.convert_long_string();
                     }
                     break;
+                }
                 case Array::coldef_Normal:
                     m_array = new ArrayString(ref, parent, pndx, alloc);
                     break;

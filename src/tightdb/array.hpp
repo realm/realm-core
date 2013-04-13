@@ -38,6 +38,7 @@ Searching: The main finding function is:
 #ifndef TIGHTDB_ARRAY_HPP
 #define TIGHTDB_ARRAY_HPP
 
+#include <cmath>
 #include <stdint.h> // unint8_t etc
 #include <cstdlib> // size_t
 #include <cstring> // memmove
@@ -45,12 +46,12 @@ Searching: The main finding function is:
 #include <vector>
 #include <ostream>
 
+#include <tightdb/meta.hpp>
 #include <tightdb/assert.hpp>
 #include <tightdb/alloc.hpp>
 #include <tightdb/utilities.hpp>
+#include <tightdb/string_data.hpp>
 #include <tightdb/query_conditions.hpp>
-#include <tightdb/meta.hpp>
-#include <math.h>
 
 /*
     MMX: mmintrin.h
@@ -270,12 +271,12 @@ public:
     const Array* GetBlock(size_t ndx, Array& arr, size_t& off,
                           bool use_retval = false) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array
     int64_t column_get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    const char* string_column_get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    StringData string_column_get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     size_t ColumnFind(int64_t target, size_t ref, Array& cache) const;
-    typedef const char*(*StringGetter)(void*, size_t); // Pre-declare getter function from string index
-    size_t IndexStringFindFirst(const char* value, void* column, StringGetter get_func) const;
-    void   IndexStringFindAll(Array& result, const char* value, void* column, StringGetter get_func) const;
-    size_t IndexStringCount(const char* value, void* column, StringGetter get_func) const;
+    typedef StringData (*StringGetter)(void*, size_t); // Pre-declare getter function from string index
+    size_t IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const;
+    void   IndexStringFindAll(Array& result, StringData value, void* column, StringGetter get_func) const;
+    size_t IndexStringCount(StringData value, void* column, StringGetter get_func) const;
 
     void SetAllToZero();
     void Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);
@@ -396,7 +397,7 @@ public:
 #ifdef TIGHTDB_DEBUG
     void Print() const;
     void Verify() const;
-    void ToDot(std::ostream& out, const char* title=NULL) const;
+    void ToDot(std::ostream& out, StringData title = StringData()) const;
     void Stats(MemStats& stats) const;
 #endif // TIGHTDB_DEBUG
 
@@ -447,10 +448,10 @@ private:
 
 protected:
     friend class GroupWriter;
-
+    friend class AdaptiveStringColumn;
+    void init_from_ref(size_t ref) TIGHTDB_NOEXCEPT;
 //    void AddPositiveLocal(int64_t value);
 
-    void init_from_ref(size_t ref) TIGHTDB_NOEXCEPT;
     void CreateFromHeader(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
     void CreateFromHeaderDirect(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
     void update_ref_in_parent();
@@ -504,6 +505,7 @@ protected:
     // the local index within that leaf corresponding to the specified
     // column-level index.
     static std::pair<const char*, std::size_t> find_leaf(const Array* root, std::size_t i) TIGHTDB_NOEXCEPT;
+    static std::pair<size_t, std::size_t> find_leaf_ref(const Array* root, std::size_t i) TIGHTDB_NOEXCEPT;
 
     static std::size_t get_as_size(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
 
@@ -1774,7 +1776,6 @@ template <class cond, Action action, size_t bitwidth, class Callback> void Array
     find_optimized<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
 
 #ifdef TIGHTDB_DEBUG
-
     if (action == act_Max || action == act_Min || action == act_Sum || action == act_Count || action == act_ReturnFirst || action == act_Count) {
         find_reference<cond, action, bitwidth, Callback>(value, start, end, baseindex, &r_state, callback);
         if (action == act_FindAll)

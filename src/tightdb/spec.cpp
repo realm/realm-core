@@ -67,10 +67,8 @@ bool Spec::update_from_parent()
     else return false;
 }
 
-size_t Spec::add_column(DataType type, const char* name, ColumnType attr)
+size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
 {
-    TIGHTDB_ASSERT(name);
-
     m_names.add(name);
     m_spec.add(type);
 
@@ -113,13 +111,13 @@ size_t Spec::add_column(DataType type, const char* name, ColumnType attr)
     return (m_names.size()-1); // column_ndx
 }
 
-size_t Spec::add_subcolumn(const vector<size_t>& column_path, DataType type, const char* name)
+size_t Spec::add_subcolumn(const vector<size_t>& column_path, DataType type, StringData name)
 {
     TIGHTDB_ASSERT(!column_path.empty());
     return do_add_subcolumn(column_path, 0, type, name);
 }
 
-size_t Spec::do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, DataType type, const char* name)
+size_t Spec::do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, DataType type, StringData name)
 {
     const size_t column_ndx = column_ids[pos];
     Spec subspec = get_subtable_spec(column_ndx);
@@ -132,7 +130,7 @@ size_t Spec::do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, Data
     }
 }
 
-Spec Spec::add_subtable_column(const char* name)
+Spec Spec::add_subtable_column(StringData name)
 {
     const size_t column_ndx = m_names.size();
     add_column(type_Table, name);
@@ -140,7 +138,7 @@ Spec Spec::add_subtable_column(const char* name)
     return get_subtable_spec(column_ndx);
 }
 
-void Spec::rename_column(size_t column_ndx, const char* newname)
+void Spec::rename_column(size_t column_ndx, StringData newname)
 {
     TIGHTDB_ASSERT(column_ndx < m_spec.size());
 
@@ -149,11 +147,12 @@ void Spec::rename_column(size_t column_ndx, const char* newname)
     m_names.set(column_ndx, newname);
 }
 
-void Spec::rename_column(const vector<size_t>& column_ids, const char* name) {
+void Spec::rename_column(const vector<size_t>& column_ids, StringData name)
+{
     do_rename_column(column_ids, 0, name);
 }
 
-void Spec::do_rename_column(const vector<size_t>& column_ids, size_t pos, const char* name)
+void Spec::do_rename_column(const vector<size_t>& column_ids, size_t pos, StringData name)
 {
     const size_t column_ndx = column_ids[pos];
 
@@ -388,13 +387,13 @@ void Spec::set_column_attr(size_t ndx, ColumnType attr)
     }
 }
 
-const char* Spec::get_column_name(size_t ndx) const TIGHTDB_NOEXCEPT
+StringData Spec::get_column_name(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
-    return m_names.get_c_str(ndx);
+    return m_names.get(ndx);
 }
 
-size_t Spec::get_column_index(const char* name) const
+size_t Spec::get_column_index(StringData name) const
 {
     return m_names.find_first(name);
 }
@@ -434,7 +433,7 @@ void Spec::Verify() const
     TIGHTDB_ASSERT(column_count <= m_spec.size());
 }
 
-void Spec::to_dot(std::ostream& out, const char*) const
+void Spec::to_dot(std::ostream& out, StringData) const
 {
     const size_t ref = m_specSet.GetRef();
 
