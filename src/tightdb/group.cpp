@@ -347,7 +347,7 @@ Table* Group::create_new_table(StringData name)
 }
 
 
-void Group::write(const string& path)
+void Group::write(const string& path) const
 {
     TIGHTDB_ASSERT(m_top.IsValid());
 
@@ -355,7 +355,7 @@ void Group::write(const string& path)
     write_to_stream(out);
 }
 
-Group::BufferSpec Group::write_to_mem()
+Group::BufferSpec Group::write_to_mem() const
 {
     TIGHTDB_ASSERT(m_top.IsValid());
 
@@ -369,6 +369,7 @@ Group::BufferSpec Group::write_to_mem()
     return BufferSpec(data, size);
 }
 
+// NOTE: This method must not modify *this if m_shared is false.
 size_t Group::commit(size_t current_version, size_t readlock_version, bool doPersist)
 {
     TIGHTDB_ASSERT(m_top.IsValid());

@@ -90,13 +90,13 @@ CATEGORIES:
   METHODS:
   - g_group_operator_equal:
       NAMES    : operator==
+      SUMMARY  : Compare two groups.
       DESCR    : &g_group_operator_equal_descr
                  >
                  Compare two groups for equality. Two groups are equal if, and
                  only if, they contain the same tables in the same order, that
                  is, for each table T at index I in one of the groups, there is
                  a table at index I in the other group that is equal to T.
-      SUMMARY  : Compare two groups.
       CONST    : true
       PARAMS:
       - TYPES  : const Group&
@@ -110,8 +110,8 @@ CATEGORIES:
         CODE   : ex_cpp_group_operator_equal
   - g_group_operator_not_equal:
       NAMES    : operator!=
-      DESCR    : *g_group_operator_equal_descr
       SUMMARY  : Compare two groups.
+      DESCR    : *g_group_operator_equal_descr
       CONST    : true
       PARAMS:
       - TYPES  : const Group&
@@ -128,12 +128,12 @@ CATEGORIES:
   METHODS:
   - g_group_size:
       NAMES    : size
+      SUMMARY  : &g_group_table_count_summary
+                 The number of tables in the group.
       DESCR    : &g_group_table_count_descr
                  >
                  A group can be a container for many tables, and this method counts
                  the number of tables currently stored in the group.
-      SUMMARY  : &g_group_table_count_summary
-                 The number of tables in the group.
       CONST    : true
       RETURN:
         TYPES  : size_t
@@ -189,7 +189,6 @@ CATEGORIES:
       SEE      : "{@link g_group_has_table}"
   - g_group_has_table:
       NAMES    : has_table
-      CONST    : true
       SUMMARY  : &g_group_has_table_summary
                  Does group have table?
       DESCR    : &g_group_has_table_descr
@@ -206,6 +205,7 @@ CATEGORIES:
                  table with the specified name, and the type of that
                  table is compatible with the specified type. See
                  {@link concepts_table_type_compatibility} for details.
+      CONST    : true
       PARAMS:
       - NAME   : name
         TYPES  : const char*
@@ -242,6 +242,7 @@ CATEGORIES:
       DESCR    : &g_group_write_to_file_descr
                  This method will write the group to persistent storage (disk). Metadata and tables
                  will be stored, and can be retrieved at later times.
+      CONST    : true
       PARAMS:
       - NAME   : file
         TYPES  : const std::string&
@@ -263,6 +264,7 @@ CATEGORIES:
                  This method will write the group to an in-memory buffer. This may be useful if you
                  want to transfer a group over a TCP connection. The returned buffer will have been
                  allocated using std::malloc(). The ownership of the buffer is passed to the caller.
+      CONST    : true
       RETURN:
         DESCR  : The allocated buffer. You will have to call std::free() when you are done with it.
         TYPES  : Group::BufferSpec
