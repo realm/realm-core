@@ -313,12 +313,11 @@ private:
     char* m_transact_log_free_end;
 
     template<class T> struct Buffer {
-        T* m_data;
+        UniquePtr<T[]> m_data;
         std::size_t m_size;
         T& operator[](std::size_t i) TIGHTDB_NOEXCEPT { return m_data[i]; }
         const T& operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
         Buffer() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
-        ~Buffer() TIGHTDB_NOEXCEPT { delete[] m_data; }
         void set_size(std::size_t);
     };
     Buffer<std::size_t> m_subtab_path_buf;
@@ -712,12 +711,10 @@ inline void Replication::on_spec_destroyed(const Spec* s) TIGHTDB_NOEXCEPT
 }
 
 
-template<class T> void Replication::Buffer<T>::set_size(std::size_t new_size)
+template<class T> void Replication::Buffer<T>::set_size(std::size_t size)
 {
-    T* const new_data = new T[new_size];
-    delete[] m_data;
-    m_data = new_data;
-    m_size = new_size;
+    m_data.reset(new T[size]);
+    m_size = size;
 }
 
 
