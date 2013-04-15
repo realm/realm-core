@@ -20,6 +20,9 @@
 #ifndef TIGHTDB_UTF8_HPP
 #define TIGHTDB_UTF8_HPP
 
+#include <stdint.h>
+#include <string>
+
 #include <tightdb/string_data.hpp>
 
 namespace tightdb {
@@ -66,6 +69,171 @@ bool equal_case_fold(StringData haystack, const char* needle_upper, const char* 
 /// needle was not found.
 std::size_t search_case_fold(StringData haystack, const char* needle_upper,
                              const char* needle_lower, std::size_t needle_size);
+
+
+
+/// Transcode between UTF-8 and UTF-16.
+///
+/// \tparam Char16 Must be an integral type with at least 16 bits.
+///
+/// \tparam Traits16 Must define a suitable to_char_type() for \a
+/// Char16.
+template<class Char16, class Traits16 = std::char_traits<Char16> > struct Utf8x16 {
+    /// Transcode as much as possible of the specified UTF-8 input, to
+    /// UTF-16. Returns true if all input characters were transcoded,
+    /// or transcoding stopped because the next character did not fit
+    /// into the output buffer. Returns false if transcoding stopped
+    /// due to invalid input. It is not specified whether this
+    /// function returns true or false if invalid input occurs at the
+    /// same time that the output buffer runs full. In any case, upon
+    /// return, \a in_begin and \a out_begin are advanced to the
+    /// position where the transcoding stopped.
+    ///
+    /// Throws only if Traits16::to_char_type() throws.
+    static bool to_utf16(const char*& in_begin, const char* in_end,
+                         Char16*& out_begin, Char16* out_end);
+};
+
+
+/// Shorthand for Utf8x16<Char16>::to_utf16(...)
+template<class Char16> bool xcode_utf8_to_utf16(const char*& in_begin, const char* in_end,
+                                                Char16*& out_begin, Char16* out_end);
+
+/// Calculate the number of UTF-16 elements needed to hold the result
+/// of transcoding the specified UTF-8 string. Upon return, if \a
+/// in_begin != \a in_end, then the calculation stopped due to invalid
+/// UTF-8 input or to prevent the returned \c size_t value from
+/// overflowing. The returned size then reflects the number of UTF-16
+/// elements needed to hold the result of transcoding the part of the
+/// input that was examined.
+std::size_t calc_buf_size_utf8_to_utf16(const char*& in_begin, const char* in_end);
+
+
+
+
+
+// Implementation:
+
+// Adapted from reference implementation.
+// http://www.unicode.org/resources/utf8.html
+// http://www.bsdua.org/files/unicode.tar.gz
+template<class Char16, class Traits16>
+inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const char* in_end,
+                                                Char16*& out_begin, Char16* out_end)
+{
+    using namespace std;
+    bool invalid = false;
+    const char* in = in_begin;
+    Char16* out = out_begin;
+    while (in != in_end) {
+        if (TIGHTDB_UNLIKELY(out == out_end)) {
+            break; // Need space in output buffer
+        }
+        uint_fast16_t v1 = char_traits<char>::to_int_type(in[0]);
+        if (TIGHTDB_LIKELY(v1 < 0x80)) { // One byte
+            *out++ = Traits16::to_char_type(v1);
+            in += 1;
+            continue;
+        }
+        if (TIGHTDB_UNLIKELY(v1 < 0xC0)) {
+            invalid = true;
+            break; // Invalid first byte of UTF-8 sequence
+        }
+        if (TIGHTDB_LIKELY(v1 < 0xE0)) { // Two bytes
+            if (TIGHTDB_UNLIKELY(in == in_end)) {
+                invalid = true;
+                break; // Incomplete UTF-8 sequence
+            }
+            uint_fast16_t v2 = char_traits<char>::to_int_type(in[1]);
+            if (TIGHTDB_UNLIKELY(v2 & 0xC0 != 0xC0)) {
+                invalid = true;
+                break; // Invalid continuation byte
+            }
+            uint_fast16_t v =
+                ((v1 & 0x1F) << 6) |
+                ((v2 & 0x3F) << 0);
+            if (TIGHTDB_UNLIKELY(v < 0x80)) {
+                invalid = true;
+                break; // Overlong encoding is invalid
+            }
+            *out++ = Traits16::to_char_type(v);
+            in += 2;
+            continue;
+        }
+        if (TIGHTDB_LIKELY(v1 < 0xF0)) { // Three bytes
+            if (TIGHTDB_UNLIKELY(in_end - in < 2)) {
+                invalid = true;
+                break; // Incomplete UTF-8 sequence
+            }
+            uint_fast16_t v2 = char_traits<char>::to_int_type(in[1]);
+            uint_fast16_t v3 = char_traits<char>::to_int_type(in[2]);
+            if (TIGHTDB_UNLIKELY(v2 & 0xC0 != 0xC0 || v3 & 0xC0 != 0xC0)) {
+                invalid = true;
+                break; // Invalid continuation byte
+            }
+            uint_fast16_t v =
+                ((v1 & 0x0F) << 12) |
+                ((v2 & 0x3F) <<  6) |
+                ((v3 & 0x3F) <<  0);
+            if (TIGHTDB_UNLIKELY(v < 0x800)) {
+                invalid = true;
+                break; // Overlong encoding is invalid
+            }
+            *out++ = Traits16::to_char_type(v);
+            in += 3;
+            continue;
+        }
+        if (TIGHTDB_UNLIKELY(out + 1 == out_end)) {
+            break; // Need space in output buffer for surrogate pair
+        }
+        if (TIGHTDB_LIKELY(v1 < 0xF8)) { // Four bytes
+            if (TIGHTDB_UNLIKELY(in_end - in < 3)) {
+                invalid = true;
+                break; // Incomplete UTF-8 sequence
+            }
+            uint_fast32_t w1 = v1; // 16 bit -> 32 bit
+            uint_fast32_t v2 = char_traits<char>::to_int_type(in[1]); // 32 bit intended
+            uint_fast16_t v3 = char_traits<char>::to_int_type(in[2]); // 16 bit intended
+            uint_fast16_t v4 = char_traits<char>::to_int_type(in[3]); // 16 bit intended
+            if (TIGHTDB_UNLIKELY(v2 & 0xC0 != 0xC0 || v3 & 0xC0 != 0xC0 || v4 & 0xC0 != 0xC0)) {
+                invalid = true;
+                break; // Invalid continuation byte
+            }
+            uint_fast32_t v =
+                ((w1 & 0x07) << 18) | // Parenthesis is 32 bit partial result
+                ((v2 & 0x3F) << 12) | // Parenthesis is 32 bit partial result
+                ((v3 & 0x3F) <<  6) | // Parenthesis is 16 bit partial result
+                ((v4 & 0x3F) <<  0);  // Parenthesis is 16 bit partial result
+            if (TIGHTDB_UNLIKELY(v < 0x10000u)) {
+                invalid = true;
+                break; // Overlong encoding is invalid
+            }
+            if (TIGHTDB_UNLIKELY(0x100000ul <= v)) {
+                invalid = true;
+                break; // Code point too big for UTF-16
+            }
+            v -= 0x100000ul;
+            *out++ = Traits16::to_char_type(v >> 10);
+            *out++ = Traits16::to_char_type(v & 0x3FF);
+            in += 4;
+            continue;
+        }
+        // Invalid first byte of UTF-8 sequence, or code point too big for UTF-16
+        invalid = true;
+        break;
+    }
+
+    in_begin  = in;
+    out_begin = out;
+    return !invalid;
+}
+
+
+template<class Char16> inline bool xcode_utf8_to_utf16(const char*& in_begin, const char* in_end,
+                                                       Char16*& out_begin, Char16* out_end)
+{
+    return Utf8x16<Char16>::to_utf16(in_begin, in_end, out_begin, out_end);
+}
 
 
 } // namespace tightdb

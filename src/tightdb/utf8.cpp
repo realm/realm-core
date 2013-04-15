@@ -19,7 +19,7 @@ namespace {
 // is as specified.
 inline int sequence_length(char lead)
 {
-    int lead2 = static_cast<unsigned char>(lead);
+    int lead2 = char_traits<char>::to_int_type(lead);
     if ((lead2 & 0x80) == 0) return 1;
     if ((lead2 & 0x40) == 0) return 0; // Error
     if ((lead2 & 0x20) == 0) return 2;
@@ -39,11 +39,11 @@ inline bool equal_sequence(const char*& begin, const char* end, const char* begi
     if (begin[0] != begin2[0]) return false;
 
     size_t i = 1;
-    if (int(static_cast<unsigned char>(begin[0])) & 0x80) {
+    if (int(char_traits<char>::to_int_type(begin[0])) & 0x80) {
         // All following bytes matching '10xxxxxx' will be considered
         // as part of this character.
         while (begin + i != end) {
-            if ((int(static_cast<unsigned char>(begin[i])) & (0x80 + 0x40)) != 0x80) break;
+            if ((int(char_traits<char>::to_int_type(begin[i])) & (0x80 + 0x40)) != 0x80) break;
             if (begin[i] != begin2[i]) return false;
             ++i;
         }
