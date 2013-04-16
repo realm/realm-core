@@ -373,6 +373,8 @@ public:
 #ifdef TIGHTDB_COMPILER_SSE
     template <class cond2, Action action, size_t width, class Callback>
     size_t FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex, Callback callback) const;
+    template <class cond2, Action action, size_t width, class Callback>
+    size_t FindSSE_intern(__m128i* action_data, __m128i* data, size_t items, QueryState<int64_t>* state, size_t baseindex, Callback callback) const;
 #endif
 
     template <size_t width> inline bool TestZero(uint64_t value) const;         // Tests value for 0-elements
@@ -1830,16 +1832,7 @@ template <class cond2, Action action, size_t bitwidth, class Callback> int64_t A
 // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first chunk
 template <class cond2, Action action, size_t width, class Callback> size_t Array::FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
-    cond2 C;
-    int cond = C.condition();
-
-    (void) baseindex;
-    (void) state;
-
-    int resmask;
     __m128i search = {0};
-    __m128i compare = {0};
-    size_t i = 0;
 
     if (width == 8)
         search = _mm_set1_epi8((char)value);
@@ -1851,43 +1844,55 @@ template <class cond2, Action action, size_t width, class Callback> size_t Array
         search = _mm_set_epi64x(value, value);
     }
 
+    return FindSSE_intern<cond2, action, width>(data, &search, items, state, baseindex, callback);
+}
+
+// Compares packed action_data with packed data (equal, less, etc) and performs aggregate action (max, min, sum, find_all, etc) on value inside action_data for first match, if any
+template <class cond2, Action action, size_t width, class Callback> size_t Array::FindSSE_intern(__m128i* action_data, __m128i* data, size_t items, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
+{
+    cond2 C;
+    int cond = C.condition();
+    size_t i = 0;
+    __m128i compare = {0};
+    int resmask;
+
     // Search loop. Unrolling it has been tested to NOT increase performance (apparently mem bound)
     for (i = 0; i < items; ++i) {
         // equal / not-equal
         if (cond == cond_Equal || cond == cond_NotEqual) {
             if (width == 8)
-                compare = _mm_cmpeq_epi8(data[i], search);
+                compare = _mm_cmpeq_epi8(action_data[i], *data);
             if (width == 16)
-                compare = _mm_cmpeq_epi16(data[i], search);
+                compare = _mm_cmpeq_epi16(action_data[i], *data);
             if (width == 32)
-                compare = _mm_cmpeq_epi32(data[i], search);
+                compare = _mm_cmpeq_epi32(action_data[i], *data);
             if (width == 64) {
-                compare = _mm_cmpeq_epi64(data[i], search); // SSE 4.2 only
+                compare = _mm_cmpeq_epi64(action_data[i], *data); // SSE 4.2 only
             }
         }
 
         // greater
         else if (cond == cond_Greater) {
             if (width == 8)
-                compare = _mm_cmpgt_epi8(data[i], search);
+                compare = _mm_cmpgt_epi8(action_data[i], *data);
             if (width == 16)
-                compare = _mm_cmpgt_epi16(data[i], search);
+                compare = _mm_cmpgt_epi16(action_data[i], *data);
             if (width == 32)
-                compare = _mm_cmpgt_epi32(data[i], search);
+                compare = _mm_cmpgt_epi32(action_data[i], *data);
             if (width == 64)
-                compare = _mm_cmpgt_epi64(data[i], search);
+                compare = _mm_cmpgt_epi64(action_data[i], *data);
         }
         // less
         else if (cond == cond_Less) {
             if (width == 8)
-                compare = _mm_cmplt_epi8(data[i], search);
+                compare = _mm_cmplt_epi8(action_data[i], *data);
             if (width == 16)
-                compare = _mm_cmplt_epi16(data[i], search);
+                compare = _mm_cmplt_epi16(action_data[i], *data);
             if (width == 32)
-                compare = _mm_cmplt_epi32(data[i], search);
+                compare = _mm_cmplt_epi32(action_data[i], *data);
             if (width == 64){
                 // There exists no _mm_cmplt_epi64 instruction, so emulate it. _mm_set1_epi8(0xff) is pre-calculated by compiler.
-                compare = _mm_cmpeq_epi64(data[i], search);
+                compare = _mm_cmpeq_epi64(action_data[i], *data);
                 compare = _mm_andnot_si128(compare, _mm_set1_epi32(0xffffffff));
             }
         }
