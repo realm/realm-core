@@ -163,8 +163,13 @@ bool case_map(StringData source, char* target, bool upper)
         else
             CharLowerW(static_cast<LPWSTR>(tmp));
 
-        int n3 = WideCharToMultiByte(CP_UTF8, MB_ERR_INVALID_CHARS, tmp, 1, target, end-begin,
-                                     0, 0);
+        // FIXME: The intention is to use flag 'WC_ERR_INVALID_CHARS'
+        // to catch invalid UTF-8. Even though the documentation says
+        // unambigously that it is supposed to work, it doesn't. When
+        // the flag is specified, the function fails with error
+        // ERROR_INVALID_FLAGS.
+        DWORD flags = 0;
+        int n3 = WideCharToMultiByte(CP_UTF8, flags, tmp, 1, target, end-begin, 0, 0);
         if (n3 == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER) return false;
         if (n3 != n) {
             copy(begin, begin+n, target); // Cannot handle different size, copy source
