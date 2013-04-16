@@ -252,4 +252,52 @@ size_t search_case_fold(StringData haystack, const char* needle_upper, const cha
     return haystack.size(); // Not found
 }
 
+
+size_t calc_buf_size_utf8_to_utf16(const char*& in_begin, const char* in_end)
+{
+    size_t num_out = 0;
+    const char* in = in_begin;
+    while (in != in_end) {
+        uint_fast16_t v1 = char_traits<char>::to_int_type(in[0]);
+        if (TIGHTDB_LIKELY(v1 < 0x80)) { // One byte
+            num_out += 1;
+            in += 1;
+            continue;
+        }
+        if (TIGHTDB_UNLIKELY(v1 < 0xC0)) {
+            break; // Invalid first byte of UTF-8 sequence
+        }
+        if (TIGHTDB_LIKELY(v1 < 0xE0)) { // Two bytes
+            if (TIGHTDB_UNLIKELY(in_end - in < 2)) {
+                break; // Incomplete UTF-8 sequence
+            }
+            num_out += 1;
+            in += 2;
+            continue;
+        }
+        if (TIGHTDB_LIKELY(v1 < 0xF0)) { // Three bytes
+            if (TIGHTDB_UNLIKELY(in_end - in < 3)) {
+                break; // Incomplete UTF-8 sequence
+            }
+            num_out += 1;
+            in += 3;
+            continue;
+        }
+        if (TIGHTDB_LIKELY(v1 < 0xF8)) { // Four bytes
+            if (TIGHTDB_UNLIKELY(in_end - in < 4)) {
+                break; // Incomplete UTF-8 sequence
+            }
+            num_out += 2; // Surrogate pair
+            in += 4;
+            continue;
+        }
+        // Invalid first byte of UTF-8 sequence, or code point too big for UTF-16
+        break;
+    }
+
+    in_begin  = in;
+    return num_out;
+}
+
+
 } // namespace tightdb
