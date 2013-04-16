@@ -743,8 +743,6 @@ TEST(TestQueryStrIndexed_non_enum)
     CHECK_EQUAL(10*2, tv.size());
 }
 
-#if 0 // fixme, disabled until bug fixed
-
 TEST(TestQueryFindAll_Contains2_2)
 {
     TupleTableType ttt;
@@ -778,8 +776,6 @@ TEST(TestQueryFindAll_Contains2_2)
     CHECK_EQUAL(5, tv2.get_source_ndx(2));
 #endif
 }
-#endif
-
 /*
 TEST(TestQuery_sum_new_aggregates)
 {
@@ -1939,9 +1935,6 @@ TEST(TestQueryEnums)
 #define ua  "\x0c3\x0a5"         // danish lower case a with ring above (as in blaabaergroed)
 #define uad "\x061\x0cc\x08a"    // decomposed form (a (41) followed by ring)
 
-
-#if 0 // fixme, disabled until bug fixed
-
 TEST(TestQueryCaseSensitivity)
 {
     TupleTableType ttt;
@@ -2085,8 +2078,6 @@ TEST(TestQueryFindAll_ContainsUNICODE)
     CHECK_EQUAL(2, tv2.get_source_ndx(2));
     CHECK_EQUAL(3, tv2.get_source_ndx(3));
 }
-
-#endif
 
 TEST(TestQuerySyntaxCheck)
 {
