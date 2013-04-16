@@ -13,6 +13,13 @@ Format:
 ==================
 
 
+2013-03-16 (Kristian Spangsege)
++ Support for explicit string lengths added.
++ Improved support for BinaryData in queries.
++ New convenience methods added to BinaryData class.
++ Group::write() and Group::write_to_mem() are now 'const'.
+
+
 2013-03-11 (Kristian Spangsege)
 + On Linux and OS X, installed shared libraries now carry a platform dependent API version which is computed from a platform neutral version specifier (same as GNU Libtool). This allows for multiple versions of the shared library to be concurrently installed.
 

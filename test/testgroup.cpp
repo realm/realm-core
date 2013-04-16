@@ -87,7 +87,7 @@ TEST(Group_Serialize0)
     // Modify table
     t->add("Test",  1, true, Wed);
 
-    CHECK_EQUAL("Test", static_cast<const char*>(t[0].first));
+    CHECK_EQUAL("Test", t[0].first);
     CHECK_EQUAL(1,      t[0].second);
     CHECK_EQUAL(true,   t[0].third);
     CHECK_EQUAL(Wed,    t[0].fourth);
@@ -348,7 +348,7 @@ TEST(Group_Serialize_All)
     table->insert_bool(1, 0, true);
     table->insert_date(2, 0, 12345);
     table->insert_string(3, 0, "test");
-    table->insert_binary(4, 0, "binary", 7);
+    table->insert_binary(4, 0, BinaryData("binary", 7));
     table->insert_mixed(5, 0, false);
     table->insert_done();
 
@@ -363,10 +363,10 @@ TEST(Group_Serialize_All)
     CHECK_EQUAL(1, t->size());
     CHECK_EQUAL(12, t->get_int(0, 0));
     CHECK_EQUAL(true, t->get_bool(1, 0));
-    CHECK_EQUAL((time_t)12345, t->get_date(2, 0));
+    CHECK_EQUAL(time_t(12345), t->get_date(2, 0));
     CHECK_EQUAL("test", t->get_string(3, 0));
-    CHECK_EQUAL(7, t->get_binary(4, 0).len);
-    CHECK_EQUAL("binary", (const char*)t->get_binary(4, 0).pointer);
+    CHECK_EQUAL(7, t->get_binary(4, 0).size());
+    CHECK_EQUAL("binary", t->get_binary(4, 0).data());
     CHECK_EQUAL(type_Bool, t->get_mixed(5, 0).get_type());
     CHECK_EQUAL(false, t->get_mixed(5, 0).get_bool());
 }
@@ -391,7 +391,7 @@ TEST(Group_Persist)
     table->insert_bool(1, 0, true);
     table->insert_date(2, 0, 12345);
     table->insert_string(3, 0, "test");
-    table->insert_binary(4, 0, "binary", 7);
+    table->insert_binary(4, 0, BinaryData("binary", 7));
     table->insert_mixed(5, 0, false);
     table->insert_done();
 
@@ -406,10 +406,10 @@ TEST(Group_Persist)
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL((time_t)12345, table->get_date(2, 0));
+    CHECK_EQUAL(time_t(12345), table->get_date(2, 0));
     CHECK_EQUAL("test", table->get_string(3, 0));
-    CHECK_EQUAL(7, table->get_binary(4, 0).len);
-    CHECK_EQUAL("binary", (const char*)table->get_binary(4, 0).pointer);
+    CHECK_EQUAL(7, table->get_binary(4, 0).size());
+    CHECK_EQUAL("binary", table->get_binary(4, 0).data());
     CHECK_EQUAL(type_Bool, table->get_mixed(5, 0).get_type());
     CHECK_EQUAL(false, table->get_mixed(5, 0).get_bool());
 
@@ -427,10 +427,10 @@ TEST(Group_Persist)
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL((time_t)12345, table->get_date(2, 0));
+    CHECK_EQUAL(time_t(12345), table->get_date(2, 0));
     CHECK_EQUAL("Changed!", table->get_string(3, 0));
-    CHECK_EQUAL(7, table->get_binary(4, 0).len);
-    CHECK_EQUAL("binary", (const char*)table->get_binary(4, 0).pointer);
+    CHECK_EQUAL(7, table->get_binary(4, 0).size());
+    CHECK_EQUAL("binary", table->get_binary(4, 0).data());
     CHECK_EQUAL(type_Bool, table->get_mixed(5, 0).get_type());
     CHECK_EQUAL(false, table->get_mixed(5, 0).get_bool());
 }

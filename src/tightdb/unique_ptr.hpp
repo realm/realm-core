@@ -53,6 +53,34 @@ private:
 };
 
 
+// Specialization for arrays
+template<class T> class DefaultDelete<T[]> {
+public:
+    void operator()(T* p) const { delete[] p; }
+};
+
+// Specialization for arrays
+template<class T, class D> class UniquePtr<T[], D>: private UniquePtr<T,D> {
+public:
+    typedef T* pointer;
+    typedef T element_type;
+    typedef D deleter_type;
+
+    explicit UniquePtr(T* = 0) TIGHTDB_NOEXCEPT;
+
+    T& operator[](std::size_t) const TIGHTDB_NOEXCEPT;
+
+    void swap(UniquePtr&) TIGHTDB_NOEXCEPT;
+
+    using UniquePtr<T,D>::get;
+    using UniquePtr<T,D>::operator*;
+    using UniquePtr<T,D>::reset;
+    using UniquePtr<T,D>::release;
+    using UniquePtr<T,D>::operator typename UniquePtr<T,D>::unspecified_bool_type;
+};
+
+
+
 template<class T, class D> void swap(UniquePtr<T,D>& p, UniquePtr<T,D>& q) TIGHTDB_NOEXCEPT;
 
 
@@ -61,6 +89,9 @@ template<class T, class D> void swap(UniquePtr<T,D>& p, UniquePtr<T,D>& q) TIGHT
 // Implementation:
 
 template<class T, class D> inline UniquePtr<T,D>::UniquePtr(T* p) TIGHTDB_NOEXCEPT: m_ptr(p) {}
+
+template<class T, class D> inline UniquePtr<T[],D>::UniquePtr(T* p) TIGHTDB_NOEXCEPT:
+    UniquePtr<T,D>(p) {}
 
 template<class T, class D> inline UniquePtr<T,D>::~UniquePtr()
 {
@@ -77,6 +108,12 @@ template<class T, class D> inline T& UniquePtr<T,D>::operator*() const TIGHTDB_N
     return *m_ptr;
 }
 
+template<class T, class D>
+inline T& UniquePtr<T[],D>::operator[](std::size_t i) const TIGHTDB_NOEXCEPT
+{
+    return (&**this)[i];
+}
+
 template<class T, class D> inline T* UniquePtr<T,D>::operator->() const TIGHTDB_NOEXCEPT
 {
     return m_ptr;
@@ -85,6 +122,11 @@ template<class T, class D> inline T* UniquePtr<T,D>::operator->() const TIGHTDB_
 template<class T, class D> inline void UniquePtr<T,D>::swap(UniquePtr& p) TIGHTDB_NOEXCEPT
 {
     using std::swap; swap(m_ptr, p.m_ptr);
+}
+
+template<class T, class D> inline void UniquePtr<T[],D>::swap(UniquePtr& p) TIGHTDB_NOEXCEPT
+{
+    UniquePtr<T,D>::swap(p);
 }
 
 template<class T, class D> inline void UniquePtr<T,D>::reset(T* p)

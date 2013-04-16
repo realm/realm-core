@@ -26,29 +26,29 @@
 
 namespace tightdb {
 
-typedef const char*(*StringGetter)(void*, size_t);
+typedef StringData (*StringGetter)(void*, size_t);
 
-class StringIndex : public Column {
+class StringIndex: public Column {
 public:
-    StringIndex(void* target_column, StringGetter get_func, Allocator& alloc);
-    StringIndex(ColumnDef type, Allocator& alloc);
-    StringIndex(size_t ref, ArrayParent* parent, size_t pndx, void* target_column, StringGetter get_func, Allocator& alloc);
+    StringIndex(void* target_column, StringGetter get_func, Allocator&);
+    StringIndex(Array::ColumnDef, Allocator&);
+    StringIndex(size_t ref, ArrayParent*, size_t pndx, void* target_column, StringGetter get_func, Allocator&);
     void SetTarget(void* target_column, StringGetter get_func);
 
     bool is_empty() const;
 
-    void Insert(size_t row_ndx, const char* value, bool isLast=false);
-    void Set(size_t row_ndx, const char* oldValue, const char* newValue);
-    void Delete(size_t row_ndx, const char* value, bool isLast=false);
+    void Insert(size_t row_ndx, StringData value, bool isLast=false);
+    void Set(size_t row_ndx, StringData oldValue, StringData newValue);
+    void erase(size_t row_ndx, StringData value, bool isLast=false);
     void Clear() TIGHTDB_OVERRIDE;
 
-    using Column::Delete;
+    using Column::erase;
 
-    size_t  count(const char* value) const;
-    size_t  find_first(const char* value) const;
-    void    find_all(Array& result, const char* value) const;
-    FindRes find_all(const char* value, size_t& ref) const;
-    void    distinct(Array& result) const;
+    size_t count(StringData value) const;
+    size_t find_first(StringData value) const;
+    void   find_all(Array& result, StringData value) const;
+    void   distinct(Array& result) const;
+    FindRes find_all(StringData value, size_t& ref) const;
 
 #ifdef TIGHTDB_DEBUG
     void verify_entries(const AdaptiveStringColumn& column) const;
@@ -59,30 +59,30 @@ public:
 protected:
     void Create();
 
-    void InsertWithOffset(size_t row_ndx, size_t offset, const char* value);
-    void InsertRowList(size_t ref, size_t offset, const char* value);
+    void InsertWithOffset(size_t row_ndx, size_t offset, StringData value);
+    void InsertRowList(size_t ref, size_t offset, StringData value);
     int32_t GetLastKey() const;
     void UpdateRefs(size_t pos, int diff);
 
     // B-Tree functions
-    void TreeInsert(size_t row_ndx, int32_t key, size_t offset, const char* value);
-    NodeChange DoInsert(size_t ndx, int32_t key, size_t offset, const char* value);
+    void TreeInsert(size_t row_ndx, int32_t key, size_t offset, StringData value);
+    NodeChange DoInsert(size_t ndx, int32_t key, size_t offset, StringData value);
     /// Returns true if there is room or it can join existing entries
-    bool LeafInsert(size_t row_ndx, int32_t key, size_t offset, const char* value, bool noextend=false);
+    bool LeafInsert(size_t row_ndx, int32_t key, size_t offset, StringData value, bool noextend=false);
     void NodeInsertSplit(size_t ndx, size_t new_ref);
     void NodeInsert(size_t ndx, size_t ref);
-    void DoDelete(size_t ndx, const char* value, size_t offset);
+    void DoDelete(size_t ndx, StringData, size_t offset);
 
-    const char* Get(size_t ndx) {return (*m_get_func)(m_target_column, ndx);}
+    StringData Get(size_t ndx) {return (*m_get_func)(m_target_column, ndx);}
 
     // Member variables
     void* m_target_column;
     StringGetter m_get_func;
 
 #ifdef TIGHTDB_DEBUG
-    void ToDot(std::ostream& out, const char* title=NULL) const;
+    void ToDot(std::ostream& out, StringData title = StringData()) const;
     void ArrayToDot(std::ostream& out, const Array& array) const;
-    void KeysToDot(std::ostream& out, const Array& array, const char* title=NULL) const;
+    void KeysToDot(std::ostream& out, const Array& array, StringData title = StringData()) const;
 #endif
 };
 

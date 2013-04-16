@@ -40,9 +40,9 @@ template<> struct AggReturnType<float> {
 template<typename T>
 class BasicColumn : public ColumnBase {
 public:
-    BasicColumn(Allocator& alloc = Allocator::get_default());
-    BasicColumn(size_t ref, ArrayParent* parent = 0, size_t pndx = 0,
-                Allocator& alloc = Allocator::get_default());
+    BasicColumn(Allocator& = Allocator::get_default());
+    BasicColumn(size_t ref, ArrayParent* = 0, size_t ndx_in_parent = 0,
+                Allocator& = Allocator::get_default());
     ~BasicColumn();
 
     void Destroy();
@@ -50,13 +50,13 @@ public:
     size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
-    T Get(size_t ndx) const TIGHTDB_NOEXCEPT;
+    T get(size_t ndx) const TIGHTDB_NOEXCEPT;
     void add() TIGHTDB_OVERRIDE { add(0); }
     void add(T value);
-    void Set(size_t ndx, T value);
-    void insert(size_t ndx) TIGHTDB_OVERRIDE { Insert(ndx, 0); }
-    void Insert(size_t ndx, T value);
-    void Delete(size_t ndx) TIGHTDB_OVERRIDE;
+    void set(size_t ndx, T value);
+    void insert(size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
+    void insert(size_t ndx, T value);
+    void erase(size_t ndx) TIGHTDB_OVERRIDE;
     void Clear() TIGHTDB_OVERRIDE;
     void Resize(size_t ndx);
     void fill(size_t count);

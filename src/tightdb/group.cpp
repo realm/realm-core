@@ -109,18 +109,19 @@ void Group::create_from_file(const string& filename, OpenMode mode, bool do_init
 
     if (!do_init)  return;
 
+    const size_t top_ref = m_alloc.GetTopRef();
+
     // if we just created shared group, we have to wait with
     // actually creating it's datastructures until first write
-    if (m_is_shared && m_alloc.GetTopRef() == 0) return;
+    if (m_is_shared && top_ref == 0) return;
 
-    const size_t top_ref = m_alloc.GetTopRef();
     create_from_ref(top_ref); // FIXME: Throws and leaves the Group in peril
 }
 
 // Create a new memory structure and attach this group instance to it.
 void Group::create()
 {
-    m_tables.SetType(coldef_HasRefs); // FIXME: Why is this not done in Group() like the rest of the arrays?
+    m_tables.SetType(Array::coldef_HasRefs); // FIXME: Why is this not done in Group() like the rest of the arrays?
 
     m_top.add(m_tableNames.GetRef());
     m_top.add(m_tables.GetRef());
@@ -144,13 +145,13 @@ void Group::create_from_ref(size_t top_ref)
 {
     // Instantiate top arrays
     if (top_ref == 0) {
-        m_top.SetType(coldef_HasRefs);
-        m_tables.SetType(coldef_HasRefs);
-        m_tableNames.SetType(coldef_Normal);
-        m_freePositions.SetType(coldef_Normal);
-        m_freeLengths.SetType(coldef_Normal);
+        m_top.SetType(Array::coldef_HasRefs);
+        m_tables.SetType(Array::coldef_HasRefs);
+        m_tableNames.SetType(Array::coldef_Normal);
+        m_freePositions.SetType(Array::coldef_Normal);
+        m_freeLengths.SetType(Array::coldef_Normal);
         if (m_is_shared) {
-            m_freeVersions.SetType(coldef_Normal);
+            m_freeVersions.SetType(Array::coldef_Normal);
         }
 
         create();
@@ -208,8 +209,8 @@ void Group::init_shared()
         // Serialized files have no free space tracking
         // at all so we have to add the basic free lists
         if (m_top.size() == 2) {
-            m_freePositions.SetType(coldef_Normal);
-            m_freeLengths.SetType(coldef_Normal);
+            m_freePositions.SetType(Array::coldef_Normal);
+            m_freeLengths.SetType(Array::coldef_Normal);
             m_top.add(m_freePositions.GetRef());
             m_top.add(m_freeLengths.GetRef());
             m_freePositions.SetParent(&m_top, 2);
@@ -220,7 +221,7 @@ void Group::init_shared()
         // mode do not have version tracking for the free lists
         if (m_top.size() == 4) {
             const size_t count = m_freePositions.size();
-            m_freeVersions.SetType(coldef_Normal);
+            m_freeVersions.SetType(Array::coldef_Normal);
             for (size_t i = 0; i < count; ++i) {
                 m_freeVersions.add(0);
             }
@@ -325,7 +326,7 @@ Table* Group::get_table_ptr(size_t ndx)
     return table;
 }
 
-Table* Group::create_new_table(const char* name)
+Table* Group::create_new_table(StringData name)
 {
     const size_t ref = Table::create_empty_table(m_alloc); // Throws
     m_tables.add(ref);
@@ -346,7 +347,7 @@ Table* Group::create_new_table(const char* name)
 }
 
 
-void Group::write(const string& path)
+void Group::write(const string& path) const
 {
     TIGHTDB_ASSERT(m_top.IsValid());
 
@@ -354,7 +355,7 @@ void Group::write(const string& path)
     write_to_stream(out);
 }
 
-Group::BufferSpec Group::write_to_mem()
+Group::BufferSpec Group::write_to_mem() const
 {
     TIGHTDB_ASSERT(m_top.IsValid());
 
@@ -368,6 +369,7 @@ Group::BufferSpec Group::write_to_mem()
     return BufferSpec(data, size);
 }
 
+// NOTE: This method must not modify *this if m_shared is false.
 size_t Group::commit(size_t current_version, size_t readlock_version, bool doPersist)
 {
     TIGHTDB_ASSERT(m_top.IsValid());
@@ -525,9 +527,8 @@ void Group::to_string(std::ostream& out) const
     size_t name_width = 6;
     size_t rows_width = 4;
     for (size_t i = 0; i < count; ++i) {
-        const char* const name = get_table_name(i);
-        const size_t len = strlen(name);
-        if (name_width < len) name_width = len;
+        StringData name = get_table_name(i);
+        if (name_width < name.size()) name_width = name.size();
 
         ConstTableRef table = get_table(name);
         const size_t row_count = table->size();
@@ -543,7 +544,7 @@ void Group::to_string(std::ostream& out) const
 
     // Print tables
     for (size_t i = 0; i < count; ++i) {
-        const char* const name = get_table_name(i);
+        StringData name = get_table_name(i);
         ConstTableRef table = get_table(name);
         const size_t row_count = table->size();
 
@@ -672,7 +673,7 @@ void Group::to_dot(std::ostream& out) const
     // Tables
     for (size_t i = 0; i < m_tables.size(); ++i) {
         const Table* table = get_table_ptr(i);
-        const char* const name = get_table_name(i);
+        StringData name = get_table_name(i);
         table->to_dot(out, name);
     }
 

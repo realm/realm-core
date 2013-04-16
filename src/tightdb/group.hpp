@@ -143,17 +143,17 @@ public:
     /// Returns the number of tables in this group.
     size_t size() const;
 
-    const char* get_table_name(size_t table_ndx) const;
-    bool has_table(const char* name) const;
+    StringData get_table_name(size_t table_ndx) const;
+    bool has_table(StringData name) const;
 
     /// Check whether this group has a table with the specified name
     /// and type.
-    template<class T> bool has_table(const char* name) const;
+    template<class T> bool has_table(StringData name) const;
 
-    TableRef      get_table(const char* name);
-    ConstTableRef get_table(const char* name) const;
-    template<class T> typename T::Ref      get_table(const char* name);
-    template<class T> typename T::ConstRef get_table(const char* name) const;
+    TableRef      get_table(StringData name);
+    ConstTableRef get_table(StringData name) const;
+    template<class T> typename T::Ref      get_table(StringData name);
+    template<class T> typename T::ConstRef get_table(StringData name) const;
 
     // Serialization
 
@@ -166,15 +166,19 @@ public:
     /// reason corresponds to one of the exception types that are
     /// derived from File::OpenError, the derived exception type is
     /// thrown.
-    void write(const std::string& file);
+    void write(const std::string& file) const;
 
     /// Write this database to a memory buffer.
     ///
     /// Ownership of the returned buffer is transferred to the
     /// caller. The memory will have been allocated using
     /// std::malloc().
-    BufferSpec write_to_mem();
+    BufferSpec write_to_mem() const;
 
+    // FIXME: What does this one do? Exactly how is it different from
+    // calling write()? There is no documentation to be found anywhere
+    // and it looks like it leaves the group in an invalid state. You
+    // should probably not use it.
     void commit();
 
     // Conversion
@@ -242,7 +246,7 @@ protected:
     void create_from_ref(size_t top_ref);
 
     // May throw WriteError
-    template<class S> size_t write_to_stream(S& out);
+    template<class S> size_t write_to_stream(S& out) const;
 
     // Member variables
     SlabAlloc m_alloc;
@@ -260,15 +264,18 @@ private:
     struct shared_tag {};
     Group(shared_tag) TIGHTDB_NOEXCEPT;
 
-    Table* get_table_ptr(const char* name);
-    Table* get_table_ptr(const char* name, bool& was_created);
-    const Table* get_table_ptr(const char* name) const;
-    template<class T> T* get_table_ptr(const char* name);
-    template<class T> const T* get_table_ptr(const char* name) const;
+    // FIXME: Implement a proper copy constructor (fairly trivial).
+    Group(const Group&); // Disable copying
+
+    Table* get_table_ptr(StringData name);
+    Table* get_table_ptr(StringData name, bool& was_created);
+    const Table* get_table_ptr(StringData name) const;
+    template<class T> T* get_table_ptr(StringData name);
+    template<class T> const T* get_table_ptr(StringData name) const;
 
     Table* get_table_ptr(size_t ndx);
     const Table* get_table_ptr(size_t ndx) const;
-    Table* create_new_table(const char* name);
+    Table* create_new_table(StringData name);
 
     void clear_cache();
 
@@ -293,10 +300,10 @@ private:
 // ownership of the underlying memory, causes lots of problems with
 // robustness both here and in other places.
 inline Group::Group():
-    m_top(coldef_HasRefs, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
-    m_freePositions(coldef_Normal, NULL, 0, m_alloc),
-    m_freeLengths(coldef_Normal, NULL, 0, m_alloc),
-    m_freeVersions(coldef_Normal, NULL, 0, m_alloc), m_is_shared(false)
+    m_top(Array::coldef_HasRefs, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
+    m_freePositions(Array::coldef_Normal, NULL, 0, m_alloc),
+    m_freeLengths(Array::coldef_Normal, NULL, 0, m_alloc),
+    m_freeVersions(Array::coldef_Normal, NULL, 0, m_alloc), m_is_shared(false)
 {
     // FIXME: Arrays are leaked when create() throws
     create();
@@ -378,11 +385,11 @@ inline std::size_t Group::size() const
     return m_tableNames.size();
 }
 
-inline const char* Group::get_table_name(std::size_t table_ndx) const
+inline StringData Group::get_table_name(std::size_t table_ndx) const
 {
     TIGHTDB_ASSERT(m_top.IsValid());
     TIGHTDB_ASSERT(table_ndx < m_tableNames.size());
-    return m_tableNames.Get(table_ndx);
+    return m_tableNames.get(table_ndx);
 }
 
 inline const Table* Group::get_table_ptr(std::size_t ndx) const
@@ -390,14 +397,14 @@ inline const Table* Group::get_table_ptr(std::size_t ndx) const
     return const_cast<Group*>(this)->get_table_ptr(ndx);
 }
 
-inline bool Group::has_table(const char* name) const
+inline bool Group::has_table(StringData name) const
 {
     if (!m_top.IsValid()) return false;
     const size_t i = m_tableNames.find_first(name);
     return i != size_t(-1);
 }
 
-template<class T> inline bool Group::has_table(const char* name) const
+template<class T> inline bool Group::has_table(StringData name) const
 {
     if (!m_top.IsValid()) return false;
     const size_t i = m_tableNames.find_first(name);
@@ -406,7 +413,7 @@ template<class T> inline bool Group::has_table(const char* name) const
     return T::matches_dynamic_spec(&table->get_spec());
 }
 
-inline Table* Group::get_table_ptr(const char* name)
+inline Table* Group::get_table_ptr(StringData name)
 {
     TIGHTDB_ASSERT(m_top.IsValid());
     const size_t ndx = m_tableNames.find_first(name);
@@ -418,7 +425,7 @@ inline Table* Group::get_table_ptr(const char* name)
     return create_new_table(name);
 }
 
-inline Table* Group::get_table_ptr(const char* name, bool& was_created)
+inline Table* Group::get_table_ptr(StringData name, bool& was_created)
 {
     TIGHTDB_ASSERT(m_top.IsValid());
     const size_t ndx = m_tableNames.find_first(name);
@@ -432,13 +439,13 @@ inline Table* Group::get_table_ptr(const char* name, bool& was_created)
     return create_new_table(name);
 }
 
-inline const Table* Group::get_table_ptr(const char* name) const
+inline const Table* Group::get_table_ptr(StringData name) const
 {
     TIGHTDB_ASSERT(has_table(name));
     return const_cast<Group*>(this)->get_table_ptr(name);
 }
 
-template<class T> inline T* Group::get_table_ptr(const char* name)
+template<class T> inline T* Group::get_table_ptr(StringData name)
 {
     TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
     TIGHTDB_ASSERT(!has_table(name) || has_table<T>(name));
@@ -455,28 +462,28 @@ template<class T> inline T* Group::get_table_ptr(const char* name)
     return table;
 }
 
-template<class T> inline const T* Group::get_table_ptr(const char* name) const
+template<class T> inline const T* Group::get_table_ptr(StringData name) const
 {
     TIGHTDB_ASSERT(has_table(name));
     return const_cast<Group*>(this)->get_table_ptr<T>(name);
 }
 
-inline TableRef Group::get_table(const char* name)
+inline TableRef Group::get_table(StringData name)
 {
     return get_table_ptr(name)->get_table_ref();
 }
 
-inline ConstTableRef Group::get_table(const char* name) const
+inline ConstTableRef Group::get_table(StringData name) const
 {
     return get_table_ptr(name)->get_table_ref();
 }
 
-template<class T> inline typename T::Ref Group::get_table(const char* name)
+template<class T> inline typename T::Ref Group::get_table(StringData name)
 {
     return get_table_ptr<T>(name)->get_table_ref();
 }
 
-template<class T> inline typename T::ConstRef Group::get_table(const char* name) const
+template<class T> inline typename T::ConstRef Group::get_table(StringData name) const
 {
     return get_table_ptr<T>(name)->get_table_ref();
 }
@@ -486,7 +493,7 @@ inline void Group::commit()
     commit(-1, -1, true);
 }
 
-template<class S> size_t Group::write_to_stream(S& out)
+template<class S> size_t Group::write_to_stream(S& out) const
 {
     // Space for file header
     out.write(SlabAlloc::default_header, sizeof SlabAlloc::default_header);
@@ -494,7 +501,7 @@ template<class S> size_t Group::write_to_stream(S& out)
     // When serializing to disk we dont want
     // to include free space tracking as serialized
     // files are written without any free space.
-    Array top(coldef_HasRefs, NULL, 0, m_alloc);
+    Array top(Array::coldef_HasRefs, NULL, 0, const_cast<SlabAlloc&>(m_alloc)); // FIXME: Another aspect of the poor constness behavior in Array class. What can we do?
     top.add(m_top.Get(0));
     top.add(m_top.Get(1));
 
@@ -506,7 +513,7 @@ template<class S> size_t Group::write_to_stream(S& out)
     // (since we initially set the last bit in the file header to
     //  zero, it is the first ref block that is valid)
     out.seek(0);
-    out.write((const char*)&topPos, 8);
+    out.write(reinterpret_cast<const char*>(&topPos), 8);
 
     // FIXME: To be 100% robust with respect to being able to detect
     // afterwards whether the file was completely written, we would
@@ -538,8 +545,8 @@ void Group::to_json(S& out) const
     out << "{";
 
     for (size_t i = 0; i < m_tables.size(); ++i) {
-        const char* const name = m_tableNames.Get(i);
-        const Table* const table = get_table_ptr(i);
+        StringData name = m_tableNames.get(i);
+        const Table* table = get_table_ptr(i);
 
         if (i) out << ",";
         out << "\"" << name << "\"";
