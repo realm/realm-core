@@ -820,6 +820,7 @@ public:
 
     void Init(const Table& table)
     {
+        m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
         m_leaf = NULL;
         m_dD = 100.0;
         m_probes = 0;
@@ -1073,6 +1074,7 @@ public:
             }
             else if(fr == FindRes_not_found) {
                 m_index_matches = new Column();
+                m_index_matches_destroy = true;
             }
 
             last_indexed = 0;

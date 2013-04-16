@@ -2,6 +2,7 @@
 
 #include <tightdb.hpp>
 #include <vector>
+#include "testsettings.hpp"
 
 using namespace tightdb;
 
@@ -13,6 +14,11 @@ TIGHTDB_TABLE_2(TwoIntTable,
 
 TIGHTDB_TABLE_1(SingleStringTable,
                 first, String)
+
+TIGHTDB_TABLE_3(TripleTable,
+                first, String,
+                second, String,
+                third, Int)
 
 TIGHTDB_TABLE_1(OneIntTable,
                 first,  Int)
@@ -61,6 +67,173 @@ TIGHTDB_TABLE_5(GATable,
 
 } // anonymous namespace
 
+
+TEST(TestQueryHuge) 
+{
+#if TEST_DURATION == 0
+    for(size_t N = 0; N < 2; N++) {
+#elif TEST_DURATION == 1
+    for(size_t N = 0; N < 100; N++) {
+#elif TEST_DURATION == 2
+    for(size_t N = 0; N < 1000; N++) {
+#elif TEST_DURATION == 3
+    for(size_t N = 0; N < 10000; N++) {
+#endif
+        srand(N + 123);    // Makes you reproduce a bug in a certain run, without having to run all successive runs
+
+        TripleTable tt;
+        TripleTable::View v;
+        bool long1;
+        bool long2;
+        bool long3;
+        size_t mdist1;
+        size_t mdist2;
+        size_t mdist3;
+
+        std::string first;
+        std::string second;
+        int64_t third;
+
+        size_t res1 = 0;
+        size_t res2 = 0;
+        size_t res3 = 0;
+        size_t res4 = 0;
+        size_t res5 = 0;
+        size_t res6 = 0;
+        size_t res7 = 0;
+        size_t res8 = 0;
+        size_t res9 = 0;
+        size_t res10 = 0;
+        size_t res11 = 0;
+
+        size_t blocksize = rand() % 1200 + 1;
+
+        for(size_t row = 0; row < 6000; row++) {
+
+            if(row % blocksize == 0) {
+                long1 = (rand() % 2 == 0);
+                long2 = (rand() % 2 == 0);
+
+                if(rand() % 2 == 0)
+                {
+                    mdist1 = rand() % 500 + 1;
+                    mdist2 = rand() % 500 + 1;
+                    mdist3 = rand() % 500 + 1;
+                }
+                else {
+                    mdist1 = rand() % 5 + 1;
+                    mdist2 = rand() % 5 + 1;
+                    mdist3 = rand() % 5 + 1;
+                }
+            }
+
+            tt.add_empty_row();
+
+            if(long1) {
+                if(rand() % mdist1 == 0)
+                    first = "longlonglonglonglonglonglong A";
+                else
+                    first = "longlonglonglonglonglonglong B";
+            }
+            else {
+                if(rand() % mdist1 == 0)
+                    first = "A";
+                else
+                    first = "B";
+            }
+        
+            if(long2) {
+                if(rand() % mdist2 == 0)
+                    second = "longlonglonglonglonglonglong A";
+                else
+                    second = "longlonglonglonglonglonglong B";
+            }
+            else {
+                if(rand() % mdist2 == 0)
+                    second = "A";
+                else
+                    second = "B";
+            }
+
+            if(rand() % mdist3 == 0)
+                third = 1;
+            else
+                third = 2;
+
+            tt[row].first = first.c_str();
+            tt[row].second = second.c_str();
+            tt[row].third = third;
+
+            if (first == "A" && second == "A" && third == 1)
+                res1++;
+
+            if ((first == "A" || second == "A") && third == 1)
+                res2++;
+
+            if (first == "A" && (second == "A" || third == 1))
+                res3++;
+
+            if (second == "A" && (first == "A" || third == 1))
+                res4++;
+
+            if (first == "A" || second == "A" || third == 1)
+                res5++;
+
+            if (first != "A" && second == "A" && third == 1)
+                res6++;
+
+            if (first != "longlonglonglonglonglonglong A" && second == "A" && third == 1)
+                res7++;
+
+            if (first != "longlonglonglonglonglonglong A" && second == "A" && third == 2)
+                res8++;
+        }
+
+        for(size_t t = 0; t < 4; t++) {
+
+            if(t == 1)
+                tt.optimize();
+            else if(t == 2)
+                tt.column().first.set_index();
+            else if(t == 3)
+                tt.column().second.set_index();
+            else if(t == 4)
+                tt.column().third.set_index();
+
+
+            v = tt.where().first.equal("A").second.equal("A").third.equal(1).find_all();
+            CHECK_EQUAL(res1, v.size());
+    
+            v = tt.where().second.equal("A").first.equal("A").third.equal(1).find_all();
+            CHECK_EQUAL(res1, v.size());
+
+            v = tt.where().third.equal(1).second.equal("A").first.equal("A").find_all();
+            CHECK_EQUAL(res1, v.size());
+
+            v = tt.where().group().first.equal("A").Or().second.equal("A").end_group().third.equal(1).find_all();
+            CHECK_EQUAL(res2, v.size());
+    
+            v = tt.where().first.equal("A").group().second.equal("A").Or().third.equal(1).end_group().find_all();
+            CHECK_EQUAL(res3, v.size());
+
+            v = tt.where().group().first.equal("A").Or().third.equal(1).end_group().second.equal("A").find_all();
+            CHECK_EQUAL(res4, v.size());
+
+            v = tt.where().first.equal("A").Or().second.equal("A").Or().third.equal(1).find_all();
+            CHECK_EQUAL(res5, v.size());
+
+            v = tt.where().first.not_equal("A").second.equal("A").third.equal(1).find_all();
+            CHECK_EQUAL(res6, v.size());
+
+            v = tt.where().first.not_equal("longlonglonglonglonglonglong A").second.equal("A").third.equal(1).find_all();
+            CHECK_EQUAL(res7, v.size());
+
+            v = tt.where().first.not_equal("longlonglonglonglonglonglong A").second.equal("A").third.equal(2).find_all();
+            CHECK_EQUAL(res8, v.size());
+        }        
+
+    }
+}
 
 TEST(TestQueryStrIndex3)
 {
@@ -165,15 +338,8 @@ TEST(TestQueryStrIndex3)
             CHECK_EQUAL(vec[t], v.get_source_ndx(t));
         v.clear();
         vec.clear();
-
-        CHECK_EQUAL(vec.size(), v.size());
-        for(size_t t = 0; t < vec.size(); t++)
-            CHECK_EQUAL(vec[t], v.get_source_ndx(t));
-        v.clear();
-        vec.clear();
     }
 }
-
 
 
 
