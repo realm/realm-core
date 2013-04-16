@@ -758,7 +758,6 @@ TEST(TestQueryFindAll_Contains2_2)
     ttt.add(8, "oobar");
 
 // FIXME: UTF-8 case handling is only implemented on msw for now
-#ifdef _WIN32
     TupleTableType::Query q1 = ttt.where().second.contains("foO", false);
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(6, tv1.size());
@@ -774,7 +773,6 @@ TEST(TestQueryFindAll_Contains2_2)
     CHECK_EQUAL(3, tv2.get_source_ndx(0));
     CHECK_EQUAL(4, tv2.get_source_ndx(1));
     CHECK_EQUAL(5, tv2.get_source_ndx(2));
-#endif
 }
 /*
 TEST(TestQuery_sum_new_aggregates)
