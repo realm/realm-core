@@ -157,7 +157,7 @@ template<class String16> String16 utf8_to_utf16(const string& s)
     typedef Utf8x16<Char16, Traits16> Xcode;
     const char* in_begin = s.data();
     const char* in_end = in_begin + s.size();
-    size_t utf16_buf_size = calc_buf_size_utf8_to_utf16(in_begin, in_end);
+    size_t utf16_buf_size = Xcode::find_utf16_buf_size(in_begin, in_end);
     if (in_begin != in_end) throw runtime_error("Bad UTF-8");
     in_begin = s.data();
     UniquePtr<Char16[]> utf16_buf(new Char16[utf16_buf_size]);
@@ -170,12 +170,46 @@ template<class String16> String16 utf8_to_utf16(const string& s)
     return String16(utf16_buf.get(), out_begin);
 }
 
-size_t calc_buf_size_utf8_to_utf16(const string& s)
+template<class String16> string utf16_to_utf8(const String16& s)
 {
+    typedef typename String16::traits_type Traits16;
+    typedef typename Traits16::char_type   Char16;
+    typedef Utf8x16<Char16, Traits16> Xcode;
+    const Char16* in_begin = s.data();
+    const Char16* in_end = in_begin + s.size();
+    size_t utf8_buf_size = Xcode::find_utf8_buf_size(in_begin, in_end);
+    if (in_begin != in_end) throw runtime_error("Bad UTF-16");
+    in_begin = s.data();
+    UniquePtr<char[]> utf8_buf(new char[utf8_buf_size]);
+    char* out_begin = utf8_buf.get();
+    char* out_end = out_begin + utf8_buf_size;
+    bool valid_utf16 = Xcode::to_utf8(in_begin, in_end, out_begin, out_end);
+    TIGHTDB_ASSERT(valid_utf16);
+    static_cast<void>(valid_utf16);
+    TIGHTDB_ASSERT(in_begin == in_end);
+    return string(utf8_buf.get(), out_begin);
+}
+
+
+size_t find_buf_size_utf8_to_utf16(const string& s)
+{
+    typedef Utf8x16<char> Xcode;
     const char* in_begin = s.data();
     const char* in_end = in_begin + s.size();
-    size_t size = ::calc_buf_size_utf8_to_utf16(in_begin, in_end);
+    size_t size = Xcode::find_utf16_buf_size(in_begin, in_end);
     if (in_begin != in_end) throw runtime_error("Bad UTF-8");
+    return size;
+}
+
+template<class String16> size_t find_buf_size_utf16_to_utf8(const String16& s)
+{
+    typedef typename String16::traits_type Traits16;
+    typedef typename Traits16::char_type   Char16;
+    typedef Utf8x16<Char16, Traits16> Xcode;
+    const Char16* in_begin = s.data();
+    const Char16* in_end = in_begin + s.size();
+    size_t size = Xcode::find_utf8_buf_size(in_begin, in_end);
+    if (in_begin != in_end) throw runtime_error("Bad UTF-16");
     return size;
 }
 
@@ -198,9 +232,11 @@ TEST(Utf8_Utf16_Transcode)
             "0020006A0075006D007000730020006F00760065007200200074006800650020"
             "006C0061007A007900200064006F0067002E";
         CHECK_EQUAL(char_traits<char>::length(utf16_hex),
-                    calc_buf_size_utf8_to_utf16(utf8) * 4);
+                    find_buf_size_utf8_to_utf16(utf8) * 4);
         String16 utf16 = decode_16bit_hex<String16>(utf16_hex);
+        CHECK_EQUAL(utf8.size(), find_buf_size_utf16_to_utf8(utf16));
         CHECK(utf16 == utf8_to_utf16<String16>(utf8));
+        CHECK(utf8 == utf16_to_utf8(utf16));
     }
 
     // Now try a harder one (contains characters beyond U+FFFF)
@@ -217,8 +253,11 @@ TEST(Utf8_Utf16_Transcode)
             "DC0FF90F";
         string utf8 = decode_8bit_hex(utf8_hex);
         CHECK_EQUAL(char_traits<char>::length(utf16_hex),
-                    calc_buf_size_utf8_to_utf16(utf8) * 4);
+                    find_buf_size_utf8_to_utf16(utf8) * 4);
         String16 utf16 = decode_16bit_hex<String16>(utf16_hex);
+        CHECK_EQUAL(char_traits<char>::length(utf8_hex),
+                    find_buf_size_utf16_to_utf8(utf16) * 2);
         CHECK(utf16 == utf8_to_utf16<String16>(utf8));
+        CHECK(utf8 == utf16_to_utf8(utf16));
     }
 }
