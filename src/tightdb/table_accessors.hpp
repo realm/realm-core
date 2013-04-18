@@ -1528,37 +1528,33 @@ private:
 public:
     explicit QueryColumn(Query* q) TIGHTDB_NOEXCEPT: Base(q) {}
 
-    Query& equal(const BinaryData& value) const
+    Query& equal(BinaryData value) const
     {
-        Base::m_query->m_impl.equal_binary(col_idx, value.data(), value.size());
+        Base::m_query->m_impl.equal(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& not_equal(const BinaryData& value, bool case_sensitive=true) const
+    Query& not_equal(BinaryData value) const
     {
-        Base::m_query->m_impl.not_equal_binary(col_idx, value.data(), value.size(),
-                                               case_sensitive);
+        Base::m_query->m_impl.not_equal(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& begins_with(const BinaryData& value, bool case_sensitive=true) const
+    Query& begins_with(BinaryData value) const
     {
-        Base::m_query->m_impl.begins_with_binary(col_idx, value.data(), value.size(),
-                                                 case_sensitive);
+        Base::m_query->m_impl.begins_with(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& ends_with(const BinaryData& value, bool case_sensitive=true) const
+    Query& ends_with(BinaryData value) const
     {
-        Base::m_query->m_impl.ends_with_binary(col_idx, value.data(), value.size(),
-                                               case_sensitive);
+        Base::m_query->m_impl.ends_with(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& contains(const BinaryData& value, bool case_sensitive=true) const
+    Query& contains(BinaryData value) const
     {
-        Base::m_query->m_impl.contains_binary(col_idx, value.data(), value.size(),
-                                              case_sensitive);
+        Base::m_query->m_impl.contains(col_idx, value);
         return *Base::m_query;
     }
 };

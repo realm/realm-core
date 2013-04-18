@@ -50,7 +50,7 @@ public:
                   std::size_t begin = 0, std::size_t end = -1) const;
 
 #ifdef TIGHTDB_DEBUG
-    void ToDot(std::ostream& out, const char* title=NULL) const;
+    void ToDot(std::ostream& out, StringData title = StringData()) const;
 #endif // TIGHTDB_DEBUG
 
 private:

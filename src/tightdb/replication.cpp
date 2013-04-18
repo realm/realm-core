@@ -872,8 +872,7 @@ template<bool insert>
 void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
 {
     switch (m_table->get_column_type(column_ndx)) {
-    case type_Int:
-        {
+        case type_Int: {
             int64_t value = read_int<int64_t>(); // Throws
             if (insert) m_table->insert_int(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
             else m_table->set_int(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
@@ -883,10 +882,9 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
                 else *m_log << "table->set_int("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
             }
 #endif
+            return;
         }
-        break;
-    case type_Bool:
-        {
+        case type_Bool: {
             bool value = read_int<bool>(); // Throws
             if (insert) m_table->insert_bool(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
             else m_table->set_bool(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
@@ -896,10 +894,9 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
                 else *m_log << "table->set_bool("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
             }
 #endif
+            return;
         }
-        break;
-    case type_Date:
-        {
+        case type_Date: {
             time_t value = read_int<time_t>(); // Throws
             if (insert) m_table->insert_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
             else m_table->set_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
@@ -909,12 +906,11 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
                 else *m_log << "table->set_date("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
             }
 #endif
+            return;
         }
-        break;
-    case type_String:
-        {
+        case type_String: {
             read_string(m_string_buffer); // Throws
-            const char* const value = m_string_buffer.c_str();
+            StringData value(m_string_buffer.data(), m_string_buffer.size());
             if (insert) m_table->insert_string(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
             else m_table->set_string(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
@@ -923,39 +919,36 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
                 else *m_log << "table->set_string("<<column_ndx<<", "<<ndx<<", \""<<value<<"\")\n";
             }
 #endif
+            return;
         }
-        break;
-    case type_Binary:
-        {
+        case type_Binary: {
             read_string(m_string_buffer); // Throws
-            if (insert) m_table->insert_binary(column_ndx, ndx, m_string_buffer.data(),
-                                               m_string_buffer.size()); // FIXME: Memory allocation failure!!!
-            else m_table->set_binary(column_ndx, ndx, m_string_buffer.data(),
-                                     m_string_buffer.size()); // FIXME: Memory allocation failure!!!
+            BinaryData value(m_string_buffer.data(), m_string_buffer.size());
+            if (insert) m_table->insert_binary(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            else m_table->set_binary(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
             if (m_log) {
                 if (insert) *m_log << "table->insert_binary("<<column_ndx<<", "<<ndx<<", ...)\n";
                 else *m_log << "table->set_binary("<<column_ndx<<", "<<ndx<<", ...)\n";
             }
 #endif
+            return;
         }
-        break;
-    case type_Table:
-        if (insert) m_table->insert_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
-        else m_table->clear_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
+        case type_Table: {
+            if (insert) m_table->insert_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
+            else m_table->clear_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
-        if (m_log) {
-            if (insert) *m_log << "table->insert_subtable("<<column_ndx<<", "<<ndx<<")\n";
-            else *m_log << "table->clear_subtable("<<column_ndx<<", "<<ndx<<")\n";
-        }
+            if (m_log) {
+                if (insert) *m_log << "table->insert_subtable("<<column_ndx<<", "<<ndx<<")\n";
+                else *m_log << "table->clear_subtable("<<column_ndx<<", "<<ndx<<")\n";
+            }
 #endif
-        break;
-    case type_Mixed:
-        {
+            return;
+        }
+        case type_Mixed: {
             int type = read_int<int>(); // Throws
             switch (type) {
-            case type_Int:
-                {
+                case type_Int: {
                     int64_t value = read_int<int64_t>(); // Throws
                     if (insert) m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
                     else m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
@@ -965,10 +958,9 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
                         else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
                     }
 #endif
+                    return;
                 }
-                break;
-            case type_Bool:
-                {
+                case type_Bool: {
                     bool value = read_int<bool>(); // Throws
                     if (insert) m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
                     else m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
@@ -978,10 +970,9 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
                         else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
                     }
 #endif
+                    return;
                 }
-                break;
-            case type_Date:
-                {
+                case type_Date: {
                     time_t value = read_int<time_t>(); // Throws
                     if (insert) m_table->insert_mixed(column_ndx, ndx, Date(value)); // FIXME: Memory allocation failure!!!
                     else m_table->set_mixed(column_ndx, ndx, Date(value)); // FIXME: Memory allocation failure!!!
@@ -991,12 +982,11 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
                         else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", Date("<<value<<"))\n";
                     }
 #endif
+                    return;
                 }
-                break;
-            case type_String:
-                {
+                case type_String: {
                     read_string(m_string_buffer); // Throws
-                    const char* const value = m_string_buffer.c_str();
+                    StringData value(m_string_buffer.data(), m_string_buffer.size());
                     if (insert) m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
                     else m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
@@ -1005,12 +995,11 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
                         else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", \""<<value<<"\")\n";
                     }
 #endif
+                    return;
                 }
-                break;
-            case type_Binary:
-                {
+                case type_Binary: {
                     read_string(m_string_buffer); // Throws
-                    const BinaryData value(m_string_buffer.data(), m_string_buffer.size());
+                    BinaryData value(m_string_buffer.data(), m_string_buffer.size());
                     if (insert) m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
                     else m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
@@ -1019,26 +1008,24 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
                         else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", BinaryData(...))\n";
                     }
 #endif
+                    return;
                 }
-                break;
-            case type_Table:
-                if (insert) m_table->insert_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
-                else m_table->set_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
+                case type_Table: {
+                    if (insert) m_table->insert_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
+                    else m_table->set_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
-                if (m_log) {
-                    if (insert) *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", Mixed::subtable_tag())\n";
-                    else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", Mixed::subtable_tag())\n";
-                }
+                    if (m_log) {
+                        if (insert) *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", Mixed::subtable_tag())\n";
+                        else *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", Mixed::subtable_tag())\n";
+                    }
 #endif
-                break;
-            default:
-                throw BadTransactLog();
+                    return;
+                }
             }
+            break;
         }
-        break;
-    default:
-        throw BadTransactLog();
     }
+    throw BadTransactLog();
 }
 
 
