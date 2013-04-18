@@ -166,15 +166,19 @@ public:
     /// reason corresponds to one of the exception types that are
     /// derived from File::OpenError, the derived exception type is
     /// thrown.
-    void write(const std::string& file);
+    void write(const std::string& file) const;
 
     /// Write this database to a memory buffer.
     ///
     /// Ownership of the returned buffer is transferred to the
     /// caller. The memory will have been allocated using
     /// std::malloc().
-    BufferSpec write_to_mem();
+    BufferSpec write_to_mem() const;
 
+    // FIXME: What does this one do? Exactly how is it different from
+    // calling write()? There is no documentation to be found anywhere
+    // and it looks like it leaves the group in an invalid state. You
+    // should probably not use it.
     void commit();
 
     // Conversion
@@ -242,7 +246,7 @@ protected:
     void create_from_ref(size_t top_ref);
 
     // May throw WriteError
-    template<class S> size_t write_to_stream(S& out);
+    template<class S> size_t write_to_stream(S& out) const;
 
     // Member variables
     SlabAlloc m_alloc;
@@ -489,7 +493,7 @@ inline void Group::commit()
     commit(-1, -1, true);
 }
 
-template<class S> size_t Group::write_to_stream(S& out)
+template<class S> size_t Group::write_to_stream(S& out) const
 {
     // Space for file header
     out.write(SlabAlloc::default_header, sizeof SlabAlloc::default_header);
@@ -497,7 +501,7 @@ template<class S> size_t Group::write_to_stream(S& out)
     // When serializing to disk we dont want
     // to include free space tracking as serialized
     // files are written without any free space.
-    Array top(Array::coldef_HasRefs, NULL, 0, m_alloc);
+    Array top(Array::coldef_HasRefs, NULL, 0, const_cast<SlabAlloc&>(m_alloc)); // FIXME: Another aspect of the poor constness behavior in Array class. What can we do?
     top.add(m_top.Get(0));
     top.add(m_top.Get(1));
 

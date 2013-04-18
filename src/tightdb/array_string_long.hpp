@@ -53,7 +53,7 @@ public:
     static void foreach(const Array*, ForEachOp<StringData>*) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
-    void ToDot(std::ostream& out, const char* title=NULL) const;
+    void ToDot(std::ostream& out, StringData title = StringData()) const;
 #endif // TIGHTDB_DEBUG
 
 private:

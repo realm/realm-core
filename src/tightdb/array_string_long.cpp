@@ -174,13 +174,13 @@ void ArrayStringLong::ForEachOffsetOp::handle_chunk(const int64_t* begin, const 
 
 #ifdef TIGHTDB_DEBUG
 
-void ArrayStringLong::ToDot(ostream& out, const char* title) const
+void ArrayStringLong::ToDot(ostream& out, StringData title) const
 {
     const size_t ref = GetRef();
 
     out << "subgraph cluster_arraystringlong" << ref << " {" << endl;
     out << " label = \"ArrayStringLong";
-    if (title) out << "\\n'" << title << "'";
+    if (0 < title.size()) out << "\\n'" << title << "'";
     out << "\";" << endl;
 
     Array::ToDot(out, "stringlong_top");

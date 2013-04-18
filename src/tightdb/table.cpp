@@ -1097,7 +1097,7 @@ void Table::set_date(size_t column_ndx, size_t ndx, Date value)
     column.set(ndx, int64_t(value.get_date()));
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().set_value(column_ndx, ndx, value); // Throws
+    transact_log().set_value(column_ndx, ndx, value.get_date()); // Throws
 #endif
 }
 

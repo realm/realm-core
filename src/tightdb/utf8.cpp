@@ -19,7 +19,7 @@ namespace {
 // is as specified.
 inline int sequence_length(char lead)
 {
-    int lead2 = static_cast<unsigned char>(lead);
+    int lead2 = char_traits<char>::to_int_type(lead);
     if ((lead2 & 0x80) == 0) return 1;
     if ((lead2 & 0x40) == 0) return 0; // Error
     if ((lead2 & 0x20) == 0) return 2;
@@ -39,11 +39,11 @@ inline bool equal_sequence(const char*& begin, const char* end, const char* begi
     if (begin[0] != begin2[0]) return false;
 
     size_t i = 1;
-    if (int(static_cast<unsigned char>(begin[0])) & 0x80) {
+    if (int(char_traits<char>::to_int_type(begin[0])) & 0x80) {
         // All following bytes matching '10xxxxxx' will be considered
         // as part of this character.
         while (begin + i != end) {
-            if ((int(static_cast<unsigned char>(begin[i])) & (0x80 + 0x40)) != 0x80) break;
+            if ((int(char_traits<char>::to_int_type(begin[i])) & (0x80 + 0x40)) != 0x80) break;
             if (begin[i] != begin2[i]) return false;
             ++i;
         }
@@ -163,8 +163,13 @@ bool case_map(StringData source, char* target, bool upper)
         else
             CharLowerW(static_cast<LPWSTR>(tmp));
 
-        int n3 = WideCharToMultiByte(CP_UTF8, MB_ERR_INVALID_CHARS, tmp, 1, target, end-begin,
-                                     0, 0);
+        // FIXME: The intention is to use flag 'WC_ERR_INVALID_CHARS'
+        // to catch invalid UTF-8. Even though the documentation says
+        // unambigously that it is supposed to work, it doesn't. When
+        // the flag is specified, the function fails with error
+        // ERROR_INVALID_FLAGS.
+        DWORD flags = 0;
+        int n3 = WideCharToMultiByte(CP_UTF8, flags, tmp, 1, target, end-begin, 0, 0);
         if (n3 == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER) return false;
         if (n3 != n) {
             copy(begin, begin+n, target); // Cannot handle different size, copy source
@@ -246,5 +251,6 @@ size_t search_case_fold(StringData haystack, const char* needle_upper, const cha
     }
     return haystack.size(); // Not found
 }
+
 
 } // namespace tightdb

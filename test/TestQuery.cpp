@@ -17,6 +17,10 @@ TIGHTDB_TABLE_2(TupleTableType,
                 first,  Int,
                 second, String)
 
+TIGHTDB_TABLE_2(TupleTableTypeBin,
+                first,  Int,
+                second, Binary)
+
 TIGHTDB_TABLE_2(BoolTupleTable,
                 first,  Int,
                 second, Bool)
@@ -53,7 +57,6 @@ TIGHTDB_TABLE_5(GATable,
                      build,   String,
                      event_1, Int,
                      event_2, Int)
-					 
 
 } // anonymous namespace
 
@@ -1514,6 +1517,81 @@ TEST(TestQueryFindAll_Contains)
     CHECK_EQUAL(2, tv1.get_source_ndx(2));
     CHECK_EQUAL(3, tv1.get_source_ndx(3));
 }
+
+
+TEST(TestQuery_Binary)
+{
+    TupleTableTypeBin t;
+
+    const char bin[64] = {
+        6, 3, 9, 5, 9, 7, 6, 3, 2, 6, 0, 0, 5, 4, 2, 4,
+        5, 7, 9, 5, 7, 1, 1, 2, 0, 8, 3, 8, 0, 9, 6, 8,
+        4, 7, 3, 4, 9, 5, 2, 3, 6, 2, 7, 4, 0, 3, 7, 6,
+        2, 3, 5, 9, 3, 1, 2, 1, 0, 5, 5, 2, 9, 4, 5, 9
+    };
+
+    const char bin_2[4] = { 6, 6, 6, 6 }; // Not occuring above
+
+    t.add(0, BinaryData(bin +  0, 16));
+    t.add(0, BinaryData(bin +  0, 32));
+    t.add(0, BinaryData(bin +  0, 48));
+    t.add(0, BinaryData(bin +  0, 64));
+    t.add(0, BinaryData(bin + 16, 48));
+    t.add(0, BinaryData(bin + 32, 32));
+    t.add(0, BinaryData(bin + 48, 16));
+    t.add(0, BinaryData(bin + 24, 16)); // The "odd ball"
+    t.add(0, BinaryData(bin +  0, 32)); // Repeat an entry
+
+    CHECK_EQUAL(0, t.where().second.equal(BinaryData(bin + 16, 16)).count());
+    CHECK_EQUAL(1, t.where().second.equal(BinaryData(bin +  0, 16)).count());
+    CHECK_EQUAL(1, t.where().second.equal(BinaryData(bin + 48, 16)).count());
+    CHECK_EQUAL(2, t.where().second.equal(BinaryData(bin +  0, 32)).count());
+
+    CHECK_EQUAL(9, t.where().second.not_equal(BinaryData(bin + 16, 16)).count());
+    CHECK_EQUAL(8, t.where().second.not_equal(BinaryData(bin +  0, 16)).count());
+
+    CHECK_EQUAL(0, t.where().second.begins_with(BinaryData(bin +  8, 16)).count());
+    CHECK_EQUAL(1, t.where().second.begins_with(BinaryData(bin + 16, 16)).count());
+    CHECK_EQUAL(4, t.where().second.begins_with(BinaryData(bin +  0, 32)).count());
+    CHECK_EQUAL(5, t.where().second.begins_with(BinaryData(bin +  0, 16)).count());
+    CHECK_EQUAL(1, t.where().second.begins_with(BinaryData(bin + 48, 16)).count());
+    CHECK_EQUAL(9, t.where().second.begins_with(BinaryData(bin + 0,   0)).count());
+
+    CHECK_EQUAL(0, t.where().second.ends_with(BinaryData(bin + 40, 16)).count());
+    CHECK_EQUAL(1, t.where().second.ends_with(BinaryData(bin + 32, 16)).count());
+    CHECK_EQUAL(3, t.where().second.ends_with(BinaryData(bin + 32, 32)).count());
+    CHECK_EQUAL(4, t.where().second.ends_with(BinaryData(bin + 48, 16)).count());
+    CHECK_EQUAL(1, t.where().second.ends_with(BinaryData(bin +  0, 16)).count());
+    CHECK_EQUAL(9, t.where().second.ends_with(BinaryData(bin + 64,  0)).count());
+
+    CHECK_EQUAL(0, t.where().second.contains(BinaryData(bin_2)).count());
+    CHECK_EQUAL(5, t.where().second.contains(BinaryData(bin +  0, 16)).count());
+    CHECK_EQUAL(5, t.where().second.contains(BinaryData(bin + 16, 16)).count());
+    CHECK_EQUAL(4, t.where().second.contains(BinaryData(bin + 24, 16)).count());
+    CHECK_EQUAL(4, t.where().second.contains(BinaryData(bin + 32, 16)).count());
+    CHECK_EQUAL(9, t.where().second.contains(BinaryData(bin +  0,  0)).count());
+
+    {
+        TupleTableTypeBin::View tv = t.where().second.equal(BinaryData(bin + 0, 32)).find_all();
+        if (tv.size() == 2) {
+            CHECK_EQUAL(1, tv.get_source_ndx(0));
+            CHECK_EQUAL(8, tv.get_source_ndx(1));
+        }
+        else CHECK(false);
+    }
+
+    {
+        TupleTableTypeBin::View tv = t.where().second.contains(BinaryData(bin + 24, 16)).find_all();
+        if (tv.size() == 4) {
+            CHECK_EQUAL(2, tv.get_source_ndx(0));
+            CHECK_EQUAL(3, tv.get_source_ndx(1));
+            CHECK_EQUAL(4, tv.get_source_ndx(2));
+            CHECK_EQUAL(7, tv.get_source_ndx(3));
+        }
+        else CHECK(false);
+    }
+}
+
 
 TEST(TestQueryEnums)
 {

@@ -38,6 +38,7 @@ class BinaryData {
 public:
     BinaryData() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
     BinaryData(const char* data, std::size_t size) TIGHTDB_NOEXCEPT: m_data(data), m_size(size) {}
+    template<std::size_t N> explicit BinaryData(const char (&data)[N]): m_data(data), m_size(N) {}
 
     char operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
 
