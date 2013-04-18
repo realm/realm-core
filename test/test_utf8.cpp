@@ -260,4 +260,6 @@ TEST(Utf8_Utf16_Transcode)
         CHECK(utf16 == utf8_to_utf16<String16>(utf8));
         CHECK(utf8 == utf16_to_utf8(utf16));
     }
+
+    CHECK_EQUAL("41", encode_8bit_hex("A")); // Avoid 'unused function' warning
 }
