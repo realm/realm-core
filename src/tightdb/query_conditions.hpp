@@ -21,7 +21,6 @@
 #define TIGHTDB_QUERY_CONDITIONS_HPP
 
 #include <stdint.h>
-#include <cstring>
 #include <string>
 
 #include <tightdb/binary_data.hpp>
