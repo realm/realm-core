@@ -242,6 +242,8 @@ public:
     size_t         find_first_string(size_t column_ndx, const char* value) const;
     size_t         find_first_binary(size_t column_ndx, const char* value, size_t len) const;
 
+    bool           find_sorted_int(size_t column_ndx, int64_t value, size_t& pos) const;
+
     TableView      find_all_int(size_t column_ndx, int64_t value);
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
     TableView      find_all_bool(size_t column_ndx, bool value);

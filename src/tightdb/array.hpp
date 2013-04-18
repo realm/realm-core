@@ -285,7 +285,8 @@ public:
     template <size_t w> bool Increment(int64_t value, size_t start, size_t end);
 
     size_t FindPos(int64_t value) const TIGHTDB_NOEXCEPT;
-    size_t FindPos2(int64_t value) const;
+    size_t FindPos2(int64_t value) const TIGHTDB_NOEXCEPT;
+    bool   FindPosSorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT;
     size_t FindGTE(int64_t target, size_t start) const;
     void Preset(int64_t min, int64_t max, size_t count);
     void Preset(size_t bitwidth, size_t count);
