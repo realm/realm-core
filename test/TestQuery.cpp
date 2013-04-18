@@ -88,17 +88,17 @@ TEST(TestQueryStrEnum)
 TEST(TestQueryStrIndex)
 {
 #ifdef TIGHTDB_DEBUG
-	int itera = 4;
-	int iterb = 100;
+	size_t itera = 4;
+	size_t iterb = 100;
 #else
-	int itera = 100;
-	int iterb = 2000;
+	size_t itera = 100;
+	size_t iterb = 2000;
 #endif
 	
 	int aa;
 	int64_t s;
 
-	for(int i = 0; i < itera; i++) {
+	for(size_t i = 0; i < itera; i++) {
 		TupleTableType ttt;
 		aa = 0;
 		for(size_t t = 0; t < iterb; t++) {
