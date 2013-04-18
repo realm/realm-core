@@ -131,7 +131,7 @@
 #endif
 
 
-/* How to specify that a function never returns.
+/* The way to specify that a function never returns.
  *
  * NOTE: C++11 generalized attributes are not yet fully supported in
  * MSVC++ 11.0. */
@@ -143,6 +143,15 @@
 #  define TIGHTDB_NORETURN __declspec(noreturn)
 #else
 #  define TIGHTDB_NORETURN
+#endif
+
+
+/* The way to specify that a variable or type is intended to possibly
+ * not be used. Use it to suppress a warning from the compiler. */
+#if __GNUC__
+#  define TIGHTDB_UNUSED __attribute__((unused))
+#else
+#  define TIGHTDB_UNUSED
 #endif
 
 
