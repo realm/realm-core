@@ -272,10 +272,27 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
         return value.size() == 0 && begin < end ? begin : -1;
     }
 
-    for (size_t i=begin; i<end; ++i) {
-        const char* data = m_data + (i * m_width);
-        std::size_t size = (m_width-1) - data[m_width-1];
-        if (StringData(data, size) == value) return i;
+    if (value.size() == 0) {
+        const char* data = m_data + (m_width-1);
+        for (size_t i = begin; i != end; ++i) {
+            size_t size = (m_width-1) - data[i * m_width];
+            if (size == 0) return i;
+        }
+    }
+    else {
+        for (size_t i = begin; i != end; ++i) {
+            const char* data = m_data + (i * m_width);
+            size_t j = 0;
+            for (;;) {
+                if (TIGHTDB_LIKELY(data[j] != value[j])) break;
+                ++j;
+                if (TIGHTDB_UNLIKELY(j == value.size())) {
+                    size_t size = (m_width-1) - data[m_width-1];
+                    if (TIGHTDB_LIKELY(size == value.size())) return i;
+                    break;
+                }
+            }
+        }
     }
 
     return size_t(-1); // not found
