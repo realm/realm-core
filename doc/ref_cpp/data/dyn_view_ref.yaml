@@ -21,11 +21,20 @@ DESCR      : &g_dyn_view_intro_descr
              Notice that this does not imply that it will work the
              opposite direction. Any change that adds or removes rows
              in the original table will invalidate the view, and you
-             will have an inconsistent view of the table. This might
-             lead to a serious data corruption.
+             must not use the view, as this could possibly lead to data
+             corruption.
 
-             It is possible to create two views for the table as
+             It is possible to create multiple views for the table as
              long as you do not change the original table.
+             
+             NOTICE: 
+             For all methods which takes row and column index as parameters,
+             you must ensure that these are in a valid range.
+             You must also ensure that you use the correct type of method for
+             the correct type of column. I.e. it's invalid to use 'getString(...)'
+             with a column index which is of Boolean type - it must be of 'String' 
+             type and so forth.
+             
 SEE        :
 EXAMPLES   :
 - DESCR:
@@ -288,8 +297,8 @@ CATEGORIES :
   - g_dyn_view_find_first_date:
   - g_dyn_view_find_first_string:
       NAMES    : find_first_*
-      SUMMARY  : *g_find_first_xxx_summary
-      DESCR    : *g_find_first_xxx_descr
+      SUMMARY  : *g_dyn_table_find_first_xxx_summary
+      DESCR    : *g_dyn_table_find_first_xxx_descr
       SIGNATURE: |
                  size_t find_first_int(size_t column_ndx, int64_t value) const;
                  size_t find_first_bool(size_t column_ndx, bool value) const;
@@ -324,8 +333,8 @@ CATEGORIES :
   - g_dyn_view_find_all_date_const:
   - g_dyn_view_find_all_string_const:
       NAMES    : find_all_*
-      SUMMARY  : *g_find_all_xxx_summary
-      DESCR    : *g_find_all_xxx_descr
+      SUMMARY  : *g_dyn_table_find_all_xxx_summary
+      DESCR    : *g_dyn_table_find_all_xxx_descr
       SIGNATURE: |
                  TableView      find_all_int(size_t column_ndx, int64_t value);
                  TableView      find_all_bool(size_t column_ndx, bool value);
@@ -374,6 +383,7 @@ CATEGORIES :
   - g_dyn_view_sum:
   - g_dyn_view_sum_float:
   - g_dyn_view_sum_double:
+      TITLE    : sum*
       NAMES    : [sum, sum_float, sum_double]
       SUMMARY  : &g_dyn_view_sum_summary
                  Calculates the sum.
@@ -397,6 +407,7 @@ CATEGORIES :
   - g_dyn_view_maximum:
   - g_dyn_view_maximum_float:
   - g_dyn_view_maximum_double:
+      TITLE    : maximum*
       NAMES    : [maximum, maximum_float, maximum_double]
       SUMMARY  : &g_dyn_view_maximum_summary
                  Find highest value.
@@ -420,6 +431,7 @@ CATEGORIES :
   - g_dyn_view_minimum:
   - g_dyn_view_minimum_float:
   - g_dyn_view_minimum_double:
+      TITLE    : minimum*
       NAMES    : [minimum, minimum_float, minimum_double]
       SUMMARY  : &g_dyn_view_minimum_summary
                  Find lowest value.
@@ -446,11 +458,13 @@ CATEGORIES :
       NAMES    : to_json
       SUMMARY  : *g_dyn_table_to_json_summary
       DESCR    : &g_dyn_view_to_json_descr
+                 >
+                 This method will convert a view and its columns and rows
+                 to a JSON compatible representation.
+                 
                  The JavaScript Object Notation (<a
                  href="http://json.org">JSON</a>) is useful for
-                 web/mobile applications and serialization. This
-                 method will convert a view and its columns and rows
-                 to a JSON compatible representation.
+                 web/mobile applications and serialization. 
       PARAMS:
       - NAME   : out
         TYPES  : std::ostream&
