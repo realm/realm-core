@@ -14,15 +14,91 @@ Format:
 
 
 2013-04-23 (Kristian Spangsege)
-+ Support for explicit string lengths added.
-+ Improved support for BinaryData in queries.
-+ New convenience methods added to BinaryData class.
++ Support for explicit string lengths added. Most method arguments and
+  return values of type 'const char*' have been changed to be of type
+  'StringData'. This new type is defined in
+  <tightdb/string_data.hpp>. 'StringData' can be implicitly
+  constructed from 'const char*', so no change is required when
+  passing arguments. Source code change is required when dealing with
+  returned strings of type 'const char*'. The following is a complete
+  list:
+    Affected form                      Possible replacement
+    ---------------------------------------------------------------------------
+    group.get_table_name(...)          group.get_table_name(...).data()
+    table.get_column_name()            table.get_column_name().data()
+    table.get_string(...)              table.get_string(...).data()
+    table.get_mixed(...).get_string()  table.get_mixed(...).get_string().data()
+    table[7].string_col                table[7].string_col.c_str()
++ Added support for table[7].string_col.data() and table[7].string_col.size().
++ Full and seamless interoperability with std::string. This comes
+  about from the fact that StringData can be implicitly constructed
+  from, and convert to std::string.
++ Full support for BinaryData in queries.
++ Added BinaryData::data(), BinaryData::size(), BinaryData::operator[]()
++ Added BinaryData::operator==(), BinaryData::operator!=(), BinaryData::operator<()
++ Added BinaryData::begins_with(), BinaryData::ends_with(), BinaryData::contains()
++ Allow BinaryData to be constructed from fixed size array:
+  template<std::size_t N> explicit BinaryData(const char (&)[N])
+- BinaryData::pointer removed, use BinaryData::data() instead.
+- BinaryData::len removed, use BinaryData::size() instead.
+- BinaryData::compare_payload() removed, use BinaryData::operator==() instead.
++ The methods
+    Table::set_binary(std::size_t column_ndx, std::size_t row_ndx, const char* data, std::size_t size)
+    Table::insert_binary(std::size_t column_ndx, std::size_t row_ndx, const char* data, std::size_t size)
+    Table::find_first_binary(std::size_t column_ndx, const char* data, std::size_t size)
+    Table::find_all_binary(std::size_t column_ndx, const char* data, std::size_t size)
+    TableView::set_binary(std::size_t column_ndx, std::size_t row_ndx, const char* data, std::size_t size)
+  have been changed to
+    Table::set_binary(size_t column_ndx, size_t row_ndx, BinaryData)
+    Table::insert_binary(size_t column_ndx, size_t row_ndx, BinaryData)
+    Table::find_first_binary(std::size_t column_ndx, BinaryData)
+    Table::find_all_binary(std::size_t column_ndx, BinaryData)
+    TableView::set_binary(size_t column_ndx, size_t row_ndx, BinaryData)
+  The following changes have been made in the statically
+  typed API:
+    Affected form                  Possible replacement
+    ---------------------------------------------------------
+    table[7].binary_col.pointer()  table[7].binary_col.data()
+    table[7].binary_col.len()      table[7].binary_col.size()
+  These changes were made for consistency with StringData.
++ Added Date::operator<()
++ Return type changed from 'std::time_t' to 'Date' on the following
+  methods:
+    Mixed::get_date()
+    Table::get_date()
+    TableView::get_date()
+  Argument type changed from 'std::time_t' to 'Date' on many methods including these:
+    Mixed::set_date()
+    Table::set_date()
+    Table::insert_date()
+    TableView::set_date()
+  Changes corresponding to these have been made in the statically
+  typed API. These are some of the affected forms:
+    time_t(table[7].date_col)
+    table[7].date_col = val
+    table[7].mixed_col.get_date()
+  These changes were made for consistency, and to improve the
+  isolation of the implementation of 'Date' (it is likely that the
+  implementation of 'Date' will change). 'Date' can be implicitly
+  constructed from std::time_t, but it cannot be implicitly converted
+  to std::time_t (nor is it considered desireable to allow such an
+  implicit conversion). This means that applications will be affected
+  as follows:
+    Affected form                    Possible replacement
+    ---------------------------------------------------------------------------
+    table.get_date(...)              table.get_date(...).get_date()
+    table.get_mixed(...).get_date()  table.get_mixed(...).get_date().get_date()
+    time_t(table[7].date_col)        Date(table[7].date_col).get_date()
+    table[7].date_col.get()          table[7].date_col.get().get_date()
 + Group::write() and Group::write_to_mem() are now 'const'.
-+ Group::BufferSpec eliminated. Use BinaryData instead.
++ Group::BufferSpec eliminated. Using BinaryData instead.
 
 
 2013-03-11 (Kristian Spangsege)
-+ On Linux and OS X, installed shared libraries now carry a platform dependent API version which is computed from a platform neutral version specifier (same as GNU Libtool). This allows for multiple versions of the shared library to be concurrently installed.
++ On Linux and OS X, installed shared libraries now carry a platform
+  dependent API version which is computed from a platform neutral
+  version specifier (same as GNU Libtool). This allows for multiple
+  versions of the shared library to be concurrently installed.
 
 
 2013-02-24 (Kristian Spangsege)
