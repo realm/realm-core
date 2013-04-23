@@ -49,11 +49,11 @@ Format:
     Table::find_all_binary(std::size_t column_ndx, const char* data, std::size_t size)
     TableView::set_binary(std::size_t column_ndx, std::size_t row_ndx, const char* data, std::size_t size)
   have been changed to
-    Table::set_binary(size_t column_ndx, size_t row_ndx, BinaryData)
-    Table::insert_binary(size_t column_ndx, size_t row_ndx, BinaryData)
+    Table::set_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData)
+    Table::insert_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData)
     Table::find_first_binary(std::size_t column_ndx, BinaryData)
     Table::find_all_binary(std::size_t column_ndx, BinaryData)
-    TableView::set_binary(size_t column_ndx, size_t row_ndx, BinaryData)
+    TableView::set_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData)
   The following changes have been made in the statically
   typed API:
     Affected form                  Possible replacement
