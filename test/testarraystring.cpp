@@ -364,9 +364,6 @@ TEST_FIXTURE(db_setup_string, ArrayStringCount)
     CHECK_EQUAL(3, count);
 }
 
-// FIXME: The following unit test has ben temporarily commented
-// out. See https://github.com/Tightdb/tightdb/pull/84
-/*
 TEST_FIXTURE(db_setup_string, ArrayStringWithZeroBytes)
 {
     c.Clear();
@@ -387,7 +384,6 @@ TEST_FIXTURE(db_setup_string, ArrayStringWithZeroBytes)
     CHECK_EQUAL(StringData(buf_2, sizeof buf_2), c.get(1));
     CHECK_EQUAL(StringData(buf_3, sizeof buf_3), c.get(2));
 }
-*/
 
 TEST_FIXTURE(db_setup_string, ArrayStringDestroy)
 {
