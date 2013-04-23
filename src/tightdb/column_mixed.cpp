@@ -1,6 +1,6 @@
 #include <tightdb/column_mixed.hpp>
 
-usinag namespace std;
+using namespace std;
 
 namespace tightdb {
 

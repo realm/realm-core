@@ -355,7 +355,7 @@ void Group::write(const string& path) const
     write_to_stream(out);
 }
 
-Group::BufferSpec Group::write_to_mem() const
+BinaryData Group::write_to_mem() const
 {
     TIGHTDB_ASSERT(m_top.IsValid());
 
@@ -366,7 +366,7 @@ Group::BufferSpec Group::write_to_mem() const
     const size_t size = write_to_stream(out);
 
     char* const data = out.release_buffer();
-    return BufferSpec(data, size);
+    return BinaryData(data, size);
 }
 
 // NOTE: This method must not modify *this if m_shared is false.

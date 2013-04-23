@@ -13,11 +13,12 @@ Format:
 ==================
 
 
-2013-03-16 (Kristian Spangsege)
+2013-04-23 (Kristian Spangsege)
 + Support for explicit string lengths added.
 + Improved support for BinaryData in queries.
 + New convenience methods added to BinaryData class.
 + Group::write() and Group::write_to_mem() are now 'const'.
++ Type of Group::BufferSpec eliminated. Use BinaryData instead.
 
 
 2013-03-11 (Kristian Spangsege)
