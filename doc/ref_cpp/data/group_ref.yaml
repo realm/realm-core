@@ -54,7 +54,7 @@ CATEGORIES:
       SIGNATURE: |
                  Group();
                  Group(const std::string& file, OpenMode mode = mode_Normal);
-                 Group(BufferSpec buffer, bool take_ownership = true);
+                 Group(BinaryData buffer, bool take_ownership = true);
                  Group(unattached_tag) noexcept;
       PARAMS:
       - NAME   : file
@@ -67,7 +67,7 @@ CATEGORIES:
                  Group::mode_ReadOnly: Open in read-only mode, fail if the file does not already exist.
                  Group::mode_NoCreate: Open in read/write mode, fail if the file does not already exist.
       - NAME   : buffer
-        TYPES  : Group::BufferSpec
+        TYPES  : BinaryData
         DESCR  : In-memory binary encoded representation of a group.
       RETURN:
         TYPES  : Group
@@ -267,7 +267,7 @@ CATEGORIES:
       CONST    : true
       RETURN:
         DESCR  : The allocated buffer. You will have to call std::free() when you are done with it.
-        TYPES  : Group::BufferSpec
+        TYPES  : BinaryData
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_write_to_mem
@@ -349,7 +349,7 @@ CATEGORIES:
                  Attach to a file or a memory buffer.
       SIGNATURE: |
                  void open(const std::string& file, OpenMode mode = mode_Normal);
-                 void open(BufferSpec buffer, bool take_ownership = true);
+                 void open(BinaryData buffer, bool take_ownership = true);
       PARAMS:
       - NAME   : file
         TYPES  : const std::string&
@@ -358,7 +358,7 @@ CATEGORIES:
         TYPES  : Group::OpenMode
         DESCR  : See Group().
       - NAME   : buffer
-        TYPES  : Group::BufferSpec
+        TYPES  : BinaryData
         DESCR  : In-memory binary encoded representation of a group.
       THROWS:
       - EXCEPT : File::OpenError

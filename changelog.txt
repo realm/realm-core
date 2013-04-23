@@ -18,7 +18,7 @@ Format:
 + Improved support for BinaryData in queries.
 + New convenience methods added to BinaryData class.
 + Group::write() and Group::write_to_mem() are now 'const'.
-+ Type of Group::BufferSpec eliminated. Use BinaryData instead.
++ Group::BufferSpec eliminated. Use BinaryData instead.
 
 
 2013-03-11 (Kristian Spangsege)
@@ -60,7 +60,7 @@ Format:
 + Simplified open-mode for Group constructor.
 - Group::is_valid() removed. Errors are now reported as exceptions from the constructor.
 + Now using Group::BufferSpec to pass a memory buffer to the Group constructor.
-+ Group::write_to_mem() now returnis a Group::BufferSpec.
++ Group::write_to_mem() now returns a Group::BufferSpec.
 + Addition of 'bool no_create' arguemnt to SharedGroup constructor.
 
 
