@@ -140,13 +140,13 @@ void ColumnBinary::fill(size_t count)
 }
 
 
-void ColumnBinary::erase(std::size_t ndx)
+void ColumnBinary::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < Size());
     TreeDelete<BinaryData,ColumnBinary>(ndx);
 }
 
-void ColumnBinary::Resize(std::size_t ndx)
+void ColumnBinary::Resize(size_t ndx)
 {
     TIGHTDB_ASSERT(!IsNode()); // currently only available on leaf level (used by b-tree code)
     TIGHTDB_ASSERT(ndx < Size());
@@ -196,7 +196,7 @@ void ColumnBinary::LeafDelete(size_t ndx)
 
 #ifdef TIGHTDB_DEBUG
 
-void ColumnBinary::LeafToDot(std::ostream& out, const Array& array) const
+void ColumnBinary::LeafToDot(ostream& out, const Array& array) const
 {
     // Rebuild array to get correct type
     const size_t ref = array.GetRef();

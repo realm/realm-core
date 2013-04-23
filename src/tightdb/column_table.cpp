@@ -132,7 +132,7 @@ void ColumnTable::Verify() const
     }
 }
 
-void ColumnTable::LeafToDot(std::ostream& out, const Array& array) const
+void ColumnTable::LeafToDot(ostream& out, const Array& array) const
 {
     array.ToDot(out);
 

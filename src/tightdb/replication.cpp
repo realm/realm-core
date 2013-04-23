@@ -448,7 +448,7 @@ void Replication::transact_log_reserve_contig(size_t n)
 }
 
 
-void Replication::transact_log_append_overflow(const char* data, std::size_t size)
+void Replication::transact_log_append_overflow(const char* data, size_t size)
 {
     // FIXME: During write access, it should be possible to use m_file_map.get_size() instead of SharedState::m_size.
     bool need_expand = false;
@@ -797,7 +797,7 @@ template<class T> T Replication::TransactLogApplier::read_int()
 {
     T value = 0;
     int part;
-    const int max_bytes = (std::numeric_limits<T>::digits+1+6)/7;
+    const int max_bytes = (numeric_limits<T>::digits+1+6)/7;
     for (int i=0; i<max_bytes; ++i) {
         char c;
         if (!read_char(c)) goto bad_transact_log;
