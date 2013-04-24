@@ -358,16 +358,16 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_lookup
         DESCR  :
-  - g_find_first_bool:
-  - g_find_first_int:
-  - g_find_first_float:
-  - g_find_first_double:
-  - g_find_first_date:
-  - g_find_first_string:
+  - g_typed_table_find_first_bool:
+  - g_typed_table_find_first_int:
+  - g_typed_table_find_first_float:
+  - g_typed_table_find_first_double:
+  - g_typed_table_find_first_date:
+  - g_typed_table_find_first_string:
       NAMES    : find_first_*
-      SUMMARY  : &g_find_first_xxx_summary
+      SUMMARY  : &g_typed_table_find_first_xxx_summary
                  Find first matching row.
-      DESCR    : &g_find_first_xxx_descr
+      DESCR    : &g_typed_table_find_first_xxx_descr
                  The method finds the first occurence of a given value in a column.
       SIGNATURE: |
                  size_t find_first_int(int64_t value) const;
@@ -387,22 +387,22 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_find_first_xxx
         DESCR  :
-  - g_find_all_bool:
-  - g_find_all_int:
-  - g_find_all_float:
-  - g_find_all_double:
-  - g_find_all_date:
-  - g_find_all_string:
-  - g_find_all_bool_const:
-  - g_find_all_float_const:
-  - g_find_all_double_const:
-  - g_find_all_int_const:
-  - g_find_all_date_const:
-  - g_find_all_string_const:
+  - g_typed_table_find_all_bool:
+  - g_typed_table_find_all_int:
+  - g_typed_table_find_all_float:
+  - g_typed_table_find_all_double:
+  - g_typed_table_find_all_date:
+  - g_typed_table_find_all_string:
+  - g_typed_table_find_all_bool_const:
+  - g_typed_table_find_all_float_const:
+  - g_typed_table_find_all_double_const:
+  - g_typed_table_find_all_int_const:
+  - g_typed_table_find_all_date_const:
+  - g_typed_table_find_all_string_const:
       NAMES    : find_all_*
-      SUMMARY  : &g_find_all_xxx_summary
+      SUMMARY  : &g_typed_table_find_all_xxx_summary
                  Find all matching rows.
-      DESCR    : &g_find_all_xxx_descr
+      DESCR    : &g_typed_table_find_all_xxx_descr
                  The method finds all occurences of a given value in a specific column.
                  The rows are returned as a {@link class_typed_tableview} object.
       SIGNATURE: |
