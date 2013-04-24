@@ -12,26 +12,28 @@ SUMMARY    : &g_dyn_query_intro_summary
              Query your TightDB table.
 DESCR      : &g_dyn_query_intro_descr
              >
+             The dynamic query class is used in conjunction with the dynamic table class.
              Query objects are used to build up queries. A query is tied to a
-             {@link class_dyn_table}. The dynamic query class is used in conjunction with the
-             dynamic table class.
+             {@link class_dyn_table} and constructed from this class by it's 
+             <code>where()</code> method.
 
-             Conditions is added to a query through a
+             Conditions are added to a query through a
              <a href="http://en.wikipedia.org/wiki/Fluent_interface">fluent interface</a>.
              This means that the methods representing the conditions will return the
              query object. In general, the predicate functions require a column index
-             as parameter. The compiler cannot infer the correct types as tables are
+             as parameter. The compiler cannot infer the correct column types as tables are
              declared at run time. Using wrong types might lead to run time errors.
 
              Once the query is ready, it is possible to reuse by multiple calls to
              the action methods.
-             Moreover, it is possible extend the query with new conditions after applying an
+             Moreover, it is possible to extend the query with new conditions after applying an
              action method and thereby implement a drill-down. It is important to stress that
              no data is cached, and the new queries cannot benefit from previous queries.
 
              Alternatively, a query can result in a {@link class_dyn_tableview} which can be further
              queried.
-SEE        :
+SEE        : &g_dyn_query_intro_see
+             See also the {@link g_typed_query_class} class which is used with typed tables.
 EXAMPLES   :
 - DESCR:
   CODE: ex_cpp_dyn_query_intro
@@ -46,6 +48,7 @@ CATEGORIES :
   - g_dyn_query_equals_string:
   - g_dyn_query_equals_date:
   - g_dyn_query_equals_binary:
+      TITLE    : equal*
       NAMES    : [ equal, equal_date, equal_binary ]
       SIGNATURE: |
                  Query& equal(size_t column_ndx, bool value);
@@ -76,8 +79,10 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_equals
-#  - g_dyn_query_notEquals_boolean:
+
   - g_dyn_query_notEquals_integer:
+  - g_dyn_query_notEquals_float:
+  - g_dyn_query_notEquals_double:
   - g_dyn_query_notEquals_string:
   - g_dyn_query_notEquals_date:
   - g_dyn_query_notEquals_binary:
@@ -110,7 +115,10 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_notEquals
-  - g_dyn_query_greaterThan:
+
+  - g_dyn_query_greaterThan_integer:
+  - g_dyn_query_greaterThan_float:
+  - g_dyn_query_greaterThan_double:
   - g_dyn_query_greaterThan_date:
       NAMES    : [ greater, greater_date ]
       SIGNATURE: |
@@ -135,7 +143,10 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_greaterThan
-  - g_dyn_query_greaterThanOrEqual:
+
+  - g_dyn_query_greaterThanOrEqual_integer:
+  - g_dyn_query_greaterThanOrEqual_float:
+  - g_dyn_query_greaterThanOrEqual_double:
   - g_dyn_query_greaterThanOrEqual_date:
       NAMES    : [ greater_equal, greater_equal_date ]
       SIGNATURE: |
@@ -160,7 +171,10 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_greaterThanOrEqual
-  - g_dyn_query_lessThan:
+
+  - g_dyn_query_lessThan_integer:
+  - g_dyn_query_lessThan_float:
+  - g_dyn_query_lessThan_double:
   - g_dyn_query_lessThan_date:
       NAMES    : [less, less_date]
       SIGNATURE: |
@@ -185,13 +199,16 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_lessThan
-  - g_dyn_query_lessThanOrEqual:
+        
+  - g_dyn_query_lessThanOrEqual_integer:
+  - g_dyn_query_lessThanOrEqual_float:
+  - g_dyn_query_lessThanOrEqual_double:
   - g_dyn_query_lessThanOrEqual_date:
       NAMES    : [less_equal, less_equal_date]
       SIGNATURE: |
                  Query& less_equal(size_t column_ndx, int64_t value);
-                 Query& less_equal(size_t column_ndx, int64_t value);
-                 Query& less_equal(size_t column_ndx, int64_t value);
+                 Query& less_equal(size_t column_ndx, float value);
+                 Query& less_equal(size_t column_ndx, double value);
                  Query& less_equal_date(size_t column_ndx, time_t value);
       SUMMARY  : &g_dyn_query_lessThanOrEqual_summary
                  Less than or equal to.
@@ -210,7 +227,10 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_lessThanOrEqual
-  - g_dyn_query_between:
+
+  - g_dyn_query_between_integer:
+  - g_dyn_query_between_float:
+  - g_dyn_query_between_double:
   - g_dyn_query_between_date:
       NAMES    : [between, between_date]
       SIGNATURE: |
@@ -219,7 +239,7 @@ CATEGORIES :
                  Query& between(size_t column_ndx, double from, double to);
                  Query& between_date(size_t column_ndx, time_t from, time_t to);
       DESCR    : &g_dyn_query_between_descr
-                 Queries for column values in ranges.
+                 Queries for column values in a range between <code>from</code> and <code>to</code>.
       SUMMARY  : &g_dyn_query_between_summary
                  Belongs to an interval.
       PARAMS:
@@ -228,10 +248,10 @@ CATEGORIES :
         DESCR  : Column index.
       - NAME   : from
         TYPES  : [int64_t, float, double, time_t]
-        DESCR  : Lower bound of range (inclusive).
+        DESCR  : Lowest value of range (inclusive).
       - NAME   : to
         TYPES  : [int64_t, float, double, time_t]
-        DESCR  : Upper bound of range (inclusive).
+        DESCR  : Highest value of range (inclusive).
       RETURN:
         TYPES  : Query&
         DESCR  : The query object.
@@ -247,7 +267,7 @@ CATEGORIES :
       DESCR    : &g_dyn_query_startsWith_descr
                  Queries for column values which begin with a certain prefix.
       SUMMARY  : &g_dyn_query_startsWith_summary
-                 Substring match at the begining of the attribute.
+                 Substring match at the begining.
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
@@ -271,9 +291,9 @@ CATEGORIES :
                  Query& ends_with(size_t column_ndx, const char* value, bool case_sensitive=true);
 #                 Query& ends_with_binary(size_t column_ndx, const char* data, size_t size);
       DESCR    : &g_dyn_query_endsWith_descr
-                 Queries for column values which end with a specified suffix.
+                 Queries for column values which ends with a specified suffix.
       SUMMARY  : &g_dyn_query_endsWith_summary
-                 Substring match at the end of the value in the column <code>column_ndx</code>.
+                 Substring match at the end.
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
@@ -316,14 +336,18 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_contains
+        
+
 - Combiners:
   METHODS:
   - g_dyn_query_group:
       NAMES    : group
       DESCR    : &g_dyn_query_group_descr
                  >
-                 Group conditions ("left" parenthesis). Group of conditions can be nested and they are
-                 conceptually a parenthesis.
+                 Group conditions ("left" parenthesis). Group of conditions can 
+                 be nested and they are conceptually a parenthesis. 
+                 
+                 You must end the grouping with {@link g_dyn_query_endGroup}.
       SUMMARY  : &g_dyn_query_group_summary
                  Start group ("left parenthesis").
       RETURN:
@@ -335,7 +359,8 @@ CATEGORIES :
   - g_dyn_query_endGroup:
       NAMES    : end_group
       DESCR    : &g_dyn_query_endGroup_descr
-                 Group conditions ("right" parenthesis).
+                 Ends the Group conditions ("right" parenthesis) that was 
+                 started with {@link g_dyn_query_group}.
       SUMMARY  : &g_dyn_query_endGroup_summary
                  Stop group ("right parenthesis").
       RETURN:
@@ -359,7 +384,10 @@ CATEGORIES :
   - g_dyn_query_subtable:
       NAMES    : subtable
       DESCR    : &g_dyn_query_subtable_descr
-                 Query a subtable.
+                 >
+                 This method selects a subtable to query.
+                 
+                 You must end the subtable query with {@link g_dyn_query_endSubtable}.
       SUMMARY  : &g_dyn_query_subtable_summary
                  Query a subtable.
       PARAMS:
@@ -375,7 +403,7 @@ CATEGORIES :
   - g_dyn_query_endSubtable:
       NAMES    : end_subtable
       DESCR    : &g_dyn_query_endSubtable_descr
-                 End of subtable query.
+                 End of subtable query that was started with {@link g_dyn_query_subtable}.
       SUMMARY  : &g_dyn_query_endSubtable_summary
                  End of subtable query.
       RETURN:
@@ -384,15 +412,17 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_subtable
+        
+        
 - Actions:
   METHODS:
   - g_dyn_query_find_all_const:
   - g_dyn_query_find_all:
       NAMES    : find_all
       DESCR    : &g_dyn_query_find_all_descr
-                 This method executes the query. See the {@link class_dyn_tableview} class for further details.
+                 This method executes the query and returns a {@link class_dyn_tableview} with the results.
       SUMMARY  : &g_dyn_query_find_all_summary
-                 Execute query.
+                 Find all matches.
       SIGNATURE: |
                  TableView      find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
                  ConstTableView find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
@@ -408,29 +438,84 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : [TableView, ConstTableView]
-        DESCR  : The TableView object.
+        DESCR  : &g_dyn_query_find_all_return_desc
+                 A TableView object containing all matches.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_findall
   - g_dyn_query_find_next:
       NAMES    : find_next
       DESCR    : &g_dyn_query_find_next_descr
-                 Find next row.
+                 Find next matching row.
+# TODO: describe further. Next form what?
       SUMMARY  : &g_dyn_query_find_next_summary
-                 Find next row.
+                 Find next match.
       PARAMS:
       - NAME   : lastmatch
         TYPES  : size_t
         DESCR  : "Row to stop search. Default: -1 (infinity)."
       RETURN:
         TYPES  : size_t
-        DESCR  : Row number
+        DESCR  : &g_dyn_query_find_next
+                 Row index that matches the query (or -1 if none).
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_find_next
+
+  - g_dyn_query_count:
+      NAMES    : count
+      DESCR    : &g_dyn_query_size_descr
+                 The method executes the query and return the number of matching rows.
+      SUMMARY  : &g_dyn_query_size_summary
+                 Number of matching rows.
+      CONST    : true
+      PARAMS:
+      - NAME   : column
+        DESCR  : Column index.
+        TYPES  : size_t
+      - NAME   : start
+        TYPES  : size_t
+        DESCR  : "Row to begin search. Default: 0."
+      - NAME   : end
+        TYPES  : size_t
+        DESCR  : "Row to stop search. Default: -1 (infinity)."
+      - NAME   : limit
+        TYPES  : size_t
+        DESCR  : "Maximum number of rows to count. Default: -1 (infinity)."
+      RETURN:
+        TYPES  : size_t
+        DESCR  : The number of matching rows.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_dyn_query_size
+  - g_dyn_query_remove:
+      NAMES    : remove
+      DESCR    : &g_dyn_query_remove_descr
+                 This method executes the query and removes all matching rows in the source table.
+      SUMMARY  : &g_dyn_query_remove_summary
+                 Remove rows.
+      CONST    : true
+      PARAMS:
+      - NAME   : start
+        TYPES  : size_t
+        DESCR  : "Row to begin search. Default: 0."
+      - NAME   : end
+        TYPES  : size_t
+        DESCR  : "Row to stop search. Default: -1 (infinity)."
+      - NAME   : limit
+        TYPES  : size_t
+        DESCR  : "Maximum number of rows to remove. Default: -1 (infinity)."
+      RETURN:
+        TYPES  : size_t
+        DESCR  : The number of rows removed.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_dyn_query_remove
+
   - g_dyn_query_sum:
   - g_dyn_query_sum_float:
   - g_dyn_query_sum_double:
+      TITLE    : sum*
       NAMES    : [sum, sum_float, sum_double]
       DESCR    : &g_dyn_query_sum_descr
                  |
@@ -447,7 +532,10 @@ CATEGORIES :
                  double sum_double(..same parameters as above..)
       PARAMS:
       - NAME   : column_ndx
-        DESCR  : Column index. The datatype of the column must match the function called. E.g. <code>sum_float()</code> can only be used on columns which contains floats.
+        DESCR  : &g_dyn_query_sum_parm1_desc
+                 >
+                 Column index. The datatype of the column must match the function called. 
+                 E.g. <code>sum_float()</code> can only be used on columns which contains floats.
         TYPES  : size_t
       - NAME   : resultcount
         DESCR  : The number of rows used to calculate the sum.
@@ -467,36 +555,13 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_sum
-  - g_dyn_query_size:
-      NAMES    : count
-      DESCR    : &g_dyn_query_size_descr
-                 The method finds the number of matching rows.
-      SUMMARY  : &g_dyn_query_size_summary
-                 Number of matching rows.
-      CONST    : true
-      PARAMS:
-      - NAME   : column
-        DESCR  : Column index.
-        TYPES  : size_t
-      - NAME   : start
-        TYPES  : size_t
-        DESCR  : "Row to begin search. Default: 0."
-      - NAME   : end
-        TYPES  : size_t
-        DESCR  : "Row to stop search. Default: -1 (infinity)."
-      - NAME   : limit
-        TYPES  : size_t
-        DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
-      RETURN:
-        TYPES  : size_t
-        DESCR  : The number of rows.
-      EXAMPLES:
-      - DESCR  :
-        CODE   : ex_cpp_dyn_query_size
+
+
   - g_dyn_query_maximum_date:
   - g_dyn_query_maximum_double:
   - g_dyn_query_maximum_float:
   - g_dyn_query_maximum:
+      TITLE    : maximum*
       NAMES    : maximum
       DESCR    : &g_dyn_query_maximum_descr
                  This method finds the highest value in the column or in a range of rows in the column.
@@ -530,11 +595,13 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_maximum
+
   - g_dyn_query_minimum_date:
   - g_dyn_query_minimum_double:
   - g_dyn_query_minimum_float:
   - g_dyn_query_minimum:
-      NAMES    : minimum
+      TITLE    : minimum*
+      NAMES    : [minimum, minimum_float, minimum_double, minimum_date]
       DESCR    : &g_dyn_query_minimum_descr
                  This method finds the lowest value in the column or in a range of rows in the column.
       SUMMARY  : &g_dyn_query_minimum_summary
@@ -567,10 +634,12 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_minimum
+
   - g_dyn_query_average_double:
   - g_dyn_query_average_float:
   - g_dyn_query_average:
-      NAMES    : average
+      TITLE    : average*
+      NAMES    : [average, average_float, average_double]
       SUMMARY  : &g_dyn_query_average_summary
                  Calculates the average.
       DESCR    : &g_dyn_query_average_descr
@@ -606,32 +675,3 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_average
-  - g_dyn_query_remove:
-      NAMES    : remove
-      DESCR    : &g_dyn_query_remove_descr
-                 This method will remove all matching rows in the source table.
-      SUMMARY  : &g_dyn_query_remove_summary
-                 Remove rows.
-      CONST    : true
-      PARAMS:
-      - NAME   : column
-        DESCR  : Column index.
-        TYPES  : size_t
-      - NAME   : resultcount
-        DESCR  : The number of rows used to calculate the average.
-        TYPES  : size_t*
-      - NAME   : start
-        TYPES  : size_t
-        DESCR  : "Row to begin search. Default: 0."
-      - NAME   : end
-        TYPES  : size_t
-        DESCR  : "Row to stop search. Default: -1 (infinity)."
-      - NAME   : limit
-        TYPES  : size_t
-        DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
-      RETURN:
-        TYPES  : size_t
-        DESCR  : The number of rows removed.
-      EXAMPLES:
-      - DESCR  :
-        CODE   : ex_cpp_dyn_query_remove
