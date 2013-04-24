@@ -196,7 +196,7 @@ CATEGORIES :
         DESCR  : &g_dyn_table_add_column_param1_descr
                  Type of data in the new column.
       - NAME   : name
-        TYPES  : const char*
+        TYPES  : StringData
         DESCR  : &g_dyn_table_add_column_param2_descr
                  Name of the new column.
       RETURN:
@@ -206,7 +206,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_add_column
         DESCR  :
-# TODO:    size_t      add_subcolumn(const vector<size_t>& column_path, DataType type, const char* name);
+# TODO:    size_t      add_subcolumn(const vector<size_t>& column_path, DataType type, StringData name);
 #          void        remove_column(const vector<size_t>& column_path);
 
   - g_dyn_table_remove_column:
@@ -237,15 +237,15 @@ CATEGORIES :
       DESCR    : &g_dyn_table_rename_column_descr
                  This method renames the specified column.
 #      SIGNATURE: |
-#                 void rename_column(size_t column_ndx, const char* name);
-#                 void rename_column(const vector<size_t>& column_path, const char* name);
+#                 void rename_column(size_t column_ndx, StringData name);
+#                 void rename_column(const vector<size_t>& column_path, StringData name);
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
         DESCR  : &g_dyn_table_rename_column_param1_descr
                  Index of column to rename.
       - NAME   : name
-        TYPES  : const char*
+        TYPES  : StringData
         DESCR  : &g_dyn_table_rename_column_param2_descr
                  New column name.
       EXAMPLES:
@@ -279,7 +279,7 @@ CATEGORIES :
         DESCR  : &g_dyn_table_get_column_name_param1_descr
                  The column index (starting from 0).
       RETURN:
-        TYPES  : const char*
+        TYPES  : StringData
         DESCR  : &g_dyn_table_get_column_name_return_descr
                  The column name.
       EXAMPLES:
@@ -294,7 +294,7 @@ CATEGORIES :
       CONST    : True
       PARAMS:
       - NAME   : column_name
-        TYPES  : const char*
+        TYPES  : StringData
         DESCR  : The name of the column to find.
       RETURN:
         TYPES  : size_t
@@ -391,9 +391,9 @@ CATEGORIES :
                  template<class E>void insert_enum(size_t column_ndx, size_t row_ndx, E value)
                  void insert_float(size_t column_ndx, size_t row_ndx, float value)
                  void insert_double(size_t column_ndx, size_t row_ndx, double value)
-                 void insert_date(size_t column_ndx, size_t row_ndx, time_t value)
-                 void insert_string(size_t column_ndx, size_t row_ndx, const char* value)
-                 void insert_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len)
+                 void insert_date(size_t column_ndx, size_t row_ndx, Date value)
+                 void insert_string(size_t column_ndx, size_t row_ndx, StringData value)
+                 void insert_binary(size_t column_ndx, size_t row_ndx, BinaryData value)
                  void insert_mixed(size_t column_ndx, size_t row_ndx, Mixed value)
                  void insert_subtable(size_t column_ndx, size_t row_ndx)
                  void insert_done()
@@ -405,11 +405,8 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : The row index.
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, time_t, const char*, Mixed]
+        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed]
         DESCR  : The value to insert.
-      - NAME   : len
-        TYPES  : size_t
-        DESCR  : Size in bytes of binary value.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_insert_xxx
         DESCR  :
@@ -460,10 +457,10 @@ CATEGORIES :
       SIGNATURE: |
                  bool          get_bool(size_t column_ndx, size_t row_ndx) const;
                  int64_t       get_int(size_t column_ndx, size_t row_ndx) const;
-                 time_t        get_date(size_t column_ndx, size_t row_ndx) const;
+                 Date          get_date(size_t column_ndx, size_t row_ndx) const;
                  float         get_float(size_t column_ndx, size_t row_ndx) const;
                  double        get_double(size_t column_ndx, size_t row_ndx) const;
-                 const char*   get_string(size_t column_ndx, size_t row_ndx) const;
+                 StringData    get_string(size_t column_ndx, size_t row_ndx) const;
                  BinaryData    get_binary(size_t column_ndx, size_t row_ndx) const;
                  Mixed         get_mixed(size_t column_ndx, size_t row_ndx) const;
                  DataType      get_mixed_type(size_t column_ndx, size_t row_ndx) const
@@ -481,7 +478,7 @@ CATEGORIES :
         DESCR  : &g_dyn_table_get_xxx_parm2_descr
                  The row index (starting from 0).
       RETURN:
-        TYPES  : [bool, int64_t, float, double, time_t, const char*, BinaryData, Mixed, DataType]
+        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed, DataType]
         DESCR  : &g_dyn_table_get_xxx_return_descr
                  The value at the given cell.
       EXAMPLES:
@@ -505,9 +502,9 @@ CATEGORIES :
                  void set_float(size_t column_ndx, size_t row_ndx, float value);
                  void set_double(size_t column_ndx, size_t row_ndx, double value);
                  template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
-                 void set_date(size_t column_ndx, size_t row_ndx, time_t value);
-                 void set_string(size_t column_ndx, size_t row_ndx, const char* value);
-                 void set_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
+                 void set_date(size_t column_ndx, size_t row_ndx, Date value);
+                 void set_string(size_t column_ndx, size_t row_ndx, StringData value);
+                 void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
                  void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
       PARAMS:
       - NAME   : column_ndx
@@ -517,12 +514,9 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : *g_dyn_table_get_xxx_parm2_descr
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, time_t, const char*, Mixed]
+        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed]
         DESCR  : &g_dyn_table_set_xxx_parm3_descr
                  The value to assign to the specified cell.
-      - NAME   : len
-        TYPES  : size_t
-        DESCR  : Size in bytes of binary value.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_set_xxx
         DESCR  :
@@ -619,7 +613,7 @@ CATEGORIES :
       CONST    : True
       PARAMS:
       - NAME   : value
-        TYPES  : const char*
+        TYPES  : StringData
         DESCR  : The value to search for.
       RETURN:
         TYPES  : size_t
@@ -641,10 +635,11 @@ CATEGORIES :
       SIGNATURE: |
                  size_t find_first_int(size_t column_ndx, int64_t value) const;
                  size_t find_first_bool(size_t column_ndx, bool value) const;
-                 size_t find_first_date(size_t column_ndx, time_t value) const;
-                 size_t find_first_string(size_t column_ndx, const char* value) const;
                  size_t find_first_float(size_t column_ndx, float value) const;
                  size_t find_first_double(size_t column_ndx, double value) const;
+                 size_t find_first_date(size_t column_ndx, Date value) const;
+                 size_t find_first_string(size_t column_ndx, StringData value) const;
+                 size_t find_first_binary(size_t column_ndx, BinaryData value) const;
       CONST    : True
       PARAMS:
       - NAME   : column_ndx
@@ -652,7 +647,7 @@ CATEGORIES :
         DESCR  : &g_dyn_table_find_first_xxx_parm1_descr
                  The column index (starting from 0) to search in.
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, time_t, const char*]
+        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData]
         DESCR  : &g_dyn_table_find_first_xxx_parm2_descr
                  The value to search for.
       RETURN:
@@ -684,17 +679,19 @@ CATEGORIES :
       SIGNATURE: |
                  TableView      find_all_int(size_t column_ndx, int64_t value);
                  TableView      find_all_bool(size_t column_ndx, bool value);
-                 TableView      find_all_date(size_t column_ndx, time_t value);
-                 TableView      find_all_string(size_t column_ndx, const char* value);
                  TableView      find_all_float(size_t column_ndx, float value);
                  TableView      find_all_double(size_t column_ndx, double value);
+                 TableView      find_all_date(size_t column_ndx, Date value);
+                 TableView      find_all_string(size_t column_ndx, StringData value);
+                 TableView      find_all_binary(size_t column_ndx, BinaryData value);
 
                  ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
                  ConstTableView find_all_bool(size_t column_ndx, bool value) const;
-                 ConstTableView find_all_date(size_t column_ndx, time_t value) const;
-                 ConstTableView find_all_string(size_t column_ndx, const char* value) const;
                  ConstTableView find_all_float(size_t column_ndx, float value) const;
                  ConstTableView find_all_double(size_t column_ndx, double value) const;
+                 ConstTableView find_all_date(size_t column_ndx, Date value) const;
+                 ConstTableView find_all_string(size_t column_ndx, StringData value) const;
+                 ConstTableView find_all_binary(size_t column_ndx, BinaryData value) const;
 
       PARAMS:
       - NAME   : column_ndx
@@ -702,7 +699,7 @@ CATEGORIES :
         DESCR  : &g_dyn_table_find_all_xxx_parm1_descr
                  The column index (starting from 0).
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, time_t, const char*]
+        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData]
         DESCR  : &g_dyn_table_find_all_xxx_parm2_descr
                  The value to find in the column.
       RETURN:
@@ -800,7 +797,7 @@ CATEGORIES :
                  size_t count(size_t column_ndx, int64_t target) const;
                  size_t count_float(size_t column_ndx, float target) const;
                  size_t count_double(size_t column_ndx, double target) const;
-                 size_t count_string(size_t column_ndx, const char* target) const;
+                 size_t count_string(size_t column_ndx, StringData target) const;
       CONST    : True
       PARAMS:
       - NAME   : column_ndx
@@ -809,7 +806,7 @@ CATEGORIES :
                  The column index (starting from 0).
                  The data type in the column must match the type of the <code>target</code> value.
       - NAME   : target
-        TYPES  : [int64_t, float, double, const char*]
+        TYPES  : [int64_t, float, double, StringData]
         DESCR  : &g_dyn_table_count_parm2_descr
                  The value to count.
       RETURN:

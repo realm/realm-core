@@ -166,13 +166,13 @@ CATEGORIES:
                  If no table exists with the specified name, a new
                  empty table will be created.
       SIGNATURE: |
-                 TableRef          get_table(const char* name);
-                 ConstTableRef     get_table(const char* name) const;
-                 MyTable::Ref      get_table<MyTable>(const char* name);
-                 MyTable::ConstRef get_table<MyTable>(const char* name) const;
+                 TableRef          get_table(StringData name);
+                 ConstTableRef     get_table(StringData name) const;
+                 MyTable::Ref      get_table<MyTable>(StringData name);
+                 MyTable::ConstRef get_table<MyTable>(StringData name) const;
       PARAMS:
       - NAME   : name
-        TYPES  : const char*
+        TYPES  : StringData
         DESCR  : >
                  Name of the table you wish to retrieve.
       - NAME   : tableclass
@@ -208,7 +208,7 @@ CATEGORIES:
       CONST    : true
       PARAMS:
       - NAME   : name
-        TYPES  : const char*
+        TYPES  : StringData
         DESCR  : Name of the table you wish to look for.
       RETURN:
         TYPES  : bool
@@ -228,7 +228,7 @@ CATEGORIES:
         TYPES  : size_t
         DESCR  : Table index.
       RETURN:
-        TYPES  : const char*
+        TYPES  : StringData
         DESCR  : The table name.
       EXAMPLES:
       - DESCR  :
