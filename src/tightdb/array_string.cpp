@@ -43,7 +43,8 @@ void ArrayString::set(size_t ndx, StringData value)
 
     // Make room for the new value plus a zero-termination
     if (m_width <= value.size()) {
-        if (value.size() == 0 && m_width == 0) return;
+        if (value.size() == 0 && m_width == 0)
+            return;
 
         TIGHTDB_ASSERT(0 < value.size());
 
@@ -315,7 +316,8 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
     TIGHTDB_ASSERT(begin <= m_len && end <= m_len && begin <= end);
 
     // A string can never be wider than the column width
-    if (m_width <= value.size()) return size_t(-1);
+    if (m_width <= value.size())
+        return size_t(-1);
 
     if (m_width == 0) {
         return value.size() == 0 && begin < end ? begin : -1;
@@ -431,7 +433,7 @@ void ArrayString::ToDot(ostream& out, StringData title) const
 {
     const size_t ref = GetRef();
 
-    if (0 < title.size()) {
+    if (title.size() > 0) {
         out << "subgraph cluster_" << ref << " {" << endl;
         out << " label = \"" << title << "\";" << endl;
         out << " color = white;" << endl;
@@ -449,7 +451,8 @@ void ArrayString::ToDot(ostream& out, StringData title) const
     }
 
     out << "</TR></TABLE>>];" << endl;
-    if (0 < title.size()) out << "}" << endl;
+    if (title.size() > 0)
+        out << "}" << endl;
 }
 
 #endif // TIGHTDB_DEBUG

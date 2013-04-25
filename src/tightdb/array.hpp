@@ -986,8 +986,10 @@ inline void Array::set_header_isnode(bool value) TIGHTDB_NOEXCEPT
 
 inline Array::ColumnDef Array::get_coldef_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    if (!get_isleaf_from_header(header)) return coldef_InnerNode;
-    if (get_hasrefs_from_header(header)) return coldef_HasRefs;
+    if (!get_isleaf_from_header(header))
+        return coldef_InnerNode;
+    if (get_hasrefs_from_header(header))
+        return coldef_HasRefs;
     return coldef_Normal;
 }
 

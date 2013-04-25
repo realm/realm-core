@@ -17,7 +17,8 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
     // Reallocate if needed
     size_t remove_size = end - begin;
     size_t add_size = size;
-    if (add_zero_term) ++add_size;
+    if (add_zero_term)
+        ++add_size;
     size_t new_size = m_len - remove_size + add_size;
     // also updates header
     Alloc(new_size, 1); // Throws
@@ -42,7 +43,8 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
 
     // Insert the data
     modify_begin = copy(data, data+size, modify_begin);
-    if (add_zero_term) *modify_begin = 0;
+    if (add_zero_term)
+        *modify_begin = 0;
 
     m_len = new_size;
 }
