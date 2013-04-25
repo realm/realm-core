@@ -72,6 +72,202 @@ TIGHTDB_TABLE_5(GATable,
 } // anonymous namespace
 
 
+TEST(QueryTwoColsEqualVaryWidthAndValues) 
+{
+    std::vector<size_t> ints1;
+    std::vector<size_t> ints2;
+    std::vector<size_t> ints3;
+
+    std::vector<size_t> floats;
+    std::vector<size_t> doubles;
+
+    Table table;
+    table.add_column(type_Int, "first1");
+    table.add_column(type_Int, "second1");
+
+    table.add_column(type_Int, "first2");
+    table.add_column(type_Int, "second2");
+
+    table.add_column(type_Int, "first3");
+    table.add_column(type_Int, "second3");
+
+    table.add_column(type_Float, "third");
+    table.add_column(type_Float, "fourth");
+    table.add_column(type_Double, "fifth");
+    table.add_column(type_Double, "sixth");
+
+#ifdef TIGHTDB_DEBUG
+    for(int i = 0; i < 5000; i++) {
+#else
+    for(int i = 0; i < 50000; i++) {
+#endif
+        table.add_empty_row();
+
+        // Important thing to test is different bitwidths because we might use SSE and/or bithacks on 64-bit blocks
+
+        // Both are bytes
+        table.set_int(0, i, rand() % 100);
+        table.set_int(1, i, rand() % 100);
+
+        // Second column widest
+        table.set_int(2, i, rand() % 10);
+        table.set_int(3, i, rand() % 100);
+
+        // First column widest
+        table.set_int(4, i, rand() % 100);
+        table.set_int(5, i, rand() % 10);
+
+        table.set_float(6, i, rand() % 10);
+        table.set_float(7, i, rand() % 10);
+
+        table.set_double(8, i, rand() % 10);
+        table.set_double(9, i, rand() % 10);
+
+        if(table.get_int(0, i) == table.get_int(1, i))
+            ints1.push_back(i);
+
+        if(table.get_int(2, i) == table.get_int(3, i))
+            ints2.push_back(i);
+
+        if(table.get_int(4, i) == table.get_int(5, i))
+            ints3.push_back(i);
+
+        if(table.get_float(6, i) == table.get_float(7, i))
+            floats.push_back(i);
+
+        if(table.get_double(8, i) == table.get_double(9, i))
+            doubles.push_back(i);
+
+    }
+
+    tightdb::TableView t1 = table.where().equal_int(size_t(0), size_t(1)).find_all();
+    tightdb::TableView t2 = table.where().equal_int(size_t(2), size_t(3)).find_all();
+    tightdb::TableView t3 = table.where().equal_int(size_t(4), size_t(5)).find_all();
+
+    tightdb::TableView t4 = table.where().equal_float(size_t(6), size_t(7)).find_all();
+    tightdb::TableView t5 = table.where().equal_double(size_t(8), size_t(9)).find_all();
+
+
+    CHECK_EQUAL(ints1.size(), t1.size());
+    for(size_t t = 0; t < ints1.size(); t++)
+        CHECK_EQUAL(ints1[t], t1.get_source_ndx(t));
+
+    CHECK_EQUAL(ints2.size(), t2.size());
+    for(size_t t = 0; t < ints2.size(); t++)
+        CHECK_EQUAL(ints2[t], t2.get_source_ndx(t));
+
+    CHECK_EQUAL(ints3.size(), t3.size());
+    for(size_t t = 0; t < ints3.size(); t++)
+        CHECK_EQUAL(ints3[t], t3.get_source_ndx(t));
+
+    CHECK_EQUAL(floats.size(), t4.size());
+    for(size_t t = 0; t < floats.size(); t++)
+        CHECK_EQUAL(floats[t], t4.get_source_ndx(t));
+
+    CHECK_EQUAL(doubles.size(), t5.size());
+    for(size_t t = 0; t < doubles.size(); t++)
+        CHECK_EQUAL(doubles[t], t5.get_source_ndx(t));
+}
+
+TEST(QueryTwoColsVaryOperators) 
+{
+    std::vector<size_t> ints1;
+    std::vector<size_t> floats;
+    std::vector<size_t> doubles;
+
+    Table table;
+    table.add_column(type_Int, "first1");
+    table.add_column(type_Int, "second1");
+
+    table.add_column(type_Float, "third");
+    table.add_column(type_Float, "fourth");
+    table.add_column(type_Double, "fifth");
+    table.add_column(type_Double, "sixth");
+
+    // row 0
+    table.add_empty_row();
+    table.set_int(0, 0, 5);
+    table.set_int(1, 0, 10);
+    table.set_float(2, 0, 5);
+    table.set_float(3, 0, 10);
+    table.set_double(4, 0, 5);
+    table.set_double(5, 0, 10);
+
+    // row 1
+    table.add_empty_row();
+    table.set_int(0, 1, 10);
+    table.set_int(1, 1, 5);
+    table.set_float(2, 1, 10);
+    table.set_float(3, 1, 5);
+    table.set_double(4, 1, 10);
+    table.set_double(5, 1, 5);
+
+    // row 2
+    table.add_empty_row();
+    table.set_int(0, 2, -10);
+    table.set_int(1, 2, -5);
+    table.set_float(2, 2, -10);
+    table.set_float(3, 2, -5);
+    table.set_double(4, 2, -10);
+    table.set_double(5, 2, -5);
+
+
+    CHECK_EQUAL(not_found, table.where().equal_int(size_t(0), size_t(1)).find_next());
+    CHECK_EQUAL(0, table.where().not_equal_int(size_t(0), size_t(1)).find_next());
+    CHECK_EQUAL(0, table.where().less_int(size_t(0), size_t(1)).find_next());
+    CHECK_EQUAL(1, table.where().greater_int(size_t(0), size_t(1)).find_next());
+    CHECK_EQUAL(1, table.where().greater_equal_int(size_t(0), size_t(1)).find_next());
+    CHECK_EQUAL(0, table.where().less_equal_int(size_t(0), size_t(1)).find_next());
+
+    CHECK_EQUAL(not_found, table.where().equal_float(size_t(2), size_t(3)).find_next());
+    CHECK_EQUAL(0, table.where().not_equal_float(size_t(2), size_t(3)).find_next());
+    CHECK_EQUAL(0, table.where().less_float(size_t(2), size_t(3)).find_next());
+    CHECK_EQUAL(1, table.where().greater_float(size_t(2), size_t(3)).find_next());
+    CHECK_EQUAL(1, table.where().greater_equal_float(size_t(2), size_t(3)).find_next());
+    CHECK_EQUAL(0, table.where().less_equal_float(size_t(2), size_t(3)).find_next());
+
+    CHECK_EQUAL(not_found, table.where().equal_double(size_t(4), size_t(5)).find_next());
+    CHECK_EQUAL(0, table.where().not_equal_double(size_t(4), size_t(5)).find_next());
+    CHECK_EQUAL(0, table.where().less_double(size_t(4), size_t(5)).find_next());
+    CHECK_EQUAL(1, table.where().greater_double(size_t(4), size_t(5)).find_next());
+    CHECK_EQUAL(1, table.where().greater_equal_double(size_t(4), size_t(5)).find_next());
+    CHECK_EQUAL(0, table.where().less_equal_double(size_t(4), size_t(5)).find_next());
+}
+
+
+
+TEST(QueryTwoCols0) 
+{
+    Table table;
+    table.add_column(type_Int, "first1");
+    table.add_column(type_Int, "second1");
+
+
+    for(int i = 0; i < 50; i++) {
+        table.add_empty_row();
+        table.set_int(0, i, 0);
+        table.set_int(1, i, 0);
+    }
+
+    tightdb::TableView t1 = table.where().equal_int(size_t(0), size_t(1)).find_all();
+    CHECK_EQUAL(50, t1.size());
+
+    tightdb::TableView t2 = table.where().less_int(size_t(0), size_t(1)).find_all();
+    CHECK_EQUAL(0, t2.size());
+    
+}
+
+
+TEST(QueryTwoColsNoRows) 
+{
+    Table table;
+    table.add_column(type_Int, "first1");
+    table.add_column(type_Int, "second1");
+
+    CHECK_EQUAL(not_found, table.where().equal_int(size_t(0), size_t(1)).find_next());
+    CHECK_EQUAL(not_found, table.where().not_equal_int(size_t(0), size_t(1)).find_next());
+}
+
 TEST(TestQueryHuge) 
 {
 #if TEST_DURATION == 0
@@ -87,12 +283,12 @@ TEST(TestQueryHuge)
 
         TripleTable tt;
         TripleTable::View v;
-        bool long1;
-        bool long2;
-        bool long3;
-        size_t mdist1;
-        size_t mdist2;
-        size_t mdist3;
+        bool long1 = false;
+        bool long2 = false;
+
+        size_t mdist1 = 1;
+        size_t mdist2 = 1;
+        size_t mdist3 = 1;
 
         std::string first;
         std::string second;
@@ -106,9 +302,7 @@ TEST(TestQueryHuge)
         size_t res6 = 0;
         size_t res7 = 0;
         size_t res8 = 0;
-        size_t res9 = 0;
-        size_t res10 = 0;
-        size_t res11 = 0;
+
 
         size_t blocksize = rand() % 1200 + 1;
 
@@ -252,8 +446,6 @@ TEST(TestQueryStrIndex3)
 #endif
         TupleTableType ttt;
  
-	    int aa;
-	    int64_t s;
         std::vector<size_t> vec;
         size_t row = 0;
 
@@ -352,8 +544,8 @@ TEST(TestQueryStrIndex2)
 {
     TupleTableType ttt;
 
-	int aa;
-	int64_t s;
+
+    int64_t s;
 
 	for(int i = 0; i < 100; i++) {
 	    ttt.add(1, "AA");
@@ -402,17 +594,17 @@ TEST(TestQueryStrEnum)
 TEST(TestQueryStrIndex)
 {
 #ifdef TIGHTDB_DEBUG
-	int itera = 4;
-	int iterb = 100;
+	size_t itera = 4;
+	size_t iterb = 100;
 #else
-	int itera = 100;
-	int iterb = 2000;
+	size_t itera = 100;
+	size_t iterb = 2000;
 #endif
 	
 	int aa;
 	int64_t s;
 
-	for(int i = 0; i < itera; i++) {
+	for(size_t i = 0; i < itera; i++) {
 		TupleTableType ttt;
 		aa = 0;
 		for(size_t t = 0; t < iterb; t++) {

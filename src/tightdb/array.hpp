@@ -45,6 +45,7 @@ Searching: The main finding function is:
 #include <utility>
 #include <vector>
 #include <ostream>
+#include <stdio.h>
 
 #include <tightdb/meta.hpp>
 #include <tightdb/assert.hpp>
@@ -124,6 +125,17 @@ const size_t not_found = size_t(-1);
     else if (wid == 8) {fun<targ1, targ2, 8, targ3> arg;} \
     else if (wid == 64) {fun<targ1, targ2, 64, targ3> arg;} \
     else {TIGHTDB_ASSERT(false); fun<targ1, targ2, 0, targ3> arg;}
+
+#define TIGHTDB_TEMPEX5(fun, targ1, targ2, targ3, targ4, wid, arg) \
+    if (wid == 16) {fun<targ1, targ2, targ3, targ4, 16> arg;} \
+    else if (wid == 32) {fun<targ1, targ2, targ3, targ4, 32> arg;} \
+    else if (wid == 0) {fun<targ1, targ2, targ3, targ4, 0> arg;} \
+    else if (wid == 1) {fun<targ1, targ2, targ3, targ4, 1> arg;} \
+    else if (wid == 2) {fun<targ1, targ2, targ3, targ4, 2> arg;} \
+    else if (wid == 4) {fun<targ1, targ2, targ3, targ4, 4> arg;} \
+    else if (wid == 8) {fun<targ1, targ2, targ3, targ4, 8> arg;} \
+    else if (wid == 64) {fun<targ1, targ2, targ3, targ4, 64> arg;} \
+    else {TIGHTDB_ASSERT(false); fun<targ1, targ2, targ3, targ4, 0> arg;}
 
 
 // Pre-definitions
@@ -369,12 +381,18 @@ public:
     template <bool gt, Action action, size_t bitwidth, class Callback>
     bool CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const;
 
+    template <class cond, Action action, size_t foreign_width, class Callback, size_t width> bool CompareLeafs4(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const;
+    template <class cond, Action action, class Callback, size_t bitwidth, size_t foreign_bitwidth> bool CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const;
+    template <class cond, Action action, class Callback> bool CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const;
+    template <class cond, Action action, size_t width, class Callback> bool CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const;
+
     // SSE find for the four functions Equal/NotEqual/Less/Greater
 #ifdef TIGHTDB_COMPILER_SSE
     template <class cond2, Action action, size_t width, class Callback>
-    size_t FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex, Callback callback) const;
-    template <class cond2, Action action, size_t width, class Callback>
-    size_t FindSSE_intern(__m128i* action_data, __m128i* data, size_t items, QueryState<int64_t>* state, size_t baseindex, Callback callback) const;
+    bool FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex, Callback callback) const;
+    
+    template <class cond2, Action action, size_t width, class Callback> TIGHTDB_FORCEINLINE bool FindSSE_intern(__m128i* action_data, __m128i* data, size_t items, QueryState<int64_t>* state, size_t baseindex, Callback callback) const;
+
 #endif
 
     template <size_t width> inline bool TestZero(uint64_t value) const;         // Tests value for 0-elements
@@ -1830,7 +1848,7 @@ template <class cond2, Action action, size_t bitwidth, class Callback> int64_t A
 
 #ifdef TIGHTDB_COMPILER_SSE
 // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first chunk
-template <class cond2, Action action, size_t width, class Callback> size_t Array::FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
+template <class cond2, Action action, size_t width, class Callback> bool Array::FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     __m128i search = {0};
 
@@ -1844,17 +1862,17 @@ template <class cond2, Action action, size_t width, class Callback> size_t Array
         search = _mm_set_epi64x(value, value);
     }
 
-    return FindSSE_intern<cond2, action, width>(data, &search, items, state, baseindex, callback);
+    return FindSSE_intern<cond2, action, width, Callback>(data, &search, items, state, baseindex, callback);
 }
 
 // Compares packed action_data with packed data (equal, less, etc) and performs aggregate action (max, min, sum, find_all, etc) on value inside action_data for first match, if any
-template <class cond2, Action action, size_t width, class Callback> size_t Array::FindSSE_intern(__m128i* action_data, __m128i* data, size_t items, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
+template <class cond2, Action action, size_t width, class Callback> TIGHTDB_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* data, size_t items, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     cond2 C;
     int cond = C.condition();
     size_t i = 0;
     __m128i compare = {0};
-    int resmask;
+    unsigned int resmask;
 
     // Search loop. Unrolling it has been tested to NOT increase performance (apparently mem bound)
     for (i = 0; i < items; ++i) {
@@ -1902,6 +1920,9 @@ template <class cond2, Action action, size_t width, class Callback> size_t Array
         if (cond == cond_NotEqual)
             resmask = ~resmask & 0x0000ffff;
 
+//        if(resmask != 0)
+//            printf("resmask=%d\n", resmask);
+
         size_t s = i * sizeof(__m128i) * 8 / no0(width);
 
         while (resmask != 0) {
@@ -1924,8 +1945,221 @@ template <class cond2, Action action, size_t width, class Callback> size_t Array
 }
 #endif //TIGHTDB_COMPILER_SSE
 
-// If gt = true: Find element(s) which are greater than value
-// If gt = false: Find element(s) which are smaller than value
+template <class cond, Action action, class Callback> bool Array::CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+{
+    cond C;
+    TIGHTDB_ASSERT(start < end);
+
+
+    int64_t v;
+
+    // We can compare first element without checking for out-of-range
+    v = Get(start);
+    if(C(v, foreign->Get(start))) {
+        if(!find_action<action, Callback>(start + baseindex, v, state, callback))
+            return false;
+    }
+
+    start++;
+    
+    if(start + 3 < end) {
+        v = Get(start);
+        if(C(v, foreign->Get(start)))
+            if(!find_action<action, Callback>(start + baseindex, v, state, callback))
+                return false;
+
+        v = Get(start + 1);
+        if(C(v, foreign->Get(start + 1)))
+            if(!find_action<action, Callback>(start + 1 + baseindex, v, state, callback))
+                return false;
+
+        v = Get(start + 2);
+        if(C(v, foreign->Get(start + 2)))
+            if(!find_action<action, Callback>(start + 2 + baseindex, v, state, callback))
+                return false;
+
+        start += 3;
+    }
+    else if(start == end) {
+        return true;
+    }
+ 
+    bool r;
+    TIGHTDB_TEMPEX4(r = CompareLeafs, cond, action, m_width, Callback, (foreign, start, end, baseindex, state, callback))
+    return r;
+}
+
+
+template <class cond, Action action, size_t width, class Callback> bool Array::CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const 
+{
+    size_t fw = foreign->m_width;
+    bool r;
+    TIGHTDB_TEMPEX5(r = CompareLeafs4, cond, action, width, Callback, fw, (foreign, start, end, baseindex, state, callback))
+    return r;
+}
+
+
+template <class cond, Action action, size_t width, class Callback, size_t foreign_width> bool Array::CompareLeafs4(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+{
+    cond C;
+    char* foreign_m_data = foreign->m_data;     
+
+    if(width == 0 && foreign_width == 0) {
+        if(C(0, 0)) {
+            while(start < end) {
+                if(!find_action<action, Callback>(start + baseindex, 0, state, callback))
+                    return false;
+                start++;
+            }
+        }
+        else {
+            return true;
+        }
+    }
+
+
+#if defined(TIGHTDB_COMPILER_SSE)
+    if(cpuid_sse<42>() && width == foreign_width && (width == 8 || width == 16 || width == 32)) {
+        // We can only use SSE if both bitwidths are equal and above 8 bits and all values are signed   
+        while (start < end && ((((size_t)m_data & 0xf) * 8 + start * width) % (128) != 0)) {            
+            int64_t v = GetUniversal<width>(m_data, start);
+            int64_t fv = GetUniversal<foreign_width>(foreign_m_data, start);
+            if(C(v, fv)) {
+                if(!find_action<action, Callback>(start + baseindex, v, state, callback))
+                    return false;
+            }
+            start++;
+        }
+        if (start == end)
+            return true; 
+
+
+        size_t sse_items = (end - start) * width / 128;
+        size_t sse_end = start + sse_items * 128 / no0(width);
+
+        while(start < sse_end) {
+            __m128i* a = (__m128i*)(m_data + start * width / 8);
+            __m128i* b = (__m128i*)(foreign_m_data + start * width / 8);
+            
+            bool continue_search = FindSSE_intern<cond, action, width, Callback>(a, b, 1, state, baseindex + start, callback);
+
+            if(!continue_search)
+                return false;
+
+            start += 128 / no0(width);
+        }
+        
+
+    }
+#endif
+    
+
+#if 0 // this method turned out to be 33% slower than a naive loop. Find out why
+
+    // index from which both arrays are 64-bit aligned
+    size_t a = round_up(start, 8*sizeof(int64_t) / (width < foreign_width ? width : foreign_width)); 
+    
+    while(start < end && start < a) {
+        int64_t v = GetUniversal<width>(m_data, start);
+        int64_t fv = GetUniversal<foreign_width>(foreign_m_data, start);
+
+        if(v == fv)
+            r++;
+
+        start++;
+    }
+
+    if (start >= end)
+        return r; 
+           
+    uint64_t chunk;
+    uint64_t fchunk;
+
+    size_t unroll_outer = (foreign_width > width ? foreign_width : width) / (foreign_width < width ? foreign_width : width);
+    size_t unroll_inner = 64 / (foreign_width > width ? foreign_width : width);
+
+    while(start + unroll_outer * unroll_inner < end) {
+
+        // fetch new most narrow chunk
+        if(foreign_width <= width)
+            fchunk = *(int64_t*)(foreign_m_data + start * foreign_width / 8);
+        else
+            chunk = *(int64_t*)(m_data + start * width / 8);
+
+        for(size_t uo = 0; uo < unroll_outer; uo++) {
+
+            // fetch new widest chunk
+            if(foreign_width > width)
+                fchunk = *(int64_t*)(foreign_m_data + start * foreign_width / 8);
+            else
+                chunk = *(int64_t*)(m_data + start * width / 8);
+
+            size_t newstart = start + unroll_inner;
+            while(start < newstart) {
+
+                // Isolate first value from chunk
+                int64_t v = (chunk << (64 - width)) >> (64 - width);
+                int64_t fv = (fchunk << (64 - foreign_width)) >> (64 - foreign_width);
+                chunk >>= width;
+                fchunk >>= foreign_width;
+
+                // Sign extend if required
+                v = (width <= 4) ? v : (width == 8) ? (int8_t)v : (width == 16) ? (int16_t)v : (width == 32) ? (int32_t)v : (int64_t)v;
+                fv = (foreign_width <= 4) ? fv : (foreign_width == 8) ? (int8_t)fv : (foreign_width == 16) ? (int16_t)fv : (foreign_width == 32) ? (int32_t)fv : (int64_t)fv;
+
+                if(v == fv)
+                    r++;
+
+                start++;
+
+            }
+
+
+        }
+    }
+#endif
+
+
+
+/*
+    // Unrolling helped less than 2% (non-frequent matches). Todo, investigate further
+    while(start + 1 < end) {
+        int64_t v = GetUniversal<width>(m_data, start);
+        int64_t v2 = GetUniversal<width>(m_data, start + 1);
+
+        int64_t fv = GetUniversal<foreign_width>(foreign_m_data, start);
+        int64_t fv2 = GetUniversal<foreign_width>(foreign_m_data, start + 1);
+
+        if(C(v, fv)) {
+            if(!find_action<action, Callback>(start + baseindex, v, state, callback))
+                return false;
+        }
+
+        if(C(v2, fv2)) {
+            if(!find_action<action, Callback>(start + 1 + baseindex, v2, state, callback))
+                return false;
+        }
+
+        start += 2;
+    }
+ */  
+
+    while(start < end) {
+        int64_t v = GetUniversal<width>(m_data, start);
+        int64_t fv = GetUniversal<foreign_width>(foreign_m_data, start);
+
+        if(C(v, fv)) {
+            if(!find_action<action, Callback>(start + baseindex, v, state, callback))
+                return false;
+        }
+
+        start++;
+    }
+
+    return true;
+}
+
+
 template <class cond2, Action action, size_t bitwidth, class Callback> bool Array::Compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     cond2 C;
@@ -1946,8 +2180,6 @@ template <class cond2, Action action, size_t bitwidth, class Callback> bool Arra
     return ret;
 }
 
-// If gt = true: Find elements that are greater than value
-// If gt = false: Find elements that are smaller than value
 template <bool gt, Action action, size_t bitwidth, class Callback> bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);

@@ -179,6 +179,10 @@ public:
 
     SequentialGetter(ColType* column) : m_array((Array::no_prealloc_tag()))
     {
+        init(column);
+    }
+
+    void init (ColType* column) {
         m_column = column;
         m_leaf_end = 0;
     }
@@ -1280,6 +1284,91 @@ public:
 private:
     size_t m_last[2];
     bool m_was_match[2];
+};
+
+
+
+
+template <class TConditionValue, class TConditionFunction> class TwoColumnsNode: public ParentNode {
+public:
+    template <Action TAction> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}
+
+    TwoColumnsNode(size_t column1, size_t column2)
+    {
+        m_dT = 100.0;
+        m_condition_column_idx1 = column1;
+        m_condition_column_idx2 = column2;
+        m_child = 0;
+    }
+
+    ~TwoColumnsNode()
+    {
+        delete[] m_value.data();
+    }
+
+    void Init(const Table& table)
+    {
+        typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
+        m_dD = 100.0;
+        m_table = &table;
+
+        ColType* c = (ColType*)&table.GetColumnBase(m_condition_column_idx1);
+        m_getter1.init(c);
+
+        c = (ColType*)&table.GetColumnBase(m_condition_column_idx2);
+        m_getter2.init(c);
+
+        if (m_child)
+            m_child->Init(table);
+    }
+
+    size_t find_first_local(size_t start, size_t end)
+    {
+        size_t s = start;
+
+        while (s < end) {
+            if(SameType<TConditionValue, int64_t>::value) {
+                // For int64_t we've created an array intrinsics named CompareLeafs which template expands bitwidths
+                // of boths arrays to make Get faster.
+                m_getter1.cache_next(s);
+                m_getter2.cache_next(s);
+
+                QueryState<int64_t> qs;
+                bool resume = m_getter1.m_array_ptr->template CompareLeafs<TConditionFunction, act_ReturnFirst>(m_getter2.m_array_ptr, s - m_getter1.m_leaf_start, m_getter1.local_end(end), 0, &qs, CallbackDummy());
+
+            if(resume)
+                s = m_getter1.m_leaf_end;
+            else
+                return qs.m_state + m_getter1.m_leaf_start;
+            } 
+            else {
+                // This is for float and double.
+                TConditionValue v1 = m_getter1.get_next(s);
+                TConditionValue v2 = m_getter2.get_next(s);
+                TConditionFunction C;
+
+                if(C(v1, v2))
+                    return s;
+                else
+                    s++;              
+
+            }
+        }
+        return end;
+    }
+
+protected:
+    BinaryData m_value;
+    const ColumnBinary* m_condition_column;
+    ColumnType m_column_type;
+
+    size_t m_condition_column_idx1;
+    size_t m_condition_column_idx2;
+
+    SequentialGetter<TConditionValue> m_getter1;
+    SequentialGetter<TConditionValue> m_getter2;
+
+
 };
 
 
