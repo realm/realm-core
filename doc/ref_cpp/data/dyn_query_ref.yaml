@@ -55,9 +55,9 @@ CATEGORIES :
                  Query& equal(size_t column_ndx, int64_t value);
                  Query& equal(size_t column_ndx, float value);
                  Query& equal(size_t column_ndx, double value);
-                 Query& equal(size_t column_ndx, const char* value, bool case_sensitive=true);
+                 Query& equal(size_t column_ndx, StringData value, bool case_sensitive=true);
                  Query& equal(size_t column_ndx, BinaryData value);
-                 Query& equal_date(size_t column_ndx, time_t value);
+                 Query& equal_date(size_t column_ndx, Date value);
       SUMMARY  : &g_dyn_query_equals_summary
                  Equal to.
       DESCR    : &g_dyn_query_equals_descr
@@ -67,7 +67,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : Column index.
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, const char*, BinaryData, time_t]
+        TYPES  : [bool, int64_t, float, double, StringData, BinaryData, Date]
         DESCR  : The value.
       - NAME   : case_sensitive
         TYPES  : bool
@@ -86,15 +86,16 @@ CATEGORIES :
   - g_dyn_query_notEquals_string:
   - g_dyn_query_notEquals_date:
   - g_dyn_query_notEquals_binary:
-      NAMES    : [ not_equal, not_equal, not_equal_binary ]
+      NAMES    : [ not_equal, not_equal_binary ]
+      TITLE    : not_equal*
       SIGNATURE: |
                  Query& not_equal(size_t column_ndx, int64_t value);
                  Query& not_equal(size_t column_ndx, float value);
                  Query& not_equal(size_t column_ndx, double value);
-                 Query& not_equal(size_t column_ndx, const char* value, bool case_sensitive=true);
-                 Query& not_equal_date(size_t column_ndx, time_t value);
+                 Query& not_equal(size_t column_ndx, StringData value, bool case_sensitive=true);
+                 Query& not_equal_date(size_t column_ndx, Date value);
  #                Query& not_equal(size_t column_ndx, bool value);
- #                Query& not_equal_binary(size_t column_ndx, const char* data, size_t size);
+ #                Query& not_equal_binary(size_t column_ndx, BinaryData value);
       SUMMARY  : &g_dyn_query_notEquals_summary
                  Not equal to.
       DESCR    : &g_dyn_query_notEquals_descr
@@ -104,7 +105,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : Column index.
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, const char*, time_t]
+        TYPES  : [bool, int64_t, float, double, StringData, Date]
         DESCR  : The value.
       - NAME   : case_sensitive
         TYPES  : bool
@@ -125,7 +126,7 @@ CATEGORIES :
                  Query& greater(size_t column_ndx, int64_t value);
                  Query& greater(size_t column_ndx, float value);
                  Query& greater(size_t column_ndx, double value);
-                 Query& greater_date(size_t column_ndx, time_t value);
+                 Query& greater_date(size_t column_ndx, Date value);
       SUMMARY  : &g_dyn_query_greaterThan_summary
                  Greater than.
       DESCR    : &g_dyn_query_greaterThan_descr
@@ -135,7 +136,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : Column index.
       - NAME   : value
-        TYPES  : [int64_t, float, double, time_t]
+        TYPES  : [int64_t, float, double, Date]
         DESCR  : The value.
       RETURN:
         TYPES  : Query&
@@ -153,7 +154,7 @@ CATEGORIES :
                  Query& greater_equal(size_t column_ndx, int64_t value);
                  Query& greater_equal(size_t column_ndx, float value);
                  Query& greater_equal(size_t column_ndx, double value);
-                 Query& greater_equal_date(size_t column_ndx, time_t value);
+                 Query& greater_equal_date(size_t column_ndx, Date value);
       SUMMARY  : &g_dyn_query_greaterThanOrEqual_summary
                  Greater than or equal to.
       DESCR    : &g_dyn_query_greaterThanOrEqual_descr
@@ -163,7 +164,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : Column index.
       - NAME   : value
-        TYPES  : [int64_t, float, double, time_t]
+        TYPES  : [int64_t, float, double, Date]
         DESCR  : The value.
       RETURN:
         TYPES  : Query&
@@ -181,7 +182,7 @@ CATEGORIES :
                  Query& less(size_t column_ndx, int64_t value);
                  Query& less(size_t column_ndx, float value);
                  Query& less(size_t column_ndx, double value);
-                 Query& less_date(size_t column_ndx, time_t value);
+                 Query& less_date(size_t column_ndx, Date value);
       SUMMARY  : &g_dyn_query_lessThan_summary
                  Less than.
       DESCR    : &g_dyn_query_lessThan_descr
@@ -191,7 +192,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : Column index.
       - NAME   : value
-        TYPES  : [int64_t, float, double, time_t]
+        TYPES  : [int64_t, float, double, Date]
         DESCR  : The value.
       RETURN:
         TYPES  : Query&
@@ -209,7 +210,7 @@ CATEGORIES :
                  Query& less_equal(size_t column_ndx, int64_t value);
                  Query& less_equal(size_t column_ndx, float value);
                  Query& less_equal(size_t column_ndx, double value);
-                 Query& less_equal_date(size_t column_ndx, time_t value);
+                 Query& less_equal_date(size_t column_ndx, Date value);
       SUMMARY  : &g_dyn_query_lessThanOrEqual_summary
                  Less than or equal to.
       DESCR    : &g_dyn_query_lessThanOrEqual_descr
@@ -219,7 +220,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : Column index.
       - NAME   : value
-        TYPES  : [int64_t, float, double, time_t]
+        TYPES  : [int64_t, float, double, Date]
         DESCR  : The value.
       RETURN:
         TYPES  : Query&
@@ -237,7 +238,7 @@ CATEGORIES :
                  Query& between(size_t column_ndx, int64_t from, int64_t to);
                  Query& between(size_t column_ndx, float from, float to);
                  Query& between(size_t column_ndx, double from, double to);
-                 Query& between_date(size_t column_ndx, time_t from, time_t to);
+                 Query& between_date(size_t column_ndx, Date from, Date to);
       DESCR    : &g_dyn_query_between_descr
                  Queries for column values in a range between <code>from</code> and <code>to</code>.
       SUMMARY  : &g_dyn_query_between_summary
@@ -247,10 +248,10 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : Column index.
       - NAME   : from
-        TYPES  : [int64_t, float, double, time_t]
+        TYPES  : [int64_t, float, double, Date]
         DESCR  : Lowest value of range (inclusive).
       - NAME   : to
-        TYPES  : [int64_t, float, double, time_t]
+        TYPES  : [int64_t, float, double, Date]
         DESCR  : Highest value of range (inclusive).
       RETURN:
         TYPES  : Query&
@@ -259,11 +260,11 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_dyn_query_between
   - g_dyn_query_startsWith:
-#  - g_dyn_query_startsWith_binary:
-      NAMES    : [begins_with] #, begins_with_binary]
+  - g_dyn_query_startsWith_binary:
+      NAMES    : [begins_with]
       SIGNATURE: |
-                 Query& begins_with(size_t column_ndx, const char* value, bool case_sensitive=true);
-#                 Query& begins_with_binary(size_t column_ndx, const char* data, size_t size);
+                 Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive=true);
+                 Query& begins_with(size_t column_ndx, BinaryData value);
       DESCR    : &g_dyn_query_startsWith_descr
                  Queries for column values which begin with a certain prefix.
       SUMMARY  : &g_dyn_query_startsWith_summary
@@ -273,7 +274,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : Column index.
       - NAME   : value
-        TYPES  : const char*
+        TYPES  : [StringData, BinaryData]
         DESCR  : The value.
       - NAME   : case_sensitive
         TYPES  : bool
@@ -285,11 +286,11 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_dyn_query_startsWith
   - g_dyn_query_endsWith:
-#  - g_dyn_query_endsWith_binary:
-      NAMES    : [ends_with] #, ends_with_binary]
+  - g_dyn_query_endsWith_binary:
+      NAMES    : [ends_with]
       SIGNATURE: |
-                 Query& ends_with(size_t column_ndx, const char* value, bool case_sensitive=true);
-#                 Query& ends_with_binary(size_t column_ndx, const char* data, size_t size);
+                 Query& ends_with(size_t column_ndx, StringData value, bool case_sensitive=true);
+                 Query& ends_with(size_t column_ndx, BinaryData value);
       DESCR    : &g_dyn_query_endsWith_descr
                  Queries for column values which ends with a specified suffix.
       SUMMARY  : &g_dyn_query_endsWith_summary
@@ -299,7 +300,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : Column index.
       - NAME   : value
-        TYPES  : const char*
+        TYPES  : [StringData, BinaryData]
         DESCR  : The value.
       - NAME   : case_sensitive
         TYPES  : bool
@@ -311,11 +312,11 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_dyn_query_endsWith
   - g_dyn_query_contains:
-#  - g_dyn_query_contains_binary:
-      NAMES    : [contains] #, contains_binary]
+  - g_dyn_query_contains_binary:
+      NAMES    : [contains]
       SIGNATURE: |
-                 Query& contains(size_t column_ndx, const char* value, bool case_sensitive=true);
-#                 Query& contains_binary(size_t column_ndx, const char* data, size_t size);
+                 Query& contains(size_t column_ndx, StringData value, bool case_sensitive=true);
+                 Query& contains(size_t column_ndx, BinaryData value);
       DESCR    : &g_dyn_query_contains_descr
                  Queries for column values which contain the specified substring.
       SUMMARY  : &g_dyn_query_contains_summary
@@ -325,7 +326,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : Column index.
       - NAME   : value
-        TYPES  : const char*
+        TYPES  : [StringData, BinaryData]
         DESCR  : The value
       - NAME   : case_sensitive
         TYPES  : bool
@@ -572,7 +573,7 @@ CATEGORIES :
                  int64_t maximum(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
                  float   maximum_float(..parameters as above..)
                  double  maximum_double(..parameters as above..)
-                 time_t  maximum_date(..parameters as above..)
+                 Date    maximum_date(..parameters as above..)
       PARAMS:
       - NAME   : column_ndx
         DESCR  : Column index. The datatype of the column must match the function called. E.g. <code>maximum_float()</code> can only be used on columns which contains floats.
@@ -590,7 +591,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : "Maximum number of rows to search. Default: -1 (infinity)."
       RETURN:
-        TYPES  : [int64_t, float, double, time_t]
+        TYPES  : [int64_t, float, double, Date]
         DESCR  : The highest value.
       EXAMPLES:
       - DESCR  :
@@ -611,7 +612,7 @@ CATEGORIES :
                  int64_t minimum(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
                  float   minimum_float(..parameters as above..)
                  double  minimum_double(..parameters as above..)
-                 time_t  minimum_date(..parameters as above..)
+                 Date    minimum_date(..parameters as above..)
       PARAMS:
       - NAME   : column_ndx
         DESCR  : Column index. The datatype of the column must match the function called. E.g. <code>minimum_float()</code> can only be used on columns which contains floats.
@@ -629,7 +630,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
-        TYPES  : [int64_t, float, double, time_t]
+        TYPES  : [int64_t, float, double, Date]
         DESCR  : The lowest value.
       EXAMPLES:
       - DESCR  :

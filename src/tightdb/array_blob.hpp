@@ -33,12 +33,15 @@ public:
               Allocator& alloc = Allocator::get_default()) TIGHTDB_NOEXCEPT;
     ArrayBlob(Allocator& alloc) TIGHTDB_NOEXCEPT;
 
-    const char* Get(size_t pos) const TIGHTDB_NOEXCEPT;
+    const char* get(std::size_t pos) const TIGHTDB_NOEXCEPT;
 
-    void add(const char* data, size_t size);
-    void Insert(size_t pos, const char* data, size_t size);
-    void Replace(size_t begin, size_t end, const char* data, size_t size);
-    void Delete(size_t begin, size_t end);
+    static const char* get_from_header(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT;
+
+    void add(const char* data, std::size_t size, bool add_zero_term = false);
+    void insert(std::size_t pos, const char* data, std::size_t size, bool add_zero_term = false);
+    void replace(std::size_t begin, std::size_t end, const char* data, std::size_t size,
+                 bool add_zero_term = false);
+    void erase(size_t begin, size_t end);
     void Resize(size_t size);
     void Clear();
 
@@ -79,35 +82,41 @@ inline ArrayBlob::ArrayBlob(std::size_t ref, const ArrayParent *parent, std::siz
 // Creates new array (but invalid, call UpdateRef to init)
 inline ArrayBlob::ArrayBlob(Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc) {}
 
-inline const char* ArrayBlob::Get(std::size_t pos) const TIGHTDB_NOEXCEPT
+inline const char* ArrayBlob::get(std::size_t pos) const TIGHTDB_NOEXCEPT
 {
     return m_data + pos;
 }
 
-inline void ArrayBlob::add(const char* data, std::size_t len)
+inline const char* ArrayBlob::get_from_header(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT
 {
-    Replace(m_len, m_len, data, len);
+    return get_data_from_header(header) + pos;
 }
 
-inline void ArrayBlob::Insert(std::size_t pos, const char* data, std::size_t len)
+inline void ArrayBlob::add(const char* data, std::size_t size, bool add_zero_term)
 {
-    Replace(pos, pos, data, len);
+    replace(m_len, m_len, data, size, add_zero_term);
 }
 
-inline void ArrayBlob::Delete(std::size_t start, std::size_t end)
+inline void ArrayBlob::insert(std::size_t pos, const char* data, std::size_t size,
+                              bool add_zero_term)
 {
-    Replace(start, end, 0, 0);
+    replace(pos, pos, data, size, add_zero_term);
+}
+
+inline void ArrayBlob::erase(std::size_t start, std::size_t end)
+{
+    replace(start, end, 0, 0);
 }
 
 inline void ArrayBlob::Resize(std::size_t len)
 {
     TIGHTDB_ASSERT(len <= m_len);
-    Replace(len, m_len, 0, 0);
+    replace(len, m_len, 0, 0);
 }
 
 inline void ArrayBlob::Clear()
 {
-    Replace(0, m_len, 0, 0);
+    replace(0, m_len, 0, 0);
 }
 
 inline const char* ArrayBlob::get_direct(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT

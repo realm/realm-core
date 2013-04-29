@@ -663,7 +663,7 @@ FILE* File::open_stdio_file(const string& path, Mode m)
 }
 
 
-bool File::exists(const std::string& path)
+bool File::exists(const string& path)
 {
 #ifdef _WIN32
     if (_access(path.c_str(), 0) == 0) return true;

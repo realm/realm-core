@@ -16,13 +16,13 @@ using namespace tightdb;
 void VerifiedInteger::VerifyNeighbours(size_t ndx)
 {
     if (v.size() > ndx)
-        TIGHTDB_ASSERT(v[ndx] == u.Get(ndx));
+        TIGHTDB_ASSERT(v[ndx] == u.get(ndx));
 
     if (ndx > 0)
-        TIGHTDB_ASSERT(v[ndx - 1] == u.Get(ndx - 1));
+        TIGHTDB_ASSERT(v[ndx - 1] == u.get(ndx - 1));
 
     if (v.size() > ndx + 1)
-        TIGHTDB_ASSERT(v[ndx + 1] == u.Get(ndx + 1));
+        TIGHTDB_ASSERT(v[ndx + 1] == u.get(ndx + 1));
 }
 
 void VerifiedInteger::add(int64_t value)
@@ -37,7 +37,7 @@ void VerifiedInteger::add(int64_t value)
 void VerifiedInteger::Insert(size_t ndx, int64_t value)
 {
     v.insert(v.begin() + ndx, value);
-    u.Insert(ndx, value);
+    u.insert(ndx, value);
     TIGHTDB_ASSERT(v.size() == u.Size());
     VerifyNeighbours(ndx);
     TIGHTDB_ASSERT(ConditionalVerify());
@@ -45,7 +45,7 @@ void VerifiedInteger::Insert(size_t ndx, int64_t value)
 
 int64_t VerifiedInteger::Get(size_t ndx)
 {
-    TIGHTDB_ASSERT(v[ndx] == u.Get(ndx));
+    TIGHTDB_ASSERT(v[ndx] == u.get(ndx));
     return v[ndx];
 }
 
@@ -105,7 +105,7 @@ int64_t VerifiedInteger::minimum(size_t start, size_t end)
 void VerifiedInteger::Set(size_t ndx, int64_t value)
 {
     v[ndx] = value;
-    u.Set(ndx, value);
+    u.set(ndx, value);
     VerifyNeighbours(ndx);
     TIGHTDB_ASSERT(ConditionalVerify());
 }
@@ -113,7 +113,7 @@ void VerifiedInteger::Set(size_t ndx, int64_t value)
 void VerifiedInteger::Delete(size_t ndx)
 {
     v.erase(v.begin() + ndx);
-    u.Delete(ndx);
+    u.erase(ndx);
     TIGHTDB_ASSERT(v.size() == u.Size());
     VerifyNeighbours(ndx);
     TIGHTDB_ASSERT(ConditionalVerify());
@@ -164,7 +164,7 @@ void VerifiedInteger::find_all(Array &c, int64_t value, size_t start, size_t end
     if (c.size() != result.size())
         TIGHTDB_ASSERT(false);
     for (size_t t = 0; t < result.size(); ++t) {
-        if (result[t] != (size_t)c.Get(t))
+        if (result[t] != size_t(c.Get(t)))
             TIGHTDB_ASSERT(false);
     }
 
@@ -178,8 +178,8 @@ bool VerifiedInteger::Verify(void)
         return false;
 
     for (size_t t = 0; t < v.size(); ++t) {
-        TIGHTDB_ASSERT(v[t] == u.Get(t));
-        if (v[t] != u.Get(t))
+        TIGHTDB_ASSERT(v[t] == u.get(t));
+        if (v[t] != u.get(t))
             return false;
     }
     return true;
@@ -188,7 +188,7 @@ bool VerifiedInteger::Verify(void)
 // makes it run amortized the same time complexity as original, even though the row count grows
 bool VerifiedInteger::ConditionalVerify(void)
 {
-    if (((uint64_t)rand() * (uint64_t)rand())  % (v.size() / 10 + 1) == 0) {
+    if ((uint64_t(rand()) * uint64_t(rand()))  % (v.size() / 10 + 1) == 0) {
         return Verify();
     }
     else {
