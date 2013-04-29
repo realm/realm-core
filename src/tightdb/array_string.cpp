@@ -312,16 +312,16 @@ size_t ArrayString::count(StringData value, size_t begin, size_t end) const
 
 size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
 {
-    if (end == size_t(-1)) end = m_len;
+    if (end == size_t(-1))
+        end = m_len;
     TIGHTDB_ASSERT(begin <= m_len && end <= m_len && begin <= end);
+
+    if (m_width == 0)
+        return value.size() == 0 && begin < end ? begin : size_t(-1);
 
     // A string can never be wider than the column width
     if (m_width <= value.size())
         return size_t(-1);
-
-    if (m_width == 0) {
-        return value.size() == 0 && begin < end ? begin : -1;
-    }
 
     if (value.size() == 0) {
 // FIXME: The following four lines are a temporary fix, and will soon
