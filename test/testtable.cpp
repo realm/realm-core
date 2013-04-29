@@ -180,7 +180,7 @@ TEST(Table4)
     const TestTableEnum::Cursor r = table.back(); // last item
 
     CHECK_EQUAL(Mon, r.first);
-    CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello", (const char*)r.second);
+    CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello", r.second);
 
     // Test string column searching
     CHECK_EQUAL(size_t(1),  table.column().second.find_first("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
@@ -317,6 +317,8 @@ TEST(Table_HighLevelCopy)
 // Pre-declare prototype
 void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows);
 
+namespace {
+
 void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
 {
     // Create table with all column types
@@ -364,14 +366,14 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
                 break;
         }
 
-        table.insert_binary(8, i, "binary", 7);
+        table.insert_binary(8, i, BinaryData("binary", 7));
 
         switch (i % 8) {
             case 0:
-                table.insert_mixed(9, i, (bool)false);
+                table.insert_mixed(9, i, false);
                 break;
             case 1:
-                table.insert_mixed(9, i, (int64_t)(i*i*sign));
+                table.insert_mixed(9, i, int64_t(i*i*sign));
                 break;
             case 2:
                 table.insert_mixed(9, i, "string");
@@ -380,7 +382,7 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
                 table.insert_mixed(9, i, Date(123456789));
                 break;
             case 4:
-                table.insert_mixed(9, i, Mixed(BinaryData("binary", 7)));
+                table.insert_mixed(9, i, BinaryData("binary", 7));
                 break;
             case 5:
             {
@@ -425,6 +427,8 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
     // We also want a ColumnStringEnum
     table.optimize();
 }
+
+} // anonymous namespace
 
 
 TEST(Table_Delete_All_Types)
@@ -541,7 +545,7 @@ TEST(Table_test_json_simple)
         table.insert_date(2, i, 0x7fffeeeeL);
         table.insert_string(3, i, "helloooooo");
         const char bin[] = "123456789012345678901234567890nopq";
-        table.insert_binary(4, i, bin, sizeof(bin) );
+        table.insert_binary(4, i, BinaryData(bin, sizeof bin));
         table.insert_done();
     }
 
@@ -900,11 +904,11 @@ TEST(TableAutoEnumeration)
         CHECK_EQUAL(8, table[3+n].first);
         CHECK_EQUAL(9, table[4+n].first);
 
-        CHECK_EQUAL("abd",     (const char*)table[0+n].second);
-        CHECK_EQUAL("eftg",    (const char*)table[1+n].second);
-        CHECK_EQUAL("hijkl",   (const char*)table[2+n].second);
-        CHECK_EQUAL("mnopqr",  (const char*)table[3+n].second);
-        CHECK_EQUAL("stuvxyz", (const char*)table[4+n].second);
+        CHECK_EQUAL("abd",     table[0+n].second);
+        CHECK_EQUAL("eftg",    table[1+n].second);
+        CHECK_EQUAL("hijkl",   table[2+n].second);
+        CHECK_EQUAL("mnopqr",  table[3+n].second);
+        CHECK_EQUAL("stuvxyz", table[4+n].second);
 
         CHECK_EQUAL(true, table[0+n].third);
         CHECK_EQUAL(true, table[1+n].third);
@@ -952,11 +956,11 @@ TEST(TableAutoEnumerationFindFindAll)
 
     TestTableAE::View tv = table.column().second.find_all("eftg");
     CHECK_EQUAL(5, tv.size());
-    CHECK_EQUAL("eftg", static_cast<const char*>(tv[0].second));
-    CHECK_EQUAL("eftg", static_cast<const char*>(tv[1].second));
-    CHECK_EQUAL("eftg", static_cast<const char*>(tv[2].second));
-    CHECK_EQUAL("eftg", static_cast<const char*>(tv[3].second));
-    CHECK_EQUAL("eftg", static_cast<const char*>(tv[4].second));
+    CHECK_EQUAL("eftg", tv[0].second);
+    CHECK_EQUAL("eftg", tv[1].second);
+    CHECK_EQUAL("eftg", tv[2].second);
+    CHECK_EQUAL("eftg", tv[3].second);
+    CHECK_EQUAL("eftg", tv[4].second);
 }
 
 namespace {
@@ -1537,8 +1541,8 @@ TEST(Table_Mixed)
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
     CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
-    CHECK_EQUAL("binary", (const char*)table.get_mixed(1, 4).get_binary().pointer);
-    CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().len);
+    CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
+    CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
 
     table.insert_int(0, 5, 0);
     table.insert_mixed(1, 5, Mixed::subtable_tag());
@@ -1559,8 +1563,8 @@ TEST(Table_Mixed)
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
     CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
-    CHECK_EQUAL("binary", (const char*)table.get_mixed(1, 4).get_binary().pointer);
-    CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().len);
+    CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
+    CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
 
     // Get table from mixed column and add schema and some values
     TableRef subtable = table.get_subtable(1, 5);
@@ -1604,8 +1608,8 @@ TEST(Table_Mixed)
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
     CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
-    CHECK_EQUAL("binary", (const char*)table.get_mixed(1, 4).get_binary().pointer);
-    CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().len);
+    CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
+    CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
     CHECK_EQUAL(float(1.123),  table.get_mixed(1, 6).get_float());
     CHECK_EQUAL(double(2.234), table.get_mixed(1, 7).get_double());
 
@@ -1894,8 +1898,8 @@ TEST(Table_DateAndBinary)
     for (size_t i=0; i<size; ++i) data[i] = (char)i;
     t.add(8, BinaryData(data, size));
     CHECK_EQUAL(t[0].date, 8);
-    CHECK_EQUAL(t[0].bin.get_len(), size);
-    CHECK(equal(t[0].bin.get_pointer(), t[0].bin.get_pointer()+size, data));
+    CHECK_EQUAL(t[0].bin.size(), size);
+    CHECK(equal(t[0].bin.data(), t[0].bin.data()+size, data));
 }
 
 // Test for a specific bug found: Calling clear on a group with a table with a subtable

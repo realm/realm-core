@@ -128,8 +128,8 @@ CATEGORIES :
                  int64_t       get_int(size_t row_ndx) const;
                  float         get_float(size_t row_ndx) const;
                  double        get_double(size_t row_ndx) const;
-                 time_t        get_date(size_t row_ndx) const;
-                 const char*   get_string(size_t row_ndx) const;
+                 Date          get_date(size_t row_ndx) const;
+                 StringData    get_string(size_t row_ndx) const;
                  BinaryData    get_binary(size_t row_ndx) const;
                  Mixed         get_mixed(size_t row_ndx) const;
                  DataType      get_mixed_type(size_t row_ndx) const
@@ -141,7 +141,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : The row index.
       RETURN:
-        TYPES  : [bool, int64_t, float, double, time_t, const char*, BinaryData, Mixed, DataType, TableRef, ConstTableRef]
+        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed, DataType, TableRef, ConstTableRef]
         DESCR  : The value.
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_get_xxx
@@ -164,20 +164,17 @@ CATEGORIES :
                  void set_float(size_t row_ndx, float value);
                  void set_double(size_t row_ndx, double value);
                  void set_enum(size_t row_ndx, EnumType value);
-                 void set_date(size_t row_ndx, time_t value);
-                 void set_string(size_t row_ndx, const char* value);
-                 void set_binary(size_t row_ndx, const char* value, size_t len);
+                 void set_date(size_t row_ndx, Date value);
+                 void set_string(size_t row_ndx, StringData value);
+                 void set_binary(size_t row_ndx, BinaryData value);
                  void set_mixed(size_t row_ndx, Mixed value);
       PARAMS:
       - NAME   : row_ndx
         TYPES  : size_t
         DESCR  : The row index.
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, time_t, const char*, Mixed]
+        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed]
         DESCR  : The value.
-      - NAME   : len
-        TYPES  : size_t
-        DESCR  : Size in bytes of binary value.
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_set_xxx
         DESCR  :
@@ -225,12 +222,12 @@ CATEGORIES :
                  size_t find_first_float(float value) const;
                  size_t find_first_double(double value) const;
                  size_t find_first_bool(bool value) const;
-                 size_t find_first_date(time_t value) const;
-                 size_t find_first_string(const char* value) const;
+                 size_t find_first_date(Date value) const;
+                 size_t find_first_string(StringData value) const;
       CONST    : True
       PARAMS:
       - NAME   : value
-        TYPES  : [bool, int64_t, time_t, const char*]
+        TYPES  : [bool, int64_t, Date, StringData]
         DESCR  : The value.
       RETURN:
         TYPES  : size_t
@@ -261,18 +258,18 @@ CATEGORIES :
                  TableView      find_all_bool(bool value);
                  TableView      find_all_float(float value);
                  TableView      find_all_double(double value);
-                 TableView      find_all_date(time_t value);
-                 TableView      find_all_string(const char* value);
+                 TableView      find_all_date(Date value);
+                 TableView      find_all_string(StringData value);
 
                  ConstTableView find_all_int(int64_t value) const;
                  ConstTableView find_all_bool(bool value) const;
                  ConstTableView find_all_float(float value) const;
                  ConstTableView find_all_double(double value) const;
-                 ConstTableView find_all_date(time_t value) const;
-                 ConstTableView find_all_string(const char* value) const;
+                 ConstTableView find_all_date(Date value) const;
+                 ConstTableView find_all_string(StringData value) const;
       PARAMS:
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, time_t, const char*]
+        TYPES  : [bool, int64_t, float, double, Date, StringData]
         DESCR  : The value.
       RETURN:
         TYPES  : TableView
