@@ -19,25 +19,25 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongMultiEmpty)
     c.add("");
     CHECK_EQUAL(6, c.size());
 
-    CHECK_EQUAL("", c.Get(0));
-    CHECK_EQUAL("", c.Get(1));
-    CHECK_EQUAL("", c.Get(2));
-    CHECK_EQUAL("", c.Get(3));
-    CHECK_EQUAL("", c.Get(4));
-    CHECK_EQUAL("", c.Get(5));
+    CHECK_EQUAL("", c.get(0));
+    CHECK_EQUAL("", c.get(1));
+    CHECK_EQUAL("", c.get(2));
+    CHECK_EQUAL("", c.get(3));
+    CHECK_EQUAL("", c.get(4));
+    CHECK_EQUAL("", c.get(5));
 }
 
 TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet)
 {
-    c.Set(0, "hey");
+    c.set(0, "hey");
 
     CHECK_EQUAL(6, c.size());
-    CHECK_EQUAL("hey", c.Get(0));
-    CHECK_EQUAL("", c.Get(1));
-    CHECK_EQUAL("", c.Get(2));
-    CHECK_EQUAL("", c.Get(3));
-    CHECK_EQUAL("", c.Get(4));
-    CHECK_EQUAL("", c.Get(5));
+    CHECK_EQUAL("hey", c.get(0));
+    CHECK_EQUAL("", c.get(1));
+    CHECK_EQUAL("", c.get(2));
+    CHECK_EQUAL("", c.get(3));
+    CHECK_EQUAL("", c.get(4));
+    CHECK_EQUAL("", c.get(5));
 }
 
 TEST_FIXTURE(db_setup_string_long, ArrayStringLongAdd)
@@ -46,12 +46,12 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongAdd)
     CHECK_EQUAL(0, c.size());
 
     c.add("abc");
-    CHECK_EQUAL("abc", c.Get(0)); // single
+    CHECK_EQUAL("abc", c.get(0)); // single
     CHECK_EQUAL(1, c.size());
 
     c.add("defg"); //non-empty
-    CHECK_EQUAL("abc", c.Get(0));
-    CHECK_EQUAL("defg", c.Get(1));
+    CHECK_EQUAL("abc", c.get(0));
+    CHECK_EQUAL("defg", c.get(1));
     CHECK_EQUAL(2, c.size());
 }
 
@@ -61,52 +61,52 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet2)
     c.Clear();
 
     c.add("abc");
-    c.Set(0, "de"); // shrink single
-    CHECK_EQUAL("de", c.Get(0));
+    c.set(0, "de"); // shrink single
+    CHECK_EQUAL("de", c.get(0));
     CHECK_EQUAL(1, c.size());
 
-    c.Set(0, "abcd"); // grow single
-    CHECK_EQUAL("abcd", c.Get(0));
+    c.set(0, "abcd"); // grow single
+    CHECK_EQUAL("abcd", c.get(0));
     CHECK_EQUAL(1, c.size());
 
     c.add("efg");
-    CHECK_EQUAL("abcd", c.Get(0));
-    CHECK_EQUAL("efg", c.Get(1));
+    CHECK_EQUAL("abcd", c.get(0));
+    CHECK_EQUAL("efg", c.get(1));
     CHECK_EQUAL(2, c.size());
 
-    c.Set(1, "hi"); // shrink last
-    CHECK_EQUAL("abcd", c.Get(0));
-    CHECK_EQUAL("hi", c.Get(1));
+    c.set(1, "hi"); // shrink last
+    CHECK_EQUAL("abcd", c.get(0));
+    CHECK_EQUAL("hi", c.get(1));
     CHECK_EQUAL(2, c.size());
 
-    c.Set(1, "jklmno"); // grow last
-    CHECK_EQUAL("abcd", c.Get(0));
-    CHECK_EQUAL("jklmno", c.Get(1));
+    c.set(1, "jklmno"); // grow last
+    CHECK_EQUAL("abcd", c.get(0));
+    CHECK_EQUAL("jklmno", c.get(1));
     CHECK_EQUAL(2, c.size());
 
     c.add("pq");
-    c.Set(1, "efghijkl"); // grow middle
-    CHECK_EQUAL("abcd", c.Get(0));
-    CHECK_EQUAL("efghijkl", c.Get(1));
-    CHECK_EQUAL("pq", c.Get(2));
+    c.set(1, "efghijkl"); // grow middle
+    CHECK_EQUAL("abcd", c.get(0));
+    CHECK_EQUAL("efghijkl", c.get(1));
+    CHECK_EQUAL("pq", c.get(2));
     CHECK_EQUAL(3, c.size());
 
-    c.Set(1, "x"); // shrink middle
-    CHECK_EQUAL("abcd", c.Get(0));
-    CHECK_EQUAL("x", c.Get(1));
-    CHECK_EQUAL("pq", c.Get(2));
+    c.set(1, "x"); // shrink middle
+    CHECK_EQUAL("abcd", c.get(0));
+    CHECK_EQUAL("x", c.get(1));
+    CHECK_EQUAL("pq", c.get(2));
     CHECK_EQUAL(3, c.size());
 
-    c.Set(0, "qwertyuio"); // grow first
-    CHECK_EQUAL("qwertyuio", c.Get(0));
-    CHECK_EQUAL("x", c.Get(1));
-    CHECK_EQUAL("pq", c.Get(2));
+    c.set(0, "qwertyuio"); // grow first
+    CHECK_EQUAL("qwertyuio", c.get(0));
+    CHECK_EQUAL("x", c.get(1));
+    CHECK_EQUAL("pq", c.get(2));
     CHECK_EQUAL(3, c.size());
 
-    c.Set(0, "mno"); // shrink first
-    CHECK_EQUAL("mno", c.Get(0));
-    CHECK_EQUAL("x", c.Get(1));
-    CHECK_EQUAL("pq", c.Get(2));
+    c.set(0, "mno"); // shrink first
+    CHECK_EQUAL("mno", c.get(0));
+    CHECK_EQUAL("x", c.get(1));
+    CHECK_EQUAL("pq", c.get(2));
     CHECK_EQUAL(3, c.size());
 }
 
@@ -115,34 +115,34 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongInsert)
 {
     c.Clear();
 
-    c.Insert(0, "abc"); // single
-    CHECK_EQUAL(c.Get(0), "abc");
+    c.insert(0, "abc"); // single
+    CHECK_EQUAL(c.get(0), "abc");
     CHECK_EQUAL(1, c.size());
 
-    c.Insert(1, "d"); // end
-    CHECK_EQUAL("abc", c.Get(0));
-    CHECK_EQUAL("d", c.Get(1));
+    c.insert(1, "d"); // end
+    CHECK_EQUAL("abc", c.get(0));
+    CHECK_EQUAL("d", c.get(1));
     CHECK_EQUAL(2, c.size());
 
-    c.Insert(2, "ef"); // end
-    CHECK_EQUAL("abc", c.Get(0));
-    CHECK_EQUAL("d", c.Get(1));
-    CHECK_EQUAL("ef", c.Get(2));
+    c.insert(2, "ef"); // end
+    CHECK_EQUAL("abc", c.get(0));
+    CHECK_EQUAL("d", c.get(1));
+    CHECK_EQUAL("ef", c.get(2));
     CHECK_EQUAL(3, c.size());
 
-    c.Insert(1, "ghij"); // middle
-    CHECK_EQUAL("abc", c.Get(0));
-    CHECK_EQUAL("ghij", c.Get(1));
-    CHECK_EQUAL("d", c.Get(2));
-    CHECK_EQUAL("ef", c.Get(3));
+    c.insert(1, "ghij"); // middle
+    CHECK_EQUAL("abc", c.get(0));
+    CHECK_EQUAL("ghij", c.get(1));
+    CHECK_EQUAL("d", c.get(2));
+    CHECK_EQUAL("ef", c.get(3));
     CHECK_EQUAL(4, c.size());
 
-    c.Insert(0, "klmno"); // first
-    CHECK_EQUAL("klmno", c.Get(0));
-    CHECK_EQUAL("abc", c.Get(1));
-    CHECK_EQUAL("ghij", c.Get(2));
-    CHECK_EQUAL("d", c.Get(3));
-    CHECK_EQUAL("ef", c.Get(4));
+    c.insert(0, "klmno"); // first
+    CHECK_EQUAL("klmno", c.get(0));
+    CHECK_EQUAL("abc", c.get(1));
+    CHECK_EQUAL("ghij", c.get(2));
+    CHECK_EQUAL("d", c.get(3));
+    CHECK_EQUAL("ef", c.get(4));
     CHECK_EQUAL(5, c.size());
 }
 
@@ -156,29 +156,29 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongDelete)
     c.add("ghij");
     c.add("klmno");
 
-    c.Delete(0); // first
-    CHECK_EQUAL("bc", c.Get(0));
-    CHECK_EQUAL("def", c.Get(1));
-    CHECK_EQUAL("ghij", c.Get(2));
-    CHECK_EQUAL("klmno", c.Get(3));
+    c.erase(0); // first
+    CHECK_EQUAL("bc", c.get(0));
+    CHECK_EQUAL("def", c.get(1));
+    CHECK_EQUAL("ghij", c.get(2));
+    CHECK_EQUAL("klmno", c.get(3));
     CHECK_EQUAL(4, c.size());
 
-    c.Delete(3); // last
-    CHECK_EQUAL("bc", c.Get(0));
-    CHECK_EQUAL("def", c.Get(1));
-    CHECK_EQUAL("ghij", c.Get(2));
+    c.erase(3); // last
+    CHECK_EQUAL("bc", c.get(0));
+    CHECK_EQUAL("def", c.get(1));
+    CHECK_EQUAL("ghij", c.get(2));
     CHECK_EQUAL(3, c.size());
 
-    c.Delete(1); // middle
-    CHECK_EQUAL("bc", c.Get(0));
-    CHECK_EQUAL("ghij", c.Get(1));
+    c.erase(1); // middle
+    CHECK_EQUAL("bc", c.get(0));
+    CHECK_EQUAL("ghij", c.get(1));
     CHECK_EQUAL(2, c.size());
 
-    c.Delete(0); // single
-    CHECK_EQUAL("ghij", c.Get(0));
+    c.erase(0); // single
+    CHECK_EQUAL("ghij", c.get(0));
     CHECK_EQUAL(1, c.size());
 
-    c.Delete(0); // all
+    c.erase(0); // all
     CHECK_EQUAL(0, c.size());
     CHECK(c.is_empty());
 }

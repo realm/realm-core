@@ -79,11 +79,15 @@ public:
 
     int64_t get_int(size_t ndx) const;
     bool get_bool(size_t ndx) const;
-    time_t get_date(size_t ndx) const;
+    Date get_date(size_t ndx) const;
     float get_float(size_t ndx) const;
     double get_double(size_t ndx) const;
-    const char* get_string(size_t ndx) const;
+    StringData get_string(size_t ndx) const;
     BinaryData get_binary(size_t ndx) const;
+
+    /// The returned array ref is zero if the specified row does not
+    /// contain a subtable.
+    size_t get_subtable_ref(std::size_t row_idx) const TIGHTDB_NOEXCEPT;
 
     /// The returned size is zero if the specified row does not
     /// contain a subtable.
@@ -96,26 +100,26 @@ public:
 
     void set_int(size_t ndx, int64_t value);
     void set_bool(size_t ndx, bool value);
-    void set_date(size_t ndx, time_t value);
+    void set_date(size_t ndx, Date value);
     void set_float(size_t ndx, float value);
     void set_double(size_t ndx, double value);
-    void set_string(size_t ndx, const char* value);
-    void set_binary(size_t ndx, const char* value, size_t len);
+    void set_string(size_t ndx, StringData value);
+    void set_binary(size_t ndx, BinaryData value);
     void set_subtable(size_t ndx, const Table*);
 
     void insert_int(size_t ndx, int64_t value);
     void insert_bool(size_t ndx, bool value);
-    void insert_date(size_t ndx, time_t value);
+    void insert_date(size_t ndx, Date value);
     void insert_float(size_t ndx, float value);
     void insert_double(size_t ndx, double value);
-    void insert_string(size_t ndx, const char* value);
-    void insert_binary(size_t ndx, const char* value, size_t len);
+    void insert_string(size_t ndx, StringData value);
+    void insert_binary(size_t ndx, BinaryData value);
     void insert_subtable(size_t ndx, const Table*);
 
     void add() TIGHTDB_OVERRIDE { insert_int(Size(), 0); }
     void insert(size_t ndx) TIGHTDB_OVERRIDE { insert_int(ndx, 0); invalidate_subtables(); }
     void Clear() TIGHTDB_OVERRIDE;
-    void Delete(size_t ndx) TIGHTDB_OVERRIDE;
+    void erase(size_t ndx) TIGHTDB_OVERRIDE;
     void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
     void fill(size_t count);
 
@@ -136,7 +140,7 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-    void ToDot(std::ostream& out, const char* title) const;
+    void ToDot(std::ostream& out, StringData title) const;
 #endif // TIGHTDB_DEBUG
 
 private:

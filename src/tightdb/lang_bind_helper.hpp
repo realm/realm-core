@@ -30,13 +30,14 @@ namespace tightdb {
 
 
 /// These functions are only to be used by language bindings to gain
-/// access to certain otherwise private memebers.
+/// access to certain memebers that are othewise private.
 ///
-/// \note An application must never call these functions directly.
+/// \note Applications are not supposed to call any of these functions
+/// directly.
 ///
-/// All the get_*_ptr() functions as well as new_table() in this class
-/// will return a Table pointer where the reference count has already been
-/// incremented.
+/// All the get_*_ptr() functions as well as new_table() and
+/// copy_table() will return a pointer to a Table whose reference
+/// count has already been incremented.
 ///
 /// The application must make sure that the unbind_table_ref() function is
 /// called to decrement the reference count when it no longer needs
@@ -64,9 +65,9 @@ public:
     static const Table* get_subtable_ptr(const ConstTableView*, std::size_t column_ndx,
                                          std::size_t row_ndx);
 
-    static Table* get_table_ptr(Group* grp, const char* name);
-    static Table* get_table_ptr(Group* grp, const char* name, bool& was_created);
-    static const Table* get_table_ptr(const Group* grp, const char* name);
+    static Table* get_table_ptr(Group* grp, StringData name);
+    static Table* get_table_ptr(Group* grp, StringData name, bool& was_created);
+    static const Table* get_table_ptr(const Group* grp, StringData name);
 
     static void unbind_table_ref(const Table*);
     static void bind_table_ref(const Table*);
@@ -141,21 +142,21 @@ inline const Table* LangBindHelper::get_subtable_ptr(const ConstTableView* tv,
     return get_subtable_ptr(&tv->get_parent(), column_ndx, tv->get_source_ndx(row_ndx));
 }
 
-inline Table* LangBindHelper::get_table_ptr(Group* grp, const char* name)
+inline Table* LangBindHelper::get_table_ptr(Group* grp, StringData name)
 {
     Table* subtab = grp->get_table_ptr(name);
     subtab->bind_ref();
     return subtab;
 }
 
-inline Table* LangBindHelper::get_table_ptr(Group* grp, const char* name, bool& was_created)
+inline Table* LangBindHelper::get_table_ptr(Group* grp, StringData name, bool& was_created)
 {
     Table* subtab = grp->get_table_ptr(name, was_created);
     subtab->bind_ref();
     return subtab;
 }
 
-inline const Table* LangBindHelper::get_table_ptr(const Group* grp, const char* name)
+inline const Table* LangBindHelper::get_table_ptr(const Group* grp, StringData name)
 {
     const Table* subtab = grp->get_table_ptr(name);
     subtab->bind_ref();

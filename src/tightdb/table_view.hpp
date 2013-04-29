@@ -28,7 +28,6 @@ namespace tightdb {
 
 
 using std::size_t;
-using std::time_t;
 
 
 /**
@@ -41,17 +40,17 @@ public:
 
     // Column information
     size_t      get_column_count() const TIGHTDB_NOEXCEPT;
-    const char* get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    size_t      get_column_index(const char* name) const;
+    StringData  get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    size_t      get_column_index(StringData name) const;
     DataType    get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     // Getting values
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     bool        get_bool(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    time_t      get_date(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    Date        get_date(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     float       get_float(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
     double      get_double(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
-    const char* get_string(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    StringData  get_string(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -62,15 +61,15 @@ public:
     // Searching (Int and String)
     size_t find_first_int(size_t column_ndx, int64_t value) const;
     size_t find_first_bool(size_t column_ndx, bool value) const;
-    size_t find_first_date(size_t column_ndx, time_t value) const;
+    size_t find_first_date(size_t column_ndx, Date value) const;
     size_t find_first_float(size_t column_ndx, float value) const;
     size_t find_first_double(size_t column_ndx, double value) const;
-    size_t find_first_string(size_t column_ndx, const char* value) const;
-    // FIXME: Need: size_t find_first_binary(size_t column_ndx, const char* value, size_t len) const;
+    size_t find_first_string(size_t column_ndx, StringData value) const;
+    // FIXME: Need: size_t find_first_binary(size_t column_ndx, BinaryData value) const;
 
     // Aggregate functions
     template <int function, typename T, typename R, class ColType>
-        R aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx) const;
+    R aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx) const;
 
 
     // TODO, FIXME: rename int versions
@@ -87,7 +86,8 @@ public:
     double maximum_double(size_t column_ndx) const;
     double minimum_double(size_t column_ndx) const;
 
-    // Sort the view according to the specified column and the specified direction.
+    // Sort the view according to the specified column and the
+    // specified direction.
     void sort(size_t column, bool ascending = true);
 
     // Get row index in the source table this view is "looking" at.
@@ -107,7 +107,7 @@ protected:
     template <class R, class V> static R find_all_integer(V*, size_t, int64_t);
     template <class R, class V> static R find_all_float(V*, size_t, float);
     template <class R, class V> static R find_all_double(V*, size_t, double);
-    template <class R, class V> static R find_all_string(V*, size_t, const char*);
+    template <class R, class V> static R find_all_string(V*, size_t, StringData);
 
     Table* m_table;
     Array m_refs;
@@ -196,12 +196,12 @@ public:
     // Setting values
     void set_int(size_t column_ndx, size_t row_ndx, int64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
-    void set_date(size_t column_ndx, size_t row_ndx, time_t value);
+    void set_date(size_t column_ndx, size_t row_ndx, Date value);
     template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value);
     void set_double(size_t column_ndx, size_t row_ndx, double value);
-    void set_string(size_t column_ndx, size_t row_ndx, const char* value);
-    void set_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
+    void set_string(size_t column_ndx, size_t row_ndx, StringData value);
+    void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void add_int(size_t column_ndx, int64_t value);
 
@@ -215,16 +215,16 @@ public:
     ConstTableView  find_all_int(size_t column_ndx, int64_t value) const;
     TableView       find_all_bool(size_t column_ndx, bool value);
     ConstTableView  find_all_bool(size_t column_ndx, bool value) const;
-    TableView       find_all_date(size_t column_ndx, time_t value);
-    ConstTableView  find_all_date(size_t column_ndx, time_t value) const;
+    TableView       find_all_date(size_t column_ndx, Date value);
+    ConstTableView  find_all_date(size_t column_ndx, Date value) const;
     TableView       find_all_float(size_t column_ndx, float value);
     ConstTableView  find_all_float(size_t column_ndx, float value) const;
     TableView       find_all_double(size_t column_ndx, double value);
     ConstTableView  find_all_double(size_t column_ndx, double value) const;
-    TableView       find_all_string(size_t column_ndx, const char *value);
-    ConstTableView  find_all_string(size_t column_ndx, const char *value) const;
-    // FIXME: Need: TableView find_all_binary(size_t column_ndx, const char* value, size_t len);
-    // FIXME: Need: ConstTableView find_all_binary(size_t column_ndx, const char* value, size_t len) const;
+    TableView       find_all_string(size_t column_ndx, StringData value);
+    ConstTableView  find_all_string(size_t column_ndx, StringData value) const;
+    // FIXME: Need: TableView find_all_binary(size_t column_ndx, BinaryData value);
+    // FIXME: Need: ConstTableView find_all_binary(size_t column_ndx, BinaryData value) const;
 
     Table& get_parent() TIGHTDB_NOEXCEPT { return *m_table; }
     const Table& get_parent() const TIGHTDB_NOEXCEPT { return *m_table; }
@@ -272,10 +272,10 @@ public:
     // Searching (Int and String)
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
     ConstTableView find_all_bool(size_t column_ndx, bool value) const;
-    ConstTableView find_all_date(size_t column_ndx, time_t value) const;
+    ConstTableView find_all_date(size_t column_ndx, Date value) const;
     ConstTableView find_all_float(size_t column_ndx, float value) const;
     ConstTableView find_all_double(size_t column_ndx, double value) const;
-    ConstTableView find_all_string(size_t column_ndx, const char *value) const;
+    ConstTableView find_all_string(size_t column_ndx, StringData value) const;
 
    const Table& get_parent() const TIGHTDB_NOEXCEPT { return *m_table; }
 
@@ -336,13 +336,13 @@ inline size_t TableViewBase::get_column_count() const TIGHTDB_NOEXCEPT
     return m_table->get_column_count();
 }
 
-inline const char* TableViewBase::get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT
+inline StringData TableViewBase::get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_table);
     return m_table->get_column_name(column_ndx);
 }
 
-inline size_t TableViewBase::get_column_index(const char* name) const
+inline size_t TableViewBase::get_column_index(StringData name) const
 {
     TIGHTDB_ASSERT(m_table);
     return m_table->get_column_index(name);
@@ -374,7 +374,7 @@ inline bool TableViewBase::get_bool(size_t column_ndx, size_t row_ndx) const TIG
     return m_table->get_bool(column_ndx, real_ndx);
 }
 
-inline time_t TableViewBase::get_date(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline Date TableViewBase::get_date(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Date);
 
@@ -398,7 +398,7 @@ inline double TableViewBase::get_double(size_t column_ndx, size_t row_ndx) const
     return m_table->get_double(column_ndx, real_ndx);
 }
 
-inline const char* TableViewBase::get_string(size_t column_ndx, size_t row_ndx) const
+inline StringData TableViewBase::get_string(size_t column_ndx, size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_String);
@@ -457,10 +457,10 @@ inline size_t TableViewBase::find_first_bool(size_t column_ndx, bool value) cons
     return find_first_integer(column_ndx, value ? 1 : 0);
 }
 
-inline size_t TableViewBase::find_first_date(size_t column_ndx, time_t value) const
+inline size_t TableViewBase::find_first_date(size_t column_ndx, Date value) const
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Date);
-    return find_first_integer(column_ndx, (int64_t)value);
+    return find_first_integer(column_ndx, int64_t(value.get_date()));
 }
 
 
@@ -495,16 +495,17 @@ R TableViewBase::find_all_double(V* view, size_t column_ndx, double value)
 }
 
 template <class R, class V>
-R TableViewBase::find_all_string(V* view, size_t column_ndx, const char* value)
+R TableViewBase::find_all_string(V* view, size_t column_ndx, StringData value)
 {
     TIGHTDB_ASSERT(view->m_table);
     TIGHTDB_ASSERT(column_ndx < view->m_table->get_column_count());
     TIGHTDB_ASSERT(view->m_table->get_column_type(column_ndx) == type_String);
 
     R tv(*view->m_table);
-    for (size_t i = 0; i < view->m_refs.size(); i++)
-        if (strcmp(view->get_string(column_ndx, i), value) == 0)
+    for (size_t i = 0; i < view->m_refs.size(); i++) {
+        if (view->get_string(column_ndx, i) == value)
             tv.get_ref_column().add(i);
+    }
     return move(tv);
 }
 
@@ -512,17 +513,17 @@ R TableViewBase::find_all_string(V* view, size_t column_ndx, const char* value)
 //-------------------------- TableView, ConstTableView implementation:
 
 // - string
-inline TableView TableView::find_all_string(size_t column_ndx, const char* value)
+inline TableView TableView::find_all_string(size_t column_ndx, StringData value)
 {
     return TableViewBase::find_all_string<TableView>(this, column_ndx, value);
 }
 
-inline ConstTableView TableView::find_all_string(size_t column_ndx, const char* value) const
+inline ConstTableView TableView::find_all_string(size_t column_ndx, StringData value) const
 {
     return TableViewBase::find_all_string<ConstTableView>(this, column_ndx, value);
 }
 
-inline ConstTableView ConstTableView::find_all_string(size_t column_ndx, const char* value) const
+inline ConstTableView ConstTableView::find_all_string(size_t column_ndx, StringData value) const
 {
     return TableViewBase::find_all_string<ConstTableView>(this, column_ndx, value);
 }
@@ -592,10 +593,10 @@ inline TableView TableView::find_all_bool(size_t column_ndx, bool value)
     return find_all_integer(column_ndx, value ? 1 : 0);
 }
 
-inline TableView TableView::find_all_date(size_t column_ndx, time_t value)
+inline TableView TableView::find_all_date(size_t column_ndx, Date value)
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Date);
-    return find_all_integer(column_ndx, (int64_t)value);
+    return find_all_integer(column_ndx, int64_t(value.get_date()));
 }
 
 
@@ -611,10 +612,10 @@ inline ConstTableView TableView::find_all_bool(size_t column_ndx, bool value) co
     return find_all_integer(column_ndx, value ? 1 : 0);
 }
 
-inline ConstTableView TableView::find_all_date(size_t column_ndx, time_t value) const
+inline ConstTableView TableView::find_all_date(size_t column_ndx, Date value) const
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Date);
-    return find_all_integer(column_ndx, (int64_t)value);
+    return find_all_integer(column_ndx, int64_t(value.get_date()));
 }
 
 
@@ -630,10 +631,10 @@ inline ConstTableView ConstTableView::find_all_bool(size_t column_ndx, bool valu
     return find_all_integer(column_ndx, value ? 1 : 0);
 }
 
-inline ConstTableView ConstTableView::find_all_date(size_t column_ndx, time_t value) const
+inline ConstTableView ConstTableView::find_all_date(size_t column_ndx, Date value) const
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Date);
-    return find_all_integer(column_ndx, (int64_t)value);
+    return find_all_integer(column_ndx, int64_t(value.get_date()));
 }
 
 
@@ -692,7 +693,7 @@ inline void TableView::set_bool(size_t column_ndx, size_t row_ndx, bool value)
     m_table->set_bool(column_ndx, real_ndx, value);
 }
 
-inline void TableView::set_date(size_t column_ndx, size_t row_ndx, time_t value)
+inline void TableView::set_date(size_t column_ndx, size_t row_ndx, Date value)
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Date);
 
@@ -722,7 +723,7 @@ template<class E> inline void TableView::set_enum(size_t column_ndx, size_t row_
     m_table->set_int(column_ndx, real_ndx, value);
 }
 
-inline void TableView::set_string(size_t column_ndx, size_t row_ndx, const char* value)
+inline void TableView::set_string(size_t column_ndx, size_t row_ndx, StringData value)
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_String);
 
@@ -730,12 +731,12 @@ inline void TableView::set_string(size_t column_ndx, size_t row_ndx, const char*
     m_table->set_string(column_ndx, real_ndx, value);
 }
 
-inline void TableView::set_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len)
+inline void TableView::set_binary(size_t column_ndx, size_t row_ndx, BinaryData value)
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Binary);
 
     const size_t real_ndx = size_t(m_refs.Get(row_ndx));
-    m_table->set_binary(column_ndx, real_ndx, value, len);
+    m_table->set_binary(column_ndx, real_ndx, value);
 }
 
 inline void TableView::set_mixed(size_t column_ndx, size_t row_ndx, Mixed value)

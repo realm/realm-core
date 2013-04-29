@@ -205,12 +205,12 @@ public:
         m_shared_group.end_read();
     }
 
-    ConstTableRef get_table(const char* name) const
+    ConstTableRef get_table(StringData name) const
     {
         return get_group().get_table(name);
     }
 
-    template<class T> typename T::ConstRef get_table(const char* name) const
+    template<class T> typename T::ConstRef get_table(StringData name) const
     {
         return get_group().get_table<T>(name);
     }
@@ -237,12 +237,12 @@ public:
         if (m_shared_group) m_shared_group->rollback();
     }
 
-    TableRef get_table(const char* name) const
+    TableRef get_table(StringData name) const
     {
         return get_group().get_table(name);
     }
 
-    template<class T> typename T::Ref get_table(const char* name) const
+    template<class T> typename T::Ref get_table(StringData name) const
     {
         return get_group().get_table<T>(name);
     }

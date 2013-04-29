@@ -2,6 +2,8 @@
 #include <tightdb/column.hpp>
 #include <tightdb/column_basic.hpp>
 
+using namespace std;
+
 namespace tightdb {
 
 // Searching
@@ -16,13 +18,12 @@ size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
     return size_t(-1);
 }
 
-size_t TableViewBase::find_first_string(size_t column_ndx, const char* value) const
+size_t TableViewBase::find_first_string(size_t column_ndx, StringData value) const
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_String);
 
     for (size_t i = 0; i < m_refs.size(); i++)
-        if (strcmp(get_string(column_ndx, i), value) == 0)
-            return i;
+        if (get_string(column_ndx, i) == value) return i;
     return size_t(-1);
 }
 
@@ -162,21 +163,21 @@ void TableViewBase::sort(size_t column, bool Ascending)
     // with rand access (we have ~log(n) accesses to each element, so using 1 additional read to speed up the rest is faster)
     if (m_table->get_column_type(column) == type_Int) {
         for (size_t t = 0; t < m_refs.size(); t++) {
-            const int64_t v = m_table->get_int(column, size_t(m_refs.Get(t)));
+            int64_t v = m_table->get_int(column, size_t(m_refs.Get(t)));
             vals.add(v);
         }
     }
     else if (m_table->get_column_type(column) == type_Date) {
         for (size_t t = 0; t < m_refs.size(); t++) {
-            const size_t idx = size_t(m_refs.Get(t));
-            const int64_t v = int64_t(m_table->get_date(column, idx));
+            size_t idx = size_t(m_refs.Get(t));
+            int64_t v = int64_t(m_table->get_date(column, idx).get_date());
             vals.add(v);
         }
     }
     else if (m_table->get_column_type(column) == type_Bool) {
         for (size_t t = 0; t < m_refs.size(); t++) {
-            const size_t idx = size_t(m_refs.Get(t));
-            const int64_t v = int64_t(m_table->get_bool(column, idx));
+            size_t idx = size_t(m_refs.Get(t));
+            int64_t v = int64_t(m_table->get_bool(column, idx));
             vals.add(v);
         }
     }
@@ -185,8 +186,8 @@ void TableViewBase::sort(size_t column, bool Ascending)
     vals.Destroy();
 
     for (size_t t = 0; t < m_refs.size(); t++) {
-        const size_t r  = (size_t)ref.Get(t);
-        const size_t rr = (size_t)m_refs.Get(r);
+        size_t r  = ref.GetAsSizeT(t);
+        size_t rr = m_refs.GetAsSizeT(r);
         result.add(rr);
     }
 
@@ -196,20 +197,20 @@ void TableViewBase::sort(size_t column, bool Ascending)
     m_refs.Clear();
     if (Ascending) {
         for (size_t t = 0; t < ref.size(); t++) {
-            const size_t v = (size_t)result.Get(t);
+            size_t v = result.GetAsSizeT(t);
             m_refs.add(v);
         }
     }
     else {
         for (size_t t = 0; t < ref.size(); t++) {
-            const size_t v = (size_t)result.Get(ref.size() - t - 1);
+            size_t v = result.GetAsSizeT(ref.size() - t - 1);
             m_refs.add(v);
         }
     }
     result.Destroy();
 }
 
-void TableViewBase::to_json(std::ostream& out)
+void TableViewBase::to_json(ostream& out)
 {
     // Represent table as list of objects
     out << "[";
@@ -225,15 +226,15 @@ void TableViewBase::to_json(std::ostream& out)
     out << "]";
 }
 
-void TableViewBase::to_string(std::ostream& out, size_t limit) const
+void TableViewBase::to_string(ostream& out, size_t limit) const
 {
     // Print header (will also calculate widths)
-    std::vector<size_t> widths;
+    vector<size_t> widths;
     m_table->to_string_header(out, widths);
 
     // Set limit=-1 to print all rows, otherwise only print to limit
     const size_t row_count = size();
-    const size_t out_count = (limit == (size_t)-1) ? row_count
+    const size_t out_count = (limit == size_t(-1)) ? row_count
                                                    : (row_count < limit) ? row_count : limit;
 
     // Print rows

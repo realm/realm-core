@@ -1,5 +1,5 @@
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 #  define NOMINMAX
 #  include <windows.h>
 #elif __APPLE__
@@ -13,7 +13,7 @@
 
 namespace tightdb {
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 
 long get_timer_millis()
 {

@@ -36,68 +36,51 @@ ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, A
 // Creates new array (but invalid, call UpdateRef to init)
 //ArrayStringLong::ArrayStringLong(Allocator& alloc) : Array(alloc) {}
 
-void ArrayStringLong::add(const char* value)
+void ArrayStringLong::add(StringData value)
 {
-    add(value, strlen(value));
+    bool add_zero_term = true;
+    m_blob.add(value.data(), value.size(), add_zero_term);
+    size_t end = value.size() + 1;
+    if (!m_offsets.is_empty()) end += m_offsets.back();
+    m_offsets.add(end);
 }
 
-void ArrayStringLong::add(const char* value, size_t len)
-{
-    TIGHTDB_ASSERT(value);
-
-    len += 1; // include trailing null byte
-    m_blob.add(value, len);
-    m_offsets.add(m_offsets.is_empty() ? len : m_offsets.back() + len);
-}
-
-void ArrayStringLong::Set(size_t ndx, const char* value)
-{
-    Set(ndx, value, strlen(value));
-}
-
-void ArrayStringLong::Set(size_t ndx, const char* value, size_t len)
+void ArrayStringLong::set(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
-    TIGHTDB_ASSERT(value);
 
-    const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
-    const size_t current_end = (size_t)m_offsets.Get(ndx);
+    size_t begin = 0 < ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
+    size_t end   = m_offsets.GetAsSizeT(ndx);
+    bool add_zero_term = true;
+    m_blob.replace(begin, end, value.data(), value.size(), add_zero_term);
 
-    len += 1; // include trailing null byte
-    const int64_t diff =  int64_t(start + len) - int64_t(current_end);
-
-    m_blob.Replace(start, current_end, value, len);
+    size_t new_end = begin + value.size() + 1;
+    int64_t diff =  int64_t(new_end) - int64_t(end);
     m_offsets.Adjust(ndx, diff);
 }
 
-void ArrayStringLong::Insert(size_t ndx, const char* value)
-{
-    Insert(ndx, value, strlen(value));
-}
-
-void ArrayStringLong::Insert(size_t ndx, const char* value, size_t len)
+void ArrayStringLong::insert(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx <= m_offsets.size());
-    TIGHTDB_ASSERT(value);
 
-    const size_t pos = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
-    len += 1; // include trailing null byte
+    size_t pos = 0 < ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
+    bool add_zero_term = true;
+    m_blob.insert(pos, value.data(), value.size(), add_zero_term);
 
-    m_blob.Insert(pos, value, len);
-    m_offsets.Insert(ndx, pos + len);
-    m_offsets.Adjust(ndx+1, len);
+    m_offsets.Insert(ndx,   pos + value.size() + 1);
+    m_offsets.Adjust(ndx+1,       value.size() + 1);
 }
 
-void ArrayStringLong::Delete(size_t ndx)
+void ArrayStringLong::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    const size_t start = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
-    const size_t end = (size_t)m_offsets.Get(ndx);
+    size_t begin = 0 < ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
+    size_t end   = m_offsets.GetAsSizeT(ndx);
 
-    m_blob.Delete(start, end);
+    m_blob.erase(begin, end);
     m_offsets.Delete(ndx);
-    m_offsets.Adjust(ndx, (int64_t)start - end);
+    m_offsets.Adjust(ndx, int64_t(begin) - int64_t(end));
 }
 
 void ArrayStringLong::Resize(size_t ndx)
@@ -116,14 +99,13 @@ void ArrayStringLong::Clear()
     m_offsets.Clear();
 }
 
-size_t ArrayStringLong::count(const char* value, size_t start, size_t end) const
+size_t ArrayStringLong::count(StringData value, size_t begin, size_t end) const
 {
-    const size_t len = strlen(value);
     size_t count = 0;
 
-    size_t lastmatch = start - 1;
+    size_t lastmatch = begin - 1;
     for (;;) {
-        lastmatch = FindWithLen(value, len, lastmatch+1, end);
+        lastmatch = find_first(value, lastmatch+1, end);
         if (lastmatch != not_found)
             ++count;
         else break;
@@ -132,60 +114,45 @@ size_t ArrayStringLong::count(const char* value, size_t start, size_t end) const
     return count;
 }
 
-size_t ArrayStringLong::find_first(const char* value, size_t start, size_t end) const
+size_t ArrayStringLong::find_first(StringData value, size_t begin, size_t end) const
 {
-    TIGHTDB_ASSERT(value);
-    return FindWithLen(value, strlen(value), start, end);
+    const size_t n = m_offsets.size();
+    if (end == size_t(-1)) end = n;
+    TIGHTDB_ASSERT(begin <= n && end <= n && begin <= end);
+
+    size_t begin2 = 0 < begin ? m_offsets.GetAsSizeT(begin - 1) : 0;
+    for (size_t i=begin; i<end; ++i) {
+        size_t end2 = m_offsets.GetAsSizeT(i);
+        size_t end3 = end2 - 1; // Discount terminating zero
+        if (StringData(m_blob.get(begin2), end3-begin2) == value) return i;
+        begin2 = end2;
+    }
+
+    return not_found;
 }
 
-void ArrayStringLong::find_all(Array& result, const char* value, size_t add_offset,
-                              size_t start, size_t end) const
+void ArrayStringLong::find_all(Array& result, StringData value, size_t add_offset,
+                              size_t begin, size_t end) const
 {
-    TIGHTDB_ASSERT(value);
-
-    const size_t len = strlen(value);
-
-    size_t first = start - 1;
+    size_t first = begin - 1;
     for (;;) {
-        first = FindWithLen(value, len, first + 1, end);
+        first = find_first(value, first + 1, end);
         if (first != not_found)
             result.add(first + add_offset);
         else break;
     }
 }
 
-size_t ArrayStringLong::FindWithLen(const char* value, size_t len, size_t start, size_t end) const
-{
-    TIGHTDB_ASSERT(value);
-
-    len += 1; // include trailing null byte
-    const size_t count = m_offsets.size();
-    size_t offset = (start == 0 ? 0 : (size_t)m_offsets.Get(start - 1)); // todo, verify
-    for (size_t i = start; i < count && i < end; ++i) {
-        const size_t end = (size_t)m_offsets.Get(i);
-
-        // Only compare strings if length matches
-        if ((end - offset) == len) {
-            const char* const v = (const char*)m_blob.Get(offset);
-            if (value[0] == *v && strcmp(value, v) == 0)
-                return i;
-        }
-        offset = end;
-    }
-
-    return not_found;
-}
-
 
 #ifdef TIGHTDB_DEBUG
 
-void ArrayStringLong::ToDot(ostream& out, const char* title) const
+void ArrayStringLong::ToDot(ostream& out, StringData title) const
 {
     const size_t ref = GetRef();
 
     out << "subgraph cluster_arraystringlong" << ref << " {" << endl;
     out << " label = \"ArrayStringLong";
-    if (title) out << "\\n'" << title << "'";
+    if (0 < title.size()) out << "\\n'" << title << "'";
     out << "\";" << endl;
 
     Array::ToDot(out, "stringlong_top");
