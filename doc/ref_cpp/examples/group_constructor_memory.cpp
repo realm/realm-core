@@ -12,7 +12,7 @@ TIGHTDB_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 
-void func(Group::BufferSpec buffer)
+void func(BinaryData buffer)
 {
     bool take_ownership = false;
     Group g(buffer, take_ownership);
@@ -28,15 +28,15 @@ void func(Group::BufferSpec buffer)
 
 int main()
 {
-    Group::BufferSpec buffer = g.write_to_mem();
+    BinaryData buffer = g.write_to_mem();
     try {
         func(buffer);
     }
     catch (...) {
-        free(const_cast<char*>(buffer.m_data));
+        free(const_cast<char*>(buffer.data()));
         throw;
     }
-    free(const_cast<char*>(buffer.m_data));
+    free(const_cast<char*>(buffer.data()));
 }
 // @@EndFold@@
 // @@EndExample@@

@@ -36,8 +36,6 @@
 namespace tightdb {
 
 using std::size_t;
-using std::time_t;
-using std::vector;
 
 class TableView;
 class ConstTableView;
@@ -137,12 +135,12 @@ public:
     Spec&       get_spec();
     const Spec& get_spec() const;
     void        update_from_spec(); // Must not be called for a table with shared spec
-    size_t      add_column(DataType type, const char* name); // Add a column dynamically
-    size_t      add_subcolumn(const vector<size_t>& column_path, DataType type, const char* name);
+    size_t      add_column(DataType type, StringData name); // Add a column dynamically
+    size_t      add_subcolumn(const std::vector<size_t>& column_path, DataType type, StringData name);
     void        remove_column(size_t column_ndx);
-    void        remove_column(const vector<size_t>& column_path);
-    void        rename_column(size_t column_ndx, const char* name);
-    void        rename_column(const vector<size_t>& column_path, const char* name);
+    void        remove_column(const std::vector<size_t>& column_path);
+    void        rename_column(size_t column_ndx, StringData name);
+    void        rename_column(const std::vector<size_t>& column_path, StringData name);
 
     // Table size and deletion
     bool        is_empty() const TIGHTDB_NOEXCEPT {return m_size == 0;}
@@ -151,8 +149,8 @@ public:
 
     // Column information
     size_t      get_column_count() const TIGHTDB_NOEXCEPT;
-    const char* get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    size_t      get_column_index(const char* name) const;
+    StringData  get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    size_t      get_column_index(StringData name) const;
     DataType    get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     // Row handling
@@ -165,12 +163,12 @@ public:
     // NOTE: You have to insert values in ALL columns followed by insert_done().
     void insert_int(size_t column_ndx, size_t row_ndx, int64_t value);
     void insert_bool(size_t column_ndx, size_t row_ndx, bool value);
-    void insert_date(size_t column_ndx, size_t row_ndx, time_t value);
+    void insert_date(size_t column_ndx, size_t row_ndx, Date value);
     template<class E> void insert_enum(size_t column_ndx, size_t row_ndx, E value);
     void insert_float(size_t column_ndx, size_t row_ndx, float value);
     void insert_double(size_t column_ndx, size_t row_ndx, double value);
-    void insert_string(size_t column_ndx, size_t row_ndx, const char* value);
-    void insert_binary(size_t column_ndx, size_t row_ndx, const char* data, size_t size);
+    void insert_string(size_t column_ndx, size_t row_ndx, StringData value);
+    void insert_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
     void insert_subtable(size_t column_ndx, size_t row_ndx); // Insert empty table
     void insert_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void insert_done();
@@ -178,11 +176,10 @@ public:
     // Get cell values
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     bool        get_bool(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    time_t      get_date(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    Date        get_date(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     float       get_float(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     double      get_double(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    const char* get_string(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    size_t      get_string_length(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    StringData  get_string(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -190,12 +187,12 @@ public:
     // Set cell values
     void set_int(size_t column_ndx, size_t row_ndx, int64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
-    void set_date(size_t column_ndx, size_t row_ndx, time_t value);
+    void set_date(size_t column_ndx, size_t row_ndx, Date value);
     template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value);
     void set_double(size_t column_ndx, size_t row_ndx, double value);
-    void set_string(size_t column_ndx, size_t row_ndx, const char* value);
-    void set_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
+    void set_string(size_t column_ndx, size_t row_ndx, StringData value);
+    void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
     void add_int(size_t column_ndx, int64_t value);
 
@@ -213,10 +210,10 @@ public:
     void set_index(size_t column_ndx) {set_index(column_ndx, true);}
 
     // Aggregate functions
-    size_t  count_int(size_t column_ndx, int64_t target) const;
-    size_t  count_string(size_t column_ndx, const char* target) const;
-    size_t  count_float(size_t column_ndx, float target) const;
-    size_t  count_double(size_t column_ndx, double target) const;
+    size_t  count_int(size_t column_ndx, int64_t value) const;
+    size_t  count_string(size_t column_ndx, StringData value) const;
+    size_t  count_float(size_t column_ndx, float value) const;
+    size_t  count_double(size_t column_ndx, double value) const;
 
     int64_t sum(size_t column_ndx) const;
     double  sum_float(size_t column_ndx) const;
@@ -233,29 +230,29 @@ public:
     double  average_double(size_t column_ndx) const;
 
     // Searching
-    size_t         lookup(const char* value) const;
+    size_t         lookup(StringData value) const;
     size_t         find_first_int(size_t column_ndx, int64_t value) const;
     size_t         find_first_bool(size_t column_ndx, bool value) const;
-    size_t         find_first_date(size_t column_ndx, time_t value) const;
+    size_t         find_first_date(size_t column_ndx, Date value) const;
     size_t         find_first_float(size_t column_ndx, float value) const;
     size_t         find_first_double(size_t column_ndx, double value) const;
-    size_t         find_first_string(size_t column_ndx, const char* value) const;
-    size_t         find_first_binary(size_t column_ndx, const char* value, size_t len) const;
+    size_t         find_first_string(size_t column_ndx, StringData value) const;
+    size_t         find_first_binary(size_t column_ndx, BinaryData value) const;
 
     TableView      find_all_int(size_t column_ndx, int64_t value);
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
     TableView      find_all_bool(size_t column_ndx, bool value);
     ConstTableView find_all_bool(size_t column_ndx, bool value) const;
-    TableView      find_all_date(size_t column_ndx, time_t value);
-    ConstTableView find_all_date(size_t column_ndx, time_t value) const;
+    TableView      find_all_date(size_t column_ndx, Date value);
+    ConstTableView find_all_date(size_t column_ndx, Date value) const;
     TableView      find_all_float(size_t column_ndx, float value);
     ConstTableView find_all_float(size_t column_ndx, float value) const;
     TableView      find_all_double(size_t column_ndx, double value);
     ConstTableView find_all_double(size_t column_ndx, double value) const;
-    TableView      find_all_string(size_t column_ndx, const char* value);
-    ConstTableView find_all_string(size_t column_ndx, const char* value) const;
-    TableView      find_all_binary(size_t column_ndx, const char* value, size_t len);
-    ConstTableView find_all_binary(size_t column_ndx, const char* value, size_t len) const;
+    TableView      find_all_string(size_t column_ndx, StringData value);
+    ConstTableView find_all_string(size_t column_ndx, StringData value) const;
+    TableView      find_all_binary(size_t column_ndx, BinaryData value);
+    ConstTableView find_all_binary(size_t column_ndx, BinaryData value) const;
 
     TableView      distinct(size_t column_ndx);
     ConstTableView distinct(size_t column_ndx) const;
@@ -293,7 +290,7 @@ public:
     // Debug
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-    void to_dot(std::ostream& out, const char* title=NULL) const;
+    void to_dot(std::ostream& out, StringData title = StringData()) const;
     void print() const;
     MemStats stats() const;
 #endif // TIGHTDB_DEBUG
@@ -318,6 +315,7 @@ protected:
     const ColumnDouble& GetColumnDouble(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     AdaptiveStringColumn& GetColumnString(size_t column_ndx);
     const AdaptiveStringColumn& GetColumnString(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+
     ColumnBinary& GetColumnBinary(size_t column_ndx);
     const ColumnBinary& GetColumnBinary(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnStringEnum& GetColumnStringEnum(size_t column_ndx);
@@ -359,10 +357,10 @@ protected:
     size_t GetColumnRefPos(size_t column_ndx) const;
     void   UpdateColumnRefs(size_t column_ndx, int diff);
     void   UpdateFromParent();
-    void   do_remove_column(const vector<size_t>& column_ids, size_t pos);
+    void   do_remove_column(const std::vector<size_t>& column_ids, size_t pos);
     void   do_remove_column(size_t column_ndx);
     size_t do_add_column(DataType type);
-    void   do_add_subcolumn(const vector<size_t>& column_path, size_t pos, DataType type);
+    void   do_add_subcolumn(const std::vector<size_t>& column_path, size_t pos, DataType type);
 
     void   set_index(size_t column_ndx, bool update_spec);
 
@@ -522,13 +520,13 @@ inline std::size_t Table::get_column_count() const TIGHTDB_NOEXCEPT
     return m_spec_set.get_column_count();
 }
 
-inline const char* Table::get_column_name(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline StringData Table::get_column_name(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
     return m_spec_set.get_column_name(ndx);
 }
 
-inline std::size_t Table::get_column_index(const char* name) const
+inline std::size_t Table::get_column_index(StringData name) const
 {
     return m_spec_set.get_column_index(name);
 }
@@ -587,9 +585,9 @@ private:
 
 inline std::size_t Table::create_empty_table(Allocator& alloc)
 {
-    Array top(coldef_HasRefs, 0, 0, alloc);
+    Array top(Array::coldef_HasRefs, 0, 0, alloc);
     top.add(Spec::create_empty_spec(alloc));
-    top.add(Array::create_empty_array(coldef_HasRefs, alloc)); // Columns
+    top.add(Array::create_empty_array(Array::coldef_HasRefs, alloc)); // Columns
     return top.GetRef();
 }
 
@@ -641,9 +639,9 @@ inline void Table::insert_bool(size_t column_ndx, size_t row_ndx, bool value)
     insert_int(column_ndx, row_ndx, value);
 }
 
-inline void Table::insert_date(size_t column_ndx, size_t row_ndx, time_t value)
+inline void Table::insert_date(size_t column_ndx, size_t row_ndx, Date value)
 {
-    insert_int(column_ndx, row_ndx, value);
+    insert_int(column_ndx, row_ndx, value.get_date());
 }
 
 template<class E> inline void Table::insert_enum(size_t column_ndx, size_t row_ndx, E value)
@@ -740,7 +738,7 @@ struct Table::LocalTransactLog {
         if (m_repl) m_repl->optimize_table(m_table); // Throws
     }
 
-    void add_column(DataType type, const char* name)
+    void add_column(DataType type, StringData name)
     {
         if (m_repl) m_repl->add_column(m_table, &m_table->m_spec_set, type, name); // Throws
     }

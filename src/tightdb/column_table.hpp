@@ -36,7 +36,7 @@ public:
     void Clear() TIGHTDB_OVERRIDE
     {
         m_array->Clear();
-        if (m_array->IsNode()) m_array->SetType(coldef_HasRefs);
+        if (m_array->IsNode()) m_array->SetType(Array::coldef_HasRefs);
         invalidate_subtables();
     }
 
@@ -184,7 +184,7 @@ public:
     void add(const Table*);
     void insert(std::size_t ndx) TIGHTDB_OVERRIDE;
     void insert(std::size_t ndx, const Table*);
-    void Delete(size_t ndx) TIGHTDB_OVERRIDE;
+    void erase(size_t ndx) TIGHTDB_OVERRIDE;
     void ClearTable(size_t ndx);
     void fill(size_t count);
 
@@ -276,8 +276,8 @@ inline Table* ColumnSubtableParent::SubtableMap::find(size_t subtable_ndx) const
 inline void ColumnSubtableParent::SubtableMap::insert(size_t subtable_ndx, Table* wrapper)
 {
     if (!m_indices.IsValid()) {
-        m_indices.SetType(coldef_Normal);
-        m_wrappers.SetType(coldef_Normal);
+        m_indices.SetType(Array::coldef_Normal);
+        m_wrappers.SetType(Array::coldef_Normal);
     }
     m_indices.add(subtable_ndx);
     m_wrappers.add(reinterpret_cast<unsigned long>(wrapper));
@@ -322,21 +322,21 @@ inline void ColumnSubtableParent::SubtableMap::invalidate_subtables()
 
 inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
                                                   const Table* table, std::size_t column_ndx):
-                            Column(coldef_HasRefs, alloc),
-                            m_table(table), m_index(column_ndx),
-                            m_subtable_map(Allocator::get_default()) {}
+    Column(Array::coldef_HasRefs, alloc),
+    m_table(table), m_index(column_ndx),
+    m_subtable_map(Allocator::get_default()) {}
 
 inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
                                                   const Table* table, std::size_t column_ndx,
                                                   ArrayParent* parent, std::size_t ndx_in_parent,
                                                   std::size_t ref):
-                            Column(ref, parent, ndx_in_parent, alloc),
-                            m_table(table), m_index(column_ndx),
-                            m_subtable_map(Allocator::get_default()) {}
+    Column(ref, parent, ndx_in_parent, alloc),
+    m_table(table), m_index(column_ndx),
+    m_subtable_map(Allocator::get_default()) {}
 
 inline void ColumnSubtableParent::update_child_ref(size_t subtable_ndx, size_t new_ref)
 {
-    Set(subtable_ndx, new_ref);
+    set(subtable_ndx, new_ref);
 }
 
 inline size_t ColumnSubtableParent::get_child_ref(size_t subtable_ndx) const TIGHTDB_NOEXCEPT

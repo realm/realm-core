@@ -1,38 +1,38 @@
-#include <tightdb/index_string.hpp>
 #include <cstdio>
 
+#include <tightdb/index_string.hpp>
+
+using namespace std;
 using namespace tightdb;
 
 namespace {
 
-// Pre-declaration
-int32_t CreateKey(const char* v);
-
-int32_t CreateKey(const char* v)
+int32_t create_key(const char* begin, const char* end)
 {
     // Create 4 byte index key
     // (encoded like this to allow literal comparisons
     // independently of endianness)
     int32_t key = 0;
-    if (*v) key  = (int32_t(*v++) << 24);
-    if (*v) key |= (int32_t(*v++) << 16);
-    if (*v) key |= (int32_t(*v++) << 8);
-    if (*v) key |=  int32_t(*v++);
+    if (begin != end) key  = (int32_t(*begin++) << 24);
+    if (begin != end) key |= (int32_t(*begin++) << 16);
+    if (begin != end) key |= (int32_t(*begin++) << 8);
+    if (begin != end) key |=  int32_t(*begin++);
     return key;
 }
 
-} // namespace
+} // anonymous namespace
 
-StringIndex::StringIndex(void* target_column, StringGetter get_func, Allocator& alloc)
-: Column(coldef_HasRefs, NULL, 0, alloc), m_target_column(target_column), m_get_func(get_func)
+
+StringIndex::StringIndex(void* target_column, StringGetter get_func, Allocator& alloc):
+    Column(Array::coldef_HasRefs, NULL, 0, alloc), m_target_column(target_column), m_get_func(get_func)
 {
     Create();
 }
 
-StringIndex::StringIndex(ColumnDef type, Allocator& alloc)
-: Column(type, NULL, 0, alloc), m_target_column(NULL), m_get_func(NULL)
+StringIndex::StringIndex(Array::ColumnDef type, Allocator& alloc):
+    Column(type, NULL, 0, alloc), m_target_column(NULL), m_get_func(NULL)
 {
-    TIGHTDB_ASSERT(type == coldef_InnerNode); // only used for node creation at this point
+    TIGHTDB_ASSERT(type == Array::coldef_InnerNode); // only used for node creation at this point
 
     // Mark that this is part of index
     // (as opposed to columns under leafs)
@@ -55,8 +55,8 @@ void StringIndex::Create()
 
     // Add subcolumns for leafs
     Allocator& alloc = m_array->GetAllocator();
-    Array values(coldef_Normal, NULL, 0, alloc);
-    Array refs(coldef_HasRefs, NULL, 1, alloc);
+    Array values(Array::coldef_Normal, NULL, 0, alloc);
+    Array refs(Array::coldef_HasRefs, NULL, 1, alloc);
     m_array->add(values.GetRef());
     m_array->add(refs.GetRef());
     values.SetParent((ArrayParent*)m_array, 0);
@@ -76,13 +76,13 @@ int32_t StringIndex::GetLastKey() const
     return (int32_t)offsets.back();
 }
 
-void StringIndex::Set(size_t ndx, const char* oldValue, const char* newValue)
+void StringIndex::Set(size_t ndx, StringData oldValue, StringData newValue)
 {
-    Delete(ndx, oldValue, true); // set isLast to avoid updating refs
+    erase(ndx, oldValue, true); // set isLast to avoid updating refs
     Insert(ndx, newValue, true); // set isLast to avoid updating refs
 }
 
-void StringIndex::Insert(size_t row_ndx, const char* value, bool isLast)
+void StringIndex::Insert(size_t row_ndx, StringData value, bool isLast)
 {
     // If it is last item in column, we don't have to update refs
     if (!isLast) UpdateRefs(row_ndx, 1);
@@ -90,22 +90,22 @@ void StringIndex::Insert(size_t row_ndx, const char* value, bool isLast)
     InsertWithOffset(row_ndx, 0, value);
 }
 
-void StringIndex::InsertWithOffset(size_t row_ndx, size_t offset, const char* value)
+void StringIndex::InsertWithOffset(size_t row_ndx, size_t offset, StringData value)
 {
     // Create 4 byte index key
-    const char* const v = value + offset;
-    const int32_t key = CreateKey(v);
+    const char* const v = value.data() + offset;
+    const int32_t key = create_key(v, value.data() + value.size());
 
     TreeInsert(row_ndx, key, offset, value);
 }
 
-void StringIndex::InsertRowList(size_t ref, size_t offset, const char* value)
+void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
 {
     TIGHTDB_ASSERT(!m_array->IsNode()); // only works in leafs
 
     // Create 4 byte index key
-    const char* const v = value + offset;
-    const int32_t key = CreateKey(v);
+    const char* const v = value.data() + offset;
+    const int32_t key = create_key(v, value.data() + value.size());
 
     // Get subnode table
     Array values = m_array->GetSubArray(0);
@@ -123,7 +123,7 @@ void StringIndex::InsertRowList(size_t ref, size_t offset, const char* value)
 #ifdef TIGHTDB_DEBUG
     // Since we only use this for moving existing values to new
     // sub-indexes, there should never be an existing match.
-    const int32_t k = (int32_t)values.Get(ins_pos);
+    const int32_t k = int32_t(values.Get(ins_pos));
     TIGHTDB_ASSERT(k != key);
 #endif
 
@@ -132,28 +132,28 @@ void StringIndex::InsertRowList(size_t ref, size_t offset, const char* value)
     refs.Insert(ins_pos, ref);
 }
 
-void StringIndex::TreeInsert(size_t row_ndx, int32_t key, size_t offset, const char* value)
+void StringIndex::TreeInsert(size_t row_ndx, int32_t key, size_t offset, StringData value)
 {
     const NodeChange nc = DoInsert(row_ndx, key, offset, value);
     switch (nc.type) {
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
-            StringIndex newNode(coldef_InnerNode, m_array->GetAllocator());
+            StringIndex newNode(Array::coldef_InnerNode, m_array->GetAllocator());
             newNode.NodeAddKey(nc.ref1);
             newNode.NodeAddKey(GetRef());
             UpdateRef(newNode.GetRef());
             return;
         }
         case NodeChange::insert_after: {
-            StringIndex newNode(coldef_InnerNode, m_array->GetAllocator());
+            StringIndex newNode(Array::coldef_InnerNode, m_array->GetAllocator());
             newNode.NodeAddKey(GetRef());
             newNode.NodeAddKey(nc.ref1);
             UpdateRef(newNode.GetRef());
             return;
         }
         case NodeChange::split: {
-            StringIndex newNode(coldef_InnerNode, m_array->GetAllocator());
+            StringIndex newNode(Array::coldef_InnerNode, m_array->GetAllocator());
             newNode.NodeAddKey(nc.ref1);
             newNode.NodeAddKey(nc.ref2);
             UpdateRef(newNode.GetRef());
@@ -163,7 +163,7 @@ void StringIndex::TreeInsert(size_t row_ndx, int32_t key, size_t offset, const c
     TIGHTDB_ASSERT(false);
 }
 
-Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t offset, const char* value)
+Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t offset, StringData value)
 {
     if (IsNode()) {
         // Get subnode table
@@ -172,7 +172,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
 
         // Find the subnode containing the item
         size_t node_ndx = offsets.FindPos2(key);
-        if (node_ndx == (size_t)-1) {
+        if (node_ndx == size_t(-1)) {
             // node can never be empty, so try to fit in last item
             node_ndx = offsets.size()-1;
         }
@@ -200,7 +200,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         }
 
         // Else create new node
-        StringIndex newNode(coldef_InnerNode, m_array->GetAllocator());
+        StringIndex newNode(Array::coldef_InnerNode, m_array->GetAllocator());
         if (nc.type == NodeChange::split) {
             // update offset for left node
             const int32_t lastKey = target.GetLastKey();
@@ -322,7 +322,7 @@ void StringIndex::NodeInsert(size_t ndx, size_t ref)
     refs.Insert(ndx, ref);
 }
 
-bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, const char* value, bool noextend)
+bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, StringData value, bool noextend)
 {
     TIGHTDB_ASSERT(!IsNode());
 
@@ -361,10 +361,10 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, const c
     // Single match (lowest bit set indicates literal row_ndx)
     if (ref & 1) {
         const size_t row_ndx2 = ref >> 1;
-        const char* const v2 = Get(row_ndx2);
-        if (strcmp(v2, value) == 0) {
+        StringData v2 = Get(row_ndx2);
+        if (v2 == value) {
             // convert to list (in sorted order)
-            Array row_list(coldef_Normal, NULL, 0, alloc);
+            Array row_list(Array::coldef_Normal, NULL, 0, alloc);
             row_list.add(row_ndx < row_ndx2 ? row_ndx : row_ndx2);
             row_list.add(row_ndx < row_ndx2 ? row_ndx2 : row_ndx);
             refs.Set(ins_pos, row_list.GetRef());
@@ -384,13 +384,13 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, const c
     if (!Array::is_index_node(ref, alloc)) {
         Column sub(ref, &refs, ins_pos, alloc);
 
-        const size_t r1 = (size_t)sub.Get(0);
-        const char* const v2 = Get(r1);
-        if (strcmp(v2, value) == 0) {
+        const size_t r1 = (size_t)sub.get(0);
+        StringData v2 = Get(r1);
+        if (v2 ==  value) {
             // find insert position (the list has to be kept in sorted order)
             // In most cases we refs will be added to the end. So we test for that
             // first to see if we can avoid the binary search for insert position
-            const size_t lastRef = (size_t)sub.Back();
+            const size_t lastRef = size_t(sub.Back());
             if (row_ndx > lastRef)
                 sub.add(row_ndx);
             else {
@@ -398,7 +398,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, const c
                 if (pos == not_found)
                     sub.add(row_ndx);
                 else
-                    sub.Insert(pos, row_ndx);
+                    sub.insert(pos, row_ndx);
             }
         }
         else {
@@ -417,25 +417,25 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, const c
     return true;
 }
 
-size_t StringIndex::find_first(const char* value) const
+size_t StringIndex::find_first(StringData value) const
 {
     // Use direct access method
     return m_array->IndexStringFindFirst(value, m_target_column, m_get_func);
 }
 
-void StringIndex::find_all(Array& result, const char* value) const
+void StringIndex::find_all(Array& result, StringData value) const
 {
     // Use direct access method
     return m_array->IndexStringFindAll(result, value, m_target_column, m_get_func);
 }
 
-FindRes StringIndex::find_all(const char* value, size_t& ref) const
+FindRes StringIndex::find_all(StringData value, size_t& ref) const
 {
     // Use direct access method
     return m_array->IndexStringFindAllNoCopy(value, ref, m_target_column, m_get_func);
 }
 
-size_t StringIndex::count(const char* value) const
+size_t StringIndex::count(StringData value) const
 {
     // Use direct access method
     return m_array->IndexStringCount(value, m_target_column, m_get_func);
@@ -473,7 +473,7 @@ void StringIndex::distinct(Array& result) const
                 }
                 else {
                     const Column sub(to_size_t(ref), &refs, i, alloc);
-                    const size_t r = to_size_t(sub.Get(0)); // get first match
+                    const size_t r = to_size_t(sub.get(0)); // get first match
                     result.add(r);
                 }
             }
@@ -532,7 +532,7 @@ void StringIndex::Clear()
     refs.Clear();
 }
 
-void StringIndex::Delete(size_t row_ndx, const char* value, bool isLast)
+void StringIndex::erase(size_t row_ndx, StringData value, bool isLast)
 {
     DoDelete(row_ndx, value, 0);
 
@@ -542,7 +542,7 @@ void StringIndex::Delete(size_t row_ndx, const char* value, bool isLast)
         TIGHTDB_ASSERT(refs.size() != 0); // node cannot be empty
         if (refs.size() > 1) break;
 
-        const size_t ref = (size_t)refs.Get(0);
+        const size_t ref = refs.GetAsRef(0);
         refs.Delete(0); // avoid deleting subtree
         m_array->Destroy();
         m_array->UpdateRef(ref);
@@ -552,15 +552,15 @@ void StringIndex::Delete(size_t row_ndx, const char* value, bool isLast)
     if (!isLast) UpdateRefs(row_ndx, -1);
 }
 
-void StringIndex::DoDelete(size_t row_ndx, const char* value, size_t offset)
+void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
 {
     Array values = m_array->GetSubArray(0);
     Array refs = m_array->GetSubArray(1);
     Allocator& alloc = m_array->GetAllocator();
 
     // Create 4 byte index key
-    const char* const v = value + offset;
-    const int32_t key = CreateKey(v);
+    const char* const v = value.data() + offset;
+    const int32_t key = create_key(v, value.data() + value.size());
 
     const size_t pos = values.FindPos2(key);
     TIGHTDB_ASSERT(pos != not_found);
@@ -585,14 +585,14 @@ void StringIndex::DoDelete(size_t row_ndx, const char* value, size_t offset)
     else {
         const int64_t ref = refs.Get(pos);
         if (ref & 1) {
-            TIGHTDB_ASSERT((uint64_t(ref) >> 1) == (int64_t)row_ndx);
+            TIGHTDB_ASSERT((uint64_t(ref) >> 1) == uint64_t(row_ndx));
             values.Delete(pos);
             refs.Delete(pos);
         }
         else {
             // A real ref either points to a list or a sub-index
             if (Array::is_index_node(to_size_t(ref), alloc)) {
-                StringIndex subNdx((size_t)ref, &refs, pos, m_target_column, m_get_func, alloc);
+                StringIndex subNdx(size_t(ref), &refs, pos, m_target_column, m_get_func, alloc);
                 subNdx.DoDelete(row_ndx, value, offset+4);
 
                 if (subNdx.is_empty()) {
@@ -605,7 +605,7 @@ void StringIndex::DoDelete(size_t row_ndx, const char* value, size_t offset)
                 Column sub(to_size_t(ref), &refs, pos, alloc);
                 const size_t r = sub.find_first(row_ndx);
                 TIGHTDB_ASSERT(r != not_found);
-                sub.Delete(r);
+                sub.erase(r);
 
                 if (sub.is_empty()) {
                     values.Delete(pos);
@@ -631,7 +631,7 @@ void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
 
     const size_t count = column.Size();
     for (size_t i = 0; i < count; ++i) {
-        const char* const value = column.Get(i);
+        StringData value = column.get(i);
 
         find_all(results, value);
 
@@ -644,31 +644,31 @@ void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
     results.Destroy(); // clean-up
 }
 
-void StringIndex::to_dot(std::ostream& out) const
+void StringIndex::to_dot(ostream& out) const
 {
-    out << "digraph G {" << std::endl;
+    out << "digraph G {" << endl;
 
     ToDot(out);
 
-    out << "}" << std::endl;
+    out << "}" << endl;
 }
 
 
-void StringIndex::ToDot(std::ostream& out, const char* title) const
+void StringIndex::ToDot(ostream& out, StringData title) const
 {
     const size_t ref = GetRef();
 
-    out << "subgraph cluster_stringindex" << ref << " {" << std::endl;
+    out << "subgraph cluster_stringindex" << ref << " {" << endl;
     out << " label = \"StringIndex";
-    if (title) out << "\\n'" << title << "'";
-    out << "\";" << std::endl;
+    if (0 < title.size()) out << "\\n'" << title << "'";
+    out << "\";" << endl;
 
     ArrayToDot(out, *m_array);
 
-    out << "}" << std::endl;
+    out << "}" << endl;
 }
 
-void StringIndex::ArrayToDot(std::ostream& out, const Array& array) const
+void StringIndex::ArrayToDot(ostream& out, const Array& array) const
 {
     if (array.HasRefs()) {
         const Array offsets = array.GetSubArray(0);
@@ -676,18 +676,18 @@ void StringIndex::ArrayToDot(std::ostream& out, const Array& array) const
         const size_t ref    = array.GetRef();
 
         if (array.IsNode()) {
-            out << "subgraph cluster_stringindex_node" << ref << " {" << std::endl;
-            out << " label = \"Node\";" << std::endl;
+            out << "subgraph cluster_stringindex_node" << ref << " {" << endl;
+            out << " label = \"Node\";" << endl;
         }
         else {
-            out << "subgraph cluster_stringindex_leaf" << ref << " {" << std::endl;
-            out << " label = \"Leaf\";" << std::endl;
+            out << "subgraph cluster_stringindex_leaf" << ref << " {" << endl;
+            out << " label = \"Leaf\";" << endl;
         }
 
         array.ToDot(out);
         KeysToDot(out, offsets, "keys");
 
-        out << "}" << std::endl;
+        out << "}" << endl;
 
         refs.ToDot(out, "refs");
 
@@ -705,25 +705,25 @@ void StringIndex::ArrayToDot(std::ostream& out, const Array& array) const
     }
 }
 
-void StringIndex::KeysToDot(std::ostream& out, const Array& array, const char* title) const
+void StringIndex::KeysToDot(ostream& out, const Array& array, StringData title) const
 {
     const size_t ref = array.GetRef();
 
-    if (title) {
-        out << "subgraph cluster_" << ref << " {" << std::endl;
-        out << " label = \"" << title << "\";" << std::endl;
-        out << " color = white;" << std::endl;
+    if (0 < title.size()) {
+        out << "subgraph cluster_" << ref << " {" << endl;
+        out << " label = \"" << title << "\";" << endl;
+        out << " color = white;" << endl;
     }
 
-    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
+    out << "n" << hex << ref << dec << "[shape=none,label=<";
+    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << endl;
 
     // Header
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
-    out << "0x" << std::hex << ref << std::dec << "<BR/>";
+    out << "0x" << hex << ref << dec << "<BR/>";
     if (array.IsNode()) out << "IsNode<BR/>";
     if (array.HasRefs()) out << "HasRefs<BR/>";
-    out << "</FONT></TD>" << std::endl;
+    out << "</FONT></TD>" << endl;
 
     // Values
     const size_t count = array.size();
@@ -737,13 +737,13 @@ void StringIndex::KeysToDot(std::ostream& out, const Array& array, const char* t
         str[0] = char((v >> 24) & 0xFF);
         const char* s = str;
 
-        out << "<TD>" << s << "</TD>" << std::endl;
+        out << "<TD>" << s << "</TD>" << endl;
     }
 
-    out << "</TR></TABLE>>];" << std::endl;
-    if (title) out << "}" << std::endl;
+    out << "</TR></TABLE>>];" << endl;
+    if (0 < title.size()) out << "}" << endl;
 
-    out << std::endl;
+    out << endl;
 }
 
 

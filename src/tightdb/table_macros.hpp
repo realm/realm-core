@@ -32,9 +32,9 @@ struct Table##Spec: ::tightdb::SpecBase { \
         ColNames(Init i) TIGHTDB_NOEXCEPT: name1(i) {} \
     }; \
  \
-    static const char* const* dyn_col_names() \
+    static const tightdb::StringData* dyn_col_names() \
     { \
-        static const char* names[] = { #name1 }; \
+        static tightdb::StringData names[] = { tightdb::StringData(#name1, sizeof(#name1)-1) }; \
         return names; \
     } \
  \
@@ -73,9 +73,9 @@ struct Table##Spec: ::tightdb::SpecBase { \
         ColNames(Init i) TIGHTDB_NOEXCEPT: name1(i), name2(i) {} \
     }; \
  \
-    static const char* const* dyn_col_names() \
+    static const tightdb::StringData* dyn_col_names() \
     { \
-        static const char* names[] = { #name1, #name2 }; \
+        static tightdb::StringData names[] = { tightdb::StringData(#name1, sizeof(#name1)-1), tightdb::StringData(#name2, sizeof(#name2)-1) }; \
         return names; \
     } \
  \
@@ -116,9 +116,9 @@ struct Table##Spec: ::tightdb::SpecBase { \
         ColNames(Init i) TIGHTDB_NOEXCEPT: name1(i), name2(i), name3(i) {} \
     }; \
  \
-    static const char* const* dyn_col_names() \
+    static const tightdb::StringData* dyn_col_names() \
     { \
-        static const char* names[] = { #name1, #name2, #name3 }; \
+        static tightdb::StringData names[] = { tightdb::StringData(#name1, sizeof(#name1)-1), tightdb::StringData(#name2, sizeof(#name2)-1), tightdb::StringData(#name3, sizeof(#name3)-1) }; \
         return names; \
     } \
  \
@@ -161,9 +161,9 @@ struct Table##Spec: ::tightdb::SpecBase { \
         ColNames(Init i) TIGHTDB_NOEXCEPT: name1(i), name2(i), name3(i), name4(i) {} \
     }; \
  \
-    static const char* const* dyn_col_names() \
+    static const tightdb::StringData* dyn_col_names() \
     { \
-        static const char* names[] = { #name1, #name2, #name3, #name4 }; \
+        static tightdb::StringData names[] = { tightdb::StringData(#name1, sizeof(#name1)-1), tightdb::StringData(#name2, sizeof(#name2)-1), tightdb::StringData(#name3, sizeof(#name3)-1), tightdb::StringData(#name4, sizeof(#name4)-1) }; \
         return names; \
     } \
  \
@@ -208,9 +208,9 @@ struct Table##Spec: ::tightdb::SpecBase { \
         ColNames(Init i) TIGHTDB_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i) {} \
     }; \
  \
-    static const char* const* dyn_col_names() \
+    static const tightdb::StringData* dyn_col_names() \
     { \
-        static const char* names[] = { #name1, #name2, #name3, #name4, #name5 }; \
+        static tightdb::StringData names[] = { tightdb::StringData(#name1, sizeof(#name1)-1), tightdb::StringData(#name2, sizeof(#name2)-1), tightdb::StringData(#name3, sizeof(#name3)-1), tightdb::StringData(#name4, sizeof(#name4)-1), tightdb::StringData(#name5, sizeof(#name5)-1) }; \
         return names; \
     } \
  \
@@ -257,9 +257,9 @@ struct Table##Spec: ::tightdb::SpecBase { \
         ColNames(Init i) TIGHTDB_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i) {} \
     }; \
  \
-    static const char* const* dyn_col_names() \
+    static const tightdb::StringData* dyn_col_names() \
     { \
-        static const char* names[] = { #name1, #name2, #name3, #name4, #name5, #name6 }; \
+        static tightdb::StringData names[] = { tightdb::StringData(#name1, sizeof(#name1)-1), tightdb::StringData(#name2, sizeof(#name2)-1), tightdb::StringData(#name3, sizeof(#name3)-1), tightdb::StringData(#name4, sizeof(#name4)-1), tightdb::StringData(#name5, sizeof(#name5)-1), tightdb::StringData(#name6, sizeof(#name6)-1) }; \
         return names; \
     } \
  \
@@ -308,9 +308,9 @@ struct Table##Spec: ::tightdb::SpecBase { \
         ColNames(Init i) TIGHTDB_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i) {} \
     }; \
  \
-    static const char* const* dyn_col_names() \
+    static const tightdb::StringData* dyn_col_names() \
     { \
-        static const char* names[] = { #name1, #name2, #name3, #name4, #name5, #name6, #name7 }; \
+        static tightdb::StringData names[] = { tightdb::StringData(#name1, sizeof(#name1)-1), tightdb::StringData(#name2, sizeof(#name2)-1), tightdb::StringData(#name3, sizeof(#name3)-1), tightdb::StringData(#name4, sizeof(#name4)-1), tightdb::StringData(#name5, sizeof(#name5)-1), tightdb::StringData(#name6, sizeof(#name6)-1), tightdb::StringData(#name7, sizeof(#name7)-1) }; \
         return names; \
     } \
  \
@@ -361,9 +361,9 @@ struct Table##Spec: ::tightdb::SpecBase { \
         ColNames(Init i) TIGHTDB_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i) {} \
     }; \
  \
-    static const char* const* dyn_col_names() \
+    static const tightdb::StringData* dyn_col_names() \
     { \
-        static const char* names[] = { #name1, #name2, #name3, #name4, #name5, #name6, #name7, #name8 }; \
+        static tightdb::StringData names[] = { tightdb::StringData(#name1, sizeof(#name1)-1), tightdb::StringData(#name2, sizeof(#name2)-1), tightdb::StringData(#name3, sizeof(#name3)-1), tightdb::StringData(#name4, sizeof(#name4)-1), tightdb::StringData(#name5, sizeof(#name5)-1), tightdb::StringData(#name6, sizeof(#name6)-1), tightdb::StringData(#name7, sizeof(#name7)-1), tightdb::StringData(#name8, sizeof(#name8)-1) }; \
         return names; \
     } \
  \
@@ -416,9 +416,9 @@ struct Table##Spec: ::tightdb::SpecBase { \
         ColNames(Init i) TIGHTDB_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i) {} \
     }; \
  \
-    static const char* const* dyn_col_names() \
+    static const tightdb::StringData* dyn_col_names() \
     { \
-        static const char* names[] = { #name1, #name2, #name3, #name4, #name5, #name6, #name7, #name8, #name9 }; \
+        static tightdb::StringData names[] = { tightdb::StringData(#name1, sizeof(#name1)-1), tightdb::StringData(#name2, sizeof(#name2)-1), tightdb::StringData(#name3, sizeof(#name3)-1), tightdb::StringData(#name4, sizeof(#name4)-1), tightdb::StringData(#name5, sizeof(#name5)-1), tightdb::StringData(#name6, sizeof(#name6)-1), tightdb::StringData(#name7, sizeof(#name7)-1), tightdb::StringData(#name8, sizeof(#name8)-1), tightdb::StringData(#name9, sizeof(#name9)-1) }; \
         return names; \
     } \
  \
@@ -473,9 +473,9 @@ struct Table##Spec: ::tightdb::SpecBase { \
         ColNames(Init i) TIGHTDB_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i) {} \
     }; \
  \
-    static const char* const* dyn_col_names() \
+    static const tightdb::StringData* dyn_col_names() \
     { \
-        static const char* names[] = { #name1, #name2, #name3, #name4, #name5, #name6, #name7, #name8, #name9, #name10 }; \
+        static tightdb::StringData names[] = { tightdb::StringData(#name1, sizeof(#name1)-1), tightdb::StringData(#name2, sizeof(#name2)-1), tightdb::StringData(#name3, sizeof(#name3)-1), tightdb::StringData(#name4, sizeof(#name4)-1), tightdb::StringData(#name5, sizeof(#name5)-1), tightdb::StringData(#name6, sizeof(#name6)-1), tightdb::StringData(#name7, sizeof(#name7)-1), tightdb::StringData(#name8, sizeof(#name8)-1), tightdb::StringData(#name9, sizeof(#name9)-1), tightdb::StringData(#name10, sizeof(#name10)-1) }; \
         return names; \
     } \
  \
@@ -532,9 +532,9 @@ struct Table##Spec: ::tightdb::SpecBase { \
         ColNames(Init i) TIGHTDB_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i) {} \
     }; \
  \
-    static const char* const* dyn_col_names() \
+    static const tightdb::StringData* dyn_col_names() \
     { \
-        static const char* names[] = { #name1, #name2, #name3, #name4, #name5, #name6, #name7, #name8, #name9, #name10, #name11 }; \
+        static tightdb::StringData names[] = { tightdb::StringData(#name1, sizeof(#name1)-1), tightdb::StringData(#name2, sizeof(#name2)-1), tightdb::StringData(#name3, sizeof(#name3)-1), tightdb::StringData(#name4, sizeof(#name4)-1), tightdb::StringData(#name5, sizeof(#name5)-1), tightdb::StringData(#name6, sizeof(#name6)-1), tightdb::StringData(#name7, sizeof(#name7)-1), tightdb::StringData(#name8, sizeof(#name8)-1), tightdb::StringData(#name9, sizeof(#name9)-1), tightdb::StringData(#name10, sizeof(#name10)-1), tightdb::StringData(#name11, sizeof(#name11)-1) }; \
         return names; \
     } \
  \
@@ -593,9 +593,9 @@ struct Table##Spec: ::tightdb::SpecBase { \
         ColNames(Init i) TIGHTDB_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i), name12(i) {} \
     }; \
  \
-    static const char* const* dyn_col_names() \
+    static const tightdb::StringData* dyn_col_names() \
     { \
-        static const char* names[] = { #name1, #name2, #name3, #name4, #name5, #name6, #name7, #name8, #name9, #name10, #name11, #name12 }; \
+        static tightdb::StringData names[] = { tightdb::StringData(#name1, sizeof(#name1)-1), tightdb::StringData(#name2, sizeof(#name2)-1), tightdb::StringData(#name3, sizeof(#name3)-1), tightdb::StringData(#name4, sizeof(#name4)-1), tightdb::StringData(#name5, sizeof(#name5)-1), tightdb::StringData(#name6, sizeof(#name6)-1), tightdb::StringData(#name7, sizeof(#name7)-1), tightdb::StringData(#name8, sizeof(#name8)-1), tightdb::StringData(#name9, sizeof(#name9)-1), tightdb::StringData(#name10, sizeof(#name10)-1), tightdb::StringData(#name11, sizeof(#name11)-1), tightdb::StringData(#name12, sizeof(#name12)-1) }; \
         return names; \
     } \
  \
@@ -656,9 +656,9 @@ struct Table##Spec: ::tightdb::SpecBase { \
         ColNames(Init i) TIGHTDB_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i), name12(i), name13(i) {} \
     }; \
  \
-    static const char* const* dyn_col_names() \
+    static const tightdb::StringData* dyn_col_names() \
     { \
-        static const char* names[] = { #name1, #name2, #name3, #name4, #name5, #name6, #name7, #name8, #name9, #name10, #name11, #name12, #name13 }; \
+        static tightdb::StringData names[] = { tightdb::StringData(#name1, sizeof(#name1)-1), tightdb::StringData(#name2, sizeof(#name2)-1), tightdb::StringData(#name3, sizeof(#name3)-1), tightdb::StringData(#name4, sizeof(#name4)-1), tightdb::StringData(#name5, sizeof(#name5)-1), tightdb::StringData(#name6, sizeof(#name6)-1), tightdb::StringData(#name7, sizeof(#name7)-1), tightdb::StringData(#name8, sizeof(#name8)-1), tightdb::StringData(#name9, sizeof(#name9)-1), tightdb::StringData(#name10, sizeof(#name10)-1), tightdb::StringData(#name11, sizeof(#name11)-1), tightdb::StringData(#name12, sizeof(#name12)-1), tightdb::StringData(#name13, sizeof(#name13)-1) }; \
         return names; \
     } \
  \
@@ -721,9 +721,9 @@ struct Table##Spec: ::tightdb::SpecBase { \
         ColNames(Init i) TIGHTDB_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i), name12(i), name13(i), name14(i) {} \
     }; \
  \
-    static const char* const* dyn_col_names() \
+    static const tightdb::StringData* dyn_col_names() \
     { \
-        static const char* names[] = { #name1, #name2, #name3, #name4, #name5, #name6, #name7, #name8, #name9, #name10, #name11, #name12, #name13, #name14 }; \
+        static tightdb::StringData names[] = { tightdb::StringData(#name1, sizeof(#name1)-1), tightdb::StringData(#name2, sizeof(#name2)-1), tightdb::StringData(#name3, sizeof(#name3)-1), tightdb::StringData(#name4, sizeof(#name4)-1), tightdb::StringData(#name5, sizeof(#name5)-1), tightdb::StringData(#name6, sizeof(#name6)-1), tightdb::StringData(#name7, sizeof(#name7)-1), tightdb::StringData(#name8, sizeof(#name8)-1), tightdb::StringData(#name9, sizeof(#name9)-1), tightdb::StringData(#name10, sizeof(#name10)-1), tightdb::StringData(#name11, sizeof(#name11)-1), tightdb::StringData(#name12, sizeof(#name12)-1), tightdb::StringData(#name13, sizeof(#name13)-1), tightdb::StringData(#name14, sizeof(#name14)-1) }; \
         return names; \
     } \
  \
@@ -788,9 +788,9 @@ struct Table##Spec: ::tightdb::SpecBase { \
         ColNames(Init i) TIGHTDB_NOEXCEPT: name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i), name10(i), name11(i), name12(i), name13(i), name14(i), name15(i) {} \
     }; \
  \
-    static const char* const* dyn_col_names() \
+    static const tightdb::StringData* dyn_col_names() \
     { \
-        static const char* names[] = { #name1, #name2, #name3, #name4, #name5, #name6, #name7, #name8, #name9, #name10, #name11, #name12, #name13, #name14, #name15 }; \
+        static tightdb::StringData names[] = { tightdb::StringData(#name1, sizeof(#name1)-1), tightdb::StringData(#name2, sizeof(#name2)-1), tightdb::StringData(#name3, sizeof(#name3)-1), tightdb::StringData(#name4, sizeof(#name4)-1), tightdb::StringData(#name5, sizeof(#name5)-1), tightdb::StringData(#name6, sizeof(#name6)-1), tightdb::StringData(#name7, sizeof(#name7)-1), tightdb::StringData(#name8, sizeof(#name8)-1), tightdb::StringData(#name9, sizeof(#name9)-1), tightdb::StringData(#name10, sizeof(#name10)-1), tightdb::StringData(#name11, sizeof(#name11)-1), tightdb::StringData(#name12, sizeof(#name12)-1), tightdb::StringData(#name13, sizeof(#name13)-1), tightdb::StringData(#name14, sizeof(#name14)-1), tightdb::StringData(#name15, sizeof(#name15)-1) }; \
         return names; \
     } \
  \

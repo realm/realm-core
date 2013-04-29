@@ -32,7 +32,7 @@ const size_t doubleValLen = SizeOfArray(doubleVal);
 void printCol(ColumnFloat& c)
 {
     for (size_t i=0; i < c.Size(); ++i) {
-        std::cerr << " Col[" << i << "] = " << c.Get(i) << " \n";
+        std::cerr << " Col[" << i << "] = " << c.get(i) << " \n";
     }
 }
 
@@ -59,7 +59,7 @@ void BasicColumn_AddGet(T val[], size_t valLen)
         CHECK_EQUAL(i+1, c.Size());
 
         for (size_t j=0; j<i; ++j) {
-            CHECK_EQUAL(val[j], c.Get(j));
+            CHECK_EQUAL(val[j], c.get(j));
         }
     }
 
@@ -98,14 +98,14 @@ void BasicColumn_Set(T val[], size_t valLen)
 
     T v0 = T(1.6);
     T v3 = T(-987.23);
-    c.Set(0, v0);
-    CHECK_EQUAL(v0, c.Get(0));
-    c.Set(3, v3);
-    CHECK_EQUAL(v3, c.Get(3));
+    c.set(0, v0);
+    CHECK_EQUAL(v0, c.get(0));
+    c.set(3, v3);
+    CHECK_EQUAL(v3, c.get(3));
 
-    CHECK_EQUAL(val[1], c.Get(1));
-    CHECK_EQUAL(val[2], c.Get(2));
-    CHECK_EQUAL(val[4], c.Get(4));
+    CHECK_EQUAL(val[1], c.get(1));
+    CHECK_EQUAL(val[2], c.get(2));
+    CHECK_EQUAL(val[4], c.get(4));
 
     c.Destroy();
 }
@@ -121,38 +121,38 @@ void BasicColumn_Insert(T val[], size_t valLen)
     C c;
 
     // Insert in empty column
-    c.Insert(0, val[0]);
-    CHECK_EQUAL(val[0], c.Get(0));
+    c.insert(0, val[0]);
+    CHECK_EQUAL(val[0], c.get(0));
     CHECK_EQUAL(1, c.Size());
 
     // Insert in top
-    c.Insert(0, val[1]);
-    CHECK_EQUAL(val[1], c.Get(0));
-    CHECK_EQUAL(val[0], c.Get(1));
+    c.insert(0, val[1]);
+    CHECK_EQUAL(val[1], c.get(0));
+    CHECK_EQUAL(val[0], c.get(1));
     CHECK_EQUAL(2, c.Size());
 
     // Insert in middle
-    c.Insert(1, val[2]);
-    CHECK_EQUAL(val[1], c.Get(0));
-    CHECK_EQUAL(val[2], c.Get(1));
-    CHECK_EQUAL(val[0], c.Get(2));
+    c.insert(1, val[2]);
+    CHECK_EQUAL(val[1], c.get(0));
+    CHECK_EQUAL(val[2], c.get(1));
+    CHECK_EQUAL(val[0], c.get(2));
     CHECK_EQUAL(3, c.Size());
 
     // Insert at buttom
-    c.Insert(3, val[3]);
-    CHECK_EQUAL(val[1], c.Get(0));
-    CHECK_EQUAL(val[2], c.Get(1));
-    CHECK_EQUAL(val[0], c.Get(2));
-    CHECK_EQUAL(val[3], c.Get(3));
+    c.insert(3, val[3]);
+    CHECK_EQUAL(val[1], c.get(0));
+    CHECK_EQUAL(val[2], c.get(1));
+    CHECK_EQUAL(val[0], c.get(2));
+    CHECK_EQUAL(val[3], c.get(3));
     CHECK_EQUAL(4, c.Size());
 
     // Insert at top
-    c.Insert(0, val[4]);
-    CHECK_EQUAL(val[4], c.Get(0));
-    CHECK_EQUAL(val[1], c.Get(1));
-    CHECK_EQUAL(val[2], c.Get(2));
-    CHECK_EQUAL(val[0], c.Get(3));
-    CHECK_EQUAL(val[3], c.Get(4));
+    c.insert(0, val[4]);
+    CHECK_EQUAL(val[4], c.get(0));
+    CHECK_EQUAL(val[1], c.get(1));
+    CHECK_EQUAL(val[2], c.get(2));
+    CHECK_EQUAL(val[0], c.get(3));
+    CHECK_EQUAL(val[3], c.get(4));
     CHECK_EQUAL(5, c.Size());
 
     c.Destroy();
@@ -188,40 +188,40 @@ void BasicColumn_Delete(T val[], size_t valLen)
     for (size_t i=0; i<valLen; ++i)
         c.add(val[i]);
     CHECK_EQUAL(5, c.Size());
-    CHECK_EQUAL(val[0], c.Get(0));
-    CHECK_EQUAL(val[1], c.Get(1));
-    CHECK_EQUAL(val[2], c.Get(2));
-    CHECK_EQUAL(val[3], c.Get(3));
-    CHECK_EQUAL(val[4], c.Get(4));
+    CHECK_EQUAL(val[0], c.get(0));
+    CHECK_EQUAL(val[1], c.get(1));
+    CHECK_EQUAL(val[2], c.get(2));
+    CHECK_EQUAL(val[3], c.get(3));
+    CHECK_EQUAL(val[4], c.get(4));
 
     // Delete first
-    c.Delete(0);
+    c.erase(0);
     CHECK_EQUAL(4, c.Size());
-    CHECK_EQUAL(val[1], c.Get(0));
-    CHECK_EQUAL(val[2], c.Get(1));
-    CHECK_EQUAL(val[3], c.Get(2));
-    CHECK_EQUAL(val[4], c.Get(3));
+    CHECK_EQUAL(val[1], c.get(0));
+    CHECK_EQUAL(val[2], c.get(1));
+    CHECK_EQUAL(val[3], c.get(2));
+    CHECK_EQUAL(val[4], c.get(3));
 
     // Delete middle
-    c.Delete(2);
+    c.erase(2);
     CHECK_EQUAL(3, c.Size());
-    CHECK_EQUAL(val[1], c.Get(0));
-    CHECK_EQUAL(val[2], c.Get(1));
-    CHECK_EQUAL(val[4], c.Get(2));
+    CHECK_EQUAL(val[1], c.get(0));
+    CHECK_EQUAL(val[2], c.get(1));
+    CHECK_EQUAL(val[4], c.get(2));
 
     // Delete last
-    c.Delete(2);
+    c.erase(2);
     CHECK_EQUAL(2, c.Size());
-    CHECK_EQUAL(val[1], c.Get(0));
-    CHECK_EQUAL(val[2], c.Get(1));
+    CHECK_EQUAL(val[1], c.get(0));
+    CHECK_EQUAL(val[2], c.get(1));
 
     // Delete single
-    c.Delete(0);
+    c.erase(0);
     CHECK_EQUAL(1, c.Size());
-    CHECK_EQUAL(val[2], c.Get(0));
+    CHECK_EQUAL(val[2], c.get(0));
 
     // Delete all
-    c.Delete(0);
+    c.erase(0);
     CHECK_EQUAL(0, c.Size());
 
     c.Destroy();

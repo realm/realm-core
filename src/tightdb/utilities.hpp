@@ -159,6 +159,7 @@ ReturnType TypePunning( OriginalType variable )
         OriginalType    in;
         ReturnType      out;
     };
+    out = ReturnType(); // Clear all bits in case ReturnType is larger than OriginalType
     in = variable;
     return out;
 }

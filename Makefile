@@ -11,7 +11,7 @@ benchmark: minimal
 # Run the performance matrix benchmarking program
 .PHONY: performance
 performance: minimal
-	@$(MAKE) -C test/performance run
+	@$(MAKE) -C test performance
 
 # Run coverage analysis after building everything, this time using LCOV
 .PHONY: lcov
