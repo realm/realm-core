@@ -138,7 +138,7 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
                                                 Char16*& out_begin, Char16* out_end)
 {
     using namespace std;
-    typedef char_traits<char> Traits8;
+    typedef char_traits<char> traits8;
     bool invalid = false;
     const char* in = in_begin;
     Char16* out = out_begin;
@@ -146,7 +146,7 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
         if (TIGHTDB_UNLIKELY(out == out_end)) {
             break; // Need space in output buffer
         }
-        uint_fast16_t v1 = Traits8::to_int_type(in[0]);
+        uint_fast16_t v1 = uint_fast16_t(traits8::to_int_type(in[0]));
         if (TIGHTDB_LIKELY(v1 < 0x80)) { // One byte
             // UTF-8 layout: 0xxxxxxx
             *out++ = Traits16::to_char_type(v1);
@@ -162,15 +162,14 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
                 invalid = true;
                 break; // Incomplete UTF-8 sequence
             }
-            uint_fast16_t v2 = Traits8::to_int_type(in[1]);
+            uint_fast16_t v2 = uint_fast16_t(traits8::to_int_type(in[1]));
             // UTF-8 layout: 110xxxxx 10xxxxxx
             if (TIGHTDB_UNLIKELY((v2 & 0xC0) != 0x80)) {
                 invalid = true;
                 break; // Invalid continuation byte
             }
-            uint_fast16_t v =
-                ((v1 & 0x1F) << 6) |
-                ((v2 & 0x3F) << 0);
+            uint_fast16_t v = uint_fast16_t(((v1 & 0x1F) << 6) |
+                                            ((v2 & 0x3F) << 0));
             if (TIGHTDB_UNLIKELY(v < 0x80)) {
                 invalid = true;
                 break; // Overlong encoding is invalid
@@ -184,17 +183,16 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
                 invalid = true;
                 break; // Incomplete UTF-8 sequence
             }
-            uint_fast16_t v2 = Traits8::to_int_type(in[1]);
-            uint_fast16_t v3 = Traits8::to_int_type(in[2]);
+            uint_fast16_t v2 = uint_fast16_t(traits8::to_int_type(in[1]));
+            uint_fast16_t v3 = uint_fast16_t(traits8::to_int_type(in[2]));
             // UTF-8 layout: 1110xxxx 10xxxxxx 10xxxxxx
             if (TIGHTDB_UNLIKELY((v2 & 0xC0) != 0x80 || (v3 & 0xC0) != 0x80)) {
                 invalid = true;
                 break; // Invalid continuation byte
             }
-            uint_fast16_t v =
-                ((v1 & 0x0F) << 12) |
-                ((v2 & 0x3F) <<  6) |
-                ((v3 & 0x3F) <<  0);
+            uint_fast16_t v = uint_fast16_t(((v1 & 0x0F) << 12) |
+                                            ((v2 & 0x3F) <<  6) |
+                                            ((v3 & 0x3F) <<  0));
             if (TIGHTDB_UNLIKELY(v < 0x800)) {
                 invalid = true;
                 break; // Overlong encoding is invalid
@@ -215,10 +213,10 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
                 invalid = true;
                 break; // Incomplete UTF-8 sequence
             }
-            uint_fast32_t w1 = v1; // 16 bit -> 32 bit
-            uint_fast32_t v2 = Traits8::to_int_type(in[1]); // 32 bit intended
-            uint_fast16_t v3 = Traits8::to_int_type(in[2]); // 16 bit intended
-            uint_fast16_t v4 = Traits8::to_int_type(in[3]); // 16 bit intended
+            uint_fast32_t w1 = uint_fast32_t(v1); // 16 bit -> 32 bit
+            uint_fast32_t v2 = uint_fast32_t(traits8::to_int_type(in[1])); // 32 bit intended
+            uint_fast16_t v3 = uint_fast16_t(traits8::to_int_type(in[2])); // 16 bit intended
+            uint_fast16_t v4 = uint_fast16_t(traits8::to_int_type(in[3])); // 16 bit intended
             // UTF-8 layout: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
             if (TIGHTDB_UNLIKELY((v2 & 0xC0) != 0x80 || (v3 & 0xC0) != 0x80 ||
                                  (v4 & 0xC0) != 0x80)) {
@@ -226,10 +224,10 @@ inline bool Utf8x16<Char16, Traits16>::to_utf16(const char*& in_begin, const cha
                 break; // Invalid continuation byte
             }
             uint_fast32_t v =
-                ((w1 & 0x07) << 18) | // Parenthesis is 32 bit partial result
-                ((v2 & 0x3F) << 12) | // Parenthesis is 32 bit partial result
-                ((v3 & 0x3F) <<  6) | // Parenthesis is 16 bit partial result
-                ((v4 & 0x3F) <<  0);  // Parenthesis is 16 bit partial result
+                uint_fast32_t(((w1 & 0x07) << 18) | // Parenthesis is 32 bit partial result
+                              ((v2 & 0x3F) << 12) | // Parenthesis is 32 bit partial result
+                              ((v3 & 0x3F) <<  6) | // Parenthesis is 16 bit partial result
+                              ((v4 & 0x3F) <<  0)); // Parenthesis is 16 bit partial result
             if (TIGHTDB_UNLIKELY(v < 0x10000)) {
                 invalid = true;
                 break; // Overlong encoding is invalid
@@ -260,11 +258,11 @@ inline std::size_t Utf8x16<Char16, Traits16>::find_utf16_buf_size(const char*& i
                                                                   const char*  in_end)
 {
     using namespace std;
-    typedef char_traits<char> Traits8;
+    typedef char_traits<char> traits8;
     size_t num_out = 0;
     const char* in = in_begin;
     while (in != in_end) {
-        uint_fast16_t v1 = Traits8::to_int_type(in[0]);
+        uint_fast16_t v1 = traits8::to_int_type(in[0]);
         if (TIGHTDB_LIKELY(v1 < 0x80)) { // One byte
             num_out += 1;
             in += 1;
@@ -315,7 +313,8 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
                                                char*& out_begin, char* out_end)
 {
     using namespace std;
-    typedef char_traits<char> Traits8;
+    typedef char_traits<char> traits8;
+    typedef typename traits8::int_type traits8_int_type;
     bool invalid = false;
     const Char16* in = in_begin;
     char* out = out_begin;
@@ -326,7 +325,7 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
                 break; // Not enough output buffer space
             }
             // UTF-8 layout: 0xxxxxxx
-            *out++ = Traits8::to_char_type(v1);
+            *out++ = traits8::to_char_type(traits8_int_type(v1));
             in += 1;
             continue;
         }
@@ -335,8 +334,8 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
                 break; // Not enough output buffer space
             }
             // UTF-8 layout: 110xxxxx 10xxxxxx
-            *out++ = Traits8::to_char_type(0xC0 + v1 / 0x40);
-            *out++ = Traits8::to_char_type(0x80 + v1 % 0x40);
+            *out++ = traits8::to_char_type(traits8_int_type(0xC0 + v1 / 0x40));
+            *out++ = traits8::to_char_type(traits8_int_type(0x80 + v1 % 0x40));
             in += 1;
             continue;
         }
@@ -345,9 +344,9 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
                 break; // Not enough output buffer space
             }
             // UTF-8 layout: 1110xxxx 10xxxxxx 10xxxxxx
-            *out++ = Traits8::to_char_type(0xE0 + v1 / 0x1000);
-            *out++ = Traits8::to_char_type(0x80 + v1 / 0x40 % 0x40);
-            *out++ = Traits8::to_char_type(0x80 + v1 % 0x40);
+            *out++ = traits8::to_char_type(traits8_int_type(0xE0 + v1 / 0x1000));
+            *out++ = traits8::to_char_type(traits8_int_type(0x80 + v1 / 0x40 % 0x40));
+            *out++ = traits8::to_char_type(traits8_int_type(0x80 + v1 % 0x40));
             in += 1;
             continue;
         }
@@ -371,10 +370,10 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
         }
         uint_fast32_t v = 0x10000l + (uint_fast32_t(v1 - 0xD800) * 0x400 + (v2 - 0xDC00));
         // UTF-8 layout: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
-        *out++ = Traits8::to_char_type(0xF0 + v / 0x40000);
-        *out++ = Traits8::to_char_type(0x80 + v / 0x1000 % 0x40);
-        *out++ = Traits8::to_char_type(0x80 + v / 0x40 % 0x40);
-        *out++ = Traits8::to_char_type(0x80 + v % 0x40);
+        *out++ = traits8::to_char_type(traits8_int_type(0xF0 + v / 0x40000));
+        *out++ = traits8::to_char_type(traits8_int_type(0x80 + v / 0x1000 % 0x40));
+        *out++ = traits8::to_char_type(traits8_int_type(0x80 + v / 0x40 % 0x40));
+        *out++ = traits8::to_char_type(traits8_int_type(0x80 + v % 0x40));
         in += 2;
     }
 
