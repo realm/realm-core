@@ -641,7 +641,7 @@ void Replication::select_table(const Table* table)
     size_t* begin;
     size_t* end;
     for (;;) {
-        begin = m_subtab_path_buf.m_data;
+        begin = m_subtab_path_buf.m_data.get();
         end = table->record_subtable_path(begin, begin+m_subtab_path_buf.m_size);
         if (end)
             break;
@@ -680,7 +680,7 @@ void Replication::select_spec(const Table* table, const Spec* spec)
     size_t* begin;
     size_t* end;
     for (;;) {
-        begin = m_subtab_path_buf.m_data;
+        begin = m_subtab_path_buf.m_data.get();
         end = table->record_subspec_path(spec, begin, begin+m_subtab_path_buf.m_size);
         if (end) break;
         size_t new_size = m_subtab_path_buf.m_size;
@@ -882,8 +882,8 @@ void Replication::TransactLogApplier::add_subspec(Spec* spec)
                 throw runtime_error("To many subspec nesting levels");
         }
         new_subspecs.set_size(new_size); // Throws
-        copy(m_subspecs.m_data, m_subspecs.m_data+m_num_subspecs, new_subspecs.m_data);
-        using std::swap;
+        copy(m_subspecs.m_data.get(), m_subspecs.m_data.get()+m_num_subspecs,
+             new_subspecs.m_data.get());
         swap(m_subspecs, new_subspecs);
     }
     m_subspecs[m_num_subspecs++] = spec;
