@@ -262,7 +262,7 @@ inline std::size_t Utf8x16<Char16, Traits16>::find_utf16_buf_size(const char*& i
     size_t num_out = 0;
     const char* in = in_begin;
     while (in != in_end) {
-        uint_fast16_t v1 = traits8::to_int_type(in[0]);
+        uint_fast16_t v1 = uint_fast16_t(traits8::to_int_type(in[0]));
         if (TIGHTDB_LIKELY(v1 < 0x80)) { // One byte
             num_out += 1;
             in += 1;
