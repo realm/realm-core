@@ -87,31 +87,28 @@ public:
     // Conditions: bool
     Query& equal(size_t column_ndx, bool value);
 
-    // Conditions: strings
-    Query& equal(size_t column_ndx, const char* value, bool case_sensitive=true);
-    Query& begins_with(size_t column_ndx, const char* value, bool case_sensitive=true);
-    Query& ends_with(size_t column_ndx, const char* value, bool case_sensitive=true);
-    Query& contains(size_t column_ndx, const char* value, bool case_sensitive=true);
-    Query& not_equal(size_t column_ndx, const char* value, bool case_sensitive=true);
-
     // Conditions: date
-    Query& equal_date(size_t column_ndx, time_t value) { return equal(column_ndx, int64_t(value)); }
-    Query& not_equal_date(size_t column_ndx, time_t value) { return not_equal(column_ndx, int64_t(value)); }
-    Query& greater_date(size_t column_ndx, time_t value) { return greater(column_ndx, int64_t(value)); }
-    Query& greater_equal_date(size_t column_ndx, time_t value) { return greater_equal(column_ndx, int64_t(value)); }
-    Query& less_date(size_t column_ndx, time_t value) { return less(column_ndx, int64_t(value)); }
-    Query& less_equal_date(size_t column_ndx, time_t value) { return less_equal(column_ndx, int64_t(value)); }
-    Query& between_date(size_t column_ndx, time_t from, time_t to) { return between(column_ndx, int64_t(from), int64_t(to)); }
+    Query& equal_date(size_t column_ndx, Date value) { return equal(column_ndx, int64_t(value.get_date())); }
+    Query& not_equal_date(size_t column_ndx, Date value) { return not_equal(column_ndx, int64_t(value.get_date())); }
+    Query& greater_date(size_t column_ndx, Date value) { return greater(column_ndx, int64_t(value.get_date())); }
+    Query& greater_equal_date(size_t column_ndx, Date value) { return greater_equal(column_ndx, int64_t(value.get_date())); }
+    Query& less_date(size_t column_ndx, Date value) { return less(column_ndx, int64_t(value.get_date())); }
+    Query& less_equal_date(size_t column_ndx, Date value) { return less_equal(column_ndx, int64_t(value.get_date())); }
+    Query& between_date(size_t column_ndx, Date from, Date to) { return between(column_ndx, int64_t(from.get_date()), int64_t(to.get_date())); }
+
+    // Conditions: strings
+    Query& equal(size_t column_ndx, StringData value, bool case_sensitive=true);
+    Query& not_equal(size_t column_ndx, StringData value, bool case_sensitive=true);
+    Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive=true);
+    Query& ends_with(size_t column_ndx, StringData value, bool case_sensitive=true);
+    Query& contains(size_t column_ndx, StringData value, bool case_sensitive=true);
 
     // Conditions: binary data
-    // Only BinaryData prototype can exist, else it would conflict with equal() for strings
-    Query& equal(size_t column_ndx, BinaryData);
-/*
-    Query& equal_binary(size_t column_ndx, const char* ptr, size_t len);
-    Query& begins_with_binary(size_t column_ndx, const char* ptr, size_t len);
-    Query& ends_with_binary(size_t column_ndx, const char* ptr, size_t len);
-    Query& contains_binary(size_t column_ndx, const char* ptr, size_t len);
-*/
+    Query& equal(size_t column_ndx, BinaryData value);
+    Query& not_equal(size_t column_ndx, BinaryData value);
+    Query& begins_with(size_t column_ndx, BinaryData value);
+    Query& ends_with(size_t column_ndx, BinaryData value);
+    Query& contains(size_t column_ndx, BinaryData value);
 
     // Grouping
     Query& group();

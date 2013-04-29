@@ -17,6 +17,10 @@ TIGHTDB_TABLE_2(TupleTableType,
                 first,  Int,
                 second, String)
 
+TIGHTDB_TABLE_2(TupleTableTypeBin,
+                first,  Int,
+                second, Binary)
+
 TIGHTDB_TABLE_2(BoolTupleTable,
                 first,  Int,
                 second, Bool)
@@ -53,7 +57,6 @@ TIGHTDB_TABLE_5(GATable,
                      build,   String,
                      event_1, Int,
                      event_2, Int)
-					 
 
 } // anonymous namespace
 
@@ -374,7 +377,7 @@ TEST(TestQueryStrIndexed_enum)
 {
     TupleTableType ttt;
 
-    for(size_t t = 0; t < 10; t++) {
+    for (size_t t = 0; t < 10; t++) {
         ttt.add(1, "a");
         ttt.add(4, "b");
         ttt.add(7, "c");
@@ -813,7 +816,7 @@ TEST(TestQuerySubtable)
     q1.subtable(2);
     q1.less(0, val50);
     q1.end_subtable();
-    TableView t1 = q1.find_all(0, (size_t)-1);
+    TableView t1 = q1.find_all(0, size_t(-1));
     CHECK_EQUAL(2, t1.size());
     CHECK_EQUAL(1, t1.get_source_ndx(0));
     CHECK_EQUAL(2, t1.get_source_ndx(1));
@@ -825,7 +828,7 @@ TEST(TestQuerySubtable)
     q2.Or();
     q2.less(0, val20);
     q2.end_subtable();
-    TableView t2 = q2.find_all(0, (size_t)-1);
+    TableView t2 = q2.find_all(0, size_t(-1));
     CHECK_EQUAL(2, t2.size());
     CHECK_EQUAL(0, t2.get_source_ndx(0));
     CHECK_EQUAL(3, t2.get_source_ndx(1));
@@ -838,7 +841,7 @@ TEST(TestQuerySubtable)
     q3.less(0, val20);
     q3.end_subtable();
     q3.less(0, val300);
-    TableView t3 = q3.find_all(0, (size_t)-1);
+    TableView t3 = q3.find_all(0, size_t(-1));
     CHECK_EQUAL(1, t3.size());
     CHECK_EQUAL(0, t3.get_source_ndx(0));
 
@@ -851,7 +854,7 @@ TEST(TestQuerySubtable)
     q4.Or();
     q4.less(0, val20);
     q4.end_subtable();
-    TableView t4 = q4.find_all(0, (size_t)-1);
+    TableView t4 = q4.find_all(0, size_t(-1));
 
 
 
@@ -1187,7 +1190,7 @@ TEST(TestQueryFindNext)
 
     CHECK_EQUAL(5, res1);
     CHECK_EQUAL(6, res2);
-    CHECK_EQUAL((size_t)-1, res3); // no more matches
+    CHECK_EQUAL(size_t(-1), res3); // no more matches
 }
 
 TEST(TestQueryFindAll1)
@@ -1515,6 +1518,81 @@ TEST(TestQueryFindAll_Contains)
     CHECK_EQUAL(3, tv1.get_source_ndx(3));
 }
 
+
+TEST(TestQuery_Binary)
+{
+    TupleTableTypeBin t;
+
+    const char bin[64] = {
+        6, 3, 9, 5, 9, 7, 6, 3, 2, 6, 0, 0, 5, 4, 2, 4,
+        5, 7, 9, 5, 7, 1, 1, 2, 0, 8, 3, 8, 0, 9, 6, 8,
+        4, 7, 3, 4, 9, 5, 2, 3, 6, 2, 7, 4, 0, 3, 7, 6,
+        2, 3, 5, 9, 3, 1, 2, 1, 0, 5, 5, 2, 9, 4, 5, 9
+    };
+
+    const char bin_2[4] = { 6, 6, 6, 6 }; // Not occuring above
+
+    t.add(0, BinaryData(bin +  0, 16));
+    t.add(0, BinaryData(bin +  0, 32));
+    t.add(0, BinaryData(bin +  0, 48));
+    t.add(0, BinaryData(bin +  0, 64));
+    t.add(0, BinaryData(bin + 16, 48));
+    t.add(0, BinaryData(bin + 32, 32));
+    t.add(0, BinaryData(bin + 48, 16));
+    t.add(0, BinaryData(bin + 24, 16)); // The "odd ball"
+    t.add(0, BinaryData(bin +  0, 32)); // Repeat an entry
+
+    CHECK_EQUAL(0, t.where().second.equal(BinaryData(bin + 16, 16)).count());
+    CHECK_EQUAL(1, t.where().second.equal(BinaryData(bin +  0, 16)).count());
+    CHECK_EQUAL(1, t.where().second.equal(BinaryData(bin + 48, 16)).count());
+    CHECK_EQUAL(2, t.where().second.equal(BinaryData(bin +  0, 32)).count());
+
+    CHECK_EQUAL(9, t.where().second.not_equal(BinaryData(bin + 16, 16)).count());
+    CHECK_EQUAL(8, t.where().second.not_equal(BinaryData(bin +  0, 16)).count());
+
+    CHECK_EQUAL(0, t.where().second.begins_with(BinaryData(bin +  8, 16)).count());
+    CHECK_EQUAL(1, t.where().second.begins_with(BinaryData(bin + 16, 16)).count());
+    CHECK_EQUAL(4, t.where().second.begins_with(BinaryData(bin +  0, 32)).count());
+    CHECK_EQUAL(5, t.where().second.begins_with(BinaryData(bin +  0, 16)).count());
+    CHECK_EQUAL(1, t.where().second.begins_with(BinaryData(bin + 48, 16)).count());
+    CHECK_EQUAL(9, t.where().second.begins_with(BinaryData(bin + 0,   0)).count());
+
+    CHECK_EQUAL(0, t.where().second.ends_with(BinaryData(bin + 40, 16)).count());
+    CHECK_EQUAL(1, t.where().second.ends_with(BinaryData(bin + 32, 16)).count());
+    CHECK_EQUAL(3, t.where().second.ends_with(BinaryData(bin + 32, 32)).count());
+    CHECK_EQUAL(4, t.where().second.ends_with(BinaryData(bin + 48, 16)).count());
+    CHECK_EQUAL(1, t.where().second.ends_with(BinaryData(bin +  0, 16)).count());
+    CHECK_EQUAL(9, t.where().second.ends_with(BinaryData(bin + 64,  0)).count());
+
+    CHECK_EQUAL(0, t.where().second.contains(BinaryData(bin_2)).count());
+    CHECK_EQUAL(5, t.where().second.contains(BinaryData(bin +  0, 16)).count());
+    CHECK_EQUAL(5, t.where().second.contains(BinaryData(bin + 16, 16)).count());
+    CHECK_EQUAL(4, t.where().second.contains(BinaryData(bin + 24, 16)).count());
+    CHECK_EQUAL(4, t.where().second.contains(BinaryData(bin + 32, 16)).count());
+    CHECK_EQUAL(9, t.where().second.contains(BinaryData(bin +  0,  0)).count());
+
+    {
+        TupleTableTypeBin::View tv = t.where().second.equal(BinaryData(bin + 0, 32)).find_all();
+        if (tv.size() == 2) {
+            CHECK_EQUAL(1, tv.get_source_ndx(0));
+            CHECK_EQUAL(8, tv.get_source_ndx(1));
+        }
+        else CHECK(false);
+    }
+
+    {
+        TupleTableTypeBin::View tv = t.where().second.contains(BinaryData(bin + 24, 16)).find_all();
+        if (tv.size() == 4) {
+            CHECK_EQUAL(2, tv.get_source_ndx(0));
+            CHECK_EQUAL(3, tv.get_source_ndx(1));
+            CHECK_EQUAL(4, tv.get_source_ndx(2));
+            CHECK_EQUAL(7, tv.get_source_ndx(3));
+        }
+        else CHECK(false);
+    }
+}
+
+
 TEST(TestQueryEnums)
 {
     TupleTableType table;
@@ -1738,12 +1816,14 @@ TEST(TestQuerySyntaxCheck)
 #ifdef TIGHTDB_DEBUG
     s = q6.Verify();
     CHECK(s != "");
-
 #endif
+
     TupleTableType::Query q7 = ttt.where().second.equal("\xa0", false);
-#ifdef TIGHTDB_DEBUG
+#ifdef _WIN32
+#  ifdef TIGHTDB_DEBUG
     s = q7.Verify();
     CHECK(s != "");
+#  endif
 #endif
 }
 

@@ -27,13 +27,13 @@ ColumnBinary::ColumnBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocat
 ColumnBinary::~ColumnBinary()
 {
     if (IsNode()) delete m_array;
-    else delete (ArrayBinary*)m_array;
+    else delete static_cast<ArrayBinary*>(m_array);
 }
 
 void ColumnBinary::Destroy()
 {
     if (IsNode()) m_array->Destroy();
-    else ((ArrayBinary*)m_array)->Destroy();
+    else static_cast<ArrayBinary*>(m_array)->Destroy();
 }
 
 void ColumnBinary::UpdateRef(size_t ref)
@@ -62,7 +62,7 @@ bool ColumnBinary::is_empty() const TIGHTDB_NOEXCEPT
         return offsets.is_empty();
     }
     else {
-        return (static_cast<ArrayBinary*>(m_array))->is_empty();
+        return static_cast<ArrayBinary*>(m_array)->is_empty();
     }
 }
 
@@ -74,7 +74,7 @@ size_t ColumnBinary::Size() const  TIGHTDB_NOEXCEPT
         return size;
     }
     else {
-        return (static_cast<ArrayBinary*>(m_array))->size();
+        return static_cast<ArrayBinary*>(m_array)->size();
     }
 }
 
@@ -94,32 +94,44 @@ void ColumnBinary::Clear()
 
         m_array = array;
     }
-    else (static_cast<ArrayBinary*>(m_array))->Clear();
+    else {
+        static_cast<ArrayBinary*>(m_array)->Clear();
+    }
 }
 
-void ColumnBinary::Set(size_t ndx, BinaryData bin)
+void ColumnBinary::set(size_t ndx, BinaryData bin)
 {
     TIGHTDB_ASSERT(ndx < Size());
-    TreeSet<BinaryData,ColumnBinary>(ndx, bin);
+    TreeSet<BinaryData, ColumnBinary>(ndx, bin);
 }
 
-void ColumnBinary::Insert(size_t ndx, BinaryData bin)
+void ColumnBinary::insert(size_t ndx, BinaryData bin)
 {
     TIGHTDB_ASSERT(ndx <= Size());
-    TreeInsert<BinaryData,ColumnBinary>(ndx, bin);
+    TreeInsert<BinaryData, ColumnBinary>(ndx, bin);
+}
+
+void ColumnBinary::set_string(size_t ndx, StringData value)
+{
+    TIGHTDB_ASSERT(ndx < Size());
+    TreeSet<StringData, ColumnBinary>(ndx, value);
+}
+
+void ColumnBinary::insert_string(size_t ndx, StringData value)
+{
+    TIGHTDB_ASSERT(ndx <= Size());
+    TreeInsert<StringData, ColumnBinary>(ndx, value);
 }
 
 void ColumnBinary::fill(size_t count)
 {
     TIGHTDB_ASSERT(is_empty());
 
-    BinaryData empty_bin; // default value
-
     // Fill column with default values
     // TODO: this is a very naive approach
     // we could speedup by creating full nodes directly
     for (size_t i = 0; i < count; ++i) {
-        TreeInsert<BinaryData, ColumnBinary>(i, empty_bin);
+        TreeInsert<BinaryData, ColumnBinary>(i, BinaryData());
     }
 
 #ifdef TIGHTDB_DEBUG
@@ -128,7 +140,7 @@ void ColumnBinary::fill(size_t count)
 }
 
 
-void ColumnBinary::Delete(size_t ndx)
+void ColumnBinary::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < Size());
     TreeDelete<BinaryData,ColumnBinary>(ndx);
@@ -138,7 +150,7 @@ void ColumnBinary::Resize(size_t ndx)
 {
     TIGHTDB_ASSERT(!IsNode()); // currently only available on leaf level (used by b-tree code)
     TIGHTDB_ASSERT(ndx < Size());
-    ((ArrayBinary*)m_array)->Resize(ndx);
+    static_cast<ArrayBinary*>(m_array)->Resize(ndx);
 }
 
 bool ColumnBinary::compare(const ColumnBinary& c) const
@@ -146,9 +158,7 @@ bool ColumnBinary::compare(const ColumnBinary& c) const
     const size_t n = Size();
     if (c.Size() != n) return false;
     for (size_t i=0; i<n; ++i) {
-        const BinaryData d1 = Get(i);
-        const BinaryData d2 = c.Get(i);
-        if (d1.len != d2.len || !equal(d1.pointer, d1.pointer+d1.len, d2.pointer)) return false;
+        if (get(i) != c.get(i)) return false;
     }
     return true;
 }
@@ -161,22 +171,32 @@ BinaryData ColumnBinary::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
 
 void ColumnBinary::LeafSet(size_t ndx, BinaryData value)
 {
-    ((ArrayBinary*)m_array)->Set(ndx, value.pointer, value.len);
+    static_cast<ArrayBinary*>(m_array)->set(ndx, value);
 }
 
 void ColumnBinary::LeafInsert(size_t ndx, BinaryData value)
 {
-    ((ArrayBinary*)m_array)->Insert(ndx, value.pointer, value.len);
+    static_cast<ArrayBinary*>(m_array)->insert(ndx, value);
+}
+
+void ColumnBinary::LeafSet(size_t ndx, StringData value)
+{
+    static_cast<ArrayBinary*>(m_array)->set_string(ndx, value);
+}
+
+void ColumnBinary::LeafInsert(size_t ndx, StringData value)
+{
+    static_cast<ArrayBinary*>(m_array)->insert_string(ndx, value);
 }
 
 void ColumnBinary::LeafDelete(size_t ndx)
 {
-    ((ArrayBinary*)m_array)->Delete(ndx);
+    static_cast<ArrayBinary*>(m_array)->Delete(ndx);
 }
 
 #ifdef TIGHTDB_DEBUG
 
-void ColumnBinary::LeafToDot(std::ostream& out, const Array& array) const
+void ColumnBinary::LeafToDot(ostream& out, const Array& array) const
 {
     // Rebuild array to get correct type
     const size_t ref = array.GetRef();

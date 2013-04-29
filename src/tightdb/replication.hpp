@@ -236,17 +236,19 @@ public:
 
     struct subtable_tag {};
 
-    void new_top_level_table(const char* name);
-    void add_column(const Table*, const Spec*, DataType, const char* name);
+    void new_top_level_table(StringData name);
+    void add_column(const Table*, const Spec*, DataType, StringData name);
 
     template<class T>
     void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
+    void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, StringData value);
     void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, BinaryData value);
     void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
     void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, subtable_tag);
 
     template<class T>
     void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
+    void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, StringData value);
     void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, BinaryData value);
     void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
     void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, subtable_tag);
@@ -311,12 +313,11 @@ private:
     char* m_transact_log_free_end;
 
     template<class T> struct Buffer {
-        T* m_data;
+        UniquePtr<T[]> m_data;
         std::size_t m_size;
         T& operator[](std::size_t i) TIGHTDB_NOEXCEPT { return m_data[i]; }
         const T& operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
         Buffer() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
-        ~Buffer() TIGHTDB_NOEXCEPT { delete[] m_data; }
         void set_size(std::size_t);
     };
     Buffer<std::size_t> m_subtab_path_buf;
@@ -350,7 +351,7 @@ private:
     void select_spec(const Table*, const Spec*);
 
     void string_cmd(char cmd, std::size_t column_ndx, std::size_t ndx,
-                    const char* data,std::size_t size);
+                    const char* data, std::size_t size);
 
     void mixed_cmd(char cmd, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
 
@@ -530,24 +531,23 @@ inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
         transact_log_advance(buf);
         break;
     case type_Date:
-        buf = encode_int(buf, value.get_date());
+        buf = encode_int(buf, value.get_date().get_date());
         transact_log_advance(buf);
         break;
     case type_String:
         {
-            const char* data = value.get_string();
-            std::size_t size = std::strlen(data);
-            buf = encode_int(buf, size);
+            StringData data = value.get_string();
+            buf = encode_int(buf, data.size());
             transact_log_advance(buf);
-            transact_log_append(data, size); // Throws
+            transact_log_append(data.data(), data.size()); // Throws
         }
         break;
     case type_Binary:
         {
             BinaryData data = value.get_binary();
-            buf = encode_int(buf, data.len);
+            buf = encode_int(buf, data.size());
             transact_log_advance(buf);
-            transact_log_append(data.pointer, data.len); // Throws
+            transact_log_append(data.data(), data.size()); // Throws
         }
         break;
     case type_Table:
@@ -559,21 +559,19 @@ inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
 }
 
 
-inline void Replication::new_top_level_table(const char* name)
+inline void Replication::new_top_level_table(StringData name)
 {
-    size_t length = std::strlen(name);
-    simple_cmd('N', tuple(length)); // Throws
-    transact_log_append(name, length); // Throws
+    simple_cmd('N', tuple(name.size())); // Throws
+    transact_log_append(name.data(), name.size()); // Throws
 }
 
 
 inline void Replication::add_column(const Table* table, const Spec* spec,
-                                    DataType type, const char* name)
+                                    DataType type, StringData name)
 {
     check_spec(table, spec); // Throws
-    size_t length = std::strlen(name);
-    simple_cmd('A', tuple(int(type), length)); // Throws
-    transact_log_append(name, length); // Throws
+    simple_cmd('A', tuple(int(type), name.size())); // Throws
+    transact_log_append(name.data(), name.size()); // Throws
 }
 
 
@@ -586,10 +584,17 @@ inline void Replication::set_value(const Table* t, std::size_t column_ndx,
 }
 
 inline void Replication::set_value(const Table* t, std::size_t column_ndx,
+                                   std::size_t ndx, StringData value)
+{
+    check_table(t); // Throws
+    string_cmd('s', column_ndx, ndx, value.data(), value.size()); // Throws
+}
+
+inline void Replication::set_value(const Table* t, std::size_t column_ndx,
                                    std::size_t ndx, BinaryData value)
 {
     check_table(t); // Throws
-    string_cmd('s', column_ndx, ndx, value.pointer, value.len); // Throws
+    string_cmd('s', column_ndx, ndx, value.data(), value.size()); // Throws
 }
 
 inline void Replication::set_value(const Table* t, std::size_t column_ndx,
@@ -616,10 +621,17 @@ inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
 }
 
 inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
+                                      std::size_t ndx, StringData value)
+{
+    check_table(t); // Throws
+    string_cmd('i', column_ndx, ndx, value.data(), value.size()); // Throws
+}
+
+inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
                                       std::size_t ndx, BinaryData value)
 {
     check_table(t); // Throws
-    string_cmd('i', column_ndx, ndx, value.pointer, value.len); // Throws
+    string_cmd('i', column_ndx, ndx, value.data(), value.size()); // Throws
 }
 
 inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
@@ -699,12 +711,10 @@ inline void Replication::on_spec_destroyed(const Spec* s) TIGHTDB_NOEXCEPT
 }
 
 
-template<class T> void Replication::Buffer<T>::set_size(std::size_t new_size)
+template<class T> void Replication::Buffer<T>::set_size(std::size_t size)
 {
-    T* const new_data = new T[new_size];
-    delete[] m_data;
-    m_data = new_data;
-    m_size = new_size;
+    m_data.reset(new T[size]);
+    m_size = size;
 }
 
 

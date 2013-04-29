@@ -22,8 +22,6 @@
 
 #include <stdint.h> // unint8_t etc
 #include <cstddef>
-#include <cstring> // strcmp()
-#include <ctime>
 #include <utility>
 
 #include <tightdb/meta.hpp>
@@ -396,6 +394,9 @@ namespace _impl
     template<> struct GetColumnTypeId<int64_t> {
         static const DataType id = type_Int;
     };
+    template<class E> struct GetColumnTypeId<SpecBase::Enum<E> > {
+        static const DataType id = type_Int;
+    };
     template<> struct GetColumnTypeId<bool> {
         static const DataType id = type_Bool;
     };
@@ -405,17 +406,14 @@ namespace _impl
     template<> struct GetColumnTypeId<double> {
         static const DataType id = type_Double;
     };
-    template<> struct GetColumnTypeId<const char*> {
+    template<> struct GetColumnTypeId<StringData> {
         static const DataType id = type_String;
-    };
-    template<class E> struct GetColumnTypeId<SpecBase::Enum<E> > {
-        static const DataType id = type_Int;
-    };
-    template<> struct GetColumnTypeId<Date> {
-        static const DataType id = type_Date;
     };
     template<> struct GetColumnTypeId<BinaryData> {
         static const DataType id = type_Binary;
+    };
+    template<> struct GetColumnTypeId<Date> {
+        static const DataType id = type_Date;
     };
     template<> struct GetColumnTypeId<Mixed> {
         static const DataType id = type_Mixed;
@@ -423,7 +421,7 @@ namespace _impl
 
 
     template<class Type, int col_idx> struct AddCol {
-        static void exec(Spec* spec, const char* const* col_names)
+        static void exec(Spec* spec, const StringData* col_names)
         {
             TIGHTDB_ASSERT(col_idx == spec->get_column_count());
             spec->add_column(GetColumnTypeId<Type>::id, col_names[col_idx]);
@@ -432,12 +430,12 @@ namespace _impl
 
     // AddCol specialization for subtables
     template<class Subtab, int col_idx> struct AddCol<SpecBase::Subtable<Subtab>, col_idx> {
-        static void exec(Spec* spec, const char* const* col_names)
+        static void exec(Spec* spec, const StringData* col_names)
         {
             TIGHTDB_ASSERT(col_idx == spec->get_column_count());
             typedef typename Subtab::Columns Subcolumns;
             Spec subspec = spec->add_subtable_column(col_names[col_idx]);
-            const char* const* const subcol_names = Subtab::spec_type::dyn_col_names();
+            const StringData* const subcol_names = Subtab::spec_type::dyn_col_names();
             ForEachType<Subcolumns, _impl::AddCol>::exec(&subspec, subcol_names);
         }
     };
@@ -445,19 +443,19 @@ namespace _impl
 
 
     template<class Type, int col_idx> struct DiffColType {
-        static bool exec(const Spec* spec, const char* const* col_names)
+        static bool exec(const Spec* spec, const StringData* col_names)
         {
             return GetColumnTypeId<Type>::id != spec->get_column_type(col_idx) ||
-                std::strcmp(col_names[col_idx], spec->get_column_name(col_idx)) != 0;
+                col_names[col_idx] != spec->get_column_name(col_idx);
         }
     };
 
     // DiffColType specialization for subtables
     template<class Subtab, int col_idx> struct DiffColType<SpecBase::Subtable<Subtab>, col_idx> {
-        static bool exec(const Spec* spec, const char* const* col_names)
+        static bool exec(const Spec* spec, const StringData* col_names)
         {
             if (spec->get_column_type(col_idx) != type_Table ||
-                std::strcmp(col_names[col_idx], spec->get_column_name(col_idx)) != 0) return true;
+                col_names[col_idx] != spec->get_column_name(col_idx)) return true;
             Spec subspec = spec->get_subtable_spec(col_idx);
             return !Subtab::matches_dynamic_spec(&subspec);
         }
@@ -498,7 +496,7 @@ namespace _impl
     };
 
     // InsertIntoCol specialization for strings
-    template<int col_idx> struct InsertIntoCol<const char*, col_idx> {
+    template<int col_idx> struct InsertIntoCol<StringData, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
             t->insert_string(col_idx, row_idx, at<col_idx>(tuple));
@@ -517,8 +515,7 @@ namespace _impl
     template<int col_idx> struct InsertIntoCol<Date, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
-            const Date d(at<col_idx>(tuple));
-            t->insert_date(col_idx, row_idx, d.get_date());
+            t->insert_date(col_idx, row_idx, at<col_idx>(tuple));
         }
     };
 
@@ -526,8 +523,7 @@ namespace _impl
     template<int col_idx> struct InsertIntoCol<BinaryData, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
-            const BinaryData b(at<col_idx>(tuple));
-            t->insert_binary(col_idx, row_idx, b.pointer, b.len);
+            t->insert_binary(col_idx, row_idx, at<col_idx>(tuple));
         }
     };
 
@@ -582,7 +578,7 @@ namespace _impl
     };
 
     // AssignIntoCol specialization for strings
-    template<int col_idx> struct AssignIntoCol<const char*, col_idx> {
+    template<int col_idx> struct AssignIntoCol<StringData, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
             t->set_string(col_idx, row_idx, at<col_idx>(tuple));
@@ -601,8 +597,7 @@ namespace _impl
     template<int col_idx> struct AssignIntoCol<Date, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
-            const Date d(at<col_idx>(tuple));
-            t->set_date(col_idx, row_idx, d.get_date());
+            t->set_date(col_idx, row_idx, at<col_idx>(tuple));
         }
     };
 
@@ -610,8 +605,7 @@ namespace _impl
     template<int col_idx> struct AssignIntoCol<BinaryData, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
-            const BinaryData b(at<col_idx>(tuple));
-            t->set_binary(col_idx, row_idx, b.pointer, b.len);
+            t->set_binary(col_idx, row_idx, at<col_idx>(tuple));
         }
     };
 

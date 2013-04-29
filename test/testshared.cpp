@@ -109,7 +109,7 @@ TEST(Shared_Initial2)
             CHECK_EQUAL(1, t1[0].first);
             CHECK_EQUAL(2, t1[0].second);
             CHECK_EQUAL(false, t1[0].third);
-            CHECK_EQUAL("test", (const char*)t1[0].fourth);
+            CHECK_EQUAL("test", t1[0].fourth);
         }
     }
 
@@ -154,7 +154,7 @@ TEST(Shared_Initial2_Mem)
             CHECK_EQUAL(1, t1[0].first);
             CHECK_EQUAL(2, t1[0].second);
             CHECK_EQUAL(false, t1[0].third);
-            CHECK_EQUAL("test", (const char*)t1[0].fourth);
+            CHECK_EQUAL("test", t1[0].fourth);
         }
     }
 
@@ -192,7 +192,7 @@ TEST(Shared1)
             CHECK_EQUAL(1, t2[0].first);
             CHECK_EQUAL(2, t2[0].second);
             CHECK_EQUAL(false, t2[0].third);
-            CHECK_EQUAL("test", (const char*)t2[0].fourth);
+            CHECK_EQUAL("test", t2[0].fourth);
 
             // Do a new change while stil having current read transaction open
             {
@@ -208,7 +208,7 @@ TEST(Shared1)
             CHECK_EQUAL(1, t2[0].first);
             CHECK_EQUAL(2, t2[0].second);
             CHECK_EQUAL(false, t2[0].third);
-            CHECK_EQUAL("test", (const char*)t2[0].fourth);
+            CHECK_EQUAL("test", t2[0].fourth);
 
             // Do one more new change while stil having current read transaction open
             // so we know that it does not overwrite data held by
@@ -225,7 +225,7 @@ TEST(Shared1)
             CHECK_EQUAL(1, t2[0].first);
             CHECK_EQUAL(2, t2[0].second);
             CHECK_EQUAL(false, t2[0].third);
-            CHECK_EQUAL("test", (const char*)t2[0].fourth);
+            CHECK_EQUAL("test", t2[0].fourth);
         }
 
         // Start a new read transaction and verify that it can now see the changes
@@ -237,15 +237,15 @@ TEST(Shared1)
             CHECK_EQUAL(1, t3[0].first);
             CHECK_EQUAL(2, t3[0].second);
             CHECK_EQUAL(false, t3[0].third);
-            CHECK_EQUAL("test", (const char*)t3[0].fourth);
+            CHECK_EQUAL("test", t3[0].fourth);
             CHECK_EQUAL(2, t3[1].first);
             CHECK_EQUAL(3, t3[1].second);
             CHECK_EQUAL(true, t3[1].third);
-            CHECK_EQUAL("more test", (const char*)t3[1].fourth);
+            CHECK_EQUAL("more test", t3[1].fourth);
             CHECK_EQUAL(0, t3[2].first);
             CHECK_EQUAL(1, t3[2].second);
             CHECK_EQUAL(false, t3[2].third);
-            CHECK_EQUAL("even more test", (const char*)t3[2].fourth);
+            CHECK_EQUAL("even more test", t3[2].fourth);
         }
     }
 
@@ -293,7 +293,7 @@ TEST(Shared_rollback)
             CHECK_EQUAL(1, t[0].first);
             CHECK_EQUAL(2, t[0].second);
             CHECK_EQUAL(false, t[0].third);
-            CHECK_EQUAL("test", (const char*)t[0].fourth);
+            CHECK_EQUAL("test", t[0].fourth);
         }
 
         // Greate more changes (but rollback)
@@ -312,7 +312,7 @@ TEST(Shared_rollback)
             CHECK_EQUAL(1, t[0].first);
             CHECK_EQUAL(2, t[0].second);
             CHECK_EQUAL(false, t[0].third);
-            CHECK_EQUAL("test", (const char*)t[0].fourth);
+            CHECK_EQUAL("test", t[0].fourth);
         }
     }
 
@@ -762,7 +762,7 @@ TEST(Shared_Notifications)
             CHECK_EQUAL(1, t1[0].first);
             CHECK_EQUAL(2, t1[0].second);
             CHECK_EQUAL(false, t1[0].third);
-            CHECK_EQUAL("test", (const char*)t1[0].fourth);
+            CHECK_EQUAL("test", t1[0].fourth);
         }
 
         // No other instance have changed db since last transaction
@@ -795,7 +795,7 @@ TEST(Shared_FromSerialized)
         CHECK_EQUAL(1, t1[0].first);
         CHECK_EQUAL(2, t1[0].second);
         CHECK_EQUAL(false, t1[0].third);
-        CHECK_EQUAL("test", (const char*)t1[0].fourth);
+        CHECK_EQUAL("test", t1[0].fourth);
     }
 }
 
