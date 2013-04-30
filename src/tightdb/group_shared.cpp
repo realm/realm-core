@@ -356,7 +356,8 @@ Group& SharedGroup::begin_write()
     TIGHTDB_ASSERT(m_group.get_allocator().IsAllFree());
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (m_replication.is_attached()) m_replication.begin_write_transact(); // Throws
+    if (Replication* repl = m_group.get_replication())
+        repl->begin_write_transact(); // Throws
 #endif
 
     SharedInfo* const info = m_file_map.get_addr();
@@ -444,7 +445,8 @@ void SharedGroup::commit()
     // Replicatin::commit_write_transact() fails, then the transaction
     // is not completed. A following call to rollback() must roll it
     // back.
-    if (m_replication.is_attached()) m_replication.commit_write_transact(); // Throws
+    if (Replication* repl = m_group.get_replication())
+        repl->commit_write_transact(); // Throws
 #endif
 
 #ifdef TIGHTDB_DEBUG
@@ -467,7 +469,8 @@ void SharedGroup::rollback()
     m_group.invalidate();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (m_replication.is_attached()) m_replication.rollback_write_transact();
+    if (Replication* repl = m_group.get_replication())
+        repl->rollback_write_transact();
 #endif
 
 #ifdef TIGHTDB_DEBUG

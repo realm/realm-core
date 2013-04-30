@@ -126,6 +126,7 @@ private:
     bool validate_buffer(const char* data, size_t len) const;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
+    Replication* get_replication() const TIGHTDB_NOEXCEPT { return m_replication; }
     void set_replication(Replication* r) { m_replication = r; }
 #endif
 };
