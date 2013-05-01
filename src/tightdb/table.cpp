@@ -2348,7 +2348,7 @@ inline void out_string(ostream& out, const string text, const size_t max_len)
 
 inline void out_table(ostream& out, const size_t len)
 {
-    const size_t width = out.width() - chars_in_int(len) - 1;
+    const streamsize width = out.width() - chars_in_int(len) - 1;
     out.width(width);
     out << "[" << len << "]";
 }
