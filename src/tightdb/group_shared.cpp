@@ -355,12 +355,7 @@ Group& SharedGroup::begin_write()
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
     TIGHTDB_ASSERT(m_group.get_allocator().IsAllFree());
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication())
-        repl->begin_write_transact(); // Throws
-#endif
-
-    SharedInfo* const info = m_file_map.get_addr();
+    SharedInfo* info = m_file_map.get_addr();
 
     // Get write lock
     // Note that this will not get released until we call
@@ -374,6 +369,11 @@ Group& SharedGroup::begin_write()
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
     m_group.update_from_shared(new_topref, new_filesize);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = m_group.get_replication())
+        repl->begin_write_transact(m_group, info->current_version); // Throws
+#endif
 
 #ifdef TIGHTDB_DEBUG
     m_group.Verify();

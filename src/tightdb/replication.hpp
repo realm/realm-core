@@ -27,6 +27,8 @@
 #include <limits>
 #include <stdexcept>
 
+#include <stdint.h> // <cstdint> is not available in C++03
+
 #include <tightdb/meta.hpp>
 #include <tightdb/tuple.hpp>
 #include <tightdb/unique_ptr.hpp>
@@ -63,6 +65,10 @@ public:
 
     std::string get_database_path();
 
+    // Be sure to keep this type aligned with what is actually used in
+    // SharedGroup.
+    typedef uint_fast32_t version_type;
+
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
     /// 'write' transaction. This ensures that the local shared
@@ -74,7 +80,7 @@ public:
     ///
     /// \throw Interrupted If this call was interrupted by an
     /// asynchronous call to interrupt().
-    void begin_write_transact();
+    void begin_write_transact(Group&, version_type version);
 
     /// Commit the accumulated transaction log. The transaction log
     /// may not be committed if any of the functions that submit data
@@ -219,7 +225,7 @@ protected:
     /// is supposed to update `m_transact_log_free_begin` and
     /// `m_transact_log_free_end` such that they refer to a (possibly
     /// empty) chunk of free space.
-    virtual void do_begin_write_transact() = 0;
+    virtual void do_begin_write_transact(Group&, version_type version) = 0;
 
     virtual void do_commit_write_transact() = 0;
 
@@ -317,9 +323,9 @@ inline std::string Replication::get_database_path()
 }
 
 
-inline void Replication::begin_write_transact()
+inline void Replication::begin_write_transact(Group& group, version_type version)
 {
-    do_begin_write_transact();
+    do_begin_write_transact(group, version);
     m_selected_table = 0;
     m_selected_spec  = 0;
 }
