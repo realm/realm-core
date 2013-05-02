@@ -67,7 +67,7 @@ public:
 
     // Be sure to keep this type aligned with what is actually used in
     // SharedGroup.
-    typedef uint_fast32_t version_type;
+    typedef uint_fast32_t database_version_type;
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -80,7 +80,7 @@ public:
     ///
     /// \throw Interrupted If this call was interrupted by an
     /// asynchronous call to interrupt().
-    void begin_write_transact(Group&, version_type version);
+    void begin_write_transact(Group&, database_version_type version);
 
     /// Commit the accumulated transaction log. The transaction log
     /// may not be committed if any of the functions that submit data
@@ -95,7 +95,7 @@ public:
     ///
     /// FIXME: In general the transaction will be considered complete
     /// even if this operation is interrupted. Is that ok?
-    void commit_write_transact();
+    database_version_type commit_write_transact();
 
     /// Called by a client to discard the accumulated transaction
     /// log. This function must be called if a write transaction was
@@ -225,9 +225,9 @@ protected:
     /// is supposed to update `m_transact_log_free_begin` and
     /// `m_transact_log_free_end` such that they refer to a (possibly
     /// empty) chunk of free space.
-    virtual void do_begin_write_transact(Group&, version_type version) = 0;
+    virtual void do_begin_write_transact(Group&, database_version_type version) = 0;
 
-    virtual void do_commit_write_transact() = 0;
+    virtual database_version_type do_commit_write_transact() = 0;
 
     virtual void do_rollback_write_transact() TIGHTDB_NOEXCEPT = 0;
 
@@ -323,16 +323,16 @@ inline std::string Replication::get_database_path()
 }
 
 
-inline void Replication::begin_write_transact(Group& group, version_type version)
+inline void Replication::begin_write_transact(Group& group, database_version_type version)
 {
     do_begin_write_transact(group, version);
     m_selected_table = 0;
     m_selected_spec  = 0;
 }
 
-inline void Replication::commit_write_transact()
+inline Replication::database_version_type Replication::commit_write_transact()
 {
-    do_commit_write_transact();
+    return do_commit_write_transact();
 }
 
 inline void Replication::rollback_write_transact() TIGHTDB_NOEXCEPT
