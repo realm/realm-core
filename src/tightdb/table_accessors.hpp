@@ -43,7 +43,7 @@ struct SpecBase {
     typedef tightdb::Date       Date;
     typedef float               Float;
     typedef double              Double;
-    typedef const char*         String;
+    typedef tightdb::StringData String;
     typedef tightdb::BinaryData Binary;
     typedef tightdb::Mixed      Mixed;
 
@@ -93,7 +93,7 @@ struct SpecBase {
 
     /// FIXME: Currently we do not support absence of dynamic column
     /// names.
-    static const char* const* dyn_col_names() { return 0; }
+    static const StringData* dyn_col_names() { return 0; }
 
     /// This is the fallback class that is used when no convenience
     /// methods are specified in the users Spec class.
@@ -392,18 +392,18 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    std::time_t get() const TIGHTDB_NOEXCEPT
+    Date get() const TIGHTDB_NOEXCEPT
     {
         return Base::m_table->get_impl()->get_date(col_idx, Base::m_row_idx);
     }
 
-    void set(const std::time_t& value) const
+    void set(Date value) const
     {
         Base::m_table->get_impl()->set_date(col_idx, Base::m_row_idx, value);
     }
 
-    operator std::time_t() const TIGHTDB_NOEXCEPT { return get(); }
-    const FieldAccessor& operator=(const std::time_t& value) const { set(value); return *this; }
+    operator Date() const TIGHTDB_NOEXCEPT { return get(); }
+    const FieldAccessor& operator=(Date value) const { set(value); return *this; }
 
 
     explicit FieldAccessor(typename Base::Init i) TIGHTDB_NOEXCEPT: Base(i) {}
@@ -412,43 +412,28 @@ public:
 
 /// Field accessor specialization for strings.
 template<class Taboid, int col_idx, bool const_tab>
-class FieldAccessor<Taboid, col_idx, const char*, const_tab>: public FieldAccessorBase<Taboid> {
+class FieldAccessor<Taboid, col_idx, StringData, const_tab>: public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    const char* get() const TIGHTDB_NOEXCEPT
+    StringData get() const TIGHTDB_NOEXCEPT
     {
         return Base::m_table->get_impl()->get_string(col_idx, Base::m_row_idx);
     }
 
-    void set(const char* value) const
+    void set(StringData value) const
     {
         Base::m_table->get_impl()->set_string(col_idx, Base::m_row_idx, value);
     }
 
-    operator const char*() const TIGHTDB_NOEXCEPT { return get(); }
-    const FieldAccessor& operator=(const char* value) const { set(value); return *this; }
+    operator StringData() const TIGHTDB_NOEXCEPT { return get(); }
+    const FieldAccessor& operator=(StringData value) const { set(value); return *this; }
 
-    friend bool operator==(const FieldAccessor& a, const char* b) TIGHTDB_NOEXCEPT
-    {
-        return std::strcmp(a.get(), b) == 0;
-    }
+    const char* data() const TIGHTDB_NOEXCEPT { return get().data(); }
+    std::size_t size() const TIGHTDB_NOEXCEPT { return get().size(); }
 
-    friend bool operator!=(const FieldAccessor& a, const char* b) TIGHTDB_NOEXCEPT
-    {
-        return std::strcmp(a.get(), b) != 0;
-    }
-
-    friend bool operator==(const char* a, const FieldAccessor& b) TIGHTDB_NOEXCEPT
-    {
-        return std::strcmp(a, b.get()) == 0;
-    }
-
-    friend bool operator!=(const char* a, const FieldAccessor& b) TIGHTDB_NOEXCEPT
-    {
-        return std::strcmp(a, b.get()) != 0;
-    }
+    const char* c_str() const TIGHTDB_NOEXCEPT { return data(); }
 
 
     explicit FieldAccessor(typename Base::Init i) TIGHTDB_NOEXCEPT: Base(i) {}
@@ -469,34 +454,36 @@ public:
 
     void set(const BinaryData& value) const
     {
-        Base::m_table->get_impl()->set_binary(col_idx, Base::m_row_idx, value.pointer, value.len);
+        Base::m_table->get_impl()->set_binary(col_idx, Base::m_row_idx, value);
     }
 
     operator BinaryData() const { return get(); } // FIXME: Should be modified so it never throws
     const FieldAccessor& operator=(const BinaryData& value) const { set(value); return *this; }
 
+/*
     friend bool operator==(const FieldAccessor& a, const BinaryData& b) // FIXME: Should be modified so it never throws
     {
-        return a.get().compare_payload(b);
+        return a.get() == b;
     }
 
     friend bool operator!=(const FieldAccessor& a, const BinaryData& b) // FIXME: Should be modified so it never throws
     {
-        return !a.get().compare_payload(b);
+        return a.get() != b;
     }
 
     friend bool operator==(const BinaryData& a, const FieldAccessor& b) // FIXME: Should be modified so it never throws
     {
-        return a.compare_payload(b.get());
+        return a == b.get();
     }
 
     friend bool operator!=(const BinaryData& a, const FieldAccessor& b) // FIXME: Should be modified so it never throws
     {
-        return !a.compare_payload(b.get());
+        return a != b.get();
     }
+*/
 
-    const char* get_pointer() const { return get().pointer; } // FIXME: Should be modified so it never throws
-    std::size_t get_len() const { return get().len; } // FIXME: Should be modified so it never throws
+    const char* data() const { return get().data(); } // FIXME: Should be modified so it never throws
+    std::size_t size() const { return get().size(); } // FIXME: Should be modified so it never throws
 
 
     explicit FieldAccessor(typename Base::Init i) TIGHTDB_NOEXCEPT: Base(i) {}
@@ -633,13 +620,13 @@ public:
 
     bool get_bool() const { return get().get_bool(); } // FIXME: Should be modified so it never throws
 
-    std::time_t get_date() const { return get().get_date(); } // FIXME: Should be modified so it never throws
+    Date get_date() const { return get().get_date(); } // FIXME: Should be modified so it never throws
 
     float get_float() const { return get().get_float(); } // FIXME: Should be modified so it never throws
 
     double get_double() const { return get().get_double(); } // FIXME: Should be modified so it never throws
 
-    const char* get_string() const { return get().get_string(); } // FIXME: Should be modified so it never throws
+    StringData get_string() const { return get().get_string(); } // FIXME: Should be modified so it never throws
 
     BinaryData get_binary() const { return get().get_binary(); } // FIXME: Should be modified so it never throws
 
@@ -1063,12 +1050,12 @@ private:
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
 
-    std::size_t find_first(std::time_t value) const
+    std::size_t find_first(Date value) const
     {
         return Base::m_table->get_impl()->find_first_date(col_idx, value);
     }
 
-    BasicTableView<typename Base::RealTable> find_all(std::time_t value) const
+    BasicTableView<typename Base::RealTable> find_all(Date value) const
     {
         return Base::m_table->get_impl()->find_all_date(col_idx, value);
     }
@@ -1077,25 +1064,25 @@ public:
 
 /// Column accessor specialization for strings.
 template<class Taboid, int col_idx>
-class ColumnAccessor<Taboid, col_idx, const char*>:
-    public ColumnAccessorBase<Taboid, col_idx, const char*> {
+class ColumnAccessor<Taboid, col_idx, StringData>:
+    public ColumnAccessorBase<Taboid, col_idx, StringData> {
 private:
-    typedef ColumnAccessorBase<Taboid, col_idx, const char*> Base;
+    typedef ColumnAccessorBase<Taboid, col_idx, StringData> Base;
 
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
 
-    size_t count(const char* target) const
+    size_t count(StringData value) const
     {
-        return Base::m_table->get_impl()->count_string(col_idx, target);
+        return Base::m_table->get_impl()->count_string(col_idx, value);
     }
 
-    std::size_t find_first(const char* value) const
+    std::size_t find_first(StringData value) const
     {
         return Base::m_table->get_impl()->find_first_string(col_idx, value);
     }
 
-    BasicTableView<typename Base::RealTable> find_all(const char* value) const
+    BasicTableView<typename Base::RealTable> find_all(StringData value) const
     {
         return Base::m_table->get_impl()->find_all_string(col_idx, value);
     }
@@ -1119,12 +1106,12 @@ public:
 
     std::size_t find_first(const BinaryData &value) const
     {
-        return Base::m_table->get_impl()->find_first_binary(col_idx, value.pointer, value.len);
+        return Base::m_table->get_impl()->find_first_binary(col_idx, value.data(), value.size());
     }
 
     BasicTableView<typename Base::RealTable> find_all(const BinaryData &value) const
     {
-        return Base::m_table->get_impl()->find_all_date(col_idx, value.pointer, value.len);
+        return Base::m_table->get_impl()->find_all_binary(col_idx, value.data(), value.size());
     }
 };
 
@@ -1431,56 +1418,56 @@ private:
 public:
     explicit QueryColumn(Query* q) TIGHTDB_NOEXCEPT: Base(q) {}
 
-    Query& equal(std::time_t value) const
+    Query& equal(Date value) const
     {
         Base::m_query->m_impl.equal_date(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& not_equal(std::time_t value) const
+    Query& not_equal(Date value) const
     {
         Base::m_query->m_impl.not_equal_date(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& greater(std::time_t value) const
+    Query& greater(Date value) const
     {
         Base::m_query->m_impl.greater_date(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& greater_equal(std::time_t value) const
+    Query& greater_equal(Date value) const
     {
         Base::m_query->m_impl.greater_equal_date(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& less(std::time_t value) const
+    Query& less(Date value) const
     {
         Base::m_query->m_impl.less_date(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& less_equal(std::time_t value) const
+    Query& less_equal(Date value) const
     {
         Base::m_query->m_impl.less_equal_date(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& between(std::time_t from, std::time_t to) const
+    Query& between(Date from, Date to) const
     {
         Base::m_query->m_impl.between_date(col_idx, from, to);
         return *Base::m_query;
     };
 
-    std::time_t maximum(const Taboid& tab, std::size_t* resultcount=NULL, std::size_t start=0,
-                        std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    Date maximum(const Taboid& tab, std::size_t* resultcount=NULL, std::size_t start=0,
+                 std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
         return Base::m_query->m_impl.maximum_date(tab, col_idx, resultcount, start, end, limit);
     }
 
-    std::time_t minimum(const Taboid& tab, std::size_t* resultcount=NULL, std::size_t start=0,
-                        std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    Date minimum(const Taboid& tab, std::size_t* resultcount=NULL, std::size_t start=0,
+                 std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
         return Base::m_query->m_impl.minimum_date(tab, col_idx, resultcount, start, end, limit);
     }
@@ -1489,40 +1476,40 @@ public:
 
 /// QueryColumn specialization for strings.
 template<class Taboid, int col_idx>
-class QueryColumn<Taboid, col_idx, const char*>:
-    public QueryColumnBase<Taboid, col_idx, const char*> {
+class QueryColumn<Taboid, col_idx, StringData>:
+    public QueryColumnBase<Taboid, col_idx, StringData> {
 private:
-    typedef QueryColumnBase<Taboid, col_idx, const char*> Base;
+    typedef QueryColumnBase<Taboid, col_idx, StringData> Base;
     typedef typename Taboid::Query Query;
 
 public:
     explicit QueryColumn(Query* q) TIGHTDB_NOEXCEPT: Base(q) {}
 
-    Query& equal(const char* value, bool case_sensitive=true) const
+    Query& equal(StringData value, bool case_sensitive=true) const
     {
         Base::m_query->m_impl.equal(col_idx, value, case_sensitive);
         return *Base::m_query;
     }
 
-    Query& not_equal(const char* value, bool case_sensitive=true) const
+    Query& not_equal(StringData value, bool case_sensitive=true) const
     {
         Base::m_query->m_impl.not_equal(col_idx, value, case_sensitive);
         return *Base::m_query;
     }
 
-    Query& begins_with(const char* value, bool case_sensitive=true) const
+    Query& begins_with(StringData value, bool case_sensitive=true) const
     {
         Base::m_query->m_impl.begins_with(col_idx, value, case_sensitive);
         return *Base::m_query;
     }
 
-    Query& ends_with(const char* value, bool case_sensitive=true) const
+    Query& ends_with(StringData value, bool case_sensitive=true) const
     {
         Base::m_query->m_impl.ends_with(col_idx, value, case_sensitive);
         return *Base::m_query;
     }
 
-    Query& contains(const char* value, bool case_sensitive=true) const
+    Query& contains(StringData value, bool case_sensitive=true) const
     {
         Base::m_query->m_impl.contains(col_idx, value, case_sensitive);
         return *Base::m_query;
@@ -1541,34 +1528,33 @@ private:
 public:
     explicit QueryColumn(Query* q) TIGHTDB_NOEXCEPT: Base(q) {}
 
-    Query& equal(const BinaryData& value) const
+    Query& equal(BinaryData value) const
     {
-        Base::m_query->m_impl.equal_binary(col_idx, value.pointer, value.len);
+        Base::m_query->m_impl.equal(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& not_equal(const BinaryData& value, bool case_sensitive=true) const
+    Query& not_equal(BinaryData value) const
     {
-        Base::m_query->m_impl.not_equal_binary(col_idx, value.pointer, value.len, case_sensitive);
+        Base::m_query->m_impl.not_equal(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& begins_with(const BinaryData& value, bool case_sensitive=true) const
+    Query& begins_with(BinaryData value) const
     {
-        Base::m_query->m_impl.begins_with_binary(col_idx, value.pointer, value.len,
-                                                 case_sensitive);
+        Base::m_query->m_impl.begins_with(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& ends_with(const BinaryData& value, bool case_sensitive=true) const
+    Query& ends_with(BinaryData value) const
     {
-        Base::m_query->m_impl.ends_with_binary(col_idx, value.pointer, value.len, case_sensitive);
+        Base::m_query->m_impl.ends_with(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& contains(const BinaryData& value, bool case_sensitive=true) const
+    Query& contains(BinaryData value) const
     {
-        Base::m_query->m_impl.contains_binary(col_idx, value.pointer, value.len, case_sensitive);
+        Base::m_query->m_impl.contains(col_idx, value);
         return *Base::m_query;
     }
 };

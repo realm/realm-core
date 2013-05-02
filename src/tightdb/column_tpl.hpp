@@ -124,7 +124,7 @@ template<typename T, class C> void ColumnBase::TreeSet(size_t ndx, T value)
 
         // Set item
         C target = GetColumnFromRef<C>(refs, node_ndx);
-        target.Set(local_ndx, value);
+        target.set(local_ndx, value);
     }
     else {
         static_cast<C*>(this)->LeafSet(ndx, value);
@@ -141,21 +141,21 @@ template<typename T, class C> void ColumnBase::TreeInsert(size_t ndx, T value)
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
-            Column newNode(coldef_InnerNode, m_array->GetAllocator());
+            Column newNode(Array::coldef_InnerNode, m_array->GetAllocator());
             newNode.NodeAdd<C>(nc.ref1);
             newNode.NodeAdd<C>(GetRef());
             static_cast<C*>(this)->UpdateRef(newNode.GetRef());
             return;
         }
         case NodeChange::insert_after: {
-            Column newNode(coldef_InnerNode, m_array->GetAllocator());
+            Column newNode(Array::coldef_InnerNode, m_array->GetAllocator());
             newNode.NodeAdd<C>(GetRef());
             newNode.NodeAdd<C>(nc.ref1);
             static_cast<C*>(this)->UpdateRef(newNode.GetRef());
             return;
         }
         case NodeChange::split: {
-            Column newNode(coldef_InnerNode, m_array->GetAllocator());
+            Column newNode(Array::coldef_InnerNode, m_array->GetAllocator());
             newNode.NodeAdd<C>(nc.ref1);
             newNode.NodeAdd<C>(nc.ref2);
             static_cast<C*>(this)->UpdateRef(newNode.GetRef());
@@ -203,7 +203,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         }
 
         // Else create new node
-        Column newNode(coldef_InnerNode, m_array->GetAllocator());
+        Column newNode(Array::coldef_InnerNode, m_array->GetAllocator());
         if (nc.type == NodeChange::split) {
             // update offset for left node
             const size_t newsize = target.Size();

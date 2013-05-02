@@ -252,7 +252,8 @@ size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXC
     if (!a.IsNode())
         return a.size();
     Array offsets(a.GetAsRef(0), 0, 0, alloc);
-    return offsets.is_empty() ? 0 : size_t(offsets.back());
+    TIGHTDB_ASSERT(!offsets.is_empty());
+    return size_t(offsets.back());
 }
 
 bool ColumnBase::is_node_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT
@@ -264,17 +265,17 @@ bool ColumnBase::is_node_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 
 Column::Column(Allocator& alloc): m_index(0)
 {
-    m_array = new Array(coldef_Normal, 0, 0, alloc);
+    m_array = new Array(Array::coldef_Normal, 0, 0, alloc);
     Create();
 }
 
-Column::Column(ColumnDef type, Allocator& alloc): m_index(0)
+Column::Column(Array::ColumnDef type, Allocator& alloc): m_index(0)
 {
     m_array = new Array(type, 0, 0, alloc);
     Create();
 }
 
-Column::Column(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(0)
+Column::Column(Array::ColumnDef type, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(0)
 {
     m_array = new Array(type, parent, pndx, alloc);
     Create();
@@ -296,8 +297,8 @@ void Column::Create()
 {
     // Add subcolumns for nodes
     if (IsNode()) {
-        const Array offsets(coldef_Normal, 0, 0, m_array->GetAllocator());
-        const Array refs(coldef_HasRefs, 0, 0, m_array->GetAllocator());
+        const Array offsets(Array::coldef_Normal, 0, 0, m_array->GetAllocator());
+        const Array refs(Array::coldef_HasRefs, 0, 0, m_array->GetAllocator());
         m_array->add(offsets.GetRef());
         m_array->add(refs.GetRef());
     }
@@ -353,7 +354,7 @@ void Column::UpdateParentNdx(int diff)
 // Used by column b-tree code to ensure all leaf having same type
 void Column::SetHasRefs()
 {
-    m_array->SetType(coldef_HasRefs);
+    m_array->SetType(Array::coldef_HasRefs);
 }
 
 /*
@@ -378,12 +379,12 @@ void Column::Clear()
 {
     m_array->Clear();
     if (m_array->IsNode())
-        m_array->SetType(coldef_Normal);
+        m_array->SetType(Array::coldef_Normal);
 }
 
-void Column::Set(size_t ndx, int64_t value)
+void Column::set(size_t ndx, int64_t value)
 {
-    const int64_t oldVal = m_index ? Get(ndx) : 0; // cache oldval for index
+    const int64_t oldVal = m_index ? get(ndx) : 0; // cache oldval for index
 
     TreeSet<int64_t, Column>(ndx, value);
 
@@ -393,10 +394,10 @@ void Column::Set(size_t ndx, int64_t value)
 
 void Column::add(int64_t value)
 {
-    Insert(Size(), value);
+    insert(Size(), value);
 }
 
-void Column::Insert(size_t ndx, int64_t value)
+void Column::insert(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx <= Size());
 
@@ -479,7 +480,7 @@ void Column::sort(size_t start, size_t end)
         // Todo, this is a bit slow. Add bulk insert or the like to Column
         const size_t count = sorted->size();
         for (size_t t = 0; t < count; ++t) {
-            Set(t, sorted->Get(t));
+            set(t, sorted->Get(t));
         }
 
         sorted->Destroy();
@@ -548,7 +549,7 @@ void ColumnBase::NodeUpdateOffsets(size_t ndx)
     Array refs = NodeGetRefs();
     TIGHTDB_ASSERT(ndx < offsets.size());
 
-    const int64_t newSize = GetRefSize((size_t)refs.Get(ndx));
+    const int64_t newSize = GetRefSize(refs.GetAsRef(ndx));
     const int64_t oldSize = offsets.Get(ndx) - (ndx ? offsets.Get(ndx-1) : 0);
     const int64_t diff = newSize - oldSize;
 
@@ -573,11 +574,11 @@ void ColumnBase::NodeAddKey(size_t ref)
     refs.add(ref);
 }
 
-void Column::Delete(size_t ndx)
+void Column::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < Size());
 
-    const int64_t oldVal = m_index ? Get(ndx) : 0; // cache oldval for index
+    const int64_t oldVal = m_index ? get(ndx) : 0; // cache oldval for index
 
     TreeDelete<int64_t, Column>(ndx);
 
@@ -595,7 +596,7 @@ void Column::Delete(size_t ndx)
     // Update index
     if (m_index) {
         const bool isLast = (ndx == Size());
-        m_index->Delete(ndx, oldVal, isLast);
+        m_index->erase(ndx, oldVal, isLast);
     }
 }
 
@@ -670,9 +671,9 @@ void Column::find_all_hamming(Array& result, uint64_t value, size_t maxdist, siz
         const size_t count = refs.size();
 
         for (size_t i = 0; i < count; ++i) {
-            const Column col((size_t)refs.Get(i));
+            const Column col(refs.GetAsRef(i));
             col.find_all_hamming(result, value, maxdist, offset);
-            offset += (size_t)offsets.Get(i);
+            offset += offsets.GetAsSizeT(i);
         }
     }
 }
@@ -694,7 +695,7 @@ size_t Column::find_pos(int64_t target) const TIGHTDB_NOEXCEPT
     // Finds position of largest value SMALLER than the target
     while (high - low > 1) {
         const size_t probe = (unsigned(low) + unsigned(high)) >> 1;
-        const int64_t v = Get(probe);
+        const int64_t v = get(probe);
 
         if (v > target) high = int(probe);
         else            low  = int(probe);
@@ -720,7 +721,7 @@ size_t Column::find_pos2(int64_t target) const
     // Finds position of closest value BIGGER OR EQUAL to the target
     while (high - low > 1) {
         const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
-        const int64_t v = Get(probe);
+        const int64_t v = get(probe);
 
         if (v < target) low  = int(probe);
         else            high = int(probe);
@@ -769,7 +770,7 @@ bool Column::compare(const Column& c) const
     const size_t n = Size();
     if (c.Size() != n) return false;
     for (size_t i=0; i<n; ++i) {
-        if (Get(i) != c.Get(i)) return false;
+        if (get(i) != c.get(i)) return false;
     }
     return true;
 }
@@ -829,34 +830,34 @@ void Column::Verify() const
     else m_array->Verify();
 }
 
-void ColumnBase::ToDot(std::ostream& out, const char* title) const
+void ColumnBase::ToDot(ostream& out, StringData title) const
 {
     const size_t ref = GetRef();
 
-    out << "subgraph cluster_column" << ref << " {" << std::endl;
+    out << "subgraph cluster_column" << ref << " {" << endl;
     out << " label = \"Column";
-    if (title) out << "\\n'" << title << "'";
-    out << "\";" << std::endl;
+    if (0 < title.size()) out << "\\n'" << title << "'";
+    out << "\";" << endl;
 
     ArrayToDot(out, *m_array);
 
-    out << "}" << std::endl;
+    out << "}" << endl;
 }
 
-void ColumnBase::ArrayToDot(std::ostream& out, const Array& array) const
+void ColumnBase::ArrayToDot(ostream& out, const Array& array) const
 {
     if (array.IsNode()) {
         const Array offsets = array.GetSubArray(0);
         const Array refs    = array.GetSubArray(1);
         const size_t ref    = array.GetRef();
 
-        out << "subgraph cluster_node" << ref << " {" << std::endl;
-        out << " label = \"Node\";" << std::endl;
+        out << "subgraph cluster_node" << ref << " {" << endl;
+        out << " label = \"Node\";" << endl;
 
         array.ToDot(out);
         offsets.ToDot(out, "offsets");
 
-        out << "}" << std::endl;
+        out << "}" << endl;
 
         refs.ToDot(out, "refs");
 
@@ -869,7 +870,7 @@ void ColumnBase::ArrayToDot(std::ostream& out, const Array& array) const
     else LeafToDot(out, array);
 }
 
-void ColumnBase::LeafToDot(std::ostream& out, const Array& array) const
+void ColumnBase::LeafToDot(ostream& out, const Array& array) const
 {
     array.ToDot(out);
 }
