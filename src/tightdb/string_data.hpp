@@ -21,7 +21,6 @@
 #define TIGHTDB_STRING_HPP
 
 #include <cstddef>
-#include <cstring>
 #include <algorithm>
 #include <string>
 #include <ostream>
@@ -112,7 +111,7 @@ template<class T, class A> inline StringData::operator std::basic_string<char, T
 }
 
 inline StringData::StringData(const char* c_str) TIGHTDB_NOEXCEPT:
-    m_data(c_str), m_size(std::strlen(c_str)) {}
+    m_data(c_str), m_size(std::char_traits<char>::length(c_str)) {}
 
 inline bool operator==(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
 {

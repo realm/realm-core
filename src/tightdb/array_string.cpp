@@ -43,7 +43,8 @@ void ArrayString::set(size_t ndx, StringData value)
 
     // Make room for the new value plus a zero-termination
     if (m_width <= value.size()) {
-        if (value.size() == 0 && m_width == 0) return;
+        if (value.size() == 0 && m_width == 0)
+            return;
 
         TIGHTDB_ASSERT(0 < value.size());
 
@@ -62,14 +63,20 @@ void ArrayString::set(size_t ndx, StringData value)
         if (0 < m_width) {
             const char* old_end = base + m_len*m_width;
             while (new_end != base) {
-                *--new_end = char(*--old_end + (new_width-m_width));
+// FIXME: The following line is temporarily commented out, but will
+// soon be reinstated. See https://github.com/Tightdb/tightdb/pull/84
+//                *--new_end = char(*--old_end + (new_width-m_width));
                 {
                     char* new_begin = new_end - (new_width-m_width);
-                    fill(new_begin, new_end, 0); // Extend padding with zero bytes
+                    fill(new_begin, new_end, 0); // Extend zero padding
                     new_end = new_begin;
                 }
                 {
-                    const char* old_begin = old_end - (m_width-1);
+// FIXME: The following line is a temporary fix, and will soon be
+// replaced by the commented line that follows it. See
+// https://github.com/Tightdb/tightdb/pull/84
+                    const char* old_begin = old_end - m_width;
+//                    const char* old_begin = old_end - (m_width-1);
                     new_end = copy_backward(old_begin, old_end, new_end);
                     old_end = old_begin;
                 }
@@ -77,9 +84,15 @@ void ArrayString::set(size_t ndx, StringData value)
         }
         else {
             while (new_end != base) {
-                *--new_end = char(new_width-1);
+// FIXME: The following line is temporarily commented out, but will
+// soon be reinstated. See https://github.com/Tightdb/tightdb/pull/84
+//                *--new_end = char(new_width-1);
                 {
-                    char* new_begin = new_end - (new_width-1);
+// FIXME: The following line is a temporary fix, and will soon be
+// replaced by the commented line that follows it. See
+// https://github.com/Tightdb/tightdb/pull/84
+                    char* new_begin = new_end - new_width;
+//                    char* new_begin = new_end - (new_width-1);
                     fill(new_begin, new_end, 0); // Fill with zero bytes
                     new_end = new_begin;
                 }
@@ -93,13 +106,20 @@ void ArrayString::set(size_t ndx, StringData value)
 
     // Set the value
     char* begin = m_data + (ndx * m_width);
-    char* end   = begin + (m_width-1);
+// FIXME: The following line is a temporary fix, and will soon be
+// replaced by the commented line that follows it. See
+// https://github.com/Tightdb/tightdb/pull/84
+    char* end   = begin + m_width;
+//    char* end   = begin + (m_width-1);
     begin = copy(value.data(), value.data()+value.size(), begin);
     fill(begin, end, 0); // Pad with zero bytes
-    TIGHTDB_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
-    TIGHTDB_ASSERT(end - begin < max_width);
-    int pad_size = int(end - begin);
-    *end = char(pad_size);
+// FIXME: The following four lines are temporarily commented out, but
+// will soon be reinstated. See
+// https://github.com/Tightdb/tightdb/pull/84
+//    TIGHTDB_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
+//    TIGHTDB_ASSERT(end - begin < max_width);
+//    int pad_size = int(end - begin);
+//    *end = char(pad_size);
 }
 
 
@@ -129,14 +149,20 @@ void ArrayString::insert(size_t ndx, StringData value)
                 if (0 < m_width) {
                     // Expand the old values
                     do {
-                        *--new_end = char(*--old_end + (new_width-m_width));
+// FIXME: The following line is temporarily commented out, but will
+// soon be reinstated. See https://github.com/Tightdb/tightdb/pull/84
+//                        *--new_end = char(*--old_end + (new_width-m_width));
                         {
                             char* new_begin2 = new_end - (new_width-m_width);
-                            fill(new_begin2, new_end, 0); // Extend padding with zero bytes
+                            fill(new_begin2, new_end, 0); // Extend zero padding
                             new_end = new_begin2;
                         }
                         {
-                            const char* old_begin = old_end - (m_width-1);
+// FIXME: The following line is a temporary fix, and will soon be
+// replaced by the commented line that follows it. See
+// https://github.com/Tightdb/tightdb/pull/84
+                            const char* old_begin = old_end - m_width;
+//                            const char* old_begin = old_end - (m_width-1);
                             new_end = copy_backward(old_begin, old_end, new_end);
                             old_end = old_begin;
                         }
@@ -145,9 +171,15 @@ void ArrayString::insert(size_t ndx, StringData value)
                 }
                 else {
                     do {
-                        *--new_end = char(new_width-1);
+// FIXME: The following line is temporarily commented out, but will
+// soon be reinstated. See https://github.com/Tightdb/tightdb/pull/84
+//                        *--new_end = char(new_width-1);
                         {
-                            char* new_begin2 = new_end - (new_width-1);
+// FIXME: The following line is a temporary fix, and will soon be
+// replaced by the commented line that follows it. See
+// https://github.com/Tightdb/tightdb/pull/84
+                            char* new_begin2 = new_end - new_width;
+//                            char* new_begin2 = new_end - (new_width-1);
                             fill(new_begin2, new_end, 0); // Fill with zero bytes
                             new_end = new_begin2;
                         }
@@ -167,12 +199,17 @@ void ArrayString::insert(size_t ndx, StringData value)
         {
             char* new_begin = new_end - new_width;
             char* pad_begin = copy(value.data(), value.data()+value.size(), new_begin);
-            --new_end;
+// FIXME: The following line is temporarily commented out, but will
+// soon be reinstated. See https://github.com/Tightdb/tightdb/pull/84
+//            --new_end;
             fill(pad_begin, new_end, 0); // Pad with zero bytes
-            TIGHTDB_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
-            TIGHTDB_ASSERT(new_end - pad_begin < max_width);
-            int pad_size = int(new_end - pad_begin);
-            *new_end = char(pad_size);
+// FIXME: The following four lines are temporarily commented out, but
+// will soon be reinstated. See
+// https://github.com/Tightdb/tightdb/pull/84
+//            TIGHTDB_STATIC_ASSERT(max_width <= 128, "Padding size must fit in 7-bits");
+//            TIGHTDB_ASSERT(new_end - pad_begin < max_width);
+//            int pad_size = int(new_end - pad_begin);
+//            *new_end = char(pad_size);
             new_end = new_begin;
         }
 
@@ -180,14 +217,20 @@ void ArrayString::insert(size_t ndx, StringData value)
         if (TIGHTDB_UNLIKELY(m_width < new_width)) {
             if (0 < m_width) {
                 while (new_end != base) {
-                    *--new_end = char(*--old_end + (new_width-m_width));
+// FIXME: The following line is temporarily commented out, but will
+// soon be reinstated. See https://github.com/Tightdb/tightdb/pull/84
+//                    *--new_end = char(*--old_end + (new_width-m_width));
                     {
                         char* new_begin = new_end - (new_width-m_width);
-                        fill(new_begin, new_end, 0); // Extend padding with zero bytes
+                        fill(new_begin, new_end, 0); // Extend zero padding
                         new_end = new_begin;
                     }
                     {
-                        const char* old_begin = old_end - (m_width-1);
+// FIXME: The following line is a temporary fix, and will soon be
+// replaced by the commented line that follows it. See
+// https://github.com/Tightdb/tightdb/pull/84
+                        const char* old_begin = old_end - m_width;
+//                        const char* old_begin = old_end - (m_width-1);
                         new_end = copy_backward(old_begin, old_end, new_end);
                         old_end = old_begin;
                     }
@@ -195,9 +238,15 @@ void ArrayString::insert(size_t ndx, StringData value)
             }
             else {
                 while (new_end != base) {
-                    *--new_end = char(new_width-1);
+// FIXME: The following line is temporarily commented out, but will
+// soon be reinstated. See https://github.com/Tightdb/tightdb/pull/84
+//                    *--new_end = char(new_width-1);
                     {
-                        char* new_begin = new_end - (new_width-1);
+// FIXME: The following line is a temporary fix, and will soon be
+// replaced by the commented line that follows it. See
+// https://github.com/Tightdb/tightdb/pull/84
+                        char* new_begin = new_end - new_width;
+//                        char* new_begin = new_end - (new_width-1);
                         fill(new_begin, new_end, 0); // Fill with zero bytes
                         new_end = new_begin;
                     }
@@ -233,7 +282,8 @@ void ArrayString::erase(size_t ndx)
 
 size_t ArrayString::CalcByteLen(size_t count, size_t width) const
 {
-    // FIXME: This arithemtic could overflow. Consider using <tightdb/overflow.hpp>
+    // FIXME: This arithemtic could overflow. Consider using one of
+    // the functions in <tightdb/safe_int_ops.hpp>
     return 8 + (count * width);
 }
 
@@ -262,20 +312,49 @@ size_t ArrayString::count(StringData value, size_t begin, size_t end) const
 
 size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
 {
-    if (end == size_t(-1)) end = m_len;
+    if (end == size_t(-1))
+        end = m_len;
     TIGHTDB_ASSERT(begin <= m_len && end <= m_len && begin <= end);
 
+    if (m_width == 0)
+        return value.size() == 0 && begin < end ? begin : size_t(-1);
+
     // A string can never be wider than the column width
-    if (m_width <= value.size()) return size_t(-1);
+    if (m_width <= value.size())
+        return size_t(-1);
 
-    if (m_width == 0) {
-        return value.size() == 0 && begin < end ? begin : -1;
+    if (value.size() == 0) {
+// FIXME: The following four lines are a temporary fix, and will soon
+// be replaced by the commented block that follows them. See
+// https://github.com/Tightdb/tightdb/pull/84
+        const char* data = m_data;
+        for (size_t i = begin; i != end; ++i) {
+            if (TIGHTDB_UNLIKELY(data[i * m_width] == 0)) return i;
+        }
+//        const char* data = m_data + (m_width-1);
+//        for (size_t i = begin; i != end; ++i) {
+//            size_t size = (m_width-1) - data[i * m_width];
+//            if (TIGHTDB_UNLIKELY(size == 0)) return i;
+//        }
     }
-
-    for (size_t i=begin; i<end; ++i) {
-        const char* data = m_data + (i * m_width);
-        std::size_t size = (m_width-1) - data[m_width-1];
-        if (StringData(data, size) == value) return i;
+    else {
+        for (size_t i = begin; i != end; ++i) {
+            const char* data = m_data + (i * m_width);
+            size_t j = 0;
+            for (;;) {
+                if (TIGHTDB_LIKELY(data[j] != value[j])) break;
+                ++j;
+                if (TIGHTDB_UNLIKELY(j == value.size())) {
+// FIXME: The following line is a temporary fix, and will soon be
+// replaced by the commented block that follows it. See
+// https://github.com/Tightdb/tightdb/pull/84
+                    if (TIGHTDB_LIKELY(data[j] == 0)) return i;
+//                    size_t size = (m_width-1) - data[m_width-1];
+//                    if (TIGHTDB_LIKELY(size == value.size())) return i;
+                    break;
+                }
+            }
+        }
     }
 
     return size_t(-1); // not found
@@ -354,7 +433,7 @@ void ArrayString::ToDot(ostream& out, StringData title) const
 {
     const size_t ref = GetRef();
 
-    if (0 < title.size()) {
+    if (title.size() > 0) {
         out << "subgraph cluster_" << ref << " {" << endl;
         out << " label = \"" << title << "\";" << endl;
         out << " color = white;" << endl;
@@ -372,7 +451,8 @@ void ArrayString::ToDot(ostream& out, StringData title) const
     }
 
     out << "</TR></TABLE>>];" << endl;
-    if (0 < title.size()) out << "}" << endl;
+    if (title.size() > 0)
+        out << "}" << endl;
 }
 
 #endif // TIGHTDB_DEBUG

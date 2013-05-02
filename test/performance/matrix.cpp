@@ -6,13 +6,13 @@
 
 #include <tightdb.hpp>
 
-#include "performance/timer.hpp"
+#include "timer.hpp"
 
 //#define ONLY_CN_TESTS
-const size_t row_count = 250112; // should be dividable with 128
+const size_t row_count = 250112; // should be divisible by 128
 const size_t rounds = 1000;
 
-//const size_t row_count = 128*10; // should be dividable with 128
+//const size_t row_count = 128*10; // should be divisible by 128
 //const size_t rounds = 1;
 
 using namespace std;

@@ -37,7 +37,7 @@ int main() {
 
     // @@Example: accessing_rows @@
     // Getting values
-    const char* name = table[3].name;  // => 'Anni'
+    StringData name  = table[3].name;  // => 'Anni'
     int age          = table[3].age;   // => 54
     bool hired       = table[3].hired; // => true
 
@@ -94,8 +94,8 @@ int main() {
     // Execute the query and return a table (view)
     MyTable::View res = q.find_all();
     for (size_t i = 0; i < res.size(); ++i) {
-        const char* name = res[i].name;
-        const int age    = res[i].age;
+        StringData name = res[i].name;
+        int        age  = res[i].age;
 
         cout << i << ": " << name << " is " << age << " years old." << endl;
     }
@@ -125,11 +125,10 @@ int main() {
         cout << i << ": " << diskTable[i].name << endl;
 
     // Write same group to memory buffer
-    size_t len;
-    const char* const buffer = group.write_to_mem(len);
+    BinaryData buffer = group.write_to_mem(size);
 
     // Load a group from memory (and print contents)
-    Group fromMem(buffer, len);
+    Group fromMem(buffer);
     MyTable::Ref memTable = fromMem.get_table<MyTable>("employees");
     for (size_t i = 0; i < memTable->size(); i++)
         cout << i << ": " << memTable[i].name << endl;

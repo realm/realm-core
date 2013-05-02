@@ -65,7 +65,7 @@ TEST(Group_Invalid2)
     const size_t size = strlen(str);
     char* const data = new char[strlen(str)];
     copy(str, str+size, data);
-    CHECK_THROW(Group(Group::BufferSpec(data, size)), InvalidDatabase);
+    CHECK_THROW(Group(BinaryData(data, size)), InvalidDatabase);
     delete[] data;
 }
 
@@ -253,7 +253,7 @@ TEST(Group_Serialize_Mem)
 #endif // TIGHTDB_DEBUG
 
     // Serialize to memory (we now own the buffer)
-    const Group::BufferSpec buffer = toMem.write_to_mem();
+    BinaryData buffer = toMem.write_to_mem();
 
     // Load the table
     Group fromMem(buffer);
@@ -278,7 +278,7 @@ TEST(Group_Close)
     table->add("",  2, true, Wed);
 
     // Serialize to memory (we now own the buffer)
-    const Group::BufferSpec buffer = toMem->write_to_mem();
+    BinaryData buffer = toMem->write_to_mem();
 
     Group *fromMem = new Group(buffer);
     delete toMem;
@@ -306,7 +306,7 @@ TEST(Group_Serialize_Optimized)
 #endif // TIGHTDB_DEBUG
 
     // Serialize to memory (we now own the buffer)
-    const Group::BufferSpec buffer = toMem.write_to_mem();
+    BinaryData buffer = toMem.write_to_mem();
 
     // Load the table
     Group fromMem(buffer);
@@ -353,7 +353,7 @@ TEST(Group_Serialize_All)
     table->insert_done();
 
     // Serialize to memory (we now own the buffer)
-    const Group::BufferSpec buffer = toMem.write_to_mem();
+    BinaryData buffer = toMem.write_to_mem();
 
     // Load the table
     Group fromMem(buffer);
@@ -880,7 +880,7 @@ TEST(Group_Index_String)
     CHECK_EQUAL(2, c1);
 
     // Serialize to memory (we now own the buffer)
-    const Group::BufferSpec buffer = toMem.write_to_mem();
+    BinaryData buffer = toMem.write_to_mem();
 
     // Load the table
     Group fromMem(buffer);

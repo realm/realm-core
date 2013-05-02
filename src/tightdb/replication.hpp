@@ -29,6 +29,7 @@
 
 #include <tightdb/meta.hpp>
 #include <tightdb/tuple.hpp>
+#include <tightdb/unique_ptr.hpp>
 #include <tightdb/file.hpp>
 #include <tightdb/mixed.hpp>
 
@@ -319,6 +320,12 @@ private:
         const T& operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
         Buffer() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
         void set_size(std::size_t);
+        friend void swap(Buffer&a, Buffer&b)
+        {
+            using std::swap;
+            swap(a.m_data, b.m_data);
+            swap(a.m_size, b.m_size);
+        }
     };
     Buffer<std::size_t> m_subtab_path_buf;
 

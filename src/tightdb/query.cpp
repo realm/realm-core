@@ -713,7 +713,7 @@ TableView Query::find_all_multi(size_t start, size_t end)
     TableView tv(*m_table);
 
     // Sort search results because user expects ascending order
-    std::sort (ts.chunks.begin(), ts.chunks.end(), &Query::comp);
+    sort(ts.chunks.begin(), ts.chunks.end(), &Query::comp);
     for (size_t i = 0; i < ts.chunks.size(); ++i) {
         const size_t from = ts.chunks[i].first;
         const size_t upto = (i == ts.chunks.size() - 1) ? size_t(-1) : ts.chunks[i + 1].first;
@@ -759,8 +759,8 @@ void* Query::query_thread(void* arg)
     static_cast<void>(arg);
     thread_state* ts = static_cast<thread_state*>(arg);
 
-    std::vector<size_t> res;
-    std::vector<std::pair<size_t, size_t> > chunks;
+    vector<size_t> res;
+    vector<pair<size_t, size_t> > chunks;
 
     for (;;) {
         // Main waiting loop that waits for a query to start
@@ -794,7 +794,7 @@ void* Query::query_thread(void* arg)
             pthread_mutex_lock(&ts->result_mutex);
             ts->done_job += chunk;
             if (res.size() > 0) {
-                ts->chunks.push_back(std::pair<size_t, size_t>(mine, ts->results.size()));
+                ts->chunks.push_back(pair<size_t, size_t>(mine, ts->results.size()));
                 ts->count += res.size();
                 for (size_t i = 0; i < res.size(); i++) {
                     ts->results.push_back(res[i]);
@@ -816,7 +816,7 @@ void* Query::query_thread(void* arg)
 
 
 #ifdef TIGHTDB_DEBUG
-std::string Query::Verify()
+string Query::Verify()
 {
     if (first.size() == 0)
         return "";
@@ -836,7 +836,7 @@ void Query::Init(const Table& table) const
     if (first[0] != NULL) {
         ParentNode* const top = (ParentNode*)first[0];
         top->Init(table);
-        std::vector<ParentNode*>v;
+        vector<ParentNode*>v;
         top->gather_children(v);
     }
 }
@@ -872,7 +872,7 @@ void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
     update[update.size()-1] = newnode;
 }
 
-bool Query::comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b)
+bool Query::comp(const pair<size_t, size_t>& a, const pair<size_t, size_t>& b)
 {
     return a.first < b.first;
 }

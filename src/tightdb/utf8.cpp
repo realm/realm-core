@@ -252,4 +252,5 @@ size_t search_case_fold(StringData haystack, const char* needle_upper, const cha
     return haystack.size(); // Not found
 }
 
+
 } // namespace tightdb

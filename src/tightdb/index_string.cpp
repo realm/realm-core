@@ -1,6 +1,8 @@
-#include <tightdb/index_string.hpp>
 #include <cstdio>
 
+#include <tightdb/index_string.hpp>
+
+using namespace std;
 using namespace tightdb;
 
 namespace {
@@ -644,31 +646,31 @@ void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
     results.Destroy(); // clean-up
 }
 
-void StringIndex::to_dot(std::ostream& out) const
+void StringIndex::to_dot(ostream& out) const
 {
-    out << "digraph G {" << std::endl;
+    out << "digraph G {" << endl;
 
     ToDot(out);
 
-    out << "}" << std::endl;
+    out << "}" << endl;
 }
 
 
-void StringIndex::ToDot(std::ostream& out, StringData title) const
+void StringIndex::ToDot(ostream& out, StringData title) const
 {
     const size_t ref = GetRef();
 
-    out << "subgraph cluster_stringindex" << ref << " {" << std::endl;
+    out << "subgraph cluster_stringindex" << ref << " {" << endl;
     out << " label = \"StringIndex";
     if (0 < title.size()) out << "\\n'" << title << "'";
-    out << "\";" << std::endl;
+    out << "\";" << endl;
 
     ArrayToDot(out, *m_array);
 
-    out << "}" << std::endl;
+    out << "}" << endl;
 }
 
-void StringIndex::ArrayToDot(std::ostream& out, const Array& array) const
+void StringIndex::ArrayToDot(ostream& out, const Array& array) const
 {
     if (array.HasRefs()) {
         const Array offsets = array.GetSubArray(0);
@@ -676,18 +678,18 @@ void StringIndex::ArrayToDot(std::ostream& out, const Array& array) const
         const size_t ref    = array.GetRef();
 
         if (array.IsNode()) {
-            out << "subgraph cluster_stringindex_node" << ref << " {" << std::endl;
-            out << " label = \"Node\";" << std::endl;
+            out << "subgraph cluster_stringindex_node" << ref << " {" << endl;
+            out << " label = \"Node\";" << endl;
         }
         else {
-            out << "subgraph cluster_stringindex_leaf" << ref << " {" << std::endl;
-            out << " label = \"Leaf\";" << std::endl;
+            out << "subgraph cluster_stringindex_leaf" << ref << " {" << endl;
+            out << " label = \"Leaf\";" << endl;
         }
 
         array.ToDot(out);
         KeysToDot(out, offsets, "keys");
 
-        out << "}" << std::endl;
+        out << "}" << endl;
 
         refs.ToDot(out, "refs");
 
@@ -705,25 +707,25 @@ void StringIndex::ArrayToDot(std::ostream& out, const Array& array) const
     }
 }
 
-void StringIndex::KeysToDot(std::ostream& out, const Array& array, StringData title) const
+void StringIndex::KeysToDot(ostream& out, const Array& array, StringData title) const
 {
     const size_t ref = array.GetRef();
 
     if (0 < title.size()) {
-        out << "subgraph cluster_" << ref << " {" << std::endl;
-        out << " label = \"" << title << "\";" << std::endl;
-        out << " color = white;" << std::endl;
+        out << "subgraph cluster_" << ref << " {" << endl;
+        out << " label = \"" << title << "\";" << endl;
+        out << " color = white;" << endl;
     }
 
-    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
+    out << "n" << hex << ref << dec << "[shape=none,label=<";
+    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << endl;
 
     // Header
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
-    out << "0x" << std::hex << ref << std::dec << "<BR/>";
+    out << "0x" << hex << ref << dec << "<BR/>";
     if (array.IsNode()) out << "IsNode<BR/>";
     if (array.HasRefs()) out << "HasRefs<BR/>";
-    out << "</FONT></TD>" << std::endl;
+    out << "</FONT></TD>" << endl;
 
     // Values
     const size_t count = array.size();
@@ -737,13 +739,13 @@ void StringIndex::KeysToDot(std::ostream& out, const Array& array, StringData ti
         str[0] = char((v >> 24) & 0xFF);
         const char* s = str;
 
-        out << "<TD>" << s << "</TD>" << std::endl;
+        out << "<TD>" << s << "</TD>" << endl;
     }
 
-    out << "</TR></TABLE>>];" << std::endl;
-    if (0 < title.size()) out << "}" << std::endl;
+    out << "</TR></TABLE>>];" << endl;
+    if (0 < title.size()) out << "}" << endl;
 
-    out << std::endl;
+    out << endl;
 }
 
 

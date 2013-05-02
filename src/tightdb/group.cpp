@@ -355,7 +355,7 @@ void Group::write(const string& path) const
     write_to_stream(out);
 }
 
-Group::BufferSpec Group::write_to_mem() const
+BinaryData Group::write_to_mem() const
 {
     TIGHTDB_ASSERT(m_top.IsValid());
 
@@ -366,7 +366,7 @@ Group::BufferSpec Group::write_to_mem() const
     const size_t size = write_to_stream(out);
 
     char* const data = out.release_buffer();
-    return BufferSpec(data, size);
+    return BinaryData(data, size);
 }
 
 // NOTE: This method must not modify *this if m_shared is false.
@@ -519,7 +519,7 @@ bool Group::operator==(const Group& g) const
     return true;
 }
 
-void Group::to_string(std::ostream& out) const
+void Group::to_string(ostream& out) const
 {
     const size_t count = size();
 
@@ -550,12 +550,12 @@ void Group::to_string(std::ostream& out) const
 
         out << i << "  ";
         out.width(name_width);
-        out.setf(std::ostream::left, std::ostream::adjustfield);
+        out.setf(ostream::left, ostream::adjustfield);
         out << name;
         out << "  ";
         out.width(rows_width);
-        out.unsetf(std::ostream::adjustfield);
-        out << row_count << std::endl;
+        out.unsetf(ostream::adjustfield);
+        out << row_count << endl;
     }
 }
 
@@ -659,7 +659,7 @@ void Group::print_free() const
     printf("\n");
 }
 
-void Group::to_dot(std::ostream& out) const
+void Group::to_dot(ostream& out) const
 {
     out << "digraph G {" << endl;
 
@@ -683,7 +683,7 @@ void Group::to_dot(std::ostream& out) const
 
 void Group::to_dot() const
 {
-    to_dot(std::cerr);
+    to_dot(cerr);
 }
 
 void Group::zero_free_space(size_t file_size, size_t readlock_version)

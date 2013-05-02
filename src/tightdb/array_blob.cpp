@@ -17,7 +17,8 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
     // Reallocate if needed
     size_t remove_size = end - begin;
     size_t add_size = size;
-    if (add_zero_term) ++add_size;
+    if (add_zero_term)
+        ++add_size;
     size_t new_size = m_len - remove_size + add_size;
     // also updates header
     Alloc(new_size, 1); // Throws
@@ -42,40 +43,41 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
 
     // Insert the data
     modify_begin = copy(data, data+size, modify_begin);
-    if (add_zero_term) *modify_begin = 0;
+    if (add_zero_term)
+        *modify_begin = 0;
 
     m_len = new_size;
 }
 
 #ifdef TIGHTDB_DEBUG
 
-void ArrayBlob::ToDot(std::ostream& out, const char* title) const
+void ArrayBlob::ToDot(ostream& out, const char* title) const
 {
     const size_t ref = GetRef();
 
     if (title) {
-        out << "subgraph cluster_" << ref << " {" << std::endl;
-        out << " label = \"" << title << "\";" << std::endl;
-        out << " color = white;" << std::endl;
+        out << "subgraph cluster_" << ref << " {" << endl;
+        out << " label = \"" << title << "\";" << endl;
+        out << " color = white;" << endl;
     }
 
-    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
+    out << "n" << hex << ref << dec << "[shape=none,label=<";
+    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << endl;
 
     // Header
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
-    out << "0x" << std::hex << ref << std::dec << "<BR/>";
-    out << "</FONT></TD>" << std::endl;
+    out << "0x" << hex << ref << dec << "<BR/>";
+    out << "</FONT></TD>" << endl;
 
     // Values
     out << "<TD>";
     out << size() << " bytes"; //TODO: write content
-    out << "</TD>" << std::endl;
+    out << "</TD>" << endl;
 
-    out << "</TR></TABLE>>];" << std::endl;
-    if (title) out << "}" << std::endl;
+    out << "</TR></TABLE>>];" << endl;
+    if (title) out << "}" << endl;
 
-    out << std::endl;
+    out << endl;
 }
 
 #endif // TIGHTDB_DEBUG

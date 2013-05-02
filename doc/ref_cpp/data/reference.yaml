@@ -17,12 +17,12 @@ DESCR     : &g_introduction_descr
             possibilities in an intuitive language and the ability to share your data
             across all supported languages and platforms.
 
-            The core of the framework is the classes {@link class_typed_table} and
+            The core of the framework are the classes {@link class_typed_table} and
             {@link class_dyn_table}. Both classes are a representation of the
-            fundamental concept <strong>Table</strong>. {@link class_typed_table}
+            fundamental <strong>Table</strong> concept. {@link class_typed_table}
             is used if you know the table structure a priori while {@link class_dyn_table}
-            provides the flexibility for situation where data model changes
-            dynamically.
+            provides the flexibility for situation where the data model changes
+            dynamically or is only known at runtime.
 
             Tables organize data in columns and rows and data is compacted for
             low memory usage. The interface to the data resembles the native
@@ -31,14 +31,18 @@ DESCR     : &g_introduction_descr
 
             It is possible to query data using the {@link class_typed_query} and
             {@link class_dyn_query} classes. Queries can be complex - involving
-            any columns and values. You can either apply aggregate functions to you
+            any columns and values. You can either apply aggregate functions to your
             resulting data set or use the data set in your application as a
             {@link class_dyn_tableview} or {@link class_typed_tableview} object.
 
             The {@link class_group} class lets you serialize tables to disk or memory. The
             TightDB data format is consistent across operating systems, hardware platforms,
             and programming languages. This implies that you can share data across applications
-            and environments.
+            and environments.For multi-threaded or multi-process applications, you can
+            use the {@link class_shared_group}.
+            
+            
+            
 IMPORT    : []
 
 CATEGORIES:                       # list global class-id in order of appearence

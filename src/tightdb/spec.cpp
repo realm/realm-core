@@ -251,7 +251,7 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const
     return pos;
 }
 
-size_t Spec::get_subspec_ref(std::size_t subspec_ndx) const
+size_t Spec::get_subspec_ref(size_t subspec_ndx) const
 {
     TIGHTDB_ASSERT(subspec_ndx < m_subSpecs.size());
 
@@ -319,7 +319,7 @@ DataType Spec::get_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
     return DataType(type);
 }
 
-void Spec::set_column_type(std::size_t column_ndx, ColumnType type)
+void Spec::set_column_type(size_t column_ndx, ColumnType type)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
 
@@ -433,7 +433,7 @@ void Spec::Verify() const
     TIGHTDB_ASSERT(column_count <= m_spec.size());
 }
 
-void Spec::to_dot(std::ostream& out, StringData) const
+void Spec::to_dot(ostream& out, StringData) const
 {
     const size_t ref = m_specSet.GetRef();
 
