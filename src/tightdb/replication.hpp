@@ -304,8 +304,9 @@ private:
     static char* encode_float(char* ptr, float value);
     static char* encode_double(char* ptr, double value);
 
-    // Make sure this is in agreement with the actual integer encoding scheme
-    static const int max_enc_bytes_per_int = (std::numeric_limits<int64_t>::digits+1+6)/7;
+    // Make sure this is in agreement with the actual integer encoding
+    // scheme (see encode_int()).
+    static const int max_enc_bytes_per_int = 10;
     static const int max_enc_bytes_per_double = sizeof (double);
     static const int max_enc_bytes_per_num = max_enc_bytes_per_int <
         max_enc_bytes_per_double ? max_enc_bytes_per_double : max_enc_bytes_per_int;
@@ -378,24 +379,79 @@ inline void Replication::transact_log_append(const char* data, std::size_t size)
 }
 
 
+// The integer encoding is platform independent. Also, it does not
+// depend on the type of the specified integer. Integers of any type
+// can be encoded as long as the specified buffer is large enough (see
+// below). The decoding does not have to use the same type. Decoding
+// will fail if, and only if the encoded value falls outside the range
+// of the requested destination type.
+//
+// The encoding uses one or more bytes. It never uses more than 8 bits
+// per byte. The last byte in the sequence is the first one that has
+// its 8th bit set to zero.
+//
+// Consider a particular non-negative value V. Let W be the number of
+// bits needed to encode V using the trivial binary encoding of
+// integers. The total number of bytes produced is then
+// ceil((W+1)/7). The first byte holds the 7 least significant bits of
+// V. The last byte holds at most 6 bits of V including the most
+// significant one. The value of the first bit of the last byte is
+// always 2**((N-1)*7) where N is the total number of bytes.
+//
+// A negative value W is encoded by setting a sign bit to one and then
+// encoding the positive value -(W+1) as described above. The
+// advantage of this representation is that it converts small negative
+// values to small positive values which require a small number of
+// bytes. This would not have been true for 2's complement
+// representation, for example. The sign bit is always stored as the
+// 7th bit of the last byte.
+//
+//               value bits    value + sign    max bytes
+//     --------------------------------------------------
+//     int8_t         7              8              2
+//     uint8_t        8              9              2
+//     int16_t       15             16              3
+//     uint16_t      16             17              3
+//     int32_t       31             32              5
+//     uint32_t      32             33              5
+//     int64_t       63             64             10
+//     uint64_t      64             65             10
+//
 template<class T> inline char* Replication::encode_int(char* ptr, T value)
 {
     TIGHTDB_STATIC_ASSERT(std::numeric_limits<T>::is_integer, "Integer required");
     bool negative = false;
     if (is_negative(value)) {
         negative = true;
+        // The following conversion is guaranteed by C++03 to never
+        // overflow (contrast this with "-value" which indeed could
+        // overflow).
         value = -(value + 1);
     }
-    // At this point 'value' is always a positive number, also, small
+    // At this point 'value' is always a positive number. Also, small
     // negative numbers have been converted to small positive numbers.
-    const int max_bytes = (std::numeric_limits<T>::digits+1+6)/7;
+    TIGHTDB_ASSERT(!is_negative(value));
+    // One sign bit plus number of value bits
+    const int num_bits = 1 + std::numeric_limits<T>::digits;
+    // Only the first 7 bits are available per byte. Had it not been
+    // for the fact that maximum guaranteed bit width of a char is 8,
+    // this value could have been increased to 15 (one less than the
+    // number of value bits in 'unsigned').
+    const int bits_per_byte = 7;
+    const int max_bytes = (num_bits + (bits_per_byte-1)) / bits_per_byte;
+    TIGHTDB_STATIC_ASSERT(max_bytes <= max_enc_bytes_per_int, "Bad max_enc_bytes_per_int");
+    // An explicit constant maximum number of iterations is specified
+    // in the hope that it will help the optimizer (to do loop
+    // unrolling, for example).
     for (int i=0; i<max_bytes; ++i) {
-        if (value >> 6 == 0) break;
-        *reinterpret_cast<unsigned char*>(ptr) = 0x80 | int(value & 0x7F);
+        if (value >> (bits_per_byte-1) == 0) break;
+        *reinterpret_cast<unsigned char*>(ptr) =
+            (1U<<bits_per_byte) | unsigned(value & ((1U<<bits_per_byte)-1));
         ++ptr;
-        value >>= 7;
+        value >>= bits_per_byte;
     }
-    *reinterpret_cast<unsigned char*>(ptr) = negative ? 0x40 | int(value) : value;
+    *reinterpret_cast<unsigned char*>(ptr) =
+        negative ? (1U<<(bits_per_byte-1)) | unsigned(value) : value;
     return ++ptr;
 }
 
@@ -412,7 +468,7 @@ inline char* Replication::encode_float(char* ptr, float value)
 
 inline char* Replication::encode_double(char* ptr, double value)
 {
-    TIGHTDB_STATIC_ASSERT(std::numeric_limits<float>::is_iec559 &&
+    TIGHTDB_STATIC_ASSERT(std::numeric_limits<double>::is_iec559 &&
                           sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
                           "Unsupported 'double' representation");
     const char* val_ptr = reinterpret_cast<char*>(&value);
