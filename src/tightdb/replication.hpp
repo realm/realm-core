@@ -398,11 +398,11 @@ inline void Replication::transact_log_append(const char* data, std::size_t size)
 // significant one. The value of the first bit of the last byte is
 // always 2**((N-1)*7) where N is the total number of bytes.
 //
-// A negative value W is encoded by setting a sign bit to one and then
-// encoding the positive value -(W+1) as described above. The
+// A negative value W is encoded by setting the sign bit to one and
+// then encoding the positive result of -(W+1) as described above. The
 // advantage of this representation is that it converts small negative
 // values to small positive values which require a small number of
-// bytes. This would not have been true for 2's complement
+// bytes. This would not have been true for 2's complements
 // representation, for example. The sign bit is always stored as the
 // 7th bit of the last byte.
 //
