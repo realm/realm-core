@@ -162,6 +162,11 @@ private:
 
     template<class T> T read_int();
 
+    void read_bytes(char* data, size_t size);
+
+    float read_float();
+    double read_double();
+
     void read_string(StringBuffer&);
 
     void add_subspec(Spec*);
@@ -241,26 +246,53 @@ template<class T> T Replication::TransactLogApplier::read_int()
 }
 
 
-void Replication::TransactLogApplier::read_string(StringBuffer& buf)
+inline void Replication::TransactLogApplier::read_bytes(char* data, size_t size)
 {
-    buf.clear();
-    size_t size = read_int<size_t>(); // Throws
-    buf.resize(size); // Throws
-    char* str_end = buf.data();
     for (;;) {
         const size_t avail = m_input_end - m_input_begin;
         if (size <= avail)
             break;
         const char* to = m_input_begin + avail;
-        copy(m_input_begin, to, str_end);
+        copy(m_input_begin, to, data);
         if (!fill_input_buffer())
             throw BadTransactLog();
-        str_end += avail;
+        data += avail;
         size -= avail;
     }
     const char* to = m_input_begin + size;
-    copy(m_input_begin, to, str_end);
+    copy(m_input_begin, to, data);
     m_input_begin = to;
+}
+
+
+float Replication::TransactLogApplier::read_float()
+{
+    TIGHTDB_STATIC_ASSERT(numeric_limits<float>::is_iec559 &&
+                          sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
+                          "Unsupported 'float' representation");
+    float value;
+    read_bytes(reinterpret_cast<char*>(&value), sizeof value); // Throws
+    return value;
+}
+
+
+double Replication::TransactLogApplier::read_double()
+{
+    TIGHTDB_STATIC_ASSERT(numeric_limits<double>::is_iec559 &&
+                          sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
+                          "Unsupported 'double' representation");
+    double value;
+    read_bytes(reinterpret_cast<char*>(&value), sizeof value); // Throws
+    return value;
+}
+
+
+void Replication::TransactLogApplier::read_string(StringBuffer& buf)
+{
+    buf.clear();
+    size_t size = read_int<size_t>(); // Throws
+    buf.resize(size); // Throws
+    read_bytes(buf.data(), size);
 }
 
 
@@ -317,6 +349,38 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
                     *m_log << "table->insert_bool("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
                 else
                     *m_log << "table->set_bool("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+            }
+#endif
+            return;
+        }
+        case type_Float: {
+            float value = read_float(); // Throws
+            if (insert)
+                m_table->insert_float(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            else
+                m_table->set_float(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+            if (m_log) {
+                if (insert)
+                    *m_log << "table->insert_float("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                else
+                    *m_log << "table->set_float("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+            }
+#endif
+            return;
+        }
+        case type_Double: {
+            double value = read_double(); // Throws
+            if (insert)
+                m_table->insert_double(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            else
+                m_table->set_double(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+            if (m_log) {
+                if (insert)
+                    *m_log << "table->insert_double("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                else
+                    *m_log << "table->set_double("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
             }
 #endif
             return;
