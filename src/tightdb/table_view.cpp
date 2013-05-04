@@ -2,6 +2,8 @@
 #include <tightdb/column.hpp>
 #include <tightdb/column_basic.hpp>
 
+using namespace std;
+
 namespace tightdb {
 
 // Searching
@@ -208,7 +210,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
     result.Destroy();
 }
 
-void TableViewBase::to_json(std::ostream& out)
+void TableViewBase::to_json(ostream& out)
 {
     // Represent table as list of objects
     out << "[";
@@ -224,10 +226,10 @@ void TableViewBase::to_json(std::ostream& out)
     out << "]";
 }
 
-void TableViewBase::to_string(std::ostream& out, size_t limit) const
+void TableViewBase::to_string(ostream& out, size_t limit) const
 {
     // Print header (will also calculate widths)
-    std::vector<size_t> widths;
+    vector<size_t> widths;
     m_table->to_string_header(out, widths);
 
     // Set limit=-1 to print all rows, otherwise only print to limit

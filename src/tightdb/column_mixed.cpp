@@ -1,5 +1,7 @@
 #include <tightdb/column_mixed.hpp>
 
+using namespace std;
+
 namespace tightdb {
 
 ColumnMixed::~ColumnMixed()
@@ -315,14 +317,14 @@ void ColumnMixed::Verify() const
     }
 }
 
-void ColumnMixed::ToDot(std::ostream& out, StringData title) const
+void ColumnMixed::ToDot(ostream& out, StringData title) const
 {
     const size_t ref = GetRef();
 
-    out << "subgraph cluster_columnmixed" << ref << " {" << std::endl;
+    out << "subgraph cluster_columnmixed" << ref << " {" << endl;
     out << " label = \"ColumnMixed";
     if (0 < title.size()) out << "\\n'" << title << "'";
-    out << "\";" << std::endl;
+    out << "\";" << endl;
 
     m_array->ToDot(out, "mixed_top");
 
@@ -342,7 +344,7 @@ void ColumnMixed::ToDot(std::ostream& out, StringData title) const
         m_data->ToDot(out, "data");
     }
 
-    out << "}" << std::endl;
+    out << "}" << endl;
 }
 
 #endif // TIGHTDB_DEBUG

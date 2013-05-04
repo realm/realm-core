@@ -848,34 +848,34 @@ void Column::Verify() const
     else m_array->Verify();
 }
 
-void ColumnBase::ToDot(std::ostream& out, StringData title) const
+void ColumnBase::ToDot(ostream& out, StringData title) const
 {
     const size_t ref = GetRef();
 
-    out << "subgraph cluster_column" << ref << " {" << std::endl;
+    out << "subgraph cluster_column" << ref << " {" << endl;
     out << " label = \"Column";
     if (0 < title.size()) out << "\\n'" << title << "'";
-    out << "\";" << std::endl;
+    out << "\";" << endl;
 
     ArrayToDot(out, *m_array);
 
-    out << "}" << std::endl;
+    out << "}" << endl;
 }
 
-void ColumnBase::ArrayToDot(std::ostream& out, const Array& array) const
+void ColumnBase::ArrayToDot(ostream& out, const Array& array) const
 {
     if (array.IsNode()) {
         const Array offsets = array.GetSubArray(0);
         const Array refs    = array.GetSubArray(1);
         const size_t ref    = array.GetRef();
 
-        out << "subgraph cluster_node" << ref << " {" << std::endl;
-        out << " label = \"Node\";" << std::endl;
+        out << "subgraph cluster_node" << ref << " {" << endl;
+        out << " label = \"Node\";" << endl;
 
         array.ToDot(out);
         offsets.ToDot(out, "offsets");
 
-        out << "}" << std::endl;
+        out << "}" << endl;
 
         refs.ToDot(out, "refs");
 
@@ -888,7 +888,7 @@ void ColumnBase::ArrayToDot(std::ostream& out, const Array& array) const
     else LeafToDot(out, array);
 }
 
-void ColumnBase::LeafToDot(std::ostream& out, const Array& array) const
+void ColumnBase::LeafToDot(ostream& out, const Array& array) const
 {
     array.ToDot(out);
 }
