@@ -8,7 +8,7 @@
 #include <tightdb/pthread_helpers.hpp>
 #include <tightdb/unique_ptr.hpp>
 #include <tightdb/table.hpp>
-#include <tightdb/group.hpp>
+#include <tightdb/group_shared.hpp>
 #include <tightdb/replication.hpp>
 
 using namespace std;
@@ -28,6 +28,25 @@ namespace tightdb {
 Replication::Replication(): m_selected_table(0), m_selected_spec(0)
 {
     m_subtab_path_buf.set_size(init_subtab_path_buf_size); // Throws
+}
+
+
+Group& Replication::get_group(SharedGroup& sg) TIGHTDB_NOEXCEPT
+{
+    return sg.m_group;
+}
+
+
+Replication::database_version_type
+Replication::get_current_version(SharedGroup& sg) TIGHTDB_NOEXCEPT
+{
+    return sg.get_current_version();
+}
+
+
+void Replication::commit_foreign_transact_log(SharedGroup& sg, database_version_type new_version)
+{
+    sg.low_level_commit(new_version);
 }
 
 

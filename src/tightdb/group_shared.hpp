@@ -95,6 +95,8 @@ public:
     /// Open this group in replication mode.
     void open(Replication::Provider&);
 
+    friend class Replication;
+
 #endif
 
     /// A SharedGroup may be created in the unattached state, and then
@@ -150,7 +152,7 @@ private:
     Group                 m_group;
     size_t                m_version;
     File                  m_file;
-    File::Map<SharedInfo> m_file_map;
+    File::Map<SharedInfo> m_file_map; // Never remapped
     File::Map<SharedInfo> m_reader_map;
     std::string           m_file_path;
 
@@ -178,6 +180,14 @@ private:
     ReadCount& ringbuf_get_last() TIGHTDB_NOEXCEPT;
     void       ringbuf_put(const ReadCount& v);
     void       ringbuf_expand();
+
+    // Must be called only by someone that has a lock on the write
+    // mutex.
+    std::size_t get_current_version() TIGHTDB_NOEXCEPT;
+
+    // Must be called only by someone that has a lock on the write
+    // mutex.
+    void low_level_commit(std::size_t new_version);
 
     friend class ReadTransaction;
     friend class WriteTransaction;

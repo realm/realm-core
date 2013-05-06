@@ -41,6 +41,7 @@ namespace tightdb {
 class Spec;
 class Table;
 class Group;
+class SharedGroup;
 
 
 // FIXME: Be careful about the possibility of one modification functions being called by another where both do transaction logging.
@@ -63,11 +64,11 @@ public:
         virtual Replication* new_instance() = 0;
     };
 
-    std::string get_database_path();
-
     // Be sure to keep this type aligned with what is actually used in
     // SharedGroup.
     typedef uint_fast32_t database_version_type;
+
+    std::string get_database_path();
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -80,7 +81,7 @@ public:
     ///
     /// \throw Interrupted If this call was interrupted by an
     /// asynchronous call to interrupt().
-    void begin_write_transact(Group&, database_version_type version);
+    void begin_write_transact(SharedGroup&);
 
     /// Commit the accumulated transaction log. The transaction log
     /// may not be committed if any of the functions that submit data
@@ -95,7 +96,7 @@ public:
     ///
     /// FIXME: In general the transaction will be considered complete
     /// even if this operation is interrupted. Is that ok?
-    database_version_type commit_write_transact();
+    database_version_type commit_write_transact(SharedGroup&);
 
     /// Called by a client to discard the accumulated transaction
     /// log. This function must be called if a write transaction was
@@ -103,7 +104,7 @@ public:
     /// data to the transaction log has failed or has been
     /// interrupted. It must also be called after a failed or
     /// interrupted call to commit_write_transact().
-    void rollback_write_transact() TIGHTDB_NOEXCEPT;
+    void rollback_write_transact(SharedGroup&) TIGHTDB_NOEXCEPT;
 
     /// Interrupt any blocking call to a function in this class. This
     /// function may be called asyncronously from any thread, but it
@@ -225,11 +226,11 @@ protected:
     /// is supposed to update `m_transact_log_free_begin` and
     /// `m_transact_log_free_end` such that they refer to a (possibly
     /// empty) chunk of free space.
-    virtual void do_begin_write_transact(Group&, database_version_type version) = 0;
+    virtual void do_begin_write_transact(SharedGroup&) = 0;
 
-    virtual database_version_type do_commit_write_transact() = 0;
+    virtual database_version_type do_commit_write_transact(SharedGroup&) = 0;
 
-    virtual void do_rollback_write_transact() TIGHTDB_NOEXCEPT = 0;
+    virtual void do_rollback_write_transact(SharedGroup&) TIGHTDB_NOEXCEPT = 0;
 
     virtual void do_interrupt() TIGHTDB_NOEXCEPT = 0;
 
@@ -253,6 +254,17 @@ protected:
     /// `m_transact_log_free_end` such that, upon return, they still
     /// refer to a (possibly empty) chunk of free space.
     virtual void do_transact_log_append(const char* data, std::size_t size) = 0;
+
+    /// Must be called only from do_begin_write_transact(),
+    /// do_commit_write_transact(), or do_rollback_write_transact().
+    static Group& get_group(SharedGroup&) TIGHTDB_NOEXCEPT;
+
+    /// Must be called only from do_begin_write_transact(),
+    /// do_commit_write_transact(), or do_rollback_write_transact().
+    static database_version_type get_current_version(SharedGroup&) TIGHTDB_NOEXCEPT;
+
+    /// Must be called only from do_begin_write_transact().
+    static void commit_foreign_transact_log(SharedGroup&, database_version_type new_version);
 
 private:
     struct TransactLogApplier;
@@ -324,21 +336,21 @@ inline std::string Replication::get_database_path()
 }
 
 
-inline void Replication::begin_write_transact(Group& group, database_version_type version)
+inline void Replication::begin_write_transact(SharedGroup& sg)
 {
-    do_begin_write_transact(group, version);
+    do_begin_write_transact(sg);
     m_selected_table = 0;
     m_selected_spec  = 0;
 }
 
-inline Replication::database_version_type Replication::commit_write_transact()
+inline Replication::database_version_type Replication::commit_write_transact(SharedGroup& sg)
 {
-    return do_commit_write_transact();
+    return do_commit_write_transact(sg);
 }
 
-inline void Replication::rollback_write_transact() TIGHTDB_NOEXCEPT
+inline void Replication::rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT
 {
-    do_rollback_write_transact();
+    do_rollback_write_transact(sg);
 }
 
 inline void Replication::interrupt() TIGHTDB_NOEXCEPT
