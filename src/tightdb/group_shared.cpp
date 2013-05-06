@@ -442,7 +442,7 @@ void SharedGroup::commit()
 }
 
 
-// FIXME: This method must wok correctly even if it is called after a
+// FIXME: This method must work correctly even if it is called after a
 // failed call to commit(). A failed call to commit() is any that
 // returns to the caller by throwing an exception. As it is right now,
 // rollback() does not handle all cases.

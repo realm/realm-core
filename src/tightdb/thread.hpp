@@ -169,6 +169,7 @@ inline void Thread::join()
     if (TIGHTDB_UNLIKELY(r != 0)) {
         join_failed(r); // Throws
     }
+    m_joinable = false;
 }
 
 template<class F> inline void* Thread::entry_point(void* cookie) TIGHTDB_NOEXCEPT
