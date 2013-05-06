@@ -52,7 +52,7 @@ TIGHTDB_NORETURN void Mutex::lock_failed(int err) TIGHTDB_NOEXCEPT
     else TIGHTDB_TERMINATE("pthread_mutex_lock() failed");
 }
 
-TIGHTDB_NORETURN void Condition::init_failed(int err)
+TIGHTDB_NORETURN void CondVar::init_failed(int err)
 {
     switch (err) {
         case ENOMEM: throw bad_alloc();
@@ -61,7 +61,7 @@ TIGHTDB_NORETURN void Condition::init_failed(int err)
     }
 }
 
-TIGHTDB_NORETURN void Condition::attr_init_failed(int err)
+TIGHTDB_NORETURN void CondVar::attr_init_failed(int err)
 {
     switch (err) {
         case ENOMEM: throw bad_alloc();
@@ -69,8 +69,8 @@ TIGHTDB_NORETURN void Condition::attr_init_failed(int err)
     }
 }
 
-TIGHTDB_NORETURN void Condition::destroy_failed(int err) TIGHTDB_NOEXCEPT
+TIGHTDB_NORETURN void CondVar::destroy_failed(int err) TIGHTDB_NOEXCEPT
 {
-    if (err == EBUSY) TIGHTDB_TERMINATE("Destruction of condition in use");
+    if (err == EBUSY) TIGHTDB_TERMINATE("Destruction of condition variable in use");
     else TIGHTDB_TERMINATE("pthread_cond_destroy() failed");
 }
