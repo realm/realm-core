@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include <tightdb/config.h>
+#include <tightdb/assert.hpp>
 
 
 namespace tightdb {
@@ -11,7 +12,7 @@ namespace tightdb {
 
 template<class T> class DefaultDelete {
 public:
-    void operator()(T* p) const { delete p; }
+    void operator()(T*) const;
 };
 
 
@@ -58,7 +59,7 @@ private:
 // Specialization for arrays
 template<class T> class DefaultDelete<T[]> {
 public:
-    void operator()(T* p) const { delete[] p; }
+    void operator()(T*) const;
 };
 
 // Specialization for arrays
@@ -88,7 +89,20 @@ template<class T, class D> void swap(UniquePtr<T,D>& p, UniquePtr<T,D>& q) TIGHT
 
 
 
+
 // Implementation:
+
+template<class T> inline void DefaultDelete<T>::operator()(T* p) const
+{
+    TIGHTDB_STATIC_ASSERT(0 < sizeof(T), "Can't delete via pointer to incomplete type");
+    delete p;
+}
+
+template<class T> inline void DefaultDelete<T[]>::operator()(T* p) const
+{
+    TIGHTDB_STATIC_ASSERT(0 < sizeof(T), "Can't delete via pointer to incomplete type");
+    delete[] p;
+}
 
 template<class T, class D> inline UniquePtr<T,D>::UniquePtr(T* p) TIGHTDB_NOEXCEPT: m_ptr(p) {}
 
