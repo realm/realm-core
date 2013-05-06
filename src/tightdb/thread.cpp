@@ -1,7 +1,7 @@
 #include <cerrno>
 
 #include <tightdb/exceptions.hpp>
-#include <tightdb/pthread_helpers.hpp>
+#include <tightdb/thread.hpp>
 
 using namespace std;
 using namespace tightdb;

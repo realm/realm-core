@@ -5,7 +5,7 @@
 #include <tightdb/terminate.hpp>
 #include <tightdb/safe_int_ops.hpp>
 #include <tightdb/string_buffer.hpp>
-#include <tightdb/pthread_helpers.hpp>
+#include <tightdb/thread.hpp>
 #include <tightdb/unique_ptr.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/group_shared.hpp>
