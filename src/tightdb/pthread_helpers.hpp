@@ -24,10 +24,32 @@
 
 #include <pthread.h>
 
+#include <tightdb/config.h>
 #include <tightdb/assert.hpp>
 #include <tightdb/terminate.hpp>
+#include <tightdb/unique_ptr.hpp>
 
 namespace tightdb {
+
+
+class Thread {
+public:
+    template<class F> explicit Thread(F func);
+    ~Thread();
+
+    bool joinable() TIGHTDB_NOEXCEPT;
+
+    void join();
+
+private:
+    pthread_t m_id;
+    bool m_joinable;
+
+    template<class> static void* entry_point(void*) TIGHTDB_NOEXCEPT;
+
+    TIGHTDB_NORETURN static void create_failed(int);
+    TIGHTDB_NORETURN static void join_failed(int);
+};
 
 
 class Mutex {
@@ -180,6 +202,59 @@ public:
 private:
     Condition* m_cond;
 };
+
+
+
+
+
+// Implementation:
+
+template<class F> inline Thread::Thread(F func): m_joinable(true)
+{
+    UniquePtr<F> func2(new F(func));
+    const pthread_attr_t* attr = 0; // Use default thread attributes
+    int r = pthread_create(&m_id, attr, &Thread::entry_point<F>, func2.get());
+    if (TIGHTDB_UNLIKELY(r != 0)) {
+        create_failed(r); // Throws
+    }
+    func2.release();
+}
+
+inline Thread::~Thread()
+{
+    if (m_joinable) {
+        std::terminate();
+    }
+}
+
+inline bool Thread::joinable() TIGHTDB_NOEXCEPT
+{
+    return m_joinable;
+}
+
+inline void Thread::join()
+{
+    if (!m_joinable) {
+        throw std::runtime_error("Thread is not joinable");
+    }
+    void** value_ptr = 0; // Ignore return value
+    int r = pthread_join(m_id, value_ptr);
+    if (TIGHTDB_UNLIKELY(r != 0)) {
+        join_failed(r); // Throws
+    }
+}
+
+template<class F> inline void* Thread::entry_point(void* cookie) TIGHTDB_NOEXCEPT
+{
+    UniquePtr<F> func(static_cast<F*>(cookie));
+    try {
+        (*func)();
+    }
+    catch (...) {
+        std::terminate();
+    }
+    return 0;
+}
 
 
 } // namespace tightdb
