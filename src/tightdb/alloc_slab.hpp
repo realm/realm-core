@@ -127,7 +127,7 @@ private:
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_replication() const TIGHTDB_NOEXCEPT { return m_replication; }
-    void set_replication(Replication* r) { m_replication = r; }
+    void set_replication(Replication* r) TIGHTDB_NOEXCEPT { m_replication = r; }
 #endif
 };
 

@@ -211,6 +211,8 @@ public:
     static void apply_transact_log(InputStream& transact_log, Group& target);
 #endif
 
+    virtual ~Replication() {}
+
 protected:
     // These two delimit a contiguous region of free space in a
     // transaction log buffer following the last written data. It may

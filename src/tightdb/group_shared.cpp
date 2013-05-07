@@ -220,6 +220,11 @@ SharedGroup::~SharedGroup()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = m_group.get_replication())
+        delete repl;
+#endif
+
     // If we can get an exclusive lock on the file we know that we are
     // the only user (since all users take at least shared locks on
     // the file.  So that means that we have to delete it when done

@@ -19,7 +19,7 @@ public:
 /// This class is a C++03 compatible replacement for
 /// <tt>std::unique_ptr</tt> (as it exists in C++11). It reproduces
 /// only a small subset of the features of
-/// <tt>std::unique_ptr</tt>. In particular, it neither provides copy
+/// <tt>std::unique_ptr</tt>. In particular, it neither provides copy,
 /// nor move semantics.
 template<class T, class D = DefaultDelete<T> > class UniquePtr {
 public:

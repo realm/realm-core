@@ -270,7 +270,7 @@ private:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     friend class Replication;
     Replication* get_replication() const TIGHTDB_NOEXCEPT { return m_alloc.get_replication(); }
-    void set_replication(Replication* r) { m_alloc.set_replication(r); }
+    void set_replication(Replication* r) TIGHTDB_NOEXCEPT { m_alloc.set_replication(r); }
 #endif
 };
 
