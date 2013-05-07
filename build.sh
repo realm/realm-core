@@ -6,8 +6,11 @@ TIGHTDB_HOME="$(pwd)"
 MODE="$1"
 [ $# -gt 0 ] && shift
 
-EXTENSIONS="java python objc node php c gui replication"
+EXTENSIONS="java python objc node php c gui"
 
+if [ "$TIGHTDB_ENABLE_REPLICATION" ]; then
+    EXTENSIONS="$EXTENSIONS replication"
+fi
 
 
 map_ext_name_to_dir()
