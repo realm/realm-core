@@ -25,7 +25,7 @@
 namespace tightdb {
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-struct Replication;
+class Replication;
 #endif
 
 struct MemRef {
