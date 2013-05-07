@@ -5,10 +5,9 @@
 #include <tightdb/terminate.hpp>
 #include <tightdb/safe_int_ops.hpp>
 #include <tightdb/string_buffer.hpp>
-#include <tightdb/pthread_helpers.hpp>
 #include <tightdb/unique_ptr.hpp>
 #include <tightdb/table.hpp>
-#include <tightdb/group.hpp>
+#include <tightdb/group_shared.hpp>
 #include <tightdb/replication.hpp>
 
 using namespace std;
@@ -16,23 +15,8 @@ using namespace tightdb;
 
 namespace {
 
-
-// Note: The sum of this value and sizeof(SharedState) must not
-// exceed the maximum values of any of the types 'size_t',
-// 'ptrdiff_t', or 'off_t'.
-#ifdef TIGHTDB_DEBUG
-const size_t initial_transact_log_buffer_size = 128;
-#else
-const size_t initial_transact_log_buffer_size = 16*1024;
-#endif
-
-const size_t init_subtab_path_buf_size = 2*8-1; // 8 table levels (soft limit)
-
-// SharedState size must fit in size_t, ptrdiff_t, and off_t
-typedef ArithBinOpType<ptrdiff_t, off_t>::type ptrdiff_off_type;
-typedef ArithBinOpType<ptrdiff_off_type, size_t>::type unsigned_max_type;
-const unsigned_max_type max_file_size = min<unsigned_max_type>(numeric_limits<ptrdiff_t>::max(),
-                                                               numeric_limits<off_t>::max());
+const size_t init_subtab_path_buf_levels = 2; // 2 table levels (soft limit)
+const size_t init_subtab_path_buf_size = 2*init_subtab_path_buf_levels - 1;
 
 } // anonymous namespace
 
@@ -40,599 +24,28 @@ const unsigned_max_type max_file_size = min<unsigned_max_type>(numeric_limits<pt
 namespace tightdb {
 
 
-struct Replication::SharedState {
-    int m_use_count;
-    Mutex m_mutex;
-    int m_want_write_transact;
-    bool m_write_transact_available, m_write_transact_finished;
-    Condition m_cond_want_write_transact, m_cond_write_transact_available,
-        m_cond_write_transact_finished, m_cond_transact_log_free, m_cond_persisted_db_version;
-
-    /// Valid when m_write_transact_available is true, and is the
-    /// version that the database will have after completion of the
-    /// 'write' transaction that is made available.
-    db_version_type m_write_transact_db_version;
-
-    /// The version of the database that has been made
-    /// persistent. After a commit, a client must wait for this
-    /// version to reach the value of m_write_transact_db_version as
-    /// it was at the time the transaction was initiated.
-    db_version_type m_persisted_db_version;
-
-    /// Size of the file. Invariant: 'm_size <= s' where 's' is the
-    /// actual size of the file. This obviously assumes that the file
-    /// is modified only through TightDB.
-    size_t m_size;
-
-    /// Index within file of the first byte of the first completed
-    /// transaction log.
-    size_t m_transact_log_used_begin;
-
-    /// Index within file of the byte that follows the last byte of
-    /// the last completed transaction log. m_transact_log_used_begin
-    /// == m_transact_log_used_end if there are no completed
-    /// transaction logs in the buffer.
-    size_t m_transact_log_used_end;
-
-    /// If m_transact_log_used_end < m_transact_log_used_begin, then
-    /// the used area in the transaction log buffer is wrapped. In
-    /// this case, the first section of the used area runs from
-    /// m_transact_log_used_begin and has size
-    /// (m_transact_log_used_wrap-m_transact_log_used_begin), and the
-    /// second section runs from sizeof(SharedState) and has size
-    /// (m_transact_log_used_end-sizeof(SharedState)).
-    size_t m_transact_log_used_wrap;
-
-    /// Index within file of the first byte of the last recently
-    /// completed transaction log. This value need only be valid while
-    /// m_write_transact_finished is true.
-    size_t m_transact_log_new_begin;
-
-    void init(size_t file_size)
-    {
-        m_want_write_transact = 0;
-        m_write_transact_available = false;
-        m_write_transact_finished  = false;
-        m_persisted_db_version = 0;
-        m_size = file_size;
-        m_transact_log_used_begin = sizeof(SharedState);
-        m_transact_log_used_end = m_transact_log_used_begin;
-
-        m_mutex.init_shared();
-        Mutex::DestroyGuard mdg(m_mutex);
-
-        m_cond_want_write_transact.init_shared();
-        Condition::DestroyGuard cdg1(m_cond_want_write_transact);
-
-        m_cond_write_transact_available.init_shared();
-        Condition::DestroyGuard cdg2(m_cond_write_transact_available);
-
-        m_cond_write_transact_finished.init_shared();
-        Condition::DestroyGuard cdg3(m_cond_write_transact_finished);
-
-        m_cond_transact_log_free.init_shared();
-        Condition::DestroyGuard cdg4(m_cond_transact_log_free);
-
-        m_cond_persisted_db_version.init_shared();
-
-        cdg4.release();
-        cdg3.release();
-        cdg2.release();
-        cdg1.release();
-        mdg.release();
-    }
-
-    void destroy() TIGHTDB_NOEXCEPT
-    {
-        m_cond_want_write_transact.destroy();
-        m_cond_write_transact_available.destroy();
-        m_cond_write_transact_finished.destroy();
-        m_cond_transact_log_free.destroy();
-        m_cond_persisted_db_version.destroy();
-        m_mutex.destroy();
-    }
-};
-
-
-void Replication::open(const string& file, bool map_transact_log_buf)
+Replication::Replication(): m_selected_table(0), m_selected_spec(0)
 {
-    string repl_file = file.empty() ? get_path_to_database_file() : file;
-    repl_file += ".repl"; // Throws
     m_subtab_path_buf.set_size(init_subtab_path_buf_size); // Throws
-    m_file.open(repl_file, File::access_ReadWrite, File::create_Auto, 0); // Throws
-    File::CloseGuard fcg(m_file);
-    {
-        File::ExclusiveLock efl(m_file); // Throws
-        // If empty, expand its size
-        size_t file_size;
-        if (int_cast_with_overflow_detect(m_file.get_size(), file_size))
-            throw runtime_error("File too large");
-        if (file_size == 0) {
-            file_size = sizeof(SharedState) + initial_transact_log_buffer_size;
-            m_file.resize(file_size); // Throws
-        }
-        const size_t map_size = map_transact_log_buf ? file_size : sizeof(SharedState);
-        m_file_map.map(m_file, File::access_ReadWrite, map_size); // Throws
-        SharedState* const shared_state = m_file_map.get_addr();
-        if (shared_state->m_use_count == 0) {
-            File::UnmapGuard fug(m_file_map);
-            shared_state->init(file_size); // Throws
-            fug.release();  // Do not unmap
-        }
-        ++shared_state->m_use_count;
-    }
-    fcg.release(); // Do not close
 }
 
 
-void Replication::remap_file(size_t size)
+Group& Replication::get_group(SharedGroup& sg) TIGHTDB_NOEXCEPT
 {
-    m_file_map.remap(m_file, File::access_ReadWrite, size); // Throws
+    return sg.m_group;
 }
 
 
-Replication::~Replication() TIGHTDB_NOEXCEPT
+Replication::database_version_type
+Replication::get_current_version(SharedGroup& sg) TIGHTDB_NOEXCEPT
 {
-    if (!is_attached()) return;
-
-    try {
-        File::ExclusiveLock efl(m_file);
-        SharedState* const shared_state = m_file_map.get_addr();
-        if (--shared_state->m_use_count == 0) {
-            shared_state->destroy();
-            m_file.resize(0);
-        }
-    }
-    catch (...) {} // Deliberately ignoring errors here
+    return sg.get_current_version();
 }
 
 
-void Replication::interrupt() TIGHTDB_NOEXCEPT
+void Replication::commit_foreign_transact_log(SharedGroup& sg, database_version_type new_version)
 {
-    SharedState* const shared_state = m_file_map.get_addr();
-    Mutex::Lock ml(shared_state->m_mutex);
-    m_interrupt = true;
-    shared_state->m_cond_want_write_transact.notify_all();
-    shared_state->m_cond_write_transact_available.notify_all();
-    shared_state->m_cond_write_transact_finished.notify_all();
-    shared_state->m_cond_transact_log_free.notify_all();
-    shared_state->m_cond_persisted_db_version.notify_all();
-}
-
-
-void Replication::begin_write_transact()
-{
-    size_t file_size, transact_log_used_begin, transact_log_used_end;
-    {
-        SharedState* const shared_state = m_file_map.get_addr();
-        Mutex::Lock ml(shared_state->m_mutex);
-        ++shared_state->m_want_write_transact;
-        shared_state->m_cond_want_write_transact.notify_all();
-        while (!shared_state->m_write_transact_available) {
-            if (m_interrupt) {
-                // FIXME: Retracting the request for a write transaction may create problems fo the local coordinator
-                --shared_state->m_want_write_transact;
-                throw Interrupted();
-            }
-            shared_state->m_cond_write_transact_available.wait(ml);
-        }
-        shared_state->m_write_transact_available = false;
-        --shared_state->m_want_write_transact;
-        file_size = shared_state->m_size;
-        transact_log_used_begin = shared_state->m_transact_log_used_begin;
-        transact_log_used_end   = shared_state->m_transact_log_used_end;
-        m_write_transact_db_version = shared_state->m_write_transact_db_version;
-    }
-    // At this point we know that the file size cannot change because
-    // this cleint is the only one who may change it.
-    TIGHTDB_ASSERT(m_file_map.get_size() <= file_size);
-    if (m_file_map.get_size() < file_size) {
-        try {
-            remap_file(file_size);
-        }
-        catch (...) {
-            rollback_write_transact();
-            throw;
-        }
-    }
-    char* const base = static_cast<char*>(static_cast<void*>(m_file_map.get_addr()));
-    m_transact_log_free_begin = base + transact_log_used_end;
-    if (transact_log_used_end < transact_log_used_begin) {
-        // Used area is wrapped. We subtract one from
-        // transact_log_used_begin to avoid using the last free byte
-        // so we can distinguish between full and empty buffer.
-        m_transact_log_free_end = base + transact_log_used_begin - 1;
-    }
-    else {
-        m_transact_log_free_end = base + m_file_map.get_size();
-    }
-    m_selected_table = 0;
-    m_selected_spec  = 0;
-}
-
-
-void Replication::commit_write_transact()
-{
-    SharedState* const shared_state = m_file_map.get_addr();
-    Mutex::Lock ml(shared_state->m_mutex);
-    shared_state->m_transact_log_new_begin = shared_state->m_transact_log_used_end;
-    shared_state->m_transact_log_used_end =
-        m_transact_log_free_begin - static_cast<char*>(static_cast<void*>(shared_state));
-    shared_state->m_write_transact_finished = true;
-    shared_state->m_cond_write_transact_finished.notify_all();
-
-    // Wait for the transaction log to be made persistent
-    while (shared_state->m_persisted_db_version < m_write_transact_db_version) {
-        if (m_interrupt) throw Interrupted();
-        shared_state->m_cond_persisted_db_version.wait(ml);
-    }
-}
-
-
-void Replication::rollback_write_transact() TIGHTDB_NOEXCEPT
-{
-    SharedState* const shared_state = m_file_map.get_addr();
-    Mutex::Lock ml(shared_state->m_mutex);
-    shared_state->m_transact_log_new_begin = shared_state->m_transact_log_used_end;
-    shared_state->m_write_transact_finished = true;
-    shared_state->m_cond_write_transact_finished.notify_all();
-}
-
-
-void Replication::clear_interrupt() TIGHTDB_NOEXCEPT
-{
-    SharedState* const shared_state = m_file_map.get_addr();
-    Mutex::Lock ml(shared_state->m_mutex);
-    m_interrupt = false;
-}
-
-
-bool Replication::wait_for_write_request() TIGHTDB_NOEXCEPT
-{
-    SharedState* const shared_state = m_file_map.get_addr();
-    Mutex::Lock ml(shared_state->m_mutex);
-    while (shared_state->m_want_write_transact == 0) {
-        if (m_interrupt) return false;
-        shared_state->m_cond_want_write_transact.wait(ml);
-    }
-    return true;
-}
-
-
-// FIXME: Consider what should happen if nobody remains interested in this write transaction
-bool Replication::grant_write_access_and_wait_for_completion(TransactLog& transact_log) TIGHTDB_NOEXCEPT
-{
-    SharedState* const shared_state = m_file_map.get_addr();
-    Mutex::Lock ml(shared_state->m_mutex);
-    shared_state->m_write_transact_db_version = transact_log.m_db_version;
-    shared_state->m_write_transact_available = true;
-    shared_state->m_cond_write_transact_available.notify_all();
-    while (!shared_state->m_write_transact_finished) {
-        if (m_interrupt)
-            return false;
-        shared_state->m_cond_write_transact_finished.wait(ml);
-    }
-    shared_state->m_write_transact_finished = false;
-    transact_log.m_offset1 = shared_state->m_transact_log_new_begin;
-    if (shared_state->m_transact_log_used_end < shared_state->m_transact_log_new_begin) {
-        transact_log.m_size1   = shared_state->m_transact_log_used_wrap - transact_log.m_offset1;
-        transact_log.m_offset2 = sizeof(SharedState);
-        transact_log.m_size2   = shared_state->m_transact_log_used_end - sizeof(SharedState);
-    }
-    else {
-        transact_log.m_size1   = shared_state->m_transact_log_used_end - transact_log.m_offset1;
-        transact_log.m_offset2 = transact_log.m_size2 = 0;
-    }
-    return true;
-}
-
-
-void Replication::map_transact_log(const TransactLog& transact_log,
-                                   const char** addr1, const char** addr2)
-{
-    const size_t mapped_size = m_file_map.get_size();
-    if (mapped_size < transact_log.m_offset1+transact_log.m_size1 ||
-        mapped_size < transact_log.m_offset2+transact_log.m_size2) {
-        size_t file_size;
-        {
-            SharedState* const shared_state = m_file_map.get_addr();
-            Mutex::Lock ml(shared_state->m_mutex);
-            file_size = shared_state->m_size;
-        }
-        remap_file(file_size); // Throws
-    }
-    SharedState* const shared_state = m_file_map.get_addr();
-    *addr1 = static_cast<char*>(static_cast<void*>(shared_state)) + transact_log.m_offset1;
-    *addr2 = static_cast<char*>(static_cast<void*>(shared_state)) + transact_log.m_offset2;
-}
-
-
-void Replication::update_persisted_db_version(db_version_type version) TIGHTDB_NOEXCEPT
-{
-    SharedState* const shared_state = m_file_map.get_addr();
-    Mutex::Lock ml(shared_state->m_mutex);
-    shared_state->m_persisted_db_version = version;
-    shared_state->m_cond_persisted_db_version.notify_all();
-}
-
-
-void Replication::transact_log_consumed(size_t size) TIGHTDB_NOEXCEPT
-{
-    SharedState* const shared_state = m_file_map.get_addr();
-    Mutex::Lock ml(shared_state->m_mutex);
-    if (shared_state->m_transact_log_used_end < shared_state->m_transact_log_used_begin) {
-        // Used area is wrapped
-        size_t contig = shared_state->m_transact_log_used_wrap -
-            shared_state->m_transact_log_used_begin;
-        if (contig < size) {
-            shared_state->m_transact_log_used_begin = sizeof(SharedState);
-            size -= contig;
-        }
-    }
-    shared_state->m_transact_log_used_begin += size;
-    shared_state->m_cond_transact_log_free.notify_all();
-}
-
-
-void Replication::transact_log_reserve_contig(size_t n)
-{
-    SharedState* const shared_state = m_file_map.get_addr();
-    const size_t used_end = m_transact_log_free_begin -
-        static_cast<char*>(static_cast<void*>(shared_state));
-    {
-        Mutex::Lock ml(shared_state->m_mutex);
-        for (;;) {
-            const size_t used_begin = shared_state->m_transact_log_used_begin;
-            if (used_begin <= used_end) {
-                // In this case the used area is not wrapped across
-                // the end of the buffer. This means that the free
-                // area extends all the way to the end of the buffer.
-                const size_t avail = shared_state->m_size - used_end;
-                if (n <= avail) {
-                    m_transact_log_free_end = m_transact_log_free_begin + avail;
-                    return;
-                }
-                // Check if there is there enough space if we wrap the
-                // used area at this point and continue at the
-                // beginning of the buffer. Note that we again require
-                // one unused byte.
-                const size_t avail2 = used_begin - sizeof(SharedState);
-                if (n < avail2) {
-                    shared_state->m_transact_log_used_wrap = used_end;
-                    m_transact_log_free_begin =
-                        static_cast<char*>(static_cast<void*>(shared_state)) +
-                        sizeof(SharedState);
-                    m_transact_log_free_end = m_transact_log_free_begin + avail2;
-                    return;
-                }
-            }
-            else {
-                // Note: We subtract 1 from the actual amount of free
-                // space. This means that whenver the used area is
-                // wrapped across the end of the buffer, then the last
-                // byte of free space is never used. This, in turn,
-                // ensures that whenever used_begin is equal to
-                // used_end, it means that the buffer is empty, not
-                // full.
-                const size_t avail = used_begin - used_end - 1;
-                if (n <= avail) {
-                    m_transact_log_free_end = m_transact_log_free_begin + avail;
-                    return;
-                }
-            }
-            // At this point we know that the transaction log buffer
-            // does not contain a contiguous unused regioun of size
-            // 'n' or more. If the buffer contains other transaction
-            // logs than the one we are currently creating, more space
-            // will eventually become available as those transaction
-            // logs gets transmitted to other clients. So in that case
-            // we will simply wait.
-            if (shared_state->m_transact_log_used_begin ==
-                shared_state->m_transact_log_used_end)
-                break;
-            if (m_interrupt)
-                throw Interrupted();
-            shared_state->m_cond_transact_log_free.wait(ml);
-        }
-    }
-    // At this point we know that we have to expand the file. We also
-    // know that thare are no readers of transaction logs, so we can
-    // safly rearrange the buffer and its contents.
-
-    // FIXME: In some cases it might be preferable to expand the
-    // buffer even when we could simply wait for transmission
-    // completion of complete logs. In that case we would have to wait
-    // until all logs had disappeared from the buffer, and then
-    // proceed to expand. But not if we are already at the maximum
-    // size. Ideally we would base this decision on runtime buffer
-    // utilization meassurments averaged over periods of time.
-
-    transact_log_expand(n, true); // Throws
-}
-
-
-void Replication::transact_log_append_overflow(const char* data, size_t size)
-{
-    // FIXME: During write access, it should be possible to use m_file_map.get_size() instead of SharedState::m_size.
-    bool need_expand = false;
-    {
-        SharedState* const shared_state = m_file_map.get_addr();
-        char* const base = static_cast<char*>(static_cast<void*>(shared_state));
-        const size_t used_end = m_transact_log_free_begin - base;
-        Mutex::Lock ml(shared_state->m_mutex);
-        for (;;) {
-            const size_t used_begin = shared_state->m_transact_log_used_begin;
-            if (used_begin <= used_end) {
-                // In this case the used area is not wrapped across
-                // the end of the buffer.
-                size_t avail = shared_state->m_size - used_end;
-                // Require one unused byte.
-                if (sizeof(SharedState) < used_begin)
-                    avail += used_begin - sizeof(SharedState) - 1; // FIXME: Use static const memeber
-                if (size <= avail) {
-                    m_transact_log_free_end = base + shared_state->m_size;
-                    break;
-                }
-            }
-            else {
-                // In this case the used area is wrapped. Note: We
-                // subtract 1 from the actual amount of free space to
-                // avoid using the last byte when the used area is
-                // wrapped.
-                const size_t avail = used_begin - used_end - 1;
-                if (size <= avail) {
-                    m_transact_log_free_end = base + (used_begin - 1);
-                    break;
-                }
-            }
-
-            if (shared_state->m_transact_log_used_begin == shared_state->m_transact_log_used_end) {
-                need_expand = true;
-                break;
-            }
-
-            if (m_interrupt) throw Interrupted();
-            shared_state->m_cond_transact_log_free.wait(ml);
-        }
-    }
-    if (need_expand) {
-        // We know at this point that no one else is trying to access
-        // the transaction log buffer.
-        transact_log_expand(size, false); // Throws
-    }
-    const size_t contig = m_transact_log_free_end - m_transact_log_free_begin;
-    if (contig < size) {
-        copy(data, data+contig, m_transact_log_free_begin);
-        data += contig;
-        size -= contig;
-        SharedState* const shared_state = m_file_map.get_addr();
-        char* const base = static_cast<char*>(static_cast<void*>(shared_state));
-        m_transact_log_free_begin = base + sizeof(SharedState);
-        {
-            Mutex::Lock ml(shared_state->m_mutex);
-            shared_state->m_transact_log_used_wrap = shared_state->m_size;
-            m_transact_log_free_end = base + (shared_state->m_transact_log_used_begin - 1);
-        }
-    }
-    m_transact_log_free_begin = copy(data, data + size, m_transact_log_free_begin);
-}
-
-
-void Replication::transact_log_expand(size_t free, bool contig)
-{
-    // This function proceeds in the following steps:
-    // 1) Determine the new larger buffer size
-    // 2) Expand the file
-    // 3) Remap the file into memory
-    // 4) Rearrange the buffer contents
-
-    // Since there are no transaction logs in the buffer except the
-    // one being created, nobody else is accessing the transaction log
-    // buffer information in SharedInfo, so we can access it without
-    // locking. We can also freely rearrange the contents of the
-    // buffer without locking.
-    SharedState* shared_state = m_file_map.get_addr();
-    const size_t buffer_begin = sizeof(SharedState);
-    const size_t used_begin = shared_state->m_transact_log_used_begin;
-    const size_t used_end = m_transact_log_free_begin -
-        static_cast<char*>(static_cast<void*>(shared_state));
-    const size_t used_wrap = shared_state->m_transact_log_used_wrap;
-    size_t min_size, new_size;
-    if (used_end < used_begin) {
-        // Used area is wrapped
-        const size_t used_upper = used_wrap - used_begin;
-        const size_t used_lower = used_end - buffer_begin;
-        if (used_lower < used_upper) {
-            // Move lower section
-            min_size = used_wrap;
-            if (int_add_with_overflow_detect(min_size, used_lower))
-                goto transact_log_too_big;
-            const size_t avail_lower = used_begin - buffer_begin;
-            if (avail_lower <= free) { // Require one unused byte
-                if (int_add_with_overflow_detect(min_size, free))
-                    goto transact_log_too_big;
-            }
-        }
-        else {
-            // Move upper section
-            min_size = used_end + 1 + used_upper; // Require one unused byte
-            if (int_add_with_overflow_detect(min_size, free))
-                goto transact_log_too_big;
-        }
-    }
-    else {
-        // Used area is not wrapped
-        if (contig || used_begin == buffer_begin) {
-            min_size = used_end;
-        }
-        else {
-            // Require one unused byte
-            min_size = buffer_begin + (used_end-used_begin) + 1;
-        }
-        if (int_add_with_overflow_detect(min_size, free))
-            goto transact_log_too_big;
-    }
-
-    new_size = shared_state->m_size;
-    if (int_multiply_with_overflow_detect(new_size, 2)) {
-        new_size = numeric_limits<size_t>::max();
-    }
-    if (new_size < min_size) new_size = min_size;
-
-    // Check that the new size fits in both ptrdiff_t and off_t (file size)
-    if (max_file_size < new_size) {
-        if (max_file_size < min_size) {
-          transact_log_too_big:
-            throw runtime_error("Transaction log too big");
-        }
-        new_size = max_file_size;
-    }
-
-    m_file.resize(new_size); // Throws
-    shared_state->m_size = new_size;
-
-    remap_file(new_size); // Throws
-    shared_state = m_file_map.get_addr();
-
-    // Rearrange the buffer contents
-    char* base = static_cast<char*>(static_cast<void*>(shared_state));
-    if (used_end < used_begin) {
-        // Used area is wrapped
-        const size_t used_upper = used_wrap - used_begin;
-        const size_t used_lower = used_end - buffer_begin;
-        if (used_lower < used_upper) {
-            // Move lower section
-            copy(base+buffer_begin, base+used_end, base+used_wrap);
-            if (shared_state->m_transact_log_used_end < used_begin)
-                shared_state->m_transact_log_used_end += used_wrap - buffer_begin;
-            if (contig && new_size - (used_wrap + used_lower) < free) {
-                shared_state->m_transact_log_used_wrap = used_wrap + used_lower;
-                m_transact_log_free_begin = base + buffer_begin;
-                m_transact_log_free_end   = base + used_begin - 1; // Require one unused byte
-            }
-            else {
-                m_transact_log_free_begin = base + (used_wrap + used_lower);
-                m_transact_log_free_end   = base + new_size;
-            }
-        }
-        else {
-            // Move upper section
-            copy_backward(base+used_begin, base+used_wrap, base+new_size);
-            shared_state->m_transact_log_used_begin = new_size - used_upper;
-            if (used_begin <= shared_state->m_transact_log_used_end)
-                shared_state->m_transact_log_used_end +=
-                    shared_state->m_transact_log_used_begin - used_begin;
-            shared_state->m_transact_log_used_wrap = new_size;
-            m_transact_log_free_begin = base + used_end;
-            // Require one unused byte
-            m_transact_log_free_end = base + (shared_state->m_transact_log_used_begin - 1);
-        }
-    }
-    else {
-        // Used area is not wrapped
-        m_transact_log_free_begin = base + used_end;
-        m_transact_log_free_end   = base + new_size;
-    }
+    sg.low_level_commit(new_version);
 }
 
 
@@ -767,6 +180,11 @@ private:
 
     template<class T> T read_int();
 
+    void read_bytes(char* data, size_t size);
+
+    float read_float();
+    double read_double();
+
     void read_string(StringBuffer&);
 
     void add_subspec(Spec*);
@@ -846,26 +264,53 @@ template<class T> T Replication::TransactLogApplier::read_int()
 }
 
 
-void Replication::TransactLogApplier::read_string(StringBuffer& buf)
+inline void Replication::TransactLogApplier::read_bytes(char* data, size_t size)
 {
-    buf.clear();
-    size_t size = read_int<size_t>(); // Throws
-    buf.resize(size); // Throws
-    char* str_end = buf.data();
     for (;;) {
         const size_t avail = m_input_end - m_input_begin;
         if (size <= avail)
             break;
         const char* to = m_input_begin + avail;
-        copy(m_input_begin, to, str_end);
+        copy(m_input_begin, to, data);
         if (!fill_input_buffer())
             throw BadTransactLog();
-        str_end += avail;
+        data += avail;
         size -= avail;
     }
     const char* to = m_input_begin + size;
-    copy(m_input_begin, to, str_end);
+    copy(m_input_begin, to, data);
     m_input_begin = to;
+}
+
+
+float Replication::TransactLogApplier::read_float()
+{
+    TIGHTDB_STATIC_ASSERT(numeric_limits<float>::is_iec559 &&
+                          sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
+                          "Unsupported 'float' representation");
+    float value;
+    read_bytes(reinterpret_cast<char*>(&value), sizeof value); // Throws
+    return value;
+}
+
+
+double Replication::TransactLogApplier::read_double()
+{
+    TIGHTDB_STATIC_ASSERT(numeric_limits<double>::is_iec559 &&
+                          sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
+                          "Unsupported 'double' representation");
+    double value;
+    read_bytes(reinterpret_cast<char*>(&value), sizeof value); // Throws
+    return value;
+}
+
+
+void Replication::TransactLogApplier::read_string(StringBuffer& buf)
+{
+    buf.clear();
+    size_t size = read_int<size_t>(); // Throws
+    buf.resize(size); // Throws
+    read_bytes(buf.data(), size);
 }
 
 
@@ -922,6 +367,38 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
                     *m_log << "table->insert_bool("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
                 else
                     *m_log << "table->set_bool("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+            }
+#endif
+            return;
+        }
+        case type_Float: {
+            float value = read_float(); // Throws
+            if (insert)
+                m_table->insert_float(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            else
+                m_table->set_float(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+            if (m_log) {
+                if (insert)
+                    *m_log << "table->insert_float("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                else
+                    *m_log << "table->set_float("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+            }
+#endif
+            return;
+        }
+        case type_Double: {
+            double value = read_double(); // Throws
+            if (insert)
+                m_table->insert_double(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            else
+                m_table->set_double(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+#ifdef TIGHTDB_DEBUG
+            if (m_log) {
+                if (insert)
+                    *m_log << "table->insert_double("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                else
+                    *m_log << "table->set_double("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
             }
 #endif
             return;
