@@ -110,7 +110,7 @@ retry:
         if (m_file.try_lock_exclusive()) {
             // There is a slight window between opening the file and getting the
             // lock where another process could have deleted the file
-            if (m_file.is_deleted()) {
+            if (m_file.is_removed()) {
                 goto retry;
             }
             // Get size
@@ -134,7 +134,7 @@ retry:
 
             // There is a slight window between opening the file and getting the
             // lock where another process could have deleted the file
-            if (len == 0 || m_file.is_deleted()) {
+            if (len == 0 || m_file.is_removed()) {
                 goto retry;
             }
         }

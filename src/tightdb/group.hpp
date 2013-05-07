@@ -89,9 +89,9 @@ public:
     ///
     /// \param file Filesystem path to a TightDB database file.
     ///
-    /// \throw File::OpenError If the file could not be opened. If the
-    /// reason corresponds to one of the exception types that are
-    /// derived from File::OpenError, the derived exception type is
+    /// \throw File::AccessError If the file could not be opened. If
+    /// the reason corresponds to one of the exception types that are
+    /// derived from File::AccessError, the derived exception type is
     /// thrown. Note that InvalidDatabase is among these derived
     /// exception types.
     void open(const std::string& file, OpenMode = mode_Normal);
@@ -152,9 +152,9 @@ public:
     ///
     /// \param file A filesystem path.
     ///
-    /// \throw File::OpenError If the file could not be opened. If the
-    /// reason corresponds to one of the exception types that are
-    /// derived from File::OpenError, the derived exception type is
+    /// \throw File::AccessError If the file could not be opened. If
+    /// the reason corresponds to one of the exception types that are
+    /// derived from File::AccessError, the derived exception type is
     /// thrown.
     void write(const std::string& file) const;
 
