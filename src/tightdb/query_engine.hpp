@@ -158,9 +158,6 @@ template<> struct ColumnTypeTraitsSum<float, act_Sum> {
     typedef double sum_type;
 };
 
-
-
-
 // Lets you access elements of an integer column in increasing order in a fast way where leafs are cached
 struct SequentialGetterBase { virtual ~SequentialGetterBase() {} };
 
@@ -182,6 +179,10 @@ public:
 
     SequentialGetter(ColType* column) : m_array((Array::no_prealloc_tag()))
     {
+        init(column);
+    }
+
+    void init (ColType* column) {
         m_column = column;
         m_leaf_end = 0;
     }
@@ -192,7 +193,6 @@ public:
         if (index >= m_leaf_end) {
             // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
             // leave m_array untouched. Else call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
-//            m_array_ptr = (ArrayType*) (((Column*)m_column)->GetBlock(index, m_array, m_leaf_start, true));
             m_array_ptr = (ArrayType*)m_column->GetBlock(index, m_array, m_leaf_start, true);
             const size_t leaf_size = m_array_ptr->size();
             m_leaf_end = m_leaf_start + leaf_size;
@@ -231,7 +231,6 @@ class ParentNode {
 public:
     ParentNode() : m_is_integer_node(false), m_table(NULL) {}
 
-    // Note: Changed to avoid a lot of copying of the vector. Lasse, plese review.
     void gather_children(std::vector<ParentNode*>& v)
     {
         m_children.clear();
@@ -833,6 +832,7 @@ public:
 
     void Init(const Table& table)
     {
+        m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
         m_leaf = NULL;
         m_dD = 100.0;
         m_probes = 0;
@@ -851,7 +851,7 @@ public:
 
         for (size_t s = start; s < end; ++s) {
             StringData t;
-#if 1
+
             if (m_column_type == col_type_StringEnum) {
                 // enum
                 t = static_cast<const ColumnStringEnum*>(m_condition_column)->get(s);
@@ -870,16 +870,6 @@ public:
                 
                 t = (m_long ? static_cast<ArrayStringLong*>(m_leaf)->get(s - m_leaf_start) : static_cast<ArrayString*>(m_leaf)->get(s - m_leaf_start));
             }
-
-#else // old legacy, to track bugs - enable to see if bug was caused by above optimization
-            // todo, can be optimized by placing outside loop
-            if (m_column_type == col_type_String)
-                t = static_cast<const AdaptiveStringColumn*>(m_condition_column)->get(s);
-            else {
-                //TODO: First check if string is in key list
-                t = static_cast<const ColumnStringEnum*>(m_condition_column)->get(s);
-            }
-#endif
             if (cond(m_value, m_ucase, m_lcase, t))
                 return s;
         }
@@ -1026,16 +1016,40 @@ public:
         std::copy(v.data(), v.data()+v.size(), data);
         m_value = StringData(data, v.size());
         m_leaf = NULL;
+        m_index_getter = 0;
+        m_index_matches = 0;
+        m_index_matches_destroy = false;
     }
     ~StringNode()
     {
+        Deallocate();
         delete[] m_value.data();
         m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
         m_index.Destroy();
     }
 
+    void Deallocate() 
+    {
+        // Must be called after each query execution too free temporary resources used by the execution. Run in 
+        // destructor, but also in Init because a user could define a query once and execute it multiple times.
+        m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
+        m_leaf = NULL;
+
+        if(m_index_matches_destroy)
+            m_index_matches->Destroy();
+
+        m_index_matches_destroy = false;
+
+        delete m_index_matches;
+        m_index_matches = NULL;
+
+        delete m_index_getter;
+        m_index_getter = NULL;
+    }
+
     void Init(const Table& table)
     {
+        Deallocate();
         m_dD = 10.0;
         m_leaf_end = 0;
         m_table = &table;
@@ -1046,19 +1060,45 @@ public:
             m_dT = 1.0;
             m_key_ndx = ((const ColumnStringEnum*)m_condition_column)->GetKeyNdx(m_value);
         }
+        else if (m_condition_column->HasIndex()) {
+            m_dT = 0.0;
+        }
         else {
             m_dT = 10.0;
         }
 
         if (m_condition_column->HasIndex()) {
             m_index.Clear();
+
+            FindRes fr;
+            size_t index_ref;
+
             if (m_column_type == col_type_StringEnum) {
-                static_cast<const ColumnStringEnum*>(m_condition_column)->find_all(m_index, m_value);
+                fr = static_cast<const ColumnStringEnum*>(m_condition_column)->find_all_indexref(m_value, index_ref);
             }
             else {
-                ((AdaptiveStringColumn*)m_condition_column)->find_all(m_index, m_value);
+                fr = static_cast<const AdaptiveStringColumn*>(m_condition_column)->find_all_indexref(m_value, index_ref);
             }
+
+            m_index_matches_destroy = false;
+            if(fr == FindRes_single) {
+                m_index_matches = new Column();
+                m_index_matches->add(index_ref);
+                m_index_matches_destroy = true;
+            }
+            else if(fr == FindRes_column) {
+                m_index_matches = new Column(index_ref, 0, 0);
+            }
+            else if(fr == FindRes_not_found) {
+                m_index_matches = new Column();
+                m_index_matches_destroy = true;
+            }
+
             last_indexed = 0;
+
+            m_index_getter = new SequentialGetter<int64_t>(m_index_matches);
+            m_index_size = m_index_getter->m_column->Size();
+
         }
         else if (m_column_type != col_type_String) {
             m_cse.m_column = (ColumnStringEnum*)m_condition_column;
@@ -1076,57 +1116,49 @@ public:
 
         for (size_t s = start; s < end; ++s) {
             if (m_condition_column->HasIndex()) {
-                size_t f = m_index.FindGTE(s, last_indexed);
-                if (f != not_found) {
-                    s = m_index.GetAsSizeT(f);
-                    if(s > end)
-                        s = not_found;
-                }
-                else
-                    return end;
 
-                if(s != not_found) {
-                    last_indexed = f;
-                    return s;
+                // Indexed string column
+                size_t f = not_found;
+
+                while(f == not_found && last_indexed < m_index_size) {
+                    m_index_getter->cache_next(last_indexed);
+                    f = m_index_getter->m_array_ptr->FindGTE(s, last_indexed - m_index_getter->m_leaf_start);
+
+                    if(f == not_found) {
+                        last_indexed = m_index_getter->m_leaf_end;
+                    }
+                    else {
+                        s = m_index_getter->m_array_ptr->GetAsSizeT(f);
+                        if(s > end)
+                            return end;
+                        else {
+                            last_indexed = f + m_index_getter->m_leaf_start;
+                            return s;
+                        }
+                    }
                 }
-                else {
-                    return end;
-                }
+                return end;
             }
             else {
-                // todo, can be optimized by placing outside loop
                 if (m_column_type != col_type_String) {
+
+                    // Enum string column
                     if (m_key_ndx == not_found)
                         s = end; // not in key set
                     else {
-#if 0 // old legacy, to track bugs - enable to see if bug was caused by above optimization
-                        const ColumnStringEnum* const cse = (const ColumnStringEnum*)m_condition_column;
-                        s = cse->find_first(m_key_ndx, s, end);
-#else
                         m_cse.cache_next(s);
-
                         s = m_cse.m_array_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, m_cse.local_end(end));
                         if(s == not_found)
                             s = m_cse.m_leaf_end - 1;
                         else
                             return s + m_cse.m_leaf_start;
-#endif
                     }
                 }
                 else {
-#if 0 // old legacy
-                    AdaptiveStringColumn* asc = (AdaptiveStringColumn*)m_condition_column;
 
-                    s = asc->find_first(m_value, s, end);
-                    if(s == not_found)
-                        s = end;
-                    else
-                        return s;
-#else
+                    // Normal string column, with long or short leaf
                     AdaptiveStringColumn* asc = (AdaptiveStringColumn*)m_condition_column;
-
                     if(s >= m_leaf_end) {
-                        // we exceeded current leaf's range
                         m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
                         m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
                         m_leaf_end = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
@@ -1138,32 +1170,35 @@ public:
                         s = m_leaf_end - 1;
                     else
                         return s + m_leaf_start;
-#endif
                 }
             }
         }
         return end;
     }
 
-protected:
 private:
     StringData m_value;
-
-private:
     const ColumnBase* m_condition_column;
     ColumnType m_column_type;
     size_t m_key_ndx;
     Array m_index;
     size_t last_indexed;
-    SequentialGetter<int64_t> m_cse;
 
-    ArrayParent *m_leaf;
+    // Used for linear scan through enum-string
+    SequentialGetter<int64_t> m_cse;  
 
+    // Used for linear scan through short/long-string
+    ArrayParent *m_leaf;                
     bool m_long;
     size_t m_leaf_end;
     size_t m_first_s;
     size_t m_leaf_start;
-    void* m_strarr;
+
+    // Used for index lookup
+    Column* m_index_matches;
+    bool m_index_matches_destroy;
+    SequentialGetter<int64_t>* m_index_getter;
+    size_t m_index_size;
 };
 
 
@@ -1249,6 +1284,91 @@ public:
 private:
     size_t m_last[2];
     bool m_was_match[2];
+};
+
+
+
+
+template <class TConditionValue, class TConditionFunction> class TwoColumnsNode: public ParentNode {
+public:
+    template <Action TAction> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}
+
+    TwoColumnsNode(size_t column1, size_t column2)
+    {
+        m_dT = 100.0;
+        m_condition_column_idx1 = column1;
+        m_condition_column_idx2 = column2;
+        m_child = 0;
+    }
+
+    ~TwoColumnsNode()
+    {
+        delete[] m_value.data();
+    }
+
+    void Init(const Table& table)
+    {
+        typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
+        m_dD = 100.0;
+        m_table = &table;
+
+        ColType* c = (ColType*)&table.GetColumnBase(m_condition_column_idx1);
+        m_getter1.init(c);
+
+        c = (ColType*)&table.GetColumnBase(m_condition_column_idx2);
+        m_getter2.init(c);
+
+        if (m_child)
+            m_child->Init(table);
+    }
+
+    size_t find_first_local(size_t start, size_t end)
+    {
+        size_t s = start;
+
+        while (s < end) {
+            if(SameType<TConditionValue, int64_t>::value) {
+                // For int64_t we've created an array intrinsics named CompareLeafs which template expands bitwidths
+                // of boths arrays to make Get faster.
+                m_getter1.cache_next(s);
+                m_getter2.cache_next(s);
+
+                QueryState<int64_t> qs;
+                bool resume = m_getter1.m_array_ptr->template CompareLeafs<TConditionFunction, act_ReturnFirst>(m_getter2.m_array_ptr, s - m_getter1.m_leaf_start, m_getter1.local_end(end), 0, &qs, CallbackDummy());
+
+            if(resume)
+                s = m_getter1.m_leaf_end;
+            else
+                return qs.m_state + m_getter1.m_leaf_start;
+            } 
+            else {
+                // This is for float and double.
+                TConditionValue v1 = m_getter1.get_next(s);
+                TConditionValue v2 = m_getter2.get_next(s);
+                TConditionFunction C;
+
+                if(C(v1, v2))
+                    return s;
+                else
+                    s++;              
+
+            }
+        }
+        return end;
+    }
+
+protected:
+    BinaryData m_value;
+    const ColumnBinary* m_condition_column;
+    ColumnType m_column_type;
+
+    size_t m_condition_column_idx1;
+    size_t m_condition_column_idx2;
+
+    SequentialGetter<TConditionValue> m_getter1;
+    SequentialGetter<TConditionValue> m_getter2;
+
+
 };
 
 

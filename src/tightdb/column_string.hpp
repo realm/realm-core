@@ -51,7 +51,7 @@ public:
     void Clear() TIGHTDB_OVERRIDE;
     void Resize(std::size_t ndx);
     void fill(std::size_t count);
-
+ 
     std::size_t count(StringData value) const;
     std::size_t find_first(StringData value, std::size_t begin = 0 , std::size_t end = -1) const;
     void find_all(Array& result, StringData value, std::size_t start = 0,
@@ -62,6 +62,7 @@ public:
     /// StringData::operator<(). This operation is semantically
     /// identical to std::lower_bound().
     std::size_t lower_bound(StringData value) const TIGHTDB_NOEXCEPT;
+    FindRes find_all_indexref(StringData value, size_t& dst) const;
 
     // Index
     bool HasIndex() const {return m_index != NULL;}

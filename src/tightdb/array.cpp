@@ -2421,7 +2421,126 @@ top:
     }
 }
 
+FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const
+{
+    const char* v = value.data();
+    const char* v_end = v + value.size();
+    const char* data = m_data;
+    const char* header;
+    size_t width = m_width;
+    bool isNode = m_isNode;
+
+top:
+    // Create 4 byte index key
+    int32_t key = 0;
+    if (v != v_end) key  = (int32_t(*v++) << 24);
+    if (v != v_end) key |= (int32_t(*v++) << 16);
+    if (v != v_end) key |= (int32_t(*v++) << 8);
+    if (v != v_end) key |=  int32_t(*v++);
+
+    for (;;) {
+        // Get subnode table
+        const size_t ref_offsets = to_size_t(get_direct(data, width, 0));
+        const size_t ref_refs    = to_ref(get_direct(data, width, 1));
+
+        // Find the position matching the key
+        const char*  offsets_header = static_cast<char*>(m_alloc.Translate(ref_offsets));
+        const char*  offsets_data   = get_data_from_header(offsets_header);
+        const size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
+
+        // If key is outside range, we know there can be no match
+        if (pos == not_found) return FindRes_not_found;
+
+        // Get entry under key
+        const char*  refs_header = static_cast<char*>(m_alloc.Translate(ref_refs));
+        const char*  refs_data   = get_data_from_header(refs_header);
+        const size_t refs_width  = get_width_from_header(refs_header);
+        const size_t ref = to_ref(get_direct(refs_data, refs_width, pos));
+
+        if (isNode) {
+            // Set vars for next iteration
+            header = static_cast<char*>(m_alloc.Translate(ref));
+            data   = get_data_from_header(header);
+            width  = get_width_from_header(header);
+            isNode = get_isnode_from_header(header);
+            continue;
+        }
+
+        const int32_t stored_key = int32_t(get_direct<32>(offsets_data, pos));
+
+        if (stored_key == key) {
+            // Literal row index
+            if (ref & 1) {
+                const size_t row_ref = (ref >> 1);
+
+                // If the last byte in the stored key is zero, we know that we have
+                // compared against the entire (target) string
+                if (!(stored_key << 24)) {
+                    res_ref = row_ref;
+                    return FindRes_single; // found single
+                }
+
+                StringData str = (*get_func)(column, row_ref);
+                if (str == value) {
+                    res_ref = row_ref;
+                    return FindRes_single; // found single
+                }
+                else return FindRes_not_found; // not_found
+            }
+
+            const char* sub_header  = static_cast<char*>(m_alloc.Translate(ref));
+            const bool  sub_isindex = get_indexflag_from_header(sub_header);
+
+            // List of matching row indexes
+            if (!sub_isindex) {
+                const bool sub_isnode = get_isnode_from_header(sub_header);
+
+                // In most cases the row list will just be an array but there
+                // might be so many matches that it has branched into a column
+                if (!sub_isnode) {
+                    const size_t sub_width = get_width_from_header(sub_header);
+                    const char*  sub_data  = get_data_from_header(sub_header);
+                    const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
+
+                    // If the last byte in the stored key is not zero, we have
+                    // not yet compared against the entire (target) string
+                    if ((stored_key << 24)) {
+                        StringData str = (*get_func)(column, first_row_ref);
+                        if (str != value)
+                            return FindRes_not_found; // not_found
+                    }
+                }
+                else {
+                    const Column sub(ref, NULL, 0, m_alloc);
+                    const size_t first_row_ref = to_size_t(sub.get(0));
+
+                    // If the last byte in the stored key is not zero, we have
+                    // not yet compared against the entire (target) string
+                    if ((stored_key << 24)) {
+                        StringData str = (*get_func)(column, first_row_ref);
+                        if (str != value)
+                            return FindRes_not_found; // not_found
+                    }
+                }
+
+                // Return a reference to the result column
+                res_ref = ref;
+                return FindRes_column; // column of matches
+            }
+
+            // Recurse into sub-index;
+            header = static_cast<char*>(m_alloc.Translate(ref));
+            data   = get_data_from_header(header);
+            width  = get_width_from_header(header);
+            isNode = get_isnode_from_header(header);
+            goto top;
+        }
+        else return FindRes_not_found; // not_found
+    }
+}
+
 size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_func) const
+
 {
     const char* v = value.data();
     const char* v_end = v + value.size();
