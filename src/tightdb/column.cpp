@@ -704,7 +704,7 @@ size_t Column::find_pos(int64_t target) const TIGHTDB_NOEXCEPT
     else return high;
 }
 
-size_t Column::find_pos2(int64_t target) const
+size_t Column::find_pos2(int64_t target) const TIGHTDB_NOEXCEPT
 {
     // NOTE: Binary search only works if the column is sorted
 
@@ -728,6 +728,34 @@ size_t Column::find_pos2(int64_t target) const
     }
     if (high == len) return not_found;
     else return high;
+}
+
+bool Column::find_sorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
+{
+    if (!IsNode()) {
+        return m_array->FindPosSorted(target, pos);
+    }
+
+    const size_t len = Size();
+    size_t low = size_t(-1);
+    size_t high = len;
+
+    // Binary search based on:
+    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+    // Finds position of closest value BIGGER OR EQUAL to the target
+    while (high - low > 1) {
+        const size_t probe = (low + high) >> 1;
+        const int64_t v = Get(probe);
+
+        if (v < target) low  = probe;
+        else            high = probe;
+    }
+
+    pos = high;
+    if (high == len)
+        return false;
+    else
+        return (Get(high) == target);
 }
 
 

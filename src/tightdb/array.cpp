@@ -472,7 +472,7 @@ size_t Array::FindPos(int64_t target) const TIGHTDB_NOEXCEPT
 }
 
 // BM FIXME: Rename to something better... // FirstGTE()
-size_t Array::FindPos2(int64_t target) const
+size_t Array::FindPos2(int64_t target) const TIGHTDB_NOEXCEPT
 {
     size_t low = (size_t)-1;
     size_t high = m_len;
@@ -494,6 +494,34 @@ size_t Array::FindPos2(int64_t target) const
         return not_found;
     else
         return high;
+}
+
+// Finds either value, or if not in set, insert position
+// used both for lookups and maintaining order in sorted lists
+bool Array::FindPosSorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
+{
+    size_t low = (size_t)-1;
+    size_t high = m_len;
+
+    // Binary search based on:
+    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+    // Finds position of closest value BIGGER OR EQUAL to the target (for
+    // lookups in indexes)
+    while (high - low > 1) {
+        const size_t probe = (low + high) >> 1;
+        const int64_t v = Get(probe);
+
+        if (v < target)
+            low = probe;
+        else
+            high = probe;
+    }
+
+    pos = high;
+    if (high == m_len)
+        return false;
+    else
+        return (Get(high) == target);
 }
 
 // return first element E for which E >= target or return -1 if none. Array must be sorted
