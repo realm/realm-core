@@ -273,9 +273,11 @@ public:
     int64_t column_get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     StringData string_column_get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     size_t ColumnFind(int64_t target, size_t ref, Array& cache) const;
+
     typedef StringData (*StringGetter)(void*, size_t); // Pre-declare getter function from string index
     size_t IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const;
     void   IndexStringFindAll(Array& result, StringData value, void* column, StringGetter get_func) const;
+    FindRes IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const;
     size_t IndexStringCount(StringData value, void* column, StringGetter get_func) const;
 
     void SetAllToZero();

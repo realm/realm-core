@@ -316,3 +316,42 @@ TEST(StringIndex_Distinct)
     result.Destroy();
     col.Destroy();
 }
+
+TEST(StringIndex_FindAllNoCopy)
+{
+    // Create a column with duplcate values
+    AdaptiveStringColumn col;
+    col.add(s1);
+    col.add(s2);
+    col.add(s2);
+    col.add(s3);
+    col.add(s3);
+    col.add(s3);
+    col.add(s4);
+    col.add(s4);
+    col.add(s4);
+    col.add(s4);
+
+    // Create a new index on column
+    StringIndex& ndx = col.CreateIndex();
+
+    size_t ref = not_found;
+    FindRes res1 = ndx.find_all("not there", ref);
+    CHECK_EQUAL(FindRes_not_found, res1);
+
+    FindRes res2 = ndx.find_all(s1, ref);
+    CHECK_EQUAL(FindRes_single, res2);
+    CHECK_EQUAL(0, ref);
+
+    FindRes res3 = ndx.find_all(s4, ref);
+    CHECK_EQUAL(FindRes_column, res3);
+    const Column results(ref);
+    CHECK_EQUAL(4, results.Size());
+    CHECK_EQUAL(6, results.get(0));
+    CHECK_EQUAL(7, results.get(1));
+    CHECK_EQUAL(8, results.get(2));
+    CHECK_EQUAL(9, results.get(3));
+
+    // Clean up
+    col.Destroy();
+}
