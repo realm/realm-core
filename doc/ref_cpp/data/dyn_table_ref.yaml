@@ -709,6 +709,29 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_find_all_xxx
         DESCR  :
+  - g_find_sorted_int:
+      NAMES    : find_sorted_*
+      SUMMARY  : Find matching row or insert position in sorted column.
+      DESCR    : This method is used for making quick lookups and maintaining order in sorted columns.
+      SIGNATURE: |
+                 bool find_sorted_int(size_t column_ndx, int64_t value, size_t& pos) const;
+      CONST    : True
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : The column index.
+      - NAME   : value
+        TYPES  : int64_t
+        DESCR  : The value.
+      - NAME   : pos
+        TYPES  : "size_t&"
+        DESCR  : Position of matching value or insert position.
+      RETURN:
+        TYPES  : bool
+        DESCR  : "true if value was found, otherwise false."
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_find_first_xxx
+        DESCR  :
   - g_dyn_table_get_sorted_view:
   - g_dyn_table_get_sorted_view_const:
       NAMES    : get_sorted_view

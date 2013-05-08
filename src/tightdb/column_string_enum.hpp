@@ -47,6 +47,7 @@ public:
     size_t count(StringData value) const;
     size_t find_first(StringData value, size_t begin=0, size_t end=-1) const;
     void find_all(Array& res, StringData value, size_t begin=0, size_t end=-1) const;
+    FindRes find_all_indexref(StringData value, size_t& dst) const;
 
     size_t count(size_t key_index) const;
     size_t find_first(size_t key_index, size_t begin=0, size_t end=-1) const;
