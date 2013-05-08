@@ -66,6 +66,14 @@ public:
     Query& less_equal(size_t column_ndx, int64_t value);
     Query& between(size_t column_ndx, int64_t from, int64_t to);
 
+    // Conditions: 2 int columns
+    Query& equal_int(size_t column_ndx1, size_t column_ndx2);
+    Query& not_equal_int(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_int(size_t column_ndx1, size_t column_ndx2);
+    Query& less_int(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_equal_int(size_t column_ndx1, size_t column_ndx2);
+    Query& less_equal_int(size_t column_ndx1, size_t column_ndx2);
+
     // Conditions: float
     Query& equal(size_t column_ndx, float value);
     Query& not_equal(size_t column_ndx, float value);
@@ -75,6 +83,14 @@ public:
     Query& less_equal(size_t column_ndx, float value);
     Query& between(size_t column_ndx, float from, float to);
 
+    // Conditions: 2 float columns
+    Query& equal_float(size_t column_ndx1, size_t column_ndx2);
+    Query& not_equal_float(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_float(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_equal_float(size_t column_ndx1, size_t column_ndx2);
+    Query& less_float(size_t column_ndx1, size_t column_ndx2);
+    Query& less_equal_float(size_t column_ndx1, size_t column_ndx2);
+
      // Conditions: double
     Query& equal(size_t column_ndx, double value);
     Query& not_equal(size_t column_ndx, double value);
@@ -83,6 +99,14 @@ public:
     Query& less(size_t column_ndx, double value);
     Query& less_equal(size_t column_ndx, double value);
     Query& between(size_t column_ndx, double from, double to);
+
+    // Conditions: 2 double columns
+    Query& equal_double(size_t column_ndx1, size_t column_ndx2);
+    Query& not_equal_double(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_double(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_equal_double(size_t column_ndx1, size_t column_ndx2);
+    Query& less_double(size_t column_ndx1, size_t column_ndx2);
+    Query& less_equal_double(size_t column_ndx1, size_t column_ndx2);
 
     // Conditions: bool
     Query& equal(size_t column_ndx, bool value);
@@ -207,6 +231,13 @@ protected:
     mutable bool do_delete;
 
 private:
+    template <class TColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
+    template <class TColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);
+    template <class TColumnType> Query& less_equal(size_t column_ndx1, size_t column_ndx2);
+    template <class TColumnType> Query& greater(size_t column_ndx1, size_t column_ndx2);
+    template <class TColumnType> Query& greater_equal(size_t column_ndx1, size_t column_ndx2);
+    template <class TColumnType> Query& not_equal(size_t column_ndx1, size_t column_ndx2);
+
     std::string error_code;
 
 #if TIGHTDB_MULTITHREAD_QUERY

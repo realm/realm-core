@@ -429,7 +429,15 @@ void StringIndex::find_all(Array& result, StringData value) const
     return m_array->IndexStringFindAll(result, value, m_target_column, m_get_func);
 }
 
+
+FindRes StringIndex::find_all(StringData value, size_t& ref) const
+{
+    // Use direct access method
+    return m_array->IndexStringFindAllNoCopy(value, ref, m_target_column, m_get_func);
+}
+
 size_t StringIndex::count(StringData value) const
+
 {
     // Use direct access method
     return m_array->IndexStringCount(value, m_target_column, m_get_func);
