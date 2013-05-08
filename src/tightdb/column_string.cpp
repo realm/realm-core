@@ -288,6 +288,16 @@ void AdaptiveStringColumn::find_all(Array &result, StringData value, size_t begi
     TreeFindAll<StringData, AdaptiveStringColumn>(result, value, 0, begin, end);
 }
 
+
+FindRes AdaptiveStringColumn::find_all_indexref(StringData value, size_t& dst) const
+{
+    TIGHTDB_ASSERT(value.data());
+    TIGHTDB_ASSERT(m_index);
+
+    return m_index->find_all(value, dst);
+}
+
+
 StringData AdaptiveStringColumn::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     if (IsLongStrings()) {
