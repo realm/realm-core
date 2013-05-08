@@ -835,7 +835,7 @@ void Query::Init(const Table& table) const
 {
     if (first[0] != NULL) {
         ParentNode* const top = (ParentNode*)first[0];
-        top->Init(table);
+        top->init(table);
         vector<ParentNode*>v;
         top->gather_children(v);
     }

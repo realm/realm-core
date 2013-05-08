@@ -286,11 +286,11 @@ public:
 
     virtual ~ParentNode() {}
 
-    virtual void Init(const Table& table)
+    virtual void init(const Table& table)
     {
         m_table = &table;
         if (m_child)
-            m_child->Init(table);
+            m_child->init(table);
     }
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
@@ -464,7 +464,7 @@ class ArrayNode: public ParentNode {
 public:
     ArrayNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.size()) {m_child = 0; m_dT = 0.0;}
 
-    void Init(const Table& table)
+    void init(const Table& table)
     {
         m_table = &table;
 
@@ -475,7 +475,7 @@ public:
         m_next = 0;
         if (m_size > 0)
             m_max = m_arr.GetAsSizeT(m_size - 1);
-        if (m_child) m_child->Init(table);
+        if (m_child) m_child->init(table);
     }
 
     size_t find_first_local(size_t start, size_t end)
@@ -500,7 +500,7 @@ class SubtableNode: public ParentNode {
 public:
     SubtableNode(size_t column): m_column(column) {m_child = 0; m_child2 = 0; m_dT = 100.0;}
     SubtableNode() {};
-    void Init(const Table& table)
+    void init(const Table& table)
     {
         m_dD = 10.0;
         m_probes = 0;
@@ -509,13 +509,13 @@ public:
         m_table = &table;
 
         if (m_child) {
-            m_child->Init(table);
+            m_child->init(table);
             std::vector<ParentNode*> v;
             m_child->gather_children(v);
         }
 
         if (m_child2)
-            m_child2->Init(table);
+            m_child2->init(table);
     }
 
     size_t find_first_local(size_t start, size_t end)
@@ -526,7 +526,7 @@ public:
         for (size_t s = start; s < end; ++s) {
             const TableRef subtable = ((Table*)m_table)->get_subtable(m_column, s);
 
-            m_child->Init(*subtable);
+            m_child->init(*subtable);
             const size_t subsize = subtable->size();
             const size_t sub = m_child->find_first(0, subsize);
 
@@ -574,14 +574,14 @@ public:
         m_conds = 0;
     }
 
-    void Init(const Table& table)
+    void init(const Table& table)
     {
         m_dD = 100.0;
         m_condition_column = (ColType*)&table.GetColumnBase(m_condition_column_idx);
         m_table = &table;
         m_leaf_end = 0;
         if (m_child)
-            m_child->Init(table);
+            m_child->init(table);
     }
 
     // This function is called from Array::find() for each search result if TAction == act_CallbackIdx
@@ -830,7 +830,7 @@ public:
         m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
     }
 
-    void Init(const Table& table)
+    void init(const Table& table)
     {
         m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
         m_leaf = NULL;
@@ -842,7 +842,7 @@ public:
         m_condition_column = &table.GetColumnBase(m_condition_column_idx);
         m_column_type = table.get_real_column_type(m_condition_column_idx);
 
-        if (m_child) m_child->Init(table);
+        if (m_child) m_child->init(table);
     }
 
     size_t find_first_local(size_t start, size_t end)
@@ -917,7 +917,7 @@ public:
         m_conds = 0;
     }
 
-    void Init(const Table& table)
+    void init(const Table& table)
     {
         m_dD = 100.0;
         m_table = &table;
@@ -925,7 +925,7 @@ public:
         m_condition_column.m_leaf_end = 0;
 
         if (m_child)
-            m_child->Init(table);
+            m_child->init(table);
     }
 
     size_t find_first_local(size_t start, size_t end)
@@ -967,7 +967,7 @@ public:
         delete[] m_value.data();
     }
 
-    void Init(const Table& table)
+    void init(const Table& table)
     {
         m_dD = 100.0;
         m_table = &table;
@@ -975,7 +975,7 @@ public:
         m_column_type = table.get_real_column_type(m_condition_column_idx);
 
         if (m_child)
-            m_child->Init(table);
+            m_child->init(table);
     }
 
     size_t find_first_local(size_t start, size_t end)
@@ -1022,13 +1022,13 @@ public:
     }
     ~StringNode()
     {
-        Deallocate();
+        deallocate();
         delete[] m_value.data();
         m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
         m_index.Destroy();
     }
 
-    void Deallocate() 
+    void deallocate() 
     {
         // Must be called after each query execution too free temporary resources used by the execution. Run in 
         // destructor, but also in Init because a user could define a query once and execute it multiple times.
@@ -1047,9 +1047,9 @@ public:
         m_index_getter = NULL;
     }
 
-    void Init(const Table& table)
+    void init(const Table& table)
     {
-        Deallocate();
+        deallocate();
         m_dD = 10.0;
         m_leaf_end = 0;
         m_table = &table;
@@ -1107,7 +1107,7 @@ public:
         }
 
         if (m_child)
-            m_child->Init(table);
+            m_child->init(table);
     }
 
     size_t find_first_local(size_t start, size_t end)
@@ -1212,14 +1212,14 @@ public:
 
     OrNode(ParentNode* p1) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL; m_dT = 50.0;};
 
-    void Init(const Table& table)
+    void init(const Table& table)
     {
         m_dD = 10.0;
 
         std::vector<ParentNode*> v;
 
         for (size_t c = 0; c < 2; ++c) {
-            m_cond[c]->Init(table);
+            m_cond[c]->init(table);
             v.clear();
             m_cond[c]->gather_children(v);
             m_last[c] = 0;
@@ -1227,7 +1227,7 @@ public:
         }
 
         if (m_child)
-            m_child->Init(table);
+            m_child->init(table);
 
         m_table = &table;
     }
@@ -1306,7 +1306,7 @@ public:
         delete[] m_value.data();
     }
 
-    void Init(const Table& table)
+    void init(const Table& table)
     {
         typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
         m_dD = 100.0;
@@ -1319,7 +1319,7 @@ public:
         m_getter2.init(c);
 
         if (m_child)
-            m_child->Init(table);
+            m_child->init(table);
     }
 
     size_t find_first_local(size_t start, size_t end)
