@@ -745,7 +745,7 @@ bool Column::find_sorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
     // Finds position of closest value BIGGER OR EQUAL to the target
     while (high - low > 1) {
         const size_t probe = (low + high) >> 1;
-        const int64_t v = Get(probe);
+        const int64_t v = get(probe);
 
         if (v < target) low  = probe;
         else            high = probe;
@@ -755,7 +755,7 @@ bool Column::find_sorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
     if (high == len)
         return false;
     else
-        return (Get(high) == target);
+        return get(high) == target;
 }
 
 
