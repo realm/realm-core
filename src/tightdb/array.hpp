@@ -1533,7 +1533,7 @@ template <bool gt, Action action, size_t width, class Callback> bool Array::Find
 
 template <bool gt, Action action, size_t width, class Callback> bool Array::FindGTLT(int64_t v, uint64_t chunk, QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
-    // Fínd items in 'chunk' that are greater (if gt == true) or smaller (if gt == false) than 'v'. Fixme, __forceinline can make it crash in vS2010 - find out why
+    // Find items in 'chunk' that are greater (if gt == true) or smaller (if gt == false) than 'v'. Fixme, __forceinline can make it crash in vS2010 - find out why
     if (width == 1) {
         for (size_t t = 0; t < 64; t++) {
             if (gt ? (int64_t)(chunk & 0x1) > v : (int64_t)(chunk & 0x1) < v) {if (!find_action<action, Callback>( t + baseindex, (int64_t)(chunk & 0x1), state, callback)) return false;} chunk >>= 1;

@@ -16,6 +16,7 @@
 #include <sqlite3.h>
 #include <mysql/mysql.h>
 #include <tightdb.hpp>
+#include <tightdb/file.hpp>
 #include <tightdb/group_shared.hpp>
 #include <iostream>
 
@@ -430,7 +431,7 @@ void sqlite_create(const char *f, long n, bool wal)
     sqlite3 *db;
     char    *errmsg;
 
-    remove(f);
+    File::try_remove(f);
     srandom(1);
 
     if (sqlite3_config(SQLITE_CONFIG_MULTITHREAD, 1) == SQLITE_ERROR) {
@@ -486,8 +487,8 @@ void mysql_create(const char *f, long n)
 
 void tdb_create(const char *f, long n)
 {
-    remove(f);
-    remove((string(f)+".lock").c_str());
+    File::try_remove(f);
+    File::try_remove(string(f)+".lock");
     SharedGroup sg(f);
     {
         WriteTransaction wt(sg);

@@ -492,12 +492,12 @@ void StringIndex::UpdateRefs(size_t pos, int diff)
     }
     else {
         for (size_t i = 0; i < count; ++i) {
-            const int64_t ref = refs.Get(i);
+            const size_t ref = to_size_t(refs.Get(i));
 
             // low bit set indicate literal ref (shifted)
             if (ref & 1) {
                 //const size_t r = (ref >> 1); Please NEVER right shift signed values - result varies btw Intel/AMD
-                const size_t r = (uint64_t(ref) >> 1); 
+                const size_t r = ref >> 1; 
                 if (r >= pos) {
                     const size_t adjusted_ref = ((r + diff) << 1)+1;
                     refs.Set(i, adjusted_ref);
@@ -505,12 +505,12 @@ void StringIndex::UpdateRefs(size_t pos, int diff)
             }
             else {
                 // A real ref either points to a list or a sub-index
-                if (Array::is_index_node(to_size_t(ref), alloc)) {
-                    StringIndex ndx(to_size_t(ref), &refs, i, m_target_column, m_get_func, alloc);
+                if (Array::is_index_node(ref, alloc)) {
+                    StringIndex ndx(ref, &refs, i, m_target_column, m_get_func, alloc);
                     ndx.UpdateRefs(pos, diff);
                 }
                 else {
-                    Column sub(to_size_t(ref), &refs, i, alloc);
+                    Column sub(ref, &refs, i, alloc);
                     sub.IncrementIf(pos, diff);
                 }
             }
