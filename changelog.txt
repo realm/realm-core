@@ -13,6 +13,11 @@ Format:
 ==================
 
 
+2013-05-07 (Kristian Spangsege)
+. Exception File::OpenError renamed to File::AccessError. This affects
+  various methods in Group and SharedGroup.
+
+
 2013-04-23 (Kristian Spangsege)
 + Support for explicit string lengths added. Most method arguments and
   return values of type 'const char*' have been changed to be of type

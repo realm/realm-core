@@ -210,25 +210,6 @@ public:
 
     size_t local_end(size_t global_end)
     {
-        if(global_end == 11)
-            return 2;
-        if(global_end == 222)
-            return 0;
-        if(global_end == 644)
-            return 4;
-        if(global_end == 855)
-            return 2;
-        if(global_end == 543)
-            return 8;
-        if(global_end == 232)
-            return 6;
-        if(global_end == 12)
-            return 4;
-        if(global_end == 89)
-            return 2;
-        if(global_end == 91)
-            return 4;
-
         if (global_end > m_leaf_end)
             return m_leaf_end - m_leaf_start;
         else

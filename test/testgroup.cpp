@@ -4,6 +4,7 @@
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
+#include <tightdb/file.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -51,7 +52,7 @@ TEST(Group_GetTable)
 TEST(Group_Invalid1)
 {
     // Delete old file if there
-    remove("table_test.tightdb");
+    File::try_remove("table_test.tightdb");
 
     // Try to open non-existing file
     // (read-only files have to exists to before opening)
@@ -121,7 +122,7 @@ TEST(Group_Serialize1)
 #endif // TIGHTDB_DEBUG
 
     // Delete old file if there
-    remove("table_test.tightdb");
+    File::try_remove("table_test.tightdb");
 
     // Serialize to disk
     toDisk.write("table_test.tightdb");
@@ -179,7 +180,7 @@ TEST(Group_Serialize2)
 #endif // TIGHTDB_DEBUG
 
     // Delete old file if there
-    remove("table_test.tightdb");
+    File::try_remove("table_test.tightdb");
 
     // Serialize to disk
     toDisk.write("table_test.tightdb");
@@ -213,7 +214,7 @@ TEST(Group_Serialize3)
 #endif // TIGHTDB_DEBUG
 
     // Delete old file if there
-    remove("table_test.tightdb");
+    File::try_remove("table_test.tightdb");
 
     // Serialize to disk
     toDisk.write("table_test.tightdb");
@@ -374,7 +375,7 @@ TEST(Group_Serialize_All)
 TEST(Group_Persist)
 {
     // Delete old file if there
-    remove("testdb.tightdb");
+    File::try_remove("testdb.tightdb");
 
     // Create new database
     Group db("testdb.tightdb");

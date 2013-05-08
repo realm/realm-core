@@ -87,11 +87,11 @@ CATEGORIES:
         DESCR  : &g_shared_group_constructor_return1_descr
                  A shared group.
       THROWS:
-      - EXCEPT : File::OpenError
+      - EXCEPT : File::AccessError
         DESCR  : &g_shared_group_constructor_throws_descr
                  If the file could not be opened. If the reason
                  corresponds to one of the exception types that are
-                 derived from File::OpenError, the derived exception
+                 derived from File::AccessError, the derived exception
                  type is thrown. Note that InvalidDatabase is among
                  these derived exception types.
       EXAMPLES:
@@ -141,11 +141,11 @@ CATEGORIES:
         DESCR  : &g_shared_group_open_parm3_descr
                  Durability Level (durability_Full or durability_MemOnly)
       THROWS:
-      - EXCEPT : File::OpenError
+      - EXCEPT : File::AccessError
         DESCR  : &g_shared_group_open_throws_descr
                  If the file could not be opened. If the reason
                  corresponds to one of the exception types that are
-                 derived from File::OpenError, the derived exception
+                 derived from File::AccessError, the derived exception
                  type is thrown. Note that InvalidDatabase is among
                  these derived exception types.
       EXAMPLES:

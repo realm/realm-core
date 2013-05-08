@@ -2,7 +2,8 @@
 
 #include <UnitTest++.h>
 
-#include "tightdb.hpp"
+#include <tightdb/file.hpp>
+#include <tightdb.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -22,8 +23,8 @@ TIGHTDB_TABLE_4(TestTableShared,
 TEST(Shared_Initial)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -48,8 +49,8 @@ TEST(Shared_Initial)
 TEST(Shared_Initial_Mem)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -75,8 +76,8 @@ TEST(Shared_Initial_Mem)
 TEST(Shared_Initial2)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -120,8 +121,8 @@ TEST(Shared_Initial2)
 TEST(Shared_Initial2_Mem)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -166,8 +167,8 @@ TEST(Shared_Initial2_Mem)
 TEST(Shared1)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -256,8 +257,8 @@ TEST(Shared1)
 TEST(Shared_rollback)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -323,8 +324,8 @@ TEST(Shared_rollback)
 TEST(Shared_Writes)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -367,8 +368,8 @@ TIGHTDB_TABLE_1(MyTable_SpecialOrder, first,  Int)
 
 TEST(Shared_Writes_SpecialOrder)
 {
-    remove("test.tightdb");
-    remove("test.tightdb.lock");
+    File::try_remove("test.tightdb");
+    File::try_remove("test.tightdb.lock");
 
     SharedGroup sg("test.tightdb");
 
@@ -448,8 +449,8 @@ void* IncrementEntry(void* arg)
 TEST(Shared_WriterThreads)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -500,8 +501,8 @@ TEST(Shared_WriterThreads)
 
 TEST(Shared_FormerErrorCase1)
 {
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock");
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock");
     SharedGroup sg("test_shared.tightdb");
     {
         WriteTransaction wt(sg);
@@ -648,8 +649,8 @@ TIGHTDB_TABLE_1(FormerErrorCase2_Table,
 
 TEST(Shared_FormerErrorCase2)
 {
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock");
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock");
 
     for (int i=0; i<10; ++i) {
         SharedGroup sg("test_shared.tightdb");
@@ -683,8 +684,8 @@ TEST(Shared_SpaceOveruse)
 
     // Many transactions
     {
-        remove("over_alloc_1.tightdb");
-        remove("over_alloc_1.tightdb.lock");
+        File::try_remove("over_alloc_1.tightdb");
+        File::try_remove("over_alloc_1.tightdb.lock");
         SharedGroup sg("over_alloc_1.tightdb");
 
         // Do a lot of sequential transactions
@@ -719,8 +720,8 @@ TEST(Shared_SpaceOveruse)
 TEST(Shared_Notifications)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -773,8 +774,8 @@ TEST(Shared_Notifications)
 TEST(Shared_FromSerialized)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     // Create new group and serialize to disk
     {
@@ -809,8 +810,8 @@ void randstr(char* res, size_t len) {
 
 TEST(StringIndex_Bug)
 {
-    remove("indexbug.tightdb");
-    remove("indexbug.tightdb.lock");
+    File::try_remove("indexbug.tightdb");
+    File::try_remove("indexbug.tightdb.lock");
     SharedGroup db("indexbug.tightdb");
 
     {

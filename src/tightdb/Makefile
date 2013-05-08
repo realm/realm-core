@@ -3,7 +3,7 @@ TABLE_MACROS_HPP = table_macros.hpp
 GENERATED_SOURCES = $(TABLE_MACROS_HPP)
 
 INST_HEADERS = config.h meta.hpp assert.hpp exceptions.hpp terminate.hpp type_list.hpp tuple.hpp \
-safe_int_ops.hpp unique_ptr.hpp bind_ptr.hpp string_buffer.hpp file.hpp pthread_helpers.hpp \
+bind.hpp safe_int_ops.hpp unique_ptr.hpp bind_ptr.hpp string_buffer.hpp file.hpp thread.hpp \
 utf8.hpp utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp data_type.hpp \
 column_type.hpp column_fwd.hpp spec.hpp date.hpp string_data.hpp binary_data.hpp mixed.hpp \
 table.hpp table_ref.hpp table_basic_fwd.hpp table_accessors.hpp table_basic.hpp table_view.hpp \
@@ -13,7 +13,7 @@ query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h replication.hpp
 lib_LIBRARIES = libtightdb.a
 bin_PROGRAMS  = tightdb-config
 
-libtightdb_a_SOURCES = terminate.cpp string_buffer.cpp file.cpp pthread_helpers.cpp utf8.cpp \
+libtightdb_a_SOURCES = terminate.cpp string_buffer.cpp file.cpp thread.cpp utf8.cpp \
 utilities.cpp alloc.cpp alloc_slab.cpp array.cpp array_string.cpp array_string_long.cpp \
 array_binary.cpp array_blob.cpp column.cpp column_string.cpp column_string_enum.cpp \
 column_binary.cpp column_table.cpp column_mixed.cpp spec.cpp table.cpp table_view.cpp group.cpp \

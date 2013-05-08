@@ -15,6 +15,7 @@
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
+#include <tightdb/file.hpp>
 #include <tightdb/group_shared.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/utilities.hpp>
@@ -80,7 +81,7 @@ TIGHTDB_FORCEINLINE void randsleep(void)
 void deletefile(const char* file)
 {
     struct stat buf;
-    remove(file);
+    File::try_remove(file);
     CHECK(stat(file, &buf) != 0);
 }
 

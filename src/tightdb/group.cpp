@@ -702,7 +702,7 @@ void Group::zero_free_space(size_t file_size, size_t readlock_version)
         const size_t pos = m_freePositions.GetAsSizeT(i);
         const size_t len = m_freeLengths.GetAsSizeT(i);
 
-        char* const p = map.get_addr() + pos;
+        char* p = map.get_addr() + pos;
         fill(p, p+len, 0);
     }
 }
