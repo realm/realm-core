@@ -112,4 +112,6 @@ There are also a number of environment variables that serve to enable
 or disable special features during building:
 
 Set `TIGHTDB_ENABLE_REPLICATION` to a nonempty value to enable
-replication.
+replication. For example:
+
+    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh src-dist all

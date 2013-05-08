@@ -8,6 +8,9 @@ MODE="$1"
 
 EXTENSIONS="java python objc node php c gui"
 
+if [ "$TIGHTDB_ENABLE_REPLICATION" ]; then
+    EXTENSIONS="$EXTENSIONS replication"
+fi
 
 
 map_ext_name_to_dir()
