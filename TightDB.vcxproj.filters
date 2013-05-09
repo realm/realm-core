@@ -25,7 +25,7 @@
     <ClCompile Include="test\testcolumnstring.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testearraybinary.cpp">
+    <ClCompile Include="test\test_array_binary.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="test\testgroup.cpp">
@@ -151,7 +151,7 @@
     <ClCompile Include="src\tightdb\terminate.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="test\transactions.cpp">
+    <ClCompile Include="test\test_transactions.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="test\testarrayfloat.cpp">
