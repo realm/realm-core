@@ -1419,6 +1419,16 @@ void Table::insert_done()
 {
     ++m_size;
 
+    // We will do an automatic optimize after 1000
+    // inserts. At that point there should be enough
+    // data to find some patterns.
+    // TODO: Ensure that we only do this once, so we
+    // don't get pathological patterns with repetitive
+    // ins/del operations overlapping the limit.
+    if (TIGHTDB_UNLIKELY(m_size == 1000)) {
+        optimize();
+    }
+
 #ifdef TIGHTDB_DEBUG
     Verify();
 #endif
