@@ -199,12 +199,7 @@ case "$MODE" in
         if ! [ "$PREFIX" ]; then
             PREFIX="/usr/local"
         fi
-        if [ "$USE_LIB64" ]; then
-            LIBDIR="$PREFIX/lib64"
-        else
-            LIBDIR="$PREFIX/lib"
-        fi
-        make prefix="$PREFIX" libdir="$LIBDIR" uninstall || exit 1
+        make prefix="$PREFIX" uninstall || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
             ldconfig || exit 1
         fi
@@ -639,6 +634,29 @@ EOF
                         fi
                     fi
                 done
+
+                # Copy the installation test directory to allow later inspection
+                INSTALL_COPY="$TEMP_DIR/install_copy"
+                cp -r "$INSTALL_ROOT" "$INSTALL_COPY" || exit 1
+
+                for x in $(printf "%s\n" $AVAIL_EXTENSIONS | tac); do
+                    message "Uninstalling extension '$x' from test location"
+                    EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
+                    if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" uninstall "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
+                        warning "Failed to uninstall extension '$x'"
+                    fi
+                done
+
+                message "Uninstalling core library from test location"
+                if ! sh "$TEST_PKG_DIR/tightdb/build.sh" uninstall "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
+                    warning "Failed to uninstall core library"
+                fi
+
+                REMAINING_PATHS="$(cd "$INSTALL_ROOT" && find * -ipath '*tightdb*')" || exit 1
+                if [ "$REMAINING_PATHS" ]; then
+                    warning "Files and/or directories remain after uninstallation"
+                    printf "%s" "$REMAINING_PATHS" >>"$LOG_FILE" || exit 1
+                fi
 
                 exit 0
 
