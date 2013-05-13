@@ -65,17 +65,20 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index.
+        DESCR  : &g_dyn_query_column_index_descr
+                 Column index.
       - NAME   : value
         TYPES  : [bool, int64_t, float, double, StringData, BinaryData, Date]
-        DESCR  : The value.
+        DESCR  : &g_dyn_query_value_descr
+                 The value.
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : &g_dyn_query_case_sensitive_descr
                  'String match can be performed case sensitive or not. Default: <code>true</code>.'
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : &g_dyn_query_return_query_object_descr
+                 The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_equals
@@ -103,16 +106,16 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index.
+        DESCR  : *g_dyn_query_column_index_descr
       - NAME   : value
         TYPES  : [bool, int64_t, float, double, StringData, Date]
-        DESCR  : The value.
+        DESCR  : *g_dyn_query_value_descr
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : 'String match can be performed case sensitive or not. Default: <code>true</code>.'
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_dyn_query_return_query_object_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_notEquals
@@ -134,13 +137,13 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index.
+        DESCR  : *g_dyn_query_column_index_descr
       - NAME   : value
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : The value.
+        DESCR  : *g_dyn_query_value_descr
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_dyn_query_return_query_object_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_greaterThan
@@ -162,13 +165,13 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index.
+        DESCR  : *g_dyn_query_column_index_descr
       - NAME   : value
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : The value.
+        DESCR  : *g_dyn_query_value_descr
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_dyn_query_return_query_object_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_greaterThanOrEqual
@@ -190,13 +193,13 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index.
+        DESCR  : *g_dyn_query_column_index_descr
       - NAME   : value
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : The value.
+        DESCR  : *g_dyn_query_value_descr
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_dyn_query_return_query_object_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_lessThan
@@ -218,13 +221,13 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index.
+        DESCR  : *g_dyn_query_column_index_descr
       - NAME   : value
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : The value.
+        DESCR  : *g_dyn_query_value_descr
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_dyn_query_return_query_object_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_lessThanOrEqual
@@ -246,7 +249,7 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index.
+        DESCR  : *g_dyn_query_column_index_descr
       - NAME   : from
         TYPES  : [int64_t, float, double, Date]
         DESCR  : Lowest value of range (inclusive).
@@ -255,7 +258,7 @@ CATEGORIES :
         DESCR  : Highest value of range (inclusive).
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_dyn_query_return_query_object_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_between
@@ -272,16 +275,16 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index.
+        DESCR  : *g_dyn_query_column_index_descr
       - NAME   : value
         TYPES  : [StringData, BinaryData]
-        DESCR  : The value.
+        DESCR  : *g_dyn_query_value_descr
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : *g_dyn_query_case_sensitive_descr
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_dyn_query_return_query_object_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_startsWith
@@ -298,16 +301,16 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index.
+        DESCR  : *g_dyn_query_column_index_descr
       - NAME   : value
         TYPES  : [StringData, BinaryData]
-        DESCR  : The value.
+        DESCR  : *g_dyn_query_value_descr
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : *g_dyn_query_case_sensitive_descr
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_dyn_query_return_query_object_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_endsWith
@@ -324,7 +327,7 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index.
+        DESCR  : *g_dyn_query_column_index_descr
       - NAME   : value
         TYPES  : [StringData, BinaryData]
         DESCR  : The value
@@ -333,7 +336,7 @@ CATEGORIES :
         DESCR  : *g_dyn_query_case_sensitive_descr
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_dyn_query_return_query_object_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_contains
@@ -353,7 +356,7 @@ CATEGORIES :
                  Start group ("left parenthesis").
       RETURN:
         TYPES  : Query
-        DESCR  : The query object.
+        DESCR  : *g_dyn_query_return_query_object_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_group
@@ -366,7 +369,7 @@ CATEGORIES :
                  Stop group ("right parenthesis").
       RETURN:
         TYPES  : Query
-        DESCR  : The query object.
+        DESCR  : *g_dyn_query_return_query_object_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_group
@@ -378,7 +381,7 @@ CATEGORIES :
                  Logical-or.
       RETURN:
         TYPES  : Query
-        DESCR  : The query object.
+        DESCR  : *g_dyn_query_return_query_object_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_or
@@ -394,7 +397,7 @@ CATEGORIES :
       PARAMS:
       - NAME   : column
         TYPES  : size_t
-        DESCR  : Column index.
+        DESCR  : *g_dyn_query_column_index_descr
       RETURN:
         TYPES  : Query
         DESCR  : The query object.
@@ -409,7 +412,7 @@ CATEGORIES :
                  End of subtable query.
       RETURN:
         TYPES  : Query
-        DESCR  : The query object.
+        DESCR  : *g_dyn_query_return_query_object_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_subtable
@@ -472,7 +475,7 @@ CATEGORIES :
       CONST    : true
       PARAMS:
       - NAME   : column
-        DESCR  : Column index.
+        DESCR  : *g_dyn_query_column_index_descr
         TYPES  : size_t
       - NAME   : start
         TYPES  : size_t
@@ -576,7 +579,8 @@ CATEGORIES :
                  Date    maximum_date(..parameters as above..)
       PARAMS:
       - NAME   : column_ndx
-        DESCR  : Column index. The datatype of the column must match the function called. E.g. <code>maximum_float()</code> can only be used on columns which contains floats.
+        DESCR  : &g_dyn_query_maximum_parm1
+                 Column index. The datatype of the column must match the function called. E.g. <code>maximum_float()</code> can only be used on columns which contains floats.
         TYPES  : size_t
       - NAME   : resultcount
         DESCR  : The number of rows used to find the highest value.
@@ -615,7 +619,8 @@ CATEGORIES :
                  Date    minimum_date(..parameters as above..)
       PARAMS:
       - NAME   : column_ndx
-        DESCR  : Column index. The datatype of the column must match the function called. E.g. <code>minimum_float()</code> can only be used on columns which contains floats.
+        DESCR  : &g_dyn_query_minimum_parm1
+                 Column index. The datatype of the column must match the function called. E.g. <code>minimum_float()</code> can only be used on columns which contains floats.
         TYPES  : size_t
       - NAME   : resultcount
         DESCR  : The number of rows used to find the lowest value.
@@ -656,7 +661,8 @@ CATEGORIES :
                  double average_double(..as above..)
       PARAMS:
       - NAME   : column_ndx
-        DESCR  : Column index. The datatype of the column must match the function called. E.g. <code>average_float()</code> can only be used on columns which contains floats.
+        DESCR  : &g_dyn_query_average_parm1
+                 Column index. The datatype of the column must match the function called. E.g. <code>average_float()</code> can only be used on columns which contains floats.
         TYPES  : size_t
       - NAME   : resultcount
         DESCR  : The number of rows used to calculate the average. If zero, the return value is undefined.

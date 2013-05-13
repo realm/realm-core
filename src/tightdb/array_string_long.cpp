@@ -41,7 +41,8 @@ void ArrayStringLong::add(StringData value)
     bool add_zero_term = true;
     m_blob.add(value.data(), value.size(), add_zero_term);
     size_t end = value.size() + 1;
-    if (!m_offsets.is_empty()) end += m_offsets.back();
+    if (!m_offsets.is_empty()) 
+        end += m_offsets.back();
     m_offsets.add(end);
 }
 

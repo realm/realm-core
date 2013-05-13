@@ -89,19 +89,13 @@ if ! printf "%s\n" "$MODE" | grep -q '^\(src-\|bin-\)\?dist'; then
     fi
     export MAKEFLAGS
 fi
-NEED_USR_LOCAL_LIB_NOTE=""
-USE_LIB64=""
 IS_REDHAT_DERIVATIVE=""
 if [ -e /etc/redhat-release ] || grep -q "Amazon" /etc/system-release 2>/dev/null; then
     IS_REDHAT_DERIVATIVE="1"
 fi
+NEED_USR_LOCAL_LIB_NOTE=""
 if [ "$IS_REDHAT_DERIVATIVE" ]; then
     NEED_USR_LOCAL_LIB_NOTE="1"
-fi
-if [ "$IS_REDHAT_DERIVATIVE" -o -e /etc/SuSE-release ]; then
-    if [ "$ARCH" = "x86_64" -o "$ARCH" = "ia64" ]; then
-        USE_LIB64="1"
-    fi
 fi
 
 
@@ -193,12 +187,7 @@ case "$MODE" in
         if ! [ "$PREFIX" ]; then
             PREFIX="/usr/local"
         fi
-        if [ "$USE_LIB64" ]; then
-            LIBDIR="$PREFIX/lib64"
-        else
-            LIBDIR="$PREFIX/lib"
-        fi
-        make prefix="$PREFIX" libdir="$LIBDIR" install || exit 1
+        make prefix="$PREFIX" install || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
             ldconfig || exit 1
         fi
@@ -740,11 +729,7 @@ EOF
             for x in "$@"; do
                 touch "$TEMP_DIR/select/$x" || exit 1
             done
-            if [ "$USE_LIB64" ]; then
-                LIBDIR="/usr/local/lib64"
-            else
-                LIBDIR="/usr/local/lib"
-            fi
+            LIBDIR="$(make get-libdir)" || exit 1
             path_list_prepend CPATH        "$TIGHTDB_HOME/src"         || exit 1
             path_list_prepend LIBRARY_PATH "$TIGHTDB_HOME/src/tightdb" || exit 1
             path_list_prepend PATH         "$TIGHTDB_HOME/src/tightdb" || exit 1
@@ -790,11 +775,7 @@ EOF
         if sh build.sh install >>"$LOG_FILE" 2>&1; then
             touch ".WAS_INSTALLED" || exit 1
             if [ "$NEED_USR_LOCAL_LIB_NOTE" ]; then
-                if [ "$USE_LIB64" ]; then
-                    LIBDIR="/usr/local/lib64"
-                else
-                    LIBDIR="/usr/local/lib"
-                fi
+                LIBDIR="$(make get-libdir)" || exit 1
                 cat <<EOF
 NOTE:
 Libraries have been installed in $LIBDIR.

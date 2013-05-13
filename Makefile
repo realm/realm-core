@@ -32,3 +32,7 @@ testcase: minimal
 	@$(MAKE) -C test testcase
 testcase-debug: debug
 	@$(MAKE) -C test testcase-debug
+
+# Used by build.sh
+get-libdir:
+	@echo $(libdir)
