@@ -41,7 +41,8 @@ CATEGORIES :
       CONST    : True
       RETURN:
         TYPES  : size_t
-        DESCR  : The number of rows.
+        DESCR  : &g_typed_view_size_return1_descr
+                 The number of rows.
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_size
         DESCR  :
@@ -80,10 +81,12 @@ CATEGORIES :
       PARAMS:
       - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : The row index in the view.
+        DESCR  : &g_typed_view_parameter_row_position_descr
+                 The row index.
       RETURN:
         TYPES  : size_t
-        DESCR  : The row index in the table.
+        DESCR  : &g_typed_view_return_row_position_descr
+                 The row index.
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_get_source_ndx
         DESCR  :
@@ -95,7 +98,7 @@ CATEGORIES :
       PARAMS:
       - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : Position of row to delete.
+        DESCR  : *g_typed_view_parameter_row_position_descr
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_remove
         DESCR  :
@@ -121,7 +124,8 @@ CATEGORIES :
   - g_typed_view_get_subtable:
   - g_typed_view_get_subtable_const:
       NAMES    : get_*
-      SUMMARY  : Get value.
+      SUMMARY  : &g_typed_view_get_summary
+                 Get value.
       DESCR    : This method retrieves the value of a cell.
       SIGNATURE: |
                  bool          get_bool(size_t row_ndx) const;
@@ -139,10 +143,11 @@ CATEGORIES :
       PARAMS:
       - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : The row index.
+        DESCR  : *g_typed_view_parameter_row_position_descr
       RETURN:
         TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed, DataType, TableRef, ConstTableRef]
-        DESCR  : The value.
+        DESCR  : &g_typed_view_value_return_descr
+                 The value.
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_get_xxx
         DESCR  :
@@ -156,8 +161,10 @@ CATEGORIES :
   - g_typed_view_set_binary:
   - g_typed_view_set_mixed:
       NAMES    : set_*
-      SUMMARY  : Set value.
-      DESCR    : This method sets the value of a cell.
+      SUMMARY  : &g_typed_view_set_mixed_summary
+                 Set value.
+      DESCR    : &g_typed_view_set_mixed_descr
+                 This method sets the value of a cell.
       SIGNATURE: |
                  void set_bool(size_t row_ndx, bool value);
                  void set_int(size_t row_ndx, int64_t value);
@@ -171,10 +178,11 @@ CATEGORIES :
       PARAMS:
       - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : The row index.
+        DESCR  : *g_typed_view_parameter_row_position_descr
       - NAME   : value
         TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed]
-        DESCR  : The value.
+        DESCR  : &g_typed_view_value_parameter_descr
+                 The value.
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_set_xxx
         DESCR  :
@@ -182,27 +190,31 @@ CATEGORIES :
   METHODS:
   - g_typed_view_get_subtable_size:
       NAMES    : get_subtable_size
-      SUMMARY  : Get size of subtable.
-      DESCR    : This method gets the size (number of rows) of a subtable.
+      SUMMARY  : &g_typed_view_get_subtable_size_summary
+                 Get size of subtable.
+      DESCR    : &g_typed_view_get_subtable_size_descr
+                 This method gets the size (number of rows) of a subtable.
       CONST    : true
       PARAMS:
       - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : The row index.
+        DESCR  : *g_typed_view_parameter_row_position_descr
       RETURN:
         TYPES  : size_t
-        DESCR  : Number of rows.
+        DESCR  : *g_typed_view_size_return1_descr
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_get_subtable
         DESCR  :
   - g_typed_view_clear_subtable:
       NAMES    : clear_subtable
-      SUMMARY  : Remove rows in subtable.
-      DESCR    : This method removes all rows in a subtable.
+      SUMMARY  : &g_typed_view_clear_subtable_summary
+                 Remove rows in subtable.
+      DESCR    : &g_typed_view_clear_subtable_descr
+                 This method removes all rows in a subtable.
       PARAMS:
       - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : The row index.
+        DESCR  : *g_typed_view_parameter_row_position_descr
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_clear_subtable
         DESCR  :
@@ -215,8 +227,10 @@ CATEGORIES :
   - g_typed_view_find_first_date:
   - g_typed_view_find_first_string:
       NAMES    : find_first_*
-      SUMMARY  : Find first match row.
-      DESCR    : This method finds the first matching row.
+      SUMMARY  : &g_typed_view_find_first_string_summary
+                 Find first match row.
+      DESCR    : &g_typed_view_find_first_string_descr
+                 This method finds the first matching row.
       SIGNATURE: |
                  size_t find_first_int(int64_t value) const;
                  size_t find_first_float(float value) const;
@@ -228,7 +242,7 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [bool, int64_t, Date, StringData]
-        DESCR  : The value.
+        DESCR  : *g_typed_view_value_parameter_descr
       RETURN:
         TYPES  : size_t
         DESCR  : "The row index or <code>tightdb::not_found</code> (equal to <code>std::size_t(-1)</code>) if there is no match."
@@ -270,10 +284,11 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [bool, int64_t, float, double, Date, StringData]
-        DESCR  : The value.
+        DESCR  : *g_typed_view_value_parameter_descr
       RETURN:
         TYPES  : TableView
-        DESCR  : The view.
+        DESCR  : &g_typed_view_find_all_return1_descr
+                 The view.
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_find_all_xxx
         DESCR  :
@@ -326,7 +341,8 @@ CATEGORIES :
                  double  maximum_double() const;
       RETURN:
         TYPES  : [int64_t, float, double]
-        DESCR  : The maximum value.
+        DESCR  : &g_typed_view_maximum_return1_descr
+                 The maximum value.
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_maximum
         DESCR  :
@@ -345,7 +361,8 @@ CATEGORIES :
                  double  minimum_double() const;
       RETURN:
         TYPES  : [int64_t, float, double]
-        DESCR  : The minimum value.
+        DESCR  : &g_typed_view_minimum_return1_descr
+                 The minimum value.
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_minimum
         DESCR  :
@@ -364,7 +381,8 @@ CATEGORIES :
                  double average_double() const;
       RETURN:
         TYPES  : [int64_t, float, double]
-        DESCR  : The average value.
+        DESCR  : &g_typed_view_average_return1_descr
+                 The average value.
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_average
         DESCR  :
@@ -383,7 +401,8 @@ CATEGORIES :
       PARAMS:
       - NAME   : out
         TYPES  : std::ostream&
-        DESCR  : Output stream.
+        DESCR  : &g_typed_view_to_json_parm1_descr
+                 Output stream.
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_to_json
         DESCR  :
@@ -398,10 +417,12 @@ CATEGORIES :
       PARAMS:
       - NAME   : out
         TYPES  : std::ostream&
-        DESCR  : Output stream.
+        DESCR  : &g_typed_view_to_string_parm1_descr
+                 Output stream.
       - NAME   : limit
         TYPES  : size_t
-        DESCR  : "The number of rows to convert. Default: 500."
+        DESCR  : &g_typed_view_to_string_parm2_descr
+                 "The number of rows to convert. Default: 500."
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_to_string
         DESCR  :
