@@ -13,6 +13,10 @@ Format:
 ==================
 
 
+2013-05-13 (Kenneth Geisshirt)
+. Added "uninstall" target in build.sh for simple uninstallation.
+
+
 2013-05-07 (Kristian Spangsege)
 . Exception File::OpenError renamed to File::AccessError. This affects
   various methods in Group and SharedGroup.

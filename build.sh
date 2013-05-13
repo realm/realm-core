@@ -205,6 +205,28 @@ case "$MODE" in
         exit 0
         ;;
 
+    "uninstall")
+        if [ "$OS" = "Darwin" ]; then
+            find /usr/ /Library/Java /System/Library/Java /Library/Python -ipath '*tightdb*' -print
+            echo
+            echo "Do you wish to delete the above files (Y/N)?"
+            read answer
+            if [ "$answer" = "y" -o "$answer" = "Y" ]; then
+                find /usr/ /Library/Java /System/Library/Java /Library/Python -ipath '*tightdb*' -delete
+            fi
+        else
+            find /usr/ -ipath '*tightdb*' -print
+            echo
+            echo "Do you wish to delete the above files (Y/N)?"
+            read answer
+            if [ "$answer" = "y" -o "$answer" = "Y" ]; then
+                find /usr/ -ipath '*tightdb*' -delete
+                ldconfig
+            fi
+        fi
+        exit 0
+        ;;
+
     "test-installed")
         PREFIX="$1"
         make -C "test-installed" clean || exit 1

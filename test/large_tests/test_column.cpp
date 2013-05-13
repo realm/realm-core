@@ -29,7 +29,7 @@ uint64_t rand2(int bitwidth = 64)
 
 }
 
-#if 1
+#if 0
 
 TEST(LESS)
 {

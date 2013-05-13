@@ -314,7 +314,6 @@ TEST(Table_HighLevelCopy)
     CHECK(*table3 == table);
 }
 
-
 namespace {
 
 void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
