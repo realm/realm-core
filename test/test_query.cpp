@@ -2313,11 +2313,17 @@ TEST(TestQuerySyntaxCheck)
     s = q6.Verify();
     CHECK(s != "");
 #endif
+
+// FIXME: Work is currently underway to fully support locale
+// indenepdent case folding as defined by Unicode. Reenable this test
+// when is becomes available.
+/*
     TupleTableType::Query q7 = ttt.where().second.equal("\xa0", false);
 #ifdef TIGHTDB_DEBUG
     s = q7.Verify();
     CHECK(s != "");
 #endif
+*/
 }
 
 TEST(TestTV)
