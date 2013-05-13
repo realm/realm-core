@@ -571,11 +571,11 @@ TEST(TestQueryStrEnum)
 	int aa;
 	int64_t s;
 
-	for(int i = 0; i < 100; i++) {
+	for (int i = 0; i < 100; i++) {
 		ttt.clear();
 		aa = 0;
-		for(size_t t = 0; t < 2000; t++) {
-			if(rand() % 3 == 0) {
+		for (size_t t = 0; t < 2000; t++) {
+			if (rand() % 3 == 0) {
 				ttt.add(1, "AA");
 				aa++;
 			}

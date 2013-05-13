@@ -44,7 +44,8 @@ CATEGORIES:
       PARAMS:
       - NAME   : v
         TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData]
-        DESCR  : The value.
+        DESCR  : &g_mixed_constructor_parm1_descr
+                 The value.
       EXAMPLES:
       - CODE   : ex_cpp_mixed_constructor
         DESCR  :
@@ -59,7 +60,8 @@ CATEGORIES:
       CONST    : True
       RETURN:
         TYPES  : DataType
-        DESCR  : The type.
+        DESCR  : &g_mixed_get_type_return1_descr
+                 The type.
       EXAMPLES:
       - CODE   : ex_cpp_mixed_get_type
         DESCR  :
@@ -84,7 +86,8 @@ CATEGORIES:
       CONST    : True
       RETURN:
         TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData]
-        DESCR  : The value.
+        DESCR  : g_mixed_get_return1_descr
+                 The value.
       EXAMPLES:
       - CODE   : ex_cpp_mixed_get_value
         DESCR  :
