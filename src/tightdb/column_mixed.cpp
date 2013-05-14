@@ -143,7 +143,8 @@ void ColumnMixed::erase(size_t ndx)
     invalidate_subtables();
 }
 
-void ColumnMixed::move_last_over(size_t ndx) {
+void ColumnMixed::move_last_over(size_t ndx) 
+{
     TIGHTDB_ASSERT(ndx+1 < Size());
 
     // Remove refs or binary data
@@ -293,7 +294,8 @@ bool ColumnMixed::compare(const ColumnMixed& c) const
         case type_Table: {
                 ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
                 ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();
-                if (*t1 != *t2) return false;
+                if (*t1 != *t2) 
+                    return false;
             }
             break;
         case type_Mixed:
@@ -312,7 +314,8 @@ void ColumnMixed::Verify() const
     m_array->Verify();
     m_types->Verify();
     m_refs->Verify();
-    if (m_data) m_data->Verify();
+    if (m_data) 
+        m_data->Verify();
 
     // types and refs should be in sync
     const size_t types_len = m_types->Size();
@@ -323,7 +326,8 @@ void ColumnMixed::Verify() const
     const size_t count = Size();
     for (size_t i = 0; i < count; ++i) {
         const int64_t v = m_refs->get(i);
-        if (v == 0 || v & 0x1) continue;
+        if (v == 0 || v & 0x1)
+            continue;
         ConstTableRef subtable = m_refs->get_subtable(i);
         subtable->Verify();
     }
@@ -335,7 +339,8 @@ void ColumnMixed::ToDot(ostream& out, StringData title) const
 
     out << "subgraph cluster_columnmixed" << ref << " {" << endl;
     out << " label = \"ColumnMixed";
-    if (0 < title.size()) out << "\\n'" << title << "'";
+    if (0 < title.size())
+        out << "\\n'" << title << "'";
     out << "\";" << endl;
 
     m_array->ToDot(out, "mixed_top");
@@ -344,7 +349,8 @@ void ColumnMixed::ToDot(ostream& out, StringData title) const
     const size_t count = Size();
     for (size_t i = 0; i < count; ++i) {
         const MixedColType type = MixedColType(m_types->get(i));
-        if (type != mixcol_Table) continue;
+        if (type != mixcol_Table)
+            continue;
         ConstTableRef subtable = m_refs->get_subtable(i);
         subtable->to_dot(out);
     }
