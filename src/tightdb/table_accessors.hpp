@@ -848,6 +848,11 @@ public:
         return Base::m_table->get_impl()->find_first_int(col_idx, value);
     }
 
+    bool find_sorted(int64_t value, std::size_t& pos) const
+    {
+        return Base::m_table->get_impl()->find_sorted_int(col_idx, value, pos);
+    }
+
     // FIXME: What does this function do? It is used by SlabAlloc. Table::find_pos_int() is protected. Something is not right!
     std::size_t find_pos(int64_t value) const TIGHTDB_NOEXCEPT
     {

@@ -25,7 +25,7 @@
     <ClCompile Include="test\testcolumnstring.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testearraybinary.cpp">
+    <ClCompile Include="test\test_array_binary.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="test\testgroup.cpp">
@@ -133,7 +133,7 @@
     <ClCompile Include="src\tightdb\file.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\tightdb\pthread_helpers.cpp">
+    <ClCompile Include="src\tightdb\thread.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\tightdb\index_string.cpp">
@@ -151,7 +151,7 @@
     <ClCompile Include="src\tightdb\terminate.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="test\transactions.cpp">
+    <ClCompile Include="test\test_transactions.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="test\testarrayfloat.cpp">
@@ -334,7 +334,7 @@
     <ClInclude Include="src\tightdb\string_buffer.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\pthread_helpers.hpp">
+    <ClInclude Include="src\tightdb\thread.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\tightdb_nmmintrin.h">

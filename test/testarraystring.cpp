@@ -478,6 +478,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringDestroy)
 TEST(ArrayStringCompare)
 {
     ArrayString a, b;
+
     CHECK(a.Compare(b));
     a.add("");
     CHECK(!a.Compare(b));
@@ -485,4 +486,7 @@ TEST(ArrayStringCompare)
     CHECK(!a.Compare(b));
     a.set(0, "x");
     CHECK(a.Compare(b));
+
+    a.Destroy();
+    b.Destroy();
 }

@@ -1625,6 +1625,15 @@ size_t Table::find_first_int(size_t column_ndx, int64_t value) const
     return column.find_first(value);
 }
 
+bool Table::find_sorted_int(size_t column_ndx, int64_t value, size_t& pos) const
+{
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Int);
+    const Column& column = GetColumn(column_ndx);
+
+    return column.find_sorted(value, pos);
+}
+
 size_t Table::find_first_bool(size_t column_ndx, bool value) const
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
@@ -2364,7 +2373,7 @@ inline void out_string(ostream& out, const string text, const size_t max_len)
 
 inline void out_table(ostream& out, const size_t len)
 {
-    const size_t width = out.width() - chars_in_int(len) - 1;
+    const streamsize width = out.width() - chars_in_int(len) - 1;
     out.width(width);
     out << "[" << len << "]";
 }

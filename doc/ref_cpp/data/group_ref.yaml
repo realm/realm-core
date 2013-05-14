@@ -59,7 +59,8 @@ CATEGORIES:
       PARAMS:
       - NAME   : file
         TYPES  : const std::string&
-        DESCR  : Filesystem path of the TightDB database file to be opened.
+        DESCR  : &g_group_constructor_memory_parm1_descr
+                 Filesystem path of the TightDB database file to be opened.
       - NAME   : mode
         TYPES  : Group::OpenMode
         DESCR  : |
@@ -68,15 +69,18 @@ CATEGORIES:
                  Group::mode_NoCreate: Open in read/write mode, fail if the file does not already exist.
       - NAME   : buffer
         TYPES  : BinaryData
-        DESCR  : In-memory binary encoded representation of a group.
+        DESCR  : &g_group_constructor_memory_parm3_descr
+                 In-memory binary encoded representation of a group.
       RETURN:
         TYPES  : Group
-        DESCR  : A - possibly empty - group.
+        DESCR  : &g_group_constructor_memory_return1_descr
+                 A - possibly empty - group.
       THROWS:
-      - EXCEPT : File::OpenError
-        DESCR  : If the file (or buffer) could not be opened. If the reason
+      - EXCEPT : File::AccessError
+        DESCR  : &g_group_constructor_memory_throws_descr
+                 If the file (or buffer) could not be opened. If the reason
                  corresponds to one of the exception types that are
-                 derived from File::OpenError, the derived exception
+                 derived from File::AccessError, the derived exception
                  type is thrown. Note that InvalidDatabase is among
                  these derived exception types.
       EXAMPLES:
@@ -137,7 +141,8 @@ CATEGORIES:
       CONST    : true
       RETURN:
         TYPES  : size_t
-        DESCR  : The number of tables.
+        DESCR  : &g_group_size_return1_descr
+                 The number of tables.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_traverse
@@ -173,14 +178,17 @@ CATEGORIES:
       PARAMS:
       - NAME   : name
         TYPES  : StringData
-        DESCR  : >
+        DESCR  : &g_group_get_table_parm1_descr
+                 >
                  Name of the table you wish to retrieve.
       - NAME   : tableclass
         TYPES  : class definition
-        DESCR  : Typed table class.
+        DESCR  : &g_group_get_table_parm2_descr
+                 Typed table class.
       RETURN:
         TYPES  : [TableRef, ConstTableRef]
-        DESCR  : A table reference object.
+        DESCR  : &g_group_get_table_return1_descr
+                 A table reference object.
       EXAMPLES:
       -  DESCR :
          CODE  : ex_cpp_group_traverse
@@ -209,7 +217,8 @@ CATEGORIES:
       PARAMS:
       - NAME   : name
         TYPES  : StringData
-        DESCR  : Name of the table you wish to look for.
+        DESCR  : &g_group_has_table_parm1_descr
+                 Name of the table you wish to look for.
       RETURN:
         TYPES  : bool
         DESCR  : <code>true</code> if the table exits, otherwise <code>false</code>.
@@ -226,10 +235,12 @@ CATEGORIES:
       PARAMS:
       - NAME   : table_ndx
         TYPES  : size_t
-        DESCR  : Table index.
+        DESCR  : &g_group_get_table_name_parm1_descr
+                 Table index.
       RETURN:
         TYPES  : StringData
-        DESCR  : The table name.
+        DESCR  : &g_group_get_table_name_return1_descr
+                 The table name.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_traverse
@@ -246,12 +257,14 @@ CATEGORIES:
       PARAMS:
       - NAME   : file
         TYPES  : const std::string&
-        DESCR  : A filesystem path.
+        DESCR  : &g_group_write_to_file_parm1_descr
+                 A filesystem path.
       THROWS:
-      - EXCEPT : File::OpenError
-        DESCR  : If the file could not be opened. If the reason
+      - EXCEPT : File::AccessError
+        DESCR  : &g_group_write_to_file_throws_descr
+                 If the file could not be opened. If the reason
                  corresponds to one of the exception types that are
-                 derived from File::OpenError, the derived exception
+                 derived from File::AccessError, the derived exception
                  type is thrown.
       EXAMPLES:
       - DESCR  :
@@ -266,7 +279,8 @@ CATEGORIES:
                  allocated using std::malloc(). The ownership of the buffer is passed to the caller.
       CONST    : true
       RETURN:
-        DESCR  : The allocated buffer. You will have to call std::free() when you are done with it.
+        DESCR  : &g_group_write_to_mem_return1_descr
+                 The allocated buffer. You will have to call std::free() when you are done with it.
         TYPES  : BinaryData
       EXAMPLES:
       - DESCR  :
@@ -297,7 +311,8 @@ CATEGORIES:
       PARAMS:
       - NAME   : out
         TYPES  : std::ostream&
-        DESCR  : The output stream.
+        DESCR  : &g_group_tostring_parm1_descr
+                 The output stream.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_tostring
@@ -353,18 +368,22 @@ CATEGORIES:
       PARAMS:
       - NAME   : file
         TYPES  : const std::string&
-        DESCR  : Filesytem path of the TightDB database file to be opened.
+        DESCR  : &g_group_open_memory_parm1_descr
+                 Filesystem path of the TightDB database file to be opened.
       - NAME   : mode
         TYPES  : Group::OpenMode
-        DESCR  : See Group().
+        DESCR  : &g_group_open_memory_parm2_descr
+                 See Group().
       - NAME   : buffer
         TYPES  : BinaryData
-        DESCR  : In-memory binary encoded representation of a group.
+        DESCR  : &g_group_open_memory_parm3_descr
+                 In-memory binary encoded representation of a group.
       THROWS:
-      - EXCEPT : File::OpenError
-        DESCR  : If the file (or buffer) could not be opened. If the reason
+      - EXCEPT : File::AccessError
+        DESCR  : &g_group_open_memory_throws_descr
+                 If the file (or buffer) could not be opened. If the reason
                  corresponds to one of the exception types that are
-                 derived from File::OpenError, the derived exception
+                 derived from File::AccessError, the derived exception
                  type is thrown. Note that InvalidDatabase is among
                  these derived exception types.
       EXAMPLES:

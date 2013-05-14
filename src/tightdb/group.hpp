@@ -89,9 +89,9 @@ public:
     ///
     /// \param file Filesystem path to a TightDB database file.
     ///
-    /// \throw File::OpenError If the file could not be opened. If the
-    /// reason corresponds to one of the exception types that are
-    /// derived from File::OpenError, the derived exception type is
+    /// \throw File::AccessError If the file could not be opened. If
+    /// the reason corresponds to one of the exception types that are
+    /// derived from File::AccessError, the derived exception type is
     /// thrown. Note that InvalidDatabase is among these derived
     /// exception types.
     void open(const std::string& file, OpenMode = mode_Normal);
@@ -152,9 +152,9 @@ public:
     ///
     /// \param file A filesystem path.
     ///
-    /// \throw File::OpenError If the file could not be opened. If the
-    /// reason corresponds to one of the exception types that are
-    /// derived from File::OpenError, the derived exception type is
+    /// \throw File::AccessError If the file could not be opened. If
+    /// the reason corresponds to one of the exception types that are
+    /// derived from File::AccessError, the derived exception type is
     /// thrown.
     void write(const std::string& file) const;
 
@@ -206,10 +206,6 @@ protected:
     void init_shared();
     size_t commit(size_t current_version, size_t readlock_version, bool doPersist);
     void rollback();
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    void set_replication(Replication* r) { m_alloc.set_replication(r); }
-#endif
 
     SlabAlloc& get_allocator() {return m_alloc;}
     Array& get_top_array() {return m_top;}
@@ -273,6 +269,8 @@ private:
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     friend class Replication;
+    Replication* get_replication() const TIGHTDB_NOEXCEPT { return m_alloc.get_replication(); }
+    void set_replication(Replication* r) TIGHTDB_NOEXCEPT { m_alloc.set_replication(r); }
 #endif
 };
 

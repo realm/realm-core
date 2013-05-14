@@ -97,8 +97,6 @@ protected:
     // Tree functions
 public:
     template<typename T, class C> T TreeGet(size_t ndx) const; // FIXME: This one should probably be eliminated or redesiged because it throws due to dynamic memory allocation
-    template<class C> size_t TreeGetLeafRef(size_t ndx) const; // FIXME: This one should probably be eliminated or redesiged because it throws due to dynamic memory allocation
-
 protected:
 	template<typename T, class C> void TreeSet(size_t ndx, T value);
     template<typename T, class C> void TreeInsert(size_t ndx, T value);
@@ -189,12 +187,13 @@ public:
 
     void Increment64(int64_t value, size_t start=0, size_t end=-1);
     void IncrementIf(int64_t limit, int64_t value);
-    size_t find_first(int64_t value, size_t start=0, size_t end=-1) const;
 
-    void find_all(Array& result, int64_t value, size_t caller_offset=0, size_t start=0, size_t end=-1) const;
-    void find_all_hamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
+    size_t find_first(int64_t value, size_t start=0, size_t end=-1) const;
+    void   find_all(Array& result, int64_t value, size_t caller_offset=0, size_t start=0, size_t end=-1) const;
+    void   find_all_hamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
     size_t find_pos(int64_t value) const TIGHTDB_NOEXCEPT;
-    size_t find_pos2(int64_t value) const;
+    size_t find_pos2(int64_t value) const TIGHTDB_NOEXCEPT;
+    bool   find_sorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT;
 
     // Query support methods
     void LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const;

@@ -210,7 +210,7 @@ CATEGORIES :
 #          void        remove_column(const vector<size_t>& column_path);
 
   - g_dyn_table_remove_column:
-      NAMES    : removeColumn
+      NAMES    : remove_column
       SUMMARY  : &g_dyn_table_remove_column_summary
                  Delete a column.
       DESCR    : &g_dyn_table_remove_column_descr
@@ -218,8 +218,6 @@ CATEGORIES :
                  It can be called on active tables with content.
                  The indexes of the columns after this one will be decremented -
                  i.e. they are moved one position left.
- #     SIGNATURE: |
- #                void remove_column(size_t column_ndx);
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
@@ -231,12 +229,13 @@ CATEGORIES :
       SEE      : See also {@link g_dyn_table_get_column_index} to get the column
                  index from the column name.
   - g_dyn_table_rename_column:
-      NAMES    : renameColumn
+      NAMES    : rename_column
       SUMMARY  : &g_dyn_table_rename_column_summary
                  Rename a column.
       DESCR    : &g_dyn_table_rename_column_descr
                  This method renames the specified column.
-#      SIGNATURE: |
+# TODO: Add when vector indexing has been fixed
+#      SIGNATURE: | 
 #                 void rename_column(size_t column_ndx, StringData name);
 #                 void rename_column(const vector<size_t>& column_path, StringData name);
       PARAMS:
@@ -295,10 +294,12 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_name
         TYPES  : StringData
-        DESCR  : The name of the column to find.
+        DESCR  : &g_dyn_table_name_of_column_descr
+                 The name of the column to find.
       RETURN:
         TYPES  : size_t
-        DESCR  : The column index or <code>std::size_t(-1)</code> if there is no column with the specified name.
+        DESCR  : &g_dyn_table_column_index_return_descr
+                 The column index or <code>std::size_t(-1)</code> if there is no column with the specified name.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_column_index
         DESCR  :
@@ -325,13 +326,32 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.
+        DESCR  : &g_dyn_table_get_column_type_parm1_descr
+                 The column index.
       RETURN:
         TYPES  : DataType
-        DESCR  : The column type.
+        DESCR  : &g_dyn_table_get_column_type_return1_descr
+                 The column type.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_column_type
         DESCR  :
+  - g_dyn_table_add_int:
+      NAMES    : add_int
+      SUMMARY  : &g_dyn_table_add_int_summary
+                 Add value to all cells in a column.
+      DESCR    : &g_dyn_table_add_int_descr
+                 Add an integer value to all the cells in the specified column. 
+                 There is no overflow or underflow protection.
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : &g_dyn_table_add_int_parm1_descr
+                 Index of the column. The column must be of DataType <code>type_Int</code>.
+      - NAME   : value
+        TYPES  : int64_t
+        DESCR  : &g_dyn_table_add_int_parm2_descr
+                 Value to add to all cells in the column.
+        
 - Rows:
   METHODS:
   - g_dyn_table_add_empty_row:
@@ -346,14 +366,15 @@ CATEGORIES :
       PARAMS:
       - NAME   : num_rows
         TYPES  : size_t
-        DESCR  : "Number of rows to add (default: 1)."
+        DESCR  : &g_dyn_table_add_empty_row_parm1_descr
+                 "Number of rows to add (default: 1)."
   - g_dyn_table_insert_empty_row:
       NAMES    : insert_empty_row
       SUMMARY  : &g_dyn_table_insert_empty_row_summary
                  Insert empty rows.
       DESCR    : &g_dyn_table_insert_empty_row_descr
                  This method inserts one or more empty rows with default values at a given position.
-                 The default cell values are 0, null, or "", as appropriate to the column types .
+                 The default cell values are 0, null, or "", as appropriate to the column types.
       SIGNATURE: |
                  void insert_empty_row(size_t row_ndx, size_t num_rows = 1)
       PARAMS:
@@ -400,13 +421,16 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.
+        DESCR  : &g_dyn_table_insert_parm1_descr
+                 The column index.
       - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : The row index.
+        DESCR  : &g_dyn_table_insert_parm2_descr
+                 The row index.
       - NAME   : value
         TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed]
-        DESCR  : The value to insert.
+        DESCR  : &g_dyn_table_insert_parm3_descr
+                 The value to insert.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_insert_xxx
         DESCR  :
@@ -614,7 +638,8 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : StringData
-        DESCR  : The value to search for.
+        DESCR  : &g_dyn_table_lookup_parm1_descr
+                 The value to search for.
       RETURN:
         TYPES  : size_t
         DESCR  : &g_dyn_table_lookup_return_descr
@@ -709,6 +734,29 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_find_all_xxx
         DESCR  :
+  - g_find_sorted_int:
+      NAMES    : find_sorted_*
+      SUMMARY  : Find matching row or insert position in sorted column.
+      DESCR    : This method is used for making quick lookups and maintaining order in sorted columns.
+      SIGNATURE: |
+                 bool find_sorted_int(size_t column_ndx, int64_t value, size_t& pos) const;
+      CONST    : True
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : The column index.
+      - NAME   : value
+        TYPES  : int64_t
+        DESCR  : The value.
+      - NAME   : pos
+        TYPES  : "size_t&"
+        DESCR  : Position of matching value or insert position.
+      RETURN:
+        TYPES  : bool
+        DESCR  : "true if value was found, otherwise false."
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_find_first_xxx
+        DESCR  :
   - g_dyn_table_get_sorted_view:
   - g_dyn_table_get_sorted_view_const:
       NAMES    : get_sorted_view
@@ -723,7 +771,8 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index (starting from 0).
+        DESCR  : &g_dyn_table_get_sorted_view_const_parm1_descr
+                 The column index (starting from 0).
       - NAME   : ascending
         TYPES  : bool
         DESCR  : &cpp_dyn_table_get_sorted_view_param
@@ -910,10 +959,12 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index.
+        DESCR  : &g_dyn_table_average_parm1_descr
+                 Column index.
       RETURN:
         TYPES  : [int64_t, float, double]
-        DESCR  : The average value in the column.
+        DESCR  : &g_dyn_table_average_return1_descr
+                 The average value in the column.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_average
         DESCR  :
@@ -948,10 +999,12 @@ CATEGORIES :
       PARAMS:
       - NAME   : out
         TYPES  : std::ostream&
-        DESCR  : Output stream.
+        DESCR  : &g_dyn_table_to_string_parm1_descr
+                 Output stream.
       - NAME   : limit
         TYPES  : size_t
-        DESCR  : "The number of rows to convert. Default: 500."
+        DESCR  : &g_dyn_table_to_string_parm2_descr
+                 "The number of rows to convert. Default: 500."
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_to_string
         DESCR  :
@@ -968,10 +1021,12 @@ CATEGORIES :
       PARAMS:
       - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : The row index.
+        DESCR  : &g_dyn_table_row_to_string_parm1_descr
+                 The row index.
       - NAME   : out
         TYPES  : std::ostream&
-        DESCR  : Output stream.
+        DESCR  : &g_dyn_table_row_to_string_parm2_descr
+                 Output stream.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_to_string
         DESCR  :

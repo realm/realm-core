@@ -48,6 +48,7 @@ public:
     size_t find_first(StringData value) const;
     void   find_all(Array& result, StringData value) const;
     void   distinct(Array& result) const;
+    FindRes find_all(StringData value, size_t& ref) const;
 
     void update_ref(StringData value, size_t old_row_ndx, size_t new_row_ndx);
 

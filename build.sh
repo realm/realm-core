@@ -8,6 +8,9 @@ MODE="$1"
 
 EXTENSIONS="java python objc node php c gui"
 
+if [ "$TIGHTDB_ENABLE_REPLICATION" ]; then
+    EXTENSIONS="$EXTENSIONS replication"
+fi
 
 
 map_ext_name_to_dir()
@@ -198,6 +201,28 @@ case "$MODE" in
         make prefix="$PREFIX" libdir="$LIBDIR" install || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
             ldconfig || exit 1
+        fi
+        exit 0
+        ;;
+
+    "uninstall")
+        if [ "$OS" = "Darwin" ]; then
+            find /usr/ /Library/Java /System/Library/Java /Library/Python -ipath '*tightdb*' -print
+            echo
+            echo "Do you wish to delete the above files (Y/N)?"
+            read answer
+            if [ "$answer" = "y" -o "$answer" = "Y" ]; then
+                find /usr/ /Library/Java /System/Library/Java /Library/Python -ipath '*tightdb*' -delete
+            fi
+        else
+            find /usr/ -ipath '*tightdb*' -print
+            echo
+            echo "Do you wish to delete the above files (Y/N)?"
+            read answer
+            if [ "$answer" = "y" -o "$answer" = "Y" ]; then
+                find /usr/ -ipath '*tightdb*' -delete
+                ldconfig
+            fi
         fi
         exit 0
         ;;
