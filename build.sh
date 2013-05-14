@@ -66,6 +66,17 @@ path_list_prepend()
     return 0
 }
 
+word_list_reverse()
+{
+    local arg
+    if [ "$#" -gt "0" ]; then
+        arg="$1"
+        shift
+        word_list_reverse "$@"
+        echo "$arg"
+    fi
+}
+
 
 
 # Setup OS specific stuff
@@ -639,7 +650,7 @@ EOF
                 INSTALL_COPY="$TEMP_DIR/install_copy"
                 cp -r "$INSTALL_ROOT" "$INSTALL_COPY" || exit 1
 
-                for x in $(printf "%s\n" $AVAIL_EXTENSIONS | tac); do
+                for x in $(word_list_reverse $AVAIL_EXTENSIONS); do
                     message "Uninstalling extension '$x' from test location"
                     EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
                     if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" uninstall "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
@@ -830,7 +841,7 @@ EOF
         chmod a+rx "$TEMP_DIR" || exit 1
         LOG_FILE="$TEMP_DIR/uninstall.log"
         ERROR=""
-        for x in $(printf "%s\n" $EXTENSIONS | tac); do
+        for x in $(word_list_reverse $EXTENSIONS); do
             echo "UNINSTALLING Extension '$x'" | tee -a "$LOG_FILE"
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if ! sh "$EXT_HOME/build.sh" uninstall >>"$LOG_FILE" 2>&1; then
