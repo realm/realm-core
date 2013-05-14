@@ -66,6 +66,17 @@ path_list_prepend()
     return 0
 }
 
+word_list_reverse()
+{
+    local arg
+    if [ "$#" -gt "0" ]; then
+        arg="$1"
+        shift
+        word_list_reverse "$@"
+        echo "$arg"
+    fi
+}
+
 
 
 # Setup OS specific stuff
@@ -195,23 +206,13 @@ case "$MODE" in
         ;;
 
     "uninstall")
-        if [ "$OS" = "Darwin" ]; then
-            find /usr/ /Library/Java /System/Library/Java /Library/Python -ipath '*tightdb*' -print
-            echo
-            echo "Do you wish to delete the above files (Y/N)?"
-            read answer
-            if [ "$answer" = "y" -o "$answer" = "Y" ]; then
-                find /usr/ /Library/Java /System/Library/Java /Library/Python -ipath '*tightdb*' -delete
-            fi
-        else
-            find /usr/ -ipath '*tightdb*' -print
-            echo
-            echo "Do you wish to delete the above files (Y/N)?"
-            read answer
-            if [ "$answer" = "y" -o "$answer" = "Y" ]; then
-                find /usr/ -ipath '*tightdb*' -delete
-                ldconfig
-            fi
+        PREFIX="$1"
+        if ! [ "$PREFIX" ]; then
+            PREFIX="/usr/local"
+        fi
+        make prefix="$PREFIX" uninstall || exit 1
+        if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
+            ldconfig || exit 1
         fi
         exit 0
         ;;
@@ -220,6 +221,15 @@ case "$MODE" in
         PREFIX="$1"
         make -C "test-installed" clean || exit 1
         make -C "test-installed" test  || exit 1
+        exit 0
+        ;;
+
+    "wipe-installed")
+        if [ "$OS" = "Darwin" ]; then
+            find /usr/ /Library/Java /System/Library/Java /Library/Python -ipath '*tightdb*' -delete || exit 1
+        else
+            find /usr/ -ipath '*tightdb*' -delete && ldconfig || exit 1
+        fi
         exit 0
         ;;
 
@@ -447,6 +457,11 @@ if [ \$# -eq 1 -a "\$1" = "install" ]; then
     exit 0
 fi
 
+if [ \$# -eq 1 -a "\$1" = "uninstall" ]; then
+    sh tightdb/build.sh dist-uninstall || exit 1
+    exit 0
+fi
+
 if [ \$# -eq 1 -a "\$1" = "test" ]; then
     sh tightdb/build.sh dist-test-installed || exit 1
     exit 0
@@ -488,9 +503,15 @@ EOI
                 cat <<EOI >"$PKG_DIR/README"
 Build specific extensions: ./build  EXT1  [EXT2]...
 Build everything:          ./build  all
-Install what was built:    sudo  ./build  install
-Test installation:         ./build  test
 Start from scratch:        ./build  clean
+Install what was built:    sudo  ./build  install
+Uninstall everything:      sudo  ./build  uninstall
+Test installation:         ./build  test
+
+Normally you can do with just:
+
+    ./build all
+    sudo ./build install
 
 Available extensions are: ${AVAIL_EXTENSIONS:-None}
 
@@ -624,6 +645,29 @@ EOF
                         fi
                     fi
                 done
+
+                # Copy the installation test directory to allow later inspection
+                INSTALL_COPY="$TEMP_DIR/install_copy"
+                cp -r "$INSTALL_ROOT" "$INSTALL_COPY" || exit 1
+
+                for x in $(word_list_reverse $AVAIL_EXTENSIONS); do
+                    message "Uninstalling extension '$x' from test location"
+                    EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
+                    if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" uninstall "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
+                        warning "Failed to uninstall extension '$x'"
+                    fi
+                done
+
+                message "Uninstalling core library from test location"
+                if ! sh "$TEST_PKG_DIR/tightdb/build.sh" uninstall "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
+                    warning "Failed to uninstall core library"
+                fi
+
+                REMAINING_PATHS="$(cd "$INSTALL_ROOT" && find * -ipath '*tightdb*')" || exit 1
+                if [ "$REMAINING_PATHS" ]; then
+                    warning "Files and/or directories remain after uninstallation"
+                    printf "%s" "$REMAINING_PATHS" >>"$LOG_FILE" || exit 1
+                fi
 
                 exit 0
 
@@ -792,6 +836,34 @@ EOF
         ;;
 
 
+    "dist-uninstall")
+        TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-uninstall.XXXX)" || exit 1
+        chmod a+rx "$TEMP_DIR" || exit 1
+        LOG_FILE="$TEMP_DIR/uninstall.log"
+        ERROR=""
+        for x in $(word_list_reverse $EXTENSIONS); do
+            echo "UNINSTALLING Extension '$x'" | tee -a "$LOG_FILE"
+            EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
+            if ! sh "$EXT_HOME/build.sh" uninstall >>"$LOG_FILE" 2>&1; then
+                echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
+                ERROR="1"
+            fi
+            rm -f "$EXT_HOME/.WAS_INSTALLED" || exit 1
+        done
+        echo "UNINSTALLING Core library" | tee -a "$LOG_FILE"
+        if ! sh build.sh uninstall >>"$LOG_FILE" 2>&1; then
+            echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
+            ERROR="1"
+        fi
+        rm -f ".WAS_INSTALLED" || exit 1
+        if [ "$ERROR" ]; then
+            echo "Log file is here: $LOG_FILE" 1>&2
+            exit 1
+        fi
+        exit 0
+        ;;
+
+
     "dist-test-installed")
         if ! [ -e ".WAS_INSTALLED" ]; then
             echo "Nothing was installed" 1>&2
@@ -912,8 +984,8 @@ EOF
 
     *)
         echo "Unspecified or bad mode '$MODE'" 1>&2
-        echo "Available modes are: clean build test install test-installed" 1>&2
-        echo "As well as: src-dist bin-dist dist-clean dist-build dist-install dist-test-installed dist-status dist-pull dist-checkout dist-copy" 1>&2
+        echo "Available modes are: clean build test install uninstall test-installed wipe-installed" 1>&2
+        echo "As well as: src-dist bin-dist dist-clean dist-build dist-install dist-uninstall dist-test-installed dist-status dist-pull dist-checkout dist-copy" 1>&2
         exit 1
         ;;
 
