@@ -12,6 +12,27 @@ void ColumnSubtableParent::child_destroyed(size_t subtable_ndx)
     if (m_table && m_subtable_map.empty()) m_table->unbind_ref();
 }
 
+void ColumnSubtableParent::move_last_over(size_t ndx) {
+    TIGHTDB_ASSERT(ndx+1 < Size());
+
+    // Delete sub-tree
+    const size_t ref_columns = GetAsRef(ndx);
+    if (ref_columns != 0) {
+        Allocator& alloc = GetAllocator();
+        Array columns(ref_columns, (Array*)NULL, 0, alloc);
+        columns.Destroy();
+    }
+
+    const size_t ndx_last = Size()-1;
+    const int64_t v = get(ndx_last);
+
+    set(ndx, v);
+
+    // We do a Column::Delete() to avoid
+    // recursive delete of the copied table(s)
+    Column::erase(ndx_last);
+}
+
 bool ColumnTable::has_subtable(size_t ndx) const
 {
     TIGHTDB_ASSERT(ndx < Size());

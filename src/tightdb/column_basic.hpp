@@ -60,6 +60,8 @@ public:
     void Clear() TIGHTDB_OVERRIDE;
     void Resize(size_t ndx);
     void fill(size_t count);
+    // Experimental. Overwrites the row at ndx with the last row and removes the last row. For unordered tables.
+    void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
 
     size_t count(T value) const;
 

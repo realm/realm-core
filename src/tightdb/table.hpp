@@ -158,6 +158,7 @@ public:
     void        insert_empty_row(size_t row_ndx, size_t num_rows = 1);
     void        remove(size_t row_ndx);
     void        remove_last() {if (!is_empty()) remove(m_size-1);}
+    void        move_last_over(size_t ndx);
 
     // Insert row
     // NOTE: You have to insert values in ALL columns followed by insert_done().

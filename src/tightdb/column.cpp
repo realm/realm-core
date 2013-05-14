@@ -389,7 +389,8 @@ void Column::set(size_t ndx, int64_t value)
     TreeSet<int64_t, Column>(ndx, value);
 
     // Update index
-    if (m_index) m_index->Set(ndx, oldVal, value);
+    if (m_index)
+        m_index->Set(ndx, oldVal, value);
 }
 
 void Column::add(int64_t value)
@@ -585,7 +586,8 @@ void Column::erase(size_t ndx)
     // Flatten tree if possible
     while (IsNode()) {
         Array refs = NodeGetRefs();
-        if (refs.size() != 1) break;
+        if (refs.size() != 1)
+            break;
 
         const size_t ref = refs.GetAsRef(0);
         refs.Delete(0); // avoid destroying subtree
@@ -598,6 +600,17 @@ void Column::erase(size_t ndx)
         const bool isLast = (ndx == Size());
         m_index->erase(ndx, oldVal, isLast);
     }
+}
+
+void Column::move_last_over(size_t ndx)
+{
+    TIGHTDB_ASSERT(ndx+1 < Size());
+
+    const size_t ndx_last = Size()-1;
+    const int64_t v = get(ndx_last);
+
+    set(ndx, v);
+    erase(ndx_last);
 }
 
 void Column::Increment64(int64_t value, size_t start, size_t end)
@@ -650,7 +663,8 @@ void Column::find_all(Array& result, int64_t value, size_t caller_offset, size_t
     (void)caller_offset;
     TIGHTDB_ASSERT(start <= Size());
     TIGHTDB_ASSERT(end == (size_t)-1 || end <= Size());
-    if (is_empty()) return;
+    if (is_empty())
+        return;
     TreeFindAll<int64_t, Column>(result, value, 0, start, end);
 }
 
@@ -697,11 +711,15 @@ size_t Column::find_pos(int64_t target) const TIGHTDB_NOEXCEPT
         const size_t probe = (unsigned(low) + unsigned(high)) >> 1;
         const int64_t v = get(probe);
 
-        if (v > target) high = int(probe);
-        else            low  = int(probe);
+        if (v > target)
+            high = int(probe);
+        else
+            low  = int(probe);
     }
-    if (high == len) return not_found;
-    else return high;
+    if (high == len)
+        return not_found;
+    else
+        return high;
 }
 
 size_t Column::find_pos2(int64_t target) const TIGHTDB_NOEXCEPT
@@ -723,11 +741,15 @@ size_t Column::find_pos2(int64_t target) const TIGHTDB_NOEXCEPT
         const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
         const int64_t v = get(probe);
 
-        if (v < target) low  = int(probe);
-        else            high = int(probe);
+        if (v < target)
+            low  = int(probe);
+        else
+            high = int(probe);
     }
-    if (high == len) return not_found;
-    else return high;
+    if (high == len)
+        return not_found;
+    else
+        return high;
 }
 
 bool Column::find_sorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
@@ -747,8 +769,10 @@ bool Column::find_sorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
         const size_t probe = (low + high) >> 1;
         const int64_t v = get(probe);
 
-        if (v < target) low  = probe;
-        else            high = probe;
+        if (v < target)
+            low  = probe;
+        else
+            high = probe;
     }
 
     pos = high;
@@ -796,9 +820,11 @@ void Column::sort()
 bool Column::compare(const Column& c) const
 {
     const size_t n = Size();
-    if (c.Size() != n) return false;
+    if (c.Size() != n)
+        return false;
     for (size_t i=0; i<n; ++i) {
-        if (get(i) != c.get(i)) return false;
+        if (get(i) != c.get(i))
+            return false;
     }
     return true;
 }
@@ -855,7 +881,8 @@ void Column::Verify() const
             }
         }
     }
-    else m_array->Verify();
+    else
+        m_array->Verify();
 }
 
 void ColumnBase::ToDot(ostream& out, StringData title) const
@@ -895,7 +922,8 @@ void ColumnBase::ArrayToDot(ostream& out, const Array& array) const
             ArrayToDot(out, r);
         }
     }
-    else LeafToDot(out, array);
+    else
+        LeafToDot(out, array);
 }
 
 void ColumnBase::LeafToDot(ostream& out, const Array& array) const
