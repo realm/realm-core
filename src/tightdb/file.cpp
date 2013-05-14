@@ -8,7 +8,7 @@
 #  define NOMINMAX
 #  include <windows.h>
 #  include <io.h>
-#  include <dirent.h>
+#  include <direct.h>
 #else
 #  include <unistd.h>
 #  include <fcntl.h>
