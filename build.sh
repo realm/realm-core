@@ -343,7 +343,7 @@ case "$MODE" in
         AVAIL_EXTENSIONS=""
         for x in $INCLUDE_EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-            if ! [ -r "$EXT_HOME/build.sh" ]; then
+            if ! [ -e "$EXT_HOME/build.sh" ]; then
                 if [ "$EXTENSION_AVAILABILITY_REQUIRED" ]; then
                     echo "Missing extension '$EXT_HOME'" 1>&2
                     failed="1"
@@ -714,7 +714,7 @@ EOF
         fi
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-            if [ -r "$EXT_HOME/build.sh" ]; then
+            if [ -e "$EXT_HOME/build.sh" ]; then
                 echo "CLEANING Extension '$x'" | tee -a "$LOG_FILE"
                 rm -f "$EXT_HOME/.TO_BE_INSTALLED" || exit 1
                 if ! sh "$EXT_HOME/build.sh" clean >>"$LOG_FILE" 2>&1; then
@@ -734,7 +734,7 @@ EOF
 #    "dist-check-avail")
 #        for x in $EXTENSIONS; do
 #            EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-#            if [ -r "$EXT_HOME/build.sh" ]; then
+#            if [ -e "$EXT_HOME/build.sh" ]; then
 #                echo ">>>>>>>> CHECKING AVAILABILITY OF '$x'"
 #                if sh "$EXT_HOME/build.sh" check-avail; then
 #                    echo "YES!"
@@ -851,13 +851,15 @@ EOF
         LOG_FILE="$TEMP_DIR/uninstall.log"
         ERROR=""
         for x in $(word_list_reverse $EXTENSIONS); do
-            echo "UNINSTALLING Extension '$x'" | tee -a "$LOG_FILE"
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-            if ! sh "$EXT_HOME/build.sh" uninstall >>"$LOG_FILE" 2>&1; then
-                echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
-                ERROR="1"
+            if [ -e "$EXT_HOME/build.sh" ]; then
+                echo "UNINSTALLING Extension '$x'" | tee -a "$LOG_FILE"
+                if ! sh "$EXT_HOME/build.sh" uninstall >>"$LOG_FILE" 2>&1; then
+                    echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
+                    ERROR="1"
+                fi
+                rm -f "$EXT_HOME/.WAS_INSTALLED" || exit 1
             fi
-            rm -f "$EXT_HOME/.WAS_INSTALLED" || exit 1
         done
         echo "UNINSTALLING Core library" | tee -a "$LOG_FILE"
         if ! sh build.sh uninstall >>"$LOG_FILE" 2>&1; then
@@ -913,7 +915,7 @@ EOF
         git status
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-            if [ -r "$EXT_HOME/build.sh" ]; then
+            if [ -e "$EXT_HOME/build.sh" ]; then
                 echo ">>>>>>>> STATUS OF '$EXT_HOME'"
                 (cd "$EXT_HOME/"; git status)
             fi
@@ -927,7 +929,7 @@ EOF
         git pull
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-            if [ -r "$EXT_HOME/build.sh" ]; then
+            if [ -e "$EXT_HOME/build.sh" ]; then
                 echo ">>>>>>>> PULLING '$EXT_HOME'"
                 (cd "$EXT_HOME/"; git pull)
             fi
@@ -946,7 +948,7 @@ EOF
         git checkout "$WHAT"
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-            if [ -r "$EXT_HOME/build.sh" ]; then
+            if [ -e "$EXT_HOME/build.sh" ]; then
                 echo ">>>>>>>> CHECKING OUT '$WHAT' OF '$EXT_HOME'"
                 (cd "$EXT_HOME/"; git checkout "$WHAT")
             fi
