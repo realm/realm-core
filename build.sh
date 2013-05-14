@@ -128,6 +128,11 @@ case "$MODE" in
     "build")
         TIGHTDB_ENABLE_FAT_BINARIES="1" make || exit 1
         if [ "$OS" = "Darwin" ]; then
+            # This section builds the following two static libraries:
+            #     src/tightdb/libtightdb-ios.a
+            #     src/tightdb/libtightdb-ios-dbg.a
+            # Each one contains both a version for iPhone and one for
+            # the iPhone simulator.
             TEMP_DIR="$(mktemp -d /tmp/tightdb.build.XXXX)" || exit 1
             # Xcode provides the iPhoneOS SDK
             XCODE_HOME="$(xcode-select --print-path)" || exit 1
@@ -183,7 +188,6 @@ case "$MODE" in
             done
             lipo "$TEMP_DIR"/*/"libtightdb.a"     -create -output "src/tightdb/libtightdb-ios.a"     || exit 1
             lipo "$TEMP_DIR"/*/"libtightdb-dbg.a" -create -output "src/tightdb/libtightdb-ios-dbg.a" || exit 1
-            make -C "src/tightdb" BASE_DENOM="ios" "tightdb-config-ios" "tightdb-config-ios-dbg" || exit 1
         fi
         exit 0
         ;;
@@ -420,11 +424,17 @@ case "$MODE" in
         mkdir "$INSTALL_ROOT" || exit 1
         mkdir "$INSTALL_ROOT/include" "$INSTALL_ROOT/lib" "$INSTALL_ROOT/lib64" "$INSTALL_ROOT/bin" || exit 1
 
-        # These three were added because when building for iOS on
-        # Darwin, the binary targets are not installed.
-        path_list_prepend LIBRARY_PATH            "$TIGHTDB_HOME/src/tightdb" || exit 1
-        path_list_prepend PATH                    "$TIGHTDB_HOME/src/tightdb" || exit 1
-        # FIXME: The problem with these is that they partially destroy
+        # This one was added because when building for iOS on Darwin,
+        # the libraries libtightdb-ios.a and libtightdb-ios-dbg.a are
+        # not installed, and the Objective-C binding needs to be able
+        # to find them. Also, when building for iOS, the default
+        # search path for header files is not used, so installed
+        # headers will not be found. This problem is eliminated by the
+        # explicit addition of the temporary header installation
+        # directory to CPATH below.
+        path_list_prepend LIBRARY_PATH "$TIGHTDB_HOME/src/tightdb" || exit 1
+
+        # FIXME: The problem with this one that it partially destroys
         # the value of the build test. We should instead transfer the
         # iOS target files to a special temporary proforma directory,
         # and add that diretory to LIBRARY_PATH and PATH above.
