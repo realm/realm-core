@@ -424,21 +424,6 @@ case "$MODE" in
         mkdir "$INSTALL_ROOT" || exit 1
         mkdir "$INSTALL_ROOT/include" "$INSTALL_ROOT/lib" "$INSTALL_ROOT/lib64" "$INSTALL_ROOT/bin" || exit 1
 
-        # This one was added because when building for iOS on Darwin,
-        # the libraries libtightdb-ios.a and libtightdb-ios-dbg.a are
-        # not installed, and the Objective-C binding needs to be able
-        # to find them. Also, when building for iOS, the default
-        # search path for header files is not used, so installed
-        # headers will not be found. This problem is eliminated by the
-        # explicit addition of the temporary header installation
-        # directory to CPATH below.
-        path_list_prepend LIBRARY_PATH "$PKG_DIR/tightdb/src/tightdb" || exit 1
-
-        # FIXME: The problem with this one that it partially destroys
-        # the value of the build test. We should instead transfer the
-        # iOS target files to a special temporary proforma directory,
-        # and add that diretory to LIBRARY_PATH and PATH above.
-
         path_list_prepend CPATH                   "$INSTALL_ROOT/include"     || exit 1
         path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib"         || exit 1
         path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib64"       || exit 1
@@ -628,6 +613,23 @@ EOF
 
                 message "Installing core library to test location"
                 sh "$TEST_PKG_DIR/tightdb/build.sh" install "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1 || exit 1
+
+                # This one was added because when building for iOS on
+                # Darwin, the libraries libtightdb-ios.a and
+                # libtightdb-ios-dbg.a are not installed, and the
+                # Objective-C binding needs to be able to find
+                # them. Also, when building for iOS, the default
+                # search path for header files is not used, so
+                # installed headers will not be found. This problem is
+                # eliminated by the explicit addition of the temporary
+                # header installation directory to CPATH below.
+                path_list_prepend LIBRARY_PATH "$TEST_PKG_DIR/tightdb/src/tightdb" || exit 1
+
+                # FIXME: The problem with this one that it partially
+                # destroys the value of the build test. We should
+                # instead transfer the iOS target files to a special
+                # temporary proforma directory, and add that diretory
+                # to LIBRARY_PATH and PATH above.
 
                 message "Testing state of core library installation"
                 sh "$TEST_PKG_DIR/tightdb/build.sh" test-installed "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1 || exit 1
