@@ -116,6 +116,10 @@
 		36E67FCA15A2EDDB00D131FB /* index_string.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E67FC815A2EDDB00D131FB /* index_string.cpp */; };
 		36E67FCB15A2EDDB00D131FB /* index_string.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36E67FC915A2EDDB00D131FB /* index_string.hpp */; };
 		36E67FCE15A2EDFB00D131FB /* testindexstring.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E67FCD15A2EDFB00D131FB /* testindexstring.cpp */; };
+		36F38235170CFEC400C95BCD /* column_basic_tpl.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36F38233170CFEC400C95BCD /* column_basic_tpl.hpp */; };
+		36F38236170CFEC400C95BCD /* column_basic.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36F38234170CFEC400C95BCD /* column_basic.hpp */; };
+		36F38239170D000300C95BCD /* array_basic_tpl.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36F38237170D000300C95BCD /* array_basic_tpl.hpp */; };
+		36F3823A170D000300C95BCD /* array_basic.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36F38238170D000300C95BCD /* array_basic.hpp */; };
 		36FD6F3614BDC61A009E0003 /* test_query.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36FD6F3414BDC61A009E0003 /* test_query.cpp */; };
 		36FD6F3714BDC61A009E0003 /* test_table_view.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36FD6F3514BDC61A009E0003 /* test_table_view.cpp */; };
 		4142C93B1623478700B3B902 /* alloc_slab.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 365CCDF1157CC37D00172BF8 /* alloc_slab.cpp */; };
@@ -412,6 +416,10 @@
 		36E67FC815A2EDDB00D131FB /* index_string.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = index_string.cpp; path = tightdb/index_string.cpp; sourceTree = "<group>"; };
 		36E67FC915A2EDDB00D131FB /* index_string.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = index_string.hpp; path = tightdb/index_string.hpp; sourceTree = "<group>"; };
 		36E67FCD15A2EDFB00D131FB /* testindexstring.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testindexstring.cpp; sourceTree = "<group>"; };
+		36F38233170CFEC400C95BCD /* column_basic_tpl.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = column_basic_tpl.hpp; path = tightdb/column_basic_tpl.hpp; sourceTree = "<group>"; };
+		36F38234170CFEC400C95BCD /* column_basic.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = column_basic.hpp; path = tightdb/column_basic.hpp; sourceTree = "<group>"; };
+		36F38237170D000300C95BCD /* array_basic_tpl.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = array_basic_tpl.hpp; path = tightdb/array_basic_tpl.hpp; sourceTree = "<group>"; };
+		36F38238170D000300C95BCD /* array_basic.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = array_basic.hpp; path = tightdb/array_basic.hpp; sourceTree = "<group>"; };
 		36FD6F3414BDC61A009E0003 /* test_query.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_query.cpp; sourceTree = "<group>"; };
 		36FD6F3514BDC61A009E0003 /* test_table_view.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_table_view.cpp; sourceTree = "<group>"; };
 		4142C9951623478700B3B902 /* liblibtightdb ios.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "liblibtightdb ios.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -474,6 +482,8 @@
 				52F6359316B43C79006117C4 /* alloc.cpp */,
 				36A1DC8E16C3F2D50086A836 /* assert.hpp */,
 				365CCDF1157CC37D00172BF8 /* alloc_slab.cpp */,
+				36F38237170D000300C95BCD /* array_basic_tpl.hpp */,
+				36F38238170D000300C95BCD /* array_basic.hpp */,
 				365CCDF4157CC37D00172BF8 /* array_binary.cpp */,
 				365CCDF5157CC37D00172BF8 /* array_binary.hpp */,
 				365CCDF6157CC37D00172BF8 /* array_blob.cpp */,
@@ -486,6 +496,8 @@
 				365CCDFD157CC37D00172BF8 /* array.hpp */,
 				365CCDFE157CC37D00172BF8 /* binary_data.hpp */,
 				365CCDFF157CC37D00172BF8 /* bind_ptr.hpp */,
+				36F38233170CFEC400C95BCD /* column_basic_tpl.hpp */,
+				36F38234170CFEC400C95BCD /* column_basic.hpp */,
 				365CCE03157CC37D00172BF8 /* column_binary.cpp */,
 				365CCE04157CC37D00172BF8 /* column_binary.hpp */,
 				365CCE05157CC37D00172BF8 /* column_fwd.hpp */,
@@ -839,6 +851,10 @@
 				36A1DC9F16C3F4250086A836 /* string_buffer.hpp in Headers */,
 				36A1DCA516C3F46E0086A836 /* safe_int_ops.hpp in Headers */,
 				36A1DCAE16C3F4E10086A836 /* thread.hpp in Headers */,
+				36F38235170CFEC400C95BCD /* column_basic_tpl.hpp in Headers */,
+				36F38236170CFEC400C95BCD /* column_basic.hpp in Headers */,
+				36F38239170D000300C95BCD /* array_basic_tpl.hpp in Headers */,
+				36F3823A170D000300C95BCD /* array_basic.hpp in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

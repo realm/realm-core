@@ -58,12 +58,6 @@
     <ClCompile Include="test\large_tests\test_column.cpp">
       <Filter>test\large_tests</Filter>
     </ClCompile>
-    <ClCompile Include="test\testquery.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
-    <ClCompile Include="test\testtableview.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
     <ClCompile Include="src\tightdb\column.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -168,6 +162,12 @@
     </ClCompile>
     <ClCompile Include="test\performance\timer.cpp" />
     <ClCompile Include="src\tightdb\utilities.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_query.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_table_view.cpp">
       <Filter>test</Filter>
     </ClCompile>
   </ItemGroup>

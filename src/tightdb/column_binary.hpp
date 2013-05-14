@@ -49,6 +49,7 @@ public:
     void Resize(std::size_t ndx);
     void Clear() TIGHTDB_OVERRIDE;
     void fill(std::size_t count);
+    void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
 
     // Requires that the specified entry was inserted as StringData.
     StringData get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT;
