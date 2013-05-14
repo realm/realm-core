@@ -40,6 +40,8 @@ public:
         invalidate_subtables();
     }
 
+    void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
+
 protected:
     /// A pointer to the table that this column is part of. For a
     /// free-standing column, this pointer is null.

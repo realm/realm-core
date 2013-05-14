@@ -41,6 +41,7 @@ public:
     void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
     void Clear() TIGHTDB_OVERRIDE;
 
+    using Column::move_last_over;
     using Column::add;
     using Column::insert;
 

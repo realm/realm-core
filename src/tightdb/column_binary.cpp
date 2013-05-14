@@ -26,21 +26,26 @@ ColumnBinary::ColumnBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocat
 
 ColumnBinary::~ColumnBinary()
 {
-    if (IsNode()) delete m_array;
-    else delete static_cast<ArrayBinary*>(m_array);
+    if (IsNode())
+        delete m_array;
+    else
+        delete static_cast<ArrayBinary*>(m_array);
 }
 
 void ColumnBinary::Destroy()
 {
-    if (IsNode()) m_array->Destroy();
-    else static_cast<ArrayBinary*>(m_array)->Destroy();
+    if (IsNode())
+        m_array->Destroy();
+    else 
+        static_cast<ArrayBinary*>(m_array)->Destroy();
 }
 
 void ColumnBinary::UpdateRef(size_t ref)
 {
     TIGHTDB_ASSERT(is_node_from_ref(ref, m_array->GetAllocator())); // Can only be called when creating node
 
-    if (IsNode()) m_array->UpdateRef(ref);
+    if (IsNode()) 
+        m_array->UpdateRef(ref);
     else {
         ArrayParent *const parent = m_array->GetParent();
         const size_t pndx   = m_array->GetParentNdx();
@@ -51,7 +56,8 @@ void ColumnBinary::UpdateRef(size_t ref)
         m_array = array;
 
         // Update ref in parent
-        if (parent) parent->update_child_ref(pndx, ref);
+        if (parent)
+            parent->update_child_ref(pndx, ref);
     }
 }
 
@@ -86,7 +92,8 @@ void ColumnBinary::Clear()
 
         // Revert to binary array
         ArrayBinary* const array = new ArrayBinary(parent, pndx, m_array->GetAllocator());
-        if (parent) parent->update_child_ref(pndx, array->GetRef());
+        if (parent)
+            parent->update_child_ref(pndx, array->GetRef());
 
         // Remove original node
         m_array->Destroy();
@@ -153,12 +160,35 @@ void ColumnBinary::Resize(size_t ndx)
     static_cast<ArrayBinary*>(m_array)->Resize(ndx);
 }
 
+void ColumnBinary::move_last_over(size_t ndx)
+{
+    TIGHTDB_ASSERT(ndx+1 < Size());
+
+    const size_t ndx_last = Size()-1;
+
+    const BinaryData v = get(ndx_last);
+    set(ndx, v);
+
+    // If the copy happened within the same array
+    // it might have moved the source data when making
+    // room for the insert. In that case we wil have to
+    // copy again from the new position
+    // TODO: manual resize before copy
+    const BinaryData v2 = get(ndx_last);
+    if (v != v2)
+        set(ndx, v2);
+
+    erase(ndx_last);
+}
+
 bool ColumnBinary::compare(const ColumnBinary& c) const
 {
     const size_t n = Size();
-    if (c.Size() != n) return false;
+    if (c.Size() != n)
+        return false;
     for (size_t i=0; i<n; ++i) {
-        if (get(i) != c.get(i)) return false;
+        if (get(i) != c.get(i))
+            return false;
     }
     return true;
 }
