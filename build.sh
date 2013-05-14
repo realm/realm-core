@@ -432,7 +432,7 @@ case "$MODE" in
         # headers will not be found. This problem is eliminated by the
         # explicit addition of the temporary header installation
         # directory to CPATH below.
-        path_list_prepend LIBRARY_PATH "$TIGHTDB_HOME/src/tightdb" || exit 1
+        path_list_prepend LIBRARY_PATH "$PKG_DIR/tightdb/src/tightdb" || exit 1
 
         # FIXME: The problem with this one that it partially destroys
         # the value of the build test. We should instead transfer the
@@ -594,7 +594,6 @@ EOF
                     cp "src/tightdb/tightdb-config" "src/tightdb/tightdb-config-dbg" "$PKG_DIR/tightdb/src/tightdb/" || exit 1
                     if [ "$OS" = "Darwin" ]; then
                         cp "src/tightdb/libtightdb-ios.a" "src/tightdb/libtightdb-ios-dbg.a" "$PKG_DIR/tightdb/src/tightdb/" || exit 1
-                        cp "src/tightdb/tightdb-config-ios" "src/tightdb/tightdb-config-ios-dbg" "$PKG_DIR/tightdb/src/tightdb/" || exit 1
                     fi
                 else
                     message "Transfering core library to package"
