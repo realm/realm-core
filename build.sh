@@ -814,15 +814,6 @@ EOF
         echo "INSTALLING Core library" | tee -a "$LOG_FILE"
         if sh build.sh install >>"$LOG_FILE" 2>&1; then
             touch ".WAS_INSTALLED" || exit 1
-            if [ "$NEED_USR_LOCAL_LIB_NOTE" ]; then
-                LIBDIR="$(make get-libdir)" || exit 1
-                cat <<EOF
-NOTE:
-Libraries have been installed in $LIBDIR.
-On your system this directory is not in the library search path
-by default, so you may have to add it to /etc/ld.so.conf manually.
-EOF
-            fi
             for x in $EXTENSIONS; do
                 EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
                 if [ -e "$EXT_HOME/.TO_BE_INSTALLED" ]; then
@@ -835,6 +826,20 @@ EOF
                     fi
                 fi
             done
+            if [ "$NEED_USR_LOCAL_LIB_NOTE" ]; then
+                LIBDIR="$(make get-libdir)" || exit 1
+                cat <<EOF
+NOTE: Libraries have been installed in $LIBDIR.
+On your system this directory is not normally part of the default
+library search path, so you may have to set LD_LIBRARY_PATH before
+running the the test suite, or your own application. You can do this
+by issuing the following command:
+
+    export LD_LIBRARY_PATH=$LIBDIR
+
+Alternatively, you can add $LIBDIR to /etc/ld.so.conf.
+EOF
+            fi
         else
             echo "Failed!" | tee -a "$LOG_FILE" 1>&2
             ERROR="1"
