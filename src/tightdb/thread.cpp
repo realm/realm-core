@@ -17,7 +17,7 @@ TIGHTDB_NORETURN void Thread::create_failed(int err)
 
 TIGHTDB_NORETURN void Thread::join_failed(int err)
 {
-    throw runtime_error("pthread_join() failed");
+    throw runtime_error("pthread_join() failed. err=" + err);
 }
 
 TIGHTDB_NORETURN void Mutex::init_failed(int err)
