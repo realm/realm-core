@@ -14,17 +14,20 @@ using namespace tightdb;
 
 int main()
 {
+    bool no_create = false;
+    SharedGroup::DurabilityLevel dlevel = SharedGroup::durability_MemOnly;
+
     remove(DIR "/benchmark-prealloc.tightdb");
-    SharedGroup sg(DIR "/benchmark-prealloc.tightdb");
+    SharedGroup sg(DIR "/benchmark-prealloc.tightdb", no_create, dlevel);
 
     remove(DIR "/benchmark-prealloc-interfere1.tightdb");
-    SharedGroup sg_interfere1(DIR "/benchmark-prealloc-interfere1.tightdb");
+    SharedGroup sg_interfere1(DIR "/benchmark-prealloc-interfere1.tightdb", no_create, dlevel);
 
     remove(DIR "/benchmark-prealloc-interfere2.tightdb");
-    SharedGroup sg_interfere2(DIR "/benchmark-prealloc-interfere2.tightdb");
+    SharedGroup sg_interfere2(DIR "/benchmark-prealloc-interfere2.tightdb", no_create, dlevel);
 
     remove(DIR "/benchmark-prealloc-interfere3.tightdb");
-    SharedGroup sg_interfere3(DIR "/benchmark-prealloc-interfere3.tightdb");
+    SharedGroup sg_interfere3(DIR "/benchmark-prealloc-interfere3.tightdb", no_create, dlevel);
 
     int n_outer = 100;
     {
