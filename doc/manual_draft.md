@@ -4,7 +4,8 @@ Strings and Unicode:
 TightDB has full support for Unicode. Internally it stores all strings
 using the UTF-8 character encoding.
 
-When TightDB performs case insensitive string comparisons, it uses the
+Although it is not fully implemented yet, it is the intention that when
+TightDB performs case insensitive string comparisons, it uses the
 locale indenpendant case folding mechanism as described in “Caseless
 Matching,” in Section 5.18, Case Mappings of the the Unicode Standard.
 
