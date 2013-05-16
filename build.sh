@@ -986,8 +986,10 @@ EOF
 EOF
         cat >"$TEMP_DIR/exclude" <<EOF
 .gitignore
-/test/experiments
+/test/test-*
 /test/benchmark-*
+/test/performance
+/test/experiments
 /doc/development
 EOF
         grep -E -v '^(#.*)?$' "$TEMP_DIR/include" >"$TEMP_DIR/include2" || exit 1
