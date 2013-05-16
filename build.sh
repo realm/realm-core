@@ -457,7 +457,7 @@ if [ \$# -eq 1 -a "\$1" = "uninstall" ]; then
     exit 0
 fi
 
-if [ \$# -eq 1 -a "\$1" = "test" ]; then
+if [ \$# -eq 1 -a "\$1" = "test-installed" ]; then
     sh tightdb/build.sh dist-test-installed || exit 1
     exit 0
 fi
@@ -501,7 +501,7 @@ Build everything:          ./build  all
 Start from scratch:        ./build  clean
 Install what was built:    sudo  ./build  install
 Uninstall everything:      sudo  ./build  uninstall
-Test installation:         ./build  test
+Test installation:         ./build  test-installed
 
 Normally you can do with just:
 
