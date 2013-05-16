@@ -18,6 +18,6 @@ value represents an absolute point it time, and is represented as an
 integral non-negative number of seconds since midnight (UTC), 1
 January 1970, not counting leap seconds.
 
-Please not that it is not currently possible to store a date that
-preceeds the year 1970. WE are working on an improved date/time
+Please note that it is not currently possible to store a date that
+preceeds the year 1970. We are working on an improved date/time
 representation that does not have this limitation.
