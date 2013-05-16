@@ -117,11 +117,11 @@ TEST(QueryTwoColsEqualVaryWidthAndValues)
         table.set_int(4, i, rand() % 100);
         table.set_int(5, i, rand() % 10);
 
-        table.set_float(6, i, rand() % 10);
-        table.set_float(7, i, rand() % 10);
+        table.set_float(6, i, float(rand() % 10));
+        table.set_float(7, i, float(rand() % 10));
 
-        table.set_double(8, i, rand() % 10);
-        table.set_double(9, i, rand() % 10);
+        table.set_double(8, i, double(rand() % 10));
+        table.set_double(9, i, double(rand() % 10));
 
         if(table.get_int(0, i) == table.get_int(1, i))
             ints1.push_back(i);
@@ -271,13 +271,13 @@ TEST(QueryTwoColsNoRows)
 TEST(TestQueryHuge) 
 {
 #if TEST_DURATION == 0
-    for(size_t N = 0; N < 2; N++) {
+    for (int N = 0; N < 2; N++) {
 #elif TEST_DURATION == 1
-    for(size_t N = 0; N < 100; N++) {
+    for (int N = 0; N < 100; N++) {
 #elif TEST_DURATION == 2
-    for(size_t N = 0; N < 1000; N++) {
+    for (int N = 0; N < 1000; N++) {
 #elif TEST_DURATION == 3
-    for(size_t N = 0; N < 10000; N++) {
+    for (int N = 0; N < 10000; N++) {
 #endif
         srand(N + 123);    // Makes you reproduce a bug in a certain run, without having to run all successive runs
 
