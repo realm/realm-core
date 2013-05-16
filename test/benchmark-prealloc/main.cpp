@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include <tightdb.hpp>
+#include <tightdb/file.hpp>
 
 TIGHTDB_TABLE_2(Alpha,
                 foo, Int,
@@ -15,18 +16,18 @@ using namespace tightdb;
 int main()
 {
     bool no_create = false;
-    SharedGroup::DurabilityLevel dlevel = SharedGroup::durability_MemOnly;
+    SharedGroup::DurabilityLevel dlevel = SharedGroup::durability_Full;
 
-    remove(DIR "/benchmark-prealloc.tightdb");
+    File::try_remove(DIR "/benchmark-prealloc.tightdb");
     SharedGroup sg(DIR "/benchmark-prealloc.tightdb", no_create, dlevel);
 
-    remove(DIR "/benchmark-prealloc-interfere1.tightdb");
+    File::try_remove(DIR "/benchmark-prealloc-interfere1.tightdb");
     SharedGroup sg_interfere1(DIR "/benchmark-prealloc-interfere1.tightdb", no_create, dlevel);
 
-    remove(DIR "/benchmark-prealloc-interfere2.tightdb");
+    File::try_remove(DIR "/benchmark-prealloc-interfere2.tightdb");
     SharedGroup sg_interfere2(DIR "/benchmark-prealloc-interfere2.tightdb", no_create, dlevel);
 
-    remove(DIR "/benchmark-prealloc-interfere3.tightdb");
+    File::try_remove(DIR "/benchmark-prealloc-interfere3.tightdb");
     SharedGroup sg_interfere3(DIR "/benchmark-prealloc-interfere3.tightdb", no_create, dlevel);
 
     int n_outer = 100;
