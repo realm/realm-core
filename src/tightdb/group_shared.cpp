@@ -110,7 +110,7 @@ retry:
         if (m_file.try_lock_exclusive()) {
             // There is a slight window between opening the file and getting the
             // lock where another process could have deleted the file
-            if (m_file.is_deleted()) {
+            if (m_file.is_removed()) {
                 goto retry;
             }
             // Get size
@@ -134,7 +134,7 @@ retry:
 
             // There is a slight window between opening the file and getting the
             // lock where another process could have deleted the file
-            if (len == 0 || m_file.is_deleted()) {
+            if (len == 0 || m_file.is_removed()) {
                 goto retry;
             }
         }
@@ -220,6 +220,11 @@ SharedGroup::~SharedGroup()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = m_group.get_replication())
+        delete repl;
+#endif
+
     // If we can get an exclusive lock on the file we know that we are
     // the only user (since all users take at least shared locks on
     // the file.  So that means that we have to delete it when done
@@ -230,7 +235,7 @@ SharedGroup::~SharedGroup()
     m_file.unlock();
     if (!m_file.try_lock_exclusive()) return;
 
-    SharedInfo* const info = m_file_map.get_addr();
+    SharedInfo* info = m_file_map.get_addr();
 
     // If the db file is just backing for a transient data structure,
     // we can delete it when done.
@@ -246,8 +251,28 @@ SharedGroup::~SharedGroup()
     remove(m_file_path.c_str());
 }
 
+
 bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 {
+    // FIXME: Due to lack of adequate synchronization, the following
+    // read of 'info->current_version' effectively participates in a
+    // "data race". See also SharedGroup::low_level_commit(). First of
+    // all, portable C++ code must always operate under the assumption
+    // that a data race is an error. The point is that the memory
+    // model defined by, and assumed by the C++ standard does not
+    // allow for data races at all. The purpose is to give harware
+    // designers more freedom to optimize their hardware. This also
+    // means that even if your 'data race' works for you today, it may
+    // malfunction and cause havoc on the next revision of that
+    // platform. According to Hans Boehm (one of the major
+    // contributors to the design of the C++ memory model) we should
+    // think of a data race as something so grave that it could cause
+    // you computer to burst into flames (see
+    // http://channel9.msdn.com/Events/GoingNative/GoingNative-2012/Threads-and-Shared-Variables-in-C-11)
+    // On top of that, if a customer chooses to run a data race
+    // detector on their application, our data race migh show up, and
+    // that may rightfully cause unwanted alarm.
+
     // Have we changed since last transaction?
     // Visibility of changes can be delayed when using has_changed() because m_info->current_version is tested
     // outside mutexes. However, the delay is finite on architectures that have hardware cache coherency (ARM, x64, x86,
@@ -255,10 +280,11 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
     // system bus and make cache controllers invalidate caches of reader). Some excotic architectures may need
     // explicit synchronization which isn't implemented yet.
     TIGHTDB_SYNC_IF_NO_CACHE_COHERENCE
-    const SharedInfo* const info = m_file_map.get_addr();
-    const bool is_changed = (m_version != info->current_version);
+    const SharedInfo* info = m_file_map.get_addr();
+    bool is_changed = (m_version != info->current_version);
     return is_changed;
 }
+
 
 const Group& SharedGroup::begin_read()
 {
@@ -269,7 +295,7 @@ const Group& SharedGroup::begin_read()
     size_t new_filesize = 0;
 
     {
-        SharedInfo* const info = m_file_map.get_addr();
+        SharedInfo* info = m_file_map.get_addr();
         ScopedMutexLock lock(&info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size())) {
@@ -283,7 +309,7 @@ const Group& SharedGroup::begin_read()
 
         // Update reader list
         if (ringbuf_is_empty()) {
-            const ReadCount r2 = {info->current_version, 1};
+            ReadCount r2 = {info->current_version, 1};
             ringbuf_put(r2);
         }
         else {
@@ -291,7 +317,7 @@ const Group& SharedGroup::begin_read()
             if (r.version == info->current_version)
                 ++(r.count);
             else {
-                const ReadCount r2 = {info->current_version, 1};
+                ReadCount r2 = {info->current_version, 1};
                 ringbuf_put(r2);
             }
         }
@@ -309,13 +335,14 @@ const Group& SharedGroup::begin_read()
     return m_group;
 }
 
+
 void SharedGroup::end_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
     {
-        SharedInfo* const info = m_file_map.get_addr();
+        SharedInfo* info = m_file_map.get_addr();
         ScopedMutexLock lock(&info->readmutex);
 
         // FIXME: m_version may well be a 64-bit integer so this cast
@@ -325,7 +352,7 @@ void SharedGroup::end_read()
         // though.
 
         // Find entry for current version
-        const size_t ndx = ringbuf_find(uint32_t(m_version));
+        size_t ndx = ringbuf_find(uint32_t(m_version));
         TIGHTDB_ASSERT(ndx != size_t(-1));
         ReadCount& r = ringbuf_get(ndx);
 
@@ -350,16 +377,13 @@ void SharedGroup::end_read()
 #endif
 }
 
+
 Group& SharedGroup::begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
     TIGHTDB_ASSERT(m_group.get_allocator().IsAllFree());
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (m_replication.is_attached()) m_replication.begin_write_transact(); // Throws
-#endif
-
-    SharedInfo* const info = m_file_map.get_addr();
+    SharedInfo* info = m_file_map.get_addr();
 
     // Get write lock
     // Note that this will not get released until we call
@@ -367,12 +391,17 @@ Group& SharedGroup::begin_write()
     pthread_mutex_lock(&info->writemutex);
 
     // Get the current top ref
-    const size_t new_topref   = to_size_t(info->current_top);
-    const size_t new_filesize = to_size_t(info->filesize);
+    size_t new_topref   = to_size_t(info->current_top);
+    size_t new_filesize = to_size_t(info->filesize);
 
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
     m_group.update_from_shared(new_topref, new_filesize);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = m_group.get_replication())
+        repl->begin_write_transact(*this); // Throws
+#endif
 
 #ifdef TIGHTDB_DEBUG
     m_group.Verify();
@@ -382,79 +411,54 @@ Group& SharedGroup::begin_write()
     return m_group;
 }
 
+
 void SharedGroup::commit()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
-    SharedInfo* const info = m_file_map.get_addr();
+    SharedInfo* info = m_file_map.get_addr();
 
-    // Get version info
-    size_t current_version;
-    size_t readlock_version;
     {
-        ScopedMutexLock lock(&info->readmutex);
-
-        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size())) {
-            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
+        size_t new_version;
+#ifdef TIGHTDB_ENABLE_REPLICATION
+        // It is essential that if Replicatin::commit_write_transact()
+        // fails, then the transaction is not completed. A subsequent call
+        // to rollback() must roll it back.
+        if (Replication* repl = m_group.get_replication()) {
+            new_version = repl->commit_write_transact(*this); // Throws
         }
-
-        current_version = info->current_version + 1;
-
-        if (ringbuf_is_empty())
-            readlock_version = current_version;
         else {
-            const ReadCount& r = ringbuf_get_first();
-            readlock_version = r.version;
+            new_version = info->current_version + 1; // FIXME: Eventual overflow
         }
-    }
-
-    // Reset version tracking in group if we are
-    // starting from a new lock file
-    if (current_version == 1) {
-        m_group.init_shared();
-    }
-
-    // Do the actual commit
-    const bool doPersist = (info->flags == durability_Full);
-    const size_t new_topref = m_group.commit(current_version, readlock_version, doPersist);
-
-    // Get the new top ref
-    const SlabAlloc& alloc = m_group.get_allocator();
-    const size_t new_filesize = alloc.GetFileLen();
-
-    // Update reader info
-    {
-        ScopedMutexLock lock(&info->readmutex);
-
-        info->current_top = new_topref;
-        info->filesize    = new_filesize;
-        ++info->current_version;
+#else
+        new_version = info->current_version + 1; // FIXME: Eventual overflow
+#endif
+        low_level_commit(new_version); // Throws
     }
 
     // Release write lock
     pthread_mutex_unlock(&info->writemutex);
 
-    // Save last version for has_changed()
-    m_version = current_version;
-
     m_group.invalidate();
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    // FIXME: It is essential that if
-    // Replicatin::commit_write_transact() fails, then the transaction
-    // is not completed. A subsequent call to rollback() must roll it
-    // back.
-    if (m_replication.is_attached()) m_replication.commit_write_transact(); // Throws
-#endif
 
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
 #endif
 }
 
+
+// FIXME: This method must work correctly even if it is called after a
+// failed call to commit(). A failed call to commit() is any that
+// returns to the caller by throwing an exception. As it is right now,
+// rollback() does not handle all cases.
 void SharedGroup::rollback()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = m_group.get_replication())
+        repl->rollback_write_transact(*this);
+#endif
 
     // Clear all changes made during transaction
     m_group.rollback();
@@ -466,14 +470,11 @@ void SharedGroup::rollback()
 
     m_group.invalidate();
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (m_replication.is_attached()) m_replication.rollback_write_transact();
-#endif
-
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
 #endif
 }
+
 
 bool SharedGroup::ringbuf_is_empty() const TIGHTDB_NOEXCEPT
 {
@@ -546,7 +547,7 @@ void SharedGroup::ringbuf_expand()
     const SharedInfo* const info = m_reader_map.get_addr();
 
     // Calculate size of file with more entries
-    const size_t current_entry_count = info->capacity + 1;
+    const size_t current_entry_count = info->capacity + 1;  // FIXME: Why size_t and not uint32 as capacity?
     const size_t excount = current_entry_count; // Always double so we can mask for index
     const size_t new_entry_count = current_entry_count + excount;
     const size_t base_filesize = sizeof(SharedInfo) - sizeof(ReadCount[32]);
@@ -571,7 +572,7 @@ void SharedGroup::ringbuf_expand()
             ReadCount* const new_start = &info2->readers[info2->get_pos + excount];
             copy(low_start, low_end, new_start);
         }
-
+        // FIXME: warning for adding size_t to uint32!
         info2->get_pos += excount;
     }
 
@@ -701,3 +702,74 @@ void SharedGroup::zero_free_space()
 }
 
 #endif // TIGHTDB_DEBUG
+
+
+size_t SharedGroup::get_current_version() TIGHTDB_NOEXCEPT
+{
+    SharedInfo* info = m_file_map.get_addr();
+    return info->current_version;
+}
+
+
+// FIXME: What type is the right type for storing the database
+// version? Somtimes we use size_t, other times we use uint32_t?
+// uint32_t is manifestly a bad choice, since it doesn't always exist,
+// and even if it exists, it may not be efficient on the target
+// platform. If 32 bits are are enough to hold a database version,
+// then the type should be 'unsigned long', 'uint_fast32_t', or
+// 'uint_least32_t'.
+void SharedGroup::low_level_commit(size_t new_version)
+{
+    SharedInfo* info = m_file_map.get_addr();
+
+    size_t readlock_version;
+    {
+        ScopedMutexLock lock(&info->readmutex);
+
+        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size())) {
+            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
+        }
+
+        if (ringbuf_is_empty())
+            readlock_version = new_version;
+        else {
+            const ReadCount& r = ringbuf_get_first();
+            readlock_version = r.version;
+        }
+    }
+
+    // Reset version tracking in group if we are
+    // starting from a new lock file
+    if (new_version == 1) {
+        // FIXME: Why is this not dealt with in begin_write()? Note
+        // that we can read the value of info->current_version without
+        // a lock on info->readmutex as long as we have a lock on
+        // info->writemutex. This is true (not a data race) becasue
+        // info->current_version is modified only while
+        // info->writemutex is locked.
+        m_group.init_shared();
+    }
+
+    // Do the actual commit
+    bool do_persist = info->flags == durability_Full;
+    size_t new_topref = m_group.commit(new_version, readlock_version, do_persist);
+
+    // Get the new top ref
+    const SlabAlloc& alloc = m_group.get_allocator();
+    size_t new_filesize = alloc.GetFileLen();
+
+    // Update reader info
+    {
+        ScopedMutexLock lock(&info->readmutex);
+        info->current_top     = new_topref;
+        info->filesize        = new_filesize;
+        // FIXME: Due to lack of adequate synchronization, the
+        // following modification of 'info->current_version'
+        // effectively participates in a "data race". Please see the
+        // FIXME in SharedGroup::has_changed() for more info.
+        info->current_version = new_version;
+    }
+
+    // Save last version for has_changed()
+    m_version = new_version;
+}

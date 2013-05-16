@@ -1,177 +1,257 @@
 #include <cstring>
+#include <algorithm>
+
 #ifdef _WIN32
-	#include <windows.h>
+    #define NOMINMAX
+    #include <windows.h>
 #else
-	#include <ctype.h>
+    #include <ctype.h>
 #endif
 
+#include <tightdb/safe_int_ops.hpp>
 #include <tightdb/utf8.hpp>
+
+using namespace std;
+
+namespace {
+
+#ifdef _WIN32
+// Returns the number of bytes in a UTF-8 sequence whose leading byte
+// is as specified.
+inline int sequence_length(char lead)
+{
+    int lead2 = char_traits<char>::to_int_type(lead);
+    if ((lead2 & 0x80) == 0) return 1;
+    if ((lead2 & 0x40) == 0) return 0; // Error
+    if ((lead2 & 0x20) == 0) return 2;
+    if ((lead2 & 0x10) == 0) return 3;
+    if ((lead2 & 0x08) == 0) return 4;
+    if ((lead2 & 0x04) == 0) return 5;
+    if ((lead2 & 0x02) == 0) return 6;
+    return 0; // Error
+}
+#endif
+
+// Check if the next UTF-8 sequence in [begin, end) is identical to
+// the one beginning at begin2. If it is, 'begin' is advanced
+// accordingly.
+inline bool equal_sequence(const char*& begin, const char* end, const char* begin2)
+{
+    if (begin[0] != begin2[0]) return false;
+
+    size_t i = 1;
+    if (int(char_traits<char>::to_int_type(begin[0])) & 0x80) {
+        // All following bytes matching '10xxxxxx' will be considered
+        // as part of this character.
+        while (begin + i != end) {
+            if ((int(char_traits<char>::to_int_type(begin[i])) & (0x80 + 0x40)) != 0x80) break;
+            if (begin[i] != begin2[i]) return false;
+            ++i;
+        }
+    }
+
+    begin += i;
+    return true;
+}
+
+} // anonymous namespace
+
 
 namespace tightdb {
 
-// Return size in bytes of one utf8 character
-size_t sequence_length(const char *lead)
+
+
+// Here is a version for Windows that may be closer to what is ultimately needed.
+/*
+bool case_map(const char* begin, const char* end, StringBuffer& dest, bool upper)
 {
-    unsigned char lead2 = *lead;
-    if (lead2 < 0x80)
-        return 1;
-    else if ((lead2 >> 5) == 0x6)
-        return 2;
-    else if ((lead2 >> 4) == 0xe)
-        return 3;
-    else if ((lead2 >> 3) == 0x1e)
-        return 4;
-    else
-        return 0;
-}
+    const int wide_buffer_size = 32;
+    wchar_t wide_buffer[wide_buffer_size];
 
+    dest.resize(end-begin);
+    size_t dest_offset = 0;
 
-// assumes both chars have same lengths. Assumes both chars are in 0-terminated strings
-size_t comparechars(const char* c1, const char* c2)
-{
-    size_t p = 0;
-    do {
-        if (c1[p] != c2[p])
-            return 0;
-        p++;
-    } while ((c1[p] & 0x80) == 0x80);
+    for (;;) {
+        int num_out;
 
-    return p;
-}
-
-// If constant == source, return 1.
-// Else, if constant is a prefix of source, return 0
-// Else return -1
-size_t case_prefix(const char* constant_upper, const char* constant_lower, const char* source)
-{
-    size_t matchlen = 0;
-    do {
-        size_t m = comparechars(&constant_lower[matchlen], &source[matchlen]);
-        if (m == 0)
-            m = comparechars(&constant_upper[matchlen], &source[matchlen]);
-        if (m != 0)
-            matchlen += m;
-        else
-            return (size_t)-1;
-    }
-    while (constant_lower[matchlen] != 0 && source[matchlen] != 0);
-
-    if (constant_lower[matchlen] == 0 && source[matchlen] != 0)
-        return 0;
-    else if (constant_lower[matchlen] == 0 && source[matchlen] == 0)
-        return 1;
-
-    return (size_t)-1;
-}
-
-// If constant == source, return true. NOTE: This function first performs a case insensitive *byte*
-// compare instead of one whole UTF-8 character at a time. This is very fast, but enough to guarantee
-// that the strings are identical, so we need a slower character compare later (we use case_prefix()
-// for this).
-bool case_cmp(const char* constant_upper, const char* constant_lower, const char *source)
-{
-    size_t matchlen = 0;
-    do {
-        if (constant_lower[matchlen] == source[matchlen] || constant_upper[matchlen] == source[matchlen])
-            matchlen++;
-        else
+        // Decode
+        {
+            size_t num_in = end - begin;
+            if (size_t(32) <= num_in) {
+                num_out = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, 32, wide_buffer, wide_buffer_size);
+                if (num_out != 0) {
+                    begin += 32;
+                    goto convert;
+                }
+                if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) return false;
+            }
+            if (num_in == 0) break;
+            int n = num_in < size_t(8) ? int(num_in) : 8;
+            num_out = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, n, wide_buffer, wide_buffer_size);
+            if (num_out != 0) {
+                begin += n;
+                goto convert;
+            }
             return false;
+        }
+
+      convert:
+        if (upper) {
+            for (int i=0; i<num_out; ++i) {
+                CharUpperW(wide_buffer + i);
+            }
+        }
+        else {
+            for (int i=0; i<num_out; ++i) {
+                CharLowerW(wide_buffer + i);
+            }
+        }
+
+      encode:
+        {
+            size_t free = dest.size() - dest_offset;
+            if (int_less_than(numeric_limits<int>::max(), free)) free = numeric_limits<int>::max();
+            int n = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, wide_buffer, num_out,
+                                        dest.data() + dest_offset, int(free), 0, 0);
+            if (i != 0) {
+                dest_offset += n;
+                continue;
+            }
+            if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) return false;
+            size_t dest_size = dest.size();
+            if (int_multiply_with_overflow_detect(dest_size, 2)) {
+                if (dest_size == numeric_limits<size_t>::max()) return false;
+                dest_size = numeric_limits<size_t>::max();
+            }
+            dest.resize(dest_size);
+            goto encode;
+        }
     }
-    while (constant_lower[matchlen] != 0 && source[matchlen] != 0);
-    if (constant_lower[matchlen] != 0 || source[matchlen] != 0)
-        return false;
 
-    if (case_prefix(constant_upper, constant_lower, source) != (size_t)-1)
-        return true;
-    else
-        return false;
+    dest.resize(dest_offset);
+    return true;
 }
+*/
 
-// Test if constant is a substring of source
-bool case_strstr(const char *constant_upper, const char *constant_lower, const char *source) {
-    size_t source_pos = 0;
-    do {
-        if (case_prefix(constant_upper, constant_lower, source + source_pos) != size_t(-1))
-            return true;
-        source_pos++;
-    } while (source[source_pos] != 0);
 
-    return false;
-}
-
-// Converts a single utf8 character to upper or lower case. Operating system specific function.
-bool utf8case_single(const char* source, char* destination, int upper)
+// Converts UTF-8 source into upper or lower case. This function
+// preserves the byte length of each UTF-8 character in following way:
+// If an output character differs in size, it is simply substituded by
+// the original character. This may of course give wrong search
+// results in very special cases. Todo.
+bool case_map(StringData source, char* target, bool upper)
 {
 #ifdef _WIN32
-    wchar_t tmp[2];
+    const char* begin = source.data();
+    const char* end = begin + source.size();
+    while (begin != end) {
+        int n = sequence_length(*begin);
+        if (n == 0 || end-begin < n) return false;
 
-    int i = MultiByteToWideChar(CP_UTF8, 0, (LPCSTR)source, (int)sequence_length(source), &tmp[0], 1);
-    if (i == 0)
-        return false;
+        wchar_t tmp[2]; // FIXME: Why no room for UTF-16 surrogate?
 
-    tmp[1] = 0;
+        int n2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, n, tmp, 1);
+        if (n2 == 0) return false;
 
-    if (upper)
-        CharUpperW((LPWSTR)&tmp);
-    else
-        CharLowerW((LPWSTR)&tmp);
+        TIGHTDB_ASSERT(0 < n2 && n2 <= 1);
+        tmp[n2] = 0;
 
-    i = WideCharToMultiByte(CP_UTF8, 0, (LPCWSTR)&tmp, 1, (LPSTR)destination, 6, 0, 0);
-    if (i == 0)
-        return false;
+        // Note: If tmp[0] == 0, it is because the string contains a
+        // null-chacarcter, which is perfectly fine.
+
+        if (upper)
+            CharUpperW(static_cast<LPWSTR>(tmp));
+        else
+            CharLowerW(static_cast<LPWSTR>(tmp));
+
+        // FIXME: The intention is to use flag 'WC_ERR_INVALID_CHARS'
+        // to catch invalid UTF-8. Even though the documentation says
+        // unambigously that it is supposed to work, it doesn't. When
+        // the flag is specified, the function fails with error
+        // ERROR_INVALID_FLAGS.
+        DWORD flags = 0;
+        int n3 = WideCharToMultiByte(CP_UTF8, flags, tmp, 1, target, int(end-begin), 0, 0);
+        if (n3 == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER) return false;
+        if (n3 != n) {
+            copy(begin, begin+n, target); // Cannot handle different size, copy source
+        }
+
+        begin  += n;
+        target += n;
+    }
 
     return true;
 #else
+    // FIXME: Implement this! Note that this is trivial in C++11 due
+    // to its built-in support for UTF-8. In C++03 it is trivial when
+    // __STDC_ISO_10646__ is defined. Also consider using ICU. Maybe
+    // GNU has something to offer too.
 
-	// On *nix we can only convert 1-byte UTF-8 characters which map to 127-bit ASCII. Multibyte UTF-8 characters
-	// are just memcopied unchanged. Warning: This may give wrong search results in case insensitive queries.
-	if(sequence_length(source) == 1) {
-		char c;
-		if(upper) {
-			c = (char)toupper(*source);
-		}
-		else {
-			c = (char)tolower(*source);			
-		}
-		*destination = c;
-	}
-	else {
-	    memcpy(destination, source, sequence_length(source));
-	}
+    // For now we handle just the ASCII subset
+    typedef char_traits<char> traits;
+    if (upper) {
+        size_t n = source.size();
+        for (size_t i=0; i<n; ++i) {
+            char c = source[i];
+            if (traits::lt(0x60, c) &&
+                traits::lt(c, 0x7B)) c = traits::to_char_type(traits::to_int_type(c)-0x20);
+            target[i] = c;
+        }
+    }
+    else { // lower
+        size_t n = source.size();
+        for (size_t i=0; i<n; ++i) {
+            char c = source[i];
+            if (traits::lt(0x40, c) &&
+                traits::lt(c, 0x5B)) c = traits::to_char_type(traits::to_int_type(c)+0x20);
+            target[i] = c;
+        }
+    }
 
-
-//    memcpy(destination, source, sequence_length(source));
-    static_cast<void>(upper);
     return true;
 #endif
 }
 
-// Converts utf8 source into upper or lower case. This function preserves the byte length of each utf8
-// character in following way: If an output character differs in size, it is simply substituded by the
-// original character. This may of course give wrong search results in very special cases. Todo.
-bool utf8case(const char* source, char* destination, int upper)
+
+// If needle == haystack, return true. NOTE: This function first
+// performs a case insensitive *byte* compare instead of one whole
+// UTF-8 character at a time. This is very fast, but not enough to
+// guarantee that the strings are identical, so we need to finish off
+// with a slower but rigorous comparison. The signature is similar in
+// spirit to std::equal().
+bool equal_case_fold(StringData haystack, const char* needle_upper, const char* needle_lower)
 {
-    while (*source != 0) {
-        if (sequence_length(source) == 0)
-            return false;
-
-        bool b = utf8case_single(source, destination, upper);
-        if (!b) {
-            return false;
-        }
-
-        if (sequence_length(destination) != sequence_length(source)) {
-            memcpy(destination, source, sequence_length(source));
-            destination += sequence_length(source);
-        }
-        else
-            destination += sequence_length(destination);
-
-        source += sequence_length(source);
+    for (size_t i=0; i!=haystack.size(); ++i) {
+        char c = haystack[i];
+        if (needle_lower[i] != c && needle_upper[i] != c) return false;
     }
 
-    *destination = 0;
+    const char* begin = haystack.data();
+    const char* end   = begin + haystack.size();
+    const char* i = begin;
+    while (i != end) {
+        if (!equal_sequence(i, end, needle_lower + (i - begin)) &&
+            !equal_sequence(i, end, needle_upper + (i - begin))) return false;
+    }
     return true;
 }
 
+
+// Test if needle is a substring of haystack. The signature is similar
+// in spirit to std::search().
+size_t search_case_fold(StringData haystack, const char* needle_upper, const char* needle_lower,
+                        size_t needle_size)
+{
+    // FIXME: This solution is terribly inefficient. Consider deploying the Boyer-Moore algorithm.
+    size_t i = 0;
+    while (needle_size <= haystack.size() - i) {
+        if (equal_case_fold(haystack.substr(i, needle_size), needle_upper, needle_lower)) {
+            return i;
+        }
+        ++i;
+    }
+    return haystack.size(); // Not found
 }
+
+
+} // namespace tightdb

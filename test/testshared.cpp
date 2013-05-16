@@ -2,7 +2,8 @@
 
 #include <UnitTest++.h>
 
-#include "tightdb.hpp"
+#include <tightdb/file.hpp>
+#include <tightdb.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -22,8 +23,8 @@ TIGHTDB_TABLE_4(TestTableShared,
 TEST(Shared_Initial)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -48,8 +49,8 @@ TEST(Shared_Initial)
 TEST(Shared_Initial_Mem)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -75,8 +76,8 @@ TEST(Shared_Initial_Mem)
 TEST(Shared_Initial2)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -109,7 +110,7 @@ TEST(Shared_Initial2)
             CHECK_EQUAL(1, t1[0].first);
             CHECK_EQUAL(2, t1[0].second);
             CHECK_EQUAL(false, t1[0].third);
-            CHECK_EQUAL("test", (const char*)t1[0].fourth);
+            CHECK_EQUAL("test", t1[0].fourth);
         }
     }
 
@@ -120,8 +121,8 @@ TEST(Shared_Initial2)
 TEST(Shared_Initial2_Mem)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -154,7 +155,7 @@ TEST(Shared_Initial2_Mem)
             CHECK_EQUAL(1, t1[0].first);
             CHECK_EQUAL(2, t1[0].second);
             CHECK_EQUAL(false, t1[0].third);
-            CHECK_EQUAL("test", (const char*)t1[0].fourth);
+            CHECK_EQUAL("test", t1[0].fourth);
         }
     }
 
@@ -166,8 +167,8 @@ TEST(Shared_Initial2_Mem)
 TEST(Shared1)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -192,7 +193,7 @@ TEST(Shared1)
             CHECK_EQUAL(1, t2[0].first);
             CHECK_EQUAL(2, t2[0].second);
             CHECK_EQUAL(false, t2[0].third);
-            CHECK_EQUAL("test", (const char*)t2[0].fourth);
+            CHECK_EQUAL("test", t2[0].fourth);
 
             // Do a new change while stil having current read transaction open
             {
@@ -208,7 +209,7 @@ TEST(Shared1)
             CHECK_EQUAL(1, t2[0].first);
             CHECK_EQUAL(2, t2[0].second);
             CHECK_EQUAL(false, t2[0].third);
-            CHECK_EQUAL("test", (const char*)t2[0].fourth);
+            CHECK_EQUAL("test", t2[0].fourth);
 
             // Do one more new change while stil having current read transaction open
             // so we know that it does not overwrite data held by
@@ -225,7 +226,7 @@ TEST(Shared1)
             CHECK_EQUAL(1, t2[0].first);
             CHECK_EQUAL(2, t2[0].second);
             CHECK_EQUAL(false, t2[0].third);
-            CHECK_EQUAL("test", (const char*)t2[0].fourth);
+            CHECK_EQUAL("test", t2[0].fourth);
         }
 
         // Start a new read transaction and verify that it can now see the changes
@@ -237,15 +238,15 @@ TEST(Shared1)
             CHECK_EQUAL(1, t3[0].first);
             CHECK_EQUAL(2, t3[0].second);
             CHECK_EQUAL(false, t3[0].third);
-            CHECK_EQUAL("test", (const char*)t3[0].fourth);
+            CHECK_EQUAL("test", t3[0].fourth);
             CHECK_EQUAL(2, t3[1].first);
             CHECK_EQUAL(3, t3[1].second);
             CHECK_EQUAL(true, t3[1].third);
-            CHECK_EQUAL("more test", (const char*)t3[1].fourth);
+            CHECK_EQUAL("more test", t3[1].fourth);
             CHECK_EQUAL(0, t3[2].first);
             CHECK_EQUAL(1, t3[2].second);
             CHECK_EQUAL(false, t3[2].third);
-            CHECK_EQUAL("even more test", (const char*)t3[2].fourth);
+            CHECK_EQUAL("even more test", t3[2].fourth);
         }
     }
 
@@ -256,8 +257,8 @@ TEST(Shared1)
 TEST(Shared_rollback)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -293,7 +294,7 @@ TEST(Shared_rollback)
             CHECK_EQUAL(1, t[0].first);
             CHECK_EQUAL(2, t[0].second);
             CHECK_EQUAL(false, t[0].third);
-            CHECK_EQUAL("test", (const char*)t[0].fourth);
+            CHECK_EQUAL("test", t[0].fourth);
         }
 
         // Greate more changes (but rollback)
@@ -312,7 +313,7 @@ TEST(Shared_rollback)
             CHECK_EQUAL(1, t[0].first);
             CHECK_EQUAL(2, t[0].second);
             CHECK_EQUAL(false, t[0].third);
-            CHECK_EQUAL("test", (const char*)t[0].fourth);
+            CHECK_EQUAL("test", t[0].fourth);
         }
     }
 
@@ -323,8 +324,8 @@ TEST(Shared_rollback)
 TEST(Shared_Writes)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -367,8 +368,8 @@ TIGHTDB_TABLE_1(MyTable_SpecialOrder, first,  Int)
 
 TEST(Shared_Writes_SpecialOrder)
 {
-    remove("test.tightdb");
-    remove("test.tightdb.lock");
+    File::try_remove("test.tightdb");
+    File::try_remove("test.tightdb.lock");
 
     SharedGroup sg("test.tightdb");
 
@@ -448,8 +449,8 @@ void* IncrementEntry(void* arg)
 TEST(Shared_WriterThreads)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -500,8 +501,8 @@ TEST(Shared_WriterThreads)
 
 TEST(Shared_FormerErrorCase1)
 {
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock");
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock");
     SharedGroup sg("test_shared.tightdb");
     {
         WriteTransaction wt(sg);
@@ -648,8 +649,8 @@ TIGHTDB_TABLE_1(FormerErrorCase2_Table,
 
 TEST(Shared_FormerErrorCase2)
 {
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock");
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock");
 
     for (int i=0; i<10; ++i) {
         SharedGroup sg("test_shared.tightdb");
@@ -683,8 +684,8 @@ TEST(Shared_SpaceOveruse)
 
     // Many transactions
     {
-        remove("over_alloc_1.tightdb");
-        remove("over_alloc_1.tightdb.lock");
+        File::try_remove("over_alloc_1.tightdb");
+        File::try_remove("over_alloc_1.tightdb.lock");
         SharedGroup sg("over_alloc_1.tightdb");
 
         // Do a lot of sequential transactions
@@ -719,8 +720,8 @@ TEST(Shared_SpaceOveruse)
 TEST(Shared_Notifications)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -762,7 +763,7 @@ TEST(Shared_Notifications)
             CHECK_EQUAL(1, t1[0].first);
             CHECK_EQUAL(2, t1[0].second);
             CHECK_EQUAL(false, t1[0].third);
-            CHECK_EQUAL("test", (const char*)t1[0].fourth);
+            CHECK_EQUAL("test", t1[0].fourth);
         }
 
         // No other instance have changed db since last transaction
@@ -773,8 +774,8 @@ TEST(Shared_Notifications)
 TEST(Shared_FromSerialized)
 {
     // Delete old files if there
-    remove("test_shared.tightdb");
-    remove("test_shared.tightdb.lock"); // also the info file
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     // Create new group and serialize to disk
     {
@@ -795,7 +796,7 @@ TEST(Shared_FromSerialized)
         CHECK_EQUAL(1, t1[0].first);
         CHECK_EQUAL(2, t1[0].second);
         CHECK_EQUAL(false, t1[0].third);
-        CHECK_EQUAL("test", (const char*)t1[0].fourth);
+        CHECK_EQUAL("test", t1[0].fourth);
     }
 }
 
@@ -809,8 +810,8 @@ void randstr(char* res, size_t len) {
 
 TEST(StringIndex_Bug)
 {
-    remove("indexbug.tightdb");
-    remove("indexbug.tightdb.lock");
+    File::try_remove("indexbug.tightdb");
+    File::try_remove("indexbug.tightdb.lock");
     SharedGroup db("indexbug.tightdb");
 
     {

@@ -71,22 +71,27 @@ CATEGORIES:
       PARAMS:
       - NAME   : file
         TYPES  : const std::string&
-        DESCR  : Filesystem path of the TightDB database file to be opened.
+        DESCR  : &g_shared_group_constructor_parm1_descr
+                 Filesystem path of the TightDB database file to be opened.
       - NAME   : no_create
         TYPES  : bool
-        DESCR  : If set to <tt>true</tt>, File::NotFound will be thrown
+        DESCR  : &g_shared_group_constructor_parm2_descr
+                 If set to <tt>true</tt>, File::NotFound will be thrown
                  if the file does not already exist.
       - NAME   : dlevel
         TYPES  : DurabilityLevel
-        DESCR  : Durability Level (durability_Full or durability_MemOnly)
+        DESCR  : &g_shared_group_constructor_parm3_descr
+                 Durability Level (durability_Full or durability_MemOnly)
       RETURN:
         TYPES  : SharedGroup
-        DESCR  : A shared group.
+        DESCR  : &g_shared_group_constructor_return1_descr
+                 A shared group.
       THROWS:
-      - EXCEPT : File::OpenError
-        DESCR  : If the file could not be opened. If the reason
+      - EXCEPT : File::AccessError
+        DESCR  : &g_shared_group_constructor_throws_descr
+                 If the file could not be opened. If the reason
                  corresponds to one of the exception types that are
-                 derived from File::OpenError, the derived exception
+                 derived from File::AccessError, the derived exception
                  type is thrown. Note that InvalidDatabase is among
                  these derived exception types.
       EXAMPLES:
@@ -124,19 +129,23 @@ CATEGORIES:
       PARAMS:
       - NAME   : file
         TYPES  : const std::string&
-        DESCR  : Filesystem path of the TightDB database file to be opened.
+        DESCR  : &g_shared_group_open_parm1_descr
+                 Filesystem path of the TightDB database file to be opened.
       - NAME   : no_create
         TYPES  : bool
-        DESCR  : If set to <tt>true</tt>, File::NotFound will be thrown
+        DESCR  : &g_shared_group_open_parm2_descr
+                 If set to <tt>true</tt>, File::NotFound will be thrown
                  if the file does not already exist.
       - NAME   : dlevel
         TYPES  : DurabilityLevel
-        DESCR  : Durability Level (durability_Full or durability_MemOnly)
+        DESCR  : &g_shared_group_open_parm3_descr
+                 Durability Level (durability_Full or durability_MemOnly)
       THROWS:
-      - EXCEPT : File::OpenError
-        DESCR  : If the file could not be opened. If the reason
+      - EXCEPT : File::AccessError
+        DESCR  : &g_shared_group_open_throws_descr
+                 If the file could not be opened. If the reason
                  corresponds to one of the exception types that are
-                 derived from File::OpenError, the derived exception
+                 derived from File::AccessError, the derived exception
                  type is thrown. Note that InvalidDatabase is among
                  these derived exception types.
       EXAMPLES:
@@ -211,16 +220,17 @@ CATEGORIES:
                  Begin writing to a shared group.
       RETURN:
         TYPES  : Group&
-        DESCR  : A group.
+        DESCR  : &g_shared_group_begin_write_return1_descr
+                 A group.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_begin_write
         DESCR  :
-  - g_shared_group_begin_commit:
+  - g_shared_group_commit:
       NAMES    : commit
       SUMMARY  : &g_shared_group_commit_summary
                  Commit a transaction.
       DESCR    : &g_shared_group_commit_descr
-                 This method closes a transaction and changes are written to the group.
+                 This method closes a transaction and all changes are written to the shared group.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_commit
         DESCR  :
@@ -229,56 +239,58 @@ CATEGORIES:
       SUMMARY  : &g_shared_group_rollback_summary
                  Rollback a transaction.
       DESCR    : &g_shared_group_rollback_descr
-                 This method descards all changes.
+                 This method closes a transaction and discards all changes done to the shared group.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_rollback
         DESCR  :
-  - g_shared_group_interrupt_transact:
-      NAMES    : interrupt_transact
-      SUMMARY  : &g_shared_group_interrupt_transact_summary
-                 Interrupt any blocking call.
-      DESCR    : &g_shared_group_interrupt_transact_descr
-                 >
-                 This function may be called asynchronously to interrupt any
-                 blocking call that is part of a transaction in a replication
-                 setup. Only {@link g_shared_group_begin_write} and
-                 modifying function that are part
-                 of a write transaction can block. The transaction is
-                 interrupted only if such a call is blocked or would
-                 block. This function may be called from a different thread. It
-                 may not be called directly from a system signal handler. When
-                 a transaction is interrupted, the only valid member function
-                 to call is {@link g_shared_group_rollback}. If a client calls
-                 {@link g_shared_group_clear_interrupt_transact} after having
-                 called {@link g_shared_group_rollback}, it
-                 may then resume normal operation on this database/shared group.
-                 Currently,
-                 transaction interruption works by throwing an exception from
-                 one of the mentioned member functions that may block.
-      EXAMPLES:
-      - CODE   : ex_cpp_shared_group_interrupt_transact
-        DESCR  :
-  - g_shared_group_clear_interrupt_transact:
-      NAMES    : clear_interrupt_transact
-      SUMMARY  : &g_shared_group_clear_interrupt_transact_summary
-                 Clean up interrupted state.
-      DESCR    : &g_shared_group_clear_interrupt_transact_descr
-                 >
-                 This method clears the interrupted state of the shared group after rolling
-                 back a transaction. It is not an error to call this function
-                 in a situation where no interruption has occured.
-      SEE      : g_shared_group_interrupt_transact
-      EXAMPLES:
-      - CODE   : ex_cpp_shared_group_clear_interrupt_transact
-        DESCR  :
+ # - g_shared_group_interrupt_transact:
+ #     NAMES    : interrupt_transact
+ #     SUMMARY  : &g_shared_group_interrupt_transact_summary
+ #                Interrupt any blocking call.
+ #     DESCR    : &g_shared_group_interrupt_transact_descr
+ #                >
+ #                This function may be called asynchronously to interrupt any
+ #                blocking call that is part of a transaction in a replication
+ #                setup. Only {@link g_shared_group_begin_write} and
+ #                modifying function that are part
+ #                of a write transaction can block. The transaction is
+ #                interrupted only if such a call is blocked or would
+ #                block. This function may be called from a different thread. It
+ #                may not be called directly from a system signal handler. When
+ #                a transaction is interrupted, the only valid member function
+ #                to call is {@link g_shared_group_rollback}. If a client calls
+ #                {@link g_shared_group_clear_interrupt_transact} after having
+ #                called {@link g_shared_group_rollback}, it
+ #                may then resume normal operation on this database/shared group.
+ #                Currently,
+ #                transaction interruption works by throwing an exception from
+ #                one of the mentioned member functions that may block.
+ #     EXAMPLES:
+ #     - CODE   : ex_cpp_shared_group_interrupt_transact
+ #       DESCR  :
+ # - g_shared_group_clear_interrupt_transact:
+ #     NAMES    : clear_interrupt_transact
+ #     SUMMARY  : &g_shared_group_clear_interrupt_transact_summary
+ #                Clean up interrupted state.
+ #     DESCR    : &g_shared_group_clear_interrupt_transact_descr
+ #                >
+ #                This method clears the interrupted state of the shared group after rolling
+ #                back a transaction. It is not an error to call this function
+ #                in a situation where no interruption has occured.
+ #     SEE      : g_shared_group_interrupt_transact
+ #     EXAMPLES:
+ #     - CODE   : ex_cpp_shared_group_clear_interrupt_transact
+ #       DESCR  :
 - Read transactions:
   METHODS:
   - g_shared_group_begin_read:
       NAMES    : begin_read
       SUMMARY  : &g_shared_group_begin_read_summary
-                 Initiate reading.
+                 Initiate reading from a shared group.
       DESCR    : &g_shared_group_begin_read_descr
-                 Begin reading from a shared group.
+                 >
+                 Begin reading from a shared group. During the read transaction, 
+                 you have a fully consistent immutable view of the group.
       CONST    : True
       RETURN:
         TYPES  : Group&
@@ -289,9 +301,9 @@ CATEGORIES:
   - g_shared_group_end_read:
       NAMES    : end_read
       SUMMARY  : &g_shared_group_end_read_summary
-                 Stop reading from a group.
+                 Terminate read transaction.
       DESCR    : &g_shared_group_end_read_descr
-                 This method stops reading from a shared group.
+                 This method terminates the read transaction.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_end_read
         DESCR  :

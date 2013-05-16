@@ -11,7 +11,7 @@ benchmark: minimal
 # Run the performance matrix benchmarking program
 .PHONY: performance
 performance: minimal
-	@$(MAKE) -C test/performance run
+	@$(MAKE) -C test performance
 
 # Run coverage analysis after building everything, this time using LCOV
 .PHONY: lcov
@@ -35,3 +35,7 @@ testcase-debug: debug
 
 benchmark-prealloc: minimal
 	@$(MAKE) -C test benchmark-prealloc
+
+# Used by build.sh
+get-libdir:
+	@echo $(libdir)

@@ -28,9 +28,9 @@ namespace tightdb {
 
 class ColumnBinary : public ColumnBase {
 public:
-    ColumnBinary(Allocator& alloc = Allocator::get_default());
-    ColumnBinary(size_t ref, ArrayParent* parent=NULL, size_t pndx=0,
-                 Allocator& alloc = Allocator::get_default());
+    ColumnBinary(Allocator& = Allocator::get_default());
+    ColumnBinary(size_t ref, ArrayParent* = 0, size_t ndx_in_parent = 0,
+                 Allocator& = Allocator::get_default());
     ~ColumnBinary();
 
     void Destroy();
@@ -38,19 +38,25 @@ public:
     size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
-    BinaryData Get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    const char* get_data(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    std::size_t get_size(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    BinaryData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
-    void add() TIGHTDB_OVERRIDE { add(NULL, 0); }
-    void add(const char* data, std::size_t size);
-    void Set(std::size_t ndx, const char* data, size_t size);
-    void insert(size_t ndx) TIGHTDB_OVERRIDE { Insert(ndx, 0, 0); }
-    void Insert(size_t ndx, const char* data, size_t size);
-    void Delete(size_t ndx) TIGHTDB_OVERRIDE;
-    void Resize(size_t ndx);
+    void add() TIGHTDB_OVERRIDE { add(BinaryData()); }
+    void add(BinaryData value);
+    void set(std::size_t ndx, BinaryData value);
+    void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, BinaryData()); }
+    void insert(std::size_t ndx, BinaryData value);
+    void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
+    void Resize(std::size_t ndx);
     void Clear() TIGHTDB_OVERRIDE;
-    void fill(size_t count);
+    void fill(std::size_t count);
+    void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
+
+    // Requires that the specified entry was inserted as StringData.
+    StringData get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+
+    void add_string(StringData value);
+    void set_string(std::size_t ndx, StringData value);
+    void insert_string(std::size_t ndx, StringData value);
 
     // Index
     bool HasIndex() const {return false;}
@@ -72,10 +78,6 @@ public:
 protected:
     friend class ColumnBase;
 
-    void add(BinaryData bin);
-    void Set(size_t ndx, BinaryData bin);
-    void Insert(size_t ndx, BinaryData bin);
-
     void UpdateRef(size_t ref);
 
     BinaryData LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
@@ -86,6 +88,12 @@ protected:
 #ifdef TIGHTDB_DEBUG
     virtual void LeafToDot(std::ostream& out, const Array& array) const;
 #endif // TIGHTDB_DEBUG
+
+private:
+    void add(StringData value) { add_string(value); }
+    void set(std::size_t ndx, StringData value) { set_string(ndx, value); }
+    void LeafSet(size_t ndx, StringData value);
+    void LeafInsert(size_t ndx, StringData value);
 };
 
 
@@ -93,40 +101,27 @@ protected:
 
 // Implementation
 
-inline BinaryData ColumnBinary::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline BinaryData ColumnBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < Size());
     return ArrayBinary::column_get(m_array, ndx);
 }
 
-inline const char* ColumnBinary::get_data(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline StringData ColumnBinary::get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    return Get(ndx).pointer;
+    BinaryData bin = get(ndx);
+    TIGHTDB_ASSERT(0 < bin.size());
+    return StringData(bin.data(), bin.size()-1);
 }
 
-inline std::size_t ColumnBinary::get_size(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline void ColumnBinary::add(BinaryData value)
 {
-    return Get(ndx).len;
+    insert(Size(), value);
 }
 
-inline void ColumnBinary::Set(std::size_t ndx, const char* data, std::size_t size)
+inline void ColumnBinary::add_string(StringData value)
 {
-    Set(ndx, BinaryData(data, size));
-}
-
-inline void ColumnBinary::add(const char* data, std::size_t size)
-{
-    Insert(Size(), data, size);
-}
-
-inline void ColumnBinary::add(BinaryData bin)
-{
-    Insert(Size(), bin);
-}
-
-inline void ColumnBinary::Insert(std::size_t ndx, const char* data, std::size_t size)
-{
-    Insert(ndx, BinaryData(data, size));
+    insert_string(Size(), value);
 }
 
 } // namespace tightdb

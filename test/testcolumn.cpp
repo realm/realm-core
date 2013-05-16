@@ -23,99 +23,99 @@ TEST_FIXTURE(db_setup, Column_IsEmpty)
 TEST_FIXTURE(db_setup, Column_Add0)
 {
     c.add(0);
-    CHECK_EQUAL(c.Get(0), 0);
+    CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.Size(), (size_t)1);
 }
 
 TEST_FIXTURE(db_setup, Column_Add1)
 {
     c.add(1);
-    CHECK_EQUAL(c.Get(0), 0);
-    CHECK_EQUAL(c.Get(1), 1);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
     CHECK_EQUAL(c.Size(), 2);
 }
 
 TEST_FIXTURE(db_setup, Column_Add2)
 {
     c.add(2);
-    CHECK_EQUAL(c.Get(0), 0);
-    CHECK_EQUAL(c.Get(1), 1);
-    CHECK_EQUAL(c.Get(2), 2);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.get(2), 2);
     CHECK_EQUAL(c.Size(), 3);
 }
 
 TEST_FIXTURE(db_setup, Column_Add3)
 {
     c.add(3);
-    CHECK_EQUAL(c.Get(0), 0);
-    CHECK_EQUAL(c.Get(1), 1);
-    CHECK_EQUAL(c.Get(2), 2);
-    CHECK_EQUAL(c.Get(3), 3);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.get(2), 2);
+    CHECK_EQUAL(c.get(3), 3);
     CHECK_EQUAL(c.Size(), 4);
 }
 
 TEST_FIXTURE(db_setup, Column_Add4)
 {
     c.add(4);
-    CHECK_EQUAL(c.Get(0), 0);
-    CHECK_EQUAL(c.Get(1), 1);
-    CHECK_EQUAL(c.Get(2), 2);
-    CHECK_EQUAL(c.Get(3), 3);
-    CHECK_EQUAL(c.Get(4), 4);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.get(2), 2);
+    CHECK_EQUAL(c.get(3), 3);
+    CHECK_EQUAL(c.get(4), 4);
     CHECK_EQUAL(c.Size(), 5);
 }
 
 TEST_FIXTURE(db_setup, Column_Add5)
 {
     c.add(16);
-    CHECK_EQUAL(c.Get(0), 0);
-    CHECK_EQUAL(c.Get(1), 1);
-    CHECK_EQUAL(c.Get(2), 2);
-    CHECK_EQUAL(c.Get(3), 3);
-    CHECK_EQUAL(c.Get(4), 4);
-    CHECK_EQUAL(c.Get(5), 16);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.get(2), 2);
+    CHECK_EQUAL(c.get(3), 3);
+    CHECK_EQUAL(c.get(4), 4);
+    CHECK_EQUAL(c.get(5), 16);
     CHECK_EQUAL(c.Size(), 6);
 }
 
 TEST_FIXTURE(db_setup, Column_Add6)
 {
     c.add(256);
-    CHECK_EQUAL(c.Get(0), 0);
-    CHECK_EQUAL(c.Get(1), 1);
-    CHECK_EQUAL(c.Get(2), 2);
-    CHECK_EQUAL(c.Get(3), 3);
-    CHECK_EQUAL(c.Get(4), 4);
-    CHECK_EQUAL(c.Get(5), 16);
-    CHECK_EQUAL(c.Get(6), 256);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.get(2), 2);
+    CHECK_EQUAL(c.get(3), 3);
+    CHECK_EQUAL(c.get(4), 4);
+    CHECK_EQUAL(c.get(5), 16);
+    CHECK_EQUAL(c.get(6), 256);
     CHECK_EQUAL(c.Size(), 7);
 }
 
 TEST_FIXTURE(db_setup, Column_Add7)
 {
     c.add(65536);
-    CHECK_EQUAL(c.Get(0), 0);
-    CHECK_EQUAL(c.Get(1), 1);
-    CHECK_EQUAL(c.Get(2), 2);
-    CHECK_EQUAL(c.Get(3), 3);
-    CHECK_EQUAL(c.Get(4), 4);
-    CHECK_EQUAL(c.Get(5), 16);
-    CHECK_EQUAL(c.Get(6), 256);
-    CHECK_EQUAL(c.Get(7), 65536);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.get(2), 2);
+    CHECK_EQUAL(c.get(3), 3);
+    CHECK_EQUAL(c.get(4), 4);
+    CHECK_EQUAL(c.get(5), 16);
+    CHECK_EQUAL(c.get(6), 256);
+    CHECK_EQUAL(c.get(7), 65536);
     CHECK_EQUAL(c.Size(), 8);
 }
 
 TEST_FIXTURE(db_setup, Column_Add8)
 {
     c.add(4294967296LL);
-    CHECK_EQUAL(c.Get(0), 0);
-    CHECK_EQUAL(c.Get(1), 1);
-    CHECK_EQUAL(c.Get(2), 2);
-    CHECK_EQUAL(c.Get(3), 3);
-    CHECK_EQUAL(c.Get(4), 4);
-    CHECK_EQUAL(c.Get(5), 16);
-    CHECK_EQUAL(c.Get(6), 256);
-    CHECK_EQUAL(c.Get(7), 65536);
-    CHECK_EQUAL(c.Get(8), 4294967296LL);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.get(2), 2);
+    CHECK_EQUAL(c.get(3), 3);
+    CHECK_EQUAL(c.get(4), 4);
+    CHECK_EQUAL(c.get(5), 16);
+    CHECK_EQUAL(c.get(6), 256);
+    CHECK_EQUAL(c.get(7), 65536);
+    CHECK_EQUAL(c.get(8), 4294967296LL);
     CHECK_EQUAL(c.Size(), 9);
 }
 
@@ -125,7 +125,7 @@ TEST_FIXTURE(db_setup, Column_AddNeg1)
     c.add(-1);
 
     CHECK_EQUAL(c.Size(), 1);
-    CHECK_EQUAL(c.Get(0), -1);
+    CHECK_EQUAL(c.get(0), -1);
 }
 
 TEST_FIXTURE(db_setup, Column_AddNeg2)
@@ -133,8 +133,8 @@ TEST_FIXTURE(db_setup, Column_AddNeg2)
     c.add(-256);
 
     CHECK_EQUAL(c.Size(), 2);
-    CHECK_EQUAL(c.Get(0), -1);
-    CHECK_EQUAL(c.Get(1), -256);
+    CHECK_EQUAL(c.get(0), -1);
+    CHECK_EQUAL(c.get(1), -256);
 }
 
 TEST_FIXTURE(db_setup, Column_AddNeg3)
@@ -142,9 +142,9 @@ TEST_FIXTURE(db_setup, Column_AddNeg3)
     c.add(-65536);
 
     CHECK_EQUAL(c.Size(), 3);
-    CHECK_EQUAL(c.Get(0), -1);
-    CHECK_EQUAL(c.Get(1), -256);
-    CHECK_EQUAL(c.Get(2), -65536);
+    CHECK_EQUAL(c.get(0), -1);
+    CHECK_EQUAL(c.get(1), -256);
+    CHECK_EQUAL(c.get(2), -65536);
 }
 
 TEST_FIXTURE(db_setup, Column_AddNeg4)
@@ -152,24 +152,24 @@ TEST_FIXTURE(db_setup, Column_AddNeg4)
     c.add(-4294967296LL);
 
     CHECK_EQUAL(c.Size(), 4);
-    CHECK_EQUAL(c.Get(0), -1);
-    CHECK_EQUAL(c.Get(1), -256);
-    CHECK_EQUAL(c.Get(2), -65536);
-    CHECK_EQUAL(c.Get(3), -4294967296LL);
+    CHECK_EQUAL(c.get(0), -1);
+    CHECK_EQUAL(c.get(1), -256);
+    CHECK_EQUAL(c.get(2), -65536);
+    CHECK_EQUAL(c.get(3), -4294967296LL);
 }
 
 TEST_FIXTURE(db_setup, Column_Set)
 {
-    c.Set(0, 3);
-    c.Set(1, 2);
-    c.Set(2, 1);
-    c.Set(3, 0);
+    c.set(0, 3);
+    c.set(1, 2);
+    c.set(2, 1);
+    c.set(3, 0);
 
     CHECK_EQUAL(c.Size(), 4);
-    CHECK_EQUAL(c.Get(0), 3);
-    CHECK_EQUAL(c.Get(1), 2);
-    CHECK_EQUAL(c.Get(2), 1);
-    CHECK_EQUAL(c.Get(3), 0);
+    CHECK_EQUAL(c.get(0), 3);
+    CHECK_EQUAL(c.get(1), 2);
+    CHECK_EQUAL(c.get(2), 1);
+    CHECK_EQUAL(c.get(3), 0);
 }
 
 TEST_FIXTURE(db_setup, Column_Insert1)
@@ -182,43 +182,43 @@ TEST_FIXTURE(db_setup, Column_Insert1)
     c.add(3);
 
     // Insert in middle
-    c.Insert(2, 16);
+    c.insert(2, 16);
 
     CHECK_EQUAL(c.Size(), 5);
-    CHECK_EQUAL(c.Get(0), 0);
-    CHECK_EQUAL(c.Get(1), 1);
-    CHECK_EQUAL(c.Get(2), 16);
-    CHECK_EQUAL(c.Get(3), 2);
-    CHECK_EQUAL(c.Get(4), 3);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.get(2), 16);
+    CHECK_EQUAL(c.get(3), 2);
+    CHECK_EQUAL(c.get(4), 3);
 }
 
 TEST_FIXTURE(db_setup, Column_Insert2)
 {
     // Insert at top
-    c.Insert(0, 256);
+    c.insert(0, 256);
 
     CHECK_EQUAL(c.Size(), 6);
-    CHECK_EQUAL(c.Get(0), 256);
-    CHECK_EQUAL(c.Get(1), 0);
-    CHECK_EQUAL(c.Get(2), 1);
-    CHECK_EQUAL(c.Get(3), 16);
-    CHECK_EQUAL(c.Get(4), 2);
-    CHECK_EQUAL(c.Get(5), 3);
+    CHECK_EQUAL(c.get(0), 256);
+    CHECK_EQUAL(c.get(1), 0);
+    CHECK_EQUAL(c.get(2), 1);
+    CHECK_EQUAL(c.get(3), 16);
+    CHECK_EQUAL(c.get(4), 2);
+    CHECK_EQUAL(c.get(5), 3);
 }
 
 TEST_FIXTURE(db_setup, Column_Insert3)
 {
     // Insert at bottom
-    c.Insert(6, 65536);
+    c.insert(6, 65536);
 
     CHECK_EQUAL(c.Size(), 7);
-    CHECK_EQUAL(c.Get(0), 256);
-    CHECK_EQUAL(c.Get(1), 0);
-    CHECK_EQUAL(c.Get(2), 1);
-    CHECK_EQUAL(c.Get(3), 16);
-    CHECK_EQUAL(c.Get(4), 2);
-    CHECK_EQUAL(c.Get(5), 3);
-    CHECK_EQUAL(c.Get(6), 65536);
+    CHECK_EQUAL(c.get(0), 256);
+    CHECK_EQUAL(c.get(1), 0);
+    CHECK_EQUAL(c.get(2), 1);
+    CHECK_EQUAL(c.get(3), 16);
+    CHECK_EQUAL(c.get(4), 2);
+    CHECK_EQUAL(c.get(5), 3);
+    CHECK_EQUAL(c.get(6), 65536);
 }
 
 /*
@@ -243,49 +243,49 @@ TEST_FIXTURE(db_setup, Column_Index1)
 TEST_FIXTURE(db_setup, Column_Delete1)
 {
     // Delete from middle
-    c.Delete(3);
+    c.erase(3);
 
     CHECK_EQUAL(c.Size(), 6);
-    CHECK_EQUAL(c.Get(0), 256);
-    CHECK_EQUAL(c.Get(1), 0);
-    CHECK_EQUAL(c.Get(2), 1);
-    CHECK_EQUAL(c.Get(3), 2);
-    CHECK_EQUAL(c.Get(4), 3);
-    CHECK_EQUAL(c.Get(5), 65536);
+    CHECK_EQUAL(c.get(0), 256);
+    CHECK_EQUAL(c.get(1), 0);
+    CHECK_EQUAL(c.get(2), 1);
+    CHECK_EQUAL(c.get(3), 2);
+    CHECK_EQUAL(c.get(4), 3);
+    CHECK_EQUAL(c.get(5), 65536);
 }
 
 TEST_FIXTURE(db_setup, Column_Delete2)
 {
     // Delete from top
-    c.Delete(0);
+    c.erase(0);
 
     CHECK_EQUAL(c.Size(), 5);
-    CHECK_EQUAL(c.Get(0), 0);
-    CHECK_EQUAL(c.Get(1), 1);
-    CHECK_EQUAL(c.Get(2), 2);
-    CHECK_EQUAL(c.Get(3), 3);
-    CHECK_EQUAL(c.Get(4), 65536);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.get(2), 2);
+    CHECK_EQUAL(c.get(3), 3);
+    CHECK_EQUAL(c.get(4), 65536);
 }
 
 TEST_FIXTURE(db_setup, Column_Delete3)
 {
     // Delete from bottom
-    c.Delete(4);
+    c.erase(4);
 
     CHECK_EQUAL(c.Size(), 4);
-    CHECK_EQUAL(c.Get(0), 0);
-    CHECK_EQUAL(c.Get(1), 1);
-    CHECK_EQUAL(c.Get(2), 2);
-    CHECK_EQUAL(c.Get(3), 3);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.get(2), 2);
+    CHECK_EQUAL(c.get(3), 3);
 }
 
 TEST_FIXTURE(db_setup, Column_DeleteAll)
 {
     // Delete all items one at a time
-    c.Delete(0);
-    c.Delete(0);
-    c.Delete(0);
-    c.Delete(0);
+    c.erase(0);
+    c.erase(0);
+    c.erase(0);
+    c.erase(0);
 
     CHECK(c.is_empty());
     CHECK_EQUAL(0, c.Size());
@@ -391,16 +391,16 @@ TEST_FIXTURE(db_setup, Column_FindLeafs)
     }
 
     // Set sentinel values at before and after each break
-    a.Set(0, 1);
-    a.Set(TIGHTDB_MAX_LIST_SIZE-1, 2);
-    a.Set(TIGHTDB_MAX_LIST_SIZE, 3);
-    a.Set(TIGHTDB_MAX_LIST_SIZE*2-1, 4);
-    a.Set(TIGHTDB_MAX_LIST_SIZE*2, 5);
-    a.Set(TIGHTDB_MAX_LIST_SIZE*3-1, 6);
-    a.Set(TIGHTDB_MAX_LIST_SIZE*3, 7);
-    a.Set(TIGHTDB_MAX_LIST_SIZE*4-1, 8);
-    a.Set(TIGHTDB_MAX_LIST_SIZE*4, 9);
-    a.Set(TIGHTDB_MAX_LIST_SIZE*5-1, 10);
+    a.set(0, 1);
+    a.set(TIGHTDB_MAX_LIST_SIZE-1, 2);
+    a.set(TIGHTDB_MAX_LIST_SIZE, 3);
+    a.set(TIGHTDB_MAX_LIST_SIZE*2-1, 4);
+    a.set(TIGHTDB_MAX_LIST_SIZE*2, 5);
+    a.set(TIGHTDB_MAX_LIST_SIZE*3-1, 6);
+    a.set(TIGHTDB_MAX_LIST_SIZE*3, 7);
+    a.set(TIGHTDB_MAX_LIST_SIZE*4-1, 8);
+    a.set(TIGHTDB_MAX_LIST_SIZE*4, 9);
+    a.set(TIGHTDB_MAX_LIST_SIZE*5-1, 10);
 
     const size_t res1 = a.find_first(1);
     const size_t res2 = a.find_first(2);
@@ -512,7 +512,7 @@ TEST(Column_FindAll_IntMin)
     size_t i = 0;
     size_t j = 0;
     while (i < c.Size()){
-        if (c.Get(i) == value)
+        if (c.get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
     }
@@ -544,7 +544,7 @@ TEST(Column_FindAll_IntMax)
     size_t i = 0;
     size_t j = 0;
     while (i < c.Size()){
-        if (c.Get(i) == value)
+        if (c.get(i) == value)
             CHECK_EQUAL(int64_t(i), r.Get(j++));
         i += 1;
     }
@@ -574,6 +574,47 @@ TEST(Column_FindHamming)
 }
 */
 
+TEST(Column_FindSorted)
+{
+    // Create column with sorted members
+    Column col;
+    for (size_t i = 5; i < 100; i += 5) {
+        col.add(i);
+    }
+
+    size_t pos;
+    bool res = col.find_sorted(0, pos);
+    CHECK_EQUAL(false, res);
+    CHECK_EQUAL(0, pos); // insert position
+
+    // first entry
+    res = col.find_sorted(5, pos);
+    CHECK_EQUAL(true, res);
+    CHECK_EQUAL(0, pos); // actual position
+
+    // middle entry
+    res = col.find_sorted(50, pos);
+    CHECK_EQUAL(true, res);
+    CHECK_EQUAL(9, pos); // actual position
+
+    // non-existent middle entry
+    res = col.find_sorted(52, pos);
+    CHECK_EQUAL(false, res);
+    CHECK_EQUAL(10, pos); // insert position
+
+    // last entry
+    res = col.find_sorted(95, pos);
+    CHECK_EQUAL(true, res);
+    CHECK_EQUAL(18, pos); // actual position
+
+    // beyond last entry
+    res = col.find_sorted(96, pos);
+    CHECK_EQUAL(false, res);
+    CHECK_EQUAL(19, pos); // insert position
+
+    // Clean up
+    col.Destroy();
+}
 
 TEST(Column_Average)
 {
@@ -614,7 +655,7 @@ TEST(Column_Sum_Average)
     // Sum of entire range, using default args
     sum = 0;
     for (int i = 0; i < 100; i++) {
-        sum += c.Get(i);
+        sum += c.get(i);
     }
     CHECK_EQUAL(sum, c.sum());
     CHECK_EQUAL(sum/100.0, c.average());
@@ -622,7 +663,7 @@ TEST(Column_Sum_Average)
     // Sum of entire range, given explicit range
     sum = 0;
     for (int i = 0; i < 100; i++) {
-        sum += c.Get(i);
+        sum += c.get(i);
     }
     CHECK_EQUAL(sum, c.sum(0, 100));
     CHECK_EQUAL(sum/100.0, c.average(0,100));
@@ -630,7 +671,7 @@ TEST(Column_Sum_Average)
     // Start to N
     sum = 0;
     for (int i = 0; i < 63; i++) {
-        sum += c.Get(i);
+        sum += c.get(i);
     }
     CHECK_EQUAL(sum, c.sum(0, 63));
     CHECK_EQUAL(sum/63.0, c.average(0, 63));
@@ -638,7 +679,7 @@ TEST(Column_Sum_Average)
     // N to end
     sum = 0;
     for (int i = 47; i < 100; i++) {
-        sum += c.Get(i);
+        sum += c.get(i);
     }
     CHECK_EQUAL(sum, c.sum(47, 100));
     CHECK_EQUAL(sum/(100.0-47.0), c.average(47, 100));
@@ -646,7 +687,7 @@ TEST(Column_Sum_Average)
     // N to M
     sum = 0;
     for (int i = 55; i < 79; i++) {
-        sum += c.Get(i);
+        sum += c.get(i);
     }
     CHECK_EQUAL(sum, c.sum(55, 79));
     CHECK_EQUAL(sum/(79.0-55.0), c.average(55, 79));
@@ -676,10 +717,10 @@ TEST(Column_Max2)
     for (int i = 0; i < 100; i++) {
         c.add(10);
     }
-    c.Set(20, 20);
-    c.Set(50, 11); // Max must select *first* occurence of largest value
-    c.Set(51, 11);
-    c.Set(81, 20);
+    c.set(20, 20);
+    c.set(50, 11); // Max must select *first* occurence of largest value
+    c.set(51, 11);
+    c.set(81, 20);
 
     int64_t t = c.maximum(51, 81);
     CHECK_EQUAL(11, t);
@@ -708,10 +749,10 @@ TEST(Column_Min2)
     for (int i = 0; i < 100; i++) {
         c.add(10);
     }
-    c.Set(20, 20);
-    c.Set(50, 9); // Max must select *first* occurence of lowest value
-    c.Set(51, 9);
-    c.Set(81, 20);
+    c.set(20, 20);
+    c.set(50, 9); // Max must select *first* occurence of lowest value
+    c.set(51, 9);
+    c.set(81, 20);
 
     int64_t t = c.minimum(51, 81);
     CHECK_EQUAL(9, t);
@@ -730,7 +771,7 @@ TEST(Column_Sort2)
     c.sort();
 
     for (size_t t = 1; t < 9*TIGHTDB_MAX_LIST_SIZE; t++) {
-        CHECK(c.Get(t) >= c.Get(t - 1));
+        CHECK(c.get(t) >= c.get(t - 1));
     }
 
     c.Destroy();
@@ -748,9 +789,9 @@ TEST(Column_prepend_many)
     for (size_t items = 0; items < 3000; ++items) {
         a.Clear();
         for (size_t j = 0; j < items + 1; ++j) {
-            a.Insert(0, j);
+            a.insert(0, j);
         }
-        a.Insert(items, 444);
+        a.insert(items, 444);
     }
     a.Destroy();
 }

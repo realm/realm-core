@@ -27,8 +27,11 @@
 #include <limits>
 #include <stdexcept>
 
+#include <stdint.h> // <cstdint> is not available in C++03
+
 #include <tightdb/meta.hpp>
 #include <tightdb/tuple.hpp>
+#include <tightdb/unique_ptr.hpp>
 #include <tightdb/file.hpp>
 #include <tightdb/mixed.hpp>
 
@@ -38,6 +41,7 @@ namespace tightdb {
 class Spec;
 class Table;
 class Group;
+class SharedGroup;
 
 
 // FIXME: Be careful about the possibility of one modification functions being called by another where both do transaction logging.
@@ -48,60 +52,59 @@ class Group;
 
 // FIXME: Checking on same Table* requires that ~Table checks and nullifies on match. Another option would be to store m_selected_table as a TableRef. Yet another option would be to assign unique identifiers to each Table instance vial Allocator. Yet another option would be to explicitely invalidate subtables recursively when parent is modified.
 
-// FIXME: Consider opportunistic transmission of the transaction log while it is being built.
 
 
-
-/// Manage replication for a client or for the local coordinator.
-///
-/// When replication is enabled, a directory named "/var/lib/tightdb/"
-/// must exist, and the user running the client and the user running
-/// the local coordinator must both have write permission to that
-/// directory.
-///
-/// Replication is enabled by creating an instance of SharedGroup and
-/// passing SharedGroup::replication_tag() to the constructor.
-///
-/// Replication also requires that a local coordinator process is
-/// running on the same host as the client. At most one local
-/// coordinator process may run on each host.
+/// Replication is enabled by passing an instance of this class to the
+/// SharedGroup constructor.
 class Replication {
 public:
-    /// Create a Replication instance in its unattached state. To
-    /// attach it to a replication coordination buffer, call open().
-    /// You may test whether this instance is currently in its
-    /// attached state by calling is_attached(). Calling any other
-    /// method (except the destructor) while in the unattached state
-    /// has undefined behaviour.
-    Replication() TIGHTDB_NOEXCEPT;
+    class Provider {
+    public:
+        /// Caller receives ownership and must `delete` when done.
+        virtual Replication* new_instance() = 0;
+    };
 
-    ~Replication() TIGHTDB_NOEXCEPT;
+    // Be sure to keep this type aligned with what is actually used in
+    // SharedGroup.
+    typedef uint_fast32_t database_version_type;
 
-    static std::string get_path_to_database_file() TIGHTDB_NOEXCEPT
-    {
-        return "/var/lib/tightdb/replication.db";
-    }
+    std::string get_database_path();
 
-    /// Attach this instance to the replication coordination buffer
-    /// associated with the specified database file.
+    /// Acquire permision to start a new 'write' transaction. This
+    /// function must be called by a client before it requests a
+    /// 'write' transaction. This ensures that the local shared
+    /// database is up-to-date. During the transaction, all
+    /// modifications must be posted to this Replication instance as
+    /// calls to set_value() and friends. After the completion of the
+    /// transaction, the client must call either
+    /// commit_write_transact() or rollback_write_transact().
     ///
-    /// This function must be called before using an instance of this
-    /// class. It must not be called more than once. It is legal to
-    /// destroy an instance of this class without this function having
-    /// been called.
-    ///
-    /// \param file The file system path to the database file. This is
-    /// used only to derive a path for a replication specific shared
-    /// memory file object. Its path is derived by appending ".repl"
-    /// to the specified path.
-    ///
-    /// \param map_transact_log_buf When true, all of the replication
-    /// specific shared memory is mapped. When false, the transaction
-    /// log buffer is not mapped. When used in conjunction with an
-    /// instance of SharedGroup, this must always be true.
-    void open(const std::string& file = "", bool map_transact_log_buf = true);
+    /// \throw Interrupted If this call was interrupted by an
+    /// asynchronous call to interrupt().
+    void begin_write_transact(SharedGroup&);
 
-    bool is_attached() const TIGHTDB_NOEXCEPT;
+    /// Commit the accumulated transaction log. The transaction log
+    /// may not be committed if any of the functions that submit data
+    /// to it, have failed or been interrupted. This operation will
+    /// block until the local coordinator reports that the transaction
+    /// log has been dealt with in a manner that makes the transaction
+    /// persistent. This operation may be interrupted by an
+    /// asynchronous call to interrupt().
+    ///
+    /// \throw Interrupted If this call was interrupted by an
+    /// asynchronous call to interrupt().
+    ///
+    /// FIXME: In general the transaction will be considered complete
+    /// even if this operation is interrupted. Is that ok?
+    database_version_type commit_write_transact(SharedGroup&);
+
+    /// Called by a client to discard the accumulated transaction
+    /// log. This function must be called if a write transaction was
+    /// successfully initiated, but one of the functions that submit
+    /// data to the transaction log has failed or has been
+    /// interrupted. It must also be called after a failed or
+    /// interrupted call to commit_write_transact().
+    void rollback_write_transact(SharedGroup&) TIGHTDB_NOEXCEPT;
 
     /// Interrupt any blocking call to a function in this class. This
     /// function may be called asyncronously from any thread, but it
@@ -122,101 +125,15 @@ public:
     /// then resume normal operation on this object.
     void interrupt() TIGHTDB_NOEXCEPT;
 
-    struct Interrupted: std::runtime_error {
-        Interrupted(): std::runtime_error("Interrupted") {}
-    };
-
-    /// Acquire permision to start a new 'write' transaction. This
-    /// function must be called by a client before it requests a
-    /// 'write' transaction. This ensures that the local shared
-    /// database is up-to-date. During the transaction, all
-    /// modifications must be posted to this Replication instance as
-    /// calls to set_value() and friends. After the completion of the
-    /// transaction, the client must call either
-    /// commit_write_transact() or rollback_write_transact().
-    ///
-    /// \throw Interrupted If this call was interrupted by an
-    /// asynchronous call to interrupt().
-    void begin_write_transact();
-
-    /// Called by a client to commit the accumulated transaction
-    /// log. The transaction log may not be committed if any of the
-    /// functions that submit data to it, have failed or been
-    /// interrupted. This operation will block until the local
-    /// coordinator reports that the transaction log has been dealt
-    /// with in a manner that makes the transaction persistent. This
-    /// operation may be interrupted by an asynchronous call to
-    /// interrupt().
-    ///
-    /// \throw Interrupted If this call was interrupted by an
-    /// asynchronous call to interrupt().
-    ///
-    /// FIXME: In general the transaction will be considered complete
-    /// even if this operation is interrupted. Is that ok?
-    void commit_write_transact();
-
-    /// Called by a client to discard the accumulated transaction
-    /// log. This function must be called if a write transaction was
-    /// successfully initiated, but one of the functions that submit
-    /// data to the transaction log has failed or has been
-    /// interrupted. It must also be called after a failed or
-    /// interrupted call to commit_write_transact().
-    void rollback_write_transact() TIGHTDB_NOEXCEPT;
-
     /// May be called by a client to reset this replication instance
     /// after an interrupted transaction. It is not an error to call
     /// this function in a situation where no interruption has
     /// occured.
     void clear_interrupt() TIGHTDB_NOEXCEPT;
 
-    /// Called by the local coordinator to wait for the next client
-    /// that wants to start a new 'write' transaction.
-    ///
-    /// \return False if the operation was aborted by an asynchronous
-    /// call to interrupt().
-    bool wait_for_write_request() TIGHTDB_NOEXCEPT;
-
-    typedef int db_version_type;
-
-    struct TransactLog {
-        db_version_type m_db_version;
-        size_t m_offset1, m_size1, m_offset2, m_size2;
+    struct Interrupted: std::runtime_error {
+        Interrupted(): std::runtime_error("Interrupted") {}
     };
-
-    /// Called by the local coordinator to grant permission for one
-    /// client to start a new 'write' transaction. This function also
-    /// waits for the client to signal completion of the write
-    /// transaction.
-    ///
-    /// At entry, \c transact_log.db_version must be set to the
-    /// version of the database as it will be after completion of the
-    /// 'write' transaction that is granted. At exit, the offsets and
-    /// the sizes in \a transact_log will have been properly
-    /// initialized.
-    ///
-    /// \return False if the operation was aborted by an asynchronous
-    /// call to interrupt().
-    bool grant_write_access_and_wait_for_completion(TransactLog& transact_log) TIGHTDB_NOEXCEPT;
-
-    /// Called by the local coordinator to gain access to the memory
-    /// that corresponds to the specified transaction log. The memory
-    /// mapping of the underlying file is expanded as necessary. This
-    /// function cannot block, and can therefore not be interrupted.
-    void map_transact_log(const TransactLog&, const char** addr1, const char** addr2);
-
-    /// Called by the local coordinator to signal to clients that a
-    /// new version of the database has been persisted. Presumably,
-    /// one of the clients is blocked in a call to
-    /// commit_write_transact() waiting for this signal.
-    void update_persisted_db_version(db_version_type) TIGHTDB_NOEXCEPT;
-
-    /// Called by the local coordinator to release space in the
-    /// transaction log buffer corresponding to a previously completed
-    /// transaction log that is no longer needed. This function may be
-    /// called asynchronously with respect to wait_for_write_request()
-    /// and grant_write_access_and_wait_for_completion().
-    void transact_log_consumed(size_t size) TIGHTDB_NOEXCEPT;
-
 
     // Transaction log instruction encoding:
     //
@@ -236,17 +153,19 @@ public:
 
     struct subtable_tag {};
 
-    void new_top_level_table(const char* name);
-    void add_column(const Table*, const Spec*, DataType, const char* name);
+    void new_top_level_table(StringData name);
+    void add_column(const Table*, const Spec*, DataType, StringData name);
 
     template<class T>
     void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
+    void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, StringData value);
     void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, BinaryData value);
     void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
     void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, subtable_tag);
 
     template<class T>
     void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
+    void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, StringData value);
     void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, BinaryData value);
     void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
     void insert_value(const Table*, std::size_t column_ndx, std::size_t ndx, subtable_tag);
@@ -292,32 +211,79 @@ public:
     static void apply_transact_log(InputStream& transact_log, Group& target);
 #endif
 
-private:
-    struct SharedState;
-    struct TransactLogApplier;
+    virtual ~Replication() {}
 
-    File m_file;
-    // Invariant: m_fil_map.get_size() <= std::numeric_limits<std::ptrdiff_t>::max()
-    File::Map<SharedState> m_file_map;
-    bool m_interrupt; // Protected by m_shared_state->m_mutex
-
-    // Set by begin_write_transact() to the new database version
-    // created by the initiated 'write' transaction.
-    db_version_type m_write_transact_db_version;
-
-    // These two delimit a contiguous region of free space in the
-    // buffer following the last written data. It may be empty.
+protected:
+    // These two delimit a contiguous region of free space in a
+    // transaction log buffer following the last written data. It may
+    // be empty.
     char* m_transact_log_free_begin;
     char* m_transact_log_free_end;
 
+    Replication();
+
+    virtual std::string do_get_database_path() = 0;
+
+    /// As part of the initiation of a write transaction, this method
+    /// is supposed to update `m_transact_log_free_begin` and
+    /// `m_transact_log_free_end` such that they refer to a (possibly
+    /// empty) chunk of free space.
+    virtual void do_begin_write_transact(SharedGroup&) = 0;
+
+    virtual database_version_type do_commit_write_transact(SharedGroup&) = 0;
+
+    virtual void do_rollback_write_transact(SharedGroup&) TIGHTDB_NOEXCEPT = 0;
+
+    virtual void do_interrupt() TIGHTDB_NOEXCEPT = 0;
+
+    virtual void do_clear_interrupt() TIGHTDB_NOEXCEPT = 0;
+
+    /// Ensure contiguous free space in the transaction log
+    /// buffer. This method must update `m_transact_log_free_begin`
+    /// and `m_transact_log_free_end` such that they refer to a chunk
+    /// of free space whose size is at least \a n.
+    ///
+    /// \param n The require amout of contiguous free space. Must be
+    /// small (probably not greater than 1024)
+    virtual void do_transact_log_reserve(std::size_t n) = 0;
+
+    /// Copy the specified data into the transaction log buffer. This
+    /// function should be called only when the specified data does
+    /// not fit inside the chunk of free space currently referred to
+    /// by `m_transact_log_free_begin` and `m_transact_log_free_end`.
+    ///
+    /// This method must update `m_transact_log_free_begin` and
+    /// `m_transact_log_free_end` such that, upon return, they still
+    /// refer to a (possibly empty) chunk of free space.
+    virtual void do_transact_log_append(const char* data, std::size_t size) = 0;
+
+    /// Must be called only from do_begin_write_transact(),
+    /// do_commit_write_transact(), or do_rollback_write_transact().
+    static Group& get_group(SharedGroup&) TIGHTDB_NOEXCEPT;
+
+    /// Must be called only from do_begin_write_transact(),
+    /// do_commit_write_transact(), or do_rollback_write_transact().
+    static database_version_type get_current_version(SharedGroup&) TIGHTDB_NOEXCEPT;
+
+    /// Must be called only from do_begin_write_transact().
+    static void commit_foreign_transact_log(SharedGroup&, database_version_type new_version);
+
+private:
+    struct TransactLogApplier;
+
     template<class T> struct Buffer {
-        T* m_data;
+        UniquePtr<T[]> m_data;
         std::size_t m_size;
         T& operator[](std::size_t i) TIGHTDB_NOEXCEPT { return m_data[i]; }
         const T& operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
         Buffer() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
-        ~Buffer() TIGHTDB_NOEXCEPT { delete[] m_data; }
         void set_size(std::size_t);
+        friend void swap(Buffer&a, Buffer&b)
+        {
+            using std::swap;
+            swap(a.m_data, b.m_data);
+            swap(a.m_size, b.m_size);
+        }
     };
     Buffer<std::size_t> m_subtab_path_buf;
 
@@ -327,21 +293,10 @@ private:
     /// \param n Must be small (probably not greater than 1024)
     void transact_log_reserve(char** buf, int n);
 
+    /// \param ptr Must be in the rangle [m_transact_log_free_begin, m_transact_log_free_end]
     void transact_log_advance(char* ptr) TIGHTDB_NOEXCEPT;
 
     void transact_log_append(const char* data, std::size_t size);
-
-    /// \param n Must be small (probably not greater than 1024)
-    void transact_log_reserve_contig(std::size_t n);
-
-    void transact_log_append_overflow(const char* data, std::size_t size);
-
-    /// Must be called only by a client that has 'write' access and
-    /// only when there are no transaction logs in the transaction log
-    /// buffer beyond the one being created.
-    void transact_log_expand(std::size_t free, bool contig);
-
-    void remap_file(std::size_t size);
 
     void check_table(const Table*);
     void select_table(const Table*);
@@ -350,7 +305,7 @@ private:
     void select_spec(const Table*, const Spec*);
 
     void string_cmd(char cmd, std::size_t column_ndx, std::size_t ndx,
-                    const char* data,std::size_t size);
+                    const char* data, std::size_t size);
 
     void mixed_cmd(char cmd, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
 
@@ -363,8 +318,9 @@ private:
     static char* encode_float(char* ptr, float value);
     static char* encode_double(char* ptr, double value);
 
-    // Make sure this is in agreement with the actual integer encoding scheme
-    static const int max_enc_bytes_per_int = (std::numeric_limits<int64_t>::digits+1+6)/7;
+    // Make sure this is in agreement with the actual integer encoding
+    // scheme (see encode_int()).
+    static const int max_enc_bytes_per_int = 10;
     static const int max_enc_bytes_per_double = sizeof (double);
     static const int max_enc_bytes_per_num = max_enc_bytes_per_int <
         max_enc_bytes_per_double ? max_enc_bytes_per_double : max_enc_bytes_per_int;
@@ -376,26 +332,52 @@ private:
 
 // Implementation:
 
-inline Replication::Replication() TIGHTDB_NOEXCEPT:
-    m_interrupt(false), m_selected_table(0), m_selected_spec(0) {}
-
-
-inline bool Replication::is_attached() const TIGHTDB_NOEXCEPT
+inline std::string Replication::get_database_path()
 {
-    return m_file_map.is_attached();
+    return do_get_database_path();
+}
+
+
+inline void Replication::begin_write_transact(SharedGroup& sg)
+{
+    do_begin_write_transact(sg);
+    m_selected_table = 0;
+    m_selected_spec  = 0;
+}
+
+inline Replication::database_version_type Replication::commit_write_transact(SharedGroup& sg)
+{
+    return do_commit_write_transact(sg);
+}
+
+inline void Replication::rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT
+{
+    do_rollback_write_transact(sg);
+}
+
+inline void Replication::interrupt() TIGHTDB_NOEXCEPT
+{
+    do_interrupt();
+}
+
+inline void Replication::clear_interrupt() TIGHTDB_NOEXCEPT
+{
+    do_clear_interrupt();
 }
 
 
 inline void Replication::transact_log_reserve(char** buf, int n)
 {
     if (std::size_t(m_transact_log_free_end - m_transact_log_free_begin) < std::size_t(n))
-        transact_log_reserve_contig(n); // Throws
+        do_transact_log_reserve(n); // Throws
     *buf = m_transact_log_free_begin;
 }
 
 
 inline void Replication::transact_log_advance(char* ptr) TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(m_transact_log_free_begin <= ptr);
+    TIGHTDB_ASSERT(ptr <= m_transact_log_free_end);
     m_transact_log_free_begin = ptr;
 }
 
@@ -404,31 +386,86 @@ inline void Replication::transact_log_append(const char* data, std::size_t size)
 {
     if (TIGHTDB_UNLIKELY(std::size_t(m_transact_log_free_end -
                                      m_transact_log_free_begin) < size)) {
-        transact_log_append_overflow(data, size); // Throws
+        do_transact_log_append(data, size); // Throws
         return;
     }
     m_transact_log_free_begin = std::copy(data, data+size, m_transact_log_free_begin);
 }
 
 
+// The integer encoding is platform independent. Also, it does not
+// depend on the type of the specified integer. Integers of any type
+// can be encoded as long as the specified buffer is large enough (see
+// below). The decoding does not have to use the same type. Decoding
+// will fail if, and only if the encoded value falls outside the range
+// of the requested destination type.
+//
+// The encoding uses one or more bytes. It never uses more than 8 bits
+// per byte. The last byte in the sequence is the first one that has
+// its 8th bit set to zero.
+//
+// Consider a particular non-negative value V. Let W be the number of
+// bits needed to encode V using the trivial binary encoding of
+// integers. The total number of bytes produced is then
+// ceil((W+1)/7). The first byte holds the 7 least significant bits of
+// V. The last byte holds at most 6 bits of V including the most
+// significant one. The value of the first bit of the last byte is
+// always 2**((N-1)*7) where N is the total number of bytes.
+//
+// A negative value W is encoded by setting the sign bit to one and
+// then encoding the positive result of -(W+1) as described above. The
+// advantage of this representation is that it converts small negative
+// values to small positive values which require a small number of
+// bytes. This would not have been true for 2's complements
+// representation, for example. The sign bit is always stored as the
+// 7th bit of the last byte.
+//
+//               value bits    value + sign    max bytes
+//     --------------------------------------------------
+//     int8_t         7              8              2
+//     uint8_t        8              9              2
+//     int16_t       15             16              3
+//     uint16_t      16             17              3
+//     int32_t       31             32              5
+//     uint32_t      32             33              5
+//     int64_t       63             64             10
+//     uint64_t      64             65             10
+//
 template<class T> inline char* Replication::encode_int(char* ptr, T value)
 {
     TIGHTDB_STATIC_ASSERT(std::numeric_limits<T>::is_integer, "Integer required");
     bool negative = false;
     if (is_negative(value)) {
         negative = true;
+        // The following conversion is guaranteed by C++03 to never
+        // overflow (contrast this with "-value" which indeed could
+        // overflow).
         value = -(value + 1);
     }
-    // At this point 'value' is always a positive number, also, small
+    // At this point 'value' is always a positive number. Also, small
     // negative numbers have been converted to small positive numbers.
-    const int max_bytes = (std::numeric_limits<T>::digits+1+6)/7;
+    TIGHTDB_ASSERT(!is_negative(value));
+    // One sign bit plus number of value bits
+    const int num_bits = 1 + std::numeric_limits<T>::digits;
+    // Only the first 7 bits are available per byte. Had it not been
+    // for the fact that maximum guaranteed bit width of a char is 8,
+    // this value could have been increased to 15 (one less than the
+    // number of value bits in 'unsigned').
+    const int bits_per_byte = 7;
+    const int max_bytes = (num_bits + (bits_per_byte-1)) / bits_per_byte;
+    TIGHTDB_STATIC_ASSERT(max_bytes <= max_enc_bytes_per_int, "Bad max_enc_bytes_per_int");
+    // An explicit constant maximum number of iterations is specified
+    // in the hope that it will help the optimizer (to do loop
+    // unrolling, for example).
     for (int i=0; i<max_bytes; ++i) {
-        if (value >> 6 == 0) break;
-        *reinterpret_cast<unsigned char*>(ptr) = 0x80 | int(value & 0x7F);
+        if (value >> (bits_per_byte-1) == 0) break;
+        *reinterpret_cast<unsigned char*>(ptr) =
+            (1U<<bits_per_byte) | unsigned(value & ((1U<<bits_per_byte)-1));
         ++ptr;
-        value >>= 7;
+        value >>= bits_per_byte;
     }
-    *reinterpret_cast<unsigned char*>(ptr) = negative ? 0x40 | int(value) : value;
+    *reinterpret_cast<unsigned char*>(ptr) =
+        negative ? (1U<<(bits_per_byte-1)) | unsigned(value) : value;
     return ++ptr;
 }
 
@@ -445,7 +482,7 @@ inline char* Replication::encode_float(char* ptr, float value)
 
 inline char* Replication::encode_double(char* ptr, double value)
 {
-    TIGHTDB_STATIC_ASSERT(std::numeric_limits<float>::is_iec559 &&
+    TIGHTDB_STATIC_ASSERT(std::numeric_limits<double>::is_iec559 &&
                           sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
                           "Unsupported 'double' representation");
     const char* val_ptr = reinterpret_cast<char*>(&value);
@@ -530,24 +567,23 @@ inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
         transact_log_advance(buf);
         break;
     case type_Date:
-        buf = encode_int(buf, value.get_date());
+        buf = encode_int(buf, value.get_date().get_date());
         transact_log_advance(buf);
         break;
     case type_String:
         {
-            const char* data = value.get_string();
-            std::size_t size = std::strlen(data);
-            buf = encode_int(buf, size);
+            StringData data = value.get_string();
+            buf = encode_int(buf, data.size());
             transact_log_advance(buf);
-            transact_log_append(data, size); // Throws
+            transact_log_append(data.data(), data.size()); // Throws
         }
         break;
     case type_Binary:
         {
             BinaryData data = value.get_binary();
-            buf = encode_int(buf, data.len);
+            buf = encode_int(buf, data.size());
             transact_log_advance(buf);
-            transact_log_append(data.pointer, data.len); // Throws
+            transact_log_append(data.data(), data.size()); // Throws
         }
         break;
     case type_Table:
@@ -559,21 +595,19 @@ inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
 }
 
 
-inline void Replication::new_top_level_table(const char* name)
+inline void Replication::new_top_level_table(StringData name)
 {
-    size_t length = std::strlen(name);
-    simple_cmd('N', tuple(length)); // Throws
-    transact_log_append(name, length); // Throws
+    simple_cmd('N', tuple(name.size())); // Throws
+    transact_log_append(name.data(), name.size()); // Throws
 }
 
 
 inline void Replication::add_column(const Table* table, const Spec* spec,
-                                    DataType type, const char* name)
+                                    DataType type, StringData name)
 {
     check_spec(table, spec); // Throws
-    size_t length = std::strlen(name);
-    simple_cmd('A', tuple(int(type), length)); // Throws
-    transact_log_append(name, length); // Throws
+    simple_cmd('A', tuple(int(type), name.size())); // Throws
+    transact_log_append(name.data(), name.size()); // Throws
 }
 
 
@@ -586,10 +620,17 @@ inline void Replication::set_value(const Table* t, std::size_t column_ndx,
 }
 
 inline void Replication::set_value(const Table* t, std::size_t column_ndx,
+                                   std::size_t ndx, StringData value)
+{
+    check_table(t); // Throws
+    string_cmd('s', column_ndx, ndx, value.data(), value.size()); // Throws
+}
+
+inline void Replication::set_value(const Table* t, std::size_t column_ndx,
                                    std::size_t ndx, BinaryData value)
 {
     check_table(t); // Throws
-    string_cmd('s', column_ndx, ndx, value.pointer, value.len); // Throws
+    string_cmd('s', column_ndx, ndx, value.data(), value.size()); // Throws
 }
 
 inline void Replication::set_value(const Table* t, std::size_t column_ndx,
@@ -616,10 +657,17 @@ inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
 }
 
 inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
+                                      std::size_t ndx, StringData value)
+{
+    check_table(t); // Throws
+    string_cmd('i', column_ndx, ndx, value.data(), value.size()); // Throws
+}
+
+inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
                                       std::size_t ndx, BinaryData value)
 {
     check_table(t); // Throws
-    string_cmd('i', column_ndx, ndx, value.pointer, value.len); // Throws
+    string_cmd('i', column_ndx, ndx, value.data(), value.size()); // Throws
 }
 
 inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
@@ -699,12 +747,10 @@ inline void Replication::on_spec_destroyed(const Spec* s) TIGHTDB_NOEXCEPT
 }
 
 
-template<class T> void Replication::Buffer<T>::set_size(std::size_t new_size)
+template<class T> void Replication::Buffer<T>::set_size(std::size_t size)
 {
-    T* const new_data = new T[new_size];
-    delete[] m_data;
-    m_data = new_data;
-    m_size = new_size;
+    m_data.reset(new T[size]);
+    m_size = size;
 }
 
 

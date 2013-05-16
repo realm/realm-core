@@ -39,6 +39,11 @@ benchmark: subdir/test-tightdb/default subdir/test-sqlite3/default subdir/test-s
 UnitTest++:
 	$(MAKE) -C UnitTest++ CXXFLAGS="-g -Wall -W -ansi" LDFLAGS= >/dev/null
 
+# Run the performance matrix benchmarking program
+.PHONY: performance
+performance:
+	@$(MAKE) -C performance test
+
 # Build and run whatever is in experiements/testcase.cpp
 .PHONY: testcase testcase-debug
 testcase:

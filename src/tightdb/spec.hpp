@@ -37,12 +37,12 @@ public:
     Spec(const Spec& s);
     ~Spec();
 
-    size_t add_column(DataType type, const char* name, ColumnType attr=col_attr_None);
-    size_t add_subcolumn(const vector<size_t>& column_path, DataType type, const char* name);
-    Spec add_subtable_column(const char* name);
+    size_t add_column(DataType type, StringData name, ColumnType attr=col_attr_None);
+    size_t add_subcolumn(const vector<size_t>& column_path, DataType type, StringData name);
+    Spec add_subtable_column(StringData name);
 
-    void rename_column(size_t column_ndx, const char* newname);
-    void rename_column(const vector<size_t>& column_ids, const char* newname);
+    void rename_column(size_t column_ndx, StringData newname);
+    void rename_column(const vector<size_t>& column_ids, StringData newname);
     void remove_column(size_t column_ndx);
     void remove_column(const vector<size_t>& column_ids);
 
@@ -63,10 +63,10 @@ public:
     size_t get_column_count() const TIGHTDB_NOEXCEPT;
     DataType get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
     ColumnType get_real_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    const char* get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    StringData get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     /// Returns std::size_t(-1) if the specified column is not found.
-    size_t get_column_index(const char* name) const;
+    size_t get_column_index(StringData name) const;
 
     // Column Attributes
     ColumnType get_column_attr(size_t column_ndx) const;
@@ -79,7 +79,7 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-    void to_dot(std::ostream& out, const char* title=NULL) const;
+    void to_dot(std::ostream& out, StringData title = StringData()) const;
 #endif // TIGHTDB_DEBUG
 
 private:
@@ -114,9 +114,9 @@ private:
     /// underlying memory.
     static size_t create_empty_spec(Allocator&);
 
-    size_t do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, DataType type, const char* name);
+    size_t do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, DataType type, StringData name);
     void do_remove_column(const vector<size_t>& column_ids, size_t pos);
-    void do_rename_column(const vector<size_t>& column_ids, size_t pos, const char* name);
+    void do_rename_column(const vector<size_t>& column_ids, size_t pos, StringData name);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // Precondition: 1 <= end - begin
@@ -142,8 +142,8 @@ inline size_t Spec::create_empty_spec(Allocator& alloc)
 {
     // The 'spec_set' contains the specification (types and names) of
     // all columns and sub-tables
-    Array spec_set(coldef_HasRefs, 0, 0, alloc);
-    spec_set.add(Array::create_empty_array(coldef_Normal, alloc)); // One type for each column
+    Array spec_set(Array::coldef_HasRefs, 0, 0, alloc);
+    spec_set.add(Array::create_empty_array(Array::coldef_Normal, alloc)); // One type for each column
     spec_set.add(ArrayString::create_empty_string_array(alloc)); // One name for each column
     return spec_set.GetRef();
 }

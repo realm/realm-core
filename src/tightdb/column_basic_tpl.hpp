@@ -144,14 +144,27 @@ void BasicColumn<T>::Resize(size_t ndx)
 }
 
 template<typename T>
-T BasicColumn<T>::Get(size_t ndx) const TIGHTDB_NOEXCEPT
+void BasicColumn<T>::move_last_over(size_t ndx)
+{
+    TIGHTDB_ASSERT(ndx+1 < Size());
+
+    const size_t ndx_last = Size()-1;
+    const T v = get(ndx_last);
+
+    set(ndx, v);
+    erase(ndx_last);
+}
+
+
+template<typename T>
+T BasicColumn<T>::get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < Size());
     return BasicArray<T>::column_get(m_array, ndx);
 }
 
 template<typename T>
-void BasicColumn<T>::Set(size_t ndx, T value)
+void BasicColumn<T>::set(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx < Size());
     TreeSet<T,BasicColumn<T> >(ndx, value);
@@ -160,11 +173,11 @@ void BasicColumn<T>::Set(size_t ndx, T value)
 template<typename T>
 void BasicColumn<T>::add(T value)
 {
-    Insert(Size(), value);
+    insert(Size(), value);
 }
 
 template<typename T>
-void BasicColumn<T>::Insert(size_t ndx, T value)
+void BasicColumn<T>::insert(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx <= Size());
     TreeInsert<T, BasicColumn<T> >(ndx, value);
@@ -194,8 +207,8 @@ bool BasicColumn<T>::compare(const BasicColumn& c) const
     if (c.Size() != n)
         return false;
     for (size_t i=0; i<n; ++i) {
-        const T v1 = Get(i);
-        const T v2 = c.Get(i);
+        const T v1 = get(i);
+        const T v2 = c.get(i);
         if (v1 == v2)
             return false;
     }
@@ -204,7 +217,7 @@ bool BasicColumn<T>::compare(const BasicColumn& c) const
 
 
 template<typename T>
-void BasicColumn<T>::Delete(size_t ndx)
+void BasicColumn<T>::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < Size());
     TreeDelete<T, BasicColumn<T> >(ndx);
