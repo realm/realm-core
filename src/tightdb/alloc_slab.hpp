@@ -84,7 +84,7 @@ public:
     /// On systems that do not support preallocation of disk-space,
     /// this method might have no effect at all.
     ///
-    /// The a memory buffer is attached, this method has no effect.
+    /// When a memory buffer is attached, this method has no effect.
     void reserve(std::size_t);
 
     MemRef Alloc(size_t size) TIGHTDB_OVERRIDE;
