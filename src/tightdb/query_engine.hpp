@@ -816,7 +816,8 @@ public:
 
         bool b1 = case_map(v, lower, false);
         bool b2 = case_map(v, upper, true);
-        if (!b1 || !b2) error_code = "Malformed UTF-8: " + std::string(v);
+        if (!b1 || !b2)
+            error_code = "Malformed UTF-8: " + std::string(v);
 
         m_ucase = upper;
         m_lcase = lower;
@@ -842,7 +843,8 @@ public:
         m_condition_column = &table.GetColumnBase(m_condition_column_idx);
         m_column_type = table.get_real_column_type(m_condition_column_idx);
 
-        if (m_child) m_child->init(table);
+        if (m_child)
+            m_child->init(table);
     }
 
     size_t find_first_local(size_t start, size_t end)
@@ -859,7 +861,7 @@ public:
             else {
                 // short or long 
                 const AdaptiveStringColumn* asc = static_cast<const AdaptiveStringColumn*>(m_condition_column);
-                if(s >= m_end_s) {
+                if (s >= m_end_s) {
                     // we exceeded current leaf's range
 
                     m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
@@ -983,7 +985,8 @@ public:
         TConditionFunction condition;
         for (size_t s = start; s < end; ++s) {
             BinaryData value = m_condition_column->get(s);
-            if (condition(m_value, value)) return s;
+            if (condition(m_value, value))
+                return s;
         }
         return end;
     }
@@ -1035,7 +1038,7 @@ public:
         m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
         m_leaf = NULL;
 
-        if(m_index_matches_destroy)
+        if (m_index_matches_destroy)
             m_index_matches->Destroy();
 
         m_index_matches_destroy = false;
@@ -1081,15 +1084,15 @@ public:
             }
 
             m_index_matches_destroy = false;
-            if(fr == FindRes_single) {
+            if (fr == FindRes_single) {
                 m_index_matches = new Column();
                 m_index_matches->add(index_ref);
                 m_index_matches_destroy = true;
             }
-            else if(fr == FindRes_column) {
+            else if (fr == FindRes_column) {
                 m_index_matches = new Column(index_ref, 0, 0);
             }
-            else if(fr == FindRes_not_found) {
+            else if (fr == FindRes_not_found) {
                 m_index_matches = new Column();
                 m_index_matches_destroy = true;
             }
@@ -1120,16 +1123,16 @@ public:
                 // Indexed string column
                 size_t f = not_found;
 
-                while(f == not_found && last_indexed < m_index_size) {
+                while (f == not_found && last_indexed < m_index_size) {
                     m_index_getter->cache_next(last_indexed);
                     f = m_index_getter->m_array_ptr->FindGTE(s, last_indexed - m_index_getter->m_leaf_start);
 
-                    if(f == not_found) {
+                    if (f == not_found) {
                         last_indexed = m_index_getter->m_leaf_end;
                     }
                     else {
                         s = m_index_getter->m_array_ptr->GetAsSizeT(f);
-                        if(s > end)
+                        if (s > end)
                             return end;
                         else {
                             last_indexed = f + m_index_getter->m_leaf_start;
@@ -1148,7 +1151,7 @@ public:
                     else {
                         m_cse.cache_next(s);
                         s = m_cse.m_array_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, m_cse.local_end(end));
-                        if(s == not_found)
+                        if (s == not_found)
                             s = m_cse.m_leaf_end - 1;
                         else
                             return s + m_cse.m_leaf_start;
@@ -1158,7 +1161,7 @@ public:
 
                     // Normal string column, with long or short leaf
                     AdaptiveStringColumn* asc = (AdaptiveStringColumn*)m_condition_column;
-                    if(s >= m_leaf_end) {
+                    if (s >= m_leaf_end) {
                         m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
                         m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
                         m_leaf_end = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
@@ -1166,7 +1169,7 @@ public:
 
                     size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
                     s = (m_long ? static_cast<ArrayStringLong*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2) : static_cast<ArrayString*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2));
-                    if(s == not_found)
+                    if (s == not_found)
                         s = m_leaf_end - 1;
                     else
                         return s + m_leaf_start;
@@ -1327,7 +1330,7 @@ public:
         size_t s = start;
 
         while (s < end) {
-            if(SameType<TConditionValue, int64_t>::value) {
+            if (SameType<TConditionValue, int64_t>::value) {
                 // For int64_t we've created an array intrinsics named CompareLeafs which template expands bitwidths
                 // of boths arrays to make Get faster.
                 m_getter1.cache_next(s);
@@ -1336,9 +1339,9 @@ public:
                 QueryState<int64_t> qs;
                 bool resume = m_getter1.m_array_ptr->template CompareLeafs<TConditionFunction, act_ReturnFirst>(m_getter2.m_array_ptr, s - m_getter1.m_leaf_start, m_getter1.local_end(end), 0, &qs, CallbackDummy());
 
-            if(resume)
-                s = m_getter1.m_leaf_end;
-            else
+                if (resume)
+                    s = m_getter1.m_leaf_end;
+                else
                 return to_size_t(qs.m_state) + m_getter1.m_leaf_start;
             } 
             else {
@@ -1347,11 +1350,10 @@ public:
                 TConditionValue v2 = m_getter2.get_next(s);
                 TConditionFunction C;
 
-                if(C(v1, v2))
+                if (C(v1, v2))
                     return s;
                 else
-                    s++;              
-
+                    s++;
             }
         }
         return end;
@@ -1367,8 +1369,6 @@ protected:
 
     SequentialGetter<TConditionValue> m_getter1;
     SequentialGetter<TConditionValue> m_getter2;
-
-
 };
 
 

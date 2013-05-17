@@ -556,7 +556,7 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     size_t add;
     add = 1;
 
-    for(;;) {
+    for (;;) {
         if (start + add < m_len && Get(start + add) < target)
             start += add;
         else
