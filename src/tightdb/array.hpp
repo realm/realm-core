@@ -663,11 +663,11 @@ public:
         if (action == act_CallbackIdx)
             return callback(index);
         else if (action == act_Max) {
-            if(value > m_state)
+            if (value > m_state)
                 m_state = value;
         }
         else if (action == act_Min) {
-            if(value < m_state)
+            if (value < m_state)
                 m_state = value;
         }
         else if (action == act_Sum)
@@ -1587,7 +1587,7 @@ template <bool gt, Action action, size_t width, class Callback> bool Array::Find
     uint64_t mask2 = mask1 >> 1;
     uint64_t m = gt ? (((chunk + magic) | chunk) & ~0ULL / no0(mask1) * (mask2 + 1)) : ((chunk - magic) & ~chunk&~0ULL/no0(mask1)*(mask2+1));
     size_t p = 0;
-    while(m) {
+    while (m) {
         if (find_action_pattern<action, Callback>(baseindex, m >> (no0(width) - 1), state, callback))
             break; // consumed, so do not call find_action()
 
@@ -1988,7 +1988,7 @@ TIGHTDB_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* da
         if (cond == cond_NotEqual)
             resmask = ~resmask & 0x0000ffff;
 
-//        if(resmask != 0)
+//        if (resmask != 0)
 //            printf("resmask=%d\n", resmask);
 
         size_t s = i * sizeof(__m128i) * 8 / no0(width);
@@ -2025,32 +2025,32 @@ bool Array::CompareLeafs(Array* foreign, size_t start, size_t end, size_t basein
 
     // We can compare first element without checking for out-of-range
     v = Get(start);
-    if(c(v, foreign->Get(start))) {
-        if(!find_action<action, Callback>(start + baseindex, v, state, callback))
+    if (c(v, foreign->Get(start))) {
+        if (!find_action<action, Callback>(start + baseindex, v, state, callback))
             return false;
     }
 
     start++;
     
-    if(start + 3 < end) {
+    if (start + 3 < end) {
         v = Get(start);
-        if(c(v, foreign->Get(start)))
-            if(!find_action<action, Callback>(start + baseindex, v, state, callback))
+        if (c(v, foreign->Get(start)))
+            if (!find_action<action, Callback>(start + baseindex, v, state, callback))
                 return false;
 
         v = Get(start + 1);
-        if(c(v, foreign->Get(start + 1)))
-            if(!find_action<action, Callback>(start + 1 + baseindex, v, state, callback))
+        if (c(v, foreign->Get(start + 1)))
+            if (!find_action<action, Callback>(start + 1 + baseindex, v, state, callback))
                 return false;
 
         v = Get(start + 2);
-        if(c(v, foreign->Get(start + 2)))
-            if(!find_action<action, Callback>(start + 2 + baseindex, v, state, callback))
+        if (c(v, foreign->Get(start + 2)))
+            if (!find_action<action, Callback>(start + 2 + baseindex, v, state, callback))
                 return false;
 
         start += 3;
     }
-    else if(start == end) {
+    else if (start == end) {
         return true;
     }
  
@@ -2076,10 +2076,10 @@ bool Array::CompareLeafs4(Array* foreign, size_t start, size_t end, size_t basei
     cond c;
     char* foreign_m_data = foreign->m_data;     
 
-    if(width == 0 && foreign_width == 0) {
-        if(c(0, 0)) {
-            while(start < end) {
-                if(!find_action<action, Callback>(start + baseindex, 0, state, callback))
+    if (width == 0 && foreign_width == 0) {
+        if (c(0, 0)) {
+            while (start < end) {
+                if (!find_action<action, Callback>(start + baseindex, 0, state, callback))
                     return false;
                 start++;
             }
@@ -2091,13 +2091,13 @@ bool Array::CompareLeafs4(Array* foreign, size_t start, size_t end, size_t basei
 
 
 #if defined(TIGHTDB_COMPILER_SSE)
-    if(cpuid_sse<42>() && width == foreign_width && (width == 8 || width == 16 || width == 32)) {
+    if (cpuid_sse<42>() && width == foreign_width && (width == 8 || width == 16 || width == 32)) {
         // We can only use SSE if both bitwidths are equal and above 8 bits and all values are signed   
         while (start < end && (((reinterpret_cast<size_t>(m_data) & 0xf) * 8 + start * width) % (128) != 0)) {            
             int64_t v = GetUniversal<width>(m_data, start);
             int64_t fv = GetUniversal<foreign_width>(foreign_m_data, start);
-            if(c(v, fv)) {
-                if(!find_action<action, Callback>(start + baseindex, v, state, callback))
+            if (c(v, fv)) {
+                if (!find_action<action, Callback>(start + baseindex, v, state, callback))
                     return false;
             }
             start++;
@@ -2109,13 +2109,13 @@ bool Array::CompareLeafs4(Array* foreign, size_t start, size_t end, size_t basei
         size_t sse_items = (end - start) * width / 128;
         size_t sse_end = start + sse_items * 128 / no0(width);
 
-        while(start < sse_end) {
+        while (start < sse_end) {
             __m128i* a = reinterpret_cast<__m128i*>(m_data + start * width / 8);
             __m128i* b = reinterpret_cast<__m128i*>(foreign_m_data + start * width / 8);
             
             bool continue_search = FindSSE_intern<cond, action, width, Callback>(a, b, 1, state, baseindex + start, callback);
 
-            if(!continue_search)
+            if (!continue_search)
                 return false;
 
             start += 128 / no0(width);
@@ -2131,11 +2131,11 @@ bool Array::CompareLeafs4(Array* foreign, size_t start, size_t end, size_t basei
     // index from which both arrays are 64-bit aligned
     size_t a = round_up(start, 8*sizeof(int64_t) / (width < foreign_width ? width : foreign_width)); 
     
-    while(start < end && start < a) {
+    while (start < end && start < a) {
         int64_t v = GetUniversal<width>(m_data, start);
         int64_t fv = GetUniversal<foreign_width>(foreign_m_data, start);
 
-        if(v == fv)
+        if (v == fv)
             r++;
 
         start++;
@@ -2150,24 +2150,24 @@ bool Array::CompareLeafs4(Array* foreign, size_t start, size_t end, size_t basei
     size_t unroll_outer = (foreign_width > width ? foreign_width : width) / (foreign_width < width ? foreign_width : width);
     size_t unroll_inner = 64 / (foreign_width > width ? foreign_width : width);
 
-    while(start + unroll_outer * unroll_inner < end) {
+    while (start + unroll_outer * unroll_inner < end) {
 
         // fetch new most narrow chunk
-        if(foreign_width <= width)
+        if (foreign_width <= width)
             fchunk = *(int64_t*)(foreign_m_data + start * foreign_width / 8);
         else
             chunk = *(int64_t*)(m_data + start * width / 8);
 
-        for(size_t uo = 0; uo < unroll_outer; uo++) {
+        for (size_t uo = 0; uo < unroll_outer; uo++) {
 
             // fetch new widest chunk
-            if(foreign_width > width)
+            if (foreign_width > width)
                 fchunk = *(int64_t*)(foreign_m_data + start * foreign_width / 8);
             else
                 chunk = *(int64_t*)(m_data + start * width / 8);
 
             size_t newstart = start + unroll_inner;
-            while(start < newstart) {
+            while (start < newstart) {
 
                 // Isolate first value from chunk
                 int64_t v = (chunk << (64 - width)) >> (64 - width);
@@ -2179,7 +2179,7 @@ bool Array::CompareLeafs4(Array* foreign, size_t start, size_t end, size_t basei
                 v = (width <= 4) ? v : (width == 8) ? (int8_t)v : (width == 16) ? (int16_t)v : (width == 32) ? (int32_t)v : (int64_t)v;
                 fv = (foreign_width <= 4) ? fv : (foreign_width == 8) ? (int8_t)fv : (foreign_width == 16) ? (int16_t)fv : (foreign_width == 32) ? (int32_t)fv : (int64_t)fv;
 
-                if(v == fv)
+                if (v == fv)
                     r++;
 
                 start++;
@@ -2195,20 +2195,20 @@ bool Array::CompareLeafs4(Array* foreign, size_t start, size_t end, size_t basei
 
 /*
     // Unrolling helped less than 2% (non-frequent matches). Todo, investigate further
-    while(start + 1 < end) {
+    while (start + 1 < end) {
         int64_t v = GetUniversal<width>(m_data, start);
         int64_t v2 = GetUniversal<width>(m_data, start + 1);
 
         int64_t fv = GetUniversal<foreign_width>(foreign_m_data, start);
         int64_t fv2 = GetUniversal<foreign_width>(foreign_m_data, start + 1);
 
-        if(c(v, fv)) {
-            if(!find_action<action, Callback>(start + baseindex, v, state, callback))
+        if (c(v, fv)) {
+            if (!find_action<action, Callback>(start + baseindex, v, state, callback))
                 return false;
         }
 
-        if(c(v2, fv2)) {
-            if(!find_action<action, Callback>(start + 1 + baseindex, v2, state, callback))
+        if (c(v2, fv2)) {
+            if (!find_action<action, Callback>(start + 1 + baseindex, v2, state, callback))
                 return false;
         }
 
@@ -2216,12 +2216,12 @@ bool Array::CompareLeafs4(Array* foreign, size_t start, size_t end, size_t basei
     }
  */  
 
-    while(start < end) {
+    while (start < end) {
         int64_t v = GetUniversal<width>(m_data, start);
         int64_t fv = GetUniversal<foreign_width>(foreign_m_data, start);
 
-        if(c(v, fv)) {
-            if(!find_action<action, Callback>(start + baseindex, v, state, callback))
+        if (c(v, fv)) {
+            if (!find_action<action, Callback>(start + baseindex, v, state, callback))
                 return false;
         }
 

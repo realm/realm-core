@@ -802,7 +802,7 @@ TEST(Shared_FromSerialized)
 
 namespace {
 void randstr(char* res, size_t len) {
-    for(size_t i = 0; i < len; ++i) {
+    for (size_t i = 0; i < len; ++i) {
         res[i] = 'a' + rand() % 10;
     }
 }

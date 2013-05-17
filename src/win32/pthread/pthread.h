@@ -744,7 +744,7 @@ struct ptw32_cleanup_t
               } \
             __finally \
                 { \
-                    if( _execute || AbnormalTermination()) \
+                    if ( _execute || AbnormalTermination()) \
                       { \
                           (*(_cleanup.routine))( _cleanup.arg ); \
                       } \
