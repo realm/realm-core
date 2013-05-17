@@ -542,7 +542,9 @@ EOI
                     (sh build.sh clean && sh build.sh build) >>"$LOG_FILE" 2>&1 || exit 1
 
                     message "Running test suite for core library"
-                    sh build.sh test >>"$LOG_FILE" 2>&1 || exit 1
+                    if ! sh build.sh test >>"$LOG_FILE" 2>&1; then
+                        warning "Test suite failed for core library"
+                    fi
 
                     message "Transfering prebuilt core library to package"
                     mkdir "$TEMP_DIR/transfer" || exit 1
