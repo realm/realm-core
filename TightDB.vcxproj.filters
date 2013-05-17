@@ -161,14 +161,14 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="test\performance\timer.cpp" />
-    <ClCompile Include="src\tightdb\utilities.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
     <ClCompile Include="test\test_query.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="test\test_table_view.cpp">
       <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\utilities.cpp">
+      <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
