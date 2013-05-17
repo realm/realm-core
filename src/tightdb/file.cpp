@@ -438,6 +438,11 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
     // just like posix_fallocate(). The advantage would be that it
     // then becomes an atomic operation (probably).
 
+#else
+
+    static_cast<void>(offset);
+    static_cast<void>(size);
+
 #endif
 }
 
