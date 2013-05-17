@@ -128,6 +128,11 @@ case "$MODE" in
     "build")
         TIGHTDB_ENABLE_FAT_BINARIES="1" make || exit 1
         if [ "$OS" = "Darwin" ]; then
+            # This section builds the following two static libraries:
+            #     src/tightdb/libtightdb-ios.a
+            #     src/tightdb/libtightdb-ios-dbg.a
+            # Each one contains both a version for iPhone and one for
+            # the iPhone simulator.
             TEMP_DIR="$(mktemp -d /tmp/tightdb.build.XXXX)" || exit 1
             # Xcode provides the iPhoneOS SDK
             XCODE_HOME="$(xcode-select --print-path)" || exit 1
@@ -183,7 +188,6 @@ case "$MODE" in
             done
             lipo "$TEMP_DIR"/*/"libtightdb.a"     -create -output "src/tightdb/libtightdb-ios.a"     || exit 1
             lipo "$TEMP_DIR"/*/"libtightdb-dbg.a" -create -output "src/tightdb/libtightdb-ios-dbg.a" || exit 1
-            make -C "src/tightdb" BASE_DENOM="ios" "tightdb-config-ios" "tightdb-config-ios-dbg" || exit 1
         fi
         exit 0
         ;;
@@ -339,7 +343,7 @@ case "$MODE" in
         AVAIL_EXTENSIONS=""
         for x in $INCLUDE_EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-            if ! [ -r "$EXT_HOME/build.sh" ]; then
+            if ! [ -e "$EXT_HOME/build.sh" ]; then
                 if [ "$EXTENSION_AVAILABILITY_REQUIRED" ]; then
                     echo "Missing extension '$EXT_HOME'" 1>&2
                     failed="1"
@@ -420,15 +424,6 @@ case "$MODE" in
         mkdir "$INSTALL_ROOT" || exit 1
         mkdir "$INSTALL_ROOT/include" "$INSTALL_ROOT/lib" "$INSTALL_ROOT/lib64" "$INSTALL_ROOT/bin" || exit 1
 
-        # These three were added because when building for iOS on
-        # Darwin, the binary targets are not installed.
-        path_list_prepend LIBRARY_PATH            "$TIGHTDB_HOME/src/tightdb" || exit 1
-        path_list_prepend PATH                    "$TIGHTDB_HOME/src/tightdb" || exit 1
-        # FIXME: The problem with these is that they partially destroy
-        # the value of the build test. We should instead transfer the
-        # iOS target files to a special temporary proforma directory,
-        # and add that diretory to LIBRARY_PATH and PATH above.
-
         path_list_prepend CPATH                   "$INSTALL_ROOT/include"     || exit 1
         path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib"         || exit 1
         path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib64"       || exit 1
@@ -462,7 +457,7 @@ if [ \$# -eq 1 -a "\$1" = "uninstall" ]; then
     exit 0
 fi
 
-if [ \$# -eq 1 -a "\$1" = "test" ]; then
+if [ \$# -eq 1 -a "\$1" = "test-installed" ]; then
     sh tightdb/build.sh dist-test-installed || exit 1
     exit 0
 fi
@@ -506,7 +501,7 @@ Build everything:          ./build  all
 Start from scratch:        ./build  clean
 Install what was built:    sudo  ./build  install
 Uninstall everything:      sudo  ./build  uninstall
-Test installation:         ./build  test
+Test installation:         ./build  test-installed
 
 Normally you can do with just:
 
@@ -584,7 +579,6 @@ EOF
                     cp "src/tightdb/tightdb-config" "src/tightdb/tightdb-config-dbg" "$PKG_DIR/tightdb/src/tightdb/" || exit 1
                     if [ "$OS" = "Darwin" ]; then
                         cp "src/tightdb/libtightdb-ios.a" "src/tightdb/libtightdb-ios-dbg.a" "$PKG_DIR/tightdb/src/tightdb/" || exit 1
-                        cp "src/tightdb/tightdb-config-ios" "src/tightdb/tightdb-config-ios-dbg" "$PKG_DIR/tightdb/src/tightdb/" || exit 1
                     fi
                 else
                     message "Transfering core library to package"
@@ -614,11 +608,30 @@ EOF
                     sh "$TEST_PKG_DIR/tightdb/build.sh" build >>"$LOG_FILE" 2>&1 || exit 1
 
                     message "Running test suite for core library"
-                    sh "$TEST_PKG_DIR/tightdb/build.sh" test >>"$LOG_FILE" 2>&1 || exit 1
+                    if ! sh "$TEST_PKG_DIR/tightdb/build.sh" test >>"$LOG_FILE" 2>&1; then
+                        warning "Test suite failed for core library"
+                    fi
                 fi
 
                 message "Installing core library to test location"
                 sh "$TEST_PKG_DIR/tightdb/build.sh" install "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1 || exit 1
+
+                # This one was added because when building for iOS on
+                # Darwin, the libraries libtightdb-ios.a and
+                # libtightdb-ios-dbg.a are not installed, and the
+                # Objective-C binding needs to be able to find
+                # them. Also, when building for iOS, the default
+                # search path for header files is not used, so
+                # installed headers will not be found. This problem is
+                # eliminated by the explicit addition of the temporary
+                # header installation directory to CPATH below.
+                path_list_prepend LIBRARY_PATH "$TEST_PKG_DIR/tightdb/src/tightdb" || exit 1
+
+                # FIXME: The problem with this one that it partially
+                # destroys the value of the build test. We should
+                # instead transfer the iOS target files to a special
+                # temporary proforma directory, and add that diretory
+                # to LIBRARY_PATH and PATH above.
 
                 message "Testing state of core library installation"
                 sh "$TEST_PKG_DIR/tightdb/build.sh" test-installed "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1 || exit 1
@@ -705,7 +718,7 @@ EOF
         fi
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-            if [ -r "$EXT_HOME/build.sh" ]; then
+            if [ -e "$EXT_HOME/build.sh" ]; then
                 echo "CLEANING Extension '$x'" | tee -a "$LOG_FILE"
                 rm -f "$EXT_HOME/.TO_BE_INSTALLED" || exit 1
                 if ! sh "$EXT_HOME/build.sh" clean >>"$LOG_FILE" 2>&1; then
@@ -725,7 +738,7 @@ EOF
 #    "dist-check-avail")
 #        for x in $EXTENSIONS; do
 #            EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-#            if [ -r "$EXT_HOME/build.sh" ]; then
+#            if [ -e "$EXT_HOME/build.sh" ]; then
 #                echo ">>>>>>>> CHECKING AVAILABILITY OF '$x'"
 #                if sh "$EXT_HOME/build.sh" check-avail; then
 #                    echo "YES!"
@@ -803,15 +816,6 @@ EOF
         echo "INSTALLING Core library" | tee -a "$LOG_FILE"
         if sh build.sh install >>"$LOG_FILE" 2>&1; then
             touch ".WAS_INSTALLED" || exit 1
-            if [ "$NEED_USR_LOCAL_LIB_NOTE" ]; then
-                LIBDIR="$(make get-libdir)" || exit 1
-                cat <<EOF
-NOTE:
-Libraries have been installed in $LIBDIR.
-On your system this directory is not in the library search path
-by default, so you may have to add it to /etc/ld.so.conf manually.
-EOF
-            fi
             for x in $EXTENSIONS; do
                 EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
                 if [ -e "$EXT_HOME/.TO_BE_INSTALLED" ]; then
@@ -824,6 +828,20 @@ EOF
                     fi
                 fi
             done
+            if [ "$NEED_USR_LOCAL_LIB_NOTE" ]; then
+                LIBDIR="$(make get-libdir)" || exit 1
+                cat <<EOF
+NOTE: Libraries have been installed in $LIBDIR.
+On your system this directory is not normally part of the default
+library search path, so you may have to set LD_LIBRARY_PATH before
+running the the test suite, or your own application. You can do this
+by issuing the following command:
+
+    export LD_LIBRARY_PATH=$LIBDIR
+
+Alternatively, you can add $LIBDIR to /etc/ld.so.conf.
+EOF
+            fi
         else
             echo "Failed!" | tee -a "$LOG_FILE" 1>&2
             ERROR="1"
@@ -842,13 +860,15 @@ EOF
         LOG_FILE="$TEMP_DIR/uninstall.log"
         ERROR=""
         for x in $(word_list_reverse $EXTENSIONS); do
-            echo "UNINSTALLING Extension '$x'" | tee -a "$LOG_FILE"
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-            if ! sh "$EXT_HOME/build.sh" uninstall >>"$LOG_FILE" 2>&1; then
-                echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
-                ERROR="1"
+            if [ -e "$EXT_HOME/build.sh" ]; then
+                echo "UNINSTALLING Extension '$x'" | tee -a "$LOG_FILE"
+                if ! sh "$EXT_HOME/build.sh" uninstall >>"$LOG_FILE" 2>&1; then
+                    echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
+                    ERROR="1"
+                fi
+                rm -f "$EXT_HOME/.WAS_INSTALLED" || exit 1
             fi
-            rm -f "$EXT_HOME/.WAS_INSTALLED" || exit 1
         done
         echo "UNINSTALLING Core library" | tee -a "$LOG_FILE"
         if ! sh build.sh uninstall >>"$LOG_FILE" 2>&1; then
@@ -904,7 +924,7 @@ EOF
         git status
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-            if [ -r "$EXT_HOME/build.sh" ]; then
+            if [ -e "$EXT_HOME/build.sh" ]; then
                 echo ">>>>>>>> STATUS OF '$EXT_HOME'"
                 (cd "$EXT_HOME/"; git status)
             fi
@@ -918,7 +938,7 @@ EOF
         git pull
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-            if [ -r "$EXT_HOME/build.sh" ]; then
+            if [ -e "$EXT_HOME/build.sh" ]; then
                 echo ">>>>>>>> PULLING '$EXT_HOME'"
                 (cd "$EXT_HOME/"; git pull)
             fi
@@ -937,7 +957,7 @@ EOF
         git checkout "$WHAT"
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-            if [ -r "$EXT_HOME/build.sh" ]; then
+            if [ -e "$EXT_HOME/build.sh" ]; then
                 echo ">>>>>>>> CHECKING OUT '$WHAT' OF '$EXT_HOME'"
                 (cd "$EXT_HOME/"; git checkout "$WHAT")
             fi
@@ -966,8 +986,10 @@ EOF
 EOF
         cat >"$TEMP_DIR/exclude" <<EOF
 .gitignore
-/test/experiments
+/test/test-*
 /test/benchmark-*
+/test/performance
+/test/experiments
 /doc/development
 EOF
         grep -E -v '^(#.*)?$' "$TEMP_DIR/include" >"$TEMP_DIR/include2" || exit 1

@@ -1342,7 +1342,7 @@ public:
                 if (resume)
                     s = m_getter1.m_leaf_end;
                 else
-                    return qs.m_state + m_getter1.m_leaf_start;
+                return to_size_t(qs.m_state) + m_getter1.m_leaf_start;
             } 
             else {
                 // This is for float and double.
