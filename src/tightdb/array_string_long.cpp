@@ -42,7 +42,7 @@ void ArrayStringLong::add(StringData value)
     m_blob.add(value.data(), value.size(), add_zero_term);
     size_t end = value.size() + 1;
     if (!m_offsets.is_empty()) 
-        end += m_offsets.back();        // FIXME: fix warning about type mismatch here
+        end += to_size_t(m_offsets.back());
     m_offsets.add(end);
 }
 

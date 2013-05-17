@@ -1038,7 +1038,7 @@ public:
         m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
         m_leaf = NULL;
 
-        if(m_index_matches_destroy)
+        if (m_index_matches_destroy)
             m_index_matches->Destroy();
 
         m_index_matches_destroy = false;
@@ -1161,7 +1161,7 @@ public:
 
                     // Normal string column, with long or short leaf
                     AdaptiveStringColumn* asc = (AdaptiveStringColumn*)m_condition_column;
-                    if(s >= m_leaf_end) {
+                    if (s >= m_leaf_end) {
                         m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
                         m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
                         m_leaf_end = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());

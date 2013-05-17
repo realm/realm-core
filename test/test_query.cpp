@@ -97,9 +97,9 @@ TEST(QueryTwoColsEqualVaryWidthAndValues)
     table.add_column(type_Double, "sixth");
 
 #ifdef TIGHTDB_DEBUG
-    for(int i = 0; i < 5000; i++) {
+    for (int i = 0; i < 5000; i++) {
 #else
-    for(int i = 0; i < 50000; i++) {
+    for (int i = 0; i < 50000; i++) {
 #endif
         table.add_empty_row();
 
@@ -123,19 +123,19 @@ TEST(QueryTwoColsEqualVaryWidthAndValues)
         table.set_double(8, i, double(rand() % 10));
         table.set_double(9, i, double(rand() % 10));
 
-        if(table.get_int(0, i) == table.get_int(1, i))
+        if (table.get_int(0, i) == table.get_int(1, i))
             ints1.push_back(i);
 
-        if(table.get_int(2, i) == table.get_int(3, i))
+        if (table.get_int(2, i) == table.get_int(3, i))
             ints2.push_back(i);
 
-        if(table.get_int(4, i) == table.get_int(5, i))
+        if (table.get_int(4, i) == table.get_int(5, i))
             ints3.push_back(i);
 
-        if(table.get_float(6, i) == table.get_float(7, i))
+        if (table.get_float(6, i) == table.get_float(7, i))
             floats.push_back(i);
 
-        if(table.get_double(8, i) == table.get_double(9, i))
+        if (table.get_double(8, i) == table.get_double(9, i))
             doubles.push_back(i);
 
     }
@@ -149,23 +149,23 @@ TEST(QueryTwoColsEqualVaryWidthAndValues)
 
 
     CHECK_EQUAL(ints1.size(), t1.size());
-    for(size_t t = 0; t < ints1.size(); t++)
+    for (size_t t = 0; t < ints1.size(); t++)
         CHECK_EQUAL(ints1[t], t1.get_source_ndx(t));
 
     CHECK_EQUAL(ints2.size(), t2.size());
-    for(size_t t = 0; t < ints2.size(); t++)
+    for (size_t t = 0; t < ints2.size(); t++)
         CHECK_EQUAL(ints2[t], t2.get_source_ndx(t));
 
     CHECK_EQUAL(ints3.size(), t3.size());
-    for(size_t t = 0; t < ints3.size(); t++)
+    for (size_t t = 0; t < ints3.size(); t++)
         CHECK_EQUAL(ints3[t], t3.get_source_ndx(t));
 
     CHECK_EQUAL(floats.size(), t4.size());
-    for(size_t t = 0; t < floats.size(); t++)
+    for (size_t t = 0; t < floats.size(); t++)
         CHECK_EQUAL(floats[t], t4.get_source_ndx(t));
 
     CHECK_EQUAL(doubles.size(), t5.size());
-    for(size_t t = 0; t < doubles.size(); t++)
+    for (size_t t = 0; t < doubles.size(); t++)
         CHECK_EQUAL(doubles[t], t5.get_source_ndx(t));
 }
 
@@ -243,7 +243,7 @@ TEST(QueryTwoCols0)
     table.add_column(type_Int, "second1");
 
 
-    for(int i = 0; i < 50; i++) {
+    for (int i = 0; i < 50; i++) {
         table.add_empty_row();
         table.set_int(0, i, 0);
         table.set_int(1, i, 0);
@@ -306,13 +306,13 @@ TEST(TestQueryHuge)
 
         size_t blocksize = rand() % 1200 + 1;
 
-        for(size_t row = 0; row < 6000; row++) {
+        for (size_t row = 0; row < 6000; row++) {
 
-            if(row % blocksize == 0) {
+            if (row % blocksize == 0) {
                 long1 = (rand() % 2 == 0);
                 long2 = (rand() % 2 == 0);
 
-                if(rand() % 2 == 0)
+                if (rand() % 2 == 0)
                 {
                     mdist1 = rand() % 500 + 1;
                     mdist2 = rand() % 500 + 1;
@@ -327,33 +327,33 @@ TEST(TestQueryHuge)
 
             tt.add_empty_row();
 
-            if(long1) {
-                if(rand() % mdist1 == 0)
+            if (long1) {
+                if (rand() % mdist1 == 0)
                     first = "longlonglonglonglonglonglong A";
                 else
                     first = "longlonglonglonglonglonglong B";
             }
             else {
-                if(rand() % mdist1 == 0)
+                if (rand() % mdist1 == 0)
                     first = "A";
                 else
                     first = "B";
             }
         
-            if(long2) {
-                if(rand() % mdist2 == 0)
+            if (long2) {
+                if (rand() % mdist2 == 0)
                     second = "longlonglonglonglonglonglong A";
                 else
                     second = "longlonglonglonglonglonglong B";
             }
             else {
-                if(rand() % mdist2 == 0)
+                if (rand() % mdist2 == 0)
                     second = "A";
                 else
                     second = "B";
             }
 
-            if(rand() % mdist3 == 0)
+            if (rand() % mdist3 == 0)
                 third = 1;
             else
                 third = 2;
@@ -387,15 +387,15 @@ TEST(TestQueryHuge)
                 res8++;
         }
 
-        for(size_t t = 0; t < 4; t++) {
+        for (size_t t = 0; t < 4; t++) {
 
-            if(t == 1)
+            if (t == 1)
                 tt.optimize();
-            else if(t == 2)
+            else if (t == 2)
                 tt.column().first.set_index();
-            else if(t == 3)
+            else if (t == 3)
                 tt.column().second.set_index();
-            else if(t == 4)
+            else if (t == 4)
                 tt.column().third.set_index();
 
 
@@ -440,9 +440,9 @@ TEST(TestQueryStrIndex3)
     // linear scan, enum and index
 
 #ifdef TIGHTDB_DEBUG
-    for(int N = 0; N < 4; N++) { 
+    for (int N = 0; N < 4; N++) { 
 #else
-    for(int N = 0; N < 20; N++) { 
+    for (int N = 0; N < 20; N++) { 
 #endif
         TupleTableType ttt;
  
@@ -451,9 +451,9 @@ TEST(TestQueryStrIndex3)
 
         size_t n = 0;
 #ifdef TIGHTDB_DEBUG
-        for(int i = 0; i < 4; i++) {
+        for (int i = 0; i < 4; i++) {
 #else
-        for(int i = 0; i < 20; i++) {
+        for (int i = 0; i < 20; i++) {
 #endif
             // 1/500 match probability because we want possibility for a 1000 sized leaf to contain 0 matches (important
             // edge case)
@@ -463,9 +463,9 @@ TEST(TestQueryStrIndex3)
 
             // 2200 entries with that probability to fill out two concecutive 1000 sized leafs with above probability,
             // plus a remainder (edge case)
-            for(int j = 0; j < 2200; j++) {
-                if(rand() % f1 == 0)
-                    if(rand() % f2 == 0) {
+            for (int j = 0; j < 2200; j++) {
+                if (rand() % f1 == 0)
+                    if (rand() % f2 == 0) {
                         ttt.add(0, longstrings ? "AAAAAAAAAAAAAAAAAAAAAAAA" : "AA");
                         if (!longstrings) {
                             n++;
@@ -475,7 +475,7 @@ TEST(TestQueryStrIndex3)
                     else
                         ttt.add(0, "BB");
                 else
-                    if(rand() % f2 == 0)
+                    if (rand() % f2 == 0)
                         ttt.add(1, "AA");
                     else
                         ttt.add(1, "BB");
@@ -489,14 +489,14 @@ TEST(TestQueryStrIndex3)
         // Both linear scans
         v = ttt.where().second.equal("AA").first.equal(0).find_all();
         CHECK_EQUAL(vec.size(), v.size());
-        for(size_t t = 0; t < vec.size(); t++)
+        for (size_t t = 0; t < vec.size(); t++)
             CHECK_EQUAL(vec[t], v.get_source_ndx(t));
         v.clear();
         vec.clear();
 
         v = ttt.where().first.equal(0).second.equal("AA").find_all();
         CHECK_EQUAL(vec.size(), v.size());
-        for(size_t t = 0; t < vec.size(); t++)
+        for (size_t t = 0; t < vec.size(); t++)
             CHECK_EQUAL(vec[t], v.get_source_ndx(t));
         v.clear();
         vec.clear();
@@ -506,14 +506,14 @@ TEST(TestQueryStrIndex3)
         // Linear scan over enum, plus linear integer column scan
         v = ttt.where().second.equal("AA").first.equal(0).find_all();
         CHECK_EQUAL(vec.size(), v.size());
-        for(size_t t = 0; t < vec.size(); t++)
+        for (size_t t = 0; t < vec.size(); t++)
             CHECK_EQUAL(vec[t], v.get_source_ndx(t));
         v.clear();
         vec.clear();
 
         v = ttt.where().first.equal(0).second.equal("AA").find_all();
         CHECK_EQUAL(vec.size(), v.size());
-        for(size_t t = 0; t < vec.size(); t++)
+        for (size_t t = 0; t < vec.size(); t++)
             CHECK_EQUAL(vec[t], v.get_source_ndx(t));
         v.clear();
         vec.clear();
@@ -523,14 +523,14 @@ TEST(TestQueryStrIndex3)
         // Index lookup, plus linear integer column scan
         v = ttt.where().second.equal("AA").first.equal(0).find_all();
         CHECK_EQUAL(vec.size(), v.size());
-        for(size_t t = 0; t < vec.size(); t++)
+        for (size_t t = 0; t < vec.size(); t++)
             CHECK_EQUAL(vec[t], v.get_source_ndx(t));
         v.clear();
         vec.clear();
 
         v = ttt.where().first.equal(0).second.equal("AA").find_all();
         CHECK_EQUAL(vec.size(), v.size());
-        for(size_t t = 0; t < vec.size(); t++)
+        for (size_t t = 0; t < vec.size(); t++)
             CHECK_EQUAL(vec[t], v.get_source_ndx(t));
         v.clear();
         vec.clear();
@@ -547,7 +547,7 @@ TEST(TestQueryStrIndex2)
 
     int64_t s;
 
-	for(int i = 0; i < 100; i++) {
+	for (int i = 0; i < 100; i++) {
 	    ttt.add(1, "AA");
     }
     ttt.add(1, "BB");
@@ -604,11 +604,11 @@ TEST(TestQueryStrIndex)
 	int aa;
 	int64_t s;
 
-	for(size_t i = 0; i < itera; i++) {
+	for (size_t i = 0; i < itera; i++) {
 		TupleTableType ttt;
 		aa = 0;
-		for(size_t t = 0; t < iterb; t++) {
-			if(rand() % 3 == 0) {
+		for (size_t t = 0; t < iterb; t++) {
+			if (rand() % 3 == 0) {
 				ttt.add(1, "AA");
 				aa++;
 			}
@@ -911,7 +911,7 @@ TEST(TestQueryStrIndexed_non_enum)
 {
     TupleTableType ttt;
 
-    for(size_t t = 0; t < 10; t++) {
+    for (size_t t = 0; t < 10; t++) {
         ttt.add(1, "a");
         ttt.add(4, "b");
         ttt.add(7, "c");
