@@ -834,9 +834,9 @@ string Query::Verify()
 void Query::Init(const Table& table) const
 {
     if (first[0] != NULL) {
-        ParentNode* const top = (ParentNode*)first[0];
+        ParentNode* top = first[0];
         top->init(table);
-        vector<ParentNode*>v;
+        vector<ParentNode*> v;
         top->gather_children(v);
     }
 }
