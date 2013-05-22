@@ -4,7 +4,7 @@ TightDB
 Dependencies
 ------------
 
-### Ubuntu 12.04
+### Ubuntu 10.04, 12.04
 
     sudo apt-get install build-essential
     #   For regenerating <tightdb/table-macros.hpp>
