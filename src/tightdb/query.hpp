@@ -66,6 +66,14 @@ public:
     Query& less_equal(size_t column_ndx, int64_t value);
     Query& between(size_t column_ndx, int64_t from, int64_t to);
 
+    // Conditions: 2 int columns
+    Query& equal_int(size_t column_ndx1, size_t column_ndx2);
+    Query& not_equal_int(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_int(size_t column_ndx1, size_t column_ndx2);
+    Query& less_int(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_equal_int(size_t column_ndx1, size_t column_ndx2);
+    Query& less_equal_int(size_t column_ndx1, size_t column_ndx2);
+
     // Conditions: float
     Query& equal(size_t column_ndx, float value);
     Query& not_equal(size_t column_ndx, float value);
@@ -74,6 +82,14 @@ public:
     Query& less(size_t column_ndx, float value);
     Query& less_equal(size_t column_ndx, float value);
     Query& between(size_t column_ndx, float from, float to);
+
+    // Conditions: 2 float columns
+    Query& equal_float(size_t column_ndx1, size_t column_ndx2);
+    Query& not_equal_float(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_float(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_equal_float(size_t column_ndx1, size_t column_ndx2);
+    Query& less_float(size_t column_ndx1, size_t column_ndx2);
+    Query& less_equal_float(size_t column_ndx1, size_t column_ndx2);
 
      // Conditions: double
     Query& equal(size_t column_ndx, double value);
@@ -84,34 +100,39 @@ public:
     Query& less_equal(size_t column_ndx, double value);
     Query& between(size_t column_ndx, double from, double to);
 
+    // Conditions: 2 double columns
+    Query& equal_double(size_t column_ndx1, size_t column_ndx2);
+    Query& not_equal_double(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_double(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_equal_double(size_t column_ndx1, size_t column_ndx2);
+    Query& less_double(size_t column_ndx1, size_t column_ndx2);
+    Query& less_equal_double(size_t column_ndx1, size_t column_ndx2);
+
     // Conditions: bool
     Query& equal(size_t column_ndx, bool value);
 
-    // Conditions: strings
-    Query& equal(size_t column_ndx, const char* value, bool case_sensitive=true);
-    Query& begins_with(size_t column_ndx, const char* value, bool case_sensitive=true);
-    Query& ends_with(size_t column_ndx, const char* value, bool case_sensitive=true);
-    Query& contains(size_t column_ndx, const char* value, bool case_sensitive=true);
-    Query& not_equal(size_t column_ndx, const char* value, bool case_sensitive=true);
-
     // Conditions: date
-    Query& equal_date(size_t column_ndx, time_t value) { return equal(column_ndx, int64_t(value)); }
-    Query& not_equal_date(size_t column_ndx, time_t value) { return not_equal(column_ndx, int64_t(value)); }
-    Query& greater_date(size_t column_ndx, time_t value) { return greater(column_ndx, int64_t(value)); }
-    Query& greater_equal_date(size_t column_ndx, time_t value) { return greater_equal(column_ndx, int64_t(value)); }
-    Query& less_date(size_t column_ndx, time_t value) { return less(column_ndx, int64_t(value)); }
-    Query& less_equal_date(size_t column_ndx, time_t value) { return less_equal(column_ndx, int64_t(value)); }
-    Query& between_date(size_t column_ndx, time_t from, time_t to) { return between(column_ndx, int64_t(from), int64_t(to)); }
+    Query& equal_date(size_t column_ndx, Date value) { return equal(column_ndx, int64_t(value.get_date())); }
+    Query& not_equal_date(size_t column_ndx, Date value) { return not_equal(column_ndx, int64_t(value.get_date())); }
+    Query& greater_date(size_t column_ndx, Date value) { return greater(column_ndx, int64_t(value.get_date())); }
+    Query& greater_equal_date(size_t column_ndx, Date value) { return greater_equal(column_ndx, int64_t(value.get_date())); }
+    Query& less_date(size_t column_ndx, Date value) { return less(column_ndx, int64_t(value.get_date())); }
+    Query& less_equal_date(size_t column_ndx, Date value) { return less_equal(column_ndx, int64_t(value.get_date())); }
+    Query& between_date(size_t column_ndx, Date from, Date to) { return between(column_ndx, int64_t(from.get_date()), int64_t(to.get_date())); }
+
+    // Conditions: strings
+    Query& equal(size_t column_ndx, StringData value, bool case_sensitive=true);
+    Query& not_equal(size_t column_ndx, StringData value, bool case_sensitive=true);
+    Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive=true);
+    Query& ends_with(size_t column_ndx, StringData value, bool case_sensitive=true);
+    Query& contains(size_t column_ndx, StringData value, bool case_sensitive=true);
 
     // Conditions: binary data
-    // Only BinaryData prototype can exist, else it would conflict with equal() for strings
-    Query& equal(size_t column_ndx, BinaryData);
-/*
-    Query& equal_binary(size_t column_ndx, const char* ptr, size_t len);
-    Query& begins_with_binary(size_t column_ndx, const char* ptr, size_t len);
-    Query& ends_with_binary(size_t column_ndx, const char* ptr, size_t len);
-    Query& contains_binary(size_t column_ndx, const char* ptr, size_t len);
-*/
+    Query& equal(size_t column_ndx, BinaryData value);
+    Query& not_equal(size_t column_ndx, BinaryData value);
+    Query& begins_with(size_t column_ndx, BinaryData value);
+    Query& ends_with(size_t column_ndx, BinaryData value);
+    Query& contains(size_t column_ndx, BinaryData value);
 
     // Grouping
     Query& group();
@@ -210,6 +231,13 @@ protected:
     mutable bool do_delete;
 
 private:
+    template <class TColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
+    template <class TColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);
+    template <class TColumnType> Query& less_equal(size_t column_ndx1, size_t column_ndx2);
+    template <class TColumnType> Query& greater(size_t column_ndx1, size_t column_ndx2);
+    template <class TColumnType> Query& greater_equal(size_t column_ndx1, size_t column_ndx2);
+    template <class TColumnType> Query& not_equal(size_t column_ndx1, size_t column_ndx2);
+
     std::string error_code;
 
 #if TIGHTDB_MULTITHREAD_QUERY

@@ -36,9 +36,29 @@
 namespace tightdb {
 
 
+/// Create the specified directory in the file system.
+///
+/// \throw File::AccessError If the directory could not be created. If
+/// the reason corresponds to one of the exception types that are
+/// derived from File::AccessError, the derived exception type is
+/// thrown (as long as the underlying system provides the information
+/// to unambiguously distinguish that particular reason).
+void make_dir(const std::string& path);
+
+/// Remove the specified directory path from the file system. If the
+/// specified path is a directory, this function is equivalent to
+/// std::remove(const char*).
+///
+/// \throw File::AccessError If the directory could not be removed. If
+/// the reason corresponds to one of the exception types that are
+/// derived from File::AccessError, the derived exception type is
+/// thrown (as long as the underlying system provides the information
+/// to unambiguously distinguish that particular reason).
+void remove_dir(const std::string& path);
+
 /// Create a new unique directory for temporary files. The absolute
 /// path to the new directory is returned without a trailing slash.
-std::string create_temp_dir();
+std::string make_temp_dir();
 
 
 /// This class provides a RAII abstraction over the concept of a file
@@ -74,9 +94,9 @@ public:
     /// Calling this method on an instance that is already attached to
     /// an open file has undefined behavior.
     ///
-    /// \throw OpenError If the file could not be opened. If the
+    /// \throw AccessError If the file could not be opened. If the
     /// reason corresponds to one of the exception types that are
-    /// derived from OpenError, the derived exception type is thrown
+    /// derived from AccessError, the derived exception type is thrown
     /// (as long as the underlying system provides the information to
     /// unambiguously distinguish that particular reason).
     void open(const std::string& path, Mode = mode_Read);
@@ -86,8 +106,8 @@ public:
     /// an open file.
     void close() TIGHTDB_NOEXCEPT;
 
-    /// Check whether this File instance currently attached to an open
-    /// file.
+    /// Check whether this File instance is currently attached to an
+    /// open file.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
     enum AccessMode {
@@ -221,6 +241,9 @@ public:
     /// This File instance does not need to remain in existence after
     /// the mapping is established.
     ///
+    /// Multiple concurrent mappings may be created from the same File
+    /// instance.
+    ///
     /// Specifying access_ReadWrite for a file that is opened in
     /// read-only mode, is an error.
     ///
@@ -267,8 +290,25 @@ public:
     /// as not existing.
     static bool exists(const std::string& path);
 
+    /// Remove the specified file path from the file system. If the
+    /// specified path is not a directory, this function is equivalent
+    /// to std::remove(const char*).
+    ///
+    /// \throw AccessError If the file could not be removed. If the
+    /// reason corresponds to one of the exception types that are
+    /// derived from AccessError, the derived exception type is thrown
+    /// (as long as the underlying system provides the information to
+    /// unambiguously distinguish that particular reason).
+    static void remove(const std::string& path);
+
+    /// Same as remove() except that this one returns false, rather
+    /// than thriowing an exception, if the specified file does not
+    /// exist. If the file did exist, and was deleted, this function
+    /// returns true.
+    static bool try_remove(const std::string& path);
+
     // FIXME: Can we get rid of this one please!!!
-    bool is_deleted() const;
+    bool is_removed() const;
 
     class ExclusiveLock;
     class SharedLock;
@@ -279,27 +319,27 @@ public:
     class UnlockGuard;
     class UnmapGuard;
 
-    struct OpenError: std::runtime_error {
-        OpenError(const std::string& msg): std::runtime_error(msg) {}
+    struct AccessError: std::runtime_error {
+        AccessError(const std::string& msg): std::runtime_error(msg) {}
     };
 
     /// Thrown if the user does not have permission to open or create
     /// the specified file in the specified access mode.
-    struct PermissionDenied: OpenError {
-        PermissionDenied(const std::string& msg): OpenError(msg) {}
+    struct PermissionDenied: AccessError {
+        PermissionDenied(const std::string& msg): AccessError(msg) {}
     };
 
     /// Thrown if the directory part of the specified path was not
     /// found, or create_Never was specified and the file did no
     /// exist.
-    struct NotFound: OpenError {
-        NotFound(const std::string& msg): OpenError(msg) {}
+    struct NotFound: AccessError {
+        NotFound(const std::string& msg): AccessError(msg) {}
     };
 
     /// Thrown if create_Always was specified and the file did already
     /// exist.
-    struct Exists: OpenError {
-        Exists(const std::string& msg): OpenError(msg) {}
+    struct Exists: AccessError {
+        Exists(const std::string& msg): AccessError(msg) {}
     };
 
 private:
@@ -349,16 +389,19 @@ private:
 /// This class provides a RAII abstraction over the concept of a
 /// memory mapped file.
 ///
-/// Once create, the Map instance makes no reference to the File
+/// Once created, the Map instance makes no reference to the File
 /// instance that it was based upon, and that File instance may be
 /// destroyed before the Map instance is destroyed.
+///
+/// Multiple concurrent mappings may be created from the same File
+/// instance.
 ///
 /// You can use UnmapGuard to acheive exception-safe unmapping prior
 /// to the Map instance being detroyed.
 ///
 /// A single Map instance must never be accessed concurrently by
 /// multiple threads.
-template<class T> class File::Map: MapBase {
+template<class T> class File::Map: private MapBase {
 public:
     /// Equivalent to calling map() on a default constructed instance.
     explicit Map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),

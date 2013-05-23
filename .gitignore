@@ -1,6 +1,3 @@
-*.tightdb
-*.tightdb.lock
-
 *.ncb
 *.suo
 *.vcproj.*.user
@@ -43,4 +40,7 @@ _ReSharper*/
 Static library*/
 *.opensdf
 *.sdf
-/tightdb.xcodeproj
+
+/tightdb.xcodeproj/project.xcworkspace
+/tightdb.xcodeproj/xcuserdata
+

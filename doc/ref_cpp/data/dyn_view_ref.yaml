@@ -3,7 +3,7 @@
 #
 
 ID         : class_dyn_tableview
-TITLE      : TableView
+TITLE      : TableView (dynamic)
 SUMMARY    : &g_dyn_view_intro_summary
              The TableView class.
 DESCR      : &g_dyn_view_intro_descr
@@ -21,11 +21,20 @@ DESCR      : &g_dyn_view_intro_descr
              Notice that this does not imply that it will work the
              opposite direction. Any change that adds or removes rows
              in the original table will invalidate the view, and you
-             will have an inconsistent view of the table. This might
-             lead to a serious data corruption.
+             must not use the view, as this could possibly lead to data
+             corruption.
 
-             It is possible to create two views for the table as
+             It is possible to create multiple views for the table as
              long as you do not change the original table.
+             
+             NOTICE: 
+             For all methods which takes row and column index as parameters,
+             you must ensure that these are in a valid range.
+             You must also ensure that you use the correct type of method for
+             the correct type of column. I.e. it's invalid to use 'getString(...)'
+             with a column index which is of Boolean type - it must be of 'String' 
+             type and so forth.
+             
 SEE        :
 EXAMPLES   :
 - DESCR:
@@ -41,7 +50,8 @@ CATEGORIES :
       CONST    : True
       RETURN:
         TYPES  : size_t
-        DESCR  : The number of rows.
+        DESCR  : &g_dyn_view_size_number_of_rows_return
+                 The number of rows.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_size
         DESCR  :
@@ -77,7 +87,8 @@ CATEGORIES :
       CONST    : True
       RETURN:
         TYPES  : size_t
-        DESCR  : The number of columns.
+        DESCR  : &g_dyn_view_get_column_count_return1_descr
+                 The number of columns.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_get_column_count
         DESCR  :
@@ -89,10 +100,12 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.
+        DESCR  : &g_dyn_view_column_index_descr
+                 The column index.
       RETURN:
-        TYPES  : const char*
-        DESCR  : The column name.
+        TYPES  : StringData
+        DESCR  : &g_dyn_view_column_name_descr
+                 The column name.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_get_column_name
         DESCR  :
@@ -103,11 +116,11 @@ CATEGORIES :
       CONST    : True
       PARAMS:
       - NAME   : column_name
-        TYPES  : const char*
-        DESCR  : The column name.
+        TYPES  : StringData
+        DESCR  : *g_dyn_view_column_name_descr
       RETURN:
         TYPES  : size_t
-        DESCR  : The column index.
+        DESCR  : *g_dyn_view_column_index_descr
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_get_column_index
         DESCR  :
@@ -119,10 +132,11 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.
+        DESCR  : *g_dyn_view_column_index_descr
       RETURN:
-        TYPES  : ColomnType
-        DESCR  : The column type.
+        TYPES  : DataType
+        DESCR  : &g_dyn_view_get_column_type_return1_descr
+                 The column type.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_get_column_type
         DESCR  :
@@ -138,10 +152,12 @@ CATEGORIES :
       PARAMS:
       - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : The row index in the view
+        DESCR  : &g_dyn_view_get_source_ndx_parm1_descr
+                 The row index in the view
       RETURN:
         TYPES  : size_t
-        DESCR  : The row index in the table.
+        DESCR  : &g_dyn_view_get_source_ndx_return1_descr
+                 The row index in the table.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_get_source_ndx
         DESCR  :
@@ -153,7 +169,8 @@ CATEGORIES :
       PARAMS:
       - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : Position of row to delete.
+        DESCR  : &g_dyn_view_remove_row_parm1_descr
+                 Position of row to delete.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_remove
         DESCR  :
@@ -169,6 +186,8 @@ CATEGORIES :
   METHODS:
   - g_dyn_view_get_bool:
   - g_dyn_view_get_int:
+  - g_dyn_view_get_float:
+  - g_dyn_view_get_double:
   - g_dyn_view_get_date:
   - g_dyn_view_get_string:
   - g_dyn_view_get_binary:
@@ -182,8 +201,10 @@ CATEGORIES :
       SIGNATURE: |
                  bool          get_bool(size_t column_ndx, size_t row_ndx) const;
                  int64_t       get_int(size_t column_ndx, size_t row_ndx) const;
-                 time_t        get_date(size_t column_ndx, size_t row_ndx) const;
-                 const char*   get_string(size_t column_ndx, size_t row_ndx) const;
+                 float         get_float(size_t column_ndx, size_t row_ndx) const;
+                 double        get_double(size_t column_ndx, size_t row_ndx) const;
+                 Date          get_date(size_t column_ndx, size_t row_ndx) const;
+                 StringData    get_string(size_t column_ndx, size_t row_ndx) const;
                  BinaryData    get_binary(size_t column_ndx, size_t row_ndx) const;
                  Mixed         get_mixed(size_t column_ndx, size_t row_ndx) const;
                  DataType      get_mixed_type(size_t column_ndx, size_t row_ndx) const
@@ -193,18 +214,22 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.
+        DESCR  : *g_dyn_view_column_index_descr
       - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : The row index.
+        DESCR  : &g_dyn_view_row_index_descr
+                 The row index.
       RETURN:
-        TYPES  : [bool, int64_t, time_t, const char*, BinaryData, Mixed, DataType, TableRef, ConstTableRef]
-        DESCR  : The value.
+        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed, DataType, TableRef, ConstTableRef]
+        DESCR  : &g_dyn_view_value_return_descr
+                 The value.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_get_xxx
         DESCR  :
   - g_dyn_view_set_bool:
   - g_dyn_view_set_int:
+  - g_dyn_view_set_float:
+  - g_dyn_view_set_double:
   - g_dyn_view_set_enum:
   - g_dyn_view_set_date:
   - g_dyn_view_set_string:
@@ -216,24 +241,23 @@ CATEGORIES :
       SIGNATURE: |
                  void set_bool(size_t column_ndx, size_t row_ndx, bool value);
                  void set_int(size_t column_ndx, size_t row_ndx, int64_t value);
-                 void set_enum(size_t column_ndx, size_t row_ndx, EnumType value);
-                 void set_date(size_t column_ndx, size_t row_ndx, time_t value);
-                 void set_string(size_t column_ndx, size_t row_ndx, const char* value);
-                 void set_binary(size_t column_ndx, size_t row_ndx, const char* value, size_t len);
+                 void set_float(size_t column_ndx, size_t row_ndx, float value);
+                 void set_double(size_t column_ndx, size_t row_ndx, double value);
+                 template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
+                 void set_date(size_t column_ndx, size_t row_ndx, Date value);
+                 void set_string(size_t column_ndx, size_t row_ndx, StringData value);
+                 void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
                  void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.
+        DESCR  : *g_dyn_view_column_index_descr
       - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : The row index.
+        DESCR  : *g_dyn_view_row_index_descr
       - NAME   : value
-        TYPES  : [bool, int64_t, time_t, const char*, Mixed]
-        DESCR  : The value.
-      - NAME   : len
-        TYPES  : size_t
-        DESCR  : Size in bytes of binary value.
+        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed]
+        DESCR  : *g_dyn_view_value_return_descr
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_set_xxx
         DESCR  :
@@ -247,13 +271,14 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.
+        DESCR  : *g_dyn_view_column_index_descr
       - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : The row index.
+        DESCR  : *g_dyn_view_row_index_descr
       RETURN:
         TYPES  : size_t
-        DESCR  : Number of rows.
+        DESCR  : &g_dyn_view_get_subtable_size_parm1_descr
+                 Number of rows.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_get_subtable
         DESCR  :
@@ -264,10 +289,10 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.
+        DESCR  : *g_dyn_view_column_index_descr
       - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : The row index.
+        DESCR  : *g_dyn_view_row_index_descr
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_clear_subtable
         DESCR  :
@@ -275,60 +300,75 @@ CATEGORIES :
   METHODS:
   - g_dyn_view_find_first_bool:
   - g_dyn_view_find_first_int:
+  - g_dyn_view_find_first_float:
+  - g_dyn_view_find_first_double:
   - g_dyn_view_find_first_date:
   - g_dyn_view_find_first_string:
       NAMES    : find_first_*
-      SUMMARY  : *g_find_first_xxx_summary
-      DESCR    : *g_find_first_xxx_descr
+      SUMMARY  : *g_dyn_table_find_first_xxx_summary
+      DESCR    : *g_dyn_table_find_first_xxx_descr
       SIGNATURE: |
                  size_t find_first_int(size_t column_ndx, int64_t value) const;
                  size_t find_first_bool(size_t column_ndx, bool value) const;
-                 size_t find_first_date(size_t column_ndx, time_t value) const;
-                 size_t find_first_string(size_t column_ndx, const char* value) const;
+                 size_t find_first_float(size_t column_ndx, float value) const;
+                 size_t find_first_double(size_t column_ndx, double value) const;
+                 size_t find_first_date(size_t column_ndx, Date value) const;
+                 size_t find_first_string(size_t column_ndx, StringData value) const;
+                 size_t find_first_binary(size_t column_ndx, BinaryData value) const;
       CONST    : True
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.
+        DESCR  : *g_dyn_view_column_index_descr
       - NAME   : value
-        TYPES  : [bool, int64_t, time_t, const char*]
-        DESCR  : The value.
+        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData]
+        DESCR  : *g_dyn_view_value_return_descr
       RETURN:
         TYPES  : size_t
-        DESCR  : "The row index or <code>tightdb::not_found</code> (equal to <code>size_t(-1)</code>) if there is no match."
+        DESCR  : "The row index or <code>tightdb::not_found</code> (equal to <code>std::size_t(-1)</code>) if there is no match."
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_find_first_xxx
         DESCR  :
   - g_dyn_view_find_all_bool:
   - g_dyn_view_find_all_int:
+  - g_dyn_view_find_all_float:
+  - g_dyn_view_find_all_double:
   - g_dyn_view_find_all_date:
   - g_dyn_view_find_all_string:
   - g_dyn_view_find_all_bool_const:
   - g_dyn_view_find_all_int_const:
+  - g_dyn_view_find_all_float_const:
+  - g_dyn_view_find_all_double_const:
   - g_dyn_view_find_all_date_const:
   - g_dyn_view_find_all_string_const:
       NAMES    : find_all_*
-      SUMMARY  : *g_find_all_xxx_summary
-      DESCR    : *g_find_all_xxx_descr
+      SUMMARY  : *g_dyn_table_find_all_xxx_summary
+      DESCR    : *g_dyn_table_find_all_xxx_descr
       SIGNATURE: |
                  TableView      find_all_int(size_t column_ndx, int64_t value);
                  TableView      find_all_bool(size_t column_ndx, bool value);
-                 TableView      find_all_date(size_t column_ndx, time_t value);
-                 TableView      find_all_string(size_t column_ndx, const char* value);
+                 TableView      find_all_date(size_t column_ndx, Date value);
+                 TableView      find_all_float(size_t column_ndx, float value);
+                 TableView      find_all_double(size_t column_ndx, double value);
+                 TableView      find_all_string(size_t column_ndx, StringData value);
+                 TableView      find_all_binary(size_t column_ndx, BinaryData value);
 
                  ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
                  ConstTableView find_all_bool(size_t column_ndx, bool value) const;
-                 ConstTableView find_all_date(size_t column_ndx, time_t value) const;
-                 ConstTableView find_all_string(size_t column_ndx, const char* value) const;
+                 ConstTableView find_all_date(size_t column_ndx, Date value) const;
+                 ConstTableView find_all_float(size_t column_ndx, float value) const;
+                 ConstTableView find_all_double(size_t column_ndx, double value) const;
+                 ConstTableView find_all_string(size_t column_ndx, StringData value) const;
+                 ConstTableView find_all_binary(size_t column_ndx, BinaryData value) const;
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.
+        DESCR  : *g_dyn_view_column_index_descr
       - NAME   : value
-        TYPES  : [bool, int64_t, time_t, const char*]
-        DESCR  : The value.
+        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData]
+        DESCR  : *g_dyn_view_value_return_descr
       RETURN:
-        TYPES  : TableView
+        TYPES  : [TableView, ConstTableView]
         DESCR  : The view.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_find_all_xxx
@@ -342,7 +382,7 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.
+        DESCR  : *g_dyn_view_column_index_descr
       - NAME   : ascending
         TYPES  : bool
         DESCR  : "If <code>true</code>, rows are sorted ascending. Default: <code>true</code>."
@@ -352,53 +392,76 @@ CATEGORIES :
 - Aggregates:
   METHODS:
   - g_dyn_view_sum:
-      NAMES    : sum
+  - g_dyn_view_sum_float:
+  - g_dyn_view_sum_double:
+      TITLE    : sum*
+      NAMES    : [sum, sum_float, sum_double]
       SUMMARY  : &g_dyn_view_sum_summary
                  Calculates the sum.
       DESCR    : &g_dyn_view_sum_descr
                  Calculates the sum of a column.
       CONST    : True
+      SIGNATURE: |
+                 int64_t sum(size_t column_ndx) const;
+                 double sum_float(size_t column_ndx) const;
+                 double sum_double(size_t column_ndx) const;
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index.
+        DESCR  : *g_dyn_view_column_index_descr
       RETURN:
-        TYPES  : int64_t
+        TYPES  : [int64_t, float, double]
         DESCR  : The sum.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_sum
         DESCR  :
   - g_dyn_view_maximum:
-      NAMES    : maximum
+  - g_dyn_view_maximum_float:
+  - g_dyn_view_maximum_double:
+      TITLE    : maximum*
+      NAMES    : [maximum, maximum_float, maximum_double]
       SUMMARY  : &g_dyn_view_maximum_summary
                  Find highest value.
       DESCR    : &g_dyn_view_maximum_descr
                  Find the highest value.
       CONST    : True
+      SIGNATURE: |
+                 int64_t maximum(size_t column_ndx) const;
+                 double  maximum_float(size_t column_ndx) const;
+                 double  maximum_double(size_t column_ndx) const;
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index.
+        DESCR  : *g_dyn_view_column_index_descr
       RETURN:
-        TYPES  : int64_t
-        DESCR  : The maximum value.
+        TYPES  : [int64_t, double]
+        DESCR  : &g_dyn_view_maximum_return1_descr
+                 The maximum value.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_maximum
         DESCR  :
   - g_dyn_view_minimum:
-      NAMES    : minimum
+  - g_dyn_view_minimum_float:
+  - g_dyn_view_minimum_double:
+      TITLE    : minimum*
+      NAMES    : [minimum, minimum_float, minimum_double]
       SUMMARY  : &g_dyn_view_minimum_summary
                  Find lowest value.
       DESCR    : &g_dyn_view_minimum_descr
                  Find the lowest value.
       CONST    : True
+      SIGNATURE: |
+                 int64_t minimum(size_t column_ndx) const;
+                 double  minimum_float(size_t column_ndx) const;
+                 double  minimum_double(size_t column_ndx) const;
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index.
+        DESCR  : *g_dyn_view_column_index_descr
       RETURN:
-        TYPES  : int64_t
-        DESCR  : The minimum value.
+        TYPES  : [int64_t, double]
+        DESCR  : &g_dyn_view_minimum_return1_descr
+                 The minimum value.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_minimum
         DESCR  :
@@ -408,15 +471,18 @@ CATEGORIES :
       NAMES    : to_json
       SUMMARY  : *g_dyn_table_to_json_summary
       DESCR    : &g_dyn_view_to_json_descr
+                 >
+                 This method will convert a view and its columns and rows
+                 to a JSON compatible representation.
+                 
                  The JavaScript Object Notation (<a
                  href="http://json.org">JSON</a>) is useful for
-                 web/mobile applications and serialization. This
-                 method will convert a view and its columns and rows
-                 to a JSON compatible representation.
+                 web/mobile applications and serialization. 
       PARAMS:
       - NAME   : out
         TYPES  : std::ostream&
-        DESCR  : Output stream.
+        DESCR  : &g_dyn_view_to_json_parm1_descr
+                 Output stream.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_to_json
         DESCR  :
@@ -431,7 +497,8 @@ CATEGORIES :
       PARAMS:
       - NAME   : out
         TYPES  : std::ostream&
-        DESCR  : Output stream.
+        DESCR  : &g_dyn_view_to_string_parm1_descr
+                 Output stream.
       - NAME   : limit
         TYPES  : size_t
         DESCR  : "The number of rows to convert. Default: 500."

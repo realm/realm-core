@@ -11,7 +11,7 @@ benchmark: minimal
 # Run the performance matrix benchmarking program
 .PHONY: performance
 performance: minimal
-	@$(MAKE) -C test/performance run
+	@$(MAKE) -C test performance
 
 # Run coverage analysis after building everything, this time using LCOV
 .PHONY: lcov
@@ -25,3 +25,14 @@ lcov: test-cover
 .PHONY: gcovr
 gcovr: test-cover
 	gcovr -r src -x >gcovr.xml
+
+# Build and run whatever is in test/experiements/testcase.cpp
+.PHONY: testcase testcase-debug
+testcase: minimal
+	@$(MAKE) -C test testcase
+testcase-debug: debug
+	@$(MAKE) -C test testcase-debug
+
+# Used by build.sh
+get-libdir:
+	@echo $(libdir)

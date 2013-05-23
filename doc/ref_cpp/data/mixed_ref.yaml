@@ -35,14 +35,17 @@ CATEGORIES:
       SIGNATURE: |
                  Mixed(bool v)
                  Mixed(int64_t v)
+                 Mixed(float v)
+                 Mixed(double v)
                  Mixed(Date v)
-                 Mixed(const char* v)
+                 Mixed(StringData v)
                  Mixed(BinaryData v)
                  Mixed(subtable_tag)
       PARAMS:
       - NAME   : v
-        TYPES  : [bool, int64_t, Date, const char*, BinaryData]
-        DESCR  : The value.
+        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData]
+        DESCR  : &g_mixed_constructor_parm1_descr
+                 The value.
       EXAMPLES:
       - CODE   : ex_cpp_mixed_constructor
         DESCR  :
@@ -57,7 +60,8 @@ CATEGORIES:
       CONST    : True
       RETURN:
         TYPES  : DataType
-        DESCR  : The type.
+        DESCR  : &g_mixed_get_type_return1_descr
+                 The type.
       EXAMPLES:
       - CODE   : ex_cpp_mixed_get_type
         DESCR  :
@@ -74,13 +78,16 @@ CATEGORIES:
       SIGNATURE: |
                  bool        get_bool()   const;
                  int64_t     get_int()    const;
-                 std::time_t get_date()   const;
-                 const char* get_string() const;
+                 Date        get_date()   const;
+                 float       get_float()  const;
+                 double      get_double() const;                 
+                 StringData  get_string() const;
                  BinaryData  get_binary() const;
       CONST    : True
       RETURN:
-        TYPES  : [bool, int64_t, time_t, const char*, BinaryData]
-        DESCR  : The value.
+        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData]
+        DESCR  : g_mixed_get_return1_descr
+                 The value.
       EXAMPLES:
       - CODE   : ex_cpp_mixed_get_value
         DESCR  :

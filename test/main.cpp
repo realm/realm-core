@@ -3,8 +3,10 @@
 
 #include <UnitTest++.h>
 #include <TestReporter.h> // Part of UnitTest++
-
+#include <tightdb.hpp>
 #include <tightdb/utilities.hpp>
+
+#define USE_VLD
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
     #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
@@ -55,6 +57,8 @@ struct CustomTestReporter: TestReporter {
 
 int main(int argc, char* argv[])
 {
+
+
     bool const no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
 #ifdef TIGHTDB_DEBUG

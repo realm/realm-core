@@ -12,6 +12,27 @@ void ColumnSubtableParent::child_destroyed(size_t subtable_ndx)
     if (m_table && m_subtable_map.empty()) m_table->unbind_ref();
 }
 
+void ColumnSubtableParent::move_last_over(size_t ndx) {
+    TIGHTDB_ASSERT(ndx+1 < Size());
+
+    // Delete sub-tree
+    const size_t ref_columns = GetAsRef(ndx);
+    if (ref_columns != 0) {
+        Allocator& alloc = GetAllocator();
+        Array columns(ref_columns, (Array*)NULL, 0, alloc);
+        columns.Destroy();
+    }
+
+    const size_t ndx_last = Size()-1;
+    const int64_t v = get(ndx_last);
+
+    set(ndx, v);
+
+    // We do a Column::Delete() to avoid
+    // recursive delete of the copied table(s)
+    Column::erase(ndx_last);
+}
+
 bool ColumnTable::has_subtable(size_t ndx) const
 {
     TIGHTDB_ASSERT(ndx < Size());
@@ -54,7 +75,7 @@ void ColumnTable::insert(size_t ndx, const Table* subtable)
     if (subtable)
         columns_ref = clone_table_columns(subtable);
 
-    Column::Insert(ndx, columns_ref);
+    Column::insert(ndx, columns_ref);
 }
 
 void ColumnTable::fill(size_t count)
@@ -69,7 +90,7 @@ void ColumnTable::fill(size_t count)
     }
 }
 
-void ColumnTable::Delete(size_t ndx)
+void ColumnTable::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < Size());
 
@@ -78,11 +99,11 @@ void ColumnTable::Delete(size_t ndx)
     // Delete sub-tree
     if (ref_columns != 0) {
         Allocator& alloc = GetAllocator();
-        Array columns(ref_columns, (Array*)NULL, 0, alloc);
+        Array columns(ref_columns, 0, 0, alloc);
         columns.Destroy();
     }
 
-    Column::Delete(ndx);
+    Column::erase(ndx);
 
     invalidate_subtables();
 }
@@ -96,11 +117,11 @@ void ColumnTable::ClearTable(size_t ndx)
 
     // Delete sub-tree
     Allocator& alloc = GetAllocator();
-    Array columns(ref_columns, (Array*)NULL, 0, alloc);
+    Array columns(ref_columns, 0, 0, alloc);
     columns.Destroy();
 
     // Mark as empty table
-    Set(ndx, 0);
+    set(ndx, 0);
 }
 
 bool ColumnTable::compare(const ColumnTable& c) const
@@ -132,7 +153,7 @@ void ColumnTable::Verify() const
     }
 }
 
-void ColumnTable::LeafToDot(std::ostream& out, const Array& array) const
+void ColumnTable::LeafToDot(ostream& out, const Array& array) const
 {
     array.ToDot(out);
 

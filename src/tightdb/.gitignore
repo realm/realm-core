@@ -8,12 +8,18 @@
 
 /libtightdb.a
 /libtightdb.so
+/libtightdb.so.*
 /libtightdb.dylib
+/libtightdb.*.dylib
 /libtightdb-dbg.a
 /libtightdb-dbg.so
+/libtightdb-dbg.so.*
 /libtightdb-dbg.dylib
+/libtightdb-dbg.*.dylib
 /libtightdb-cov.so
+/libtightdb-cov.so.*
 /libtightdb-cov.dylib
+/libtightdb-cov.*.dylib
 
 /tightdb-config
 /tightdb-config-dbg
@@ -26,5 +32,3 @@
 
 /libtightdb-ios.a
 /libtightdb-ios-dbg.a
-/tightdb-config-ios
-/tightdb-config-ios-dbg

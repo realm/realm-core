@@ -74,9 +74,23 @@ GCC. Here is an example:
 Building a distribution package
 -------------------------------
 
-    sh build.sh dist all
+In general, it is necessary (and crucial) to properly update the
+versions of the following shared libraries (do this by editing the the
+indicated Makefiles):
 
-If everything went well, consider tagging and then making the package again:
+    libtightdb.so      (/tightdb/src/tightdb/Makefile)
+    libtightdb-c.so    (/tightdb_c/src/tightdb/c/Makefile)
+    libtightdb-objc.so (/tightdb_objc/src/tightdb/objc/Makefile)
+
+Please note that these versions are completely independent of each
+other and of the package version. When the library versions are set
+correctly, do one of the following:
+
+    sh build.sh src-dist all   # Source distribution
+    sh build.sh bin-dist all   # Prebuilt core library
+
+If everything went well, consider tagging and then rebuilding the
+package:
 
     git tag -a 'bNNN' -m "New tag for 'Build NNN'"
     git push --tags
@@ -90,12 +104,14 @@ Configuration
 
 To use a nondefault compiler, or a compiler in a nondefault location,
 set the environment variable `CC` before calling `sh build.sh build`
-or `sh build.sh dist`, as in the following example:
+or `sh build.sh bin-dist`, as in the following example:
 
-    CC=clang sh build.sh dist all
+    CC=clang sh build.sh bin-dist all
 
 There are also a number of environment variables that serve to enable
 or disable special features during building:
 
 Set `TIGHTDB_ENABLE_REPLICATION` to a nonempty value to enable
-replication.
+replication. For example:
+
+    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh src-dist all

@@ -15,6 +15,7 @@
 #include <tightdb/column.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
+#include <tightdb/utilities.hpp>
 
 using namespace std;
 
@@ -147,7 +148,7 @@ static size_t BitWidth(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan instruction and it is fast, then this function could be implemented simply as (v<2 ? v : 2<<rev_bitscan(rev_bitscan(v))).
 
-    if ((v >> 4) == 0) {
+    if ((uint64_t(v) >> 4) == 0) {
         static const int8_t bits[] = {0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
         return bits[(int8_t)v];
     }
@@ -156,7 +157,7 @@ static size_t BitWidth(int64_t v)
     if (v < 0) v = ~v;
 
     // Then check if bits 15-31 used (32b), 7-31 used (16b), else (8b)
-    return v >> 31 ? 64 : v >> 15 ? 32 : v >> 7 ? 16 : 8;
+    return uint64_t(v) >> 31 ? 64 : uint64_t(v) >> 15 ? 32 : uint64_t(v) >> 7 ? 16 : 8;
 }
 
 // Allocates space for 'count' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
@@ -172,7 +173,7 @@ void Array::Preset(size_t bitwidth, size_t count)
 
 void Array::Preset(int64_t min, int64_t max, size_t count)
 {
-    size_t w = std::max(BitWidth(max), BitWidth(min));
+    size_t w = ::max(BitWidth(max), BitWidth(min));
     Preset(w, count);
 }
 
@@ -215,10 +216,10 @@ void Array::Clear()
     // Make sure we don't have any dangling references
     if (m_hasRefs) {
         for (size_t i = 0; i < size(); ++i) {
-            const size_t ref = GetAsRef(i);
-            if (ref == 0 || ref & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
+            const int64_t v = Get(i);
+            if (v == 0 || v & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
 
-            Array sub(ref, this, i, m_alloc);
+            Array sub(to_ref(v), this, i, m_alloc);
             sub.Destroy();
         }
     }
@@ -471,7 +472,7 @@ size_t Array::FindPos(int64_t target) const TIGHTDB_NOEXCEPT
 }
 
 // BM FIXME: Rename to something better... // FirstGTE()
-size_t Array::FindPos2(int64_t target) const
+size_t Array::FindPos2(int64_t target) const TIGHTDB_NOEXCEPT
 {
     size_t low = (size_t)-1;
     size_t high = m_len;
@@ -493,6 +494,34 @@ size_t Array::FindPos2(int64_t target) const
         return not_found;
     else
         return high;
+}
+
+// Finds either value, or if not in set, insert position
+// used both for lookups and maintaining order in sorted lists
+bool Array::FindPosSorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
+{
+    size_t low = (size_t)-1;
+    size_t high = m_len;
+
+    // Binary search based on:
+    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+    // Finds position of closest value BIGGER OR EQUAL to the target (for
+    // lookups in indexes)
+    while (high - low > 1) {
+        const size_t probe = (low + high) >> 1;
+        const int64_t v = Get(probe);
+
+        if (v < target)
+            low = probe;
+        else
+            high = probe;
+    }
+
+    pos = high;
+    if (high == m_len)
+        return false;
+    else
+        return (Get(high) == target);
 }
 
 // return first element E for which E >= target or return -1 if none. Array must be sorted
@@ -527,7 +556,7 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     size_t add;
     add = 1;
 
-    for(;;) {
+    for (;;) {
         if (start + add < m_len && Get(start + add) < target)
             start += add;
         else
@@ -604,7 +633,7 @@ size_t Array::FirstSetBit64(int64_t v) const
     return __builtin_clzll(v);
 #else
     unsigned int v0 = (unsigned int)v;
-    unsigned int v1 = (unsigned int)(v >> 32);
+    unsigned int v1 = (unsigned int)(uint64_t(v) >> 32);
     size_t r;
 
     if (v0 != 0)
@@ -738,7 +767,7 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
             // We originally had declared '__m128i state2' and did an 'state2 = state' assignment. When we read from state2 through int16_t, int32_t or int64_t in GetUniversal(),
             // the compiler thinks it cannot alias state2 and hence reorders the read and assignment.
 
-            // In this fixed version using memcpy, we have char-read-access from __m128i (OK aliasing) and char-write-access to char-array, and finally int8/16/32/64 
+            // In this fixed version using memcpy, we have char-read-access from __m128i (OK aliasing) and char-write-access to char-array, and finally int8/16/32/64
             // read access from char-array (OK aliasing).
             memcpy(&state2, &state, sizeof(state));
             for (size_t t = 0; t < sizeof(__m128i) * 8 / no0(w); ++t) {
@@ -746,7 +775,7 @@ template <bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t st
                 if (find_max ? v > m : v < m) {
                     m = v;
                 }
-            }        
+            }
         }
     }
 #endif
@@ -1266,14 +1295,14 @@ void Array::Alloc(size_t count, size_t width)
             if (!m_data) {
                 mem_ref = m_alloc.Alloc(capacity_bytes); // Throws
                 header = static_cast<char*>(mem_ref.pointer);
-                init_header(header, m_isNode, m_hasRefs, GetWidthType(), width, count,
+                init_header(header, m_isNode, m_hasRefs, GetWidthType(), (int)width, count,
                             capacity_bytes);
             }
             else {
                 header = get_header_from_data(m_data);
                 mem_ref = m_alloc.ReAlloc(m_ref, header, capacity_bytes); // Throws
                 header = static_cast<char*>(mem_ref.pointer);
-                set_header_width(width, header);
+                set_header_width((int)width, header);
                 set_header_len(count, header);
                 set_header_capacity(capacity_bytes, header);
             }
@@ -1287,7 +1316,7 @@ void Array::Alloc(size_t count, size_t width)
         }
 
         m_capacity = CalcItemCount(capacity_bytes, width);
-        set_header_width(width);
+        set_header_width((int)width);
     }
 
     // Update header
@@ -1530,7 +1559,7 @@ template <size_t w> void Array::sort()
 
     size_t lo = 0;
     size_t hi = m_len - 1;
-    std::vector<size_t> count;
+    vector<size_t> count;
     int64_t min;
     int64_t max;
     bool b = false;
@@ -1668,9 +1697,9 @@ template<size_t w> void Array::QuickSort(size_t lo, size_t hi)
     if (i < (int)hi) QuickSort(i, hi);
 }
 
-std::vector<int64_t> Array::ToVector() const
+vector<int64_t> Array::ToVector() const
 {
-    std::vector<int64_t> v;
+    vector<int64_t> v;
     const size_t count = size();
     for (size_t t = 0; t < count; ++t)
         v.push_back(Get(t));
@@ -1693,12 +1722,12 @@ bool Array::Compare(const Array& c) const
 
 void Array::Print() const
 {
-    std::cout << std::hex << GetRef() << std::dec << ": (" << size() << ") ";
+    cout << hex << GetRef() << dec << ": (" << size() << ") ";
     for (size_t i = 0; i < size(); ++i) {
-        if (i) std::cout << ", ";
-        std::cout << Get(i);
+        if (i) cout << ", ";
+        cout << Get(i);
     }
-    std::cout << "\n";
+    cout << "\n";
 }
 
 void Array::Verify() const
@@ -1713,25 +1742,25 @@ void Array::Verify() const
     TIGHTDB_ASSERT(ref_in_parent == (IsValid() ? m_ref : 0));
 }
 
-void Array::ToDot(std::ostream& out, const char* title) const
+void Array::ToDot(ostream& out, StringData title) const
 {
     const size_t ref = GetRef();
 
-    if (title) {
-        out << "subgraph cluster_" << ref << " {" << std::endl;
-        out << " label = \"" << title << "\";" << std::endl;
-        out << " color = white;" << std::endl;
+    if (0 < title.size()) {
+        out << "subgraph cluster_" << ref << " {" << endl;
+        out << " label = \"" << title << "\";" << endl;
+        out << " color = white;" << endl;
     }
 
-    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
-    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << std::endl;
+    out << "n" << hex << ref << dec << "[shape=none,label=<";
+    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>" << endl;
 
     // Header
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
-    out << "0x" << std::hex << ref << std::dec << "<BR/>";
+    out << "0x" << hex << ref << dec << "<BR/>";
     if (m_isNode) out << "IsNode<BR/>";
     if (m_hasRefs) out << "HasRefs<BR/>";
-    out << "</FONT></TD>" << std::endl;
+    out << "</FONT></TD>" << endl;
 
     // Values
     for (size_t i = 0; i < m_len; ++i) {
@@ -1739,27 +1768,27 @@ void Array::ToDot(std::ostream& out, const char* title) const
         if (m_hasRefs) {
             // zero-refs and refs that are not 64-aligned do not point to sub-trees
             if (v == 0) out << "<TD>none";
-            else if (v & 0x1) out << "<TD BGCOLOR=\"grey90\">" << (v >> 1);
+            else if (v & 0x1) out << "<TD BGCOLOR=\"grey90\">" << (uint64_t(v) >> 1);
             else out << "<TD PORT=\"" << i << "\">";
         }
         else out << "<TD>" << v;
-        out << "</TD>" << std::endl;
+        out << "</TD>" << endl;
     }
 
-    out << "</TR></TABLE>>];" << std::endl;
-    if (title) out << "}" << std::endl;
+    out << "</TR></TABLE>>];" << endl;
+    if (0 < title.size()) out << "}" << endl;
 
     if (m_hasRefs) {
         for (size_t i = 0; i < m_len; ++i) {
             const int64_t target = Get(i);
             if (target == 0 || target & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
 
-            out << "n" << std::hex << ref << std::dec << ":" << i;
-            out << " -> n" << std::hex << target << std::dec << std::endl;
+            out << "n" << hex << ref << dec << ":" << i;
+            out << " -> n" << hex << target << dec << endl;
         }
     }
 
-    out << std::endl;
+    out << endl;
 }
 
 void Array::Stats(MemStats& stats) const
@@ -1857,8 +1886,7 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) TIGHTDB_NO
 //
 // It may be worth considering if overall efficiency can be improved
 // by doing a linear search for short sequences.
-template<int width>
-inline size_t lower_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
+template<int width> inline size_t lower_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
 {
     const char* data = tightdb::Array::get_data_from_header(header);
 
@@ -1873,14 +1901,15 @@ inline size_t lower_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
             i = mid + 1;
             size -= half + 1;
         }
-        else size = half;
+        else {
+            size = half;
+        }
     }
     return i;
 }
 
 // See lower_bound()
-template<int width>
-inline size_t upper_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
+template<int width> inline size_t upper_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
 {
     const char* data = tightdb::Array::get_data_from_header(header);
 
@@ -1895,11 +1924,12 @@ inline size_t upper_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
             i = mid + 1;
             size -= half + 1;
         }
-        else size = half;
+        else {
+            size = half;
+        }
     }
     return i;
 }
-
 
 // Find the child that contains the specified local tree index.
 // Returns (child_ndx, local_tree_offset) where 'local_tree_offset' is
@@ -1909,7 +1939,7 @@ find_child_offset(const char* header, size_t local_ndx) TIGHTDB_NOEXCEPT
 {
     size_t child_ndx = upper_bound<width>(header, local_ndx);
     size_t local_tree_offset = child_ndx == 0 ? 0 :
-        get_direct<width>(tightdb::Array::get_data_from_header(header), child_ndx-1);
+        tightdb::to_ref(get_direct<width>(tightdb::Array::get_data_from_header(header), child_ndx-1));
     return make_pair(child_ndx, local_tree_offset);
 }
 
@@ -2102,40 +2132,46 @@ int64_t Array::column_get(size_t ndx) const TIGHTDB_NOEXCEPT
     return get_direct(data, width, p.second);
 }
 
-const char* Array::string_column_get(size_t ndx) const TIGHTDB_NOEXCEPT
+StringData Array::string_column_get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     if (is_leaf()) {
-        if (HasRefs())
-            return static_cast<const ArrayStringLong*>(this)->Get(ndx);
-        return static_cast<const ArrayString*>(this)->Get(ndx);
+        if (HasRefs()) {
+            return static_cast<const ArrayStringLong*>(this)->get(ndx);
+        }
+        return static_cast<const ArrayString*>(this)->get(ndx);
     }
 
     pair<const char*, size_t> p = find_leaf(this, ndx);
     const char* header = p.first;
     ndx = p.second;
 
-    int width = get_width_from_header(header);
     if (!get_hasrefs_from_header(header)) {
-        // short strings
-        if (width == 0) return "";
-        return get_data_from_header(header) + (ndx * width);
+        return ArrayString::get_from_header(header, ndx); // short strings
     }
 
     // long strings
+    int width = get_width_from_header(header);
     pair<size_t, size_t> p2;
     TIGHTDB_TEMPEX(p2 = ::get_two_as_size, width, (header, 0));
     const size_t offsets_ref = p2.first;
     const size_t blob_ref    = p2.second;
 
-    size_t offset = 0;
+    header = static_cast<char*>(m_alloc.Translate(offsets_ref));
+    width  = get_width_from_header(header);
+    size_t begin, end;
     if (0 < ndx) {
-        header = static_cast<char*>(m_alloc.Translate(offsets_ref));
-        width  = get_width_from_header(header);
-        offset = to_size_t(get_direct(get_data_from_header(header), width, ndx-1));
+        TIGHTDB_TEMPEX(p2 = ::get_two_as_size, width, (header, ndx-1));
+        begin = p2.first;
+        end   = p2.second;
     }
+    else {
+        begin = 0;
+        end   = to_size_t(get_direct(get_data_from_header(header), width, 0));
+    }
+    --end; // Discount the terminating zero
 
     header = static_cast<char*>(m_alloc.Translate(blob_ref));
-    return get_data_from_header(header) + offset;
+    return StringData(ArrayBlob::get_from_header(header, begin), end-begin);
 }
 
 // Find value direct through column b-tree without instatiating any Arrays.
@@ -2182,9 +2218,10 @@ size_t Array::ColumnFind(int64_t target, size_t ref, Array& cache) const
     }
 }
 
-size_t Array::IndexStringFindFirst(const char* value, void* column, StringGetter get_func) const
+size_t Array::IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const
 {
-    const char* v = value;
+    const char* v = value.data();
+    const char* v_end = v + value.size();
     const char* data   = m_data;
     const char* header;
     size_t width = m_width;
@@ -2193,10 +2230,10 @@ size_t Array::IndexStringFindFirst(const char* value, void* column, StringGetter
 top:
     // Create 4 byte index key
     int32_t key = 0;
-    if (*v) key  = (int32_t(*v++) << 24);
-    if (*v) key |= (int32_t(*v++) << 16);
-    if (*v) key |= (int32_t(*v++) << 8);
-    if (*v) key |=  int32_t(*v++);
+    if (v != v_end) key  = (int32_t(*v++) << 24);
+    if (v != v_end) key |= (int32_t(*v++) << 16);
+    if (v != v_end) key |= (int32_t(*v++) << 8);
+    if (v != v_end) key |=  int32_t(*v++);
 
     for (;;) {
         // Get subnode table
@@ -2237,8 +2274,8 @@ top:
                 // compared against the entire (target) string
                 if (!(stored_key << 24)) return row_ref;
 
-                const char* str = (*get_func)(column, row_ref);
-                if (strcmp(str, value) == 0) return row_ref;
+                StringData str = (*get_func)(column, row_ref);
+                if (str == value) return row_ref;
                 else return not_found;
             }
 
@@ -2255,18 +2292,18 @@ top:
                 // might be so many matches that it has branched into a column
                 size_t row_ref;
                 if (!sub_isnode)
-                    row_ref = get_direct(sub_data, sub_width, 0);
+                    row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
                 else {
                     const Array sub(ref, NULL, 0, m_alloc);
-                    row_ref = sub.column_get(0);
+                    row_ref = to_size_t(sub.column_get(0));
                 }
 
                 // If the last byte in the stored key is zero, we know that we have
                 // compared against the entire (target) string
                 if (!(stored_key << 24)) return row_ref;
 
-                const char* str = (*get_func)(column, row_ref);
-                if (strcmp(str, value) == 0) return row_ref;
+                StringData str = (*get_func)(column, row_ref);
+                if (str == value) return row_ref;
                 else return not_found;
             }
 
@@ -2281,9 +2318,10 @@ top:
     }
 }
 
-void Array::IndexStringFindAll(Array& result, const char* value, void* column, StringGetter get_func) const
+void Array::IndexStringFindAll(Array& result, StringData value, void* column, StringGetter get_func) const
 {
-    const char* v = value;
+    const char* v = value.data();
+    const char* v_end = v + value.size();
     const char* data = m_data;
     const char* header;
     size_t width = m_width;
@@ -2292,10 +2330,10 @@ void Array::IndexStringFindAll(Array& result, const char* value, void* column, S
 top:
     // Create 4 byte index key
     int32_t key = 0;
-    if (*v) key  = (int32_t(*v++) << 24);
-    if (*v) key |= (int32_t(*v++) << 16);
-    if (*v) key |= (int32_t(*v++) << 8);
-    if (*v) key |=  int32_t(*v++);
+    if (v != v_end) key  = (int32_t(*v++) << 24);
+    if (v != v_end) key |= (int32_t(*v++) << 16);
+    if (v != v_end) key |= (int32_t(*v++) << 8);
+    if (v != v_end) key |=  int32_t(*v++);
 
     for (;;) {
         // Get subnode table
@@ -2339,8 +2377,8 @@ top:
                     return;
                 }
 
-                const char* const str = (*get_func)(column, row_ref);
-                if (strcmp(str, value) == 0) {
+                StringData str = (*get_func)(column, row_ref);
+                if (str == value) {
                     result.add(row_ref);
                     return;
                 }
@@ -2359,13 +2397,13 @@ top:
                 if (!sub_isnode) {
                     const size_t sub_width = get_width_from_header(sub_header);
                     const char* sub_data = get_data_from_header(sub_header);
-                    const size_t first_row_ref = get_direct(sub_data, sub_width, 0);
+                    const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
 
                     // If the last byte in the stored key is not zero, we have
                     // not yet compared against the entire (target) string
                     if ((stored_key << 24)) {
-                        const char* const str = (*get_func)(column, first_row_ref);
-                        if (strcmp(str, value) != 0)
+                        StringData str = (*get_func)(column, first_row_ref);
+                        if (str != value)
                             return; // not_found
                     }
 
@@ -2373,19 +2411,19 @@ top:
                     const size_t sub_len  = get_len_from_header(sub_header);
 
                     for (size_t i = 0; i < sub_len; ++i) {
-                        const size_t row_ref = get_direct(sub_data, sub_width, i);
+                        const size_t row_ref = to_size_t(get_direct(sub_data, sub_width, i));
                         result.add(row_ref);
                     }
                 }
                 else {
                     const Column sub(ref, NULL, 0, m_alloc);
-                    const size_t first_row_ref = sub.Get(0);
+                    const size_t first_row_ref = to_size_t(sub.get(0));
 
                     // If the last byte in the stored key is not zero, we have
                     // not yet compared against the entire (target) string
                     if ((stored_key << 24)) {
-                        const char* const str = (*get_func)(column, first_row_ref);
-                        if (strcmp(str, value) != 0)
+                        StringData str = (*get_func)(column, first_row_ref);
+                        if (str != value)
                             return; // not_found
                     }
 
@@ -2393,7 +2431,7 @@ top:
                     const size_t sub_len  = sub.Size();
 
                     for (size_t i = 0; i < sub_len; ++i) {
-                        const size_t row_ref = sub.Get(i);
+                        const size_t row_ref = to_size_t(sub.get(i));
                         result.add(row_ref);
                     }
                 }
@@ -2411,9 +2449,129 @@ top:
     }
 }
 
-size_t Array::IndexStringCount(const char* value, void* column, StringGetter get_func) const
+FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const
 {
-    const char* v = value;
+    const char* v = value.data();
+    const char* v_end = v + value.size();
+    const char* data = m_data;
+    const char* header;
+    size_t width = m_width;
+    bool isNode = m_isNode;
+
+top:
+    // Create 4 byte index key
+    int32_t key = 0;
+    if (v != v_end) key  = (int32_t(*v++) << 24);
+    if (v != v_end) key |= (int32_t(*v++) << 16);
+    if (v != v_end) key |= (int32_t(*v++) << 8);
+    if (v != v_end) key |=  int32_t(*v++);
+
+    for (;;) {
+        // Get subnode table
+        const size_t ref_offsets = to_size_t(get_direct(data, width, 0));
+        const size_t ref_refs    = to_ref(get_direct(data, width, 1));
+
+        // Find the position matching the key
+        const char*  offsets_header = static_cast<char*>(m_alloc.Translate(ref_offsets));
+        const char*  offsets_data   = get_data_from_header(offsets_header);
+        const size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
+
+        // If key is outside range, we know there can be no match
+        if (pos == not_found) return FindRes_not_found;
+
+        // Get entry under key
+        const char*  refs_header = static_cast<char*>(m_alloc.Translate(ref_refs));
+        const char*  refs_data   = get_data_from_header(refs_header);
+        const size_t refs_width  = get_width_from_header(refs_header);
+        const size_t ref = to_ref(get_direct(refs_data, refs_width, pos));
+
+        if (isNode) {
+            // Set vars for next iteration
+            header = static_cast<char*>(m_alloc.Translate(ref));
+            data   = get_data_from_header(header);
+            width  = get_width_from_header(header);
+            isNode = get_isnode_from_header(header);
+            continue;
+        }
+
+        const int32_t stored_key = int32_t(get_direct<32>(offsets_data, pos));
+
+        if (stored_key == key) {
+            // Literal row index
+            if (ref & 1) {
+                const size_t row_ref = (ref >> 1);
+
+                // If the last byte in the stored key is zero, we know that we have
+                // compared against the entire (target) string
+                if (!(stored_key << 24)) {
+                    res_ref = row_ref;
+                    return FindRes_single; // found single
+                }
+
+                StringData str = (*get_func)(column, row_ref);
+                if (str == value) {
+                    res_ref = row_ref;
+                    return FindRes_single; // found single
+                }
+                else return FindRes_not_found; // not_found
+            }
+
+            const char* sub_header  = static_cast<char*>(m_alloc.Translate(ref));
+            const bool  sub_isindex = get_indexflag_from_header(sub_header);
+
+            // List of matching row indexes
+            if (!sub_isindex) {
+                const bool sub_isnode = get_isnode_from_header(sub_header);
+
+                // In most cases the row list will just be an array but there
+                // might be so many matches that it has branched into a column
+                if (!sub_isnode) {
+                    const size_t sub_width = get_width_from_header(sub_header);
+                    const char*  sub_data  = get_data_from_header(sub_header);
+                    const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
+
+                    // If the last byte in the stored key is not zero, we have
+                    // not yet compared against the entire (target) string
+                    if ((stored_key << 24)) {
+                        StringData str = (*get_func)(column, first_row_ref);
+                        if (str != value)
+                            return FindRes_not_found; // not_found
+                    }
+                }
+                else {
+                    const Column sub(ref, NULL, 0, m_alloc);
+                    const size_t first_row_ref = to_size_t(sub.get(0));
+
+                    // If the last byte in the stored key is not zero, we have
+                    // not yet compared against the entire (target) string
+                    if ((stored_key << 24)) {
+                        StringData str = (*get_func)(column, first_row_ref);
+                        if (str != value)
+                            return FindRes_not_found; // not_found
+                    }
+                }
+
+                // Return a reference to the result column
+                res_ref = ref;
+                return FindRes_column; // column of matches
+            }
+
+            // Recurse into sub-index;
+            header = static_cast<char*>(m_alloc.Translate(ref));
+            data   = get_data_from_header(header);
+            width  = get_width_from_header(header);
+            isNode = get_isnode_from_header(header);
+            goto top;
+        }
+        else return FindRes_not_found; // not_found
+    }
+}
+
+size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_func) const
+
+{
+    const char* v = value.data();
+    const char* v_end = v + value.size();
     const char* data   = m_data;
     const char* header;
     size_t width = m_width;
@@ -2422,10 +2580,10 @@ size_t Array::IndexStringCount(const char* value, void* column, StringGetter get
 top:
     // Create 4 byte index key
     int32_t key = 0;
-    if (*v) key  = (int32_t(*v++) << 24);
-    if (*v) key |= (int32_t(*v++) << 16);
-    if (*v) key |= (int32_t(*v++) << 8);
-    if (*v) key |=  int32_t(*v++);
+    if (v != v_end) key  = (int32_t(*v++) << 24);
+    if (v != v_end) key |= (int32_t(*v++) << 16);
+    if (v != v_end) key |= (int32_t(*v++) << 8);
+    if (v != v_end) key |=  int32_t(*v++);
 
     for (;;) {
         // Get subnode table
@@ -2466,8 +2624,8 @@ top:
                 // compared against the entire (target) string
                 if (!(stored_key << 24)) return 1;
 
-                const char* const str = (*get_func)(column, row_ref);
-                if (strcmp(str, value) == 0) return 1;
+                StringData str = (*get_func)(column, row_ref);
+                if (str == value) return 1;
                 else return 0;
             }
 
@@ -2491,7 +2649,7 @@ top:
 
                     const char* sub_data = get_data_from_header(sub_header);
                     const size_t sub_width  = get_width_from_header(sub_header);
-                    row_ref = get_direct(sub_data, sub_width, 0);
+                    row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
                 }
                 else {
                     const Column sub(ref, NULL, 0, m_alloc);
@@ -2501,11 +2659,11 @@ top:
                     // compared against the entire (target) string
                     if (!(stored_key << 24)) return sub_count;
 
-                    row_ref = sub.Get(0);
+                    row_ref = to_size_t(sub.get(0));
                 }
 
-                const char* const str = (*get_func)(column, row_ref);
-                if (strcmp(str, value) == 0) return sub_count;
+                StringData str = (*get_func)(column, row_ref);
+                if (str == value) return sub_count;
                 else return 0;
             }
 
@@ -2550,6 +2708,35 @@ pair<const char*, size_t> Array::find_leaf(const Array* root, size_t i) TIGHTDB_
     }
 }
 
+
+pair<size_t, size_t> Array::find_leaf_ref(const Array* root, size_t i) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!root->is_leaf());
+    size_t offsets_ref = root->GetAsRef(0);
+    size_t refs_ref    = root->GetAsRef(1);
+    for (;;) {
+        const char* header = static_cast<char*>(root->m_alloc.Translate(offsets_ref));
+        int width = get_width_from_header(header);
+        pair<size_t, size_t> p;
+        TIGHTDB_TEMPEX(p = find_child_offset, width, (header, i));
+        size_t child_ndx         = p.first;
+        size_t local_tree_offset = p.second;
+        i -= local_tree_offset; // local index
+
+        header = static_cast<char*>(root->m_alloc.Translate(refs_ref));
+        width = get_width_from_header(header);
+        size_t child_ref = to_size_t(get_direct(get_data_from_header(header), width, child_ndx));
+
+        header = static_cast<char*>(root->m_alloc.Translate(child_ref));
+        bool child_is_leaf = !get_isnode_from_header(header);
+        if (child_is_leaf) return make_pair(child_ref, i);
+
+        width = get_width_from_header(header);
+        TIGHTDB_TEMPEX(p = ::get_two_as_size, width, (header, 0));
+        offsets_ref = p.first;
+        refs_ref    = p.second;
+    }
+}
 
 size_t Array::get_as_size(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 {

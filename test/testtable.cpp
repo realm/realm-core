@@ -5,7 +5,7 @@
 #include <ostream>
 
 #include <UnitTest++.h>
-
+#include "testsettings.hpp"
 #include <tightdb/table_macros.hpp>
 #include <tightdb/lang_bind_helper.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -13,6 +13,22 @@
 
 using namespace std;
 using namespace tightdb;
+
+TIGHTDB_TABLE_2(TupleTableType,
+                first,  Int,
+                second, String)
+
+#ifndef TIGHTDB_BYPASS_OPTIMIZE_CRASH_BUG
+TEST(TestOptimizeCrash)
+{
+	// This will crash at the .add() method
+	TupleTableType ttt;
+	ttt.optimize();
+	ttt.column().second.set_index();
+	ttt.clear();
+	ttt.add(1, "AA");
+}
+#endif
 
 TEST(Table1)
 {
@@ -93,22 +109,16 @@ TEST(Table_floats)
 }
 
 namespace {
-enum Days {
-    Mon,
-    Tue,
-    Wed,
-    Thu,
-    Fri,
-    Sat,
-    Sun
-};
+
+enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
 TIGHTDB_TABLE_4(TestTable,
                 first,  Int,
                 second, Int,
                 third,  Bool,
                 fourth, Enum<Days>)
-}
+
+} // anonymous namespace
 
 TEST(Table2)
 {
@@ -159,7 +169,8 @@ namespace {
 TIGHTDB_TABLE_2(TestTableEnum,
                 first,      Enum<Days>,
                 second,     String)
-}
+} // anonymous namespace
+
 TEST(Table4)
 {
     TestTableEnum table;
@@ -169,7 +180,7 @@ TEST(Table4)
     const TestTableEnum::Cursor r = table.back(); // last item
 
     CHECK_EQUAL(Mon, r.first);
-    CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello", (const char*)r.second);
+    CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello", r.second);
 
     // Test string column searching
     CHECK_EQUAL(size_t(1),  table.column().second.find_first("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
@@ -184,7 +195,7 @@ namespace {
 TIGHTDB_TABLE_2(TestTableFloats,
                 first,      Float,
                 second,     Double)
-}
+} // anonymous namespace
 
 TEST(Table_float2)
 {
@@ -303,9 +314,9 @@ TEST(Table_HighLevelCopy)
     CHECK(*table3 == table);
 }
 
+namespace {
 
-// Pre-declare free standing function
-void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows);
+void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows); // pre-declaration
 
 void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
 {
@@ -314,6 +325,8 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
     s.add_column(type_Int,    "int");
     s.add_column(type_Bool,   "bool");
     s.add_column(type_Date,   "date");
+    s.add_column(type_Float,  "float");
+    s.add_column(type_Double, "double");
     s.add_column(type_String, "string");
     s.add_column(type_String, "string_long");
     s.add_column(type_String, "string_enum"); // becomes ColumnStringEnum
@@ -326,67 +339,76 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
 
     // Add some rows
     for (size_t i = 0; i < rows; ++i) {
-        table.insert_int(0, i, i);
+        int64_t sign = (i%2 == 0) ? 1 : -1;
+        table.insert_int(0, i, int64_t(i*sign));
         table.insert_bool(1, i, (i % 2 ? true : false));
         table.insert_date(2, i, 12345);
+        table.insert_float(3, i, 123.456f*sign);
+        table.insert_double(4, i, 9876.54321*sign);
 
         stringstream ss;
         ss << "string" << i;
-        table.insert_string(3, i, ss.str().c_str());
+        table.insert_string(5, i, ss.str().c_str());
 
         ss << " very long string.........";
-        table.insert_string(4, i, ss.str().c_str());
+        table.insert_string(6, i, ss.str().c_str());
 
         switch (i % 3) {
             case 0:
-                table.insert_string(5, i, "enum1");
+                table.insert_string(7, i, "enum1");
                 break;
             case 1:
-                table.insert_string(5, i, "enum2");
+                table.insert_string(7, i, "enum2");
                 break;
             case 2:
-                table.insert_string(5, i, "enum3");
+                table.insert_string(7, i, "enum3");
                 break;
         }
 
-        table.insert_binary(6, i, "binary", 7);
+        table.insert_binary(8, i, BinaryData("binary", 7));
 
-        switch (i % 6) {
+        switch (i % 8) {
             case 0:
-                table.insert_mixed(7, i, (bool)false);
+                table.insert_mixed(9, i, false);
                 break;
             case 1:
-                table.insert_mixed(7, i, (int64_t)(i*i));
+                table.insert_mixed(9, i, int64_t(i*i*sign));
                 break;
             case 2:
-                table.insert_mixed(7, i, "string");
+                table.insert_mixed(9, i, "string");
                 break;
             case 3:
-                table.insert_mixed(7, i, Date(123456789));
+                table.insert_mixed(9, i, Date(123456789));
                 break;
             case 4:
-                table.insert_mixed(7, i, Mixed(BinaryData("binary", 7)));
+                table.insert_mixed(9, i, BinaryData("binary", 7));
                 break;
             case 5:
             {
                 // Add subtable to mixed column
                 // We can first set schema and contents when the entire
                 // row has been inserted
-                table.insert_mixed(7, i, Mixed::subtable_tag());
+                table.insert_mixed(9, i, Mixed::subtable_tag());
                 break;
             }
+            case 6:
+                table.insert_mixed(9, i, float(123.1*i*sign));
+                break;
+            case 7:
+                table.insert_mixed(9, i, double(987.65*i*sign));
+                break;
         }
 
-        table.insert_subtable(8, i);
+        table.insert_subtable(10, i);
         table.insert_done();
 
         // Add subtable to mixed column
-        if (i % 6 == 5) {
-            TableRef subtable = table.get_subtable(7, i);
+        if (i % 8 == 5) {
+            TableRef subtable = table.get_subtable(9, i);
             subtable->add_column(type_Int,    "first");
             subtable->add_column(type_String, "second");
             for (size_t j=0; j<2; j++) {
-                subtable->insert_int(0, j, i*i*j);
+                subtable->insert_int(0, j, i*i*j*sign);
                 subtable->insert_string(1, j, "mixed sub");
                 subtable->insert_done();
             }
@@ -394,8 +416,9 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
 
         // Add sub-tables to table column
         for (size_t j=0; j<sub_rows; j++) {
-            TableRef subtable = table.get_subtable(8, i);
-            subtable->insert_int(0, j, 42+i*i*j*1234567890);
+            TableRef subtable = table.get_subtable(10, i);
+            int64_t val = -123+i*j*1234*sign;
+            subtable->insert_int(0, j, val);
             subtable->insert_string(1, j, "sub");
             subtable->insert_done();
         }
@@ -403,6 +426,8 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
     // We also want a ColumnStringEnum
     table.optimize();
 }
+
+} // anonymous namespace
 
 
 TEST(Table_Delete_All_Types)
@@ -430,6 +455,27 @@ TEST(Table_Delete_All_Types)
 #endif
 }
 
+TEST(Table_Move_All_Types)
+{
+    Table table;
+    setup_multi_table(table, 15, 2);
+    table.set_index(6);
+
+    while (table.size() > 1) {
+        const size_t len = table.size();
+        const size_t ndx = size_t(rand()) % (len-1);
+
+        table.move_last_over(ndx);
+
+#ifdef TIGHTDB_DEBUG
+        table.Verify();
+#endif
+    }
+}
+
+// enable to generate testfiles for to_string and json below
+#define GENERATE 0
+
 TEST(Table_test_to_string)
 {
     Table table;
@@ -438,19 +484,28 @@ TEST(Table_test_to_string)
     stringstream ss;
     table.to_string(ss);
     const string result = ss.str();
-    if (0) {
-        cerr << "to_string:" << "\n" << result << "\n";
-        ofstream testFile("expect_string.txt", ios::out | ios::binary);
+
+#if _MSC_VER
+    const char* filename = "expect_string-win.txt";
+#else
+    const char* filename = "expect_string.txt";
+#endif
+#if GENERATE   // enable to generate testfile - check it manually
+    ofstream testFile(filename, ios::out | ios::binary);
+    testFile << result;
+#else
+    ifstream testFile(filename, ios::in | ios::binary);
+    CHECK(!testFile.fail());
+    string expected;
+    expected.assign( istreambuf_iterator<char>(testFile),
+                     istreambuf_iterator<char>() );
+    CHECK_EQUAL(true, result == expected);
+    if (result != expected) {
+        ofstream testFile("expect_string.error.txt", ios::out | ios::binary);
         testFile << result;
+        cerr << "\n error result in 'expect_string.error.txt'\n";
     }
-    else {
-        ifstream testFile("expect_string.txt", ios::in | ios::binary);
-        CHECK(!testFile.fail());
-        string expected;
-        expected.assign( istreambuf_iterator<char>(testFile),
-                         istreambuf_iterator<char>() );
-        CHECK_EQUAL(true, result == expected);
-    }
+#endif
 }
 
 TEST(Table_test_json_all_data)
@@ -461,21 +516,30 @@ TEST(Table_test_json_all_data)
     stringstream ss;
     table.to_json(ss);
     const string json = ss.str();
-    if (0) {
+#if _MSC_VER
+    const char* filename = "expect_json-win.json";
+#else
+    const char* filename = "expect_json.json";
+#endif
+#if GENERATE
         // Generate the testdata to compare. After doing this,
         // verify that the output is correct with a json validator:
         // http://jsonformatter.curiousconcept.com/
-        cerr << "JSON:" << json << "\n";
-        ofstream testFile("expect_json.json", ios::out | ios::binary);
+    cerr << "JSON:" << json << "\n";
+    ofstream testFile(filename, ios::out | ios::binary);
+    testFile << json;
+#else
+    string expected;
+    ifstream testFile(filename, ios::in | ios::binary);
+    CHECK(!testFile.fail());
+    getline(testFile,expected);
+    CHECK_EQUAL(true, json == expected);
+    if (json != expected) {
+        ofstream testFile("expect_json.error.json", ios::out | ios::binary);
         testFile << json;
+        cerr << "\n error result in 'expect_json.error.json'\n";
     }
-    else {
-        string expected;
-        ifstream testFile("expect_json.json", ios::in | ios::binary);
-        CHECK(!testFile.fail());
-        getline(testFile,expected);
-        CHECK_EQUAL(true, json == expected);
-    }
+#endif
 }
 
 TEST(Table_test_json_simple)
@@ -498,7 +562,7 @@ TEST(Table_test_json_simple)
         table.insert_date(2, i, 0x7fffeeeeL);
         table.insert_string(3, i, "helloooooo");
         const char bin[] = "123456789012345678901234567890nopq";
-        table.insert_binary(4, i, bin, sizeof(bin) );
+        table.insert_binary(4, i, BinaryData(bin, sizeof bin));
         table.insert_done();
     }
 
@@ -661,7 +725,8 @@ namespace {
 TIGHTDB_TABLE_2(LookupTable,
                 first,  String,
                 second, Int)
-}
+} // anonymous namespace
+
 TEST(Table_Lookup)
 {
     LookupTable table;
@@ -832,7 +897,8 @@ TIGHTDB_TABLE_4(TestTableAE,
                 second, String,
                 third,  Bool,
                 fourth, Enum<Days>)
-}
+} // anonymous namespace
+
 TEST(TableAutoEnumeration)
 {
     TestTableAE table;
@@ -855,11 +921,11 @@ TEST(TableAutoEnumeration)
         CHECK_EQUAL(8, table[3+n].first);
         CHECK_EQUAL(9, table[4+n].first);
 
-        CHECK_EQUAL("abd",     (const char*)table[0+n].second);
-        CHECK_EQUAL("eftg",    (const char*)table[1+n].second);
-        CHECK_EQUAL("hijkl",   (const char*)table[2+n].second);
-        CHECK_EQUAL("mnopqr",  (const char*)table[3+n].second);
-        CHECK_EQUAL("stuvxyz", (const char*)table[4+n].second);
+        CHECK_EQUAL("abd",     table[0+n].second);
+        CHECK_EQUAL("eftg",    table[1+n].second);
+        CHECK_EQUAL("hijkl",   table[2+n].second);
+        CHECK_EQUAL("mnopqr",  table[3+n].second);
+        CHECK_EQUAL("stuvxyz", table[4+n].second);
 
         CHECK_EQUAL(true, table[0+n].third);
         CHECK_EQUAL(true, table[1+n].third);
@@ -907,11 +973,11 @@ TEST(TableAutoEnumerationFindFindAll)
 
     TestTableAE::View tv = table.column().second.find_all("eftg");
     CHECK_EQUAL(5, tv.size());
-    CHECK_EQUAL("eftg", static_cast<const char*>(tv[0].second));
-    CHECK_EQUAL("eftg", static_cast<const char*>(tv[1].second));
-    CHECK_EQUAL("eftg", static_cast<const char*>(tv[2].second));
-    CHECK_EQUAL("eftg", static_cast<const char*>(tv[3].second));
-    CHECK_EQUAL("eftg", static_cast<const char*>(tv[4].second));
+    CHECK_EQUAL("eftg", tv[0].second);
+    CHECK_EQUAL("eftg", tv[1].second);
+    CHECK_EQUAL("eftg", tv[2].second);
+    CHECK_EQUAL("eftg", tv[3].second);
+    CHECK_EQUAL("eftg", tv[4].second);
 }
 
 namespace {
@@ -919,7 +985,7 @@ TIGHTDB_TABLE_1(TestSubtabEnum2,
                 str, String)
 TIGHTDB_TABLE_1(TestSubtabEnum1,
                 subtab, Subtable<TestSubtabEnum2>)
-}
+} // anonymous namespace
 
 TEST(Table_OptimizeSubtable)
 {
@@ -951,7 +1017,7 @@ TEST(Table_OptimizeSubtable)
         // Non-enumerable
         TestSubtabEnum2::Ref r = t[0].subtab;
         string s;
-        for (int i = 0; i < r->size(); ++i) {
+        for (size_t i = 0; i < r->size(); ++i) {
             CHECK_EQUAL(s.c_str(), r[i].str);
             s += 'x';
         }
@@ -959,7 +1025,7 @@ TEST(Table_OptimizeSubtable)
     {
         // Non-enumerable
         TestSubtabEnum2::Ref r = t[1].subtab;
-        for (int i = 0; i < r->size(); ++i) {
+        for (size_t i = 0; i < r->size(); ++i) {
             CHECK_EQUAL("foo", r[i].str);
         }
     }
@@ -1492,8 +1558,8 @@ TEST(Table_Mixed)
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
     CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
-    CHECK_EQUAL("binary", (const char*)table.get_mixed(1, 4).get_binary().pointer);
-    CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().len);
+    CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
+    CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
 
     table.insert_int(0, 5, 0);
     table.insert_mixed(1, 5, Mixed::subtable_tag());
@@ -1514,8 +1580,8 @@ TEST(Table_Mixed)
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
     CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
-    CHECK_EQUAL("binary", (const char*)table.get_mixed(1, 4).get_binary().pointer);
-    CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().len);
+    CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
+    CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
 
     // Get table from mixed column and add schema and some values
     TableRef subtable = table.get_subtable(1, 5);
@@ -1559,8 +1625,8 @@ TEST(Table_Mixed)
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
     CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
-    CHECK_EQUAL("binary", (const char*)table.get_mixed(1, 4).get_binary().pointer);
-    CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().len);
+    CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
+    CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
     CHECK_EQUAL(float(1.123),  table.get_mixed(1, 6).get_float());
     CHECK_EQUAL(double(2.234), table.get_mixed(1, 7).get_double());
 
@@ -1573,7 +1639,7 @@ TEST(Table_Mixed)
 namespace {
 TIGHTDB_TABLE_1(TestTableMX,
                 first, Mixed)
-}
+} // anonymous namespace
 
 TEST(Table_Mixed2)
 {
@@ -1658,22 +1724,21 @@ TEST(Table_SubtableSizeAndClear)
 }
 
 
-namespace
-{
-    TIGHTDB_TABLE_2(MyTable1,
-                    val, Int,
-                    val2, Int)
+namespace {
+TIGHTDB_TABLE_2(MyTable1,
+                val, Int,
+                val2, Int)
 
-    TIGHTDB_TABLE_2(MyTable2,
-                    val, Int,
-                    subtab, Subtable<MyTable1>)
+TIGHTDB_TABLE_2(MyTable2,
+                val, Int,
+                subtab, Subtable<MyTable1>)
 
-    TIGHTDB_TABLE_1(MyTable3,
-                    subtab, Subtable<MyTable2>)
+TIGHTDB_TABLE_1(MyTable3,
+                subtab, Subtable<MyTable2>)
 
-    TIGHTDB_TABLE_1(MyTable4,
-                    mix, Mixed)
-}
+TIGHTDB_TABLE_1(MyTable4,
+                mix, Mixed)
+} // anonymous namespace
 
 
 TEST(Table_SetMethod)
@@ -1835,12 +1900,11 @@ TEST(Table_SubtableCopyOnSetAndInsert)
 }
 
 
-namespace
-{
-    TIGHTDB_TABLE_2(TableDateAndBinary,
-                    date, Date,
-                    bin, Binary)
-}
+namespace {
+TIGHTDB_TABLE_2(TableDateAndBinary,
+                date, Date,
+                bin, Binary)
+} // anonymous namespace
 
 TEST(Table_DateAndBinary)
 {
@@ -1851,8 +1915,8 @@ TEST(Table_DateAndBinary)
     for (size_t i=0; i<size; ++i) data[i] = (char)i;
     t.add(8, BinaryData(data, size));
     CHECK_EQUAL(t[0].date, 8);
-    CHECK_EQUAL(t[0].bin.get_len(), size);
-    CHECK(equal(t[0].bin.get_pointer(), t[0].bin.get_pointer()+size, data));
+    CHECK_EQUAL(t[0].bin.size(), size);
+    CHECK(equal(t[0].bin.data(), t[0].bin.data()+size, data));
 }
 
 // Test for a specific bug found: Calling clear on a group with a table with a subtable
@@ -1958,7 +2022,7 @@ TIGHTDB_TABLE_3(TableAgg,
                 c_double, Double)
 
                 // TODO: Bool? Date
-}
+} // anonymous namespace
 
 #if TEST_DURATION > 0
 #define TBL_SIZE TIGHTDB_MAX_LIST_SIZE*10
@@ -2005,6 +2069,27 @@ TEST(Table_Aggregates)
     CHECK_EQUAL(double(d_sum)/size, table.column().c_double.average());
 }
 
+namespace {
+TIGHTDB_TABLE_1(TableAgg2,
+                c_count, Int)
+} // anonymous namespace
+
+
+TEST(Table_Aggregates2)
+{
+    TableAgg2 table;
+    int c = -420;
+    int s = 0;
+    while (c < -20) {
+        table.add(c);
+        s += c;
+        c++;
+    }
+
+    CHECK_EQUAL(-420, table.column().c_count.minimum());
+    CHECK_EQUAL(-21, table.column().c_count.maximum());
+    CHECK_EQUAL(s, table.column().c_count.sum());
+}
 
 TEST(Table_LanguageBindings)
 {
@@ -2024,4 +2109,14 @@ TEST(Table_LanguageBindings)
 
    LangBindHelper::unbind_table_ref(table);
    LangBindHelper::unbind_table_ref(table2);
+}
+
+TEST(Table_MultipleColumn)
+{
+    
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_column(type_Int, "first");
+    CHECK_EQUAL(table.get_column_count(), 2);
+    CHECK_EQUAL(table.get_column_index("first"), 0);
 }
