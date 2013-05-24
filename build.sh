@@ -635,7 +635,7 @@ EOF
                 # search path for header files is not used, so
                 # installed headers will not be found. This problem is
                 # eliminated by the explicit addition of the temporary
-                # header installation directory to CPATH below.
+                # header installation directory to CPATH above.
                 path_list_prepend LIBRARY_PATH "$TEST_PKG_DIR/tightdb/src/tightdb" || exit 1
 
                 # FIXME: The problem with this one that it partially
