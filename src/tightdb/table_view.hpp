@@ -65,7 +65,7 @@ public:
     size_t find_first_float(size_t column_ndx, float value) const;
     size_t find_first_double(size_t column_ndx, double value) const;
     size_t find_first_string(size_t column_ndx, StringData value) const;
-    // FIXME: Need: size_t find_first_binary(size_t column_ndx, BinaryData value) const;
+    size_t find_first_binary(size_t column_ndx, BinaryData value) const;
 
     // Aggregate functions
     template <int function, typename T, typename R, class ColType>

@@ -140,7 +140,7 @@ retry:
         }
 
         // Map to memory
-        m_file_map.map(m_file, File::access_ReadWrite, File::map_NoSync);
+        m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
         File::UnmapGuard fug(m_file_map);
 
         SharedInfo* const info = m_file_map.get_addr();
@@ -204,7 +204,7 @@ retry:
         // since that part can be resized and as such remapped which
         // could move our mutexes (which we don't want to risk moving while
         // they are locked)
-        m_reader_map.map(m_file, File::access_ReadWrite, File::map_NoSync);
+        m_reader_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
 
         fug.release(); // Do not unmap
         fcg.release(); // Do not close
@@ -547,7 +547,7 @@ void SharedGroup::ringbuf_expand()
     const SharedInfo* const info = m_reader_map.get_addr();
 
     // Calculate size of file with more entries
-    const size_t current_entry_count = info->capacity + 1;
+    const size_t current_entry_count = info->capacity + 1;  // FIXME: Why size_t and not uint32 as capacity?
     const size_t excount = current_entry_count; // Always double so we can mask for index
     const size_t new_entry_count = current_entry_count + excount;
     const size_t base_filesize = sizeof(SharedInfo) - sizeof(ReadCount[32]);
@@ -572,7 +572,7 @@ void SharedGroup::ringbuf_expand()
             ReadCount* const new_start = &info2->readers[info2->get_pos + excount];
             copy(low_start, low_end, new_start);
         }
-
+        // FIXME: warning for adding size_t to uint32!
         info2->get_pos += excount;
     }
 

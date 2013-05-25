@@ -51,6 +51,7 @@ public:
     void Clear() TIGHTDB_OVERRIDE;
     void Resize(std::size_t ndx);
     void fill(std::size_t count);
+    void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
  
     std::size_t count(StringData value) const;
     std::size_t find_first(StringData value, std::size_t begin = 0 , std::size_t end = -1) const;

@@ -41,7 +41,7 @@ public:
     /// Equivalent to calling open(const std::string&, bool,
     /// DurabilityLevel) on a default constructed instance.
     explicit SharedGroup(const std::string& file, bool no_create = false,
-                         DurabilityLevel dlevel=durability_Full);
+                         DurabilityLevel dlevel = durability_Full);
 
     struct unattached_tag {};
 

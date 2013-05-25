@@ -50,6 +50,8 @@ public:
     void   distinct(Array& result) const;
     FindRes find_all(StringData value, size_t& ref) const;
 
+    void update_ref(StringData value, size_t old_row_ndx, size_t new_row_ndx);
+
 #ifdef TIGHTDB_DEBUG
     void verify_entries(const AdaptiveStringColumn& column) const;
     void to_dot() const {to_dot(std::cerr);}
@@ -72,6 +74,7 @@ protected:
     void NodeInsertSplit(size_t ndx, size_t new_ref);
     void NodeInsert(size_t ndx, size_t ref);
     void DoDelete(size_t ndx, StringData, size_t offset);
+    void do_update_ref(StringData value, size_t row_ndx, size_t new_row_ndx, size_t offset);
 
     StringData Get(size_t ndx) {return (*m_get_func)(m_target_column, ndx);}
 

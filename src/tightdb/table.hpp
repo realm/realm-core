@@ -158,6 +158,7 @@ public:
     void        insert_empty_row(size_t row_ndx, size_t num_rows = 1);
     void        remove(size_t row_ndx);
     void        remove_last() {if (!is_empty()) remove(m_size-1);}
+    void        move_last_over(size_t ndx);
 
     // Insert row
     // NOTE: You have to insert values in ALL columns followed by insert_done().
@@ -577,7 +578,7 @@ inline bool Table::has_shared_spec() const
 
 struct Table::UnbindGuard {
     UnbindGuard(Table* t) TIGHTDB_NOEXCEPT: m_table(t) {}
-    ~UnbindGuard() { if(m_table) m_table->unbind_ref(); } // FIXME: Cannot be noexcept since ~Table() may throw
+    ~UnbindGuard() { if (m_table) m_table->unbind_ref(); } // FIXME: Cannot be noexcept since ~Table() may throw
     Table* operator->() const { return m_table; }
     Table* get() const { return m_table; }
     Table* release() TIGHTDB_NOEXCEPT { Table* t = m_table; m_table = 0; return t; }

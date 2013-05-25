@@ -883,6 +883,22 @@ void Table::remove(size_t ndx)
 #endif
 }
 
+void Table::move_last_over(size_t ndx)
+{
+    TIGHTDB_ASSERT(ndx+1 < m_size);
+
+    const size_t count = get_column_count();
+    for (size_t i = 0; i < count; ++i) {
+        ColumnBase& column = GetColumnBase(i);
+        column.move_last_over(ndx);
+    }
+    --m_size;
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    //TODO: transact_log().move_last_over(ndx); // Throws
+#endif
+}
+
 
 void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 {
@@ -2367,7 +2383,7 @@ inline void out_string(ostream& out, const string text, const size_t max_len)
 
 inline void out_table(ostream& out, const size_t len)
 {
-    const size_t width = out.width() - chars_in_int(len) - 1;
+    const streamsize width = out.width() - chars_in_int(len) - 1;
     out.width(width);
     out << "[" << len << "]";
 }

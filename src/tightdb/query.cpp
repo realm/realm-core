@@ -5,7 +5,7 @@
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/query.hpp>
 #include <tightdb/query_engine.hpp>
-
+#include <cstdio>
 
 using namespace std;
 using namespace tightdb;
@@ -659,7 +659,6 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     return size_t(r);
 }
 
-#include <cstdio>
 
 // todo, not sure if start, end and limit could be useful for delete.
 size_t Query::remove(size_t start, size_t end, size_t limit)
@@ -834,9 +833,9 @@ string Query::Verify()
 void Query::Init(const Table& table) const
 {
     if (first[0] != NULL) {
-        ParentNode* const top = (ParentNode*)first[0];
+        ParentNode* top = first[0];
         top->init(table);
-        vector<ParentNode*>v;
+        vector<ParentNode*> v;
         top->gather_children(v);
     }
 }

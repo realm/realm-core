@@ -59,14 +59,16 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData]
-        DESCR  : The value.
+        DESCR  : &g_typed_query_value_descr
+                 The value.
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : &g_typed_query_case_sensitive_descr
                  'String match can be performed case sensitive or not. Default: <code>true</code>.'
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : &g_typed_query_query_object_return_descr
+                 The query object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_equals
@@ -93,13 +95,13 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData]
-        DESCR  : The value.
+        DESCR  : *g_typed_query_value_descr
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : 'String match can be performed case sensitive or not. Default: <code>true</code>.'
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_typed_query_query_object_return_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_notEquals
@@ -120,10 +122,10 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : The value.
+        DESCR  : *g_typed_query_value_descr
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_typed_query_query_object_return_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_greaterThan
@@ -142,10 +144,10 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : The value.
+        DESCR  : *g_typed_query_value_descr
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_typed_query_query_object_return_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_greaterThanOrEqual
@@ -164,10 +166,10 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : The value.
+        DESCR  : *g_typed_query_value_descr
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_typed_query_query_object_return_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_lessThan
@@ -186,10 +188,10 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : The value.
+        DESCR  : *g_typed_query_value_descr
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_typed_query_query_object_return_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_lessThanOrEqual
@@ -208,13 +210,15 @@ CATEGORIES :
       PARAMS:
       - NAME   : from
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : Lower bound of range.
+        DESCR  : &g_typed_query_between_parm1_descr
+                 Lower bound of range.
       - NAME   : to
         TYPES  : [int64_t, Date]
-        DESCR  : Upper bound of range.
+        DESCR  : &g_typed_query_between_parm2_descr
+                 Upper bound of range.
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_typed_query_query_object_return_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_between
@@ -231,13 +235,13 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [StringData, BinaryData]
-        DESCR  : The value.
+        DESCR  : *g_typed_query_value_descr
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : *g_typed_query_case_sensitive_descr
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_typed_query_query_object_return_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_startsWith
@@ -254,13 +258,13 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [StringData, BinaryData]
-        DESCR  : The value.
+        DESCR  : *g_typed_query_value_descr
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : *g_typed_query_case_sensitive_descr
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_typed_query_query_object_return_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_endsWith
@@ -277,13 +281,13 @@ CATEGORIES :
       PARAMS:
       - NAME   : value
         TYPES  : [StringData, BinaryData]
-        DESCR  : The value.
+        DESCR  : *g_typed_query_value_descr
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : *g_typed_query_case_sensitive_descr
       RETURN:
         TYPES  : Query&
-        DESCR  : The query object.
+        DESCR  : *g_typed_query_query_object_return_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_contains
@@ -299,7 +303,7 @@ CATEGORIES :
                  Start group ("left parenthesis").
       RETURN:
         TYPES  : Query
-        DESCR  : The query object.
+        DESCR  : *g_typed_query_query_object_return_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_group
@@ -311,7 +315,7 @@ CATEGORIES :
                  Stop group ("right parenthesis").
       RETURN:
         TYPES  : Query
-        DESCR  : The query object.
+        DESCR  : *g_typed_query_query_object_return_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_group
@@ -323,7 +327,7 @@ CATEGORIES :
                  Logical-or.
       RETURN:
         TYPES  : Query
-        DESCR  : The query object.
+        DESCR  : *g_typed_query_query_object_return_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_or
@@ -335,7 +339,7 @@ CATEGORIES :
                  Query a subtable.
       RETURN:
         TYPES  : Query
-        DESCR  : The query object.
+        DESCR  : *g_typed_query_query_object_return_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_subtable
@@ -347,7 +351,7 @@ CATEGORIES :
                  End of subtable query.
       RETURN:
         TYPES  : Query
-        DESCR  : The query object.
+        DESCR  : *g_typed_query_query_object_return_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_subtable
@@ -375,7 +379,8 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : [TableView, ConstTableView]
-        DESCR  : The TableView object.
+        DESCR  : &g_typed_query_find_all_return1_descr
+                 The TableView object.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_findall
@@ -410,7 +415,8 @@ CATEGORIES :
                  double sum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
       PARAMS:
       - NAME   : resultcount
-        DESCR  : The number of rows used to calculate the sum.
+        DESCR  : &g_typed_query_number_of_rows_descr
+                 The number of rows to consider.
         TYPES  : size_t*
       - NAME   : start
         TYPES  : size_t
@@ -446,7 +452,8 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : size_t
-        DESCR  : The number of rows.
+        DESCR  : &g_typed_query_size_return1_descr
+                 The number of rows.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_size
@@ -466,7 +473,7 @@ CATEGORIES :
                  double  maximum_double(size_t* resultcount, size_t start, size_t end, size_t limit) const;
       PARAMS:
       - NAME   : resultcount
-        DESCR  : The number of rows used to find the highest value.
+        DESCR  : *g_typed_query_number_of_rows_descr
         TYPES  : size_t*
       - NAME   : start
         TYPES  : size_t
@@ -479,7 +486,8 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : [int64_t, float, double]
-        DESCR  : The highest value.
+        DESCR  : &g_typed_query_maximum_return1_descr
+                 The highest value.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_maximum
@@ -498,7 +506,7 @@ CATEGORIES :
                  double  minimum_double(size_t* resultcount, size_t start, size_t end, size_t limit) const;
       PARAMS:
       - NAME   : resultcount
-        DESCR  : The number of rows used to find the value.
+        DESCR  : *g_typed_query_number_of_rows_descr
         TYPES  : size_t*
       - NAME   : start
         TYPES  : size_t
@@ -511,7 +519,8 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : [int64_t, float, double]
-        DESCR  : The lowest value.
+        DESCR  : &g_typed_query_minimum_return1_descr
+                 The lowest value.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_manimum
@@ -530,7 +539,7 @@ CATEGORIES :
                  double  average_double(size_t* resultcount, size_t start, size_t end, size_t limit) const;
       PARAMS:
       - NAME   : resultcount
-        DESCR  : The number of rows used to calculate the average.
+        DESCR  : *g_typed_query_number_of_rows_descr
         TYPES  : size_t*
       - NAME   : start
         TYPES  : size_t
@@ -543,7 +552,8 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : double
-        DESCR  : The average.
+        DESCR  : &g_typed_query_average_return1_descr
+                 The average.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_average
@@ -556,7 +566,7 @@ CATEGORIES :
       CONST    : true
       PARAMS:
       - NAME   : resultcount
-        DESCR  : The number of rows used to calculate the average.
+        DESCR  : *g_typed_query_number_of_rows_descr
         TYPES  : size_t*
       - NAME   : start
         TYPES  : size_t
@@ -569,7 +579,8 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : size_t
-        DESCR  : The number of rows removed.
+        DESCR  : &g_typed_query_remove_return1_descr
+                 The number of rows removed.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_remove

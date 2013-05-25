@@ -463,7 +463,6 @@ void StringIndex::distinct(Array& result) const
 
             // low bit set indicate literal ref (shifted)
             if (ref & 1) {
-//             const size_t r = (ref >> 1); NEVER right shift signed - it's undefined and varies btw AMD/Intel/ARM
                const size_t r = to_size_t((uint64_t(ref) >> 1)); 
                result.add(r);
             }
@@ -500,12 +499,12 @@ void StringIndex::UpdateRefs(size_t pos, int diff)
     }
     else {
         for (size_t i = 0; i < count; ++i) {
-            const int64_t ref = refs.Get(i);
+            const size_t ref = to_size_t(refs.Get(i));
 
             // low bit set indicate literal ref (shifted)
             if (ref & 1) {
                 //const size_t r = (ref >> 1); Please NEVER right shift signed values - result varies btw Intel/AMD
-                const size_t r = (uint64_t(ref) >> 1); 
+                const size_t r = ref >> 1; 
                 if (r >= pos) {
                     const size_t adjusted_ref = ((r + diff) << 1)+1;
                     refs.Set(i, adjusted_ref);
@@ -513,12 +512,12 @@ void StringIndex::UpdateRefs(size_t pos, int diff)
             }
             else {
                 // A real ref either points to a list or a sub-index
-                if (Array::is_index_node(to_size_t(ref), alloc)) {
-                    StringIndex ndx(to_size_t(ref), &refs, i, m_target_column, m_get_func, alloc);
+                if (Array::is_index_node(ref, alloc)) {
+                    StringIndex ndx(ref, &refs, i, m_target_column, m_get_func, alloc);
                     ndx.UpdateRefs(pos, diff);
                 }
                 else {
-                    Column sub(to_size_t(ref), &refs, i, alloc);
+                    Column sub(ref, &refs, i, alloc);
                     sub.IncrementIf(pos, diff);
                 }
             }
@@ -614,6 +613,52 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
                     refs.Delete(pos);
                     sub.Destroy();
                 }
+            }
+        }
+    }
+}
+
+void StringIndex::update_ref(StringData value, size_t old_row_ndx, size_t new_row_ndx)
+{
+    do_update_ref(value, old_row_ndx, new_row_ndx, 0);
+}
+
+void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row_ndx, size_t offset)
+{
+    Array values = m_array->GetSubArray(0);
+    Array refs = m_array->GetSubArray(1);
+    Allocator& alloc = m_array->GetAllocator();
+
+    // Create 4 byte index key
+    const char* const v = value.data() + offset;
+    const int32_t key = create_key(v, value.data() + value.size());
+
+    const size_t pos = values.FindPos2(key);
+    TIGHTDB_ASSERT(pos != not_found);
+
+    if (m_array->IsNode()) {
+        const size_t ref = refs.GetAsRef(pos);
+        StringIndex node(ref, &refs, pos, m_target_column, m_get_func, alloc);
+        node.do_update_ref(value, row_ndx, new_row_ndx, offset);
+    }
+    else {
+        const int64_t ref = refs.Get(pos);
+        if (ref & 1) {
+            TIGHTDB_ASSERT((uint64_t(ref) >> 1) == (int64_t)row_ndx);
+            const size_t shifted = (new_row_ndx << 1) + 1; // shift to indicate literal
+            refs.Set(pos, shifted);
+        }
+        else {
+            // A real ref either points to a list or a sub-index
+            if (Array::is_index_node(to_size_t(ref), alloc)) {
+                StringIndex subNdx((size_t)ref, &refs, pos, m_target_column, m_get_func, alloc);
+                subNdx.do_update_ref(value, row_ndx, new_row_ndx, offset+4);
+            }
+            else {
+                Column sub(to_size_t(ref), &refs, pos, alloc);
+                const size_t r = sub.find_first(row_ndx);
+                TIGHTDB_ASSERT(r != not_found);
+                sub.set(r, new_row_ndx);
             }
         }
     }

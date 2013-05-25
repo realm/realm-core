@@ -18,15 +18,6 @@ size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
     return size_t(-1);
 }
 
-size_t TableViewBase::find_first_string(size_t column_ndx, StringData value) const
-{
-    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_String);
-
-    for (size_t i = 0; i < m_refs.size(); i++)
-        if (get_string(column_ndx, i) == value) return i;
-    return size_t(-1);
-}
-
 size_t TableViewBase::find_first_float(size_t column_ndx, float value) const
 {
     for (size_t i = 0; i < m_refs.size(); i++)
@@ -40,6 +31,24 @@ size_t TableViewBase::find_first_double(size_t column_ndx, double value) const
     for (size_t i = 0; i < m_refs.size(); i++)
         if (get_double(column_ndx, i) == value)
             return i;
+    return size_t(-1);
+}
+
+size_t TableViewBase::find_first_string(size_t column_ndx, StringData value) const
+{
+    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_String);
+
+    for (size_t i = 0; i < m_refs.size(); i++)
+        if (get_string(column_ndx, i) == value) return i;
+    return size_t(-1);
+}
+
+size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) const
+{
+    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Binary);
+
+    for (size_t i = 0; i < m_refs.size(); i++)
+        if (get_binary(column_ndx, i) == value) return i;
     return size_t(-1);
 }
 
