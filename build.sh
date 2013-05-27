@@ -903,7 +903,7 @@ EOF
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-test-installed.XXXX)" || exit 1
         LOG_FILE="$TEMP_DIR/test.log"
         ERROR=""
-        echo "TESTING Installation of core library" | tee -a "$LOG_FILE"
+        echo "TESTING Installed core library" | tee -a "$LOG_FILE"
         if sh build.sh test-installed >>"$LOG_FILE" 2>&1; then
             echo "SUCCESS!"  | tee -a "$LOG_FILE"
         else
@@ -913,7 +913,7 @@ EOF
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -e "$EXT_HOME/.WAS_INSTALLED" ]; then
-                echo "TESTING Installation of extension '$x'" | tee -a "$LOG_FILE"
+                echo "TESTING Installed extension '$x'" | tee -a "$LOG_FILE"
                 if sh "$EXT_HOME/build.sh" test-installed >>"$LOG_FILE" 2>&1; then
                     echo "SUCCESS!"  | tee -a "$LOG_FILE"
                 else
