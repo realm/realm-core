@@ -34,7 +34,6 @@
  *      59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  */
 
-#include <errno.h>
 #include <limits.h>
 
 #include "pthread.h"
@@ -105,7 +104,7 @@ pthread_rwlock_timedwrlock (pthread_rwlock_t * rwlock,
 	   * This routine may be a cancelation point
 	   * according to POSIX 1003.1j section 18.1.2.
 	   */
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && _MSC_VER < 1400
 #pragma inline_depth(0)
 #endif
 	  pthread_cleanup_push (ptw32_rwlock_cancelwrwait, (void *) rwl);
@@ -120,7 +119,7 @@ pthread_rwlock_timedwrlock (pthread_rwlock_t * rwlock,
 	  while (result == 0 && rwl->nCompletedSharedAccessCount < 0);
 
 	  pthread_cleanup_pop ((result != 0) ? 1 : 0);
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && _MSC_VER < 1400
 #pragma inline_depth()
 #endif
 

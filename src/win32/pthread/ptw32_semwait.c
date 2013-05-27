@@ -34,8 +34,8 @@
  *      59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  */
 
-#ifndef _UWIN
-//#   include <process.h>
+#if !defined(_UWIN)
+/*#   include <process.h> */
 #endif
 #include "pthread.h"
 #include "implement.h"
@@ -77,8 +77,18 @@ ptw32_semwait (sem_t * sem)
     {
       if ((result = pthread_mutex_lock (&s->lock)) == 0)
         {
-          int v = --s->value;
+          int v;
 
+	  /* See sem_destroy.c
+	   */
+	  if (*sem == NULL)
+	    {
+	      (void) pthread_mutex_unlock (&s->lock);
+	      errno = EINVAL;
+	      return -1;
+	    }
+
+          v = --s->value;
           (void) pthread_mutex_unlock (&s->lock);
 
           if (v < 0)
@@ -86,9 +96,16 @@ ptw32_semwait (sem_t * sem)
               /* Must wait */
               if (WaitForSingleObject (s->sem, INFINITE) == WAIT_OBJECT_0)
 		{
-#ifdef NEED_SEM
+#if defined(NEED_SEM)
 		  if (pthread_mutex_lock (&s->lock) == 0)
 		    {
+        	      if (*sem == NULL)
+        	        {
+        	          (void) pthread_mutex_unlock (&s->lock);
+        	          errno = EINVAL;
+        	          return -1;
+        	        }
+
 		      if (s->leftToUnblock > 0)
 			{
 			  --s->leftToUnblock;
