@@ -520,8 +520,17 @@ EOI
                     cat <<EOI >>"$PKG_DIR/README"
 When building is requested, the core library will be built along
 with all the extensions that you have specified.
+
+For information on prerequisites for building the core library, see
+tightdb/README.md.
 EOI
                 fi
+
+                cat <<EOI >>"$PKG_DIR/README"
+
+For information on prerequisites for building each extension, see the
+README.md file in the corresponding subdirectory.
+EOI
 
                 for x in $AVAIL_EXTENSIONS; do
                     EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
