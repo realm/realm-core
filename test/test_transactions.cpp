@@ -419,8 +419,6 @@ private:
 } // anonymous namespace
 
 
-#ifndef _WIN32 // Shared PTHREAD mutexes appear not to work on Windows
-
 TEST(Transactions)
 {
     string database_path = "transactions.tightdb";
@@ -549,5 +547,3 @@ TEST(Transactions)
     }
     // End of read transaction
 }
-
-#endif // Shared PTHREAD mutexes appear not to work on Windows
