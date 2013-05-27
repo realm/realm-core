@@ -1,0 +1,5 @@
+tightdb (0.0.1-1) UNRELEASED; urgency=low
+
+  * Initial release. (Closes: #00001)
+
+ -- Kenneth Geisshirt <kg@tightdb.com>  Fri, 24 May 2013 17:44:23 +0200
