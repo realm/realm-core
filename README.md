@@ -28,7 +28,7 @@ Dependencies
     Install command line tools (via Xcode)
 
 Note: The TightDB source code comes bundled with a fallback version of
-UnitTest++ which will be used when testing, if the 'pkg-config'
+UnitTest++ which will be used when testing if the 'pkg-config'
 program does not exists, or if 'pkg-config unittest++ --exists' does
 not succeed.
 
