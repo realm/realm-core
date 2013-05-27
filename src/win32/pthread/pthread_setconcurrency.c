@@ -1,5 +1,3 @@
-#pragma warning (push, 0)
-
 /*
  * pthread_setconcurrency.c
  *
