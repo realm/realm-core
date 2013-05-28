@@ -325,14 +325,16 @@ ifneq ($(LD_IS_GCC_LIKE),)
 LDFLAGS_SHARED = -shared
 endif
 
-# Workaround for CLANG < v3.2 ignoring LIBRARY_PATH
+# Work-around for CLANG < v3.2 ignoring LIBRARY_PATH
 LD_IS_CLANG = $(or $(call MATCH_CMD,clang,$(LD)),$(call MATCH_CMD,clang++,$(LD)))
 ifneq ($(LD_IS_CLANG),)
-CLANG_VERSION = $(shell $(LD) --version | grep -i 'clang version' | sed 's/.*clang version \([^ ][^ ]*\).*/\1/' | sed 's/[._-]/ /g')
+CLANG_VERSION = $(shell printf '\#ifdef __clang__\n\#if defined __clang_major__ && defined __clang_minor__\n__clang_major__ __clang_minor__\n\#else\n0 0\n\#endif\n\#endif' | $(LD) -E - | grep -v -e '^\#' -e '^$$')
+ifneq ($(CLANG_VERSION),)
 CLANG_MAJOR = $(word 1,$(CLANG_VERSION))
 CLANG_MINOR = $(word 2,$(CLANG_VERSION))
 ifeq ($(shell echo $$(($(CLANG_MAJOR) < 3 || ($(CLANG_MAJOR) == 3 && $(CLANG_MINOR) < 2)))),1)
 LDFLAGS_LIBRARY_PATH = $(foreach x,$(subst :, ,$(LIBRARY_PATH)),-L$(x))
+endif
 endif
 endif
 
