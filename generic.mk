@@ -125,6 +125,14 @@ ENABLE_INSTALL_DEBUG_LIBS =
 # the opposite is true.
 ENABLE_INSTALL_DEBUG_PROGS =
 
+# Use this if you want to install only a subset of what is usually
+# installed. For example, to produce a separate binary and development
+# package for a library product, you can run 'make install
+# INSTALL_FILTER=shared-libs' for the binary package and 'make install
+# INSTALL_FILTER=headers,static-libs,progs' for the development
+# package.
+INSTALL_FILTER = headers,static-libs,shared-libs,progs
+
 # Installation (GNU style)
 prefix          = /usr/local
 exec_prefix     = $(prefix)
@@ -640,17 +648,17 @@ clean clean/after: $(patsubst %,subdir/%/clean,$(AVAIL_PASSIVE_SUBDIRS))
 # INSTALL / UNINSTALL
 
 .PHONY: install/header/dir install/lib/dirs install/prog/dirs
-.PHONY: install/headers install/libs install/progs
+.PHONY: install/headers install/static-libs install/shared-libs install/progs
 .PHONY: uninstall/libs uninstall/progs uninstall/extra
 
 ifeq ($(NO_BUILD_ON_INSTALL),)
 install/local: default/local
 ifneq ($(ENABLE_INSTALL_STATIC_LIBS),)
-install/libs: $(TARGETS_LIB_STATIC_OPTIM)
+install/static-libs: $(TARGETS_LIB_STATIC_OPTIM)
 endif
-install/libs: $(TARGETS_LIB_SHARED_OPTIM)
+install/shared-libs: $(TARGETS_LIB_SHARED_OPTIM)
 ifneq ($(ENABLE_INSTALL_DEBUG_LIBS),)
-install/libs: $(TARGETS_LIB_SHARED_DEBUG)
+install/shared-libs: $(TARGETS_LIB_SHARED_DEBUG)
 endif
 install/progs: $(TARGETS_PROG_OPTIM)
 ifneq ($(ENABLE_INSTALL_DEBUG_PROGS),)
@@ -658,7 +666,20 @@ install/progs: $(TARGETS_PROG_DEBUG)
 endif
 endif
 
-install/local: install/headers install/libs install/progs
+INSTALL_FILTER_2 = $(subst $(COMMA), ,$(INSTALL_FILTER))
+ifneq ($(filter headers,$(INSTALL_FILTER_2)),)
+install/local: install/headers
+endif
+ifneq ($(filter static-libs,$(INSTALL_FILTER_2)),)
+install/local: install/static-libs
+endif
+ifneq ($(filter shared-libs,$(INSTALL_FILTER_2)),)
+install/local: install/shared-libs
+endif
+ifneq ($(filter progs,$(INSTALL_FILTER_2)),)
+install/local: install/progs
+endif
+
 uninstall/after: uninstall/progs uninstall/libs uninstall/extra
 
 HEADER_INSTALL_DIR =
@@ -733,8 +754,10 @@ install/header/dir:
 	$(INSTALL_DIR) $(HEADER_INSTALL_DIR)
 endif
 
-install/libs: install/lib/dirs
+install/static-libs: install/lib/dirs
 $(foreach x,lib $(EXTRA_INSTALL_PREFIXES),$(call INSTALL_RECIPE_LIBS,$(x),$(strip $(call GET_STATIC_LIB_INST_NAMES,$(x)))))
+
+install/shared-libs: install/lib/dirs
 $(foreach x,lib $(EXTRA_INSTALL_PREFIXES),$(foreach y,$($(x)_LIBRARIES),$(foreach z,$(INST_SHARED_LIB_SUFFICES),$(call INSTALL_RECIPE_LIB_SHARED,$(x),$(call GET_LIBRARY_NAME,$(y))$(patsubst +%,%,$(z)),$(call GET_VERSION_FOR_TARGET,$(y))))))
 
 uninstall/libs:
