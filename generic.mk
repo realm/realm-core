@@ -129,9 +129,13 @@ ENABLE_INSTALL_DEBUG_PROGS =
 # installed. For example, to produce a separate binary and development
 # package for a library product, you can run 'make install
 # INSTALL_FILTER=shared-libs' for the binary package and 'make install
-# INSTALL_FILTER=headers,static-libs,progs' for the development
-# package.
-INSTALL_FILTER = headers,static-libs,shared-libs,progs
+# INSTALL_FILTER=static-libs,progs,headers' for the development
+# package. This filter also affects 'uninstall', but note that
+# 'uninstall' makes no attempt to uninstall headers, instead it
+# invokes a custom target 'uninstall/extra' if 'extra' is included in
+# the filter. It is then up to the apllication to decide what actions
+# to take on 'uninstall/extra'.
+INSTALL_FILTER = shared-libs,static-libs,progs,headers,extra
 
 # Installation (GNU style)
 prefix          = /usr/local
@@ -650,7 +654,7 @@ clean clean/after: $(patsubst %,subdir/%/clean,$(AVAIL_PASSIVE_SUBDIRS))
 
 .PHONY: install/header/dir install/lib/dirs install/prog/dirs
 .PHONY: install/headers install/static-libs install/shared-libs install/progs
-.PHONY: uninstall/libs uninstall/progs uninstall/extra
+.PHONY: uninstall/static-libs uninstall/shared-libs uninstall/progs uninstall/extra
 
 ifeq ($(NO_BUILD_ON_INSTALL),)
 install/local: default/local
@@ -668,6 +672,7 @@ endif
 endif
 
 INSTALL_FILTER_2 = $(subst $(COMMA), ,$(INSTALL_FILTER))
+
 ifneq ($(filter headers,$(INSTALL_FILTER_2)),)
 install/local: install/headers
 endif
@@ -681,7 +686,18 @@ ifneq ($(filter progs,$(INSTALL_FILTER_2)),)
 install/local: install/progs
 endif
 
-uninstall/after: uninstall/progs uninstall/libs uninstall/extra
+ifneq ($(filter progs,$(INSTALL_FILTER_2)),)
+uninstall/after: uninstall/progs
+endif
+ifneq ($(filter shared-libs,$(INSTALL_FILTER_2)),)
+uninstall/after: uninstall/shared-libs
+endif
+ifneq ($(filter static-libs,$(INSTALL_FILTER_2)),)
+uninstall/after: uninstall/static-libs
+endif
+ifneq ($(filter extra,$(INSTALL_FILTER_2)),)
+uninstall/after: uninstall/extra
+endif
 
 HEADER_INSTALL_DIR =
 ifneq ($(INST_HEADERS),)
@@ -761,8 +777,10 @@ $(foreach x,lib $(EXTRA_INSTALL_PREFIXES),$(call INSTALL_RECIPE_LIBS,$(x),$(stri
 install/shared-libs: install/lib/dirs
 $(foreach x,lib $(EXTRA_INSTALL_PREFIXES),$(foreach y,$($(x)_LIBRARIES),$(foreach z,$(INST_SHARED_LIB_SUFFICES),$(call INSTALL_RECIPE_LIB_SHARED,$(x),$(call GET_LIBRARY_NAME,$(y))$(patsubst +%,%,$(z)),$(call GET_VERSION_FOR_TARGET,$(y))))))
 
-uninstall/libs:
+uninstall/static-libs:
 $(foreach x,lib $(EXTRA_INSTALL_PREFIXES),$(call UNINSTALL_RECIPE_LIBS,$(x),$(strip $(call GET_STATIC_LIB_INST_NAMES,$(x)))))
+
+uninstall/shared-libs:
 $(foreach x,lib $(EXTRA_INSTALL_PREFIXES),$(foreach y,$($(x)_LIBRARIES),$(foreach z,$(INST_SHARED_LIB_SUFFICES),$(call UNINSTALL_RECIPE_LIB_SHARED,$(x),$(call GET_LIBRARY_NAME,$(y))$(patsubst +%,%,$(z)),$(call GET_VERSION_FOR_TARGET,$(y))))))
 
 install/progs: install/prog/dirs
