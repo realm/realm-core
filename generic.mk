@@ -324,6 +324,7 @@ OCC_AND_OCXX_ARE_GCC_LIKE = $(and $(call IS_GCC_LIKE,$(OCC)),$(or $(call IS_GCC_
 # SETUP A GCC-LIKE DEFAULT LINKER IF POSSIBLE
 
 ifneq ($(CC_AND_CXX_ARE_GCC_LIKE),)
+LD_SPECIFIED = $(filter-out undefined default,$(origin LD))
 ifeq ($(LD_SPECIFIED),)
 LD := $(CXX)
 endif
