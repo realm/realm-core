@@ -771,7 +771,7 @@ EOF
         else
             echo "BUILDING Core library" | tee -a "$LOG_FILE"
             rm -f ".TO_BE_INSTALLED" || exit 1
-            if sh "build.sh" build >>"$LOG_FILE" 2>&1; then
+            if DISABLE_UPDATE_TABLE_MACROS_HPP="1" sh "build.sh" build >>"$LOG_FILE" 2>&1; then
                 touch ".TO_BE_INSTALLED" || exit 1
             else
                 echo "Failed!" | tee -a "$LOG_FILE" 1>&2
