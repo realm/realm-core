@@ -110,6 +110,36 @@ if [ "$IS_REDHAT_DERIVATIVE" ]; then
 fi
 
 
+get_host_info()
+{
+    echo "\$ uname -a"
+    uname -a
+    if [ "$OS" = "Darwin" ]; then
+        echo "\$ system_profiler SPSoftwareDataType"
+        system_profiler SPSoftwareDataType
+    elif [ -e "/etc/issue" ]; then
+        echo "\$ cat /etc/issue"
+        cat "/etc/issue" | grep -v 's/^ *$//'
+    fi
+}
+
+get_compiler_info()
+{
+    local CC_CMD CXX_CMD LD_CMD
+    CC_CMD="$(make get-cc)" || exit 1
+    CXX_CMD="$(make get-cxx)" || exit 1
+    LD_CMD="$(make get-ld)" || exit 1
+    echo "C compiler is '$CC_CMD' ($(which "$CC_CMD" 2>/dev/null))"
+    echo "C++ compiler is '$CXX_CMD' ($(which "$CXX_CMD" 2>/dev/null))"
+    echo "Linker is '$LD_CMD' ($(which "$LD_CMD" 2>/dev/null))"
+    for x in $(printf "%s\n%s\n%s\n" "$CC_CMD" "$CXX_CMD" "$LD_CMD" | sort -u); do
+        echo
+        echo "\$ $x --version"
+        $x --version 2>/dev/null | grep -v 's/^ *$//'
+    done
+}
+
+
 
 case "$MODE" in
 
@@ -501,6 +531,8 @@ case "$MODE" in
 
 EXTENSIONS="$AUGMENTED_EXTENSIONS"
 
+export TIGHTDB_VERSION="$VERSION"
+
 if [ \$# -eq 1 -a "\$1" = "clean" ]; then
     sh tightdb/build.sh dist-clean$BIN_CORE_ARG || exit 1
     exit 0
@@ -658,6 +690,7 @@ EOF
                     if [ "$OS" = "Darwin" ]; then
                         cp "src/tightdb/libtightdb-ios.a" "src/tightdb/libtightdb-ios-dbg.a" "$PKG_DIR/tightdb/src/tightdb/" || exit 1
                     fi
+                    get_host_info >"$PKG_DIR/tightdb/.PREBUILD_INFO" || exit 1
                 else
                     message "Transfering core library to package"
                     sh "$TIGHTDB_HOME/build.sh" dist-copy "$PKG_DIR/tightdb" >>"$LOG_FILE" 2>&1 || exit 1
@@ -832,6 +865,20 @@ EOF
     "dist-build")
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-build.XXXX)" || exit 1
         LOG_FILE="$TEMP_DIR/build.log"
+        (
+            echo "Tightdb version: ${TIGHTDB_VERSION:-Unknown}"
+            if [ -e ".PREBUILD_INFO" ]; then
+                echo
+                echo "PREBUILD HOST INFO:"
+                cat ".PREBUILD_INFO"
+            fi
+            echo
+            echo "BUILD HOST INFO:"
+            get_host_info || exit 1
+            echo
+            get_compiler_info || exit 1
+            echo
+        ) >>"$LOG_FILE"
         ERROR=""
         if [ "$1" = "bin-core" ]; then
             shift
@@ -899,6 +946,18 @@ EOF
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-install.XXXX)" || exit 1
         chmod a+rx "$TEMP_DIR" || exit 1
         LOG_FILE="$TEMP_DIR/install.log"
+        (
+            echo "Tightdb version: ${TIGHTDB_VERSION:-Unknown}"
+            if [ -e ".PREBUILD_INFO" ]; then
+                echo
+                echo "PREBUILD HOST INFO:"
+                cat ".PREBUILD_INFO"
+            fi
+            echo
+            echo "BUILD HOST INFO:"
+            get_host_info || exit 1
+            echo
+        ) >>"$LOG_FILE"
         ERROR=""
         NEED_USR_LOCAL_LIB_NOTE=""
         echo "INSTALLING Core library" | tee -a "$LOG_FILE"
@@ -976,11 +1035,23 @@ EOF
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-uninstall.XXXX)" || exit 1
         chmod a+rx "$TEMP_DIR" || exit 1
         LOG_FILE="$TEMP_DIR/uninstall.log"
+        (
+            echo "Tightdb version: ${TIGHTDB_VERSION:-Unknown}"
+            if [ -e ".PREBUILD_INFO" ]; then
+                echo
+                echo "PREBUILD HOST INFO:"
+                cat ".PREBUILD_INFO"
+            fi
+            echo
+            echo "BUILD HOST INFO:"
+            get_host_info || exit 1
+            echo
+        ) >>"$LOG_FILE"
+        ERROR=""
         mkdir "$TEMP_DIR/select" || exit 1
         for x in "$@"; do
             touch "$TEMP_DIR/select/$x" || exit 1
         done
-        ERROR=""
         for x in $(word_list_reverse $EXTENSIONS); do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -e "$TEMP_DIR/select/$x" ]; then
@@ -1022,6 +1093,20 @@ EOF
         fi
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-test-installed.XXXX)" || exit 1
         LOG_FILE="$TEMP_DIR/test.log"
+        (
+            echo "Tightdb version: ${TIGHTDB_VERSION:-Unknown}"
+            if [ -e ".PREBUILD_INFO" ]; then
+                echo
+                echo "PREBUILD HOST INFO:"
+                cat ".PREBUILD_INFO"
+            fi
+            echo
+            echo "BUILD HOST INFO:"
+            get_host_info || exit 1
+            echo
+            get_compiler_info || exit 1
+            echo
+        ) >>"$LOG_FILE"
         ERROR=""
         if [ -e ".DEVEL_FILES_WERE_INSTALLED" ]; then
             echo "TESTING Installed extension 'c++'" | tee -a "$LOG_FILE"

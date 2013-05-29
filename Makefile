@@ -36,3 +36,9 @@ testcase-debug: debug
 # Used by build.sh
 get-libdir:
 	@echo $(libdir)
+get-cc:
+	@echo $(CC)
+get-cxx:
+	@echo $(CXX)
+get-ld:
+	@echo $(LD)
