@@ -104,9 +104,9 @@ IS_REDHAT_DERIVATIVE=""
 if [ -e /etc/redhat-release ] || grep -q "Amazon" /etc/system-release 2>/dev/null; then
     IS_REDHAT_DERIVATIVE="1"
 fi
-NEED_USR_LOCAL_LIB_NOTE=""
+PLATFORM_HAS_LIBRARY_PATH_ISSUE=""
 if [ "$IS_REDHAT_DERIVATIVE" ]; then
-    NEED_USR_LOCAL_LIB_NOTE="1"
+    PLATFORM_HAS_LIBRARY_PATH_ISSUE="1"
 fi
 
 
@@ -122,6 +122,7 @@ case "$MODE" in
             done
             make -C "src/tightdb" BASE_DENOM="ios" clean || exit 1
         fi
+        echo "Done cleaning"
         exit 0
         ;;
 
@@ -189,11 +190,13 @@ case "$MODE" in
             lipo "$TEMP_DIR"/*/"libtightdb.a"     -create -output "src/tightdb/libtightdb-ios.a"     || exit 1
             lipo "$TEMP_DIR"/*/"libtightdb-dbg.a" -create -output "src/tightdb/libtightdb-ios-dbg.a" || exit 1
         fi
+        echo "Done building"
         exit 0
         ;;
 
     "test")
         make test || exit 1
+        echo "Test passed"
         exit 0
         ;;
 
@@ -206,6 +209,7 @@ case "$MODE" in
         if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
             ldconfig || exit 1
         fi
+        echo "Done installing"
         exit 0
         ;;
 
@@ -218,6 +222,7 @@ case "$MODE" in
         if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
             ldconfig || exit 1
         fi
+        echo "Done installing"
         exit 0
         ;;
 
@@ -227,6 +232,7 @@ case "$MODE" in
             PREFIX="/usr/local"
         fi
         make prefix="$PREFIX" install INSTALL_FILTER=static-libs,progs,headers || exit 1
+        echo "Done installing"
         exit 0
         ;;
 
@@ -239,6 +245,7 @@ case "$MODE" in
         if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
             ldconfig || exit 1
         fi
+        echo "Done uninstalling"
         exit 0
         ;;
 
@@ -251,6 +258,7 @@ case "$MODE" in
         if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
             ldconfig || exit 1
         fi
+        echo "Done uninstalling"
         exit 0
         ;;
 
@@ -260,6 +268,7 @@ case "$MODE" in
             PREFIX="/usr/local"
         fi
         make prefix="$PREFIX" uninstall INSTALL_FILTER=static-libs,progs,extra || exit 1
+        echo "Done uninstalling"
         exit 0
         ;;
 
@@ -272,6 +281,7 @@ case "$MODE" in
         export LD_RUN_PATH="$LIBDIR"
         make -C "test-installed" clean || exit 1
         make -C "test-installed" test  || exit 1
+        echo "Test passed"
         exit 0
         ;;
 
@@ -545,14 +555,14 @@ EOI
                 chmod +x "$PKG_DIR/build"
 
                 cat <<EOI >"$PKG_DIR/README"
-Build specific extensions: ./build  EXT1  [EXT2]...
-Build everything:          ./build  all
-Start from scratch:        ./build  clean
-Install what was built:    sudo  ./build  install
-Uninstall everything:      sudo  ./build  uninstall
-Check installation:        ./build  test-installed
+Build specific extensions:    ./build  EXT1  [EXT2]...
+Build everything:             ./build  all
+Start from scratch:           ./build  clean
+Install what was built:       sudo  ./build  install
+Uninstall everything:         sudo  ./build  uninstall
+Check state of installation:  ./build  test-installed
 
-Normally the following will suffice:
+The following steps should generally suffice:
 
     ./build all
     sudo ./build install
@@ -796,6 +806,7 @@ EOF
                 fi
             fi
         done
+        echo "DONE CLEANING" | tee -a "$LOG_FILE"
         if [ "$ERROR" ]; then
             echo "Log file is here: $LOG_FILE" 1>&2
             exit 1
@@ -864,10 +875,11 @@ EOF
                     fi
                 fi
             done
+            echo "DONE BUILDING" | tee -a "$LOG_FILE"
         fi
         if [ "$ERROR" ]; then
             cat 1>&2 <<EOF
-Some parts failed to build. You may be missing one or more
+Note: Some parts failed to build. You may be missing one or more
 dependencies. Check the README file for details. If this does not
 help, check the log file.
 The log file is here: $LOG_FILE
@@ -887,13 +899,17 @@ EOF
         chmod a+rx "$TEMP_DIR" || exit 1
         LOG_FILE="$TEMP_DIR/install.log"
         ERROR=""
+        NEED_USR_LOCAL_LIB_NOTE=""
         echo "INSTALLING Core library" | tee -a "$LOG_FILE"
         if DISABLE_UPDATE_TABLE_MACROS_HPP="1" sh build.sh install-shared >>"$LOG_FILE" 2>&1; then
             touch ".WAS_INSTALLED" || exit 1
+            echo "Success!" | tee -a "$LOG_FILE"
             if [ -e ".INSTALL_DEVEL_FILES" ]; then
                 echo "INSTALLING Extension 'c++'" | tee -a "$LOG_FILE"
                 if DISABLE_UPDATE_TABLE_MACROS_HPP="1" sh build.sh install-devel >>"$LOG_FILE" 2>&1; then
                     touch ".DEVEL_FILES_WERE_INSTALLED" || exit 1
+                    echo "Success!" | tee -a "$LOG_FILE"
+                    NEED_USR_LOCAL_LIB_NOTE="$PLATFORM_HAS_LIBRARY_PATH_ISSUE"
                 else
                     echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                     ERROR="1"
@@ -905,6 +921,10 @@ EOF
                     echo "INSTALLING Extension '$x'" | tee -a "$LOG_FILE"
                     if sh "$EXT_HOME/build.sh" install >>"$LOG_FILE" 2>&1; then
                         touch "$EXT_HOME/.WAS_INSTALLED" || exit 1
+                        echo "Success!" | tee -a "$LOG_FILE"
+                        if [ "$x" = "c" -o "$x" = "objc" ]; then
+                            NEED_USR_LOCAL_LIB_NOTE="$PLATFORM_HAS_LIBRARY_PATH_ISSUE"
+                        fi
                     else
                         echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                         ERROR="1"
@@ -914,17 +934,24 @@ EOF
             if [ "$NEED_USR_LOCAL_LIB_NOTE" ]; then
                 LIBDIR="$(make get-libdir)" || exit 1
                 cat <<EOF
-NOTE: Libraries have been installed in $LIBDIR.
-On your system this directory is not normally part of the default
-library search path, so you may have to set LD_LIBRARY_PATH before
-running the the test suite, or your own application. You can do this
-by issuing the following command:
 
-    export LD_LIBRARY_PATH=$LIBDIR
+NOTE: Shared libraries have been installed in '$LIBDIR'.
 
-Alternatively, you can add $LIBDIR to /etc/ld.so.conf.
+We believe that on your system, this directory is not part of the
+default library search path. If this is true, you probably have to do
+one of the following things to successfully use Tightdb in a C, C++,
+or Objective-C application:
+
+ - Run 'export LD_RUN_PATH=$LIBDIR' before building your application.
+
+ - Run 'export LD_LIBRARY_PATH=$LIBDIR' before launching your
+   application.
+
+ - Add '$LIBDIR' to the system-wide library search path by editing
+   /etc/ld.so.conf.
 EOF
             fi
+            echo "DONE INSTALLING" | tee -a "$LOG_FILE"
         else
             echo "Failed!" | tee -a "$LOG_FILE" 1>&2
             ERROR="1"
@@ -933,6 +960,12 @@ EOF
             echo "Log file is here: $LOG_FILE" 1>&2
             exit 1
         fi
+        cat <<EOF
+
+NOTE: At this point you should run './build test-installed' to check
+that all installed parts are working properly. If any part failed to
+install, it will be skipped in this test.
+EOF
         exit 0
         ;;
 
@@ -951,7 +984,7 @@ EOF
             if [ -e "$TEMP_DIR/select/$x" ]; then
                 echo "UNINSTALLING Extension '$x'" | tee -a "$LOG_FILE"
                 if ! sh "$EXT_HOME/build.sh" uninstall >>"$LOG_FILE" 2>&1; then
-                    echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
+                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                     ERROR="1"
                 fi
                 rm -f "$EXT_HOME/.WAS_INSTALLED" || exit 1
@@ -960,17 +993,18 @@ EOF
         if [ -e "$TEMP_DIR/select/c++" ]; then
             echo "UNINSTALLING Extension 'c++'" | tee -a "$LOG_FILE"
             if ! sh build.sh uninstall-devel >>"$LOG_FILE" 2>&1; then
-                echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
+                echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                 ERROR="1"
             fi
             rm -f ".DEVEL_FILES_WERE_INSTALLED" || exit 1
         fi
         echo "UNINSTALLING Core library" | tee -a "$LOG_FILE"
         if ! sh build.sh uninstall-shared >>"$LOG_FILE" 2>&1; then
-            echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
+            echo "Failed!" | tee -a "$LOG_FILE" 1>&2
             ERROR="1"
         fi
         rm -f ".WAS_INSTALLED" || exit 1
+        echo "DONE UNINSTALLING" | tee -a "$LOG_FILE"
         if [ "$ERROR" ]; then
             echo "Log file is here: $LOG_FILE" 1>&2
             exit 1
@@ -990,9 +1024,9 @@ EOF
         if [ -e ".DEVEL_FILES_WERE_INSTALLED" ]; then
             echo "TESTING Installed extension 'c++'" | tee -a "$LOG_FILE"
             if sh build.sh test-installed >>"$LOG_FILE" 2>&1; then
-                echo "SUCCESS!"  | tee -a "$LOG_FILE"
+                echo "Success!" | tee -a "$LOG_FILE"
             else
-                echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
+                echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                 ERROR="1"
             fi
         fi
@@ -1001,13 +1035,14 @@ EOF
             if [ -e "$EXT_HOME/.WAS_INSTALLED" ]; then
                 echo "TESTING Installed extension '$x'" | tee -a "$LOG_FILE"
                 if sh "$EXT_HOME/build.sh" test-installed >>"$LOG_FILE" 2>&1; then
-                    echo "SUCCESS!"  | tee -a "$LOG_FILE"
+                    echo "Success!" | tee -a "$LOG_FILE"
                 else
-                    echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
+                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                     ERROR="1"
                 fi
             fi
         done
+        echo "DONE TESTING" | tee -a "$LOG_FILE"
         if [ "$ERROR" ]; then
             echo "Log file is here: $LOG_FILE" 1>&2
             exit 1
