@@ -879,6 +879,7 @@ EOF
         fi
         if [ "$ERROR" ]; then
             cat 1>&2 <<EOF
+
 Note: Some parts failed to build. You may be missing one or more
 dependencies. Check the README file for details. If this does not
 help, check the log file.
@@ -937,7 +938,7 @@ EOF
 
 NOTE: Shared libraries have been installed in '$LIBDIR'.
 
-We believe that on your system, this directory is not part of the
+We believe that on your system this directory is not part of the
 default library search path. If this is true, you probably have to do
 one of the following things to successfully use Tightdb in a C, C++,
 or Objective-C application:
@@ -949,6 +950,7 @@ or Objective-C application:
 
  - Add '$LIBDIR' to the system-wide library search path by editing
    /etc/ld.so.conf.
+
 EOF
             fi
             echo "DONE INSTALLING" | tee -a "$LOG_FILE"
