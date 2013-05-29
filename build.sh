@@ -116,7 +116,7 @@ get_host_info()
     uname -a
     if [ "$OS" = "Darwin" ]; then
         echo "\$ system_profiler SPSoftwareDataType"
-        system_profiler SPSoftwareDataType
+        system_profiler SPSoftwareDataType | grep -v '^ *$'
     elif [ -e "/etc/issue" ]; then
         echo "\$ cat /etc/issue"
         cat "/etc/issue" | grep -v '^ *$'
