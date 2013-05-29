@@ -59,7 +59,7 @@ namespace tightdb {
 /// data) is stored in a TightDB database, it is always followed by a
 /// terminating null character. This is also true when strings are
 /// stored in a mixed type column. This means that in the following
-/// code if the 'mixed' value of the 8th row stores a string, then \c
+/// code, if the 'mixed' value of the 8th row stores a string, then \c
 /// c_str will always point to a null-terminated string:
 ///
 /// \code{.cpp}
@@ -82,7 +82,7 @@ namespace tightdb {
 /// of copying and destroying Mixed instances, and it would serve just
 /// fine for passing a table as argument when setting the value of an
 /// entry in a mixed column. In that case a copy of the referenced
-/// table would inserted into the mixed column.
+/// table would be inserted into the mixed column.
 ///
 /// On the other hand, when retrieving a table reference from a mixed
 /// column, storing it as a plain pointer in a Mixed instance is no
@@ -94,7 +94,7 @@ namespace tightdb {
 /// problems. One problem is the risk of a Mixed instance outliving a
 /// stack allocated Table instance that it references. This would be a
 /// fatal error. Another problem is the impact that the nontrivial
-/// table reference has on the performance of copying and detroying
+/// table reference has on the performance of copying and destroying
 /// Mixed instances.
 ///
 /// \sa StringData
