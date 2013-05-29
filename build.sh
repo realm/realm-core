@@ -119,7 +119,7 @@ get_host_info()
         system_profiler SPSoftwareDataType
     elif [ -e "/etc/issue" ]; then
         echo "\$ cat /etc/issue"
-        cat "/etc/issue" | grep -v 's/^ *$//'
+        cat "/etc/issue" | grep -v '^ *$'
     fi
 }
 
@@ -135,7 +135,7 @@ get_compiler_info()
     for x in $(printf "%s\n%s\n%s\n" "$CC_CMD" "$CXX_CMD" "$LD_CMD" | sort -u); do
         echo
         echo "\$ $x --version"
-        $x --version 2>/dev/null | grep -v 's/^ *$//'
+        $x --version 2>/dev/null | grep -v '^ *$'
     done
 }
 
