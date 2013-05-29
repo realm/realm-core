@@ -379,6 +379,9 @@ Query& Query::between(size_t column_ndx, double from, double to)
 }
 
 // STRINGS
+
+// Fixme: If user writes equal(col, "hello") then it compiles fine but the *bool* method gets called
+// which crashes! That's not user friendly
 Query& Query::equal(size_t column_ndx, StringData value, bool case_sensitive)
 {
     ParentNode* p;

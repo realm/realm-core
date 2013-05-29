@@ -1087,14 +1087,21 @@ public:
             if (fr == FindRes_single) {
                 m_index_matches = new Column();
                 m_index_matches->add(index_ref);
-                m_index_matches_destroy = true;
+                m_index_matches_destroy = true;		// we own m_index_matches, so we must destroy it
             }
             else if (fr == FindRes_column) {
-                m_index_matches = new Column(index_ref, 0, 0);
+				// todo: Apparently we can't use m_index.GetAllocator() because it uses default allocator which simply makes 
+				// Translate(x) = x. Shouldn't it inherit owner column's allocator?!
+				if (m_column_type == col_type_StringEnum) {
+	                m_index_matches = new Column(index_ref, 0, 0, static_cast<const ColumnStringEnum*>(m_condition_column)->GetAllocator());
+				}
+				else {
+	                m_index_matches = new Column(index_ref, 0, 0, static_cast<const AdaptiveStringColumn*>(m_condition_column)->GetAllocator());
+				}
             }
             else if (fr == FindRes_not_found) {
                 m_index_matches = new Column();
-                m_index_matches_destroy = true;
+                m_index_matches_destroy = true;		// we own m_index_matches, so we must destroy it
             }
 
             last_indexed = 0;
