@@ -4,7 +4,7 @@
 
 #include <tightdb.hpp>
 #include "testsettings.hpp"
-
+#include <stdlib.h> // itoa()
 
 using namespace tightdb;
 
@@ -71,6 +71,44 @@ TIGHTDB_TABLE_5(GATable,
                      event_2, Int)
 
 } // anonymous namespace
+
+
+TEST(TestQueryStrIndexCrash)
+{
+	// Rasmus "8" index crash 
+	for(int iter = 0; iter < 5; iter++)
+	{
+	    Group group;
+		TableRef table = group.get_table("test");
+
+		Spec& s = table->get_spec();
+	    s.add_column(type_String, "first");
+	    table->update_from_spec();
+
+		int64_t eights = 0;
+
+		for(int i = 0; i < 2000; i++) {
+			int v = rand() % 10;
+			if(v == 8) {
+				eights++;			
+			}
+			char dst[100];
+			memset(dst, 0, sizeof(dst));
+			sprintf(dst,"%d",v);
+			table->insert_string(0, i, dst);
+			table->insert_done();
+		}
+
+		table->set_index(0);
+		TableView v = table->where().equal(0, StringData("8")).find_all();
+		CHECK_EQUAL(eights, v.size());
+	
+		v = table->where().equal(0, StringData("10")).find_all();
+
+		v = table->where().equal(0, StringData("8")).find_all();
+		CHECK_EQUAL(eights, v.size());
+	}
+}
 
 
 TEST(QueryTwoColsEqualVaryWidthAndValues)

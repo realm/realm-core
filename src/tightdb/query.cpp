@@ -378,7 +378,36 @@ Query& Query::between(size_t column_ndx, double from, double to)
     return *this;
 }
 
-// STRINGS
+
+// Strings, const char*
+
+Query& Query::equal(size_t column_ndx, const char* value, bool case_sensitive)
+{
+	return equal(column_ndx, StringData(value), case_sensitive);
+}
+
+Query& Query::begins_with(size_t column_ndx, const char* value, bool case_sensitive)
+{
+	return begins_with(column_ndx, StringData(value), case_sensitive);
+}
+
+Query& Query::ends_with(size_t column_ndx, const char* value, bool case_sensitive)
+{
+	return ends_with(column_ndx, StringData(value), case_sensitive);
+}
+
+Query& Query::contains(size_t column_ndx, const char* value, bool case_sensitive)
+{
+	return contains(column_ndx, StringData(value), case_sensitive);
+}
+
+Query& Query::not_equal(size_t column_ndx, const char* value, bool case_sensitive)
+{
+	return not_equal(column_ndx, StringData(value), case_sensitive);
+}
+	
+// Strings, StringData()
+
 Query& Query::equal(size_t column_ndx, StringData value, bool case_sensitive)
 {
     ParentNode* p;
