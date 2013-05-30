@@ -128,7 +128,7 @@ public:
     Query& contains(size_t column_ndx, StringData value, bool case_sensitive=true);
 
     // These are shortcuts for equal(StringData(c_str)) and
-    // note_equal(StringData(c_str)), and are needed to avoid unwanted
+    // not_equal(StringData(c_str)), and are needed to avoid unwanted
     // implicit conversion of char* to bool.
     Query& equal(size_t column_ndx, const char* c_str, bool case_sensitive=true);
     Query& not_equal(size_t column_ndx, const char* c_str, bool case_sensitive=true);
