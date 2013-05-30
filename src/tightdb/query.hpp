@@ -121,7 +121,19 @@ public:
     Query& between_date(size_t column_ndx, Date from, Date to) { return between(column_ndx, int64_t(from.get_date()), int64_t(to.get_date())); }
 
     // Conditions: strings
-    Query& equal(size_t column_ndx, StringData value, bool case_sensitive=true);
+    Query& equal(size_t column_ndx, const std::string value, bool case_sensitive);
+    Query& not_equal(size_t column_ndx, const std::string value, bool case_sensitive);
+    Query& begins_with(size_t column_ndx, const std::string value, bool case_sensitive);
+    Query& ends_with(size_t column_ndx, const std::string value, bool case_sensitive);
+    Query& contains(size_t column_ndx, const std::string value, bool case_sensitive);
+
+	Query& equal(size_t column_ndx, const char* value, bool case_sensitive);
+    Query& not_equal(size_t column_ndx, const char* value, bool case_sensitive);
+    Query& begins_with(size_t column_ndx, const char* value, bool case_sensitive);
+    Query& ends_with(size_t column_ndx, const char* value, bool case_sensitive);
+    Query& contains(size_t column_ndx, const char* value, bool case_sensitive);
+
+	Query& equal(size_t column_ndx, StringData value, bool case_sensitive=true);
     Query& not_equal(size_t column_ndx, StringData value, bool case_sensitive=true);
     Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive=true);
     Query& ends_with(size_t column_ndx, StringData value, bool case_sensitive=true);
