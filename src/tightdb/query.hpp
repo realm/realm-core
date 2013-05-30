@@ -121,6 +121,7 @@ public:
     Query& between_date(size_t column_ndx, Date from, Date to) { return between(column_ndx, int64_t(from.get_date()), int64_t(to.get_date())); }
 
     // Conditions: strings
+
     Query& equal(size_t column_ndx, StringData value, bool case_sensitive=true);
     Query& not_equal(size_t column_ndx, StringData value, bool case_sensitive=true);
     Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive=true);

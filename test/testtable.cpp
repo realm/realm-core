@@ -21,12 +21,12 @@ TIGHTDB_TABLE_2(TupleTableType,
 #ifndef TIGHTDB_BYPASS_OPTIMIZE_CRASH_BUG
 TEST(TestOptimizeCrash)
 {
-	// This will crash at the .add() method
-	TupleTableType ttt;
-	ttt.optimize();
-	ttt.column().second.set_index();
-	ttt.clear();
-	ttt.add(1, "AA");
+    // This will crash at the .add() method
+    TupleTableType ttt;
+    ttt.optimize();
+    ttt.column().second.set_index();
+    ttt.clear();
+    ttt.add(1, "AA");
 }
 #endif
 

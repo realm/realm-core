@@ -377,7 +377,8 @@ Query& Query::between(size_t column_ndx, double from, double to)
     less_equal(column_ndx, to);
     return *this;
 }
-	
+
+
 // Strings, StringData()
 
 Query& Query::equal(size_t column_ndx, StringData value, bool case_sensitive)
