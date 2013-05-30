@@ -166,7 +166,7 @@ TEST(Shared_Initial2_Mem)
 
     // Verify that both db and lock file was deleted after use
 #ifndef _WIN32 // GroupShared cannot clean lock/db file on Windows
-	CHECK(!File::exists("test_shared.tightdb"));
+    CHECK(!File::exists("test_shared.tightdb"));
     CHECK(!File::exists("test_shared.tightdb.lock"));
 #endif
 }

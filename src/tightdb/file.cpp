@@ -491,9 +491,9 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (non_blocking) flags |= LOCKFILE_FAIL_IMMEDIATELY;
     OVERLAPPED overlapped;
     memset(&overlapped, 0, sizeof overlapped);
-	overlapped.Offset = 0;		// Just for clarity
-	overlapped.OffsetHigh = 0;	// Just for clarity
-	if (LockFileEx(m_handle, flags, 0, 1, 0, &overlapped)) {
+    overlapped.Offset = 0;        // Just for clarity
+    overlapped.OffsetHigh = 0;    // Just for clarity
+    if (LockFileEx(m_handle, flags, 0, 1, 0, &overlapped)) {
         m_have_lock = true;
         return true;
     }

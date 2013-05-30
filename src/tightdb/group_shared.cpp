@@ -50,7 +50,7 @@ public:
     ScopedMutexLock(pthread_mutex_t* mutex) TIGHTDB_NOEXCEPT : m_mutex(mutex)
     {
         int r = pthread_mutex_lock(m_mutex);
-		TIGHTDB_ASSERT(r == 0);
+        TIGHTDB_ASSERT(r == 0);
         static_cast<void>(r);
     }
 

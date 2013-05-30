@@ -75,39 +75,39 @@ TIGHTDB_TABLE_5(GATable,
 
 TEST(TestQueryStrIndexCrash)
 {
-	// Rasmus "8" index crash 
-	for(int iter = 0; iter < 5; iter++)
-	{
-	    Group group;
-		TableRef table = group.get_table("test");
+    // Rasmus "8" index crash 
+    for(int iter = 0; iter < 5; iter++)
+    {
+        Group group;
+        TableRef table = group.get_table("test");
 
-		Spec& s = table->get_spec();
-	    s.add_column(type_String, "first");
-	    table->update_from_spec();
+        Spec& s = table->get_spec();
+        s.add_column(type_String, "first");
+        table->update_from_spec();
 
-		int64_t eights = 0;
+        int64_t eights = 0;
 
-		for(int i = 0; i < 2000; i++) {
-			int v = rand() % 10;
-			if(v == 8) {
-				eights++;			
-			}
-			char dst[100];
-			memset(dst, 0, sizeof(dst));
-			sprintf(dst,"%d",v);
-			table->insert_string(0, i, dst);
-			table->insert_done();
-		}
+        for(int i = 0; i < 2000; i++) {
+            int v = rand() % 10;
+            if(v == 8) {
+                eights++;            
+            }
+            char dst[100];
+            memset(dst, 0, sizeof(dst));
+            sprintf(dst,"%d",v);
+            table->insert_string(0, i, dst);
+            table->insert_done();
+        }
 
-		table->set_index(0);
-		TableView v = table->where().equal(0, StringData("8")).find_all();
-		CHECK_EQUAL(eights, v.size());
-	
-		v = table->where().equal(0, StringData("10")).find_all();
+        table->set_index(0);
+        TableView v = table->where().equal(0, StringData("8")).find_all();
+        CHECK_EQUAL(eights, v.size());
+    
+        v = table->where().equal(0, StringData("10")).find_all();
 
-		v = table->where().equal(0, StringData("8")).find_all();
-		CHECK_EQUAL(eights, v.size());
-	}
+        v = table->where().equal(0, StringData("8")).find_all();
+        CHECK_EQUAL(eights, v.size());
+    }
 }
 
 
@@ -584,8 +584,8 @@ TEST(TestQueryStrIndex2)
 
     int64_t s;
 
-	for (int i = 0; i < 100; i++) {
-	    ttt.add(1, "AA");
+    for (int i = 0; i < 100; i++) {
+        ttt.add(1, "AA");
     }
     ttt.add(1, "BB");
     ttt.column().second.set_index();
@@ -605,25 +605,25 @@ TEST(TestQueryStrEnum)
 {
     TupleTableType ttt;
 
-	int aa;
-	int64_t s;
+    int aa;
+    int64_t s;
 
-	for (int i = 0; i < 100; i++) {
-		ttt.clear();
-		aa = 0;
-		for (size_t t = 0; t < 2000; t++) {
-			if (rand() % 3 == 0) {
-				ttt.add(1, "AA");
-				aa++;
-			}
-			else {
-				ttt.add(1, "BB");
-			}
-		}
-		ttt.optimize();
-		s = ttt.where().second.equal("AA").count();
-		CHECK_EQUAL(aa, s);
-	}
+    for (int i = 0; i < 100; i++) {
+        ttt.clear();
+        aa = 0;
+        for (size_t t = 0; t < 2000; t++) {
+            if (rand() % 3 == 0) {
+                ttt.add(1, "AA");
+                aa++;
+            }
+            else {
+                ttt.add(1, "BB");
+            }
+        }
+        ttt.optimize();
+        s = ttt.where().second.equal("AA").count();
+        CHECK_EQUAL(aa, s);
+    }
 
 }
 
@@ -631,40 +631,40 @@ TEST(TestQueryStrEnum)
 TEST(TestQueryStrIndex)
 {
 #ifdef TIGHTDB_DEBUG
-	size_t itera = 4;
-	size_t iterb = 100;
+    size_t itera = 4;
+    size_t iterb = 100;
 #else
-	size_t itera = 100;
-	size_t iterb = 2000;
+    size_t itera = 100;
+    size_t iterb = 2000;
 #endif
 
-	int aa;
-	int64_t s;
+    int aa;
+    int64_t s;
 
-	for (size_t i = 0; i < itera; i++) {
-		TupleTableType ttt;
-		aa = 0;
-		for (size_t t = 0; t < iterb; t++) {
-			if (rand() % 3 == 0) {
-				ttt.add(1, "AA");
-				aa++;
-			}
-			else {
-				ttt.add(1, "BB");
-			}
-		}
+    for (size_t i = 0; i < itera; i++) {
+        TupleTableType ttt;
+        aa = 0;
+        for (size_t t = 0; t < iterb; t++) {
+            if (rand() % 3 == 0) {
+                ttt.add(1, "AA");
+                aa++;
+            }
+            else {
+                ttt.add(1, "BB");
+            }
+        }
 
-		s = ttt.where().second.equal("AA").count();
-		CHECK_EQUAL(aa, s);
+        s = ttt.where().second.equal("AA").count();
+        CHECK_EQUAL(aa, s);
 
-		ttt.optimize();
-		s = ttt.where().second.equal("AA").count();
-		CHECK_EQUAL(aa, s);
+        ttt.optimize();
+        s = ttt.where().second.equal("AA").count();
+        CHECK_EQUAL(aa, s);
 
-		ttt.column().second.set_index();
-		s = ttt.where().second.equal("AA").count();
-		CHECK_EQUAL(aa, s);
-	}
+        ttt.column().second.set_index();
+        s = ttt.where().second.equal("AA").count();
+        CHECK_EQUAL(aa, s);
+    }
 
 }
 
@@ -1165,9 +1165,9 @@ TEST(TestQuerySimpleStr)
     ttt.add(5, "X");
     ttt.add(6, "X");
     TupleTableType::Query q = ttt.where().second.equal("X");
-	size_t c = q.count();
+    size_t c = q.count();
 
-	CHECK_EQUAL(4, c);
+    CHECK_EQUAL(4, c);
 }
 
 TEST(TestQueryDelete)
@@ -1619,8 +1619,8 @@ TEST(TestQueryLongEnum)
             ttt.add(6, "aaaaaaaaaaaaaaaaaa");
         }
     }
-	ttt.optimize();
-	TupleTableType::Query q1 = ttt.where().first.equal(2).second.not_equal("aaaaaaaaaaaaaaaaaa");
+    ttt.optimize();
+    TupleTableType::Query q1 = ttt.where().first.equal(2).second.not_equal("aaaaaaaaaaaaaaaaaa");
 
     // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
     //q1.set_threads(5);
