@@ -31,8 +31,8 @@ namespace tightdb {
 
 /// A reference to a chunk of character data.
 ///
-/// This class does not own the referenced memory, nor does it in any
-/// other way attempt to manage the lifetime of it.
+/// An instance of this class does not own the referenced memory, nor
+/// does it in any other way attempt to manage the lifetime of it.
 ///
 /// For compatibility with C style strings, when a string is stored in
 /// a TightDB database, it is always followed by a terminating null

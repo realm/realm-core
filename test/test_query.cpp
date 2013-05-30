@@ -1,7 +1,8 @@
+#include <vector>
+
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
-#include <vector>
 #include "testsettings.hpp"
 
 
@@ -72,7 +73,7 @@ TIGHTDB_TABLE_5(GATable,
 } // anonymous namespace
 
 
-TEST(QueryTwoColsEqualVaryWidthAndValues) 
+TEST(QueryTwoColsEqualVaryWidthAndValues)
 {
     std::vector<size_t> ints1;
     std::vector<size_t> ints2;
@@ -169,7 +170,7 @@ TEST(QueryTwoColsEqualVaryWidthAndValues)
         CHECK_EQUAL(doubles[t], t5.get_source_ndx(t));
 }
 
-TEST(QueryTwoColsVaryOperators) 
+TEST(QueryTwoColsVaryOperators)
 {
     std::vector<size_t> ints1;
     std::vector<size_t> floats;
@@ -236,7 +237,7 @@ TEST(QueryTwoColsVaryOperators)
 
 
 
-TEST(QueryTwoCols0) 
+TEST(QueryTwoCols0)
 {
     Table table;
     table.add_column(type_Int, "first1");
@@ -254,11 +255,10 @@ TEST(QueryTwoCols0)
 
     tightdb::TableView t2 = table.where().less_int(size_t(0), size_t(1)).find_all();
     CHECK_EQUAL(0, t2.size());
-    
 }
 
 
-TEST(QueryTwoColsNoRows) 
+TEST(QueryTwoColsNoRows)
 {
     Table table;
     table.add_column(type_Int, "first1");
@@ -268,7 +268,7 @@ TEST(QueryTwoColsNoRows)
     CHECK_EQUAL(not_found, table.where().not_equal_int(size_t(0), size_t(1)).find_next());
 }
 
-TEST(TestQueryHuge) 
+TEST(TestQueryHuge)
 {
 #if TEST_DURATION == 0
     for (int N = 0; N < 2; N++) {
@@ -339,7 +339,7 @@ TEST(TestQueryHuge)
                 else
                     first = "B";
             }
-        
+
             if (long2) {
                 if (rand() % mdist2 == 0)
                     second = "longlonglonglonglonglonglong A";
@@ -401,7 +401,7 @@ TEST(TestQueryHuge)
 
             v = tt.where().first.equal("A").second.equal("A").third.equal(1).find_all();
             CHECK_EQUAL(res1, v.size());
-    
+
             v = tt.where().second.equal("A").first.equal("A").third.equal(1).find_all();
             CHECK_EQUAL(res1, v.size());
 
@@ -410,7 +410,7 @@ TEST(TestQueryHuge)
 
             v = tt.where().group().first.equal("A").Or().second.equal("A").end_group().third.equal(1).find_all();
             CHECK_EQUAL(res2, v.size());
-    
+
             v = tt.where().first.equal("A").group().second.equal("A").Or().third.equal(1).end_group().find_all();
             CHECK_EQUAL(res3, v.size());
 
@@ -428,24 +428,23 @@ TEST(TestQueryHuge)
 
             v = tt.where().first.not_equal("longlonglonglonglonglonglong A").second.equal("A").third.equal(2).find_all();
             CHECK_EQUAL(res8, v.size());
-        }        
-
+        }
     }
 }
 
 TEST(TestQueryStrIndex3)
 {
-    // Create two columns where query match-density varies alot throughout the rows. This forces the query engine to 
+    // Create two columns where query match-density varies alot throughout the rows. This forces the query engine to
     // jump back and forth between the two conditions and test edge cases in these transitions. Tests combinations of
     // linear scan, enum and index
 
 #ifdef TIGHTDB_DEBUG
-    for (int N = 0; N < 4; N++) { 
+    for (int N = 0; N < 4; N++) {
 #else
-    for (int N = 0; N < 20; N++) { 
+    for (int N = 0; N < 20; N++) {
 #endif
         TupleTableType ttt;
- 
+
         std::vector<size_t> vec;
         size_t row = 0;
 
@@ -479,13 +478,13 @@ TEST(TestQueryStrIndex3)
                         ttt.add(1, "AA");
                     else
                         ttt.add(1, "BB");
-                
+
                 row++;
             }
         }
-    
+
         TupleTableType::View v;
-        
+
         // Both linear scans
         v = ttt.where().second.equal("AA").first.equal(0).find_all();
         CHECK_EQUAL(vec.size(), v.size());
@@ -600,7 +599,7 @@ TEST(TestQueryStrIndex)
 	size_t itera = 100;
 	size_t iterb = 2000;
 #endif
-	
+
 	int aa;
 	int64_t s;
 
@@ -2202,7 +2201,7 @@ TEST(TestQueryUnicode3)
     CHECK_EQUAL(3, tv4.get_source_ndx(0));
 }
 
-#endif 
+#endif
 
 TEST(TestQueryFindAll_BeginsUNICODE)
 {
@@ -2528,6 +2527,85 @@ TEST(TestQuery_Subtables_Typed)
 }
 
 
+TEST(TestQuery_AllTypes_DynamicallyTyped)
+{
+    Table table;
+    {
+        Spec& spec = table.get_spec();
+        spec.add_column(type_Bool,   "boo");
+        spec.add_column(type_Int,    "int");
+        spec.add_column(type_Float,  "flt");
+        spec.add_column(type_Double, "dbl");
+        spec.add_column(type_String, "str");
+        spec.add_column(type_Binary, "bin");
+        spec.add_column(type_Date,   "dat");
+        {
+            Spec subspec = spec.add_subtable_column("tab");
+            subspec.add_column(type_Int, "sub_int");
+        }
+        spec.add_column(type_Mixed,  "mix");
+    }
+    table.update_from_spec();
+
+    const char bin[4] = { 0, 1, 2, 3 };
+    BinaryData bin1(bin, sizeof bin / 2);
+    BinaryData bin2(bin, sizeof bin);
+    time_t time_now = time(0);
+    Mixed mix_int(int64_t(1));
+    Mixed mix_subtab((Mixed::subtable_tag()));
+
+    table.add_empty_row();
+    table.set_bool   (0, 0, false);
+    table.set_int    (1, 0, 54);
+    table.set_float  (2, 0, 0.7f);
+    table.set_double (3, 0, 0.8);
+    table.set_string (4, 0, "foo");
+    table.set_binary (5, 0, bin1);
+    table.set_date   (6, 0, 0);
+    table.set_mixed  (8, 0, mix_int);
+
+    table.add_empty_row();
+    table.set_bool   (0, 1, true);
+    table.set_int    (1, 1, 506);
+    table.set_float  (2, 1, 7.7f);
+    table.set_double (3, 1, 8.8);
+    table.set_string (4, 1, "banach");
+    table.set_binary (5, 1, bin2);
+    table.set_date   (6, 1, time_now);
+    TableRef subtab = table.get_subtable(7, 1);
+    subtab->add_empty_row();
+    subtab->set_int(0, 0, 100);
+    table.set_mixed  (8, 1, mix_subtab);
+
+    CHECK_EQUAL(1, table.where().equal(0, false).count());
+    CHECK_EQUAL(1, table.where().equal(1, int64_t(54)).count());
+    CHECK_EQUAL(1, table.where().equal(2, 0.7f).count());
+    CHECK_EQUAL(1, table.where().equal(3, 0.8).count());
+    CHECK_EQUAL(1, table.where().equal(4, "foo").count());
+    CHECK_EQUAL(1, table.where().equal(5, bin1).count());
+    CHECK_EQUAL(1, table.where().equal_date(6, 0).count());
+//    CHECK_EQUAL(1, table.where().equal(7, subtab).count());
+//    CHECK_EQUAL(1, table.where().equal(8, mix_int).count());
+
+    Query query = table.where().equal(0, false);
+
+    CHECK_EQUAL(54, query.minimum(1));
+    CHECK_EQUAL(54, query.maximum(1));
+    CHECK_EQUAL(54, query.sum(1));
+    CHECK_EQUAL(54, query.average(1));
+
+    CHECK_EQUAL(0.7f, query.minimum(2));
+    CHECK_EQUAL(0.7f, query.maximum(2));
+    CHECK_EQUAL(0.7f, query.sum(2));
+    CHECK_EQUAL(0.7f, query.average(2));
+
+    CHECK_EQUAL(0.8, query.minimum(3));
+    CHECK_EQUAL(0.8, query.maximum(3));
+    CHECK_EQUAL(0.8, query.sum(3));
+    CHECK_EQUAL(0.8, query.average(3));
+}
+
+
 namespace {
 TIGHTDB_TABLE_1(TestQuerySub,
                 age,  Int)
@@ -2544,7 +2622,7 @@ TIGHTDB_TABLE_9(TestQueryAllTypes,
                 mixed_col,  Mixed)
 }
 
-TEST(TestQuery_AllTypes)
+TEST(TestQuery_AllTypes_StaticallyTyped)
 {
     TestQueryAllTypes table;
 
@@ -2552,39 +2630,38 @@ TEST(TestQuery_AllTypes)
     BinaryData bin1(bin, sizeof bin / 2);
     BinaryData bin2(bin, sizeof bin);
     time_t time_now = time(0);
-//    TestQuerySub subtab1;
-    TestQuerySub subtab2;
-    subtab2.add(100);
-    Mixed mix_int_1(int64_t(1));
-//    Mixed mix_subtab(subtab2);
+    TestQuerySub subtab;
+    subtab.add(100);
+    Mixed mix_int(int64_t(1));
+    Mixed mix_subtab((Mixed::subtable_tag()));
 
-    table.add(false,  54, 0.7f, 0.8, "foo",    bin1, 0,        0,        mix_int_1);
-    table.add(true,  506, 7.7f, 8.8, "banach", bin2, time_now, &subtab2, mix_int_1);
+    table.add(false,  54, 0.7f, 0.8, "foo",    bin1, 0,        0,       mix_int);
+    table.add(true,  506, 7.7f, 8.8, "banach", bin2, time_now, &subtab, mix_subtab);
 
     CHECK_EQUAL(1, table.where().bool_col.equal(false).count());
     CHECK_EQUAL(1, table.where().int_col.equal(54).count());
     CHECK_EQUAL(1, table.where().float_col.equal(0.7f).count());
     CHECK_EQUAL(1, table.where().double_col.equal(0.8).count());
     CHECK_EQUAL(1, table.where().string_col.equal("foo").count());
-//    CHECK_EQUAL(1, table.where().binary_col.equal(bin1).count());
+    CHECK_EQUAL(1, table.where().binary_col.equal(bin1).count());
     CHECK_EQUAL(1, table.where().date_col.equal(0).count());
-//    CHECK_EQUAL(1, table.where().table_col.equal(subtab1).count());
-//    CHECK_EQUAL(1, table.where().mixed_col.equal(mix_int_1).count());
+//    CHECK_EQUAL(1, table.where().table_col.equal(subtab).count());
+//    CHECK_EQUAL(1, table.where().mixed_col.equal(mix_int).count());
 
     TestQueryAllTypes::Query query = table.where().bool_col.equal(false);
 
-    CHECK_EQUAL(query.int_col.minimum(), 54);
-    CHECK_EQUAL(query.int_col.maximum(), 54);
-    CHECK_EQUAL(query.int_col.sum(),     54);
-    CHECK_EQUAL(query.int_col.average(), 54);
+    CHECK_EQUAL(54, query.int_col.minimum());
+    CHECK_EQUAL(54, query.int_col.maximum());
+    CHECK_EQUAL(54, query.int_col.sum());
+    CHECK_EQUAL(54, query.int_col.average());
 
-    CHECK_EQUAL(query.float_col.minimum(), 0.7f);
-    CHECK_EQUAL(query.float_col.maximum(), 0.7f);
-    CHECK_EQUAL(query.float_col.sum(),     0.7f);
-    CHECK_EQUAL(query.float_col.average(), 0.7f);
+    CHECK_EQUAL(0.7f, query.float_col.minimum());
+    CHECK_EQUAL(0.7f, query.float_col.maximum());
+    CHECK_EQUAL(0.7f, query.float_col.sum());
+    CHECK_EQUAL(0.7f, query.float_col.average());
 
-    CHECK_EQUAL(query.double_col.minimum(), 0.8);
-    CHECK_EQUAL(query.double_col.maximum(), 0.8);
-    CHECK_EQUAL(query.double_col.sum(),     0.8);
-    CHECK_EQUAL(query.double_col.average(), 0.8);
+    CHECK_EQUAL(0.8, query.double_col.minimum());
+    CHECK_EQUAL(0.8, query.double_col.maximum());
+    CHECK_EQUAL(0.8, query.double_col.sum());
+    CHECK_EQUAL(0.8, query.double_col.average());
 }

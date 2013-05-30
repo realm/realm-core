@@ -41,6 +41,7 @@ clean-doc-ex:
 	@$(MAKE) -C doc/ref_cpp/examples clean
 
 # Used by build.sh
+.PHONY: get-libdir get-cc get-cxx get-ld
 get-libdir:
 	@echo $(libdir)
 get-cc:
