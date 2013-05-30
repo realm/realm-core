@@ -2632,15 +2632,15 @@ TEST(TestQuery_AllTypes_DynamicallyTyped)
     CHECK_EQUAL(54, query.sum(1));
     CHECK_EQUAL(54, query.average(1));
 
-    CHECK_EQUAL(0.7f, query.minimum(2));
-    CHECK_EQUAL(0.7f, query.maximum(2));
-    CHECK_EQUAL(0.7f, query.sum(2));
-    CHECK_EQUAL(0.7f, query.average(2));
+    CHECK_EQUAL(0.7f, query.minimum_float(2));
+    CHECK_EQUAL(0.7f, query.maximum_float(2));
+    CHECK_EQUAL(0.7f, query.sum_float(2));
+    CHECK_EQUAL(0.7f, query.average_float(2));
 
-    CHECK_EQUAL(0.8, query.minimum(3));
-    CHECK_EQUAL(0.8, query.maximum(3));
-    CHECK_EQUAL(0.8, query.sum(3));
-    CHECK_EQUAL(0.8, query.average(3));
+    CHECK_EQUAL(0.8, query.minimum_double(3));
+    CHECK_EQUAL(0.8, query.maximum_double(3));
+    CHECK_EQUAL(0.8, query.sum_double(3));
+    CHECK_EQUAL(0.8, query.average_double(3));
 }
 
 
