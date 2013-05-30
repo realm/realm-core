@@ -121,17 +121,17 @@ public:
     Query& between_date(size_t column_ndx, Date from, Date to) { return between(column_ndx, int64_t(from.get_date()), int64_t(to.get_date())); }
 
     // Conditions: strings
-	Query& equal(size_t column_ndx, const char* value, bool case_sensitive=true);
-    Query& not_equal(size_t column_ndx, const char* value, bool case_sensitive=true);
-    Query& begins_with(size_t column_ndx, const char* value, bool case_sensitive=true);
-    Query& ends_with(size_t column_ndx, const char* value, bool case_sensitive=true);
-    Query& contains(size_t column_ndx, const char* value, bool case_sensitive=true);
-
-	Query& equal(size_t column_ndx, StringData value, bool case_sensitive=true);
+    Query& equal(size_t column_ndx, StringData value, bool case_sensitive=true);
     Query& not_equal(size_t column_ndx, StringData value, bool case_sensitive=true);
     Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive=true);
     Query& ends_with(size_t column_ndx, StringData value, bool case_sensitive=true);
     Query& contains(size_t column_ndx, StringData value, bool case_sensitive=true);
+
+    // These are shortcuts for equal(StringData(c_str)) and
+    // note_equal(StringData(c_str)), and are needed to avoid unwanted
+    // implicit conversion of char* to bool.
+    Query& equal(size_t column_ndx, const char* c_str, bool case_sensitive=true);
+    Query& not_equal(size_t column_ndx, const char* c_str, bool case_sensitive=true);
 
     // Conditions: binary data
     Query& equal(size_t column_ndx, BinaryData value);
@@ -258,6 +258,20 @@ private:
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
 };
 
+
+
+
+// Implementation:
+
+inline Query& Query::equal(size_t column_ndx, const char* c_str, bool case_sensitive)
+{
+    return equal(column_ndx, StringData(c_str), case_sensitive);
+}
+
+inline Query& Query::not_equal(size_t column_ndx, const char* c_str, bool case_sensitive)
+{
+    return not_equal(column_ndx, StringData(c_str), case_sensitive);
+}
 
 } // namespace tightdb
 
