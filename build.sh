@@ -1226,8 +1226,8 @@ EOF
     *)
         echo "Unspecified or bad mode '$MODE'" 1>&2
         echo "Available modes are: clean build test install uninstall test-installed wipe-installed" 1>&2
-        echo "As well as: install-shared install-devel uninstall-shared uninstall-devel" 1>&2
-        echo "As well as: src-dist bin-dist dist-status dist-pull dist-checkout dist-copy" 1>&2
+        echo "As well as: install-shared install-devel uninstall-shared uninstall-devel dist-copy" 1>&2
+        echo "As well as: src-dist bin-dist dist-status dist-pull dist-checkout" 1>&2
         echo "As well as: dist-clean dist-build dist-install dist-uninstall dist-test-installed" 1>&2
         exit 1
         ;;
