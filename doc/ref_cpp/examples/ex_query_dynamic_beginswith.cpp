@@ -1,4 +1,5 @@
 // @@Example: ex_cpp_dyn_query_startsWith @@
+#include <cassert>
 #include <tightdb.hpp>
 
 using namespace tightdb;
@@ -24,8 +25,8 @@ int main()
     // Find Names (column 0) beginning with "Jo"
     TableView view1 = table->where().begins_with(0, "Jo").find_all();
     assert(view1.size() == 2);
-    assert(!strcmp(view1.get_string(0, 0), "Joe"));
-    assert(!strcmp(view1.get_string(0, 1), "Jo"));
+    assert(view1.get_string(0,0) == "Joe");
+    assert(view1.get_string(0,1) == "Jo");
 
     // Will find no Names (column 0) because it's case sensitive
     TableView view2 = table->where().begins_with(0, "JO").find_all();
@@ -36,8 +37,8 @@ int main()
     TableView view3 = table->where().begins_with(0, "JO", false).find_all();
 
     assert(view3.size() == 2);
-    assert(!strcmp(view3.get_string(0, 0), "Joe"));
-    assert(!strcmp(view3.get_string(0, 1), "Jo"));
+    assert(view3.get_string(0,0) == "Joe");
+    assert(view3.get_string(0,1) == "Jo");
 #endif
 // @@EndShow@@
 }

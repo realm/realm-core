@@ -49,7 +49,9 @@ class ScopedMutexLock {
 public:
     ScopedMutexLock(pthread_mutex_t* mutex) TIGHTDB_NOEXCEPT : m_mutex(mutex)
     {
-        pthread_mutex_lock(m_mutex);
+        int r = pthread_mutex_lock(m_mutex);
+        TIGHTDB_ASSERT(r == 0);
+        static_cast<void>(r);
     }
 
     ~ScopedMutexLock() TIGHTDB_NOEXCEPT
@@ -140,7 +142,7 @@ retry:
         }
 
         // Map to memory
-        m_file_map.map(m_file, File::access_ReadWrite, File::map_NoSync);
+        m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
         File::UnmapGuard fug(m_file_map);
 
         SharedInfo* const info = m_file_map.get_addr();
@@ -204,7 +206,7 @@ retry:
         // since that part can be resized and as such remapped which
         // could move our mutexes (which we don't want to risk moving while
         // they are locked)
-        m_reader_map.map(m_file, File::access_ReadWrite, File::map_NoSync);
+        m_reader_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
 
         fug.release(); // Do not unmap
         fcg.release(); // Do not close

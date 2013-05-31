@@ -37,7 +37,6 @@
 #include "pthread.h"
 #include "implement.h"
 
-#pragma warning(disable:4273)
 
 int
 pthread_barrierattr_destroy (pthread_barrierattr_t * attr)

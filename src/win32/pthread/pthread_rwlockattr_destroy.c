@@ -1,6 +1,3 @@
-
-#pragma warning (push, 0)
-
 /*
  * pthread_rwlockattr_destroy.c
  *
@@ -37,7 +34,6 @@
  *      59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  */
 
-#include <errno.h>
 #include <limits.h>
 
 #include "pthread.h"

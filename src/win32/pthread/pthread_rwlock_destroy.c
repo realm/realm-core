@@ -34,7 +34,6 @@
  *      59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  */
 
-#include <errno.h>
 #include <limits.h>
 
 #include "pthread.h"
@@ -109,10 +108,11 @@ pthread_rwlock_destroy (pthread_rwlock_t * rwlock)
     }
   else
     {
+      ptw32_mcs_local_node_t node;
       /*
        * See notes in ptw32_rwlock_check_need_init() above also.
        */
-      EnterCriticalSection (&ptw32_rwlock_test_init_lock);
+      ptw32_mcs_lock_acquire(&ptw32_rwlock_test_init_lock, &node);
 
       /*
        * Check again.
@@ -136,7 +136,7 @@ pthread_rwlock_destroy (pthread_rwlock_t * rwlock)
 	  result = EBUSY;
 	}
 
-      LeaveCriticalSection (&ptw32_rwlock_test_init_lock);
+      ptw32_mcs_lock_release(&node);
     }
 
   return ((result != 0) ? result : ((result1 != 0) ? result1 : result2));

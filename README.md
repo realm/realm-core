@@ -4,7 +4,7 @@ TightDB
 Dependencies
 ------------
 
-### Ubuntu 12.04
+### Ubuntu 10.04, 12.04
 
     sudo apt-get install build-essential
     #   For regenerating <tightdb/table-macros.hpp>
@@ -28,7 +28,7 @@ Dependencies
     Install command line tools (via Xcode)
 
 Note: The TightDB source code comes bundled with a fallback version of
-UnitTest++ which will be used when testing, if the 'pkg-config'
+UnitTest++ which will be used when testing if the 'pkg-config'
 program does not exists, or if 'pkg-config unittest++ --exists' does
 not succeed.
 
