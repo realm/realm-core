@@ -5,7 +5,7 @@
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/query.hpp>
 #include <tightdb/query_engine.hpp>
-
+#include <cstdio>
 
 using namespace std;
 using namespace tightdb;
@@ -122,7 +122,142 @@ Query& Query::add_condition(size_t column_ndx, T value)
     return *this;
 }
 
-// int64
+
+template <class TColumnType> Query& Query::equal(size_t column_ndx1, size_t column_ndx2)
+{
+    ParentNode* const p = new TwoColumnsNode<TColumnType, Equal>(column_ndx1, column_ndx2);
+    UpdatePointers(p, &p->m_child);
+    return *this;
+}
+
+// Two column methods, any type
+template <class TColumnType> Query& Query::less(size_t column_ndx1, size_t column_ndx2)
+{
+    ParentNode* const p = new TwoColumnsNode<TColumnType, Less>(column_ndx1, column_ndx2);
+    UpdatePointers(p, &p->m_child);
+    return *this;
+}
+template <class TColumnType> Query& Query::less_equal(size_t column_ndx1, size_t column_ndx2)
+{
+    ParentNode* const p = new TwoColumnsNode<TColumnType, LessEqual>(column_ndx1, column_ndx2);
+    UpdatePointers(p, &p->m_child);
+    return *this;
+}
+template <class TColumnType> Query& Query::greater(size_t column_ndx1, size_t column_ndx2)
+{
+    ParentNode* const p = new TwoColumnsNode<TColumnType, Greater>(column_ndx1, column_ndx2);
+    UpdatePointers(p, &p->m_child);
+    return *this;
+}
+template <class TColumnType> Query& Query::greater_equal(size_t column_ndx1, size_t column_ndx2)
+{
+    ParentNode* const p = new TwoColumnsNode<TColumnType, GreaterEqual>(column_ndx1, column_ndx2);
+    UpdatePointers(p, &p->m_child);
+    return *this;
+}
+template <class TColumnType> Query& Query::not_equal(size_t column_ndx1, size_t column_ndx2)
+{
+    ParentNode* const p = new TwoColumnsNode<TColumnType, NotEqual>(column_ndx1, column_ndx2);
+    UpdatePointers(p, &p->m_child);
+    return *this;
+}
+
+// column vs column, integer
+Query& Query::equal_int(size_t column_ndx1, size_t column_ndx2)
+{
+    return equal<int64_t>(column_ndx1, column_ndx2);
+}
+
+Query& Query::not_equal_int(size_t column_ndx1, size_t column_ndx2)
+{
+    return not_equal<int64_t>(column_ndx1, column_ndx2);
+}
+
+Query& Query::less_int(size_t column_ndx1, size_t column_ndx2)
+{
+    return less<int64_t>(column_ndx1, column_ndx2);
+}
+
+Query& Query::greater_equal_int(size_t column_ndx1, size_t column_ndx2)
+{
+    return greater_equal<int64_t>(column_ndx1, column_ndx2);
+}
+
+Query& Query::less_equal_int(size_t column_ndx1, size_t column_ndx2)
+{
+    return less_equal<int64_t>(column_ndx1, column_ndx2);
+}
+
+Query& Query::greater_int(size_t column_ndx1, size_t column_ndx2)
+{
+    return greater<int64_t>(column_ndx1, column_ndx2);
+}
+
+
+// column vs column, float
+Query& Query::not_equal_float(size_t column_ndx1, size_t column_ndx2)
+{
+    return not_equal<float>(column_ndx1, column_ndx2);
+}
+
+Query& Query::less_float(size_t column_ndx1, size_t column_ndx2)
+{
+    return less<float>(column_ndx1, column_ndx2);
+}
+
+Query& Query::greater_float(size_t column_ndx1, size_t column_ndx2)
+{
+    return greater<float>(column_ndx1, column_ndx2);
+}
+
+Query& Query::greater_equal_float(size_t column_ndx1, size_t column_ndx2)
+{
+    return greater_equal<float>(column_ndx1, column_ndx2);
+}
+
+Query& Query::less_equal_float(size_t column_ndx1, size_t column_ndx2)
+{
+    return less_equal<float>(column_ndx1, column_ndx2);
+}
+
+Query& Query::equal_float(size_t column_ndx1, size_t column_ndx2)
+{
+    return equal<float>(column_ndx1, column_ndx2);
+}
+
+// column vs column, double
+Query& Query::equal_double(size_t column_ndx1, size_t column_ndx2)
+{
+    return equal<double>(column_ndx1, column_ndx2);
+}
+
+Query& Query::less_equal_double(size_t column_ndx1, size_t column_ndx2)
+{
+    return less_equal<double>(column_ndx1, column_ndx2);
+}
+
+Query& Query::greater_equal_double(size_t column_ndx1, size_t column_ndx2)
+{
+    return greater_equal<double>(column_ndx1, column_ndx2);
+}
+Query& Query::greater_double(size_t column_ndx1, size_t column_ndx2)
+{
+    return greater<double>(column_ndx1, column_ndx2);
+}
+Query& Query::less_double(size_t column_ndx1, size_t column_ndx2)
+{
+    return less<double>(column_ndx1, column_ndx2);
+}
+
+Query& Query::not_equal_double(size_t column_ndx1, size_t column_ndx2)
+{
+    return not_equal<double>(column_ndx1, column_ndx2);
+}
+
+
+
+
+// int64 constant vs column
 Query& Query::equal(size_t column_ndx, int64_t value)
 {
     ParentNode* const p = new IntegerNode<int64_t, Equal>(value, column_ndx);
@@ -210,6 +345,7 @@ Query& Query::between(size_t column_ndx, float from, float to)
     return *this;
 }
 
+
 // ------------- double
 Query& Query::equal(size_t column_ndx, double value)
 {
@@ -242,7 +378,36 @@ Query& Query::between(size_t column_ndx, double from, double to)
     return *this;
 }
 
-// STRINGS
+
+// Strings, const char*
+
+Query& Query::equal(size_t column_ndx, const char* value, bool case_sensitive)
+{
+    return equal(column_ndx, StringData(value), case_sensitive);
+}
+
+Query& Query::begins_with(size_t column_ndx, const char* value, bool case_sensitive)
+{
+    return begins_with(column_ndx, StringData(value), case_sensitive);
+}
+
+Query& Query::ends_with(size_t column_ndx, const char* value, bool case_sensitive)
+{
+    return ends_with(column_ndx, StringData(value), case_sensitive);
+}
+
+Query& Query::contains(size_t column_ndx, const char* value, bool case_sensitive)
+{
+    return contains(column_ndx, StringData(value), case_sensitive);
+}
+
+Query& Query::not_equal(size_t column_ndx, const char* value, bool case_sensitive)
+{
+    return not_equal(column_ndx, StringData(value), case_sensitive);
+}
+    
+// Strings, StringData()
+
 Query& Query::equal(size_t column_ndx, StringData value, bool case_sensitive)
 {
     ParentNode* p;
@@ -523,7 +688,6 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     return size_t(r);
 }
 
-#include <cstdio>
 
 // todo, not sure if start, end and limit could be useful for delete.
 size_t Query::remove(size_t start, size_t end, size_t limit)
@@ -577,7 +741,7 @@ TableView Query::find_all_multi(size_t start, size_t end)
     TableView tv(*m_table);
 
     // Sort search results because user expects ascending order
-    std::sort (ts.chunks.begin(), ts.chunks.end(), &Query::comp);
+    sort(ts.chunks.begin(), ts.chunks.end(), &Query::comp);
     for (size_t i = 0; i < ts.chunks.size(); ++i) {
         const size_t from = ts.chunks[i].first;
         const size_t upto = (i == ts.chunks.size() - 1) ? size_t(-1) : ts.chunks[i + 1].first;
@@ -623,8 +787,8 @@ void* Query::query_thread(void* arg)
     static_cast<void>(arg);
     thread_state* ts = static_cast<thread_state*>(arg);
 
-    std::vector<size_t> res;
-    std::vector<std::pair<size_t, size_t> > chunks;
+    vector<size_t> res;
+    vector<pair<size_t, size_t> > chunks;
 
     for (;;) {
         // Main waiting loop that waits for a query to start
@@ -658,7 +822,7 @@ void* Query::query_thread(void* arg)
             pthread_mutex_lock(&ts->result_mutex);
             ts->done_job += chunk;
             if (res.size() > 0) {
-                ts->chunks.push_back(std::pair<size_t, size_t>(mine, ts->results.size()));
+                ts->chunks.push_back(pair<size_t, size_t>(mine, ts->results.size()));
                 ts->count += res.size();
                 for (size_t i = 0; i < res.size(); i++) {
                     ts->results.push_back(res[i]);
@@ -680,7 +844,7 @@ void* Query::query_thread(void* arg)
 
 
 #ifdef TIGHTDB_DEBUG
-std::string Query::Verify()
+string Query::Verify()
 {
     if (first.size() == 0)
         return "";
@@ -698,9 +862,9 @@ std::string Query::Verify()
 void Query::Init(const Table& table) const
 {
     if (first[0] != NULL) {
-        ParentNode* const top = (ParentNode*)first[0];
-        top->Init(table);
-        std::vector<ParentNode*>v;
+        ParentNode* top = first[0];
+        top->init(table);
+        vector<ParentNode*> v;
         top->gather_children(v);
     }
 }
@@ -736,7 +900,7 @@ void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
     update[update.size()-1] = newnode;
 }
 
-bool Query::comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b)
+bool Query::comp(const pair<size_t, size_t>& a, const pair<size_t, size_t>& b)
 {
     return a.first < b.first;
 }

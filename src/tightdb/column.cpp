@@ -389,7 +389,8 @@ void Column::set(size_t ndx, int64_t value)
     TreeSet<int64_t, Column>(ndx, value);
 
     // Update index
-    if (m_index) m_index->Set(ndx, oldVal, value);
+    if (m_index)
+        m_index->Set(ndx, oldVal, value);
 }
 
 void Column::add(int64_t value)
@@ -585,7 +586,8 @@ void Column::erase(size_t ndx)
     // Flatten tree if possible
     while (IsNode()) {
         Array refs = NodeGetRefs();
-        if (refs.size() != 1) break;
+        if (refs.size() != 1)
+            break;
 
         const size_t ref = refs.GetAsRef(0);
         refs.Delete(0); // avoid destroying subtree
@@ -598,6 +600,17 @@ void Column::erase(size_t ndx)
         const bool isLast = (ndx == Size());
         m_index->erase(ndx, oldVal, isLast);
     }
+}
+
+void Column::move_last_over(size_t ndx)
+{
+    TIGHTDB_ASSERT(ndx+1 < Size());
+
+    const size_t ndx_last = Size()-1;
+    const int64_t v = get(ndx_last);
+
+    set(ndx, v);
+    erase(ndx_last);
 }
 
 void Column::Increment64(int64_t value, size_t start, size_t end)
@@ -650,7 +663,8 @@ void Column::find_all(Array& result, int64_t value, size_t caller_offset, size_t
     (void)caller_offset;
     TIGHTDB_ASSERT(start <= Size());
     TIGHTDB_ASSERT(end == (size_t)-1 || end <= Size());
-    if (is_empty()) return;
+    if (is_empty())
+        return;
     TreeFindAll<int64_t, Column>(result, value, 0, start, end);
 }
 
@@ -697,14 +711,18 @@ size_t Column::find_pos(int64_t target) const TIGHTDB_NOEXCEPT
         const size_t probe = (unsigned(low) + unsigned(high)) >> 1;
         const int64_t v = get(probe);
 
-        if (v > target) high = int(probe);
-        else            low  = int(probe);
+        if (v > target)
+            high = int(probe);
+        else
+            low  = int(probe);
     }
-    if (high == len) return not_found;
-    else return high;
+    if (high == len)
+        return not_found;
+    else
+        return high;
 }
 
-size_t Column::find_pos2(int64_t target) const
+size_t Column::find_pos2(int64_t target) const TIGHTDB_NOEXCEPT
 {
     // NOTE: Binary search only works if the column is sorted
 
@@ -723,11 +741,45 @@ size_t Column::find_pos2(int64_t target) const
         const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
         const int64_t v = get(probe);
 
-        if (v < target) low  = int(probe);
-        else            high = int(probe);
+        if (v < target)
+            low  = int(probe);
+        else
+            high = int(probe);
     }
-    if (high == len) return not_found;
-    else return high;
+    if (high == len)
+        return not_found;
+    else
+        return high;
+}
+
+bool Column::find_sorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
+{
+    if (!IsNode()) {
+        return m_array->FindPosSorted(target, pos);
+    }
+
+    const size_t len = Size();
+    size_t low = size_t(-1);
+    size_t high = len;
+
+    // Binary search based on:
+    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+    // Finds position of closest value BIGGER OR EQUAL to the target
+    while (high - low > 1) {
+        const size_t probe = (low + high) >> 1;
+        const int64_t v = get(probe);
+
+        if (v < target)
+            low  = probe;
+        else
+            high = probe;
+    }
+
+    pos = high;
+    if (high == len)
+        return false;
+    else
+        return get(high) == target;
 }
 
 
@@ -768,9 +820,11 @@ void Column::sort()
 bool Column::compare(const Column& c) const
 {
     const size_t n = Size();
-    if (c.Size() != n) return false;
+    if (c.Size() != n)
+        return false;
     for (size_t i=0; i<n; ++i) {
-        if (get(i) != c.get(i)) return false;
+        if (get(i) != c.get(i))
+            return false;
     }
     return true;
 }
@@ -827,37 +881,38 @@ void Column::Verify() const
             }
         }
     }
-    else m_array->Verify();
+    else
+        m_array->Verify();
 }
 
-void ColumnBase::ToDot(std::ostream& out, StringData title) const
+void ColumnBase::ToDot(ostream& out, StringData title) const
 {
     const size_t ref = GetRef();
 
-    out << "subgraph cluster_column" << ref << " {" << std::endl;
+    out << "subgraph cluster_column" << ref << " {" << endl;
     out << " label = \"Column";
     if (0 < title.size()) out << "\\n'" << title << "'";
-    out << "\";" << std::endl;
+    out << "\";" << endl;
 
     ArrayToDot(out, *m_array);
 
-    out << "}" << std::endl;
+    out << "}" << endl;
 }
 
-void ColumnBase::ArrayToDot(std::ostream& out, const Array& array) const
+void ColumnBase::ArrayToDot(ostream& out, const Array& array) const
 {
     if (array.IsNode()) {
         const Array offsets = array.GetSubArray(0);
         const Array refs    = array.GetSubArray(1);
         const size_t ref    = array.GetRef();
 
-        out << "subgraph cluster_node" << ref << " {" << std::endl;
-        out << " label = \"Node\";" << std::endl;
+        out << "subgraph cluster_node" << ref << " {" << endl;
+        out << " label = \"Node\";" << endl;
 
         array.ToDot(out);
         offsets.ToDot(out, "offsets");
 
-        out << "}" << std::endl;
+        out << "}" << endl;
 
         refs.ToDot(out, "refs");
 
@@ -867,10 +922,11 @@ void ColumnBase::ArrayToDot(std::ostream& out, const Array& array) const
             ArrayToDot(out, r);
         }
     }
-    else LeafToDot(out, array);
+    else
+        LeafToDot(out, array);
 }
 
-void ColumnBase::LeafToDot(std::ostream& out, const Array& array) const
+void ColumnBase::LeafToDot(ostream& out, const Array& array) const
 {
     array.ToDot(out);
 }

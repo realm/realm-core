@@ -141,10 +141,10 @@ template<class String16> string encode_16bit_hex(const String16& bin)
     const Char16* end = begin + bin.size();
     for (const Char16* i = begin; i != end; ++i) {
         long value = Traits16::to_int_type(*i);
-        s.push_back(encode_hex_digit(value / 4096));
-        s.push_back(encode_hex_digit(value / 256 % 16));
-        s.push_back(encode_hex_digit(value / 16 % 16));
-        s.push_back(encode_hex_digit(value % 16));
+        s.push_back(encode_hex_digit(int(value / 4096)));
+        s.push_back(encode_hex_digit(int(value / 256) % 16));
+        s.push_back(encode_hex_digit(int(value / 16) % 16));
+        s.push_back(encode_hex_digit(int(value) % 16));
     }
     return s;
 }

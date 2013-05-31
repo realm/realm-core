@@ -52,19 +52,9 @@ public:
     /// default constructed instance.
     explicit Group(const std::string& file, OpenMode = mode_Normal);
 
-    /// Specification of a memory buffer. The purpose of this class is
-    /// neither to allocate nor to deallocate memory. Its only purpose
-    /// is to specify the buffer.
-    struct BufferSpec {
-        const char* m_data;
-        std::size_t m_size;
-        BufferSpec() {}
-        BufferSpec(const char* d, std::size_t s): m_data(d), m_size(s) {}
-    };
-
-    /// Equivalent to calling open(BufferSpec, bool) on a default
+    /// Equivalent to calling open(BinaryData, bool) on a default
     /// constructed instance.
-    explicit Group(BufferSpec, bool take_ownership = true);
+    explicit Group(BinaryData, bool take_ownership = true);
 
     struct unattached_tag {};
 
@@ -99,9 +89,9 @@ public:
     ///
     /// \param file Filesystem path to a TightDB database file.
     ///
-    /// \throw File::OpenError If the file could not be opened. If the
-    /// reason corresponds to one of the exception types that are
-    /// derived from File::OpenError, the derived exception type is
+    /// \throw File::AccessError If the file could not be opened. If
+    /// the reason corresponds to one of the exception types that are
+    /// derived from File::AccessError, the derived exception type is
     /// thrown. Note that InvalidDatabase is among these derived
     /// exception types.
     void open(const std::string& file, OpenMode = mode_Normal);
@@ -128,7 +118,7 @@ public:
     ///
     /// \throw InvalidDatabase If the specified buffer does not appear
     /// to contain a valid database.
-    void open(BufferSpec, bool take_ownership = true);
+    void open(BinaryData, bool take_ownership = true);
 
     /// A group may be created in the unattached state, and then later
     /// attached to a file with a call to open(). Calling any method
@@ -162,9 +152,9 @@ public:
     ///
     /// \param file A filesystem path.
     ///
-    /// \throw File::OpenError If the file could not be opened. If the
-    /// reason corresponds to one of the exception types that are
-    /// derived from File::OpenError, the derived exception type is
+    /// \throw File::AccessError If the file could not be opened. If
+    /// the reason corresponds to one of the exception types that are
+    /// derived from File::AccessError, the derived exception type is
     /// thrown.
     void write(const std::string& file) const;
 
@@ -173,7 +163,7 @@ public:
     /// Ownership of the returned buffer is transferred to the
     /// caller. The memory will have been allocated using
     /// std::malloc().
-    BufferSpec write_to_mem() const;
+    BinaryData write_to_mem() const;
 
     // FIXME: What does this one do? Exactly how is it different from
     // calling write()? There is no documentation to be found anywhere
@@ -216,10 +206,6 @@ protected:
     void init_shared();
     size_t commit(size_t current_version, size_t readlock_version, bool doPersist);
     void rollback();
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    void set_replication(Replication* r) { m_alloc.set_replication(r); }
-#endif
 
     SlabAlloc& get_allocator() {return m_alloc;}
     Array& get_top_array() {return m_top;}
@@ -283,6 +269,8 @@ private:
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     friend class Replication;
+    Replication* get_replication() const TIGHTDB_NOEXCEPT { return m_alloc.get_replication(); }
+    void set_replication(Replication* r) TIGHTDB_NOEXCEPT { m_alloc.set_replication(r); }
 #endif
 };
 
@@ -325,7 +313,7 @@ inline Group::Group(const std::string& file, OpenMode mode):
     }
 }
 
-inline Group::Group(BufferSpec buffer, bool take_ownership):
+inline Group::Group(BinaryData buffer, bool take_ownership):
     m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
     m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(false)
 {
@@ -355,11 +343,11 @@ inline void Group::open(const std::string& file, OpenMode mode)
     create_from_file(file, mode, true);
 }
 
-inline void Group::open(BufferSpec buffer, bool take_ownership)
+inline void Group::open(BinaryData buffer, bool take_ownership)
 {
     TIGHTDB_ASSERT(!is_attached());
-    TIGHTDB_ASSERT(buffer.m_data);
-    m_alloc.attach_buffer(buffer.m_data, buffer.m_size, take_ownership);
+    TIGHTDB_ASSERT(buffer.data());
+    m_alloc.attach_buffer(buffer.data(), buffer.size(), take_ownership);
     create_from_ref(m_alloc.GetTopRef()); // FIXME: Throws and leaves the Group in peril
 }
 

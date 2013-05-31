@@ -370,7 +370,7 @@ void round(SharedGroup& db, int index)
 }
 
 
-void thread(int index, const char* database_path)
+void thread(int index, string database_path)
 {
     for (int i=0; i<num_rounds; ++i) {
         SharedGroup db(database_path);
@@ -380,7 +380,7 @@ void thread(int index, const char* database_path)
 
 
 struct ThreadWrapper {
-    void run(int index, const char* database_path)
+    void run(int index, string database_path)
     {
         m_index         = index;
         m_database_path = database_path;
@@ -400,7 +400,7 @@ struct ThreadWrapper {
 private:
     pthread_t m_pthread;
     int m_index;
-    const char* m_database_path;
+    string m_database_path;
     bool m_error;
 
     static void* run(void* arg)
@@ -419,13 +419,11 @@ private:
 } // anonymous namespace
 
 
-#ifndef _WIN32 // Shared PTHREAD mutexes appear not to work on Windows
-
 TEST(Transactions)
 {
-    const char* database_path = "transactions.tightdb";
-    remove(database_path);
-    remove((database_path+string(".lock")).c_str());
+    string database_path = "transactions.tightdb";
+    File::try_remove(database_path);
+    File::try_remove(database_path+".lock");
 
     // Run N rounds in each thread
     {
@@ -549,5 +547,3 @@ TEST(Transactions)
     }
     // End of read transaction
 }
-
-#endif // Shared PTHREAD mutexes appear not to work on Windows

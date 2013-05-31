@@ -4,6 +4,7 @@
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
+#include <tightdb/file.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -51,7 +52,7 @@ TEST(Group_GetTable)
 TEST(Group_Invalid1)
 {
     // Delete old file if there
-    remove("table_test.tightdb");
+    File::try_remove("table_test.tightdb");
 
     // Try to open non-existing file
     // (read-only files have to exists to before opening)
@@ -65,7 +66,7 @@ TEST(Group_Invalid2)
     const size_t size = strlen(str);
     char* const data = new char[strlen(str)];
     copy(str, str+size, data);
-    CHECK_THROW(Group(Group::BufferSpec(data, size)), InvalidDatabase);
+    CHECK_THROW(Group(BinaryData(data, size)), InvalidDatabase);
     delete[] data;
 }
 
@@ -121,7 +122,7 @@ TEST(Group_Serialize1)
 #endif // TIGHTDB_DEBUG
 
     // Delete old file if there
-    remove("table_test.tightdb");
+    File::try_remove("table_test.tightdb");
 
     // Serialize to disk
     toDisk.write("table_test.tightdb");
@@ -179,7 +180,7 @@ TEST(Group_Serialize2)
 #endif // TIGHTDB_DEBUG
 
     // Delete old file if there
-    remove("table_test.tightdb");
+    File::try_remove("table_test.tightdb");
 
     // Serialize to disk
     toDisk.write("table_test.tightdb");
@@ -213,7 +214,7 @@ TEST(Group_Serialize3)
 #endif // TIGHTDB_DEBUG
 
     // Delete old file if there
-    remove("table_test.tightdb");
+    File::try_remove("table_test.tightdb");
 
     // Serialize to disk
     toDisk.write("table_test.tightdb");
@@ -253,7 +254,7 @@ TEST(Group_Serialize_Mem)
 #endif // TIGHTDB_DEBUG
 
     // Serialize to memory (we now own the buffer)
-    const Group::BufferSpec buffer = toMem.write_to_mem();
+    BinaryData buffer = toMem.write_to_mem();
 
     // Load the table
     Group fromMem(buffer);
@@ -278,7 +279,7 @@ TEST(Group_Close)
     table->add("",  2, true, Wed);
 
     // Serialize to memory (we now own the buffer)
-    const Group::BufferSpec buffer = toMem->write_to_mem();
+    BinaryData buffer = toMem->write_to_mem();
 
     Group *fromMem = new Group(buffer);
     delete toMem;
@@ -306,7 +307,7 @@ TEST(Group_Serialize_Optimized)
 #endif // TIGHTDB_DEBUG
 
     // Serialize to memory (we now own the buffer)
-    const Group::BufferSpec buffer = toMem.write_to_mem();
+    BinaryData buffer = toMem.write_to_mem();
 
     // Load the table
     Group fromMem(buffer);
@@ -353,7 +354,7 @@ TEST(Group_Serialize_All)
     table->insert_done();
 
     // Serialize to memory (we now own the buffer)
-    const Group::BufferSpec buffer = toMem.write_to_mem();
+    BinaryData buffer = toMem.write_to_mem();
 
     // Load the table
     Group fromMem(buffer);
@@ -374,7 +375,7 @@ TEST(Group_Serialize_All)
 TEST(Group_Persist)
 {
     // Delete old file if there
-    remove("testdb.tightdb");
+    File::try_remove("testdb.tightdb");
 
     // Create new database
     Group db("testdb.tightdb");
@@ -880,7 +881,7 @@ TEST(Group_Index_String)
     CHECK_EQUAL(2, c1);
 
     // Serialize to memory (we now own the buffer)
-    const Group::BufferSpec buffer = toMem.write_to_mem();
+    BinaryData buffer = toMem.write_to_mem();
 
     // Load the table
     Group fromMem(buffer);

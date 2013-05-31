@@ -61,7 +61,8 @@ AdaptiveStringColumn::~AdaptiveStringColumn()
 
 void AdaptiveStringColumn::Destroy()
 {
-    if (IsNode()) m_array->Destroy();
+    if (IsNode())
+        m_array->Destroy();
     else if (IsLongStrings()) {
         static_cast<ArrayStringLong*>(m_array)->Destroy();
     }
@@ -78,7 +79,8 @@ void AdaptiveStringColumn::UpdateRef(size_t ref)
 {
     TIGHTDB_ASSERT(get_coldef_from_ref(ref, m_array->GetAllocator()) == Array::coldef_InnerNode); // Can only be called when creating node
 
-    if (IsNode()) m_array->UpdateRef(ref);
+    if (IsNode())
+        m_array->UpdateRef(ref);
     else {
         ArrayParent *const parent = m_array->GetParent();
         const size_t pndx   = m_array->GetParentNdx();
@@ -89,7 +91,8 @@ void AdaptiveStringColumn::UpdateRef(size_t ref)
         m_array = array;
 
         // Update ref in parent
-        if (parent) parent->update_child_ref(pndx, ref);
+        if (parent)
+            parent->update_child_ref(pndx, ref);
     }
 }
 
@@ -176,6 +179,36 @@ void AdaptiveStringColumn::Resize(size_t ndx)
         static_cast<ArrayString*>(m_array)->Resize(ndx);
     }
 
+}
+
+void AdaptiveStringColumn::move_last_over(size_t ndx) 
+{
+    TIGHTDB_ASSERT(ndx+1 < Size());
+
+    const size_t ndx_last = Size()-1;
+    StringData v = get(ndx_last);
+
+    if (m_index) {
+        // remove the value to be overwritten from index
+        StringData oldVal = get(ndx);
+        m_index->erase(ndx, oldVal, true);
+
+        // update index to point to new location
+        m_index->update_ref(v, ndx_last, ndx);
+    }
+
+    TreeSet<StringData, AdaptiveStringColumn>(ndx, v);
+
+    // If the copy happened within the same array
+    // it might have moved the source data when making
+    // room for the insert. In that case we wil have to
+    // copy again from the new position
+    // TODO: manual resize before copy
+    StringData v2 = get(ndx_last);
+    if (v != v2)
+        TreeSet<StringData, AdaptiveStringColumn>(ndx, v2);
+
+    TreeDelete<StringData, AdaptiveStringColumn>(ndx_last);
 }
 
 void AdaptiveStringColumn::set(size_t ndx, StringData str)
@@ -288,6 +321,16 @@ void AdaptiveStringColumn::find_all(Array &result, StringData value, size_t begi
     TreeFindAll<StringData, AdaptiveStringColumn>(result, value, 0, begin, end);
 }
 
+
+FindRes AdaptiveStringColumn::find_all_indexref(StringData value, size_t& dst) const
+{
+    TIGHTDB_ASSERT(value.data());
+    TIGHTDB_ASSERT(m_index);
+
+    return m_index->find_all(value, dst);
+}
+
+
 StringData AdaptiveStringColumn::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     if (IsLongStrings()) {
@@ -348,8 +391,7 @@ void AdaptiveStringColumn::LeafInsert(size_t ndx, StringData value)
     }
 
     // Replace string array with long string array
-    ArrayStringLong* const newarray =
-        new ArrayStringLong(static_cast<Array*>(0), 0, m_array->GetAllocator());
+    ArrayStringLong* const newarray = new ArrayStringLong(static_cast<Array*>(0), 0, m_array->GetAllocator());
 
     // Copy strings to new array
     ArrayString* const oldarray = static_cast<ArrayString*>(m_array);
@@ -411,7 +453,8 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
 
         // Insert keys in sorted order, ignoring duplicates
         size_t pos = keys.lower_bound(v);
-        if (pos != keys.Size() && keys.get(pos) == v) continue;
+        if (pos != keys.Size() && keys.get(pos) == v)
+            continue;
 
         // Don't bother auto enumerating if there are too few duplicates
         if (n/2 < keys.Size()) {
@@ -439,9 +482,11 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
 bool AdaptiveStringColumn::compare(const AdaptiveStringColumn& c) const
 {
     const size_t n = Size();
-    if (c.Size() != n) return false;
+    if (c.Size() != n)
+        return false;
     for (size_t i=0; i<n; ++i) {
-        if (get(i) != c.get(i)) return false;
+        if (get(i) != c.get(i))
+            return false;
     }
     return true;
 }

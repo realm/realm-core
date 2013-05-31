@@ -37,8 +37,8 @@ class GroupWriter;
 /// Thrown by Group and SharedGroup constructors if the specified file
 /// (or memory buffer) does not appear to contain a valid TightDB
 /// database.
-struct InvalidDatabase: File::OpenError {
-    InvalidDatabase(): File::OpenError("Invalid database") {}
+struct InvalidDatabase: File::AccessError {
+    InvalidDatabase(): File::AccessError("Invalid database") {}
 };
 
 
@@ -63,7 +63,7 @@ public:
     ///
     /// \param no_create Fail if the file does not already exist.
     ///
-    /// \throw File::OpenError
+    /// \throw File::AccessError
     void attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create);
 
     /// Attach this allocator to the specified memory buffer.
@@ -126,7 +126,8 @@ private:
     bool validate_buffer(const char* data, size_t len) const;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    void set_replication(Replication* r) { m_replication = r; }
+    Replication* get_replication() const TIGHTDB_NOEXCEPT { return m_replication; }
+    void set_replication(Replication* r) TIGHTDB_NOEXCEPT { m_replication = r; }
 #endif
 };
 

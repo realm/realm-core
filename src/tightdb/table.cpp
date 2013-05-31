@@ -883,6 +883,22 @@ void Table::remove(size_t ndx)
 #endif
 }
 
+void Table::move_last_over(size_t ndx)
+{
+    TIGHTDB_ASSERT(ndx+1 < m_size);
+
+    const size_t count = get_column_count();
+    for (size_t i = 0; i < count; ++i) {
+        ColumnBase& column = GetColumnBase(i);
+        column.move_last_over(ndx);
+    }
+    --m_size;
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    //TODO: transact_log().move_last_over(ndx); // Throws
+#endif
+}
+
 
 void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 {
@@ -1609,6 +1625,15 @@ size_t Table::find_first_int(size_t column_ndx, int64_t value) const
     return column.find_first(value);
 }
 
+bool Table::find_sorted_int(size_t column_ndx, int64_t value, size_t& pos) const
+{
+    TIGHTDB_ASSERT(column_ndx < m_columns.size());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Int);
+    const Column& column = GetColumn(column_ndx);
+
+    return column.find_sorted(value, pos);
+}
+
 size_t Table::find_first_bool(size_t column_ndx, bool value) const
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
@@ -2042,7 +2067,7 @@ void Table::update_from_spec()
 
 // to JSON: ------------------------------------------
 
-void Table::to_json(std::ostream& out)
+void Table::to_json(ostream& out)
 {
     // Represent table as list of objects
     out << "[";
@@ -2059,7 +2084,7 @@ void Table::to_json(std::ostream& out)
 
 namespace {
 
-inline void out_date(std::ostream& out, Date value)
+inline void out_date(ostream& out, Date value)
 {
     time_t rawtime = value.get_date();
     struct tm* const t = gmtime(&rawtime);
@@ -2073,14 +2098,14 @@ inline void out_date(std::ostream& out, Date value)
     }
 }
 
-inline void out_binary(std::ostream& out, const BinaryData bin)
+inline void out_binary(ostream& out, const BinaryData bin)
 {
     const char* p = bin.data();
     for (size_t i = 0; i < bin.size(); ++i)
         out << setw(2) << setfill('0') << hex << static_cast<unsigned int>(p[i]) << dec;
 }
 
-template<typename T> void out_floats(std::ostream& out, T value)
+template<typename T> void out_floats(ostream& out, T value)
 {
     streamsize old = out.precision();
     out.precision(numeric_limits<T>::digits10 + 1);
@@ -2090,7 +2115,7 @@ template<typename T> void out_floats(std::ostream& out, T value)
 
 } // anonymous namespace
 
-void Table::to_json_row(size_t row_ndx, std::ostream& out)
+void Table::to_json_row(size_t row_ndx, ostream& out)
 {
     out << "{";
     const size_t column_count = get_column_count();
@@ -2184,10 +2209,10 @@ size_t chars_in_int(int64_t v)
 }
 }
 
-void Table::to_string(std::ostream& out, size_t limit) const
+void Table::to_string(ostream& out, size_t limit) const
 {
     // Print header (will also calculate widths)
-    std::vector<size_t> widths;
+    vector<size_t> widths;
     to_string_header(out, widths);
 
     // Set limit=-1 to print all rows, otherwise only print to limit
@@ -2206,19 +2231,19 @@ void Table::to_string(std::ostream& out, size_t limit) const
     }
 }
 
-void Table::row_to_string(size_t row_ndx, std::ostream& out) const
+void Table::row_to_string(size_t row_ndx, ostream& out) const
 {
     TIGHTDB_ASSERT(row_ndx < size());
 
     // Print header (will also calculate widths)
-    std::vector<size_t> widths;
+    vector<size_t> widths;
     to_string_header(out, widths);
 
     // Print row contents
     to_string_row(row_ndx, out, widths);
 }
 
-void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) const
+void Table::to_string_header(ostream& out, vector<size_t>& widths) const
 {
     const size_t column_count = get_column_count();
     const size_t row_count = size();
@@ -2336,26 +2361,26 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
 
 namespace {
 
-inline void out_string(std::ostream& out, const std::string text, const size_t max_len)
+inline void out_string(ostream& out, const string text, const size_t max_len)
 {
-    out.setf(std::ostream::left, std::ostream::adjustfield);
+    out.setf(ostream::left, ostream::adjustfield);
     if (text.size() > max_len)
         out << text.substr(0, max_len) + "...";
     else
         out << text;
-    out.unsetf(std::ostream::adjustfield);
+    out.unsetf(ostream::adjustfield);
 }
 
-inline void out_table(std::ostream& out, const size_t len)
+inline void out_table(ostream& out, const size_t len)
 {
-    const size_t width = out.width() - chars_in_int(len) - 1;
+    const streamsize width = out.width() - chars_in_int(len) - 1;
     out.width(width);
     out << "[" << len << "]";
 }
 
 }
 
-void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<size_t>& widths) const
+void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& widths) const
 {
     const size_t column_count  = get_column_count();
     const size_t row_ndx_width = widths[0];
@@ -2637,7 +2662,7 @@ void Table::Verify() const
     alloc.Verify();
 }
 
-void Table::to_dot(std::ostream& out, StringData title) const
+void Table::to_dot(ostream& out, StringData title) const
 {
     if (m_top.IsValid()) {
         out << "subgraph cluster_topleveltable" << m_top.GetRef() << " {" << endl;
@@ -2660,7 +2685,7 @@ void Table::to_dot(std::ostream& out, StringData title) const
     out << "}" << endl;
 }
 
-void Table::ToDotInternal(std::ostream& out) const
+void Table::ToDotInternal(ostream& out) const
 {
     m_columns.ToDot(out, "columns");
 

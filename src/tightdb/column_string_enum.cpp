@@ -148,6 +148,13 @@ void ColumnStringEnum::find_all(Array& res, size_t key_ndx, size_t begin, size_t
     return;
 }
 
+FindRes ColumnStringEnum::find_all_indexref(StringData value, size_t& dst) const
+{
+//    TIGHTDB_ASSERT(value.m_data); fixme
+    TIGHTDB_ASSERT(m_index);
+
+    return m_index->find_all(value, dst);
+}
 
 size_t ColumnStringEnum::find_first(size_t key_ndx, size_t begin, size_t end) const
 {
@@ -247,19 +254,19 @@ void ColumnStringEnum::Verify() const
     Column::Verify();
 }
 
-void ColumnStringEnum::ToDot(std::ostream& out, StringData title) const
+void ColumnStringEnum::ToDot(ostream& out, StringData title) const
 {
     const size_t ref = m_keys.GetRef();
 
-    out << "subgraph cluster_columnstringenum" << ref << " {" << std::endl;
+    out << "subgraph cluster_columnstringenum" << ref << " {" << endl;
     out << " label = \"ColumnStringEnum";
     if (0 < title.size()) out << "\\n'" << title << "'";
-    out << "\";" << std::endl;
+    out << "\";" << endl;
 
     m_keys.ToDot(out, "keys");
     Column::ToDot(out, "values");
 
-    out << "}" << std::endl;
+    out << "}" << endl;
 }
 
 #endif // TIGHTDB_DEBUG

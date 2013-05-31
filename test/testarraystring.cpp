@@ -28,6 +28,79 @@ TEST_FIXTURE(db_setup_string, ArrayStringMultiEmpty)
     CHECK_EQUAL("", c.get(5));
 }
 
+TEST_FIXTURE(db_setup_string, ArrayStringSetEmpty1)
+{
+    c.set(0, "");
+
+    CHECK_EQUAL(6, c.size());
+    CHECK_EQUAL("", c.get(0));
+    CHECK_EQUAL("", c.get(1));
+    CHECK_EQUAL("", c.get(2));
+    CHECK_EQUAL("", c.get(3));
+    CHECK_EQUAL("", c.get(4));
+    CHECK_EQUAL("", c.get(5));
+}
+
+TEST_FIXTURE(db_setup_string, ArrayStringErase0)
+{
+    c.erase(5);
+}
+
+TEST_FIXTURE(db_setup_string, ArrayStringInsert0)
+{
+    // Intention: Insert a non-empty string into an array that is not
+    // empty but contains only empty strings (and only ever have
+    // contained empty strings). The insertion is not at the end of
+    // the array.
+    c.insert(0, "x");
+}
+
+TEST_FIXTURE(db_setup_string, ArrayStringSetEmpty2)
+{
+    c.set(0, "");
+    c.set(5, "");
+
+    CHECK_EQUAL(6, c.size());
+    CHECK_EQUAL("", c.get(0));
+    CHECK_EQUAL("", c.get(1));
+    CHECK_EQUAL("", c.get(2));
+    CHECK_EQUAL("", c.get(3));
+    CHECK_EQUAL("", c.get(4));
+    CHECK_EQUAL("", c.get(5));
+}
+
+TEST_FIXTURE(db_setup_string, ArrayStringClear)
+{
+    c.Clear();
+    c.add("");
+    c.add("");
+    c.add("");
+    c.add("");
+    c.add("");
+    c.add("");
+    CHECK_EQUAL(6, c.size());
+
+    CHECK_EQUAL("", c.get(0));
+    CHECK_EQUAL("", c.get(1));
+    CHECK_EQUAL("", c.get(2));
+    CHECK_EQUAL("", c.get(3));
+    CHECK_EQUAL("", c.get(4));
+    CHECK_EQUAL("", c.get(5));
+}
+
+TEST_FIXTURE(db_setup_string, ArrayStringFind1)
+{
+    CHECK_EQUAL(6, c.size());
+    CHECK_EQUAL("", c.get(0));
+    // Intention: Search for strings in an array that is not empty but
+    // contains only empty strings (and only ever have contained empty
+    // strings).
+    CHECK_EQUAL(0, c.find_first(""));
+    CHECK_EQUAL(size_t(-1), c.find_first("x"));
+    CHECK_EQUAL(5, c.find_first("", 5));
+    CHECK_EQUAL(size_t(-1), c.find_first("", 6));
+}
+
 TEST_FIXTURE(db_setup_string, ArrayStringSetExpand4)
 {
     c.set(0, "hey");
@@ -39,6 +112,13 @@ TEST_FIXTURE(db_setup_string, ArrayStringSetExpand4)
     CHECK_EQUAL("", c.get(3));
     CHECK_EQUAL("", c.get(4));
     CHECK_EQUAL("", c.get(5));
+}
+
+TEST_FIXTURE(db_setup_string, ArrayStringFind2)
+{
+    // Intention: Search for non-empty string P that is not in then
+    // array, but the array does contain a string where P is a prefix.
+    CHECK_EQUAL(size_t(-1), c.find_first("he"));
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringSetExpand8)
@@ -175,9 +255,9 @@ TEST_FIXTURE(db_setup_string, ArrayStringInsert1)
     CHECK_EQUAL(9, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringDelete1)
+TEST_FIXTURE(db_setup_string, ArrayStringErase1)
 {
-    // Delete from end
+    // Erase from end
     c.erase(8);
 
     CHECK_EQUAL("ccc",  c.get(0));
@@ -191,9 +271,9 @@ TEST_FIXTURE(db_setup_string, ArrayStringDelete1)
     CHECK_EQUAL(8, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringDelete2)
+TEST_FIXTURE(db_setup_string, ArrayStringErase2)
 {
-    // Delete from top
+    // Erase from top
     c.erase(0);
 
     CHECK_EQUAL("bb",   c.get(0));
@@ -206,9 +286,9 @@ TEST_FIXTURE(db_setup_string, ArrayStringDelete2)
     CHECK_EQUAL(7, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringDelete3)
+TEST_FIXTURE(db_setup_string, ArrayStringErase3)
 {
-    // Delete from middle
+    // Erase from middle
     c.erase(3);
 
     CHECK_EQUAL("bb",   c.get(0));
@@ -220,9 +300,9 @@ TEST_FIXTURE(db_setup_string, ArrayStringDelete3)
     CHECK_EQUAL(6, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringDeleteAll)
+TEST_FIXTURE(db_setup_string, ArrayStringEraseAll)
 {
-    // Delete all items one at a time
+    // Erase all items one at a time
     c.erase(0);
     c.erase(0);
     c.erase(0);
@@ -268,7 +348,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringInsert3)
     CHECK_EQUAL(6, c.size());
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringFind1)
+TEST_FIXTURE(db_setup_string, ArrayStringFind3)
 {
     // Create new list
     c.Clear();
@@ -283,7 +363,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind1)
     CHECK_EQUAL(3, r);
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringFind2)
+TEST_FIXTURE(db_setup_string, ArrayStringFind4)
 {
     // Expand to 8 bytes width
     c.add("eeeeee");
@@ -294,7 +374,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind2)
     CHECK_EQUAL(4, r);
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringFind3)
+TEST_FIXTURE(db_setup_string, ArrayStringFind5)
 {
     // Expand to 16 bytes width
     c.add("ffffffffffff");
@@ -305,7 +385,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind3)
     CHECK_EQUAL(5, r);
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringFind4)
+TEST_FIXTURE(db_setup_string, ArrayStringFind6)
 {
     // Expand to 32 bytes width
     c.add("gggggggggggggggggggggggg");
@@ -316,7 +396,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind4)
     CHECK_EQUAL(6, r);
 }
 
-TEST_FIXTURE(db_setup_string, ArrayStringFind5)
+TEST_FIXTURE(db_setup_string, ArrayStringFind7)
 {
     // Expand to 64 bytes width
     c.add("hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
@@ -389,4 +469,20 @@ TEST_FIXTURE(db_setup_string, ArrayStringDestroy)
 {
     // clean up (ALWAYS PUT THIS LAST)
     c.Destroy();
+}
+
+TEST(ArrayStringCompare)
+{
+    ArrayString a, b;
+
+    CHECK(a.Compare(b));
+    a.add("");
+    CHECK(!a.Compare(b));
+    b.add("x");
+    CHECK(!a.Compare(b));
+    a.set(0, "x");
+    CHECK(a.Compare(b));
+
+    a.Destroy();
+    b.Destroy();
 }

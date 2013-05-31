@@ -1,5 +1,7 @@
 #include <tightdb/column_mixed.hpp>
 
+using namespace std;
+
 namespace tightdb {
 
 ColumnMixed::~ColumnMixed()
@@ -101,6 +103,7 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType newtype)
             case mixcol_Binary: {
                 // If item is in middle of the column, we just clear
                 // it to avoid having to adjust refs to following items
+                // TODO: this is a leak. We should adjust
                 const size_t ref = m_refs->GetAsRef(ndx) >> 1;
                 if (ref == m_data->Size()-1)
                     m_data->erase(ref);
@@ -124,6 +127,7 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType newtype)
     }
     if (type != newtype)
         m_types->set(ndx, newtype);
+    m_refs->set(ndx, 0);
 }
 
 void ColumnMixed::erase(size_t ndx)
@@ -137,6 +141,17 @@ void ColumnMixed::erase(size_t ndx)
     m_refs->erase(ndx);
 
     invalidate_subtables();
+}
+
+void ColumnMixed::move_last_over(size_t ndx) 
+{
+    TIGHTDB_ASSERT(ndx+1 < Size());
+
+    // Remove refs or binary data
+    clear_value(ndx, mixcol_Int);
+
+    m_types->move_last_over(ndx);
+    m_refs->move_last_over(ndx);
 }
 
 void ColumnMixed::Clear()
@@ -279,7 +294,8 @@ bool ColumnMixed::compare(const ColumnMixed& c) const
         case type_Table: {
                 ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
                 ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();
-                if (*t1 != *t2) return false;
+                if (*t1 != *t2) 
+                    return false;
             }
             break;
         case type_Mixed:
@@ -298,7 +314,8 @@ void ColumnMixed::Verify() const
     m_array->Verify();
     m_types->Verify();
     m_refs->Verify();
-    if (m_data) m_data->Verify();
+    if (m_data) 
+        m_data->Verify();
 
     // types and refs should be in sync
     const size_t types_len = m_types->Size();
@@ -309,20 +326,22 @@ void ColumnMixed::Verify() const
     const size_t count = Size();
     for (size_t i = 0; i < count; ++i) {
         const int64_t v = m_refs->get(i);
-        if (v == 0 || v & 0x1) continue;
+        if (v == 0 || v & 0x1)
+            continue;
         ConstTableRef subtable = m_refs->get_subtable(i);
         subtable->Verify();
     }
 }
 
-void ColumnMixed::ToDot(std::ostream& out, StringData title) const
+void ColumnMixed::ToDot(ostream& out, StringData title) const
 {
     const size_t ref = GetRef();
 
-    out << "subgraph cluster_columnmixed" << ref << " {" << std::endl;
+    out << "subgraph cluster_columnmixed" << ref << " {" << endl;
     out << " label = \"ColumnMixed";
-    if (0 < title.size()) out << "\\n'" << title << "'";
-    out << "\";" << std::endl;
+    if (0 < title.size())
+        out << "\\n'" << title << "'";
+    out << "\";" << endl;
 
     m_array->ToDot(out, "mixed_top");
 
@@ -330,7 +349,8 @@ void ColumnMixed::ToDot(std::ostream& out, StringData title) const
     const size_t count = Size();
     for (size_t i = 0; i < count; ++i) {
         const MixedColType type = MixedColType(m_types->get(i));
-        if (type != mixcol_Table) continue;
+        if (type != mixcol_Table)
+            continue;
         ConstTableRef subtable = m_refs->get_subtable(i);
         subtable->to_dot(out);
     }
@@ -342,7 +362,7 @@ void ColumnMixed::ToDot(std::ostream& out, StringData title) const
         m_data->ToDot(out, "data");
     }
 
-    out << "}" << std::endl;
+    out << "}" << endl;
 }
 
 #endif // TIGHTDB_DEBUG

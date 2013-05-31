@@ -32,3 +32,21 @@ testcase: minimal
 	@$(MAKE) -C test testcase
 testcase-debug: debug
 	@$(MAKE) -C test testcase-debug
+
+# Check documentation examples
+.PHONY: check-doc-ex clean-doc-ex
+check-doc-ex: debug
+	@$(MAKE) -C doc/ref_cpp/examples test-debug
+clean-doc-ex:
+	@$(MAKE) -C doc/ref_cpp/examples clean
+
+# Used by build.sh
+.PHONY: get-libdir get-cc get-cxx get-ld
+get-libdir:
+	@echo $(libdir)
+get-cc:
+	@echo $(CC)
+get-cxx:
+	@echo $(CXX)
+get-ld:
+	@echo $(LD)
