@@ -235,7 +235,7 @@ case "$MODE" in
         if ! [ "$PREFIX" ]; then
             PREFIX="/usr/local"
         fi
-        make prefix="$PREFIX" install || exit 1
+        make install DESTDIR="$DESTDIR" prefix="$PREFIX" || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
             ldconfig || exit 1
         fi
@@ -248,7 +248,7 @@ case "$MODE" in
         if ! [ "$PREFIX" ]; then
             PREFIX="/usr/local"
         fi
-        make prefix="$PREFIX" install INSTALL_FILTER=shared-libs || exit 1
+        make install DESTDIR="$DESTDIR" prefix="$PREFIX" INSTALL_FILTER=shared-libs || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
             ldconfig || exit 1
         fi
@@ -261,7 +261,7 @@ case "$MODE" in
         if ! [ "$PREFIX" ]; then
             PREFIX="/usr/local"
         fi
-        make prefix="$PREFIX" install INSTALL_FILTER=static-libs,progs,headers || exit 1
+        make install DESTDIR="$DESTDIR" prefix="$PREFIX" INSTALL_FILTER=static-libs,progs,headers || exit 1
         echo "Done installing"
         exit 0
         ;;
@@ -271,7 +271,7 @@ case "$MODE" in
         if ! [ "$PREFIX" ]; then
             PREFIX="/usr/local"
         fi
-        make prefix="$PREFIX" uninstall || exit 1
+        make uninstall prefix="$PREFIX" || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
             ldconfig || exit 1
         fi
@@ -284,7 +284,7 @@ case "$MODE" in
         if ! [ "$PREFIX" ]; then
             PREFIX="/usr/local"
         fi
-        make prefix="$PREFIX" uninstall INSTALL_FILTER=shared-libs || exit 1
+        make uninstall prefix="$PREFIX" INSTALL_FILTER=shared-libs || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
             ldconfig || exit 1
         fi
@@ -297,7 +297,7 @@ case "$MODE" in
         if ! [ "$PREFIX" ]; then
             PREFIX="/usr/local"
         fi
-        make prefix="$PREFIX" uninstall INSTALL_FILTER=static-libs,progs,extra || exit 1
+        make uninstall prefix="$PREFIX" INSTALL_FILTER=static-libs,progs,extra || exit 1
         echo "Done uninstalling"
         exit 0
         ;;
