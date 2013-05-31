@@ -49,16 +49,18 @@ tightdb_config_SOURCES = config.cpp
 include ../../generic.mk
 
 # Code generation
+ifeq ($(DISABLE_UPDATE_TABLE_MACROS_HPP),)
 $(TABLE_MACROS_HPP): build/table_macros.hpp.sh build/table_macros.hpp.py
 	$(SHELL) build/table_macros.hpp.sh $(TABLE_MACROS_HPP)
+endif
 
 uninstall/extra:
 	$(RM) $(DESTDIR)$(includedir)/tightdb/*.hpp
 	$(RM) $(DESTDIR)$(includedir)/tightdb/*.h
 	-rmdir $(DESTDIR)$(includedir)/tightdb
 
+.PHONY: get-inst-headers get-inst-libraries
 get-inst-headers:
 	@echo $(INST_HEADERS)
-
 get-inst-libraries:
 	@echo $(filter-out libtightdb-cov.% libtightdb-dbg.a,$(TARGETS_LIB_STATIC) $(TARGETS_LIB_SHARED_ALIASES))

@@ -76,7 +76,7 @@ Searching: The main finding function is:
 namespace tightdb {
 
 enum Action {act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll, act_CallIdx, act_CallbackIdx, 
-			 act_CallbackVal, act_CallbackNone, act_CallbackBoth};
+             act_CallbackVal, act_CallbackNone, act_CallbackBoth};
 
 template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 
@@ -344,35 +344,35 @@ public:
 
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
     void find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, 
-		      QueryState<int64_t>* state) const;
+              QueryState<int64_t>* state) const;
 
     template <class cond, Action action, size_t bitwidth, class Callback>
     void find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-		      Callback callback) const;
+              Callback callback) const;
 
     template <class cond, Action action, size_t bitwidth>
     void find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const;
 
     template <class cond, Action action, class Callback>
     void find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-		      Callback callback) const;
+              Callback callback) const;
 
     // Optimized implementation for release mode
     template <class cond2, Action action, size_t bitwidth, class Callback>
     void find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-		                Callback callback) const;
+                        Callback callback) const;
 
     // Reference implementation of find() - verifies result from optimized version if debug mode
     template <class cond2, Action action, size_t bitwidth, class Callback>
     int64_t find_reference(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-						   Callback callback) const;
+                           Callback callback) const;
 
     // Called for each search result
     template <Action action, class Callback> 
-	bool find_action(size_t index, int64_t value, QueryState<int64_t>* state, Callback callback) const;
+    bool find_action(size_t index, int64_t value, QueryState<int64_t>* state, Callback callback) const;
 
     template <Action action, class Callback> 
-	bool find_action_pattern(size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const;
+    bool find_action_pattern(size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const;
 
     // Wrappers for backwards compatibility and for simple use without setting up state initialization etc
     template <class cond> size_t find_first(int64_t value, size_t start = 0, size_t end = size_t(-1)) const;
@@ -382,43 +382,43 @@ public:
     // Non-SSE find for the four functions Equal/NotEqual/Less/Greater
     template <class cond2, Action action, size_t bitwidth, class Callback>
     bool Compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-				 Callback callback) const;
+                 Callback callback) const;
 
     // Non-SSE find for Equal/NotEqual
     template <bool eq, Action action, size_t width, class Callback>
     inline bool CompareEquality(int64_t value, size_t start, size_t end, size_t baseindex, 
-		                        QueryState<int64_t>* state, Callback callback) const;
+                                QueryState<int64_t>* state, Callback callback) const;
 
     // Non-SSE find for Less/Greater
     template <bool gt, Action action, size_t bitwidth, class Callback>
     bool CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-		                 Callback callback) const;
+                         Callback callback) const;
 
     template <class cond, Action action, size_t foreign_width, class Callback, size_t width> 
-	bool CompareLeafs4(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-		               Callback callback) const;
+    bool CompareLeafs4(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
+                       Callback callback) const;
 
     template <class cond, Action action, class Callback, size_t bitwidth, size_t foreign_bitwidth> 
-	bool CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-		              Callback callback) const;
+    bool CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
+                      Callback callback) const;
     
-	template <class cond, Action action, class Callback>
-	bool CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-		              Callback callback) const;
+    template <class cond, Action action, class Callback>
+    bool CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
+                      Callback callback) const;
    
-	template <class cond, Action action, size_t width, class Callback>
-	bool CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-		              Callback callback) const;
+    template <class cond, Action action, size_t width, class Callback>
+    bool CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
+                      Callback callback) const;
 
     // SSE find for the four functions Equal/NotEqual/Less/Greater
 #ifdef TIGHTDB_COMPILER_SSE
     template <class cond2, Action action, size_t width, class Callback>
     bool FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex, 
-		         Callback callback) const;
+                 Callback callback) const;
     
     template <class cond2, Action action, size_t width, class Callback> 
-	TIGHTDB_FORCEINLINE bool FindSSE_intern(__m128i* action_data, __m128i* data, size_t items, 
-		                                    QueryState<int64_t>* state, size_t baseindex, Callback callback) const;
+    TIGHTDB_FORCEINLINE bool FindSSE_intern(__m128i* action_data, __m128i* data, size_t items, 
+                                            QueryState<int64_t>* state, size_t baseindex, Callback callback) const;
 
 #endif
 
@@ -434,7 +434,7 @@ public:
     // Find value greater/less in 64-bit chunk - only works for positive values
     template <bool gt, Action action, size_t width, class Callback>
     bool FindGTLT_Fast(uint64_t chunk, uint64_t magic, QueryState<int64_t>* state, size_t baseindex, 
-		               Callback callback) const;
+                       Callback callback) const;
 
     // Find value greater/less in 64-bit chunk - no constraints
     template <bool gt, Action action, size_t width, class Callback>
@@ -833,9 +833,9 @@ inline Array Array::GetSubArray(std::size_t ndx) const TIGHTDB_NOEXCEPT
     const std::size_t ref = std::size_t(Get(ndx));
     TIGHTDB_ASSERT(ref);
 
-	// FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying 
-	// the returned array genrally causes the parent to be modified too.
-	return Array(ref, const_cast<Array*>(this), ndx, m_alloc); 
+    // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying 
+    // the returned array genrally causes the parent to be modified too.
+    return Array(ref, const_cast<Array*>(this), ndx, m_alloc); 
 }
 
 
@@ -1386,28 +1386,28 @@ template <class cond2, Action action, size_t bitwidth, class Callback> void Arra
     // Test first few items with no initial time overhead
     if (start > 0) {
         if (m_len > start && c(Get<bitwidth>(start), value) && start < end) { 
-			if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return;
-		}
+            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return;
+        }
 
-		++start;
+        ++start;
 
         if (m_len > start && c(Get<bitwidth>(start), value) && start < end) { 
-			if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return;
-		} 
+            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return;
+        } 
 
-		++start;
+        ++start;
 
         if (m_len > start && c(Get<bitwidth>(start), value) && start < end) {
-			if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return;
-		} 
+            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return;
+        } 
 
-		++start;
+        ++start;
 
         if (m_len > start && c(Get<bitwidth>(start), value) && start < end) { 
-			if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return;
-		} 
+            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return;
+        } 
 
-		++start;
+        ++start;
     }
 
     if (!(m_len > start && start < end))
@@ -1420,7 +1420,7 @@ template <class cond2, Action action, size_t bitwidth, class Callback> void Arra
         return;
 
     // call find_action() on all items in array if all items are guaranteed to match (such as cond2 == NotEqual and
-	// value == 100 and m_ubound == 15)
+    // value == 100 and m_ubound == 15)
     if (c.will_match(value, m_lbound, m_ubound)) {
         if (action == act_Sum || action == act_Max || action == act_Min) {
             int64_t res;
@@ -1525,7 +1525,7 @@ template <bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
 {
     size_t start = 0;
     uint64_t hasZeroByte;
-	// Warning free way of computing (1ULL << width) - 1
+    // Warning free way of computing (1ULL << width) - 1
     uint64_t mask = (width == 64 ? ~0ULL : ((1ULL << (width == 64 ? 0 : width)) - 1ULL)); 
 
     if (eq == (((v >> (width * start)) & mask) == 0)) {
@@ -1533,8 +1533,8 @@ template <bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
     }
 
     // Bisection optimization, speeds up small bitwidths with high match frequency. More partions than 2 do NOT pay 
-	// off because the work done by TestZero() is wasted for the cases where the value exists in first half, but 
-	// useful if it exists in last half. Sweet spot turns out to be the widths and partitions below.
+    // off because the work done by TestZero() is wasted for the cases where the value exists in first half, but 
+    // useful if it exists in last half. Sweet spot turns out to be the widths and partitions below.
     if (width <= 8) {
         hasZeroByte = TestZero<width>(v | 0xffffffff00000000ULL);
         if (eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
@@ -1561,7 +1561,7 @@ template <bool eq, size_t width>size_t Array::FindZero(uint64_t v) const
     }
 
     while (eq == (((v >> (width * start)) & mask) != 0)) {
-		// You must only call FindZero() if you are sure that at least 1 item matches
+        // You must only call FindZero() if you are sure that at least 1 item matches
         TIGHTDB_ASSERT(start <= 8 * sizeof(v)); 
         start++;
     }
@@ -1833,14 +1833,14 @@ void Array::find(int64_t value, size_t start, size_t end, size_t baseindex, Quer
 
 template <class cond, Action action, class Callback> 
 void Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-				 Callback callback) const
+                 Callback callback) const
 {
     TIGHTDB_TEMPEX4(find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback));
 }
 
 template <class cond, Action action, size_t bitwidth, class Callback> 
 void Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-			     Callback callback) const
+                 Callback callback) const
 {
 #ifdef TIGHTDB_DEBUG
     Array r_arr;
@@ -1873,7 +1873,7 @@ void Array::find(int64_t value, size_t start, size_t end, size_t baseindex, Quer
 
 template <class cond2, Action action, size_t bitwidth, class Callback> 
 int64_t Array::find_reference(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-	                          Callback callback) const
+                              Callback callback) const
 {
     // Reference implementation of find_optimized for bug testing
     (void)callback;
@@ -1913,7 +1913,7 @@ int64_t Array::find_reference(int64_t value, size_t start, size_t end, size_t ba
 // 'items' is the number of 16-byte SSE chunks. Returns index of packed element relative to first integer of first chunk
 template <class cond2, Action action, size_t width, class Callback> 
 bool Array::FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex,
-					Callback callback) const
+                    Callback callback) const
 {
     __m128i search = {0};
 
@@ -1934,7 +1934,7 @@ bool Array::FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64
 // find_all, etc) on value inside action_data for first match, if any
 template <class cond2, Action action, size_t width, class Callback> 
 TIGHTDB_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* data, size_t items, 
-											   QueryState<int64_t>* state, size_t baseindex, Callback callback) const
+                                               QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     cond2 c;
     int cond = c.condition();
@@ -2015,7 +2015,7 @@ TIGHTDB_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* da
 
 template <class cond, Action action, class Callback>
 bool Array::CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-	                     Callback callback) const
+                         Callback callback) const
 {
     cond c;
     TIGHTDB_ASSERT(start < end);
@@ -2071,7 +2071,7 @@ template <class cond, Action action, size_t width, class Callback> bool Array::C
 
 template <class cond, Action action, size_t width, class Callback, size_t foreign_width> 
 bool Array::CompareLeafs4(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-	                      Callback callback) const
+                          Callback callback) const
 {
     cond c;
     char* foreign_m_data = foreign->m_data;     
@@ -2234,7 +2234,7 @@ bool Array::CompareLeafs4(Array* foreign, size_t start, size_t end, size_t basei
 
 template <class cond2, Action action, size_t bitwidth, class Callback> 
 bool Array::Compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-	                Callback callback) const
+                    Callback callback) const
 {
     cond2 c;
     int cond = c.condition();
@@ -2256,7 +2256,7 @@ bool Array::Compare(int64_t value, size_t start, size_t end, size_t baseindex, Q
 
 template <bool gt, Action action, size_t bitwidth, class Callback> 
 bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-	                        Callback callback) const
+                            Callback callback) const
 {
     TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
     uint64_t mask = (bitwidth == 64 ? ~0ULL : ((1ULL << (bitwidth == 64 ? 0 : bitwidth)) - 1ULL)); // Warning free way of computing (1ULL << width) - 1

@@ -104,10 +104,40 @@ IS_REDHAT_DERIVATIVE=""
 if [ -e /etc/redhat-release ] || grep -q "Amazon" /etc/system-release 2>/dev/null; then
     IS_REDHAT_DERIVATIVE="1"
 fi
-NEED_USR_LOCAL_LIB_NOTE=""
+PLATFORM_HAS_LIBRARY_PATH_ISSUE=""
 if [ "$IS_REDHAT_DERIVATIVE" ]; then
-    NEED_USR_LOCAL_LIB_NOTE="1"
+    PLATFORM_HAS_LIBRARY_PATH_ISSUE="1"
 fi
+
+
+get_host_info()
+{
+    echo "\$ uname -a"
+    uname -a
+    if [ "$OS" = "Darwin" ]; then
+        echo "\$ system_profiler SPSoftwareDataType"
+        system_profiler SPSoftwareDataType | grep -v '^ *$'
+    elif [ -e "/etc/issue" ]; then
+        echo "\$ cat /etc/issue"
+        cat "/etc/issue" | grep -v '^ *$'
+    fi
+}
+
+get_compiler_info()
+{
+    local CC_CMD CXX_CMD LD_CMD
+    CC_CMD="$(make get-cc)" || exit 1
+    CXX_CMD="$(make get-cxx)" || exit 1
+    LD_CMD="$(make get-ld)" || exit 1
+    echo "C compiler is '$CC_CMD' ($(which "$CC_CMD" 2>/dev/null))"
+    echo "C++ compiler is '$CXX_CMD' ($(which "$CXX_CMD" 2>/dev/null))"
+    echo "Linker is '$LD_CMD' ($(which "$LD_CMD" 2>/dev/null))"
+    for x in $(printf "%s\n%s\n%s\n" "$CC_CMD" "$CXX_CMD" "$LD_CMD" | sort -u); do
+        echo
+        echo "\$ $x --version"
+        $x --version 2>/dev/null | grep -v '^ *$'
+    done
+}
 
 
 
@@ -122,6 +152,7 @@ case "$MODE" in
             done
             make -C "src/tightdb" BASE_DENOM="ios" clean || exit 1
         fi
+        echo "Done cleaning"
         exit 0
         ;;
 
@@ -189,11 +220,13 @@ case "$MODE" in
             lipo "$TEMP_DIR"/*/"libtightdb.a"     -create -output "src/tightdb/libtightdb-ios.a"     || exit 1
             lipo "$TEMP_DIR"/*/"libtightdb-dbg.a" -create -output "src/tightdb/libtightdb-ios-dbg.a" || exit 1
         fi
+        echo "Done building"
         exit 0
         ;;
 
     "test")
         make test || exit 1
+        echo "Test passed"
         exit 0
         ;;
 
@@ -206,6 +239,30 @@ case "$MODE" in
         if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
             ldconfig || exit 1
         fi
+        echo "Done installing"
+        exit 0
+        ;;
+
+    "install-shared")
+        PREFIX="$1"
+        if ! [ "$PREFIX" ]; then
+            PREFIX="/usr/local"
+        fi
+        make prefix="$PREFIX" install INSTALL_FILTER=shared-libs || exit 1
+        if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
+            ldconfig || exit 1
+        fi
+        echo "Done installing"
+        exit 0
+        ;;
+
+    "install-devel")
+        PREFIX="$1"
+        if ! [ "$PREFIX" ]; then
+            PREFIX="/usr/local"
+        fi
+        make prefix="$PREFIX" install INSTALL_FILTER=static-libs,progs,headers || exit 1
+        echo "Done installing"
         exit 0
         ;;
 
@@ -218,13 +275,43 @@ case "$MODE" in
         if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
             ldconfig || exit 1
         fi
+        echo "Done uninstalling"
+        exit 0
+        ;;
+
+    "uninstall-shared")
+        PREFIX="$1"
+        if ! [ "$PREFIX" ]; then
+            PREFIX="/usr/local"
+        fi
+        make prefix="$PREFIX" uninstall INSTALL_FILTER=shared-libs || exit 1
+        if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
+            ldconfig || exit 1
+        fi
+        echo "Done uninstalling"
+        exit 0
+        ;;
+
+    "uninstall-devel")
+        PREFIX="$1"
+        if ! [ "$PREFIX" ]; then
+            PREFIX="/usr/local"
+        fi
+        make prefix="$PREFIX" uninstall INSTALL_FILTER=static-libs,progs,extra || exit 1
+        echo "Done uninstalling"
         exit 0
         ;;
 
     "test-installed")
         PREFIX="$1"
+        if [ -z "$PREFIX" ]; then
+            PREFIX="/usr/local"
+        fi
+        LIBDIR="$(make prefix="$PREFIX" get-libdir)" || exit 1
+        export LD_RUN_PATH="$LIBDIR"
         make -C "test-installed" clean || exit 1
         make -C "test-installed" test  || exit 1
+        echo "Test passed"
         exit 0
         ;;
 
@@ -433,6 +520,8 @@ case "$MODE" in
         export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME" PATH
 
         if (
+                AUGMENTED_EXTENSIONS="$AVAIL_EXTENSIONS"
+                word_list_prepend AUGMENTED_EXTENSIONS "c++" || exit 1
                 BIN_CORE_ARG=""
                 if [ "$PREBUILT_CORE" ]; then
                     BIN_CORE_ARG=" bin-core"
@@ -440,7 +529,9 @@ case "$MODE" in
                 cat <<EOI > "$PKG_DIR/build"
 #!/bin/sh
 
-EXTENSIONS="$AVAIL_EXTENSIONS"
+EXTENSIONS="$AUGMENTED_EXTENSIONS"
+
+export TIGHTDB_VERSION="$VERSION"
 
 if [ \$# -eq 1 -a "\$1" = "clean" ]; then
     sh tightdb/build.sh dist-clean$BIN_CORE_ARG || exit 1
@@ -453,7 +544,7 @@ if [ \$# -eq 1 -a "\$1" = "install" ]; then
 fi
 
 if [ \$# -eq 1 -a "\$1" = "uninstall" ]; then
-    sh tightdb/build.sh dist-uninstall || exit 1
+    sh tightdb/build.sh dist-uninstall \$EXTENSIONS || exit 1
     exit 0
 fi
 
@@ -496,39 +587,47 @@ EOI
                 chmod +x "$PKG_DIR/build"
 
                 cat <<EOI >"$PKG_DIR/README"
-Build specific extensions: ./build  EXT1  [EXT2]...
-Build everything:          ./build  all
-Start from scratch:        ./build  clean
-Install what was built:    sudo  ./build  install
-Uninstall everything:      sudo  ./build  uninstall
-Test installation:         ./build  test-installed
+Build specific extensions:    ./build  EXT1  [EXT2]...
+Build everything:             ./build  all
+Start from scratch:           ./build  clean
+Install what was built:       sudo  ./build  install
+Uninstall everything:         sudo  ./build  uninstall
+Check state of installation:  ./build  test-installed
 
-Normally you can do with just:
+The following steps should generally suffice:
 
     ./build all
     sudo ./build install
 
-Available extensions are: ${AVAIL_EXTENSIONS:-None}
+Available extensions are: ${AUGMENTED_EXTENSIONS:-None}
 
 EOI
                 if [ "$PREBUILT_CORE" ]; then
                     cat <<EOI >>"$PKG_DIR/README"
 During installation, the prebuilt core library will be installed along
-with all the extensions that you have built yourself.
+with all the extensions that were successfully built. The C++
+extension is part of the core library, so the effect of including
+'c++' in the list of extensions in the build command is simply to
+request that the C++ header files are to be installed along with other
+files needed when using Tightdb in a C++ application.
 EOI
                 else
                     cat <<EOI >>"$PKG_DIR/README"
-When building is requested, the core library will be built along
-with all the extensions that you have specified.
+When building is requested, the core library will be built along with
+all the extensions that you have specified. The C++ extension is part
+of the core library, so the effect of including 'c++' in the list of
+extensions is simply to request that the C++ header files are to be
+installed along with other files needed when using Tightdb in a C++
+application.
 
-For information on prerequisites for building the core library, see
+For information on prerequisites when building the core library, see
 tightdb/README.md.
 EOI
                 fi
 
                 cat <<EOI >>"$PKG_DIR/README"
 
-For information on prerequisites for building each extension, see the
+For information on prerequisites when building each extension, see the
 README.md file in the corresponding subdirectory.
 EOI
 
@@ -591,6 +690,7 @@ EOF
                     if [ "$OS" = "Darwin" ]; then
                         cp "src/tightdb/libtightdb-ios.a" "src/tightdb/libtightdb-ios-dbg.a" "$PKG_DIR/tightdb/src/tightdb/" || exit 1
                     fi
+                    get_host_info >"$PKG_DIR/tightdb/.PREBUILD_INFO" || exit 1
                 else
                     message "Transfering core library to package"
                     sh "$TIGHTDB_HOME/build.sh" dist-copy "$PKG_DIR/tightdb" >>"$LOG_FILE" 2>&1 || exit 1
@@ -635,7 +735,7 @@ EOF
                 # search path for header files is not used, so
                 # installed headers will not be found. This problem is
                 # eliminated by the explicit addition of the temporary
-                # header installation directory to CPATH below.
+                # header installation directory to CPATH above.
                 path_list_prepend LIBRARY_PATH "$TEST_PKG_DIR/tightdb/src/tightdb" || exit 1
 
                 # FIXME: The problem with this one that it partially
@@ -718,6 +818,7 @@ EOF
         LOG_FILE="$TEMP_DIR/clean.log"
         ERROR=""
         rm -f ".TO_BE_INSTALLED" || exit 1
+        rm -f ".INSTALL_DEVEL_FILES" || exit 1
         if [ "$1" = "bin-core" ]; then
             shift
         else
@@ -738,6 +839,7 @@ EOF
                 fi
             fi
         done
+        echo "DONE CLEANING" | tee -a "$LOG_FILE"
         if [ "$ERROR" ]; then
             echo "Log file is here: $LOG_FILE" 1>&2
             exit 1
@@ -763,7 +865,20 @@ EOF
     "dist-build")
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-build.XXXX)" || exit 1
         LOG_FILE="$TEMP_DIR/build.log"
-        mkdir "$TEMP_DIR/select" || exit 1
+        (
+            echo "Tightdb version: ${TIGHTDB_VERSION:-Unknown}"
+            if [ -e ".PREBUILD_INFO" ]; then
+                echo
+                echo "PREBUILD HOST INFO:"
+                cat ".PREBUILD_INFO"
+            fi
+            echo
+            echo "BUILD HOST INFO:"
+            get_host_info || exit 1
+            echo
+            get_compiler_info || exit 1
+            echo
+        ) >>"$LOG_FILE"
         ERROR=""
         if [ "$1" = "bin-core" ]; then
             shift
@@ -771,7 +886,7 @@ EOF
         else
             echo "BUILDING Core library" | tee -a "$LOG_FILE"
             rm -f ".TO_BE_INSTALLED" || exit 1
-            if sh "build.sh" build >>"$LOG_FILE" 2>&1; then
+            if DISABLE_UPDATE_TABLE_MACROS_HPP="1" sh "build.sh" build >>"$LOG_FILE" 2>&1; then
                 touch ".TO_BE_INSTALLED" || exit 1
             else
                 echo "Failed!" | tee -a "$LOG_FILE" 1>&2
@@ -779,9 +894,14 @@ EOF
             fi
         fi
         if ! [ "$ERROR" ]; then
+            mkdir "$TEMP_DIR/select" || exit 1
             for x in "$@"; do
                 touch "$TEMP_DIR/select/$x" || exit 1
             done
+            if [ -e "$TEMP_DIR/select/c++" ]; then
+                echo "Marking extension 'c++' for installation" | tee -a "$LOG_FILE"
+                touch ".INSTALL_DEVEL_FILES" || exit 1
+            fi
             LIBDIR="$(make get-libdir)" || exit 1
             path_list_prepend CPATH        "$TIGHTDB_HOME/src"         || exit 1
             path_list_prepend LIBRARY_PATH "$TIGHTDB_HOME/src/tightdb" || exit 1
@@ -794,6 +914,7 @@ EOF
                     EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
                     rm -f "$EXT_HOME/.TO_BE_INSTALLED" || exit 1
                     if sh "$EXT_HOME/build.sh" build >>"$LOG_FILE" 2>&1; then
+                        echo "Marking extension '$x' for installation" | tee -a "$LOG_FILE"
                         touch "$EXT_HOME/.TO_BE_INSTALLED" || exit 1
                     else
                         echo "Failed!" | tee -a "$LOG_FILE" 1>&2
@@ -801,10 +922,12 @@ EOF
                     fi
                 fi
             done
+            echo "DONE BUILDING" | tee -a "$LOG_FILE"
         fi
         if [ "$ERROR" ]; then
             cat 1>&2 <<EOF
-One or more parts failed to build. You may be missing one or more
+
+Note: Some parts failed to build. You may be missing one or more
 dependencies. Check the README file for details. If this does not
 help, check the log file.
 The log file is here: $LOG_FILE
@@ -823,16 +946,45 @@ EOF
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-install.XXXX)" || exit 1
         chmod a+rx "$TEMP_DIR" || exit 1
         LOG_FILE="$TEMP_DIR/install.log"
+        (
+            echo "Tightdb version: ${TIGHTDB_VERSION:-Unknown}"
+            if [ -e ".PREBUILD_INFO" ]; then
+                echo
+                echo "PREBUILD HOST INFO:"
+                cat ".PREBUILD_INFO"
+            fi
+            echo
+            echo "BUILD HOST INFO:"
+            get_host_info || exit 1
+            echo
+        ) >>"$LOG_FILE"
         ERROR=""
+        NEED_USR_LOCAL_LIB_NOTE=""
         echo "INSTALLING Core library" | tee -a "$LOG_FILE"
-        if sh build.sh install >>"$LOG_FILE" 2>&1; then
+        if DISABLE_UPDATE_TABLE_MACROS_HPP="1" sh build.sh install-shared >>"$LOG_FILE" 2>&1; then
             touch ".WAS_INSTALLED" || exit 1
+            echo "Success!" | tee -a "$LOG_FILE"
+            if [ -e ".INSTALL_DEVEL_FILES" ]; then
+                echo "INSTALLING Extension 'c++'" | tee -a "$LOG_FILE"
+                if DISABLE_UPDATE_TABLE_MACROS_HPP="1" sh build.sh install-devel >>"$LOG_FILE" 2>&1; then
+                    touch ".DEVEL_FILES_WERE_INSTALLED" || exit 1
+                    echo "Success!" | tee -a "$LOG_FILE"
+                    NEED_USR_LOCAL_LIB_NOTE="$PLATFORM_HAS_LIBRARY_PATH_ISSUE"
+                else
+                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                    ERROR="1"
+                fi
+            fi
             for x in $EXTENSIONS; do
                 EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
                 if [ -e "$EXT_HOME/.TO_BE_INSTALLED" ]; then
                     echo "INSTALLING Extension '$x'" | tee -a "$LOG_FILE"
                     if sh "$EXT_HOME/build.sh" install >>"$LOG_FILE" 2>&1; then
                         touch "$EXT_HOME/.WAS_INSTALLED" || exit 1
+                        echo "Success!" | tee -a "$LOG_FILE"
+                        if [ "$x" = "c" -o "$x" = "objc" ]; then
+                            NEED_USR_LOCAL_LIB_NOTE="$PLATFORM_HAS_LIBRARY_PATH_ISSUE"
+                        fi
                     else
                         echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                         ERROR="1"
@@ -842,17 +994,25 @@ EOF
             if [ "$NEED_USR_LOCAL_LIB_NOTE" ]; then
                 LIBDIR="$(make get-libdir)" || exit 1
                 cat <<EOF
-NOTE: Libraries have been installed in $LIBDIR.
-On your system this directory is not normally part of the default
-library search path, so you may have to set LD_LIBRARY_PATH before
-running the the test suite, or your own application. You can do this
-by issuing the following command:
 
-    export LD_LIBRARY_PATH=$LIBDIR
+NOTE: Shared libraries have been installed in '$LIBDIR'.
 
-Alternatively, you can add $LIBDIR to /etc/ld.so.conf.
+We believe that on your system this directory is not part of the
+default library search path. If this is true, you probably have to do
+one of the following things to successfully use Tightdb in a C, C++,
+or Objective-C application:
+
+ - Run 'export LD_RUN_PATH=$LIBDIR' before building your application.
+
+ - Run 'export LD_LIBRARY_PATH=$LIBDIR' before launching your
+   application.
+
+ - Add '$LIBDIR' to the system-wide library search path by editing
+   /etc/ld.so.conf.
+
 EOF
             fi
+            echo "DONE INSTALLING" | tee -a "$LOG_FILE"
         else
             echo "Failed!" | tee -a "$LOG_FILE" 1>&2
             ERROR="1"
@@ -861,6 +1021,12 @@ EOF
             echo "Log file is here: $LOG_FILE" 1>&2
             exit 1
         fi
+        cat <<EOF
+
+NOTE: At this point you should run './build test-installed' to check
+that all installed parts are working properly. If any part failed to
+install, it will be skipped in this test.
+EOF
         exit 0
         ;;
 
@@ -869,24 +1035,49 @@ EOF
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-uninstall.XXXX)" || exit 1
         chmod a+rx "$TEMP_DIR" || exit 1
         LOG_FILE="$TEMP_DIR/uninstall.log"
+        (
+            echo "Tightdb version: ${TIGHTDB_VERSION:-Unknown}"
+            if [ -e ".PREBUILD_INFO" ]; then
+                echo
+                echo "PREBUILD HOST INFO:"
+                cat ".PREBUILD_INFO"
+            fi
+            echo
+            echo "BUILD HOST INFO:"
+            get_host_info || exit 1
+            echo
+        ) >>"$LOG_FILE"
         ERROR=""
+        mkdir "$TEMP_DIR/select" || exit 1
+        for x in "$@"; do
+            touch "$TEMP_DIR/select/$x" || exit 1
+        done
         for x in $(word_list_reverse $EXTENSIONS); do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-            if [ -e "$EXT_HOME/build.sh" ]; then
+            if [ -e "$TEMP_DIR/select/$x" ]; then
                 echo "UNINSTALLING Extension '$x'" | tee -a "$LOG_FILE"
                 if ! sh "$EXT_HOME/build.sh" uninstall >>"$LOG_FILE" 2>&1; then
-                    echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
+                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                     ERROR="1"
                 fi
                 rm -f "$EXT_HOME/.WAS_INSTALLED" || exit 1
             fi
         done
+        if [ -e "$TEMP_DIR/select/c++" ]; then
+            echo "UNINSTALLING Extension 'c++'" | tee -a "$LOG_FILE"
+            if ! sh build.sh uninstall-devel >>"$LOG_FILE" 2>&1; then
+                echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                ERROR="1"
+            fi
+            rm -f ".DEVEL_FILES_WERE_INSTALLED" || exit 1
+        fi
         echo "UNINSTALLING Core library" | tee -a "$LOG_FILE"
-        if ! sh build.sh uninstall >>"$LOG_FILE" 2>&1; then
-            echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
+        if ! sh build.sh uninstall-shared >>"$LOG_FILE" 2>&1; then
+            echo "Failed!" | tee -a "$LOG_FILE" 1>&2
             ERROR="1"
         fi
         rm -f ".WAS_INSTALLED" || exit 1
+        echo "DONE UNINSTALLING" | tee -a "$LOG_FILE"
         if [ "$ERROR" ]; then
             echo "Log file is here: $LOG_FILE" 1>&2
             exit 1
@@ -902,26 +1093,43 @@ EOF
         fi
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-test-installed.XXXX)" || exit 1
         LOG_FILE="$TEMP_DIR/test.log"
+        (
+            echo "Tightdb version: ${TIGHTDB_VERSION:-Unknown}"
+            if [ -e ".PREBUILD_INFO" ]; then
+                echo
+                echo "PREBUILD HOST INFO:"
+                cat ".PREBUILD_INFO"
+            fi
+            echo
+            echo "BUILD HOST INFO:"
+            get_host_info || exit 1
+            echo
+            get_compiler_info || exit 1
+            echo
+        ) >>"$LOG_FILE"
         ERROR=""
-        echo "TESTING Installation of core library" | tee -a "$LOG_FILE"
-        if sh build.sh test-installed >>"$LOG_FILE" 2>&1; then
-            echo "SUCCESS!"  | tee -a "$LOG_FILE"
-        else
-            echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
-            ERROR="1"
+        if [ -e ".DEVEL_FILES_WERE_INSTALLED" ]; then
+            echo "TESTING Installed extension 'c++'" | tee -a "$LOG_FILE"
+            if sh build.sh test-installed >>"$LOG_FILE" 2>&1; then
+                echo "Success!" | tee -a "$LOG_FILE"
+            else
+                echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                ERROR="1"
+            fi
         fi
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -e "$EXT_HOME/.WAS_INSTALLED" ]; then
-                echo "TESTING Installation of extension '$x'" | tee -a "$LOG_FILE"
+                echo "TESTING Installed extension '$x'" | tee -a "$LOG_FILE"
                 if sh "$EXT_HOME/build.sh" test-installed >>"$LOG_FILE" 2>&1; then
-                    echo "SUCCESS!"  | tee -a "$LOG_FILE"
+                    echo "Success!" | tee -a "$LOG_FILE"
                 else
-                    echo "FAILED!!!" | tee -a "$LOG_FILE" 1>&2
+                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                     ERROR="1"
                 fi
             fi
         done
+        echo "DONE TESTING" | tee -a "$LOG_FILE"
         if [ "$ERROR" ]; then
             echo "Log file is here: $LOG_FILE" 1>&2
             exit 1
@@ -1018,7 +1226,9 @@ EOF
     *)
         echo "Unspecified or bad mode '$MODE'" 1>&2
         echo "Available modes are: clean build test install uninstall test-installed wipe-installed" 1>&2
-        echo "As well as: src-dist bin-dist dist-clean dist-build dist-install dist-uninstall dist-test-installed dist-status dist-pull dist-checkout dist-copy" 1>&2
+        echo "As well as: install-shared install-devel uninstall-shared uninstall-devel" 1>&2
+        echo "As well as: src-dist bin-dist dist-status dist-pull dist-checkout dist-copy" 1>&2
+        echo "As well as: dist-clean dist-build dist-install dist-uninstall dist-test-installed" 1>&2
         exit 1
         ;;
 

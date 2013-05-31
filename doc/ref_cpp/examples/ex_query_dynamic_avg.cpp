@@ -1,4 +1,5 @@
 // @@Example: ex_cpp_dyn_query_avg @@
+#include <cassert>
 #include <tightdb.hpp>
 
 using namespace tightdb;
