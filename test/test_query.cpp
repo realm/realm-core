@@ -1981,6 +1981,7 @@ TEST(TestQueryFindAll_Begins)
 
 TEST(TestQueryFindAll_Ends)
 {
+
     TupleTableType ttt;
 
     ttt.add(0, "barfo");
