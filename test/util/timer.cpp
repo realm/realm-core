@@ -1,3 +1,5 @@
+#include <stdexcept>
+
 #if defined _WIN32
 #  define NOMINMAX
 #  include <windows.h>
@@ -9,6 +11,7 @@
 
 #include "timer.hpp"
 
+using namespace std;
 using namespace tightdb::test_util;
 
 
