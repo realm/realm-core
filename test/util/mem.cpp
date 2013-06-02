@@ -111,7 +111,8 @@ size_t get_mem_usage()
 #if defined _WIN32
 
     // FIXME: Does this return virtual size or resident set size? What
-    // we need is the virtual size.
+    // we need is the virtual size, i.e., we want to include that
+    // which is temporarily swapped out.
     return calculate_ws_private(GetCurrentProcessId());
 
 #elif defined __APPLE__
@@ -121,7 +122,11 @@ size_t get_mem_usage()
     if (KERN_SUCCESS != task_info(mach_task_self(), TASK_BASIC_INFO, (task_info_t)&t_info, &t_info_count)) return -1;
     // resident size is in t_info.resident_size;
     // virtual size is in t_info.virtual_size;
-    return t_info.virtual_size;
+    // FIXME: Virtual size does not seem to contain a usfull metric as
+    // expected. It is way too large. If resident size, as expected,
+    // includes swapped out memory, it is not the metric we need
+    // either, yet we will yse the resident size for now.
+    return t_info.resident_size;
 
 #elif defined TIGHTDB_HAVE_LIBPROCPS
 
