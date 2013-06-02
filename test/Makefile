@@ -1,9 +1,14 @@
-PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl performance experiments
+PASSIVE_SUBDIRS = util test-tightdb test-sqlite3 test-stl performance experiments
+
+test_tightdb_DEPS = util
+test_sqlite3_DEPS = util
+test_stl_DEPS     = util
+performance_DEPS  = util
 
 TEST_PROGRAMS = tightdb-tests
 
 tightdb_tests_SOURCES = $(wildcard *.c *.cpp large_tests/*.cpp)
-tightdb_tests_LIBS = ../src/tightdb/libtightdb.a
+tightdb_tests_LIBS    = ../src/tightdb/libtightdb.a
 
 EXTRA_CLEAN_DIRS = large_tests
 
@@ -11,11 +16,8 @@ ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)
 tightdb_tests_CFLAGS  = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
 tightdb_tests_LDFLAGS = $(shell pkg-config unittest++ --libs)
 else
-PASSIVE_SUBDIRS      += UnitTest++
-test_tightdb_DEPS     = UnitTest++
-test_sqlite3_DEPS     = UnitTest++
-test_stl_DEPS         = UnitTest++
-experiments_DEPS      = UnitTest++
+PASSIVE_SUBDIRS   += UnitTest++
+experiments_DEPS  += UnitTest++
 tightdb_tests_CFLAGS  = -IUnitTest++/src
 tightdb_tests_LDFLAGS = -LUnitTest++ -lUnitTest++
 tightdb_tests_DEPS    = UnitTest++
@@ -24,7 +26,7 @@ endif
 include ../generic.mk
 
 .PHONY: benchmark
-benchmark: subdir/test-tightdb/default subdir/test-sqlite3/default subdir/test-stl/default
+benchmark: subdir/test-tightdb/minimal subdir/test-sqlite3/minimal subdir/test-stl/minimal
 	@echo ""
 	@echo ".:: TightDB ::."
 	test-tightdb/test-tightdb
@@ -41,7 +43,7 @@ UnitTest++:
 
 # Run the performance matrix benchmarking program
 .PHONY: performance
-performance:
+performance: subdir/util/minimal
 	@$(MAKE) -C performance test
 
 # Build and run whatever is in experiements/testcase.cpp

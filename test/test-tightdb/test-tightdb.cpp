@@ -1,11 +1,15 @@
-#include <stdio.h>
-#include <UnitTest++.h>
-#include <tightdb/table_macros.hpp>
-#include "../Support/mem.hpp"
-#include "../Support/number_names.hpp"
+#include <iostream>
+
+#include <tightdb.hpp>
+
+#include "../util/timer.hpp"
+#include "../util/mem.hpp"
+#include "../util/number_names.hpp"
 
 using namespace std;
 using namespace tightdb;
+
+namespace {
 
 // Get and Set are too fast (50ms/M) for normal 64-bit rand*rand*rand*rand*rand (5-10ms/M)
 uint64_t rand2()
@@ -39,6 +43,9 @@ TIGHTDB_TABLE_4(TestTable,
                 third,  Int,
                 fourth, Enum<Days>)
 
+} // anonymous namespace
+
+
 int main()
 {
     TestTable table;
@@ -47,93 +54,88 @@ int main()
     for (size_t i = 0; i < 250000; ++i) {
         // create random string
         const size_t n = rand() % 1000;// * 10 + rand();
-        const string s = number_name(n);
+        const string s = test_util::number_name(n);
 
         table.add(n, s.c_str(), 100, Wed);
     }
     table.add(0, "abcde", 100, Wed);
 
-    printf("Memory usage: %lld bytes\n", (long long)GetMemUsage()); // %zu doesn't work in vc
+    cout << "Memory usage: "<<test_util::get_mem_usage()<<" bytes\n";
 
-    UnitTest::Timer timer;
+    test_util::Timer timer;
 
     // Search small integer column
     {
-        timer.Start();
+        timer.start();
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
             const size_t res = table.column().fourth.find_first(Tue);
             if (res != size_t(-1)) {
-                printf("error");
+                cout << "error\n";
             }
         }
 
-        const int search_time = timer.GetTimeInMs();
-        printf("Search (small integer): %dms\n", search_time);
+        cout << "Search (small integer): "<<timer<<"\n";
     }
 
     // Search byte-size integer column
     {
-        timer.Start();
+        timer.start();
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
             const size_t res = table.column().third.find_first(50);
             if (res != size_t(-1)) {
-                printf("error");
+                cout << "error\n";
             }
         }
 
-        const int search_time = timer.GetTimeInMs();
-        printf("Search (byte-size integer): %dms\n", search_time);
+        cout << "Search (byte-size integer): "<<timer<<"\n";
     }
 
     // Search string column
     {
-        timer.Start();
+        timer.start();
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
             const size_t res = table.column().second.find_first("abcde");
             if (res != 250000) {
-                printf("error");
+                cerr << "error\n";
             }
         }
 
-        const int search_time = timer.GetTimeInMs();
-        printf("Search (string): %dms\n", search_time);
+        cout << "Search (string): "<<timer<<"\n";
     }
 
     // Add index
     {
-        timer.Start();
+        timer.start();
 
         table.column().first.set_index();
 
-        const int search_time = timer.GetTimeInMs();
-        printf("Add index: %dms\n", search_time);
+        cout << "Add index: "<<timer<<"\n";
     }
 
-    printf("Memory usage2: %lld bytes\n", (long long)GetMemUsage()); // %zu doesn't work in vc
+    cout << "Memory usage2: "<<test_util::get_mem_usage()<<" bytes\n";
 
     // Search with index
     {
-        timer.Start();
+        timer.start();
 
         for (size_t i = 0; i < 100000; ++i) {
             const size_t n = rand() % 1000;
             const size_t res = table.column().first.find_first(n);
             if (res == 2500002) { // to avoid above find being optimized away
-                printf("error");
+                cout << "error\n";
             }
         }
 
-        const int search_time = timer.GetTimeInMs();
-        printf("Search index: %dms\n", search_time);
+        cout << "Search index: "<<timer<<"\n";
     }
+
 #ifdef _MSC_VER
-    getchar();
+    cin.get();
 #endif
-    return 0;
 }
