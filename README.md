@@ -4,7 +4,7 @@ TightDB
 Dependencies
 ------------
 
-### Ubuntu 10.04, 12.04
+### Ubuntu 10.04, 12.04, 13.04
 
     sudo apt-get install build-essential
     #   For regenerating <tightdb/table-macros.hpp>
@@ -12,7 +12,7 @@ Dependencies
     #   For testing:
     sudo apt-get install libunittest++-dev
     #   For benchmarking:
-    sudo apt-get install libproc-dev
+    sudo apt-get install libproc-dev  (libprocps0-dev on 13.04)
 
 ### Fedora 17
 
