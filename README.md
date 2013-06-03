@@ -99,6 +99,14 @@ This will produce a package whose name and whose top-level directory
 is named according to the tag.
 
 
+Building a Debian/Ubuntu package
+--------------------------------
+
+The following command will create a deb package:
+
+    dpkg-buildpackage -rfakeroot
+
+
 Configuration
 -------------
 

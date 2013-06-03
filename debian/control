@@ -1,0 +1,19 @@
+Source: libtightdb
+Section: unknown
+Priority: extra
+Maintainer: Kenneth Geisshirt <kg@tightdb.com>
+Build-Depends: debhelper (>=9)
+Standards-Version: 3.9.4
+Homepage: http://www.tightdb.com/
+
+Package: libtightdb
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Fast, embedded database
+ TightDB is a fast, embedded database.
+
+Package: libtightdb-dev
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, g++
+Description: Fast, emdded database.
+ TightDB is a fast, embedded database: Development and header files.
