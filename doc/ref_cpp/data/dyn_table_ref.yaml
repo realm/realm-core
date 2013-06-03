@@ -387,12 +387,17 @@ CATEGORIES :
   - g_dyn_table_insert_bool:
   - g_dyn_table_insert_int:
   - g_dyn_table_insert_enum:
+  - g_dyn_table_insert_float:
+  - g_dyn_table_insert_double:  
   - g_dyn_table_insert_date:
   - g_dyn_table_insert_string:
   - g_dyn_table_insert_binary:
   - g_dyn_table_insert_mixed:
+  - g_dyn_table_insert_subtable:
   - g_dyn_table_insert_done:
-      NAMES    : insert_*
+      TITLE    : insert_*
+	  NAMES    : [insert_bool, insert_int, insert_enum, insert_float, insert_double,
+				  insert_date, insert_string, insert_binary, insert_mixed, insert_subtable, insert_done]
       SUMMARY  : &g_dyn_table_insert_xxx_summary
                  Insert a value.
       DESCR    : &g_dyn_table_insert_xxx_descr
