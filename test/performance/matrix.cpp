@@ -1,24 +1,25 @@
-#include <cstdio>
-#include <string>
 #include <algorithm>
 #include <vector>
+#include <string>
 #include <sstream>
+#include <iostream>
 
 #include <tightdb.hpp>
 
-#include "timer.hpp"
+#include "../util/timer.hpp"
 
 //#define ONLY_CN_TESTS
-const size_t row_count = 250112; // should be divisible by 128
-const size_t rounds = 1000;
-
-//const size_t row_count = 128*10; // should be divisible by 128
-//const size_t rounds = 1;
 
 using namespace std;
 using namespace tightdb;
 
 namespace {
+
+const size_t row_count = 250112; // should be divisible by 128
+const size_t rounds = 1000;
+
+//const size_t row_count = 128*10; // should be divisible by 128
+//const size_t rounds = 1;
 
 TIGHTDB_TABLE_11(TestTable,
                 bits_0,    Int,
@@ -34,7 +35,7 @@ TIGHTDB_TABLE_11(TestTable,
                 enum_str,  String)
 
 
-Timer timer;
+test_util::Timer timer;
 
 
 struct TestStruct {
@@ -182,16 +183,18 @@ public:
 
 } // anonymous namespace
 
+
+
 int main()
 {
 #ifdef TIGHTDB_DEBUG
-    printf("Running Debug Build\n");
+    cout << "Running Debug Build\n";
 #else
-    printf("Running Release Build\n");
+    cout << "Running Release Build\n";
 #endif
-    printf("  Row count: %d\n", (int)row_count);
-    printf("  Rounds:    %d\n", (int)rounds);
-    printf("\n");
+    cout << "  Row count: "<<row_count<<"\n";
+    cout << "  Rounds:    "<<rounds<<"\n";
+    cout << "\n";
 
 
 #ifndef ONLY_CN_TESTS
@@ -242,12 +245,11 @@ int main()
                     for (size_t n = 0; n < rounds; ++n) {
                         const size_t res = q.count();
                         if (res != expected) {
-                            printf("error");
+                            cout << "error\n";
                         }
                     }
                 }
-                const double search_time = timer.get_elapsed_millis();
-                printf("TightDB: Column %d: Sparse:  %10fs\n", (int)i, search_time);
+                cout << "TightDB: Column "<<i<<": Sparse:  "<<timer<<"\n";
 
                 // Search with column intrinsic functions
                 timer.start();
@@ -264,12 +266,11 @@ int main()
                         else if (i == 7) res = table.column().bits_64.count(0);
 
                         if (res != expected) {
-                            printf("error");
+                            cout << "error\n";
                         }
                     }
                 }
-                const double search_time2 = timer.get_elapsed_millis();
-                printf("TightDB: Column %d: Sparse2: %10fs\n", (int)i, search_time2);
+                cout << "TightDB: Column "<<i<<": Sparse2: "<<timer<<"\n";
             }
 
             // Do a search over entire column (all matches)
@@ -293,12 +294,11 @@ int main()
                     for (size_t n = 0; n < rounds; ++n) {
                         const size_t res = q.count();
                         if (res != expected) {
-                            printf("error");
+                            cout << "error\n";
                         }
                     }
                 }
-                const double search_time = timer.get_elapsed_millis();
-                printf("TightDB: Column %d: Many:    %10fs\n", (int)i, search_time);
+                cout << "TightDB: Column "<<i<<": Many:    "<<timer<<"\n";
 
                 // Search with column intrinsic functions
                 timer.start();
@@ -315,12 +315,11 @@ int main()
                         else if (i == 7) res = table.column().bits_64.count(0x7FFFFFFFFFFFFFFFLL);
 
                         if (res != expected) {
-                            printf("error");
+                            cout << "error\n";
                         }
                     }
                 }
-                const double search_time2 = timer.get_elapsed_millis();
-                printf("TightDB: Column %d: Many2:   %10fs\n", (int)i, search_time2);
+                cout << "TightDB: Column "<<i<<": Many2:   "<<timer<<"\n";
             }
 
             // Do a sum over entire column (all matches)
@@ -350,12 +349,11 @@ int main()
                         else if (i == 7) res = q.bits_64.sum();
 
                         if (res != expected) {
-                            printf("error");
+                            cout << "error\n";
                         }
                     }
                 }
-                const double search_time = timer.get_elapsed_millis();
-                printf("TightDB: Column %d: Sum:     %10fs\n", (int)i, search_time);
+                cout << "TightDB: Column "<<i<<": Sum:     "<<timer<<"\n";
             }
 
             // Do a sum over entire column (all matches)
@@ -384,12 +382,11 @@ int main()
                         else if (i == 7) res = table.column().bits_64.sum();
 
                         if (res != expected) {
-                            printf("error");
+                            cout << "error\n";
                         }
                     }
                 }
-                const double search_time = timer.get_elapsed_millis();
-                printf("TightDB: Column %d: Sum2:    %10fs\n", (int)i, search_time);
+                cout << "TightDB: Column "<<i<<": Sum2:    "<<timer<<"\n";
             }
         }
 
@@ -409,12 +406,11 @@ int main()
                             else if (i == 1) res = table.column().long_str.count("long bottom");
                             else if (i == 2) res = table.column().enum_str.count("saturday");
                             if (res != expected) {
-                                printf("error");
+                                cout << "error\n";
                             }
                         }
                     }
-                    const double search_time = timer.get_elapsed_millis();
-                    printf("TightDB: %sColumn c %d: Sparse: %10fs\n", run, (int)i, search_time);
+                    cout << "TightDB: "<<run<<"Column c "<<i<<": Sparse: "<<timer<<"\n";
                 }
 
                 // Query: Do a search over entire column (sparse, only last value matches)
@@ -431,12 +427,11 @@ int main()
                         for (size_t n = 0; n < rounds; ++n) {
                             const size_t res = q.count();
                             if (res != expected) {
-                                printf("error");
+                                cout << "error\n";
                             }
                         }
                     }
-                    const double search_time = timer.get_elapsed_millis();
-                    printf("TightDB: %sColumn q %d: Sparse: %10fs\n", run, (int)i, search_time);
+                    cout << "TightDB: "<<run<<"Column q "<<i<<": Sparse: "<<timer<<"\n";
                 }
 
                 // Do a search over entire column (many matches)
@@ -457,12 +452,11 @@ int main()
                             else if (i == 1) res = len -table.column().long_str.count("long bottom");
                             else if (i == 2) res = table.column().enum_str.count("monday");
                             if (res != expected) {
-                                printf("error");
+                                cout << "error\n";
                             }
                         }
                     }
-                    const double search_time = timer.get_elapsed_millis();
-                    printf("TightDB: %sColumn c %d: Many:   %10fs\n", run, (int)i, search_time);
+                    cout << "TightDB: "<<run<<"Column c "<<i<<": Many:   "<<timer<<"\n";
                 }
 
                 // Query: Do a search over entire column (many matches)
@@ -479,12 +473,11 @@ int main()
                         for (size_t n = 0; n < rounds; ++n) {
                             const size_t res = q.count();
                             if (res != expected) {
-                                printf("error");
+                                cout << "error\n";
                             }
                         }
                     }
-                    const double search_time = timer.get_elapsed_millis();
-                    printf("TightDB: %sColumn q %d: Many:   %10fs\n", run, (int)i, search_time);
+                    cout << "TightDB: "<<run<<"Column q "<<i<<": Many:   "<<timer<<"\n";
                 }
             }
 
@@ -544,12 +537,11 @@ int main()
                         else if (i == 7) res = count_if(table.begin(), table.end(), match8(0));
 
                         if (res != expected) {
-                            printf("error");
+                            cout << "error\n";
                         }
                     }
                 }
-                const double search_time = timer.get_elapsed_millis();
-                printf("STL: Column %d: Sparse: %fs\n", (int)i, search_time);
+                cout << "STL: Column "<<i<<": Sparse: "<<timer<<"\n";
             }
 
             // Do a search over entire column (all matches)
@@ -571,12 +563,11 @@ int main()
                         else if (i == 7) res = count_if(table.begin(), table.end(), match8(0x7FFFFFFFFFFFFFFFLL));
 
                         if (res != expected) {
-                            printf("error");
+                            cout << "error\n";
                         }
                     }
                 }
-                const double search_time = timer.get_elapsed_millis();
-                printf("STL: Column %d: Many:   %fs\n", (int)i, search_time);
+                cout << "STL: Column "<<i<<": Many:   "<<timer<<"\n";
             }
 
             // Do a sum over entire column (all matches)
@@ -636,12 +627,11 @@ int main()
                         }
 
                         if (res != expected) {
-                            printf("error");
+                            cout << "error\n";
                         }
                     }
                 }
-                const double search_time = timer.get_elapsed_millis();
-                printf("STL: Column %d: Sum:    %fs\n", (int)i, search_time);
+                cout << "STL: Column "<<i<<": Sum:    "<<timer<<"\n";
             }
         }
 
@@ -659,12 +649,11 @@ int main()
                         else if (i == 2) res = count_if(table.begin(), table.end(), match11("saturday"));
 
                         if (res != expected) {
-                            printf("error");
+                            cout << "error\n";
                         }
                     }
                 }
-                const double search_time = timer.get_elapsed_millis();
-                printf("STL: StringColumn %d: Sparse: %fs\n", (int)i, search_time);
+                cout << "STL: StringColumn "<<i<<": Sparse: "<<timer<<"\n";
             }
 
             // Do a search over entire column (all but last value matches)
@@ -680,12 +669,11 @@ int main()
                         else if (i == 2) res = count_if(table.begin(), table.end(), match11n("saturday"));
 
                         if (res != expected) {
-                            printf("error");
+                            cout << "error\n";
                         }
                     }
                 }
-                const double search_time = timer.get_elapsed_millis();
-                printf("STL: StringColumn %d: Many: %fs\n", (int)i, search_time);
+                cout << "STL: StringColumn "<<i<<": Many: "<<timer<<"\n";
             }
         }
 
@@ -736,12 +724,11 @@ int main()
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count();
                     if (res != expected) {
-                        printf("error");
+                        cout << "error\n";
                     }
                 }
             }
-            const double search_time = timer.get_elapsed_millis();
-            printf("TightDB: c2: %fs\n", search_time);
+            cout << "TightDB: c2: "<<timer<<"\n";
         }
 
         // Search over three columns
@@ -754,12 +741,11 @@ int main()
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count();
                     if (res != expected) {
-                        printf("error");
+                        cout << "error\n";
                     }
                 }
             }
-            const double search_time = timer.get_elapsed_millis();
-            printf("TightDB: c3: %fs\n", search_time);
+            cout << "TightDB: c3: "<<timer<<"\n";
         }
 
         // Search over four columns
@@ -775,12 +761,11 @@ int main()
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count();
                     if (res != expected) {
-                        printf("error");
+                        cout << "error\n";
                     }
                 }
             }
-            const double search_time = timer.get_elapsed_millis();
-            printf("TightDB: c4: %fs\n", search_time);
+            cout << "TightDB: c4: "<<timer<<"\n";
         }
 
         // Search over five columns
@@ -797,12 +782,11 @@ int main()
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count();
                     if (res != expected) {
-                        printf("error %d %d", (int)expected, (int)res);
+                        cout << "error "<<expected<<" "<<res<<"\n";
                     }
                 }
             }
-            const double search_time = timer.get_elapsed_millis();
-            printf("TightDB: c5: %fs\n", search_time);
+            cout << "TightDB: c5: "<<timer<<"\n";
         }
 
         // Search over six columns
@@ -820,12 +804,11 @@ int main()
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count();
                     if (res != expected) {
-                        printf("error");
+                        cout << "error\n";
                     }
                 }
             }
-            const double search_time = timer.get_elapsed_millis();
-            printf("TightDB: c6: %fs\n", search_time);
+            cout << "TightDB: c6: "<<timer<<"\n";
         }
 
         // Search over six columns
@@ -844,12 +827,11 @@ int main()
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count();
                     if (res != expected) {
-                        printf("error");
+                        cout << "error\n";
                     }
                 }
             }
-            const double search_time = timer.get_elapsed_millis();
-            printf("TightDB: c7: %fs\n", search_time);
+            cout << "TightDB: c7: "<<timer<<"\n";
         }
     }
 
@@ -897,12 +879,11 @@ int main()
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns2());
                     if (res != expected) {
-                        printf("error");
+                        cout << "error\n";
                     }
                 }
             }
-            const double search_time = timer.get_elapsed_millis();
-            printf("STL: c2: %fs\n", search_time);
+            cout << "STL: c2: "<<timer<<"\n";
         }
 
         // Search over three columns
@@ -914,12 +895,11 @@ int main()
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns3());
                     if (res != expected) {
-                        printf("error");
+                        cout << "error\n";
                     }
                 }
             }
-            const double search_time = timer.get_elapsed_millis();
-            printf("STL: c3: %fs\n", search_time);
+            cout << "STL: c3: "<<timer<<"\n";
         }
 
         // Search over four columns
@@ -931,12 +911,11 @@ int main()
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns4());
                     if (res != expected) {
-                        printf("error");
+                        cout << "error\n";
                     }
                 }
             }
-            const double search_time = timer.get_elapsed_millis();
-            printf("STL: c4: %fs\n", search_time);
+            cout << "STL: c4: "<<timer<<"\n";
         }
 
         // Search over five columns
@@ -948,12 +927,11 @@ int main()
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns5());
                     if (res != expected) {
-                        printf("error");
+                        cout << "error\n";
                     }
                 }
             }
-            const double search_time = timer.get_elapsed_millis();
-            printf("STL: c5: %fs\n", search_time);
+            cout << "STL: c5: "<<timer<<"\n";
         }
 
         // Search over six columns
@@ -965,12 +943,11 @@ int main()
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns6());
                     if (res != expected) {
-                        printf("error");
+                        cout << "error\n";
                     }
                 }
             }
-            const double search_time = timer.get_elapsed_millis();
-            printf("STL: c6: %fs\n", search_time);
+            cout << "STL: c6: "<<timer<<"\n";
         }
 
         // Search over seven columns
@@ -982,12 +959,11 @@ int main()
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns7());
                     if (res != expected) {
-                        printf("error");
+                        cout << "error\n";
                     }
                 }
             }
-            const double search_time = timer.get_elapsed_millis();
-            printf("STL: c7: %fs\n", search_time);
+            cout << "STL: c7: "<<timer<<"\n";
         }
     }
 
