@@ -51,7 +51,7 @@ namespace _impl {
 /// valid to cast a pointer from Table to BasicTable<Spec> even when
 /// the instance is constructed as a Table. Of couse, this also
 /// assumes that Table is non-polymorphic. Further more, accessing the
-/// Table via a poiter or reference to a BasicTable is not in
+/// Table via a pointer or reference to a BasicTable is not in
 /// violation of the strict aliasing rule.
 template<class Spec> class BasicTable: private Table, public Spec::ConvenienceMethods {
 public:
