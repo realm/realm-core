@@ -8,6 +8,7 @@
 #include <tightdb.hpp>
 #include <tightdb/utilities.hpp>
 
+#include <../importer.hpp>
 
 #define USE_VLD
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
@@ -16,6 +17,12 @@
 
 using namespace std;
 using namespace UnitTest;
+using namespace tightdb;
+
+TIGHTDB_TABLE_2(TwoIntTable,
+                first,  Int,
+                second, String)
+
 
 namespace {
 
@@ -59,221 +66,19 @@ struct CustomTestReporter: TestReporter {
 
 
 
-template <bool can_fail> int64_t parse_integer(const char* col, bool* success = NULL){
-	int64_t	x = 0;
 
-	if(*col == '-'){
-		++col;
-		x = 0;
-		while(*col != '\0'){
-			if(can_fail && ('0' > *col || *col > '9')){
-				*success = false;
-				return 0;
-			}
-
-			int64_t y = *col - '0';
-			if(can_fail && x < (std::numeric_limits<int64_t>::min()+y)/10){
-				*success = false;
-				return 0;
-			}
-
-			x = 10*x-y;
-			++col;
-		}
-		return x;
-	}else if(*col == '+')
-		++col;
-
-	while(*col != '\0'){
-		if(can_fail && ('0' > *col || *col > '9')){
-			*success = false;
-			return 0;
-		}
-		int64_t y = *col - '0';
-		x = 10*x+y;
-		++col;
-	}
-
-	return x;
-}
-
-template <bool can_fail> double parse_double(const char*col, bool* success = NULL){
-			double x;
-
-			bool is_neg = false;
-			if(*col == '-'){
-				is_neg = true;
-				++col;
-			}else if(*col == '+')
-				++col;
-
-			x = 0;
-			while('0' <= *col && *col <= '9'){
-				int y = *col - '0';
-				x *= 10;
-				x += y;
-				++col;
-			}
-			
-			if(*col == '.'|| *col == ','){
-				++col;
-				double pos = 1;
-				while('0' <= *col && *col <= '9'){
-					pos /= 10;
-					int y = *col - '0';
-					++col;
-					x += y*pos;
-				}
-			}
-
-			if(*col == 'e' || *col == 'E'){
-				++col;
-				int64_t e;
-				e = parse_integer<false>(col);
-				
-				if(e != 0){
-					double base;	
-					if(e < 0){
-						base = 0.1;
-						e = -e;
-					}else{
-						base = 10;
-					}
-	
-					while(e != 1){
-						if((e & 1) == 0){
-							base = base*base;
-							e >>= 1;
-						}else{
-							x *= base;
-							--e;
-						}
-					}
-					x *= base;
-				}
-			}else{
-				if(can_fail && *col != '\0') {
-					*success = false;
-					return 0;
-				}
-
-			}
-
-			if(is_neg)
-				x = -x;
-
-			return x;
-		}
+// Must be at least 3 times as large as the largest row!
 
 
 
-
-const size_t chunk_size = 16*1024;
-char src[2*chunk_size];
-
-size_t top = 0;
-
-vector<vector<string>> v;
 
 int main(int argc, char* argv[])
 {
-	bool success;
-	double d2 = parse_double<true>("3.5", &success);
-	int i2 = parse_integer<true>("3432", &success);
+    Importer importer;
+	tightdb::Table table;
 
-	size_t s = 0;
-	size_t d = 0;
+	importer.import_csv("d:/csv/perf.csv", table);
 
-    size_t field;
-
-    FILE* f = fopen("d:/csv/perf.csv", "rb"); // csv.txt", "rb");
-
-nextrecord:
-
-    if(top - s < chunk_size / 2) {
-        memmove(src, src + s, top - s);
-        top -= s;
-        size_t r = fread(src + top, 1, chunk_size / 2, f);
-        top += r;
-        s = 0;
-        if(r != chunk_size / 2) {
-            src[top] = 0;
-        }
-        printf("");
-    }
-
-    if(src[s] == 0)
-        goto end;
-
-	v.push_back(vector<string>());
-
-nextfield:
-
-    if(src[s] == 0)
-        goto end;
-
-	v.back().push_back("");
-
-	while(src[s] == ' ')
-		s++;
-
-	if(src[s] == '"') {
-		// Field in quotes - can only end with another quote
-		s++;
-
-
-
-
-payload:
-		while(src[s] != '"') {
-			// Payload character
-			v.back().back().push_back(src[s]);
-			s++;
-		}
-
-		if(src[s + 1] == '"') {
-			// Double-quote
-			v.back().back().push_back('"');
-			s += 2;
-			goto payload;
-		}
-		else {
-			// Done with field
-			s += 1;
-
-			// Only whitespace is allowed to occur between end quote and non-comma/non-eof/non-newline
-			while(src[s] == ' ')
-				s++;
-
-			s++;
-		}
-
-	}
-	else {
-		// Field not in quotes - cannot contain quotes, commas or line breaks. So read until comma, eof or linebreak
-		while(src[s] != ',' && src[s] != 0xd && src[s] != 0xa && src[s] != 0) {
-			v.back().back().push_back(src[s]);
-			s++;
-		}
-			
-		if(src[s] == ',') {
-			s++;
-			goto nextfield;
-		}
-	}
-
-	if(src[s] == 0xd)
-		s++;
-
-	if(src[s] == 0xa) {
-		s++;
-		goto nextrecord;	
-	}
-	else {
-		goto nextfield;
-	}
-
-end:
 
 	exit(-1);
 

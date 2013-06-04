@@ -170,6 +170,9 @@
     <ClCompile Include="test\test_table_view.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="importer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">
@@ -359,6 +362,9 @@
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="test\pthread_test.hpp">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="importer.hpp">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
