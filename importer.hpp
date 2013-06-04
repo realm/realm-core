@@ -26,7 +26,7 @@ private:
 	vector<tightdb::DataType> types (vector<string> v);
 	size_t import(const char* csv_file, vector<vector<string> > & payload, size_t records);
 
-	vector<tightdb::DataType> detect_scheme (vector<vector<string>> payload, size_t begin, size_t end);
+	vector<tightdb::DataType> detect_scheme (vector<vector<string> > payload, size_t begin, size_t end);
 	vector<tightdb::DataType> lowest_common (vector<tightdb::DataType> types1, vector<tightdb::DataType> types2); 
 	char src[2*chunk_size];
 	size_t top;

@@ -209,7 +209,7 @@ vector<tightdb::DataType> Importer::lowest_common(vector<tightdb::DataType> type
 }
 
 
-vector<tightdb::DataType> Importer::detect_scheme(vector<vector<string>> payload, size_t begin, size_t end)
+vector<tightdb::DataType> Importer::detect_scheme(vector<vector<string> > payload, size_t begin, size_t end)
 {
 	vector<tightdb::DataType> res;
 	res = types(payload[begin]);
@@ -316,7 +316,7 @@ end:
 
 void Importer::import_csv(const char* file, tightdb::Table& table, bool null_to_0, size_t type_detection_rows)
 {
-	vector<vector<string>> payload;
+	vector<vector<string> > payload;
 	bool header_present = false;
 
 	m_null_to_0 = null_to_0;
