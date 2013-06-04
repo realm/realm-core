@@ -311,6 +311,9 @@ public:
     /// underlying file, that is, if writing via one of them, will
     /// affect what is read from the other. In UNIX this boils down to
     /// comparing inode numbers.
+    ///
+    /// Both instances have to be attached to open files. If they are
+    /// not, this method has undefined behavior.
     bool is_same_file(const File&) const;
 
     // FIXME: Can we get rid of this one please!!!
