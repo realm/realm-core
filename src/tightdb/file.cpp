@@ -777,23 +777,34 @@ bool File::is_same_file(const File& f) const
 {
 #ifdef _WIN32 // Windows version
 
-/*
-    LPBY_HANDLE_FILE_INFORMATION file_info;
+    // FIXME: This version does not work on ReFS.
+    BY_HANDLE_FILE_INFORMATION file_info;
     if (GetFileInformationByHandle(m_handle, &file_info)) {
+        DWORD vol_serial_number = file_info.dwVolumeSerialNumber;
+        DWORD file_ndx_high     = file_info.nFileIndexHigh;
+        DWORD file_ndx_low      = file_info.nFileIndexLow;
         if (GetFileInformationByHandle(f.m_handle, &file_info)) {
+            return vol_serial_num == file_info.dwVolumeSerialNumber &&
+                file_ndx_high == file_info.nFileIndexHigh &&
+                file_ndx_low  == file_info.nFileIndexLow;
         }
     }
-*/
+
+/* FIXME: Here is how to do it on Windows Server 2012 and onwards. This new
+   solution correctly handles file identification on ReFS.
+
     FILE_ID_INFO file_id_info;
     if (GetFileInformationByHandleEx(m_handle, FileIdInfo, &file_id_info, sizeof file_id_info)) {
-        ULONGLONG volume_serial_num = file_id_info.VolumeSerialNumber;
+        ULONGLONG vol_serial_num = file_id_info.VolumeSerialNumber;
         EXT_FILE_ID_128 file_id     = file_id_info.FileId;
         if (GetFileInformationByHandleEx(f.m_handle, FileIdInfo, &file_id_info,
                                          sizeof file_id_info)) {
-            return volume_serial_num == file_id_info.VolumeSerialNumber &&
+            return vol_serial_num == file_id_info.VolumeSerialNumber &&
                 file_id == file_id_info.FileId;
         }
     }
+*/
+
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     string msg = get_last_error_msg("GetFileInformationByHandleEx() failed: ", err);
     throw runtime_error(msg);
