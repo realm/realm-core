@@ -780,9 +780,9 @@ bool File::is_same_file(const File& f) const
     // FIXME: This version does not work on ReFS.
     BY_HANDLE_FILE_INFORMATION file_info;
     if (GetFileInformationByHandle(m_handle, &file_info)) {
-        DWORD vol_serial_number = file_info.dwVolumeSerialNumber;
-        DWORD file_ndx_high     = file_info.nFileIndexHigh;
-        DWORD file_ndx_low      = file_info.nFileIndexLow;
+        DWORD vol_serial_num = file_info.dwVolumeSerialNumber;
+        DWORD file_ndx_high  = file_info.nFileIndexHigh;
+        DWORD file_ndx_low   = file_info.nFileIndexLow;
         if (GetFileInformationByHandle(f.m_handle, &file_info)) {
             return vol_serial_num == file_info.dwVolumeSerialNumber &&
                 file_ndx_high == file_info.nFileIndexHigh &&
