@@ -307,6 +307,12 @@ public:
     /// returns true.
     static bool try_remove(const std::string& path);
 
+    /// Check whether two open file file descriptors refer to the same
+    /// underlying file, that is, if writing via one of them, will
+    /// affect what is read from the other. In UNIX this boils down to
+    /// comparing inode numbers.
+    bool is_same_file(const File&) const;
+
     // FIXME: Can we get rid of this one please!!!
     bool is_removed() const;
 

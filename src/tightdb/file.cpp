@@ -773,6 +773,49 @@ bool File::try_remove(const string& path)
 }
 
 
+bool File::is_same_file(const File& f) const
+{
+#ifdef _WIN32 // Windows version
+
+/*
+    LPBY_HANDLE_FILE_INFORMATION file_info;
+    if (GetFileInformationByHandle(m_handle, &file_info)) {
+        if (GetFileInformationByHandle(f.m_handle, &file_info)) {
+        }
+    }
+*/
+    FILE_ID_INFO file_id_info;
+    if (GetFileInformationByHandleEx(m_handle, FileIdInfo, &file_id_info, sizeof file_id_info)) {
+        ULONGLONG volume_serial_num = file_id_info.VolumeSerialNumber;
+        EXT_FILE_ID_128 file_id     = file_id_info.FileId;
+        if (GetFileInformationByHandleEx(f.m_handle, FileIdInfo, &file_id_info,
+                                         sizeof file_id_info)) {
+            return volume_serial_num == file_id_info.VolumeSerialNumber &&
+                file_id == file_id_info.FileId;
+        }
+    }
+    DWORD err = GetLastError(); // Eliminate any risk of clobbering
+    string msg = get_last_error_msg("GetFileInformationByHandleEx() failed: ", err);
+    throw runtime_error(msg);
+
+#else // POSIX version
+
+    struct stat statbuf;
+    if (::fstat(m_fd, &statbuf) == 0) {
+        dev_t device_id = statbuf.st_dev;
+        ino_t inode_num = statbuf.st_ino;
+        if (::fstat(f.m_fd, &statbuf) == 0) {
+            return device_id == statbuf.st_dev && inode_num == statbuf.st_ino;
+        }
+    }
+    int err = errno; // Eliminate any risk of clobbering
+    string msg = get_errno_msg("fstat() failed: ", err);
+    throw runtime_error(msg);
+
+#endif
+}
+
+
 bool File::is_removed() const
 {
 #ifdef _WIN32 // Windows version
