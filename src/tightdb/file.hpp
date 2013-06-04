@@ -307,7 +307,7 @@ public:
     /// returns true.
     static bool try_remove(const std::string& path);
 
-    /// Check whether two open file file descriptors refer to the same
+    /// Check whether two open file descriptors refer to the same
     /// underlying file, that is, if writing via one of them, will
     /// affect what is read from the other. In UNIX this boils down to
     /// comparing inode numbers.
