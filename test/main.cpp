@@ -77,7 +77,15 @@ int main(int argc, char* argv[])
     Importer importer;
 	tightdb::Table table;
 
-	importer.import_csv("d:/csv/perf.csv", table);
+	// Arguments to import_csv():
+
+	// null_to_0 imports value rows as TightDB value types (Integer, Float or Double) even though they contain empty
+	// strings (null / ""). Else they are converted to String
+
+	// type_detection_rows tells how many rows to read before analyzing data types (to see if numeric rows are really
+	// numeric everywhere, and not strings that happen to just mostly contain numeric characters
+
+	importer.import_csv("d:/csv/perf.csv", table, true, 1000);
 
 
 
