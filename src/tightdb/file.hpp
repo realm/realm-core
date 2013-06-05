@@ -22,9 +22,9 @@
 
 #include <cstddef>
 #include <stdint.h>
-#include <cstdio>
 #include <stdexcept>
 #include <string>
+#include <streambuf>
 
 #ifndef _WIN32
 #  include <sys/types.h>
@@ -32,6 +32,8 @@
 
 #include <tightdb/config.h>
 #include <tightdb/assert.hpp>
+#include <tightdb/unique_ptr.hpp>
+#include <tightdb/safe_int_ops.hpp>
 
 namespace tightdb {
 
@@ -72,6 +74,16 @@ std::string make_temp_dir();
 ///
 /// A single File instance must never be accessed concurrently by
 /// multiple threads.
+///
+/// You can write to a file via an std::ostream as follows:
+///
+/// \code{.cpp}
+///
+///   File::Streambuf my_streambuf(&my_file);
+///   std::ostream out(&my_strerambuf);
+///   out << 7945.9;
+///
+/// \endcode
 class File {
 public:
     enum Mode {
@@ -134,10 +146,30 @@ public:
     /// together with create_Must results in undefined behavior.
     void open(const std::string& path, AccessMode, CreateMode, int flags);
 
+    /// Read data into the specified buffer and return the number of
+    /// bytes read. If the returned number of bytes is less than \a
+    /// size, then the end of the file has been reached.
+    ///
+    /// Calling this method on an instance, that is not currently
+    /// attached to an open file, has undefined behavior.
+    std::size_t read(char* data, std::size_t size);
+
+    /// Write the specified data to this file.
+    ///
+    /// Calling this method on an instance, that is not currently
+    /// attached to an open file, has undefined behavior.
+    ///
+    /// Calling this method on an instance, that was opened in
+    /// read-only mode, has undefined behavior.
     void write(const char* data, std::size_t size);
 
+    /// Calls write(s.data(), s.size()).
     void write(const std::string& s) { write(s.data(), s.size()); }
 
+    /// Calls read(data, N).
+    template<std::size_t N> std::size_t read(char (&data)[N]) { return read(data, N); }
+
+    /// Calls write(data(), N).
     template<std::size_t N> void write(const char (&data)[N]) { write(data, N); }
 
 #ifdef _WIN32
@@ -280,10 +312,6 @@ public:
     /// map().
     static void sync_map(void* addr, std::size_t size);
 
-    /// See open(const std::string&, Mode). The STDIO file stream is
-    /// always opened in binary mode.
-    static std::FILE* open_stdio_file(const std::string& path, Mode = mode_Read);
-
     /// Check whether the specified file or directory exists. Note
     /// that a file or directory that resides in a directory that the
     /// calling process has no access to, will necessarily be reported
@@ -327,6 +355,8 @@ public:
     class CloseGuard;
     class UnlockGuard;
     class UnmapGuard;
+
+    class Streambuf;
 
     struct AccessError: std::runtime_error {
         AccessError(const std::string& msg): std::runtime_error(msg) {}
@@ -507,6 +537,30 @@ private:
 
 
 
+/// Only output is supported at this point.
+class File::Streambuf: public std::streambuf {
+public:
+    explicit Streambuf(File*);
+    ~Streambuf();
+
+private:
+    static const std::size_t buffer_size = 4096;
+
+    File& m_file;
+    UniquePtr<char[]> const m_buffer;
+
+    int_type overflow(int_type) TIGHTDB_OVERRIDE;
+    int sync() TIGHTDB_OVERRIDE;
+    pos_type seekpos(pos_type, std::ios_base::openmode) TIGHTDB_OVERRIDE;
+    void flush();
+
+    // Disable copying
+    Streambuf(const Streambuf&);
+    Streambuf& operator=(const Streambuf&);
+};
+
+
+
 
 
 
@@ -671,9 +725,59 @@ template<class T> inline std::size_t File::Map<T>::get_size() const TIGHTDB_NOEX
 
 template<class T> inline T* File::Map<T>::release() TIGHTDB_NOEXCEPT
 {
-    T* const addr = static_cast<T*>(m_addr);
+    T* addr = static_cast<T*>(m_addr);
     m_addr = 0;
     return addr;
+}
+
+
+inline File::Streambuf::Streambuf(File* f): m_file(*f), m_buffer(new char[buffer_size])
+{
+    char* b = m_buffer.get();
+    setp(b, b + buffer_size);
+}
+
+inline File::Streambuf::~Streambuf()
+{
+    try {
+        if (m_file.is_attached()) flush();
+    }
+    catch (...) {
+        // Errors deliberately ignored
+    }
+}
+
+inline File::Streambuf::int_type File::Streambuf::overflow(int_type c)
+{
+    flush();
+    if (c == traits_type::eof())
+        return traits_type::not_eof(c);
+    *pptr() = traits_type::to_char_type(c);
+    pbump(1);
+    return c;
+}
+
+inline int File::Streambuf::sync()
+{
+    flush();
+    return 0;
+}
+
+inline File::Streambuf::pos_type File::Streambuf::seekpos(pos_type pos, std::ios_base::openmode)
+{
+    flush();
+    SizeType pos2 = 0;
+    if (int_cast_with_overflow_detect(std::streamsize(pos), pos2))
+        throw std::runtime_error("Seek position overflow");
+    m_file.seek(pos2);
+    return pos;
+}
+
+inline void File::Streambuf::flush()
+{
+    std::size_t n = pptr() - pbase();
+    m_file.write(pbase(), n);
+    setp(m_buffer.get(), epptr());
 }
 
 

@@ -1,8 +1,13 @@
+#include <sstream>
+#include <ostream>
+
 #include <UnitTest++.h>
 
 #include <tightdb/file.hpp>
 
+using namespace std;
 using namespace tightdb;
+
 
 TEST(File_ExistsAndRemove)
 {
@@ -27,4 +32,27 @@ TEST(File_IsSame)
     }
     File::try_remove("test_file_1");
     File::try_remove("test_file_2");
+}
+
+TEST(File_Streambuf)
+{
+    {
+        File f("test_file", File::mode_Write);
+        File::Streambuf b(&f);
+        ostream out(&b);
+        out << "Line " << 1 << endl;
+        out << "Line " << 2 << endl;
+    }
+    {
+        File f("test_file", File::mode_Read);
+        char buffer[256];
+        size_t n = f.read(buffer);
+        string s_1(buffer, buffer+n);
+        ostringstream out;
+        out << "Line " << 1 << endl;
+        out << "Line " << 2 << endl;
+        string s_2 = out.str();
+        CHECK(s_1 == s_2);
+    }
+    File::try_remove("test_file");
 }

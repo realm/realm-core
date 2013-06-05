@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
+#include <algorithm>
 
 #ifdef _WIN32
 #  define NOMINMAX
@@ -301,44 +302,103 @@ void File::close() TIGHTDB_NOEXCEPT
 }
 
 
+size_t File::read(char* data, size_t size)
+{
+    TIGHTDB_ASSERT(is_attached());
+
+#ifdef _WIN32 // Windows version
+
+    char* const data_0 = data;
+    while (0 < size) {
+        DWORD n = numeric_limits<DWORD>::max();
+        if (int_less_than(size, n))
+            n = static_cast<DWORD>(size);
+        DWORD r = 0;
+        if (!ReadFile(m_handle, data, n, &r, 0))
+            goto error;
+        if (r == 0)
+            break;
+        TIGHTDB_ASSERT(r == n); // Partial reads are not possible.
+        size -= size_t(r);
+        data += size_t(r);
+    }
+    return data - data_0;
+
+  error:
+    DWORD err = GetLastError(); // Eliminate any risk of clobbering
+    string msg = get_last_error_msg("ReadFile() failed: ", err);
+    throw runtime_error(msg);
+
+#else // POSIX version
+
+    char* const data_0 = data;
+    while (0 < size) {
+        // POSIX requires that 'n' is less than or equal to SSIZE_MAX
+        size_t n = min(size, size_t(SSIZE_MAX));
+        ssize_t r = ::read(m_fd, data, n);
+        if (r == 0)
+            break;
+        if (r < 0)
+            goto error;
+        TIGHTDB_ASSERT(size_t(r) <= n);
+        size -= size_t(r);
+        data += size_t(r);
+    }
+    return data - data_0;
+
+  error:
+    int err = errno; // Eliminate any risk of clobbering
+    string msg = get_errno_msg("read(): failed: ", err);
+    switch (err) {
+        case ENOBUFS:
+        case ENOMEM:  throw ResourceAllocError(msg);
+        default:      throw runtime_error(msg);
+    }
+
+#endif
+}
+
+
 void File::write(const char* data, size_t size)
 {
     TIGHTDB_ASSERT(is_attached());
 
 #ifdef _WIN32 // Windows version
 
-    DWORD max_write = numeric_limits<DWORD>::max();
-    while (int_less_than(max_write, size)) {
-        write(data, max_write);
-        size -= max_write;
-        data += max_write;
+    while (0 < size) {
+        DWORD n = numeric_limits<DWORD>::max();
+        if (int_less_than(size, n))
+            n = static_cast<DWORD>(size);
+        DWORD r = 0;
+        if (!WriteFile(m_handle, data, n, &r, 0))
+            goto error;
+        TIGHTDB_ASSERT(r == n); // Partial writes are not possible.
+        size -= size_t(r);
+        data += size_t(r);
     }
+    return;
 
-    DWORD n = 0;
-    if (WriteFile(m_handle, data, static_cast<DWORD>(size), &n, 0)) {
-        TIGHTDB_ASSERT(n == static_cast<DWORD>(size));
-        return;
-    }
-
+  error:
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     string msg = get_last_error_msg("WriteFile() failed: ", err);
     throw runtime_error(msg);
 
 #else // POSIX version
 
-    // POSIX requires that size is less than or equal to SSIZE_MAX
-    while (int_less_than(SSIZE_MAX, size)) {
-        write(data, SSIZE_MAX);
-        size -= SSIZE_MAX;
-        data += SSIZE_MAX;
+    while (0 < size) {
+        // POSIX requires that 'n' is less than or equal to SSIZE_MAX
+        size_t n = min(size, size_t(SSIZE_MAX));
+        ssize_t r = ::write(m_fd, data, n);
+        if (r < 0)
+            goto error;
+        TIGHTDB_ASSERT(r != 0);
+        TIGHTDB_ASSERT(size_t(r) <= n);
+        size -= size_t(r);
+        data += size_t(r);
     }
+    return;
 
-    ssize_t r = ::write(m_fd, data, size);
-    if (0 <= r) {
-        TIGHTDB_ASSERT(int_equal_to(r, size));
-        return;
-    }
-
+  error:
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("write(): failed: ", err);
     switch (err) {
@@ -681,43 +741,6 @@ void File::sync_map(void* addr, size_t size)
 }
 
 
-FILE* File::open_stdio_file(const string& path, Mode m)
-{
-    const char* mode = 0;
-    switch (m) {
-        case mode_Read:   mode = "rb";  break;
-        case mode_Update: mode = "rb+"; break;
-        case mode_Write:  mode = "wb+"; break;
-        case mode_Append: mode = "ab+"; break;
-    }
-    FILE* file = fopen(path.c_str(), mode);
-    if (file) return file;
-
-    int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("fopen() failed: ", err);
-    // Note: The following error codes are defined by POSIX, and
-    // Windows follows POSIX in this respect, however, Windows
-    // probably never produce most of these.
-    switch (err) {
-        case EACCES:
-        case EROFS:
-        case ETXTBSY:       throw PermissionDenied(msg);
-        case ENOENT:        throw NotFound(msg);
-        case EISDIR:
-        case ELOOP:
-        case ENAMETOOLONG:
-        case ENOTDIR:
-        case ENXIO:         throw AccessError(msg);
-        case EMFILE:
-        case ENFILE:
-        case ENOSR:
-        case ENOSPC:
-        case ENOMEM:        throw ResourceAllocError(msg);
-        default:            throw runtime_error(msg);
-    }
-}
-
-
 bool File::exists(const string& path)
 {
 #ifdef _WIN32
@@ -775,6 +798,9 @@ bool File::try_remove(const string& path)
 
 bool File::is_same_file(const File& f) const
 {
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(f.is_attached());
+
 #ifdef _WIN32 // Windows version
 
     // FIXME: This version does not work on ReFS.
@@ -829,6 +855,8 @@ bool File::is_same_file(const File& f) const
 
 bool File::is_removed() const
 {
+    TIGHTDB_ASSERT(is_attached());
+
 #ifdef _WIN32 // Windows version
 
     return false; // An open file cannot be deleted on Windows
