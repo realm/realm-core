@@ -94,6 +94,25 @@ TEST(Group_Serialize0)
     CHECK_EQUAL(Wed,    t[0].fourth);
 }
 
+TEST(Group_Overwrite)
+{
+    File::try_remove("test_overwrite.tightdb");
+    {
+        Group g;
+        g.write("test_overwrite.tightdb");
+        CHECK_THROW(g.write("test_overwrite.tightdb"), File::Exists);
+    }
+    {
+        Group g("test_overwrite.tightdb");
+        CHECK_THROW(g.write("test_overwrite.tightdb"), File::Exists);
+    }
+    {
+        Group g;
+        File::try_remove("test_overwrite.tightdb");
+        g.write("test_overwrite.tightdb");
+    }
+}
+
 TEST(Group_Read0)
 {
     // Load the group and let it clean up without loading
