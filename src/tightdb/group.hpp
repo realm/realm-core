@@ -82,11 +82,14 @@ public:
     /// automatically committed to the specified file. You may,
     /// however, at any time, explicitely commit your changes by
     /// calling the commit() method. Alternatively you may call
-    /// write() to write the entire database to a new file.
+    /// write() to write the entire database to a new file. After
+    /// writing the new file, the Group will continue to be associated
+    /// with the file that was specified in the call to open().
     ///
-    /// A file that is opened this way, may not be modified until
-    /// after the Group object is destroyed. Behaviour is undefined if
-    /// a file is modified while any Group instance refers to it.
+    /// A file that is passed to Group::open(), may not be modified
+    /// until after the Group object is destroyed. Behaviour is
+    /// undefined if a file is modified while any Group object is
+    /// associated with it.
     ///
     /// Calling open() on a Group instance that is already in the
     /// attached state has undefined behavior.
