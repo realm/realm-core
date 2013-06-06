@@ -35,7 +35,7 @@ CATEGORIES :
 - State:
   METHODS:
   - g_typed_view_size:
-      NAMES    : size
+      NAME     : size
       SUMMARY  : *g_typed_table_size_summary
       DESCR    : *g_typed_table_size_descr
       CONST    : True
@@ -47,7 +47,7 @@ CATEGORIES :
       - CODE   : ex_cpp_typed_view_size
         DESCR  :
   - g_typed_view_is_empty:
-      NAMES    : is_empty
+      NAME     : is_empty
       SUMMARY  : &g_typed_view_is_empty_summary
                  Is view empty.
       DESCR    : &g_typed_view_is_empty_descr
@@ -62,7 +62,7 @@ CATEGORIES :
 - View:
   METHODS:
   - g_typed_view_clear:
-      NAMES    : clear
+      NAME     : clear
       SUMMARY  : *g_typed_table_clear_summary
       DESCR    : &g_typed_view_clear_descr
                  This method will remove all rows in a view.
@@ -72,7 +72,7 @@ CATEGORIES :
 - Rows:
   METHODS:
   - g_typed_view_get_source_ndx:
-      NAMES    : get_source_ndx
+      NAME     : get_source_ndx
       SUMMARY  : &g_typed_view_get_source_ndx_summary
                  Get source index.
       DESCR    : &g_typed_view_get_source_ndx_descr
@@ -91,7 +91,7 @@ CATEGORIES :
       - CODE   : ex_cpp_typed_view_get_source_ndx
         DESCR  :
   - g_typed_view_remove_row:
-      NAMES    : remove
+      NAME     : remove
       SUMMARY  : *g_typed_table_remove_row_summary
       DESCR    : *g_typed_table_remove_row_descr
       SIGNATURE: void remove(size_t row_ndx);
@@ -103,7 +103,7 @@ CATEGORIES :
       - CODE   : ex_cpp_typed_table_remove
         DESCR  :
   - g_typed_view_remove_last_row:
-      NAMES    : remove_last
+      NAME     : remove_last
       SUMMARY  : *g_typed_table_remove_last_row_summary
       DESCR    : *g_typed_table_remove_last_row_descr
       SIGNATURE: void remove_last();
@@ -113,17 +113,28 @@ CATEGORIES :
 - Values:
   METHODS:
   - g_typed_view_get_bool:
-  - g_typed_view_get_float:
-  - g_typed_view_get_double:
+      NAME     : get_bool
   - g_typed_view_get_int:
+      NAME     : get_int
+  - g_typed_view_get_float:
+      NAME     : get_float
+  - g_typed_view_get_double:
+      NAME     : get_double
   - g_typed_view_get_date:
+      NAME     : get_date
   - g_typed_view_get_string:
+      NAME     : get_string
   - g_typed_view_get_binary:
+      NAME     : get_binary
   - g_typed_view_get_mixed:
+      NAME     : get_mixed
   - g_typed_view_get_mixed_type:
+      NAME     : get_mixed_type
   - g_typed_view_get_subtable:
+      NAME     : get_subtable
   - g_typed_view_get_subtable_const:
-      NAMES    : get_*
+      NAME     : get_subtable
+      TITLE    : get_*
       SUMMARY  : &g_typed_view_get_summary
                  Get value.
       DESCR    : This method retrieves the value of a cell.
@@ -151,16 +162,26 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_get_xxx
         DESCR  :
+        
   - g_typed_view_set_bool:
+      NAME     : set_bool
   - g_typed_view_set_int:
+      NAME     : set_int
   - g_typed_view_set_float:
+      NAME     : set_float
   - g_typed_view_set_double:
+      NAME     : set_double
   - g_typed_view_set_enum:
+      NAME     : set_enum
   - g_typed_view_set_date:
+      NAME     : set_date
   - g_typed_view_set_string:
+      NAME     : set_string
   - g_typed_view_set_binary:
+      NAME     : set_binary
   - g_typed_view_set_mixed:
-      NAMES    : set_*
+      NAME     : set_mixed
+      TITLE    : set_*
       SUMMARY  : &g_typed_view_set_mixed_summary
                  Set value.
       DESCR    : &g_typed_view_set_mixed_descr
@@ -180,16 +201,17 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : *g_typed_view_parameter_row_position_descr
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed]
+        TYPES  : [bool, int64_t, float, double, EnumType, Date, StringData, BinaryData, Mixed]
         DESCR  : &g_typed_view_value_parameter_descr
                  The value.
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_set_xxx
         DESCR  :
+        
 - Sub-tables:
   METHODS:
   - g_typed_view_get_subtable_size:
-      NAMES    : get_subtable_size
+      NAME     : get_subtable_size
       SUMMARY  : &g_typed_view_get_subtable_size_summary
                  Get size of subtable.
       DESCR    : &g_typed_view_get_subtable_size_descr
@@ -206,7 +228,7 @@ CATEGORIES :
       - CODE   : ex_cpp_typed_view_get_subtable
         DESCR  :
   - g_typed_view_clear_subtable:
-      NAMES    : clear_subtable
+      NAME     : clear_subtable
       SUMMARY  : &g_typed_view_clear_subtable_summary
                  Remove rows in subtable.
       DESCR    : &g_typed_view_clear_subtable_descr
@@ -218,30 +240,38 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_clear_subtable
         DESCR  :
+        
+        
 - Searching:
   METHODS:
   - g_typed_view_find_first_bool:
+      NAME     : find_first_bool
   - g_typed_view_find_first_int:
+      NAME     : find_first_int
   - g_typed_view_find_first_float:
+      NAME     : find_first_float
   - g_typed_view_find_first_double:
+      NAME     : find_first_double
   - g_typed_view_find_first_date:
+      NAME     : find_first_date
   - g_typed_view_find_first_string:
+      NAME     : find_first_string
       NAMES    : find_first_*
       SUMMARY  : &g_typed_view_find_first_string_summary
                  Find first match row.
       DESCR    : &g_typed_view_find_first_string_descr
                  This method finds the first matching row.
       SIGNATURE: |
+                 size_t find_first_bool(bool value) const;
                  size_t find_first_int(int64_t value) const;
                  size_t find_first_float(float value) const;
                  size_t find_first_double(double value) const;
-                 size_t find_first_bool(bool value) const;
                  size_t find_first_date(Date value) const;
                  size_t find_first_string(StringData value) const;
       CONST    : True
       PARAMS:
       - NAME   : value
-        TYPES  : [bool, int64_t, Date, StringData]
+        TYPES  : [bool, int64_t, float, double, Date, StringData]
         DESCR  : *g_typed_view_value_parameter_descr
       RETURN:
         TYPES  : size_t
@@ -249,41 +279,55 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_find_first_xxx
         DESCR  :
+        
   - g_typed_view_find_all_bool:
+      NAME     : find_all_bool
   - g_typed_view_find_all_int:
+      NAME     : find_all_int
   - g_typed_view_find_all_date:
+      NAME     : find_all_date
   - g_typed_view_find_all_float:
+      NAME     : find_all_float
   - g_typed_view_find_all_double:
+      NAME     : find_all_double
   - g_typed_view_find_all_string:
+      NAME     : find_all_string
   - g_typed_view_find_all_bool_const:
+      NAME     : find_all_bool
   - g_typed_view_find_all_int_const:
+      NAME     : find_all_int
   - g_typed_view_find_all_float_const:
+      NAME     : find_all_float
   - g_typed_view_find_all_double_double:
+      NAME     : find_all_double
   - g_typed_view_find_all_date_const:
+      NAME     : find_all_date
   - g_typed_view_find_all_string_const:
-      NAMES    : find_all_*
+      NAME     : find_all_string
+      TITLE    : find_all_*
       SUMMARY  : Find all matching rows.
       DESCR    : >
                  This method finds all matching rows and returns a new {@link class_typed_tableview} object. Beware,
                  changes to the returning view will propagate back to the source table but changes in the current
                  view will not propagate forward.
       SIGNATURE: |
-                 TableView      find_all_int(int64_t value);
                  TableView      find_all_bool(bool value);
+                 TableView      find_all_int(int64_t value);
                  TableView      find_all_float(float value);
                  TableView      find_all_double(double value);
                  TableView      find_all_date(Date value);
                  TableView      find_all_string(StringData value);
 
-                 ConstTableView find_all_int(int64_t value) const;
                  ConstTableView find_all_bool(bool value) const;
+                 ConstTableView find_all_int(int64_t value) const;
                  ConstTableView find_all_float(float value) const;
                  ConstTableView find_all_double(double value) const;
                  ConstTableView find_all_date(Date value) const;
                  ConstTableView find_all_string(StringData value) const;
       PARAMS:
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, Date, StringData]
+        TYPES  : [bool, int64_t, float, double, Date, StringData,
+                  bool, int64_t, float, double, Date, StringData]
         DESCR  : *g_typed_view_value_parameter_descr
       RETURN:
         TYPES  : TableView
@@ -292,8 +336,9 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_find_all_xxx
         DESCR  :
+        
   - g_typed_view_sort:
-      NAMES    : sort
+      NAME     : sort
       SUMMARY  : &g_typed_view_get_sorted_view_summary
                  Sort the view.
       DESCR    : &g_typed_view_get_sorted_view_desc
@@ -305,6 +350,8 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_sort
         DESCR  :
+
+
 - Aggregates:
   METHODS:
   - g_typed_view_sum:
@@ -386,10 +433,11 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_average
         DESCR  :
+        
 - Dump:
   METHODS:
   - g_typed_view_to_json:
-      NAMES    : to_json
+      NAME     : to_json
       SUMMARY  : &g_typed_view_to_json_summary
                  Convert view to JSON.
       DESCR    : &g_typed_view_to_json_descr
@@ -407,7 +455,7 @@ CATEGORIES :
       - CODE   : ex_cpp_typed_view_to_json
         DESCR  :
   - g_typed_view_to_string:
-      NAMES    : to_string
+      NAME     : to_string
       SUMMARY  : &g_typed_view_to_string_summary
                  Convert view to a string.
       DESCR    : &g_typed_view_to_string_descr
