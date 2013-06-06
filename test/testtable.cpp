@@ -1133,6 +1133,7 @@ TEST(Table_Spec)
     }
 
     // Write the group to disk
+    File::try_remove("subtables.tightdb");
     group.write("subtables.tightdb");
 
     // Read back tables

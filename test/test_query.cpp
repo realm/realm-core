@@ -683,6 +683,7 @@ TEST(Group_GameAnalytics)
             t->add("10", "US", "1.0", r1, r2);
         }
         t->optimize();
+        File::try_remove("ga_test.tightdb");
         g.write("ga_test.tightdb");
     }
 
