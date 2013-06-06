@@ -25,7 +25,7 @@ CATEGORIES:
 - Constructors:
   METHODS:
   - g_mixed_constructor:
-      NAMES    : Mixed
+      NAME     : Mixed
       SUMMARY  : &g_mixed_constructor_summary
                  Create a Mixed variable.
       DESCR    : &g_mixed_constructor_descr
@@ -49,10 +49,11 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_mixed_constructor
         DESCR  :
+        
 - Getters:
   METHODS:
   - g_mixed_get_type:
-      NAMES    : get_type
+      NAME     : get_type
       SUMMARY  : &g_mixed_get_type_summary
                  Get the type.
       DESCR    : &g_mixed_get_type_descr
@@ -65,12 +66,22 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_mixed_get_type
         DESCR  :
+        
   - g_mixed_get_bool:
+      NAME     : get_bool
   - g_mixed_get_int:
+      NAME     : get_int
+  - g_mixed_get_float:
+      NAME     : get_float
+  - g_mixed_get_double:
+      NAME     : get_double      
   - g_mixed_get_date:
+      NAME     : get_date
   - g_mixed_get_string:
+      NAME     : get_string
   - g_mixed_get_binary:
-      NAMES    : get_*
+      NAME     : get_binary
+      TITLE    : get_*
       SUMMARY  : &g_mixed_get_value_summary
                  Get value of Mixed variable.
       DESCR    : &g_mixed_get_value_descr
@@ -78,9 +89,9 @@ CATEGORIES:
       SIGNATURE: |
                  bool        get_bool()   const;
                  int64_t     get_int()    const;
-                 Date        get_date()   const;
                  float       get_float()  const;
                  double      get_double() const;                 
+                 Date        get_date()   const;
                  StringData  get_string() const;
                  BinaryData  get_binary() const;
       CONST    : True

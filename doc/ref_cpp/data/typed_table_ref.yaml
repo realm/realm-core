@@ -40,7 +40,7 @@ CATEGORIES:
 - Definition:
   METHODS:
   - g_typed_table_macros:
-      NAMES    : TIGHTDB_TABLE_*
+      NAME     : TIGHTDB_TABLE_*
       DESCR    : >
                  This set of predefined macros is used to declare type safe table classes.
                  It is possible to declare table classes with 1 to 15 columns.
@@ -90,7 +90,7 @@ CATEGORIES:
 - State:
   METHODS:
   - g_typed_table_is_empty:
-      NAMES    : is_empty
+      NAME     : is_empty
       DESCR    : &g_typed_table_is_empty_descr
                  This method checks if the table is empty (contains no rows).
       SUMMARY  : &g_typed_table_is_empty_summary
@@ -104,7 +104,7 @@ CATEGORIES:
       - CODE   :  ex_cpp_type_table_is_empty
         DESCR  :
   - g_typed_table_size:
-      NAMES    : size
+      NAME     : size
       DESCR    : &g_typed_table_size_descr
                  This method retrieves the number of rows in table.
       SUMMARY  : &g_typed_table_size_summary
@@ -121,7 +121,7 @@ CATEGORIES:
 - Table:
   METHODS:
   - g_typed_table_clear:
-      NAMES    : clear
+      NAME     : clear
       SUMMARY  : &g_typed_table_clear_summary
                  Remove all rows.
       DESCR    : &g_typed_table_clear_descr
@@ -130,7 +130,7 @@ CATEGORIES:
       - CODE   : ex_cpp_typed_table_clear
         DESCR  :
   - g_typed_table_optimize:
-      NAMES    : optimize
+      NAME     : optimize
       SUMMARY  : &g_typed_table_optimize_summary
                  Optimize a table.
       DESCR    : &g_typed_table_optimize_descr
@@ -149,7 +149,7 @@ CATEGORIES:
       - CODE   : ex_cpp_typed_table_optimize
         DESCR  :
   - g_typed_table_columns:
-      NAMES    : columns
+      NAME     : columns
       SIGNATURE: |
                  ColsAccessor      column()
                  ConstColsAccessor column() const
@@ -160,7 +160,7 @@ CATEGORIES:
         DESCR  : &g_typed_table_columns_return1_descr
                  Cursor that lets you access and do operations on columns.
   - g_dyn_table_operator==:
-      NAMES    : operator==
+      NAME     : operator==
       SUMMARY  : &g_typed_table_operator_eq_summary
                  Compare two tables.
       DESCR    : &g_typed_table_operator_eq_descr
@@ -184,7 +184,7 @@ CATEGORIES:
       - CODE   : ex_cpp_dyn_table_operator==
         DESCR  :
   - g_dyn_table_operator!=:
-      NAMES    : operator!=
+      NAME     : operator!=
       SUMMARY  : &g_typed_table_operator_neq_summary
                  Compare two tables.
       DESCR    : &g_typed_table_operator_neq_descr
@@ -209,7 +209,7 @@ CATEGORIES:
 - Rows:
   METHODS:
   - g_typed_table_operator_brackets:
-      NAMES    : "operator[]"
+      NAME     : "operator[]"
       SIGNATURE: |
                  RowAccessor      operator[](size_t row_ndx)
                  ConstRowAccessor operator[](size_t row_ndx) const
@@ -230,7 +230,7 @@ CATEGORIES:
       - CODE   : ex_cpp_typed_table_operator_brackets
         DESCR  :
   - g_typed_table_front:
-      NAMES    : front
+      NAME     : front
       SIGNATURE: |
                  RowAccessor      front()
                  ConstRowAccessor front() const
@@ -244,7 +244,7 @@ CATEGORIES:
       - CODE   : ex_cpp_typed_table_front
         DESCR  :
   - g_typed_table_back:
-      NAMES    : back
+      NAME     : back
       SIGNATURE: |
                  RowAccessor      back()
                  ConstRowAccessor back() const
@@ -258,7 +258,7 @@ CATEGORIES:
       - CODE   : ex_cpp_typed_table_back
         DESCR  :
   - g_typed_table_add:
-      NAMES    : add
+      NAME     : add
       SIGNATURE: |
                  RowAccesor add(value, ...)
       SUMMARY  : Add new row.
@@ -278,7 +278,7 @@ CATEGORIES:
       - CODE   : ex_cpp_typed_table_add
         DESCR  :
   - g_typed_table_add_empty_row:
-      NAMES    : add_empty_row
+      NAME     : add_empty_row
       SUMMARY  : &g_typed_table_add_empty_row_summary
                  This method will add one or more empty rows at the end of the table.
       DESCR    : &g_typed_table_add_empty_row_descr
@@ -293,7 +293,7 @@ CATEGORIES:
       - CODE   : ex_cpp_typed_table_add_empty_row
         DESCR  :
   - g_typed_table_insert:
-      NAMES    : insert
+      NAME     : insert
       SIGNATURE: |
                  RowAccesor insert(size_t row_ndx, values, ...)
       SUMMARY  : &g_typed_table_insert_summary
@@ -317,7 +317,7 @@ CATEGORIES:
       - CODE   : ex_cpp_typed_table_insert
         DESCR  :
   - g_typed_table_insert_empty_row:
-      NAMES    : insert_empty_row
+      NAME     : insert_empty_row
       SUMMARY  : This method inserts empty rows at a given position.
       DESCR    : Insert empty rows.
       SIGNATURE: void insert_empty_row(size_t row_ndx, size_t num_rows = 1)
@@ -332,7 +332,7 @@ CATEGORIES:
       - CODE   : ex_cpp_typed_table_insert_empty_row
         DESCR  :
   - g_typed_table_remove_row:
-      NAMES    : remove
+      NAME     : remove
       SUMMARY  : &g_typed_table_remove_row_summary
                  Delete row.
       DESCR    : &g_typed_table_remove_row_descr
@@ -347,7 +347,7 @@ CATEGORIES:
       - CODE   : ex_cpp_typed_table_remove
         DESCR  :
   - g_typed_table_remove_last_row:
-      NAMES    : remove_last
+      NAME     : remove_last
       SUMMARY  : &g_typed_table_remove_last_row_summary
                  Delete last row.
       DESCR    : &g_typed_table_remove_last_row_descr
@@ -357,10 +357,11 @@ CATEGORIES:
       - CODE   : ex_cpp_typed_table_remove_last_row
         DESCR  :
 
+
 - Searching:
   METHODS:
   - g_typed_table_lookup:
-      NAMES    : lookup
+      NAME     : lookup
       SUMMARY  : &g_typed_table_lookup_summary
                  Lookup a value.
       DESCR    : &g_typed_table_lookup_descr
@@ -380,22 +381,29 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_lookup
         DESCR  :
+        
   - g_typed_table_find_first_bool:
+      NAME     : find_first_bool
   - g_typed_table_find_first_int:
+      NAME     : find_first_int
   - g_typed_table_find_first_float:
+      NAME     : find_first_float
   - g_typed_table_find_first_double:
+      NAME     : find_first_double
   - g_typed_table_find_first_date:
+      NAME     : find_first_date
   - g_typed_table_find_first_string:
-      NAMES    : find_first_*
+      NAME     : find_first_string
+      TITLE    : find_first_*
       SUMMARY  : &g_typed_table_find_first_xxx_summary
                  Find first matching row.
       DESCR    : &g_typed_table_find_first_xxx_descr
                  The method finds the first occurence of a given value in a column.
       SIGNATURE: |
+                 size_t find_first_bool(bool value) const;
                  size_t find_first_int(int64_t value) const;
                  size_t find_first_float(float value) const;
                  size_t find_first_double(double value) const;
-                 size_t find_first_bool(bool value) const;
                  size_t find_first_date(Date value) const;
                  size_t find_first_string(StringData value) const;
       CONST    : True
@@ -410,34 +418,47 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_find_first_xxx
         DESCR  :
+
   - g_typed_table_find_all_bool:
+      NAME     : find_all_bool
   - g_typed_table_find_all_int:
+      NAME     : find_all_int
   - g_typed_table_find_all_float:
+      NAME     : find_all_float
   - g_typed_table_find_all_double:
+      NAME     : find_all_double
   - g_typed_table_find_all_date:
+      NAME     : find_all_date
   - g_typed_table_find_all_string:
+      NAME     : find_all_string
   - g_typed_table_find_all_bool_const:
+      NAME     : find_all_bool
   - g_typed_table_find_all_float_const:
+      NAME     : find_all_float
   - g_typed_table_find_all_double_const:
+      NAME     : find_all_double
   - g_typed_table_find_all_int_const:
+      NAME     : find_all_int
   - g_typed_table_find_all_date_const:
+      NAME     : find_all_date
   - g_typed_table_find_all_string_const:
-      NAMES    : find_all_*
+      NAME     : find_all_string
+      TITLE    : find_all_*
       SUMMARY  : &g_typed_table_find_all_xxx_summary
                  Find all matching rows.
       DESCR    : &g_typed_table_find_all_xxx_descr
                  The method finds all occurences of a given value in a specific column.
                  The rows are returned as a {@link class_typed_tableview} object.
       SIGNATURE: |
-                 TableView      find_all_int(int64_t value);
                  TableView      find_all_bool(bool value);
+                 TableView      find_all_int(int64_t value);
                  TableView      find_all_float(float value);
                  TableView      find_all_double(double value);
                  TableView      find_all_date(Date value);
                  TableView      find_all_string(StringData value);
 
-                 ConstTableView find_all_int(int64_t value) const;
                  ConstTableView find_all_bool(bool value) const;
+                 ConstTableView find_all_int(int64_t value) const;
                  ConstTableView find_all_float(float value) const;
                  ConstTableView find_all_double(double value) const;
                  ConstTableView find_all_date(Date value) const;
@@ -453,9 +474,10 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_find_all_xxx
         DESCR  :
+        
   - g_typed_table_get_sorted_view:
   - g_typed_table_get_sorted_view_const:
-      NAMES    : get_sorted_view
+      NAMES    : [get_sorted_view, get_sorted_view]
       SUMMARY  : &g_typed_table_get_sorted_view_summary
                  Sort the table.
       DESCR    : &g_typed_table_get_sorted_view_desc
@@ -475,9 +497,10 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_get_sorted_view
         DESCR  :
+        
   - g_typed_table_distinct:
   - g_typed_table_distinct_const:
-      NAMES    : distinct
+      NAMES    : [distinct, distinct]
       SUMMARY  : &g_typed_table_distinct_summary
                  Get distinct rows.
       DESCR    : &g_typed_table_distinct_desc
@@ -495,6 +518,7 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_distinct
         DESCR  :
+        
   - g_typed_table_where:
   - g_typed_table_where_const:
       NAMES    : [where, where]

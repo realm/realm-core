@@ -36,7 +36,8 @@ CATEGORIES:
   - g_group_constructor_plain:
   - g_group_constructor_file:
   - g_group_constructor_memory:
-      NAMES    : Group
+  - g_group_constructor_unattached:
+      NAMES    : [Group, Group, Group, Group]
       DESCR    : &g_group_constructor_descr
                  >
                  Group objects can be created in various ways
@@ -93,7 +94,7 @@ CATEGORIES:
 - Operators:
   METHODS:
   - g_group_operator_equal:
-      NAMES    : operator==
+      NAME     : operator==
       SUMMARY  : Compare two groups.
       DESCR    : &g_group_operator_equal_descr
                  >
@@ -113,7 +114,7 @@ CATEGORIES:
       - DESCR  :
         CODE   : ex_cpp_group_operator_equal
   - g_group_operator_not_equal:
-      NAMES    : operator!=
+      NAME     : operator!=
       SUMMARY  : Compare two groups.
       DESCR    : *g_group_operator_equal_descr
       CONST    : true
@@ -131,7 +132,7 @@ CATEGORIES:
 - Table:
   METHODS:
   - g_group_size:
-      NAMES    : size
+      NAME     : size
       SUMMARY  : &g_group_table_count_summary
                  The number of tables in the group.
       DESCR    : &g_group_table_count_descr
@@ -147,7 +148,7 @@ CATEGORIES:
       - DESCR  :
         CODE   : ex_cpp_group_traverse
   - g_group_get_table:
-      NAMES    : get_table
+      NAME     : get_table
       SUMMARY  : &g_group_get_table_summary
                  Get a table.
       DESCR    : &g_group_get_table_descr
@@ -196,7 +197,7 @@ CATEGORIES:
          CODE  : ex_cpp_group_optional_table
       SEE      : "{@link g_group_has_table}"
   - g_group_has_table:
-      NAMES    : has_table
+      NAME     : has_table
       SUMMARY  : &g_group_has_table_summary
                  Does group have table?
       DESCR    : &g_group_has_table_descr
@@ -226,7 +227,7 @@ CATEGORIES:
       - DESCR  :
         CODE   : ex_cpp_group_optional_table
   - g_group_get_table_name:
-      NAMES    : get_table_name
+      NAME     : get_table_name
       DESCR    : &g_group_get_table_name_descr
                  This method will find the name of a table stored in the group.
       SUMMARY  : &g_group_get_table_name_summary
@@ -247,7 +248,7 @@ CATEGORIES:
 - IO:
   METHODS:
   - g_group_write_to_file:
-      NAMES    : write
+      NAME     : write
       SUMMARY  : &g_group_write_to_file_summary
                  Write a group to disk.
       DESCR    : &g_group_write_to_file_descr
@@ -270,7 +271,7 @@ CATEGORIES:
       - DESCR  :
         CODE   : ex_cpp_group_write_to_file
   - g_group_write_to_mem:
-      NAMES    : write_to_mem
+      NAME     : write_to_mem
       SUMMARY  : &g_group_write_to_mem_summary
                  Write a group to an in-memory buffer.
       DESCR    : &g_group_write_to_mem_descr
@@ -285,10 +286,11 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_write_to_mem
+
 - Group:
   METHODS:
   - g_group_is_empty:
-      NAMES    : is_empty
+      NAME     : is_empty
       SUMMARY  : &g_group_is_empty_summary
                  Is group empty?
       DESCR    : &g_group_is_empty_descr
@@ -301,7 +303,7 @@ CATEGORIES:
       - DESCR  :
         CODE   : ex_cpp_group_is_empty
   - g_group_tostring:
-      NAMES    : to_string
+      NAME     : to_string
       SUMMARY  : &g_group_to_string_summary
                  Get a string representation of the group.
       DESCR    : &g_group_to_string_descr
@@ -316,9 +318,10 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_tostring
+        
   - g_group_open_file:
   - g_group_open_memory:
-      NAMES    : open
+      NAMES    : [open, open]
       DESCR    : &g_group_open_descr
                  >
                  Attach this Group instance to a file or an externally
@@ -391,8 +394,9 @@ CATEGORIES:
         CODE   : ex_cpp_group_open_file
       - DESCR  :
         CODE   : ex_cpp_group_open_memory
+        
   - g_group_is_attached:
-      NAMES    : is_attached
+      NAME     : is_attached
       SUMMARY  : &g_group_is_attached_summary
                  Is this Group instance in its attached state?
       DESCR    : &g_group_is_attached_descr

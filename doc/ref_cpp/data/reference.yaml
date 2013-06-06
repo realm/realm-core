@@ -65,45 +65,5 @@ EXAMPLES  :
 - DESCR   :
   CODE    : ex_sharedgroup_intro           # id to example code
 
-#
-# Syntax instructions:
-#
 
-# TODO!!!
-
-# Text quotation
-# --------------
-# Examples:
-# plain: unqouted text can't contain colon character
-# single-quoted: 'quoted text can contain :'
-# double-quoted: "double quoted can contain special characters - apparently"
-# literal: |
-#    multiple lines,
-#    each with newline at end
-# folded: >
-#    only 1 newline at
-#    end of last line.
-#
-
-
-
-# Text tags
-# ----------
-# @link global-id
-
-# Aliases:
-# --------
-# Alias anchors are denoted '&' and aliases as '*'.
-#
-# Example:
-# RETURNS:       &php_table_size_returns    # anchor next to Key
-#                'returns size of table'    # Value of Key
-# SOMEWHEREELSE: *php_table_size_returns    # Value of above key is inserted
-#
-# Anchor identifiers are global with this structure:
-# xxx_class_method_key for global keys where
-# xxx   = 'g', 'php', 'cpp',... with 'g' used for gloabl references
-# (class, method, key) refers to the specific 'key' in the 'method' from the 'class'.
-
-
-
+IGNORE    : []
