@@ -20,34 +20,52 @@ int main(int argc, char* argv[])
     Importer importer;
 	tightdb::Table table;
 
-	//***************************************
-	
-	//	Prototype! Has only been tested with flight data cvs files!
+/*
 
-	// And the code is really messy. To be cleaned, etc
+*/
 
-	//***************************************
+	size_t n = importer.import_csv("d:/csv/_AssetsImportCompleteSample.csv", table, -1, true, 10000);
 
 
-	// Supports: 
-	//		Newline inside data fields (yay!)
-	//		double-quoted and non-quoted fields, and these can be mixed arbitrarely
-	//		double-quotes inside data field
-	//		*nix + Windows line feed
-	//		TightDB types String, Integer, Float and Double
-	//		Auto detection of float precision to prioritize Float over Double
-	//		Auto detection of header and naming of TightDB columns accordingly
+	// Print column names
+	printf("\n");
+	for(size_t t = 0; t < table.get_column_count(); t++) {
+		printf("%s    ", table.get_column_name(t).data());
+	}
+	printf("\n\n");
 
-	// Arguments to import_csv():
+	// Print scheme
+	for(size_t c = 0; c < table.get_column_count(); c++) {
+		if(table.get_column_type(c) == tightdb::type_Bool)
+			printf("Bool    ");
+		if(table.get_column_type(c) == tightdb::type_Double)
+			printf("Double    ");
+		if(table.get_column_type(c) == tightdb::type_Float)
+			printf("Float    ");
+		if(table.get_column_type(c) == tightdb::type_Int)
+			printf("Integer    ");
+		if(table.get_column_type(c) == tightdb::type_String)
+			printf("String    ");
+	}
+	printf("\n\n");
 
-    // null_to_0 imports value rows as TightDB value types (Integer, Float or Double) even though they contain empty
-	// strings (null / ""). Else they are converted to String
-
-	// type_detection_rows tells how many rows to read before analyzing data types (to see if numeric rows are really
-	// numeric everywhere, and not strings that happen to just mostly contain numeric characters
-
-	importer.import_csv("d:/csv/perf.csv", table, true, 1000);
-
+	// Print payload
+	for(size_t r = 0; r < table.size(); r++) {
+		for(size_t c = 0; c < table.get_column_count(); c++) {
+			if(table.get_column_type(c) == tightdb::type_Bool)
+				printf("%d    ", table.get_bool(c, r));
+			if(table.get_column_type(c) == tightdb::type_Double)
+				printf("%f    ", table.get_double(c, r));
+			if(table.get_column_type(c) == tightdb::type_Float)
+				printf("%f    ", table.get_float(c, r));
+			if(table.get_column_type(c) == tightdb::type_Int)
+				printf("%d    ", table.get_int(c, r));
+			if(table.get_column_type(c) == tightdb::type_String)
+				printf("%s    ", table.get_string(c, r).data());
+		}
+		printf("\n");
+		
+	}
 
 
 }
