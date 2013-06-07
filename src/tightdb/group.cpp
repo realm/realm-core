@@ -62,38 +62,49 @@ private:
 
 class FileOStream {
 public:
-    FileOStream(const string& path) : m_pos(0)
+    FileOStream(const string& path): m_pos(0), m_streambuf(&m_file), m_out(&m_streambuf)
     {
-        m_file = File::open_stdio_file(path, File::mode_Write);
+        m_file.open(path, File::access_ReadWrite, File::create_Must, 0);
     }
 
-    ~FileOStream()
-    {
-        int r = fclose(m_file);
-        TIGHTDB_ASSERT(r == 0);
-        static_cast<void>(r);
-    }
+    size_t getpos() const { return m_pos; }
 
-    size_t getpos() const {return m_pos;}
-
-    size_t write(const char* p, size_t n)
+    size_t write(const char* data, size_t size)
     {
-        const size_t pos = m_pos;
-        if (fwrite(p, 1, n, m_file) < n)
-            throw runtime_error("std::fwrite() failed");
-        m_pos += n;
+        size_t size_0 = size;
+
+        // Handle the case where 'size_t' has a larger range than 'streamsize'
+        streamsize max_streamsize = numeric_limits<streamsize>::max();
+        size_t max_put = numeric_limits<size_t>::max();
+        if (int_less_than(max_streamsize, max_put))
+            max_put = size_t(max_streamsize);
+        while (max_put < size) {
+            m_out.write(data, max_put);
+            data += max_put;
+            size -= max_put;
+        }
+
+        m_out.write(data, size);
+
+        size_t pos = m_pos;
+        if (int_add_with_overflow_detect(m_pos, size_0))
+            throw runtime_error("File size overflow");
         return pos;
     }
 
     void seek(size_t pos)
     {
-        if (fseek(m_file, static_cast<long>(pos), SEEK_SET) != 0)
-            throw runtime_error("std::fseek() failed");
+        streamsize pos2 = 0;
+        if (int_cast_with_overflow_detect(pos, pos2))
+            throw std::runtime_error("Seek position overflow");
+        m_out.seekp(pos2);
     }
 
 private:
     size_t m_pos;
-    FILE*  m_file;
+    File m_file;
+    File::Streambuf m_streambuf;
+    ostream m_out;
 };
 
 } // anonymous namespace
