@@ -8,7 +8,7 @@
 #include <tightdb.hpp>
 #include <tightdb/utilities.hpp>
 
-#include <../importer.hpp>
+#include <importer.hpp>
 
 using namespace std;
 using namespace UnitTest;
@@ -24,7 +24,7 @@ int main(int argc, char* argv[])
 
 */
 
-	size_t n = importer.import_csv("d:/csv/_AssetsImportCompleteSample.csv", table, -1, true, 10000);
+	size_t n = importer.import_csv("500.csv", table, -1, true, 1000);
 
 
 	// Print column names
