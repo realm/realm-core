@@ -13,6 +13,10 @@ Format:
 ==================
 
 
+2013-06-05 (Kristian Spangsege)
+. Group::write(path) now throws File::Exists if 'path' already exists in the file system.
+
+
 2013-05-13 (Kenneth Geisshirt)
 . Added "uninstall" target in build.sh for simple uninstallation.
 

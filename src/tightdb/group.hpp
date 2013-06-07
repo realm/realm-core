@@ -82,7 +82,14 @@ public:
     /// automatically committed to the specified file. You may,
     /// however, at any time, explicitely commit your changes by
     /// calling the commit() method. Alternatively you may call
-    /// write() to write the entire database to a new file.
+    /// write() to write the entire database to a new file. After
+    /// writing the new file, the Group will continue to be associated
+    /// with the file that was specified in the call to open().
+    ///
+    /// A file that is passed to Group::open(), may not be modified
+    /// until after the Group object is destroyed. Behaviour is
+    /// undefined if a file is modified while any Group object is
+    /// associated with it.
     ///
     /// Calling open() on a Group instance that is already in the
     /// attached state has undefined behavior.
@@ -147,15 +154,18 @@ public:
 
     // Serialization
 
-    /// Write this database to a file. If the file exists already, it
-    /// will be truncated first.
+    /// Write this database to a new file. It is an error to specify a
+    /// file that already exists. This is to protect against
+    /// overwriting a database file that is currently open, which
+    /// would cause undefined behaviour.
     ///
     /// \param file A filesystem path.
     ///
     /// \throw File::AccessError If the file could not be opened. If
     /// the reason corresponds to one of the exception types that are
     /// derived from File::AccessError, the derived exception type is
-    /// thrown.
+    /// thrown. In particular, File::Exists will be thrown if the file
+    /// exists already.
     void write(const std::string& file) const;
 
     /// Write this database to a memory buffer.
