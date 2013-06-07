@@ -170,7 +170,7 @@
     <ClCompile Include="test\test_table_view.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="src\importer.cpp">
+    <ClCompile Include="src\tightdb\importer.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
@@ -364,8 +364,8 @@
     <ClInclude Include="test\pthread_test.hpp">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\importer.hpp">
-      <Filter>src</Filter>
+    <ClInclude Include="src\tightdb\importer.hpp">
+      <Filter>src\include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

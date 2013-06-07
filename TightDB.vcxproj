@@ -481,7 +481,6 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\importer.cpp" />
     <ClCompile Include="src\tightdb\alloc.cpp" />
     <ClCompile Include="src\tightdb\alloc_slab.cpp" />
     <ClCompile Include="src\tightdb\array.cpp" />
@@ -496,6 +495,7 @@
     <ClCompile Include="src\tightdb\column_string_enum.cpp" />
     <ClCompile Include="src\tightdb\column_table.cpp" />
     <ClCompile Include="src\tightdb\file.cpp" />
+    <ClCompile Include="src\tightdb\importer.cpp" />
     <ClCompile Include="src\tightdb\thread.cpp" />
     <ClCompile Include="src\tightdb\group.cpp" />
     <ClCompile Include="src\tightdb\group_shared.cpp" />
@@ -679,7 +679,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\importer.hpp" />
     <ClInclude Include="src\tightdb.hpp" />
     <ClInclude Include="src\tightdb\alloc.hpp" />
     <ClInclude Include="src\tightdb\alloc_slab.hpp" />
@@ -693,6 +692,7 @@
     <ClInclude Include="src\tightdb\array_string.hpp" />
     <ClInclude Include="src\tightdb\array_string_long.hpp" />
     <ClInclude Include="src\tightdb\binary_data.hpp" />
+    <ClInclude Include="src\tightdb\importer.hpp" />
     <ClInclude Include="src\tightdb\unique_ptr.hpp" />
     <ClInclude Include="src\tightdb\bind_ptr.hpp" />
     <ClInclude Include="src\tightdb\column.hpp" />

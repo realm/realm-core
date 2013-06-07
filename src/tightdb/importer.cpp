@@ -472,7 +472,7 @@ size_t Importer::import_csv(const char* file, tightdb::Table& table, size_t impo
 
 			table.add_empty_row();
 			for(size_t col = 0; col < scheme.size(); col++) {
-				bool success;
+				bool success = true;
 
 				if(scheme[col] == tightdb::type_String)
 					table.set_string(col, imported_rows, tightdb::StringData(payload[row][col]));
