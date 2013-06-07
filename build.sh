@@ -236,7 +236,7 @@ case "$MODE" in
             PREFIX="/usr/local"
         fi
         make install DESTDIR="$DESTDIR" prefix="$PREFIX" || exit 1
-        if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
+        if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
         echo "Done installing"
@@ -249,7 +249,7 @@ case "$MODE" in
             PREFIX="/usr/local"
         fi
         make install DESTDIR="$DESTDIR" prefix="$PREFIX" INSTALL_FILTER=shared-libs || exit 1
-        if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
+        if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
         echo "Done installing"
@@ -272,7 +272,7 @@ case "$MODE" in
             PREFIX="/usr/local"
         fi
         make uninstall prefix="$PREFIX" || exit 1
-        if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
+        if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
         echo "Done uninstalling"
@@ -285,7 +285,7 @@ case "$MODE" in
             PREFIX="/usr/local"
         fi
         make uninstall prefix="$PREFIX" INSTALL_FILTER=shared-libs || exit 1
-        if [ "$USER" = "root" ] && which ldconfig >/dev/null; then
+        if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
         echo "Done uninstalling"
