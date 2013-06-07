@@ -6,8 +6,19 @@
 
 using namespace std;
 
+bool is_null(const char* v)
+{
+	if (v[0] == 0)
+		return true;
 
+	if(v[1] != 'u' && v[1] != 'U')
+		return false;
 
+	if(strcmp(v, "NULL") == 0 || strcmp(v, "Null") == 0 || strcmp(v, "null") == 0)
+		return true;
+
+	return false;
+}
 
 // Set can_fail = true to detect if a string is an integer. In this case, provide a success argument
 // Set can_fail = false to do the conversion. In this case, omit success argument. 
@@ -15,10 +26,14 @@ template <bool can_fail> int64_t Importer::parse_integer(const char* col, bool* 
 {
 	int64_t	x = 0;
 
-	if(can_fail && !*col) {
-		*success = false;
+	if(can_fail && is_null(col)) {
+		if(m_null_to_0)
+			*success = true;
+		else
+			*success = false;
 		return 0;
 	}
+
 	if (*col == '-'){
 		++col;
 		x = 0;
@@ -71,8 +86,11 @@ template <bool can_fail> bool Importer::parse_bool(const char*col, bool* success
 	// that iterates through a[n][0] to remove redundant letters, even though 'a' is static const. So we need to do 
 	// it manually.
 	if(can_fail) {
-		if (col[0] == 0) {
-			*success = true;
+		if (is_null(col)) {
+			if(m_null_to_0)
+				*success = true;
+			else
+				*success = false;
 			return false;
 		}
 
@@ -134,7 +152,8 @@ template <bool can_fail> float Importer::parse_float(const char*col, bool* succe
 // It will return the number of significant digits in the input string in 'significants', that is, 4 for 1.234 and
 // 4 for -2.531e9 and 5 for 1.0000 (this is helper functionality for parse_float()).
 //
-// Set can_fail = false to do the conversion. In this case, omit success argument. 
+// Set can_fail = false to do the conversion. In this case, omit success argument. Empty string ('') converts to 0.0 
+// and integers with no radix point ('5000') converts to nearest double.
 template <bool can_fail> double Importer::parse_double(const char* col, bool* success, size_t* significants)
 {
 	const char* orig_col = col;
@@ -144,8 +163,11 @@ template <bool can_fail> double Importer::parse_double(const char* col, bool* su
 	if(can_fail && significants == NULL)
 		significants = &dummy;
 
-	if(can_fail && *col == 0) {
-		*success = true;
+	if(can_fail && is_null(col)) {
+		if(m_null_to_0)
+			*success = true;
+		else
+			*success = false;
 		return 0;
 	}
 
@@ -165,7 +187,7 @@ template <bool can_fail> double Importer::parse_double(const char* col, bool* su
 		++*significants;
 	}
 			
-	if(*col == '.'|| *col == ','){
+	if(*col == '.'|| *col == m_separator){
 		++col;
 		double pos = 1;
 		while ('0' <= *col && *col <= '9'){
@@ -240,7 +262,7 @@ vector<tightdb::DataType> Importer::types (vector<string> v)
 		parse_float<true>(v[t].c_str(), &f);
 		parse_bool<true>(v[t].c_str(), &b);
 
-		if(v[t] == "" && m_null_to_0) {
+		if(is_null(v[t].c_str()) && m_null_to_0) {
 			// If m_null_to_0 is set, then integer/bool fields containing empty strings may be converted to 0/false 
 			i = true;
 			d = true;
@@ -265,6 +287,12 @@ vector<tightdb::DataType> Importer::lowest_common(vector<tightdb::DataType> type
 			res.push_back(tightdb::type_String);
 		else if(types1[t] == tightdb::type_Double || types2[t] == tightdb::type_Double)
 			res.push_back(tightdb::type_Double);
+		else if((types1[t] == tightdb::type_Float && types2[t] == tightdb::type_Int) || (types2[t] == tightdb::type_Float && types1[t] == tightdb::type_Int)) {
+			// This covers the special case where first values are integers and suddenly radix points occur. In this case we must import as double, because a float 
+			// may not be precise enough to hold the number of significant digits in the integers. Todo: We could keep track of the significant digits seen in
+			// all integers so that we know if we can import as float instead.
+			res.push_back(tightdb::type_Double);
+		}
 		else if(types1[t] == tightdb::type_Float || types2[t] == tightdb::type_Float)
 			res.push_back(tightdb::type_Float);
 		else if(types1[t] == tightdb::type_Int || types2[t] == tightdb::type_Int)
@@ -357,14 +385,14 @@ payload:
 		// non-conforming, some CSV files can contain non-quoted line breaks, so we need to test if we can't test for
 		// new record by just testing for 0a/0d.
 		size_t fields = payload.back().size();
-		while(src[s] != ',' && src[s] != 0 && ((src[s] != 0xd && src[s] != 0xa) || (fields < m_fields && m_fields != size_t(-1)) )) {
+		while(src[s] != m_separator && src[s] != 0 && ((src[s] != 0xd && src[s] != 0xa) || (fields < m_fields && m_fields != size_t(-1)) )) {
 			payload.back().back().push_back(src[s]);
 			s++;
 		}
 		
 	}
 
-	if(src[s] == ',') {
+	if(src[s] == m_separator) {
 		s++;
 		goto nextfield;
 	}
@@ -384,12 +412,13 @@ end:
 }
 
 
-size_t Importer::import_csv(const char* file, tightdb::Table& table, size_t import_rows, bool null_to_0, size_t type_detection_rows)
+size_t Importer::import_csv(const char* file, tightdb::Table& table, size_t import_rows, bool null_to_0, size_t type_detection_rows, char separator)
 {
+	m_separator = separator;
+	m_null_to_0 = null_to_0;
+
 	vector<vector<string> > payload;
 	bool header_present = false;
-
-	m_null_to_0 = null_to_0;
 
 	top = 0;
 	s = 0;
@@ -470,6 +499,9 @@ size_t Importer::import_csv(const char* file, tightdb::Table& table, size_t impo
 			if(imported_rows == import_rows)
 				return imported_rows;
 
+			if(imported_rows % 10000 == 0)
+				printf("%d rows...\n", imported_rows);
+
 			table.add_empty_row();
 			for(size_t col = 0; col < scheme.size(); col++) {
 				bool success = true;
@@ -489,8 +521,7 @@ size_t Importer::import_csv(const char* file, tightdb::Table& table, size_t impo
 
 				if(!success) {
 					fprintf(stderr, "Column %d was was auto detected to be of type %s using the first %d rows of CSV"
-									"file, but in row %d the field contained '%s' which is of another type. Try "
-									"import_csv() with larger type_detection_rows argument.\n",
+									"file, but in row %d of cvs file, the field contained '%s' which is of another type. Please increase the 'type_detection_rows' argument or try -1.\n",
 									(int)col,
 									scheme[col] == tightdb::type_Bool ? "Bool" : 
 									scheme[col] == tightdb::type_String ? "String" :
@@ -498,7 +529,7 @@ size_t Importer::import_csv(const char* file, tightdb::Table& table, size_t impo
 									scheme[col] == tightdb::type_Float ? "Float" :
 									scheme[col] == tightdb::type_Double ? "Double" : "?",
 									(int)type_detection_rows,
-									(int)col - header_present ? 1 : 0, 
+									(int)imported_rows, 
 									payload[row][col].c_str());
 
 					// Remove all columns so that user can call csv_import() on it again
@@ -506,7 +537,7 @@ size_t Importer::import_csv(const char* file, tightdb::Table& table, size_t impo
 					for(size_t t = 0; t < table.get_column_count(); t++)
 						table.remove_column(0);
 					
-					return 0;																									  
+					return static_cast<size_t>(-2);																									  
 				}
 			}
 			imported_rows++;

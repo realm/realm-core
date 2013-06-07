@@ -4,8 +4,7 @@
 Main method: import_csv(). Arguments:
 ---------------------------------------------------------------------------------------------------------------------
 null_to_0:	
-	imports value rows as TightDB value types (Integer, Float or Double) even though they contain empty
-	strings (null / ""). Else they are converted to String
+	Converts null and empty string to false/0/0.0. Else the entire column is imported as String.
 
 type_detection_rows:
 	tells how many rows to read before analyzing data types (to see if numeric rows are really
@@ -14,14 +13,14 @@ type_detection_rows:
 
 This library supports: 
 ---------------------------------------------------------------------------------------------------------------------
-	* Auto detection of header and naming of TightDB columns accordingly
+	* Auto detection of float vs. double, depending on number of significant digits
+	* Bool types can be case insensitive "true, false, 0, 1, yes, no"
 	* Newline inside data fields, plus autodetection of non-conforming non-quoted newlines (as in some IBM sample files)
+	* TightDB types String, Integer, Bool, Float and Double
+	* Auto detection of header and naming of TightDB columns accordingly
 	* double-quoted and non-quoted fields, and these can be mixed arbitrarely
 	* double-quotes inside data field
 	* *nix + MacOSv9 + Windows line feed
-	* TightDB types String, Integer, Bool, Float and Double
-	* Bool types can be case insensitive "true, false, 0, 1, yes, no"
-	* Auto detection of float vs. double, depending on number of significant digits
 	* Comma and dot as radix point
 	* Scientific notation of floats/doubles (+1.23e-10)
 	* FAST FAST FAST (200 MB/s). Uses state-machine instead of traditional char-by-char loop with state checks inside
@@ -33,7 +32,9 @@ Problems:
 	contains 'false, false, false, hello' and we detect and create TightDB table scheme using the first 3 rows, we fail
 	when we meet 'hello' (this error is handled with a thorough error message)
 
+
 */
+
 static const size_t chunk_size = 16*1024; 
 static const size_t record_chunks = 100;
 
@@ -46,7 +47,7 @@ using namespace std;
 class Importer 
 {
 public:
-	size_t import_csv(const char* file, tightdb::Table& table, size_t import_rows = size_t(-1), bool null_to_0 = true, size_t type_detection_rows = 1000);
+	size_t import_csv(const char* file, tightdb::Table& table, size_t import_rows = size_t(-1), bool null_to_0 = true, size_t type_detection_rows = 1000, char separator = ',');
 
 private:
 	template <bool can_fail> float parse_float(const char*col, bool* success = NULL);
@@ -65,7 +66,7 @@ private:
     FILE* f;
 	bool m_null_to_0;
 	size_t m_fields;
-
+	char m_separator;
 	char m_bool_true;
 };
 

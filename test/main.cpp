@@ -20,15 +20,26 @@ int main(int argc, char* argv[])
     Importer importer;
 	tightdb::Table table;
 
-/*
+	/*
+	argc = 2;
+	argv[1] = "d:/csv/star0000-1.csv";
+	*/
 
-*/
 	if(argc == 1) {
 		printf("\nError: enter .csv file name as argument 1. For example 500.csv located somewhere in this branch :)\n");
+		return 0;
 	}
 
-	size_t n = importer.import_csv(argv[1], table, -1, true, 1000);
+	size_t n = importer.import_csv(argv[1], table, -1, true, 10000, ',');
 
+	if(n == -1) {
+		printf("File does not exist\n");
+		return 0;
+	}
+
+	if(n == -2) {
+		return 0;
+	}
 
 	// Print column names
 	printf("\n");
