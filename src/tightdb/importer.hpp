@@ -43,21 +43,24 @@ static const size_t record_chunks = 100;
 #include <tightdb.hpp>
 
 using namespace std;
+using namespace tightdb;
 
 class Importer 
 {
 public:
-	size_t import_csv(const char* file, tightdb::Table& table, size_t import_rows = size_t(-1), bool null_to_0 = true, size_t type_detection_rows = 1000, char separator = ',');
+	size_t import_csv(FILE* file, Table& table,   size_t type_detection_rows = 1000, bool null_to_0 = true,                                    size_t import_rows = -1, char separator = ',');
+	size_t import_csv(FILE* file, Table& table,   vector<DataType> scheme, vector<string> column_names, size_t skip_first_rows = 0,   size_t import_rows = -1, char separator = ',');
 
 private:
+	size_t import_csv(FILE* file, Table& table, vector<DataType> *scheme, vector<string> *column_names, size_t type_detection_rows = 1000, bool null_to_0 = true, size_t skip_first_rows = 0, size_t import_rows = size_t(-1), char separator = ',');
 	template <bool can_fail> float parse_float(const char*col, bool* success = NULL);
 	template <bool can_fail> double parse_double(const char* col, bool* success = NULL, size_t* significants = NULL);
     template <bool can_fail> int64_t parse_integer(const char* col, bool* success = NULL);
 	template <bool can_fail> bool parse_bool(const char*col, bool* success = NULL);
-	vector<tightdb::DataType> types (vector<string> v);
-	size_t import(const char* csv_file, vector<vector<string> > & payload, size_t records);
-	vector<tightdb::DataType> detect_scheme (vector<vector<string> > payload, size_t begin, size_t end);
-	vector<tightdb::DataType> lowest_common (vector<tightdb::DataType> types1, vector<tightdb::DataType> types2); 
+	vector<DataType> types (vector<string> v);
+	size_t import(vector<vector<string> > & payload, size_t records);
+	vector<DataType> detect_scheme (vector<vector<string> > payload, size_t begin, size_t end);
+	vector<DataType> lowest_common (vector<DataType> types1, vector<DataType> types2); 
 	char src[2*chunk_size];
 	size_t top;
 	size_t s;
@@ -68,6 +71,8 @@ private:
 	size_t m_fields;
 	char m_separator;
 	char m_bool_true;
+	int m_verbose;
+
 };
 
 

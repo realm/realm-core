@@ -3,8 +3,43 @@
 #include <limits>
 #include <vector>
 #include <assert.h>
-
+#include <sstream>
 using namespace std;
+using namespace tightdb;
+
+const size_t print_width = 16;
+
+const char* DataTypeToText(DataType t) {
+	if(t == type_Int)
+		return "Int";
+	else if(t == type_Bool)
+		return "Bool";
+	else if(t == type_Float)
+		return "Float";
+	else if(t == type_Double)
+		return "Double";
+	else if(t == type_String)
+		return "String";
+	else if(t == type_Binary)
+		return "Binary";
+	else if(t == type_Date)
+		return "Date";
+	else if(t == type_Table)
+		return "Table";
+	else if(t == type_Mixed)
+		return "Mixed";
+	else
+		TIGHTDB_ASSERT(true);
+}
+
+string set_width(string s, size_t w) {
+	if(s.size() > w)
+		s = s.substr(0, w - 3) + "...";
+	else
+		s = s + string(w - s.size(), ' ');
+	return s;
+}
+
 
 bool is_null(const char* v)
 {
@@ -247,9 +282,9 @@ template <bool can_fail> double Importer::parse_double(const char* col, bool* su
 
 // Takes a row of payload and returns a vector of TightDB types. Prioritizes Bool > Int > Float > Double > String. If 
 // m_null_to_0 == true, then empty strings ('') are converted to Integer 0.
-vector<tightdb::DataType> Importer::types (vector<string> v)
+vector<DataType> Importer::types (vector<string> v)
 {
-	vector<tightdb::DataType> res;
+	vector<DataType> res;
 
 	for(size_t t = 0; t < v.size(); t++) {
 		bool i;
@@ -270,35 +305,35 @@ vector<tightdb::DataType> Importer::types (vector<string> v)
 			b = true;
 		}
 
-		res.push_back(b ? tightdb::type_Bool : i ? tightdb::type_Int : f ? tightdb::type_Float : d ? tightdb::type_Double : tightdb::type_String);
+		res.push_back(b ? type_Bool : i ? type_Int : f ? type_Float : d ? type_Double : type_String);
 	}
 
 	return res;
 }
 
 // Takes two vectors of TightDB types, and for each field finds best type that can represent both.
-vector<tightdb::DataType> Importer::lowest_common(vector<tightdb::DataType> types1, vector<tightdb::DataType> types2)
+vector<DataType> Importer::lowest_common(vector<DataType> types1, vector<DataType> types2)
 {
-	vector<tightdb::DataType> res;
+	vector<DataType> res;
 
 	for(size_t t = 0; t < types1.size(); t++) {
 		// All choices except for the last must be ||. The last must be &&
-		if(types1[t] == tightdb::type_String || types2[t] == tightdb::type_String) 
-			res.push_back(tightdb::type_String);
-		else if(types1[t] == tightdb::type_Double || types2[t] == tightdb::type_Double)
-			res.push_back(tightdb::type_Double);
-		else if((types1[t] == tightdb::type_Float && types2[t] == tightdb::type_Int) || (types2[t] == tightdb::type_Float && types1[t] == tightdb::type_Int)) {
+		if(types1[t] == type_String || types2[t] == type_String) 
+			res.push_back(type_String);
+		else if(types1[t] == type_Double || types2[t] == type_Double)
+			res.push_back(type_Double);
+		else if((types1[t] == type_Float && types2[t] == type_Int) || (types2[t] == type_Float && types1[t] == type_Int)) {
 			// This covers the special case where first values are integers and suddenly radix points occur. In this case we must import as double, because a float 
 			// may not be precise enough to hold the number of significant digits in the integers. Todo: We could keep track of the significant digits seen in
 			// all integers so that we know if we can import as float instead.
-			res.push_back(tightdb::type_Double);
+			res.push_back(type_Double);
 		}
-		else if(types1[t] == tightdb::type_Float || types2[t] == tightdb::type_Float)
-			res.push_back(tightdb::type_Float);
-		else if(types1[t] == tightdb::type_Int || types2[t] == tightdb::type_Int)
-			res.push_back(tightdb::type_Int);
-		else if(types1[t] == tightdb::type_Bool && types2[t] == tightdb::type_Bool)
-			res.push_back(tightdb::type_Bool);
+		else if(types1[t] == type_Float || types2[t] == type_Float)
+			res.push_back(type_Float);
+		else if(types1[t] == type_Int || types2[t] == type_Int)
+			res.push_back(type_Int);
+		else if(types1[t] == type_Bool && types2[t] == type_Bool)
+			res.push_back(type_Bool);
 		else
 			assert(false);
 	}
@@ -306,19 +341,19 @@ vector<tightdb::DataType> Importer::lowest_common(vector<tightdb::DataType> type
 }
 
 // Takes payload vectors, and for each field finds best type that can represent all rows.
-vector<tightdb::DataType> Importer::detect_scheme(vector<vector<string> > payload, size_t begin, size_t end)
+vector<DataType> Importer::detect_scheme(vector<vector<string> > payload, size_t begin, size_t end)
 {
-	vector<tightdb::DataType> res;
+	vector<DataType> res;
 	res = types(payload[begin]);
 
 	for(size_t t = begin + 1; t < end && t < payload.size(); t++) {
-		vector<tightdb::DataType> t2 = types(payload[t]);	
+		vector<DataType> t2 = types(payload[t]);	
 		res = lowest_common(res, t2);
 	}
 	return res;
 }
 
-size_t Importer::import(const char* csv_file, vector<vector<string> > & payload, size_t records) 
+size_t Importer::import(vector<vector<string> > & payload, size_t records) 
 {
 	size_t original_size = payload.size();
 
@@ -411,145 +446,202 @@ end:
 	return payload.size() - original_size;
 }
 
-
-size_t Importer::import_csv(const char* file, tightdb::Table& table, size_t import_rows, bool null_to_0, size_t type_detection_rows, char separator)
+size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2, vector<string> *column_names, size_t type_detection_rows, bool null_to_0, size_t skip_first_rows, size_t import_rows, char separator)
 {
 	m_separator = separator;
 	m_null_to_0 = null_to_0;
+	m_verbose = 1;
 
 	vector<vector<string> > payload;
+	vector<string> header;
+	vector<DataType> scheme;
 	bool header_present = false;
+	vector<vector<string>> pprint;
 
 	top = 0;
 	s = 0;
 	d = 0;
 	m_fields = static_cast<size_t>(-1);
 
-    f = fopen(file, "rb");
-	if(f == 0)
-		return size_t(-1);
+    f = file;
 
-	// 3 scenarios for header: 1) If first line is text-only and second row contains at least 1 non-string field, then
-	// header is guaranteed present. 2) If both lines are string-only, we can't tell, and import first line as payload
-	// 3) If at least 1 field of the first row is non-string, no header is present.
-	import(file, payload, 2);
+	if(scheme2 == NULL) {
+		// Auto detection of format:
+		// 3 scenarios for header: 1) If first line is text-only and second row contains at least 1 non-string field, then
+		// header is guaranteed present. 2) If both lines are string-only, we can't tell, and import first line as payload
+		// 3) If at least 1 field of the first row is non-string, no header is present.
+		import(payload, 2);
 
-	// The flight data files contain "" as last field in header. This is the reason why we temporary disable conversion
-	// to 0 during hedaer detection 
-	bool original_null_to_0 = null_to_0;
-	m_null_to_0 = false;
-	vector<tightdb::DataType> scheme1 = detect_scheme(payload, 0, 1);
+		// The flight data files contain "" as last field in header. This is the reason why we temporary disable conversion
+		// to 0 during hedaer detection 
+		bool original_null_to_0 = null_to_0;
+		m_null_to_0 = false;
+		vector<DataType> scheme1 = detect_scheme(payload, 0, 1);
 
-	// First row is best one to detect number of fields since it's less likely to contain embedded line breaks
-	m_fields = scheme1.size();
+		// First row is best one to detect number of fields since it's less likely to contain embedded line breaks
+		m_fields = scheme1.size();
 
-	vector<tightdb::DataType> scheme2 = detect_scheme(payload, 1, 2);
-	bool only_strings1 = true;
-	bool only_strings2 = true;
-	for(size_t t = 0; t < scheme1.size(); t++) {
-		if(scheme1[t] != tightdb::type_String)
-			only_strings1 = false;
-		if(scheme2[t] != tightdb::type_String)
-			only_strings2 = false;
-	}
-	m_null_to_0 = original_null_to_0;
+		vector<DataType> scheme2 = detect_scheme(payload, 1, 2);
+		bool only_strings1 = true;
+		bool only_strings2 = true;
+		for(size_t t = 0; t < scheme1.size(); t++) {
+			if(scheme1[t] != type_String)
+				only_strings1 = false;
+			if(scheme2[t] != type_String)
+				only_strings2 = false;
+		}
+		m_null_to_0 = original_null_to_0;
 
-	if(only_strings1 && !only_strings2)
-		header_present = true;
+		if(only_strings1 && !only_strings2)
+			header_present = true;
 
-	vector<string> header;
-	if(header_present) {
-		// Use first row of csv for column names
-		header = payload[0];
-		payload.erase(payload.begin());
-		for(size_t t = 0; t < header.size(); t++) {
-			// In flight database, header is present but contains null ("") as last field. We replace such occurences by 
-			// a string
-			if(header[t] == "") {
+
+		if(header_present) {
+			// Use first row of csv for column names
+			header = payload[0];
+			payload.erase(payload.begin());
+			for(size_t t = 0; t < header.size(); t++) {
+				// In flight database, header is present but contains null ("") as last field. We replace such occurences by 
+				// a string
+				if(header[t] == "") {
+					char buf[10];
+					sprintf(buf, "Column%d\0", t);
+					header[t] = buf;
+				}
+			}
+
+		}
+		else {
+			// Use "1", "2", "3", ... for column names
+			for(int i = 0; i < scheme1.size(); i++) {
 				char buf[10];
-				sprintf(buf, "noname_%d\0", t);
-				header[t] = buf;
+				sprintf(buf, "%d\0", i);
+				header.push_back(buf);
 			}
 		}
 
+		// Detect scheme using next N rows. 
+		import(payload, type_detection_rows);
+		scheme = detect_scheme(payload, 0, type_detection_rows);
 	}
 	else {
-		// Use "1", "2", "3", ... for column names
-		for(int i = 0; i < scheme1.size(); i++) {
-			char buf[10];
-			sprintf(buf, "%d\0", i);
-			header.push_back(buf);
-		}
+		// Use user provided column names and types
+		scheme = *scheme2;
+		header = *column_names;
 	}
-
-	// Detect scheme using next N rows. 
-	import(file, payload, type_detection_rows);
-	vector<tightdb::DataType> scheme = detect_scheme(payload, 0, type_detection_rows);
 
 	// Create sheme in TightDB table
 	for(size_t t = 0; t < scheme.size(); t++)
-		table.add_column(scheme[t], tightdb::StringData(header[t]));
+		table.add_column(scheme[t], StringData(header[t]).data());
    
+	if(m_verbose > 0) {
+		// Print column names
+		printf("\n");
+
+		for(size_t t = 0; t < table.get_column_count(); t++) {
+			string s = string(table.get_column_name(t).data()) + "(" + string(DataTypeToText(table.get_column_type(t))) + ")";
+			s = set_width(s, print_width);
+			cout << s.c_str() << " ";
+		}
+		printf("\n");
+
+	}
 
 	size_t imported_rows = 0;
 	do {
-	
 		for(size_t row = 0; row < payload.size(); row++) {
 
 			if(imported_rows == import_rows)
 				return imported_rows;
 
-			if(imported_rows % 10000 == 0)
-				printf("%d rows...\n", imported_rows);
+			if(m_verbose > 0 && imported_rows % 1000 == 0)
+				printf("%d k rows...\r", imported_rows / 1000);
 
 			table.add_empty_row();
 			for(size_t col = 0; col < scheme.size(); col++) {
 				bool success = true;
 
-				if(scheme[col] == tightdb::type_String)
-					table.set_string(col, imported_rows, tightdb::StringData(payload[row][col]));
-				else if(scheme[col] == tightdb::type_Int)
+				if(scheme[col] == type_String)
+					table.set_string(col, imported_rows, StringData(payload[row][col]));
+				else if(scheme[col] == type_Int)
 					table.set_int(col, imported_rows, parse_integer<true>(payload[row][col].c_str(), &success));
-				else if(scheme[col] == tightdb::type_Double)
+				else if(scheme[col] == type_Double)
 					table.set_double(col, imported_rows, parse_double<true>(payload[row][col].c_str(), &success));
-				else if(scheme[col] == tightdb::type_Float)
+				else if(scheme[col] == type_Float)
 					table.set_float(col, imported_rows, parse_float<true>(payload[row][col].c_str(), &success));
-				else if(scheme[col] == tightdb::type_Bool)
+				else if(scheme[col] == type_Bool)
 					table.set_bool(col, imported_rows, parse_bool<true>(payload[row][col].c_str(), &success));
 				else
 					assert(false);
 
 				if(!success) {
-					fprintf(stderr, "Column %d was was auto detected to be of type %s using the first %d rows of CSV"
-									"file, but in row %d of cvs file, the field contained '%s' which is of another type. Please increase the 'type_detection_rows' argument or try -1.\n",
-									(int)col,
-									scheme[col] == tightdb::type_Bool ? "Bool" : 
-									scheme[col] == tightdb::type_String ? "String" :
-									scheme[col] == tightdb::type_Int ? "Integer" :
-									scheme[col] == tightdb::type_Float ? "Float" :
-									scheme[col] == tightdb::type_Double ? "Double" : "?",
-									(int)type_detection_rows,
-									(int)imported_rows, 
-									payload[row][col].c_str());
-
 					// Remove all columns so that user can call csv_import() on it again
 					table.clear();
 					for(size_t t = 0; t < table.get_column_count(); t++)
 						table.remove_column(0);
-					
-					return static_cast<size_t>(-2);																									  
+					std::stringstream sstm;
+					sstm << "Column " << col << " was was auto detected to be of type " << DataTypeToText(scheme[col]) <<
+								 "using the first " << type_detection_rows << " rows of CSV file, but in row " << imported_rows << " of cvs file," <<
+								 "the field contained '" << payload[row][col].c_str() << "' which is of another type. Please increase the 'type_detection_rows' argument or try -1";
+
+					throw runtime_error(sstm.str());
 				}
 			}
+
+
+			if(m_verbose > 0 && imported_rows < 5) {
+				size_t r = imported_rows;
+				for(size_t c = 0; c < table.get_column_count(); c++) {
+					char buf[print_width];
+
+					if(table.get_column_type(c) == type_Bool)
+						sprintf(buf, "%d", table.get_bool(c, r));
+					if(table.get_column_type(c) == type_Double)
+						sprintf(buf, "%f", table.get_double(c, r));
+					if(table.get_column_type(c) == type_Float)
+						sprintf(buf, "%f", table.get_float(c, r));
+					if(table.get_column_type(c) == type_Int)
+						sprintf(buf, "%d", table.get_int(c, r));
+					if(table.get_column_type(c) == type_String) {
+#if _MSC_VER
+						_snprintf(buf, sizeof(buf), "%s", table.get_string(c, r).data());
+#else							
+						snprintf(buf, sizeof(buf), "%s", table.get_string(c, r).data());
+#endif
+					}
+					string s = string(buf);
+					s = set_width(s, print_width);
+					cout << s.c_str() << " ";
+				}
+
+				cout << "\n";		
+			}
+			
+
 			imported_rows++;
 		}
 		payload.clear();
-		import(file, payload, record_chunks);
+		import(payload, record_chunks);
 	}
 	while(payload.size() > 0);
 
 	return imported_rows;
 
 }
+
+size_t Importer::import_csv(FILE* file, Table& table, size_t type_detection_rows, bool null_to_0, size_t import_rows, char separator)
+{
+	return import_csv(file, table, NULL, NULL, type_detection_rows, null_to_0, import_rows, separator);
+}
+
+size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> scheme, vector<string> column_names, size_t skip_first_rows, size_t import_rows, char separator)
+{
+	if(column_names.size() != scheme.size() || column_names.size() > 0)
+		throw runtime_error("Header and scheme vectors must have equal size and be larger than 0");
+
+	return import_csv(file, table, &scheme, &column_names, 0, 0, skip_first_rows, import_rows, separator);
+}
+
 
 
 
