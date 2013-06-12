@@ -3,8 +3,8 @@
 /*
 Main method: import_csv(). Arguments:
 ---------------------------------------------------------------------------------------------------------------------
-null_to_0:	
-	Converts null and empty string to false/0/0.0. Else the entire column is imported as String.
+empty_as_string_flag:	
+	Imports a column that has occurences of empty strings as String type column. Else fields arec onverted to false/0/0.0
 
 type_detection_rows:
 	tells how many rows to read before analyzing data types (to see if numeric rows are really
@@ -48,11 +48,14 @@ using namespace tightdb;
 class Importer 
 {
 public:
-	size_t import_csv(FILE* file, Table& table,   size_t type_detection_rows = 1000, bool null_to_0 = true,                                    size_t import_rows = -1, char separator = ',');
-	size_t import_csv(FILE* file, Table& table,   vector<DataType> scheme, vector<string> column_names, size_t skip_first_rows = 0,   size_t import_rows = -1, char separator = ',');
+	Importer();
+	size_t import_csv_auto(FILE* file, Table& table,     size_t type_detection_rows = 1000, bool empty_as_string_flag = false,               size_t import_rows = static_cast<size_t>(-1));
+	size_t import_csv_manual(FILE* file, Table& table,   vector<DataType> scheme, vector<string> column_names, size_t skip_first_rows = 0,   size_t import_rows = static_cast<size_t>(-1));
+	bool Quiet;
+	char Separator;
 
 private:
-	size_t import_csv(FILE* file, Table& table, vector<DataType> *scheme, vector<string> *column_names, size_t type_detection_rows = 1000, bool null_to_0 = true, size_t skip_first_rows = 0, size_t import_rows = size_t(-1), char separator = ',');
+	size_t import_csv(FILE* file, Table& table, vector<DataType> *scheme, vector<string> *column_names, size_t type_detection_rows, bool empty_as_string_flag, size_t skip_first_rows, size_t import_rows);
 	template <bool can_fail> float parse_float(const char*col, bool* success = NULL);
 	template <bool can_fail> double parse_double(const char* col, bool* success = NULL, size_t* significants = NULL);
     template <bool can_fail> int64_t parse_integer(const char* col, bool* success = NULL);
@@ -67,11 +70,9 @@ private:
 	size_t d;
     size_t field;
     FILE* f;
-	bool m_null_to_0;
+	bool m_empty_as_string_flag;
 	size_t m_fields;
-	char m_separator;
 	char m_bool_true;
-	int m_verbose;
 
 };
 

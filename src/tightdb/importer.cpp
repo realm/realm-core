@@ -7,7 +7,15 @@
 using namespace std;
 using namespace tightdb;
 
-const size_t print_width = 16;
+const size_t print_width = 25;
+
+string set_width(string s, size_t w) {
+	if(s.size() > w)
+		s = s.substr(0, w - 3) + "...";
+	else
+		s = s + string(w - s.size(), ' ');
+	return s;
+}
 
 const char* DataTypeToText(DataType t) {
 	if(t == type_Int)
@@ -28,16 +36,46 @@ const char* DataTypeToText(DataType t) {
 		return "Table";
 	else if(t == type_Mixed)
 		return "Mixed";
-	else
+	else {
 		TIGHTDB_ASSERT(true);
+		return "";
+	}
 }
 
-string set_width(string s, size_t w) {
-	if(s.size() > w)
-		s = s.substr(0, w - 3) + "...";
-	else
-		s = s + string(w - s.size(), ' ');
-	return s;
+void print_col_names(Table& table) {
+	cout << "\n";
+	for(size_t t = 0; t < table.get_column_count(); t++) {
+		string s = string(table.get_column_name(t).data()) + " (" + string(DataTypeToText(table.get_column_type(t))) + ")";
+		s = set_width(s, print_width);
+		cout << s.c_str() << " ";
+	}
+	cout << "\n" << string(table.get_column_count() * (print_width + 1), '-').c_str() << "\n";
+}
+
+void print_row(Table& table, size_t r) {
+	for(size_t c = 0; c < table.get_column_count(); c++) {
+		char buf[print_width];
+
+		if(table.get_column_type(c) == type_Bool)
+			sprintf(buf, "%d", table.get_bool(c, r));
+		if(table.get_column_type(c) == type_Double)
+			sprintf(buf, "%f", table.get_double(c, r));
+		if(table.get_column_type(c) == type_Float)
+			sprintf(buf, "%f", table.get_float(c, r));
+		if(table.get_column_type(c) == type_Int)
+			sprintf(buf, "%d", table.get_int(c, r));
+		if(table.get_column_type(c) == type_String) {
+#if _MSC_VER
+			_snprintf(buf, sizeof(buf), "%s", table.get_string(c, r).data());
+#else							
+			snprintf(buf, sizeof(buf), "%s", table.get_string(c, r).data());
+#endif
+		}
+		string s = string(buf);
+		s = set_width(s, print_width);
+		cout << s.c_str() << " ";
+	}
+	cout << "\n";					
 }
 
 
@@ -55,6 +93,11 @@ bool is_null(const char* v)
 	return false;
 }
 
+Importer::Importer(void) : Quiet(false), Separator(',') 
+{
+
+}
+
 // Set can_fail = true to detect if a string is an integer. In this case, provide a success argument
 // Set can_fail = false to do the conversion. In this case, omit success argument. 
 template <bool can_fail> int64_t Importer::parse_integer(const char* col, bool* success)
@@ -62,7 +105,7 @@ template <bool can_fail> int64_t Importer::parse_integer(const char* col, bool* 
 	int64_t	x = 0;
 
 	if(can_fail && is_null(col)) {
-		if(m_null_to_0)
+		if(!m_empty_as_string_flag)
 			*success = true;
 		else
 			*success = false;
@@ -122,7 +165,7 @@ template <bool can_fail> bool Importer::parse_bool(const char*col, bool* success
 	// it manually.
 	if(can_fail) {
 		if (is_null(col)) {
-			if(m_null_to_0)
+			if(!m_empty_as_string_flag)
 				*success = true;
 			else
 				*success = false;
@@ -199,7 +242,7 @@ template <bool can_fail> double Importer::parse_double(const char* col, bool* su
 		significants = &dummy;
 
 	if(can_fail && is_null(col)) {
-		if(m_null_to_0)
+		if(!m_empty_as_string_flag)
 			*success = true;
 		else
 			*success = false;
@@ -222,7 +265,7 @@ template <bool can_fail> double Importer::parse_double(const char* col, bool* su
 		++*significants;
 	}
 			
-	if(*col == '.'|| *col == m_separator){
+	if(*col == '.'|| *col == Separator){
 		++col;
 		double pos = 1;
 		while ('0' <= *col && *col <= '9'){
@@ -281,7 +324,7 @@ template <bool can_fail> double Importer::parse_double(const char* col, bool* su
 }
 
 // Takes a row of payload and returns a vector of TightDB types. Prioritizes Bool > Int > Float > Double > String. If 
-// m_null_to_0 == true, then empty strings ('') are converted to Integer 0.
+// m_empty_as_string_flag == false, then empty strings ('') are converted to Integer 0.
 vector<DataType> Importer::types (vector<string> v)
 {
 	vector<DataType> res;
@@ -297,8 +340,8 @@ vector<DataType> Importer::types (vector<string> v)
 		parse_float<true>(v[t].c_str(), &f);
 		parse_bool<true>(v[t].c_str(), &b);
 
-		if(is_null(v[t].c_str()) && m_null_to_0) {
-			// If m_null_to_0 is set, then integer/bool fields containing empty strings may be converted to 0/false 
+		if(is_null(v[t].c_str()) && !m_empty_as_string_flag) {
+			// If m_empty_as_string_flag == false, then integer/bool fields containing empty strings may be converted to 0/false 
 			i = true;
 			d = true;
 			f = true;
@@ -420,14 +463,14 @@ payload:
 		// non-conforming, some CSV files can contain non-quoted line breaks, so we need to test if we can't test for
 		// new record by just testing for 0a/0d.
 		size_t fields = payload.back().size();
-		while(src[s] != m_separator && src[s] != 0 && ((src[s] != 0xd && src[s] != 0xa) || (fields < m_fields && m_fields != size_t(-1)) )) {
+		while(src[s] != Separator && src[s] != 0 && ((src[s] != 0xd && src[s] != 0xa) || (fields < m_fields && m_fields != size_t(-1)) )) {
 			payload.back().back().push_back(src[s]);
 			s++;
 		}
 		
 	}
 
-	if(src[s] == m_separator) {
+	if(src[s] == Separator) {
 		s++;
 		goto nextfield;
 	}
@@ -446,17 +489,15 @@ end:
 	return payload.size() - original_size;
 }
 
-size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2, vector<string> *column_names, size_t type_detection_rows, bool null_to_0, size_t skip_first_rows, size_t import_rows, char separator)
+size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2, vector<string> *column_names, size_t type_detection_rows, bool empty_as_string_flag, size_t skip_first_rows, size_t import_rows)
 {
-	m_separator = separator;
-	m_null_to_0 = null_to_0;
-	m_verbose = 1;
+	m_empty_as_string_flag = empty_as_string_flag;
 
 	vector<vector<string> > payload;
 	vector<string> header;
 	vector<DataType> scheme;
 	bool header_present = false;
-	vector<vector<string>> pprint;
+	vector<vector<string> > pprint;
 
 	top = 0;
 	s = 0;
@@ -474,8 +515,8 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
 
 		// The flight data files contain "" as last field in header. This is the reason why we temporary disable conversion
 		// to 0 during hedaer detection 
-		bool original_null_to_0 = null_to_0;
-		m_null_to_0 = false;
+		bool original_empty_as_string_flag = empty_as_string_flag;
+		m_empty_as_string_flag = true;
 		vector<DataType> scheme1 = detect_scheme(payload, 0, 1);
 
 		// First row is best one to detect number of fields since it's less likely to contain embedded line breaks
@@ -490,7 +531,7 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
 			if(scheme2[t] != type_String)
 				only_strings2 = false;
 		}
-		m_null_to_0 = original_null_to_0;
+		m_empty_as_string_flag = original_empty_as_string_flag;
 
 		if(only_strings1 && !only_strings2)
 			header_present = true;
@@ -500,9 +541,10 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
 			// Use first row of csv for column names
 			header = payload[0];
 			payload.erase(payload.begin());
+
 			for(size_t t = 0; t < header.size(); t++) {
-				// In flight database, header is present but contains null ("") as last field. We replace such occurences by 
-				// a string
+				// In flight database, header is present but contains null ("") as last field. We replace such 
+				// occurences by a string
 				if(header[t] == "") {
 					char buf[10];
 					sprintf(buf, "Column%d\0", t);
@@ -534,27 +576,23 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
 	for(size_t t = 0; t < scheme.size(); t++)
 		table.add_column(scheme[t], StringData(header[t]).data());
    
-	if(m_verbose > 0) {
-		// Print column names
-		printf("\n");
-
-		for(size_t t = 0; t < table.get_column_count(); t++) {
-			string s = string(table.get_column_name(t).data()) + "(" + string(DataTypeToText(table.get_column_type(t))) + ")";
-			s = set_width(s, print_width);
-			cout << s.c_str() << " ";
-		}
-		printf("\n");
-
-	}
+	if(!Quiet)
+		print_col_names(table);
 
 	size_t imported_rows = 0;
+
+	if(skip_first_rows > 0) {
+		import(payload, skip_first_rows);
+		payload.clear();
+	}
+
 	do {
 		for(size_t row = 0; row < payload.size(); row++) {
 
 			if(imported_rows == import_rows)
 				return imported_rows;
 
-			if(m_verbose > 0 && imported_rows % 1000 == 0)
+			if(!Quiet && imported_rows % 1000 == 0)
 				printf("%d k rows...\r", imported_rows / 1000);
 
 			table.add_empty_row();
@@ -577,46 +615,41 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
 				if(!success) {
 					// Remove all columns so that user can call csv_import() on it again
 					table.clear();
+					
 					for(size_t t = 0; t < table.get_column_count(); t++)
 						table.remove_column(0);
+
 					std::stringstream sstm;
-					sstm << "Column " << col << " was was auto detected to be of type " << DataTypeToText(scheme[col]) <<
-								 "using the first " << type_detection_rows << " rows of CSV file, but in row " << imported_rows << " of cvs file," <<
-								 "the field contained '" << payload[row][col].c_str() << "' which is of another type. Please increase the 'type_detection_rows' argument or try -1";
+
+					if(type_detection_rows > 0) {
+						if(scheme[col] != type_String && is_null(payload[row][col].c_str()) && empty_as_string_flag)
+							sstm << "Column " << col << " was auto detected to be of type " << DataTypeToText(scheme[col]) 
+							<< " using the first " << type_detection_rows << " rows of CSV file, but in row " << 
+							imported_rows << " of cvs file the field contained the NULL value '" << 
+							payload[row][col].c_str() << "'. Please increase the 'type_detection_rows' argument or set "
+							"empty_as_string_flag = false/void the -e flag to convert such fields to 0, 0.0 or false";
+						else
+							sstm << "Column " << col << " was auto detected to be of type " << DataTypeToText(scheme[col]) 
+							<< " using the first " << type_detection_rows << " rows of CSV file, but in row " << 
+							imported_rows << " of cvs file the field contained '" << payload[row][col].c_str() << 
+							"' which is of another type. Please increase the 'type_detection_rows' argument";
+					}
+					else
+						sstm << "Column " << col << " was specified to be of type " << DataTypeToText(scheme[col]) <<
+						", but in row " << imported_rows << " of cvs file," << "the field contained '" << 
+						payload[row][col].c_str() << "' which is of another type";
 
 					throw runtime_error(sstm.str());
 				}
 			}
 
 
-			if(m_verbose > 0 && imported_rows < 5) {
-				size_t r = imported_rows;
-				for(size_t c = 0; c < table.get_column_count(); c++) {
-					char buf[print_width];
-
-					if(table.get_column_type(c) == type_Bool)
-						sprintf(buf, "%d", table.get_bool(c, r));
-					if(table.get_column_type(c) == type_Double)
-						sprintf(buf, "%f", table.get_double(c, r));
-					if(table.get_column_type(c) == type_Float)
-						sprintf(buf, "%f", table.get_float(c, r));
-					if(table.get_column_type(c) == type_Int)
-						sprintf(buf, "%d", table.get_int(c, r));
-					if(table.get_column_type(c) == type_String) {
-#if _MSC_VER
-						_snprintf(buf, sizeof(buf), "%s", table.get_string(c, r).data());
-#else							
-						snprintf(buf, sizeof(buf), "%s", table.get_string(c, r).data());
-#endif
-					}
-					string s = string(buf);
-					s = set_width(s, print_width);
-					cout << s.c_str() << " ";
-				}
-
-				cout << "\n";		
+			if(!Quiet) {
+				if(imported_rows < 10)
+					print_row(table, imported_rows);
+				else if(imported_rows == 11)
+					cout << "\nOnly showing first few rows...\n";
 			}
-			
 
 			imported_rows++;
 		}
@@ -629,17 +662,14 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
 
 }
 
-size_t Importer::import_csv(FILE* file, Table& table, size_t type_detection_rows, bool null_to_0, size_t import_rows, char separator)
+size_t Importer::import_csv_auto(FILE* file, Table& table, size_t type_detection_rows, bool empty_as_string_flag, size_t import_rows)
 {
-	return import_csv(file, table, NULL, NULL, type_detection_rows, null_to_0, import_rows, separator);
+	return import_csv(file, table, NULL, NULL, type_detection_rows, empty_as_string_flag, 0, import_rows);
 }
 
-size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> scheme, vector<string> column_names, size_t skip_first_rows, size_t import_rows, char separator)
+size_t Importer::import_csv_manual(FILE* file, Table& table, vector<DataType> scheme, vector<string> column_names, size_t skip_first_rows, size_t import_rows)
 {
-	if(column_names.size() != scheme.size() || column_names.size() > 0)
-		throw runtime_error("Header and scheme vectors must have equal size and be larger than 0");
-
-	return import_csv(file, table, &scheme, &column_names, 0, 0, skip_first_rows, import_rows, separator);
+	return import_csv(file, table, &scheme, &column_names, 0, 0, skip_first_rows, import_rows);
 }
 
 
