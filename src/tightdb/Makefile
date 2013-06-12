@@ -59,6 +59,7 @@ uninstall/extra:
 	$(RM) $(DESTDIR)$(includedir)/tightdb/*.h
 	-rmdir $(DESTDIR)$(includedir)/tightdb
 
+# Used by ../../build.sh
 .PHONY: get-inst-headers get-inst-libraries
 get-inst-headers:
 	@echo $(INST_HEADERS)
