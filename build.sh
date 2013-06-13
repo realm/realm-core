@@ -459,7 +459,11 @@ EOF
             exit 1
         fi
 
+        VERSION="$(git describe)" || exit 1
+        NAME="tightdb-$VERSION"
+
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist.XXXX)" || exit 1
+
         LOG_FILE="$TEMP_DIR/build.log"
         log_message()
         {
@@ -543,11 +547,9 @@ EOF
                 fi
             done
 
-            BRANCH="$(git rev-parse --abbrev-ref HEAD)" || exit 1
-            VERSION="$(git describe)" || exit 1
-
             message "Continuing with these parts:"
             {
+                BRANCH="$(git rev-parse --abbrev-ref HEAD)" || exit 1
                 echo "core  ->  .  $BRANCH  $VERSION"
                 for x in $AVAIL_EXTENSIONS; do
                     EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
@@ -562,7 +564,6 @@ EOF
 
 
             # Setup package directory
-            NAME="tightdb-$VERSION"
             PKG_DIR="$TEMP_DIR/$NAME"
             mkdir "$PKG_DIR" || exit 1
             INSTALL_ROOT="$TEMP_DIR/install"
