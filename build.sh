@@ -782,21 +782,23 @@ EOF
             TEST_PKG_DIR="$TEST_DIR/$NAME"
             cd "$TEST_PKG_DIR" || exit 1
 
+            export DISABLE_CHEETAH_CODE_GEN="1"
+
             message "Configuring core library"
             sh "$TEST_PKG_DIR/tightdb/build.sh" config "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1 || exit 1
 
             if ! [ "$PREBUILT_CORE" ]; then
                 message "Building core library"
-                DISABLE_UPDATE_TABLE_MACROS_HPP="1" sh "$TEST_PKG_DIR/tightdb/build.sh" build >>"$LOG_FILE" 2>&1 || exit 1
+                sh "$TEST_PKG_DIR/tightdb/build.sh" build >>"$LOG_FILE" 2>&1 || exit 1
 
                 message "Running test suite for core library"
-                if ! DISABLE_UPDATE_TABLE_MACROS_HPP="1" sh "$TEST_PKG_DIR/tightdb/build.sh" test >>"$LOG_FILE" 2>&1; then
+                if ! sh "$TEST_PKG_DIR/tightdb/build.sh" test >>"$LOG_FILE" 2>&1; then
                     warning "Test suite failed for core library"
                 fi
             fi
 
             message "Installing core library to test location"
-            DISABLE_UPDATE_TABLE_MACROS_HPP="1" sh "$TEST_PKG_DIR/tightdb/build.sh" install >>"$LOG_FILE" 2>&1 || exit 1
+            sh "$TEST_PKG_DIR/tightdb/build.sh" install >>"$LOG_FILE" 2>&1 || exit 1
 
             # This one was added because when building for iOS on
             # Darwin, the libraries libtightdb-ios.a and
@@ -1033,10 +1035,11 @@ EOF
             get_compiler_info || exit 1
             echo
         ) >>"$LOG_FILE"
+        export DISABLE_CHEETAH_CODE_GEN="1"
         if [ "$1" != "bin-core" ]; then
             echo "BUILDING Core library" | tee -a "$LOG_FILE"
             rm -f ".DIST_WAS_BUILT" || exit 1
-            if DISABLE_UPDATE_TABLE_MACROS_HPP="1" sh "build.sh" build >>"$LOG_FILE" 2>&1; then
+            if sh "build.sh" build >>"$LOG_FILE" 2>&1; then
                 touch ".DIST_WAS_BUILT" || exit 1
             else
                 echo "Failed!" | tee -a "$LOG_FILE" 1>&2
@@ -1111,14 +1114,15 @@ EOF
             get_host_info || exit 1
             echo
         ) >>"$LOG_FILE"
+        export DISABLE_CHEETAH_CODE_GEN="1"
         ERROR=""
         NEED_USR_LOCAL_LIB_NOTE=""
         echo "INSTALLING Core library" | tee -a "$LOG_FILE"
-        if DISABLE_UPDATE_TABLE_MACROS_HPP="1" sh build.sh install-shared >>"$LOG_FILE" 2>&1; then
+        if sh build.sh install-shared >>"$LOG_FILE" 2>&1; then
             touch ".DIST_WAS_INSTALLED" || exit 1
             if [ -e ".DIST_DEVEL_WAS_CONFIGURED" ]; then
                 echo "INSTALLING Extension 'c++'" | tee -a "$LOG_FILE"
-                if DISABLE_UPDATE_TABLE_MACROS_HPP="1" sh build.sh install-devel >>"$LOG_FILE" 2>&1; then
+                if sh build.sh install-devel >>"$LOG_FILE" 2>&1; then
                     touch ".DIST_DEVEL_WAS_INSTALLED" || exit 1
                     NEED_USR_LOCAL_LIB_NOTE="$PLATFORM_HAS_LIBRARY_PATH_ISSUE"
                 else
