@@ -85,6 +85,12 @@ public:
     /// Calls parent.set_mixed_subtable(col_ndx, row_ndx, &source).
     static void set_mixed_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
                                    const Table& source);
+
+    /// This is an alternative to Table::get_spec() that may be
+    /// legally called even for a table with shared spec. It is then
+    /// the responsibility of the language binding to ensure that
+    /// modification is only done through it when it is not shared.
+    static Spec& get_spec(Table&);
 };
 
 
@@ -189,6 +195,11 @@ inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_nd
                                                std::size_t row_ndx, const Table& source)
 {
     parent.set_mixed_subtable(col_ndx, row_ndx, &source);
+}
+
+inline Spec& LangBindHelper::get_spec(Table& t)
+{
+    return t.m_spec_set;
 }
 
 

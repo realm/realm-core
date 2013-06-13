@@ -167,17 +167,6 @@ void Table::CreateColumns()
     }
 }
 
-Spec& Table::get_spec()
-{
-    TIGHTDB_ASSERT(m_top.IsValid()); // you can only change specs on top-level tables
-    return m_spec_set;
-}
-
-const Spec& Table::get_spec() const
-{
-    return m_spec_set;
-}
-
 
 void Table::invalidate()
 {
