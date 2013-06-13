@@ -52,6 +52,11 @@ each of our major platforms:
     Install Xcode
     Install command line tools (via Xcode)
 
+    Download https://pypi.python.org/packages/source/C/Cheetah/Cheetah-2.4.4.tar.gz
+    tar xf Cheetah-2.4.4.tar.gz
+    cd Cheetah-2.4.4/
+    sudo python setup.py install
+
 
 Building, testing, and installing
 ---------------------------------
