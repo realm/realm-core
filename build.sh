@@ -876,6 +876,7 @@ EOF
 
         ); then
             message 'SUCCESS!'
+            message "Log file is here: $LOG_FILE"
             message "Package is here: $TEMP_DIR/$NAME.tar.gz"
             if [ "$PREBUILT_CORE" ]; then
                 message "Distribution type: BINARY (prebuilt core library)"
