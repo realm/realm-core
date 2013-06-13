@@ -17,7 +17,7 @@ TIGHTDB_NORETURN void Thread::create_failed(int err)
 
 TIGHTDB_NORETURN void Thread::join_failed(int)
 {
-    // It is intentional thet the argument is ignored here.
+    // It is intentional that the argument is ignored here.
     throw runtime_error("pthread_join() failed.");
 }
 
