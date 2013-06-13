@@ -1,19 +1,19 @@
-Tightdb
+TightDB
 =======
 
-This README file explains how to build and install the Tightdb core
+This README file explains how to build and install the TightDB core
 library.
 
 
 Prerequisites
 -------------
 
-To build the Tightdb core library, you need the standard set of build
-tools. This includes a C/C++ compiler and GNU make. Tightdb is
+To build the TightDB core library, you need the standard set of build
+tools. This includes a C/C++ compiler and GNU make. TightDB is
 thoroughly tested with both GCC and Clang. It is known to work with
 GCC 4.2 and newer, as well as with Clang 3.0 and newer.
 
-If you are going to modify the Tightdb core library, you will need
+If you are going to modify the TightDB core library, you will need
 Cheetah for Python (http://www.cheetahtemplate.org). It is needed
 because some source files are generated.
 

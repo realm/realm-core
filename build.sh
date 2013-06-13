@@ -911,7 +911,7 @@ EOF
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-config.XXXX)" || exit 1
         LOG_FILE="$TEMP_DIR/config.log"
         (
-            echo "Tightdb version: ${TIGHTDB_VERSION:-Unknown}"
+            echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -1024,7 +1024,7 @@ EOF
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-build.XXXX)" || exit 1
         LOG_FILE="$TEMP_DIR/build.log"
         (
-            echo "Tightdb version: ${TIGHTDB_VERSION:-Unknown}"
+            echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -1105,7 +1105,7 @@ EOF
         chmod a+rx "$TEMP_DIR" || exit 1
         LOG_FILE="$TEMP_DIR/install.log"
         (
-            echo "Tightdb version: ${TIGHTDB_VERSION:-Unknown}"
+            echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -1155,7 +1155,7 @@ NOTE: Shared libraries have been installed in '$LIBDIR'.
 
 We believe that on your system this directory is not part of the
 default library search path. If this is true, you probably have to do
-one of the following things to successfully use Tightdb in a C, C++,
+one of the following things to successfully use TightDB in a C, C++,
 or Objective-C application:
 
  - Either run 'export LD_RUN_PATH=$LIBDIR' before building your
@@ -1200,7 +1200,7 @@ EOF
         chmod a+rx "$TEMP_DIR" || exit 1
         LOG_FILE="$TEMP_DIR/uninstall.log"
         (
-            echo "Tightdb version: ${TIGHTDB_VERSION:-Unknown}"
+            echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
@@ -1257,7 +1257,7 @@ EOF
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-test-installed.XXXX)" || exit 1
         LOG_FILE="$TEMP_DIR/test.log"
         (
-            echo "Tightdb version: ${TIGHTDB_VERSION:-Unknown}"
+            echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
                 echo
                 echo "PREBUILD HOST INFO:"
