@@ -51,6 +51,7 @@ EXAMPLES   :
 - DESCR:
   CODE     : ex_cpp_dyn_table_intro
 IGNORE     : []                   # List of method-ids to ignore
+
 CATEGORIES :
 - State:
   METHODS:
@@ -68,6 +69,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_size
         DESCR  :
+
   - g_dyn_table_is_empty:
       NAME     : is_empty
       SUMMARY  : &g_dyn_table_is_empty_summary
@@ -82,7 +84,8 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_is_empty
         DESCR  :
-# TODO: Should is_valid() be public? Then describe what to use it for...
+
+# TODO: describe what to use it for...
   - g_dyn_table_is_valid:
       NAME     : is_valid
       SUMMARY  : &g_dyn_table_is_valid_summary
@@ -98,6 +101,8 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_is_valid
         DESCR  :
+
+
 - Table:
   METHODS:
   - g_dyn_table_clear:
@@ -109,6 +114,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_clear
         DESCR  :
+
   - g_dyn_table_optimize:
       NAME     : optimize
       SUMMARY  : &g_dyn_table_optimize_summary
@@ -127,6 +133,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_optimize
         DESCR  :
+
   - g_dyn_table_opertator==:
       NAME     : operator==
       SUMMARY  : &g_dyn_table_operator_eq_summary
@@ -147,11 +154,15 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_operator==
         DESCR  :
+
   - g_dyn_table_opertator!=:
       NAME     : operator!=
       SUMMARY  : &g_dyn_table_operator_neq_summary
                  Compare two tables for inequality.
-      DESCR    : *g_dyn_table_operator_eq_descr
+      DESCR    : &g_dyn_table_operator_neq_descr
+                 This method compares two tables for inequality. 
+                 Two tables are equal only if they contain the same columns and
+                 rows in the same order.
       CONST    : True
       PARAMS:
       - NAME   : table
@@ -228,6 +239,7 @@ CATEGORIES :
         DESCR  :
       SEE      : See also {@link g_dyn_table_get_column_index} to get the column
                  index from the column name.
+
   - g_dyn_table_rename_column:
       NAME     : rename_column
       SUMMARY  : &g_dyn_table_rename_column_summary
@@ -265,6 +277,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_column_count
         DESCR  :
+
   - g_dyn_table_get_column_name:
       NAME     : get_column_name
       SUMMARY  : &g_dyn_table_get_column_name_summary
@@ -284,6 +297,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_column_name
         DESCR  :
+  
   - g_dyn_table_get_column_index:
       NAME     : get_column_index
       SUMMARY  : &g_dyn_table_get_column_index_summary
@@ -303,6 +317,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_column_index
         DESCR  :
+
   - g_dyn_table_get_column_type:
       NAME     : get_column_type
       SUMMARY  : &g_dyn_table_get_column_type_summary
@@ -335,6 +350,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_column_type
         DESCR  :
+
   - g_dyn_table_add_int:
       NAME     : add_int
       SUMMARY  : &g_dyn_table_add_int_summary
@@ -368,6 +384,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : &g_dyn_table_add_empty_row_parm1_descr
                  "Number of rows to add (default: 1)."
+
   - g_dyn_table_insert_empty_row:
       NAME     : insert_empty_row
       SUMMARY  : &g_dyn_table_insert_empty_row_summary
@@ -380,10 +397,13 @@ CATEGORIES :
       PARAMS:
       - NAME   : row_ndx
         TYPES  : size_t
-        DESCR  : Position to insert at.
+        DESCR  : &g_dyn_table_insert_empty_row_parm1_descr
+                 Position to insert at.
       - NAME   : num_rows
         TYPES  : size_t
-        DESCR  : "Number of rows to insert (default: 1)."
+        DESCR  : &g_dyn_table_insert_empty_row_parm2_descr
+                 "Number of rows to insert (default: 1)."
+
   - g_dyn_table_insert_bool:
   - g_dyn_table_insert_int:
   - g_dyn_table_insert_enum:
@@ -457,6 +477,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_remove
         DESCR  :
+
   - g_dyn_table_remove_last_row:
       NAME     : remove_last
       SUMMARY  : &g_dyn_table_remove_last_row_summary
@@ -467,6 +488,8 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_remove_last_row
         DESCR  :
+
+
 - Values:
   METHODS:
   - g_dyn_table_get_bool:
@@ -491,6 +514,7 @@ CATEGORIES :
       NAME     : get_subtable
   - g_dyn_table_get_subtable_const:
       NAME     : get_subtable
+
       TITLE    : get_*
       SUMMARY  : &g_dyn_table_get_xxx_summary
                  Get cell value.
@@ -543,8 +567,11 @@ CATEGORIES :
       NAME     : set_string
   - g_dyn_table_set_binary:
       NAME     : set_binary
+  - g_dyn_table_set_binary_2:
+      IGNORE   : ""
   - g_dyn_table_set_mixed:
       NAME     : set_mixed
+
       TITLE    : set_*
       SUMMARY  : &g_dyn_table_set_xxx_summary
                  Set cell value.
@@ -574,6 +601,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_set_xxx
         DESCR  :
+
 - Sub-tables:
   METHODS:
   - g_dyn_table_get_subtable_size:
@@ -598,6 +626,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_subtable
         DESCR  :
+
   - g_dyn_table_clear_subtable:
       NAME     : clear_subtable
       SUMMARY  : &g_dyn_table_clear_subtable_summary
@@ -615,6 +644,8 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_clear_subtable
         DESCR  :
+
+
 - Indexes:
   METHODS:
   - g_dyn_table_set_index:
@@ -636,6 +667,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_set_index
         DESCR  :
+
   - g_dyn_table_has_index:
       NAME     : has_index
       SUMMARY  : &g_dyn_table_has_index_summary
@@ -649,7 +681,8 @@ CATEGORIES :
         DESCR  : *g_dyn_table_get_xxx_parm1_descr
       RETURN:
         TYPES  : bool
-        DESCR  : <code>true</code> if column is indexed, <code>false</code> otherwise.
+        DESCR  : &g_dyn_table_has_index_return_descr
+                 <code>true</code> if column is indexed, <code>false</code> otherwise.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_has_index
         DESCR  :
@@ -694,6 +727,7 @@ CATEGORIES :
       NAME     : find_first_string
   - g_dyn_table_find_first_binary:
       NAME     : find_first_binary
+
       TITLE    : find_first_*
       SUMMARY  : &g_dyn_table_find_first_xxx_summary
                  Find first matching row.
@@ -794,16 +828,18 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : The column index.
+        DESCR  : *g_dyn_table_find_all_xxx_parm1_descr
       - NAME   : value
         TYPES  : int64_t
-        DESCR  : The value.
+        DESCR  : *g_dyn_table_find_all_xxx_parm2_descr
       - NAME   : pos
         TYPES  : "size_t&"
-        DESCR  : Position of matching value or insert position.
+        DESCR  : &g_dyn_table_find_sorted_int_parm3_descr
+                 Position of matching value or insert position.
       RETURN:
         TYPES  : bool
-        DESCR  : "true if value was found, otherwise false."
+        DESCR  : &g_dyn_table_find_sorted_int_return_descr
+                 "true if value was found, otherwise false."
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_find_first_xxx
         DESCR  :
@@ -822,15 +858,16 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : &g_dyn_table_get_sorted_view_const_parm1_descr
+        DESCR  : &g_dyn_table_get_sorted_view_parm1_descr
                  The column index (starting from 0).
       - NAME   : ascending
         TYPES  : bool
-        DESCR  : &cpp_dyn_table_get_sorted_view_param
+        DESCR  : &cpp_dyn_table_get_sorted_view_parm2_descr
                  "If <code>true</code>, rows are sorted ascending, otherwise descending. Default: <code>true</code>."
       RETURN:
         TYPES  : TableView
-        DESCR  : A view.
+        DESCR  : &g_dyn_table_get_sorted_view_return_descr
+                 A view.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_sorted_view
         DESCR  :
@@ -870,7 +907,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_where_summary
                  Query table.
       DESCR    : &g_dyn_table_where_descr
-                 This method initiates a query in the table.
+                 This method initiates a query in the table.  See {@link class_dyn_query}.
       RETURN:
         TYPES  : [Query, const Query]
         DESCR  : &g_dyn_table_where_return_descr
@@ -919,7 +956,7 @@ CATEGORIES :
       - CODE   : ex_cpp_dyn_table_count
         DESCR  :
 
-  - g_dyn_table_sum:
+  - g_dyn_table_sum_int:
   - g_dyn_table_sum_float:
   - g_dyn_table_sum_double:
       TITLE    : sum_*
@@ -945,7 +982,8 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_sum
         DESCR  :
-  - g_dyn_table_maximum:
+
+  - g_dyn_table_maximum_int:
   - g_dyn_table_maximum_float:
   - g_dyn_table_maximum_double:
       TITLE    : maximum_*
@@ -967,11 +1005,12 @@ CATEGORIES :
       RETURN:
         TYPES  : [int64_t, float, double]
         DESCR  : &g_dyn_table_maximum_return_descr
-                 The maximum value.
+                 The maximum value in the column.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_maximum
         DESCR  :
-  - g_dyn_table_minimum:
+
+  - g_dyn_table_minimum_int:
   - g_dyn_table_minimum_float:
   - g_dyn_table_minimum_double:
       TITLE    : minimum_*
@@ -988,14 +1027,16 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : Column index.
+        DESCR  : *g_dyn_table_maximum_parm1_descr
       RETURN:
         TYPES  : [int64_t, float, double]
-        DESCR  : The minimum value in the column.
+        DESCR  : &g_dyn_table_minimum_return_descr
+                 The minimum value in the column.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_minimum
         DESCR  :
-  - g_dyn_table_average:
+
+  - g_dyn_table_average_int:
   - g_dyn_table_average_float:
   - g_dyn_table_average_double:
       TITLE    : average_*
@@ -1012,8 +1053,7 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : &g_dyn_table_average_parm1_descr
-                 Column index.
+        DESCR  : *g_dyn_table_maximum_parm1_descr
       RETURN:
         TYPES  : [int64_t, float, double]
         DESCR  : &g_dyn_table_average_return1_descr
@@ -1040,6 +1080,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_to_json
         DESCR  :
+
   - g_dyn_table_to_string:
       NAME     : to_string
       SUMMARY  : &g_dyn_table_to_string_summary
@@ -1062,6 +1103,7 @@ CATEGORIES :
       - CODE   : ex_cpp_dyn_table_to_string
         DESCR  :
       SEE      : See also {@link g_dyn_table_row_to_string} which do the same for a specific row.
+
   - g_dyn_table_row_to_string:
       NAME     : to_string
       SUMMARY  : &g_dyn_table_row_to_string_summary
