@@ -38,6 +38,7 @@ EXAMPLES   :
 - DESCR:
   CODE: ex_cpp_dyn_query_intro
 IGNORE     : []                   # List of method-ids to ignore
+
 CATEGORIES :
 - Conditions:
   METHODS:
@@ -46,6 +47,8 @@ CATEGORIES :
   - g_dyn_query_equals_float:
   - g_dyn_query_equals_double:
   - g_dyn_query_equals_string:
+  - g_dyn_query_equals_string_2:
+      IGNORE   : ""
   - g_dyn_query_equals_date:
   - g_dyn_query_equals_binary:
       TITLE    : equal*
@@ -83,10 +86,14 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_dyn_query_equals
 
+  - g_dyn_query_notEquals_bool:
+      TODO     : soon
   - g_dyn_query_notEquals_integer:
   - g_dyn_query_notEquals_float:
   - g_dyn_query_notEquals_double:
   - g_dyn_query_notEquals_string:
+  - g_dyn_query_notEquals_string_2:
+      IGNORE   : ""
   - g_dyn_query_notEquals_date:
   - g_dyn_query_notEquals_binary:
       NAMES    : [ not_equal, not_equal, not_equal, not_equal, not_equal_date ]
@@ -262,9 +269,13 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_between
-  - g_dyn_query_startsWith:
+
+  - g_dyn_query_startsWith_string:
+      NAME     : begins_with
+  - g_dyn_query_startsWith_string_2:
+      IGNORE   : ""
   - g_dyn_query_startsWith_binary:
-      NAMES    : [begins_with, begins_with]
+      NAME     : begins_with
       SIGNATURE: |
                  Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive=true);
                  Query& begins_with(size_t column_ndx, BinaryData value);
@@ -288,9 +299,13 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_startsWith
-  - g_dyn_query_endsWith:
+
+  - g_dyn_query_endsWith_string:
+      NAME     : ends_with
+  - g_dyn_query_endsWith_string_2:
+      IGNORE   : ""
   - g_dyn_query_endsWith_binary:
-      NAMES    : [ends_with, ends_with]
+      NAME     : ends_with
       SIGNATURE: |
                  Query& ends_with(size_t column_ndx, StringData value, bool case_sensitive=true);
                  Query& ends_with(size_t column_ndx, BinaryData value);
@@ -314,7 +329,10 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_endsWith
-  - g_dyn_query_contains:
+
+  - g_dyn_query_contains_string_2:
+      IGNORE   : ""  
+  - g_dyn_query_contains_string:
   - g_dyn_query_contains_binary:
       NAMES    : [contains, contains]
       SIGNATURE: |
@@ -420,6 +438,8 @@ CATEGORIES :
         
 - Actions:
   METHODS:
+  - g_dyn_query_find_all_2:
+      IGNORE   : ""
   - g_dyn_query_find_all_const:
   - g_dyn_query_find_all:
       NAMES    : [find_all, find_all]
@@ -518,7 +538,7 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_dyn_query_remove
 
-  - g_dyn_query_sum:
+  - g_dyn_query_sum_int:
   - g_dyn_query_sum_float:
   - g_dyn_query_sum_double:
       TITLE    : sum*
@@ -563,7 +583,7 @@ CATEGORIES :
         CODE   : ex_cpp_dyn_query_sum
 
 
-  - g_dyn_query_maximum:
+  - g_dyn_query_maximum_int:
   - g_dyn_query_maximum_float:
   - g_dyn_query_maximum_double:
   - g_dyn_query_maximum_date:
@@ -603,7 +623,7 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_dyn_query_maximum
 
-  - g_dyn_query_minimum:
+  - g_dyn_query_minimum_int:
   - g_dyn_query_minimum_float:
   - g_dyn_query_minimum_double:
   - g_dyn_query_minimum_date:
@@ -643,7 +663,7 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_dyn_query_minimum
 
-  - g_dyn_query_average:
+  - g_dyn_query_average_int:
   - g_dyn_query_average_double:
   - g_dyn_query_average_float:
       TITLE    : average*
