@@ -44,3 +44,5 @@ Static library*/
 /tightdb.xcodeproj/project.xcworkspace
 /tightdb.xcodeproj/xcuserdata
 
+# sh build.sh config
+/config

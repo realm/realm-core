@@ -17,11 +17,12 @@ clean:
 	sh build.sh clean
 
 build: clean
+	sh build.sh config /usr
 	sh build.sh build
 
 
 libtightdb: build
-	sh build.sh install-shared $$(pwd)/debian/libtightdb/usr
+	DESTDIR=$$(pwd)/debian/libtightdb sh build.sh install-shared
 	dh_testdir -a
 	dh_testroot -a
 	dh_installdocs -a
@@ -38,7 +39,7 @@ libtightdb: build
 
 
 libtightdb-dev: build
-	sh build.sh install-devel $$(pwd)/debian/libtightdb-dev/usr
+	DESTDIR=$$(pwd)/debian/libtightdb-dev sh build.sh install-devel
 	dh_testdir -a
 	dh_testroot -a
 	dh_installdocs -a

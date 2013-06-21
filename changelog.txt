@@ -1,4 +1,4 @@
-Tightdb Changelog:
+TightDB Changelog:
 ==================
 
 Format:
