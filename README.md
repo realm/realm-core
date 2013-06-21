@@ -47,12 +47,24 @@ each of our major platforms:
     sudo yum install python-cheetah
     sudo yum install procps-devel
 
-### OS X 10.7 and 10.8
+### Mac OS X 10.7 and 10.8
 
-    Install Xcode
-    Install command line tools (via Xcode)
+On Mac OS X, the build procedure uses Clang as the C/C++
+compiler. Clang comes with Xcode, so install Xcode if it is not
+already installed. If you have a version that preceeds 4.2, we
+recommend that you upgrade. This will ensure that the Clang version is
+at least 3.0. Run the following command in the command prompt to see
+if you have Xcode installed, and, if so, what version it is:
 
-    Download https://pypi.python.org/packages/source/C/Cheetah/Cheetah-2.4.4.tar.gz
+    xcodebuild -version
+
+Make sure you also install "Command line tools" found under the
+preferences pane "Downloads" in Xcode.
+
+Download the latest version of Python cheetah
+(https://pypi.python.org/packages/source/C/Cheetah/Cheetah-2.4.4.tar.gz),
+then:
+
     tar xf Cheetah-2.4.4.tar.gz
     cd Cheetah-2.4.4/
     sudo python setup.py install
