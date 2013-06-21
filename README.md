@@ -61,7 +61,7 @@ if you have Xcode installed, and, if so, what version it is:
 Make sure you also install "Command line tools" found under the
 preferences pane "Downloads" in Xcode.
 
-Download the latest version of Python cheetah
+Download the latest version of Python Cheetah
 (https://pypi.python.org/packages/source/C/Cheetah/Cheetah-2.4.4.tar.gz),
 then:
 
