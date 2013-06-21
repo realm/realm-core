@@ -41,7 +41,7 @@ each of our major platforms:
     sudo apt-get install libunittest++-dev
     sudo apt-get install libprocps0-dev
 
-### Fedora 17 and 18
+### Fedora 17 and 18, Amazon Linux 2012.09
 
     sudo yum install gcc gcc-c++
     sudo yum install python-cheetah
