@@ -15,7 +15,7 @@ GCC 4.2 and newer, as well as with Clang 3.0 and newer.
 
 If you are going to modify the TightDB core library, you will need
 Cheetah for Python (http://www.cheetahtemplate.org). It is needed
-because some source files are generated.
+because some source files are generated from Cheetah templates.
 
 To run the test suite, you will need "UnitTest++"
 (http://unittest-cpp.sourceforge.net), however, a bundled fallback
