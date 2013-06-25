@@ -47,9 +47,9 @@ public:
     void ZeroFreeSpace();
 #endif
 
-private:
     void DoCommit(uint64_t topPos);
 
+private:
     std::size_t get_free_space(size_t len);
     std::size_t reserve_free_space(size_t len, size_t start=0);
     void        add_free_space(size_t pos, size_t len, size_t version=0);

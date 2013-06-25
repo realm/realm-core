@@ -875,3 +875,39 @@ TEST(StringIndex_Bug)
         }
     }
 }
+
+TEST(Shared_Async)
+{
+    // Clean up old state
+    File::try_remove("asynctest.tightdb");
+    File::try_remove("asynctest.tightdb.lock");
+
+    // Do some changes in a async db
+    {
+        SharedGroup db("asynctest.tightdb", false, SharedGroup::durability_Async);
+
+        for (size_t n = 0; n < 100; ++n) {
+            //printf("t %d\n", (int)n);
+            WriteTransaction wt(db);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            t1->add(1, n, false, "test");
+            wt.commit();
+        }
+    }
+
+    // Wait for async_commit process to shutdown
+    while (File::exists("asynctest.tightdb.lock")) {
+        sleep(1);
+    }
+
+    // Read the db again in normal mode to verify
+    {
+        SharedGroup db("asynctest.tightdb");
+
+        for (size_t n = 0; n < 100; ++n) {
+            ReadTransaction rt(db);
+            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+            CHECK(t1->size() == 100);
+        }
+    }
+}

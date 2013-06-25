@@ -4,6 +4,7 @@
 #include <tightdb/safe_int_ops.hpp>
 #include <tightdb/string_buffer.hpp>
 #include <tightdb/group_shared.hpp>
+#include <tightdb/group_writer.hpp>
 
 // FIXME: We should not include files from the test directory here. A
 // solution would probably be to move the definition of
@@ -89,7 +90,7 @@ private:
 // - Possible reinitialization due to temporary unlocking during downgrade of file lock
 
 void SharedGroup::open(const string& file, bool no_create_file,
-                       DurabilityLevel dlevel)
+                       DurabilityLevel dlevel, bool is_backend)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -183,6 +184,16 @@ retry:
             // change the db
             m_version = 0;
 
+            // In async mode we need a separate process to do the async commits
+            // We start it up here during init so that it only get started once
+            if (dlevel == durability_Async) {
+                if (fork() == 0) {
+                    unattached_tag tag;
+                    SharedGroup async_committer(tag);
+                    async_committer.open(file, true, durability_Async, true);
+                }
+            }
+
             // FIXME: This downgrading of the lock is not guaranteed to be atomic
 
             // Downgrade lock to shared now that it is initialized,
@@ -215,6 +226,18 @@ retry:
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
 #endif
+
+    if (dlevel == durability_Async) {
+        if (is_backend) {
+            do_async_commits(); // will never return
+        }
+        else {
+            // In async mode we need to wait for the commit process to get ready
+            // so we wait for first read lock being made by async_commit process
+            SharedInfo* const info = m_file_map.get_addr();
+            while (info->put_pos == 0) usleep(2);
+        }
+    }
 }
 
 
@@ -238,6 +261,11 @@ SharedGroup::~SharedGroup()
     if (!m_file.try_lock_exclusive()) return;
 
     SharedInfo* info = m_file_map.get_addr();
+
+    // In sync mode, cleanup will be handled by the async_commit process
+    // (but we might still be able to get exclusive lock, as it will
+    //  release it while doing its own try_lock_exclusive())
+    if (info->flags == durability_Async) return;
 
     // If the db file is just backing for a transient data structure,
     // we can delete it when done.
@@ -285,6 +313,63 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
     const SharedInfo* info = m_file_map.get_addr();
     bool is_changed = (m_version != info->current_version);
     return is_changed;
+}
+
+void SharedGroup::do_async_commits()
+{
+    bool shutdown = false;
+    SharedInfo* info = m_file_map.get_addr();
+    TIGHTDB_ASSERT(info->current_version == 0);
+
+    // We always want to keep a read lock on the last version
+    // that was commited to disk, to protect it against being
+    // overwritten by commits being made to memory by others.
+    // Note that taking this lock also signals to the other
+    // processes that that they can start commiting to the db.
+    begin_read();
+    size_t last_version = m_version;
+    m_group.invalidate();
+
+    while(true) {
+        // If we can get an exclusive lock, we know that we are
+        // the last process using the db so we can close down
+        // (all other processes using the db holds shared locks)
+        if (m_file.try_lock_exclusive()) {
+            shutdown = true;
+        }
+
+        if (has_changed()) {
+            // Get a read lock on the (current) version that we want
+            // to commit to disk.
+#ifdef TIGHTDB_DEBUG
+            m_transact_stage = transact_Ready;
+#endif
+            begin_read();
+            size_t current_version = m_version;
+            size_t current_top_ref = m_group.get_top_array().GetRef();
+
+            GroupWriter writer(m_group, true);
+            writer.DoCommit(current_top_ref);
+
+            // Now we can release the version that was previously commited
+            // to disk and just keep the lock on the latest version.
+            m_version = last_version;
+            end_read();
+            last_version = current_version;
+        }
+        else if (!shutdown) {
+            usleep(20);
+        }
+
+        if (shutdown) {
+            // Being the backend process, we own the lock file, so we
+            // have to clean up when we shut down.
+            pthread_mutex_destroy(&info->readmutex);
+            pthread_mutex_destroy(&info->writemutex);
+            remove(m_file_path.c_str());
+            exit(EXIT_SUCCESS);
+        }
+    }
 }
 
 
