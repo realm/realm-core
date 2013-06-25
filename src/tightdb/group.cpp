@@ -116,7 +116,9 @@ void Group::create_from_file(const string& filename, OpenMode mode, bool do_init
 {
     // Memory map file
     // This leaves the group ready, but in invalid state
-    m_alloc.attach_file(filename, m_is_shared, mode == mode_ReadOnly, mode == mode_NoCreate);
+    bool read_only = mode == mode_ReadOnly;
+    bool no_create = mode == mode_ReadWriteNoCreate;
+    m_alloc.attach_file(filename, m_is_shared, read_only, no_create);
 
     if (!do_init)  return;
 
@@ -381,7 +383,7 @@ BinaryData Group::write_to_mem() const
 }
 
 // NOTE: This method must not modify *this if m_shared is false.
-size_t Group::commit(size_t current_version, size_t readlock_version, bool doPersist)
+size_t Group::commit(size_t current_version, size_t readlock_version, bool persist)
 {
     TIGHTDB_ASSERT(m_top.IsValid());
     TIGHTDB_ASSERT(readlock_version <= current_version);
@@ -392,7 +394,7 @@ size_t Group::commit(size_t current_version, size_t readlock_version, bool doPer
     // If we have an empty db file, we can just serialize directly
     //if (m_alloc.GetTopRef() == 0) {}
 
-    GroupWriter out(*this, doPersist);
+    GroupWriter out(*this, persist);
 
     if (m_is_shared) {
         m_readlock_version = readlock_version;
@@ -400,7 +402,7 @@ size_t Group::commit(size_t current_version, size_t readlock_version, bool doPer
     }
 
     // Recursively write all changed arrays to end of file
-    const size_t top_pos = out.Commit();
+    const size_t top_pos = out.commit();
 
     // If the group is persisiting in single-thread (un-shared) mode
     // we have to make sure that the group stays valid after commit
