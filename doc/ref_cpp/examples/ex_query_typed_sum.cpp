@@ -1,6 +1,7 @@
 // @@Example: ex_cpp_typed_query_sum @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_3(PeopleTable,
                 name, String,

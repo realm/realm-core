@@ -1,6 +1,7 @@
 // @@Example: ex_cpp_typed_query_between @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_3(PeopleTable,
                 name,  String,
@@ -22,15 +23,15 @@ int main()
 
 // @@Fold@@
     assert(view1.size() == 2);
-    assert(!strcmp(view1[0].name, "Joe"));
-    assert(!strcmp(view1[1].name, "Jill"));
+    assert(!strcmp(view1[0].name.data(), "Joe"));
+    assert(!strcmp(view1[1].name.data(), "Jill"));
 
 // @@EndFold@@
     // Find people where hired year == 2012 using a 'between' clause
     PeopleTable::View view5 = table.where().hired.between(tightdb::Date(2012,  1,  1,  0,  0,  0).get_date(),
                                                           tightdb::Date(2012, 12, 31, 23, 59, 59).get_date()).find_all();
 // @@Fold@@
-    assert(view5.size() == 1 && !strcmp(view5[0].name, "Jack"));
+    assert(view5.size() == 1 && !strcmp(view5[0].name.data(), "Jack"));
 }
 // @@EndFold@@
 // @@EndExample@@

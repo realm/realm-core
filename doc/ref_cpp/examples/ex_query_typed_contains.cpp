@@ -1,6 +1,7 @@
 // @@Example: ex_cpp_typed_query_contains @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_1(PeopleTable,
                 name,  String)
@@ -18,7 +19,7 @@ int main()
     PeopleTable::View view1 = table.where().name.contains("ac").find_all();
 // @@Fold@@
     assert(view1.size() == 1);
-    assert(!strcmp(view1[0].name, "Jack"));
+    assert(!strcmp(view1[0].name.data(), "Jack"));
 // @@EndFold@@
 
     // Will find none because it's case sensitive
@@ -33,7 +34,7 @@ int main()
 // @@Fold@@
 
     assert(view3.size() == 1);
-    assert(!strcmp(view3[0].name, "Jack"));
+    assert(!strcmp(view3[0].name.data(), "Jack"));
 #endif
 }
 // @@EndFold@@
