@@ -397,7 +397,7 @@ TEST(Group_Persist)
     File::try_remove("testdb.tightdb");
 
     // Create new database
-    Group db("testdb.tightdb");
+    Group db("testdb.tightdb", Group::mode_ReadWrite);
 
     // Insert some data
     TableRef table = db.get_table("test");

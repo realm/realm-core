@@ -217,8 +217,8 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
     TIGHTDB_ASSERT(!(is_shared && read_only));
     static_cast<void>(is_shared);
 
-    const File::AccessMode access = read_only ? File::access_ReadOnly : File::access_ReadWrite;
-    const File::CreateMode create = read_only || no_create ? File::create_Never : File::create_Auto;
+    File::AccessMode access = read_only ? File::access_ReadOnly : File::access_ReadWrite;
+    File::CreateMode create = read_only || no_create ? File::create_Never : File::create_Auto;
     m_file.open(path.c_str(), access, create, 0);
     File::CloseGuard fcg(m_file);
 
