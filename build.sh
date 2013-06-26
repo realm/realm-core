@@ -559,13 +559,14 @@ EOF
             done
         else
             cat 1>&2 <<EOF
-Please specify which extensions to include:
+Please specify which extensions (and auxiliary platforms) to include:
   Specify 'all' to include all extensions.
   Specify 'avail' to include all available extensions.
   Specify 'none' to exclude all extensions.
   Specify 'EXT1  [EXT2]...' to include the specified extensions.
   Specify 'not  EXT1  [EXT2]...' to exclude the specified extensions.
-Available extensions are: $EXTENSIONS $PLATFORMS
+Available extensions: $EXTENSIONS
+Available auxiliary platforms: $PLATFORMS
 EOF
             exit 1
         fi
