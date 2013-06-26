@@ -230,8 +230,15 @@ get_compiler_info()
     for x in $(printf "%s\n%s\n%s\n" "$CC_CMD" "$CXX_CMD" "$LD_CMD" | sort -u); do
         echo
         echo "\$ $x --version"
-        $x --version 2>/dev/null | grep -v '^ *$'
+        $x --version 2>&1 | grep -v '^ *$'
     done
+    if [ "$OS" = "Darwin" ]; then
+        if xcode-select --print-path >/dev/null 2>&1; then
+            echo
+            echo "\$ xcodebuild -version"
+            xcodebuild -version 2>&1 | grep -v '^ *$'
+        fi
+    fi
 }
 
 
