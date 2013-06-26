@@ -28,6 +28,7 @@ void func(BinaryData buffer)
 
 int main()
 {
+    Group g;
     BinaryData buffer = g.write_to_mem();
     try {
         func(buffer);
