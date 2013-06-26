@@ -1,6 +1,7 @@
 // @@Example: ex_cpp_typed_query_greaterThan @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_2(PeopleTable,
                 name,  String,
@@ -20,8 +21,8 @@ int main()
     PeopleTable::View view1 = table.where().age.greater(37).find_all();
 // @@Fold@@
     assert(view1.size() == 2);
-    assert(!strcmp(view1[0].name, "Joe"));
-    assert(!strcmp(view1[1].name, "Jack"));
+    assert(!strcmp(view1[0].name.data(), "Joe"));
+    assert(!strcmp(view1[1].name.data(), "Jack"));
 }
 // @@EndExample@@
 // @@EndFold@@

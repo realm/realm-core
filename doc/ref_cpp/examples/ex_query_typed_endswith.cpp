@@ -1,6 +1,7 @@
 // @@Example: ex_cpp_typed_query_endsWith @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_1(PeopleTable,
                 name,  String)
@@ -19,8 +20,8 @@ int main()
     PeopleTable::View view1 = table.where().name.ends_with("oe").find_all();
 // @@Fold@@
     assert(view1.size() == 2);
-    assert(!strcmp(view1[0].name, "Joe"));
-    assert(!strcmp(view1[1].name, "oe"));
+    assert(!strcmp(view1[0].name.data(), "Joe"));
+    assert(!strcmp(view1[1].name.data(), "oe"));
 // @@EndFold@@
 
     // Will find none because search is case sensitive
@@ -34,8 +35,8 @@ int main()
     PeopleTable::View view3 = table.where().name.ends_with("oE", false).find_all();
 // @@Fold@@
     assert(view3.size() == 2);
-    assert(!strcmp(view3[0].name, "Joe"));
-    assert(!strcmp(view3[1].name, "oe"));
+    assert(!strcmp(view3[0].name.data(), "Joe"));
+    assert(!strcmp(view3[1].name.data(), "oe"));
 #endif
 }
 // @@EndExample@@

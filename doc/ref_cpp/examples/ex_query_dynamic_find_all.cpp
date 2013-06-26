@@ -1,5 +1,6 @@
 // @@Example: ex_cpp_dyn_query_do @@
 #include <tightdb.hpp>
+#include <assert.h>
 
 using namespace tightdb;
 using namespace std;
@@ -46,12 +47,12 @@ int main()
 
 // @@Show@@
     // Find rows where (age > 12 && age < 20) || name == "Alice"
-    Query query = table->where().less(1, 50);
+    Query query = table->where().less((int64_t)1, (int64_t)50);
     TableView view = query.find_all();
 
     assert(view.size() == 2);
-    assert(!strcmp(view.get_string(0, 0), "Alice"));
-    assert(!strcmp(view.get_string(0, 1), "Peter"));
+    assert(!strcmp(view.get_string(0, 0).data(), "Alice"));
+    assert(!strcmp(view.get_string(0, 1).data(), "Peter"));
 // @@EndShow@@
 }
 // @@EndExample@@

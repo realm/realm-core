@@ -1,13 +1,11 @@
-TABLE_MACROS_HPP = table_macros.hpp
-
-GENERATED_SOURCES = $(TABLE_MACROS_HPP)
+GENERATED_SOURCES = table_macros.hpp
 
 INST_HEADERS = config.h meta.hpp assert.hpp exceptions.hpp terminate.hpp type_list.hpp tuple.hpp \
 bind.hpp safe_int_ops.hpp unique_ptr.hpp bind_ptr.hpp string_buffer.hpp file.hpp thread.hpp \
 utf8.hpp utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp data_type.hpp \
 column_type.hpp column_fwd.hpp spec.hpp date.hpp string_data.hpp binary_data.hpp mixed.hpp \
 table.hpp table_ref.hpp table_basic_fwd.hpp table_accessors.hpp table_basic.hpp table_view.hpp \
-table_view_basic.hpp $(TABLE_MACROS_HPP) group.hpp group_shared.hpp query.hpp \
+table_view_basic.hpp table_macros.hpp group.hpp group_shared.hpp query.hpp \
 query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h replication.hpp
 
 lib_LIBRARIES = libtightdb.a
@@ -49,9 +47,9 @@ tightdb_config_SOURCES = config.cpp
 include ../../generic.mk
 
 # Code generation
-ifeq ($(DISABLE_UPDATE_TABLE_MACROS_HPP),)
-$(TABLE_MACROS_HPP): build/table_macros.hpp.sh build/table_macros.hpp.py
-	$(SHELL) build/table_macros.hpp.sh $(TABLE_MACROS_HPP)
+ifeq ($(DISABLE_CHEETAH_CODE_GEN),)
+table_macros.hpp: table_macros.hpp.cheetah
+	$(SHELL) cheetah.sh $< $@
 endif
 
 uninstall/extra:
@@ -59,6 +57,7 @@ uninstall/extra:
 	$(RM) $(DESTDIR)$(includedir)/tightdb/*.h
 	-rmdir $(DESTDIR)$(includedir)/tightdb
 
+# Used by ../../build.sh
 .PHONY: get-inst-headers get-inst-libraries
 get-inst-headers:
 	@echo $(INST_HEADERS)

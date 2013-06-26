@@ -103,10 +103,18 @@ int main(int argc, char* argv[])
 
 
     if (emit_ldflags) {
-#ifdef TIGHTDB_DEBUG
-        emit_flags("-ltightdb-dbg");
+#ifdef TIGHTDB_CONFIG_IOS
+#  ifdef TIGHTDB_DEBUG
+        emit_flags("-ltightdb-ios-dbg");
+#  else
+        emit_flags("-ltightdb-ios");
+#  endif
 #else
+#  ifdef TIGHTDB_DEBUG
+        emit_flags("-ltightdb-dbg");
+#  else
         emit_flags("-ltightdb");
+#  endif
 #endif
     }
 

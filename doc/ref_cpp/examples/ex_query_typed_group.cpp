@@ -1,12 +1,13 @@
 // @@Example: ex_cpp_typed_query_group @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 
-void main()
+int main()
 {
     PeopleTable table;
 
@@ -29,9 +30,9 @@ void main()
 // @@Fold@@
     // Expected result
     assert(view.size() == 3);
-    assert(!strcmp(view[0].name, "Mary"));
-    assert(!strcmp(view[1].name, "Joe"));
-    assert(!strcmp(view[2].name, "Alice"));
+    assert(!strcmp(view[0].name.data(), "Mary"));
+    assert(!strcmp(view[1].name.data(), "Joe"));
+    assert(!strcmp(view[2].name.data(), "Alice"));
 }
 // @@EndFold@@
 // @@EndExample@@

@@ -1,5 +1,6 @@
 // @@Example: ex_cpp_tableview_into @@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_2(PeopleTable,
                 name, String,

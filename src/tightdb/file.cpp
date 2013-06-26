@@ -318,7 +318,7 @@ size_t File::read(char* data, size_t size)
             goto error;
         if (r == 0)
             break;
-        TIGHTDB_ASSERT(r == n); // Partial reads are not possible.
+        TIGHTDB_ASSERT(r <= n);
         size -= size_t(r);
         data += size_t(r);
     }
