@@ -115,6 +115,35 @@ without actually instyalling anything. This can be done as follows:
     DESTDIR=/tmp/check sh build.sh install && find /tmp/check -type f
 
 
+Building for iPhone
+-------------------
+
+On Mac OS X it is possible to build a version of the TightDB core
+library for iOS (the iPhone OS). It requires that the iPhoneOS and
+iPhoneSimulator SDKs for Xcode are installed.
+
+Run the following command to build the TightDB core library for
+iPhone:
+
+    sh build.sh build-iphone
+
+This produces the following files and directories:
+
+    iphone-lib/include/
+    iphone-lib/libtightdb-ios.a
+    iphone-lib/libtightdb-ios-dbg.a
+    iphone-lib/tightdb-config
+    iphone-lib/tightdb-config-dbg
+
+The `include` directory holds a copy of the header files, which are
+identical to the ones installed by `sh build.sh install`. There are
+two versions of the static library, one that is compiled with
+optimization, and one that is compiled for debugging. Each one
+contains code compiled for both iPhone and for the iPhone
+simulator. Each one also comes with a `config` program that can be
+used to enquire about required compiler and linker flags.
+
+
 Configuration
 -------------
 
