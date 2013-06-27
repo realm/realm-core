@@ -906,6 +906,23 @@ void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 }
 
 
+void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
+{
+    TIGHTDB_ASSERT(col_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Table);
+    TIGHTDB_ASSERT(row_ndx < m_size);
+
+    ColumnTable& subtables = GetColumnTable(col_ndx);
+    subtables.invalidate_subtables();
+    subtables.set(row_ndx, table);
+
+    // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    transact_log().set_value(col_ndx, row_ndx, Replication::subtable_tag()); // Throws
+#endif
+}
+
+
 void Table::insert_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
 {
     TIGHTDB_ASSERT(col_ndx < get_column_count());
