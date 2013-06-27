@@ -25,7 +25,7 @@ int main()
     // Find names (column 0) containing "ac", case sensitive
     TableView view1 = table->where().contains(0, StringData("ac")).find_all();
     assert(view1.size() == 1);
-    assert(!strcmp(view1.get_string(0, 0).data(), "Jack"));
+    assert(view1.get_string(0, 0) == "Jack");
 
     // Will find no names (column 0) because it's case sensitive
     TableView view2 = table->where().contains(0, StringData("AC")).find_all();
@@ -36,7 +36,7 @@ int main()
     TableView view3 = table->where().contains(0, StringData("AC"), false).find_all();
 
     assert(view1.size() == 1);
-    assert(!strcmp(view1.get_string(0, 0), StringData("Jack")));
+    assert(view1.get_string(0, 0), StringData("Jack")));
 #endif
 // @@EndShow@@
 }

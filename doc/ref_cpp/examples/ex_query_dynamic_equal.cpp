@@ -39,7 +39,7 @@ int main()
     assert(view1.size() == 1 && view1.get_string(0,0) == "Frank");
 
     // Find rows where age (column 1) == 56
-    TableView view2 = table->where().equal(1, int64_t(56)).find_all();
+    TableView view2 = table->where().equal(1, 56).find_all();
     assert(view2.size() == 1 && view2.get_string(0,0) == "Frank");
 
     // Find rows where male (column 2) == true

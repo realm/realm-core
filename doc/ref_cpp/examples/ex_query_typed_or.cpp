@@ -23,8 +23,8 @@ int main()
 
     // Expected result
     assert(view.size() == 2);
-    assert(!strcmp(view[0].name.data(), "Mary"));
-    assert(!strcmp(view[1].name.data(), "Joe"));
+    assert(view[0].name == "Mary");
+    assert(view[1].name == "Joe");
 }
 // @@EndFold@@
 // @@EndExample@@
