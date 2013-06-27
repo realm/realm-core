@@ -33,7 +33,7 @@ TEST(File_IsSame)
     File::try_remove("test_file_1");
     File::try_remove("test_file_2");
 }
-
+/*
 TEST(File_Streambuf)
 {
     {
@@ -56,3 +56,4 @@ TEST(File_Streambuf)
     }
     File::try_remove("test_file");
 }
+*/

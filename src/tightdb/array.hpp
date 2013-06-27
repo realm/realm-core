@@ -343,29 +343,24 @@ public:
     bool Compare(const Array&) const;
 
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
-    void find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, 
+    bool find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, 
               QueryState<int64_t>* state) const;
 
     template <class cond, Action action, size_t bitwidth, class Callback>
-    void find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
+    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
               Callback callback) const;
 
     template <class cond, Action action, size_t bitwidth>
-    void find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const;
+    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const;
 
     template <class cond, Action action, class Callback>
-    void find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
+    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
               Callback callback) const;
 
     // Optimized implementation for release mode
     template <class cond2, Action action, size_t bitwidth, class Callback>
-    void find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
+    bool find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
                         Callback callback) const;
-
-    // Reference implementation of find() - verifies result from optimized version if debug mode
-    template <class cond2, Action action, size_t bitwidth, class Callback>
-    int64_t find_reference(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-                           Callback callback) const;
 
     // Called for each search result
     template <Action action, class Callback> 
@@ -592,7 +587,7 @@ protected:
     // Getters and Setters for adaptive-packed arrays
     typedef int64_t (Array::*Getter)(size_t) const; // Note: getters must not throw
     typedef void (Array::*Setter)(size_t, int64_t);
-    typedef void (Array::*Finder)(int64_t, size_t, size_t, size_t, QueryState<int64_t>*) const;
+    typedef bool (Array::*Finder)(int64_t, size_t, size_t, size_t, QueryState<int64_t>*) const;
 
     Getter m_getter;
     Setter m_setter;
@@ -650,6 +645,11 @@ public:
     {
         if (pattern) {
             if (action == act_Count) {
+                // If we are close to 'limit' argument in query, we cannot count-up a complete chunk. Count up single 
+                // elements instead 
+                if(m_match_count + 64 >= m_limit)
+                    return false;
+                
                 m_state += fast_popcount64(indexpattern);
                 m_match_count = size_t(m_state);
                 return true;
@@ -684,7 +684,8 @@ public:
         }
         else
             TIGHTDB_ASSERT(false);
-        return true;
+
+        return (m_limit > m_match_count);
     }
 };
 
@@ -737,7 +738,8 @@ public:
             m_state += value;
         else
             TIGHTDB_ASSERT(false);
-        return true;
+
+        return (m_limit > m_match_count);
     }
 };
 
@@ -1378,7 +1380,7 @@ template<size_t width> uint64_t Array::cascade(uint64_t a) const
 
 // This is the main finding function for Array. Other finding functions are just wrappers around this one.
 // Search for 'value' using condition cond2 (Equal, NotEqual, Less, etc) and call find_action() or find_action_pattern() for each match. Break and return if find_action() returns false or 'end' is reached.
-template <class cond2, Action action, size_t bitwidth, class Callback> void Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+template <class cond2, Action action, size_t bitwidth, class Callback> bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     cond2 c;
     TIGHTDB_ASSERT(start <= m_len && (end <= m_len || end == (size_t)-1) && start <= end);
@@ -1386,38 +1388,38 @@ template <class cond2, Action action, size_t bitwidth, class Callback> void Arra
     // Test first few items with no initial time overhead
     if (start > 0) {
         if (m_len > start && c(Get<bitwidth>(start), value) && start < end) { 
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return;
+            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return false;
         }
 
         ++start;
 
         if (m_len > start && c(Get<bitwidth>(start), value) && start < end) { 
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return;
+            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return false;
         } 
 
         ++start;
 
         if (m_len > start && c(Get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return;
+            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return false;
         } 
 
         ++start;
 
         if (m_len > start && c(Get<bitwidth>(start), value) && start < end) { 
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return;
+            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return false;
         } 
 
         ++start;
     }
 
     if (!(m_len > start && start < end))
-        return;
+        return true;
 
     if (end == (size_t)-1) end = m_len;
 
     // Return immediately if no items in array can match (such as if cond2 == Greater and value == 100 and m_ubound == 15).
     if (!c.can_match(value, m_lbound, m_ubound))
-        return;
+        return true;
 
     // call find_action() on all items in array if all items are guaranteed to match (such as cond2 == NotEqual and
     // value == 100 and m_ubound == 15)
@@ -1439,9 +1441,9 @@ template <class cond2, Action action, size_t bitwidth, class Callback> void Arra
         else {
             for (; start < end; start++)
                 if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
-                    return;
+                    return false;
         }
-        return;
+        return true;
     }
 
     // finder cannot handle this bitwidth
@@ -1456,30 +1458,29 @@ template <class cond2, Action action, size_t bitwidth, class Callback> void Arra
         __m128i* const b = (__m128i *)round_down(m_data + end * bitwidth / 8, sizeof(__m128i));
 
         if (!Compare<cond2, action, bitwidth, Callback>(value, start, (reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth), baseindex, state, callback))
-            return;
+            return false;
 
         // Search aligned area with SSE
         if (b > a) {
             if (cpuid_sse<42>()) {
                 if (!FindSSE<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
-                    return;
+                    return false;
                 }
                 else if (cpuid_sse<30>()) {
 
                 if (!FindSSE<Equal, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
-                    return;
+                    return false;
                 }
         }
 
         // Search remainder with CompareEquality()
         if (!Compare<cond2, action, bitwidth, Callback>(value, (reinterpret_cast<char*>(b) - m_data) * 8 / no0(bitwidth), end, baseindex, state, callback))
-            return;
+            return false;
 
-        return;
+        return true;
     }
     else {
-        Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-        return;
+        return Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     }
 #else
 Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
@@ -1826,87 +1827,23 @@ template <bool eq, Action action, size_t width, class Callback> inline bool Arra
 // takes as most as possible to get best performance.
 
 template <class cond, Action action, size_t bitwidth> 
-void Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const
+bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const
 {
-    find<cond, action, bitwidth>(value, start, end, baseindex, state, CallbackDummy());
+    return find<cond, action, bitwidth>(value, start, end, baseindex, state, CallbackDummy());
 }
 
 template <class cond, Action action, class Callback> 
-void Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
+bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
                  Callback callback) const
 {
-    TIGHTDB_TEMPEX4(find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback));
+    TIGHTDB_TEMPEX4(return find, cond, action, m_width, Callback, (value, start, end, baseindex, state, callback));
 }
 
 template <class cond, Action action, size_t bitwidth, class Callback> 
-void Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
+bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
                  Callback callback) const
 {
-#ifdef TIGHTDB_DEBUG
-    Array r_arr;
-    QueryState<int64_t> r_state;
-    Array *accu = reinterpret_cast<Array*>(state->m_state);
-    r_state.m_state = reinterpret_cast<int64_t>(&r_arr);
-
-    if (action == act_FindAll) {
-        for (size_t t = 0; t < accu->size(); t++)
-            r_arr.add(accu->Get(t));
-    }
-    else {
-        r_state.m_state = state->m_state;
-    }
-#endif
-    find_optimized<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-
-#ifdef TIGHTDB_DEBUG
-    if (action == act_Max || action == act_Min || action == act_Sum || action == act_Count || action == act_ReturnFirst || action == act_Count) {
-        find_reference<cond, action, bitwidth, Callback>(value, start, end, baseindex, &r_state, callback);
-        if (action == act_FindAll)
-            TIGHTDB_ASSERT(accu->Compare(r_arr));
-        else
-            TIGHTDB_ASSERT(state->m_state == r_state.m_state);
-    }
-    r_arr.Destroy();
-#endif
-
-}
-
-template <class cond2, Action action, size_t bitwidth, class Callback> 
-int64_t Array::find_reference(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
-                              Callback callback) const
-{
-    // Reference implementation of find_optimized for bug testing
-    (void)callback;
-
-    if (end > size())
-        end = size();
-
-    for (size_t t = start; t < end; t++) {
-        int64_t v = Get(t);
-
-        if (SameType<cond2, None>::value || (SameType<cond2, Equal>::value && v == value) || (SameType<cond2, NotEqual>::value && v != value) || (SameType<cond2, Greater>::value && v > value) || (SameType<cond2, Less>::value && v < value)) {
-            if (action == act_ReturnFirst) {
-                state->m_state = t;
-                return false;
-            }
-            else if (action == act_Sum)
-                state->m_state += v;
-            else if (action == act_Max && v > state->m_state)
-                    state->m_state = v;
-            else if (action == act_Min && v < state->m_state)
-                    state->m_state = v;
-            else if (action == act_Count)
-                state->m_state++;
-            else if (action == act_FindAll)
-                reinterpret_cast<Array*>(state->m_state)->add(t + baseindex);
-        }
-
-    }
-
-    if (action == act_ReturnFirst)
-        return false;
-    else
-        return true;
+    return find_optimized<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
 }
 
 #ifdef TIGHTDB_COMPILER_SSE
