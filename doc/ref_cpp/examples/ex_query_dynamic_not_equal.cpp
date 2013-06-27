@@ -36,12 +36,12 @@ int main()
     // Find rows where age (column 1) != 27
     TableView view = table->where().not_equal(1, 27).find_all();
     assert(view.size() == 1);
-    assert(!strcmp(view.get_string(0, 0).data(), "Bob"));
+    assert(view.get_string(0, 0) == "Bob");
 
     // Find rows where name (column 0) != "Bob"
     view = table->where().not_equal(0, "Bob").find_all();
     assert(view.size() == 1);
-    assert(!strcmp(view.get_string(0, 0).data(), "Alice"));
+    assert(view.get_string(0, 0) == "Alice");
 // @@EndShow@@
 }
 // @@EndExample@@

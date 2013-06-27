@@ -53,9 +53,9 @@ int main()
 
     TableView view = query.find_all();
     assert(view.size() == 3);
-    assert(!strcmp(view.get_string(0, 0).data(), "Mary"));
-    assert(!strcmp(view.get_string(0, 1).data(), "Joe"));
-    assert(!strcmp(view.get_string(0, 2).data(), "Alice"));
+    assert(view.get_string(0, 0) == "Mary");
+    assert(view.get_string(0, 1) == "Joe");
+    assert(view.get_string(0, 2) == "Alice");
 // @@EndShow@@
 }
 // @@EndExample@@
