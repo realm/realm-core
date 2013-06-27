@@ -413,6 +413,11 @@ protected:
     /// get_column_type()).
     void insert_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
 
+    /// Like insert_subtable(std::size_t, std::size_t, const Table*)
+    /// but overwrites the specified cell rather than inserting a new
+    /// one.
+    void set_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
+
     void insert_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
 
     void set_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
