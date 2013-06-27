@@ -26,24 +26,16 @@ int main()
     table->update_from_spec();
 
     table->add_empty_row();
-    table->set_string(0, 0, "Mary");
-    table->insert_int(1, 0, 14);
+    table->set_string(0, 0, "Alice");
+    table->insert_int(1, 0, 27);
 
     table->add_empty_row();
-    table->set_string(0, 1, "Joe");
-    table->insert_int(1, 1, 17);
+    table->set_string(0, 1, "Bob");
+    table->insert_int(1, 1, 50);
 
     table->add_empty_row();
-    table->set_string(0, 2, "Jack");
-    table->insert_int(1, 2, 22);
-
-    table->add_empty_row();
-    table->set_string(0, 2, "Bob");
-    table->insert_int(1, 2, 80);
-
-    table->add_empty_row();
-    table->set_string(0, 2, "Alice");
-    table->insert_int(1, 2, 71);
+    table->set_string(0, 2, "Peter");
+    table->insert_int(1, 2, 44);
 
 // @@Show@@
     // Find rows where (age > 12 && age < 20) || name == "Alice"
