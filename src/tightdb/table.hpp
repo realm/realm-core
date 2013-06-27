@@ -576,6 +576,17 @@ inline bool Table::has_shared_spec() const
     return static_cast<Parent*>(parent)->subtables_have_shared_spec();
 }
 
+inline Spec& Table::get_spec()
+{
+    TIGHTDB_ASSERT(m_top.IsValid()); // you can only change specs on top-level tables
+    return m_spec_set;
+}
+
+inline const Spec& Table::get_spec() const
+{
+    return m_spec_set;
+}
+
 struct Table::UnbindGuard {
     UnbindGuard(Table* t) TIGHTDB_NOEXCEPT: m_table(t) {}
     ~UnbindGuard() { if (m_table) m_table->unbind_ref(); } // FIXME: Cannot be noexcept since ~Table() may throw

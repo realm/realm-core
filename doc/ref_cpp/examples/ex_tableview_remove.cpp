@@ -1,6 +1,7 @@
 // @@Example: ex_cpp_tableview_clear @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_2(PeopleTable,
                 name, String,
@@ -18,11 +19,11 @@ int main()
 
     PeopleTable::View view = table.where().age.greater(18).find_all();
 
-    assert(view[1].name == "Alice");
+    assert(!strcmp(view[1].name.data(), "Alice"));
 
     view.remove(1);
 
-    assert(!strcmp(view[1].name, "Jack"));
+    assert(!strcmp(view[1].name.data(), "Jack"));
     assert(table.size() == 3);
 // @@Fold@@
 }

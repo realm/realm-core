@@ -1,4 +1,4 @@
-Tightdb Changelog:
+TightDB Changelog:
 ==================
 
 Format:
@@ -11,6 +11,16 @@ Format:
 . Any other notes .... 				     (internal changes)
 
 ==================
+
+
+2013-06-25 (Kristian Spangsege)
+. The default group open mode has been changed from Group::mode_Normal
+  (read/write) to Group::mode_ReadOnly. This makes it possible to open
+  a read-only file without specifying a special open mode. Also, since
+  changed groups are generally written to new files, there is rarely a
+  need for the group to be opened in read/write mode.
+. Group::mode_Normal has been renamed to Group::mode_ReadWrite since it is no longer a normal mode.
+. Group::mode_NoCreate has been renamed to Group::mode_ReadWriteNoCreate for clarity.
 
 
 2013-06-05 (Kristian Spangsege)

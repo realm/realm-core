@@ -1,6 +1,7 @@
 // @@Example: ex_cpp_typed_query_notEquals @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_2(PeopleTable,
                 name,  String,
@@ -18,13 +19,13 @@ int main()
     PeopleTable::View view1 = table.where().age.not_equal(56).find_all();
 // @@Fold@@
 
-    assert(view1.size() == 1 && !strcmp(view1[0].name, "Mary"));
+    assert(view1.size() == 1 && !strcmp(view1[0].name.data(), "Mary"));
 // @@EndFold@@
 
     // Find rows where name != "Frank"
     PeopleTable::View view2 = table.where().name.not_equal("Frank").find_all();
 // @@Fold@@
-    assert(view2.size() == 1 && !strcmp(view2[0].name, "Mary"));
+    assert(view2.size() == 1 && !strcmp(view2[0].name.data(), "Mary"));
 }
 // @@EndFold@@
 // @@EndExample@@

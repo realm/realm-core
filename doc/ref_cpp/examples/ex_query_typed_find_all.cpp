@@ -1,6 +1,7 @@
 // @@Example: ex_cpp_typed_query_do @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_2(PeopleTable,
                 name, String,
@@ -26,10 +27,10 @@ int main()
 // @@Fold@@
 
     assert(view1.size() == 4);
-    assert(view1[0].name == "Mary");
-    assert(view1[1].name == "Joe");
-    assert(view1[2].name == "Jack");
-    assert(view1[3].name == "Peter");
+    assert(!strcmp(view1[0].name.data(), "Mary"));
+    assert(!strcmp(view1[1].name.data(), "Joe"));
+    assert(!strcmp(view1[2].name.data(), "Jack"));
+    assert(!strcmp(view1[3].name.data(), "Peter"));
 // @@EndFold@@
 
     // Find matches between 2'nd (Joe) and 4'th (Jack) row, both inclusive.
@@ -37,8 +38,8 @@ int main()
 
 // @@Fold@@
     assert(view2.size() == 2);
-    assert(view2[0].name == "Joe");
-    assert(view2[1].name == "Jack");
+    assert(!strcmp(view2[0].name.data(), "Joe"));
+    assert(!strcmp(view2[1].name.data(), "Jack"));
 
 // @@EndFold@@
     // Find first 2 matches of table
@@ -47,8 +48,8 @@ int main()
 
 // @@Fold@@
     assert(view3.size() == 2);
-    assert(view3[0].name == "Mary");
-    assert(view3[1].name == "Joe");
+    assert(!strcmp(view3[0].name.data(), "Mary"));
+    assert(!strcmp(view3[1].name.data(), "Joe"));
 
 // @@EndFold@@
     // Find next 2 matches of table
@@ -57,8 +58,8 @@ int main()
 
 // @@Fold@@
     assert(view4.size() == 2);
-    assert(view4[0].name == "Jack");
-    assert(view4[1].name == "Peter");
+    assert(!strcmp(view4[0].name.data(), "Jack"));
+    assert(!strcmp(view4[1].name.data(), "Peter"));
 }
 // @@EndFold@@
 // @@EndExample@@

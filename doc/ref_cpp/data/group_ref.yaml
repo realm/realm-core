@@ -54,7 +54,7 @@ CATEGORIES:
                  Creates a table group.
       SIGNATURE: |
                  Group();
-                 Group(const std::string& file, OpenMode mode = mode_Normal);
+                 Group(const std::string& file, OpenMode mode = mode_ReadOnly);
                  Group(BinaryData buffer, bool take_ownership = true);
                  Group(unattached_tag) noexcept;
       PARAMS:
@@ -65,9 +65,9 @@ CATEGORIES:
       - NAME   : mode
         TYPES  : Group::OpenMode
         DESCR  : |
-                 Group::mode_Normal:   Open in read/write mode, create the file if it does not already exist.
-                 Group::mode_ReadOnly: Open in read-only mode, fail if the file does not already exist.
-                 Group::mode_NoCreate: Open in read/write mode, fail if the file does not already exist.
+                 Group::mode_ReadOnly:          Open in read-only mode. Fail if the file does not already exist.
+                 Group::mode_ReadWrite:         Open in read/write mode. Create the file if it does not already exist.
+                 Group::mode_ReadWriteNoCreate: Open in read/write mode. Fail if the file does not already exist.
       - NAME   : buffer
         TYPES  : BinaryData
         DESCR  : &g_group_constructor_memory_parm3_descr
@@ -324,7 +324,7 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_tostring
-        
+
   - g_group_open_file:
   - g_group_open_memory:
       NAMES    : [open, open]
@@ -333,28 +333,67 @@ CATEGORIES:
                  Attach this Group instance to a file or an externally
                  supplied memory buffer.
 
-                 If the specified file exists in the file system, it
-                 must contain a valid TightDB database. If the file
-                 does not exist, it will be created (unless
-                 mode_NoCreate is specified). While a group
-                 constructed this way, can be used to access and
-                 manipulate a TightDB database, it is generally better
-                 to use a SharedGroup instance along with proper
-                 transactions.
+                 By default, the specified file is opened in read-only
+                 mode (mode_ReadOnly). This allows opening a file even
+                 when the caller lacks permission to write to that
+                 file. The opened group may still be modified freely,
+                 but the changes cannot be written back to the same
+                 file using the commit() function. An attempt to do
+                 that, will cause an exception to be thrown. When
+                 opening in read-only mode, it is an error if the
+                 specified file does not already exist in the file
+                 system.
 
-                 Changes made to the database via a Group instance are
-                 not automatically committed to the specified
-                 file. You may, however, at any time, call write() to
-                 write the entire database to a new file. After
-                 writing the new file, the Group will continue to be
-                 associated with the file that was specified in the
-                 call to open().
+                 Alternatively, the file can be opened in read/write
+                 mode (mode_ReadWrite). This allows use of the
+                 commit() function, but, of course, it also requires
+                 that the caller has permission to write to the
+                 specified file. When opening in read-write mode, an
+                 attempt to create the specified file will be made, if
+                 it does not already exist in the file system.
+
+                 In any case, if the file already exists, it must
+                 contain a valid TightDB database. In many cases
+                 invalidity will be detected and cause the
+                 InvalidDatabase exception to be thrown, but you
+                 should not rely on it.
+
+                 Note that changes made to the database via a Group
+                 instance are not automatically committed to the
+                 specified file. You may, however, at any time,
+                 explicitly commit your changes by calling the
+                 commit() method, provided that the specified
+                 open-mode is not mode_ReadOnly. Alternatively, you
+                 may call write() to write the entire database to a
+                 new file. Writing the database to a new file does not
+                 end, or in any other way change the association
+                 between the Group instance and the file that was
+                 specified in the call to open().
 
                  A file that is passed to Group::open(), may not be
-                 modified until after the Group object is
-                 destroyed. Behaviour is undefined if a file is
-                 modified while any Group object is associated with
-                 it.
+                 modified by a third party until after the Group
+                 object is destroyed. Behavior is undefined if a file
+                 is modified by a third party while any Group object
+                 is associated with it.
+
+                 Calling open() on a Group instance that is already in
+                 the attached state has undefined behavior.
+
+                 Accessing a TightDB database file through manual
+                 construction of a Group object does not offer any
+                 level of thread safety or transaction safety. When
+                 any of those kinds of safety are a concern, consider
+                 using a SharedGroup instead. When accessing a
+                 database file in read/write mode through a manually
+                 constructed Group object, it is entirely the
+                 responsibility of the application that the file is
+                 not accessed in any way by a third party during the
+                 life-time of that group object. It is, on the other
+                 hand, safe to concurrently access a database file by
+                 multiple manually created Group objects, as long as
+                 all of them are opened in read-only mode, and there
+                 is no other party that modifies the file
+                 concurrently.
 
 
                  Specifying a memory buffer is equivalent to
@@ -380,7 +419,7 @@ CATEGORIES:
       SUMMARY  : &g_group_open_summary
                  Attach to a file or a memory buffer.
       SIGNATURE: |
-                 void open(const std::string& file, OpenMode mode = mode_Normal);
+                 void open(const std::string& file, OpenMode mode = mode_ReadOnly);
                  void open(BinaryData buffer, bool take_ownership = true);
       PARAMS:
       - NAME   : file
@@ -390,7 +429,11 @@ CATEGORIES:
       - NAME   : mode
         TYPES  : Group::OpenMode
         DESCR  : &g_group_open_memory_parm2_descr
-                 See Group().
+                 Specifying a mode that is not mode_ReadOnly requires
+                 that the specified file can be opened in read/write
+                 mode. In general there is no reason to open a group
+                 in read/write mode unless you want to be able to call
+                 Group::commit().
       - NAME   : buffer
         TYPES  : BinaryData
         DESCR  : &g_group_open_memory_parm3_descr
@@ -408,7 +451,7 @@ CATEGORIES:
         CODE   : ex_cpp_group_open_file
       - DESCR  :
         CODE   : ex_cpp_group_open_memory
-        
+
   - g_group_is_attached:
       NAME     : is_attached
       SUMMARY  : &g_group_is_attached_summary

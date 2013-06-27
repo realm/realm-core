@@ -1394,6 +1394,7 @@ TEST(Table_Spec_AddColumns)
         CHECK_EQUAL("test", subtable->get_string(1, 0));
         CHECK_EQUAL(0,      subtable->get_int(2, 0));
         CHECK_EQUAL(0,      subtable->get_subtable_size(3, 0));
+        CHECK_EQUAL(1,      table->get_subtable_size(2, 0));
     }
 
     // Add new column to new sub-table
@@ -1409,6 +1410,18 @@ TEST(Table_Spec_AddColumns)
         TableRef subsubtable = subtable->get_subtable(3, 0);
         CHECK_EQUAL(1,      subsubtable->get_column_count());
     }
+
+    // Add a new mixed column
+    table->add_column(type_Mixed, "eighth");
+    CHECK_EQUAL(8, table->get_column_count());
+    table->set_mixed(7, 0, Mixed::subtable_tag());
+    TableRef stab = table->get_subtable(7, 0);
+    stab->add_column(type_Int, "smurf");
+    stab->insert_int(0, 0, 1);
+    stab->insert_done();
+    stab->insert_int(0, 1, 2);
+    stab->insert_done();
+    CHECK_EQUAL(2, table->get_subtable_size(7, 0));
 
 #ifdef TIGHTDB_DEBUG
     table->Verify();
@@ -2117,7 +2130,7 @@ TEST(Table_LanguageBindings)
 
 TEST(Table_MultipleColumn)
 {
-    
+
     Table table;
     table.add_column(type_Int, "first");
     table.add_column(type_Int, "first");

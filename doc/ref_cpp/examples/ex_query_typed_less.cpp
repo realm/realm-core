@@ -1,6 +1,7 @@
 // @@Example: ex_php_query_lessThan @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_2(PeopleTable,
                 name,  String,
@@ -20,7 +21,7 @@ int main()
     PeopleTable::View view1 = table.where().age.less(20).find_all();
 // @@Fold@@
     assert(view1.size() == 1);
-    assert(!strcmp(view1[0].name, "Mary"));
+    assert(!strcmp(view1[0].name.data(), "Mary"));
 }
 // @@Fold@@
 // @@EndExample@@

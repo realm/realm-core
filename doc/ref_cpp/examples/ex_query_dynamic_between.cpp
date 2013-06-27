@@ -38,7 +38,7 @@ int main()
 
 // @@Show@@
     // Find rows where age >= 20 && age <= 48 (age is column 1)
-    Query query = table->where().between(1, 20, 48);
+    Query query = table->where().between(1, (int64_t)20, (int64_t)48);
     TableView view = query.find_all();
 
     assert(view.size() == 2);

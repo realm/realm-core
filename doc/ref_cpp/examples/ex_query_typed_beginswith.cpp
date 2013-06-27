@@ -1,6 +1,7 @@
 // @@Example: ex_cpp_typed_query_startsWith @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_1(PeopleTable,
                 name,  String)

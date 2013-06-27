@@ -1,5 +1,6 @@
 // @@Example: ex_cpp_dyn_query_contains @@
 #include <tightdb.hpp>
+#include <assert.h>
 
 using namespace tightdb;
 using namespace std;
@@ -22,20 +23,20 @@ int main()
     table->set_string(0, 4, "Jo");
 
     // Find names (column 0) containing "ac", case sensitive
-    TableView view1 = table->where().contains(0, "ac").find_all();
+    TableView view1 = table->where().contains(0, StringData("ac")).find_all();
     assert(view1.size() == 1);
-    assert(!strcmp(view1.get_string(0, 0), "Jack"));
+    assert(!strcmp(view1.get_string(0, 0).data(), "Jack"));
 
     // Will find no names (column 0) because it's case sensitive
-    TableView view2 = table->where().contains(0, "AC").find_all();
+    TableView view2 = table->where().contains(0, StringData("AC")).find_all();
     assert(view2.size() == 0);
 
 #ifdef _MSC_VER
     // Case insensitive search only supported on Windows
-    TableView view3 = table->where().contains(0, "AC", false).find_all();
+    TableView view3 = table->where().contains(0, StringData("AC"), false).find_all();
 
     assert(view1.size() == 1);
-    assert(!strcmp(view1.get_string(0, 0), "Jack"));
+    assert(!strcmp(view1.get_string(0, 0), StringData("Jack")));
 #endif
 // @@EndShow@@
 }
