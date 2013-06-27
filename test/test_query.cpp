@@ -342,7 +342,7 @@ TEST(QueryTwoColsNoRows)
 TEST(TestQueryHuge)
 {
 #if TEST_DURATION == 0
-    for (int N = 0; N < 200; N++) {
+    for (int N = 0; N < 2; N++) {
 #elif TEST_DURATION == 1
     for (int N = 0; N < 100; N++) {
 #elif TEST_DURATION == 2

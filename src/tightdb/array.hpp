@@ -1843,33 +1843,6 @@ template <class cond, Action action, size_t bitwidth, class Callback>
 bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, 
                  Callback callback) const
 {
-#ifdef TIGHTDB_DEBUG
-    Array r_arr;
-    QueryState<int64_t> r_state;
-    Array *accu = reinterpret_cast<Array*>(state->m_state);
-    r_state.m_state = reinterpret_cast<int64_t>(&r_arr);
-
-    if (action == act_FindAll) {
-        for (size_t t = 0; t < accu->size(); t++)
-            r_arr.add(accu->Get(t));
-    }
-    else {
-        r_state.m_state = state->m_state;
-    }
-#endif
-    find_optimized<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-
-#ifdef TIGHTDB_DEBUG
-    if (action == act_Max || action == act_Min || action == act_Sum || action == act_Count || action == act_ReturnFirst || action == act_Count) {
-        find_reference<cond, action, bitwidth, Callback>(value, start, end, baseindex, &r_state, callback);
-        if (action == act_FindAll)
-            TIGHTDB_ASSERT(accu->Compare(r_arr));
-        else
-            TIGHTDB_ASSERT(state->m_state == r_state.m_state);
-    }
-    r_arr.Destroy();
-#endif
-
     return find_optimized<cond, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
 }
 
