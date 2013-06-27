@@ -39,7 +39,7 @@ int main()
 
 // @@Show@@
     // Find rows where age (column 1) < 48
-    Query query = table->where().less(1, (int64_t)48);
+    Query query = table->where().less(1, 48);
     size_t removed = query.remove();
 
     // 2 rows deleted

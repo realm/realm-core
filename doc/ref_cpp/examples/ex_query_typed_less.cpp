@@ -21,7 +21,7 @@ int main()
     PeopleTable::View view1 = table.where().age.less(20).find_all();
 // @@Fold@@
     assert(view1.size() == 1);
-    assert(!strcmp(view1[0].name.data(), "Mary"));
+    assert(view1[0].name == "Mary");
 }
 // @@Fold@@
 // @@EndExample@@

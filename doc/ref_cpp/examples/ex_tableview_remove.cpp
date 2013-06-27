@@ -19,11 +19,11 @@ int main()
 
     PeopleTable::View view = table.where().age.greater(18).find_all();
 
-    assert(!strcmp(view[1].name.data(), "Alice"));
+    assert(view[1].name == "Alice");
 
     view.remove(1);
 
-    assert(!strcmp(view[1].name.data(), "Jack"));
+    assert(view[1].name == "Jack");
     assert(table.size() == 3);
 // @@Fold@@
 }

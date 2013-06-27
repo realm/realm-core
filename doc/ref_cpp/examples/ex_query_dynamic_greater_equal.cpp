@@ -43,8 +43,8 @@ int main()
     TableView view = query.find_all();
 
     assert(view.size() == 2);
-    assert(!strcmp(view.get_string(0, 0).data(), "Bob"));
-    assert(!strcmp(view.get_string(0, 1).data(), "Peter"));
+    assert(view.get_string(0, 0) == "Bob");
+    assert(view.get_string(0, 1) == "Peter");
 // @@EndShow@@
 }
 // @@EndExample@@

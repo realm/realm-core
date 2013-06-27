@@ -1985,115 +1985,119 @@ void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t star
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
     QueryState<int64_t> state;
-    state.m_state = reinterpret_cast<int64_t>(&result);
+    state.init(act_FindAll, &result, static_cast<size_t>(-1));
+//    state.m_state = reinterpret_cast<int64_t>(&result);
 
     TIGHTDB_TEMPEX3(find, Equal, act_FindAll, m_width, (value, start, end, colOffset, &state, CallbackDummy()));
 
     return;
 }
 
-void Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state) const
+bool Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state) const
 {
     if (cond == cond_Equal) {
         if (action == act_Sum) {
-            TIGHTDB_TEMPEX3(find, Equal, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Equal, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
-            TIGHTDB_TEMPEX3(find, Equal, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Equal, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Max) {
-            TIGHTDB_TEMPEX3(find, Equal, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Equal, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Count) {
-            TIGHTDB_TEMPEX3(find, Equal, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Equal, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_FindAll) {
-            TIGHTDB_TEMPEX3(find, Equal, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Equal, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_CallbackIdx) {
-            TIGHTDB_TEMPEX3(find, Equal, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Equal, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
     }
     if (cond == cond_NotEqual) {
         if (action == act_Sum) {
-            TIGHTDB_TEMPEX3(find, NotEqual, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, NotEqual, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
-            TIGHTDB_TEMPEX3(find, NotEqual, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, NotEqual, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Max) {
-            TIGHTDB_TEMPEX3(find, NotEqual, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, NotEqual, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Count) {
-            TIGHTDB_TEMPEX3(find, NotEqual, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, NotEqual, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_FindAll) {
-            TIGHTDB_TEMPEX3(find, NotEqual, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, NotEqual, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_CallbackIdx) {
-            TIGHTDB_TEMPEX3(find, NotEqual, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, NotEqual, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
     }
     if (cond == cond_Greater) {
         if (action == act_Sum) {
-            TIGHTDB_TEMPEX3(find, Greater, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Greater, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
-            TIGHTDB_TEMPEX3(find, Greater, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Greater, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Max) {
-            TIGHTDB_TEMPEX3(find, Greater, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Greater, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Count) {
-            TIGHTDB_TEMPEX3(find, Greater, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Greater, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_FindAll) {
-            TIGHTDB_TEMPEX3(find, Greater, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Greater, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_CallbackIdx) {
-            TIGHTDB_TEMPEX3(find, Greater, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Greater, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
     }
     if (cond == cond_Less) {
         if (action == act_Sum) {
-            TIGHTDB_TEMPEX3(find, Less, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Less, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
-            TIGHTDB_TEMPEX3(find, Less, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Less, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Max) {
-            TIGHTDB_TEMPEX3(find, Less, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Less, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Count) {
-            TIGHTDB_TEMPEX3(find, Less, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Less, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_FindAll) {
-            TIGHTDB_TEMPEX3(find, Less, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Less, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_CallbackIdx) {
-            TIGHTDB_TEMPEX3(find, Less, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Less, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
     }
     if (cond == cond_None) {
         if (action == act_Sum) {
-            TIGHTDB_TEMPEX3(find, None, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, None, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
-            TIGHTDB_TEMPEX3(find, None, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, None, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Max) {
-            TIGHTDB_TEMPEX3(find, None, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, None, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Count) {
-            TIGHTDB_TEMPEX3(find, None, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, None, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_FindAll) {
-            TIGHTDB_TEMPEX3(find, None, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, None, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_CallbackIdx) {
-            TIGHTDB_TEMPEX3(find, None, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, None, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
     }
+    TIGHTDB_ASSERT(false);
+    return false;
+
 }
 
 
