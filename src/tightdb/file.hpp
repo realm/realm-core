@@ -26,10 +26,6 @@
 #include <string>
 #include <streambuf>
 
-#ifndef _WIN32
-#  include <sys/types.h>
-#endif
-
 #include <tightdb/config.h>
 #include <tightdb/assert.hpp>
 #include <tightdb/unique_ptr.hpp>
@@ -172,11 +168,8 @@ public:
     /// Calls write(data(), N).
     template<std::size_t N> void write(const char (&data)[N]) { write(data, N); }
 
-#ifdef _WIN32
-    typedef int64_t SizeType;
-#else // POSIX
-    typedef off_t SizeType;
-#endif
+    // Plays the same role as off_t in POSIX
+    typedef int_fast64_t SizeType;
 
     /// Calling this method on an instance that is not attached to an
     /// open file has undefined behavior.
