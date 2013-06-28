@@ -1483,8 +1483,7 @@ template <class cond2, Action action, size_t bitwidth, class Callback> bool Arra
         return Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
     }
 #else
-Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
-return;
+return Compare<cond2, action, bitwidth, Callback>(value, start, end, baseindex, state, callback);
 #endif
 }
 
