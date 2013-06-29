@@ -1227,9 +1227,6 @@ size_t Array::clone(const char* header, Allocator& alloc, Allocator& clone_alloc
     TIGHTDB_ASSERT(get_wtype_from_header(header) == wtype_Bits);
 
     Array array((Array::no_prealloc_tag()));
-    // FIXME: There should be no need to specify a 'ref' argument when
-    // calling CreateFromHeaderDirect(). See FIXME's in
-    // CreateFromHeaderDirect().
     array.CreateFromHeaderDirect(const_cast<char*>(header));
 
     // Create new empty array of refs
