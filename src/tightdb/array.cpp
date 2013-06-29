@@ -35,6 +35,25 @@ void Array::init_from_ref(size_t ref) TIGHTDB_NOEXCEPT
     CreateFromHeader(header, ref);
 }
 
+// FIXME: This is a very crude and error prone misuse of Array,
+// especially since its use is not isolated inside the array
+// class. There seems to be confusion about how to construct an array
+// to be used with this method. Somewhere (e.g. in
+// Column::find_first()) we use Array(Allocator&). In other places
+// (TableViewBase::aggregate()) we use Array(no_prealloc_tag). We must
+// at least document the rules governing the use of
+// CreateFromHeaderDirect().
+//
+// FIXME: If we want to keep this methid, we should formally define
+// what can be termed 'direct read-only' use of an Array instance, and
+// wat rules apply in this case. Currently Array::clone() just passes
+// zero for the 'ref' argument.
+//
+// FIXME: Assuming that this method is only used for what can be
+// termed 'direct read-only' use, the type of the header argument
+// should be changed to 'const char*', and a const_cast should be
+// added below. This would avoid the need for const_cast's in places
+// like Array::clone().
 void Array::CreateFromHeaderDirect(char* header, size_t ref) TIGHTDB_NOEXCEPT
 {
     // Parse header
@@ -1176,47 +1195,77 @@ size_t Array::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
     return total_bits / width;
 }
 
-void Array::Copy(const Array& a)
+size_t Array::clone(const char* header, Allocator& alloc, Allocator& clone_alloc)
 {
-    // Calculate size in bytes (plus a bit of matchcount room for expansion)
-    size_t len = CalcByteLen(a.m_len, a.m_width);
-    const size_t rest = (~len & 0x7)+1;
-    if (rest < 8) len += rest; // 64bit blocks
-    const size_t new_len = len + 64;
+    if (!get_hasrefs_from_header(header)) {
+        // This array has no subarrays, so we can make a byte-for-byte
+        // copy, which is more efficient.
 
-    // Create new copy of array
-    MemRef mref = m_alloc.Alloc(new_len); // Throws
-    const char* src_begin = get_header_from_data(a.m_data);
-    const char* src_end   = a.m_data + len;
-    char*       dst_begin = static_cast<char*>(mref.pointer);
-    copy(src_begin, src_end, dst_begin);
+        // Calculate size of new array in bytes
+        size_t size = get_byte_size_from_header(header);
+        // FIXME: Alexander, what is the reasoning behing this precise
+        // amount of extra capacity in the new array?
+        const size_t new_size = size + 64;
 
-    // Clear old contents
-    Destroy();
+        // Create the new array
+        MemRef mem_ref = clone_alloc.Alloc(new_size); // Throws
+        char* clone_header = static_cast<char*>(mem_ref.pointer);
 
-    // Update internal data
-    UpdateRef(mref.ref);
-    set_header_capacity(new_len); // uses m_data to find header, so m_data must be initialized correctly first
+        // Copy contents
+        const char* src_begin = header;
+        const char* src_end   = header + size;
+        char*       dst_begin = clone_header;
+        copy(src_begin, src_end, dst_begin);
 
-    // Copy sub-arrays as well
-    if (m_hasRefs) {
-        for (size_t i = 0; i < m_len; ++i) {
-            const size_t ref = GetAsRef(i);
+        // Update with correct capacity
+        set_header_capacity(new_size, clone_header);
 
-            // null-refs signify empty sub-trees
-            if (ref == 0) continue;
-
-            // all refs are 64bit aligned, so the lowest bits
-            // cannot be set. If they are it means that it should
-            // not be interpreted as a ref
-            if (ref & 0x1) continue;
-
-            const Array sub(ref, NULL, 0, a.m_alloc);
-            Array cp(m_alloc);
-            cp.SetParent(this, i);
-            cp.Copy(sub);
-        }
+        return mem_ref.ref;
     }
+
+    // Refs are integers, and integers arrays use wtype_Bits.
+    TIGHTDB_ASSERT(get_wtype_from_header(header) == wtype_Bits);
+
+    Array array((Array::no_prealloc_tag()));
+    // FIXME: There should be no need to specify a 'ref' argument when
+    // calling CreateFromHeaderDirect(). See FIXME's in
+    // CreateFromHeaderDirect().
+    array.CreateFromHeaderDirect(const_cast<char*>(header));
+
+    // Create new empty array of refs
+    MemRef mem_ref = clone_alloc.Alloc(initial_capacity); // Throws
+    char* clone_header = static_cast<char*>(mem_ref.pointer);
+    {
+        bool is_node = get_isnode_from_header(header);
+        bool has_refs = true;
+        WidthType width_type = wtype_Bits;
+        int width = 0;
+        size_t length = 0;
+        init_header(clone_header, is_node, has_refs, width_type, width, length, initial_capacity);
+    }
+
+    Array new_array(clone_alloc);
+    new_array.CreateFromHeader(clone_header, mem_ref.ref);
+
+    size_t n = array.size();
+    for (size_t i = 0; i < n; ++i) {
+        int64_t value = array.Get(i);
+
+        // Null-refs signify empty sub-trees. Also, all refs are
+        // 8-byte aligned, so the lowest bits cannot be set. If they
+        // are, it means that it should not be interpreted as a ref.
+        bool is_subarray = value != 0 && (value & 0x1) == 0;
+        if (is_subarray) {
+            size_t ref = value;
+            const char* subheader = static_cast<char*>(alloc.Translate(ref));
+            size_t new_ref = clone(subheader, alloc, clone_alloc);
+            value = new_ref;
+        }
+
+        new_array.add(value);
+    }
+
+    return mem_ref.ref;
 }
 
 void Array::CopyOnWrite()

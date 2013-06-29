@@ -113,7 +113,7 @@ void SlabAlloc::Free(size_t ref, const void* p)
 
     // Get size from segment
     const size_t size = isReadOnly ?
-        Array::get_alloc_size_from_header(static_cast<const char*>(p)) :
+        Array::get_byte_size_from_header(static_cast<const char*>(p)) :
         Array::get_capacity_from_header(static_cast<const char*>(p));
     const size_t refEnd = ref + size;
     bool isMerged = false;

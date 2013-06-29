@@ -740,9 +740,7 @@ size_t Table::clone_columns(Allocator& alloc) const
         }
         else {
             const Array& root = *col->get_root_array();
-            Array new_root(alloc);
-            new_root.Copy(root);
-            new_col_ref = new_root.GetRef();
+            new_col_ref = root.clone(alloc); // Throws
         }
         new_columns.add(new_col_ref);
     }
@@ -752,23 +750,12 @@ size_t Table::clone_columns(Allocator& alloc) const
 
 size_t Table::clone(Allocator& alloc) const
 {
-    if (m_top.IsValid()) {
-        Array new_top(alloc);
-        new_top.Copy(m_top);
-        return new_top.GetRef();
-    }
+    if (m_top.IsValid())
+        return m_top.clone(alloc); // Throws
 
-    Array new_top(Array::coldef_HasRefs, 0, 0, alloc);
-    {
-        Array new_spec(alloc);
-        new_spec.Copy(m_spec_set.m_specSet);
-        new_top.add(new_spec.GetRef());
-    }
-    {
-        Array new_columns(alloc);
-        new_columns.Copy(m_columns);
-        new_top.add(new_columns.GetRef());
-    }
+    Array new_top(Array::coldef_HasRefs, 0, 0, alloc); // Throws
+    new_top.add(m_spec_set.m_specSet.clone(alloc)); // Throws
+    new_top.add(m_columns.clone(alloc)); // Throws
     return new_top.GetRef();
 }
 
