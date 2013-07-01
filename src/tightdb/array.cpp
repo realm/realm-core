@@ -1203,12 +1203,9 @@ size_t Array::clone(const char* header, Allocator& alloc, Allocator& clone_alloc
 
         // Calculate size of new array in bytes
         size_t size = get_byte_size_from_header(header);
-        // FIXME: Alexander, what is the reasoning behing this precise
-        // amount of extra capacity in the new array?
-        const size_t new_size = size + 64;
 
         // Create the new array
-        MemRef mem_ref = clone_alloc.Alloc(new_size); // Throws
+        MemRef mem_ref = clone_alloc.Alloc(size); // Throws
         char* clone_header = static_cast<char*>(mem_ref.pointer);
 
         // Copy contents
@@ -1218,7 +1215,7 @@ size_t Array::clone(const char* header, Allocator& alloc, Allocator& clone_alloc
         copy(src_begin, src_end, dst_begin);
 
         // Update with correct capacity
-        set_header_capacity(new_size, clone_header);
+        set_header_capacity(size, clone_header);
 
         return mem_ref.ref;
     }
