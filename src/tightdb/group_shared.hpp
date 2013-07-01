@@ -35,7 +35,8 @@ class SharedGroup {
 public:
     enum DurabilityLevel {
         durability_Full,
-        durability_MemOnly
+        durability_MemOnly,
+        durability_Async
     };
 
     /// Equivalent to calling open(const std::string&, bool,
@@ -84,7 +85,7 @@ public:
     /// thrown. Note that InvalidDatabase is among these derived
     /// exception types.
     void open(const std::string& file, bool no_create = false,
-              DurabilityLevel dlevel=durability_Full);
+              DurabilityLevel dlevel=durability_Full, bool is_backend=false);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
@@ -188,6 +189,8 @@ private:
     // Must be called only by someone that has a lock on the write
     // mutex.
     void low_level_commit(std::size_t new_version);
+
+    void do_async_commits();
 
     friend class ReadTransaction;
     friend class WriteTransaction;
