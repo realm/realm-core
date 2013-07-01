@@ -257,12 +257,15 @@ TEST(Table_LowLevelCopy)
     Table table;
     table.add_column(type_Int, "i1");
     table.add_column(type_Int, "i2");
+    table.add_column(type_Int, "xxxxxxxxxxxxxxxxxxxxxxx");
 
     table.insert_int(0, 0, 10);
     table.insert_int(1, 0, 120);
+    table.insert_int(2, 0, 1230);
     table.insert_done();
     table.insert_int(0, 1, 12);
     table.insert_int(1, 1, 100);
+    table.insert_int(2, 1, 1300);
     table.insert_done();
 
 #ifdef TIGHTDB_DEBUG

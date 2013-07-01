@@ -473,8 +473,8 @@ private:
     std::size_t clone_columns(Allocator&) const;
 
     /// Construct a complete copy of this table (including its spec)
-    /// using the specified allocator and return just the ref to that
-    /// array.
+    /// using the specified allocator and return just the ref to the
+    /// new top array.
     std::size_t clone(Allocator&) const;
 
     // Experimental
