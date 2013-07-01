@@ -30,9 +30,7 @@ namespace tightdb {
 using std::size_t;
 
 
-/**
- * Common base class for TableView and ConstTableView.
- */
+/// Common base class for TableView and ConstTableView.
 class TableViewBase {
 public:
     bool is_empty() const TIGHTDB_NOEXCEPT { return m_refs.is_empty(); }
@@ -112,27 +110,17 @@ protected:
     Table* m_table;
     Array m_refs;
 
-    /**
-     * Construct null view (no memory allocated).
-     */
+    /// Construct null view (no memory allocated).
     TableViewBase(): m_table(0), m_refs(Allocator::get_default()) {}
 
-    /**
-     * Construct empty view, ready for addition of row indices.
-     */
+    /// Construct empty view, ready for addition of row indices.
     TableViewBase(Table* parent): m_table(parent) {}
 
-    /**
-     * Copy constructor.
-     */
-    TableViewBase(const TableViewBase& tv): m_table(tv.m_table)
-    {
-        m_refs.Copy(tv.m_refs);
-    }
+    /// Copy constructor.
+    TableViewBase(const TableViewBase& tv):
+        m_table(tv.m_table), m_refs(tv.m_refs, Allocator::get_default()) {}
 
-    /**
-     * Moving constructor.
-     */
+    /// Moving constructor.
     TableViewBase(TableViewBase*);
 
     ~TableViewBase() { m_refs.Destroy(); }
@@ -152,36 +140,34 @@ class ConstTableView;
 
 
 
-/**
- * A TableView gives read and write access to the parent table.
- *
- * A 'const TableView' cannot be changed (e.g. sorted), nor can the
- * parent table be modified through it.
- *
- * A TableView is both copyable and movable. Copying a TableView makes
- * a proper copy. Copying a temporary TableView is optimized away on
- * all modern compilers due to such things as 'return value
- * optimization'. Move semantics is accessed using the move()
- * function. For example, to efficiently return a non-temporary
- * TableView from a function, you would have to do something like
- * this:
- *
- * \code{.cpp}
- *
- *   tightdb::TableView func()
- *   {
- *      tightdb::TableView tv;
- *      return move(tv);
- *   }
- *
- * \endcode
- *
- * Note that move(tv) removes the contents from 'tv' and leaves it
- * truncated.
- *
- * FIXME: Add general documentation about move semantics, and refer to
- * it from here.
- */
+/// A TableView gives read and write access to the parent table.
+///
+/// A 'const TableView' cannot be changed (e.g. sorted), nor can the
+/// parent table be modified through it.
+///
+/// A TableView is both copyable and movable. Copying a TableView
+/// makes a proper copy. Copying a temporary TableView is optimized
+/// away on all modern compilers due to such things as 'return value
+/// optimization'. Move semantics is accessed using the move()
+/// function. For example, to efficiently return a non-temporary
+/// TableView from a function, you would have to do something like
+/// this:
+///
+/// \code{.cpp}
+///
+///   tightdb::TableView func()
+///   {
+///      tightdb::TableView tv;
+///      return move(tv);
+///   }
+///
+/// \endcode
+///
+/// Note that move(tv) removes the contents from 'tv' and leaves it
+/// truncated.
+///
+/// FIXME: Add general documentation about move semantics, and refer
+/// to it from here.
 class TableView: public TableViewBase {
 public:
     TableView() {}
@@ -245,18 +231,16 @@ private:
 
 
 
-/**
- * A ConstTableView gives read access to the parent table, but no
- * write access. The view itself, though, can be changed, for example,
- * it can be sorted.
- *
- * Note that methods are declared 'const' if, and only
- * if they leave the view unmodified, and this is irrespective of
- * whether they modify the parent table.
- *
- * A ConstTableView has both copy and move semantics. See TableView
- * for more on this.
- */
+/// A ConstTableView gives read access to the parent table, but no
+/// write access. The view itself, though, can be changed, for
+/// example, it can be sorted.
+///
+/// Note that methods are declared 'const' if, and only if they leave
+/// the view unmodified, and this is irrespective of whether they
+/// modify the parent table.
+///
+/// A ConstTableView has both copy and move semantics. See TableView
+/// for more on this.
 class ConstTableView: public TableViewBase {
 public:
     ConstTableView() {}
