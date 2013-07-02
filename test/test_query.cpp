@@ -78,11 +78,52 @@ TIGHTDB_TABLE_2(PeopleTable2,
 } // anonymous namespace
 
 
+TEST(MergeQueries)
+{
+    Table table;
+    table.add_column(type_Int, "first1");
+    table.add_column(type_Int, "second1");
+
+    table.add_empty_row(6);
+
+    table.set_int(0, 0, 15);
+    table.set_int(1, 0, 20);
+
+    table.set_int(0, 1, 15); //
+    table.set_int(1, 1, 25);
+
+    table.set_int(0, 2, 15);
+    table.set_int(1, 2, 66);
+
+    table.set_int(0, 3, 16); //
+    table.set_int(1, 3, 25);
+
+    table.set_int(0, 4, 17); //
+    table.set_int(1, 4, 25);
+
+    table.set_int(0, 5, 16); //
+    table.set_int(1, 5, 25);
+
+    tightdb::Query q1 = table.where().equal(1, 25);
+    tightdb::Query q2 = table.where().group().equal(0, 15).Or().equal(0, 16).end_group().AndQuery(q1);
+
+    tightdb::TableView tv = q2.find_all();
+    for(int i = 0; i < tv.size(); i++)        printf("%d\n", tv.get_source_ndx(i));
+
+    printf("\n");  
+
+    tv = q1.find_all();
+    for(int i = 0; i < tv.size(); i++)
+        printf("%d\n", tv.get_source_ndx(i));
+
+
+
+}
+
 TEST(CountLimit)
 {
     PeopleTable2 table;
 
-// @@EndFold@@
     table.add("Mary",  14);
     table.add("Joe",   17);
     table.add("Alice", 42);

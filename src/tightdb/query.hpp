@@ -157,6 +157,10 @@ public:
     void end_subtable();
     Query& Or();
 
+    Query& AndQuery(Query& q);
+
+
+
     // Searching
     size_t         find_next(size_t lastmatch=size_t(-1));
     TableView      find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
@@ -200,6 +204,8 @@ public:
 #ifdef TIGHTDB_DEBUG
     std::string Verify(); // Must be upper case to avoid conflict with macro in ObjC
 #endif
+   
+    mutable bool do_delete;
 
 protected:
     friend class Table;
@@ -244,7 +250,7 @@ protected:
     std::vector<ParentNode**> update_override;
     std::vector<ParentNode**> subtables;
     std::vector<ParentNode*> all_nodes;
-    mutable bool do_delete;
+
 
 private:
     template <class TColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);

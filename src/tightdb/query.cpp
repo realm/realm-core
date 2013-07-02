@@ -908,3 +908,20 @@ bool Query::comp(const pair<size_t, size_t>& a, const pair<size_t, size_t>& b)
 
 
 
+Query& Query::AndQuery(Query& q) 
+{
+
+    //first[0]->m_children.push_back(q.first[0]);
+/*
+    ParentNode* const p = new TwoColumnsNode<TColumnType, Equal>(column_ndx1, column_ndx2);
+    UpdatePointers(p, &p->m_child);
+    return *this;
+*/
+    q.do_delete = false;
+    ParentNode* const p = q.first[0];
+    UpdatePointers(p, &p->m_child);
+    
+
+
+    return *this;
+}
