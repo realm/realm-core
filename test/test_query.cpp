@@ -80,6 +80,31 @@ TIGHTDB_TABLE_2(PeopleTable2,
 
 TEST(MergeQueries)
 {
+    // test OR vs AND precedence
+    Table table;
+    table.add_column(type_Int, "first");
+    table.add_column(type_Int, "second");
+
+    table.add_empty_row(3);
+    table.set_int(0, 0, 10);
+    table.set_int(1, 0, 20);        
+
+    table.set_int(0, 1, 20);
+    table.set_int(1, 1, 30);        
+
+    table.set_int(0, 2, 30);
+    table.set_int(1, 2, 20);        
+
+    // Must evaluate as if AndQuery is inside paranthesis, that is, (first == 1 or first == 20) && second == 30
+    tightdb::Query q1_0 = table.where().equal(0, 10).Or().equal(0, 20);
+    tightdb::Query q2_0 = table.where().AndQuery(q1_0).equal(1, 30);
+
+    size_t c = q2_0.count();
+    CHECK_EQUAL(1, c);
+}
+
+TEST(MergeQueriesMonkey)
+{
     for(int iter = 0; iter < 5; iter++)
     {
         const size_t rows = 4000;
