@@ -80,42 +80,175 @@ TIGHTDB_TABLE_2(PeopleTable2,
 
 TEST(MergeQueries)
 {
-    Table table;
-    table.add_column(type_Int, "first1");
-    table.add_column(type_Int, "second1");
+    for(int iter = 0; iter < 5; iter++)
+    {
+        const size_t rows = 4000;
+        Table table;
+        table.add_column(type_Int, "first");
+        table.add_column(type_Int, "second");
+        table.add_column(type_Int, "third");
 
-    table.add_empty_row(6);
+        for(size_t r = 0; r < rows; r++) {
+            table.add_empty_row();
+            table.set_int(0, r, rand() % 3);
+            table.set_int(1, r, rand() % 3);        
+            table.set_int(2, r, rand() % 3);        
+        }
 
-    table.set_int(0, 0, 15);
-    table.set_int(1, 0, 20);
+        size_t tvpos;
 
-    table.set_int(0, 1, 15); //
-    table.set_int(1, 1, 25);
+        // AndQuery(second == 1)
+        tightdb::Query q1_0 = table.where().equal(1, 1);
+        tightdb::Query q2_0 = table.where().AndQuery(q1_0);
+        tightdb::TableView tv_0 = q2_0.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(1, r) == 1) {
+                CHECK_EQUAL(r, tv_0.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
 
-    table.set_int(0, 2, 15);
-    table.set_int(1, 2, 66);
+        // (first == 0 || first == 1) && AndQuery(second == 1)
+        tightdb::Query q1_1 = table.where().equal(1, 1);
+        tightdb::Query q2_1 = table.where().group().equal(0, 0).Or().equal(0, 1).end_group().AndQuery(q1_1);
+        tightdb::TableView tv_1 = q2_1.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
+                CHECK_EQUAL(r, tv_1.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
 
-    table.set_int(0, 3, 16); //
-    table.set_int(1, 3, 25);
+        // first == 0 || (first == 1 && AndQuery(second == 1)) 
+        tightdb::Query q1_2 = table.where().equal(1, 1);
+        tightdb::Query q2_2 = table.where().equal(0, 0).Or().equal(0, 1).AndQuery(q1_2);
+        tightdb::TableView tv_2 = q2_2.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
+                CHECK_EQUAL(r, tv_2.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
 
-    table.set_int(0, 4, 17); //
-    table.set_int(1, 4, 25);
+        // AndQuery(first == 0) || (first == 1 && second == 1) 
+        tightdb::Query q1_3 = table.where().equal(0, 0);
+        tightdb::Query q2_3 = table.where().AndQuery(q1_3).Or().equal(0, 1).equal(1, 1);
+        tightdb::TableView tv_3 = q2_3.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
+                CHECK_EQUAL(r, tv_3.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
 
-    table.set_int(0, 5, 16); //
-    table.set_int(1, 5, 25);
 
-    tightdb::Query q1 = table.where().equal(1, 25);
-    tightdb::Query q2 = table.where().group().equal(0, 15).Or().equal(0, 16).end_group().AndQuery(q1);
+        // first == 0 || AndQuery(first == 1 && second == 1) 
+        tightdb::Query q2_4 = table.where().equal(0, 1).equal(1, 1);
+        tightdb::Query q1_4 = table.where().equal(0, 0).Or().AndQuery(q2_4);
+        tightdb::TableView tv_4 = q1_4.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
+                CHECK_EQUAL(r, tv_4.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
 
-    tightdb::TableView tv = q2.find_all();
-    for(int i = 0; i < tv.size(); i++)        printf("%d\n", tv.get_source_ndx(i));
 
-    printf("\n");  
+        // AndQuery(first == 0 || first == 2) || AndQuery(first == 1 && second == 1) 
+        tightdb::Query q2_5 = table.where().equal(0, 0).Or().equal(0, 2);
+        tightdb::Query q1_5 = table.where().equal(0, 1).equal(1, 1);
+        tightdb::Query q3_5 = table.where().AndQuery(q2_5).Or().AndQuery(q1_5);
+        tightdb::TableView tv_5 = q3_5.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
+                CHECK_EQUAL(r, tv_5.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
 
-    tv = q1.find_all();
-    for(int i = 0; i < tv.size(); i++)
-        printf("%d\n", tv.get_source_ndx(i));
 
+        // AndQuery(first == 0) && AndQuery(second == 1)
+        tightdb::Query q1_6 = table.where().equal(0, 0);
+        tightdb::Query q2_6 = table.where().equal(1, 1);
+        tightdb::Query q3_6 = table.where().AndQuery(q1_6).AndQuery(q2_6);
+        tightdb::TableView tv_6 = q3_6.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(0, r) == 0 && table.get_int(1, r) == 1) {
+                CHECK_EQUAL(r, tv_6.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+
+        // AndQuery(first == 0 || first == 2) && AndQuery(first == 1 || second == 1) 
+        tightdb::Query q2_7 = table.where().equal(0, 0).Or().equal(0, 2);
+        tightdb::Query q1_7 = table.where().equal(0, 1).equal(0, 1).Or().equal(1, 1);
+        tightdb::Query q3_7 = table.where().AndQuery(q2_7).AndQuery(q1_7);
+        tightdb::TableView tv_7 = q3_7.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) && (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
+                CHECK_EQUAL(r, tv_7.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+
+        // Nested AndQuery
+
+        // second == 0 && AndQuery(first == 0 || AndQuery(first == 2))
+        tightdb::Query q2_8 = table.where().equal(0, 2);
+        tightdb::Query q3_8 = table.where().equal(0, 0).Or().AndQuery(q2_8);
+        tightdb::Query q4_8 = table.where().equal(1, 0).AndQuery(q3_8);    
+        tightdb::TableView tv_8 = q4_8.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(1, r) == 0 && ((table.get_int(0, r) == 0) || table.get_int(0, r) == 2)) {
+                CHECK_EQUAL(r, tv_8.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+
+
+        // Nested as above but constructed differently
+
+        // second == 0 && AndQuery(first == 0 || AndQuery(first == 2))
+        tightdb::Query q2_9 = table.where().equal(0, 2);
+        tightdb::Query q5_9 = table.where().equal(0, 0);
+        tightdb::Query q3_9 = table.where().AndQuery(q5_9).Or().AndQuery(q2_9);
+        tightdb::Query q4_9 = table.where().equal(1, 0).AndQuery(q3_9);    
+        tightdb::TableView tv_9 = q4_9.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(1, r) == 0 && ((table.get_int(0, r) == 0) || table.get_int(0, r) == 2)) {
+                CHECK_EQUAL(r, tv_9.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+   
+
+        // Nested
+
+        // AndQuery(AndQuery(AndQuery(first == 0)))
+        tightdb::Query q2_10 = table.where().equal(0, 0);
+        tightdb::Query q5_10 = table.where().AndQuery(q2_10);
+        tightdb::Query q3_10 = table.where().AndQuery(q5_10);
+        tightdb::Query q4_10 = table.where().AndQuery(q3_10);    
+        tightdb::TableView tv_10 = q4_10.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(0, r) == 0) {
+                CHECK_EQUAL(r, tv_10.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+
+    }
 
 
 }

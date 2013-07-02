@@ -50,6 +50,7 @@ Query::Query(const Query& copy)
     do_delete = true;
 }
 
+
 Query::~Query()
 {
 #if TIGHTDB_MULTITHREAD_QUERY
@@ -60,7 +61,9 @@ Query::~Query()
     if (do_delete) {
         for (size_t t = 0; t < all_nodes.size(); t++) {
             ParentNode *p = all_nodes[t];
-            delete p;
+            std::vector<ParentNode *>::iterator it = std::find(all_nodes.begin(), all_nodes.begin() + t, p);
+            if(it == all_nodes.begin() + t)
+                delete p;
         }
     }
 }
@@ -910,18 +913,14 @@ bool Query::comp(const pair<size_t, size_t>& a, const pair<size_t, size_t>& b)
 
 Query& Query::AndQuery(Query& q) 
 {
-
-    //first[0]->m_children.push_back(q.first[0]);
-/*
-    ParentNode* const p = new TwoColumnsNode<TColumnType, Equal>(column_ndx1, column_ndx2);
-    UpdatePointers(p, &p->m_child);
-    return *this;
-*/
-    q.do_delete = false;
     ParentNode* const p = q.first[0];
     UpdatePointers(p, &p->m_child);
-    
 
+    // The query on which AddQuery() was called is now responsible for destruction of query given as argument. do_delete
+    // indicates not to do cleanup in deconstructor, and all_nodes contains a list of all objects to be deleted. So
+    // take all objects of argument and copy to this node's all_nodes list.
+    q.do_delete = false;
+    all_nodes.insert( all_nodes.end(), q.all_nodes.begin(), q.all_nodes.end() );
 
     return *this;
 }
