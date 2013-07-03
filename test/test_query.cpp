@@ -409,7 +409,7 @@ TEST(MergeQueriesMonkeyOverloads)
         tightdb::Query q1_3 = table.where().equal(0, 0);
         tightdb::Query q2_3 = table.where().equal(0, 1);
         tightdb::Query q3_3 = table.where().equal(1, 1);
-        tightdb::Query q4_3 = q1_3 || q2_3 && q3_3; 
+        tightdb::Query q4_3 = q1_3 || (q2_3 && q3_3); 
         tightdb::TableView tv_3 = q4_3.find_all();    
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
@@ -423,7 +423,7 @@ TEST(MergeQueriesMonkeyOverloads)
         // and_query(first == 0) || (first == 1 && second == 1) written in another way
         tightdb::Query q1_30 = table.where().equal(0, 0);
         tightdb::Query q3_30 = table.where().equal(1, 1);
-        tightdb::Query q4_30 = table.where().equal(0, 0) || table.where().equal(0, 1) && q3_30; 
+        tightdb::Query q4_30 = table.where().equal(0, 0) || (table.where().equal(0, 1) && q3_30); 
         tightdb::TableView tv_30 = q4_30.find_all();    
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {

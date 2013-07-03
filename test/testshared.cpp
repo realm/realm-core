@@ -1,4 +1,3 @@
-#if 0
 #include <pthread.h>
 
 #include <UnitTest++.h>
@@ -876,4 +875,3 @@ TEST(StringIndex_Bug)
         }
     }
 }
-#endif

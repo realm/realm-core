@@ -158,8 +158,8 @@ public:
     Query& Or();
 
     Query& and_query(Query& q);
-    Query operator||(Query& q); 
-    Query operator&&(Query& q); 
+    Query operator||(Query q); 
+    Query operator&&(Query q); 
 
 
 

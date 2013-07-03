@@ -909,11 +909,11 @@ bool Query::comp(const pair<size_t, size_t>& a, const pair<size_t, size_t>& b)
     return a.first < b.first;
 }
 
-/*********************************************************************************************************************
- *
- * Stuff related to next-generation query syntax
- *
-/*********************************************************************************************************************/
+/* ********************************************************************************************************************
+*
+*  Stuff related to next-generation query syntax
+*
+******************************************************************************************************************** */
 
 Query& Query::and_query(Query& q) 
 {
@@ -930,7 +930,7 @@ Query& Query::and_query(Query& q)
 }
 
 
-Query Query::operator||(Query& q)
+Query Query::operator||(Query q)
 {
     Query q2(*this->m_table);
     q2.and_query(*this);
@@ -941,7 +941,7 @@ Query Query::operator||(Query& q)
 }
  
 
-Query Query::operator&&(Query& q)
+Query Query::operator&&(Query q)
 {
     if(first[0] == NULL)
         return q;

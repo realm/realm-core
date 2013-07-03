@@ -333,8 +333,6 @@ public:
 
     Query& Or() { m_impl.Or(); return *this; }
 
-    Query& AndQuery(Query& q) { m_impl.AndQuery(q); return *this; }
-
     std::size_t find_next(std::size_t lastmatch=std::size_t(-1))
     {
         return m_impl.find_next(lastmatch);

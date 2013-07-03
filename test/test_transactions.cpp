@@ -1,4 +1,3 @@
-#if 0
 
 #include <cstdio>
 #include <vector>
@@ -550,5 +549,3 @@ TEST(Transactions)
     }
     // End of read transaction
 }
-
-#endif
