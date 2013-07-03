@@ -259,10 +259,12 @@ CATEGORIES :
         DESCR  : *g_dyn_query_column_index_descr
       - NAME   : from
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : Lowest value of range (inclusive).
+        DESCR  : &g_dyn_query_between_parm1_descr
+                 Lowest value of range (inclusive).
       - NAME   : to
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : Highest value of range (inclusive).
+        DESCR  : &g_dyn_query_between_parm2_descr
+                 Highest value of range (inclusive)
       RETURN:
         TYPES  : Query&
         DESCR  : *g_dyn_query_return_query_object_descr
@@ -453,13 +455,16 @@ CATEGORIES :
       PARAMS:
       - NAME   : start
         TYPES  : size_t
-        DESCR  : "Row to begin search. Default: 0."
+        DESCR  : &g_dyn_query_find_all_parm1_descr
+                 "Row to begin search. Default: 0."
       - NAME   : end
         TYPES  : size_t
-        DESCR  : "Row to stop search. Default: -1 (infinity)."
+        DESCR  : &g_dyn_query_find_all_parm2_descr
+                 "Row to stop search. Default: -1 (infinity)."
       - NAME   : limit
         TYPES  : size_t
-        DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
+        DESCR  : &g_dyn_query_find_all_parm3_descr
+                 "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : [TableView, ConstTableView]
         DESCR  : &g_dyn_query_find_all_return_desc
@@ -478,7 +483,8 @@ CATEGORIES :
       PARAMS:
       - NAME   : lastmatch
         TYPES  : size_t
-        DESCR  : "Row to stop search. Default: -1 (infinity)."
+        DESCR  : &g_dyn_query_find_next_parm1_descr
+                 "Row to stop search. Default: -1 (infinity)."
       RETURN:
         TYPES  : size_t
         DESCR  : &g_dyn_query_find_next
@@ -500,16 +506,20 @@ CATEGORIES :
         TYPES  : size_t
       - NAME   : start
         TYPES  : size_t
-        DESCR  : "Row to begin search. Default: 0."
+        DESCR  : &g_dyn_query_count_parm2_descr
+                 "Row to begin search. Default: 0."
       - NAME   : end
         TYPES  : size_t
-        DESCR  : "Row to stop search. Default: -1 (infinity)."
+        DESCR  : &g_dyn_query_count_parm3_descr
+                 "Row to stop search. Default: -1 (infinity)."
       - NAME   : limit
         TYPES  : size_t
-        DESCR  : "Maximum number of rows to count. Default: -1 (infinity)."
+        DESCR  : &g_dyn_query_count_parm4_descr
+                 "Maximum number of rows to count. Default: -1 (infinity)."
       RETURN:
         TYPES  : size_t
-        DESCR  : The number of matching rows.
+        DESCR  : &g_dyn_query_count_return_descr
+                 The number of matching rows.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_size
@@ -533,7 +543,8 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to remove. Default: -1 (infinity)."
       RETURN:
         TYPES  : size_t
-        DESCR  : The number of rows removed.
+        DESCR  : &g_dyn_query_remove_return_descr
+                 The number of rows removed.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_remove
@@ -577,7 +588,8 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : [int64_t, float, double]
-        DESCR  : The sum.
+        DESCR  : &g_dyn_query_sum_return_descr
+                 The sum.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_sum
@@ -601,7 +613,7 @@ CATEGORIES :
                  Date    maximum_date(..parameters as above..)
       PARAMS:
       - NAME   : column_ndx
-        DESCR  : &g_dyn_query_maximum_parm1
+        DESCR  : &g_dyn_query_maximum_parm1_descr
                  Column index. The datatype of the column must match the function called. E.g. <code>maximum_float()</code> can only be used on columns which contains floats.
         TYPES  : size_t
       - NAME   : resultcount
@@ -618,7 +630,8 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to search. Default: -1 (infinity)."
       RETURN:
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : The highest value.
+        DESCR  : &g_dyn_query_maximum_return_descr
+                 The highest value.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_maximum
@@ -658,7 +671,8 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : The lowest value.
+        DESCR  : &g_dyn_query_minimum_return_descr
+                 The lowest value.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_minimum
@@ -700,7 +714,8 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : double
-        DESCR  : The average.
+        DESCR  : &g_dyn_query_average_return_descr
+                 The average.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_average

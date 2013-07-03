@@ -161,6 +161,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_get_source_ndx
         DESCR  :
+
   - g_dyn_view_remove_row:
       NAME     : remove
       SUMMARY  : *g_dyn_table_remove_row_summary
@@ -174,6 +175,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_remove
         DESCR  :
+
   - g_dyn_view_remove_last_row:
       NAME     : remove_last
       SUMMARY  : *g_dyn_table_remove_last_row_summary
