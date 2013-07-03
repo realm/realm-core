@@ -1,3 +1,5 @@
+#if 0
+
 #include <cstdio>
 #include <vector>
 #include <sstream>
@@ -376,6 +378,7 @@ void thread(int index, string database_path)
         SharedGroup db(database_path);
         round(db, index);
     }
+    pthread_exit(NULL);
 }
 
 
@@ -547,3 +550,5 @@ TEST(Transactions)
     }
     // End of read transaction
 }
+
+#endif

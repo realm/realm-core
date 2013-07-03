@@ -909,9 +909,13 @@ bool Query::comp(const pair<size_t, size_t>& a, const pair<size_t, size_t>& b)
     return a.first < b.first;
 }
 
+/*********************************************************************************************************************
+ *
+ * Stuff related to next-generation query syntax
+ *
+/*********************************************************************************************************************/
 
-
-Query& Query::AndQuery(Query& q) 
+Query& Query::and_query(Query& q) 
 {
     ParentNode* const p = q.first[0];
     UpdatePointers(p, &p->m_child);
@@ -924,3 +928,31 @@ Query& Query::AndQuery(Query& q)
 
     return *this;
 }
+
+
+Query Query::operator||(Query& q)
+{
+    Query q2(*this->m_table);
+    q2.and_query(*this);
+    q2.Or();
+    q2.and_query(q);
+
+    return q2;
+}
+ 
+
+Query Query::operator&&(Query& q)
+{
+    if(first[0] == NULL)
+        return q;
+
+    if(q.first[0] == NULL)
+        return (*this);
+
+    Query q2(*this->m_table);
+    q2.and_query(*this);
+    q2.and_query(q);
+
+    return q2;
+}
+ 

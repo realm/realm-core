@@ -157,7 +157,9 @@ public:
     void end_subtable();
     Query& Or();
 
-    Query& AndQuery(Query& q);
+    Query& and_query(Query& q);
+    Query operator||(Query& q); 
+    Query operator&&(Query& q); 
 
 
 
