@@ -34,7 +34,7 @@ each of our major platforms:
     sudo apt-get install libunittest++-dev
     sudo apt-get install libproc-dev
 
-### Ubuntu 13.04
+### Ubuntu 13.04, Linux Mint 15
 
     sudo apt-get install build-essential
     sudo apt-get install python-cheetah
