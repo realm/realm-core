@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <cstdio>
+#include <stdlib.h>
 
 using namespace tightdb;
 using namespace std;
@@ -30,6 +31,7 @@ void usage(void) {
     cout << "  -n : rows between print outs" << endl;
     cout << "  -g : use group (default: no)" << endl;
     cout << "  -r : rows/commit (default: 1)" << endl;
+    cout << "  -R : insert at random position (only useful with -i)" << endl;
     exit(-1);
 }
 
@@ -44,15 +46,19 @@ int main(int argc, char *argv[]) {
     int c;
     extern char *optarg;
 
-    bool use_shared = false;
+    bool use_shared    = false;
     SharedGroup::DurabilityLevel dlevel;
-    bool do_insert  = false;
-    bool use_group  = false;
+    bool do_insert     = false;
+    bool use_group     = false;
+    bool random_insert = false;
 
-    while ((c = getopt(argc, argv, "hs:iN:n:r:g")) != EOF) {
+    while ((c = getopt(argc, argv, "hs:iN:n:r:gR")) != EOF) {
         switch (c) {
             case 'h':
                 usage();
+                break;
+            case 'R':
+                random_insert = true;
                 break;
             case 's':
                 use_shared = true;
@@ -114,7 +120,12 @@ int main(int argc, char *argv[]) {
     cout << "#  output frequency  : " << n << endl;
     cout << "#  mode              : " << m << endl;
     if (do_insert) {
-        cout << "# do inserts" << endl;
+        cout << "#  do inserts" << endl;
+        cout << "#  random insert     : " << random_insert << endl;
+    }
+
+    if (random_insert) {  // initialize RNG
+        srandom(0);
     }
 
     File::try_remove("test.tightdb");
@@ -153,7 +164,11 @@ int main(int argc, char *argv[]) {
                 {
                     for(size_t j=0; j<rows_per_commit; ++j) {
                         if (do_insert) {
-                            t1->insert(0, N, "Hello", i%2, "World", "Smurf");
+                            size_t k = 0;
+                            if (random_insert && t1->size() > 0) {
+                                k = size_t(random() % t1->size());
+                            }
+                            t1->insert(k, N, "Hello", i%2, "World", "Smurf");
                         }
                         else {
                             t1->add(N, "Hello", i%2, "World", "Smurf");
@@ -167,7 +182,11 @@ int main(int argc, char *argv[]) {
                 BasicTableRef<TestTable> t1 = g.get_table<TestTable>("test");
                 for(size_t j=0; j<rows_per_commit; ++j) {
                     if (do_insert) {
-                        t1->insert(0, N, "Hello", i%2, "World", "Smurf");
+                        size_t k = 0;
+                        if (random_insert && t1->size() > 0) {
+                            k = size_t(random() % t1->size());
+                        }
+                        t1->insert(k, N, "Hello", i%2, "World", "Smurf");
                     }
                     else {
                         t1->add(N, "Hello", i%2, "World", "Smurf");
@@ -189,7 +208,11 @@ int main(int argc, char *argv[]) {
             case USE_TABLE:
                 for(size_t j=0; j<rows_per_commit; ++j) {
                     if (do_insert) {
-                        t.insert(0, N, "Hello", i%2, "World", "Smurf");
+                        size_t k = 0;
+                        if (random_insert && t.size() > 0) {
+                            k = size_t(random() % t.size());
+                        }
+                        t.insert(k, N, "Hello", i%2, "World", "Smurf");
                     }
                     else {
                         t.add(N, "Hello", i%2, "World", "Smurf");
