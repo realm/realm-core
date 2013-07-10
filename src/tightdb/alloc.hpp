@@ -20,7 +20,12 @@
 #ifndef TIGHTDB_ALLOC_HPP
 #define TIGHTDB_ALLOC_HPP
 
+#include <stdint.h>
 #include <cstddef>
+
+#include <tightdb/config.h>
+#include <tightdb/assert.hpp>
+#include <tightdb/safe_int_ops.hpp>
 
 namespace tightdb {
 
@@ -28,11 +33,20 @@ namespace tightdb {
 class Replication;
 #endif
 
+typedef std::size_t ref_type;
+
+inline ref_type to_ref(int64_t v) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!int_cast_has_overflow<ref_type>(v));
+    // FIXME: Must also check that v is divisible by 8 (64-bit aligned).
+    return ref_type(v);
+}
+
 struct MemRef {
     MemRef(): pointer(0), ref(0) {}
-    MemRef(void* p, std::size_t r): pointer(p), ref(r) {}
+    MemRef(void* p, ref_type r): pointer(p), ref(r) {}
     void* pointer;
-    std::size_t ref;
+    ref_type ref;
 };
 
 // FIXME: Casting a pointer to std::size_t is inherently nonportable
@@ -57,8 +71,8 @@ public:
     // FIXME: SlabAlloc::Free() should be modified such than this method never throws.
     virtual void Free(std::size_t, const void* addr);
 
-    virtual void* Translate(std::size_t ref) const TIGHTDB_NOEXCEPT;
-    virtual bool IsReadOnly(std::size_t) const TIGHTDB_NOEXCEPT;
+    virtual void* Translate(ref_type ref) const TIGHTDB_NOEXCEPT;
+    virtual bool IsReadOnly(ref_type) const TIGHTDB_NOEXCEPT;
 
     static Allocator& get_default() TIGHTDB_NOEXCEPT;
 
