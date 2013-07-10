@@ -122,6 +122,7 @@ int main(int argc, char *argv[]) {
     File::try_remove("gtest.tightdb");
 
     SharedGroup sg = SharedGroup("test.tightdb", false, dlevel);
+    Group g("gtest.tightdb", Group::mode_ReadWrite);
 
     switch (m) {
         case USE_SHARED:
@@ -132,8 +133,14 @@ int main(int argc, char *argv[]) {
             }
             break;
         case USE_GROUP:
-            Group g("gtest.tightdb");
             BasicTableRef<TestTable> t = g.get_table<TestTable>("test");
+            try {
+                g.commit();
+            }
+            catch (std::runtime_error& e) {
+                cerr << "Cannot create table: " << e.what() << endl;
+                exit(-1);
+            }
             break;
     }
 
@@ -157,21 +164,26 @@ int main(int argc, char *argv[]) {
                 break;
             }
             case USE_GROUP: {
-                {
-                    Group g("gtest.tightdb");
-                    BasicTableRef<TestTable> t1 = g.get_table<TestTable>("test");
-                    for(size_t j=0; j<rows_per_commit; ++j) {
-                        if (do_insert) {
-                            t1->insert(0, N, "Hello", i%2, "World", "Smurf");
-                        }
-                        else {
-                            t1->add(N, "Hello", i%2, "World", "Smurf");
-                        }
+                BasicTableRef<TestTable> t1 = g.get_table<TestTable>("test");
+                for(size_t j=0; j<rows_per_commit; ++j) {
+                    if (do_insert) {
+                        t1->insert(0, N, "Hello", i%2, "World", "Smurf");
                     }
-                    File::try_remove("tmp.tightdb");
-                    g.write("tmp.tightdb");
+                    else {
+                        t1->add(N, "Hello", i%2, "World", "Smurf");
+                    }
                 }
-                rename("tmp.tightdb", "gtest.tightdb");
+                try {
+                    g.commit();
+                }
+                catch (File::PermissionDenied& e) {
+                    cerr << "commit (permission denied): " << e.what() << endl;
+                    exit(-1);
+                }
+                catch (std::runtime_error& e) {
+                    cerr << "commit (runtime error): " << e.what() << endl;
+                    exit(-1);
+                }
                 break;
             }
             case USE_TABLE:
