@@ -449,8 +449,9 @@ void Array::Adjust(size_t start, int64_t diff)
 {
     TIGHTDB_ASSERT(start <= m_len);
 
-    for (size_t i = start; i < m_len; ++i) {
-        const int64_t v = Get(i);
+    size_t n = m_len;
+    for (size_t i = start; i < n; ++i) {
+        int64_t v = Get(i);
         Set(i, v + diff);
     }
 }
@@ -1929,12 +1930,15 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) TIGHTDB_NO
 //
 // It may be worth considering if overall efficiency can be improved
 // by doing a linear search for short sequences.
-template<int width> inline size_t lower_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
+template<int width>
+inline size_t lower_bound(const char* offsets_header, int64_t value) TIGHTDB_NOEXCEPT
 {
-    const char* data = tightdb::Array::get_data_from_header(header);
+    using namespace tightdb;
+
+    const char* data = Array::get_data_from_header(offsets_header);
 
     size_t i = 0;
-    size_t size = tightdb::Array::get_len_from_header(header);
+    size_t size = Array::get_len_from_header(offsets_header);
 
     while (0 < size) {
         size_t half = size / 2;
@@ -1952,12 +1956,15 @@ template<int width> inline size_t lower_bound(const char* header, int64_t value)
 }
 
 // See lower_bound()
-template<int width> inline size_t upper_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
+template<int width>
+inline size_t upper_bound(const char* offsets_header, int64_t value) TIGHTDB_NOEXCEPT
 {
-    const char* data = tightdb::Array::get_data_from_header(header);
+    using namespace tightdb;
+
+    const char* data = Array::get_data_from_header(offsets_header);
 
     size_t i = 0;
-    size_t size = tightdb::Array::get_len_from_header(header);
+    size_t size = Array::get_len_from_header(offsets_header);
 
     while (0 < size) {
         size_t half = size / 2;
@@ -1974,16 +1981,21 @@ template<int width> inline size_t upper_bound(const char* header, int64_t value)
     return i;
 }
 
-// Find the child that contains the specified local tree index.
-// Returns (child_ndx, local_tree_offset) where 'local_tree_offset' is
-// the local tree index offset of the located child.
+// Find the index of the child node that contains the specified
+// element index. Element index zero corresponds to the first element
+// of the first leaf node contained in the subtree corresponding with
+// the specified 'offsets' array.
+//
+// Returns (child_ndx, elem_ndx_offset) where 'elem_ndx_offset' is the
+// element index of the first element of the identified child.
 template<int width> inline pair<size_t, size_t>
-find_child_offset(const char* header, size_t local_ndx) TIGHTDB_NOEXCEPT
+find_child_offset(const char* offsets_header, size_t elem_ndx) TIGHTDB_NOEXCEPT
 {
-    size_t child_ndx = upper_bound<width>(header, local_ndx);
-    size_t local_tree_offset = child_ndx == 0 ? 0 :
-        tightdb::to_ref(get_direct<width>(tightdb::Array::get_data_from_header(header), child_ndx-1));
-    return make_pair(child_ndx, local_tree_offset);
+    using namespace tightdb;
+    size_t child_ndx = upper_bound<width>(offsets_header, elem_ndx);
+    size_t elem_ndx_offset = child_ndx == 0 ? 0 :
+        to_size_t(get_direct<width>(Array::get_data_from_header(offsets_header), child_ndx-1));
+    return make_pair(child_ndx, elem_ndx_offset);
 }
 
 
@@ -2736,9 +2748,9 @@ pair<const char*, size_t> Array::find_leaf(const Array* root, size_t i) TIGHTDB_
         int width = get_width_from_header(header);
         pair<size_t, size_t> p;
         TIGHTDB_TEMPEX(p = find_child_offset, width, (header, i));
-        size_t child_ndx         = p.first;
-        size_t local_tree_offset = p.second;
-        i -= local_tree_offset; // local index
+        size_t child_ndx       = p.first;
+        size_t elem_ndx_offset = p.second;
+        i -= elem_ndx_offset; // local index
 
         header = static_cast<char*>(root->m_alloc.Translate(refs_ref));
         width = get_width_from_header(header);
@@ -2766,9 +2778,9 @@ pair<size_t, size_t> Array::find_leaf_ref(const Array* root, size_t i) TIGHTDB_N
         int width = get_width_from_header(header);
         pair<size_t, size_t> p;
         TIGHTDB_TEMPEX(p = find_child_offset, width, (header, i));
-        size_t child_ndx         = p.first;
-        size_t local_tree_offset = p.second;
-        i -= local_tree_offset; // local index
+        size_t child_ndx       = p.first;
+        size_t elem_ndx_offset = p.second;
+        i -= elem_ndx_offset; // local index
 
         header = static_cast<char*>(root->m_alloc.Translate(refs_ref));
         width = get_width_from_header(header);

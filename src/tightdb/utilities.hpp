@@ -30,6 +30,7 @@
 #endif
 
 #include <tightdb/assert.hpp>
+#include <tightdb/safe_int_ops.hpp>
 
 #if defined(__GNUC__)
     #define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
@@ -132,22 +133,15 @@ int fast_popcount64(int64_t x);
 
 inline std::size_t to_ref(int64_t v) TIGHTDB_NOEXCEPT
 {
-#ifdef TIGHTDB_DEBUG
-    uint64_t m = std::size_t(-1);
-    TIGHTDB_ASSERT(uint64_t(v) <= m);
+    TIGHTDB_ASSERT(!int_cast_has_overflow<std::size_t>(v));
     // FIXME: Must also check that v is divisible by 8 (64-bit aligned).
-#endif
     return std::size_t(v);
 }
 
 // Safe cast from 64 to 32 bits on 32 bit architecture. Differs from to_ref() by not testing alignment and REF-bitflag.
 inline std::size_t to_size_t(int64_t v) TIGHTDB_NOEXCEPT
 {
-#ifdef TIGHTDB_DEBUG
-    uint64_t m = std::size_t(-1);
-    TIGHTDB_ASSERT(uint64_t(v) <= m);
-    // FIXME: Should probably be TIGHTDB_ASSERT(0 <= v && uint64_t(v) <= numeric_limits<size_t>::max());
-#endif
+    TIGHTDB_ASSERT(!int_cast_has_overflow<std::size_t>(v));
     return std::size_t(v);
 }
 

@@ -305,9 +305,7 @@ public:
     void SetAllToZero();
     void Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);
     void IncrementIf(int64_t limit, int64_t value);
-    template <size_t w> void Adjust(size_t start, int64_t diff);
     void Adjust(size_t start, int64_t diff);
-    template <size_t w> bool Increment(int64_t value, size_t start, size_t end);
 
     size_t FindPos(int64_t value) const TIGHTDB_NOEXCEPT;
     size_t FindPos2(int64_t value) const TIGHTDB_NOEXCEPT;
