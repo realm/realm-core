@@ -477,10 +477,6 @@ private:
     /// new top array.
     std::size_t clone(Allocator&) const;
 
-    // Experimental
-    TableView find_all_hamming(size_t column_ndx, uint64_t value, size_t max);
-    ConstTableView find_all_hamming(size_t column_ndx, uint64_t value, size_t max) const;
-
 #ifdef TIGHTDB_ENABLE_REPLICATION
     struct LocalTransactLog;
     LocalTransactLog transact_log() TIGHTDB_NOEXCEPT;
