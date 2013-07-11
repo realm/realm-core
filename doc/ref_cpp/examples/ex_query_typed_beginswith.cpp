@@ -1,6 +1,7 @@
 // @@Example: ex_cpp_typed_query_startsWith @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_1(PeopleTable,
                 name,  String)
@@ -30,8 +31,8 @@ int main()
     PeopleTable::View view3 = table.where().name.begins_with("JO", false).find_all();
 // @@Fold@@
     assert(view3.size() == 2);
-    assert(!strcmp(view3[0].name, "Joe"));
-    assert(!strcmp(view3[1].name, "Jo"));
+    assert(view3[0].name, "Joe");
+    assert(view3[1].name, "Jo");
 // @@EndFold@@
 #endif
 // @@Fold@@

@@ -1,5 +1,6 @@
 // @@Example: ex_cpp_dyn_query_find_next @@
 #include <tightdb.hpp>
+#include <assert.h>
 
 using namespace tightdb;
 using namespace std;

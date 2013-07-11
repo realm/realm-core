@@ -37,8 +37,8 @@ class GroupWriter;
 /// Thrown by Group and SharedGroup constructors if the specified file
 /// (or memory buffer) does not appear to contain a valid TightDB
 /// database.
-struct InvalidDatabase: File::OpenError {
-    InvalidDatabase(): File::OpenError("Invalid database") {}
+struct InvalidDatabase: File::AccessError {
+    InvalidDatabase(): File::AccessError("Invalid database") {}
 };
 
 
@@ -57,13 +57,15 @@ public:
     /// allowed. When used by SharedGroup, concurrency is allowed, but
     /// read_only and no_create must both be false in this case.
     ///
-    /// \param is_shared Must be true iff we are called on behalf of SharedGroup.
+    /// \param is_shared Must be true if, and only if we are called on
+    /// behalf of SharedGroup.
     ///
-    /// \param read_only Open the file in read-only mode. This implies \a no_create.
+    /// \param read_only Open the file in read-only mode. This implies
+    /// \a no_create.
     ///
     /// \param no_create Fail if the file does not already exist.
     ///
-    /// \throw File::OpenError
+    /// \throw File::AccessError
     void attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create);
 
     /// Attach this allocator to the specified memory buffer.
@@ -126,7 +128,8 @@ private:
     bool validate_buffer(const char* data, size_t len) const;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    void set_replication(Replication* r) { m_replication = r; }
+    Replication* get_replication() const TIGHTDB_NOEXCEPT { return m_replication; }
+    void set_replication(Replication* r) TIGHTDB_NOEXCEPT { m_replication = r; }
 #endif
 };
 

@@ -120,6 +120,7 @@ public:
     void insert(size_t ndx) TIGHTDB_OVERRIDE { insert_int(ndx, 0); invalidate_subtables(); }
     void Clear() TIGHTDB_OVERRIDE;
     void erase(size_t ndx) TIGHTDB_OVERRIDE;
+    void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
     void fill(size_t count);
 
     // Indexing

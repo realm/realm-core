@@ -25,12 +25,10 @@
 /tightdb-config-dbg
 /tightdb-config-cov
 
+# iPhone
 /libtightdb-iPhoneOS.a
 /libtightdb-iPhoneOS-dbg.a
 /libtightdb-iPhoneSimulator.a
 /libtightdb-iPhoneSimulator-dbg.a
-
-/libtightdb-ios.a
-/libtightdb-ios-dbg.a
 /tightdb-config-ios
 /tightdb-config-ios-dbg

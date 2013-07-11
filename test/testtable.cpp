@@ -21,12 +21,12 @@ TIGHTDB_TABLE_2(TupleTableType,
 #ifndef TIGHTDB_BYPASS_OPTIMIZE_CRASH_BUG
 TEST(TestOptimizeCrash)
 {
-	// This will crash at the .add() method
-	TupleTableType ttt;
-	ttt.optimize();
-	ttt.column().second.set_index();
-	ttt.clear();
-	ttt.add(1, "AA");
+    // This will crash at the .add() method
+    TupleTableType ttt;
+    ttt.optimize();
+    ttt.column().second.set_index();
+    ttt.clear();
+    ttt.add(1, "AA");
 }
 #endif
 
@@ -257,12 +257,15 @@ TEST(Table_LowLevelCopy)
     Table table;
     table.add_column(type_Int, "i1");
     table.add_column(type_Int, "i2");
+    table.add_column(type_Int, "xxxxxxxxxxxxxxxxxxxxxxx");
 
     table.insert_int(0, 0, 10);
     table.insert_int(1, 0, 120);
+    table.insert_int(2, 0, 1230);
     table.insert_done();
     table.insert_int(0, 1, 12);
     table.insert_int(1, 1, 100);
+    table.insert_int(2, 1, 1300);
     table.insert_done();
 
 #ifdef TIGHTDB_DEBUG
@@ -314,8 +317,9 @@ TEST(Table_HighLevelCopy)
     CHECK(*table3 == table);
 }
 
-
 namespace {
+
+void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows); // pre-declaration
 
 void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
 {
@@ -452,6 +456,24 @@ TEST(Table_Delete_All_Types)
 #ifdef TIGHTDB_DEBUG
     table.Verify();
 #endif
+}
+
+TEST(Table_Move_All_Types)
+{
+    Table table;
+    setup_multi_table(table, 15, 2);
+    table.set_index(6);
+
+    while (table.size() > 1) {
+        const size_t len = table.size();
+        const size_t ndx = size_t(rand()) % (len-1);
+
+        table.move_last_over(ndx);
+
+#ifdef TIGHTDB_DEBUG
+        table.Verify();
+#endif
+    }
 }
 
 // enable to generate testfiles for to_string and json below
@@ -1114,6 +1136,7 @@ TEST(Table_Spec)
     }
 
     // Write the group to disk
+    File::try_remove("subtables.tightdb");
     group.write("subtables.tightdb");
 
     // Read back tables
@@ -1371,6 +1394,7 @@ TEST(Table_Spec_AddColumns)
         CHECK_EQUAL("test", subtable->get_string(1, 0));
         CHECK_EQUAL(0,      subtable->get_int(2, 0));
         CHECK_EQUAL(0,      subtable->get_subtable_size(3, 0));
+        CHECK_EQUAL(1,      table->get_subtable_size(2, 0));
     }
 
     // Add new column to new sub-table
@@ -1386,6 +1410,18 @@ TEST(Table_Spec_AddColumns)
         TableRef subsubtable = subtable->get_subtable(3, 0);
         CHECK_EQUAL(1,      subsubtable->get_column_count());
     }
+
+    // Add a new mixed column
+    table->add_column(type_Mixed, "eighth");
+    CHECK_EQUAL(8, table->get_column_count());
+    table->set_mixed(7, 0, Mixed::subtable_tag());
+    TableRef stab = table->get_subtable(7, 0);
+    stab->add_column(type_Int, "smurf");
+    stab->insert_int(0, 0, 1);
+    stab->insert_done();
+    stab->insert_int(0, 1, 2);
+    stab->insert_done();
+    CHECK_EQUAL(2, table->get_subtable_size(7, 0));
 
 #ifdef TIGHTDB_DEBUG
     table->Verify();
@@ -2094,7 +2130,7 @@ TEST(Table_LanguageBindings)
 
 TEST(Table_MultipleColumn)
 {
-    
+
     Table table;
     table.add_column(type_Int, "first");
     table.add_column(type_Int, "first");

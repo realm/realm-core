@@ -43,14 +43,20 @@ public:
     Group();
 
     enum OpenMode {
-        mode_Normal,   ///< Open in read/write mode, create the file if it does not already exist.
-        mode_ReadOnly, ///< Open in read-only mode, fail if the file does not already exist.
-        mode_NoCreate  ///< Open in read/write mode, fail if the file does not already exist.
+        /// Open in read-only mode. Fail if the file does not already
+        /// exist.
+        mode_ReadOnly,
+        /// Open in read/write mode. Create the file if it does not
+        /// already exist.
+        mode_ReadWrite,
+        /// Open in read/write mode. Fail if the file does not already
+        /// exist.
+        mode_ReadWriteNoCreate
     };
 
     /// Equivalent to calling open(const std::string&, OpenMode) on a
     /// default constructed instance.
-    explicit Group(const std::string& file, OpenMode = mode_Normal);
+    explicit Group(const std::string& file, OpenMode = mode_ReadOnly);
 
     /// Equivalent to calling open(BinaryData, bool) on a default
     /// constructed instance.
@@ -71,30 +77,72 @@ public:
 
     /// Attach this Group instance to the specified database file.
     ///
-    /// If the specified file exists in the file system, it must
-    /// contain a valid TightDB database. If the file does not exist,
-    /// it will be created (unless mode_NoCreate is specified). While
-    /// a group constructed this way, can be used to access and
-    /// manipulate a TightDB database, it is generally better to use a
-    /// SharedGroup instance along with proper transactions.
+    /// By default, the specified file is opened in read-only mode
+    /// (mode_ReadOnly). This allows opening a file even when the
+    /// caller lacks permission to write to that file. The opened
+    /// group may still be modified freely, but the changes cannot be
+    /// written back to the same file using the commit() function. An
+    /// attempt to do that, will cause an exception to be thrown. When
+    /// opening in read-only mode, it is an error if the specified
+    /// file does not already exist in the file system.
     ///
-    /// Changes made to the database via a Group instance are not
-    /// automatically committed to the specified file. You may,
-    /// however, at any time, explicitely commit your changes by
-    /// calling the commit() method. Alternatively you may call
-    /// write() to write the entire database to a new file.
+    /// Alternatively, the file can be opened in read/write mode
+    /// (mode_ReadWrite). This allows use of the commit() function,
+    /// but, of course, it also requires that the caller has
+    /// permission to write to the specified file. When opening in
+    /// read-write mode, an attempt to create the specified file will
+    /// be made, if it does not already exist in the file system.
+    ///
+    /// In any case, if the file already exists, it must contain a
+    /// valid TightDB database. In many cases invalidity will be
+    /// detected and cause the InvalidDatabase exception to be thrown,
+    /// but you should not rely on it.
+    ///
+    /// Note that changes made to the database via a Group instance
+    /// are not automatically committed to the specified file. You
+    /// may, however, at any time, explicitly commit your changes by
+    /// calling the commit() method, provided that the specified
+    /// open-mode is not mode_ReadOnly. Alternatively, you may call
+    /// write() to write the entire database to a new file. Writing
+    /// the database to a new file does not end, or in any other way
+    /// change the association between the Group instance and the file
+    /// that was specified in the call to open().
+    ///
+    /// A file that is passed to Group::open(), may not be modified by
+    /// a third party until after the Group object is
+    /// destroyed. Behavior is undefined if a file is modified by a
+    /// third party while any Group object is associated with it.
     ///
     /// Calling open() on a Group instance that is already in the
     /// attached state has undefined behavior.
     ///
-    /// \param file Filesystem path to a TightDB database file.
+    /// Accessing a TightDB database file through manual construction
+    /// of a Group object does not offer any level of thread safety or
+    /// transaction safety. When any of those kinds of safety are a
+    /// concern, consider using a SharedGroup instead. When accessing
+    /// a database file in read/write mode through a manually
+    /// constructed Group object, it is entirely the responsibility of
+    /// the application that the file is not accessed in any way by a
+    /// third party during the life-time of that group object. It is,
+    /// on the other hand, safe to concurrently access a database file
+    /// by multiple manually created Group objects, as long as all of
+    /// them are opened in read-only mode, and there is no other party
+    /// that modifies the file concurrently.
     ///
-    /// \throw File::OpenError If the file could not be opened. If the
-    /// reason corresponds to one of the exception types that are
-    /// derived from File::OpenError, the derived exception type is
+    /// \param file File system path to a TightDB database file.
+    ///
+    /// \param mode Specifying a mode that is not mode_ReadOnly
+    /// requires that the specified file can be opened in read/write
+    /// mode. In general there is no reason to open a group in
+    /// read/write mode unless you want to be able to call
+    /// Group::commit().
+    ///
+    /// \throw File::AccessError If the file could not be opened. If
+    /// the reason corresponds to one of the exception types that are
+    /// derived from File::AccessError, the derived exception type is
     /// thrown. Note that InvalidDatabase is among these derived
     /// exception types.
-    void open(const std::string& file, OpenMode = mode_Normal);
+    void open(const std::string& file, OpenMode mode = mode_ReadOnly);
 
     /// Attach this Group instance to the specified memory buffer.
     ///
@@ -147,15 +195,18 @@ public:
 
     // Serialization
 
-    /// Write this database to a file. If the file exists already, it
-    /// will be truncated first.
+    /// Write this database to a new file. It is an error to specify a
+    /// file that already exists. This is to protect against
+    /// overwriting a database file that is currently open, which
+    /// would cause undefined behaviour.
     ///
     /// \param file A filesystem path.
     ///
-    /// \throw File::OpenError If the file could not be opened. If the
-    /// reason corresponds to one of the exception types that are
-    /// derived from File::OpenError, the derived exception type is
-    /// thrown.
+    /// \throw File::AccessError If the file could not be opened. If
+    /// the reason corresponds to one of the exception types that are
+    /// derived from File::AccessError, the derived exception type is
+    /// thrown. In particular, File::Exists will be thrown if the file
+    /// exists already.
     void write(const std::string& file) const;
 
     /// Write this database to a memory buffer.
@@ -169,6 +220,13 @@ public:
     // calling write()? There is no documentation to be found anywhere
     // and it looks like it leaves the group in an invalid state. You
     // should probably not use it.
+    // FIXME: Must throw an exception if the group is opened in
+    // read-only mode. Currently this is impossible because the
+    // information is not stored anywhere. A flag probably needs to be
+    // added to SlabAlloc.
+    // FIXME: It needs to be determined whether or not this method can
+    // leave the Group instance in an invalid state. This issue
+    // strongly affects how high-level language bindings can use it.
     void commit();
 
     // Conversion
@@ -204,12 +262,8 @@ protected:
     void invalidate();
     bool in_initial_state() const;
     void init_shared();
-    size_t commit(size_t current_version, size_t readlock_version, bool doPersist);
+    size_t commit(size_t current_version, size_t readlock_version, bool persist);
     void rollback();
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    void set_replication(Replication* r) { m_alloc.set_replication(r); }
-#endif
 
     SlabAlloc& get_allocator() {return m_alloc;}
     Array& get_top_array() {return m_top;}
@@ -273,6 +327,8 @@ private:
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     friend class Replication;
+    Replication* get_replication() const TIGHTDB_NOEXCEPT { return m_alloc.get_replication(); }
+    void set_replication(Replication* r) TIGHTDB_NOEXCEPT { m_alloc.set_replication(r); }
 #endif
 };
 

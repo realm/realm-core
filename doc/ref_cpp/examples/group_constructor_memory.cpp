@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <tightdb.hpp>
+#include <tightdb/file.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -28,6 +29,7 @@ void func(BinaryData buffer)
 
 int main()
 {
+    Group g;
     BinaryData buffer = g.write_to_mem();
     try {
         func(buffer);
@@ -37,6 +39,7 @@ int main()
         throw;
     }
     free(const_cast<char*>(buffer.data()));
+    File::remove("people.tightdb");
 }
 // @@EndFold@@
 // @@EndExample@@

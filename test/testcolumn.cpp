@@ -554,26 +554,48 @@ TEST(Column_FindAll_IntMax)
     r.Destroy();
 }
 
-/*
-TEST(Column_FindHamming)
+
+TEST(Column_FindSorted)
 {
+    // Create column with sorted members
     Column col;
-    for (size_t i = 0; i < 10; ++i) {
-        col.add(0x5555555555555555LL);
-        col.add(0x3333333333333333LL);
+    for (size_t i = 5; i < 100; i += 5) {
+        col.add(i);
     }
 
-    Array res;
-    col.find_all_hamming(res, 0x3333333333333332LL, 2);
+    size_t pos;
+    bool res = col.find_sorted(0, pos);
+    CHECK_EQUAL(false, res);
+    CHECK_EQUAL(0, pos); // insert position
 
-    CHECK_EQUAL(10, res.size()); // Half should match
+    // first entry
+    res = col.find_sorted(5, pos);
+    CHECK_EQUAL(true, res);
+    CHECK_EQUAL(0, pos); // actual position
+
+    // middle entry
+    res = col.find_sorted(50, pos);
+    CHECK_EQUAL(true, res);
+    CHECK_EQUAL(9, pos); // actual position
+
+    // non-existent middle entry
+    res = col.find_sorted(52, pos);
+    CHECK_EQUAL(false, res);
+    CHECK_EQUAL(10, pos); // insert position
+
+    // last entry
+    res = col.find_sorted(95, pos);
+    CHECK_EQUAL(true, res);
+    CHECK_EQUAL(18, pos); // actual position
+
+    // beyond last entry
+    res = col.find_sorted(96, pos);
+    CHECK_EQUAL(false, res);
+    CHECK_EQUAL(19, pos); // insert position
 
     // Clean up
     col.Destroy();
-    res.Destroy();
 }
-*/
-
 
 TEST(Column_Average)
 {

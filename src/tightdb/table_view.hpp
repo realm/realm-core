@@ -30,9 +30,7 @@ namespace tightdb {
 using std::size_t;
 
 
-/**
- * Common base class for TableView and ConstTableView.
- */
+/// Common base class for TableView and ConstTableView.
 class TableViewBase {
 public:
     bool is_empty() const TIGHTDB_NOEXCEPT { return m_refs.is_empty(); }
@@ -65,26 +63,34 @@ public:
     size_t find_first_float(size_t column_ndx, float value) const;
     size_t find_first_double(size_t column_ndx, double value) const;
     size_t find_first_string(size_t column_ndx, StringData value) const;
-    // FIXME: Need: size_t find_first_binary(size_t column_ndx, BinaryData value) const;
+    size_t find_first_binary(size_t column_ndx, BinaryData value) const;
 
     // Aggregate functions
     template <int function, typename T, typename R, class ColType>
-    R aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx) const;
+    R aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx, T count_target) const;
 
 
     // TODO, FIXME: rename int versions
-    // TODO: Add maximum, minimum for date
     int64_t sum(size_t column_ndx) const;
     int64_t maximum(size_t column_ndx) const;
     int64_t minimum(size_t column_ndx) const;
+    double average(size_t column_ndx) const;
+    size_t count_int(size_t column_ndx, int64_t target) const;
 
     double sum_float(size_t column_ndx) const;
     float maximum_float(size_t column_ndx) const;
     float minimum_float(size_t column_ndx) const;
+    double average_float(size_t column_ndx) const;
+    size_t count_float(size_t column_ndx, float target) const;
 
     double sum_double(size_t column_ndx) const;
     double maximum_double(size_t column_ndx) const;
     double minimum_double(size_t column_ndx) const;
+    double average_double(size_t column_ndx) const;
+    size_t count_double(size_t column_ndx, double target) const;
+
+    Date maximum_date(size_t column_ndx) const;
+    Date minimum_date(size_t column_ndx) const;
 
     // Sort the view according to the specified column and the
     // specified direction.
@@ -112,27 +118,17 @@ protected:
     Table* m_table;
     Array m_refs;
 
-    /**
-     * Construct null view (no memory allocated).
-     */
+    /// Construct null view (no memory allocated).
     TableViewBase(): m_table(0), m_refs(Allocator::get_default()) {}
 
-    /**
-     * Construct empty view, ready for addition of row indices.
-     */
+    /// Construct empty view, ready for addition of row indices.
     TableViewBase(Table* parent): m_table(parent) {}
 
-    /**
-     * Copy constructor.
-     */
-    TableViewBase(const TableViewBase& tv): m_table(tv.m_table)
-    {
-        m_refs.Copy(tv.m_refs);
-    }
+    /// Copy constructor.
+    TableViewBase(const TableViewBase& tv):
+        m_table(tv.m_table), m_refs(tv.m_refs, Allocator::get_default()) {}
 
-    /**
-     * Moving constructor.
-     */
+    /// Moving constructor.
     TableViewBase(TableViewBase*);
 
     ~TableViewBase() { m_refs.Destroy(); }
@@ -152,36 +148,34 @@ class ConstTableView;
 
 
 
-/**
- * A TableView gives read and write access to the parent table.
- *
- * A 'const TableView' cannot be changed (e.g. sorted), nor can the
- * parent table be modified through it.
- *
- * A TableView is both copyable and movable. Copying a TableView makes
- * a proper copy. Copying a temporary TableView is optimized away on
- * all modern compilers due to such things as 'return value
- * optimization'. Move semantics is accessed using the move()
- * function. For example, to efficiently return a non-temporary
- * TableView from a function, you would have to do something like
- * this:
- *
- * \code{.cpp}
- *
- *   tightdb::TableView func()
- *   {
- *      tightdb::TableView tv;
- *      return move(tv);
- *   }
- *
- * \endcode
- *
- * Note that move(tv) removes the contents from 'tv' and leaves it
- * truncated.
- *
- * FIXME: Add general documentation about move semantics, and refer to
- * it from here.
- */
+/// A TableView gives read and write access to the parent table.
+///
+/// A 'const TableView' cannot be changed (e.g. sorted), nor can the
+/// parent table be modified through it.
+///
+/// A TableView is both copyable and movable. Copying a TableView
+/// makes a proper copy. Copying a temporary TableView is optimized
+/// away on all modern compilers due to such things as 'return value
+/// optimization'. Move semantics is accessed using the move()
+/// function. For example, to efficiently return a non-temporary
+/// TableView from a function, you would have to do something like
+/// this:
+///
+/// \code{.cpp}
+///
+///   tightdb::TableView func()
+///   {
+///      tightdb::TableView tv;
+///      return move(tv);
+///   }
+///
+/// \endcode
+///
+/// Note that move(tv) removes the contents from 'tv' and leaves it
+/// truncated.
+///
+/// FIXME: Add general documentation about move semantics, and refer
+/// to it from here.
 class TableView: public TableViewBase {
 public:
     TableView() {}
@@ -245,18 +239,16 @@ private:
 
 
 
-/**
- * A ConstTableView gives read access to the parent table, but no
- * write access. The view itself, though, can be changed, for example,
- * it can be sorted.
- *
- * Note that methods are declared 'const' if, and only
- * if they leave the view unmodified, and this is irrespective of
- * whether they modify the parent table.
- *
- * A ConstTableView has both copy and move semantics. See TableView
- * for more on this.
- */
+/// A ConstTableView gives read access to the parent table, but no
+/// write access. The view itself, though, can be changed, for
+/// example, it can be sorted.
+///
+/// Note that methods are declared 'const' if, and only if they leave
+/// the view unmodified, and this is irrespective of whether they
+/// modify the parent table.
+///
+/// A ConstTableView has both copy and move semantics. See TableView
+/// for more on this.
 class ConstTableView: public TableViewBase {
 public:
     ConstTableView() {}
@@ -301,7 +293,8 @@ private:
 
 #define TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type)             \
     TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \
-    TIGHTDB_ASSERT(m_table->get_column_type(column_ndx) == column_type);
+    TIGHTDB_ASSERT(m_table->get_column_type(column_ndx) == column_type ||   \
+                  (m_table->get_column_type(column_ndx) == type_Date && column_type == type_Int));
 
 #define TIGHTDB_ASSERT_INDEX(column_ndx, row_ndx)                           \
     TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \

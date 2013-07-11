@@ -41,7 +41,7 @@ public:
     /// Equivalent to calling open(const std::string&, bool,
     /// DurabilityLevel) on a default constructed instance.
     explicit SharedGroup(const std::string& file, bool no_create = false,
-                         DurabilityLevel dlevel=durability_Full);
+                         DurabilityLevel dlevel = durability_Full);
 
     struct unattached_tag {};
 
@@ -78,9 +78,9 @@ public:
     ///
     /// \param file Filesystem path to a TightDB database file.
     ///
-    /// \throw File::OpenError If the file could not be opened. If the
-    /// reason corresponds to one of the exception types that are
-    /// derived from File::OpenError, the derived exception type is
+    /// \throw File::AccessError If the file could not be opened. If
+    /// the reason corresponds to one of the exception types that are
+    /// derived from File::AccessError, the derived exception type is
     /// thrown. Note that InvalidDatabase is among these derived
     /// exception types.
     void open(const std::string& file, bool no_create = false,
@@ -88,17 +88,14 @@ public:
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-    struct replication_tag {};
-
-    /// Equivalent to calling open(replication_tag, const
-    /// std::string&, bool, DurabilityLevel) on a default constructed
-    /// instance.
-    explicit SharedGroup(replication_tag, const std::string& file = "",
-                         DurabilityLevel dlevel=durability_Full);
+    /// Equivalent to calling open(Replication::Provider&) on a
+    /// default constructed instance.
+    explicit SharedGroup(Replication::Provider&);
 
     /// Open this group in replication mode.
-    void open(replication_tag, const std::string& file = "",
-              DurabilityLevel dlevel=durability_Full);
+    void open(Replication::Provider&);
+
+    friend class Replication;
 
 #endif
 
@@ -139,13 +136,13 @@ public:
     /// may then resume normal operation on this database. Currently,
     /// transaction interruption works by throwing an exception from
     /// one of the mentioned member functions that may block.
-    void interrupt_transact() { m_replication.interrupt(); }
+    void interrupt_transact();
 
     /// Clear the interrupted state of this database after rolling
     /// back a transaction. It is not an error to call this function
     /// in a situation where no interruption has occured. See
     /// interrupt_transact() for more.
-    void clear_interrupt_transact() { m_replication.clear_interrupt(); }
+    void clear_interrupt_transact();
 #endif
 
 private:
@@ -155,7 +152,7 @@ private:
     Group                 m_group;
     size_t                m_version;
     File                  m_file;
-    File::Map<SharedInfo> m_file_map;
+    File::Map<SharedInfo> m_file_map; // Never remapped
     File::Map<SharedInfo> m_reader_map;
     std::string           m_file_path;
 
@@ -167,10 +164,6 @@ private:
         transact_Writing
     };
     TransactStage m_transact_stage;
-#endif
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    Replication m_replication;
 #endif
 
     struct ReadCount;
@@ -187,6 +180,14 @@ private:
     ReadCount& ringbuf_get_last() TIGHTDB_NOEXCEPT;
     void       ringbuf_put(const ReadCount& v);
     void       ringbuf_expand();
+
+    // Must be called only by someone that has a lock on the write
+    // mutex.
+    std::size_t get_current_version() TIGHTDB_NOEXCEPT;
+
+    // Must be called only by someone that has a lock on the write
+    // mutex.
+    void low_level_commit(std::size_t new_version);
 
     friend class ReadTransaction;
     friend class WriteTransaction;
@@ -283,20 +284,34 @@ inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-inline SharedGroup::SharedGroup(replication_tag, const std::string& file, DurabilityLevel dlevel):
+inline SharedGroup::SharedGroup(Replication::Provider& repl_provider):
     m_group(Group::shared_tag()), m_version(std::numeric_limits<size_t>::max())
 {
-    open(replication_tag(), file, dlevel);
+    open(repl_provider);
 }
 
-inline void SharedGroup::open(replication_tag, const std::string& file, DurabilityLevel dlevel)
+inline void SharedGroup::open(Replication::Provider& repl_provider)
 {
     TIGHTDB_ASSERT(!is_attached());
+    // We receive ownership of the Replication instance. Note that
+    // even though we store the pointer in the Group instance, it is
+    // still ~SharedGroup() that is responsible for deleting it.
+    Replication* repl = repl_provider.new_instance();
+    m_group.set_replication(repl);
+    std::string file       = repl->get_database_path();
+    bool no_create         = false;
+    DurabilityLevel dlevel = durability_Full;
+    open(file, no_create, dlevel);
+}
 
-    m_replication.open(file);
-    m_group.set_replication(&m_replication);
+inline void SharedGroup::interrupt_transact()
+{
+    m_group.get_replication()->interrupt();
+}
 
-    open(!file.empty() ? file : Replication::get_path_to_database_file(), false, dlevel);
+inline void SharedGroup::clear_interrupt_transact()
+{
+    m_group.get_replication()->clear_interrupt();
 }
 
 #endif

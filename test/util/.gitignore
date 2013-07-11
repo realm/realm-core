@@ -1,0 +1,10 @@
+/*.d
+/*.o
+/*.libdeps
+
+# Coverage data
+/*.gcno
+/*.gcda
+
+/test-util.a
+/test-util-dbg.a

@@ -15,6 +15,7 @@
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
+#include <tightdb/file.hpp>
 #include <tightdb/group_shared.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/utilities.hpp>
@@ -41,25 +42,25 @@ TIGHTDB_FORCEINLINE void randsleep(void)
     const int64_t ms = 500000;
     unsigned char r = rand();
 
-    if(r <= 244)
+    if (r <= 244)
         return;
-    else if(r <= 248) {
+    else if (r <= 248) {
         // Busyloop for 0 - 1 ms (on a 2 ghz), probably resume in current time slice
         int64_t t = (rand() * rand() * rand()) % ms; // rand can be just 16 bit
-        for(volatile int64_t i = 0; i < t; i++) {
+        for (volatile int64_t i = 0; i < t; i++) {
         }
     }
-    else if(r <= 250) {
+    else if (r <= 250) {
         // Busyloop for 0 - 20 ms (on a 2 ghz), maybe resume in different time slice
         int64_t t = ms * (rand() % 20);
-        for(volatile int64_t i = 0; i < t; i++) {
+        for (volatile int64_t i = 0; i < t; i++) {
         }
     }
-    else if(r <= 252) {
+    else if (r <= 252) {
         // Release current time slice but get next available
         sched_yield();
     }
-    else if(r <= 254) {
+    else if (r <= 254) {
         // Release current time slice and get time slice according to normal scheduling
 #ifdef _MSC_VER
         Sleep(0);
@@ -80,7 +81,7 @@ TIGHTDB_FORCEINLINE void randsleep(void)
 void deletefile(const char* file)
 {
     struct stat buf;
-    remove(file);
+    File::try_remove(file);
     CHECK(stat(file, &buf) != 0);
 }
 
@@ -103,7 +104,7 @@ void* write_thread(void* arg)
     (void)id;
     SharedGroup sg("database.tightdb");
 
-    for(size_t t = 0; t < ITER1; ++t) {
+    for (size_t t = 0; t < ITER1; ++t) {
         {
             WriteTransaction wt(sg);
             TableRef table = wt.get_table("table");
@@ -127,7 +128,7 @@ void* read_thread(void* arg)
     int64_t r2;
 
     SharedGroup sg("database.tightdb");
-    for(size_t t = 0; t < ITER1; ++t) {
+    for (size_t t = 0; t < ITER1; ++t) {
         ReadTransaction rt(sg);
         r1 = rt.get_table("table")->get_int(0, 0);
         randsleep();
@@ -165,16 +166,16 @@ TEST(Transactions_Stress1)
         pthread_win32_process_attach_np ();
     #endif
 
-    for(size_t t = 0; t < READERS1; t++)
+    for (size_t t = 0; t < READERS1; t++)
         pthread_create(&read_threads[t], NULL, read_thread, (void*)t);
 
-    for(size_t t = 0; t < WRITERS1; t++)
+    for (size_t t = 0; t < WRITERS1; t++)
         pthread_create(&write_threads[t], NULL, write_thread, (void*)t);
 
-    for(size_t t = 0; t < READERS1; t++)
+    for (size_t t = 0; t < READERS1; t++)
         pthread_join(read_threads[t], NULL);
 
-    for(size_t t = 0; t < WRITERS1; t++)
+    for (size_t t = 0; t < WRITERS1; t++)
         pthread_join(write_threads[t], NULL);
 }
 
@@ -200,14 +201,14 @@ void* create_groups(void* arg)
 
     std::vector<SharedGroup*> group;
 
-    for(size_t t = 0; t < ITER2; ++t) {
+    for (size_t t = 0; t < ITER2; ++t) {
         // Repeatedly create a group or destroy a group or do nothing
         int action = rand() % 2;
 
-        if(action == 0 && group.size() < GROUPS2) {
+        if (action == 0 && group.size() < GROUPS2) {
             group.push_back(new SharedGroup("database.tightdb"));
         }
-        else if(action == 1 && group.size() > 0) {
+        else if (action == 1 && group.size() > 0) {
             size_t g = rand() % group.size();
             delete group[g];
             group.erase(group.begin() + g);
@@ -224,10 +225,10 @@ TEST(Transactions_Stress2)
     deletefile("database.tightdb");
     deletefile("database.tightdb.lock");
 
-    for(size_t t = 0; t < THREADS2; t++)
+    for (size_t t = 0; t < THREADS2; t++)
         pthread_create(&threads[t], NULL, create_groups, (void*)t);
 
-    for(size_t t = 0; t < THREADS2; t++)
+    for (size_t t = 0; t < THREADS2; t++)
         pthread_join(threads[t], NULL);
 }
 #endif
@@ -255,21 +256,21 @@ void* write_thread3(void* arg)
     (void)id;
     SharedGroup sg("database.tightdb");
 
-    for(size_t t = 0; t < ITER3; ++t) {
+    for (size_t t = 0; t < ITER3; ++t) {
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("table");
         size_t s = table->size();
 
-        if(rand() % 2 == 0 && s > 0) {
+        if (rand() % 2 == 0 && s > 0) {
             size_t from = fastrand() % s;
             size_t n = fastrand() % (s - from + 1);
-            for(size_t t = 0; t < n; ++t)
+            for (size_t t = 0; t < n; ++t)
                 table->remove(from);
         }
-        else if(s < ROWS3 / 2) {
+        else if (s < ROWS3 / 2) {
             size_t at = fastrand() % (s + 1);
             size_t n = fastrand() % ROWS3;
-            for(size_t t = 0; t < n; ++t) {
+            for (size_t t = 0; t < n; ++t) {
                 table->insert_empty_row(at);
                 table->set_int(0, at, fastrand() % 80);
             }
@@ -288,7 +289,7 @@ void* read_thread3(void* arg)
     int64_t r2;
 
     SharedGroup sg("database.tightdb");
-    while(!terminate3) {
+    while (!terminate3) {
         ReadTransaction rt(sg);
         r1 = rt.get_table("table")->get_int(0, 0);
         randsleep();
@@ -324,18 +325,18 @@ TEST(Transactions_Stress3)
         pthread_win32_process_attach_np ();
     #endif
 
-    for(size_t t = 0; t < WRITERS3; t++)
+    for (size_t t = 0; t < WRITERS3; t++)
         pthread_create(&write_threads3[t], NULL, write_thread3, (void*)t);
 
-    for(size_t t = 0; t < READERS3; t++)
+    for (size_t t = 0; t < READERS3; t++)
         pthread_create(&read_threads3[t], NULL, read_thread3, (void*)t);
 
-    for(size_t t = 0; t < WRITERS3; t++)
+    for (size_t t = 0; t < WRITERS3; t++)
         pthread_join(write_threads3[t], NULL);
 
     // Terminate reader threads cleanly
     terminate3 = true;
-    for(size_t t = 0; t < READERS3; t++)
+    for (size_t t = 0; t < READERS3; t++)
         pthread_join(read_threads3[t], NULL);
 }
 
@@ -361,7 +362,7 @@ void* write_thread4(void* arg)
     (void)id;
     SharedGroup sg("database.tightdb");
 
-    for(size_t t = 0; t < ITER4; ++t) {
+    for (size_t t = 0; t < ITER4; ++t) {
         {
             WriteTransaction wt(sg);
             TableRef table = wt.get_table("table");
@@ -385,7 +386,7 @@ void* read_thread4(void* arg)
     int64_t r2;
 
     SharedGroup sg("database.tightdb");
-    while(!terminate4) {
+    while (!terminate4) {
         ReadTransaction rt(sg);
         r1 = rt.get_table("table")->get_int(0, 0);
         randsleep();
@@ -423,17 +424,17 @@ TEST(Transactions_Stress4)
         pthread_win32_process_attach_np ();
     #endif
 
-    for(size_t t = 0; t < READERS4; t++)
+    for (size_t t = 0; t < READERS4; t++)
         pthread_create(&read_threads[t], NULL, read_thread4, (void*)t);
 
-    for(size_t t = 0; t < WRITERS4; t++)
+    for (size_t t = 0; t < WRITERS4; t++)
         pthread_create(&write_threads[t], NULL, write_thread4, (void*)t);
 
-    for(size_t t = 0; t < WRITERS4; t++)
+    for (size_t t = 0; t < WRITERS4; t++)
         pthread_join(write_threads[t], NULL);
 
     terminate4 = true;
-    for(size_t t = 0; t < READERS4; t++)
+    for (size_t t = 0; t < READERS4; t++)
         pthread_join(read_threads[t], NULL);
 }
 

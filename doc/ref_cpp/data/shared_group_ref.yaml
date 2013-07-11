@@ -71,22 +71,27 @@ CATEGORIES:
       PARAMS:
       - NAME   : file
         TYPES  : const std::string&
-        DESCR  : Filesystem path of the TightDB database file to be opened.
+        DESCR  : &g_shared_group_constructor_parm1_descr
+                 Filesystem path of the TightDB database file to be opened.
       - NAME   : no_create
         TYPES  : bool
-        DESCR  : If set to <tt>true</tt>, File::NotFound will be thrown
+        DESCR  : &g_shared_group_constructor_parm2_descr
+                 If set to <tt>true</tt>, File::NotFound will be thrown
                  if the file does not already exist.
       - NAME   : dlevel
         TYPES  : DurabilityLevel
-        DESCR  : Durability Level (durability_Full or durability_MemOnly)
+        DESCR  : &g_shared_group_constructor_parm3_descr
+                 Durability Level (durability_Full or durability_MemOnly)
       RETURN:
         TYPES  : SharedGroup
-        DESCR  : A shared group.
+        DESCR  : &g_shared_group_constructor_return1_descr
+                 A shared group.
       THROWS:
-      - EXCEPT : File::OpenError
-        DESCR  : If the file could not be opened. If the reason
+      - EXCEPT : File::AccessError
+        DESCR  : &g_shared_group_constructor_throws_descr
+                 If the file could not be opened. If the reason
                  corresponds to one of the exception types that are
-                 derived from File::OpenError, the derived exception
+                 derived from File::AccessError, the derived exception
                  type is thrown. Note that InvalidDatabase is among
                  these derived exception types.
       EXAMPLES:
@@ -124,19 +129,23 @@ CATEGORIES:
       PARAMS:
       - NAME   : file
         TYPES  : const std::string&
-        DESCR  : Filesystem path of the TightDB database file to be opened.
+        DESCR  : &g_shared_group_open_parm1_descr
+                 Filesystem path of the TightDB database file to be opened.
       - NAME   : no_create
         TYPES  : bool
-        DESCR  : If set to <tt>true</tt>, File::NotFound will be thrown
+        DESCR  : &g_shared_group_open_parm2_descr
+                 If set to <tt>true</tt>, File::NotFound will be thrown
                  if the file does not already exist.
       - NAME   : dlevel
         TYPES  : DurabilityLevel
-        DESCR  : Durability Level (durability_Full or durability_MemOnly)
+        DESCR  : &g_shared_group_open_parm3_descr
+                 Durability Level (durability_Full or durability_MemOnly)
       THROWS:
-      - EXCEPT : File::OpenError
-        DESCR  : If the file could not be opened. If the reason
+      - EXCEPT : File::AccessError
+        DESCR  : &g_shared_group_open_throws_descr
+                 If the file could not be opened. If the reason
                  corresponds to one of the exception types that are
-                 derived from File::OpenError, the derived exception
+                 derived from File::AccessError, the derived exception
                  type is thrown. Note that InvalidDatabase is among
                  these derived exception types.
       EXAMPLES:
@@ -187,7 +196,8 @@ CATEGORIES:
                  Begin writing to a shared group.
       RETURN:
         TYPES  : Group&
-        DESCR  : A group.
+        DESCR  : &g_shared_group_begin_write_return1_descr
+                 A group.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_begin_write
         DESCR  :

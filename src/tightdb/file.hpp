@@ -22,23 +22,41 @@
 
 #include <cstddef>
 #include <stdint.h>
-#include <cstdio>
 #include <stdexcept>
 #include <string>
-
-#ifndef _WIN32
-#  include <sys/types.h>
-#endif
+#include <streambuf>
 
 #include <tightdb/config.h>
 #include <tightdb/assert.hpp>
+#include <tightdb/unique_ptr.hpp>
+#include <tightdb/safe_int_ops.hpp>
 
 namespace tightdb {
 
 
+/// Create the specified directory in the file system.
+///
+/// \throw File::AccessError If the directory could not be created. If
+/// the reason corresponds to one of the exception types that are
+/// derived from File::AccessError, the derived exception type is
+/// thrown (as long as the underlying system provides the information
+/// to unambiguously distinguish that particular reason).
+void make_dir(const std::string& path);
+
+/// Remove the specified directory path from the file system. If the
+/// specified path is a directory, this function is equivalent to
+/// std::remove(const char*).
+///
+/// \throw File::AccessError If the directory could not be removed. If
+/// the reason corresponds to one of the exception types that are
+/// derived from File::AccessError, the derived exception type is
+/// thrown (as long as the underlying system provides the information
+/// to unambiguously distinguish that particular reason).
+void remove_dir(const std::string& path);
+
 /// Create a new unique directory for temporary files. The absolute
 /// path to the new directory is returned without a trailing slash.
-std::string create_temp_dir();
+std::string make_temp_dir();
 
 
 /// This class provides a RAII abstraction over the concept of a file
@@ -52,6 +70,16 @@ std::string create_temp_dir();
 ///
 /// A single File instance must never be accessed concurrently by
 /// multiple threads.
+///
+/// You can write to a file via an std::ostream as follows:
+///
+/// \code{.cpp}
+///
+///   File::Streambuf my_streambuf(&my_file);
+///   std::ostream out(&my_strerambuf);
+///   out << 7945.9;
+///
+/// \endcode
 class File {
 public:
     enum Mode {
@@ -74,9 +102,9 @@ public:
     /// Calling this method on an instance that is already attached to
     /// an open file has undefined behavior.
     ///
-    /// \throw OpenError If the file could not be opened. If the
+    /// \throw AccessError If the file could not be opened. If the
     /// reason corresponds to one of the exception types that are
-    /// derived from OpenError, the derived exception type is thrown
+    /// derived from AccessError, the derived exception type is thrown
     /// (as long as the underlying system provides the information to
     /// unambiguously distinguish that particular reason).
     void open(const std::string& path, Mode = mode_Read);
@@ -114,17 +142,34 @@ public:
     /// together with create_Must results in undefined behavior.
     void open(const std::string& path, AccessMode, CreateMode, int flags);
 
+    /// Read data into the specified buffer and return the number of
+    /// bytes read. If the returned number of bytes is less than \a
+    /// size, then the end of the file has been reached.
+    ///
+    /// Calling this method on an instance, that is not currently
+    /// attached to an open file, has undefined behavior.
+    std::size_t read(char* data, std::size_t size);
+
+    /// Write the specified data to this file.
+    ///
+    /// Calling this method on an instance, that is not currently
+    /// attached to an open file, has undefined behavior.
+    ///
+    /// Calling this method on an instance, that was opened in
+    /// read-only mode, has undefined behavior.
     void write(const char* data, std::size_t size);
 
+    /// Calls write(s.data(), s.size()).
     void write(const std::string& s) { write(s.data(), s.size()); }
 
+    /// Calls read(data, N).
+    template<std::size_t N> std::size_t read(char (&data)[N]) { return read(data, N); }
+
+    /// Calls write(data(), N).
     template<std::size_t N> void write(const char (&data)[N]) { write(data, N); }
 
-#ifdef _WIN32
-    typedef int64_t SizeType;
-#else // POSIX
-    typedef off_t SizeType;
-#endif
+    // Plays the same role as off_t in POSIX
+    typedef int_fast64_t SizeType;
 
     /// Calling this method on an instance that is not attached to an
     /// open file has undefined behavior.
@@ -260,18 +305,40 @@ public:
     /// map().
     static void sync_map(void* addr, std::size_t size);
 
-    /// See open(const std::string&, Mode). The STDIO file stream is
-    /// always opened in binary mode.
-    static std::FILE* open_stdio_file(const std::string& path, Mode = mode_Read);
-
     /// Check whether the specified file or directory exists. Note
     /// that a file or directory that resides in a directory that the
     /// calling process has no access to, will necessarily be reported
     /// as not existing.
     static bool exists(const std::string& path);
 
+    /// Remove the specified file path from the file system. If the
+    /// specified path is not a directory, this function is equivalent
+    /// to std::remove(const char*).
+    ///
+    /// \throw AccessError If the file could not be removed. If the
+    /// reason corresponds to one of the exception types that are
+    /// derived from AccessError, the derived exception type is thrown
+    /// (as long as the underlying system provides the information to
+    /// unambiguously distinguish that particular reason).
+    static void remove(const std::string& path);
+
+    /// Same as remove() except that this one returns false, rather
+    /// than thriowing an exception, if the specified file does not
+    /// exist. If the file did exist, and was deleted, this function
+    /// returns true.
+    static bool try_remove(const std::string& path);
+
+    /// Check whether two open file descriptors refer to the same
+    /// underlying file, that is, if writing via one of them, will
+    /// affect what is read from the other. In UNIX this boils down to
+    /// comparing inode numbers.
+    ///
+    /// Both instances have to be attached to open files. If they are
+    /// not, this method has undefined behavior.
+    bool is_same_file(const File&) const;
+
     // FIXME: Can we get rid of this one please!!!
-    bool is_deleted() const;
+    bool is_removed() const;
 
     class ExclusiveLock;
     class SharedLock;
@@ -282,27 +349,29 @@ public:
     class UnlockGuard;
     class UnmapGuard;
 
-    struct OpenError: std::runtime_error {
-        OpenError(const std::string& msg): std::runtime_error(msg) {}
+    class Streambuf;
+
+    struct AccessError: std::runtime_error {
+        AccessError(const std::string& msg): std::runtime_error(msg) {}
     };
 
     /// Thrown if the user does not have permission to open or create
     /// the specified file in the specified access mode.
-    struct PermissionDenied: OpenError {
-        PermissionDenied(const std::string& msg): OpenError(msg) {}
+    struct PermissionDenied: AccessError {
+        PermissionDenied(const std::string& msg): AccessError(msg) {}
     };
 
     /// Thrown if the directory part of the specified path was not
     /// found, or create_Never was specified and the file did no
     /// exist.
-    struct NotFound: OpenError {
-        NotFound(const std::string& msg): OpenError(msg) {}
+    struct NotFound: AccessError {
+        NotFound(const std::string& msg): AccessError(msg) {}
     };
 
     /// Thrown if create_Always was specified and the file did already
     /// exist.
-    struct Exists: OpenError {
-        Exists(const std::string& msg): OpenError(msg) {}
+    struct Exists: AccessError {
+        Exists(const std::string& msg): AccessError(msg) {}
     };
 
 private:
@@ -457,6 +526,30 @@ public:
     void release() TIGHTDB_NOEXCEPT { m_map = 0; }
 private:
     MapBase* m_map;
+};
+
+
+
+/// Only output is supported at this point.
+class File::Streambuf: public std::streambuf {
+public:
+    explicit Streambuf(File*);
+    ~Streambuf();
+
+private:
+    static const std::size_t buffer_size = 4096;
+
+    File& m_file;
+    UniquePtr<char[]> const m_buffer;
+
+    int_type overflow(int_type) TIGHTDB_OVERRIDE;
+    int sync() TIGHTDB_OVERRIDE;
+    pos_type seekpos(pos_type, std::ios_base::openmode) TIGHTDB_OVERRIDE;
+    void flush();
+
+    // Disable copying
+    Streambuf(const Streambuf&);
+    Streambuf& operator=(const Streambuf&);
 };
 
 
@@ -625,9 +718,59 @@ template<class T> inline std::size_t File::Map<T>::get_size() const TIGHTDB_NOEX
 
 template<class T> inline T* File::Map<T>::release() TIGHTDB_NOEXCEPT
 {
-    T* const addr = static_cast<T*>(m_addr);
+    T* addr = static_cast<T*>(m_addr);
     m_addr = 0;
     return addr;
+}
+
+
+inline File::Streambuf::Streambuf(File* f): m_file(*f), m_buffer(new char[buffer_size])
+{
+    char* b = m_buffer.get();
+    setp(b, b + buffer_size);
+}
+
+inline File::Streambuf::~Streambuf()
+{
+    try {
+        if (m_file.is_attached()) flush();
+    }
+    catch (...) {
+        // Errors deliberately ignored
+    }
+}
+
+inline File::Streambuf::int_type File::Streambuf::overflow(int_type c)
+{
+    flush();
+    if (c == traits_type::eof())
+        return traits_type::not_eof(c);
+    *pptr() = traits_type::to_char_type(c);
+    pbump(1);
+    return c;
+}
+
+inline int File::Streambuf::sync()
+{
+    flush();
+    return 0;
+}
+
+inline File::Streambuf::pos_type File::Streambuf::seekpos(pos_type pos, std::ios_base::openmode)
+{
+    flush();
+    SizeType pos2 = 0;
+    if (int_cast_with_overflow_detect(std::streamsize(pos), pos2))
+        throw std::runtime_error("Seek position overflow");
+    m_file.seek(pos2);
+    return pos;
+}
+
+inline void File::Streambuf::flush()
+{
+    std::size_t n = pptr() - pbase();
+    m_file.write(pbase(), n);
+    setp(m_buffer.get(), epptr());
 }
 
 

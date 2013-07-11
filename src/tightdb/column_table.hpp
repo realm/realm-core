@@ -40,6 +40,8 @@ public:
         invalidate_subtables();
     }
 
+    void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
+
 protected:
     /// A pointer to the table that this column is part of. For a
     /// free-standing column, this pointer is null.
@@ -184,6 +186,7 @@ public:
     void add(const Table*);
     void insert(std::size_t ndx) TIGHTDB_OVERRIDE;
     void insert(std::size_t ndx, const Table*);
+    void set(std::size_t ndx, const Table*);
     void erase(size_t ndx) TIGHTDB_OVERRIDE;
     void ClearTable(size_t ndx);
     void fill(size_t count);

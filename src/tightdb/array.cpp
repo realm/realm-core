@@ -35,6 +35,25 @@ void Array::init_from_ref(size_t ref) TIGHTDB_NOEXCEPT
     CreateFromHeader(header, ref);
 }
 
+// FIXME: This is a very crude and error prone misuse of Array,
+// especially since its use is not isolated inside the array
+// class. There seems to be confusion about how to construct an array
+// to be used with this method. Somewhere (e.g. in
+// Column::find_first()) we use Array(Allocator&). In other places
+// (TableViewBase::aggregate()) we use Array(no_prealloc_tag). We must
+// at least document the rules governing the use of
+// CreateFromHeaderDirect().
+//
+// FIXME: If we want to keep this methid, we should formally define
+// what can be termed 'direct read-only' use of an Array instance, and
+// wat rules apply in this case. Currently Array::clone() just passes
+// zero for the 'ref' argument.
+//
+// FIXME: Assuming that this method is only used for what can be
+// termed 'direct read-only' use, the type of the header argument
+// should be changed to 'const char*', and a const_cast should be
+// added below. This would avoid the need for const_cast's in places
+// like Array::clone().
 void Array::CreateFromHeaderDirect(char* header, size_t ref) TIGHTDB_NOEXCEPT
 {
     // Parse header
@@ -472,7 +491,7 @@ size_t Array::FindPos(int64_t target) const TIGHTDB_NOEXCEPT
 }
 
 // BM FIXME: Rename to something better... // FirstGTE()
-size_t Array::FindPos2(int64_t target) const
+size_t Array::FindPos2(int64_t target) const TIGHTDB_NOEXCEPT
 {
     size_t low = (size_t)-1;
     size_t high = m_len;
@@ -494,6 +513,34 @@ size_t Array::FindPos2(int64_t target) const
         return not_found;
     else
         return high;
+}
+
+// Finds either value, or if not in set, insert position
+// used both for lookups and maintaining order in sorted lists
+bool Array::FindPosSorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
+{
+    size_t low = (size_t)-1;
+    size_t high = m_len;
+
+    // Binary search based on:
+    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+    // Finds position of closest value BIGGER OR EQUAL to the target (for
+    // lookups in indexes)
+    while (high - low > 1) {
+        const size_t probe = (low + high) >> 1;
+        const int64_t v = Get(probe);
+
+        if (v < target)
+            low = probe;
+        else
+            high = probe;
+    }
+
+    pos = high;
+    if (high == m_len)
+        return false;
+    else
+        return (Get(high) == target);
 }
 
 // return first element E for which E >= target or return -1 if none. Array must be sorted
@@ -528,7 +575,7 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     size_t add;
     add = 1;
 
-    for(;;) {
+    for (;;) {
         if (start + add < m_len && Get(start + add) < target)
             start += add;
         else
@@ -1111,15 +1158,6 @@ size_t Array::count(int64_t value) const
     return count;
 }
 
-
-void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const
-{
-    (void)result;
-    (void)value;
-    (void)maxdist;
-    (void)offset;
-}
-
 size_t Array::GetByteSize(bool align) const
 {
     size_t len = CalcByteLen(m_len, m_width);
@@ -1148,47 +1186,71 @@ size_t Array::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
     return total_bits / width;
 }
 
-void Array::Copy(const Array& a)
+size_t Array::clone(const char* header, Allocator& alloc, Allocator& clone_alloc)
 {
-    // Calculate size in bytes (plus a bit of matchcount room for expansion)
-    size_t len = CalcByteLen(a.m_len, a.m_width);
-    const size_t rest = (~len & 0x7)+1;
-    if (rest < 8) len += rest; // 64bit blocks
-    const size_t new_len = len + 64;
+    if (!get_hasrefs_from_header(header)) {
+        // This array has no subarrays, so we can make a byte-for-byte
+        // copy, which is more efficient.
 
-    // Create new copy of array
-    MemRef mref = m_alloc.Alloc(new_len); // Throws
-    const char* src_begin = get_header_from_data(a.m_data);
-    const char* src_end   = a.m_data + len;
-    char*       dst_begin = static_cast<char*>(mref.pointer);
-    copy(src_begin, src_end, dst_begin);
+        // Calculate size of new array in bytes
+        size_t size = get_byte_size_from_header(header);
 
-    // Clear old contents
-    Destroy();
+        // Create the new array
+        MemRef mem_ref = clone_alloc.Alloc(size); // Throws
+        char* clone_header = static_cast<char*>(mem_ref.pointer);
 
-    // Update internal data
-    UpdateRef(mref.ref);
-    set_header_capacity(new_len); // uses m_data to find header, so m_data must be initialized correctly first
+        // Copy contents
+        const char* src_begin = header;
+        const char* src_end   = header + size;
+        char*       dst_begin = clone_header;
+        copy(src_begin, src_end, dst_begin);
 
-    // Copy sub-arrays as well
-    if (m_hasRefs) {
-        for (size_t i = 0; i < m_len; ++i) {
-            const size_t ref = GetAsRef(i);
+        // Update with correct capacity
+        set_header_capacity(size, clone_header);
 
-            // null-refs signify empty sub-trees
-            if (ref == 0) continue;
-
-            // all refs are 64bit aligned, so the lowest bits
-            // cannot be set. If they are it means that it should
-            // not be interpreted as a ref
-            if (ref & 0x1) continue;
-
-            const Array sub(ref, NULL, 0, a.m_alloc);
-            Array cp(m_alloc);
-            cp.SetParent(this, i);
-            cp.Copy(sub);
-        }
+        return mem_ref.ref;
     }
+
+    // Refs are integers, and integers arrays use wtype_Bits.
+    TIGHTDB_ASSERT(get_wtype_from_header(header) == wtype_Bits);
+
+    Array array((Array::no_prealloc_tag()));
+    array.CreateFromHeaderDirect(const_cast<char*>(header));
+
+    // Create new empty array of refs
+    MemRef mem_ref = clone_alloc.Alloc(initial_capacity); // Throws
+    char* clone_header = static_cast<char*>(mem_ref.pointer);
+    {
+        bool is_node = get_isnode_from_header(header);
+        bool has_refs = true;
+        WidthType width_type = wtype_Bits;
+        int width = 0;
+        size_t length = 0;
+        init_header(clone_header, is_node, has_refs, width_type, width, length, initial_capacity);
+    }
+
+    Array new_array(clone_alloc);
+    new_array.CreateFromHeader(clone_header, mem_ref.ref);
+
+    size_t n = array.size();
+    for (size_t i = 0; i < n; ++i) {
+        int64_t value = array.Get(i);
+
+        // Null-refs signify empty sub-trees. Also, all refs are
+        // 8-byte aligned, so the lowest bits cannot be set. If they
+        // are, it means that it should not be interpreted as a ref.
+        bool is_subarray = value != 0 && (value & 0x1) == 0;
+        if (is_subarray) {
+            size_t ref = value;
+            const char* subheader = static_cast<char*>(alloc.Translate(ref));
+            size_t new_ref = clone(subheader, alloc, clone_alloc);
+            value = new_ref;
+        }
+
+        new_array.add(value);
+    }
+
+    return mem_ref.ref;
 }
 
 void Array::CopyOnWrite()
@@ -1957,115 +2019,119 @@ void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t star
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
     QueryState<int64_t> state;
-    state.m_state = reinterpret_cast<int64_t>(&result);
+    state.init(act_FindAll, &result, static_cast<size_t>(-1));
+//    state.m_state = reinterpret_cast<int64_t>(&result);
 
     TIGHTDB_TEMPEX3(find, Equal, act_FindAll, m_width, (value, start, end, colOffset, &state, CallbackDummy()));
 
     return;
 }
 
-void Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state) const
+bool Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state) const
 {
     if (cond == cond_Equal) {
         if (action == act_Sum) {
-            TIGHTDB_TEMPEX3(find, Equal, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Equal, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
-            TIGHTDB_TEMPEX3(find, Equal, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Equal, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Max) {
-            TIGHTDB_TEMPEX3(find, Equal, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Equal, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Count) {
-            TIGHTDB_TEMPEX3(find, Equal, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Equal, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_FindAll) {
-            TIGHTDB_TEMPEX3(find, Equal, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Equal, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_CallbackIdx) {
-            TIGHTDB_TEMPEX3(find, Equal, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Equal, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
     }
     if (cond == cond_NotEqual) {
         if (action == act_Sum) {
-            TIGHTDB_TEMPEX3(find, NotEqual, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, NotEqual, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
-            TIGHTDB_TEMPEX3(find, NotEqual, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, NotEqual, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Max) {
-            TIGHTDB_TEMPEX3(find, NotEqual, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, NotEqual, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Count) {
-            TIGHTDB_TEMPEX3(find, NotEqual, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, NotEqual, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_FindAll) {
-            TIGHTDB_TEMPEX3(find, NotEqual, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, NotEqual, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_CallbackIdx) {
-            TIGHTDB_TEMPEX3(find, NotEqual, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, NotEqual, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
     }
     if (cond == cond_Greater) {
         if (action == act_Sum) {
-            TIGHTDB_TEMPEX3(find, Greater, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Greater, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
-            TIGHTDB_TEMPEX3(find, Greater, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Greater, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Max) {
-            TIGHTDB_TEMPEX3(find, Greater, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Greater, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Count) {
-            TIGHTDB_TEMPEX3(find, Greater, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Greater, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_FindAll) {
-            TIGHTDB_TEMPEX3(find, Greater, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Greater, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_CallbackIdx) {
-            TIGHTDB_TEMPEX3(find, Greater, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Greater, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
     }
     if (cond == cond_Less) {
         if (action == act_Sum) {
-            TIGHTDB_TEMPEX3(find, Less, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Less, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
-            TIGHTDB_TEMPEX3(find, Less, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Less, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Max) {
-            TIGHTDB_TEMPEX3(find, Less, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Less, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Count) {
-            TIGHTDB_TEMPEX3(find, Less, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Less, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_FindAll) {
-            TIGHTDB_TEMPEX3(find, Less, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Less, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_CallbackIdx) {
-            TIGHTDB_TEMPEX3(find, Less, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, Less, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
     }
     if (cond == cond_None) {
         if (action == act_Sum) {
-            TIGHTDB_TEMPEX3(find, None, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, None, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
-            TIGHTDB_TEMPEX3(find, None, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, None, act_Min, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Max) {
-            TIGHTDB_TEMPEX3(find, None, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, None, act_Max, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Count) {
-            TIGHTDB_TEMPEX3(find, None, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, None, act_Count, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_FindAll) {
-            TIGHTDB_TEMPEX3(find, None, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, None, act_FindAll, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_CallbackIdx) {
-            TIGHTDB_TEMPEX3(find, None, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+            TIGHTDB_TEMPEX3(return find, None, act_CallbackIdx, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
     }
+    TIGHTDB_ASSERT(false);
+    return false;
+
 }
 
 
@@ -2421,7 +2487,126 @@ top:
     }
 }
 
+FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const
+{
+    const char* v = value.data();
+    const char* v_end = v + value.size();
+    const char* data = m_data;
+    const char* header;
+    size_t width = m_width;
+    bool isNode = m_isNode;
+
+top:
+    // Create 4 byte index key
+    int32_t key = 0;
+    if (v != v_end) key  = (int32_t(*v++) << 24);
+    if (v != v_end) key |= (int32_t(*v++) << 16);
+    if (v != v_end) key |= (int32_t(*v++) << 8);
+    if (v != v_end) key |=  int32_t(*v++);
+
+    for (;;) {
+        // Get subnode table
+        const size_t ref_offsets = to_size_t(get_direct(data, width, 0));
+        const size_t ref_refs    = to_ref(get_direct(data, width, 1));
+
+        // Find the position matching the key
+        const char*  offsets_header = static_cast<char*>(m_alloc.Translate(ref_offsets));
+        const char*  offsets_data   = get_data_from_header(offsets_header);
+        const size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
+
+        // If key is outside range, we know there can be no match
+        if (pos == not_found) return FindRes_not_found;
+
+        // Get entry under key
+        const char*  refs_header = static_cast<char*>(m_alloc.Translate(ref_refs));
+        const char*  refs_data   = get_data_from_header(refs_header);
+        const size_t refs_width  = get_width_from_header(refs_header);
+        const size_t ref = to_ref(get_direct(refs_data, refs_width, pos));
+
+        if (isNode) {
+            // Set vars for next iteration
+            header = static_cast<char*>(m_alloc.Translate(ref));
+            data   = get_data_from_header(header);
+            width  = get_width_from_header(header);
+            isNode = get_isnode_from_header(header);
+            continue;
+        }
+
+        const int32_t stored_key = int32_t(get_direct<32>(offsets_data, pos));
+
+        if (stored_key == key) {
+            // Literal row index
+            if (ref & 1) {
+                const size_t row_ref = (ref >> 1);
+
+                // If the last byte in the stored key is zero, we know that we have
+                // compared against the entire (target) string
+                if (!(stored_key << 24)) {
+                    res_ref = row_ref;
+                    return FindRes_single; // found single
+                }
+
+                StringData str = (*get_func)(column, row_ref);
+                if (str == value) {
+                    res_ref = row_ref;
+                    return FindRes_single; // found single
+                }
+                else return FindRes_not_found; // not_found
+            }
+
+            const char* sub_header  = static_cast<char*>(m_alloc.Translate(ref));
+            const bool  sub_isindex = get_indexflag_from_header(sub_header);
+
+            // List of matching row indexes
+            if (!sub_isindex) {
+                const bool sub_isnode = get_isnode_from_header(sub_header);
+
+                // In most cases the row list will just be an array but there
+                // might be so many matches that it has branched into a column
+                if (!sub_isnode) {
+                    const size_t sub_width = get_width_from_header(sub_header);
+                    const char*  sub_data  = get_data_from_header(sub_header);
+                    const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
+
+                    // If the last byte in the stored key is not zero, we have
+                    // not yet compared against the entire (target) string
+                    if ((stored_key << 24)) {
+                        StringData str = (*get_func)(column, first_row_ref);
+                        if (str != value)
+                            return FindRes_not_found; // not_found
+                    }
+                }
+                else {
+                    const Column sub(ref, NULL, 0, m_alloc);
+                    const size_t first_row_ref = to_size_t(sub.get(0));
+
+                    // If the last byte in the stored key is not zero, we have
+                    // not yet compared against the entire (target) string
+                    if ((stored_key << 24)) {
+                        StringData str = (*get_func)(column, first_row_ref);
+                        if (str != value)
+                            return FindRes_not_found; // not_found
+                    }
+                }
+
+                // Return a reference to the result column
+                res_ref = ref;
+                return FindRes_column; // column of matches
+            }
+
+            // Recurse into sub-index;
+            header = static_cast<char*>(m_alloc.Translate(ref));
+            data   = get_data_from_header(header);
+            width  = get_width_from_header(header);
+            isNode = get_isnode_from_header(header);
+            goto top;
+        }
+        else return FindRes_not_found; // not_found
+    }
+}
+
 size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_func) const
+
 {
     const char* v = value.data();
     const char* v_end = v + value.size();

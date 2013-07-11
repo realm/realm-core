@@ -57,7 +57,7 @@ public:
     Query& tableview(const TableView& tv);
     Query& tableview(const Array& arr);
 
-    // Conditions: int
+    // Conditions: int64_t
     Query& equal(size_t column_ndx, int64_t value);
     Query& not_equal(size_t column_ndx, int64_t value);
     Query& greater(size_t column_ndx, int64_t value);
@@ -65,6 +65,23 @@ public:
     Query& less(size_t column_ndx, int64_t value);
     Query& less_equal(size_t column_ndx, int64_t value);
     Query& between(size_t column_ndx, int64_t from, int64_t to);
+
+    // Conditions: int (we need those because conversion from '1234' is ambiguous with float/double)
+    Query& equal(size_t column_ndx, int value);
+    Query& not_equal(size_t column_ndx, int value);
+    Query& greater(size_t column_ndx, int value);
+    Query& greater_equal(size_t column_ndx, int value);
+    Query& less(size_t column_ndx, int value);
+    Query& less_equal(size_t column_ndx, int value);
+    Query& between(size_t column_ndx, int from, int to);
+
+    // Conditions: 2 int columns
+    Query& equal_int(size_t column_ndx1, size_t column_ndx2);
+    Query& not_equal_int(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_int(size_t column_ndx1, size_t column_ndx2);
+    Query& less_int(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_equal_int(size_t column_ndx1, size_t column_ndx2);
+    Query& less_equal_int(size_t column_ndx1, size_t column_ndx2);
 
     // Conditions: float
     Query& equal(size_t column_ndx, float value);
@@ -75,6 +92,14 @@ public:
     Query& less_equal(size_t column_ndx, float value);
     Query& between(size_t column_ndx, float from, float to);
 
+    // Conditions: 2 float columns
+    Query& equal_float(size_t column_ndx1, size_t column_ndx2);
+    Query& not_equal_float(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_float(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_equal_float(size_t column_ndx1, size_t column_ndx2);
+    Query& less_float(size_t column_ndx1, size_t column_ndx2);
+    Query& less_equal_float(size_t column_ndx1, size_t column_ndx2);
+
      // Conditions: double
     Query& equal(size_t column_ndx, double value);
     Query& not_equal(size_t column_ndx, double value);
@@ -83,6 +108,14 @@ public:
     Query& less(size_t column_ndx, double value);
     Query& less_equal(size_t column_ndx, double value);
     Query& between(size_t column_ndx, double from, double to);
+
+    // Conditions: 2 double columns
+    Query& equal_double(size_t column_ndx1, size_t column_ndx2);
+    Query& not_equal_double(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_double(size_t column_ndx1, size_t column_ndx2);
+    Query& greater_equal_double(size_t column_ndx1, size_t column_ndx2);
+    Query& less_double(size_t column_ndx1, size_t column_ndx2);
+    Query& less_equal_double(size_t column_ndx1, size_t column_ndx2);
 
     // Conditions: bool
     Query& equal(size_t column_ndx, bool value);
@@ -97,11 +130,18 @@ public:
     Query& between_date(size_t column_ndx, Date from, Date to) { return between(column_ndx, int64_t(from.get_date()), int64_t(to.get_date())); }
 
     // Conditions: strings
+
     Query& equal(size_t column_ndx, StringData value, bool case_sensitive=true);
     Query& not_equal(size_t column_ndx, StringData value, bool case_sensitive=true);
     Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive=true);
     Query& ends_with(size_t column_ndx, StringData value, bool case_sensitive=true);
     Query& contains(size_t column_ndx, StringData value, bool case_sensitive=true);
+
+    // These are shortcuts for equal(StringData(c_str)) and
+    // not_equal(StringData(c_str)), and are needed to avoid unwanted
+    // implicit conversion of char* to bool.
+    Query& equal(size_t column_ndx, const char* c_str, bool case_sensitive=true);
+    Query& not_equal(size_t column_ndx, const char* c_str, bool case_sensitive=true);
 
     // Conditions: binary data
     Query& equal(size_t column_ndx, BinaryData value);
@@ -207,6 +247,13 @@ protected:
     mutable bool do_delete;
 
 private:
+    template <class TColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
+    template <class TColumnType> Query& less(size_t column_ndx1, size_t column_ndx2);
+    template <class TColumnType> Query& less_equal(size_t column_ndx1, size_t column_ndx2);
+    template <class TColumnType> Query& greater(size_t column_ndx1, size_t column_ndx2);
+    template <class TColumnType> Query& greater_equal(size_t column_ndx1, size_t column_ndx2);
+    template <class TColumnType> Query& not_equal(size_t column_ndx1, size_t column_ndx2);
+
     std::string error_code;
 
 #if TIGHTDB_MULTITHREAD_QUERY
@@ -221,6 +268,20 @@ private:
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
 };
 
+
+
+
+// Implementation:
+
+inline Query& Query::equal(size_t column_ndx, const char* c_str, bool case_sensitive)
+{
+    return equal(column_ndx, StringData(c_str), case_sensitive);
+}
+
+inline Query& Query::not_equal(size_t column_ndx, const char* c_str, bool case_sensitive)
+{
+    return not_equal(column_ndx, StringData(c_str), case_sensitive);
+}
 
 } // namespace tightdb
 

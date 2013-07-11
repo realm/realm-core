@@ -1333,8 +1333,7 @@ TEST(ArrayCopy)
     a.add(3);
     a.add(4);
 
-    Array b;
-    b.Copy(a);
+    Array b(a, Allocator::get_default());
 
 #ifdef TIGHTDB_DEBUG
     b.Verify();
@@ -1351,11 +1350,10 @@ TEST(ArrayCopy)
     Array c(Array::coldef_HasRefs);
     c.add(a.GetRef());
 
-    Array d;
-    d.Copy(c);
+    Array d(c, Allocator::get_default());
 
 #ifdef TIGHTDB_DEBUG
-    b.Verify();
+    b.Verify(); // FIXME: Should this not have been d.Verify()?
 #endif
 
     CHECK(d.HasRefs());

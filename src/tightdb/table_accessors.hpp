@@ -848,6 +848,11 @@ public:
         return Base::m_table->get_impl()->find_first_int(col_idx, value);
     }
 
+    bool find_sorted(int64_t value, std::size_t& pos) const
+    {
+        return Base::m_table->get_impl()->find_sorted_int(col_idx, value, pos);
+    }
+
     // FIXME: What does this function do? It is used by SlabAlloc. Table::find_pos_int() is protected. Something is not right!
     std::size_t find_pos(int64_t value) const TIGHTDB_NOEXCEPT
     {
@@ -1049,6 +1054,16 @@ private:
 
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
+
+    Date maximum() const
+    {
+        return Base::m_table->get_impl()->maximum_date(col_idx);
+    }
+
+    Date minimum() const
+    {
+        return Base::m_table->get_impl()->minimum_date(col_idx);
+    }
 
     std::size_t find_first(Date value) const
     {

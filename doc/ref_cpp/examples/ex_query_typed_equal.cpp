@@ -1,6 +1,7 @@
 // @@Example: ex_cpp_typed_query_equals @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_5(PeopleTable,
                 name,  String,

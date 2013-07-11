@@ -48,7 +48,8 @@ public:
     virtual void insert(size_t ndx) = 0; // Insert an entry into this column using the columns default value
     virtual void Clear() = 0;
     virtual void erase(size_t ndx) = 0;
-    void Resize(size_t ndx) { m_array->Resize(ndx); }
+    virtual void move_last_over(size_t ndx) = 0;
+    void Resize(size_t ndx) {m_array->Resize(ndx);}
 
     // Indexing
     virtual bool HasIndex() const = 0;
@@ -96,10 +97,8 @@ protected:
     // Tree functions
 public:
     template<typename T, class C> T TreeGet(size_t ndx) const; // FIXME: This one should probably be eliminated or redesiged because it throws due to dynamic memory allocation
-    template<class C> size_t TreeGetLeafRef(size_t ndx) const; // FIXME: This one should probably be eliminated or redesiged because it throws due to dynamic memory allocation
-
 protected:
-	template<typename T, class C> void TreeSet(size_t ndx, T value);
+    template<typename T, class C> void TreeSet(size_t ndx, T value);
     template<typename T, class C> void TreeInsert(size_t ndx, T value);
     template<typename T, class C> NodeChange DoInsert(size_t ndx, T value);
     template<typename T, class C> void TreeDelete(size_t ndx);
@@ -178,21 +177,18 @@ public:
 
     void sort(size_t start, size_t end);
     void ReferenceSort(size_t start, size_t end, Column &ref);
-
-    intptr_t GetPtr(size_t ndx) const {return intptr_t(get(ndx));} // FIXME: intptr_t is not guaranteed to exists, not even in C++11
-
     void Clear() TIGHTDB_OVERRIDE;
     void erase(size_t ndx) TIGHTDB_OVERRIDE;
-    //void Resize(size_t len);
+    void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
 
     void Increment64(int64_t value, size_t start=0, size_t end=-1);
     void IncrementIf(int64_t limit, int64_t value);
-    size_t find_first(int64_t value, size_t start=0, size_t end=-1) const;
 
-    void find_all(Array& result, int64_t value, size_t caller_offset=0, size_t start=0, size_t end=-1) const;
-    void find_all_hamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
+    size_t find_first(int64_t value, size_t start=0, size_t end=-1) const;
+    void   find_all(Array& result, int64_t value, size_t caller_offset=0, size_t start=0, size_t end=-1) const;
     size_t find_pos(int64_t value) const TIGHTDB_NOEXCEPT;
-    size_t find_pos2(int64_t value) const;
+    size_t find_pos2(int64_t value) const TIGHTDB_NOEXCEPT;
+    bool   find_sorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT;
 
     // Query support methods
     void LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const;

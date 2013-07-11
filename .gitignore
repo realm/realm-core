@@ -40,4 +40,24 @@ _ReSharper*/
 Static library*/
 *.opensdf
 *.sdf
-/tightdb.xcodeproj
+
+/tightdb.xcodeproj/project.xcworkspace
+/tightdb.xcodeproj/xcuserdata
+
+# sh build.sh config
+/config
+
+# sh build.sh build-iphone
+/iphone-lib/include
+/iphone-lib/libtightdb-ios.a
+/iphone-lib/libtightdb-ios-dbg.a
+/iphone-lib/tightdb-config
+/iphone-lib/tightdb-config-dbg
+
+# debian/ubuntu builds
+debian/tightdb/*
+debian/libtightdb/*
+debian/libtightdb-dev/*
+debian/libtightdb-dev.substvars
+debian/libtightdb.substvars
+debian/tightdb.substvars

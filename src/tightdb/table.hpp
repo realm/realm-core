@@ -158,6 +158,7 @@ public:
     void        insert_empty_row(size_t row_ndx, size_t num_rows = 1);
     void        remove(size_t row_ndx);
     void        remove_last() {if (!is_empty()) remove(m_size-1);}
+    void        move_last_over(size_t ndx);
 
     // Insert row
     // NOTE: You have to insert values in ALL columns followed by insert_done().
@@ -238,6 +239,8 @@ public:
     size_t         find_first_double(size_t column_ndx, double value) const;
     size_t         find_first_string(size_t column_ndx, StringData value) const;
     size_t         find_first_binary(size_t column_ndx, BinaryData value) const;
+
+    bool           find_sorted_int(size_t column_ndx, int64_t value, size_t& pos) const;
 
     TableView      find_all_int(size_t column_ndx, int64_t value);
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
@@ -446,6 +449,11 @@ protected:
     /// get_column_type()).
     void insert_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
 
+    /// Like insert_subtable(std::size_t, std::size_t, const Table*)
+    /// but overwrites the specified cell rather than inserting a new
+    /// one.
+    void set_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
+
     void insert_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
 
     void set_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
@@ -509,13 +517,9 @@ private:
     std::size_t clone_columns(Allocator&) const;
 
     /// Construct a complete copy of this table (including its spec)
-    /// using the specified allocator and return just the ref to that
-    /// array.
+    /// using the specified allocator and return just the ref to the
+    /// new top array.
     std::size_t clone(Allocator&) const;
-
-    // Experimental
-    TableView find_all_hamming(size_t column_ndx, uint64_t value, size_t max);
-    ConstTableView find_all_hamming(size_t column_ndx, uint64_t value, size_t max) const;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     struct LocalTransactLog;
@@ -617,9 +621,20 @@ inline bool Table::has_shared_spec() const
     return static_cast<Parent*>(parent)->subtables_have_shared_spec();
 }
 
+inline Spec& Table::get_spec()
+{
+    TIGHTDB_ASSERT(m_top.IsValid()); // you can only change specs on top-level tables
+    return m_spec_set;
+}
+
+inline const Spec& Table::get_spec() const
+{
+    return m_spec_set;
+}
+
 struct Table::UnbindGuard {
     UnbindGuard(Table* t) TIGHTDB_NOEXCEPT: m_table(t) {}
-    ~UnbindGuard() { if(m_table) m_table->unbind_ref(); } // FIXME: Cannot be noexcept since ~Table() may throw
+    ~UnbindGuard() { if (m_table) m_table->unbind_ref(); } // FIXME: Cannot be noexcept since ~Table() may throw
     Table* operator->() const { return m_table; }
     Table* get() const { return m_table; }
     Table* release() TIGHTDB_NOEXCEPT { Table* t = m_table; m_table = 0; return t; }

@@ -1,8 +1,8 @@
 // @@Example: ex_cpp_dyn_query_between @@
+#include <cassert>
 #include <tightdb.hpp>
 
 using namespace tightdb;
-using namespace std;
 
 int main()
 {
@@ -42,8 +42,8 @@ int main()
     TableView view = query.find_all();
 
     assert(view.size() == 2);
-    assert(!strcmp(view.get_string(0, 0), "Alice"));
-    assert(!strcmp(view.get_string(0, 1), "Peter"));
+    assert(view.get_string(0,0) == "Alice");
+    assert(view.get_string(0,1) == "Peter");
 // @@EndShow@@
 }
 // @@EndExample@@
