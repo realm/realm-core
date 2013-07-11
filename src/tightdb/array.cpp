@@ -1158,15 +1158,6 @@ size_t Array::count(int64_t value) const
     return count;
 }
 
-
-void Array::FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const
-{
-    (void)result;
-    (void)value;
-    (void)maxdist;
-    (void)offset;
-}
-
 size_t Array::GetByteSize(bool align) const
 {
     size_t len = CalcByteLen(m_len, m_width);
