@@ -2060,7 +2060,7 @@ void Table::update_from_spec()
 
 // to JSON: ------------------------------------------
 
-void Table::to_json(ostream& out)
+void Table::to_json(ostream& out) const
 {
     // Represent table as list of objects
     out << "[";
@@ -2108,7 +2108,7 @@ template<typename T> void out_floats(ostream& out, T value)
 
 } // anonymous namespace
 
-void Table::to_json_row(size_t row_ndx, ostream& out)
+void Table::to_json_row(size_t row_ndx, ostream& out) const
 {
     out << "{";
     const size_t column_count = get_column_count();

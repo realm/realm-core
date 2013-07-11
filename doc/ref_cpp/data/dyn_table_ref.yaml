@@ -32,20 +32,20 @@ DESCR      : &g_dyn_table_intro_descr
 
              It is possible to query a dynamic table using {@link class_dyn_query} objects. The result
              set is often returned as a {@link class_dyn_tableview} object.
-             
-             NOTICE: 
+
+             NOTICE:
              For all methods which takes row and column index as parameters,
              you must ensure that these are in a valid range.
              You must also ensure that you use the correct type of method for
              the correct type of column. I.e. it's invalid to use 'getString(...)'
-             with a column index which is of Boolean type - it must be of 'String' 
+             with a column index which is of Boolean type - it must be of 'String'
              type and so forth.
-             
+
 
 SEE        : &g_dyn_table_intro_see
              >
              Besides the dynamic table described here, {@link class_typed_table} are preferred
-             when the structure of your data is know at compile time. It provides additional 
+             when the structure of your data is know at compile time. It provides additional
              type safety and auto-completion productivity compared to the dynamic table.
 EXAMPLES   :
 - DESCR:
@@ -160,7 +160,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_operator_neq_summary
                  Compare two tables for inequality.
       DESCR    : &g_dyn_table_operator_neq_descr
-                 This method compares two tables for inequality. 
+                 This method compares two tables for inequality.
                  Two tables are equal only if they contain the same columns and
                  rows in the same order.
       CONST    : True
@@ -188,7 +188,7 @@ CATEGORIES :
                  This method appends a column of the specified type and name to the table.
                  If it's used in a table which already has rows, the new column will just get
                  default values (0, "", null) in those rows.
-                 
+
                  Currently, the following types are supported:
                  <ul>
                    <li><code>type_Bool</code></li>
@@ -247,7 +247,7 @@ CATEGORIES :
       DESCR    : &g_dyn_table_rename_column_descr
                  This method renames the specified column.
 # TODO: Add when vector indexing has been fixed
-#      SIGNATURE: | 
+#      SIGNATURE: |
 #                 void rename_column(size_t column_ndx, StringData name);
 #                 void rename_column(const vector<size_t>& column_path, StringData name);
       PARAMS:
@@ -297,7 +297,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_column_name
         DESCR  :
-  
+
   - g_dyn_table_get_column_index:
       NAME     : get_column_index
       SUMMARY  : &g_dyn_table_get_column_index_summary
@@ -356,7 +356,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_add_int_summary
                  Add value to all cells in a column.
       DESCR    : &g_dyn_table_add_int_descr
-                 Add an integer value to all the cells in the specified column. 
+                 Add an integer value to all the cells in the specified column.
                  There is no overflow or underflow protection.
       PARAMS:
       - NAME   : column_ndx
@@ -367,7 +367,7 @@ CATEGORIES :
         TYPES  : int64_t
         DESCR  : &g_dyn_table_add_int_parm2_descr
                  Value to add to all cells in the column.
-        
+
 - Rows:
   METHODS:
   - g_dyn_table_add_empty_row:
@@ -408,7 +408,7 @@ CATEGORIES :
   - g_dyn_table_insert_int:
   - g_dyn_table_insert_enum:
   - g_dyn_table_insert_float:
-  - g_dyn_table_insert_double:  
+  - g_dyn_table_insert_double:
   - g_dyn_table_insert_date:
   - g_dyn_table_insert_string:
   - g_dyn_table_insert_binary:
@@ -466,7 +466,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_remove_row_summary
                  Delete a row.
       DESCR    : &g_dyn_table_remove_row_descr
-                 This method deletes a specific row. 
+                 This method deletes a specific row.
                  All rows with a larger row index will be repositioned with a row index one lower.
       SIGNATURE: void remove(size_t row_ndx);
       PARAMS:
@@ -686,8 +686,8 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_has_index
         DESCR  :
-        
-        
+
+
 - Searching:
   METHODS:
   - g_dyn_table_lookup:
@@ -712,7 +712,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_lookup
         DESCR  :
-        
+
   - g_dyn_table_find_first_bool:
       NAME     : find_first_bool
   - g_dyn_table_find_first_int:
@@ -758,7 +758,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_find_first_xxx
         DESCR  :
-        
+
   - g_dyn_table_find_all_bool:
   - g_dyn_table_find_all_int:
   - g_dyn_table_find_all_float:
@@ -817,7 +817,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_find_all_xxx
         DESCR  :
-        
+
   - g_dyn_table_find_sorted_int:
       NAMES    : find_sorted_int
       SUMMARY  : Find matching row or insert position in sorted column.
@@ -843,7 +843,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_find_first_xxx
         DESCR  :
-        
+
   - g_dyn_table_get_sorted_view:
   - g_dyn_table_get_sorted_view_const:
       NAMES    : [get_sorted_view, get_sorted_view]
@@ -871,7 +871,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_sorted_view
         DESCR  :
-        
+
   - g_dyn_table_distinct:
   - g_dyn_table_distinct_const:
       NAMES    : [distinct, distinct]
@@ -897,7 +897,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_distinct
         DESCR  :
-        
+
   - g_dyn_table_where:
   - g_dyn_table_where_const:
       NAMES    : [where, where]
@@ -915,8 +915,8 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_table_where
-        
-        
+
+
 - Aggregates:
   METHODS:
   - g_dyn_table_count_int:
@@ -930,7 +930,7 @@ CATEGORIES :
       DESCR    : &g_dyn_table_count_descr
                  This method counts the number of rows matching a specified value
                  in the specified column.
-                 It is convinient to determine the number briefly compared to using 
+                 It is convinient to determine the number briefly compared to using
                  a {@link class_dyn_query} object.
       SIGNATURE: |
                  size_t count(size_t column_ndx, int64_t target) const;
@@ -1040,7 +1040,7 @@ CATEGORIES :
   - g_dyn_table_average_float:
   - g_dyn_table_average_double:
       TITLE    : average_*
-      NAMES    : [average, average_float, average_double]      
+      NAMES    : [average, average_float, average_double]
       SUMMARY  : &g_dyn_table_average_summary
                  Calculates the average.
       DESCR    : &g_dyn_table_average_descr
@@ -1068,11 +1068,12 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_to_json_summary
                  Convert table to JSON.
       DESCR    : &g_dyn_table_to_json_descr
-                 This method will convert a table and its columns and rows to a 
+                 This method will convert a table and its columns and rows to a
                  JSON compatible representation.
-                 
-                 The JavaScript Object Notation (<a href="http://json.org">JSON</a>) 
-                 is useful for web/mobile applications and serialization. 
+
+                 The JavaScript Object Notation (<a href="http://json.org">JSON</a>)
+                 is useful for web/mobile applications and serialization.
+      CONST    : true
       PARAMS:
       - NAME   : out
         TYPES  : std::ostream&
