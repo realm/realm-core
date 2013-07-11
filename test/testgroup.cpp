@@ -874,6 +874,20 @@ TEST(Group_InvalidateTables)
     CHECK(!subtable3->is_valid());
 }
 
+TEST(Group_toJSON)
+{
+    Group g;
+    TestTableGroup::Ref table = g.get_table<TestTableGroup>("test");
+
+    table->add("jeff",     1, true, Wed);
+    table->add("jim",      1, true, Wed);
+    std::ostringstream ss;
+    ss.sync_with_stdio(false); // for performance
+    g.to_json(ss);
+    const std::string str = ss.str();
+    CHECK(str.length() > 0);
+}
+
 TEST(Group_Index_String)
 {
     Group toMem;
