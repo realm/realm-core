@@ -186,6 +186,7 @@ public:
     void add(const Table*);
     void insert(std::size_t ndx) TIGHTDB_OVERRIDE;
     void insert(std::size_t ndx, const Table*);
+    void set(std::size_t ndx, const Table*);
     void erase(size_t ndx) TIGHTDB_OVERRIDE;
     void ClearTable(size_t ndx);
     void fill(size_t count);

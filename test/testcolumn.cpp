@@ -554,25 +554,6 @@ TEST(Column_FindAll_IntMax)
     r.Destroy();
 }
 
-/*
-TEST(Column_FindHamming)
-{
-    Column col;
-    for (size_t i = 0; i < 10; ++i) {
-        col.add(0x5555555555555555LL);
-        col.add(0x3333333333333333LL);
-    }
-
-    Array res;
-    col.find_all_hamming(res, 0x3333333333333332LL, 2);
-
-    CHECK_EQUAL(10, res.size()); // Half should match
-
-    // Clean up
-    col.Destroy();
-    res.Destroy();
-}
-*/
 
 TEST(Column_FindSorted)
 {

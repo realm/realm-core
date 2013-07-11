@@ -6,6 +6,26 @@ using namespace tightdb;
 namespace {
 TIGHTDB_TABLE_1(TestTableInt,
                 first, Int)
+
+TIGHTDB_TABLE_2(TestTableDate,
+                first, Date,
+                second, Int)
+
+}
+
+TEST(TableViewDateMaxMin)
+{
+    TestTableDate ttd;
+
+    ttd.add(Date(2014, 7, 10), 1);
+    ttd.add(Date(2013, 7, 10), 1);
+    ttd.add(Date(2015, 8, 10), 1);
+    ttd.add(Date(2015, 7, 10), 1);
+
+    TestTableDate::View v = ttd.column().second.find_all(1);
+
+    CHECK_EQUAL(Date(2015, 8, 10), v.column().first.maximum());
+    CHECK_EQUAL(Date(2013, 7, 10), v.column().first.minimum());
 }
 
 TEST(GetSetInteger)
@@ -128,7 +148,21 @@ TEST(TableView_Floats_Find_and_Aggregations)
     CHECK_EQUAL(-1.1f, v_all.column().col_float.minimum());
     CHECK_EQUAL(-1.1f, v_some.column().col_float.minimum());
 
-    // TODO: Test +=, average, count
+    // Test avg
+    CHECK_EQUAL(sum_d / 6.0, v_all.column().col_double.average());
+    CHECK_EQUAL((-1.2 + -1.2) / 2.0, v_some.column().col_double.average());
+    CHECK_EQUAL(sum_f / 6.0, v_all.column().col_float.average());
+
+    // Need to test this way because items summed one at a time differ with compile-time constant by some infinitesimal
+    CHECK_EQUAL(int(0.05 * 1000), int(v_some.column().col_float.average() * 1000));
+
+    CHECK_EQUAL(1, v_some.column().col_float.count(1.2f));
+    CHECK_EQUAL(2, v_some.column().col_double.count(-1.2));
+    CHECK_EQUAL(2, v_some.column().col_int.count(1));
+
+    CHECK_EQUAL(2, v_all.column().col_float.count(2.1f));
+    CHECK_EQUAL(2, v_all.column().col_double.count(-1.2));
+    CHECK_EQUAL(6, v_all.column().col_int.count(1));
 }
 
 TEST(TableViewSum)

@@ -22,7 +22,7 @@ void GroupWriter::SetVersions(size_t current, size_t readlock)
     m_readlock_version = readlock;
 }
 
-size_t GroupWriter::Commit()
+size_t GroupWriter::commit()
 {
     merge_free_space();
 

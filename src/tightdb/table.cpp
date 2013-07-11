@@ -167,17 +167,6 @@ void Table::CreateColumns()
     }
 }
 
-Spec& Table::get_spec()
-{
-    TIGHTDB_ASSERT(m_top.IsValid()); // you can only change specs on top-level tables
-    return m_spec_set;
-}
-
-const Spec& Table::get_spec() const
-{
-    return m_spec_set;
-}
-
 
 void Table::invalidate()
 {
@@ -751,9 +740,7 @@ size_t Table::clone_columns(Allocator& alloc) const
         }
         else {
             const Array& root = *col->get_root_array();
-            Array new_root(alloc);
-            new_root.Copy(root);
-            new_col_ref = new_root.GetRef();
+            new_col_ref = root.clone(alloc); // Throws
         }
         new_columns.add(new_col_ref);
     }
@@ -763,23 +750,12 @@ size_t Table::clone_columns(Allocator& alloc) const
 
 size_t Table::clone(Allocator& alloc) const
 {
-    if (m_top.IsValid()) {
-        Array new_top(alloc);
-        new_top.Copy(m_top);
-        return new_top.GetRef();
-    }
+    if (m_top.IsValid())
+        return m_top.clone(alloc); // Throws
 
-    Array new_top(Array::coldef_HasRefs, 0, 0, alloc);
-    {
-        Array new_spec(alloc);
-        new_spec.Copy(m_spec_set.m_specSet);
-        new_top.add(new_spec.GetRef());
-    }
-    {
-        Array new_columns(alloc);
-        new_columns.Copy(m_columns);
-        new_top.add(new_columns.GetRef());
-    }
+    Array new_top(Array::coldef_HasRefs, 0, 0, alloc); // Throws
+    new_top.add(m_spec_set.m_specSet.clone(alloc)); // Throws
+    new_top.add(m_columns.clone(alloc)); // Throws
     return new_top.GetRef();
 }
 
@@ -913,6 +889,23 @@ void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
     // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().insert_value(col_ndx, row_ndx, Replication::subtable_tag()); // Throws
+#endif
+}
+
+
+void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
+{
+    TIGHTDB_ASSERT(col_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Table);
+    TIGHTDB_ASSERT(row_ndx < m_size);
+
+    ColumnTable& subtables = GetColumnTable(col_ndx);
+    subtables.invalidate_subtables();
+    subtables.set(row_ndx, table);
+
+    // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    transact_log().set_value(col_ndx, row_ndx, Replication::subtable_tag()); // Throws
 #endif
 }
 
@@ -1858,30 +1851,6 @@ ConstTableView Table::find_all_binary(size_t, BinaryData) const
     // FIXME: Implement this!
     throw runtime_error("Not implemented");
 }
-
-
-TableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t max)
-{
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const Column& column = GetColumn(column_ndx);
-
-    TableView tv(*this);
-    column.find_all_hamming(tv.get_ref_column(), value, max);
-    return move(tv);
-}
-
-ConstTableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t max) const
-{
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const Column& column = GetColumn(column_ndx);
-
-    ConstTableView tv(*this);
-    column.find_all_hamming(tv.get_ref_column(), value, max);
-    return move(tv);
-}
-
 
 TableView Table::distinct(size_t column_ndx)
 {

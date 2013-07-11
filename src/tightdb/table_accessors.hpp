@@ -1055,6 +1055,16 @@ private:
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
 
+    Date maximum() const
+    {
+        return Base::m_table->get_impl()->maximum_date(col_idx);
+    }
+
+    Date minimum() const
+    {
+        return Base::m_table->get_impl()->minimum_date(col_idx);
+    }
+
     std::size_t find_first(Date value) const
     {
         return Base::m_table->get_impl()->find_first_date(col_idx, value);

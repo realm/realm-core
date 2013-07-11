@@ -157,7 +157,6 @@
     <ClCompile Include="src\tightdb\array.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="test\performance\timer.cpp" />
     <ClCompile Include="src\tightdb\utilities.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -169,6 +168,9 @@
     </ClCompile>
     <ClCompile Include="src\tightdb\table_view.cpp">
       <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_file.cpp">
+      <Filter>test</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

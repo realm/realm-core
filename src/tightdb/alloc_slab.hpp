@@ -57,9 +57,11 @@ public:
     /// allowed. When used by SharedGroup, concurrency is allowed, but
     /// read_only and no_create must both be false in this case.
     ///
-    /// \param is_shared Must be true iff we are called on behalf of SharedGroup.
+    /// \param is_shared Must be true if, and only if we are called on
+    /// behalf of SharedGroup.
     ///
-    /// \param read_only Open the file in read-only mode. This implies \a no_create.
+    /// \param read_only Open the file in read-only mode. This implies
+    /// \a no_create.
     ///
     /// \param no_create Fail if the file does not already exist.
     ///

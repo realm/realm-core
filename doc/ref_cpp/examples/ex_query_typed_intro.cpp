@@ -1,11 +1,12 @@
 // @@Example: ex_cpp_typed_query_intro @@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 
-void main()
+int main()
 {
     PeopleTable table;
 
@@ -19,7 +20,7 @@ void main()
 
     // Expected result
     assert(view.size() == 2);
-    assert(!strcmp(view1[0].name, "Mary"));
-    assert(!strcmp(view1[1].name, "Joe"));
+    assert(view[0].name == "Mary");
+    assert(view[1].name == "Joe");
 }
 // @@EndExample@@

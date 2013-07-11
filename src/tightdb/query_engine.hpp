@@ -148,7 +148,12 @@ template<> struct ColumnTypeTraits<double> {
     typedef double sum_type;
     static const DataType id = type_Double;
 };
-
+template<> struct ColumnTypeTraits<Date> {
+    typedef Column column_type;
+    typedef Array array_type;
+    typedef int64_t sum_type;
+    static const DataType id = type_Int;
+};
 // Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
 template<class T, Action A> struct ColumnTypeTraitsSum {
     typedef T sum_type;
@@ -390,14 +395,14 @@ public:
         size_t r = start - 1;
         for (;;) {
             if (local_matches == local_limit) {
-                m_dD = double(r - start) / local_matches;
+                m_dD = double(r - start) / (local_matches + 1);
                 return r + 1;
             }
 
             // Find first match in this condition node
             r = find_first_local(r + 1, end);
             if (r == end) {
-                m_dD = double(r - start) / local_matches;
+                m_dD = double(r - start) / (local_matches + 1);
                 return end;
             }
 
@@ -423,7 +428,9 @@ public:
                     av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
                 }
                 TIGHTDB_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != NULL);
-                static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av), CallbackDummy());
+                bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av), CallbackDummy());
+                if(!cont)
+                    return static_cast<size_t>(-1);
              }
         }
     }
@@ -601,7 +608,7 @@ public:
             m_children[c]->m_probes++;
             size_t m = m_children[c]->find_first_local(i, i + 1);
             if (m != i)
-                return (m_local_matches != m_local_limit);
+                return true; //(m_local_matches != m_local_limit);
         }
 
         bool b;
@@ -613,10 +620,7 @@ public:
             b = state->template match<TAction, false>(i, 0, TSourceColumn(0), CallbackDummy());
         }
 
-        if (m_local_matches == m_local_limit)
-            return false;
-        else
-            return b;
+        return b;
     }
 
     size_t aggregate_call_specialized(Action TAction, DataType col_id, QueryStateBase* st,
@@ -634,7 +638,6 @@ public:
         else if (TAction == act_Sum && col_id == type_Int)
             ret = aggregate_local<act_Sum, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == act_Sum && col_id == type_Float)
-            // todo, fixme, see if we must let sum return a double even when summing a float coltype
             ret = aggregate_local<act_Sum, float, void>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == act_Sum && col_id == type_Double)
             ret = aggregate_local<act_Sum, double, void>(st, start, end, local_limit, source_column, matchcount);
@@ -701,13 +704,17 @@ public:
             if (m_conds <= 1 && (source_column == NULL ||
                 (SameType<TSourceColumn, int64_t>::value
                  && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))) {
-                m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
+                bool cont = m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
+                if(!cont)
+                    return static_cast<size_t>(-1);
             }
             else {
                 QueryState<int64_t> jumpstate; // todo optimize by moving outside for loop
                 m_source_column = source_column;
-                m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, &jumpstate,
+                bool cont = m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, &jumpstate,
                              std::bind1st(std::mem_fun(&IntegerNode::template match_callback<TAction, TSourceColumn>), this));
+                if(!cont)
+                    return static_cast<size_t>(-1);
             }
 
             if (m_local_matches == m_local_limit)

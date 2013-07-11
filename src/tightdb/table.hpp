@@ -413,6 +413,11 @@ protected:
     /// get_column_type()).
     void insert_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
 
+    /// Like insert_subtable(std::size_t, std::size_t, const Table*)
+    /// but overwrites the specified cell rather than inserting a new
+    /// one.
+    void set_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
+
     void insert_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
 
     void set_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
@@ -468,13 +473,9 @@ private:
     std::size_t clone_columns(Allocator&) const;
 
     /// Construct a complete copy of this table (including its spec)
-    /// using the specified allocator and return just the ref to that
-    /// array.
+    /// using the specified allocator and return just the ref to the
+    /// new top array.
     std::size_t clone(Allocator&) const;
-
-    // Experimental
-    TableView find_all_hamming(size_t column_ndx, uint64_t value, size_t max);
-    ConstTableView find_all_hamming(size_t column_ndx, uint64_t value, size_t max) const;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     struct LocalTransactLog;
@@ -574,6 +575,17 @@ inline bool Table::has_shared_spec() const
     if (!parent) return false;
     TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
     return static_cast<Parent*>(parent)->subtables_have_shared_spec();
+}
+
+inline Spec& Table::get_spec()
+{
+    TIGHTDB_ASSERT(m_top.IsValid()); // you can only change specs on top-level tables
+    return m_spec_set;
+}
+
+inline const Spec& Table::get_spec() const
+{
+    return m_spec_set;
 }
 
 struct Table::UnbindGuard {

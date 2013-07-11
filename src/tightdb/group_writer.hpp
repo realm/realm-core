@@ -37,7 +37,7 @@ public:
 
     void SetVersions(std::size_t current, std::size_t readlock);
 
-    std::size_t Commit();
+    std::size_t commit();
 
     size_t write(const char* p, std::size_t n);
     void WriteAt(std::size_t pos, const char* p, std::size_t n);

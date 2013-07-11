@@ -94,6 +94,25 @@ TEST(Group_Serialize0)
     CHECK_EQUAL(Wed,    t[0].fourth);
 }
 
+TEST(Group_Overwrite)
+{
+    File::try_remove("test_overwrite.tightdb");
+    {
+        Group g;
+        g.write("test_overwrite.tightdb");
+        CHECK_THROW(g.write("test_overwrite.tightdb"), File::Exists);
+    }
+    {
+        Group g("test_overwrite.tightdb");
+        CHECK_THROW(g.write("test_overwrite.tightdb"), File::Exists);
+    }
+    {
+        Group g;
+        File::try_remove("test_overwrite.tightdb");
+        g.write("test_overwrite.tightdb");
+    }
+}
+
 TEST(Group_Read0)
 {
     // Load the group and let it clean up without loading
@@ -378,7 +397,7 @@ TEST(Group_Persist)
     File::try_remove("testdb.tightdb");
 
     // Create new database
-    Group db("testdb.tightdb");
+    Group db("testdb.tightdb", Group::mode_ReadWrite);
 
     // Insert some data
     TableRef table = db.get_table("test");
@@ -527,6 +546,7 @@ TEST(Group_Subtable)
         }
     }
 
+    File::try_remove("subtables.tightdb");
     g.write("subtables.tightdb");
 
     // Read back tables
@@ -618,6 +638,7 @@ TEST(Group_Subtable)
         }
     }
 
+    File::try_remove("subtables2.tightdb");
     g2.write("subtables2.tightdb");
 
     // Read back tables
@@ -711,6 +732,7 @@ TEST(Group_MultiLevelSubtables)
             }
             b->add_empty_row();
         }
+        File::try_remove("subtables.tightdb");
         g.write("subtables.tightdb");
     }
 
@@ -734,6 +756,7 @@ TEST(Group_MultiLevelSubtables)
         // get a second ref to B (compare)
         CHECK_EQUAL(a->get_subtable(1, 0), b);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661012);
+        File::try_remove("subtables2.tightdb");
         g.write("subtables2.tightdb");
     }
     {
@@ -753,6 +776,7 @@ TEST(Group_MultiLevelSubtables)
         // Get third ref to B and verify last mod
         b = a->get_subtable(1, 0);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661013);
+        File::try_remove("subtables3.tightdb");
         g.write("subtables3.tightdb");
     }
 
@@ -776,6 +800,7 @@ TEST(Group_MultiLevelSubtables)
         // get a second ref to B (compare)
         CHECK_EQUAL(a->get_subtable(1, 0), b);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661012);
+        File::try_remove("subtables4.tightdb");
         g.write("subtables4.tightdb");
     }
     {
@@ -795,6 +820,7 @@ TEST(Group_MultiLevelSubtables)
         // Get third ref to B and verify last mod
         b = a->get_subtable(1, 0);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661013);
+        File::try_remove("subtables5.tightdb");
         g.write("subtables5.tightdb");
     }
 }

@@ -255,7 +255,35 @@ Query& Query::not_equal_double(size_t column_ndx1, size_t column_ndx2)
 }
 
 
-
+// int constant vs column (we need those because '1234' is ambiguous, can convert to float/double/int64_t)
+Query& Query::equal(size_t column_ndx, int value)
+{
+    return equal(column_ndx, static_cast<int64_t>(value));
+}
+Query& Query::not_equal(size_t column_ndx, int value)
+{
+    return not_equal(column_ndx, static_cast<int64_t>(value));
+}
+Query& Query::greater(size_t column_ndx, int value)
+{
+    return greater(column_ndx, static_cast<int64_t>(value));
+}
+Query& Query::greater_equal(size_t column_ndx, int value)
+{
+    return greater_equal(column_ndx, static_cast<int64_t>(value));
+}
+Query& Query::less_equal(size_t column_ndx, int value)
+{
+    return less_equal(column_ndx, static_cast<int64_t>(value));
+}
+Query& Query::less(size_t column_ndx, int value)
+{
+    return less(column_ndx, static_cast<int64_t>(value));
+}
+Query& Query::between(size_t column_ndx, int from, int to)
+{
+    return between(column_ndx, static_cast<int64_t>(from), static_cast<int64_t>(to));
+}
 
 // int64 constant vs column
 Query& Query::equal(size_t column_ndx, int64_t value)
@@ -379,33 +407,6 @@ Query& Query::between(size_t column_ndx, double from, double to)
 }
 
 
-// Strings, const char*
-
-Query& Query::equal(size_t column_ndx, const char* value, bool case_sensitive)
-{
-    return equal(column_ndx, StringData(value), case_sensitive);
-}
-
-Query& Query::begins_with(size_t column_ndx, const char* value, bool case_sensitive)
-{
-    return begins_with(column_ndx, StringData(value), case_sensitive);
-}
-
-Query& Query::ends_with(size_t column_ndx, const char* value, bool case_sensitive)
-{
-    return ends_with(column_ndx, StringData(value), case_sensitive);
-}
-
-Query& Query::contains(size_t column_ndx, const char* value, bool case_sensitive)
-{
-    return contains(column_ndx, StringData(value), case_sensitive);
-}
-
-Query& Query::not_equal(size_t column_ndx, const char* value, bool case_sensitive)
-{
-    return not_equal(column_ndx, StringData(value), case_sensitive);
-}
-    
 // Strings, StringData()
 
 Query& Query::equal(size_t column_ndx, StringData value, bool case_sensitive)
