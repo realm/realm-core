@@ -1852,30 +1852,6 @@ ConstTableView Table::find_all_binary(size_t, BinaryData) const
     throw runtime_error("Not implemented");
 }
 
-
-TableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t max)
-{
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const Column& column = GetColumn(column_ndx);
-
-    TableView tv(*this);
-    column.find_all_hamming(tv.get_ref_column(), value, max);
-    return move(tv);
-}
-
-ConstTableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t max) const
-{
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const Column& column = GetColumn(column_ndx);
-
-    ConstTableView tv(*this);
-    column.find_all_hamming(tv.get_ref_column(), value, max);
-    return move(tv);
-}
-
-
 TableView Table::distinct(size_t column_ndx)
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
