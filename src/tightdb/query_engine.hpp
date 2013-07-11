@@ -148,7 +148,12 @@ template<> struct ColumnTypeTraits<double> {
     typedef double sum_type;
     static const DataType id = type_Double;
 };
-
+template<> struct ColumnTypeTraits<Date> {
+    typedef Column column_type;
+    typedef Array array_type;
+    typedef int64_t sum_type;
+    static const DataType id = type_Int;
+};
 // Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
 template<class T, Action A> struct ColumnTypeTraitsSum {
     typedef T sum_type;
@@ -633,7 +638,6 @@ public:
         else if (TAction == act_Sum && col_id == type_Int)
             ret = aggregate_local<act_Sum, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == act_Sum && col_id == type_Float)
-            // todo, fixme, see if we must let sum return a double even when summing a float coltype
             ret = aggregate_local<act_Sum, float, void>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == act_Sum && col_id == type_Double)
             ret = aggregate_local<act_Sum, double, void>(st, start, end, local_limit, source_column, matchcount);
