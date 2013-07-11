@@ -1989,7 +1989,7 @@ inline size_t upper_bound(const char* offsets_header, int64_t value) TIGHTDB_NOE
 // Returns (child_ndx, elem_ndx_offset) where 'elem_ndx_offset' is the
 // element index of the first element of the identified child.
 template<int width> inline pair<size_t, size_t>
-find_child_offset(const char* offsets_header, size_t elem_ndx) TIGHTDB_NOEXCEPT
+find_child(const char* offsets_header, size_t elem_ndx) TIGHTDB_NOEXCEPT
 {
     using namespace tightdb;
     size_t child_ndx = upper_bound<width>(offsets_header, elem_ndx);
@@ -2747,7 +2747,7 @@ pair<const char*, size_t> Array::find_leaf(const Array* root, size_t i) TIGHTDB_
         const char* header = static_cast<char*>(root->m_alloc.Translate(offsets_ref));
         int width = get_width_from_header(header);
         pair<size_t, size_t> p;
-        TIGHTDB_TEMPEX(p = find_child_offset, width, (header, i));
+        TIGHTDB_TEMPEX(p = find_child, width, (header, i));
         size_t child_ndx       = p.first;
         size_t elem_ndx_offset = p.second;
         i -= elem_ndx_offset; // local index
@@ -2777,7 +2777,7 @@ pair<size_t, size_t> Array::find_leaf_ref(const Array* root, size_t i) TIGHTDB_N
         const char* header = static_cast<char*>(root->m_alloc.Translate(offsets_ref));
         int width = get_width_from_header(header);
         pair<size_t, size_t> p;
-        TIGHTDB_TEMPEX(p = find_child_offset, width, (header, i));
+        TIGHTDB_TEMPEX(p = find_child, width, (header, i));
         size_t child_ndx       = p.first;
         size_t elem_ndx_offset = p.second;
         i -= elem_ndx_offset; // local index

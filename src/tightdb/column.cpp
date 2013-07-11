@@ -297,8 +297,8 @@ void Column::Create()
 {
     // Add subcolumns for nodes
     if (IsNode()) {
-        const Array offsets(Array::coldef_Normal, 0, 0, m_array->GetAllocator());
-        const Array refs(Array::coldef_HasRefs, 0, 0, m_array->GetAllocator());
+        Array offsets(Array::coldef_Normal, 0, 0, m_array->GetAllocator());
+        Array refs(Array::coldef_HasRefs, 0, 0, m_array->GetAllocator());
         m_array->add(offsets.GetRef());
         m_array->add(refs.GetRef());
     }

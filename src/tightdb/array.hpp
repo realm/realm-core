@@ -246,6 +246,12 @@ public:
     bool operator==(const Array& a) const;
 
     void SetType(ColumnDef type);
+
+    /// Reinitialize this array accessor to point to the specified new
+    /// underlying array, and if it has a parent, update the parent to
+    /// point to the new array. The updating of the parent only works
+    /// if this array was initialized with the correct parent
+    /// reference.
     void UpdateRef(size_t ref);
 
     /// Construct a complete copy of this array (including its
