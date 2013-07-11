@@ -17,29 +17,27 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TIMER_HPP
-#define TIGHTDB_TIMER_HPP
+#ifndef TIGHTDB_TEST_UTIL_MEM_HPP
+#define TIGHTDB_TEST_UTIL_MEM_HPP
+
+#include <cstddef>
 
 namespace tightdb {
+namespace test_util {
 
 
-/// Get the number of milliseconds since the system was started (or
-/// since some other arbitrary point in time after the system was
-/// started). The timer is guaranteed to increase without overflow for
-/// at least 24.8 days after the system was started (corresponding to
-/// a 31-bit representation).
-long get_timer_millis();
-
-class Timer {
-public:
-    void start() { m_start = get_timer_millis(); }
-    double get_elapsed_millis() const;
-
-private:
-    long m_start;
-};
+/// Returns the amount (in number of bytes) of virtaul memory
+/// allocated to the calling process.
+///
+/// FIXME: 'std::size_t' is inappropriate for holding the total memory
+/// usage. C++11 guarantees only that it can hold the size of a single
+/// object or array. 'std::uintptr_t' would have been the ideal type
+/// to use here, but C++11 does not required it to be available (see
+/// 18.4.1 "Header <cstdint> synopsis".)
+std::size_t get_mem_usage();
 
 
+} // namespace test_util
 } // namespace tightdb
 
-#endif // TIGHTDB_TIMER_HPP
+#endif // TIGHTDB_TEST_UTIL_MEM_HPP

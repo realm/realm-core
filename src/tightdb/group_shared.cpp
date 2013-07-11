@@ -152,7 +152,7 @@ retry:
             // but we invalidate the internals right after to avoid conflicting
             // with old state when starting transactions
             const Group::OpenMode group_open_mode =
-                no_create_file ? Group::mode_NoCreate : Group::mode_Normal;
+                no_create_file ? Group::mode_ReadWriteNoCreate : Group::mode_ReadWrite;
             m_group.create_from_file(file, group_open_mode, true);
             m_group.invalidate();
 
@@ -199,7 +199,7 @@ retry:
                 throw runtime_error("Inconsistent durability level");
 
             // Setup the group, but leave it in invalid state
-            m_group.create_from_file(file, Group::mode_NoCreate, false);
+            m_group.create_from_file(file, Group::mode_ReadWriteNoCreate, false);
         }
 
         // We need to map the info file once more for the readers part

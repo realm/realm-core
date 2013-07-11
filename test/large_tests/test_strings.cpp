@@ -1,7 +1,7 @@
 #include <UnitTest++.h>
 #include <tightdb/column.hpp>
 #include "../testsettings.hpp"
-#include "../Support/number_names.hpp"
+#include "../util/number_names.hpp"
 #include "verified_string.hpp"
 
 #if TEST_DURATION > 0
@@ -34,7 +34,7 @@ std::string randstring(void)
     size_t len = (rand() % 10) * 100 + 1;
     std::string s;
     while (s.length() < len)
-        s += number_name(t);
+        s += test_util::number_name(t);
 
     s = s.substr(0, len);
     return s;

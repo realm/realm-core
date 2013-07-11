@@ -78,6 +78,17 @@ void ColumnTable::insert(size_t ndx, const Table* subtable)
     Column::insert(ndx, columns_ref);
 }
 
+void ColumnTable::set(size_t ndx, const Table* subtable)
+{
+    TIGHTDB_ASSERT(ndx < Size());
+
+    size_t columns_ref = 0;
+    if (subtable)
+        columns_ref = clone_table_columns(subtable);
+
+    Column::set(ndx, columns_ref);
+}
+
 void ColumnTable::fill(size_t count)
 {
     TIGHTDB_ASSERT(is_empty());

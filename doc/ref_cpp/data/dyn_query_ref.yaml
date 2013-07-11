@@ -38,6 +38,7 @@ EXAMPLES   :
 - DESCR:
   CODE: ex_cpp_dyn_query_intro
 IGNORE     : []                   # List of method-ids to ignore
+
 CATEGORIES :
 - Conditions:
   METHODS:
@@ -46,10 +47,12 @@ CATEGORIES :
   - g_dyn_query_equals_float:
   - g_dyn_query_equals_double:
   - g_dyn_query_equals_string:
+  - g_dyn_query_equals_string_2:
+      IGNORE   : ""
   - g_dyn_query_equals_date:
   - g_dyn_query_equals_binary:
       TITLE    : equal*
-      NAMES    : [ equal, equal_date, equal_binary ]
+      NAMES    : [ equal, equal, equal, equal, equal, equal, equal_date ]
       SIGNATURE: |
                  Query& equal(size_t column_ndx, bool value);
                  Query& equal(size_t column_ndx, int64_t value);
@@ -83,13 +86,17 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_dyn_query_equals
 
+  - g_dyn_query_notEquals_bool:
+      TODO     : soon
   - g_dyn_query_notEquals_integer:
   - g_dyn_query_notEquals_float:
   - g_dyn_query_notEquals_double:
   - g_dyn_query_notEquals_string:
+  - g_dyn_query_notEquals_string_2:
+      IGNORE   : ""
   - g_dyn_query_notEquals_date:
   - g_dyn_query_notEquals_binary:
-      NAMES    : [ not_equal, not_equal_binary ]
+      NAMES    : [ not_equal, not_equal, not_equal, not_equal, not_equal_date ]
       TITLE    : not_equal*
       SIGNATURE: |
                  Query& not_equal(size_t column_ndx, int64_t value);
@@ -108,7 +115,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : *g_dyn_query_column_index_descr
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, StringData, Date]
+        TYPES  : [int64_t, float, double, StringData, Date]
         DESCR  : *g_dyn_query_value_descr
       - NAME   : case_sensitive
         TYPES  : bool
@@ -124,7 +131,7 @@ CATEGORIES :
   - g_dyn_query_greaterThan_float:
   - g_dyn_query_greaterThan_double:
   - g_dyn_query_greaterThan_date:
-      NAMES    : [ greater, greater_date ]
+      NAMES    : [ greater, greater, greater, greater_date ]
       SIGNATURE: |
                  Query& greater(size_t column_ndx, int64_t value);
                  Query& greater(size_t column_ndx, float value);
@@ -152,7 +159,7 @@ CATEGORIES :
   - g_dyn_query_greaterThanOrEqual_float:
   - g_dyn_query_greaterThanOrEqual_double:
   - g_dyn_query_greaterThanOrEqual_date:
-      NAMES    : [ greater_equal, greater_equal_date ]
+      NAMES    : [ greater_equal, greater_equal, greater_equal, greater_equal_date ]
       SIGNATURE: |
                  Query& greater_equal(size_t column_ndx, int64_t value);
                  Query& greater_equal(size_t column_ndx, float value);
@@ -180,7 +187,7 @@ CATEGORIES :
   - g_dyn_query_lessThan_float:
   - g_dyn_query_lessThan_double:
   - g_dyn_query_lessThan_date:
-      NAMES    : [less, less_date]
+      NAMES    : [less, less, less, less_date]
       SIGNATURE: |
                  Query& less(size_t column_ndx, int64_t value);
                  Query& less(size_t column_ndx, float value);
@@ -208,7 +215,7 @@ CATEGORIES :
   - g_dyn_query_lessThanOrEqual_float:
   - g_dyn_query_lessThanOrEqual_double:
   - g_dyn_query_lessThanOrEqual_date:
-      NAMES    : [less_equal, less_equal_date]
+      NAMES    : [less_equal, less_equal, less_equal, less_equal_date]
       SIGNATURE: |
                  Query& less_equal(size_t column_ndx, int64_t value);
                  Query& less_equal(size_t column_ndx, float value);
@@ -236,7 +243,7 @@ CATEGORIES :
   - g_dyn_query_between_float:
   - g_dyn_query_between_double:
   - g_dyn_query_between_date:
-      NAMES    : [between, between_date]
+      NAMES    : [between, between, between, between_date]
       SIGNATURE: |
                  Query& between(size_t column_ndx, int64_t from, int64_t to);
                  Query& between(size_t column_ndx, float from, float to);
@@ -252,19 +259,25 @@ CATEGORIES :
         DESCR  : *g_dyn_query_column_index_descr
       - NAME   : from
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : Lowest value of range (inclusive).
+        DESCR  : &g_dyn_query_between_parm1_descr
+                 Lowest value of range (inclusive).
       - NAME   : to
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : Highest value of range (inclusive).
+        DESCR  : &g_dyn_query_between_parm2_descr
+                 Highest value of range (inclusive)
       RETURN:
         TYPES  : Query&
         DESCR  : *g_dyn_query_return_query_object_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_between
-  - g_dyn_query_startsWith:
+
+  - g_dyn_query_startsWith_string:
+      NAME     : begins_with
+  - g_dyn_query_startsWith_string_2:
+      IGNORE   : ""
   - g_dyn_query_startsWith_binary:
-      NAMES    : [begins_with]
+      NAME     : begins_with
       SIGNATURE: |
                  Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive=true);
                  Query& begins_with(size_t column_ndx, BinaryData value);
@@ -288,9 +301,13 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_startsWith
-  - g_dyn_query_endsWith:
+
+  - g_dyn_query_endsWith_string:
+      NAME     : ends_with
+  - g_dyn_query_endsWith_string_2:
+      IGNORE   : ""
   - g_dyn_query_endsWith_binary:
-      NAMES    : [ends_with]
+      NAME     : ends_with
       SIGNATURE: |
                  Query& ends_with(size_t column_ndx, StringData value, bool case_sensitive=true);
                  Query& ends_with(size_t column_ndx, BinaryData value);
@@ -314,9 +331,12 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_endsWith
-  - g_dyn_query_contains:
+
+  - g_dyn_query_contains_string_2:
+      IGNORE   : ""  
+  - g_dyn_query_contains_string:
   - g_dyn_query_contains_binary:
-      NAMES    : [contains]
+      NAMES    : [contains, contains]
       SIGNATURE: |
                  Query& contains(size_t column_ndx, StringData value, bool case_sensitive=true);
                  Query& contains(size_t column_ndx, BinaryData value);
@@ -345,7 +365,7 @@ CATEGORIES :
 - Combiners:
   METHODS:
   - g_dyn_query_group:
-      NAMES    : group
+      NAME     : group
       DESCR    : &g_dyn_query_group_descr
                  >
                  Group conditions ("left" parenthesis). Group of conditions can 
@@ -361,7 +381,7 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_dyn_query_group
   - g_dyn_query_endGroup:
-      NAMES    : end_group
+      NAME     : end_group
       DESCR    : &g_dyn_query_endGroup_descr
                  Ends the Group conditions ("right" parenthesis) that was 
                  started with {@link g_dyn_query_group}.
@@ -374,7 +394,7 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_dyn_query_group
   - g_dyn_query_or:
-      NAMES    : Or
+      NAME     : Or
       DESCR    : &g_dyn_query_or_descr
                  Conditions to the left and right are folded using logical-or.
       SUMMARY  : &g_dyn_query_or_summary
@@ -386,7 +406,7 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_dyn_query_or
   - g_dyn_query_subtable:
-      NAMES    : subtable
+      NAME     : subtable
       DESCR    : &g_dyn_query_subtable_descr
                  >
                  This method selects a subtable to query.
@@ -405,7 +425,7 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_dyn_query_subtable
   - g_dyn_query_endSubtable:
-      NAMES    : end_subtable
+      NAME     : end_subtable
       DESCR    : &g_dyn_query_endSubtable_descr
                  End of subtable query that was started with {@link g_dyn_query_subtable}.
       SUMMARY  : &g_dyn_query_endSubtable_summary
@@ -420,9 +440,11 @@ CATEGORIES :
         
 - Actions:
   METHODS:
+  - g_dyn_query_find_all_2:
+      IGNORE   : ""
   - g_dyn_query_find_all_const:
   - g_dyn_query_find_all:
-      NAMES    : find_all
+      NAMES    : [find_all, find_all]
       DESCR    : &g_dyn_query_find_all_descr
                  This method executes the query and returns a {@link class_dyn_tableview} with the results.
       SUMMARY  : &g_dyn_query_find_all_summary
@@ -433,13 +455,16 @@ CATEGORIES :
       PARAMS:
       - NAME   : start
         TYPES  : size_t
-        DESCR  : "Row to begin search. Default: 0."
+        DESCR  : &g_dyn_query_find_all_parm1_descr
+                 "Row to begin search. Default: 0."
       - NAME   : end
         TYPES  : size_t
-        DESCR  : "Row to stop search. Default: -1 (infinity)."
+        DESCR  : &g_dyn_query_find_all_parm2_descr
+                 "Row to stop search. Default: -1 (infinity)."
       - NAME   : limit
         TYPES  : size_t
-        DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
+        DESCR  : &g_dyn_query_find_all_parm3_descr
+                 "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : [TableView, ConstTableView]
         DESCR  : &g_dyn_query_find_all_return_desc
@@ -447,8 +472,9 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_findall
+        
   - g_dyn_query_find_next:
-      NAMES    : find_next
+      NAME     : find_next
       DESCR    : &g_dyn_query_find_next_descr
                  Find next matching row.
 # TODO: describe further. Next form what?
@@ -457,7 +483,8 @@ CATEGORIES :
       PARAMS:
       - NAME   : lastmatch
         TYPES  : size_t
-        DESCR  : "Row to stop search. Default: -1 (infinity)."
+        DESCR  : &g_dyn_query_find_next_parm1_descr
+                 "Row to stop search. Default: -1 (infinity)."
       RETURN:
         TYPES  : size_t
         DESCR  : &g_dyn_query_find_next
@@ -467,7 +494,7 @@ CATEGORIES :
         CODE   : ex_cpp_dyn_query_find_next
 
   - g_dyn_query_count:
-      NAMES    : count
+      NAME     : count
       DESCR    : &g_dyn_query_size_descr
                  The method executes the query and return the number of matching rows.
       SUMMARY  : &g_dyn_query_size_summary
@@ -479,21 +506,26 @@ CATEGORIES :
         TYPES  : size_t
       - NAME   : start
         TYPES  : size_t
-        DESCR  : "Row to begin search. Default: 0."
+        DESCR  : &g_dyn_query_count_parm2_descr
+                 "Row to begin search. Default: 0."
       - NAME   : end
         TYPES  : size_t
-        DESCR  : "Row to stop search. Default: -1 (infinity)."
+        DESCR  : &g_dyn_query_count_parm3_descr
+                 "Row to stop search. Default: -1 (infinity)."
       - NAME   : limit
         TYPES  : size_t
-        DESCR  : "Maximum number of rows to count. Default: -1 (infinity)."
+        DESCR  : &g_dyn_query_count_parm4_descr
+                 "Maximum number of rows to count. Default: -1 (infinity)."
       RETURN:
         TYPES  : size_t
-        DESCR  : The number of matching rows.
+        DESCR  : &g_dyn_query_count_return_descr
+                 The number of matching rows.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_size
+        
   - g_dyn_query_remove:
-      NAMES    : remove
+      NAME     : remove
       DESCR    : &g_dyn_query_remove_descr
                  This method executes the query and removes all matching rows in the source table.
       SUMMARY  : &g_dyn_query_remove_summary
@@ -511,12 +543,13 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to remove. Default: -1 (infinity)."
       RETURN:
         TYPES  : size_t
-        DESCR  : The number of rows removed.
+        DESCR  : &g_dyn_query_remove_return_descr
+                 The number of rows removed.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_remove
 
-  - g_dyn_query_sum:
+  - g_dyn_query_sum_int:
   - g_dyn_query_sum_float:
   - g_dyn_query_sum_double:
       TITLE    : sum*
@@ -555,18 +588,19 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : [int64_t, float, double]
-        DESCR  : The sum.
+        DESCR  : &g_dyn_query_sum_return_descr
+                 The sum.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_sum
 
 
-  - g_dyn_query_maximum_date:
-  - g_dyn_query_maximum_double:
+  - g_dyn_query_maximum_int:
   - g_dyn_query_maximum_float:
-  - g_dyn_query_maximum:
+  - g_dyn_query_maximum_double:
+  - g_dyn_query_maximum_date:
       TITLE    : maximum*
-      NAMES    : maximum
+      NAMES    : [maximum, maximum_float, maximum_double, maximum_date]
       DESCR    : &g_dyn_query_maximum_descr
                  This method finds the highest value in the column or in a range of rows in the column.
       SUMMARY  : &g_dyn_query_maximum_summary
@@ -579,7 +613,7 @@ CATEGORIES :
                  Date    maximum_date(..parameters as above..)
       PARAMS:
       - NAME   : column_ndx
-        DESCR  : &g_dyn_query_maximum_parm1
+        DESCR  : &g_dyn_query_maximum_parm1_descr
                  Column index. The datatype of the column must match the function called. E.g. <code>maximum_float()</code> can only be used on columns which contains floats.
         TYPES  : size_t
       - NAME   : resultcount
@@ -596,15 +630,16 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to search. Default: -1 (infinity)."
       RETURN:
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : The highest value.
+        DESCR  : &g_dyn_query_maximum_return_descr
+                 The highest value.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_maximum
 
-  - g_dyn_query_minimum_date:
-  - g_dyn_query_minimum_double:
+  - g_dyn_query_minimum_int:
   - g_dyn_query_minimum_float:
-  - g_dyn_query_minimum:
+  - g_dyn_query_minimum_double:
+  - g_dyn_query_minimum_date:
       TITLE    : minimum*
       NAMES    : [minimum, minimum_float, minimum_double, minimum_date]
       DESCR    : &g_dyn_query_minimum_descr
@@ -636,14 +671,15 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : [int64_t, float, double, Date]
-        DESCR  : The lowest value.
+        DESCR  : &g_dyn_query_minimum_return_descr
+                 The lowest value.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_minimum
 
+  - g_dyn_query_average_int:
   - g_dyn_query_average_double:
   - g_dyn_query_average_float:
-  - g_dyn_query_average:
       TITLE    : average*
       NAMES    : [average, average_float, average_double]
       SUMMARY  : &g_dyn_query_average_summary
@@ -678,7 +714,8 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : double
-        DESCR  : The average.
+        DESCR  : &g_dyn_query_average_return_descr
+                 The average.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_average

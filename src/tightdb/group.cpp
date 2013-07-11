@@ -62,38 +62,49 @@ private:
 
 class FileOStream {
 public:
-    FileOStream(const string& path) : m_pos(0)
+    FileOStream(const string& path): m_pos(0), m_streambuf(&m_file), m_out(&m_streambuf)
     {
-        m_file = File::open_stdio_file(path, File::mode_Write);
+        m_file.open(path, File::access_ReadWrite, File::create_Must, 0);
     }
 
-    ~FileOStream()
-    {
-        int r = fclose(m_file);
-        TIGHTDB_ASSERT(r == 0);
-        static_cast<void>(r);
-    }
+    size_t getpos() const { return m_pos; }
 
-    size_t getpos() const {return m_pos;}
-
-    size_t write(const char* p, size_t n)
+    size_t write(const char* data, size_t size)
     {
-        const size_t pos = m_pos;
-        if (fwrite(p, 1, n, m_file) < n)
-            throw runtime_error("std::fwrite() failed");
-        m_pos += n;
+        size_t size_0 = size;
+
+        // Handle the case where 'size_t' has a larger range than 'streamsize'
+        streamsize max_streamsize = numeric_limits<streamsize>::max();
+        size_t max_put = numeric_limits<size_t>::max();
+        if (int_less_than(max_streamsize, max_put))
+            max_put = size_t(max_streamsize);
+        while (max_put < size) {
+            m_out.write(data, max_put);
+            data += max_put;
+            size -= max_put;
+        }
+
+        m_out.write(data, size);
+
+        size_t pos = m_pos;
+        if (int_add_with_overflow_detect(m_pos, size_0))
+            throw runtime_error("File size overflow");
         return pos;
     }
 
     void seek(size_t pos)
     {
-        if (fseek(m_file, static_cast<long>(pos), SEEK_SET) != 0)
-            throw runtime_error("std::fseek() failed");
+        streamsize pos2 = 0;
+        if (int_cast_with_overflow_detect(pos, pos2))
+            throw std::runtime_error("Seek position overflow");
+        m_out.seekp(pos2);
     }
 
 private:
     size_t m_pos;
-    FILE*  m_file;
+    File m_file;
+    File::Streambuf m_streambuf;
+    ostream m_out;
 };
 
 } // anonymous namespace
@@ -105,7 +116,9 @@ void Group::create_from_file(const string& filename, OpenMode mode, bool do_init
 {
     // Memory map file
     // This leaves the group ready, but in invalid state
-    m_alloc.attach_file(filename, m_is_shared, mode == mode_ReadOnly, mode == mode_NoCreate);
+    bool read_only = mode == mode_ReadOnly;
+    bool no_create = mode == mode_ReadWriteNoCreate;
+    m_alloc.attach_file(filename, m_is_shared, read_only, no_create);
 
     if (!do_init)  return;
 
@@ -370,7 +383,7 @@ BinaryData Group::write_to_mem() const
 }
 
 // NOTE: This method must not modify *this if m_shared is false.
-size_t Group::commit(size_t current_version, size_t readlock_version, bool doPersist)
+size_t Group::commit(size_t current_version, size_t readlock_version, bool persist)
 {
     TIGHTDB_ASSERT(m_top.IsValid());
     TIGHTDB_ASSERT(readlock_version <= current_version);
@@ -381,7 +394,7 @@ size_t Group::commit(size_t current_version, size_t readlock_version, bool doPer
     // If we have an empty db file, we can just serialize directly
     //if (m_alloc.GetTopRef() == 0) {}
 
-    GroupWriter out(*this, doPersist);
+    GroupWriter out(*this, persist);
 
     if (m_is_shared) {
         m_readlock_version = readlock_version;
@@ -389,7 +402,7 @@ size_t Group::commit(size_t current_version, size_t readlock_version, bool doPer
     }
 
     // Recursively write all changed arrays to end of file
-    const size_t top_pos = out.Commit();
+    const size_t top_pos = out.commit();
 
     // If the group is persisiting in single-thread (un-shared) mode
     // we have to make sure that the group stays valid after commit
