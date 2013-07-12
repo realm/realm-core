@@ -103,7 +103,7 @@ public:
     }
 
     // Conversion
-    void to_json(std::ostream& out);
+    void to_json(std::ostream& out) const;
     void to_string(std::ostream& out, size_t limit=500) const;
 
 protected:

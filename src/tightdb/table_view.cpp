@@ -269,7 +269,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
     result.Destroy();
 }
 
-void TableViewBase::to_json(ostream& out)
+void TableViewBase::to_json(ostream& out) const
 {
     // Represent table as list of objects
     out << "[";

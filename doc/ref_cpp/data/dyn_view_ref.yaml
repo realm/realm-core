@@ -26,15 +26,15 @@ DESCR      : &g_dyn_view_intro_descr
 
              It is possible to create multiple views for the table as
              long as you do not change the original table.
-             
-             NOTICE: 
+
+             NOTICE:
              For all methods which takes row and column index as parameters,
              you must ensure that these are in a valid range.
              You must also ensure that you use the correct type of method for
              the correct type of column. I.e. it's invalid to use 'getString(...)'
-             with a column index which is of Boolean type - it must be of 'String' 
+             with a column index which is of Boolean type - it must be of 'String'
              type and so forth.
-             
+
 SEE        :
 EXAMPLES   :
 - DESCR:
@@ -285,7 +285,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_set_xxx
         DESCR  :
-        
+
 - Sub-tables:
   METHODS:
   - g_dyn_view_get_subtable_size:
@@ -321,8 +321,8 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_clear_subtable
         DESCR  :
-        
-        
+
+
 - Searching:
   METHODS:
   - g_dyn_view_find_first_bool:
@@ -364,7 +364,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_find_first_xxx
         DESCR  :
-        
+
   - g_dyn_view_find_all_bool:
       NAME     : find_all_bool
   - g_dyn_view_find_all_int:
@@ -526,10 +526,11 @@ CATEGORIES :
                  >
                  This method will convert a view and its columns and rows
                  to a JSON compatible representation.
-                 
+
                  The JavaScript Object Notation (<a
                  href="http://json.org">JSON</a>) is useful for
-                 web/mobile applications and serialization. 
+                 web/mobile applications and serialization.
+      CONST    : true
       PARAMS:
       - NAME   : out
         TYPES  : std::ostream&
