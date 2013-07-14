@@ -43,7 +43,7 @@ void VerifiedInteger::Insert(size_t ndx, int64_t value)
     TIGHTDB_ASSERT(ConditionalVerify());
 }
 
-int64_t VerifiedInteger::Get(size_t ndx)
+int64_t VerifiedInteger::get(size_t ndx)
 {
     TIGHTDB_ASSERT(v[ndx] == u.get(ndx));
     return v[ndx];
@@ -102,7 +102,7 @@ int64_t VerifiedInteger::minimum(size_t start, size_t end)
     return min;
 }
 
-void VerifiedInteger::Set(size_t ndx, int64_t value)
+void VerifiedInteger::set(size_t ndx, int64_t value)
 {
     v[ndx] = value;
     u.set(ndx, value);
@@ -164,7 +164,7 @@ void VerifiedInteger::find_all(Array &c, int64_t value, size_t start, size_t end
     if (c.size() != result.size())
         TIGHTDB_ASSERT(false);
     for (size_t t = 0; t < result.size(); ++t) {
-        if (result[t] != size_t(c.Get(t)))
+        if (result[t] != size_t(c.get(t)))
             TIGHTDB_ASSERT(false);
     }
 

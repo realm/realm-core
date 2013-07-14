@@ -20,7 +20,7 @@ Column GetColumnFromRef(Array &parent, size_t ndx)
 {
     TIGHTDB_ASSERT(parent.HasRefs());
     TIGHTDB_ASSERT(ndx < parent.size());
-    return Column(parent.GetAsRef(ndx), &parent, ndx, parent.GetAllocator());
+    return Column(parent.get_as_ref(ndx), &parent, ndx, parent.GetAllocator());
 }
 
 /*
@@ -55,10 +55,10 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
     size_t s0 = idx0->size();
     size_t s1 = idx1->size();
 
-    i0 = idx0->GetAsRef(p0++);
-    i1 = idx1->GetAsRef(p1++);
-    v0 = vals->Get(i0);
-    v1 = vals->Get(i1);
+    i0 = idx0->get_as_ref(p0++);
+    i1 = idx1->get_as_ref(p1++);
+    v0 = vals->get(i0);
+    v1 = vals->get(i1);
 
     for (;;) {
         if (v0 < v1) {
@@ -66,15 +66,15 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
             // Only check p0 if it has been modified :)
             if (p0 == s0)
                 break;
-            i0 = idx0->GetAsRef(p0++);
-            v0 = vals->Get(i0);
+            i0 = idx0->get_as_ref(p0++);
+            v0 = vals->get(i0);
         }
         else {
             idxres->add(i1);
             if (p1 == s1)
                 break;
-            i1 = idx1->GetAsRef(p1++);
-            v1 = vals->Get(i1);
+            i1 = idx1->get_as_ref(p1++);
+            v1 = vals->get(i1);
         }
     }
 
@@ -84,11 +84,11 @@ void merge_core_references(Array* vals, Array* idx0, Array* idx1, Array* idxres)
         p1--;
 
     while (p0 < s0) {
-        i0 = idx0->GetAsRef(p0++);
+        i0 = idx0->get_as_ref(p0++);
         idxres->add(i0);
     }
     while (p1 < s1) {
-        i1 = idx1->GetAsRef(p1++);
+        i1 = idx1->get_as_ref(p1++);
         idxres->add(i1);
     }
 
@@ -105,21 +105,21 @@ void merge_core(const Array& a0, const Array& a1, Array& res)
     const size_t s0 = a0.size();
     const size_t s1 = a1.size();
 
-    int64_t v0 = a0.Get(p0++);
-    int64_t v1 = a1.Get(p1++);
+    int64_t v0 = a0.get(p0++);
+    int64_t v1 = a1.get(p1++);
 
     for (;;) {
         if (v0 < v1) {
             res.add(v0);
             if (p0 == s0)
                 break;
-            v0 = a0.Get(p0++);
+            v0 = a0.get(p0++);
         }
         else {
             res.add(v1);
             if (p1 == s1)
                 break;
-            v1 = a1.Get(p1++);
+            v1 = a1.get(p1++);
         }
     }
 
@@ -129,11 +129,11 @@ void merge_core(const Array& a0, const Array& a1, Array& res)
         --p1;
 
     while (p0 < s0) {
-        v0 = a0.Get(p0++);
+        v0 = a0.get(p0++);
         res.add(v0);
     }
     while (p1 < s1) {
-        v1 = a1.Get(p1++);
+        v1 = a1.get(p1++);
         res.add(v1);
     }
 
@@ -154,9 +154,9 @@ Array* merge(const Array& arrayList)
     Array leftHalf, rightHalf;
     const size_t leftSize = size / 2;
     for (size_t t = 0; t < leftSize; ++t)
-        leftHalf.add(arrayList.Get(t));
+        leftHalf.add(arrayList.get(t));
     for (size_t t = leftSize; t < size; ++t)
-        rightHalf.add(arrayList.Get(t));
+        rightHalf.add(arrayList.get(t));
 
     // We merge left-half-first instead of bottom-up so that we access the same data in each call
     // so that it's in cache, at least for the first few iterations until lists get too long
@@ -167,12 +167,12 @@ Array* merge(const Array& arrayList)
     if (left && right)
         merge_core(*left, *right, *res);
     else if (left) {
-        const size_t ref = rightHalf.GetAsRef(0);
+        const size_t ref = rightHalf.get_as_ref(0);
         Array right0(ref, NULL);
         merge_core(*left, right0, *res);
     }
     else if (right) {
-        const size_t ref = leftHalf.GetAsRef(0);
+        const size_t ref = leftHalf.get_as_ref(0);
         Array left0(ref, NULL);
         merge_core(left0, *right, *res);
     }
@@ -199,8 +199,8 @@ Array* merge(const Array& arrayList)
 void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
 {
     if (indexlists->size() == 1) {
-//      size_t ref = valuelist->Get(0);
-        *indexresult = (Array *)indexlists->Get(0);
+//      size_t ref = valuelist->get(0);
+        *indexresult = reinterpret_cast<Array*>(indexlists->get(0));
         return;
     }
 
@@ -208,12 +208,12 @@ void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
     Array leftI, rightI;
     size_t leftSize = indexlists->size() / 2;
     for (size_t t = 0; t < leftSize; t++) {
-        leftV.add(indexlists->Get(t));
-        leftI.add(indexlists->Get(t));
+        leftV.add(indexlists->get(t));
+        leftI.add(indexlists->get(t));
     }
     for (size_t t = leftSize; t < indexlists->size(); t++) {
-        rightV.add(indexlists->Get(t));
-        rightI.add(indexlists->Get(t));
+        rightV.add(indexlists->get(t));
+        rightI.add(indexlists->get(t));
     }
 
     Array *li;
@@ -251,7 +251,7 @@ size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXC
     Array a(ref, 0, 0, alloc);
     if (!a.IsNode())
         return a.size();
-    Array offsets(a.GetAsRef(0), 0, 0, alloc);
+    Array offsets(a.get_as_ref(0), 0, 0, alloc);
     TIGHTDB_ASSERT(!offsets.is_empty());
     return size_t(offsets.back());
 }
@@ -390,7 +390,7 @@ void Column::set(size_t ndx, int64_t value)
 
     // Update index
     if (m_index)
-        m_index->Set(ndx, oldVal, value);
+        m_index->set(ndx, oldVal, value);
 }
 
 void Column::add(int64_t value)
@@ -471,7 +471,7 @@ void Column::sort(size_t start, size_t end)
     Array arr;
     TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, (void *)&arr);
     for (size_t t = 0; t < arr.size(); t++) {
-        const size_t ref = to_ref(arr.Get(t));
+        const size_t ref = to_ref(arr.get(t));
         Array a(ref);
         a.sort();
     }
@@ -481,7 +481,7 @@ void Column::sort(size_t start, size_t end)
         // Todo, this is a bit slow. Add bulk insert or the like to Column
         const size_t count = sorted->size();
         for (size_t t = 0; t < count; ++t) {
-            set(t, sorted->Get(t));
+            set(t, sorted->get(t));
         }
 
         sorted->Destroy();
@@ -504,15 +504,15 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
     size_t offset = 0;
     for (size_t t = 0; t < values.size(); t++) {
         Array *i = new Array();
-        size_t ref = values.GetAsRef(t);
+        size_t ref = values.get_as_ref(t);
         Array v(ref);
         for (size_t j = 0; j < v.size(); j++)
-            all_values.add(v.Get(j));
+            all_values.add(v.get(j));
         v.ReferenceSort(*i);
         for (size_t n = 0; n < v.size(); n++)
-            i->Set(n, i->Get(n) + offset);
+            i->set(n, i->get(n) + offset);
         offset += v.size();
-        indexes.add((int64_t)i);
+        indexes.add(int64_t(i));
     }
 
     Array *ResI;
@@ -520,7 +520,7 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
     merge_references(&all_values, &indexes, &ResI);
 
     for (size_t t = 0; t < ResI->size(); t++)
-        ref.add(ResI->Get(t));
+        ref.add(ResI->get(t));
 }
 
 size_t ColumnBase::GetRefSize(size_t ref) const
@@ -550,8 +550,8 @@ void ColumnBase::NodeUpdateOffsets(size_t ndx)
     Array refs = NodeGetRefs();
     TIGHTDB_ASSERT(ndx < offsets.size());
 
-    const int64_t newSize = GetRefSize(refs.GetAsRef(ndx));
-    const int64_t oldSize = offsets.Get(ndx) - (ndx ? offsets.Get(ndx-1) : 0);
+    const int64_t newSize = GetRefSize(refs.get_as_ref(ndx));
+    const int64_t oldSize = offsets.get(ndx) - (ndx ? offsets.get(ndx-1) : 0);
     const int64_t diff = newSize - oldSize;
 
     offsets.Increment(diff, ndx);
@@ -567,7 +567,7 @@ void ColumnBase::NodeAddKey(size_t ref)
     TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
 
     const Array new_top(ref, NULL, 0,m_array->GetAllocator());
-    const Array new_offsets(new_top.GetAsRef(0), NULL, 0,m_array->GetAllocator());
+    const Array new_offsets(new_top.get_as_ref(0), NULL, 0,m_array->GetAllocator());
     TIGHTDB_ASSERT(!new_offsets.is_empty());
 
     const int64_t key = new_offsets.back();
@@ -589,7 +589,7 @@ void Column::erase(size_t ndx)
         if (refs.size() != 1)
             break;
 
-        const size_t ref = refs.GetAsRef(0);
+        const size_t ref = refs.get_as_ref(0);
         refs.Delete(0); // avoid destroying subtree
         m_array->Destroy();
         m_array->UpdateRef(ref);
@@ -822,10 +822,10 @@ void Column::Print() const
         const Array refs = NodeGetRefs();
 
         for (size_t i = 0; i < refs.size(); ++i) {
-            cout << " " << i << ": " << offsets.Get(i) << " " << hex << refs.Get(i) << dec <<"\n";
+            cout << " " << i << ": " << offsets.get(i) << " " << hex << refs.get(i) << dec <<"\n";
         }
         for (size_t i = 0; i < refs.size(); ++i) {
-            const Column col(refs.GetAsRef(i));
+            const Column col(refs.get_as_ref(i));
             col.Print();
         }
     }
@@ -849,14 +849,14 @@ void Column::Verify() const
 
         size_t off = 0;
         for (size_t i = 0; i < refs.size(); ++i) {
-            const size_t ref = size_t(refs.Get(i));
+            const size_t ref = size_t(refs.get(i));
             TIGHTDB_ASSERT(ref);
 
             const Column col(ref, NULL, 0, m_array->GetAllocator());
             col.Verify();
 
             off += col.Size();
-            const size_t node_off = size_t(offsets.Get(i));
+            const size_t node_off = size_t(offsets.get(i));
             if (node_off != off) {
                 TIGHTDB_ASSERT(false);
             }

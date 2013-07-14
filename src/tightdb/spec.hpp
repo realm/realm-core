@@ -183,7 +183,7 @@ inline Spec::Spec(const Spec& s):
 inline Spec Spec::get_subspec_by_ndx(size_t subspec_ndx)
 {
     Allocator& alloc = m_specSet.GetAllocator();
-    const size_t ref = m_subSpecs.GetAsRef(subspec_ndx);
+    const size_t ref = m_subSpecs.get_as_ref(subspec_ndx);
     return Spec(m_table, alloc, ref, &m_subSpecs, subspec_ndx);
 }
 

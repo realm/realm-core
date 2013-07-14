@@ -80,8 +80,8 @@ inline BinaryData ArrayBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    std::size_t begin = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
-    std::size_t end   = m_offsets.GetAsSizeT(ndx);
+    std::size_t begin = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    std::size_t end   = to_size_t(m_offsets.get(ndx));
     return BinaryData(m_blob.get(begin), end-begin);
 }
 

@@ -38,7 +38,7 @@ public:
     bool is_empty() const;
 
     void Insert(size_t row_ndx, StringData value, bool isLast=false);
-    void Set(size_t row_ndx, StringData oldValue, StringData newValue);
+    void set(size_t row_ndx, StringData oldValue, StringData newValue);
     void erase(size_t row_ndx, StringData value, bool isLast=false);
     void Clear() TIGHTDB_OVERRIDE;
 
@@ -76,7 +76,7 @@ protected:
     void DoDelete(size_t ndx, StringData, size_t offset);
     void do_update_ref(StringData value, size_t row_ndx, size_t new_row_ndx, size_t offset);
 
-    StringData Get(size_t ndx) {return (*m_get_func)(m_target_column, ndx);}
+    StringData get(size_t ndx) {return (*m_get_func)(m_target_column, ndx);}
 
     // Member variables
     void* m_target_column;

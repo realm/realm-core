@@ -226,13 +226,13 @@ void BasicColumn<T>::erase(size_t ndx)
 template<typename T>
 T BasicColumn<T>::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    return static_cast<BasicArray<T>*>(m_array)->Get(ndx);
+    return static_cast<BasicArray<T>*>(m_array)->get(ndx);
 }
 
 template<typename T>
 void BasicColumn<T>::LeafSet(size_t ndx, T value)
 {
-    static_cast<BasicArray<T>*>(m_array)->Set(ndx, value);
+    static_cast<BasicArray<T>*>(m_array)->set(ndx, value);
 }
 
 template<typename T>

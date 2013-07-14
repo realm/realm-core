@@ -9,14 +9,14 @@ Index GetIndexFromRef(Array& parent, size_t ndx)
 {
     TIGHTDB_ASSERT(parent.HasRefs());
     TIGHTDB_ASSERT(ndx < parent.size());
-    return Index(parent.GetAsRef(ndx), &parent, ndx);
+    return Index(parent.get_as_ref(ndx), &parent, ndx);
 }
 
 const Index GetIndexFromRef(const Array& parent, size_t ndx)
 {
     TIGHTDB_ASSERT(parent.HasRefs());
     TIGHTDB_ASSERT(ndx < parent.size());
-    return Index(parent.GetAsRef(ndx));
+    return Index(parent.get_as_ref(ndx));
 }
 
 }
@@ -61,7 +61,7 @@ void Index::BuildIndex(const Column& src)
 #endif // TIGHTDB_DEBUG
 }
 
-void Index::Set(size_t ndx, int64_t oldValue, int64_t newValue)
+void Index::set(size_t ndx, int64_t oldValue, int64_t newValue)
 {
     erase(ndx, oldValue, true); // set isLast to avoid updating refs
     Insert(ndx, newValue, true); // set isLast to avoid updating refs
@@ -77,7 +77,7 @@ void Index::erase(size_t ndx, int64_t value, bool isLast)
         TIGHTDB_ASSERT(refs.size() != 0); // node cannot be empty
         if (refs.size() > 1) break;
 
-        const size_t ref = refs.GetAsRef(0);
+        const size_t ref = refs.get_as_ref(0);
         refs.Delete(0); // avoid deleting subtree
         m_array->Destroy();
         m_array->UpdateRef(ref);
@@ -108,7 +108,7 @@ bool Index::DoDelete(size_t ndx, int64_t value)
                 }
                 else {
                     const int64_t maxval = node.MaxValue();
-                    if (maxval != values.Get(pos)) values.Set(pos, maxval);
+                    if (maxval != values.get(pos)) values.set(pos, maxval);
                 }
                 return true;
             }
@@ -118,7 +118,7 @@ bool Index::DoDelete(size_t ndx, int64_t value)
     }
     else {
         do {
-            if (refs.Get(pos) == (int)ndx) {
+            if (refs.get(pos) == int(ndx)) {
                 values.Delete(pos);
                 refs.Delete(pos);
                 return true;
@@ -228,7 +228,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
         }
 
         // Calc index in subnode
-        const size_t offset = node_ndx ? (size_t)offsets.Get(node_ndx-1) : 0;
+        const size_t offset = node_ndx ? to_size_t(offsets.get(node_ndx-1)) : 0;
         const size_t local_ndx = ndx - offset;
 
         // Get sublist
@@ -263,7 +263,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
             // Move items below split to new node
             const size_t len = refs.size();
             for (size_t i = node_ndx; i < len; ++i) {
-                newNode.NodeAdd((size_t)refs.Get(i));
+                newNode.NodeAdd(to_size_t(refs.get(i)));
             }
             offsets.Resize(node_ndx);
             refs.Resize(node_ndx);
@@ -289,7 +289,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
         default:            // split
             // Move items below split to new list
             for (size_t i = ndx; i < m_array->size(); ++i) {
-                newList.add(m_array->Get(i));
+                newList.add(m_array->get(i));
             }
             m_array->Resize(ndx);
 
@@ -308,13 +308,13 @@ size_t Index::find_first(int64_t value) const
 
         const size_t pos = values.FindPos2(value);
 
-        if (pos == (size_t)-1) return (size_t)-1;
+        if (pos == size_t(-1)) return size_t(-1);
         else if (!m_array->IsNode()) {
-            if (values.Get(pos) == value) return (size_t)refs.Get(pos);
-            else return (size_t)-1;
+            if (values.get(pos) == value) return to_size_t(refs.get(pos));
+            else return size_t(-1);
         }
 
-        ref = (size_t)refs.Get(pos);
+        ref = to_size_t(refs.get(pos));
     }
 }
 
@@ -336,8 +336,8 @@ bool Index::find_all(Column& result, int64_t value) const
     }
     else {
         do {
-            if (values.Get(pos) == value) {
-                result.add(refs.Get(pos));
+            if (values.get(pos) == value) {
+                result.add(refs.get(pos));
                 ++pos;
             }
             else return false; // no more matches
@@ -353,7 +353,7 @@ bool Index::FindAllRange(Column& result, int64_t start, int64_t end) const
     const Array refs = m_array->GetSubArray(1);
 
     size_t pos = values.FindPos2(start);
-    TIGHTDB_ASSERT(pos != (size_t)-1);
+    TIGHTDB_ASSERT(pos != size_t(-1));
 
     // There may be several nodes with the same values,
     if (m_array->IsNode()) {
@@ -367,7 +367,7 @@ bool Index::FindAllRange(Column& result, int64_t start, int64_t end) const
         do {
             const int64_t v = values[pos];
             if (v >= start && v < end) {
-                result.add(refs.Get(pos));
+                result.add(refs.get(pos));
                 ++pos;
             }
             else return false; // no more matches
@@ -385,7 +385,7 @@ void Index::UpdateRefs(size_t pos, int diff)
 
     if (m_array->IsNode()) {
         for (size_t i = 0; i < refs.size(); ++i) {
-            const size_t ref = size_t(refs.Get(i));
+            const size_t ref = size_t(refs.get(i));
             Index ndx(ref);
             ndx.UpdateRefs(pos, diff);
         }
@@ -413,13 +413,13 @@ void Index::Verify() const
 
         // Make sure that all offsets matches biggest value in ref
         for (size_t i = 0; i < refs.size(); ++i) {
-            const size_t ref = (size_t)refs.Get(i);
+            const size_t ref = to_size_t(refs.get(i));
             TIGHTDB_ASSERT(ref);
 
             const Index col(ref);
             col.Verify();
 
-            if (offsets.Get(i) != col.MaxValue()) {
+            if (offsets.get(i) != col.MaxValue()) {
                 TIGHTDB_ASSERT(false);
             }
         }

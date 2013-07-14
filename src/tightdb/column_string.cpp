@@ -221,7 +221,7 @@ void AdaptiveStringColumn::set(size_t ndx, StringData str)
     //  position to update (as it looks for the old value))
     if (m_index) {
         StringData oldVal = get(ndx);
-        m_index->Set(ndx, oldVal, str);
+        m_index->set(ndx, oldVal, str);
     }
 
     TreeSet<StringData, AdaptiveStringColumn>(ndx, str);
@@ -286,7 +286,7 @@ size_t AdaptiveStringColumn::count(StringData target) const
         const size_t n = refs.size();
 
         for (size_t i = 0; i < n; ++i) {
-            const size_t ref = refs.GetAsRef(i);
+            const size_t ref = refs.get_as_ref(i);
             const AdaptiveStringColumn col(ref, NULL, 0, m_array->GetAllocator());
 
             count += col.count(target);

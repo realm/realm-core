@@ -43,7 +43,7 @@ void BasicArray_AddGet(T val[], size_t valLen)
         CHECK_EQUAL(i+1, f.size());
 
         for (size_t j=0; j<i; ++j) {
-            CHECK_EQUAL(val[j], f.Get(j));
+            CHECK_EQUAL(val[j], f.get(j));
         }
     }
 
@@ -63,12 +63,12 @@ void BasicArray_AddManyValues()
     const size_t repeats = 1100;
     for (size_t i=0; i<repeats; ++i) {
         f.add(T(i));
-        T val = f.Get(i);
+        T val = f.get(i);
         CHECK_EQUAL(T(i), val);
         CHECK_EQUAL(i+1, f.size());
     }
     for (size_t i=0; i<repeats; ++i) {
-        T val = f.Get(i);
+        T val = f.get(i);
         CHECK_EQUAL(T(i), val);
     }
 
@@ -90,28 +90,28 @@ void BasicArray_Delete()
     // Delete first
     f.Delete(0);
     CHECK_EQUAL(4, f.size());
-    CHECK_EQUAL(1, f.Get(0));
-    CHECK_EQUAL(2, f.Get(1));
-    CHECK_EQUAL(3, f.Get(2));
-    CHECK_EQUAL(4, f.Get(3));
+    CHECK_EQUAL(1, f.get(0));
+    CHECK_EQUAL(2, f.get(1));
+    CHECK_EQUAL(3, f.get(2));
+    CHECK_EQUAL(4, f.get(3));
 
     // Delete last
     f.Delete(3);
     CHECK_EQUAL(3, f.size());
-    CHECK_EQUAL(1, f.Get(0));
-    CHECK_EQUAL(2, f.Get(1));
-    CHECK_EQUAL(3, f.Get(2));
+    CHECK_EQUAL(1, f.get(0));
+    CHECK_EQUAL(2, f.get(1));
+    CHECK_EQUAL(3, f.get(2));
 
     // Delete middle
     f.Delete(1);
     CHECK_EQUAL(2, f.size());
-    CHECK_EQUAL(1, f.Get(0));
-    CHECK_EQUAL(3, f.Get(1));
+    CHECK_EQUAL(1, f.get(0));
+    CHECK_EQUAL(3, f.get(1));
 
     // Delete all
     f.Delete(0);
     CHECK_EQUAL(1, f.size());
-    CHECK_EQUAL(3, f.Get(0));
+    CHECK_EQUAL(3, f.get(0));
     f.Delete(0);
     CHECK_EQUAL(0, f.size());
     CHECK(f.is_empty());
@@ -131,14 +131,14 @@ void BasicArray_Set(T val[], size_t valLen)
         f.add(val[i]);
     CHECK_EQUAL(valLen, f.size());
 
-    f.Set(0, T(1.6));
-    CHECK_EQUAL(T(1.6), f.Get(0));
-    f.Set(3, T(987.23));
-    CHECK_EQUAL(T(987.23), f.Get(3));
+    f.set(0, T(1.6));
+    CHECK_EQUAL(T(1.6), f.get(0));
+    f.set(3, T(987.23));
+    CHECK_EQUAL(T(987.23), f.get(3));
 
-    CHECK_EQUAL(val[1], f.Get(1));
-    CHECK_EQUAL(val[2], f.Get(2));
-    CHECK_EQUAL(val[4], f.Get(4));
+    CHECK_EQUAL(val[1], f.get(1));
+    CHECK_EQUAL(val[2], f.get(2));
+    CHECK_EQUAL(val[4], f.get(4));
     CHECK_EQUAL(valLen, f.size());
 
     f.Destroy();    // cleanup
@@ -158,28 +158,28 @@ void BasicArray_Insert()
 
     // Insert in empty array
     f.Insert(0, v0);
-    CHECK_EQUAL(v0, f.Get(0));
+    CHECK_EQUAL(v0, f.get(0));
     CHECK_EQUAL(1, f.size());
 
     // Insert in top
     f.Insert(0, v1);
-    CHECK_EQUAL(v1, f.Get(0));
-    CHECK_EQUAL(v0, f.Get(1));
+    CHECK_EQUAL(v1, f.get(0));
+    CHECK_EQUAL(v0, f.get(1));
     CHECK_EQUAL(2, f.size());
 
     // Insert in middle
     f.Insert(1, v2);
-    CHECK_EQUAL(v1, f.Get(0));
-    CHECK_EQUAL(v2, f.Get(1));
-    CHECK_EQUAL(v0, f.Get(2));
+    CHECK_EQUAL(v1, f.get(0));
+    CHECK_EQUAL(v2, f.get(1));
+    CHECK_EQUAL(v0, f.get(2));
     CHECK_EQUAL(3, f.size());
 
     // Insert at buttom
     f.Insert(3, v3);
-    CHECK_EQUAL(v1, f.Get(0));
-    CHECK_EQUAL(v2, f.Get(1));
-    CHECK_EQUAL(v0, f.Get(2));
-    CHECK_EQUAL(v3, f.Get(3));
+    CHECK_EQUAL(v1, f.get(0));
+    CHECK_EQUAL(v2, f.get(1));
+    CHECK_EQUAL(v0, f.get(2));
+    CHECK_EQUAL(v3, f.get(3));
     CHECK_EQUAL(4, f.size());
 
     f.Destroy();    // cleanup
@@ -324,8 +324,8 @@ void BasicArray_Find()
     Array resArr;
     f.find_all(resArr, T(1.1), 0);
     CHECK_EQUAL(2, resArr.size());
-    CHECK_EQUAL(0, resArr.Get(0));
-    CHECK_EQUAL(4, resArr.Get(1));
+    CHECK_EQUAL(0, resArr.get(0));
+    CHECK_EQUAL(4, resArr.get(1));
     // Find all, range limited -> no match
     resArr.Clear();
     f.find_all(resArr, T(1.1), 0, 1, 4);

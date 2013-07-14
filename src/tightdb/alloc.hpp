@@ -38,7 +38,9 @@ typedef std::size_t ref_type;
 inline ref_type to_ref(int64_t v) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(!int_cast_has_overflow<ref_type>(v));
-    // FIXME: Must also check that v is divisible by 8 (64-bit aligned).
+    // Check that v is divisible by 8 (64-bit aligned).
+    // FIXME: Enable the following assert!
+    // TIGHTDB_ASSERT(v % 8 == 0);
     return ref_type(v);
 }
 

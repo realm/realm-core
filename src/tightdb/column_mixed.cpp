@@ -55,8 +55,8 @@ void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx
     m_array = new Array(ref, parent, ndx_in_parent, alloc);
     TIGHTDB_ASSERT(m_array->size() == 2 || m_array->size() == 3);
 
-    const size_t types_ref = m_array->GetAsRef(0);
-    const size_t refs_ref  = m_array->GetAsRef(1);
+    const size_t types_ref = m_array->get_as_ref(0);
+    const size_t refs_ref  = m_array->get_as_ref(1);
 
     m_types = new Column(types_ref, m_array, 0, alloc);
     m_refs  = new RefsColumn(alloc, table, column_ndx, m_array, 1, refs_ref);
@@ -65,7 +65,7 @@ void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx
     // Binary column with values that does not fit in refs
     // is only there if needed
     if (m_array->size() == 3) {
-        const size_t data_ref = m_array->GetAsRef(2);
+        const size_t data_ref = m_array->get_as_ref(2);
         m_data = new ColumnBinary(data_ref, m_array, 2, alloc);
     }
 }
@@ -104,7 +104,7 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType newtype)
                 // If item is in middle of the column, we just clear
                 // it to avoid having to adjust refs to following items
                 // TODO: this is a leak. We should adjust
-                const size_t ref = m_refs->GetAsRef(ndx) >> 1;
+                const size_t ref = m_refs->get_as_ref(ndx) >> 1;
                 if (ref == m_data->Size()-1)
                     m_data->erase(ref);
                 else
@@ -116,7 +116,7 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType newtype)
             }
             case mixcol_Table: {
                 // Delete entire table
-                const size_t ref = m_refs->GetAsRef(ndx);
+                const size_t ref = m_refs->get_as_ref(ndx);
                 Array top(ref, 0, 0, m_array->GetAllocator());
                 top.Destroy();
                 break;
@@ -202,11 +202,11 @@ void ColumnMixed::set_string(size_t ndx, StringData value)
 
     // See if we can reuse data position
     if (type == mixcol_String) {
-        size_t ref = m_refs->GetAsRef(ndx) >> 1;
+        size_t ref = m_refs->get_as_ref(ndx) >> 1;
         m_data->set_string(ref, value);
     }
     else if (type == mixcol_Binary) {
-        size_t ref = m_refs->GetAsRef(ndx) >> 1;
+        size_t ref = m_refs->get_as_ref(ndx) >> 1;
         m_data->set_string(ref, value);
         m_types->set(ndx, mixcol_String);
     }
@@ -235,12 +235,12 @@ void ColumnMixed::set_binary(size_t ndx, BinaryData value)
 
     // See if we can reuse data position
     if (type == mixcol_String) {
-        const size_t ref = m_refs->GetAsRef(ndx) >> 1;
+        const size_t ref = m_refs->get_as_ref(ndx) >> 1;
         m_data->set(ref, value);
         m_types->set(ndx, mixcol_Binary);
     }
     else if (type == mixcol_Binary) {
-        const size_t ref = m_refs->GetAsRef(ndx) >> 1;
+        const size_t ref = m_refs->get_as_ref(ndx) >> 1;
         m_data->set(ref, value);
     }
     else {

@@ -37,7 +37,7 @@ public:
 
     void Insert(size_t ndx, int64_t value, bool isLast=false);
     void erase(size_t ndx, int64_t value, bool isLast=false);
-    void Set(size_t ndx, int64_t oldValue, int64_t newValue);
+    void set(size_t ndx, int64_t oldValue, int64_t newValue);
 
     using Column::erase;
 

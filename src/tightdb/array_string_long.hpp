@@ -81,12 +81,12 @@ inline StringData ArrayStringLong::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
         // FIXME: Consider how much of a performance problem it is,
         // that we have to issue two separate calls to read two
         // consecutive values from an array.
-        begin = m_offsets.GetAsSizeT(ndx-1);
-        end   = m_offsets.GetAsSizeT(ndx);
+        begin = to_size_t(m_offsets.get(ndx-1));
+        end   = to_size_t(m_offsets.get(ndx));
     }
     else {
         begin = 0;
-        end   = m_offsets.GetAsSizeT(0);
+        end   = to_size_t(m_offsets.get(0));
     }
     --end; // Discount the terminating zero
     return StringData(m_blob.get(begin), end-begin);

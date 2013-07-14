@@ -209,7 +209,7 @@ public:
     TIGHTDB_FORCEINLINE T get_next(size_t index)
     {
         cache_next(index);
-        T av = m_array_ptr->Get(index - m_leaf_start);
+        T av = m_array_ptr->get(index - m_leaf_start);
         return av;
     }
 
@@ -481,7 +481,7 @@ public:
 
         m_next = 0;
         if (m_size > 0)
-            m_max = m_arr.GetAsSizeT(m_size - 1);
+            m_max = to_size_t(m_arr.get(m_size-1));
         if (m_child) m_child->init(table);
     }
 
@@ -492,7 +492,7 @@ public:
             return end;
 
         m_next = r;
-        return m_arr.GetAsSizeT(r);
+        return to_size_t(m_arr.get(r));
     }
 
 protected:
@@ -753,7 +753,7 @@ public:
 
             // Do search directly on cached leaf array
             if (start + 1 == end) {
-                if (condition(m_array.Get(start - m_leaf_start), m_value))
+                if (condition(m_array.get(start - m_leaf_start), m_value))
                     return start;
                 else
                     return end;
@@ -1145,7 +1145,7 @@ public:
                         last_indexed = m_index_getter->m_leaf_end;
                     }
                     else {
-                        s = m_index_getter->m_array_ptr->GetAsSizeT(f);
+                        s = to_size_t(m_index_getter->m_array_ptr->get(f));
                         if (s > end)
                             return end;
                         else {

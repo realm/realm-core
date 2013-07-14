@@ -421,9 +421,9 @@ TEST_FIXTURE(db_setup_string, ArrayStringFindAll)
 
     c.find_all(col, "foobar");
     CHECK_EQUAL(3, col.size());
-    CHECK_EQUAL(0, col.Get(0));
-    CHECK_EQUAL(2, col.Get(1));
-    CHECK_EQUAL(4, col.Get(2));
+    CHECK_EQUAL(0, col.get(0));
+    CHECK_EQUAL(2, col.get(1));
+    CHECK_EQUAL(4, col.get(2));
 
     // Cleanup
     col.Destroy();

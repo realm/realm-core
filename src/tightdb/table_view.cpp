@@ -86,8 +86,8 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
     size_t row_ndx;
 
     R res = static_cast<R>(0);
-    
-    T first = column->template TreeGet<T, ColType>(m_refs.GetAsSizeT(0));
+
+    T first = column->template TreeGet<T, ColType>(to_size_t(m_refs.get(0)));
 
     if(function == act_Count)
         res = static_cast<R>((first == count_target ? 1 : 0));
@@ -95,14 +95,14 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
         res = static_cast<R>(first);
 
     for (size_t ss = 1; ss < m_refs.size(); ++ss) {
-        row_ndx = m_refs.GetAsSizeT(ss);
+        row_ndx = to_size_t(m_refs.get(ss));
         if (row_ndx >= leaf_end) {
             column->GetBlock(row_ndx, arr, leaf_start);
             const size_t leaf_size = arr.size();
             leaf_end = leaf_start + leaf_size;
         }
 
-        T v = arr.Get(row_ndx - leaf_start);
+        T v = arr.get(row_ndx - leaf_start);
 
         if (function == act_Sum)
             res += static_cast<R>(v);
@@ -222,20 +222,20 @@ void TableViewBase::sort(size_t column, bool Ascending)
     // with rand access (we have ~log(n) accesses to each element, so using 1 additional read to speed up the rest is faster)
     if (m_table->get_column_type(column) == type_Int) {
         for (size_t t = 0; t < m_refs.size(); t++) {
-            int64_t v = m_table->get_int(column, size_t(m_refs.Get(t)));
+            int64_t v = m_table->get_int(column, size_t(m_refs.get(t)));
             vals.add(v);
         }
     }
     else if (m_table->get_column_type(column) == type_Date) {
         for (size_t t = 0; t < m_refs.size(); t++) {
-            size_t idx = size_t(m_refs.Get(t));
+            size_t idx = size_t(m_refs.get(t));
             int64_t v = int64_t(m_table->get_date(column, idx).get_date());
             vals.add(v);
         }
     }
     else if (m_table->get_column_type(column) == type_Bool) {
         for (size_t t = 0; t < m_refs.size(); t++) {
-            size_t idx = size_t(m_refs.Get(t));
+            size_t idx = size_t(m_refs.get(t));
             int64_t v = int64_t(m_table->get_bool(column, idx));
             vals.add(v);
         }
@@ -245,8 +245,8 @@ void TableViewBase::sort(size_t column, bool Ascending)
     vals.Destroy();
 
     for (size_t t = 0; t < m_refs.size(); t++) {
-        size_t r  = ref.GetAsSizeT(t);
-        size_t rr = m_refs.GetAsSizeT(r);
+        size_t r  = to_size_t(ref.get(t));
+        size_t rr = to_size_t(m_refs.get(r));
         result.add(rr);
     }
 
@@ -256,13 +256,13 @@ void TableViewBase::sort(size_t column, bool Ascending)
     m_refs.Clear();
     if (Ascending) {
         for (size_t t = 0; t < ref.size(); t++) {
-            size_t v = result.GetAsSizeT(t);
+            size_t v = to_size_t(result.get(t));
             m_refs.add(v);
         }
     }
     else {
         for (size_t t = 0; t < ref.size(); t++) {
-            size_t v = result.GetAsSizeT(ref.size() - t - 1);
+            size_t v = to_size_t(result.get(ref.size() - t - 1));
             m_refs.add(v);
         }
     }
@@ -314,7 +314,7 @@ void TableView::remove(size_t ndx)
     TIGHTDB_ASSERT(ndx < m_refs.size());
 
     // Delete row in source table
-    const size_t real_ndx = size_t(m_refs.Get(ndx));
+    const size_t real_ndx = size_t(m_refs.get(ndx));
     m_table->remove(real_ndx);
 
     // Update refs
@@ -332,7 +332,7 @@ void TableView::clear()
     // (in reverse order to avoid index drift)
     const size_t count = m_refs.size();
     for (size_t i = count; i; --i) {
-        const size_t ndx = size_t(m_refs.Get(i-1));
+        const size_t ndx = size_t(m_refs.get(i-1));
         m_table->remove(ndx);
     }
 

@@ -50,7 +50,7 @@ void ColumnStringEnum::UpdateFromParent()
 StringData ColumnStringEnum::get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < Column::Size());
-    size_t key_ndx = Column::GetAsRef(ndx);
+    size_t key_ndx = Column::get_as_ref(ndx);
     return m_keys.get(key_ndx);
 }
 
@@ -69,7 +69,7 @@ void ColumnStringEnum::set(size_t ndx, StringData value)
     //  position to update (as it looks for the old value))
     if (m_index) {
         StringData oldVal = get(ndx);
-        m_index->Set(ndx, oldVal, value);
+        m_index->set(ndx, oldVal, value);
     }
 
     size_t key_ndx = GetKeyNdxOrAdd(value);

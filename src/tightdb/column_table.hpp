@@ -231,7 +231,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) c
 
     Table *subtable = m_subtable_map.find(subtable_ndx);
     if (!subtable) {
-        const std::size_t top_ref = GetAsRef(subtable_ndx);
+        const std::size_t top_ref = get_as_ref(subtable_ndx);
         Allocator& alloc = GetAllocator();
         subtable = new Table(Table::RefCountTag(), alloc, top_ref,
                              const_cast<ColumnSubtableParent*>(this), subtable_ndx);
@@ -249,7 +249,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx,
 
     Table *subtable = m_subtable_map.find(subtable_ndx);
     if (!subtable) {
-        const std::size_t columns_ref = GetAsRef(subtable_ndx);
+        const std::size_t columns_ref = get_as_ref(subtable_ndx);
         Allocator& alloc = GetAllocator();
         subtable = new Table(Table::RefCountTag(), alloc, spec_ref, columns_ref,
                              const_cast<ColumnSubtableParent*>(this), subtable_ndx);
@@ -273,7 +273,7 @@ inline Table* ColumnSubtableParent::SubtableMap::find(size_t subtable_ndx) const
 {
     if (!m_indices.IsValid()) return 0;
     size_t const pos = m_indices.find_first(subtable_ndx);
-    return pos != size_t(-1) ? reinterpret_cast<Table *>(m_wrappers.Get(pos)) : 0;
+    return pos != size_t(-1) ? reinterpret_cast<Table *>(m_wrappers.get(pos)) : 0;
 }
 
 inline void ColumnSubtableParent::SubtableMap::insert(size_t subtable_ndx, Table* wrapper)
@@ -304,7 +304,7 @@ inline void ColumnSubtableParent::SubtableMap::update_from_parents()
 
     const size_t count = m_wrappers.size();
     for (size_t i = 0; i < count; ++i) {
-        Table* const t = reinterpret_cast<Table*>(m_wrappers.Get(i));
+        Table* const t = reinterpret_cast<Table*>(m_wrappers.get(i));
         t->UpdateFromParent();
     }
 }
@@ -315,7 +315,7 @@ inline void ColumnSubtableParent::SubtableMap::invalidate_subtables()
 
     const size_t n = m_wrappers.size();
     for (size_t i=0; i<n; ++i) {
-        Table* const t = reinterpret_cast<Table*>(m_wrappers.Get(i));
+        Table* const t = reinterpret_cast<Table*>(m_wrappers.get(i));
         t->invalidate();
     }
 
@@ -344,7 +344,7 @@ inline void ColumnSubtableParent::update_child_ref(size_t subtable_ndx, size_t n
 
 inline size_t ColumnSubtableParent::get_child_ref(size_t subtable_ndx) const TIGHTDB_NOEXCEPT
 {
-    return GetAsRef(subtable_ndx);
+    return get_as_ref(subtable_ndx);
 }
 
 inline void ColumnSubtableParent::invalidate_subtables()

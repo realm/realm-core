@@ -160,7 +160,7 @@ public:
 
     // Getting and setting values
     int64_t get(size_t ndx) const TIGHTDB_NOEXCEPT;
-    size_t GetAsRef(size_t ndx) const TIGHTDB_NOEXCEPT;
+    size_t get_as_ref(size_t ndx) const TIGHTDB_NOEXCEPT;
     int64_t Back() const TIGHTDB_NOEXCEPT {return get(Size()-1);}
     void set(size_t ndx, int64_t value);
     void insert(size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
@@ -223,8 +223,8 @@ protected:
     void UpdateRef(size_t ref);
 
     // Node functions
-    int64_t LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT { return m_array->Get(ndx); }
-    void LeafSet(size_t ndx, int64_t value) { m_array->Set(ndx, value); }
+    int64_t LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT { return m_array->get(ndx); }
+    void LeafSet(size_t ndx, int64_t value) { m_array->set(ndx, value); }
     void LeafInsert(size_t ndx, int64_t value) { m_array->Insert(ndx, value); }
     void LeafDelete(size_t ndx) { m_array->Delete(ndx); }
     template<class F> size_t LeafFind(int64_t value, size_t start, size_t end) const
@@ -251,7 +251,7 @@ inline int64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     return m_array->column_get(ndx);
 }
 
-inline std::size_t Column::GetAsRef(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline std::size_t Column::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     return to_ref(get(ndx));
 }

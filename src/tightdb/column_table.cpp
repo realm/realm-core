@@ -16,7 +16,7 @@ void ColumnSubtableParent::move_last_over(size_t ndx) {
     TIGHTDB_ASSERT(ndx+1 < Size());
 
     // Delete sub-tree
-    const size_t ref_columns = GetAsRef(ndx);
+    const size_t ref_columns = get_as_ref(ndx);
     if (ref_columns != 0) {
         Allocator& alloc = GetAllocator();
         Array columns(ref_columns, (Array*)NULL, 0, alloc);
@@ -37,7 +37,7 @@ bool ColumnTable::has_subtable(size_t ndx) const
 {
     TIGHTDB_ASSERT(ndx < Size());
 
-    const size_t ref_columns = GetAsRef(ndx);
+    const size_t ref_columns = get_as_ref(ndx);
     return (ref_columns != 0);
 }
 
@@ -48,10 +48,10 @@ size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
     // presence of the cached object and use it when available.
     TIGHTDB_ASSERT(ndx < Size());
 
-    const size_t ref_columns = GetAsRef(ndx);
+    const size_t ref_columns = get_as_ref(ndx);
     if (ref_columns == 0) return 0;
 
-    const size_t ref_first_col = Array(ref_columns, 0, 0, GetAllocator()).GetAsRef(0);
+    const size_t ref_first_col = Array(ref_columns, 0, 0, GetAllocator()).get_as_ref(0);
     return get_size_from_ref(ref_first_col, GetAllocator());
 }
 
@@ -105,7 +105,7 @@ void ColumnTable::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < Size());
 
-    const size_t ref_columns = GetAsRef(ndx);
+    const size_t ref_columns = get_as_ref(ndx);
 
     // Delete sub-tree
     if (ref_columns != 0) {
@@ -123,7 +123,7 @@ void ColumnTable::ClearTable(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < Size());
 
-    const size_t ref_columns = GetAsRef(ndx);
+    const size_t ref_columns = get_as_ref(ndx);
     if (ref_columns == 0) return; // already empty
 
     // Delete sub-tree
@@ -170,7 +170,7 @@ void ColumnTable::LeafToDot(ostream& out, const Array& array) const
 
     const size_t count = array.size();
     for (size_t i = 0; i < count; ++i) {
-        if (array.GetAsRef(i) == 0) continue;
+        if (array.get_as_ref(i) == 0) continue;
         const ConstTableRef subtable = get_subtable(i, m_ref_specSet);
         subtable->to_dot(out);
     }

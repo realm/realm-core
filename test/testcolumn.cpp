@@ -474,16 +474,16 @@ TEST(Column_Sort)
 
     a.sort();
 
-    CHECK_EQUAL(0, a.Get(0));
-    CHECK_EQUAL(2, a.Get(1));
-    CHECK_EQUAL(3, a.Get(2));
-    CHECK_EQUAL(12, a.Get(3));
-    CHECK_EQUAL(17, a.Get(4));
-    CHECK_EQUAL(25, a.Get(5));
-    CHECK_EQUAL(34, a.Get(6));
-    CHECK_EQUAL(40, a.Get(7));
-    CHECK_EQUAL(50, a.Get(8));
-    CHECK_EQUAL(51, a.Get(9));
+    CHECK_EQUAL(0, a.get(0));
+    CHECK_EQUAL(2, a.get(1));
+    CHECK_EQUAL(3, a.get(2));
+    CHECK_EQUAL(12, a.get(3));
+    CHECK_EQUAL(17, a.get(4));
+    CHECK_EQUAL(25, a.get(5));
+    CHECK_EQUAL(34, a.get(6));
+    CHECK_EQUAL(40, a.get(7));
+    CHECK_EQUAL(50, a.get(8));
+    CHECK_EQUAL(51, a.get(9));
 
     // Cleanup
     a.Destroy();
@@ -513,7 +513,7 @@ TEST(Column_FindAll_IntMin)
     size_t j = 0;
     while (i < c.Size()){
         if (c.get(i) == value)
-            CHECK_EQUAL(int64_t(i), r.Get(j++));
+            CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
     }
 
@@ -545,7 +545,7 @@ TEST(Column_FindAll_IntMax)
     size_t j = 0;
     while (i < c.Size()){
         if (c.get(i) == value)
-            CHECK_EQUAL(int64_t(i), r.Get(j++));
+            CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
     }
 

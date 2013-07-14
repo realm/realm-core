@@ -22,8 +22,8 @@ ArrayStringLong::ArrayStringLong(ArrayParent* parent, size_t pndx, Allocator& al
 }
 
 ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
-    Array(ref, parent, pndx, alloc), m_offsets(Array::GetAsRef(0), NULL, 0, alloc),
-    m_blob(Array::GetAsRef(1), NULL, 0, alloc)
+    Array(ref, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), NULL, 0, alloc),
+    m_blob(Array::get_as_ref(1), NULL, 0, alloc)
 {
     TIGHTDB_ASSERT(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
     TIGHTDB_ASSERT(Array::size() == 2);
@@ -41,7 +41,7 @@ void ArrayStringLong::add(StringData value)
     bool add_zero_term = true;
     m_blob.add(value.data(), value.size(), add_zero_term);
     size_t end = value.size() + 1;
-    if (!m_offsets.is_empty()) 
+    if (!m_offsets.is_empty())
         end += to_size_t(m_offsets.back());
     m_offsets.add(end);
 }
@@ -50,8 +50,8 @@ void ArrayStringLong::set(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    size_t begin = 0 < ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
-    size_t end   = m_offsets.GetAsSizeT(ndx);
+    size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t end   = to_size_t(m_offsets.get(ndx));
     bool add_zero_term = true;
     m_blob.replace(begin, end, value.data(), value.size(), add_zero_term);
 
@@ -64,7 +64,7 @@ void ArrayStringLong::insert(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx <= m_offsets.size());
 
-    size_t pos = 0 < ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
+    size_t pos = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     bool add_zero_term = true;
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
 
@@ -76,8 +76,8 @@ void ArrayStringLong::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    size_t begin = 0 < ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
-    size_t end   = m_offsets.GetAsSizeT(ndx);
+    size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t end   = to_size_t(m_offsets.get(ndx));
 
     m_blob.erase(begin, end);
     m_offsets.Delete(ndx);
@@ -88,7 +88,7 @@ void ArrayStringLong::Resize(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    const size_t len = ndx ? (size_t)m_offsets.Get(ndx-1) : 0;
+    const size_t len = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
 
     m_offsets.Resize(ndx);
     m_blob.Resize(len);
@@ -121,9 +121,9 @@ size_t ArrayStringLong::find_first(StringData value, size_t begin, size_t end) c
     if (end == size_t(-1)) end = n;
     TIGHTDB_ASSERT(begin <= n && end <= n && begin <= end);
 
-    size_t begin2 = 0 < begin ? m_offsets.GetAsSizeT(begin - 1) : 0;
+    size_t begin2 = 0 < begin ? to_size_t(m_offsets.get(begin-1)) : 0;
     for (size_t i=begin; i<end; ++i) {
-        size_t end2 = m_offsets.GetAsSizeT(i);
+        size_t end2 = to_size_t(m_offsets.get(i));
         size_t end3 = end2 - 1; // Discount terminating zero
         if (StringData(m_blob.get(begin2), end3-begin2) == value) return i;
         begin2 = end2;

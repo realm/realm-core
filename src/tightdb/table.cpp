@@ -39,8 +39,8 @@ void Table::init_from_ref(size_t top_ref, ArrayParent* parent, size_t ndx_in_par
     m_top.SetParent(parent, ndx_in_parent);
     TIGHTDB_ASSERT(m_top.size() == 2);
 
-    const size_t spec_ref    = m_top.GetAsRef(0);
-    const size_t columns_ref = m_top.GetAsRef(1);
+    const size_t spec_ref    = m_top.get_as_ref(0);
+    const size_t columns_ref = m_top.get_as_ref(1);
 
     init_from_ref(spec_ref, columns_ref, &m_top, 1);
     m_spec_set.set_parent(&m_top, 0);
@@ -178,7 +178,7 @@ void Table::invalidate()
     // Invalidate all subtables
     const size_t n = m_cols.size();
     for (size_t i=0; i<n; ++i) {
-        ColumnBase* const c = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
+        ColumnBase* const c = reinterpret_cast<ColumnBase*>(m_cols.get(i));
         c->invalidate_subtables_virtual();
     }
 
@@ -207,7 +207,7 @@ void Table::CacheColumns()
     // Cache columns
     for (size_t i = 0; i < count; ++i) {
         const ColumnType type = m_spec_set.get_type_attr(i);
-        const size_t ref = m_columns.GetAsRef(ndx_in_parent);
+        const size_t ref = m_columns.get_as_ref(ndx_in_parent);
 
         ColumnBase* new_col = 0;
         size_t colsize = size_t(-1);
@@ -252,7 +252,7 @@ void Table::CacheColumns()
             break;
         case col_type_StringEnum:
             {
-                const size_t values_ref = m_columns.GetAsRef(ndx_in_parent+1);
+                const size_t values_ref = m_columns.get_as_ref(ndx_in_parent+1);
                 ColumnStringEnum* c =
                     new ColumnStringEnum(ref, values_ref, &m_columns, ndx_in_parent, alloc);
                 colsize = c->Size();
@@ -300,7 +300,7 @@ void Table::CacheColumns()
                            type == col_type_StringEnum);  // index only for strings
 
             const size_t pndx = ndx_in_parent+1;
-            const size_t index_ref = m_columns.GetAsRef(pndx);
+            const size_t index_ref = m_columns.get_as_ref(pndx);
             new_col->SetIndexRef(index_ref, &m_columns, pndx);
 
             ++ndx_in_parent; // advance one matchcount pos to account for index
@@ -324,7 +324,7 @@ void Table::ClearCachedColumns()
 
     const size_t count = m_cols.size();
     for (size_t i = 0; i < count; ++i) {
-        ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
+        ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.get(i));
         delete column;
     }
     m_cols.Destroy();
@@ -576,7 +576,7 @@ void Table::do_remove_column(size_t column_ndx)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
 
     // Delete the cached column
-    ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(column_ndx));
+    ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.get(column_ndx));
     const bool has_index = column->HasIndex();
     column->invalidate_subtables_virtual();
     column->Destroy();
@@ -697,14 +697,14 @@ ColumnBase& Table::GetColumnBase(size_t ndx)
     TIGHTDB_ASSERT(ndx < get_column_count());
     InstantiateBeforeChange();
     TIGHTDB_ASSERT(m_cols.size() == get_column_count());
-    return *reinterpret_cast<ColumnBase*>(m_cols.Get(ndx));
+    return *reinterpret_cast<ColumnBase*>(m_cols.get(ndx));
 }
 
 const ColumnBase& Table::GetColumnBase(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
     TIGHTDB_ASSERT(m_cols.size() == get_column_count());
-    return *reinterpret_cast<ColumnBase*>(m_cols.Get(ndx));
+    return *reinterpret_cast<ColumnBase*>(m_cols.get(ndx));
 }
 
 
@@ -1962,7 +1962,7 @@ void Table::optimize()
             // Add to spec and column refs
             m_spec_set.set_column_type(i, col_type_StringEnum);
             const size_t column_ndx = GetColumnRefPos(i);
-            m_columns.Set(column_ndx, ref_keys);
+            m_columns.set(column_ndx, ref_keys);
             m_columns.Insert(column_ndx+1, ref_values);
 
             // There are still same number of columns, but since
@@ -1972,7 +1972,7 @@ void Table::optimize()
 
             // Replace cached column
             ColumnStringEnum* const e = new ColumnStringEnum(ref_keys, ref_values, &m_columns, column_ndx, alloc);
-            m_cols.Set(i, (intptr_t)e);
+            m_cols.set(i, (intptr_t)e);
 
             // Inherit any existing index
             if (column->HasIndex()) {
@@ -1994,7 +1994,7 @@ void Table::optimize()
 void Table::UpdateColumnRefs(size_t column_ndx, int diff)
 {
     for (size_t i = column_ndx; i < m_cols.size(); ++i) {
-        ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
+        ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.get(i));
         column->UpdateParentNdx(diff);
     }
 }
@@ -2011,7 +2011,7 @@ void Table::UpdateFromParent() {
     // Update cached columns
     const size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
-        ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
+        ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.get(i));
         column->UpdateFromParent();
     }
 
@@ -2020,7 +2020,7 @@ void Table::UpdateFromParent() {
         m_size = 0;
     }
     else {
-        const ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(0));
+        const ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.get(0));
         m_size = column->Size();
     }
 }
@@ -2532,7 +2532,7 @@ bool Table::compare_rows(const Table& t) const
 const Array* Table::get_column_root(size_t col_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(col_ndx < get_column_count());
-    return reinterpret_cast<ColumnBase*>(m_cols.Get(col_ndx))->get_root_array();
+    return reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx))->get_root_array();
 }
 
 pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) const
@@ -2540,7 +2540,7 @@ pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) 
 {
     TIGHTDB_ASSERT(col_ndx < get_column_count());
 
-    const ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.Get(col_ndx));
+    const ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx));
 
     const Array* root = col->get_root_array();
     const Array* enum_root = 0;

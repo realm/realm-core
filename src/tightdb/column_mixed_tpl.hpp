@@ -42,7 +42,7 @@ inline size_t ColumnMixed::get_subtable_ref(size_t row_idx) const TIGHTDB_NOEXCE
 {
     TIGHTDB_ASSERT(row_idx < m_types->Size());
     if (m_types->get(row_idx) != type_Table) return 0;
-    return m_refs->GetAsRef(row_idx);
+    return m_refs->get_as_ref(row_idx);
 }
 
 inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const TIGHTDB_NOEXCEPT
@@ -52,10 +52,10 @@ inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const TIGHTDB_NOEXC
     // the presence of the cached object and use it when available.
     const size_t top_ref = get_subtable_ref(row_idx);
     if (!top_ref) return 0;
-    const size_t columns_ref = Array(top_ref, 0, 0, m_refs->GetAllocator()).GetAsRef(1);
+    const size_t columns_ref = Array(top_ref, 0, 0, m_refs->GetAllocator()).get_as_ref(1);
     const Array columns(columns_ref, 0, 0, m_refs->GetAllocator());
     if (columns.is_empty()) return 0;
-    const size_t first_col_ref = columns.GetAsRef(0);
+    const size_t first_col_ref = columns.get_as_ref(0);
     return get_size_from_ref(first_col_ref, m_refs->GetAllocator());
 }
 
@@ -155,7 +155,7 @@ inline StringData ColumnMixed::get_string(size_t ndx) const
     TIGHTDB_ASSERT(m_types->get(ndx) == mixcol_String);
     TIGHTDB_ASSERT(m_data);
 
-    size_t offset = m_refs->GetAsRef(ndx) >> 1;
+    size_t offset = m_refs->get_as_ref(ndx) >> 1;
     return m_data->get_string(offset);
 }
 
@@ -165,7 +165,7 @@ inline BinaryData ColumnMixed::get_binary(size_t ndx) const
     TIGHTDB_ASSERT(m_types->get(ndx) == mixcol_Binary);
     TIGHTDB_ASSERT(m_data);
 
-    const size_t offset = m_refs->GetAsRef(ndx) >> 1;
+    const size_t offset = m_refs->get_as_ref(ndx) >> 1;
     return m_data->get(offset);
 }
 

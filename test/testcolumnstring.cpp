@@ -436,11 +436,11 @@ TEST(ColumnStringAutoEnumerateIndex)
 
     e.find_all(results, "klmop");
     CHECK_EQUAL(5, results.size());
-    CHECK_EQUAL(4, results.Get(0));
-    CHECK_EQUAL(9, results.Get(1));
-    CHECK_EQUAL(14, results.Get(2));
-    CHECK_EQUAL(19, results.Get(3));
-    CHECK_EQUAL(24, results.Get(4));
+    CHECK_EQUAL(4, results.get(0));
+    CHECK_EQUAL(9, results.get(1));
+    CHECK_EQUAL(14, results.get(2));
+    CHECK_EQUAL(19, results.get(3));
+    CHECK_EQUAL(24, results.get(4));
 
     // Set a value
     e.set(1, "newval");
@@ -454,7 +454,7 @@ TEST(ColumnStringAutoEnumerateIndex)
     results.Clear();
     e.find_all(results, "newval");
     CHECK_EQUAL(1, results.size());
-    CHECK_EQUAL(1, results.Get(0));
+    CHECK_EQUAL(1, results.get(0));
 
     // Insert a value
     e.insert(4, "newval");
@@ -577,9 +577,9 @@ TEST(AdaptiveStringColumnFindAllExpand)
 
     CHECK_EQUAL(5, asc.Size());
     CHECK_EQUAL(3, c.size());
-    CHECK_EQUAL(0, c.Get(0));
-    CHECK_EQUAL(2, c.Get(1));
-    CHECK_EQUAL(4, c.Get(2));
+    CHECK_EQUAL(0, c.get(0));
+    CHECK_EQUAL(2, c.get(1));
+    CHECK_EQUAL(4, c.get(2));
 
     // Expand to ArrayStringLong
     asc.add("dfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfs");
@@ -594,11 +594,11 @@ TEST(AdaptiveStringColumnFindAllExpand)
 
     CHECK_EQUAL(10, asc.Size());
     CHECK_EQUAL(5, c.size());
-    CHECK_EQUAL(0, c.Get(0));
-    CHECK_EQUAL(2, c.Get(1));
-    CHECK_EQUAL(4, c.Get(2));
-    CHECK_EQUAL(6, c.Get(3));
-    CHECK_EQUAL(8, c.Get(4));
+    CHECK_EQUAL(0, c.get(0));
+    CHECK_EQUAL(2, c.get(1));
+    CHECK_EQUAL(4, c.get(2));
+    CHECK_EQUAL(6, c.get(3));
+    CHECK_EQUAL(8, c.get(4));
 
     asc.Destroy();
     c.Destroy();
@@ -633,26 +633,26 @@ TEST(AdaptiveStringColumnFindAllRangesLong)
     c.Clear();
     asc.find_all(c, "HEJSA", 0, 17);
     CHECK_EQUAL(9, c.size());
-    CHECK_EQUAL(0, c.Get(0));
-    CHECK_EQUAL(2, c.Get(1));
-    CHECK_EQUAL(4, c.Get(2));
-    CHECK_EQUAL(6, c.Get(3));
-    CHECK_EQUAL(8, c.Get(4));
-    CHECK_EQUAL(10, c.Get(5));
-    CHECK_EQUAL(12, c.Get(6));
-    CHECK_EQUAL(14, c.Get(7));
-    CHECK_EQUAL(16, c.Get(8));
+    CHECK_EQUAL(0, c.get(0));
+    CHECK_EQUAL(2, c.get(1));
+    CHECK_EQUAL(4, c.get(2));
+    CHECK_EQUAL(6, c.get(3));
+    CHECK_EQUAL(8, c.get(4));
+    CHECK_EQUAL(10, c.get(5));
+    CHECK_EQUAL(12, c.get(6));
+    CHECK_EQUAL(14, c.get(7));
+    CHECK_EQUAL(16, c.get(8));
 
     c.Clear();
     asc.find_all(c, "HEJSA", 1, 16);
     CHECK_EQUAL(7, c.size());
-    CHECK_EQUAL(2, c.Get(0));
-    CHECK_EQUAL(4, c.Get(1));
-    CHECK_EQUAL(6, c.Get(2));
-    CHECK_EQUAL(8, c.Get(3));
-    CHECK_EQUAL(10, c.Get(4));
-    CHECK_EQUAL(12, c.Get(5));
-    CHECK_EQUAL(14, c.Get(6));
+    CHECK_EQUAL(2, c.get(0));
+    CHECK_EQUAL(4, c.get(1));
+    CHECK_EQUAL(6, c.get(2));
+    CHECK_EQUAL(8, c.get(3));
+    CHECK_EQUAL(10, c.get(4));
+    CHECK_EQUAL(12, c.get(5));
+    CHECK_EQUAL(14, c.get(6));
 
     // Clean-up
     asc.Destroy();
@@ -687,26 +687,26 @@ TEST(AdaptiveStringColumnFindAllRanges)
     c.Clear();
     asc.find_all(c, "HEJSA", 0, 17);
     CHECK_EQUAL(9, c.size());
-    CHECK_EQUAL(0, c.Get(0));
-    CHECK_EQUAL(2, c.Get(1));
-    CHECK_EQUAL(4, c.Get(2));
-    CHECK_EQUAL(6, c.Get(3));
-    CHECK_EQUAL(8, c.Get(4));
-    CHECK_EQUAL(10, c.Get(5));
-    CHECK_EQUAL(12, c.Get(6));
-    CHECK_EQUAL(14, c.Get(7));
-    CHECK_EQUAL(16, c.Get(8));
+    CHECK_EQUAL(0, c.get(0));
+    CHECK_EQUAL(2, c.get(1));
+    CHECK_EQUAL(4, c.get(2));
+    CHECK_EQUAL(6, c.get(3));
+    CHECK_EQUAL(8, c.get(4));
+    CHECK_EQUAL(10, c.get(5));
+    CHECK_EQUAL(12, c.get(6));
+    CHECK_EQUAL(14, c.get(7));
+    CHECK_EQUAL(16, c.get(8));
 
     c.Clear();
     asc.find_all(c, "HEJSA", 1, 16);
     CHECK_EQUAL(7, c.size());
-    CHECK_EQUAL(2, c.Get(0));
-    CHECK_EQUAL(4, c.Get(1));
-    CHECK_EQUAL(6, c.Get(2));
-    CHECK_EQUAL(8, c.Get(3));
-    CHECK_EQUAL(10, c.Get(4));
-    CHECK_EQUAL(12, c.Get(5));
-    CHECK_EQUAL(14, c.Get(6));
+    CHECK_EQUAL(2, c.get(0));
+    CHECK_EQUAL(4, c.get(1));
+    CHECK_EQUAL(6, c.get(2));
+    CHECK_EQUAL(8, c.get(3));
+    CHECK_EQUAL(10, c.get(4));
+    CHECK_EQUAL(12, c.get(5));
+    CHECK_EQUAL(14, c.get(6));
 
     // Clean-up
     asc.Destroy();

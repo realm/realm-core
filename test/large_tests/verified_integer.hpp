@@ -14,8 +14,8 @@ public:
     void add(int64_t value);
     void Insert(std::size_t ndx, int64_t value);
     void Insert(std::size_t ndx, const char *value);
-    int64_t Get(std::size_t ndx);
-    void Set(std::size_t ndx, int64_t value);
+    int64_t get(std::size_t ndx);
+    void set(std::size_t ndx, int64_t value);
     void Delete(std::size_t ndx);
     void Clear();
     size_t find_first(int64_t value);

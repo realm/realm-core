@@ -22,8 +22,8 @@ ArrayBinary::ArrayBinary(ArrayParent* parent, size_t pndx, Allocator& alloc):
 }
 
 ArrayBinary::ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
-    Array(ref, parent, pndx, alloc), m_offsets(Array::GetAsRef(0), NULL, 0, alloc),
-    m_blob(Array::GetAsRef(1), NULL, 0, alloc)
+    Array(ref, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), NULL, 0, alloc),
+    m_blob(Array::get_as_ref(1), NULL, 0, alloc)
 {
     TIGHTDB_ASSERT(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
     TIGHTDB_ASSERT(Array::size() == 2);
@@ -49,8 +49,8 @@ void ArrayBinary::set(size_t ndx, BinaryData value)
     TIGHTDB_ASSERT(ndx < m_offsets.size());
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    const size_t start = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
-    const size_t current_end = m_offsets.GetAsSizeT(ndx);
+    const size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    const size_t current_end = to_size_t(m_offsets.get(ndx));
     const ssize_t diff =  (start + value.size()) - current_end;
 
     m_blob.replace(start, current_end, value.data(), value.size());
@@ -62,7 +62,7 @@ void ArrayBinary::insert(size_t ndx, BinaryData value)
     TIGHTDB_ASSERT(ndx <= m_offsets.size());
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    const size_t pos = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
+    const size_t pos = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
 
     m_blob.insert(pos, value.data(), value.size());
     m_offsets.Insert(ndx, pos + value.size());
@@ -74,8 +74,8 @@ void ArrayBinary::set_string(size_t ndx, StringData value)
     TIGHTDB_ASSERT(ndx < m_offsets.size());
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    const size_t start = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
-    const size_t current_end = m_offsets.GetAsSizeT(ndx);
+    const size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    const size_t current_end = to_size_t(m_offsets.get(ndx));
     const ssize_t diff =  (start + value.size() + 1) - current_end;
 
     bool add_zero_term = true;
@@ -88,7 +88,7 @@ void ArrayBinary::insert_string(size_t ndx, StringData value)
     TIGHTDB_ASSERT(ndx <= m_offsets.size());
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    const size_t pos = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
+    const size_t pos = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
 
     bool add_zero_term = true;
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
@@ -100,8 +100,8 @@ void ArrayBinary::Delete(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    const size_t start = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
-    const size_t end = m_offsets.GetAsSizeT(ndx);
+    const size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    const size_t end = to_size_t(m_offsets.get(ndx));
 
     m_blob.erase(start, end);
     m_offsets.Delete(ndx);
@@ -112,7 +112,7 @@ void ArrayBinary::Resize(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    const size_t len = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
+    const size_t len = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
 
     m_offsets.Resize(ndx);
     m_blob.Resize(len);

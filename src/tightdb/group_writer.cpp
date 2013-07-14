@@ -72,7 +72,7 @@ size_t GroupWriter::commit()
     // the blocks can occupy, so that later when we know the real size, we can
     // adjust the segment size, without changing the width.
     const size_t res_ndx = reserve_free_space(total_reserve);
-    const size_t res_pos = fpositions.GetAsSizeT(res_ndx); // top of reserved segments
+    const size_t res_pos = to_size_t(fpositions.get(res_ndx)); // top of reserved segments
 
     // Get final sizes of free lists
     const size_t fp_size  = fpositions.GetByteSize(true);
@@ -85,11 +85,11 @@ size_t GroupWriter::commit()
     const size_t top_pos = fv_pos + fv_size;
 
     // Update top to point to the reserved locations
-    top.Set(0, n_pos);
-    top.Set(1, t_pos);
-    top.Set(2, res_pos);
-    top.Set(3, fl_pos);
-    if (isShared) top.Set(4, fv_pos);
+    top.set(0, n_pos);
+    top.set(1, t_pos);
+    top.set(2, res_pos);
+    top.set(3, fl_pos);
+    if (isShared) top.set(4, fv_pos);
     else if (top.size() == 5) top.Delete(4); // versions
 
     // Get final sizes
@@ -98,8 +98,8 @@ size_t GroupWriter::commit()
     const size_t rest = total_reserve - (end_pos - res_pos);
 
     // Set the correct values for rest space
-    fpositions.Set(res_ndx, end_pos);
-    flengths.Set(res_ndx, rest);
+    fpositions.set(res_ndx, end_pos);
+    flengths.set(res_ndx, rest);
 
     // Write free lists
     fpositions.WriteAt(res_pos, *this);
@@ -190,25 +190,25 @@ void GroupWriter::merge_free_space()
     size_t count = flengths.size()-1;
     for (size_t i = 0; i < count; ++i) {
         const size_t i2 = i+1;
-        const size_t pos1 = fpositions.GetAsSizeT(i);
-        const size_t len1 = flengths.GetAsSizeT(i);
-        const size_t pos2 = fpositions.GetAsSizeT(i2);
+        const size_t pos1 = to_size_t(fpositions.get(i));
+        const size_t len1 = to_size_t(flengths.get(i));
+        const size_t pos2 = to_size_t(fpositions.get(i2));
 
         if (pos2 == pos1 + len1) {
             // If this is a shared db, we can only merge
             // segments where no part is currently in use
             if (isShared) {
-                const size_t v1 = fversions.GetAsSizeT(i);
+                const size_t v1 = to_size_t(fversions.get(i));
                 if (v1 >= m_readlock_version)
                     continue;
-                const size_t v2 = fversions.GetAsSizeT(i2);
+                const size_t v2 = to_size_t(fversions.get(i2));
                 if (v2 >= m_readlock_version)
                     continue;
             }
 
             // Merge
-            const size_t len2 = flengths.GetAsSizeT(i2);
-            flengths.Set(i, len1 + len2);
+            const size_t len2 = to_size_t(flengths.get(i2));
+            flengths.set(i, len1 + len2);
             fpositions.Delete(i2);
             flengths.Delete(i2);
             if (isShared) fversions.Delete(i2);
@@ -255,12 +255,12 @@ size_t GroupWriter::reserve_free_space(size_t len, size_t start)
     const size_t count = flengths.size();
     size_t ndx = not_found;
     for (size_t i = start; i < count; ++i) {
-        const size_t free_len = flengths.GetAsSizeT(i);
+        const size_t free_len = to_size_t(flengths.get(i));
         if (len <= free_len) {
             // Only blocks that are not occupied by current
             // readers are allowed to be used.
             if (isShared) {
-                const size_t v = fversions.GetAsSizeT(i);
+                const size_t v = to_size_t(fversions.get(i));
                 if (v >= m_readlock_version) continue;
             }
 
@@ -276,11 +276,11 @@ size_t GroupWriter::reserve_free_space(size_t len, size_t start)
     }
 
     // Split segment so we get exactly what was asked for
-    const size_t free_len = flengths.GetAsSizeT(ndx);
+    const size_t free_len = to_size_t(flengths.get(ndx));
     if (len != free_len) {
-        flengths.Set(ndx, len);
+        flengths.set(ndx, len);
 
-        const size_t pos = fpositions.GetAsSizeT(ndx) + len;
+        const size_t pos = to_size_t(fpositions.get(ndx)) + len;
         const size_t rest = free_len - len;
         fpositions.Insert(ndx+1, pos);
         flengths.Insert(ndx+1, rest);
@@ -309,16 +309,16 @@ size_t GroupWriter::get_free_space(size_t len)
 
     // Do we have a free space we can reuse?
     for (size_t i = start; i < count; ++i) {
-        const size_t free_len = flengths.GetAsSizeT(i);
+        const size_t free_len = to_size_t(flengths.get(i));
         if (len <= free_len) {
             // Only blocks that are not occupied by current
             // readers are allowed to be used.
             if (isShared) {
-                const size_t v = fversions.GetAsSizeT(i);
+                const size_t v = to_size_t(fversions.get(i));
                 if (v >= m_readlock_version) continue;
             }
 
-            const size_t location = fpositions.GetAsSizeT(i);
+            const size_t location = to_size_t(fpositions.get(i));
 
             // Update free list
             const size_t rest = free_len - len;
@@ -329,8 +329,8 @@ size_t GroupWriter::get_free_space(size_t len)
                     fversions.Delete(i);
             }
             else {
-                flengths.Set(i, rest);
-                fpositions.Set(i, location + len);
+                flengths.set(i, rest);
+                fpositions.set(i, location + len);
             }
 
             return location;
@@ -345,8 +345,8 @@ size_t GroupWriter::get_free_space(size_t len)
     const size_t end  = old_filesize + len;
     const size_t rest = m_file_map.get_size() - end;
     if (rest) {
-        fpositions.Set(ext_pos, end);
-        flengths.Set(ext_pos, rest);
+        fpositions.set(ext_pos, end);
+        flengths.set(ext_pos, rest);
     }
     else {
         fpositions.Delete(ext_pos);
@@ -378,16 +378,16 @@ size_t GroupWriter::extend_free_space(size_t len)
 
     m_file_map.remap(m_alloc.m_file, File::access_ReadWrite, new_filesize);
 
-    const size_t ext_len = new_filesize - old_filesize;
+    size_t ext_len = new_filesize - old_filesize;
 
     // See if we can merge in new space
     if (!fpositions.is_empty()) {
-        const size_t last_ndx = to_size_t(fpositions.size()-1);
-        const size_t last_len = to_size_t(flengths[last_ndx]);
-        const size_t end  = to_size_t(fpositions[last_ndx] + last_len);
-        const size_t ver  = to_size_t(isShared ? fversions[last_ndx] : 0);
+        size_t last_ndx = to_size_t(fpositions.size()-1);
+        size_t last_len = to_size_t(flengths[last_ndx]);
+        size_t end  = to_size_t(fpositions[last_ndx] + last_len);
+        size_t ver  = to_size_t(isShared ? fversions[last_ndx] : 0);
         if (end == old_filesize && ver == 0) {
-            flengths.Set(last_ndx, last_len + ext_len);
+            flengths.set(last_ndx, last_len + ext_len);
             return last_ndx;
         }
     }
@@ -408,18 +408,18 @@ void GroupWriter::dump()
     Array& fpositions   = m_group.m_freePositions;
     Array& flengths     = m_group.m_freeLengths;
     Array& fversions    = m_group.m_freeVersions;
-    const bool isShared = m_group.m_is_shared;
+    bool isShared = m_group.m_is_shared;
 
-    const size_t count = flengths.size();
+    size_t count = flengths.size();
     cout << "count: " << count << ", m_len = " << m_file_map.get_size() << ", version >= " << m_readlock_version << "\n";
     if (!isShared) {
         for (size_t i = 0; i < count; ++i) {
-            cout << i << ": " << fpositions.Get(i) << ", " << flengths.Get(i) << "\n";
+            cout << i << ": " << fpositions.get(i) << ", " << flengths.get(i) << "\n";
         }
     }
     else {
         for (size_t i = 0; i < count; ++i) {
-            cout << i << ": " << fpositions.Get(i) << ", " << flengths.Get(i) << " - " << fversions.Get(i) << "\n";
+            cout << i << ": " << fpositions.get(i) << ", " << flengths.get(i) << " - " << fversions.get(i) << "\n";
         }
     }
 }

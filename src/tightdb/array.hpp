@@ -281,16 +281,15 @@ public:
 
     void Insert(size_t ndx, int64_t value);
     void add(int64_t value);
-    void Set(size_t ndx, int64_t value);
+    void set(size_t ndx, int64_t value);
     template<size_t w> void Set(size_t ndx, int64_t value);
 
-    int64_t Get(size_t ndx) const TIGHTDB_NOEXCEPT;
+    int64_t get(size_t ndx) const TIGHTDB_NOEXCEPT;
     template<size_t w> int64_t Get(size_t ndx) const TIGHTDB_NOEXCEPT;
 
-    size_t GetAsRef(size_t ndx) const TIGHTDB_NOEXCEPT;
-    size_t GetAsSizeT(size_t ndx) const TIGHTDB_NOEXCEPT;
+    size_t get_as_ref(size_t ndx) const TIGHTDB_NOEXCEPT;
 
-    int64_t operator[](size_t ndx) const TIGHTDB_NOEXCEPT {return Get(ndx);}
+    int64_t operator[](size_t ndx) const TIGHTDB_NOEXCEPT {return get(ndx);}
     int64_t back() const TIGHTDB_NOEXCEPT;
     void Delete(size_t ndx);
     void Clear();
@@ -811,10 +810,10 @@ inline Array::Array(no_prealloc_tag) TIGHTDB_NOEXCEPT: m_alloc(Allocator::get_de
 inline int64_t Array::back() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_len);
-    return Get(m_len-1);
+    return get(m_len-1);
 }
 
-inline int64_t Array::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_len);
     return (this->*m_getter)(ndx);
@@ -836,19 +835,12 @@ inline int64_t Array::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 */
 }
 
-inline std::size_t Array::GetAsRef(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline std::size_t Array::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_len);
     TIGHTDB_ASSERT(m_hasRefs);
-    const int64_t v = Get(ndx);
+    const int64_t v = get(ndx);
     return to_ref(v);
-}
-
-inline std::size_t Array::GetAsSizeT(std::size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < m_len);
-    const int64_t v = Get(ndx);
-    return to_size_t(v);
 }
 
 
@@ -857,7 +849,7 @@ inline Array Array::GetSubArray(std::size_t ndx) const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(ndx < m_len);
     TIGHTDB_ASSERT(m_hasRefs);
 
-    const std::size_t ref = std::size_t(Get(ndx));
+    const std::size_t ref = std::size_t(get(ndx));
     TIGHTDB_ASSERT(ref);
 
     // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying
@@ -1146,7 +1138,7 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
         // First write out all sub-arrays
         const size_t count = size();
         for (size_t i = 0; i < count; ++i) {
-            const size_t ref = GetAsRef(i);
+            const size_t ref = get_as_ref(i);
             if (ref == 0 || ref & 0x1) {
                 // zero-refs and refs that are not 64-aligned do not point to sub-trees
                 newRefs.add(ref);
@@ -1229,12 +1221,12 @@ inline void Array::update_ref_in_parent()
 
 inline void Array::update_child_ref(size_t child_ndx, size_t new_ref)
 {
-    Set(child_ndx, new_ref);
+    set(child_ndx, new_ref);
 }
 
 inline size_t Array::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 {
-    return GetAsRef(child_ndx);
+    return get_as_ref(child_ndx);
 }
 
 
@@ -1994,8 +1986,8 @@ bool Array::CompareLeafs(Array* foreign, size_t start, size_t end, size_t basein
     int64_t v;
 
     // We can compare first element without checking for out-of-range
-    v = Get(start);
-    if (c(v, foreign->Get(start))) {
+    v = get(start);
+    if (c(v, foreign->get(start))) {
         if (!find_action<action, Callback>(start + baseindex, v, state, callback))
             return false;
     }
@@ -2003,18 +1995,18 @@ bool Array::CompareLeafs(Array* foreign, size_t start, size_t end, size_t basein
     start++;
 
     if (start + 3 < end) {
-        v = Get(start);
-        if (c(v, foreign->Get(start)))
+        v = get(start);
+        if (c(v, foreign->get(start)))
             if (!find_action<action, Callback>(start + baseindex, v, state, callback))
                 return false;
 
-        v = Get(start + 1);
-        if (c(v, foreign->Get(start + 1)))
+        v = get(start + 1);
+        if (c(v, foreign->get(start + 1)))
             if (!find_action<action, Callback>(start + 1 + baseindex, v, state, callback))
                 return false;
 
-        v = Get(start + 2);
-        if (c(v, foreign->Get(start + 2)))
+        v = get(start + 2);
+        if (c(v, foreign->get(start + 2)))
             if (!find_action<action, Callback>(start + 2 + baseindex, v, state, callback))
                 return false;
 
