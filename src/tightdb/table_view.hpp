@@ -67,22 +67,30 @@ public:
 
     // Aggregate functions
     template <int function, typename T, typename R, class ColType>
-    R aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx) const;
+    R aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx, T count_target) const;
 
 
     // TODO, FIXME: rename int versions
-    // TODO: Add maximum, minimum for date
     int64_t sum(size_t column_ndx) const;
     int64_t maximum(size_t column_ndx) const;
     int64_t minimum(size_t column_ndx) const;
+    double average(size_t column_ndx) const;
+    size_t count_int(size_t column_ndx, int64_t target) const;
 
     double sum_float(size_t column_ndx) const;
     float maximum_float(size_t column_ndx) const;
     float minimum_float(size_t column_ndx) const;
+    double average_float(size_t column_ndx) const;
+    size_t count_float(size_t column_ndx, float target) const;
 
     double sum_double(size_t column_ndx) const;
     double maximum_double(size_t column_ndx) const;
     double minimum_double(size_t column_ndx) const;
+    double average_double(size_t column_ndx) const;
+    size_t count_double(size_t column_ndx, double target) const;
+
+    Date maximum_date(size_t column_ndx) const;
+    Date minimum_date(size_t column_ndx) const;
 
     // Sort the view according to the specified column and the
     // specified direction.
@@ -95,7 +103,7 @@ public:
     }
 
     // Conversion
-    void to_json(std::ostream& out);
+    void to_json(std::ostream& out) const;
     void to_string(std::ostream& out, size_t limit=500) const;
 
 protected:
@@ -285,7 +293,8 @@ private:
 
 #define TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type)             \
     TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \
-    TIGHTDB_ASSERT(m_table->get_column_type(column_ndx) == column_type);
+    TIGHTDB_ASSERT(m_table->get_column_type(column_ndx) == column_type ||   \
+                  (m_table->get_column_type(column_ndx) == type_Date && column_type == type_Int));
 
 #define TIGHTDB_ASSERT_INDEX(column_ndx, row_ndx)                           \
     TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \

@@ -673,25 +673,6 @@ void Column::LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t
     m_array->find_all(result, value, add_offset, start, end);
 }
 
-void Column::find_all_hamming(Array& result, uint64_t value, size_t maxdist, size_t offset) const
-{
-    if (!IsNode()) {
-        m_array->FindAllHamming(result, value, maxdist, offset);
-    }
-    else {
-        // Get subnode table
-        const Array offsets = NodeGetOffsets();
-        const Array refs = NodeGetRefs();
-        const size_t count = refs.size();
-
-        for (size_t i = 0; i < count; ++i) {
-            const Column col(refs.GetAsRef(i));
-            col.find_all_hamming(result, value, maxdist, offset);
-            offset += offsets.GetAsSizeT(i);
-        }
-    }
-}
-
 size_t Column::find_pos(int64_t target) const TIGHTDB_NOEXCEPT
 {
     // NOTE: Binary search only works if the column is sorted

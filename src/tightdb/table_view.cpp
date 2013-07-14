@@ -55,12 +55,12 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
 
 // Aggregates ----------------------------------------------------
 
-
+// count_target argument is only used for act_Count. Ignored for other actions
 template <int function, typename T, typename R, class ColType>
-R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx) const
+R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx, T count_target = static_cast<T>(0)) const
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, ColumnTypeTraits<T>::id);
-    TIGHTDB_ASSERT(function == act_Sum || function == act_Max || function == act_Min);
+    TIGHTDB_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count);
     TIGHTDB_ASSERT(m_table);
     TIGHTDB_ASSERT(column_ndx < m_table->get_column_count());
     if (m_refs.size() == 0)
@@ -71,7 +71,10 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
 
     if (m_refs.size() == column->Size()) {
         // direct aggregate on the column
-        return (column->*aggregateMethod)(0, size_t(-1));
+        if(function == act_Count)
+            return static_cast<R>(column->count(count_target));
+        else
+            return (column->*aggregateMethod)(0, size_t(-1));
     }
 
     // Array object instantiation must NOT allocate initial memory (capacity)
@@ -82,12 +85,19 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
     size_t leaf_end = 0;
     size_t row_ndx;
 
-    R res = static_cast<R>( column->template TreeGet<T,ColType>(m_refs.GetAsSizeT(0)) );
+    R res = static_cast<R>(0);
+    
+    T first = column->template TreeGet<T, ColType>(m_refs.GetAsSizeT(0));
+
+    if(function == act_Count)
+        res = static_cast<R>((first == count_target ? 1 : 0));
+    else
+        res = static_cast<R>(first);
 
     for (size_t ss = 1; ss < m_refs.size(); ++ss) {
         row_ndx = m_refs.GetAsSizeT(ss);
         if (row_ndx >= leaf_end) {
-            ((Column*)column)->GetBlock(row_ndx, arr, leaf_start);
+            column->GetBlock(row_ndx, arr, leaf_start);
             const size_t leaf_size = arr.size();
             leaf_end = leaf_start + leaf_size;
         }
@@ -95,9 +105,14 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
         T v = arr.Get(row_ndx - leaf_start);
 
         if (function == act_Sum)
-            res += v;
-        else if (function == act_Max ? v > res : v < res)
-            res = v;
+            res += static_cast<R>(v);
+        else if (function == act_Max && v > static_cast<T>(res))
+            res = static_cast<R>(v);
+        else if (function == act_Min && v < static_cast<T>(res))
+            res = static_cast<R>(v);
+        else if (function == act_Count && v == count_target)
+            res++;
+
     }
 
     return res;
@@ -132,6 +147,10 @@ double TableViewBase::maximum_double(size_t column_ndx) const
 {
     return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx);
 }
+Date TableViewBase::maximum_date(size_t column_ndx) const
+{
+    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx);
+}
 
 // Minimum
 
@@ -147,8 +166,39 @@ double TableViewBase::minimum_double(size_t column_ndx) const
 {
     return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx);
 }
+Date TableViewBase::minimum_date(size_t column_ndx) const
+{
+    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx);
+}
 
-//
+// Average
+
+double TableViewBase::average(size_t column_ndx) const
+{
+    return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx) / static_cast<double>(size());
+}
+double TableViewBase::average_float(size_t column_ndx) const
+{
+    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx) / static_cast<double>(size());
+}
+double TableViewBase::average_double(size_t column_ndx) const
+{
+    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx) / static_cast<double>(size());
+}
+
+// Count
+size_t TableViewBase::count_int(size_t column_ndx, int64_t target) const
+{
+    return aggregate<act_Count, int64_t, size_t, Column>(NULL, column_ndx, target);
+}
+size_t TableViewBase::count_float(size_t column_ndx, float target) const
+{
+    return aggregate<act_Count, float, size_t, ColumnFloat>(NULL, column_ndx, target);
+}
+size_t TableViewBase::count_double(size_t column_ndx, double target) const
+{
+    return aggregate<act_Count, double, size_t, ColumnDouble>(NULL, column_ndx, target);
+}
 
 void TableViewBase::sort(size_t column, bool Ascending)
 {
@@ -219,7 +269,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
     result.Destroy();
 }
 
-void TableViewBase::to_json(ostream& out)
+void TableViewBase::to_json(ostream& out) const
 {
     // Represent table as list of objects
     out << "[";
