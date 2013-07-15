@@ -69,7 +69,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
     typedef typename ColumnTypeTraits<T>::array_type ArrType;
     const ColType* column = (ColType*)&m_table->GetColumnBase(column_ndx);
 
-    if (m_refs.size() == column->Size()) {
+    if (m_refs.size() == column->size()) {
         // direct aggregate on the column
         if(function == act_Count)
             return static_cast<R>(column->count(count_target));

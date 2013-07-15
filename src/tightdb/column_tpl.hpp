@@ -60,7 +60,7 @@ R ColumnBase::aggregate(T target, size_t start, size_t end, size_t *matchcount) 
     typedef typename ColumnTypeTraits2<condition,T>::node_type NodeType;
 
     if (end == size_t(-1))
-        end = Size();
+        end = size();
 
     NodeType node(target, 0);
 
@@ -78,14 +78,14 @@ R ColumnBase::aggregate(T target, size_t start, size_t end, size_t *matchcount) 
 
 template<class T> T GetColumnFromRef(Array& parent, size_t ndx) // Throws
 {
-    //TIGHTDB_ASSERT(parent.HasRefs());
-    //TIGHTDB_ASSERT(ndx < parent.Size());
+    //TIGHTDB_ASSERT(parent.has_refs());
+    //TIGHTDB_ASSERT(ndx < parent.size());
     return T(size_t(parent.get(ndx)), &parent, ndx, parent.get_alloc()); // Throws
 }
 
 template<typename T, class C> T ColumnBase::TreeGet(size_t ndx) const
 {
-    if (IsNode()) {
+    if (!root_is_leaf()) {
         // Get subnode table
         const Array offsets = NodeGetOffsets();
         Array refs = NodeGetRefs();
@@ -110,7 +110,7 @@ template<typename T, class C> void ColumnBase::TreeSet(size_t ndx, T value)
 {
     //const T oldVal = m_index ? get(ndx) : 0; // cache oldval for index
 
-    if (IsNode()) {
+    if (!root_is_leaf()) {
         // Get subnode table
         const Array offsets = NodeGetOffsets();
         Array refs = NodeGetRefs();
@@ -167,7 +167,7 @@ template<typename T, class C> void ColumnBase::TreeInsert(size_t ndx, T value)
 
 template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx, T value)
 {
-    if (IsNode()) {
+    if (!root_is_leaf()) {
         // Get subnode table
         Array offsets = NodeGetOffsets();
         Array refs = NodeGetRefs();
@@ -206,7 +206,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         Column newNode(Array::coldef_InnerNode, m_array->get_alloc());
         if (nc.type == NodeChange::split) {
             // update offset for left node
-            const size_t newsize = target.Size();
+            const size_t newsize = target.size();
             const size_t preoffset = node_ndx ? to_ref(offsets.get(node_ndx-1)) : 0;
             offsets.set(node_ndx, preoffset + newsize);
 
@@ -236,7 +236,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
     }
     else {
         // Is there room in the list?
-        const size_t count = static_cast<C*>(this)->Size();
+        const size_t count = static_cast<C*>(this)->size();
         if (count < TIGHTDB_MAX_LIST_SIZE) {
             static_cast<C*>(this)->LeafInsert(ndx, value);
             return NodeChange::none;
@@ -244,7 +244,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
 
         // Create new list for item
         C newList(m_array->get_alloc()); // Throws
-        if (m_array->HasRefs()) newList.SetHasRefs(); // all leafs should have same type
+        if (m_array->has_refs()) newList.SetHasRefs(); // all leafs should have same type
 
         newList.add(value);
 
@@ -267,7 +267,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
 
 template<class C> void ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
 {
-    TIGHTDB_ASSERT(IsNode());
+    TIGHTDB_ASSERT(!root_is_leaf());
     TIGHTDB_ASSERT(new_ref);
 
     Array offsets = NodeGetOffsets();
@@ -282,7 +282,7 @@ template<class C> void ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
 
     // Update original size
     const size_t offset = ndx ? to_ref(offsets.get(ndx-1)) : 0;
-    const size_t newSize = orig_col.Size();
+    const size_t newSize = orig_col.size();
     const size_t newOffset = offset + newSize;
 #ifdef TIGHTDB_DEBUG
     const size_t oldSize = to_ref(offsets.get(ndx)) - offset;
@@ -290,7 +290,7 @@ template<class C> void ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
     offsets.set(ndx, newOffset);
 
     // Insert new ref
-    const size_t refSize = new_col.Size();
+    const size_t refSize = new_col.size();
     offsets.insert(ndx+1, newOffset + refSize);
     refs.insert(ndx+1, new_ref);
 
@@ -306,7 +306,7 @@ template<class C> void ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
 template<class C> void ColumnBase::NodeInsert(size_t ndx, size_t ref)
 {
     TIGHTDB_ASSERT(ref);
-    TIGHTDB_ASSERT(IsNode());
+    TIGHTDB_ASSERT(!root_is_leaf());
 
     Array offsets = NodeGetOffsets();
     Array refs = NodeGetRefs();
@@ -315,7 +315,7 @@ template<class C> void ColumnBase::NodeInsert(size_t ndx, size_t ref)
     TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
 
     const C col(ref, NULL, 0, m_array->get_alloc());
-    const size_t refSize = col.Size();
+    const size_t refSize = col.size();
     const int64_t newOffset = (ndx ? offsets.get(ndx-1) : 0) + refSize;
 
     offsets.insert(ndx, newOffset);
@@ -328,7 +328,7 @@ template<class C> void ColumnBase::NodeInsert(size_t ndx, size_t ref)
 template<class C> void ColumnBase::NodeAdd(size_t ref)
 {
     TIGHTDB_ASSERT(ref);
-    TIGHTDB_ASSERT(IsNode());
+    TIGHTDB_ASSERT(!root_is_leaf());
 
     Array offsets = NodeGetOffsets();
     Array refs = NodeGetRefs();
@@ -336,14 +336,14 @@ template<class C> void ColumnBase::NodeAdd(size_t ref)
 
     TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
 
-    const int64_t newOffset = (offsets.is_empty() ? 0 : offsets.back()) + col.Size();
+    const int64_t newOffset = (offsets.is_empty() ? 0 : offsets.back()) + col.size();
     offsets.add(newOffset);
     refs.add(ref);
 }
 
 template<typename T, class C> void ColumnBase::TreeDelete(size_t ndx)
 {
-    if (!IsNode()) {
+    if (root_is_leaf()) {
         static_cast<C*>(this)->LeafDelete(ndx);
     }
     else {
@@ -390,7 +390,7 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
      return FindWithIndex(value);
      }*/
 //  F function;
-    if (!IsNode()) {
+    if (root_is_leaf()) {
         const C* c = static_cast<const C*>(this);
         return c->template LeafFind<F>(value, start, end);
     }
@@ -449,7 +449,7 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
 
 template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset, size_t start, size_t end) const
 {
-    if (!IsNode()) {
+    if (root_is_leaf()) {
         return static_cast<const C*>(this)->LeafFindAll(result, value, add_offset, start, end);
     }
     else {
@@ -494,7 +494,7 @@ void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
                                              size_t caller_offset, void *state),
                                 void *state) const
 {
-    if (!IsNode()) {
+    if (root_is_leaf()) {
         if (end == size_t(-1))
             end = m_array->size();
         if (m_array->size() > 0)

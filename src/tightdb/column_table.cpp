@@ -13,7 +13,7 @@ void ColumnSubtableParent::child_destroyed(size_t subtable_ndx)
 }
 
 void ColumnSubtableParent::move_last_over(size_t ndx) {
-    TIGHTDB_ASSERT(ndx+1 < Size());
+    TIGHTDB_ASSERT(ndx+1 < size());
 
     // Delete sub-tree
     const size_t ref_columns = get_as_ref(ndx);
@@ -23,7 +23,7 @@ void ColumnSubtableParent::move_last_over(size_t ndx) {
         columns.destroy();
     }
 
-    const size_t ndx_last = Size()-1;
+    const size_t ndx_last = size()-1;
     const int64_t v = get(ndx_last);
 
     set(ndx, v);
@@ -35,7 +35,7 @@ void ColumnSubtableParent::move_last_over(size_t ndx) {
 
 bool ColumnTable::has_subtable(size_t ndx) const
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
 
     const size_t ref_columns = get_as_ref(ndx);
     return (ref_columns != 0);
@@ -46,7 +46,7 @@ size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
     // FIXME: If the table object is cached, it is possible to get the
     // size from it. Maybe it is faster in general to check for the
     // presence of the cached object and use it when available.
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
 
     const size_t ref_columns = get_as_ref(ndx);
     if (ref_columns == 0) return 0;
@@ -69,7 +69,7 @@ void ColumnTable::insert(size_t ndx)
 
 void ColumnTable::insert(size_t ndx, const Table* subtable)
 {
-    TIGHTDB_ASSERT(ndx <= Size());
+    TIGHTDB_ASSERT(ndx <= size());
 
     size_t columns_ref = 0;
     if (subtable)
@@ -80,7 +80,7 @@ void ColumnTable::insert(size_t ndx, const Table* subtable)
 
 void ColumnTable::set(size_t ndx, const Table* subtable)
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
 
     size_t columns_ref = 0;
     if (subtable)
@@ -103,7 +103,7 @@ void ColumnTable::fill(size_t count)
 
 void ColumnTable::erase(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
 
     const size_t ref_columns = get_as_ref(ndx);
 
@@ -121,7 +121,7 @@ void ColumnTable::erase(size_t ndx)
 
 void ColumnTable::clear_table(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
 
     const size_t ref_columns = get_as_ref(ndx);
     if (ref_columns == 0) return; // already empty
@@ -137,8 +137,8 @@ void ColumnTable::clear_table(size_t ndx)
 
 bool ColumnTable::compare(const ColumnTable& c) const
 {
-    const size_t n = Size();
-    if (c.Size() != n) return false;
+    const size_t n = size();
+    if (c.size() != n) return false;
     for (size_t i=0; i<n; ++i) {
         ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
         ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();
@@ -155,7 +155,7 @@ void ColumnTable::Verify() const
     Column::Verify();
 
     // Verify each sub-table
-    const size_t count = Size();
+    const size_t count = size();
     for (size_t i = 0; i < count; ++i) {
         // We want to verify any cached table instance so we do not
         // want to skip null refs here.

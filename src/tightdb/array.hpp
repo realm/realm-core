@@ -331,10 +331,7 @@ public:
     bool is_leaf() const TIGHTDB_NOEXCEPT { return !m_isNode; }
 
     /// Returns true if type is either coldef_HasRefs or coldef_InnerNode
-    bool HasRefs() const TIGHTDB_NOEXCEPT { return m_hasRefs; }
-
-    // FIXME: Remove this, wrong terminology
-    bool IsNode() const TIGHTDB_NOEXCEPT { return m_isNode; }
+    bool has_refs() const TIGHTDB_NOEXCEPT { return m_hasRefs; }
 
     bool IsIndexNode() const  TIGHTDB_NOEXCEPT { return get_indexflag_from_header(); }
     void SetIsIndexNode(bool value) { set_header_indexflag(value); }
@@ -401,19 +398,19 @@ public:
                          Callback callback) const;
 
     template <class cond, Action action, size_t foreign_width, class Callback, size_t width>
-    bool CompareLeafs4(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                        Callback callback) const;
 
     template <class cond, Action action, class Callback, size_t bitwidth, size_t foreign_bitwidth>
-    bool CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                       Callback callback) const;
 
     template <class cond, Action action, class Callback>
-    bool CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                       Callback callback) const;
 
     template <class cond, Action action, size_t width, class Callback>
-    bool CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                       Callback callback) const;
 
     // SSE find for the four functions Equal/NotEqual/Less/Greater
@@ -512,7 +509,7 @@ protected:
     void init_from_ref(size_t ref) TIGHTDB_NOEXCEPT;
 //    void AddPositiveLocal(int64_t value);
 
-    void CreateFromHeader(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
+    void init_from_header(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
     void CreateFromHeaderDirect(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
     void update_ref_in_parent();
 
@@ -1983,7 +1980,7 @@ TIGHTDB_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* da
 #endif //TIGHTDB_COMPILER_SSE
 
 template <class cond, Action action, class Callback>
-bool Array::CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                          Callback callback) const
 {
     cond c;
@@ -2029,7 +2026,7 @@ bool Array::CompareLeafs(Array* foreign, size_t start, size_t end, size_t basein
 }
 
 
-template <class cond, Action action, size_t width, class Callback> bool Array::CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+template <class cond, Action action, size_t width, class Callback> bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     size_t fw = foreign->m_width;
     bool r;
@@ -2039,7 +2036,7 @@ template <class cond, Action action, size_t width, class Callback> bool Array::C
 
 
 template <class cond, Action action, size_t width, class Callback, size_t foreign_width>
-bool Array::CompareLeafs4(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                           Callback callback) const
 {
     cond c;

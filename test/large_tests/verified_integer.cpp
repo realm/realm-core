@@ -29,7 +29,7 @@ void VerifiedInteger::add(int64_t value)
 {
     v.push_back(value);
     u.add(value);
-    TIGHTDB_ASSERT(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.size());
     VerifyNeighbours(v.size());
     TIGHTDB_ASSERT(ConditionalVerify());
 }
@@ -38,7 +38,7 @@ void VerifiedInteger::Insert(size_t ndx, int64_t value)
 {
     v.insert(v.begin() + ndx, value);
     u.insert(ndx, value);
-    TIGHTDB_ASSERT(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.size());
     VerifyNeighbours(ndx);
     TIGHTDB_ASSERT(ConditionalVerify());
 }
@@ -114,7 +114,7 @@ void VerifiedInteger::Delete(size_t ndx)
 {
     v.erase(v.begin() + ndx);
     u.erase(ndx);
-    TIGHTDB_ASSERT(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.size());
     VerifyNeighbours(ndx);
     TIGHTDB_ASSERT(ConditionalVerify());
 }
@@ -123,7 +123,7 @@ void VerifiedInteger::Clear()
 {
     v.clear();
     u.clear();
-    TIGHTDB_ASSERT(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.size());
     TIGHTDB_ASSERT(ConditionalVerify());
 }
 
@@ -133,13 +133,13 @@ size_t VerifiedInteger::find_first(int64_t value)
     size_t ndx = std::distance(v.begin(), it);
     size_t index2 = u.find_first(value);
     TIGHTDB_ASSERT(ndx == index2 || (it == v.end() && index2 == size_t(-1)));
-    (void)index2;
+    static_cast<void>(index2);
     return ndx;
 }
 
-size_t VerifiedInteger::Size(void)
+size_t VerifiedInteger::size()
 {
-    TIGHTDB_ASSERT(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.size());
     return v.size();
 }
 
@@ -171,10 +171,10 @@ void VerifiedInteger::find_all(Array &c, int64_t value, size_t start, size_t end
     return;
 }
 
-bool VerifiedInteger::Verify(void)
+bool VerifiedInteger::Verify()
 {
-    TIGHTDB_ASSERT(u.Size() == v.size());
-    if (u.Size() != v.size())
+    TIGHTDB_ASSERT(u.size() == v.size());
+    if (u.size() != v.size())
         return false;
 
     for (size_t t = 0; t < v.size(); ++t) {
@@ -186,7 +186,7 @@ bool VerifiedInteger::Verify(void)
 }
 
 // makes it run amortized the same time complexity as original, even though the row count grows
-bool VerifiedInteger::ConditionalVerify(void)
+bool VerifiedInteger::ConditionalVerify()
 {
     if ((uint64_t(rand()) * uint64_t(rand()))  % (v.size() / 10 + 1) == 0) {
         return Verify();
@@ -196,7 +196,7 @@ bool VerifiedInteger::ConditionalVerify(void)
     }
 }
 
-void VerifiedInteger::Destroy(void)
+void VerifiedInteger::Destroy()
 {
     u.destroy();
 }

@@ -178,7 +178,7 @@ public:
     SequentialGetter(const Table& table, size_t column_ndx) : m_array((Array::no_prealloc_tag()))
     {
         if (column_ndx != not_found)
-            m_column = (ColType *)&table.GetColumnBase(column_ndx);
+            m_column = static_cast<const ColType*>(&table.GetColumnBase(column_ndx));
         m_leaf_end = 0;
     }
 
@@ -197,8 +197,8 @@ public:
         // Return wether or not leaf array has changed (could be useful to know for caller)
         if (index >= m_leaf_end) {
             // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
-            // leave m_array untouched. Else call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
-            m_array_ptr = (ArrayType*)m_column->GetBlock(index, m_array, m_leaf_start, true);
+            // leave m_array untouched. Else call init_from_header() on m_array (more time consuming) and return pointer to m_array.
+            m_array_ptr = static_cast<const ArrayType*>(m_column->GetBlock(index, m_array, m_leaf_start, true));
             const size_t leaf_size = m_array_ptr->size();
             m_leaf_end = m_leaf_start + leaf_size;
             return true;
@@ -223,10 +223,10 @@ public:
 
     size_t m_leaf_start;
     size_t m_leaf_end;
-    ColType* m_column;
+    const ColType* m_column;
 
     // See reason for having both a pointer and instance above
-    ArrayType* m_array_ptr;
+    const ArrayType* m_array_ptr;
 private:
     // Never access through m_array because it's uninitialized if column is just a leaf
     ArrayType m_array;
@@ -1107,18 +1107,18 @@ public:
                 }
             }
             else if (fr == FindRes_not_found) {
-                m_index_matches = new Column();
+                m_index_matches = new Column;
                 m_index_matches_destroy = true;        // we own m_index_matches, so we must destroy it
             }
 
             last_indexed = 0;
 
             m_index_getter = new SequentialGetter<int64_t>(m_index_matches);
-            m_index_size = m_index_getter->m_column->Size();
+            m_index_size = m_index_getter->m_column->size();
 
         }
         else if (m_column_type != col_type_String) {
-            m_cse.m_column = (ColumnStringEnum*)m_condition_column;
+            m_cse.m_column = static_cast<const ColumnStringEnum*>(m_condition_column);
             m_cse.m_leaf_end = 0;
             m_cse.m_leaf_start = 0;
         }
@@ -1357,7 +1357,7 @@ public:
                     s = m_getter1.m_leaf_end;
                 else
                 return to_size_t(qs.m_state) + m_getter1.m_leaf_start;
-            } 
+            }
             else {
                 // This is for float and double.
                 TConditionValue v1 = m_getter1.get_next(s);

@@ -31,7 +31,7 @@ const size_t doubleValLen = SizeOfArray(doubleVal);
 
 void printCol(ColumnFloat& c)
 {
-    for (size_t i=0; i < c.Size(); ++i) {
+    for (size_t i=0; i < c.size(); ++i) {
         std::cerr << " Col[" << i << "] = " << c.get(i) << " \n";
     }
 }
@@ -42,7 +42,7 @@ void BasicColumn_IsEmpty()
 {
     C c;
     CHECK(c.is_empty());
-    CHECK_EQUAL(c.Size(), (size_t)0);
+    CHECK_EQUAL(c.size(), (size_t)0);
     c.destroy();
 }
 TEST(ColumnFloat_IsEmpty) { BasicColumn_IsEmpty<ColumnFloat>(); }
@@ -56,7 +56,7 @@ void BasicColumn_AddGet(T val[], size_t valLen)
     for (size_t i=0; i<valLen; ++i) {
         c.add(val[i]);
 
-        CHECK_EQUAL(i+1, c.Size());
+        CHECK_EQUAL(i+1, c.size());
 
         for (size_t j=0; j<i; ++j) {
             CHECK_EQUAL(val[j], c.get(j));
@@ -94,7 +94,7 @@ void BasicColumn_Set(T val[], size_t valLen)
     C c;
     for (size_t i=0; i<valLen; ++i)
         c.add(val[i]);
-    CHECK_EQUAL(valLen, c.Size());
+    CHECK_EQUAL(valLen, c.size());
 
     T v0 = T(1.6);
     T v3 = T(-987.23);
@@ -123,20 +123,20 @@ void BasicColumn_Insert(T val[], size_t valLen)
     // Insert in empty column
     c.insert(0, val[0]);
     CHECK_EQUAL(val[0], c.get(0));
-    CHECK_EQUAL(1, c.Size());
+    CHECK_EQUAL(1, c.size());
 
     // Insert in top
     c.insert(0, val[1]);
     CHECK_EQUAL(val[1], c.get(0));
     CHECK_EQUAL(val[0], c.get(1));
-    CHECK_EQUAL(2, c.Size());
+    CHECK_EQUAL(2, c.size());
 
     // Insert in middle
     c.insert(1, val[2]);
     CHECK_EQUAL(val[1], c.get(0));
     CHECK_EQUAL(val[2], c.get(1));
     CHECK_EQUAL(val[0], c.get(2));
-    CHECK_EQUAL(3, c.Size());
+    CHECK_EQUAL(3, c.size());
 
     // Insert at buttom
     c.insert(3, val[3]);
@@ -144,7 +144,7 @@ void BasicColumn_Insert(T val[], size_t valLen)
     CHECK_EQUAL(val[2], c.get(1));
     CHECK_EQUAL(val[0], c.get(2));
     CHECK_EQUAL(val[3], c.get(3));
-    CHECK_EQUAL(4, c.Size());
+    CHECK_EQUAL(4, c.size());
 
     // Insert at top
     c.insert(0, val[4]);
@@ -153,7 +153,7 @@ void BasicColumn_Insert(T val[], size_t valLen)
     CHECK_EQUAL(val[2], c.get(2));
     CHECK_EQUAL(val[0], c.get(3));
     CHECK_EQUAL(val[3], c.get(4));
-    CHECK_EQUAL(5, c.Size());
+    CHECK_EQUAL(5, c.size());
 
     c.destroy();
 }
@@ -187,7 +187,7 @@ void BasicColumn_Delete(T val[], size_t valLen)
     C c;
     for (size_t i=0; i<valLen; ++i)
         c.add(val[i]);
-    CHECK_EQUAL(5, c.Size());
+    CHECK_EQUAL(5, c.size());
     CHECK_EQUAL(val[0], c.get(0));
     CHECK_EQUAL(val[1], c.get(1));
     CHECK_EQUAL(val[2], c.get(2));
@@ -196,7 +196,7 @@ void BasicColumn_Delete(T val[], size_t valLen)
 
     // Delete first
     c.erase(0);
-    CHECK_EQUAL(4, c.Size());
+    CHECK_EQUAL(4, c.size());
     CHECK_EQUAL(val[1], c.get(0));
     CHECK_EQUAL(val[2], c.get(1));
     CHECK_EQUAL(val[3], c.get(2));
@@ -204,25 +204,25 @@ void BasicColumn_Delete(T val[], size_t valLen)
 
     // Delete middle
     c.erase(2);
-    CHECK_EQUAL(3, c.Size());
+    CHECK_EQUAL(3, c.size());
     CHECK_EQUAL(val[1], c.get(0));
     CHECK_EQUAL(val[2], c.get(1));
     CHECK_EQUAL(val[4], c.get(2));
 
     // Delete last
     c.erase(2);
-    CHECK_EQUAL(2, c.Size());
+    CHECK_EQUAL(2, c.size());
     CHECK_EQUAL(val[1], c.get(0));
     CHECK_EQUAL(val[2], c.get(1));
 
     // Delete single
     c.erase(0);
-    CHECK_EQUAL(1, c.Size());
+    CHECK_EQUAL(1, c.size());
     CHECK_EQUAL(val[2], c.get(0));
 
     // Delete all
     c.erase(0);
-    CHECK_EQUAL(0, c.Size());
+    CHECK_EQUAL(0, c.size());
 
     c.destroy();
 }

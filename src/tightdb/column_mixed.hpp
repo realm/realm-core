@@ -74,7 +74,7 @@ public:
     void UpdateFromParent();
 
     DataType get_type(size_t ndx) const TIGHTDB_NOEXCEPT;
-    size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_types->Size(); }
+    size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_types->size(); }
     bool is_empty() const TIGHTDB_NOEXCEPT { return m_types->is_empty(); }
 
     int64_t get_int(size_t ndx) const;
@@ -116,7 +116,7 @@ public:
     void insert_binary(size_t ndx, BinaryData value);
     void insert_subtable(size_t ndx, const Table*);
 
-    void add() TIGHTDB_OVERRIDE { insert_int(Size(), 0); }
+    void add() TIGHTDB_OVERRIDE { insert_int(size(), 0); }
     void insert(size_t ndx) TIGHTDB_OVERRIDE { insert_int(ndx, 0); invalidate_subtables(); }
     void clear() TIGHTDB_OVERRIDE;
     void erase(size_t ndx) TIGHTDB_OVERRIDE;

@@ -42,7 +42,7 @@ public:
 
     virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT {return false;}
 
-    virtual size_t Size() const TIGHTDB_NOEXCEPT = 0;
+    virtual size_t size() const TIGHTDB_NOEXCEPT = 0;
 
     virtual void add() = 0; // Add an entry to this column using the columns default value
     virtual void insert(size_t ndx) = 0; // Insert an entry into this column using the columns default value
@@ -107,7 +107,7 @@ protected:
     template<typename T, class C, class S> size_t TreeWrite(S& out, size_t& pos) const;
 
     // Node functions
-    bool IsNode() const TIGHTDB_NOEXCEPT {return m_array->IsNode();} // FIXME: This one should go away. It does not make any sense to think of a column being a node or not a node.
+    bool root_is_leaf() const TIGHTDB_NOEXCEPT { return m_array->is_leaf(); }
     Array NodeGetOffsets() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
     Array NodeGetRefs() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
     template<class C> void NodeInsert(size_t ndx, size_t ref);
@@ -155,13 +155,13 @@ public:
     void UpdateParentNdx(int diff);
     void SetHasRefs();
 
-    size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
     // Getting and setting values
     int64_t get(size_t ndx) const TIGHTDB_NOEXCEPT;
     size_t get_as_ref(size_t ndx) const TIGHTDB_NOEXCEPT;
-    int64_t Back() const TIGHTDB_NOEXCEPT {return get(Size()-1);}
+    int64_t Back() const TIGHTDB_NOEXCEPT {return get(size()-1);}
     void set(size_t ndx, int64_t value);
     void insert(size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
     void insert(size_t ndx, int64_t value);

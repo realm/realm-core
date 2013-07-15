@@ -50,7 +50,7 @@ BasicColumn<T>::BasicColumn(size_t ref, ArrayParent* parent, size_t pndx, Alloca
 template<typename T>
 BasicColumn<T>::~BasicColumn()
 {
-    if (IsNode())
+    if (!root_is_leaf())
         delete m_array;
     else
         delete static_cast<BasicArray<T>*>(m_array);
@@ -59,7 +59,7 @@ BasicColumn<T>::~BasicColumn()
 template<typename T>
 void BasicColumn<T>::destroy()
 {
-    if (IsNode())
+    if (!root_is_leaf())
         m_array->destroy();
     else
         static_cast<BasicArray<T>*>(m_array)->destroy();
@@ -71,7 +71,7 @@ void BasicColumn<T>::update_ref(size_t ref)
 {
     TIGHTDB_ASSERT(is_node_from_ref(ref, m_array->get_alloc())); // Can only be called when creating node
 
-    if (IsNode())
+    if (!root_is_leaf())
         m_array->update_ref(ref);
     else {
         ArrayParent* const parent = m_array->GetParent();
@@ -91,7 +91,7 @@ void BasicColumn<T>::update_ref(size_t ref)
 template<typename T>
 bool BasicColumn<T>::is_empty() const TIGHTDB_NOEXCEPT
 {
-    if (IsNode()) {
+    if (!root_is_leaf()) {
         const Array offsets = NodeGetOffsets();
         return offsets.is_empty();
     }
@@ -101,9 +101,9 @@ bool BasicColumn<T>::is_empty() const TIGHTDB_NOEXCEPT
 }
 
 template<typename T>
-size_t BasicColumn<T>::Size() const TIGHTDB_NOEXCEPT
+size_t BasicColumn<T>::size() const TIGHTDB_NOEXCEPT
 {
-    if (IsNode())  {
+    if (!root_is_leaf())  {
         const Array offsets = NodeGetOffsets();
         const size_t size = offsets.is_empty() ? 0 : size_t(offsets.back());
         return size;
@@ -116,7 +116,7 @@ size_t BasicColumn<T>::Size() const TIGHTDB_NOEXCEPT
 template<typename T>
 void BasicColumn<T>::clear()
 {
-    if (m_array->IsNode()) {
+    if (!m_array->is_leaf()) {
         ArrayParent *const parent = m_array->GetParent();
         const size_t pndx = m_array->GetParentNdx();
 
@@ -138,17 +138,17 @@ void BasicColumn<T>::clear()
 template<typename T>
 void BasicColumn<T>::resize(size_t ndx)
 {
-    TIGHTDB_ASSERT(!IsNode()); // currently only available on leaf level (used by b-tree code)
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(root_is_leaf()); // currently only available on leaf level (used by b-tree code)
+    TIGHTDB_ASSERT(ndx < size());
     static_cast<BasicArray<T>*>(m_array)->resize(ndx);
 }
 
 template<typename T>
 void BasicColumn<T>::move_last_over(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx+1 < Size());
+    TIGHTDB_ASSERT(ndx+1 < size());
 
-    const size_t ndx_last = Size()-1;
+    const size_t ndx_last = size()-1;
     const T v = get(ndx_last);
 
     set(ndx, v);
@@ -159,27 +159,27 @@ void BasicColumn<T>::move_last_over(size_t ndx)
 template<typename T>
 T BasicColumn<T>::get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
     return BasicArray<T>::column_get(m_array, ndx);
 }
 
 template<typename T>
 void BasicColumn<T>::set(size_t ndx, T value)
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
     TreeSet<T,BasicColumn<T> >(ndx, value);
 }
 
 template<typename T>
 void BasicColumn<T>::add(T value)
 {
-    insert(Size(), value);
+    insert(size(), value);
 }
 
 template<typename T>
 void BasicColumn<T>::insert(size_t ndx, T value)
 {
-    TIGHTDB_ASSERT(ndx <= Size());
+    TIGHTDB_ASSERT(ndx <= size());
     TreeInsert<T, BasicColumn<T> >(ndx, value);
 }
 
@@ -203,8 +203,8 @@ void BasicColumn<T>::fill(size_t count)
 template<typename T>
 bool BasicColumn<T>::compare(const BasicColumn& c) const
 {
-    const size_t n = Size();
-    if (c.Size() != n)
+    const size_t n = size();
+    if (c.size() != n)
         return false;
     for (size_t i=0; i<n; ++i) {
         const T v1 = get(i);
@@ -219,7 +219,7 @@ bool BasicColumn<T>::compare(const BasicColumn& c) const
 template<typename T>
 void BasicColumn<T>::erase(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
     TreeDelete<T, BasicColumn<T> >(ndx);
 }
 
@@ -290,7 +290,7 @@ void BasicColumn<T>::find_all(Array &result, T value, size_t start, size_t end) 
 template<typename T>
 size_t BasicColumn<T>::count(T target) const
 {
-    return size_t(ColumnBase::aggregate<T, int64_t, act_Count, Equal>(target, 0, Size(), NULL));
+    return size_t(ColumnBase::aggregate<T, int64_t, act_Count, Equal>(target, 0, size(), NULL));
 }
 
 template<typename T>
@@ -303,7 +303,7 @@ template<typename T>
 double BasicColumn<T>::average(size_t start, size_t end) const
 {
     if (end == size_t(-1))
-        end = Size();
+        end = size();
     size_t size = end - start;
     double sum1 = ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, NULL);
     double avg = sum1 / ( size == 0 ? 1 : size );

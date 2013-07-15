@@ -36,7 +36,7 @@ public:
     void clear() TIGHTDB_OVERRIDE
     {
         m_array->clear();
-        if (m_array->IsNode()) m_array->set_type(Array::coldef_HasRefs);
+        if (!m_array->is_leaf()) m_array->set_type(Array::coldef_HasRefs);
         invalidate_subtables();
     }
 
@@ -227,7 +227,7 @@ inline void ColumnSubtableParent::UpdateFromParent()
 
 inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) const
 {
-    TIGHTDB_ASSERT(subtable_ndx < Size());
+    TIGHTDB_ASSERT(subtable_ndx < size());
 
     Table *subtable = m_subtable_map.find(subtable_ndx);
     if (!subtable) {
@@ -245,7 +245,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) c
 inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx,
                                                      std::size_t spec_ref) const
 {
-    TIGHTDB_ASSERT(subtable_ndx < Size());
+    TIGHTDB_ASSERT(subtable_ndx < size());
 
     Table *subtable = m_subtable_map.find(subtable_ndx);
     if (!subtable) {
@@ -377,7 +377,7 @@ inline ColumnTable::ColumnTable(Allocator& alloc, const Table* table, std::size_
 
 inline void ColumnTable::add(const Table* subtable)
 {
-    insert(Size(), subtable);
+    insert(size(), subtable);
 }
 
 inline void ColumnTable::invalidate_subtables_virtual()

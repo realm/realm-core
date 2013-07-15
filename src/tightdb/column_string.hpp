@@ -38,7 +38,7 @@ public:
 
     void destroy() TIGHTDB_OVERRIDE;
 
-    std::size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    std::size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
@@ -85,7 +85,7 @@ public:
 
     bool GetBlock(size_t ndx, ArrayParent** ap, size_t& off) const
     {
-        if (IsNode()) {
+        if (!root_is_leaf()) {
             std::pair<size_t, size_t> p = m_array->find_leaf_ref(m_array, ndx);
             bool longstr = m_array->get_hasrefs_from_header(static_cast<const char*>(m_array->get_alloc().translate(p.first)));
             if (longstr) {
@@ -121,9 +121,9 @@ public:
 #endif // TIGHTDB_DEBUG
 
     // Assumes that this column has only a single leaf node, no
-    // internal nodes. In this case HasRefs indicates a long string
+    // internal nodes. In this case has_refs() indicates a long string
     // array.
-    bool IsLongStrings() const TIGHTDB_NOEXCEPT {return m_array->HasRefs();}
+    bool IsLongStrings() const TIGHTDB_NOEXCEPT { return m_array->has_refs(); }
 
 protected:
     friend class ColumnBase;
@@ -154,19 +154,19 @@ private:
 
 inline StringData AdaptiveStringColumn::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
     return m_array->string_column_get(ndx);
 }
 
 inline void AdaptiveStringColumn::add(StringData str)
 {
-    insert(Size(), str);
+    insert(size(), str);
 }
 
 inline std::size_t AdaptiveStringColumn::lower_bound(StringData value) const TIGHTDB_NOEXCEPT
 {
     std::size_t i = 0;
-    std::size_t size = Size();
+    std::size_t size = this->size();
 
     while (0 < size) {
         std::size_t half = size / 2;

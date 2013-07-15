@@ -19,7 +19,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringMultiEmpty)
     c.add("");
     c.add("");
     c.add("");
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
 
     CHECK_EQUAL("", c.get(0));
     CHECK_EQUAL("", c.get(1));
@@ -34,7 +34,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringSetExpand4)
 {
     c.set(0, "hey");
 
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
     CHECK_EQUAL("hey", c.get(0));
     CHECK_EQUAL("", c.get(1));
     CHECK_EQUAL("", c.get(2));
@@ -47,7 +47,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringSetExpand8)
 {
     c.set(1, "test");
 
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
     CHECK_EQUAL("hey", c.get(0));
     CHECK_EQUAL("test", c.get(1));
     CHECK_EQUAL("", c.get(2));
@@ -61,7 +61,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd0)
     c.clear();
     c.add();
     CHECK_EQUAL("", c.get(0));
-    CHECK_EQUAL(1, c.Size());
+    CHECK_EQUAL(1, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd1)
@@ -69,7 +69,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd1)
     c.add("a");
     CHECK_EQUAL("",  c.get(0));
     CHECK_EQUAL("a", c.get(1));
-    CHECK_EQUAL(2, c.Size());
+    CHECK_EQUAL(2, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd2)
@@ -78,7 +78,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd2)
     CHECK_EQUAL("",   c.get(0));
     CHECK_EQUAL("a",  c.get(1));
     CHECK_EQUAL("bb", c.get(2));
-    CHECK_EQUAL(3, c.Size());
+    CHECK_EQUAL(3, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd3)
@@ -88,7 +88,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd3)
     CHECK_EQUAL("a",   c.get(1));
     CHECK_EQUAL("bb",  c.get(2));
     CHECK_EQUAL("ccc", c.get(3));
-    CHECK_EQUAL(4, c.Size());
+    CHECK_EQUAL(4, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd4)
@@ -99,7 +99,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd4)
     CHECK_EQUAL("bb",   c.get(2));
     CHECK_EQUAL("ccc",  c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
-    CHECK_EQUAL(5, c.Size());
+    CHECK_EQUAL(5, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd8)
@@ -111,7 +111,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd8)
     CHECK_EQUAL("ccc",  c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd16)
@@ -124,7 +124,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd16)
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
-    CHECK_EQUAL(7, c.Size());
+    CHECK_EQUAL(7, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd32)
@@ -139,7 +139,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd32)
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(7));
-    CHECK_EQUAL(8, c.Size());
+    CHECK_EQUAL(8, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd64)
@@ -156,7 +156,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd64)
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(7));
     CHECK_EQUAL("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx", c.get(8));
-    CHECK_EQUAL(9, c.Size());
+    CHECK_EQUAL(9, c.size());
 }
 
 
@@ -167,7 +167,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringSet1)
     c.set(2, "a");
     c.set(3, "");
 
-    CHECK_EQUAL(9, c.Size());
+    CHECK_EQUAL(9, c.size());
 
     CHECK_EQUAL("ccc",  c.get(0));
     CHECK_EQUAL("bb",   c.get(1));
@@ -185,7 +185,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringInsert1)
     // Insert in middle
     c.insert(4, "xx");
 
-    CHECK_EQUAL(10, c.Size());
+    CHECK_EQUAL(10, c.size());
 
     CHECK_EQUAL("ccc",  c.get(0));
     CHECK_EQUAL("bb",   c.get(1));
@@ -204,7 +204,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete1)
     // Delete from end
     c.erase(9);
 
-    CHECK_EQUAL(9, c.Size());
+    CHECK_EQUAL(9, c.size());
 
     CHECK_EQUAL("ccc",  c.get(0));
     CHECK_EQUAL("bb",   c.get(1));
@@ -222,7 +222,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete2)
     // Delete from top
     c.erase(0);
 
-    CHECK_EQUAL(8, c.Size());
+    CHECK_EQUAL(8, c.size());
 
     CHECK_EQUAL("bb",   c.get(0));
     CHECK_EQUAL("a",    c.get(1));
@@ -239,7 +239,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete3)
     // Delete from middle
     c.erase(3);
 
-    CHECK_EQUAL(7, c.Size());
+    CHECK_EQUAL(7, c.size());
 
     CHECK_EQUAL("bb",   c.get(0));
     CHECK_EQUAL("a",    c.get(1));
@@ -254,19 +254,19 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDeleteAll)
 {
     // Delete all items one at a time
     c.erase(0);
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
     c.erase(0);
-    CHECK_EQUAL(5, c.Size());
+    CHECK_EQUAL(5, c.size());
     c.erase(0);
-    CHECK_EQUAL(4, c.Size());
+    CHECK_EQUAL(4, c.size());
     c.erase(0);
-    CHECK_EQUAL(3, c.Size());
+    CHECK_EQUAL(3, c.size());
     c.erase(0);
-    CHECK_EQUAL(2, c.Size());
+    CHECK_EQUAL(2, c.size());
     c.erase(0);
-    CHECK_EQUAL(1, c.Size());
+    CHECK_EQUAL(1, c.size());
     c.erase(0);
-    CHECK_EQUAL(0, c.Size());
+    CHECK_EQUAL(0, c.size());
 
     CHECK(c.is_empty());
 }
@@ -288,7 +288,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringInsert2)
     CHECK_EQUAL("b",     c.get(2));
     CHECK_EQUAL("c",     c.get(3));
     CHECK_EQUAL("d",     c.get(4));
-    CHECK_EQUAL(5, c.Size());
+    CHECK_EQUAL(5, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringInsert3)
@@ -302,7 +302,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringInsert3)
     CHECK_EQUAL("xxxxxxxxxx", c.get(3));
     CHECK_EQUAL("c",     c.get(4));
     CHECK_EQUAL("d",     c.get(5));
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
 }
 
 TEST(ColumnStringFind1)
@@ -378,8 +378,8 @@ TEST(ColumnStringAutoEnumerate)
     ColumnStringEnum e(keys, values);
 
     // Verify that all entries match source
-    CHECK_EQUAL(c.Size(), e.Size());
-    for (size_t i = 0; i < c.Size(); ++i) {
+    CHECK_EQUAL(c.size(), e.size());
+    for (size_t i = 0; i < c.size(); ++i) {
         StringData s1 = c.get(i);
         StringData s2 = e.get(i);
         CHECK_EQUAL(s1, s2);
@@ -534,7 +534,7 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2)
 
     c.set(1, "70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
 
-    CHECK_EQUAL(c.Size(), c.Size());
+    CHECK_EQUAL(c.size(), c.size());
     CHECK_EQUAL("foobar", c.get(0));
     CHECK_EQUAL("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", c.get(1));
     CHECK_EQUAL("baz", c.get(2));
@@ -575,7 +575,7 @@ TEST(AdaptiveStringColumnFindAllExpand)
 
     asc.find_all(c, "HEJ");
 
-    CHECK_EQUAL(5, asc.Size());
+    CHECK_EQUAL(5, asc.size());
     CHECK_EQUAL(3, c.size());
     CHECK_EQUAL(0, c.get(0));
     CHECK_EQUAL(2, c.get(1));
@@ -592,7 +592,7 @@ TEST(AdaptiveStringColumnFindAllExpand)
     c.clear();
     asc.find_all(c, "HEJ");
 
-    CHECK_EQUAL(10, asc.Size());
+    CHECK_EQUAL(10, asc.size());
     CHECK_EQUAL(5, c.size());
     CHECK_EQUAL(0, c.get(0));
     CHECK_EQUAL(2, c.get(1));

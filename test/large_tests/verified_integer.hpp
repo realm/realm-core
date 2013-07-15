@@ -20,12 +20,12 @@ public:
     void Clear();
     size_t find_first(int64_t value);
     void find_all(tightdb::Array &c, int64_t value, std::size_t start = 0, std::size_t end = -1);
-    std::size_t Size(void);
+    std::size_t size();
     int64_t Sum(std::size_t start = 0, std::size_t end = -1);
     int64_t maximum(std::size_t start = 0, std::size_t end = -1);
     int64_t minimum(std::size_t start = 0, std::size_t end = -1);
-    bool Verify(void);
-    bool ConditionalVerify(void);
+    bool Verify();
+    bool ConditionalVerify();
     void VerifyNeighbours(std::size_t ndx);
-    void Destroy(void);
+    void Destroy();
 };

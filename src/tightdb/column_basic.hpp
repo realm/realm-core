@@ -47,7 +47,7 @@ public:
 
     void destroy() TIGHTDB_OVERRIDE;
 
-    size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
     T get(size_t ndx) const TIGHTDB_NOEXCEPT;

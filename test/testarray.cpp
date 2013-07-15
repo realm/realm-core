@@ -1356,7 +1356,7 @@ TEST(ArrayCopy)
     b.Verify(); // FIXME: Should this not have been d.Verify()?
 #endif
 
-    CHECK(d.HasRefs());
+    CHECK(d.has_refs());
     CHECK_EQUAL(1, d.size());
 
     const Array e = d.GetSubArray(0);

@@ -217,21 +217,21 @@ void Table::CacheColumns()
         case type_Date:
             {
                 Column* c = new Column(ref, &m_columns, ndx_in_parent, alloc);
-                colsize = c->Size();
+                colsize = c->size();
                 new_col = c;
             }
             break;
         case type_Float:
             {
                 ColumnFloat* c = new ColumnFloat(ref, &m_columns, ndx_in_parent, alloc);
-                colsize = c->Size();
+                colsize = c->size();
                 new_col = c;
             }
             break;
         case type_Double:
             {
                 ColumnDouble* c = new ColumnDouble(ref, &m_columns, ndx_in_parent, alloc);
-                colsize = c->Size();
+                colsize = c->size();
                 new_col = c;
             }
             break;
@@ -239,14 +239,14 @@ void Table::CacheColumns()
             {
                 AdaptiveStringColumn* c =
                     new AdaptiveStringColumn(ref, &m_columns, ndx_in_parent, alloc);
-                colsize = c->Size();
+                colsize = c->size();
                 new_col = c;
             }
             break;
         case type_Binary:
             {
                 ColumnBinary* c = new ColumnBinary(ref, &m_columns, ndx_in_parent, alloc);
-                colsize = c->Size();
+                colsize = c->size();
                 new_col = c;
             }
             break;
@@ -255,7 +255,7 @@ void Table::CacheColumns()
                 const size_t values_ref = m_columns.get_as_ref(ndx_in_parent+1);
                 ColumnStringEnum* c =
                     new ColumnStringEnum(ref, values_ref, &m_columns, ndx_in_parent, alloc);
-                colsize = c->Size();
+                colsize = c->size();
                 new_col = c;
                 ++ndx_in_parent; // advance one matchcount pos to account for keys/values pair
             }
@@ -266,7 +266,7 @@ void Table::CacheColumns()
                 const size_t spec_ref = m_spec_set.get_subspec_ref(subtable_count);
                 ColumnTable* c = new ColumnTable(alloc, this, column_ndx, &m_columns, ndx_in_parent,
                                                  spec_ref, ref);
-                colsize = c->Size();
+                colsize = c->size();
                 new_col = c;
                 ++subtable_count;
             }
@@ -276,7 +276,7 @@ void Table::CacheColumns()
                 const size_t column_ndx = m_cols.size();
                 ColumnMixed* c =
                     new ColumnMixed(alloc, this, column_ndx, &m_columns, ndx_in_parent, ref);
-                colsize = c->Size();
+                colsize = c->size();
                 new_col = c;
             }
             break;
@@ -733,7 +733,7 @@ size_t Table::clone_columns(Allocator& alloc) const
             // FIXME: Should be optimized with something like
             // new_col.add(seq_tree_accessor.begin(),
             // seq_tree_accessor.end())
-            size_t n2 = enum_col->Size();
+            size_t n2 = enum_col->size();
             for (size_t i2=0; i2<n2; ++i2)
                 new_col.add(enum_col->get(i));
             new_col_ref = new_col.get_ref();
@@ -2021,7 +2021,7 @@ void Table::UpdateFromParent() {
     }
     else {
         const ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.get(0));
-        m_size = column->Size();
+        m_size = column->size();
     }
 }
 
@@ -2573,49 +2573,49 @@ void Table::Verify() const
                 case type_Bool:
                 case type_Date: {
                     const Column& column = GetColumn(i);
-                    TIGHTDB_ASSERT(column.Size() == m_size);
+                    TIGHTDB_ASSERT(column.size() == m_size);
                     column.Verify();
                     break;
                 }
                 case type_Float: {
                     const ColumnFloat& column = GetColumnFloat(i);
-                    TIGHTDB_ASSERT(column.Size() == m_size);
+                    TIGHTDB_ASSERT(column.size() == m_size);
                     column.Verify();
                     break;
                 }
                 case type_Double: {
                     const ColumnDouble& column = GetColumnDouble(i);
-                    TIGHTDB_ASSERT(column.Size() == m_size);
+                    TIGHTDB_ASSERT(column.size() == m_size);
                     column.Verify();
                     break;
                 }
                 case type_String: {
                     const AdaptiveStringColumn& column = GetColumnString(i);
-                    TIGHTDB_ASSERT(column.Size() == m_size);
+                    TIGHTDB_ASSERT(column.size() == m_size);
                     column.Verify();
                     break;
                 }
                 case col_type_StringEnum: {
                     const ColumnStringEnum& column = GetColumnStringEnum(i);
-                    TIGHTDB_ASSERT(column.Size() == m_size);
+                    TIGHTDB_ASSERT(column.size() == m_size);
                     column.Verify();
                     break;
                 }
                 case type_Binary: {
                     const ColumnBinary& column = GetColumnBinary(i);
-                    TIGHTDB_ASSERT(column.Size() == m_size);
+                    TIGHTDB_ASSERT(column.size() == m_size);
                     column.Verify();
                     break;
                 }
                 case type_Table: {
                     const ColumnTable& column = GetColumnTable(i);
-                    TIGHTDB_ASSERT(column.Size() == m_size);
+                    TIGHTDB_ASSERT(column.size() == m_size);
                     column.Verify();
                     break;
                 }
                 case type_Mixed: {
                     const ColumnMixed& column = GetColumnMixed(i);
-                    TIGHTDB_ASSERT(column.Size() == m_size);
+                    TIGHTDB_ASSERT(column.size() == m_size);
                     column.Verify();
                     break;
                 }

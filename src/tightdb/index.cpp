@@ -7,14 +7,14 @@ using namespace tightdb;
 
 Index GetIndexFromRef(Array& parent, size_t ndx)
 {
-    TIGHTDB_ASSERT(parent.HasRefs());
+    TIGHTDB_ASSERT(parent.has_refs());
     TIGHTDB_ASSERT(ndx < parent.size());
     return Index(parent.get_as_ref(ndx), &parent, ndx);
 }
 
 const Index GetIndexFromRef(const Array& parent, size_t ndx)
 {
-    TIGHTDB_ASSERT(parent.HasRefs());
+    TIGHTDB_ASSERT(parent.has_refs());
     TIGHTDB_ASSERT(ndx < parent.size());
     return Index(parent.get_as_ref(ndx));
 }
@@ -52,7 +52,7 @@ void Index::BuildIndex(const Column& src)
 
     // Brute-force build-up
     // TODO: sort and merge
-    for (size_t i = 0; i < src.Size(); ++i) {
+    for (size_t i = 0; i < src.size(); ++i) {
         insert(i, src.get(i), true);
     }
 
@@ -72,7 +72,7 @@ void Index::erase(size_t ndx, int64_t value, bool isLast)
     DoDelete(ndx, value);
 
     // Collapse top nodes with single item
-    while (IsNode()) {
+    while (!root_is_leaf()) {
         Array refs = m_array->GetSubArray(1);
         TIGHTDB_ASSERT(refs.size() != 0); // node cannot be empty
         if (refs.size() > 1) break;
@@ -97,7 +97,7 @@ bool Index::DoDelete(size_t ndx, int64_t value)
 
     // There may be several nodes with the same values,
     // so we have to find the one with the matching ref
-    if (m_array->IsNode()) {
+    if (!m_array->is_leaf()) {
         do {
             Index node = GetIndexFromRef(refs, pos);
             if (node.DoDelete(ndx, value)) {
@@ -165,7 +165,7 @@ void Index::insert(size_t ndx, int64_t value, bool isLast)
 
 void Index::LeafInsert(size_t ref, int64_t value)
 {
-    TIGHTDB_ASSERT(!IsNode());
+    TIGHTDB_ASSERT(root_is_leaf());
 
     // Get subnode table
     Array values = m_array->GetSubArray(0);
@@ -186,7 +186,7 @@ void Index::LeafInsert(size_t ref, int64_t value)
 void Index::NodeAdd(size_t ref)
 {
     TIGHTDB_ASSERT(ref);
-    TIGHTDB_ASSERT(IsNode());
+    TIGHTDB_ASSERT(!root_is_leaf());
 
     const Index col(ref);
     TIGHTDB_ASSERT(!col.is_empty());
@@ -215,7 +215,7 @@ int64_t Index::MaxValue() const
 
 Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
 {
-    if (IsNode()) {
+    if (!root_is_leaf()) {
         // Get subnode table
         Array offsets = m_array->GetSubArray(0);
         Array refs = m_array->GetSubArray(1);
@@ -272,7 +272,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
     }
     else {
         // Is there room in the list?
-        if (Size() < TIGHTDB_MAX_LIST_SIZE) {
+        if (size() < TIGHTDB_MAX_LIST_SIZE) {
             LeafInsert(ndx, value);
             return NodeChange::none;
         }
@@ -309,7 +309,7 @@ size_t Index::find_first(int64_t value) const
         const size_t pos = values.FindPos2(value);
 
         if (pos == size_t(-1)) return size_t(-1);
-        else if (!m_array->IsNode()) {
+        else if (m_array->is_leaf()) {
             if (values.get(pos) == value) return to_size_t(refs.get(pos));
             else return size_t(-1);
         }
@@ -327,7 +327,7 @@ bool Index::find_all(Column& result, int64_t value) const
     TIGHTDB_ASSERT(pos != (size_t)-1);
 
     // There may be several nodes with the same values,
-    if (m_array->IsNode()) {
+    if (!m_array->is_leaf()) {
         do {
             const Index node = GetIndexFromRef(refs, pos);
             if (!node.find_all(result, value)) return false;
@@ -356,7 +356,7 @@ bool Index::FindAllRange(Column& result, int64_t start, int64_t end) const
     TIGHTDB_ASSERT(pos != size_t(-1));
 
     // There may be several nodes with the same values,
-    if (m_array->IsNode()) {
+    if (!m_array->is_leaf()) {
         do {
             const Index node = GetIndexFromRef(refs, pos);
             if (!node.FindAllRange(result, start, end)) return false;
@@ -383,7 +383,7 @@ void Index::UpdateRefs(size_t pos, int diff)
 
     Array refs = m_array->GetSubArray(1);
 
-    if (m_array->IsNode()) {
+    if (!m_array->is_leaf()) {
         for (size_t i = 0; i < refs.size(); ++i) {
             const size_t ref = size_t(refs.get(i));
             Index ndx(ref);
@@ -400,7 +400,7 @@ void Index::UpdateRefs(size_t pos, int diff)
 void Index::Verify() const
 {
     TIGHTDB_ASSERT(m_array->size() == 2);
-    TIGHTDB_ASSERT(m_array->HasRefs());
+    TIGHTDB_ASSERT(m_array->has_refs());
 
     const Array offsets = m_array->GetSubArray(0);
     const Array refs = m_array->GetSubArray(1);
@@ -408,8 +408,8 @@ void Index::Verify() const
     refs.Verify();
     TIGHTDB_ASSERT(offsets.size() == refs.size());
 
-    if (m_array->IsNode()) {
-        TIGHTDB_ASSERT(refs.HasRefs());
+    if (!m_array->is_leaf()) {
+        TIGHTDB_ASSERT(refs.has_refs());
 
         // Make sure that all offsets matches biggest value in ref
         for (size_t i = 0; i < refs.size(); ++i) {
@@ -425,7 +425,7 @@ void Index::Verify() const
         }
     }
     else {
-        TIGHTDB_ASSERT(!refs.HasRefs());
+        TIGHTDB_ASSERT(!refs.has_refs());
     }
 }
 

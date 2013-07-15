@@ -35,7 +35,7 @@ public:
 
     void destroy() TIGHTDB_OVERRIDE;
 
-    size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
     BinaryData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
@@ -103,7 +103,7 @@ private:
 
 inline BinaryData ColumnBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
     return ArrayBinary::column_get(m_array, ndx);
 }
 
@@ -116,12 +116,12 @@ inline StringData ColumnBinary::get_string(std::size_t ndx) const TIGHTDB_NOEXCE
 
 inline void ColumnBinary::add(BinaryData value)
 {
-    insert(Size(), value);
+    insert(size(), value);
 }
 
 inline void ColumnBinary::add_string(StringData value)
 {
-    insert_string(Size(), value);
+    insert_string(size(), value);
 }
 
 } // namespace tightdb

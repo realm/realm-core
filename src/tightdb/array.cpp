@@ -32,7 +32,7 @@ void Array::init_from_ref(size_t ref) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ref);
     char* header = static_cast<char*>(m_alloc.translate(ref));
-    CreateFromHeader(header, ref);
+    init_from_header(header, ref);
 }
 
 // FIXME: This is a very crude and error prone misuse of Array,
@@ -67,7 +67,7 @@ void Array::CreateFromHeaderDirect(char* header, size_t ref) TIGHTDB_NOEXCEPT
     SetWidth(m_width);
 }
 
-void Array::CreateFromHeader(char* header, size_t ref) TIGHTDB_NOEXCEPT
+void Array::init_from_header(char* header, size_t ref) TIGHTDB_NOEXCEPT
 {
     // Parse header
     m_isNode   = get_isnode_from_header(header);
@@ -1225,7 +1225,7 @@ size_t Array::clone(const char* header, Allocator& alloc, Allocator& clone_alloc
     }
 
     Array new_array(clone_alloc);
-    new_array.CreateFromHeader(clone_header, mem_ref.ref);
+    new_array.init_from_header(clone_header, mem_ref.ref);
 
     size_t n = array.size();
     for (size_t i = 0; i < n; ++i) {
@@ -2181,7 +2181,7 @@ int64_t Array::column_get(size_t ndx) const TIGHTDB_NOEXCEPT
 StringData Array::string_column_get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     if (is_leaf()) {
-        if (HasRefs()) {
+        if (has_refs()) {
             return static_cast<const ArrayStringLong*>(this)->get(ndx);
         }
         return static_cast<const ArrayString*>(this)->get(ndx);
@@ -2474,7 +2474,7 @@ top:
                     }
 
                     // Copy all matches into result array
-                    const size_t sub_len  = sub.Size();
+                    const size_t sub_len  = sub.size();
 
                     for (size_t i = 0; i < sub_len; ++i) {
                         const size_t row_ref = to_size_t(sub.get(i));
@@ -2699,7 +2699,7 @@ top:
                 }
                 else {
                     const Column sub(ref, NULL, 0, m_alloc);
-                    sub_count = sub.Size();
+                    sub_count = sub.size();
 
                     // If the last byte in the stored key is zero, we know that we have
                     // compared against the entire (target) string

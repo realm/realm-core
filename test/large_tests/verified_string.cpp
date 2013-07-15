@@ -27,7 +27,7 @@ void VerifiedString::add(StringData value)
 {
     v.push_back(value);
     u.add(value);
-    TIGHTDB_ASSERT(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.size());
     VerifyNeighbours(v.size());
     TIGHTDB_ASSERT(ConditionalVerify());
 }
@@ -37,7 +37,7 @@ void VerifiedString::Insert(size_t ndx, StringData value)
 {
     v.insert(v.begin() + ndx, value);
     u.insert(ndx, value);
-    TIGHTDB_ASSERT(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.size());
     VerifyNeighbours(ndx);
     TIGHTDB_ASSERT(ConditionalVerify());
 }
@@ -61,7 +61,7 @@ void VerifiedString::Delete(size_t ndx)
 {
     v.erase(v.begin() + ndx);
     u.erase(ndx);
-    TIGHTDB_ASSERT(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.size());
     VerifyNeighbours(ndx);
     TIGHTDB_ASSERT(ConditionalVerify());
 }
@@ -70,7 +70,7 @@ void VerifiedString::Clear()
 {
     v.clear();
     u.clear();
-    TIGHTDB_ASSERT(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.size());
     TIGHTDB_ASSERT(ConditionalVerify());
 }
 
@@ -84,9 +84,9 @@ size_t VerifiedString::find_first(StringData value)
     return ndx;
 }
 
-size_t VerifiedString::Size()
+size_t VerifiedString::size()
 {
-    TIGHTDB_ASSERT(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.size());
     return v.size();
 }
 
@@ -121,8 +121,8 @@ void VerifiedString::find_all(Array& c, StringData value, size_t start, size_t e
 
 bool VerifiedString::Verify()
 {
-    TIGHTDB_ASSERT(u.Size() == v.size());
-    if (u.Size() != v.size())
+    TIGHTDB_ASSERT(u.size() == v.size());
+    if (u.size() != v.size())
         return false;
 
     for (size_t t = 0; t < v.size(); ++t) {

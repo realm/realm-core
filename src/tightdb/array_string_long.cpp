@@ -25,7 +25,7 @@ ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, A
     Array(ref, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), NULL, 0, alloc),
     m_blob(Array::get_as_ref(1), NULL, 0, alloc)
 {
-    TIGHTDB_ASSERT(HasRefs() && !IsNode()); // HasRefs indicates that this is a long string
+    TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
     TIGHTDB_ASSERT(Array::size() == 2);
     TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : (size_t)m_offsets.back()));
 

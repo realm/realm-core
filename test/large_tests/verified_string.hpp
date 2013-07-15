@@ -22,11 +22,11 @@ public:
     void Clear();
     std::size_t find_first(tightdb::StringData value);
     void find_all(tightdb::Array& c, tightdb::StringData value, std::size_t start = 0, std::size_t end = -1);
-    std::size_t Size(void);
-    bool Verify(void);
-    bool ConditionalVerify(void);
+    std::size_t size();
+    bool Verify();
+    bool ConditionalVerify();
     void VerifyNeighbours(std::size_t ndx);
-    void Destroy(void);
+    void Destroy();
 
 };
 

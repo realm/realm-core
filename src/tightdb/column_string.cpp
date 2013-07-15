@@ -61,7 +61,7 @@ AdaptiveStringColumn::~AdaptiveStringColumn()
 
 void AdaptiveStringColumn::destroy()
 {
-    if (IsNode())
+    if (!root_is_leaf())
         m_array->destroy();
     else if (IsLongStrings()) {
         static_cast<ArrayStringLong*>(m_array)->destroy();
@@ -79,7 +79,7 @@ void AdaptiveStringColumn::update_ref(size_t ref)
 {
     TIGHTDB_ASSERT(get_coldef_from_ref(ref, m_array->get_alloc()) == Array::coldef_InnerNode); // Can only be called when creating node
 
-    if (IsNode())
+    if (!root_is_leaf())
         m_array->update_ref(ref);
     else {
         ArrayParent *const parent = m_array->GetParent();
@@ -104,7 +104,7 @@ StringIndex& AdaptiveStringColumn::CreateIndex()
     m_index = new StringIndex(this, &get_string, m_array->get_alloc());
 
     // Populate the index
-    const size_t count = Size();
+    const size_t count = size();
     for (size_t i = 0; i < count; ++i) {
         StringData value = get(i);
         m_index->insert(i, value, true);
@@ -121,7 +121,7 @@ void AdaptiveStringColumn::SetIndexRef(size_t ref, ArrayParent* parent, size_t p
 
 bool AdaptiveStringColumn::is_empty() const TIGHTDB_NOEXCEPT
 {
-    if (IsNode()) {
+    if (!root_is_leaf()) {
         const Array offsets = NodeGetOffsets();
         return offsets.is_empty();
     }
@@ -133,9 +133,9 @@ bool AdaptiveStringColumn::is_empty() const TIGHTDB_NOEXCEPT
     }
 }
 
-size_t AdaptiveStringColumn::Size() const TIGHTDB_NOEXCEPT
+size_t AdaptiveStringColumn::size() const TIGHTDB_NOEXCEPT
 {
-    if (IsNode())  {
+    if (!root_is_leaf())  {
         const Array offsets = NodeGetOffsets();
         const size_t size = offsets.is_empty() ? 0 : size_t(offsets.back());
         return size;
@@ -150,7 +150,7 @@ size_t AdaptiveStringColumn::Size() const TIGHTDB_NOEXCEPT
 
 void AdaptiveStringColumn::clear()
 {
-    if (m_array->IsNode()) {
+    if (!m_array->is_leaf()) {
         // Revert to string array
         m_array->destroy();
         Array* array = new ArrayString(m_array->GetParent(), m_array->GetParentNdx(), m_array->get_alloc());
@@ -170,7 +170,7 @@ void AdaptiveStringColumn::clear()
 
 void AdaptiveStringColumn::resize(size_t ndx)
 {
-    TIGHTDB_ASSERT(!IsNode()); // currently only available on leaf level (used by b-tree code)
+    TIGHTDB_ASSERT(root_is_leaf()); // currently only available on leaf level (used by b-tree code)
 
     if (IsLongStrings()) {
         static_cast<ArrayStringLong*>(m_array)->resize(ndx);
@@ -181,11 +181,11 @@ void AdaptiveStringColumn::resize(size_t ndx)
 
 }
 
-void AdaptiveStringColumn::move_last_over(size_t ndx) 
+void AdaptiveStringColumn::move_last_over(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx+1 < Size());
+    TIGHTDB_ASSERT(ndx+1 < size());
 
-    const size_t ndx_last = Size()-1;
+    const size_t ndx_last = size()-1;
     StringData v = get(ndx_last);
 
     if (m_index) {
@@ -213,7 +213,7 @@ void AdaptiveStringColumn::move_last_over(size_t ndx)
 
 void AdaptiveStringColumn::set(size_t ndx, StringData str)
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
 
     // Update index
     // (it is important here that we do it before actually setting
@@ -229,12 +229,12 @@ void AdaptiveStringColumn::set(size_t ndx, StringData str)
 
 void AdaptiveStringColumn::insert(size_t ndx, StringData str)
 {
-    TIGHTDB_ASSERT(ndx <= Size());
+    TIGHTDB_ASSERT(ndx <= size());
 
     TreeInsert<StringData, AdaptiveStringColumn>(ndx, str);
 
     if (m_index) {
-        const bool isLast = (ndx+1 == Size());
+        const bool isLast = (ndx+1 == size());
         m_index->insert(ndx, str, isLast);
     }
 }
@@ -258,7 +258,7 @@ void AdaptiveStringColumn::fill(size_t count)
 
 void AdaptiveStringColumn::erase(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
 
     // Update index
     // (it is important here that we do it before actually setting
@@ -266,7 +266,7 @@ void AdaptiveStringColumn::erase(size_t ndx)
     //  position to update (as it looks for the old value))
     if (m_index) {
         StringData oldVal = get(ndx);
-        const bool isLast = (ndx == Size());
+        const bool isLast = (ndx == size());
         m_index->erase(ndx, oldVal, isLast);
     }
 
@@ -281,7 +281,7 @@ size_t AdaptiveStringColumn::count(StringData target) const
 
     size_t count = 0;
 
-    if (m_array->IsNode()) {
+    if (!m_array->is_leaf()) {
         const Array refs = NodeGetRefs();
         const size_t n = refs.size();
 
@@ -447,17 +447,17 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
     AdaptiveStringColumn keys(m_array->get_alloc());
 
     // Generate list of unique values (keys)
-    size_t n = Size();
+    size_t n = size();
     for (size_t i=0; i<n; ++i) {
         StringData v = get(i);
 
         // Insert keys in sorted order, ignoring duplicates
         size_t pos = keys.lower_bound(v);
-        if (pos != keys.Size() && keys.get(pos) == v)
+        if (pos != keys.size() && keys.get(pos) == v)
             continue;
 
         // Don't bother auto enumerating if there are too few duplicates
-        if (n/2 < keys.Size()) {
+        if (n/2 < keys.size()) {
             keys.destroy(); // cleanup
             return false;
         }
@@ -470,7 +470,7 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
     for (size_t i=0; i<n; ++i) {
         StringData v = get(i);
         size_t pos = keys.lower_bound(v);
-        TIGHTDB_ASSERT(pos != keys.Size());
+        TIGHTDB_ASSERT(pos != keys.size());
         values.add(pos);
     }
 
@@ -481,8 +481,8 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
 
 bool AdaptiveStringColumn::compare(const AdaptiveStringColumn& c) const
 {
-    const size_t n = Size();
-    if (c.Size() != n)
+    const size_t n = size();
+    if (c.size() != n)
         return false;
     for (size_t i=0; i<n; ++i) {
         if (get(i) != c.get(i))
@@ -503,7 +503,7 @@ void AdaptiveStringColumn::Verify() const
 
 void AdaptiveStringColumn::LeafToDot(ostream& out, const Array& array) const
 {
-    const bool isLongStrings = array.HasRefs(); // HasRefs indicates long string array
+    const bool isLongStrings = array.has_refs(); // has_refs() indicates long string array
 
     if (isLongStrings) {
         // ArrayStringLong has more members than Array, so we have to
