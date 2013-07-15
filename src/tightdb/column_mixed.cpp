@@ -78,7 +78,7 @@ void ColumnMixed::InitDataColumn()
     TIGHTDB_ASSERT(m_array->size() == 2);
 
     // Create new data column for items that do not fit in refs
-    m_data = new ColumnBinary(m_array->GetAllocator());
+    m_data = new ColumnBinary(m_array->get_alloc());
     const size_t ref = m_data->get_ref();
 
     m_array->add(ref);
@@ -117,7 +117,7 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType newtype)
             case mixcol_Table: {
                 // Delete entire table
                 const size_t ref = m_refs->get_as_ref(ndx);
-                Array top(ref, 0, 0, m_array->GetAllocator());
+                Array top(ref, 0, 0, m_array->get_alloc());
                 top.Destroy();
                 break;
             }
@@ -143,7 +143,7 @@ void ColumnMixed::erase(size_t ndx)
     invalidate_subtables();
 }
 
-void ColumnMixed::move_last_over(size_t ndx) 
+void ColumnMixed::move_last_over(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx+1 < Size());
 

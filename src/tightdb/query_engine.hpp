@@ -876,7 +876,7 @@ public:
                     m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
                     m_end_s = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
                 }
-                
+
                 t = (m_long ? static_cast<ArrayStringLong*>(m_leaf)->get(s - m_leaf_start) : static_cast<ArrayString*>(m_leaf)->get(s - m_leaf_start));
             }
             if (cond(m_value, m_ucase, m_lcase, t))
@@ -1038,9 +1038,9 @@ public:
         m_index.Destroy();
     }
 
-    void deallocate() 
+    void deallocate()
     {
-        // Must be called after each query execution too free temporary resources used by the execution. Run in 
+        // Must be called after each query execution too free temporary resources used by the execution. Run in
         // destructor, but also in Init because a user could define a query once and execute it multiple times.
         m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
         m_leaf = NULL;
@@ -1097,13 +1097,13 @@ public:
                 m_index_matches_destroy = true;        // we own m_index_matches, so we must destroy it
             }
             else if (fr == FindRes_column) {
-                // todo: Apparently we can't use m_index.GetAllocator() because it uses default allocator which simply makes 
-                // Translate(x) = x. Shouldn't it inherit owner column's allocator?!
+                // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which simply makes
+                // translate(x) = x. Shouldn't it inherit owner column's allocator?!
                 if (m_column_type == col_type_StringEnum) {
-                    m_index_matches = new Column(index_ref, 0, 0, static_cast<const ColumnStringEnum*>(m_condition_column)->GetAllocator());
+                    m_index_matches = new Column(index_ref, 0, 0, static_cast<const ColumnStringEnum*>(m_condition_column)->get_alloc());
                 }
                 else {
-                    m_index_matches = new Column(index_ref, 0, 0, static_cast<const AdaptiveStringColumn*>(m_condition_column)->GetAllocator());
+                    m_index_matches = new Column(index_ref, 0, 0, static_cast<const AdaptiveStringColumn*>(m_condition_column)->get_alloc());
                 }
             }
             else if (fr == FindRes_not_found) {
@@ -1202,10 +1202,10 @@ private:
     size_t last_indexed;
 
     // Used for linear scan through enum-string
-    SequentialGetter<int64_t> m_cse;  
+    SequentialGetter<int64_t> m_cse;
 
     // Used for linear scan through short/long-string
-    ArrayParent *m_leaf;                
+    ArrayParent *m_leaf;
     bool m_long;
     size_t m_leaf_end;
     size_t m_first_s;

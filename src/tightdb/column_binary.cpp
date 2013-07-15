@@ -36,22 +36,22 @@ void ColumnBinary::Destroy()
 {
     if (IsNode())
         m_array->Destroy();
-    else 
+    else
         static_cast<ArrayBinary*>(m_array)->Destroy();
 }
 
 void ColumnBinary::update_ref(size_t ref)
 {
-    TIGHTDB_ASSERT(is_node_from_ref(ref, m_array->GetAllocator())); // Can only be called when creating node
+    TIGHTDB_ASSERT(is_node_from_ref(ref, m_array->get_alloc())); // Can only be called when creating node
 
-    if (IsNode()) 
+    if (IsNode())
         m_array->update_ref(ref);
     else {
         ArrayParent *const parent = m_array->GetParent();
         const size_t pndx   = m_array->GetParentNdx();
 
         // Replace the Binary array with int array for node
-        Array* array = new Array(ref, parent, pndx, m_array->GetAllocator());
+        Array* array = new Array(ref, parent, pndx, m_array->get_alloc());
         delete m_array;
         m_array = array;
 
@@ -91,7 +91,7 @@ void ColumnBinary::Clear()
         const size_t pndx = m_array->GetParentNdx();
 
         // Revert to binary array
-        ArrayBinary* const array = new ArrayBinary(parent, pndx, m_array->GetAllocator());
+        ArrayBinary* const array = new ArrayBinary(parent, pndx, m_array->get_alloc());
         if (parent)
             parent->update_child_ref(pndx, array->get_ref());
 
@@ -230,7 +230,7 @@ void ColumnBinary::LeafToDot(ostream& out, const Array& array) const
 {
     // Rebuild array to get correct type
     const size_t ref = array.get_ref();
-    const ArrayBinary binarray(ref, NULL, 0, array.GetAllocator());
+    const ArrayBinary binarray(ref, NULL, 0, array.get_alloc());
 
     binarray.ToDot(out);
 }

@@ -73,7 +73,7 @@ public:
     // FIXME: SlabAlloc::Free() should be modified such than this method never throws.
     virtual void Free(std::size_t, const void* addr);
 
-    virtual void* Translate(ref_type ref) const TIGHTDB_NOEXCEPT;
+    virtual void* translate(ref_type ref) const TIGHTDB_NOEXCEPT;
     virtual bool IsReadOnly(ref_type) const TIGHTDB_NOEXCEPT;
 
     static Allocator& get_default() TIGHTDB_NOEXCEPT;

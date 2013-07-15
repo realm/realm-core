@@ -232,7 +232,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) c
     Table *subtable = m_subtable_map.find(subtable_ndx);
     if (!subtable) {
         const std::size_t top_ref = get_as_ref(subtable_ndx);
-        Allocator& alloc = GetAllocator();
+        Allocator& alloc = get_alloc();
         subtable = new Table(Table::RefCountTag(), alloc, top_ref,
                              const_cast<ColumnSubtableParent*>(this), subtable_ndx);
         const bool was_empty = m_subtable_map.empty();
@@ -250,7 +250,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx,
     Table *subtable = m_subtable_map.find(subtable_ndx);
     if (!subtable) {
         const std::size_t columns_ref = get_as_ref(subtable_ndx);
-        Allocator& alloc = GetAllocator();
+        Allocator& alloc = get_alloc();
         subtable = new Table(Table::RefCountTag(), alloc, spec_ref, columns_ref,
                              const_cast<ColumnSubtableParent*>(this), subtable_ndx);
         const bool was_empty = m_subtable_map.empty();
@@ -361,7 +361,7 @@ inline bool ColumnSubtableParent::compare_subtable_rows(const Table& a, const Ta
 
 inline std::size_t ColumnSubtableParent::clone_table_columns(const Table* t)
 {
-    return t->clone_columns(m_array->GetAllocator());
+    return t->clone_columns(m_array->get_alloc());
 }
 
 

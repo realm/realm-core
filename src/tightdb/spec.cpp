@@ -11,7 +11,7 @@ namespace tightdb {
 Spec::~Spec()
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    Replication* repl = m_specSet.GetAllocator().get_replication();
+    Replication* repl = m_specSet.get_alloc().get_replication();
     if (repl) repl->on_spec_destroyed(this);
 #endif
 }
@@ -89,7 +89,7 @@ size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
             m_subSpecs.set_parent(&m_specSet, 2);
         }
 
-        Allocator& alloc = m_specSet.GetAllocator();
+        Allocator& alloc = m_specSet.get_alloc();
 
         // Create spec for new subtable
         Array spec(Array::coldef_Normal, NULL, 0, alloc);
@@ -104,7 +104,7 @@ size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    Replication* repl = m_spec_set.GetAllocator().get_replication();
+    Replication* repl = m_spec_set.get_alloc().get_replication();
     if (repl) repl->add_column(m_table, this, type, name); // Throws
 #endif
 
@@ -178,7 +178,7 @@ void Spec::remove_column(size_t column_ndx)
         const size_t subspec_ndx = get_subspec_ndx(column_ndx);
         const size_t subspec_ref = m_subSpecs.get_as_ref(subspec_ndx);
 
-        Array subspec_top(subspec_ref, NULL, 0, m_specSet.GetAllocator());
+        Array subspec_top(subspec_ref, NULL, 0, m_specSet.get_alloc());
         subspec_top.Destroy(); // recursively delete entire subspec
         m_subSpecs.Delete(subspec_ndx);
     }
@@ -219,7 +219,7 @@ Spec Spec::get_subtable_spec(size_t column_ndx)
 
     const size_t subspec_ndx = get_subspec_ndx(column_ndx);
 
-    Allocator& alloc = m_specSet.GetAllocator();
+    Allocator& alloc = m_specSet.get_alloc();
     const size_t ref = m_subSpecs.get_as_ref(subspec_ndx);
 
     return Spec(m_table, alloc, ref, &m_subSpecs, subspec_ndx);
@@ -232,7 +232,7 @@ const Spec Spec::get_subtable_spec(size_t column_ndx) const
 
     const size_t subspec_ndx = get_subspec_ndx(column_ndx);
 
-    Allocator& alloc = m_specSet.GetAllocator();
+    Allocator& alloc = m_specSet.get_alloc();
     const size_t ref = m_subSpecs.get_as_ref(subspec_ndx);
 
     return Spec(m_table, alloc, ref, NULL, 0);
@@ -428,7 +428,7 @@ bool Spec::operator==(const Spec& spec) const
 
 void Spec::Verify() const
 {
-    const size_t column_count = get_column_count();
+    size_t column_count = get_column_count();
     TIGHTDB_ASSERT(column_count == m_names.size());
     TIGHTDB_ASSERT(column_count <= m_spec.size());
 }
@@ -447,7 +447,7 @@ void Spec::to_dot(ostream& out, StringData) const
         m_subSpecs.ToDot(out, "subspecs");
 
         const size_t count = m_subSpecs.size();
-        Allocator& alloc = m_specSet.GetAllocator();
+        Allocator& alloc = m_specSet.get_alloc();
 
         // Write out subspecs
         for (size_t i = 0; i < count; ++i) {

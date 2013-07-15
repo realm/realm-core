@@ -54,7 +54,7 @@ void StringIndex::Create()
     m_array->SetIsIndexNode(true);
 
     // Add subcolumns for leafs
-    Allocator& alloc = m_array->GetAllocator();
+    Allocator& alloc = m_array->get_alloc();
     Array values(Array::coldef_Normal, NULL, 0, alloc);
     Array refs(Array::coldef_HasRefs, NULL, 1, alloc);
     m_array->add(values.get_ref());
@@ -139,21 +139,21 @@ void StringIndex::TreeInsert(size_t row_ndx, int32_t key, size_t offset, StringD
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
-            StringIndex newNode(Array::coldef_InnerNode, m_array->GetAllocator());
+            StringIndex newNode(Array::coldef_InnerNode, m_array->get_alloc());
             newNode.NodeAddKey(nc.ref1);
             newNode.NodeAddKey(get_ref());
             update_ref(newNode.get_ref());
             return;
         }
         case NodeChange::insert_after: {
-            StringIndex newNode(Array::coldef_InnerNode, m_array->GetAllocator());
+            StringIndex newNode(Array::coldef_InnerNode, m_array->get_alloc());
             newNode.NodeAddKey(get_ref());
             newNode.NodeAddKey(nc.ref1);
             update_ref(newNode.get_ref());
             return;
         }
         case NodeChange::split: {
-            StringIndex newNode(Array::coldef_InnerNode, m_array->GetAllocator());
+            StringIndex newNode(Array::coldef_InnerNode, m_array->get_alloc());
             newNode.NodeAddKey(nc.ref1);
             newNode.NodeAddKey(nc.ref2);
             update_ref(newNode.get_ref());
@@ -179,7 +179,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
 
         // Get sublist
         const size_t ref = refs.get_as_ref(node_ndx);
-        StringIndex target(ref, &refs, node_ndx, m_target_column, m_get_func, m_array->GetAllocator());
+        StringIndex target(ref, &refs, node_ndx, m_target_column, m_get_func, m_array->get_alloc());
 
         // Insert item
         const NodeChange nc = target.DoInsert(row_ndx, key, offset, value);
@@ -200,7 +200,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         }
 
         // Else create new node
-        StringIndex newNode(Array::coldef_InnerNode, m_array->GetAllocator());
+        StringIndex newNode(Array::coldef_InnerNode, m_array->get_alloc());
         if (nc.type == NodeChange::split) {
             // update offset for left node
             int32_t lastKey = target.GetLastKey();
@@ -242,7 +242,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
             return NodeChange::none;
 
         // Create new list for item
-        StringIndex newList(m_target_column, m_get_func, m_array->GetAllocator());
+        StringIndex newList(m_target_column, m_get_func, m_array->get_alloc());
 
         newList.LeafInsert(row_ndx, key, offset, value);
 
@@ -291,8 +291,8 @@ void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
 
     // Get sublists
     const size_t orig_ref = refs.get_as_ref(ndx);
-    const StringIndex orig_col(orig_ref, &refs, ndx, m_target_column, m_get_func, m_array->GetAllocator());
-    const StringIndex new_col(new_ref, NULL, 0, m_target_column, m_get_func, m_array->GetAllocator());
+    const StringIndex orig_col(orig_ref, &refs, ndx, m_target_column, m_get_func, m_array->get_alloc());
+    const StringIndex new_col(new_ref, NULL, 0, m_target_column, m_get_func, m_array->get_alloc());
 
     // Update original key
     const int64_t lastKey = orig_col.GetLastKey();
@@ -315,7 +315,7 @@ void StringIndex::NodeInsert(size_t ndx, size_t ref)
     TIGHTDB_ASSERT(ndx <= offsets.size());
     TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
 
-    const StringIndex col(ref, NULL, 0, m_target_column, m_get_func, m_array->GetAllocator());
+    const StringIndex col(ref, NULL, 0, m_target_column, m_get_func, m_array->get_alloc());
     const int64_t lastKey = col.GetLastKey();
 
     offsets.Insert(ndx, lastKey);
@@ -356,7 +356,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, StringD
 
     const size_t ref = refs.get_as_ref(ins_pos);
     const size_t sub_offset = offset + 4;
-    Allocator& alloc = m_array->GetAllocator();
+    Allocator& alloc = m_array->get_alloc();
 
     // Single match (lowest bit set indicates literal row_ndx)
     if (ref & 1) {
@@ -447,7 +447,7 @@ void StringIndex::distinct(Array& result) const
 {
     Array refs = m_array->GetSubArray(1);
     const size_t count = refs.size();
-    Allocator& alloc = m_array->GetAllocator();
+    Allocator& alloc = m_array->get_alloc();
 
     // Get first matching row for every key
     if (m_array->IsNode()) {
@@ -488,7 +488,7 @@ void StringIndex::UpdateRefs(size_t pos, int diff)
 
     Array refs = m_array->GetSubArray(1);
     const size_t count = refs.size();
-    Allocator& alloc = m_array->GetAllocator();
+    Allocator& alloc = m_array->get_alloc();
 
     if (m_array->IsNode()) {
         for (size_t i = 0; i < count; ++i) {
@@ -557,7 +557,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
 {
     Array values = m_array->GetSubArray(0);
     Array refs = m_array->GetSubArray(1);
-    Allocator& alloc = m_array->GetAllocator();
+    Allocator& alloc = m_array->get_alloc();
 
     // Create 4 byte index key
     const char* const v = value.data() + offset;
@@ -627,7 +627,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
 {
     Array values = m_array->GetSubArray(0);
     Array refs = m_array->GetSubArray(1);
-    Allocator& alloc = m_array->GetAllocator();
+    Allocator& alloc = m_array->get_alloc();
 
     // Create 4 byte index key
     const char* const v = value.data() + offset;

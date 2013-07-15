@@ -80,7 +80,7 @@ template<class T> T GetColumnFromRef(Array& parent, size_t ndx) // Throws
 {
     //TIGHTDB_ASSERT(parent.HasRefs());
     //TIGHTDB_ASSERT(ndx < parent.Size());
-    return T(size_t(parent.get(ndx)), &parent, ndx, parent.GetAllocator()); // Throws
+    return T(size_t(parent.get(ndx)), &parent, ndx, parent.get_alloc()); // Throws
 }
 
 template<typename T, class C> T ColumnBase::TreeGet(size_t ndx) const
@@ -141,21 +141,21 @@ template<typename T, class C> void ColumnBase::TreeInsert(size_t ndx, T value)
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
-            Column newNode(Array::coldef_InnerNode, m_array->GetAllocator());
+            Column newNode(Array::coldef_InnerNode, m_array->get_alloc());
             newNode.NodeAdd<C>(nc.ref1);
             newNode.NodeAdd<C>(get_ref());
             static_cast<C*>(this)->update_ref(newNode.get_ref());
             return;
         }
         case NodeChange::insert_after: {
-            Column newNode(Array::coldef_InnerNode, m_array->GetAllocator());
+            Column newNode(Array::coldef_InnerNode, m_array->get_alloc());
             newNode.NodeAdd<C>(get_ref());
             newNode.NodeAdd<C>(nc.ref1);
             static_cast<C*>(this)->update_ref(newNode.get_ref());
             return;
         }
         case NodeChange::split: {
-            Column newNode(Array::coldef_InnerNode, m_array->GetAllocator());
+            Column newNode(Array::coldef_InnerNode, m_array->get_alloc());
             newNode.NodeAdd<C>(nc.ref1);
             newNode.NodeAdd<C>(nc.ref2);
             static_cast<C*>(this)->update_ref(newNode.get_ref());
@@ -203,7 +203,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         }
 
         // Else create new node
-        Column newNode(Array::coldef_InnerNode, m_array->GetAllocator());
+        Column newNode(Array::coldef_InnerNode, m_array->get_alloc());
         if (nc.type == NodeChange::split) {
             // update offset for left node
             const size_t newsize = target.Size();
@@ -243,7 +243,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         }
 
         // Create new list for item
-        C newList(m_array->GetAllocator()); // Throws
+        C newList(m_array->get_alloc()); // Throws
         if (m_array->HasRefs()) newList.SetHasRefs(); // all leafs should have same type
 
         newList.add(value);
@@ -278,7 +278,7 @@ template<class C> void ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
 
     // Get sublists
     const C orig_col = GetColumnFromRef<C>(refs, ndx);
-    const C new_col(new_ref, NULL, 0, m_array->GetAllocator());
+    const C new_col(new_ref, NULL, 0, m_array->get_alloc());
 
     // Update original size
     const size_t offset = ndx ? to_ref(offsets.get(ndx-1)) : 0;
@@ -314,7 +314,7 @@ template<class C> void ColumnBase::NodeInsert(size_t ndx, size_t ref)
     TIGHTDB_ASSERT(ndx <= offsets.size());
     TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
 
-    const C col(ref, (Array*)NULL, 0, m_array->GetAllocator());
+    const C col(ref, (Array*)NULL, 0, m_array->get_alloc());
     const size_t refSize = col.Size();
     const int64_t newOffset = (ndx ? offsets.get(ndx-1) : 0) + refSize;
 
@@ -332,7 +332,7 @@ template<class C> void ColumnBase::NodeAdd(size_t ref)
 
     Array offsets = NodeGetOffsets();
     Array refs = NodeGetRefs();
-    const C col(ref, (Array*)NULL, 0, m_array->GetAllocator());
+    const C col(ref, (Array*)NULL, 0, m_array->get_alloc());
 
     TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
 
@@ -402,7 +402,7 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
 
         if (start == 0 && end == size_t(-1)) {
             for (size_t i = 0; i < count; ++i) {
-                const C col(size_t(refs.get(i)), NULL, 0, m_array->GetAllocator());
+                const C col(size_t(refs.get(i)), NULL, 0, m_array->get_alloc());
                 const size_t ndx = col.template TreeFind<T, C, F>(value, 0, size_t(-1));
                 if (ndx != size_t(-1)) {
                     const size_t offset = i ? to_ref(offsets.get(i-1)) : 0;
@@ -418,7 +418,7 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
             size_t e = (end == size_t(-1) || int(end) >= offsets.get(i)) ? size_t(-1) : end - offset;
 
             for (;;) {
-                const C col(size_t(refs.get(i)), NULL, 0, m_array->GetAllocator());
+                const C col(size_t(refs.get(i)), NULL, 0, m_array->get_alloc());
 
                 const size_t ndx = col.template TreeFind<T, C, F>(value, s, e);
                 if (ndx != not_found) {
@@ -464,7 +464,7 @@ template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T valu
 
         for (;;) {
             const size_t ref = refs.get_as_ref(i);
-            const C col(ref, NULL, 0, m_array->GetAllocator());
+            const C col(ref, NULL, 0, m_array->get_alloc());
 
             size_t add = i ? to_ref(offsets.get(i-1)) : 0;
             add += add_offset;
@@ -511,7 +511,7 @@ void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
 
         for (;;) {
             const size_t ref = refs.get_as_ref(i);
-            const C col(ref, NULL, 0, m_array->GetAllocator());
+            const C col(ref, NULL, 0, m_array->get_alloc());
 
             size_t add = i ? to_ref(offsets.get(i-1)) : 0;
             add += caller_offset;

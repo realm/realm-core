@@ -127,8 +127,8 @@ void ArrayBinary::Clear()
 BinaryData ArrayBinary::get_direct(Allocator& alloc, const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 {
     pair<size_t, size_t> p = Array::get_two_as_size(header, 0);
-    const char* offsets_header = static_cast<char*>(alloc.Translate(p.first));
-    const char* blob_header = static_cast<char*>(alloc.Translate(p.second));
+    const char* offsets_header = static_cast<char*>(alloc.translate(p.first));
+    const char* blob_header = static_cast<char*>(alloc.translate(p.second));
     size_t begin, end;
     if (ndx) {
         pair<size_t, size_t> p2 = Array::get_two_as_size(offsets_header, ndx-1);

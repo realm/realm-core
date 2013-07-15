@@ -29,7 +29,7 @@ void Allocator::Free(size_t, const void* addr)
     free(const_cast<void*>(addr));
 }
 
-void* Allocator::Translate(size_t ref) const TIGHTDB_NOEXCEPT
+void* Allocator::translate(size_t ref) const TIGHTDB_NOEXCEPT
 {
     return reinterpret_cast<void*>(ref);
 }

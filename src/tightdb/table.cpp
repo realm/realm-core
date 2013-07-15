@@ -71,7 +71,7 @@ void Table::CreateColumns()
 
     size_t subtable_count = 0;
     ColumnType attr = col_attr_None;
-    Allocator& alloc = m_columns.GetAllocator();
+    Allocator& alloc = m_columns.get_alloc();
     const size_t count = m_spec_set.get_type_attr_count();
 
     // Add the newly defined columns
@@ -197,7 +197,7 @@ void Table::CacheColumns()
 {
     TIGHTDB_ASSERT(m_cols.is_empty()); // only done on creation
 
-    Allocator& alloc = m_columns.GetAllocator();
+    Allocator& alloc = m_columns.get_alloc();
     ColumnType attr = col_attr_None;
     size_t size = size_t(-1);
     size_t ndx_in_parent = 0;
@@ -476,7 +476,7 @@ size_t Table::do_add_column(DataType type)
     const size_t column_ndx = m_cols.size();
 
     ColumnBase* new_col = NULL;
-    Allocator& alloc = m_columns.GetAllocator();
+    Allocator& alloc = m_columns.get_alloc();
 
     switch (type) {
     case type_Int:
@@ -1946,7 +1946,7 @@ void Table::optimize()
     if (has_shared_spec()) return;
 
     const size_t column_count = get_column_count();
-    Allocator& alloc = m_columns.GetAllocator();
+    Allocator& alloc = m_columns.get_alloc();
 
     for (size_t i = 0; i < column_count; ++i) {
         const ColumnType type = get_real_column_type(i);
@@ -2627,7 +2627,7 @@ void Table::Verify() const
 
     m_spec_set.Verify();
 
-    Allocator& alloc = m_columns.GetAllocator();
+    Allocator& alloc = m_columns.get_alloc();
     alloc.Verify();
 }
 

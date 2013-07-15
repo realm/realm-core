@@ -202,7 +202,7 @@ public:
     size_t FindWithIndex(int64_t value) const;
 
     size_t get_ref() const {return m_array->get_ref();}
-    Allocator& GetAllocator() const TIGHTDB_NOEXCEPT {return m_array->GetAllocator();}
+    Allocator& get_alloc() const TIGHTDB_NOEXCEPT {return m_array->get_alloc();}
     Array* GetArray(void) {return m_array;}
 
     void sort();

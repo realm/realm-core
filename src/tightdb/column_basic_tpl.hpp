@@ -69,7 +69,7 @@ void BasicColumn<T>::Destroy()
 template<typename T>
 void BasicColumn<T>::update_ref(size_t ref)
 {
-    TIGHTDB_ASSERT(is_node_from_ref(ref, m_array->GetAllocator())); // Can only be called when creating node
+    TIGHTDB_ASSERT(is_node_from_ref(ref, m_array->get_alloc())); // Can only be called when creating node
 
     if (IsNode())
         m_array->update_ref(ref);
@@ -78,7 +78,7 @@ void BasicColumn<T>::update_ref(size_t ref)
         const size_t pndx = m_array->GetParentNdx();
 
         // Replace the generic array with int array for node
-        Array* array = new Array(ref, parent, pndx, m_array->GetAllocator());
+        Array* array = new Array(ref, parent, pndx, m_array->get_alloc());
         delete m_array;
         m_array = array;
 
@@ -121,7 +121,7 @@ void BasicColumn<T>::Clear()
         const size_t pndx = m_array->GetParentNdx();
 
         // Revert to generic array
-        BasicArray<T>* array = new BasicArray<T>(parent, pndx, m_array->GetAllocator());
+        BasicArray<T>* array = new BasicArray<T>(parent, pndx, m_array->get_alloc());
         if (parent)
             parent->update_child_ref(pndx, array->get_ref());
 
@@ -255,7 +255,7 @@ void BasicColumn<T>::LeafToDot(std::ostream& out, const Array& array) const
 {
     // Rebuild array to get correct type
     const size_t ref = array.get_ref();
-    const BasicArray<T> newArray(ref, NULL, 0, array.GetAllocator());
+    const BasicArray<T> newArray(ref, NULL, 0, array.get_alloc());
 
     newArray.ToDot(out);
 }

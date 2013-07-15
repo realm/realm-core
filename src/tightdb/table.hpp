@@ -772,7 +772,7 @@ private:
 
 inline Table::LocalTransactLog Table::transact_log() TIGHTDB_NOEXCEPT
 {
-    return LocalTransactLog(m_top.GetAllocator().get_replication(), this);
+    return LocalTransactLog(m_top.get_alloc().get_replication(), this);
 }
 
 inline size_t* Table::record_subspec_path(const Spec* spec, size_t* begin,

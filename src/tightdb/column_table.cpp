@@ -18,8 +18,8 @@ void ColumnSubtableParent::move_last_over(size_t ndx) {
     // Delete sub-tree
     const size_t ref_columns = get_as_ref(ndx);
     if (ref_columns != 0) {
-        Allocator& alloc = GetAllocator();
-        Array columns(ref_columns, (Array*)NULL, 0, alloc);
+        Allocator& alloc = get_alloc();
+        Array columns(ref_columns, NULL, 0, alloc);
         columns.Destroy();
     }
 
@@ -51,8 +51,8 @@ size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
     const size_t ref_columns = get_as_ref(ndx);
     if (ref_columns == 0) return 0;
 
-    const size_t ref_first_col = Array(ref_columns, 0, 0, GetAllocator()).get_as_ref(0);
-    return get_size_from_ref(ref_first_col, GetAllocator());
+    const size_t ref_first_col = Array(ref_columns, 0, 0, get_alloc()).get_as_ref(0);
+    return get_size_from_ref(ref_first_col, get_alloc());
 }
 
 void ColumnTable::add()
@@ -109,7 +109,7 @@ void ColumnTable::erase(size_t ndx)
 
     // Delete sub-tree
     if (ref_columns != 0) {
-        Allocator& alloc = GetAllocator();
+        Allocator& alloc = get_alloc();
         Array columns(ref_columns, 0, 0, alloc);
         columns.Destroy();
     }
@@ -127,7 +127,7 @@ void ColumnTable::ClearTable(size_t ndx)
     if (ref_columns == 0) return; // already empty
 
     // Delete sub-tree
-    Allocator& alloc = GetAllocator();
+    Allocator& alloc = get_alloc();
     Array columns(ref_columns, 0, 0, alloc);
     columns.Destroy();
 

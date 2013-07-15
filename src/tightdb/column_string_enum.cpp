@@ -219,7 +219,7 @@ StringIndex& ColumnStringEnum::CreateIndex()
     TIGHTDB_ASSERT(m_index == NULL);
 
     // Create new index
-    m_index = new StringIndex(this, &get_string, m_array->GetAllocator());
+    m_index = new StringIndex(this, &get_string, m_array->get_alloc());
 
     // Populate the index
     const size_t count = Size();
@@ -234,7 +234,7 @@ StringIndex& ColumnStringEnum::CreateIndex()
 void ColumnStringEnum::SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx)
 {
     TIGHTDB_ASSERT(m_index == NULL);
-    m_index = new StringIndex(ref, parent, pndx, this, &get_string, m_array->GetAllocator());
+    m_index = new StringIndex(ref, parent, pndx, this, &get_string, m_array->get_alloc());
 }
 
 void ColumnStringEnum::ReuseIndex(StringIndex& index)

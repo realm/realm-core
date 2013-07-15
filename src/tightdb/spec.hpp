@@ -169,8 +169,8 @@ inline Spec::Spec(const Table* table, Allocator& alloc, size_t ref, ArrayParent*
 }
 
 inline Spec::Spec(const Spec& s):
-    m_table(s.m_table), m_specSet(s.m_specSet.GetAllocator()), m_spec(s.m_specSet.GetAllocator()),
-    m_names(s.m_specSet.GetAllocator()), m_subSpecs(s.m_specSet.GetAllocator())
+    m_table(s.m_table), m_specSet(s.m_specSet.get_alloc()), m_spec(s.m_specSet.get_alloc()),
+    m_names(s.m_specSet.get_alloc()), m_subSpecs(s.m_specSet.get_alloc())
 {
     const size_t ref    = s.m_specSet.get_ref();
     ArrayParent *parent = s.m_specSet.GetParent();
@@ -182,7 +182,7 @@ inline Spec::Spec(const Spec& s):
 
 inline Spec Spec::get_subspec_by_ndx(size_t subspec_ndx)
 {
-    Allocator& alloc = m_specSet.GetAllocator();
+    Allocator& alloc = m_specSet.get_alloc();
     const size_t ref = m_subSpecs.get_as_ref(subspec_ndx);
     return Spec(m_table, alloc, ref, &m_subSpecs, subspec_ndx);
 }

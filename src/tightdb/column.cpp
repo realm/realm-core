@@ -20,7 +20,7 @@ Column GetColumnFromRef(Array &parent, size_t ndx)
 {
     TIGHTDB_ASSERT(parent.HasRefs());
     TIGHTDB_ASSERT(ndx < parent.size());
-    return Column(parent.get_as_ref(ndx), &parent, ndx, parent.GetAllocator());
+    return Column(parent.get_as_ref(ndx), &parent, ndx, parent.get_alloc());
 }
 
 /*
@@ -258,7 +258,7 @@ size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXC
 
 bool ColumnBase::is_node_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    const uint8_t* const header = reinterpret_cast<uint8_t*>(alloc.Translate(ref));
+    const uint8_t* const header = reinterpret_cast<uint8_t*>(alloc.translate(ref));
     const bool isNode = (header[0] & 0x80) != 0;
     return isNode;
 }
@@ -297,8 +297,8 @@ void Column::Create()
 {
     // Add subcolumns for nodes
     if (IsNode()) {
-        Array offsets(Array::coldef_Normal, 0, 0, m_array->GetAllocator());
-        Array refs(Array::coldef_HasRefs, 0, 0, m_array->GetAllocator());
+        Array offsets(Array::coldef_Normal, 0, 0, m_array->get_alloc());
+        Array refs(Array::coldef_HasRefs, 0, 0, m_array->get_alloc());
         m_array->add(offsets.get_ref());
         m_array->add(refs.get_ref());
     }
@@ -526,7 +526,7 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
 size_t ColumnBase::GetRefSize(size_t ref) const
 {
     // parse the length part of 8byte header
-    const uint8_t* const header = (uint8_t*)m_array->GetAllocator().Translate(ref);
+    const uint8_t* const header = (uint8_t*)m_array->get_alloc().translate(ref);
     return (header[1] << 16) + (header[2] << 8) + header[3];
 }
 
@@ -566,8 +566,8 @@ void ColumnBase::NodeAddKey(size_t ref)
     Array refs = NodeGetRefs();
     TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
 
-    const Array new_top(ref, NULL, 0,m_array->GetAllocator());
-    const Array new_offsets(new_top.get_as_ref(0), NULL, 0,m_array->GetAllocator());
+    const Array new_top(ref, NULL, 0,m_array->get_alloc());
+    const Array new_offsets(new_top.get_as_ref(0), NULL, 0,m_array->get_alloc());
     TIGHTDB_ASSERT(!new_offsets.is_empty());
 
     const int64_t key = new_offsets.back();
@@ -648,7 +648,7 @@ size_t Column::find_first(int64_t value, size_t start, size_t end) const
     TIGHTDB_ASSERT(end == size_t(-1) || end <= Size());
 
     if (start == 0 && end == size_t(-1)) {
-        Array cache(m_array->GetAllocator());
+        Array cache(m_array->get_alloc());
         size_t ref = m_array->get_ref();
         return m_array->ColumnFind(value, ref, cache);
     }
@@ -851,7 +851,7 @@ void Column::Verify() const
             const size_t ref = size_t(refs.get(i));
             TIGHTDB_ASSERT(ref);
 
-            const Column col(ref, NULL, 0, m_array->GetAllocator());
+            const Column col(ref, NULL, 0, m_array->get_alloc());
             col.Verify();
 
             off += col.Size();

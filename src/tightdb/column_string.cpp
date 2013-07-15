@@ -16,7 +16,7 @@ namespace {
 
 tightdb::Array::ColumnDef get_coldef_from_ref(size_t ref, tightdb::Allocator& alloc)
 {
-    const char* header = static_cast<char*>(alloc.Translate(ref));
+    const char* header = static_cast<char*>(alloc.translate(ref));
     return tightdb::Array::get_coldef_from_header(header);
 }
 
@@ -77,7 +77,7 @@ void AdaptiveStringColumn::Destroy()
 
 void AdaptiveStringColumn::update_ref(size_t ref)
 {
-    TIGHTDB_ASSERT(get_coldef_from_ref(ref, m_array->GetAllocator()) == Array::coldef_InnerNode); // Can only be called when creating node
+    TIGHTDB_ASSERT(get_coldef_from_ref(ref, m_array->get_alloc()) == Array::coldef_InnerNode); // Can only be called when creating node
 
     if (IsNode())
         m_array->update_ref(ref);
@@ -86,7 +86,7 @@ void AdaptiveStringColumn::update_ref(size_t ref)
         const size_t pndx   = m_array->GetParentNdx();
 
         // Replace the string array with int array for node
-        Array* array = new Array(ref, parent, pndx, m_array->GetAllocator());
+        Array* array = new Array(ref, parent, pndx, m_array->get_alloc());
         delete m_array;
         m_array = array;
 
@@ -101,7 +101,7 @@ StringIndex& AdaptiveStringColumn::CreateIndex()
     TIGHTDB_ASSERT(!m_index);
 
     // Create new index
-    m_index = new StringIndex(this, &get_string, m_array->GetAllocator());
+    m_index = new StringIndex(this, &get_string, m_array->get_alloc());
 
     // Populate the index
     const size_t count = Size();
@@ -116,7 +116,7 @@ StringIndex& AdaptiveStringColumn::CreateIndex()
 void AdaptiveStringColumn::SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx)
 {
     TIGHTDB_ASSERT(!m_index);
-    m_index = new StringIndex(ref, parent, pndx, this, &get_string, m_array->GetAllocator());
+    m_index = new StringIndex(ref, parent, pndx, this, &get_string, m_array->get_alloc());
 }
 
 bool AdaptiveStringColumn::is_empty() const TIGHTDB_NOEXCEPT
@@ -153,7 +153,7 @@ void AdaptiveStringColumn::Clear()
     if (m_array->IsNode()) {
         // Revert to string array
         m_array->Destroy();
-        Array* array = new ArrayString(m_array->GetParent(), m_array->GetParentNdx(), m_array->GetAllocator());
+        Array* array = new ArrayString(m_array->GetParent(), m_array->GetParentNdx(), m_array->get_alloc());
         delete m_array;
         m_array = array;
     }
@@ -287,7 +287,7 @@ size_t AdaptiveStringColumn::count(StringData target) const
 
         for (size_t i = 0; i < n; ++i) {
             const size_t ref = refs.get_as_ref(i);
-            const AdaptiveStringColumn col(ref, NULL, 0, m_array->GetAllocator());
+            const AdaptiveStringColumn col(ref, NULL, 0, m_array->get_alloc());
 
             count += col.count(target);
         }
@@ -355,7 +355,7 @@ void AdaptiveStringColumn::LeafSet(size_t ndx, StringData value)
 
     // Replace string array with long string array
     ArrayStringLong* const newarray =
-        new ArrayStringLong(static_cast<Array*>(0), 0, m_array->GetAllocator());
+        new ArrayStringLong(static_cast<Array*>(0), 0, m_array->get_alloc());
 
     // Copy strings to new array
     ArrayString* const oldarray = static_cast<ArrayString*>(m_array);
@@ -391,7 +391,7 @@ void AdaptiveStringColumn::LeafInsert(size_t ndx, StringData value)
     }
 
     // Replace string array with long string array
-    ArrayStringLong* const newarray = new ArrayStringLong(static_cast<Array*>(0), 0, m_array->GetAllocator());
+    ArrayStringLong* const newarray = new ArrayStringLong(static_cast<Array*>(0), 0, m_array->get_alloc());
 
     // Copy strings to new array
     ArrayString* const oldarray = static_cast<ArrayString*>(m_array);
@@ -444,7 +444,7 @@ void AdaptiveStringColumn::LeafDelete(size_t ndx)
 
 bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) const
 {
-    AdaptiveStringColumn keys(m_array->GetAllocator());
+    AdaptiveStringColumn keys(m_array->get_alloc());
 
     // Generate list of unique values (keys)
     size_t n = Size();
@@ -466,7 +466,7 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
     }
 
     // Generate enumerated list of entries
-    Column values(m_array->GetAllocator());
+    Column values(m_array->get_alloc());
     for (size_t i=0; i<n; ++i) {
         StringData v = get(i);
         size_t pos = keys.lower_bound(v);
@@ -509,7 +509,7 @@ void AdaptiveStringColumn::LeafToDot(ostream& out, const Array& array) const
         // ArrayStringLong has more members than Array, so we have to
         // really instantiate it (it is not enough with a cast)
         const size_t ref = array.get_ref();
-        ArrayStringLong str_array(ref, static_cast<Array*>(0), 0, array.GetAllocator());
+        ArrayStringLong str_array(ref, static_cast<Array*>(0), 0, array.get_alloc());
         str_array.ToDot(out);
     }
     else {

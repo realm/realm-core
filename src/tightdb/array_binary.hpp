@@ -89,7 +89,7 @@ inline BinaryData ArrayBinary::column_get(const Array* root, std::size_t ndx) TI
 {
     if (root->is_leaf()) return static_cast<const ArrayBinary*>(root)->get(ndx);
     std::pair<const char*, std::size_t> p = find_leaf(root, ndx);
-    return get_direct(root->GetAllocator(), p.first, p.second);
+    return get_direct(root->get_alloc(), p.first, p.second);
 }
 
 

@@ -52,11 +52,11 @@ inline size_t ColumnMixed::get_subtable_size(size_t row_idx) const TIGHTDB_NOEXC
     // the presence of the cached object and use it when available.
     const size_t top_ref = get_subtable_ref(row_idx);
     if (!top_ref) return 0;
-    const size_t columns_ref = Array(top_ref, 0, 0, m_refs->GetAllocator()).get_as_ref(1);
-    const Array columns(columns_ref, 0, 0, m_refs->GetAllocator());
+    const size_t columns_ref = Array(top_ref, 0, 0, m_refs->get_alloc()).get_as_ref(1);
+    const Array columns(columns_ref, 0, 0, m_refs->get_alloc());
     if (columns.is_empty()) return 0;
     const size_t first_col_ref = columns.get_as_ref(0);
-    return get_size_from_ref(first_col_ref, m_refs->GetAllocator());
+    return get_size_from_ref(first_col_ref, m_refs->get_alloc());
 }
 
 inline Table* ColumnMixed::get_subtable_ptr(size_t row_idx) const
@@ -235,10 +235,10 @@ inline void ColumnMixed::set_subtable(std::size_t ndx, const Table* t)
     TIGHTDB_ASSERT(ndx < m_types->Size());
     std::size_t ref;
     if (t) {
-        ref = t->clone(m_array->GetAllocator()); // Throws
+        ref = t->clone(m_array->get_alloc()); // Throws
     }
     else {
-        ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
+        ref = Table::create_empty_table(m_array->get_alloc()); // Throws
     }
     clear_value(ndx, mixcol_Table); // Remove any previous refs or binary data
     m_refs->set(ndx, ref);
@@ -347,10 +347,10 @@ inline void ColumnMixed::insert_subtable(std::size_t ndx, const Table* t)
     TIGHTDB_ASSERT(ndx <= m_types->Size());
     std::size_t ref;
     if (t) {
-        ref = t->clone(m_array->GetAllocator()); // Throws
+        ref = t->clone(m_array->get_alloc()); // Throws
     }
     else {
-        ref = Table::create_empty_table(m_array->GetAllocator()); // Throws
+        ref = Table::create_empty_table(m_array->get_alloc()); // Throws
     }
     m_types->insert(ndx, mixcol_Table);
     m_refs->insert(ndx, ref);

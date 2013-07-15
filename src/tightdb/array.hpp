@@ -342,7 +342,7 @@ public:
     size_t get_ref() const TIGHTDB_NOEXCEPT { return m_ref; }
     void Destroy();
 
-    Allocator& GetAllocator() const TIGHTDB_NOEXCEPT {return m_alloc;}
+    Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_alloc; }
 
     // Serialization
     template<class S> size_t Write(S& target, bool recurse=true, bool persist=false) const;
@@ -868,7 +868,7 @@ inline Array Array::GetSubArray(std::size_t ndx) const TIGHTDB_NOEXCEPT
 inline bool Array::is_index_node(std::size_t ref, const Allocator& alloc)
 {
     TIGHTDB_ASSERT(ref);
-    return get_indexflag_from_header(static_cast<char*>(alloc.Translate(ref)));
+    return get_indexflag_from_header(static_cast<char*>(alloc.translate(ref)));
 }
 
 
@@ -1155,7 +1155,7 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
                 newRefs.add(ref);
             }
             else {
-                const Array sub(ref, NULL, 0, GetAllocator());
+                const Array sub(ref, NULL, 0, get_alloc());
                 const size_t sub_pos = sub.Write(out, true, persist);
                 TIGHTDB_ASSERT((sub_pos & 0x7) == 0); // 64bit alignment
                 newRefs.add(sub_pos);
