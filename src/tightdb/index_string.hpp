@@ -51,6 +51,7 @@ public:
     FindRes find_all(StringData value, size_t& ref) const;
 
     void update_ref(StringData value, size_t old_row_ndx, size_t new_row_ndx);
+    using Column::update_ref;
 
 #ifdef TIGHTDB_DEBUG
     void verify_entries(const AdaptiveStringColumn& column) const;

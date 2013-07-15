@@ -96,7 +96,7 @@ inline ArrayString::ArrayString(std::size_t ref, const ArrayParent *parent,
     SetParent(const_cast<ArrayParent *>(parent), ndx_in_parent);
 }
 
-// Creates new array (but invalid, call UpdateRef to init)
+// Creates new array (but invalid, call update_ref() to init)
 inline ArrayString::ArrayString(Allocator& alloc): Array(alloc) {}
 
 inline StringData ArrayString::get_from_header(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT

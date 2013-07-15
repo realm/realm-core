@@ -15,8 +15,8 @@ ArrayBinary::ArrayBinary(ArrayParent* parent, size_t pndx, Allocator& alloc):
     m_offsets(coldef_Normal, NULL, 0, alloc), m_blob(NULL, 0, alloc)
 {
     // Add subarrays for long string
-    Array::add(m_offsets.GetRef());
-    Array::add(m_blob.GetRef());
+    Array::add(m_offsets.get_ref());
+    Array::add(m_blob.get_ref());
     m_offsets.SetParent(this, 0);
     m_blob.SetParent(this, 1);
 }
@@ -33,7 +33,7 @@ ArrayBinary::ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator
     m_blob.SetParent(this, 1);
 }
 
-// Creates new array (but invalid, call UpdateRef to init)
+// Creates new array (but invalid, call update_ref() to init)
 //ArrayBinary::ArrayBinary(Allocator& alloc) : Array(alloc) {}
 
 void ArrayBinary::add(BinaryData value)
@@ -147,7 +147,7 @@ BinaryData ArrayBinary::get_direct(Allocator& alloc, const char* header, size_t 
 
 void ArrayBinary::ToDot(ostream& out, const char* title) const
 {
-    const size_t ref = GetRef();
+    const size_t ref = get_ref();
 
     out << "subgraph cluster_binary" << ref << " {" << endl;
     out << " label = \"ArrayBinary";

@@ -79,7 +79,7 @@ inline ArrayBlob::ArrayBlob(std::size_t ref, const ArrayParent *parent, std::siz
     SetParent(const_cast<ArrayParent *>(parent), pndx);
 }
 
-// Creates new array (but invalid, call UpdateRef to init)
+// Creates new array (but invalid, call update_ref() to init)
 inline ArrayBlob::ArrayBlob(Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc) {}
 
 inline const char* ArrayBlob::get(std::size_t pos) const TIGHTDB_NOEXCEPT

@@ -125,12 +125,6 @@ bool Array::operator==(const Array& a) const
     return m_data == a.m_data;
 }
 
-void Array::UpdateRef(size_t ref)
-{
-    init_from_ref(ref);
-    update_ref_in_parent();
-}
-
 bool Array::UpdateFromParent() TIGHTDB_NOEXCEPT
 {
     if (!m_parent) return false;
@@ -1759,7 +1753,7 @@ bool Array::Compare(const Array& c) const
 
 void Array::Print() const
 {
-    cout << hex << GetRef() << dec << ": (" << size() << ") ";
+    cout << hex << get_ref() << dec << ": (" << size() << ") ";
     for (size_t i = 0; i < size(); ++i) {
         if (i) cout << ", ";
         cout << get(i);
@@ -1781,7 +1775,7 @@ void Array::Verify() const
 
 void Array::ToDot(ostream& out, StringData title) const
 {
-    const size_t ref = GetRef();
+    const size_t ref = get_ref();
 
     if (0 < title.size()) {
         out << "subgraph cluster_" << ref << " {" << endl;

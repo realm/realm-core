@@ -252,7 +252,7 @@ public:
     /// point to the new array. The updating of the parent only works
     /// if this array was initialized with the correct parent
     /// reference.
-    void UpdateRef(size_t ref);
+    void update_ref(size_t ref);
 
     /// Construct a complete copy of this array (including its
     /// subarrays) using the specified allocator and return just the
@@ -339,7 +339,7 @@ public:
     bool IsIndexNode() const  TIGHTDB_NOEXCEPT { return get_indexflag_from_header(); }
     void SetIsIndexNode(bool value) { set_header_indexflag(value); }
     Array GetSubArray(size_t ndx) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array may cause the parent to be modified too.
-    size_t GetRef() const TIGHTDB_NOEXCEPT { return m_ref; }
+    size_t get_ref() const TIGHTDB_NOEXCEPT { return m_ref; }
     void Destroy();
 
     Allocator& GetAllocator() const TIGHTDB_NOEXCEPT {return m_alloc;}
@@ -777,7 +777,7 @@ inline Array::Array(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator&
     update_ref_in_parent();
 }
 
-// Creates new array (but invalid, call UpdateRef or SetType to init)
+// Creates new array (but invalid, call update_ref() or SetType() to init)
 inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
     m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false),
     m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {}
@@ -788,7 +788,7 @@ inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
 inline Array::Array(const Array& src) TIGHTDB_NOEXCEPT:
     ArrayParent(), m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc)
 {
-    const size_t ref = src.GetRef();
+    const size_t ref = src.get_ref();
     init_from_ref(ref);
     src.Invalidate();
 }
@@ -805,6 +805,13 @@ inline Array::Array(const Array& array, Allocator& alloc):
 // and a few other basic things needed for read-only access. Or for use if you just want a way to call
 // some methods written in Array.*
 inline Array::Array(no_prealloc_tag) TIGHTDB_NOEXCEPT: m_alloc(Allocator::get_default()) {}
+
+
+inline void Array::update_ref(std::size_t ref)
+{
+    init_from_ref(ref);
+    update_ref_in_parent();
+}
 
 
 inline int64_t Array::back() const TIGHTDB_NOEXCEPT
@@ -1203,7 +1210,7 @@ inline void Array::move_assign(Array& a)
     // example, relies on long chains of moves to be optimized away
     // completely. This change should be a 'no-brainer'.
     Destroy();
-    UpdateRef(a.GetRef());
+    update_ref(a.get_ref());
     a.Invalidate();
 }
 

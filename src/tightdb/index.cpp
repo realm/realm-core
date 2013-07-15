@@ -30,8 +30,8 @@ Index::Index(): Column(Array::coldef_HasRefs)
     // Add subcolumns for leafs
     const Array values(Array::coldef_Normal);
     const Array refs(Array::coldef_Normal); // we do not own these refs (to column positions), so no COLUMN_HASREF
-    m_array->add(intptr_t(values.GetRef()));
-    m_array->add(intptr_t(refs.GetRef()));
+    m_array->add(intptr_t(values.get_ref()));
+    m_array->add(intptr_t(refs.get_ref()));
 }
 
 Index::Index(Array::ColumnDef type, Array* parent, size_t pndx): Column(type, parent, pndx) {}
@@ -80,7 +80,7 @@ void Index::erase(size_t ndx, int64_t value, bool isLast)
         const size_t ref = refs.get_as_ref(0);
         refs.Delete(0); // avoid deleting subtree
         m_array->Destroy();
-        m_array->UpdateRef(ref);
+        m_array->update_ref(ref);
     }
 
     // If it is last item in column, we don't have to update refs
@@ -141,22 +141,22 @@ void Index::Insert(size_t ndx, int64_t value, bool isLast)
         case NodeChange::insert_before: {
             Index newNode(Array::coldef_InnerNode);
             newNode.NodeAdd(nc.ref1);
-            newNode.NodeAdd(GetRef());
-            m_array->UpdateRef(newNode.GetRef());
+            newNode.NodeAdd(get_ref());
+            m_array->update_ref(newNode.get_ref());
             return;
         }
         case NodeChange::insert_after: {
             Index newNode(Array::coldef_InnerNode);
-            newNode.NodeAdd(GetRef());
+            newNode.NodeAdd(get_ref());
             newNode.NodeAdd(nc.ref1);
-            m_array->UpdateRef(newNode.GetRef());
+            m_array->update_ref(newNode.get_ref());
             return;
         }
         case NodeChange::split: {
             Index newNode(Array::coldef_InnerNode);
             newNode.NodeAdd(nc.ref1);
             newNode.NodeAdd(nc.ref2);
-            m_array->UpdateRef(newNode.GetRef());
+            m_array->update_ref(newNode.get_ref());
             return;
         }
     }
@@ -256,9 +256,9 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
 
         switch (node_ndx) {
         case 0:             // insert before
-            return NodeChange(NodeChange::insert_before, newNode.GetRef());
+            return NodeChange(NodeChange::insert_before, newNode.get_ref());
         case TIGHTDB_MAX_LIST_SIZE: // insert below
-            return NodeChange(NodeChange::insert_after, newNode.GetRef());
+            return NodeChange(NodeChange::insert_after, newNode.get_ref());
         default:            // split
             // Move items below split to new node
             const size_t len = refs.size();
@@ -267,7 +267,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
             }
             offsets.Resize(node_ndx);
             refs.Resize(node_ndx);
-            return NodeChange(NodeChange::split, GetRef(), newNode.GetRef());
+            return NodeChange(NodeChange::split, get_ref(), newNode.get_ref());
         }
     }
     else {
@@ -283,9 +283,9 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
 
         switch (ndx) {
         case 0:             // insert before
-            return NodeChange(NodeChange::insert_before, newList.GetRef());
+            return NodeChange(NodeChange::insert_before, newList.get_ref());
         case TIGHTDB_MAX_LIST_SIZE: // insert below
-            return NodeChange(NodeChange::insert_after, newList.GetRef());
+            return NodeChange(NodeChange::insert_after, newList.get_ref());
         default:            // split
             // Move items below split to new list
             for (size_t i = ndx; i < m_array->size(); ++i) {
@@ -293,14 +293,14 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
             }
             m_array->Resize(ndx);
 
-            return NodeChange(NodeChange::split, GetRef(), newList.GetRef());
+            return NodeChange(NodeChange::split, get_ref(), newList.get_ref());
         }
     }
 }
 
 size_t Index::find_first(int64_t value) const
 {
-    size_t ref = GetRef();
+    size_t ref = get_ref();
     for (;;) {
         const Array node(ref);
         const Array values = node.GetSubArray(0);

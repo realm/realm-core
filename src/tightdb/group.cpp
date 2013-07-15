@@ -136,10 +136,10 @@ void Group::create()
 {
     m_tables.SetType(Array::coldef_HasRefs); // FIXME: Why is this not done in Group() like the rest of the arrays?
 
-    m_top.add(m_tableNames.GetRef());
-    m_top.add(m_tables.GetRef());
-    m_top.add(m_freePositions.GetRef());
-    m_top.add(m_freeLengths.GetRef());
+    m_top.add(m_tableNames.get_ref());
+    m_top.add(m_tables.get_ref());
+    m_top.add(m_freePositions.get_ref());
+    m_top.add(m_freeLengths.get_ref());
 
     // Set parent info
     m_tableNames.SetParent(&m_top, 0);
@@ -148,7 +148,7 @@ void Group::create()
     m_freeLengths.SetParent(&m_top, 3);
 
     if (m_freeVersions.IsValid()) {
-        m_top.add(m_freeVersions.GetRef());
+        m_top.add(m_freeVersions.get_ref());
         m_freeVersions.SetParent(&m_top, 4);
     }
 }
@@ -176,14 +176,14 @@ void Group::create_from_ref(size_t top_ref)
             m_freeVersions.add(0);
     }
     else {
-        m_top.UpdateRef(top_ref);
+        m_top.update_ref(top_ref);
         const size_t top_size = m_top.size();
         TIGHTDB_ASSERT(top_size >= 2);
 
         const size_t n_ref = m_top.get_as_ref(0);
         const size_t t_ref = m_top.get_as_ref(1);
-        m_tableNames.UpdateRef(n_ref);
-        m_tables.UpdateRef(t_ref);
+        m_tableNames.update_ref(n_ref);
+        m_tables.update_ref(t_ref);
         m_tableNames.SetParent(&m_top, 0);
         m_tables.SetParent(&m_top, 1);
 
@@ -193,13 +193,13 @@ void Group::create_from_ref(size_t top_ref)
         if (top_size >= 4) {
             const size_t fp_ref = m_top.get_as_ref(2);
             const size_t fl_ref = m_top.get_as_ref(3);
-            m_freePositions.UpdateRef(fp_ref);
-            m_freeLengths.UpdateRef(fl_ref);
+            m_freePositions.update_ref(fp_ref);
+            m_freeLengths.update_ref(fl_ref);
             m_freePositions.SetParent(&m_top, 2);
             m_freeLengths.SetParent(&m_top, 3);
         }
         if (top_size == 5) {
-            m_freeVersions.UpdateRef(m_top.get_as_ref(4));
+            m_freeVersions.update_ref(m_top.get_as_ref(4));
             m_freeVersions.SetParent(&m_top, 4);
         }
 
@@ -224,8 +224,8 @@ void Group::init_shared()
         if (m_top.size() == 2) {
             m_freePositions.SetType(Array::coldef_Normal);
             m_freeLengths.SetType(Array::coldef_Normal);
-            m_top.add(m_freePositions.GetRef());
-            m_top.add(m_freeLengths.GetRef());
+            m_top.add(m_freePositions.get_ref());
+            m_top.add(m_freeLengths.get_ref());
             m_freePositions.SetParent(&m_top, 2);
             m_freeLengths.SetParent(&m_top, 3);
         }
@@ -238,7 +238,7 @@ void Group::init_shared()
             for (size_t i = 0; i < count; ++i) {
                 m_freeVersions.add(0);
             }
-            m_top.add(m_freeVersions.GetRef());
+            m_top.add(m_freeVersions.get_ref());
             m_freeVersions.SetParent(&m_top, 4);
         }
     }
@@ -426,7 +426,7 @@ size_t Group::commit(size_t current_version, size_t readlock_version, bool persi
 void Group::update_refs(size_t topRef)
 {
     // Update top with the new (persistent) ref
-    m_top.UpdateRef(topRef);
+    m_top.update_ref(topRef);
     TIGHTDB_ASSERT(m_top.size() >= 2);
 
     // Now we can update it's child arrays
@@ -480,10 +480,10 @@ void Group::update_from_shared(size_t top_ref, size_t len)
     }
 
     // If the top has not changed, everything is up-to-date
-    if (!isRemapped && top_ref == m_top.GetRef()) return;
+    if (!isRemapped && top_ref == m_top.get_ref()) return;
 
     // Update group arrays
-    m_top.UpdateRef(top_ref);
+    m_top.update_ref(top_ref);
     TIGHTDB_ASSERT(m_top.size() >= 2);
     const bool nameschanged = !m_tableNames.UpdateFromParent();
     m_tables.UpdateFromParent();

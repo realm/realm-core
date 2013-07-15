@@ -128,7 +128,7 @@ public:
     void BuildIndex(Index& index) { static_cast<void>(index); }
     void ClearIndex() {}
 
-    size_t GetRef() const {return m_array->GetRef();}
+    size_t get_ref() const {return m_array->get_ref();}
 
     /// Compare two mixed columns for equality.
     bool compare(const ColumnMixed&) const;

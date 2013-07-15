@@ -445,7 +445,7 @@ TEST_FIXTURE(db_setup, Column_PartialFind1)
 
 TEST_FIXTURE(db_setup, Column_HeaderParse)
 {
-    Column column(c.GetRef(), (Array*)NULL, 0);
+    Column column(c.get_ref(), NULL, 0);
     const bool isEqual = (c == column);
     CHECK(isEqual);
 }

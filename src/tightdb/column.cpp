@@ -236,7 +236,7 @@ bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, voi
     static_cast<void>(start);
     static_cast<void>(caller_offset);
     Array* p = static_cast<Array*>(state);
-    const size_t ref = a->GetRef();
+    const size_t ref = a->get_ref();
     p->add(int64_t(ref)); // todo, check cast
     return true;
 }
@@ -299,14 +299,14 @@ void Column::Create()
     if (IsNode()) {
         Array offsets(Array::coldef_Normal, 0, 0, m_array->GetAllocator());
         Array refs(Array::coldef_HasRefs, 0, 0, m_array->GetAllocator());
-        m_array->add(offsets.GetRef());
-        m_array->add(refs.GetRef());
+        m_array->add(offsets.get_ref());
+        m_array->add(refs.get_ref());
     }
 }
 
-void Column::UpdateRef(size_t ref)
+void Column::update_ref(size_t ref)
 {
-    m_array->UpdateRef(ref);
+    m_array->update_ref(ref);
 }
 
 bool Column::operator==(const Column& column) const
@@ -589,15 +589,15 @@ void Column::erase(size_t ndx)
         if (refs.size() != 1)
             break;
 
-        const size_t ref = refs.get_as_ref(0);
+        size_t ref = refs.get_as_ref(0);
         refs.Delete(0); // avoid destroying subtree
         m_array->Destroy();
-        m_array->UpdateRef(ref);
+        m_array->update_ref(ref);
     }
 
     // Update index
     if (m_index) {
-        const bool isLast = (ndx == Size());
+        bool isLast = (ndx == Size());
         m_index->erase(ndx, oldVal, isLast);
     }
 }
@@ -606,8 +606,8 @@ void Column::move_last_over(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx+1 < Size());
 
-    const size_t ndx_last = Size()-1;
-    const int64_t v = get(ndx_last);
+    size_t ndx_last = Size()-1;
+    int64_t v = get(ndx_last);
 
     set(ndx, v);
     erase(ndx_last);
@@ -622,7 +622,7 @@ void Column::Increment64(int64_t value, size_t start, size_t end)
 
     //TODO: partial incr
     Array refs = NodeGetRefs();
-    const size_t count = refs.size();
+    size_t count = refs.size();
     for (size_t i = 0; i < count; ++i) {
         Column col = ::GetColumnFromRef(refs, i);
         col.Increment64(value);
@@ -634,7 +634,7 @@ void Column::IncrementIf(int64_t limit, int64_t value)
     if (!IsNode()) m_array->IncrementIf(limit, value);
     else {
         Array refs = NodeGetRefs();
-        const size_t count = refs.size();
+        size_t count = refs.size();
         for (size_t i = 0; i < count; ++i) {
             Column col = ::GetColumnFromRef(refs, i);
             col.IncrementIf(limit, value);
@@ -645,12 +645,11 @@ void Column::IncrementIf(int64_t limit, int64_t value)
 size_t Column::find_first(int64_t value, size_t start, size_t end) const
 {
     TIGHTDB_ASSERT(start <= Size());
-    TIGHTDB_ASSERT(end == (size_t)-1 || end <= Size());
+    TIGHTDB_ASSERT(end == size_t(-1) || end <= Size());
 
-    if (start == 0 && end == (size_t)-1) {
+    if (start == 0 && end == size_t(-1)) {
         Array cache(m_array->GetAllocator());
-        const size_t ref = m_array->GetRef();
-
+        size_t ref = m_array->get_ref();
         return m_array->ColumnFind(value, ref, cache);
     }
     else {
@@ -662,7 +661,7 @@ void Column::find_all(Array& result, int64_t value, size_t caller_offset, size_t
 {
     (void)caller_offset;
     TIGHTDB_ASSERT(start <= Size());
-    TIGHTDB_ASSERT(end == (size_t)-1 || end <= Size());
+    TIGHTDB_ASSERT(end == size_t(-1) || end <= Size());
     if (is_empty())
         return;
     TreeFindAll<int64_t, Column>(result, value, 0, start, end);
@@ -689,8 +688,8 @@ size_t Column::find_pos(int64_t target) const TIGHTDB_NOEXCEPT
     // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
     // Finds position of largest value SMALLER than the target
     while (high - low > 1) {
-        const size_t probe = (unsigned(low) + unsigned(high)) >> 1;
-        const int64_t v = get(probe);
+        size_t probe = (unsigned(low) + unsigned(high)) >> 1;
+        int64_t v = get(probe);
 
         if (v > target)
             high = int(probe);
@@ -719,8 +718,8 @@ size_t Column::find_pos2(int64_t target) const TIGHTDB_NOEXCEPT
     // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
     // Finds position of closest value BIGGER OR EQUAL to the target
     while (high - low > 1) {
-        const size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
-        const int64_t v = get(probe);
+        size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+        int64_t v = get(probe);
 
         if (v < target)
             low  = int(probe);
@@ -747,8 +746,8 @@ bool Column::find_sorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
     // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
     // Finds position of closest value BIGGER OR EQUAL to the target
     while (high - low > 1) {
-        const size_t probe = (low + high) >> 1;
-        const int64_t v = get(probe);
+        size_t probe = (low + high) >> 1;
+        int64_t v = get(probe);
 
         if (v < target)
             low  = probe;
@@ -816,7 +815,7 @@ bool Column::compare(const Column& c) const
 void Column::Print() const
 {
     if (IsNode()) {
-        cout << "Node: " << hex << m_array->GetRef() << dec << "\n";
+        cout << "Node: " << hex << m_array->get_ref() << dec << "\n";
 
         const Array offsets = NodeGetOffsets();
         const Array refs = NodeGetRefs();
@@ -868,7 +867,7 @@ void Column::Verify() const
 
 void ColumnBase::ToDot(ostream& out, StringData title) const
 {
-    const size_t ref = GetRef();
+    const size_t ref = get_ref();
 
     out << "subgraph cluster_column" << ref << " {" << endl;
     out << " label = \"Column";
@@ -885,7 +884,7 @@ void ColumnBase::ArrayToDot(ostream& out, const Array& array) const
     if (array.IsNode()) {
         const Array offsets = array.GetSubArray(0);
         const Array refs    = array.GetSubArray(1);
-        const size_t ref    = array.GetRef();
+        const size_t ref    = array.get_ref();
 
         out << "subgraph cluster_node" << ref << " {" << endl;
         out << " label = \"Node\";" << endl;

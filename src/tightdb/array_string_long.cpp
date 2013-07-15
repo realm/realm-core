@@ -15,8 +15,8 @@ ArrayStringLong::ArrayStringLong(ArrayParent* parent, size_t pndx, Allocator& al
     m_offsets(coldef_Normal, NULL, 0, alloc), m_blob(NULL, 0, alloc)
 {
     // Add subarrays for long string
-    Array::add(m_offsets.GetRef());
-    Array::add(m_blob.GetRef());
+    Array::add(m_offsets.get_ref());
+    Array::add(m_blob.get_ref());
     m_offsets.SetParent(this, 0);
     m_blob.SetParent(this, 1);
 }
@@ -33,7 +33,7 @@ ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, A
     m_blob.SetParent(this, 1);
 }
 
-// Creates new array (but invalid, call UpdateRef to init)
+// Creates new array (but invalid, call update_ref() to init)
 //ArrayStringLong::ArrayStringLong(Allocator& alloc) : Array(alloc) {}
 
 void ArrayStringLong::add(StringData value)
@@ -149,7 +149,7 @@ void ArrayStringLong::find_all(Array& result, StringData value, size_t add_offse
 
 void ArrayStringLong::ToDot(ostream& out, StringData title) const
 {
-    const size_t ref = GetRef();
+    const size_t ref = get_ref();
 
     out << "subgraph cluster_arraystringlong" << ref << " {" << endl;
     out << " label = \"ArrayStringLong";

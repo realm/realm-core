@@ -42,8 +42,8 @@ void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx
     m_types = new Column(Array::coldef_Normal, alloc);
     m_refs  = new RefsColumn(alloc, table, column_ndx);
 
-    m_array->add(m_types->GetRef());
-    m_array->add(m_refs->GetRef());
+    m_array->add(m_types->get_ref());
+    m_array->add(m_refs->get_ref());
 
     m_types->SetParent(m_array, 0);
     m_refs->SetParent(m_array, 1);
@@ -79,7 +79,7 @@ void ColumnMixed::InitDataColumn()
 
     // Create new data column for items that do not fit in refs
     m_data = new ColumnBinary(m_array->GetAllocator());
-    const size_t ref = m_data->GetRef();
+    const size_t ref = m_data->get_ref();
 
     m_array->add(ref);
     m_data->SetParent(m_array, 2);
@@ -335,7 +335,7 @@ void ColumnMixed::Verify() const
 
 void ColumnMixed::ToDot(ostream& out, StringData title) const
 {
-    const size_t ref = GetRef();
+    const size_t ref = get_ref();
 
     out << "subgraph cluster_columnmixed" << ref << " {" << endl;
     out << " label = \"ColumnMixed";

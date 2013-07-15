@@ -1348,7 +1348,7 @@ TEST(ArrayCopy)
 
     // With sub-arrays
     Array c(Array::coldef_HasRefs);
-    c.add(a.GetRef());
+    c.add(a.get_ref());
 
     Array d(c, Allocator::get_default());
 

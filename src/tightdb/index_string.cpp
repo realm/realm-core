@@ -57,8 +57,8 @@ void StringIndex::Create()
     Allocator& alloc = m_array->GetAllocator();
     Array values(Array::coldef_Normal, NULL, 0, alloc);
     Array refs(Array::coldef_HasRefs, NULL, 1, alloc);
-    m_array->add(values.GetRef());
-    m_array->add(refs.GetRef());
+    m_array->add(values.get_ref());
+    m_array->add(refs.get_ref());
     values.SetParent(m_array, 0);
     refs.SetParent(m_array, 1);
 }
@@ -141,22 +141,22 @@ void StringIndex::TreeInsert(size_t row_ndx, int32_t key, size_t offset, StringD
         case NodeChange::insert_before: {
             StringIndex newNode(Array::coldef_InnerNode, m_array->GetAllocator());
             newNode.NodeAddKey(nc.ref1);
-            newNode.NodeAddKey(GetRef());
-            UpdateRef(newNode.GetRef());
+            newNode.NodeAddKey(get_ref());
+            update_ref(newNode.get_ref());
             return;
         }
         case NodeChange::insert_after: {
             StringIndex newNode(Array::coldef_InnerNode, m_array->GetAllocator());
-            newNode.NodeAddKey(GetRef());
+            newNode.NodeAddKey(get_ref());
             newNode.NodeAddKey(nc.ref1);
-            UpdateRef(newNode.GetRef());
+            update_ref(newNode.get_ref());
             return;
         }
         case NodeChange::split: {
             StringIndex newNode(Array::coldef_InnerNode, m_array->GetAllocator());
             newNode.NodeAddKey(nc.ref1);
             newNode.NodeAddKey(nc.ref2);
-            UpdateRef(newNode.GetRef());
+            update_ref(newNode.get_ref());
             return;
         }
     }
@@ -213,11 +213,11 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
 
         switch (node_ndx) {
             case 0:             // insert before
-                return NodeChange(NodeChange::insert_before, newNode.GetRef());
+                return NodeChange(NodeChange::insert_before, newNode.get_ref());
             case TIGHTDB_MAX_LIST_SIZE: // insert after
                 if (nc.type == NodeChange::split)
-                    return NodeChange(NodeChange::split, GetRef(), newNode.GetRef());
-                else return NodeChange(NodeChange::insert_after, newNode.GetRef());
+                    return NodeChange(NodeChange::split, get_ref(), newNode.get_ref());
+                else return NodeChange(NodeChange::insert_after, newNode.get_ref());
             default:            // split
                 // Move items after split to new node
                 const size_t len = refs.size();
@@ -227,7 +227,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
                 }
                 offsets.Resize(node_ndx);
                 refs.Resize(node_ndx);
-                return NodeChange(NodeChange::split, GetRef(), newNode.GetRef());
+                return NodeChange(NodeChange::split, get_ref(), newNode.get_ref());
         }
     }
     else {
@@ -250,9 +250,9 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
 
         switch (ndx) {
             case 0:             // insert before
-                return NodeChange(NodeChange::insert_before, newList.GetRef());
+                return NodeChange(NodeChange::insert_before, newList.get_ref());
             case -1: // insert after
-                return NodeChange(NodeChange::insert_after, newList.GetRef());
+                return NodeChange(NodeChange::insert_after, newList.get_ref());
             default: // split
             {
                 Array old_refs = m_array->GetSubArray(1);
@@ -269,7 +269,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
                 old_offsets.Resize(ndx);
                 old_refs.Resize(ndx);
 
-                return NodeChange(NodeChange::split, GetRef(), newList.GetRef());
+                return NodeChange(NodeChange::split, get_ref(), newList.get_ref());
             }
         }
     }
@@ -367,14 +367,14 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, StringD
             Array row_list(Array::coldef_Normal, NULL, 0, alloc);
             row_list.add(row_ndx < row_ndx2 ? row_ndx : row_ndx2);
             row_list.add(row_ndx < row_ndx2 ? row_ndx2 : row_ndx);
-            refs.set(ins_pos, row_list.GetRef());
+            refs.set(ins_pos, row_list.get_ref());
         }
         else {
             // convert to sub-index
             StringIndex sub_index(m_target_column, m_get_func, alloc);
             sub_index.InsertWithOffset(row_ndx2, sub_offset, v2);
             sub_index.InsertWithOffset(row_ndx, sub_offset, value);
-            refs.set(ins_pos, sub_index.GetRef());
+            refs.set(ins_pos, sub_index.get_ref());
         }
         return true;
     }
@@ -403,9 +403,9 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, StringD
         }
         else {
             StringIndex sub_index(m_target_column, m_get_func, alloc);
-            sub_index.InsertRowList(sub.GetRef(), sub_offset, v2);
+            sub_index.InsertRowList(sub.get_ref(), sub_offset, v2);
             sub_index.InsertWithOffset(row_ndx, sub_offset, value);
-            refs.set(ins_pos, sub_index.GetRef());
+            refs.set(ins_pos, sub_index.get_ref());
         }
         return true;
     }
@@ -546,7 +546,7 @@ void StringIndex::erase(size_t row_ndx, StringData value, bool isLast)
         size_t ref = refs.get_as_ref(0);
         refs.Delete(0); // avoid deleting subtree
         m_array->Destroy();
-        m_array->UpdateRef(ref);
+        m_array->update_ref(ref);
     }
 
     // If it is last item in column, we don't have to update refs
@@ -703,7 +703,7 @@ void StringIndex::to_dot(ostream& out) const
 
 void StringIndex::ToDot(ostream& out, StringData title) const
 {
-    const size_t ref = GetRef();
+    const size_t ref = get_ref();
 
     out << "subgraph cluster_stringindex" << ref << " {" << endl;
     out << " label = \"StringIndex";
@@ -720,7 +720,7 @@ void StringIndex::ArrayToDot(ostream& out, const Array& array) const
     if (array.HasRefs()) {
         const Array offsets = array.GetSubArray(0);
         const Array refs    = array.GetSubArray(1);
-        const size_t ref    = array.GetRef();
+        const size_t ref    = array.get_ref();
 
         if (array.IsNode()) {
             out << "subgraph cluster_stringindex_node" << ref << " {" << endl;
@@ -754,7 +754,7 @@ void StringIndex::ArrayToDot(ostream& out, const Array& array) const
 
 void StringIndex::KeysToDot(ostream& out, const Array& array, StringData title) const
 {
-    const size_t ref = array.GetRef();
+    const size_t ref = array.get_ref();
 
     if (0 < title.size()) {
         out << "subgraph cluster_" << ref << " {" << endl;

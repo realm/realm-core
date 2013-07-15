@@ -256,7 +256,7 @@ void ColumnStringEnum::Verify() const
 
 void ColumnStringEnum::ToDot(ostream& out, StringData title) const
 {
-    const size_t ref = m_keys.GetRef();
+    const size_t ref = m_keys.get_ref();
 
     out << "subgraph cluster_columnstringenum" << ref << " {" << endl;
     out << " label = \"ColumnStringEnum";

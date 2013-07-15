@@ -64,7 +64,7 @@ public:
     void ClearIndex() {}
     size_t FindWithIndex(int64_t) const {return (size_t)-1;}
 
-    size_t GetRef() const {return m_array->GetRef();}
+    size_t get_ref() const {return m_array->get_ref();}
     void SetParent(ArrayParent *parent, size_t pndx) {m_array->SetParent(parent, pndx);}
     void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
 
@@ -78,7 +78,7 @@ public:
 protected:
     friend class ColumnBase;
 
-    void UpdateRef(size_t ref);
+    void update_ref(size_t ref);
 
     BinaryData LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
     void LeafSet(size_t ndx, BinaryData value);

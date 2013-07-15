@@ -18,18 +18,18 @@ Spec::~Spec()
 
 void Spec::init_from_ref(size_t ref, ArrayParent* parent, size_t ndx_in_parent)
 {
-    m_specSet.UpdateRef(ref);
+    m_specSet.update_ref(ref);
     m_specSet.SetParent(parent, ndx_in_parent);
     TIGHTDB_ASSERT(m_specSet.size() == 2 || m_specSet.size() == 3);
 
-    m_spec.UpdateRef(m_specSet.get_as_ref(0));
+    m_spec.update_ref(m_specSet.get_as_ref(0));
     m_spec.SetParent(&m_specSet, 0);
-    m_names.UpdateRef(m_specSet.get_as_ref(1));
+    m_names.update_ref(m_specSet.get_as_ref(1));
     m_names.SetParent(&m_specSet, 1);
 
     // SubSpecs array is only there when there are subtables
     if (m_specSet.size() == 3) {
-        m_subSpecs.UpdateRef(m_specSet.get_as_ref(2));
+        m_subSpecs.update_ref(m_specSet.get_as_ref(2));
         m_subSpecs.SetParent(&m_specSet, 2);
     }
 }
@@ -41,7 +41,7 @@ void Spec::destroy()
 
 size_t Spec::get_ref() const
 {
-    return m_specSet.GetRef();
+    return m_specSet.get_ref();
 }
 
 void Spec::update_ref(size_t ref, ArrayParent* parent, size_t pndx)
@@ -85,7 +85,7 @@ size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
             m_subSpecs.SetType(Array::coldef_HasRefs);
             //m_subSpecs.SetType((ColumnDef)4);
             //return;
-            m_specSet.add(m_subSpecs.GetRef());
+            m_specSet.add(m_subSpecs.get_ref());
             m_subSpecs.SetParent(&m_specSet, 2);
         }
 
@@ -95,11 +95,11 @@ size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
         Array spec(Array::coldef_Normal, NULL, 0, alloc);
         ArrayString names(NULL, 0, alloc);
         Array spec_set(Array::coldef_HasRefs, NULL, 0, alloc);
-        spec_set.add(spec.GetRef());
-        spec_set.add(names.GetRef());
+        spec_set.add(spec.get_ref());
+        spec_set.add(names.get_ref());
 
         // Add to list of subspecs
-        const size_t ref = spec_set.GetRef();
+        const size_t ref = spec_set.get_ref();
         m_subSpecs.add(ref);
     }
 
@@ -435,7 +435,7 @@ void Spec::Verify() const
 
 void Spec::to_dot(ostream& out, StringData) const
 {
-    const size_t ref = m_specSet.GetRef();
+    const size_t ref = m_specSet.get_ref();
 
     out << "subgraph cluster_specset" << ref << " {" << endl;
     out << " label = \"specset\";" << endl;

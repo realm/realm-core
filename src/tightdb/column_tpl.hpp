@@ -143,22 +143,22 @@ template<typename T, class C> void ColumnBase::TreeInsert(size_t ndx, T value)
         case NodeChange::insert_before: {
             Column newNode(Array::coldef_InnerNode, m_array->GetAllocator());
             newNode.NodeAdd<C>(nc.ref1);
-            newNode.NodeAdd<C>(GetRef());
-            static_cast<C*>(this)->UpdateRef(newNode.GetRef());
+            newNode.NodeAdd<C>(get_ref());
+            static_cast<C*>(this)->update_ref(newNode.get_ref());
             return;
         }
         case NodeChange::insert_after: {
             Column newNode(Array::coldef_InnerNode, m_array->GetAllocator());
-            newNode.NodeAdd<C>(GetRef());
+            newNode.NodeAdd<C>(get_ref());
             newNode.NodeAdd<C>(nc.ref1);
-            static_cast<C*>(this)->UpdateRef(newNode.GetRef());
+            static_cast<C*>(this)->update_ref(newNode.get_ref());
             return;
         }
         case NodeChange::split: {
             Column newNode(Array::coldef_InnerNode, m_array->GetAllocator());
             newNode.NodeAdd<C>(nc.ref1);
             newNode.NodeAdd<C>(nc.ref2);
-            static_cast<C*>(this)->UpdateRef(newNode.GetRef());
+            static_cast<C*>(this)->update_ref(newNode.get_ref());
             return;
         }
     }
@@ -217,11 +217,11 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
 
         switch (node_ndx) {
         case 0:             // insert before
-            return NodeChange(NodeChange::insert_before, newNode.GetRef());
+            return NodeChange(NodeChange::insert_before, newNode.get_ref());
         case TIGHTDB_MAX_LIST_SIZE: // insert after
             if (nc.type == NodeChange::split)
-                return NodeChange(NodeChange::split, GetRef(), newNode.GetRef());
-            else return NodeChange(NodeChange::insert_after, newNode.GetRef());
+                return NodeChange(NodeChange::split, get_ref(), newNode.get_ref());
+            else return NodeChange(NodeChange::insert_after, newNode.get_ref());
         default:            // split
             // Move items after split to new node
             const size_t len = refs.size();
@@ -231,7 +231,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
             }
             offsets.Resize(node_ndx);
             refs.Resize(node_ndx);
-            return NodeChange(NodeChange::split, GetRef(), newNode.GetRef());
+            return NodeChange(NodeChange::split, get_ref(), newNode.get_ref());
         }
     }
     else {
@@ -250,9 +250,9 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
 
         switch (ndx) {
         case 0:             // insert before
-            return NodeChange(NodeChange::insert_before, newList.GetRef());
+            return NodeChange(NodeChange::insert_before, newList.get_ref());
         case TIGHTDB_MAX_LIST_SIZE: // insert below
-            return NodeChange(NodeChange::insert_after, newList.GetRef());
+            return NodeChange(NodeChange::insert_after, newList.get_ref());
         default:            // split
             // Move items after split to new list
             for (size_t i = ndx; i < count; ++i) {
@@ -260,7 +260,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
             }
             static_cast<C*>(this)->Resize(ndx);
 
-            return NodeChange(NodeChange::split, GetRef(), newList.GetRef());
+            return NodeChange(NodeChange::split, get_ref(), newList.get_ref());
         }
     }
 }

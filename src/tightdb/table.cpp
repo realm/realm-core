@@ -35,7 +35,7 @@ struct FakeParent: Table::Parent {
 void Table::init_from_ref(size_t top_ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     // Load from allocated memory
-    m_top.UpdateRef(top_ref);
+    m_top.update_ref(top_ref);
     m_top.SetParent(parent, ndx_in_parent);
     TIGHTDB_ASSERT(m_top.size() == 2);
 
@@ -54,7 +54,7 @@ void Table::init_from_ref(size_t spec_ref, size_t columns_ref,
     // A table instatiated with a zero-ref is just an empty table
     // but it will have to create itself on first modification
     if (columns_ref != 0) {
-        m_columns.UpdateRef(columns_ref);
+        m_columns.update_ref(columns_ref);
         CacheColumns(); // Also initializes m_size
     }
     m_columns.SetParent(parent, ndx_in_parent);
@@ -86,7 +86,7 @@ void Table::CreateColumns()
         case type_Date:
             {
                 Column* c = new Column(Array::coldef_Normal, alloc);
-                m_columns.add(c->GetRef());
+                m_columns.add(c->get_ref());
                 c->SetParent(&m_columns, ref_pos);
                 new_col = c;
             }
@@ -94,7 +94,7 @@ void Table::CreateColumns()
         case type_Float:
             {
                 ColumnFloat* c = new ColumnFloat(alloc);
-                m_columns.add(c->GetRef());
+                m_columns.add(c->get_ref());
                 c->SetParent(&m_columns, ref_pos);
                 new_col = c;
             }
@@ -102,7 +102,7 @@ void Table::CreateColumns()
         case type_Double:
             {
                 ColumnDouble* c = new ColumnDouble(alloc);
-                m_columns.add(c->GetRef());
+                m_columns.add(c->get_ref());
                 c->SetParent(&m_columns, ref_pos);
                 new_col = c;
             }
@@ -110,7 +110,7 @@ void Table::CreateColumns()
         case type_String:
             {
                 AdaptiveStringColumn* c = new AdaptiveStringColumn(alloc);
-                m_columns.add(c->GetRef());
+                m_columns.add(c->get_ref());
                 c->SetParent(&m_columns, ref_pos);
                 new_col = c;
             }
@@ -118,7 +118,7 @@ void Table::CreateColumns()
         case type_Binary:
             {
                 ColumnBinary* c = new ColumnBinary(alloc);
-                m_columns.add(c->GetRef());
+                m_columns.add(c->get_ref());
                 c->SetParent(&m_columns, ref_pos);
                 new_col = c;
             }
@@ -128,7 +128,7 @@ void Table::CreateColumns()
                 const size_t column_ndx = m_cols.size();
                 const size_t subspec_ref = m_spec_set.get_subspec_ref(subtable_count);
                 ColumnTable* c = new ColumnTable(alloc, this, column_ndx, subspec_ref);
-                m_columns.add(c->GetRef());
+                m_columns.add(c->get_ref());
                 c->SetParent(&m_columns, ref_pos);
                 new_col = c;
                 ++subtable_count;
@@ -138,7 +138,7 @@ void Table::CreateColumns()
             {
                 const size_t column_ndx = m_cols.size();
                 ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx);
-                m_columns.add(c->GetRef());
+                m_columns.add(c->get_ref());
                 c->SetParent(&m_columns, ref_pos);
                 new_col = c;
             }
@@ -484,7 +484,7 @@ size_t Table::do_add_column(DataType type)
     case type_Date:
         {
             Column* c = new Column(Array::coldef_Normal, alloc);
-            m_columns.add(c->GetRef());
+            m_columns.add(c->get_ref());
             c->SetParent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
@@ -493,7 +493,7 @@ size_t Table::do_add_column(DataType type)
     case type_Float:
         {
             ColumnFloat* c = new ColumnFloat(alloc);
-            m_columns.add(c->GetRef());
+            m_columns.add(c->get_ref());
             c->SetParent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
@@ -502,7 +502,7 @@ size_t Table::do_add_column(DataType type)
     case type_Double:
         {
             ColumnDouble* c = new ColumnDouble(alloc);
-            m_columns.add(c->GetRef());
+            m_columns.add(c->get_ref());
             c->SetParent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
@@ -511,7 +511,7 @@ size_t Table::do_add_column(DataType type)
     case type_String:
         {
             AdaptiveStringColumn* c = new AdaptiveStringColumn(alloc);
-            m_columns.add(c->GetRef());
+            m_columns.add(c->get_ref());
             c->SetParent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
@@ -520,7 +520,7 @@ size_t Table::do_add_column(DataType type)
     case type_Binary:
         {
             ColumnBinary* c = new ColumnBinary(alloc);
-            m_columns.add(c->GetRef());
+            m_columns.add(c->get_ref());
             c->SetParent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
@@ -530,7 +530,7 @@ size_t Table::do_add_column(DataType type)
     case type_Table:
         {
             ColumnTable* c = new ColumnTable(alloc, this, column_ndx, -1); // subspec ref will be filled in later
-            m_columns.add(c->GetRef());
+            m_columns.add(c->get_ref());
             c->SetParent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
@@ -540,7 +540,7 @@ size_t Table::do_add_column(DataType type)
     case type_Mixed:
         {
             ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx);
-            m_columns.add(c->GetRef());
+            m_columns.add(c->get_ref());
             c->SetParent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
@@ -662,7 +662,7 @@ void Table::set_index(size_t column_ndx, bool update_spec)
         // Create the index
         StringIndex& ndx = col.CreateIndex();
         ndx.SetParent(&m_columns, column_pos+1);
-        ndx_ref = ndx.GetRef();
+        ndx_ref = ndx.get_ref();
     }
     else if (ct == col_type_StringEnum) {
         ColumnStringEnum& col = GetColumnStringEnum(column_ndx);
@@ -670,7 +670,7 @@ void Table::set_index(size_t column_ndx, bool update_spec)
         // Create the index
         StringIndex& ndx = col.CreateIndex();
         ndx.SetParent(&m_columns, column_pos+1);
-        ndx_ref = ndx.GetRef();
+        ndx_ref = ndx.get_ref();
     }
     else {
         TIGHTDB_ASSERT(false);
@@ -736,7 +736,7 @@ size_t Table::clone_columns(Allocator& alloc) const
             size_t n2 = enum_col->Size();
             for (size_t i2=0; i2<n2; ++i2)
                 new_col.add(enum_col->get(i));
-            new_col_ref = new_col.GetRef();
+            new_col_ref = new_col.get_ref();
         }
         else {
             const Array& root = *col->get_root_array();
@@ -744,7 +744,7 @@ size_t Table::clone_columns(Allocator& alloc) const
         }
         new_columns.add(new_col_ref);
     }
-    return new_columns.GetRef();
+    return new_columns.get_ref();
 }
 
 
@@ -756,7 +756,7 @@ size_t Table::clone(Allocator& alloc) const
     Array new_top(Array::coldef_HasRefs, 0, 0, alloc); // Throws
     new_top.add(m_spec_set.m_specSet.clone(alloc)); // Throws
     new_top.add(m_columns.clone(alloc)); // Throws
-    return new_top.GetRef();
+    return new_top.get_ref();
 }
 
 
@@ -2634,7 +2634,7 @@ void Table::Verify() const
 void Table::to_dot(ostream& out, StringData title) const
 {
     if (m_top.IsValid()) {
-        out << "subgraph cluster_topleveltable" << m_top.GetRef() << " {" << endl;
+        out << "subgraph cluster_topleveltable" << m_top.get_ref() << " {" << endl;
         out << " label = \"TopLevelTable";
         if (0 < title.size()) out << "\\n'" << title << "'";
         out << "\";" << endl;
@@ -2643,7 +2643,7 @@ void Table::to_dot(ostream& out, StringData title) const
         specset.to_dot(out);
     }
     else {
-        out << "subgraph cluster_table_"  << m_columns.GetRef() <<  " {" << endl;
+        out << "subgraph cluster_table_"  << m_columns.get_ref() <<  " {" << endl;
         out << " label = \"Table";
         if (0 < title.size()) out << " " << title;
         out << "\";" << endl;

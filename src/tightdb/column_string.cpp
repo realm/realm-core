@@ -75,12 +75,12 @@ void AdaptiveStringColumn::Destroy()
 }
 
 
-void AdaptiveStringColumn::UpdateRef(size_t ref)
+void AdaptiveStringColumn::update_ref(size_t ref)
 {
     TIGHTDB_ASSERT(get_coldef_from_ref(ref, m_array->GetAllocator()) == Array::coldef_InnerNode); // Can only be called when creating node
 
     if (IsNode())
-        m_array->UpdateRef(ref);
+        m_array->update_ref(ref);
     else {
         ArrayParent *const parent = m_array->GetParent();
         const size_t pndx   = m_array->GetParentNdx();
@@ -368,7 +368,7 @@ void AdaptiveStringColumn::LeafSet(size_t ndx, StringData value)
     ArrayParent *const parent = oldarray->GetParent();
     if (parent) {
         const size_t pndx = oldarray->GetParentNdx();
-        parent->update_child_ref(pndx, newarray->GetRef());
+        parent->update_child_ref(pndx, newarray->get_ref());
         newarray->SetParent(parent, pndx);
     }
 
@@ -405,7 +405,7 @@ void AdaptiveStringColumn::LeafInsert(size_t ndx, StringData value)
     ArrayParent *const parent = oldarray->GetParent();
     if (parent) {
         const size_t pndx = oldarray->GetParentNdx();
-        parent->update_child_ref(pndx, newarray->GetRef());
+        parent->update_child_ref(pndx, newarray->get_ref());
         newarray->SetParent(parent, pndx);
     }
 
@@ -474,8 +474,8 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
         values.add(pos);
     }
 
-    ref_keys   = keys.GetRef();
-    ref_values = values.GetRef();
+    ref_keys   = keys.get_ref();
+    ref_values = values.get_ref();
     return true;
 }
 
@@ -508,7 +508,7 @@ void AdaptiveStringColumn::LeafToDot(ostream& out, const Array& array) const
     if (isLongStrings) {
         // ArrayStringLong has more members than Array, so we have to
         // really instantiate it (it is not enough with a cast)
-        const size_t ref = array.GetRef();
+        const size_t ref = array.get_ref();
         ArrayStringLong str_array(ref, static_cast<Array*>(0), 0, array.GetAllocator());
         str_array.ToDot(out);
     }

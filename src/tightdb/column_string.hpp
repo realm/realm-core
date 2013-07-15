@@ -52,7 +52,7 @@ public:
     void Resize(std::size_t ndx);
     void fill(std::size_t count);
     void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
- 
+
     std::size_t count(StringData value) const;
     std::size_t find_first(StringData value, std::size_t begin = 0 , std::size_t end = -1) const;
     void find_all(Array& result, StringData value, std::size_t start = 0,
@@ -73,7 +73,7 @@ public:
     void SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx);
     void RemoveIndex() {m_index = NULL;}
 
-    size_t GetRef() const {return m_array->GetRef();}
+    size_t get_ref() const {return m_array->get_ref();}
     Allocator& GetAllocator() const {return m_array->GetAllocator();}
     void SetParent(ArrayParent* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
 
@@ -102,12 +102,12 @@ public:
         else {
             off = 0;
             if (IsLongStrings()) {
-                ArrayStringLong* asl2 = new ArrayStringLong(m_array->GetRef(), NULL, 0, m_array->GetAllocator());
+                ArrayStringLong* asl2 = new ArrayStringLong(m_array->get_ref(), NULL, 0, m_array->GetAllocator());
                 *ap = asl2;
                 return true;
             }
             else {
-                ArrayString* as2 = new ArrayString(m_array->GetRef(), NULL, 0, m_array->GetAllocator());
+                ArrayString* as2 = new ArrayString(m_array->get_ref(), NULL, 0, m_array->GetAllocator());
                 *ap = as2;
                 return false;
             }
@@ -127,7 +127,7 @@ public:
 
 protected:
     friend class ColumnBase;
-    void UpdateRef(size_t ref);
+    void update_ref(size_t ref);
 
     StringData LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
     void LeafSet(size_t ndx, StringData value);
