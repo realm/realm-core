@@ -26,32 +26,32 @@ ColumnBinary::ColumnBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocat
 
 ColumnBinary::~ColumnBinary()
 {
-    if (IsNode())
+    if (!root_is_leaf())
         delete m_array;
     else
         delete static_cast<ArrayBinary*>(m_array);
 }
 
-void ColumnBinary::Destroy()
+void ColumnBinary::destroy()
 {
-    if (IsNode())
-        m_array->Destroy();
-    else 
-        static_cast<ArrayBinary*>(m_array)->Destroy();
+    if (!root_is_leaf())
+        m_array->destroy();
+    else
+        static_cast<ArrayBinary*>(m_array)->destroy();
 }
 
-void ColumnBinary::UpdateRef(size_t ref)
+void ColumnBinary::update_ref(size_t ref)
 {
-    TIGHTDB_ASSERT(is_node_from_ref(ref, m_array->GetAllocator())); // Can only be called when creating node
+    TIGHTDB_ASSERT(is_node_from_ref(ref, m_array->get_alloc())); // Can only be called when creating node
 
-    if (IsNode()) 
-        m_array->UpdateRef(ref);
+    if (!root_is_leaf())
+        m_array->update_ref(ref);
     else {
         ArrayParent *const parent = m_array->GetParent();
         const size_t pndx   = m_array->GetParentNdx();
 
         // Replace the Binary array with int array for node
-        Array* array = new Array(ref, parent, pndx, m_array->GetAllocator());
+        Array* array = new Array(ref, parent, pndx, m_array->get_alloc());
         delete m_array;
         m_array = array;
 
@@ -63,7 +63,7 @@ void ColumnBinary::UpdateRef(size_t ref)
 
 bool ColumnBinary::is_empty() const TIGHTDB_NOEXCEPT
 {
-    if (IsNode()) {
+    if (!root_is_leaf()) {
         const Array offsets = NodeGetOffsets();
         return offsets.is_empty();
     }
@@ -72,9 +72,9 @@ bool ColumnBinary::is_empty() const TIGHTDB_NOEXCEPT
     }
 }
 
-size_t ColumnBinary::Size() const  TIGHTDB_NOEXCEPT
+size_t ColumnBinary::size() const  TIGHTDB_NOEXCEPT
 {
-    if (IsNode())  {
+    if (!root_is_leaf())  {
         const Array offsets = NodeGetOffsets();
         const size_t size = offsets.is_empty() ? 0 : size_t(offsets.back());
         return size;
@@ -84,49 +84,49 @@ size_t ColumnBinary::Size() const  TIGHTDB_NOEXCEPT
     }
 }
 
-void ColumnBinary::Clear()
+void ColumnBinary::clear()
 {
-    if (m_array->IsNode()) {
+    if (!m_array->is_leaf()) {
         ArrayParent *const parent = m_array->GetParent();
         const size_t pndx = m_array->GetParentNdx();
 
         // Revert to binary array
-        ArrayBinary* const array = new ArrayBinary(parent, pndx, m_array->GetAllocator());
+        ArrayBinary* const array = new ArrayBinary(parent, pndx, m_array->get_alloc());
         if (parent)
-            parent->update_child_ref(pndx, array->GetRef());
+            parent->update_child_ref(pndx, array->get_ref());
 
         // Remove original node
-        m_array->Destroy();
+        m_array->destroy();
         delete m_array;
 
         m_array = array;
     }
     else {
-        static_cast<ArrayBinary*>(m_array)->Clear();
+        static_cast<ArrayBinary*>(m_array)->clear();
     }
 }
 
 void ColumnBinary::set(size_t ndx, BinaryData bin)
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
     TreeSet<BinaryData, ColumnBinary>(ndx, bin);
 }
 
 void ColumnBinary::insert(size_t ndx, BinaryData bin)
 {
-    TIGHTDB_ASSERT(ndx <= Size());
+    TIGHTDB_ASSERT(ndx <= size());
     TreeInsert<BinaryData, ColumnBinary>(ndx, bin);
 }
 
 void ColumnBinary::set_string(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
     TreeSet<StringData, ColumnBinary>(ndx, value);
 }
 
 void ColumnBinary::insert_string(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT(ndx <= Size());
+    TIGHTDB_ASSERT(ndx <= size());
     TreeInsert<StringData, ColumnBinary>(ndx, value);
 }
 
@@ -149,22 +149,22 @@ void ColumnBinary::fill(size_t count)
 
 void ColumnBinary::erase(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
     TreeDelete<BinaryData,ColumnBinary>(ndx);
 }
 
-void ColumnBinary::Resize(size_t ndx)
+void ColumnBinary::resize(size_t ndx)
 {
-    TIGHTDB_ASSERT(!IsNode()); // currently only available on leaf level (used by b-tree code)
-    TIGHTDB_ASSERT(ndx < Size());
-    static_cast<ArrayBinary*>(m_array)->Resize(ndx);
+    TIGHTDB_ASSERT(root_is_leaf()); // currently only available on leaf level (used by b-tree code)
+    TIGHTDB_ASSERT(ndx < size());
+    static_cast<ArrayBinary*>(m_array)->resize(ndx);
 }
 
 void ColumnBinary::move_last_over(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx+1 < Size());
+    TIGHTDB_ASSERT(ndx+1 < size());
 
-    const size_t ndx_last = Size()-1;
+    const size_t ndx_last = size()-1;
 
     const BinaryData v = get(ndx_last);
     set(ndx, v);
@@ -183,8 +183,8 @@ void ColumnBinary::move_last_over(size_t ndx)
 
 bool ColumnBinary::compare(const ColumnBinary& c) const
 {
-    const size_t n = Size();
-    if (c.Size() != n)
+    const size_t n = size();
+    if (c.size() != n)
         return false;
     for (size_t i=0; i<n; ++i) {
         if (get(i) != c.get(i))
@@ -221,7 +221,7 @@ void ColumnBinary::LeafInsert(size_t ndx, StringData value)
 
 void ColumnBinary::LeafDelete(size_t ndx)
 {
-    static_cast<ArrayBinary*>(m_array)->Delete(ndx);
+    static_cast<ArrayBinary*>(m_array)->erase(ndx);
 }
 
 #ifdef TIGHTDB_DEBUG
@@ -229,8 +229,8 @@ void ColumnBinary::LeafDelete(size_t ndx)
 void ColumnBinary::LeafToDot(ostream& out, const Array& array) const
 {
     // Rebuild array to get correct type
-    const size_t ref = array.GetRef();
-    const ArrayBinary binarray(ref, NULL, 0, array.GetAllocator());
+    const size_t ref = array.get_ref();
+    const ArrayBinary binarray(ref, NULL, 0, array.get_alloc());
 
     binarray.ToDot(out);
 }

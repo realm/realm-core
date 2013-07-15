@@ -45,9 +45,9 @@ public:
                 Allocator& = Allocator::get_default());
     ~BasicColumn();
 
-    void Destroy();
+    void destroy() TIGHTDB_OVERRIDE;
 
-    size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
     T get(size_t ndx) const TIGHTDB_NOEXCEPT;
@@ -57,8 +57,8 @@ public:
     void insert(size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
     void insert(size_t ndx, T value);
     void erase(size_t ndx) TIGHTDB_OVERRIDE;
-    void Clear() TIGHTDB_OVERRIDE;
-    void Resize(size_t ndx);
+    void clear() TIGHTDB_OVERRIDE;
+    void resize(size_t ndx);
     void fill(size_t count);
     // Experimental. Overwrites the row at ndx with the last row and removes the last row. For unordered tables.
     void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
@@ -74,13 +74,13 @@ public:
     void find_all(Array& result, T value, size_t start = 0, size_t end = -1) const;
 
     // Index
-    bool HasIndex() const TIGHTDB_OVERRIDE {return false;}
+    bool HasIndex() const TIGHTDB_OVERRIDE { return false; }
     void BuildIndex(Index&) {}
     void ClearIndex() {}
-    size_t FindWithIndex(int64_t) const {return size_t(-1);}
+    size_t FindWithIndex(int64_t) const { return size_t(-1); }
 
-    size_t GetRef() const TIGHTDB_OVERRIDE {return m_array->GetRef();}
-    void SetParent(ArrayParent* parent, size_t pndx) TIGHTDB_OVERRIDE {m_array->SetParent(parent, pndx);}
+    size_t get_ref() const TIGHTDB_OVERRIDE { return m_array->get_ref(); }
+    void set_parent(ArrayParent* parent, size_t pndx) TIGHTDB_OVERRIDE { m_array->set_parent(parent, pndx); }
 
     /// Compare two columns for equality.
     bool compare(const BasicColumn&) const;
@@ -94,7 +94,7 @@ public:
 private:
     friend class ColumnBase;
 
-    void UpdateRef(size_t ref);
+    void update_ref(size_t ref);
 
     T LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
     void LeafSet(size_t ndx, T value);

@@ -35,12 +35,12 @@ public:
     BasicArray(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc=Allocator::get_default()) TIGHTDB_NOEXCEPT;
     explicit BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT;
 
-    T Get(size_t ndx) const TIGHTDB_NOEXCEPT;
+    T get(size_t ndx) const TIGHTDB_NOEXCEPT;
     void add(T value);
-    void Set(size_t ndx, T value);
-    void Insert(size_t ndx, T value);
-    void Delete(size_t ndx);
-    void Clear();
+    void set(size_t ndx, T value);
+    void insert(size_t ndx, T value);
+    void erase(size_t ndx);
+    void clear();
 
     size_t Find(T target, size_t start, size_t end) const;
     size_t find_first(T value, size_t start=0 , size_t end=-1) const;

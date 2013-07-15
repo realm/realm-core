@@ -41,8 +41,8 @@ public:
     void set(std::size_t ndx, StringData value);
     void insert(std::size_t ndx, StringData value);
     void erase(std::size_t ndx);
-    void Resize(std::size_t ndx);
-    void Clear();
+    void resize(std::size_t ndx);
+    void clear();
 
     std::size_t count(StringData value, std::size_t begin = 0, std::size_t end = -1) const;
     std::size_t find_first(StringData value, std::size_t begin = 0 , std::size_t end = -1) const;
@@ -86,12 +86,12 @@ inline StringData ArrayStringLong::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
         // FIXME: Consider how much of a performance problem it is,
         // that we have to issue two separate calls to read two
         // consecutive values from an array.
-        begin = m_offsets.GetAsSizeT(ndx-1);
-        end   = m_offsets.GetAsSizeT(ndx);
+        begin = to_size_t(m_offsets.get(ndx-1));
+        end   = to_size_t(m_offsets.get(ndx));
     }
     else {
         begin = 0;
-        end   = m_offsets.GetAsSizeT(0);
+        end   = to_size_t(m_offsets.get(0));
     }
     --end; // Discount the terminating zero
     return StringData(m_blob.get(begin), end-begin);

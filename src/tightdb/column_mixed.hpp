@@ -68,13 +68,13 @@ public:
                 ArrayParent* parent, std::size_t ndx_in_parent, std::size_t ref);
 
     ~ColumnMixed();
-    void Destroy();
+    void destroy() TIGHTDB_OVERRIDE;
 
-    void SetParent(ArrayParent* parent, size_t pndx);
+    void set_parent(ArrayParent* parent, size_t pndx);
     void UpdateFromParent();
 
     DataType get_type(size_t ndx) const TIGHTDB_NOEXCEPT;
-    size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_types->Size(); }
+    size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_types->size(); }
     bool is_empty() const TIGHTDB_NOEXCEPT { return m_types->is_empty(); }
 
     int64_t get_int(size_t ndx) const;
@@ -116,9 +116,9 @@ public:
     void insert_binary(size_t ndx, BinaryData value);
     void insert_subtable(size_t ndx, const Table*);
 
-    void add() TIGHTDB_OVERRIDE { insert_int(Size(), 0); }
+    void add() TIGHTDB_OVERRIDE { insert_int(size(), 0); }
     void insert(size_t ndx) TIGHTDB_OVERRIDE { insert_int(ndx, 0); invalidate_subtables(); }
-    void Clear() TIGHTDB_OVERRIDE;
+    void clear() TIGHTDB_OVERRIDE;
     void erase(size_t ndx) TIGHTDB_OVERRIDE;
     void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
     void fill(size_t count);
@@ -128,7 +128,7 @@ public:
     void BuildIndex(Index& index) { static_cast<void>(index); }
     void ClearIndex() {}
 
-    size_t GetRef() const {return m_array->GetRef();}
+    size_t get_ref() const {return m_array->get_ref();}
 
     /// Compare two mixed columns for equality.
     bool compare(const ColumnMixed&) const;

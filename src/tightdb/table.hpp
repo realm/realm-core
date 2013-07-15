@@ -122,7 +122,7 @@ public:
     /// table (except ~Table()) has undefined behaviour and is
     /// considered an error on behalf of the application. Note that
     /// even Table::is_valid() is disallowed in this case.
-    bool is_valid() const TIGHTDB_NOEXCEPT { return m_columns.HasParent(); }
+    bool is_valid() const TIGHTDB_NOEXCEPT { return m_columns.has_parent(); }
 
     /// A shared spec is a column specification that in general
     /// applies to many tables. A table is not allowed to directly
@@ -271,7 +271,7 @@ public:
     void optimize();
 
     // Conversion
-    void to_json(std::ostream& out);
+    void to_json(std::ostream& out) const;
     void to_string(std::ostream& out, size_t limit=500) const;
     void row_to_string(size_t row_ndx, std::ostream& out) const;
 
@@ -404,7 +404,7 @@ protected:
     void   set_index(size_t column_ndx, bool update_spec);
 
     // Support function for conversions
-    void to_json_row(size_t row_ndx, std::ostream& out);
+    void to_json_row(size_t row_ndx, std::ostream& out) const;
     void to_string_header(std::ostream& out, std::vector<size_t>& widths) const;
     void to_string_row(size_t row_ndx, std::ostream& out, const std::vector<size_t>& widths) const;
 
@@ -647,7 +647,7 @@ inline std::size_t Table::create_empty_table(Allocator& alloc)
     Array top(Array::coldef_HasRefs, 0, 0, alloc);
     top.add(Spec::create_empty_spec(alloc));
     top.add(Array::create_empty_array(Array::coldef_HasRefs, alloc)); // Columns
-    return top.GetRef();
+    return top.get_ref();
 }
 
 inline Table::Table(Allocator& alloc):
@@ -907,7 +907,7 @@ private:
 
 inline Table::LocalTransactLog Table::transact_log() TIGHTDB_NOEXCEPT
 {
-    return LocalTransactLog(m_top.GetAllocator().get_replication(), this);
+    return LocalTransactLog(m_top.get_alloc().get_replication(), this);
 }
 
 inline size_t* Table::record_subspec_path(const Spec* spec, size_t* begin,

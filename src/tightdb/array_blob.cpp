@@ -53,7 +53,7 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
 
 void ArrayBlob::ToDot(ostream& out, const char* title) const
 {
-    const size_t ref = GetRef();
+    const size_t ref = get_ref();
 
     if (title) {
         out << "subgraph cluster_" << ref << " {" << endl;

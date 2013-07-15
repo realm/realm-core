@@ -276,14 +276,14 @@ protected:
 
     void update_child_ref(size_t subtable_ndx, size_t new_ref) TIGHTDB_OVERRIDE
     {
-        m_tables.Set(subtable_ndx, new_ref);
+        m_tables.set(subtable_ndx, new_ref);
     }
 
     void child_destroyed(std::size_t) TIGHTDB_OVERRIDE {} // Ignore
 
     size_t get_child_ref(size_t subtable_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
-        return m_tables.GetAsRef(subtable_ndx);
+        return m_tables.get_as_ref(subtable_ndx);
     }
 
     void create(); // FIXME: Could be private
@@ -366,7 +366,7 @@ inline Group::Group(const std::string& file, OpenMode mode):
         open(file, mode); // Throws
     }
     catch (...) {
-        m_cachedtables.Destroy();
+        m_cachedtables.destroy();
         throw;
     }
 }
@@ -382,7 +382,7 @@ inline Group::Group(BinaryData buffer, bool take_ownership):
         open(buffer, take_ownership); // Throws
     }
     catch (...) {
-        m_cachedtables.Destroy();
+        m_cachedtables.destroy();
         throw;
     }
 }
@@ -548,8 +548,8 @@ template<class S> size_t Group::write_to_stream(S& out) const
     // to include free space tracking as serialized
     // files are written without any free space.
     Array top(Array::coldef_HasRefs, NULL, 0, const_cast<SlabAlloc&>(m_alloc)); // FIXME: Another aspect of the poor constness behavior in Array class. What can we do?
-    top.add(m_top.Get(0));
-    top.add(m_top.Get(1));
+    top.add(m_top.get(0));
+    top.add(m_top.get(1));
 
     // Recursively write all arrays
     const uint64_t topPos = top.Write(out); // FIXME: Why does this not return char*?
@@ -572,9 +572,9 @@ template<class S> size_t Group::write_to_stream(S& out) const
     // be considered invalid.
 
     // Clean up temporary top
-    top.Set(0, 0); // reset to avoid recursive delete
-    top.Set(1, 0); // reset to avoid recursive delete
-    top.Destroy();
+    top.set(0, 0); // reset to avoid recursive delete
+    top.set(1, 0); // reset to avoid recursive delete
+    top.destroy();
 
     // return bytes written
     return byte_size;
@@ -608,12 +608,12 @@ inline void Group::clear_cache()
 {
     const size_t count = m_cachedtables.size();
     for (size_t i = 0; i < count; ++i) {
-        if (Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i))) {
+        if (Table* const t = reinterpret_cast<Table*>(m_cachedtables.get(i))) {
             t->invalidate();
             t->unbind_ref();
         }
     }
-    m_cachedtables.Clear();
+    m_cachedtables.clear();
 }
 
 
