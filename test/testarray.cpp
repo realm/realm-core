@@ -460,6 +460,53 @@ TEST_FIXTURE(db_setup_array, Array_Destroy)
     c.destroy();
 }
 
+TEST_FIXTURE(db_setup_array, Array_LowerUpperBound)
+{
+    Array a;
+    a.add(10);
+    a.add(20);
+    a.add(30);
+    a.add(40);
+    a.add(50);
+    a.add(60);
+    a.add(70);
+    a.add(80);
+
+    CHECK_EQUAL(0, a.lower_bound(0));  CHECK_EQUAL(0, a.upper_bound(0));
+    CHECK_EQUAL(0, a.lower_bound(1));  CHECK_EQUAL(0, a.upper_bound(1));
+    CHECK_EQUAL(0, a.lower_bound(9));  CHECK_EQUAL(0, a.upper_bound(9));
+    CHECK_EQUAL(0, a.lower_bound(10)); CHECK_EQUAL(1, a.upper_bound(10));
+    CHECK_EQUAL(1, a.lower_bound(11)); CHECK_EQUAL(1, a.upper_bound(11));
+    CHECK_EQUAL(1, a.lower_bound(19)); CHECK_EQUAL(1, a.upper_bound(19));
+    CHECK_EQUAL(1, a.lower_bound(20)); CHECK_EQUAL(2, a.upper_bound(20));
+    CHECK_EQUAL(2, a.lower_bound(21)); CHECK_EQUAL(2, a.upper_bound(21));
+    CHECK_EQUAL(2, a.lower_bound(29)); CHECK_EQUAL(2, a.upper_bound(29));
+    CHECK_EQUAL(2, a.lower_bound(30)); CHECK_EQUAL(3, a.upper_bound(30));
+    CHECK_EQUAL(3, a.lower_bound(31)); CHECK_EQUAL(3, a.upper_bound(31));
+    CHECK_EQUAL(3, a.lower_bound(32)); CHECK_EQUAL(3, a.upper_bound(32));
+    CHECK_EQUAL(3, a.lower_bound(39)); CHECK_EQUAL(3, a.upper_bound(39));
+    CHECK_EQUAL(3, a.lower_bound(40)); CHECK_EQUAL(4, a.upper_bound(40));
+    CHECK_EQUAL(4, a.lower_bound(41)); CHECK_EQUAL(4, a.upper_bound(41));
+    CHECK_EQUAL(4, a.lower_bound(42)); CHECK_EQUAL(4, a.upper_bound(42));
+    CHECK_EQUAL(4, a.lower_bound(49)); CHECK_EQUAL(4, a.upper_bound(49));
+    CHECK_EQUAL(4, a.lower_bound(50)); CHECK_EQUAL(5, a.upper_bound(50));
+    CHECK_EQUAL(5, a.lower_bound(51)); CHECK_EQUAL(5, a.upper_bound(51));
+    CHECK_EQUAL(5, a.lower_bound(52)); CHECK_EQUAL(5, a.upper_bound(52));
+    CHECK_EQUAL(5, a.lower_bound(59)); CHECK_EQUAL(5, a.upper_bound(59));
+    CHECK_EQUAL(5, a.lower_bound(60)); CHECK_EQUAL(6, a.upper_bound(60));
+    CHECK_EQUAL(6, a.lower_bound(61)); CHECK_EQUAL(6, a.upper_bound(61));
+    CHECK_EQUAL(6, a.lower_bound(62)); CHECK_EQUAL(6, a.upper_bound(62));
+    CHECK_EQUAL(6, a.lower_bound(69)); CHECK_EQUAL(6, a.upper_bound(69));
+    CHECK_EQUAL(6, a.lower_bound(70)); CHECK_EQUAL(7, a.upper_bound(70));
+    CHECK_EQUAL(7, a.lower_bound(71)); CHECK_EQUAL(7, a.upper_bound(71));
+    CHECK_EQUAL(7, a.lower_bound(72)); CHECK_EQUAL(7, a.upper_bound(72));
+    CHECK_EQUAL(7, a.lower_bound(78)); CHECK_EQUAL(7, a.upper_bound(78));
+    CHECK_EQUAL(7, a.lower_bound(79)); CHECK_EQUAL(7, a.upper_bound(79));
+    CHECK_EQUAL(7, a.lower_bound(80)); CHECK_EQUAL(8, a.upper_bound(80));
+    CHECK_EQUAL(8, a.lower_bound(81)); CHECK_EQUAL(8, a.upper_bound(81));
+    CHECK_EQUAL(8, a.lower_bound(82)); CHECK_EQUAL(8, a.upper_bound(82));
+}
+
 TEST(Array_Sort)
 {
     // Create Array with random values

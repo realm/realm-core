@@ -312,6 +312,39 @@ public:
     void IncrementIf(int64_t limit, int64_t value);
     void adjust(size_t start, int64_t diff);
 
+    //@{
+
+    /// Find the lower/upper bound in a sorted sequence.
+    ///
+    /// <pre>
+    ///
+    ///   3 3 3 4 4 4 5 6 7 9 9 9
+    ///   ^     ^     ^     ^     ^
+    ///   |     |     |     |     |
+    ///   |     |     |     |      -- Lower and upper bound of 15
+    ///   |     |     |     |
+    ///   |     |     |      -- Lower and upper bound of 8
+    ///   |     |     |
+    ///   |     |      -- Upper bound of 4
+    ///   |     |
+    ///   |      -- Lower bound of 4
+    ///   |
+    ///    -- Lower and upper bound of 1
+    ///
+    /// </pre>
+    ///
+    /// These functions are functionally identical to
+    /// std::lower_bound() and std::upper_bound().
+    ///
+    /// We currently use binary search. See for example
+    /// http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
+    ///
+    /// It may be worth considering if overall efficiency can be
+    /// improved by doing a linear search for short sequences.
+    std::size_t lower_bound(int64_t value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound(int64_t value) const TIGHTDB_NOEXCEPT;
+    //@}
+
     size_t FindPos(int64_t value) const TIGHTDB_NOEXCEPT;
     size_t FindPos2(int64_t value) const TIGHTDB_NOEXCEPT;
     bool   FindPosSorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT;
