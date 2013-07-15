@@ -1918,14 +1918,14 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) TIGHTDB_NO
 // It may be worth considering if overall efficiency can be improved
 // by doing a linear search for short sequences.
 template<int width>
-inline size_t lower_bound(const char* offsets_header, int64_t value) TIGHTDB_NOEXCEPT
+inline size_t lower_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
 {
     using namespace tightdb;
 
-    const char* data = Array::get_data_from_header(offsets_header);
+    const char* data = Array::get_data_from_header(header);
 
     size_t i = 0;
-    size_t size = Array::get_len_from_header(offsets_header);
+    size_t size = Array::get_len_from_header(header);
 
     while (0 < size) {
         size_t half = size / 2;
@@ -1944,14 +1944,14 @@ inline size_t lower_bound(const char* offsets_header, int64_t value) TIGHTDB_NOE
 
 // See lower_bound()
 template<int width>
-inline size_t upper_bound(const char* offsets_header, int64_t value) TIGHTDB_NOEXCEPT
+inline size_t upper_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
 {
     using namespace tightdb;
 
-    const char* data = Array::get_data_from_header(offsets_header);
+    const char* data = Array::get_data_from_header(header);
 
     size_t i = 0;
-    size_t size = Array::get_len_from_header(offsets_header);
+    size_t size = Array::get_len_from_header(header);
 
     while (0 < size) {
         size_t half = size / 2;
@@ -2020,6 +2020,18 @@ size_t FindPos2Direct_32(const char* const header, const char* const data, int32
 }
 
 namespace tightdb {
+
+
+size_t Array::lower_bound(int64_t value) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_TEMPEX(return ::lower_bound, m_width, (get_header_from_data(m_data), value));
+}
+
+size_t Array::upper_bound(int64_t value) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_TEMPEX(return ::upper_bound, m_width, (get_header_from_data(m_data), value));
+}
+
 
 void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t start, size_t end) const
 {
