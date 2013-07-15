@@ -190,7 +190,7 @@ inline std::size_t AdaptiveStringColumn::lower_bound(StringData value) const TIG
 inline void AdaptiveStringColumn::foreach(Array::ForEachOp<StringData>* op) const TIGHTDB_NOEXCEPT
 {
     if (TIGHTDB_LIKELY(m_array->is_leaf())) {
-        if (m_array->HasRefs()) {
+        if (m_array->has_refs()) {
             static_cast<const ArrayStringLong*>(m_array)->foreach(op);
         }
         else {

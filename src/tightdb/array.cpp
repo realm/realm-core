@@ -2822,12 +2822,12 @@ void Array::foreach(ForEachOp<int64_t>* op) const TIGHTDB_NOEXCEPT
     size_t ndx = 0;
     while (size_t(buf_size) < n - ndx) {
         for (int i=0; i<buf_size; ++i) {
-            buf[i] = Get(ndx++);
+            buf[i] = get(ndx++);
         }
         op->handle_chunk(buf, buf + buf_size);
     }
     for (int i=0; i<int(n - ndx); ++i) {
-        buf[i] = Get(ndx+i);
+        buf[i] = get(ndx+i);
     }
     op->handle_chunk(buf, buf + (n - ndx));
 }

@@ -231,11 +231,11 @@ inline void BasicColumn<T>::foreach(Array::ForEachOp<T>* op) const TIGHTDB_NOEXC
 template<class T>
 inline void BasicColumn<T>::foreach(const Array* parent, Array::ForEachOp<T>* op) TIGHTDB_NOEXCEPT
 {
-    Allocator& alloc = parent->GetAllocator();
-    Array children(parent->GetAsRef(1), 0, 0, alloc);
+    Allocator& alloc = parent->get_alloc();
+    Array children(parent->get_as_ref(1), 0, 0, alloc);
     const std::size_t n = children.size();
     for (std::size_t i=0; i<n; ++i) {
-        const std::size_t ref = children.GetAsRef(i);
+        const std::size_t ref = children.get_as_ref(i);
         Array child(ref, 0, 0, alloc);
         if (TIGHTDB_LIKELY(child.is_leaf())) {
             BasicArray<T>::foreach(&child, op);

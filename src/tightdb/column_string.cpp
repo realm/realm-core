@@ -495,14 +495,14 @@ bool AdaptiveStringColumn::compare(const AdaptiveStringColumn& c) const
 void AdaptiveStringColumn::foreach(const Array* parent, Array::ForEachOp<StringData>* op)
     TIGHTDB_NOEXCEPT
 {
-    Allocator& alloc = parent->GetAllocator();
-    Array children(parent->GetAsRef(1), 0, 0, alloc);
+    Allocator& alloc = parent->get_alloc();
+    Array children(parent->get_as_ref(1), 0, 0, alloc);
     const size_t n = children.size();
     for (size_t i=0; i<n; ++i) {
-        const size_t ref = children.GetAsRef(i);
+        const size_t ref = children.get_as_ref(i);
         Array child(ref, 0, 0, alloc);
         if (TIGHTDB_LIKELY(child.is_leaf())) {
-            if (child.HasRefs()) {
+            if (child.has_refs()) {
                 ArrayStringLong::foreach(&child, op);
             }
             else {

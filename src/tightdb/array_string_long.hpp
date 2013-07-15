@@ -115,9 +115,9 @@ inline void ArrayStringLong::foreach(ForEachOp<StringData>* op) const TIGHTDB_NO
 
 inline void ArrayStringLong::foreach(const Array* a, ForEachOp<StringData>* op) TIGHTDB_NOEXCEPT
 {
-    Allocator& alloc = a->GetAllocator();
-    Array offsets(a->GetAsRef(0), 0, 0, alloc);
-    ArrayBlob blob(a->GetAsRef(1), 0, 0, alloc);
+    Allocator& alloc = a->get_alloc();
+    Array offsets(a->get_as_ref(0), 0, 0, alloc);
+    ArrayBlob blob(a->get_as_ref(1), 0, 0, alloc);
     ForEachOffsetOp op2(blob, op);
     offsets.foreach(&op2);
 }
