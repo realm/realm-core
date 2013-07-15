@@ -42,7 +42,7 @@ inline BasicArray<T>::BasicArray(ArrayParent *parent, size_t ndx_in_parent, Allo
 {
     const size_t ref = create_empty_basic_array(alloc); // Throws
     init_from_ref(ref);
-    SetParent(parent, ndx_in_parent);
+    set_parent(parent, ndx_in_parent);
     update_ref_in_parent();
 }
 
@@ -53,7 +53,7 @@ inline BasicArray<T>::BasicArray(size_t ref, ArrayParent *parent, size_t ndx_in_
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
     init_from_ref(ref);
-    SetParent(const_cast<ArrayParent *>(parent), ndx_in_parent);
+    set_parent(const_cast<ArrayParent *>(parent), ndx_in_parent);
 }
 
 template<typename T>
@@ -63,7 +63,7 @@ inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT : Array(no_pr
 
 
 template<typename T>
-inline void BasicArray<T>::Clear()
+inline void BasicArray<T>::clear()
 {
     CopyOnWrite(); // Throws
 
@@ -75,11 +75,11 @@ inline void BasicArray<T>::Clear()
 template<typename T>
 inline void BasicArray<T>::add(T value)
 {
-    Insert(m_len, value);
+    insert(m_len, value);
 }
 
 
-template<typename T> inline T BasicArray<T>::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+template<typename T> inline T BasicArray<T>::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     return *(reinterpret_cast<T*>(m_data) + ndx);
 }
@@ -88,7 +88,7 @@ template<typename T> inline T BasicArray<T>::Get(std::size_t ndx) const TIGHTDB_
 template<class T>
 inline T BasicArray<T>::column_get(const Array* root, std::size_t ndx) TIGHTDB_NOEXCEPT
 {
-    if (root->is_leaf()) return static_cast<const BasicArray*>(root)->Get(ndx);
+    if (root->is_leaf()) return static_cast<const BasicArray*>(root)->get(ndx);
     std::pair<const char*, std::size_t> p = find_leaf(root, ndx);
     const char* data = get_data_from_header(p.first);
     return *(reinterpret_cast<const T*>(data) + p.second);
@@ -96,7 +96,7 @@ inline T BasicArray<T>::column_get(const Array* root, std::size_t ndx) TIGHTDB_N
 
 
 template<typename T>
-inline void BasicArray<T>::Set(size_t ndx, T value)
+inline void BasicArray<T>::set(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx < m_len);
 
@@ -109,7 +109,7 @@ inline void BasicArray<T>::Set(size_t ndx, T value)
 }
 
 template<typename T>
-void BasicArray<T>::Insert(size_t ndx, T value)
+void BasicArray<T>::insert(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx <= m_len);
 
@@ -136,7 +136,7 @@ void BasicArray<T>::Insert(size_t ndx, T value)
 }
 
 template<typename T>
-void BasicArray<T>::Delete(size_t ndx)
+void BasicArray<T>::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_len);
 
@@ -161,7 +161,7 @@ template<typename T>
 bool BasicArray<T>::Compare(const BasicArray<T>& c) const
 {
     for (size_t i = 0; i < size(); ++i) {
-        if (Get(i) != c.Get(i))
+        if (get(i) != c.get(i))
             return false;
     }
     return true;
@@ -196,7 +196,7 @@ size_t BasicArray<T>::Find(T target, size_t start, size_t end) const
         return not_found; // empty list
 
     for (size_t i = start; i < end; ++i) {
-        if (target == Get(i))
+        if (target == get(i))
             return i;
     }
     return not_found;
@@ -249,7 +249,7 @@ double BasicArray<T>::sum(size_t start, size_t end) const
 
     R sum = 0;
     for (size_t i = start; i < end; ++i) {
-        sum += Get(i);
+        sum += get(i);
     }
     return sum;
 }
@@ -264,10 +264,10 @@ bool BasicArray<T>::minmax(T& result, size_t start, size_t end) const
         return false;
     TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
 
-    T m = Get(start);
+    T m = get(start);
     ++start;
     for (; start < end; ++start) {
-        const T val = Get(start);
+        const T val = get(start);
         if (find_max ? val > m : val < m)
             m = val;
     }

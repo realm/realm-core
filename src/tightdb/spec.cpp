@@ -11,37 +11,37 @@ namespace tightdb {
 Spec::~Spec()
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    Replication* repl = m_specSet.GetAllocator().get_replication();
+    Replication* repl = m_specSet.get_alloc().get_replication();
     if (repl) repl->on_spec_destroyed(this);
 #endif
 }
 
 void Spec::init_from_ref(size_t ref, ArrayParent* parent, size_t ndx_in_parent)
 {
-    m_specSet.UpdateRef(ref);
-    m_specSet.SetParent(parent, ndx_in_parent);
+    m_specSet.update_ref(ref);
+    m_specSet.set_parent(parent, ndx_in_parent);
     TIGHTDB_ASSERT(m_specSet.size() == 2 || m_specSet.size() == 3);
 
-    m_spec.UpdateRef(m_specSet.GetAsRef(0));
-    m_spec.SetParent(&m_specSet, 0);
-    m_names.UpdateRef(m_specSet.GetAsRef(1));
-    m_names.SetParent(&m_specSet, 1);
+    m_spec.update_ref(m_specSet.get_as_ref(0));
+    m_spec.set_parent(&m_specSet, 0);
+    m_names.update_ref(m_specSet.get_as_ref(1));
+    m_names.set_parent(&m_specSet, 1);
 
     // SubSpecs array is only there when there are subtables
     if (m_specSet.size() == 3) {
-        m_subSpecs.UpdateRef(m_specSet.GetAsRef(2));
-        m_subSpecs.SetParent(&m_specSet, 2);
+        m_subSpecs.update_ref(m_specSet.get_as_ref(2));
+        m_subSpecs.set_parent(&m_specSet, 2);
     }
 }
 
 void Spec::destroy()
 {
-    m_specSet.Destroy();
+    m_specSet.destroy();
 }
 
 size_t Spec::get_ref() const
 {
-    return m_specSet.GetRef();
+    return m_specSet.get_ref();
 }
 
 void Spec::update_ref(size_t ref, ArrayParent* parent, size_t pndx)
@@ -51,7 +51,7 @@ void Spec::update_ref(size_t ref, ArrayParent* parent, size_t pndx)
 
 void Spec::set_parent(ArrayParent* parent, size_t pndx)
 {
-    m_specSet.SetParent(parent, pndx);
+    m_specSet.set_parent(parent, pndx);
 }
 
 bool Spec::update_from_parent()
@@ -82,29 +82,29 @@ size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
     if (type == type_Table) {
         // SubSpecs array is only there when there are subtables
         if (m_specSet.size() == 2) {
-            m_subSpecs.SetType(Array::coldef_HasRefs);
-            //m_subSpecs.SetType((ColumnDef)4);
+            m_subSpecs.set_type(Array::coldef_HasRefs);
+            //m_subSpecs.set_type((ColumnDef)4);
             //return;
-            m_specSet.add(m_subSpecs.GetRef());
-            m_subSpecs.SetParent(&m_specSet, 2);
+            m_specSet.add(m_subSpecs.get_ref());
+            m_subSpecs.set_parent(&m_specSet, 2);
         }
 
-        Allocator& alloc = m_specSet.GetAllocator();
+        Allocator& alloc = m_specSet.get_alloc();
 
         // Create spec for new subtable
         Array spec(Array::coldef_Normal, NULL, 0, alloc);
         ArrayString names(NULL, 0, alloc);
-        Array specSet(Array::coldef_HasRefs, NULL, 0, alloc);
-        specSet.add(spec.GetRef());
-        specSet.add(names.GetRef());
+        Array spec_set(Array::coldef_HasRefs, NULL, 0, alloc);
+        spec_set.add(spec.get_ref());
+        spec_set.add(names.get_ref());
 
         // Add to list of subspecs
-        const size_t ref = specSet.GetRef();
+        const size_t ref = spec_set.get_ref();
         m_subSpecs.add(ref);
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    Replication* repl = m_specSet.GetAllocator().get_replication();
+    Replication* repl = m_spec_set.get_alloc().get_replication();
     if (repl) repl->add_column(m_table, this, type, name); // Throws
 #endif
 
@@ -173,25 +173,25 @@ void Spec::remove_column(size_t column_ndx)
 
     // If the column is a subtable column, we have to delete
     // the subspec(s) as well
-    const ColumnType type = ColumnType(m_spec.Get(type_ndx));
+    const ColumnType type = ColumnType(m_spec.get(type_ndx));
     if (type == col_type_Table) {
         const size_t subspec_ndx = get_subspec_ndx(column_ndx);
-        const size_t subspec_ref = m_subSpecs.GetAsRef(subspec_ndx);
+        const size_t subspec_ref = m_subSpecs.get_as_ref(subspec_ndx);
 
-        Array subspec_top(subspec_ref, NULL, 0, m_specSet.GetAllocator());
-        subspec_top.Destroy(); // recursively delete entire subspec
-        m_subSpecs.Delete(subspec_ndx);
+        Array subspec_top(subspec_ref, NULL, 0, m_specSet.get_alloc());
+        subspec_top.destroy(); // recursively delete entire subspec
+        m_subSpecs.erase(subspec_ndx);
     }
 
     // Delete the actual name and type entries
     m_names.erase(column_ndx);
-    m_spec.Delete(type_ndx);
+    m_spec.erase(type_ndx);
 
     // If there are an attribute, we have to delete that as well
     if (type_ndx > 0) {
-        const ColumnType type_prefix = ColumnType(m_spec.Get(type_ndx-1));
+        const ColumnType type_prefix = ColumnType(m_spec.get(type_ndx-1));
         if (type_prefix >= col_attr_Indexed)
-            m_spec.Delete(type_ndx-1);
+            m_spec.erase(type_ndx-1);
     }
 }
 
@@ -219,8 +219,8 @@ Spec Spec::get_subtable_spec(size_t column_ndx)
 
     const size_t subspec_ndx = get_subspec_ndx(column_ndx);
 
-    Allocator& alloc = m_specSet.GetAllocator();
-    const size_t ref = m_subSpecs.GetAsRef(subspec_ndx);
+    Allocator& alloc = m_specSet.get_alloc();
+    const size_t ref = m_subSpecs.get_as_ref(subspec_ndx);
 
     return Spec(m_table, alloc, ref, &m_subSpecs, subspec_ndx);
 }
@@ -232,8 +232,8 @@ const Spec Spec::get_subtable_spec(size_t column_ndx) const
 
     const size_t subspec_ndx = get_subspec_ndx(column_ndx);
 
-    Allocator& alloc = m_specSet.GetAllocator();
-    const size_t ref = m_subSpecs.GetAsRef(subspec_ndx);
+    Allocator& alloc = m_specSet.get_alloc();
+    const size_t ref = m_subSpecs.get_as_ref(subspec_ndx);
 
     return Spec(m_table, alloc, ref, NULL, 0);
 }
@@ -246,7 +246,7 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const
     // so we need to count up to it's position
     size_t pos = 0;
     for (size_t i = 0; i < type_ndx; ++i) {
-        if (ColumnType(m_spec.Get(i)) == col_type_Table) ++pos;
+        if (ColumnType(m_spec.get(i)) == col_type_Table) ++pos;
     }
     return pos;
 }
@@ -257,7 +257,7 @@ size_t Spec::get_subspec_ref(size_t subspec_ndx) const
 
     // Note that this addresses subspecs directly, indexing
     // by number of sub-table columns
-    return m_subSpecs.GetAsRef(subspec_ndx);
+    return m_subSpecs.get_as_ref(subspec_ndx);
 }
 
 size_t Spec::get_type_attr_count() const
@@ -267,7 +267,7 @@ size_t Spec::get_type_attr_count() const
 
 ColumnType Spec::get_type_attr(size_t ndx) const
 {
-    return (ColumnType)m_spec.Get(ndx);
+    return ColumnType(m_spec.get(ndx));
 }
 
 size_t Spec::get_column_count() const TIGHTDB_NOEXCEPT
@@ -285,7 +285,7 @@ size_t Spec::get_column_type_pos(size_t column_ndx) const TIGHTDB_NOEXCEPT
     size_t i = 0;
     size_t type_ndx = 0;
     for (; type_ndx < column_ndx; ++i) {
-        const ColumnType type = ColumnType(m_spec.Get(i));
+        ColumnType type = ColumnType(m_spec.get(i));
         if (type >= col_attr_Indexed) continue; // ignore attributes
         ++type_ndx;
     }
@@ -299,7 +299,7 @@ ColumnType Spec::get_real_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
     ColumnType type;
     size_t column_ndx = 0;
     for (size_t i = 0; column_ndx <= ndx; ++i) {
-        type = ColumnType(m_spec.Get(i));
+        type = ColumnType(m_spec.get(i));
         if (type >= col_attr_Indexed) continue; // ignore attributes
         ++column_ndx;
     }
@@ -328,17 +328,17 @@ void Spec::set_column_type(size_t column_ndx, ColumnType type)
     const size_t count = m_spec.size();
 
     for (;type_ndx < count; ++type_ndx) {
-        const ColumnType t = ColumnType(m_spec.Get(type_ndx));
+        ColumnType t = ColumnType(m_spec.get(type_ndx));
         if (t >= col_attr_Indexed) continue; // ignore attributes
         if (column_count == column_ndx) break;
         ++column_count;
     }
 
     // At this point we only support upgrading to string enum
-    TIGHTDB_ASSERT(ColumnType(m_spec.Get(type_ndx)) == col_type_String);
+    TIGHTDB_ASSERT(ColumnType(m_spec.get(type_ndx)) == col_type_String);
     TIGHTDB_ASSERT(type == col_type_StringEnum);
 
-    m_spec.Set(type_ndx, type);
+    m_spec.set(type_ndx, type);
 }
 
 ColumnType Spec::get_column_attr(size_t ndx) const
@@ -349,7 +349,7 @@ ColumnType Spec::get_column_attr(size_t ndx) const
 
     // The attribute is an optional prefix for the type
     for (size_t i = 0; column_ndx <= ndx; ++i) {
-        const ColumnType type = (ColumnType)m_spec.Get(i);
+        ColumnType type = ColumnType(m_spec.get(i));
         if (type >= col_attr_Indexed) {
             if (column_ndx == ndx) return type;
         }
@@ -367,19 +367,19 @@ void Spec::set_column_attr(size_t ndx, ColumnType attr)
     size_t column_ndx = 0;
 
     for (size_t i = 0; column_ndx <= ndx; ++i) {
-        const ColumnType type = (ColumnType)m_spec.Get(i);
+        const ColumnType type = ColumnType(m_spec.get(i));
         if (type >= col_attr_Indexed) {
             if (column_ndx == ndx) {
                 // if column already has an attr, we replace it
-                if (attr == col_attr_None) m_spec.Delete(i);
-                else m_spec.Set(i, attr);
+                if (attr == col_attr_None) m_spec.erase(i);
+                else m_spec.set(i, attr);
                 return;
             }
         }
         else {
             if (column_ndx == ndx) {
                 // prefix type with attr
-                m_spec.Insert(i, attr);
+                m_spec.insert(i, attr);
                 return;
             }
             ++column_ndx;
@@ -428,14 +428,14 @@ bool Spec::operator==(const Spec& spec) const
 
 void Spec::Verify() const
 {
-    const size_t column_count = get_column_count();
+    size_t column_count = get_column_count();
     TIGHTDB_ASSERT(column_count == m_names.size());
     TIGHTDB_ASSERT(column_count <= m_spec.size());
 }
 
 void Spec::to_dot(ostream& out, StringData) const
 {
-    const size_t ref = m_specSet.GetRef();
+    const size_t ref = m_specSet.get_ref();
 
     out << "subgraph cluster_specset" << ref << " {" << endl;
     out << " label = \"specset\";" << endl;
@@ -447,11 +447,11 @@ void Spec::to_dot(ostream& out, StringData) const
         m_subSpecs.ToDot(out, "subspecs");
 
         const size_t count = m_subSpecs.size();
-        Allocator& alloc = m_specSet.GetAllocator();
+        Allocator& alloc = m_specSet.get_alloc();
 
         // Write out subspecs
         for (size_t i = 0; i < count; ++i) {
-            const size_t ref = m_subSpecs.GetAsRef(i);
+            const size_t ref = m_subSpecs.get_as_ref(i);
             const Spec s(m_table, alloc, ref, NULL, 0);
 
             s.to_dot(out);

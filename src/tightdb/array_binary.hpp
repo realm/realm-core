@@ -41,9 +41,9 @@ public:
     void add(BinaryData value);
     void set(std::size_t ndx, BinaryData value);
     void insert(std::size_t ndx, BinaryData value);
-    void Delete(std::size_t ndx);
-    void Resize(std::size_t ndx);
-    void Clear();
+    void erase(std::size_t ndx);
+    void resize(std::size_t ndx);
+    void clear();
 
     void set_string(std::size_t ndx, StringData value);
     void insert_string(std::size_t ndx, StringData value);
@@ -80,8 +80,8 @@ inline BinaryData ArrayBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    std::size_t begin = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
-    std::size_t end   = m_offsets.GetAsSizeT(ndx);
+    std::size_t begin = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    std::size_t end   = to_size_t(m_offsets.get(ndx));
     return BinaryData(m_blob.get(begin), end-begin);
 }
 
@@ -89,7 +89,7 @@ inline BinaryData ArrayBinary::column_get(const Array* root, std::size_t ndx) TI
 {
     if (root->is_leaf()) return static_cast<const ArrayBinary*>(root)->get(ndx);
     std::pair<const char*, std::size_t> p = find_leaf(root, ndx);
-    return get_direct(root->GetAllocator(), p.first, p.second);
+    return get_direct(root->get_alloc(), p.first, p.second);
 }
 
 
