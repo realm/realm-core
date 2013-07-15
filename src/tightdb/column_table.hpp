@@ -33,10 +33,10 @@ public:
 
     void invalidate_subtables();
 
-    void Clear() TIGHTDB_OVERRIDE
+    void clear() TIGHTDB_OVERRIDE
     {
-        m_array->Clear();
-        if (m_array->IsNode()) m_array->SetType(Array::coldef_HasRefs);
+        m_array->clear();
+        if (!m_array->is_leaf()) m_array->set_type(Array::coldef_HasRefs);
         invalidate_subtables();
     }
 
@@ -188,7 +188,7 @@ public:
     void insert(std::size_t ndx, const Table*);
     void set(std::size_t ndx, const Table*);
     void erase(size_t ndx) TIGHTDB_OVERRIDE;
-    void ClearTable(size_t ndx);
+    void clear_table(size_t ndx);
     void fill(size_t count);
 
     /// Compare two subtable columns for equality.
@@ -227,12 +227,12 @@ inline void ColumnSubtableParent::UpdateFromParent()
 
 inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) const
 {
-    TIGHTDB_ASSERT(subtable_ndx < Size());
+    TIGHTDB_ASSERT(subtable_ndx < size());
 
     Table *subtable = m_subtable_map.find(subtable_ndx);
     if (!subtable) {
-        const std::size_t top_ref = GetAsRef(subtable_ndx);
-        Allocator& alloc = GetAllocator();
+        const std::size_t top_ref = get_as_ref(subtable_ndx);
+        Allocator& alloc = get_alloc();
         subtable = new Table(Table::RefCountTag(), alloc, top_ref,
                              const_cast<ColumnSubtableParent*>(this), subtable_ndx);
         const bool was_empty = m_subtable_map.empty();
@@ -245,12 +245,12 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) c
 inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx,
                                                      std::size_t spec_ref) const
 {
-    TIGHTDB_ASSERT(subtable_ndx < Size());
+    TIGHTDB_ASSERT(subtable_ndx < size());
 
     Table *subtable = m_subtable_map.find(subtable_ndx);
     if (!subtable) {
-        const std::size_t columns_ref = GetAsRef(subtable_ndx);
-        Allocator& alloc = GetAllocator();
+        const std::size_t columns_ref = get_as_ref(subtable_ndx);
+        Allocator& alloc = get_alloc();
         subtable = new Table(Table::RefCountTag(), alloc, spec_ref, columns_ref,
                              const_cast<ColumnSubtableParent*>(this), subtable_ndx);
         const bool was_empty = m_subtable_map.empty();
@@ -264,8 +264,8 @@ inline ColumnSubtableParent::SubtableMap::~SubtableMap()
 {
     if (m_indices.IsValid()) {
         TIGHTDB_ASSERT(m_indices.is_empty());
-        m_indices.Destroy();
-        m_wrappers.Destroy();
+        m_indices.destroy();
+        m_wrappers.destroy();
     }
 }
 
@@ -273,14 +273,14 @@ inline Table* ColumnSubtableParent::SubtableMap::find(size_t subtable_ndx) const
 {
     if (!m_indices.IsValid()) return 0;
     size_t const pos = m_indices.find_first(subtable_ndx);
-    return pos != size_t(-1) ? reinterpret_cast<Table *>(m_wrappers.Get(pos)) : 0;
+    return pos != size_t(-1) ? reinterpret_cast<Table *>(m_wrappers.get(pos)) : 0;
 }
 
 inline void ColumnSubtableParent::SubtableMap::insert(size_t subtable_ndx, Table* wrapper)
 {
     if (!m_indices.IsValid()) {
-        m_indices.SetType(Array::coldef_Normal);
-        m_wrappers.SetType(Array::coldef_Normal);
+        m_indices.set_type(Array::coldef_Normal);
+        m_wrappers.set_type(Array::coldef_Normal);
     }
     m_indices.add(subtable_ndx);
     m_wrappers.add(reinterpret_cast<unsigned long>(wrapper));
@@ -292,10 +292,10 @@ inline void ColumnSubtableParent::SubtableMap::remove(size_t subtable_ndx)
     const size_t pos = m_indices.find_first(subtable_ndx);
     TIGHTDB_ASSERT(pos != size_t(-1));
     // FIXME: It is a problem that Array as our most low-level array
-    // construct has too many features to deliver a Delete() method
+    // construct has too many features to deliver a erase() method
     // that cannot be guaranteed to never throw.
-    m_indices.Delete(pos);
-    m_wrappers.Delete(pos);
+    m_indices.erase(pos);
+    m_wrappers.erase(pos);
 }
 
 inline void ColumnSubtableParent::SubtableMap::update_from_parents()
@@ -304,7 +304,7 @@ inline void ColumnSubtableParent::SubtableMap::update_from_parents()
 
     const size_t count = m_wrappers.size();
     for (size_t i = 0; i < count; ++i) {
-        Table* const t = reinterpret_cast<Table*>(m_wrappers.Get(i));
+        Table* const t = reinterpret_cast<Table*>(m_wrappers.get(i));
         t->UpdateFromParent();
     }
 }
@@ -315,12 +315,12 @@ inline void ColumnSubtableParent::SubtableMap::invalidate_subtables()
 
     const size_t n = m_wrappers.size();
     for (size_t i=0; i<n; ++i) {
-        Table* const t = reinterpret_cast<Table*>(m_wrappers.Get(i));
+        Table* const t = reinterpret_cast<Table*>(m_wrappers.get(i));
         t->invalidate();
     }
 
-    m_indices.Clear(); // FIXME: Can we rely on Array::Clear() never failing????
-    m_wrappers.Clear();
+    m_indices.clear(); // FIXME: Can we rely on Array::clear() never failing????
+    m_wrappers.clear();
 }
 
 inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
@@ -344,7 +344,7 @@ inline void ColumnSubtableParent::update_child_ref(size_t subtable_ndx, size_t n
 
 inline size_t ColumnSubtableParent::get_child_ref(size_t subtable_ndx) const TIGHTDB_NOEXCEPT
 {
-    return GetAsRef(subtable_ndx);
+    return get_as_ref(subtable_ndx);
 }
 
 inline void ColumnSubtableParent::invalidate_subtables()
@@ -361,7 +361,7 @@ inline bool ColumnSubtableParent::compare_subtable_rows(const Table& a, const Ta
 
 inline std::size_t ColumnSubtableParent::clone_table_columns(const Table* t)
 {
-    return t->clone_columns(m_array->GetAllocator());
+    return t->clone_columns(m_array->get_alloc());
 }
 
 
@@ -377,7 +377,7 @@ inline ColumnTable::ColumnTable(Allocator& alloc, const Table* table, std::size_
 
 inline void ColumnTable::add(const Table* subtable)
 {
-    insert(Size(), subtable);
+    insert(size(), subtable);
 }
 
 inline void ColumnTable::invalidate_subtables_virtual()

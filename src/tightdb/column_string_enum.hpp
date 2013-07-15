@@ -32,14 +32,14 @@ public:
     ColumnStringEnum(size_t ref_keys, size_t ref_values, ArrayParent* parent=NULL, size_t pndx=0,
                      Allocator& alloc = Allocator::get_default());
     ~ColumnStringEnum();
-    void Destroy();
+    void destroy() TIGHTDB_OVERRIDE;
 
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add(StringData value);
     void set(std::size_t ndx, StringData value);
     void insert(std::size_t ndx, StringData value);
     void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
-    void Clear() TIGHTDB_OVERRIDE;
+    void clear() TIGHTDB_OVERRIDE;
 
     using Column::move_last_over;
     using Column::add;

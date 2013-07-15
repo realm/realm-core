@@ -37,10 +37,10 @@ public:
 
     bool is_empty() const;
 
-    void Insert(size_t row_ndx, StringData value, bool isLast=false);
-    void Set(size_t row_ndx, StringData oldValue, StringData newValue);
+    void insert(size_t row_ndx, StringData value, bool isLast=false);
+    void set(size_t row_ndx, StringData oldValue, StringData newValue);
     void erase(size_t row_ndx, StringData value, bool isLast=false);
-    void Clear() TIGHTDB_OVERRIDE;
+    void clear() TIGHTDB_OVERRIDE;
 
     using Column::erase;
 
@@ -51,6 +51,7 @@ public:
     FindRes find_all(StringData value, size_t& ref) const;
 
     void update_ref(StringData value, size_t old_row_ndx, size_t new_row_ndx);
+    using Column::update_ref;
 
 #ifdef TIGHTDB_DEBUG
     void verify_entries(const AdaptiveStringColumn& column) const;
@@ -76,7 +77,7 @@ protected:
     void DoDelete(size_t ndx, StringData, size_t offset);
     void do_update_ref(StringData value, size_t row_ndx, size_t new_row_ndx, size_t offset);
 
-    StringData Get(size_t ndx) {return (*m_get_func)(m_target_column, ndx);}
+    StringData get(size_t ndx) {return (*m_get_func)(m_target_column, ndx);}
 
     // Member variables
     void* m_target_column;

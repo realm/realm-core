@@ -372,7 +372,7 @@ void ArrayString::ToDot(FILE* f) const
 
 void ArrayString::ToDot(ostream& out, StringData title) const
 {
-    const size_t ref = GetRef();
+    const size_t ref = get_ref();
 
     if (title.size() > 0) {
         out << "subgraph cluster_" << ref << " {" << endl;

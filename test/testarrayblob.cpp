@@ -59,5 +59,5 @@ TEST(ArrayBlob)
     CHECK(blob.is_empty());
 
     // Cleanup
-    blob.Destroy();
+    blob.destroy();
 }

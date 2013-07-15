@@ -145,11 +145,11 @@ inline size_t Spec::create_empty_spec(Allocator& alloc)
     Array spec_set(Array::coldef_HasRefs, 0, 0, alloc);
     spec_set.add(Array::create_empty_array(Array::coldef_Normal, alloc)); // One type for each column
     spec_set.add(ArrayString::create_empty_string_array(alloc)); // One name for each column
-    return spec_set.GetRef();
+    return spec_set.get_ref();
 }
 
 
-// Uninitialized Spec (call UpdateRef to init)
+// Uninitialized Spec (call update_ref() to init)
 inline Spec::Spec(const Table* table, Allocator& alloc):
     m_table(table), m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc) {}
 
@@ -169,10 +169,10 @@ inline Spec::Spec(const Table* table, Allocator& alloc, size_t ref, ArrayParent*
 }
 
 inline Spec::Spec(const Spec& s):
-    m_table(s.m_table), m_specSet(s.m_specSet.GetAllocator()), m_spec(s.m_specSet.GetAllocator()),
-    m_names(s.m_specSet.GetAllocator()), m_subSpecs(s.m_specSet.GetAllocator())
+    m_table(s.m_table), m_specSet(s.m_specSet.get_alloc()), m_spec(s.m_specSet.get_alloc()),
+    m_names(s.m_specSet.get_alloc()), m_subSpecs(s.m_specSet.get_alloc())
 {
-    const size_t ref    = s.m_specSet.GetRef();
+    const size_t ref    = s.m_specSet.get_ref();
     ArrayParent *parent = s.m_specSet.GetParent();
     const size_t pndx   = s.m_specSet.GetParentNdx();
 
@@ -182,8 +182,8 @@ inline Spec::Spec(const Spec& s):
 
 inline Spec Spec::get_subspec_by_ndx(size_t subspec_ndx)
 {
-    Allocator& alloc = m_specSet.GetAllocator();
-    const size_t ref = m_subSpecs.GetAsRef(subspec_ndx);
+    Allocator& alloc = m_specSet.get_alloc();
+    const size_t ref = m_subSpecs.get_as_ref(subspec_ndx);
     return Spec(m_table, alloc, ref, &m_subSpecs, subspec_ndx);
 }
 

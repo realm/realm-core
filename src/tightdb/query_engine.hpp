@@ -178,7 +178,7 @@ public:
     SequentialGetter(const Table& table, size_t column_ndx) : m_array((Array::no_prealloc_tag()))
     {
         if (column_ndx != not_found)
-            m_column = (ColType *)&table.GetColumnBase(column_ndx);
+            m_column = static_cast<const ColType*>(&table.GetColumnBase(column_ndx));
         m_leaf_end = 0;
     }
 
@@ -197,8 +197,8 @@ public:
         // Return wether or not leaf array has changed (could be useful to know for caller)
         if (index >= m_leaf_end) {
             // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
-            // leave m_array untouched. Else call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
-            m_array_ptr = (ArrayType*)m_column->GetBlock(index, m_array, m_leaf_start, true);
+            // leave m_array untouched. Else call init_from_header() on m_array (more time consuming) and return pointer to m_array.
+            m_array_ptr = static_cast<const ArrayType*>(m_column->GetBlock(index, m_array, m_leaf_start, true));
             const size_t leaf_size = m_array_ptr->size();
             m_leaf_end = m_leaf_start + leaf_size;
             return true;
@@ -209,7 +209,7 @@ public:
     TIGHTDB_FORCEINLINE T get_next(size_t index)
     {
         cache_next(index);
-        T av = m_array_ptr->Get(index - m_leaf_start);
+        T av = m_array_ptr->get(index - m_leaf_start);
         return av;
     }
 
@@ -223,10 +223,10 @@ public:
 
     size_t m_leaf_start;
     size_t m_leaf_end;
-    ColType* m_column;
+    const ColType* m_column;
 
     // See reason for having both a pointer and instance above
-    ArrayType* m_array_ptr;
+    const ArrayType* m_array_ptr;
 private:
     // Never access through m_array because it's uninitialized if column is just a leaf
     ArrayType m_array;
@@ -481,7 +481,7 @@ public:
 
         m_next = 0;
         if (m_size > 0)
-            m_max = m_arr.GetAsSizeT(m_size - 1);
+            m_max = to_size_t(m_arr.get(m_size-1));
         if (m_child) m_child->init(table);
     }
 
@@ -492,7 +492,7 @@ public:
             return end;
 
         m_next = r;
-        return m_arr.GetAsSizeT(r);
+        return to_size_t(m_arr.get(r));
     }
 
 protected:
@@ -753,7 +753,7 @@ public:
 
             // Do search directly on cached leaf array
             if (start + 1 == end) {
-                if (condition(m_array.Get(start - m_leaf_start), m_value))
+                if (condition(m_array.get(start - m_leaf_start), m_value))
                     return start;
                 else
                     return end;
@@ -876,7 +876,7 @@ public:
                     m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
                     m_end_s = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
                 }
-                
+
                 t = (m_long ? static_cast<ArrayStringLong*>(m_leaf)->get(s - m_leaf_start) : static_cast<ArrayString*>(m_leaf)->get(s - m_leaf_start));
             }
             if (cond(m_value, m_ucase, m_lcase, t))
@@ -1035,18 +1035,18 @@ public:
         deallocate();
         delete[] m_value.data();
         m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
-        m_index.Destroy();
+        m_index.destroy();
     }
 
-    void deallocate() 
+    void deallocate()
     {
-        // Must be called after each query execution too free temporary resources used by the execution. Run in 
+        // Must be called after each query execution too free temporary resources used by the execution. Run in
         // destructor, but also in Init because a user could define a query once and execute it multiple times.
         m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
         m_leaf = NULL;
 
         if (m_index_matches_destroy)
-            m_index_matches->Destroy();
+            m_index_matches->destroy();
 
         m_index_matches_destroy = false;
 
@@ -1078,7 +1078,7 @@ public:
         }
 
         if (m_condition_column->HasIndex()) {
-            m_index.Clear();
+            m_index.clear();
 
             FindRes fr;
             size_t index_ref;
@@ -1097,28 +1097,28 @@ public:
                 m_index_matches_destroy = true;        // we own m_index_matches, so we must destroy it
             }
             else if (fr == FindRes_column) {
-                // todo: Apparently we can't use m_index.GetAllocator() because it uses default allocator which simply makes 
-                // Translate(x) = x. Shouldn't it inherit owner column's allocator?!
+                // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which simply makes
+                // translate(x) = x. Shouldn't it inherit owner column's allocator?!
                 if (m_column_type == col_type_StringEnum) {
-                    m_index_matches = new Column(index_ref, 0, 0, static_cast<const ColumnStringEnum*>(m_condition_column)->GetAllocator());
+                    m_index_matches = new Column(index_ref, 0, 0, static_cast<const ColumnStringEnum*>(m_condition_column)->get_alloc());
                 }
                 else {
-                    m_index_matches = new Column(index_ref, 0, 0, static_cast<const AdaptiveStringColumn*>(m_condition_column)->GetAllocator());
+                    m_index_matches = new Column(index_ref, 0, 0, static_cast<const AdaptiveStringColumn*>(m_condition_column)->get_alloc());
                 }
             }
             else if (fr == FindRes_not_found) {
-                m_index_matches = new Column();
+                m_index_matches = new Column;
                 m_index_matches_destroy = true;        // we own m_index_matches, so we must destroy it
             }
 
             last_indexed = 0;
 
             m_index_getter = new SequentialGetter<int64_t>(m_index_matches);
-            m_index_size = m_index_getter->m_column->Size();
+            m_index_size = m_index_getter->m_column->size();
 
         }
         else if (m_column_type != col_type_String) {
-            m_cse.m_column = (ColumnStringEnum*)m_condition_column;
+            m_cse.m_column = static_cast<const ColumnStringEnum*>(m_condition_column);
             m_cse.m_leaf_end = 0;
             m_cse.m_leaf_start = 0;
         }
@@ -1145,7 +1145,7 @@ public:
                         last_indexed = m_index_getter->m_leaf_end;
                     }
                     else {
-                        s = m_index_getter->m_array_ptr->GetAsSizeT(f);
+                        s = to_size_t(m_index_getter->m_array_ptr->get(f));
                         if (s > end)
                             return end;
                         else {
@@ -1202,10 +1202,10 @@ private:
     size_t last_indexed;
 
     // Used for linear scan through enum-string
-    SequentialGetter<int64_t> m_cse;  
+    SequentialGetter<int64_t> m_cse;
 
     // Used for linear scan through short/long-string
-    ArrayParent *m_leaf;                
+    ArrayParent *m_leaf;
     bool m_long;
     size_t m_leaf_end;
     size_t m_first_s;
@@ -1357,7 +1357,7 @@ public:
                     s = m_getter1.m_leaf_end;
                 else
                 return to_size_t(qs.m_state) + m_getter1.m_leaf_start;
-            } 
+            }
             else {
                 // This is for float and double.
                 TConditionValue v1 = m_getter1.get_next(s);
