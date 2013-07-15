@@ -369,7 +369,7 @@ void AdaptiveStringColumn::LeafSet(size_t ndx, StringData value)
     if (parent) {
         const size_t pndx = oldarray->GetParentNdx();
         parent->update_child_ref(pndx, newarray->get_ref());
-        newarray->SetParent(parent, pndx);
+        newarray->set_parent(parent, pndx);
     }
 
     // Replace string array with long string array
@@ -406,7 +406,7 @@ void AdaptiveStringColumn::LeafInsert(size_t ndx, StringData value)
     if (parent) {
         const size_t pndx = oldarray->GetParentNdx();
         parent->update_child_ref(pndx, newarray->get_ref());
-        newarray->SetParent(parent, pndx);
+        newarray->set_parent(parent, pndx);
     }
 
     // Replace string array with long string array

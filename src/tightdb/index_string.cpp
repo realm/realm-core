@@ -59,8 +59,8 @@ void StringIndex::Create()
     Array refs(Array::coldef_HasRefs, NULL, 1, alloc);
     m_array->add(values.get_ref());
     m_array->add(refs.get_ref());
-    values.SetParent(m_array, 0);
-    refs.SetParent(m_array, 1);
+    values.set_parent(m_array, 0);
+    refs.set_parent(m_array, 1);
 }
 
 void StringIndex::SetTarget(void* target_column, StringGetter get_func)

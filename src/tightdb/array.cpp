@@ -86,7 +86,7 @@ void Array::CreateFromHeader(char* header, size_t ref) TIGHTDB_NOEXCEPT
 }
 
 
-void Array::SetType(ColumnDef type)
+void Array::set_type(ColumnDef type)
 {
     // If we are reviving an invalidated array
     // we need to reset state first
@@ -190,7 +190,7 @@ void Array::Preset(int64_t min, int64_t max, size_t count)
     Preset(w, count);
 }
 
-void Array::SetParent(ArrayParent *parent, size_t pndx) TIGHTDB_NOEXCEPT
+void Array::set_parent(ArrayParent *parent, size_t pndx) TIGHTDB_NOEXCEPT
 {
     m_parent = parent;
     m_parentNdx = pndx;

@@ -36,7 +36,7 @@ public:
     void Clear() TIGHTDB_OVERRIDE
     {
         m_array->Clear();
-        if (m_array->IsNode()) m_array->SetType(Array::coldef_HasRefs);
+        if (m_array->IsNode()) m_array->set_type(Array::coldef_HasRefs);
         invalidate_subtables();
     }
 
@@ -279,8 +279,8 @@ inline Table* ColumnSubtableParent::SubtableMap::find(size_t subtable_ndx) const
 inline void ColumnSubtableParent::SubtableMap::insert(size_t subtable_ndx, Table* wrapper)
 {
     if (!m_indices.IsValid()) {
-        m_indices.SetType(Array::coldef_Normal);
-        m_wrappers.SetType(Array::coldef_Normal);
+        m_indices.set_type(Array::coldef_Normal);
+        m_wrappers.set_type(Array::coldef_Normal);
     }
     m_indices.add(subtable_ndx);
     m_wrappers.add(reinterpret_cast<unsigned long>(wrapper));

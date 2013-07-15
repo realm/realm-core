@@ -59,7 +59,7 @@ public:
     virtual void SetIndexRef(size_t, ArrayParent*, size_t) {}
 
     virtual size_t get_ref() const = 0;
-    virtual void SetParent(ArrayParent* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
+    virtual void set_parent(ArrayParent* parent, size_t pndx) {m_array->set_parent(parent, pndx);}
     virtual void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
     virtual void UpdateFromParent() {m_array->UpdateFromParent();}
 

@@ -17,8 +17,8 @@ ArrayBinary::ArrayBinary(ArrayParent* parent, size_t pndx, Allocator& alloc):
     // Add subarrays for long string
     Array::add(m_offsets.get_ref());
     Array::add(m_blob.get_ref());
-    m_offsets.SetParent(this, 0);
-    m_blob.SetParent(this, 1);
+    m_offsets.set_parent(this, 0);
+    m_blob.set_parent(this, 1);
 }
 
 ArrayBinary::ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
@@ -29,8 +29,8 @@ ArrayBinary::ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator
     TIGHTDB_ASSERT(Array::size() == 2);
     TIGHTDB_ASSERT(m_blob.size() ==(size_t)(m_offsets.is_empty() ? 0 : m_offsets.back()));
 
-    m_offsets.SetParent(this, 0);
-    m_blob.SetParent(this, 1);
+    m_offsets.set_parent(this, 0);
+    m_blob.set_parent(this, 1);
 }
 
 // Creates new array (but invalid, call update_ref() to init)

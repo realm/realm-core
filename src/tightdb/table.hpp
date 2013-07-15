@@ -122,7 +122,7 @@ public:
     /// table (except ~Table()) has undefined behaviour and is
     /// considered an error on behalf of the application. Note that
     /// even Table::is_valid() is disallowed in this case.
-    bool is_valid() const TIGHTDB_NOEXCEPT { return m_columns.HasParent(); }
+    bool is_valid() const TIGHTDB_NOEXCEPT { return m_columns.has_parent(); }
 
     /// A shared spec is a column specification that in general
     /// applies to many tables. A table is not allowed to directly

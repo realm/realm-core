@@ -70,7 +70,7 @@ public:
     ~ColumnMixed();
     void Destroy();
 
-    void SetParent(ArrayParent* parent, size_t pndx);
+    void set_parent(ArrayParent* parent, size_t pndx);
     void UpdateFromParent();
 
     DataType get_type(size_t ndx) const TIGHTDB_NOEXCEPT;

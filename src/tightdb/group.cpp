@@ -134,7 +134,7 @@ void Group::create_from_file(const string& filename, OpenMode mode, bool do_init
 // Create a new memory structure and attach this group instance to it.
 void Group::create()
 {
-    m_tables.SetType(Array::coldef_HasRefs); // FIXME: Why is this not done in Group() like the rest of the arrays?
+    m_tables.set_type(Array::coldef_HasRefs); // FIXME: Why is this not done in Group() like the rest of the arrays?
 
     m_top.add(m_tableNames.get_ref());
     m_top.add(m_tables.get_ref());
@@ -142,14 +142,14 @@ void Group::create()
     m_top.add(m_freeLengths.get_ref());
 
     // Set parent info
-    m_tableNames.SetParent(&m_top, 0);
-    m_tables.SetParent(&m_top, 1);
-    m_freePositions.SetParent(&m_top, 2);
-    m_freeLengths.SetParent(&m_top, 3);
+    m_tableNames.set_parent(&m_top, 0);
+    m_tables.set_parent(&m_top, 1);
+    m_freePositions.set_parent(&m_top, 2);
+    m_freeLengths.set_parent(&m_top, 3);
 
     if (m_freeVersions.IsValid()) {
         m_top.add(m_freeVersions.get_ref());
-        m_freeVersions.SetParent(&m_top, 4);
+        m_freeVersions.set_parent(&m_top, 4);
     }
 }
 
@@ -158,13 +158,13 @@ void Group::create_from_ref(size_t top_ref)
 {
     // Instantiate top arrays
     if (top_ref == 0) {
-        m_top.SetType(Array::coldef_HasRefs);
-        m_tables.SetType(Array::coldef_HasRefs);
-        m_tableNames.SetType(Array::coldef_Normal);
-        m_freePositions.SetType(Array::coldef_Normal);
-        m_freeLengths.SetType(Array::coldef_Normal);
+        m_top.set_type(Array::coldef_HasRefs);
+        m_tables.set_type(Array::coldef_HasRefs);
+        m_tableNames.set_type(Array::coldef_Normal);
+        m_freePositions.set_type(Array::coldef_Normal);
+        m_freeLengths.set_type(Array::coldef_Normal);
         if (m_is_shared) {
-            m_freeVersions.SetType(Array::coldef_Normal);
+            m_freeVersions.set_type(Array::coldef_Normal);
         }
 
         create();
@@ -184,8 +184,8 @@ void Group::create_from_ref(size_t top_ref)
         const size_t t_ref = m_top.get_as_ref(1);
         m_tableNames.update_ref(n_ref);
         m_tables.update_ref(t_ref);
-        m_tableNames.SetParent(&m_top, 0);
-        m_tables.SetParent(&m_top, 1);
+        m_tableNames.set_parent(&m_top, 0);
+        m_tables.set_parent(&m_top, 1);
 
         // Serialized files do not have free space markers
         // at all, and files that are not shared does not
@@ -195,12 +195,12 @@ void Group::create_from_ref(size_t top_ref)
             const size_t fl_ref = m_top.get_as_ref(3);
             m_freePositions.update_ref(fp_ref);
             m_freeLengths.update_ref(fl_ref);
-            m_freePositions.SetParent(&m_top, 2);
-            m_freeLengths.SetParent(&m_top, 3);
+            m_freePositions.set_parent(&m_top, 2);
+            m_freeLengths.set_parent(&m_top, 3);
         }
         if (top_size == 5) {
             m_freeVersions.update_ref(m_top.get_as_ref(4));
-            m_freeVersions.SetParent(&m_top, 4);
+            m_freeVersions.set_parent(&m_top, 4);
         }
 
         // Make room for pointers to cached tables
@@ -222,24 +222,24 @@ void Group::init_shared()
         // Serialized files have no free space tracking
         // at all so we have to add the basic free lists
         if (m_top.size() == 2) {
-            m_freePositions.SetType(Array::coldef_Normal);
-            m_freeLengths.SetType(Array::coldef_Normal);
+            m_freePositions.set_type(Array::coldef_Normal);
+            m_freeLengths.set_type(Array::coldef_Normal);
             m_top.add(m_freePositions.get_ref());
             m_top.add(m_freeLengths.get_ref());
-            m_freePositions.SetParent(&m_top, 2);
-            m_freeLengths.SetParent(&m_top, 3);
+            m_freePositions.set_parent(&m_top, 2);
+            m_freeLengths.set_parent(&m_top, 3);
         }
 
         // Files that have only been used in single thread
         // mode do not have version tracking for the free lists
         if (m_top.size() == 4) {
             const size_t count = m_freePositions.size();
-            m_freeVersions.SetType(Array::coldef_Normal);
+            m_freeVersions.set_type(Array::coldef_Normal);
             for (size_t i = 0; i < count; ++i) {
                 m_freeVersions.add(0);
             }
             m_top.add(m_freeVersions.get_ref());
-            m_freeVersions.SetParent(&m_top, 4);
+            m_freeVersions.set_parent(&m_top, 4);
         }
     }
 }
@@ -264,11 +264,11 @@ void Group::reset_to_new()
     m_freeLengths.Invalidate();
     m_freeVersions.Invalidate();
 
-    m_tableNames.SetParent(NULL, 0);
-    m_tables.SetParent(NULL, 0);
-    m_freePositions.SetParent(NULL, 0);
-    m_freeLengths.SetParent(NULL, 0);
-    m_freeVersions.SetParent(NULL, 0);
+    m_tableNames.set_parent(0, 0);
+    m_tables.set_parent(0, 0);
+    m_freePositions.set_parent(0, 0);
+    m_freeLengths.set_parent(0, 0);
+    m_freeVersions.set_parent(0, 0);
 }
 
 void Group::rollback()
@@ -308,11 +308,11 @@ void Group::invalidate()
     m_freeVersions.Invalidate();
 
     // FIXME: I (Kristian) had to add these to avoid a problem when resurrecting the arrays in create_from_ref() (top_ref==0). The problem is that if the parent is left as non-null, then Array::Alloc() will attempt to update the parent array, but the parent array is still empty at that point. I don't, however, think this is a sufficiently good fix? Alexander?
-    m_tables.SetParent(0,0);
-    m_tableNames.SetParent(0,0);
-    m_freePositions.SetParent(0,0);
-    m_freeLengths.SetParent(0,0);
-    m_freeVersions.SetParent(0,0);
+    m_tables.set_parent(0,0);
+    m_tableNames.set_parent(0,0);
+    m_freePositions.set_parent(0,0);
+    m_freeLengths.set_parent(0,0);
+    m_freeVersions.set_parent(0,0);
 
     // Reads may allocate some temproary state that we have
     // to clean up

@@ -17,8 +17,8 @@ ArrayStringLong::ArrayStringLong(ArrayParent* parent, size_t pndx, Allocator& al
     // Add subarrays for long string
     Array::add(m_offsets.get_ref());
     Array::add(m_blob.get_ref());
-    m_offsets.SetParent(this, 0);
-    m_blob.SetParent(this, 1);
+    m_offsets.set_parent(this, 0);
+    m_blob.set_parent(this, 1);
 }
 
 ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
@@ -29,8 +29,8 @@ ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, A
     TIGHTDB_ASSERT(Array::size() == 2);
     TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : (size_t)m_offsets.back()));
 
-    m_offsets.SetParent(this, 0);
-    m_blob.SetParent(this, 1);
+    m_offsets.set_parent(this, 0);
+    m_blob.set_parent(this, 1);
 }
 
 // Creates new array (but invalid, call update_ref() to init)

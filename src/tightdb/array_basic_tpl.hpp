@@ -42,7 +42,7 @@ inline BasicArray<T>::BasicArray(ArrayParent *parent, size_t ndx_in_parent, Allo
 {
     const size_t ref = create_empty_basic_array(alloc); // Throws
     init_from_ref(ref);
-    SetParent(parent, ndx_in_parent);
+    set_parent(parent, ndx_in_parent);
     update_ref_in_parent();
 }
 
@@ -53,7 +53,7 @@ inline BasicArray<T>::BasicArray(size_t ref, ArrayParent *parent, size_t ndx_in_
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
     init_from_ref(ref);
-    SetParent(const_cast<ArrayParent *>(parent), ndx_in_parent);
+    set_parent(const_cast<ArrayParent *>(parent), ndx_in_parent);
 }
 
 template<typename T>

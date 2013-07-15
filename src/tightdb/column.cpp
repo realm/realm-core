@@ -354,7 +354,7 @@ void Column::UpdateParentNdx(int diff)
 // Used by column b-tree code to ensure all leaf having same type
 void Column::SetHasRefs()
 {
-    m_array->SetType(Array::coldef_HasRefs);
+    m_array->set_type(Array::coldef_HasRefs);
 }
 
 /*
@@ -379,7 +379,7 @@ void Column::Clear()
 {
     m_array->Clear();
     if (m_array->IsNode())
-        m_array->SetType(Array::coldef_Normal);
+        m_array->set_type(Array::coldef_Normal);
 }
 
 void Column::set(size_t ndx, int64_t value)

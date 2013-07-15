@@ -66,16 +66,16 @@ public:
     FindRes find_all_indexref(StringData value, size_t& dst) const;
 
     // Index
-    bool HasIndex() const {return m_index != NULL;}
-    const StringIndex& GetIndex() const {return *m_index;}
-    StringIndex& PullIndex() {StringIndex& ndx = *m_index; m_index = NULL; return ndx;}
+    bool HasIndex() const { return m_index != 0; }
+    const StringIndex& GetIndex() const { return *m_index; }
+    StringIndex& PullIndex() {StringIndex& ndx = *m_index; m_index = 0; return ndx;}
     StringIndex& CreateIndex();
     void SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx);
-    void RemoveIndex() {m_index = NULL;}
+    void RemoveIndex() { m_index = 0; }
 
-    size_t get_ref() const {return m_array->get_ref();}
-    Allocator& GetAllocator() const {return m_array->GetAllocator();}
-    void SetParent(ArrayParent* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
+    size_t get_ref() const { return m_array->get_ref(); }
+    Allocator& GetAllocator() const { return m_array->GetAllocator(); }
+    void set_parent(ArrayParent* parent, size_t pndx) { m_array->set_parent(parent, pndx); }
 
     // Optimizing data layout
     bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;

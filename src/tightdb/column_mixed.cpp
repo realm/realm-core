@@ -18,9 +18,9 @@ void ColumnMixed::Destroy()
         m_array->Destroy();
 }
 
-void ColumnMixed::SetParent(ArrayParent *parent, size_t pndx)
+void ColumnMixed::set_parent(ArrayParent *parent, size_t pndx)
 {
-    m_array->SetParent(parent, pndx);
+    m_array->set_parent(parent, pndx);
 }
 
 void ColumnMixed::UpdateFromParent()
@@ -45,8 +45,8 @@ void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx
     m_array->add(m_types->get_ref());
     m_array->add(m_refs->get_ref());
 
-    m_types->SetParent(m_array, 0);
-    m_refs->SetParent(m_array, 1);
+    m_types->set_parent(m_array, 0);
+    m_refs->set_parent(m_array, 1);
 }
 
 void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx,
@@ -82,7 +82,7 @@ void ColumnMixed::InitDataColumn()
     const size_t ref = m_data->get_ref();
 
     m_array->add(ref);
-    m_data->SetParent(m_array, 2);
+    m_data->set_parent(m_array, 2);
 }
 
 void ColumnMixed::clear_value(size_t ndx, MixedColType newtype)

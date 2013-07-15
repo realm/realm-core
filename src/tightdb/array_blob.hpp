@@ -76,7 +76,7 @@ inline ArrayBlob::ArrayBlob(std::size_t ref, const ArrayParent *parent, std::siz
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
     init_from_ref(ref);
-    SetParent(const_cast<ArrayParent *>(parent), pndx);
+    set_parent(const_cast<ArrayParent *>(parent), pndx);
 }
 
 // Creates new array (but invalid, call update_ref() to init)

@@ -83,7 +83,7 @@ inline ArrayString::ArrayString(ArrayParent *parent, std::size_t ndx_in_parent,
 {
     std::size_t ref = create_empty_string_array(alloc); // Throws
     init_from_ref(ref);
-    SetParent(parent, ndx_in_parent);
+    set_parent(parent, ndx_in_parent);
     update_ref_in_parent();
 }
 
@@ -93,7 +93,7 @@ inline ArrayString::ArrayString(std::size_t ref, const ArrayParent *parent,
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
     init_from_ref(ref);
-    SetParent(const_cast<ArrayParent *>(parent), ndx_in_parent);
+    set_parent(const_cast<ArrayParent *>(parent), ndx_in_parent);
 }
 
 // Creates new array (but invalid, call update_ref() to init)

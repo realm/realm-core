@@ -36,7 +36,7 @@ void Table::init_from_ref(size_t top_ref, ArrayParent* parent, size_t ndx_in_par
 {
     // Load from allocated memory
     m_top.update_ref(top_ref);
-    m_top.SetParent(parent, ndx_in_parent);
+    m_top.set_parent(parent, ndx_in_parent);
     TIGHTDB_ASSERT(m_top.size() == 2);
 
     const size_t spec_ref    = m_top.get_as_ref(0);
@@ -57,7 +57,7 @@ void Table::init_from_ref(size_t spec_ref, size_t columns_ref,
         m_columns.update_ref(columns_ref);
         CacheColumns(); // Also initializes m_size
     }
-    m_columns.SetParent(parent, ndx_in_parent);
+    m_columns.set_parent(parent, ndx_in_parent);
 }
 
 void Table::CreateColumns()
@@ -66,7 +66,7 @@ void Table::CreateColumns()
 
     // Instantiate first if we have an empty table (from zero-ref)
     if (!m_columns.IsValid()) {
-        m_columns.SetType(Array::coldef_HasRefs);
+        m_columns.set_type(Array::coldef_HasRefs);
     }
 
     size_t subtable_count = 0;
@@ -87,7 +87,7 @@ void Table::CreateColumns()
             {
                 Column* c = new Column(Array::coldef_Normal, alloc);
                 m_columns.add(c->get_ref());
-                c->SetParent(&m_columns, ref_pos);
+                c->set_parent(&m_columns, ref_pos);
                 new_col = c;
             }
             break;
@@ -95,7 +95,7 @@ void Table::CreateColumns()
             {
                 ColumnFloat* c = new ColumnFloat(alloc);
                 m_columns.add(c->get_ref());
-                c->SetParent(&m_columns, ref_pos);
+                c->set_parent(&m_columns, ref_pos);
                 new_col = c;
             }
             break;
@@ -103,7 +103,7 @@ void Table::CreateColumns()
             {
                 ColumnDouble* c = new ColumnDouble(alloc);
                 m_columns.add(c->get_ref());
-                c->SetParent(&m_columns, ref_pos);
+                c->set_parent(&m_columns, ref_pos);
                 new_col = c;
             }
             break;
@@ -111,7 +111,7 @@ void Table::CreateColumns()
             {
                 AdaptiveStringColumn* c = new AdaptiveStringColumn(alloc);
                 m_columns.add(c->get_ref());
-                c->SetParent(&m_columns, ref_pos);
+                c->set_parent(&m_columns, ref_pos);
                 new_col = c;
             }
             break;
@@ -119,7 +119,7 @@ void Table::CreateColumns()
             {
                 ColumnBinary* c = new ColumnBinary(alloc);
                 m_columns.add(c->get_ref());
-                c->SetParent(&m_columns, ref_pos);
+                c->set_parent(&m_columns, ref_pos);
                 new_col = c;
             }
             break;
@@ -129,7 +129,7 @@ void Table::CreateColumns()
                 const size_t subspec_ref = m_spec_set.get_subspec_ref(subtable_count);
                 ColumnTable* c = new ColumnTable(alloc, this, column_ndx, subspec_ref);
                 m_columns.add(c->get_ref());
-                c->SetParent(&m_columns, ref_pos);
+                c->set_parent(&m_columns, ref_pos);
                 new_col = c;
                 ++subtable_count;
             }
@@ -139,7 +139,7 @@ void Table::CreateColumns()
                 const size_t column_ndx = m_cols.size();
                 ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx);
                 m_columns.add(c->get_ref());
-                c->SetParent(&m_columns, ref_pos);
+                c->set_parent(&m_columns, ref_pos);
                 new_col = c;
             }
             break;
@@ -173,7 +173,7 @@ void Table::invalidate()
     // This prevents the destructor from deallocating the underlying
     // memory structure, and from attempting to notify the parent. It
     // also causes is_valid() to return false.
-    m_columns.SetParent(0,0);
+    m_columns.set_parent(0,0);
 
     // Invalidate all subtables
     const size_t n = m_cols.size();
@@ -485,7 +485,7 @@ size_t Table::do_add_column(DataType type)
         {
             Column* c = new Column(Array::coldef_Normal, alloc);
             m_columns.add(c->get_ref());
-            c->SetParent(&m_columns, m_columns.size()-1);
+            c->set_parent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
         }
@@ -494,7 +494,7 @@ size_t Table::do_add_column(DataType type)
         {
             ColumnFloat* c = new ColumnFloat(alloc);
             m_columns.add(c->get_ref());
-            c->SetParent(&m_columns, m_columns.size()-1);
+            c->set_parent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
         }
@@ -503,7 +503,7 @@ size_t Table::do_add_column(DataType type)
         {
             ColumnDouble* c = new ColumnDouble(alloc);
             m_columns.add(c->get_ref());
-            c->SetParent(&m_columns, m_columns.size()-1);
+            c->set_parent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
         }
@@ -512,7 +512,7 @@ size_t Table::do_add_column(DataType type)
         {
             AdaptiveStringColumn* c = new AdaptiveStringColumn(alloc);
             m_columns.add(c->get_ref());
-            c->SetParent(&m_columns, m_columns.size()-1);
+            c->set_parent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
         }
@@ -521,7 +521,7 @@ size_t Table::do_add_column(DataType type)
         {
             ColumnBinary* c = new ColumnBinary(alloc);
             m_columns.add(c->get_ref());
-            c->SetParent(&m_columns, m_columns.size()-1);
+            c->set_parent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
         }
@@ -531,7 +531,7 @@ size_t Table::do_add_column(DataType type)
         {
             ColumnTable* c = new ColumnTable(alloc, this, column_ndx, -1); // subspec ref will be filled in later
             m_columns.add(c->get_ref());
-            c->SetParent(&m_columns, m_columns.size()-1);
+            c->set_parent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
         }
@@ -541,7 +541,7 @@ size_t Table::do_add_column(DataType type)
         {
             ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx);
             m_columns.add(c->get_ref());
-            c->SetParent(&m_columns, m_columns.size()-1);
+            c->set_parent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
         }
@@ -661,7 +661,7 @@ void Table::set_index(size_t column_ndx, bool update_spec)
 
         // Create the index
         StringIndex& ndx = col.CreateIndex();
-        ndx.SetParent(&m_columns, column_pos+1);
+        ndx.set_parent(&m_columns, column_pos+1);
         ndx_ref = ndx.get_ref();
     }
     else if (ct == col_type_StringEnum) {
@@ -669,7 +669,7 @@ void Table::set_index(size_t column_ndx, bool update_spec)
 
         // Create the index
         StringIndex& ndx = col.CreateIndex();
-        ndx.SetParent(&m_columns, column_pos+1);
+        ndx.set_parent(&m_columns, column_pos+1);
         ndx_ref = ndx.get_ref();
     }
     else {

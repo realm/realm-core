@@ -245,7 +245,7 @@ public:
     // sequence of column types.
     bool operator==(const Array& a) const;
 
-    void SetType(ColumnDef type);
+    void set_type(ColumnDef type);
 
     /// Reinitialize this array accessor to point to the specified new
     /// underlying array, and if it has a parent, update the parent to
@@ -266,8 +266,8 @@ public:
     static size_t create_empty_array(ColumnDef, Allocator&);
 
     // Parent tracking
-    bool HasParent() const TIGHTDB_NOEXCEPT {return m_parent != NULL;}
-    void SetParent(ArrayParent *parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
+    bool has_parent() const TIGHTDB_NOEXCEPT { return m_parent != 0; }
+    void set_parent(ArrayParent *parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
     void UpdateParentNdx(int diff) {m_parentNdx += diff;}
     ArrayParent *GetParent() const TIGHTDB_NOEXCEPT {return m_parent;}
     size_t GetParentNdx() const TIGHTDB_NOEXCEPT {return m_parentNdx;}
@@ -777,7 +777,7 @@ inline Array::Array(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator&
     update_ref_in_parent();
 }
 
-// Creates new array (but invalid, call update_ref() or SetType() to init)
+// Creates new array (but invalid, call update_ref() or set_type() to init)
 inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
     m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false),
     m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {}
@@ -1167,7 +1167,7 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
         const size_t refs_pos = newRefs.Write(out, false, persist);
 
         // Clean-up
-        newRefs.SetType(coldef_Normal); // avoid recursive del
+        newRefs.set_type(coldef_Normal); // avoid recursive del
         newRefs.Destroy();
 
         return refs_pos; // Return position

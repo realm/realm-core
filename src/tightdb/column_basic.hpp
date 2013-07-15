@@ -74,13 +74,13 @@ public:
     void find_all(Array& result, T value, size_t start = 0, size_t end = -1) const;
 
     // Index
-    bool HasIndex() const TIGHTDB_OVERRIDE {return false;}
+    bool HasIndex() const TIGHTDB_OVERRIDE { return false; }
     void BuildIndex(Index&) {}
     void ClearIndex() {}
-    size_t FindWithIndex(int64_t) const {return size_t(-1);}
+    size_t FindWithIndex(int64_t) const { return size_t(-1); }
 
-    size_t get_ref() const TIGHTDB_OVERRIDE {return m_array->get_ref();}
-    void SetParent(ArrayParent* parent, size_t pndx) TIGHTDB_OVERRIDE {m_array->SetParent(parent, pndx);}
+    size_t get_ref() const TIGHTDB_OVERRIDE { return m_array->get_ref(); }
+    void set_parent(ArrayParent* parent, size_t pndx) TIGHTDB_OVERRIDE { m_array->set_parent(parent, pndx); }
 
     /// Compare two columns for equality.
     bool compare(const BasicColumn&) const;

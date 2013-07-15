@@ -19,18 +19,18 @@ Spec::~Spec()
 void Spec::init_from_ref(size_t ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     m_specSet.update_ref(ref);
-    m_specSet.SetParent(parent, ndx_in_parent);
+    m_specSet.set_parent(parent, ndx_in_parent);
     TIGHTDB_ASSERT(m_specSet.size() == 2 || m_specSet.size() == 3);
 
     m_spec.update_ref(m_specSet.get_as_ref(0));
-    m_spec.SetParent(&m_specSet, 0);
+    m_spec.set_parent(&m_specSet, 0);
     m_names.update_ref(m_specSet.get_as_ref(1));
-    m_names.SetParent(&m_specSet, 1);
+    m_names.set_parent(&m_specSet, 1);
 
     // SubSpecs array is only there when there are subtables
     if (m_specSet.size() == 3) {
         m_subSpecs.update_ref(m_specSet.get_as_ref(2));
-        m_subSpecs.SetParent(&m_specSet, 2);
+        m_subSpecs.set_parent(&m_specSet, 2);
     }
 }
 
@@ -51,7 +51,7 @@ void Spec::update_ref(size_t ref, ArrayParent* parent, size_t pndx)
 
 void Spec::set_parent(ArrayParent* parent, size_t pndx)
 {
-    m_specSet.SetParent(parent, pndx);
+    m_specSet.set_parent(parent, pndx);
 }
 
 bool Spec::update_from_parent()
@@ -82,11 +82,11 @@ size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
     if (type == type_Table) {
         // SubSpecs array is only there when there are subtables
         if (m_specSet.size() == 2) {
-            m_subSpecs.SetType(Array::coldef_HasRefs);
-            //m_subSpecs.SetType((ColumnDef)4);
+            m_subSpecs.set_type(Array::coldef_HasRefs);
+            //m_subSpecs.set_type((ColumnDef)4);
             //return;
             m_specSet.add(m_subSpecs.get_ref());
-            m_subSpecs.SetParent(&m_specSet, 2);
+            m_subSpecs.set_parent(&m_specSet, 2);
         }
 
         Allocator& alloc = m_specSet.GetAllocator();

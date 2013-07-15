@@ -62,11 +62,11 @@ public:
     bool HasIndex() const {return false;}
     void BuildIndex(Index&) {}
     void ClearIndex() {}
-    size_t FindWithIndex(int64_t) const {return (size_t)-1;}
+    size_t FindWithIndex(int64_t) const { return size_t(-1); }
 
-    size_t get_ref() const {return m_array->get_ref();}
-    void SetParent(ArrayParent *parent, size_t pndx) {m_array->SetParent(parent, pndx);}
-    void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
+    size_t get_ref() const { return m_array->get_ref(); }
+    void set_parent(ArrayParent *parent, size_t pndx) { m_array->set_parent(parent, pndx); }
+    void UpdateParentNdx(int diff) { m_array->UpdateParentNdx(diff); }
 
     /// Compare two binary columns for equality.
     bool compare(const ColumnBinary&) const;
