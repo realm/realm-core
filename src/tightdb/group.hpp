@@ -366,7 +366,7 @@ inline Group::Group(const std::string& file, OpenMode mode):
         open(file, mode); // Throws
     }
     catch (...) {
-        m_cachedtables.Destroy();
+        m_cachedtables.destroy();
         throw;
     }
 }
@@ -382,7 +382,7 @@ inline Group::Group(BinaryData buffer, bool take_ownership):
         open(buffer, take_ownership); // Throws
     }
     catch (...) {
-        m_cachedtables.Destroy();
+        m_cachedtables.destroy();
         throw;
     }
 }
@@ -574,7 +574,7 @@ template<class S> size_t Group::write_to_stream(S& out) const
     // Clean up temporary top
     top.set(0, 0); // reset to avoid recursive delete
     top.set(1, 0); // reset to avoid recursive delete
-    top.Destroy();
+    top.destroy();
 
     // return bytes written
     return byte_size;
@@ -613,7 +613,7 @@ inline void Group::clear_cache()
             t->unbind_ref();
         }
     }
-    m_cachedtables.Clear();
+    m_cachedtables.clear();
 }
 
 

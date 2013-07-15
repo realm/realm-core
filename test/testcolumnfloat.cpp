@@ -43,7 +43,7 @@ void BasicColumn_IsEmpty()
     C c;
     CHECK(c.is_empty());
     CHECK_EQUAL(c.Size(), (size_t)0);
-    c.Destroy();
+    c.destroy();
 }
 TEST(ColumnFloat_IsEmpty) { BasicColumn_IsEmpty<ColumnFloat>(); }
 TEST(ColumnDouble_IsEmpty){ BasicColumn_IsEmpty<ColumnDouble>(); }
@@ -63,7 +63,7 @@ void BasicColumn_AddGet(T val[], size_t valLen)
         }
     }
 
-    c.Destroy();
+    c.destroy();
 }
 TEST(ColumnFloat_AddGet) { BasicColumn_AddGet<ColumnFloat, float>(floatVal, floatValLen); }
 TEST(ColumnDouble_AddGet){ BasicColumn_AddGet<ColumnDouble, double>(doubleVal, doubleValLen); }
@@ -79,10 +79,10 @@ void BasicColumn_Clear()
         c.add();
     CHECK(!c.is_empty());
 
-    c.Clear();
+    c.clear();
     CHECK(c.is_empty());
 
-    c.Destroy();
+    c.destroy();
 }
 TEST(ColumnFloat_Clear) { BasicColumn_Clear<ColumnFloat, float>(); }
 TEST(ColumnDouble_Clear){ BasicColumn_Clear<ColumnDouble, double>(); }
@@ -107,7 +107,7 @@ void BasicColumn_Set(T val[], size_t valLen)
     CHECK_EQUAL(val[2], c.get(2));
     CHECK_EQUAL(val[4], c.get(4));
 
-    c.Destroy();
+    c.destroy();
 }
 TEST(ColumnFloat_Set) { BasicColumn_Set<ColumnFloat, float>(floatVal, floatValLen); }
 TEST(ColumnDouble_Set){ BasicColumn_Set<ColumnDouble, double>(doubleVal, doubleValLen); }
@@ -155,7 +155,7 @@ void BasicColumn_Insert(T val[], size_t valLen)
     CHECK_EQUAL(val[3], c.get(4));
     CHECK_EQUAL(5, c.Size());
 
-    c.Destroy();
+    c.destroy();
 }
 TEST(ColumnFloat_Insert) { BasicColumn_Insert<ColumnFloat, float>(floatVal, floatValLen); }
 TEST(ColumnDouble_Insert){ BasicColumn_Insert<ColumnDouble, double>(doubleVal, doubleValLen); }
@@ -175,7 +175,7 @@ void BasicColumn_Aggregates(T val[], size_t valLen)
     // todo: add tests for minimum, maximum,
     // todo !!!
 
-   c.Destroy();
+   c.destroy();
 }
 TEST(ColumnFloat_Aggregates) { BasicColumn_Aggregates<ColumnFloat, float>(floatVal, floatValLen); }
 TEST(ColumnDouble_Aggregates){ BasicColumn_Aggregates<ColumnDouble, double>(doubleVal, doubleValLen); }
@@ -224,7 +224,7 @@ void BasicColumn_Delete(T val[], size_t valLen)
     c.erase(0);
     CHECK_EQUAL(0, c.Size());
 
-    c.Destroy();
+    c.destroy();
 }
 TEST(ColumnFloat_Delete) { BasicColumn_Delete<ColumnFloat, float>(floatVal, floatValLen); }
 TEST(ColumnDouble_Delete){ BasicColumn_Delete<ColumnDouble, double>(doubleVal, doubleValLen); }

@@ -131,7 +131,7 @@ protected:
     /// Moving constructor.
     TableViewBase(TableViewBase*);
 
-    ~TableViewBase() { m_refs.Destroy(); }
+    ~TableViewBase() { m_refs.destroy(); }
 
     void move_assign(TableViewBase*);
 

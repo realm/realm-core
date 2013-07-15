@@ -54,7 +54,7 @@ void ArrayBinary::set(size_t ndx, BinaryData value)
     const ssize_t diff =  (start + value.size()) - current_end;
 
     m_blob.replace(start, current_end, value.data(), value.size());
-    m_offsets.Adjust(ndx, diff);
+    m_offsets.adjust(ndx, diff);
 }
 
 void ArrayBinary::insert(size_t ndx, BinaryData value)
@@ -65,8 +65,8 @@ void ArrayBinary::insert(size_t ndx, BinaryData value)
     const size_t pos = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
 
     m_blob.insert(pos, value.data(), value.size());
-    m_offsets.Insert(ndx, pos + value.size());
-    m_offsets.Adjust(ndx+1, value.size());
+    m_offsets.insert(ndx, pos + value.size());
+    m_offsets.adjust(ndx+1, value.size());
 }
 
 void ArrayBinary::set_string(size_t ndx, StringData value)
@@ -80,7 +80,7 @@ void ArrayBinary::set_string(size_t ndx, StringData value)
 
     bool add_zero_term = true;
     m_blob.replace(start, current_end, value.data(), value.size(), add_zero_term);
-    m_offsets.Adjust(ndx, diff);
+    m_offsets.adjust(ndx, diff);
 }
 
 void ArrayBinary::insert_string(size_t ndx, StringData value)
@@ -92,11 +92,11 @@ void ArrayBinary::insert_string(size_t ndx, StringData value)
 
     bool add_zero_term = true;
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
-    m_offsets.Insert(ndx, pos + value.size() + 1);
-    m_offsets.Adjust(ndx+1, value.size() + 1);
+    m_offsets.insert(ndx, pos + value.size() + 1);
+    m_offsets.adjust(ndx+1, value.size() + 1);
 }
 
-void ArrayBinary::Delete(size_t ndx)
+void ArrayBinary::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
@@ -104,24 +104,24 @@ void ArrayBinary::Delete(size_t ndx)
     const size_t end = to_size_t(m_offsets.get(ndx));
 
     m_blob.erase(start, end);
-    m_offsets.Delete(ndx);
-    m_offsets.Adjust(ndx, int64_t(start) - end);
+    m_offsets.erase(ndx);
+    m_offsets.adjust(ndx, int64_t(start) - end);
 }
 
-void ArrayBinary::Resize(size_t ndx)
+void ArrayBinary::resize(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
     const size_t len = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
 
-    m_offsets.Resize(ndx);
-    m_blob.Resize(len);
+    m_offsets.resize(ndx);
+    m_blob.resize(len);
 }
 
-void ArrayBinary::Clear()
+void ArrayBinary::clear()
 {
-    m_blob.Clear();
-    m_offsets.Clear();
+    m_blob.clear();
+    m_offsets.clear();
 }
 
 BinaryData ArrayBinary::get_direct(Allocator& alloc, const char* header, size_t ndx) TIGHTDB_NOEXCEPT

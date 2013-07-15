@@ -45,7 +45,7 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet)
 
 TEST_FIXTURE(db_setup_column_binary, ColumnBinaryAdd)
 {
-    c.Clear();
+    c.clear();
     CHECK_EQUAL(0, c.Size());
 
     c.add(BinaryData("abc", 4));
@@ -64,7 +64,7 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryAdd)
 TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet2)
 {
     // {shrink, grow} x {first, middle, last, single}
-    c.Clear();
+    c.clear();
 
     c.add(BinaryData("abc", 4));
     c.set(0, BinaryData("de", 3)); // shrink single
@@ -118,7 +118,7 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet2)
 
 TEST_FIXTURE(db_setup_column_binary, ColumnBinaryInsert)
 {
-    c.Clear();
+    c.clear();
 
     c.insert(0, BinaryData("abc", 4)); // single
     CHECK_EQUAL("abc", c.get(0).data());
@@ -162,7 +162,7 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryInsert)
 
 TEST_FIXTURE(db_setup_column_binary, ColumnBinaryDelete)
 {
-    c.Clear();
+    c.clear();
 
     c.add(BinaryData("a", 2));
     c.add(BinaryData("bc", 3));
@@ -200,5 +200,5 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryDelete)
 TEST_FIXTURE(db_setup_column_binary, ColumnBinary_Destroy)
 {
     // clean up (ALWAYS PUT THIS LAST)
-    c.Destroy();
+    c.destroy();
 }

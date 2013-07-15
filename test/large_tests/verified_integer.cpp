@@ -122,7 +122,7 @@ void VerifiedInteger::Delete(size_t ndx)
 void VerifiedInteger::Clear()
 {
     v.clear();
-    u.Clear();
+    u.clear();
     TIGHTDB_ASSERT(v.size() == u.Size());
     TIGHTDB_ASSERT(ConditionalVerify());
 }
@@ -158,7 +158,7 @@ void VerifiedInteger::find_all(Array &c, int64_t value, size_t start, size_t end
         }
     }
 
-    c.Clear();
+    c.clear();
 
     u.find_all(c, value);
     if (c.size() != result.size())
@@ -198,7 +198,7 @@ bool VerifiedInteger::ConditionalVerify(void)
 
 void VerifiedInteger::Destroy(void)
 {
-    u.Destroy();
+    u.destroy();
 }
 
 #endif

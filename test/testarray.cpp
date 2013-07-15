@@ -35,13 +35,13 @@ void hasZeroByte(int64_t value, size_t reps)
     size_t t = a.find_first(0);
     CHECK_EQUAL(a.size() - 1, t);
 
-    r.Clear();
+    r.clear();
     a.find_all(r, 0);
     CHECK_EQUAL(int64_t(a.size() - 1), r.get(0));
 
     // Cleanup
-    a.Destroy();
-    r.Destroy();
+    a.destroy();
+    r.destroy();
 }
 
 } // anonymous namespace
@@ -157,7 +157,7 @@ TEST_FIXTURE(db_setup_array, Array_Add8)
 
 TEST_FIXTURE(db_setup_array, Array_AddNeg1)
 {
-    c.Clear();
+    c.clear();
     c.add(-1);
 
     CHECK_EQUAL(c.size(), 1);
@@ -182,7 +182,7 @@ TEST(Array_AddNeg1_1)
     CHECK_EQUAL(8, c.get_width());
 
     // Cleanup
-    c.Destroy();
+    c.destroy();
 }
 
 TEST_FIXTURE(db_setup_array, Array_AddNeg2)
@@ -235,14 +235,14 @@ TEST_FIXTURE(db_setup_array, Array_Set)
 TEST_FIXTURE(db_setup_array, Array_Insert1)
 {
     // Set up some initial values
-    c.Clear();
+    c.clear();
     c.add(0);
     c.add(1);
     c.add(2);
     c.add(3);
 
     // Insert in middle
-    c.Insert(2, 16);
+    c.insert(2, 16);
 
     CHECK_EQUAL(c.size(), 5);
     CHECK_EQUAL(c.get(0), 0);
@@ -255,7 +255,7 @@ TEST_FIXTURE(db_setup_array, Array_Insert1)
 TEST_FIXTURE(db_setup_array, Array_Insert2)
 {
     // Insert at top
-    c.Insert(0, 256);
+    c.insert(0, 256);
 
     CHECK_EQUAL(c.size(), 6);
     CHECK_EQUAL(c.get(0), 256);
@@ -269,7 +269,7 @@ TEST_FIXTURE(db_setup_array, Array_Insert2)
 TEST_FIXTURE(db_setup_array, Array_Insert3)
 {
     // Insert at bottom
-    c.Insert(6, 65536);
+    c.insert(6, 65536);
 
     CHECK_EQUAL(c.size(), 7);
     CHECK_EQUAL(c.get(0), 256);
@@ -303,7 +303,7 @@ TEST_FIXTURE(db_setup_array, Array_Index1)
 TEST_FIXTURE(db_setup_array, Array_Delete1)
 {
     // Delete from middle
-    c.Delete(3);
+    c.erase(3);
 
     CHECK_EQUAL(c.size(), 6);
     CHECK_EQUAL(c.get(0), 256);
@@ -317,7 +317,7 @@ TEST_FIXTURE(db_setup_array, Array_Delete1)
 TEST_FIXTURE(db_setup_array, Array_Delete2)
 {
     // Delete from top
-    c.Delete(0);
+    c.erase(0);
 
     CHECK_EQUAL(c.size(), 5);
     CHECK_EQUAL(c.get(0), 0);
@@ -330,7 +330,7 @@ TEST_FIXTURE(db_setup_array, Array_Delete2)
 TEST_FIXTURE(db_setup_array, Array_Delete3)
 {
     // Delete from bottom
-    c.Delete(4);
+    c.erase(4);
 
     CHECK_EQUAL(c.size(), 4);
     CHECK_EQUAL(c.get(0), 0);
@@ -342,10 +342,10 @@ TEST_FIXTURE(db_setup_array, Array_Delete3)
 TEST_FIXTURE(db_setup_array, Array_DeleteAll)
 {
     // Delete all items one at a time
-    c.Delete(0);
-    c.Delete(0);
-    c.Delete(0);
-    c.Delete(0);
+    c.erase(0);
+    c.erase(0);
+    c.erase(0);
+    c.erase(0);
 
     CHECK(c.is_empty());
     CHECK_EQUAL(0, c.size());
@@ -362,7 +362,7 @@ TEST_FIXTURE(db_setup_array, Array_Find1)
 TEST_FIXTURE(db_setup_array, Array_Find2)
 {
     // zero-bit width
-    c.Clear();
+    c.clear();
     c.add(0);
     c.add(0);
 
@@ -442,7 +442,7 @@ TEST_FIXTURE(db_setup_array, Array_Find9)
 #define PARTIAL_COUNT 100
 TEST_FIXTURE(db_setup_array, Array_PartialFind1)
 {
-    c.Clear();
+    c.clear();
 
     for (size_t i = 0; i < PARTIAL_COUNT; ++i) {
         c.add(i);
@@ -457,7 +457,7 @@ TEST_FIXTURE(db_setup_array, Array_PartialFind1)
 TEST_FIXTURE(db_setup_array, Array_Destroy)
 {
     // clean up (ALWAYS PUT THIS LAST)
-    c.Destroy();
+    c.destroy();
 }
 
 TEST(Array_Sort)
@@ -489,7 +489,7 @@ TEST(Array_Sort)
     CHECK_EQUAL(51, a.get(9));
 
     // Cleanup
-    a.Destroy();
+    a.destroy();
 }
 
 /** find_all() int tests spread out over bitwidth
@@ -521,8 +521,8 @@ TEST(findallint0)
     }
 
     // Cleanup
-    a.Destroy();
-    r.Destroy();
+    a.destroy();
+    r.destroy();
 }
 
 TEST(findallint1)
@@ -552,8 +552,8 @@ TEST(findallint1)
     }
 
     // Cleanup
-    a.Destroy();
-    r.Destroy();
+    a.destroy();
+    r.destroy();
 }
 
 TEST(findallint2)
@@ -583,8 +583,8 @@ TEST(findallint2)
     }
 
     // Cleanup
-    a.Destroy();
-    r.Destroy();
+    a.destroy();
+    r.destroy();
 }
 
 TEST(findallint3)
@@ -614,8 +614,8 @@ TEST(findallint3)
     }
 
     // Cleanup
-    a.Destroy();
-    r.Destroy();
+    a.destroy();
+    r.destroy();
 }
 
 TEST(findallint4)
@@ -646,8 +646,8 @@ TEST(findallint4)
     }
 
     // Cleanup
-    a.Destroy();
-    r.Destroy();
+    a.destroy();
+    r.destroy();
 }
 
 TEST(findallint5)
@@ -678,8 +678,8 @@ TEST(findallint5)
     }
 
     // Cleanup
-    a.Destroy();
-    r.Destroy();
+    a.destroy();
+    r.destroy();
 }
 
 TEST(findallint6)
@@ -710,8 +710,8 @@ TEST(findallint6)
     }
 
     // Cleanup
-    a.Destroy();
-    r.Destroy();
+    a.destroy();
+    r.destroy();
 }
 
 TEST(findallint7)
@@ -742,8 +742,8 @@ TEST(findallint7)
     }
 
     // Cleanup
-    a.Destroy();
-    r.Destroy();
+    a.destroy();
+    r.destroy();
 }
 
 // Tests the case where a value does *not* exist in one entire 64-bit chunk (triggers the 'if (hasZeroByte) break;' condition)
@@ -775,7 +775,7 @@ TEST(FindSSE)
         a.set(i, 10000);
         static_cast<void>(t);
     }
-    a.Destroy();
+    a.destroy();
 }
 
 
@@ -786,7 +786,7 @@ TEST(Sum0)
         a.add(0);
     }
     CHECK_EQUAL(0, a.sum(0, a.size()));
-    a.Destroy();
+    a.destroy();
 }
 
 TEST(Sum1)
@@ -806,7 +806,7 @@ TEST(Sum1)
         s1 += a.get(i);
     CHECK_EQUAL(s1, a.sum(3, 100));
 
-    a.Destroy();
+    a.destroy();
 }
 
 TEST(Sum2)
@@ -826,7 +826,7 @@ TEST(Sum2)
         s1 += a.get(i);
     CHECK_EQUAL(s1, a.sum(3, 100));
 
-    a.Destroy();
+    a.destroy();
 }
 
 
@@ -847,7 +847,7 @@ TEST(Sum4)
         s1 += a.get(i);
     CHECK_EQUAL(s1, a.sum(3, 100));
 
-    a.Destroy();
+    a.destroy();
 }
 
 TEST(Sum16)
@@ -867,7 +867,7 @@ TEST(Sum16)
         s1 += a.get(i);
     CHECK_EQUAL(s1, a.sum(3, 100));
 
-    a.Destroy();
+    a.destroy();
 }
 
 TEST(Greater)
@@ -879,7 +879,7 @@ TEST(Greater)
     for (items = 2; items < 200; items += 7)
     {
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(0);
         }
@@ -887,7 +887,7 @@ TEST(Greater)
         CHECK_EQUAL(-1, t);
 
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(0);
         }
@@ -901,7 +901,7 @@ TEST(Greater)
             a.set(i, 0);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(2);
         }
@@ -912,7 +912,7 @@ TEST(Greater)
             a.set(i, 2);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(10);
         }
@@ -923,7 +923,7 @@ TEST(Greater)
             a.set(i, 10);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(100);
         }
@@ -933,7 +933,7 @@ TEST(Greater)
             CHECK_EQUAL(i, t);
             a.set(i, 100);
         }
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(200);
         }
@@ -944,7 +944,7 @@ TEST(Greater)
             a.set(i, 200);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(10000);
         }
@@ -954,7 +954,7 @@ TEST(Greater)
             CHECK_EQUAL(i, t);
             a.set(i, 10000);
         }
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(40000);
         }
@@ -966,7 +966,7 @@ TEST(Greater)
             a.set(i, 40000);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(1000000);
         }
@@ -977,7 +977,7 @@ TEST(Greater)
             a.set(i, 1000000);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(1000ULL*1000ULL*1000ULL*1000ULL);
         }
@@ -989,7 +989,7 @@ TEST(Greater)
         }
 
     }
-    a.Destroy();
+    a.destroy();
 }
 
 
@@ -1004,7 +1004,7 @@ TEST(Less)
     for (items = 2; items < 200; items += 7)
     {
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(0);
         }
@@ -1012,7 +1012,7 @@ TEST(Less)
         CHECK_EQUAL(-1, t);
 
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(1);
         }
@@ -1023,7 +1023,7 @@ TEST(Less)
             a.set(i, 1);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(3);
         }
@@ -1034,7 +1034,7 @@ TEST(Less)
             a.set(i, 3);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(11);
         }
@@ -1045,7 +1045,7 @@ TEST(Less)
             a.set(i, 11);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(110);
         }
@@ -1055,7 +1055,7 @@ TEST(Less)
             CHECK_EQUAL(i, t);
             a.set(i, 110);
         }
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(210);
         }
@@ -1066,7 +1066,7 @@ TEST(Less)
             a.set(i, 210);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(11000);
         }
@@ -1076,7 +1076,7 @@ TEST(Less)
             CHECK_EQUAL(i, t);
             a.set(i, 11000);
         }
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(41000);
         }
@@ -1088,7 +1088,7 @@ TEST(Less)
             a.set(i, 41000);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(1100000);
         }
@@ -1099,7 +1099,7 @@ TEST(Less)
             a.set(i, 1100000);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(1000ULL*1000ULL*1000ULL*1000ULL);
         }
@@ -1111,7 +1111,7 @@ TEST(Less)
         }
 
     }
-    a.Destroy();
+    a.destroy();
 }
 
 
@@ -1119,14 +1119,14 @@ TEST(NotEqual1)
 {
     Array a;
 
-    a.Clear();
+    a.clear();
     for (size_t i = 0; i < 100; i++) {
         a.add(0x33);
     }
     a.set(50, 0x44);
     size_t t = a.find_first<NotEqual>(0x33, 0, (size_t)-1);
     CHECK_EQUAL(50, t);
-    a.Destroy();
+    a.destroy();
 }
 
 TEST(NotEqual)
@@ -1137,7 +1137,7 @@ TEST(NotEqual)
 
     for (items = 2; items < 200; items += 7)
     {
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(0);
         }
@@ -1145,7 +1145,7 @@ TEST(NotEqual)
         CHECK_EQUAL(-1, t);
 
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(0);
         }
@@ -1156,7 +1156,7 @@ TEST(NotEqual)
             a.set(i, 0);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(2);
         }
@@ -1167,7 +1167,7 @@ TEST(NotEqual)
             a.set(i, 2);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(10);
         }
@@ -1178,7 +1178,7 @@ TEST(NotEqual)
             a.set(i, 10);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(100);
         }
@@ -1188,7 +1188,7 @@ TEST(NotEqual)
             CHECK_EQUAL(i, t);
             a.set(i, 100);
         }
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(200);
         }
@@ -1199,7 +1199,7 @@ TEST(NotEqual)
             a.set(i, 200);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(10000);
         }
@@ -1209,7 +1209,7 @@ TEST(NotEqual)
             CHECK_EQUAL(i, t);
             a.set(i, 10000);
         }
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(40000);
         }
@@ -1221,7 +1221,7 @@ TEST(NotEqual)
             a.set(i, 40000);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(1000000);
         }
@@ -1232,7 +1232,7 @@ TEST(NotEqual)
             a.set(i, 1000000);
         }
 
-        a.Clear();
+        a.clear();
         for (size_t i = 0; i < items; i++) {
             a.add(1000ULL*1000ULL*1000ULL*1000ULL);
         }
@@ -1244,7 +1244,7 @@ TEST(NotEqual)
         }
 
     }
-    a.Destroy();
+    a.destroy();
 }
 
 
@@ -1265,7 +1265,7 @@ TEST(ArraySort)
     for (size_t t = 1; t < a.size(); t++)
         CHECK(a.get(t) >= a.get(t - 1));
 
-    a.Destroy();
+    a.destroy();
 }
 
 
@@ -1284,7 +1284,7 @@ TEST(ArraySort2)
     for (size_t t = 1; t < a.size(); t++)
         CHECK(a.get(t) >= a.get(t - 1));
 
-    a.Destroy();
+    a.destroy();
 }
 
 TEST(ArraySort3)
@@ -1302,7 +1302,7 @@ TEST(ArraySort3)
     for (size_t t = 1; t < a.size(); t++)
         CHECK(a.get(t) >= a.get(t - 1));
 
-    a.Destroy();
+    a.destroy();
 }
 
 
@@ -1321,7 +1321,7 @@ TEST(ArraySort4)
     for (size_t t = 1; t < a.size(); t++)
         CHECK(a.get(t) == 0);
 
-    a.Destroy();
+    a.destroy();
 }
 
 TEST(ArrayCopy)
@@ -1367,11 +1367,11 @@ TEST(ArrayCopy)
     CHECK_EQUAL(3, e.get(3));
     CHECK_EQUAL(4, e.get(4));
 
-    //a.Destroy() // will be destroyed as sub-array by c
-    b.Destroy();
-    c.Destroy();
-    d.Destroy();
-    //e.Destroy() // will be destroyed as sub-array by d
+    //a.destroy() // will be destroyed as sub-array by c
+    b.destroy();
+    c.destroy();
+    d.destroy();
+    //e.destroy() // will be destroyed as sub-array by d
 }
 
 TEST(ArrayCount)
@@ -1459,5 +1459,5 @@ TEST(ArrayCount)
     CHECK_EQUAL(0, a.count(-0xFFFFFFFFll));
 
     // Clean-up
-    a.Destroy();
+    a.destroy();
 }

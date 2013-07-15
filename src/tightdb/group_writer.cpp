@@ -25,19 +25,19 @@ size_t GroupWriter::commit()
 {
     merge_free_space();
 
-    Array& top          = m_group.get_top_array();
-    Array& fpositions   = m_group.m_freePositions;
-    Array& flengths     = m_group.m_freeLengths;
-    Array& fversions    = m_group.m_freeVersions;
-    const bool isShared = m_group.m_is_shared;
+    Array& top           = m_group.get_top_array();
+    Array& fpositions    = m_group.m_freePositions;
+    Array& flengths      = m_group.m_freeLengths;
+    Array& fversions     = m_group.m_freeVersions;
+    const bool is_shared = m_group.m_is_shared;
     TIGHTDB_ASSERT(fpositions.size() == flengths.size());
-    TIGHTDB_ASSERT(!isShared || fversions.size() == flengths.size());
+    TIGHTDB_ASSERT(!is_shared || fversions.size() == flengths.size());
 
     // Ensure that the freelist arrays are are themselves added to
     // (the allocator) free list
     fpositions.CopyOnWrite();
     flengths.CopyOnWrite();
-    if (isShared) fversions.CopyOnWrite();
+    if (is_shared) fversions.CopyOnWrite();
 
     // Recursively write all changed arrays
     // (but not top yet, as it contains refs to free lists which are changing)
@@ -66,7 +66,7 @@ size_t GroupWriter::commit()
     const size_t free_count = fpositions.size() + 5;
     const size_t top_max_size = (5 + 1) * 8;
     const size_t flist_max_size = free_count * 8;
-    const size_t total_reserve = top_max_size + (flist_max_size * (isShared ? 3 : 2));
+    const size_t total_reserve = top_max_size + (flist_max_size * (is_shared ? 3 : 2));
 
     // Reserve space for each block. We explicitly ask for a bigger space than
     // the blocks can occupy, so that later when we know the real size, we can
@@ -77,7 +77,7 @@ size_t GroupWriter::commit()
     // Get final sizes of free lists
     const size_t fp_size  = fpositions.GetByteSize(true);
     const size_t fl_size  = flengths.GetByteSize(true);
-    const size_t fv_size  = isShared ? fversions.GetByteSize(true) : 0;
+    const size_t fv_size  = is_shared ? fversions.GetByteSize(true) : 0;
 
     // Calc write positions
     const size_t fl_pos = res_pos + fp_size;
@@ -89,8 +89,8 @@ size_t GroupWriter::commit()
     top.set(1, t_pos);
     top.set(2, res_pos);
     top.set(3, fl_pos);
-    if (isShared) top.set(4, fv_pos);
-    else if (top.size() == 5) top.Delete(4); // versions
+    if (is_shared) top.set(4, fv_pos);
+    else if (top.size() == 5) top.erase(4); // versions
 
     // Get final sizes
     const size_t top_size = top.GetByteSize(true);
@@ -104,7 +104,7 @@ size_t GroupWriter::commit()
     // Write free lists
     fpositions.WriteAt(res_pos, *this);
     flengths.WriteAt(fl_pos, *this);
-    if (isShared) fversions.WriteAt(fv_pos, *this);
+    if (is_shared) fversions.WriteAt(fv_pos, *this);
 
     // Write top
     top.WriteAt(top_pos, *this);
@@ -179,10 +179,10 @@ void GroupWriter::DoCommit(uint64_t topPos)
 
 void GroupWriter::merge_free_space()
 {
-    Array& fpositions   = m_group.m_freePositions;
-    Array& flengths     = m_group.m_freeLengths;
-    Array& fversions    = m_group.m_freeVersions;
-    const bool isShared = m_group.m_is_shared;
+    Array& fpositions    = m_group.m_freePositions;
+    Array& flengths      = m_group.m_freeLengths;
+    Array& fversions     = m_group.m_freeVersions;
+    const bool is_shared = m_group.m_is_shared;
 
     if (flengths.is_empty())
         return;
@@ -197,7 +197,7 @@ void GroupWriter::merge_free_space()
         if (pos2 == pos1 + len1) {
             // If this is a shared db, we can only merge
             // segments where no part is currently in use
-            if (isShared) {
+            if (is_shared) {
                 const size_t v1 = to_size_t(fversions.get(i));
                 if (v1 >= m_readlock_version)
                     continue;
@@ -209,9 +209,9 @@ void GroupWriter::merge_free_space()
             // Merge
             const size_t len2 = to_size_t(flengths.get(i2));
             flengths.set(i, len1 + len2);
-            fpositions.Delete(i2);
-            flengths.Delete(i2);
-            if (isShared) fversions.Delete(i2);
+            fpositions.erase(i2);
+            flengths.erase(i2);
+            if (is_shared) fversions.erase(i2);
 
             --count;
             --i;
@@ -221,10 +221,10 @@ void GroupWriter::merge_free_space()
 
 void GroupWriter::add_free_space(size_t pos, size_t len, size_t version)
 {
-    Array& fpositions   = m_group.m_freePositions;
-    Array& flengths     = m_group.m_freeLengths;
-    Array& fversions    = m_group.m_freeVersions;
-    const bool isShared = m_group.m_is_shared;
+    Array& fpositions    = m_group.m_freePositions;
+    Array& flengths      = m_group.m_freeLengths;
+    Array& fversions     = m_group.m_freeVersions;
+    const bool is_shared = m_group.m_is_shared;
 
     // We always want to keep the list of free space in
     // sorted order (by position) to facilitate merge of
@@ -235,21 +235,21 @@ void GroupWriter::add_free_space(size_t pos, size_t len, size_t version)
     if (p == not_found) {
         fpositions.add(pos);
         flengths.add(len);
-        if (isShared) fversions.add(version);
+        if (is_shared) fversions.add(version);
     }
     else {
-        fpositions.Insert(p, pos);
-        flengths.Insert(p, len);
-        if (isShared) fversions.Insert(p, version);
+        fpositions.insert(p, pos);
+        flengths.insert(p, len);
+        if (is_shared) fversions.insert(p, version);
     }
 }
 
 size_t GroupWriter::reserve_free_space(size_t len, size_t start)
 {
-    Array& fpositions   = m_group.m_freePositions;
-    Array& flengths     = m_group.m_freeLengths;
-    Array& fversions    = m_group.m_freeVersions;
-    const bool isShared = m_group.m_is_shared;
+    Array& fpositions    = m_group.m_freePositions;
+    Array& flengths      = m_group.m_freeLengths;
+    Array& fversions     = m_group.m_freeVersions;
+    const bool is_shared = m_group.m_is_shared;
 
     // Do we have a free space we can reuse?
     const size_t count = flengths.size();
@@ -259,7 +259,7 @@ size_t GroupWriter::reserve_free_space(size_t len, size_t start)
         if (len <= free_len) {
             // Only blocks that are not occupied by current
             // readers are allowed to be used.
-            if (isShared) {
+            if (is_shared) {
                 const size_t v = to_size_t(fversions.get(i));
                 if (v >= m_readlock_version) continue;
             }
@@ -282,9 +282,9 @@ size_t GroupWriter::reserve_free_space(size_t len, size_t start)
 
         const size_t pos = to_size_t(fpositions.get(ndx)) + len;
         const size_t rest = free_len - len;
-        fpositions.Insert(ndx+1, pos);
-        flengths.Insert(ndx+1, rest);
-        if (isShared) fversions.Insert(ndx+1, 0);
+        fpositions.insert(ndx+1, pos);
+        flengths.insert(ndx+1, rest);
+        if (is_shared) fversions.insert(ndx+1, 0);
     }
 
     return ndx;
@@ -295,10 +295,10 @@ size_t GroupWriter::get_free_space(size_t len)
     TIGHTDB_ASSERT((len & 0x7) == 0); // 64bit alignment
     TIGHTDB_ASSERT((m_file_map.get_size() & 0x7) == 0); // 64bit alignment
 
-    Array& fpositions   = m_group.m_freePositions;
-    Array& flengths     = m_group.m_freeLengths;
-    Array& fversions    = m_group.m_freeVersions;
-    const bool isShared = m_group.m_is_shared;
+    Array& fpositions    = m_group.m_freePositions;
+    Array& flengths      = m_group.m_freeLengths;
+    Array& fversions     = m_group.m_freeVersions;
+    const bool is_shared = m_group.m_is_shared;
 
     const size_t count = flengths.size();
 
@@ -313,7 +313,7 @@ size_t GroupWriter::get_free_space(size_t len)
         if (len <= free_len) {
             // Only blocks that are not occupied by current
             // readers are allowed to be used.
-            if (isShared) {
+            if (is_shared) {
                 const size_t v = to_size_t(fversions.get(i));
                 if (v >= m_readlock_version) continue;
             }
@@ -323,10 +323,10 @@ size_t GroupWriter::get_free_space(size_t len)
             // Update free list
             const size_t rest = free_len - len;
             if (rest == 0) {
-                fpositions.Delete(i);
-                flengths.Delete(i);
-                if (isShared)
-                    fversions.Delete(i);
+                fpositions.erase(i);
+                flengths.erase(i);
+                if (is_shared)
+                    fversions.erase(i);
             }
             else {
                 flengths.set(i, rest);
@@ -349,9 +349,9 @@ size_t GroupWriter::get_free_space(size_t len)
         flengths.set(ext_pos, rest);
     }
     else {
-        fpositions.Delete(ext_pos);
-        flengths.Delete(ext_pos);
-        if (isShared) fversions.Delete(ext_pos);
+        fpositions.erase(ext_pos);
+        flengths.erase(ext_pos);
+        if (is_shared) fversions.erase(ext_pos);
     }
 
     return old_filesize;
@@ -359,10 +359,10 @@ size_t GroupWriter::get_free_space(size_t len)
 
 size_t GroupWriter::extend_free_space(size_t len)
 {
-    Array& fpositions   = m_group.m_freePositions;
-    Array& flengths     = m_group.m_freeLengths;
-    Array& fversions    = m_group.m_freeVersions;
-    const bool isShared = m_group.m_is_shared;
+    Array& fpositions    = m_group.m_freePositions;
+    Array& flengths      = m_group.m_freeLengths;
+    Array& fversions     = m_group.m_freeVersions;
+    const bool is_shared = m_group.m_is_shared;
 
     // we always expand megabytes at a time, both for
     // performance and to avoid excess fragmentation
@@ -385,7 +385,7 @@ size_t GroupWriter::extend_free_space(size_t len)
         size_t last_ndx = to_size_t(fpositions.size()-1);
         size_t last_len = to_size_t(flengths[last_ndx]);
         size_t end  = to_size_t(fpositions[last_ndx] + last_len);
-        size_t ver  = to_size_t(isShared ? fversions[last_ndx] : 0);
+        size_t ver  = to_size_t(is_shared ? fversions[last_ndx] : 0);
         if (end == old_filesize && ver == 0) {
             flengths.set(last_ndx, last_len + ext_len);
             return last_ndx;
@@ -395,7 +395,7 @@ size_t GroupWriter::extend_free_space(size_t len)
     // Else add new free space
     fpositions.add(old_filesize);
     flengths.add(ext_len);
-    if (isShared) fversions.add(0); // new space is always free for writing
+    if (is_shared) fversions.add(0); // new space is always free for writing
 
     return fpositions.size()-1;
 }
@@ -405,14 +405,14 @@ size_t GroupWriter::extend_free_space(size_t len)
 
 void GroupWriter::dump()
 {
-    Array& fpositions   = m_group.m_freePositions;
-    Array& flengths     = m_group.m_freeLengths;
-    Array& fversions    = m_group.m_freeVersions;
-    bool isShared = m_group.m_is_shared;
+    Array& fpositions = m_group.m_freePositions;
+    Array& flengths   = m_group.m_freeLengths;
+    Array& fversions  = m_group.m_freeVersions;
+    bool is_shared    = m_group.m_is_shared;
 
     size_t count = flengths.size();
     cout << "count: " << count << ", m_len = " << m_file_map.get_size() << ", version >= " << m_readlock_version << "\n";
-    if (!isShared) {
+    if (!is_shared) {
         for (size_t i = 0; i < count; ++i) {
             cout << i << ": " << fpositions.get(i) << ", " << flengths.get(i) << "\n";
         }

@@ -26,13 +26,13 @@ ColumnStringEnum::~ColumnStringEnum()
         delete m_index;
 }
 
-void ColumnStringEnum::Destroy()
+void ColumnStringEnum::destroy()
 {
-    m_keys.Destroy();
-    Column::Destroy();
+    m_keys.destroy();
+    Column::destroy();
 
     if (m_index)
-        m_index->Destroy();
+        m_index->destroy();
 }
 
 void ColumnStringEnum::UpdateParentNdx(int diff)
@@ -85,7 +85,7 @@ void ColumnStringEnum::insert(size_t ndx, StringData value)
 
     if (m_index) {
         const bool isLast = ndx+1 == Size();
-        m_index->Insert(ndx, value, isLast);
+        m_index->insert(ndx, value, isLast);
     }
 }
 
@@ -106,13 +106,13 @@ void ColumnStringEnum::erase(size_t ndx)
     Column::erase(ndx);
 }
 
-void ColumnStringEnum::Clear()
+void ColumnStringEnum::clear()
 {
     // Note that clearing a StringEnum does not remove keys
-    Column::Clear();
+    Column::clear();
 
     if (m_index)
-        m_index->Clear();
+        m_index->clear();
 }
 
 size_t ColumnStringEnum::count(size_t key_ndx) const
@@ -225,7 +225,7 @@ StringIndex& ColumnStringEnum::CreateIndex()
     const size_t count = Size();
     for (size_t i = 0; i < count; ++i) {
         StringData value = get(i);
-        m_index->Insert(i, value, true);
+        m_index->insert(i, value, true);
     }
 
     return *m_index;

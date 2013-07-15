@@ -59,19 +59,19 @@ AdaptiveStringColumn::~AdaptiveStringColumn()
         delete m_index;
 }
 
-void AdaptiveStringColumn::Destroy()
+void AdaptiveStringColumn::destroy()
 {
     if (IsNode())
-        m_array->Destroy();
+        m_array->destroy();
     else if (IsLongStrings()) {
-        static_cast<ArrayStringLong*>(m_array)->Destroy();
+        static_cast<ArrayStringLong*>(m_array)->destroy();
     }
     else {
-        static_cast<ArrayString*>(m_array)->Destroy();
+        static_cast<ArrayString*>(m_array)->destroy();
     }
 
     if (m_index)
-        m_index->Destroy();
+        m_index->destroy();
 }
 
 
@@ -107,7 +107,7 @@ StringIndex& AdaptiveStringColumn::CreateIndex()
     const size_t count = Size();
     for (size_t i = 0; i < count; ++i) {
         StringData value = get(i);
-        m_index->Insert(i, value, true);
+        m_index->insert(i, value, true);
     }
 
     return *m_index;
@@ -148,35 +148,35 @@ size_t AdaptiveStringColumn::Size() const TIGHTDB_NOEXCEPT
     }
 }
 
-void AdaptiveStringColumn::Clear()
+void AdaptiveStringColumn::clear()
 {
     if (m_array->IsNode()) {
         // Revert to string array
-        m_array->Destroy();
+        m_array->destroy();
         Array* array = new ArrayString(m_array->GetParent(), m_array->GetParentNdx(), m_array->get_alloc());
         delete m_array;
         m_array = array;
     }
     else if (IsLongStrings()) {
-        static_cast<ArrayStringLong*>(m_array)->Clear();
+        static_cast<ArrayStringLong*>(m_array)->clear();
     }
     else {
-        static_cast<ArrayString*>(m_array)->Clear();
+        static_cast<ArrayString*>(m_array)->clear();
     }
 
     if (m_index)
-        m_index->Clear();
+        m_index->clear();
 }
 
-void AdaptiveStringColumn::Resize(size_t ndx)
+void AdaptiveStringColumn::resize(size_t ndx)
 {
     TIGHTDB_ASSERT(!IsNode()); // currently only available on leaf level (used by b-tree code)
 
     if (IsLongStrings()) {
-        static_cast<ArrayStringLong*>(m_array)->Resize(ndx);
+        static_cast<ArrayStringLong*>(m_array)->resize(ndx);
     }
     else {
-        static_cast<ArrayString*>(m_array)->Resize(ndx);
+        static_cast<ArrayString*>(m_array)->resize(ndx);
     }
 
 }
@@ -235,7 +235,7 @@ void AdaptiveStringColumn::insert(size_t ndx, StringData str)
 
     if (m_index) {
         const bool isLast = (ndx+1 == Size());
-        m_index->Insert(ndx, str, isLast);
+        m_index->insert(ndx, str, isLast);
     }
 }
 
@@ -374,7 +374,7 @@ void AdaptiveStringColumn::LeafSet(size_t ndx, StringData value)
 
     // Replace string array with long string array
     m_array = newarray;
-    oldarray->Destroy();
+    oldarray->destroy();
     delete oldarray;
 }
 
@@ -411,7 +411,7 @@ void AdaptiveStringColumn::LeafInsert(size_t ndx, StringData value)
 
     // Replace string array with long string array
     m_array = newarray;
-    oldarray->Destroy();
+    oldarray->destroy();
     delete oldarray;
 }
 
@@ -458,7 +458,7 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
 
         // Don't bother auto enumerating if there are too few duplicates
         if (n/2 < keys.Size()) {
-            keys.Destroy(); // cleanup
+            keys.destroy(); // cleanup
             return false;
         }
 

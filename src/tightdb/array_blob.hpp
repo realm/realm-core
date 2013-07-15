@@ -42,8 +42,8 @@ public:
     void replace(std::size_t begin, std::size_t end, const char* data, std::size_t size,
                  bool add_zero_term = false);
     void erase(size_t begin, size_t end);
-    void Resize(size_t size);
-    void Clear();
+    void resize(size_t size);
+    void clear();
 
     static const char* get_direct(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT;
 
@@ -108,13 +108,13 @@ inline void ArrayBlob::erase(std::size_t start, std::size_t end)
     replace(start, end, 0, 0);
 }
 
-inline void ArrayBlob::Resize(std::size_t len)
+inline void ArrayBlob::resize(std::size_t len)
 {
     TIGHTDB_ASSERT(len <= m_len);
     replace(len, m_len, 0, 0);
 }
 
-inline void ArrayBlob::Clear()
+inline void ArrayBlob::clear()
 {
     replace(0, m_len, 0, 0);
 }

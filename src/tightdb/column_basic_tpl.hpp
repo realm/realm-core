@@ -57,12 +57,12 @@ BasicColumn<T>::~BasicColumn()
 }
 
 template<typename T>
-void BasicColumn<T>::Destroy()
+void BasicColumn<T>::destroy()
 {
     if (IsNode())
-        m_array->Destroy();
+        m_array->destroy();
     else
-        static_cast<BasicArray<T>*>(m_array)->Destroy();
+        static_cast<BasicArray<T>*>(m_array)->destroy();
 }
 
 
@@ -114,7 +114,7 @@ size_t BasicColumn<T>::Size() const TIGHTDB_NOEXCEPT
 }
 
 template<typename T>
-void BasicColumn<T>::Clear()
+void BasicColumn<T>::clear()
 {
     if (m_array->IsNode()) {
         ArrayParent *const parent = m_array->GetParent();
@@ -126,21 +126,21 @@ void BasicColumn<T>::Clear()
             parent->update_child_ref(pndx, array->get_ref());
 
         // Remove original node
-        m_array->Destroy();
+        m_array->destroy();
         delete m_array;
 
         m_array = array;
     }
     else
-        static_cast<BasicArray<T>*>(m_array)->Clear();
+        static_cast<BasicArray<T>*>(m_array)->clear();
 }
 
 template<typename T>
-void BasicColumn<T>::Resize(size_t ndx)
+void BasicColumn<T>::resize(size_t ndx)
 {
     TIGHTDB_ASSERT(!IsNode()); // currently only available on leaf level (used by b-tree code)
     TIGHTDB_ASSERT(ndx < Size());
-    static_cast<BasicArray<T>*>(m_array)->Resize(ndx);
+    static_cast<BasicArray<T>*>(m_array)->resize(ndx);
 }
 
 template<typename T>
@@ -238,13 +238,13 @@ void BasicColumn<T>::LeafSet(size_t ndx, T value)
 template<typename T>
 void BasicColumn<T>::LeafInsert(size_t ndx, T value)
 {
-    static_cast<BasicArray<T>*>(m_array)->Insert(ndx, value);
+    static_cast<BasicArray<T>*>(m_array)->insert(ndx, value);
 }
 
 template<typename T>
 void BasicColumn<T>::LeafDelete(size_t ndx)
 {
-    static_cast<BasicArray<T>*>(m_array)->Delete(ndx);
+    static_cast<BasicArray<T>*>(m_array)->erase(ndx);
 }
 
 

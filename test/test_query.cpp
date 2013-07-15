@@ -1196,7 +1196,7 @@ TEST(TestQueryFindAll_range_or_monkey2)
             size_t i2 = tv1.get_source_ndx(t);
             CHECK_EQUAL(i1, i2);
         }
-        a.Destroy();
+        a.destroy();
     }
 
 }

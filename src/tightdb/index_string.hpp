@@ -37,10 +37,10 @@ public:
 
     bool is_empty() const;
 
-    void Insert(size_t row_ndx, StringData value, bool isLast=false);
+    void insert(size_t row_ndx, StringData value, bool isLast=false);
     void set(size_t row_ndx, StringData oldValue, StringData newValue);
     void erase(size_t row_ndx, StringData value, bool isLast=false);
-    void Clear() TIGHTDB_OVERRIDE;
+    void clear() TIGHTDB_OVERRIDE;
 
     using Column::erase;
 

@@ -288,10 +288,10 @@ Group::~Group()
         clear_cache();
 
         // Recursively deletes entire tree
-        m_top.Destroy();
+        m_top.destroy();
     }
 
-    m_cachedtables.Destroy();
+    m_cachedtables.destroy();
 }
 
 void Group::invalidate()

@@ -42,7 +42,7 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet)
 
 TEST_FIXTURE(db_setup_string_long, ArrayStringLongAdd)
 {
-    c.Clear();
+    c.clear();
     CHECK_EQUAL(0, c.size());
 
     c.add("abc");
@@ -58,7 +58,7 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongAdd)
 TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet2)
 {
     // {shrink, grow} x {first, middle, last, single}
-    c.Clear();
+    c.clear();
 
     c.add("abc");
     c.set(0, "de"); // shrink single
@@ -113,7 +113,7 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongSet2)
 
 TEST_FIXTURE(db_setup_string_long, ArrayStringLongInsert)
 {
-    c.Clear();
+    c.clear();
 
     c.insert(0, "abc"); // single
     CHECK_EQUAL(c.get(0), "abc");
@@ -148,7 +148,7 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongInsert)
 
 TEST_FIXTURE(db_setup_string_long, ArrayStringLongDelete)
 {
-    c.Clear();
+    c.clear();
 
     c.add("a");
     c.add("bc");
@@ -185,7 +185,7 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongDelete)
 
 TEST_FIXTURE(db_setup_string_long, ArrayStringLongFind)
 {
-    c.Clear();
+    c.clear();
 
     c.add("a");
     c.add("bc iu");
@@ -205,7 +205,7 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongFind)
 
 TEST_FIXTURE(db_setup_string_long, ArrayStringLongCount)
 {
-    c.Clear();
+    c.clear();
 
     // first, middle and end
     c.add("foobar");
@@ -222,5 +222,5 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLongCount)
 TEST_FIXTURE(db_setup_string_long, ArrayStringLong_Destroy)
 {
     // clean up (ALWAYS PUT THIS LAST)
-    c.Destroy();
+    c.destroy();
 }

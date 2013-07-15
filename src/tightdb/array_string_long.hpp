@@ -41,8 +41,8 @@ public:
     void set(std::size_t ndx, StringData value);
     void insert(std::size_t ndx, StringData value);
     void erase(std::size_t ndx);
-    void Resize(std::size_t ndx);
-    void Clear();
+    void resize(std::size_t ndx);
+    void clear();
 
     std::size_t count(StringData value, std::size_t begin = 0, std::size_t end = -1) const;
     std::size_t find_first(StringData value, std::size_t begin = 0 , std::size_t end = -1) const;

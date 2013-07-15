@@ -45,7 +45,7 @@ public:
                 Allocator& = Allocator::get_default());
     ~BasicColumn();
 
-    void Destroy();
+    void destroy() TIGHTDB_OVERRIDE;
 
     size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
@@ -57,8 +57,8 @@ public:
     void insert(size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
     void insert(size_t ndx, T value);
     void erase(size_t ndx) TIGHTDB_OVERRIDE;
-    void Clear() TIGHTDB_OVERRIDE;
-    void Resize(size_t ndx);
+    void clear() TIGHTDB_OVERRIDE;
+    void resize(size_t ndx);
     void fill(size_t count);
     // Experimental. Overwrites the row at ndx with the last row and removes the last row. For unordered tables.
     void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;

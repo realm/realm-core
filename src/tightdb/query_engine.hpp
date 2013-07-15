@@ -1035,7 +1035,7 @@ public:
         deallocate();
         delete[] m_value.data();
         m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
-        m_index.Destroy();
+        m_index.destroy();
     }
 
     void deallocate()
@@ -1046,7 +1046,7 @@ public:
         m_leaf = NULL;
 
         if (m_index_matches_destroy)
-            m_index_matches->Destroy();
+            m_index_matches->destroy();
 
         m_index_matches_destroy = false;
 
@@ -1078,7 +1078,7 @@ public:
         }
 
         if (m_condition_column->HasIndex()) {
-            m_index.Clear();
+            m_index.clear();
 
             FindRes fr;
             size_t index_ref;

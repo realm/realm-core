@@ -121,7 +121,7 @@ TEST_FIXTURE(db_setup, Column_Add8)
 
 TEST_FIXTURE(db_setup, Column_AddNeg1)
 {
-    c.Clear();
+    c.clear();
     c.add(-1);
 
     CHECK_EQUAL(c.Size(), 1);
@@ -175,7 +175,7 @@ TEST_FIXTURE(db_setup, Column_Set)
 TEST_FIXTURE(db_setup, Column_Insert1)
 {
     // Set up some initial values
-    c.Clear();
+    c.clear();
     c.add(0);
     c.add(1);
     c.add(2);
@@ -303,7 +303,7 @@ TEST_FIXTURE(db_setup, Column_Find1)
 TEST_FIXTURE(db_setup, Column_Find2)
 {
     // zero-bit width
-    c.Clear();
+    c.clear();
     c.add(0);
     c.add(0);
 
@@ -424,14 +424,14 @@ TEST_FIXTURE(db_setup, Column_FindLeafs)
     CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE*4, res9);
     CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE*5-1, res10);
 
-    a.Destroy();
+    a.destroy();
 }
 
 /* Partial find is not fully implemented yet
 #define PARTIAL_COUNT 100
 TEST_FIXTURE(db_setup, Column_PartialFind1)
 {
-    c.Clear();
+    c.clear();
 
     for (size_t i = 0; i < PARTIAL_COUNT; ++i) {
         c.add(i);
@@ -453,7 +453,7 @@ TEST_FIXTURE(db_setup, Column_HeaderParse)
 TEST_FIXTURE(db_setup, Column_Destroy)
 {
     // clean up (ALWAYS PUT THIS LAST)
-    c.Destroy();
+    c.destroy();
 }
 
 /*
@@ -486,7 +486,7 @@ TEST(Column_Sort)
     CHECK_EQUAL(51, a.get(9));
 
     // Cleanup
-    a.Destroy();
+    a.destroy();
 }
 */
 
@@ -518,8 +518,8 @@ TEST(Column_FindAll_IntMin)
     }
 
     // Cleanup
-    c.Destroy();
-    r.Destroy();
+    c.destroy();
+    r.destroy();
 }
 
 TEST(Column_FindAll_IntMax)
@@ -550,8 +550,8 @@ TEST(Column_FindAll_IntMax)
     }
 
     // Cleanup
-    c.Destroy();
-    r.Destroy();
+    c.destroy();
+    r.destroy();
 }
 
 
@@ -594,7 +594,7 @@ TEST(Column_FindSorted)
     CHECK_EQUAL(19, pos); // insert position
 
     // Clean up
-    col.Destroy();
+    col.destroy();
 }
 
 TEST(Column_Average)
@@ -610,7 +610,7 @@ TEST(Column_Average)
     CHECK_EQUAL(30, c.average(1,2));    // second
     CHECK_EQUAL(20, c.average(0,2));    // both
 
-    c.Destroy();
+    c.destroy();
 }
 
 TEST(Column_Sum_Average)
@@ -627,7 +627,7 @@ TEST(Column_Sum_Average)
     CHECK_EQUAL(123, c.sum());
     CHECK_EQUAL(123, c.average());
 
-    c.Clear();
+    c.clear();
 
     for (int i = 0; i < 100; i++) {
         c.add(i);
@@ -673,7 +673,7 @@ TEST(Column_Sum_Average)
     CHECK_EQUAL(sum, c.sum(55, 79));
     CHECK_EQUAL(sum/(79.0-55.0), c.average(55, 79));
 
-    c.Destroy();
+    c.destroy();
 }
 
 
@@ -687,7 +687,7 @@ TEST(Column_Max)
     t = c.maximum();
     CHECK_EQUAL(1, t);
 
-    c.Destroy();
+    c.destroy();
 }
 
 
@@ -706,7 +706,7 @@ TEST(Column_Max2)
     int64_t t = c.maximum(51, 81);
     CHECK_EQUAL(11, t);
 
-    c.Destroy();
+    c.destroy();
 }
 
 TEST(Column_Min)
@@ -719,7 +719,7 @@ TEST(Column_Min)
     t = c.minimum();
     CHECK_EQUAL(1, t);
 
-    c.Destroy();
+    c.destroy();
 }
 
 
@@ -738,7 +738,7 @@ TEST(Column_Min2)
     int64_t t = c.minimum(51, 81);
     CHECK_EQUAL(9, t);
 
-    c.Destroy();
+    c.destroy();
 }
 
 /*
@@ -755,7 +755,7 @@ TEST(Column_Sort2)
         CHECK(c.get(t) >= c.get(t - 1));
     }
 
-    c.Destroy();
+    c.destroy();
 }
 */
 
@@ -768,13 +768,13 @@ TEST(Column_prepend_many)
     Column a;
 
     for (size_t items = 0; items < 3000; ++items) {
-        a.Clear();
+        a.clear();
         for (size_t j = 0; j < items + 1; ++j) {
             a.insert(0, j);
         }
         a.insert(items, 444);
     }
-    a.Destroy();
+    a.destroy();
 }
 
 #endif

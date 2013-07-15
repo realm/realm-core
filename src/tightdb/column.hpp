@@ -36,7 +36,7 @@ class Index;
 class ColumnBase {
 public:
     virtual ~ColumnBase() {};
-    virtual void Destroy() = 0;
+    virtual void destroy() = 0;
 
     virtual void SetHasRefs() {};
 
@@ -46,10 +46,10 @@ public:
 
     virtual void add() = 0; // Add an entry to this column using the columns default value
     virtual void insert(size_t ndx) = 0; // Insert an entry into this column using the columns default value
-    virtual void Clear() = 0;
+    virtual void clear() = 0;
     virtual void erase(size_t ndx) = 0;
     virtual void move_last_over(size_t ndx) = 0;
-    void Resize(size_t ndx) {m_array->Resize(ndx);}
+    void resize(size_t size) { m_array->resize(size); }
 
     // Indexing
     virtual bool HasIndex() const = 0;
@@ -146,9 +146,9 @@ public:
     Column(const Column&); // FIXME: Constness violation
     ~Column();
 
-    void Destroy();
+    void destroy() TIGHTDB_OVERRIDE;
 
-    bool IsIntColumn() const TIGHTDB_NOEXCEPT {return true;}
+    bool IsIntColumn() const TIGHTDB_NOEXCEPT { return true; }
 
     bool operator==(const Column& column) const;
 
@@ -177,7 +177,7 @@ public:
 
     void sort(size_t start, size_t end);
     void ReferenceSort(size_t start, size_t end, Column &ref);
-    void Clear() TIGHTDB_OVERRIDE;
+    void clear() TIGHTDB_OVERRIDE;
     void erase(size_t ndx) TIGHTDB_OVERRIDE;
     void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
 
@@ -225,8 +225,8 @@ protected:
     // Node functions
     int64_t LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT { return m_array->get(ndx); }
     void LeafSet(size_t ndx, int64_t value) { m_array->set(ndx, value); }
-    void LeafInsert(size_t ndx, int64_t value) { m_array->Insert(ndx, value); }
-    void LeafDelete(size_t ndx) { m_array->Delete(ndx); }
+    void LeafInsert(size_t ndx, int64_t value) { m_array->insert(ndx, value); }
+    void LeafDelete(size_t ndx) { m_array->erase(ndx); }
     template<class F> size_t LeafFind(int64_t value, size_t start, size_t end) const
     {
         return m_array->find_first<F>(value, start, end);

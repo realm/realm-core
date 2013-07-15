@@ -41,9 +41,9 @@ public:
     void add(BinaryData value);
     void set(std::size_t ndx, BinaryData value);
     void insert(std::size_t ndx, BinaryData value);
-    void Delete(std::size_t ndx);
-    void Resize(std::size_t ndx);
-    void Clear();
+    void erase(std::size_t ndx);
+    void resize(std::size_t ndx);
+    void clear();
 
     void set_string(std::size_t ndx, StringData value);
     void insert_string(std::size_t ndx, StringData value);

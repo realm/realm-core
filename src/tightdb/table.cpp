@@ -327,7 +327,7 @@ void Table::ClearCachedColumns()
         ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.get(i));
         delete column;
     }
-    m_cols.Destroy();
+    m_cols.destroy();
 }
 
 Table::~Table()
@@ -377,7 +377,7 @@ Table::~Table()
     // invalidate, because they would have kept their parent alive.
     if (0 < m_ref_count) invalidate();
     else ClearCachedColumns();
-    m_top.Destroy();
+    m_top.destroy();
 }
 
 size_t Table::GetColumnRefPos(size_t column_ndx) const
@@ -579,18 +579,18 @@ void Table::do_remove_column(size_t column_ndx)
     ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.get(column_ndx));
     const bool has_index = column->HasIndex();
     column->invalidate_subtables_virtual();
-    column->Destroy();
+    column->destroy();
     delete column;
-    m_cols.Delete(column_ndx);
+    m_cols.erase(column_ndx);
 
     // Remove from column list
     const size_t column_pos = GetColumnRefPos(column_ndx);
-    m_columns.Delete(column_pos);
+    m_columns.erase(column_pos);
     int deleted = 1;
 
     // If the column had an index we have to remove that as well
     if (has_index) {
-        m_columns.Delete(column_pos);
+        m_columns.erase(column_pos);
         ++deleted;
     }
 
@@ -678,7 +678,7 @@ void Table::set_index(size_t column_ndx, bool update_spec)
     }
 
     // Insert ref into columns list after the owning column
-    m_columns.Insert(column_pos+1, ndx_ref);
+    m_columns.insert(column_pos+1, ndx_ref);
     UpdateColumnRefs(column_ndx+1, 1);
 
     // Update spec
@@ -834,7 +834,7 @@ void Table::clear()
     const size_t count = get_column_count();
     for (size_t i = 0; i < count; ++i) {
         ColumnBase& column = GetColumnBase(i);
-        column.Clear();
+        column.clear();
     }
     m_size = 0;
 
@@ -1007,7 +1007,7 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
     if (type == col_type_Table) {
         ColumnTable& subtables = GetColumnTable(col_idx);
         subtables.invalidate_subtables();
-        subtables.ClearTable(row_idx);
+        subtables.clear_table(row_idx);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
         transact_log().set_value(col_idx, row_idx, Replication::subtable_tag()); // Throws
@@ -1963,7 +1963,7 @@ void Table::optimize()
             m_spec_set.set_column_type(i, col_type_StringEnum);
             const size_t column_ndx = GetColumnRefPos(i);
             m_columns.set(column_ndx, ref_keys);
-            m_columns.Insert(column_ndx+1, ref_values);
+            m_columns.insert(column_ndx+1, ref_values);
 
             // There are still same number of columns, but since
             // the enum type takes up two posistions in m_columns
@@ -1981,7 +1981,7 @@ void Table::optimize()
             }
 
             // Clean up the old column
-            column->Destroy();
+            column->destroy();
             delete column;
         }
     }

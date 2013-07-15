@@ -176,7 +176,7 @@ static size_t BitWidth(int64_t v)
 // Allocates space for 'count' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
 void Array::Preset(size_t bitwidth, size_t count)
 {
-    Clear();
+    clear();
     SetWidth(bitwidth);
     Alloc(count, bitwidth); // Throws
     m_len = count;
@@ -196,7 +196,7 @@ void Array::set_parent(ArrayParent *parent, size_t pndx) TIGHTDB_NOEXCEPT
     m_parentNdx = pndx;
 }
 
-void Array::Destroy()
+void Array::destroy()
 {
     if (!m_data) return;
 
@@ -213,7 +213,7 @@ void Array::Destroy()
             if (ref & 0x1) continue;
 
             Array sub(ref, this, i, m_alloc);
-            sub.Destroy();
+            sub.destroy();
         }
     }
 
@@ -222,7 +222,7 @@ void Array::Destroy()
     m_data = NULL;
 }
 
-void Array::Clear()
+void Array::clear()
 {
     CopyOnWrite(); // Throws
 
@@ -233,7 +233,7 @@ void Array::Clear()
             if (v == 0 || v & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
 
             Array sub(to_ref(v), this, i, m_alloc);
-            sub.Destroy();
+            sub.destroy();
         }
     }
 
@@ -247,7 +247,7 @@ void Array::Clear()
     set_header_width(0);
 }
 
-void Array::Delete(size_t ndx)
+void Array::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_len);
 
@@ -325,11 +325,11 @@ void Array::AddPositiveLocal(int64_t value)
         }
     }
 
-    Insert(m_len, value);
+    insert(m_len, value);
 }
 */
 
-void Array::Insert(size_t ndx, int64_t value)
+void Array::insert(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx <= m_len);
 
@@ -392,10 +392,10 @@ void Array::Insert(size_t ndx, int64_t value)
 
 void Array::add(int64_t value)
 {
-    Insert(m_len, value);
+    insert(m_len, value);
 }
 
-void Array::Resize(size_t count)
+void Array::resize(size_t count)
 {
     TIGHTDB_ASSERT(count <= m_len);
 
@@ -439,7 +439,7 @@ void Array::IncrementIf(int64_t limit, int64_t value)
     }
 }
 
-void Array::Adjust(size_t start, int64_t diff)
+void Array::adjust(size_t start, int64_t diff)
 {
     TIGHTDB_ASSERT(start <= m_len);
 
@@ -1572,8 +1572,8 @@ template <size_t w>void Array::ReferenceSort(Array& ref)
         for (size_t t = 0; t < res.size(); t++)
             ref.set(t, res.get(t));
 
-        res.Destroy();
-        count.Destroy();
+        res.destroy();
+        count.destroy();
     }
     else {
         ReferenceQuickSort(ref);

@@ -58,7 +58,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringSetExpand8)
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd0)
 {
-    c.Clear();
+    c.clear();
     c.add();
     CHECK_EQUAL("", c.get(0));
     CHECK_EQUAL(1, c.Size());
@@ -274,7 +274,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDeleteAll)
 TEST_FIXTURE(db_setup_column_string, ColumnStringInsert2)
 {
     // Create new list
-    c.Clear();
+    c.clear();
     c.add("a");
     c.add("b");
     c.add("c");
@@ -325,7 +325,7 @@ TEST(ColumnStringFind1)
     CHECK_EQUAL(4, res3);
 
     // Cleanup
-    c.Destroy();
+    c.destroy();
 }
 
 TEST(ColumnStringFind2)
@@ -354,7 +354,7 @@ TEST(ColumnStringFind2)
     CHECK_EQUAL(5, res4);
 
     // Cleanup
-    c.Destroy();
+    c.destroy();
 }
 
 TEST(ColumnStringAutoEnumerate)
@@ -394,8 +394,8 @@ TEST(ColumnStringAutoEnumerate)
     CHECK_EQUAL(4, res2);
 
     // Cleanup
-    c.Destroy();
-    e.Destroy();
+    c.destroy();
+    e.destroy();
 }
 
 TEST(ColumnStringAutoEnumerateIndex)
@@ -451,7 +451,7 @@ TEST(ColumnStringAutoEnumerateIndex)
     CHECK_EQUAL(4, res4);
     CHECK_EQUAL(1, res5);
 
-    results.Clear();
+    results.clear();
     e.find_all(results, "newval");
     CHECK_EQUAL(1, results.size());
     CHECK_EQUAL(1, results.get(0));
@@ -470,14 +470,14 @@ TEST(ColumnStringAutoEnumerateIndex)
     CHECK_EQUAL(1, res8);
 
     // Clear all
-    e.Clear();
+    e.clear();
     const size_t res9 = e.count("a");
     CHECK_EQUAL(0, res9);
 
     // Cleanup
-    c.Destroy();
-    e.Destroy();
-    results.Destroy();
+    c.destroy();
+    e.destroy();
+    results.destroy();
 }
 
 TEST(ColumnStringAutoEnumerateIndexReuse)
@@ -518,14 +518,14 @@ TEST(ColumnStringAutoEnumerateIndexReuse)
     CHECK_EQUAL(4, res2);
 
     // Cleanup
-    c.Destroy();
-    e.Destroy();
+    c.destroy();
+    e.destroy();
 }
 
 // Test "Replace string array with long string array" when doing it through LeafSet()
 TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2)
 {
-    c.Clear();
+    c.clear();
     Column col;
 
     c.add("foobar");
@@ -540,13 +540,13 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2)
     CHECK_EQUAL("baz", c.get(2));
 
     // Cleanup
-    col.Destroy();
+    col.destroy();
 }
 
 // Test against a bug where FindWithLen() would fail finding ajacent hits
 TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent)
 {
-    c.Clear();
+    c.clear();
     Array col;
 
     c.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
@@ -559,7 +559,7 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent)
     CHECK_EQUAL(2, col.size());
 
     // Cleanup
-    col.Destroy();
+    col.destroy();
 }
 
 TEST(AdaptiveStringColumnFindAllExpand)
@@ -589,7 +589,7 @@ TEST(AdaptiveStringColumnFindAllExpand)
     asc.add("dfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfgdfg djf gjkfdghkfds");
 
     // Todo, should the API behaviour really require us to clear c manually?
-    c.Clear();
+    c.clear();
     asc.find_all(c, "HEJ");
 
     CHECK_EQUAL(10, asc.Size());
@@ -600,8 +600,8 @@ TEST(AdaptiveStringColumnFindAllExpand)
     CHECK_EQUAL(6, c.get(3));
     CHECK_EQUAL(8, c.get(4));
 
-    asc.Destroy();
-    c.Destroy();
+    asc.destroy();
+    c.destroy();
 
 }
 
@@ -630,7 +630,7 @@ TEST(AdaptiveStringColumnFindAllRangesLong)
     asc.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
     asc.add("HEJSA"); // 16
 
-    c.Clear();
+    c.clear();
     asc.find_all(c, "HEJSA", 0, 17);
     CHECK_EQUAL(9, c.size());
     CHECK_EQUAL(0, c.get(0));
@@ -643,7 +643,7 @@ TEST(AdaptiveStringColumnFindAllRangesLong)
     CHECK_EQUAL(14, c.get(7));
     CHECK_EQUAL(16, c.get(8));
 
-    c.Clear();
+    c.clear();
     asc.find_all(c, "HEJSA", 1, 16);
     CHECK_EQUAL(7, c.size());
     CHECK_EQUAL(2, c.get(0));
@@ -655,8 +655,8 @@ TEST(AdaptiveStringColumnFindAllRangesLong)
     CHECK_EQUAL(14, c.get(6));
 
     // Clean-up
-    asc.Destroy();
-    c.Destroy();
+    asc.destroy();
+    c.destroy();
 }
 
 // FindAll using ranges, when not expanded (using ArrayString)
@@ -684,7 +684,7 @@ TEST(AdaptiveStringColumnFindAllRanges)
     asc.add("15");
     asc.add("HEJSA"); // 16
 
-    c.Clear();
+    c.clear();
     asc.find_all(c, "HEJSA", 0, 17);
     CHECK_EQUAL(9, c.size());
     CHECK_EQUAL(0, c.get(0));
@@ -697,7 +697,7 @@ TEST(AdaptiveStringColumnFindAllRanges)
     CHECK_EQUAL(14, c.get(7));
     CHECK_EQUAL(16, c.get(8));
 
-    c.Clear();
+    c.clear();
     asc.find_all(c, "HEJSA", 1, 16);
     CHECK_EQUAL(7, c.size());
     CHECK_EQUAL(2, c.get(0));
@@ -709,8 +709,8 @@ TEST(AdaptiveStringColumnFindAllRanges)
     CHECK_EQUAL(14, c.get(6));
 
     // Clean-up
-    asc.Destroy();
-    c.Destroy();
+    asc.destroy();
+    c.destroy();
 }
 
 TEST(AdaptiveStringColumnCount)
@@ -751,8 +751,8 @@ TEST(AdaptiveStringColumnCount)
     CHECK_EQUAL(9, ecount);
 
     // Clean-up
-    asc.Destroy();
-    e.Destroy();
+    asc.destroy();
+    e.destroy();
 }
 
 TEST(AdaptiveStringColumnIndex)
@@ -838,18 +838,18 @@ TEST(AdaptiveStringColumnIndex)
     CHECK_EQUAL(15, del5);
 
     // Remove all
-    asc.Clear();
+    asc.clear();
     const size_t c1 = asc.find_first("HEJSA");
     const size_t c2 = asc.find_first("fifteen");
     CHECK_EQUAL(not_found, c1);
     CHECK_EQUAL(not_found, c2);
 
     // Clean-up
-    asc.Destroy();
+    asc.destroy();
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnString_Destroy)
 {
     // clean up (ALWAYS PUT THIS LAST)
-    c.Destroy();
+    c.destroy();
 }

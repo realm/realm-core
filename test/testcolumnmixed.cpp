@@ -42,7 +42,7 @@ TEST(ColumnMixed_Int)
     CHECK_EQUAL(     1, c.get_int(3));
     CHECK_EQUAL(4, c.Size());
 
-    c.Destroy();
+    c.destroy();
 }
 
 
@@ -75,7 +75,7 @@ TEST(ColumnMixed_Float)
     }
     CHECK_EQUAL(4, c.Size());
 
-    c.Destroy();
+    c.destroy();
 }
 
 
@@ -110,7 +110,7 @@ TEST(ColumnMixed_Double)
         CHECK_EQUAL( fval2[i], c.get_double(i));
     }
 
-    c.Destroy();
+    c.destroy();
 }
 
 TEST(ColumnMixed_Bool)
@@ -143,7 +143,7 @@ TEST(ColumnMixed_Bool)
     CHECK_EQUAL(true,  c.get_bool(1));
     CHECK_EQUAL(false, c.get_bool(2));
 
-    c.Destroy();
+    c.destroy();
 }
 
 TEST(ColumnMixed_Date)
@@ -176,7 +176,7 @@ TEST(ColumnMixed_Date)
     CHECK_EQUAL(99999, c.get_date(2));
     CHECK_EQUAL(3, c.Size());
 
-    c.Destroy();
+    c.destroy();
 }
 
 TEST(ColumnMixed_String)
@@ -209,7 +209,7 @@ TEST(ColumnMixed_String)
     CHECK_EQUAL("",          c.get_string(1));
     CHECK_EQUAL("eeeeeeeee", c.get_string(2));
 
-    c.Destroy();
+    c.destroy();
 }
 
 TEST(ColumnMixed_Binary)
@@ -242,7 +242,7 @@ TEST(ColumnMixed_Binary)
     CHECK_EQUAL("",          c.get_binary(1).data());
     CHECK_EQUAL("eeeeeeeee", c.get_binary(2).data());
 
-    c.Destroy();
+    c.destroy();
 }
 
 TEST(ColumnMixed_Table)
@@ -264,7 +264,7 @@ TEST(ColumnMixed_Table)
     delete t1;
     delete t2;
 
-    c.Destroy();
+    c.destroy();
 }
 
 TEST(ColumnMixed_Mixed)
@@ -311,5 +311,5 @@ TEST(ColumnMixed_Mixed)
     CHECK_EQUAL(type_Bool,   c.get_type(1));
     CHECK_EQUAL(type_Int,    c.get_type(0));
 
-    c.Destroy();
+    c.destroy();
 }

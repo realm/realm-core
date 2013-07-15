@@ -79,10 +79,10 @@ int32_t StringIndex::GetLastKey() const
 void StringIndex::set(size_t ndx, StringData oldValue, StringData newValue)
 {
     erase(ndx, oldValue, true); // set isLast to avoid updating refs
-    Insert(ndx, newValue, true); // set isLast to avoid updating refs
+    insert(ndx, newValue, true); // set isLast to avoid updating refs
 }
 
-void StringIndex::Insert(size_t row_ndx, StringData value, bool isLast)
+void StringIndex::insert(size_t row_ndx, StringData value, bool isLast)
 {
     // If it is last item in column, we don't have to update refs
     if (!isLast) UpdateRefs(row_ndx, 1);
@@ -128,8 +128,8 @@ void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
 #endif
 
     // If key is not present we add it at the correct location
-    values.Insert(ins_pos, key);
-    refs.Insert(ins_pos, ref);
+    values.insert(ins_pos, key);
+    refs.insert(ins_pos, ref);
 }
 
 void StringIndex::TreeInsert(size_t row_ndx, int32_t key, size_t offset, StringData value)
@@ -225,8 +225,8 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
                     size_t ref = refs.get_as_ref(i);
                     newNode.NodeAddKey(ref);
                 }
-                offsets.Resize(node_ndx);
-                refs.Resize(node_ndx);
+                offsets.resize(node_ndx);
+                refs.resize(node_ndx);
                 return NodeChange(NodeChange::split, get_ref(), newNode.get_ref());
         }
     }
@@ -266,8 +266,8 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
                     new_offsets.add(v2);
                     new_refs.add(v3);
                 }
-                old_offsets.Resize(ndx);
-                old_refs.Resize(ndx);
+                old_offsets.resize(ndx);
+                old_refs.resize(ndx);
 
                 return NodeChange(NodeChange::split, get_ref(), newList.get_ref());
             }
@@ -300,8 +300,8 @@ void StringIndex::NodeInsertSplit(size_t ndx, size_t new_ref)
 
     // Insert new ref
     const size_t newKey = new_col.GetLastKey();
-    offsets.Insert(ndx+1, newKey);
-    refs.Insert(ndx+1, new_ref);
+    offsets.insert(ndx+1, newKey);
+    refs.insert(ndx+1, new_ref);
 }
 
 void StringIndex::NodeInsert(size_t ndx, size_t ref)
@@ -318,8 +318,8 @@ void StringIndex::NodeInsert(size_t ndx, size_t ref)
     const StringIndex col(ref, NULL, 0, m_target_column, m_get_func, m_array->get_alloc());
     const int64_t lastKey = col.GetLastKey();
 
-    offsets.Insert(ndx, lastKey);
-    refs.Insert(ndx, ref);
+    offsets.insert(ndx, lastKey);
+    refs.insert(ndx, ref);
 }
 
 bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, StringData value, bool noextend)
@@ -348,9 +348,9 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, StringD
     if (k != key) {
         if (noextend) return false;
 
-        values.Insert(ins_pos, key);
+        values.insert(ins_pos, key);
         size_t shifted = (row_ndx << 1) + 1; // shift to indicate literal
-        refs.Insert(ins_pos, shifted);
+        refs.insert(ins_pos, shifted);
         return true;
     }
 
@@ -525,12 +525,12 @@ void StringIndex::UpdateRefs(size_t pos, int diff)
     }
 }
 
-void StringIndex::Clear()
+void StringIndex::clear()
 {
     Array values = m_array->GetSubArray(0);
     Array refs   = m_array->GetSubArray(1);
-    values.Clear();
-    refs.Clear();
+    values.clear();
+    refs.clear();
 }
 
 void StringIndex::erase(size_t row_ndx, StringData value, bool isLast)
@@ -544,8 +544,8 @@ void StringIndex::erase(size_t row_ndx, StringData value, bool isLast)
         if (refs.size() > 1) break;
 
         size_t ref = refs.get_as_ref(0);
-        refs.Delete(0); // avoid deleting subtree
-        m_array->Destroy();
+        refs.erase(0); // avoid deleting subtree
+        m_array->destroy();
         m_array->update_ref(ref);
     }
 
@@ -573,9 +573,9 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
 
         // Update the ref
         if (node.is_empty()) {
-            values.Delete(pos);
-            refs.Delete(pos);
-            node.Destroy();
+            values.erase(pos);
+            refs.erase(pos);
+            node.destroy();
         }
         else {
             int64_t maxval = node.GetLastKey();
@@ -587,8 +587,8 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
         const int64_t ref = refs.get(pos);
         if (ref & 1) {
             TIGHTDB_ASSERT((uint64_t(ref) >> 1) == uint64_t(row_ndx));
-            values.Delete(pos);
-            refs.Delete(pos);
+            values.erase(pos);
+            refs.erase(pos);
         }
         else {
             // A real ref either points to a list or a sub-index
@@ -597,9 +597,9 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
                 subNdx.DoDelete(row_ndx, value, offset+4);
 
                 if (subNdx.is_empty()) {
-                    values.Delete(pos);
-                    refs.Delete(pos);
-                    subNdx.Destroy();
+                    values.erase(pos);
+                    refs.erase(pos);
+                    subNdx.destroy();
                 }
             }
             else {
@@ -609,9 +609,9 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
                 sub.erase(r);
 
                 if (sub.is_empty()) {
-                    values.Delete(pos);
-                    refs.Delete(pos);
-                    sub.Destroy();
+                    values.erase(pos);
+                    refs.erase(pos);
+                    sub.destroy();
                 }
             }
         }
@@ -686,9 +686,9 @@ void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
         if (has_match == not_found) {
             TIGHTDB_ASSERT(false);
         }
-        results.Clear();
+        results.clear();
     }
-    results.Destroy(); // clean-up
+    results.destroy(); // clean-up
 }
 
 void StringIndex::to_dot(ostream& out) const

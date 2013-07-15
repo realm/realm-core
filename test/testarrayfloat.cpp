@@ -47,10 +47,10 @@ void BasicArray_AddGet(T val[], size_t valLen)
         }
     }
 
-    f.Clear();
+    f.clear();
     CHECK_EQUAL(0, f.size());
 
-    f.Destroy();    // cleanup
+    f.destroy();    // cleanup
 }
 TEST(ArrayFloat_AddGet) { BasicArray_AddGet<ArrayFloat, float>(floatVal, floatValLen); }
 TEST(ArrayDouble_AddGet){ BasicArray_AddGet<ArrayDouble, double>(doubleVal, doubleValLen); }
@@ -72,10 +72,10 @@ void BasicArray_AddManyValues()
         CHECK_EQUAL(T(i), val);
     }
 
-    f.Clear();
+    f.clear();
     CHECK_EQUAL(0, f.size());
 
-    f.Destroy();    // cleanup
+    f.destroy();    // cleanup
 }
 TEST(ArrayFloat_AddManyValues) { BasicArray_AddManyValues<ArrayFloat, float>(); }
 TEST(ArrayDouble_AddManyValues){ BasicArray_AddManyValues<ArrayDouble, double>(); }
@@ -88,7 +88,7 @@ void BasicArray_Delete()
         f.add( T(i) );
 
     // Delete first
-    f.Delete(0);
+    f.erase(0);
     CHECK_EQUAL(4, f.size());
     CHECK_EQUAL(1, f.get(0));
     CHECK_EQUAL(2, f.get(1));
@@ -96,27 +96,27 @@ void BasicArray_Delete()
     CHECK_EQUAL(4, f.get(3));
 
     // Delete last
-    f.Delete(3);
+    f.erase(3);
     CHECK_EQUAL(3, f.size());
     CHECK_EQUAL(1, f.get(0));
     CHECK_EQUAL(2, f.get(1));
     CHECK_EQUAL(3, f.get(2));
 
     // Delete middle
-    f.Delete(1);
+    f.erase(1);
     CHECK_EQUAL(2, f.size());
     CHECK_EQUAL(1, f.get(0));
     CHECK_EQUAL(3, f.get(1));
 
     // Delete all
-    f.Delete(0);
+    f.erase(0);
     CHECK_EQUAL(1, f.size());
     CHECK_EQUAL(3, f.get(0));
-    f.Delete(0);
+    f.erase(0);
     CHECK_EQUAL(0, f.size());
     CHECK(f.is_empty());
 
-    f.Destroy();    // cleanup
+    f.destroy();    // cleanup
 }
 TEST(ArrayFloat_Delete) { BasicArray_Delete<ArrayFloat, float>(); }
 TEST(ArrayDouble_Delete){ BasicArray_Delete<ArrayDouble, double>(); }
@@ -141,7 +141,7 @@ void BasicArray_Set(T val[], size_t valLen)
     CHECK_EQUAL(val[4], f.get(4));
     CHECK_EQUAL(valLen, f.size());
 
-    f.Destroy();    // cleanup
+    f.destroy();    // cleanup
 }
 TEST(ArrayFloat_Set) { BasicArray_Set<ArrayFloat, float>(floatVal, floatValLen); }
 TEST(ArrayDouble_Set){ BasicArray_Set<ArrayDouble, double>(doubleVal, doubleValLen); }
@@ -157,32 +157,32 @@ void BasicArray_Insert()
     T v3 = T(-999.973);
 
     // Insert in empty array
-    f.Insert(0, v0);
+    f.insert(0, v0);
     CHECK_EQUAL(v0, f.get(0));
     CHECK_EQUAL(1, f.size());
 
     // Insert in top
-    f.Insert(0, v1);
+    f.insert(0, v1);
     CHECK_EQUAL(v1, f.get(0));
     CHECK_EQUAL(v0, f.get(1));
     CHECK_EQUAL(2, f.size());
 
     // Insert in middle
-    f.Insert(1, v2);
+    f.insert(1, v2);
     CHECK_EQUAL(v1, f.get(0));
     CHECK_EQUAL(v2, f.get(1));
     CHECK_EQUAL(v0, f.get(2));
     CHECK_EQUAL(3, f.size());
 
     // Insert at buttom
-    f.Insert(3, v3);
+    f.insert(3, v3);
     CHECK_EQUAL(v1, f.get(0));
     CHECK_EQUAL(v2, f.get(1));
     CHECK_EQUAL(v0, f.get(2));
     CHECK_EQUAL(v3, f.get(3));
     CHECK_EQUAL(4, f.size());
 
-    f.Destroy();    // cleanup
+    f.destroy();    // cleanup
 }
 TEST(ArrayFloat_Insert) { BasicArray_Insert<ArrayFloat, float>(); }
 TEST(ArrayDouble_Insert){ BasicArray_Insert<ArrayDouble, double>(); }
@@ -212,7 +212,7 @@ void BasicArray_Sum()
     CHECK_EQUAL(double(values[2]) + double(values[3]) + double(values[4]), f.sum(2));
     // single middle
     CHECK_EQUAL(double(values[2]), f.sum(2, 3));
-    f.Destroy();    // cleanup
+    f.destroy();    // cleanup
 }
 TEST(ArrayFloat_Sum) { BasicArray_Sum<ArrayFloat, float>(); }
 TEST(ArrayDouble_Sum){ BasicArray_Sum<ArrayDouble, double>(); }
@@ -248,7 +248,7 @@ void BasicArray_Minimum()
     CHECK_EQUAL(true, f.minimum(res, 3, size_t(-1)));
     CHECK_EQUAL(values[4], res);
 
-    f.Destroy();    // cleanup
+    f.destroy();    // cleanup
 }
 TEST(ArrayFloat_Minimum) { BasicArray_Minimum<ArrayFloat, float>(); }
 TEST(ArrayDouble_Minimum){ BasicArray_Minimum<ArrayDouble, double>(); }
@@ -284,7 +284,7 @@ void BasicArray_Maximum()
     CHECK_EQUAL(true, f.maximum(res, 3, size_t(-1)));
     CHECK_EQUAL(values[3], res);
 
-    f.Destroy();    // cleanup
+    f.destroy();    // cleanup
 }
 TEST(ArrayFloat_Maximum) { BasicArray_Maximum<ArrayFloat, float>(); }
 TEST(ArrayDouble_Maximum){ BasicArray_Maximum<ArrayDouble, double>(); }
@@ -327,12 +327,12 @@ void BasicArray_Find()
     CHECK_EQUAL(0, resArr.get(0));
     CHECK_EQUAL(4, resArr.get(1));
     // Find all, range limited -> no match
-    resArr.Clear();
+    resArr.clear();
     f.find_all(resArr, T(1.1), 0, 1, 4);
     CHECK_EQUAL(0, resArr.size());
-    resArr.Destroy();
+    resArr.destroy();
 
-    f.Destroy();    // cleanup
+    f.destroy();    // cleanup
 }
 TEST(ArrayFloat_Find) { BasicArray_Find<ArrayFloat, float>(); }
 TEST(ArrayDouble_Find){ BasicArray_Find<ArrayDouble, double>(); }
@@ -368,7 +368,7 @@ void BasicArray_Count()
     CHECK_EQUAL(1, f.count(T(-1.0), 2, 4));
     CHECK_EQUAL(1, f.count(T(-1.0), 1));
 
-    f.Destroy();    // cleanup
+    f.destroy();    // cleanup
 }
 TEST(ArrayFloat_Count) { BasicArray_Count<ArrayFloat, float>(); }
 TEST(ArrayDouble_Count){ BasicArray_Count<ArrayDouble, double>(); }
@@ -391,14 +391,14 @@ void BasicArray_Compare()
         CHECK_EQUAL(true, f1.Compare(f2));
     }
 
-    f1.Delete(0);
+    f1.erase(0);
     CHECK_EQUAL(false, f1.Compare(f2));
 
-    f2.Delete(0);
+    f2.erase(0);
     CHECK_EQUAL(true, f1.Compare(f2));
 
-    f1.Destroy();    // cleanup
-    f2.Destroy();
+    f1.destroy();    // cleanup
+    f2.destroy();
 }
 TEST(ArrayFloat_Compare) { BasicArray_Compare<ArrayFloat, float>(); }
 TEST(ArrayDouble_Compare){ BasicArray_Compare<ArrayDouble, double>(); }

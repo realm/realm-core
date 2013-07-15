@@ -32,12 +32,12 @@ ColumnBinary::~ColumnBinary()
         delete static_cast<ArrayBinary*>(m_array);
 }
 
-void ColumnBinary::Destroy()
+void ColumnBinary::destroy()
 {
     if (IsNode())
-        m_array->Destroy();
+        m_array->destroy();
     else
-        static_cast<ArrayBinary*>(m_array)->Destroy();
+        static_cast<ArrayBinary*>(m_array)->destroy();
 }
 
 void ColumnBinary::update_ref(size_t ref)
@@ -84,7 +84,7 @@ size_t ColumnBinary::Size() const  TIGHTDB_NOEXCEPT
     }
 }
 
-void ColumnBinary::Clear()
+void ColumnBinary::clear()
 {
     if (m_array->IsNode()) {
         ArrayParent *const parent = m_array->GetParent();
@@ -96,13 +96,13 @@ void ColumnBinary::Clear()
             parent->update_child_ref(pndx, array->get_ref());
 
         // Remove original node
-        m_array->Destroy();
+        m_array->destroy();
         delete m_array;
 
         m_array = array;
     }
     else {
-        static_cast<ArrayBinary*>(m_array)->Clear();
+        static_cast<ArrayBinary*>(m_array)->clear();
     }
 }
 
@@ -153,11 +153,11 @@ void ColumnBinary::erase(size_t ndx)
     TreeDelete<BinaryData,ColumnBinary>(ndx);
 }
 
-void ColumnBinary::Resize(size_t ndx)
+void ColumnBinary::resize(size_t ndx)
 {
     TIGHTDB_ASSERT(!IsNode()); // currently only available on leaf level (used by b-tree code)
     TIGHTDB_ASSERT(ndx < Size());
-    static_cast<ArrayBinary*>(m_array)->Resize(ndx);
+    static_cast<ArrayBinary*>(m_array)->resize(ndx);
 }
 
 void ColumnBinary::move_last_over(size_t ndx)
@@ -221,7 +221,7 @@ void ColumnBinary::LeafInsert(size_t ndx, StringData value)
 
 void ColumnBinary::LeafDelete(size_t ndx)
 {
-    static_cast<ArrayBinary*>(m_array)->Delete(ndx);
+    static_cast<ArrayBinary*>(m_array)->erase(ndx);
 }
 
 #ifdef TIGHTDB_DEBUG

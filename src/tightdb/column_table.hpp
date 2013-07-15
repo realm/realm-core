@@ -33,9 +33,9 @@ public:
 
     void invalidate_subtables();
 
-    void Clear() TIGHTDB_OVERRIDE
+    void clear() TIGHTDB_OVERRIDE
     {
-        m_array->Clear();
+        m_array->clear();
         if (m_array->IsNode()) m_array->set_type(Array::coldef_HasRefs);
         invalidate_subtables();
     }
@@ -188,7 +188,7 @@ public:
     void insert(std::size_t ndx, const Table*);
     void set(std::size_t ndx, const Table*);
     void erase(size_t ndx) TIGHTDB_OVERRIDE;
-    void ClearTable(size_t ndx);
+    void clear_table(size_t ndx);
     void fill(size_t count);
 
     /// Compare two subtable columns for equality.
@@ -264,8 +264,8 @@ inline ColumnSubtableParent::SubtableMap::~SubtableMap()
 {
     if (m_indices.IsValid()) {
         TIGHTDB_ASSERT(m_indices.is_empty());
-        m_indices.Destroy();
-        m_wrappers.Destroy();
+        m_indices.destroy();
+        m_wrappers.destroy();
     }
 }
 
@@ -292,10 +292,10 @@ inline void ColumnSubtableParent::SubtableMap::remove(size_t subtable_ndx)
     const size_t pos = m_indices.find_first(subtable_ndx);
     TIGHTDB_ASSERT(pos != size_t(-1));
     // FIXME: It is a problem that Array as our most low-level array
-    // construct has too many features to deliver a Delete() method
+    // construct has too many features to deliver a erase() method
     // that cannot be guaranteed to never throw.
-    m_indices.Delete(pos);
-    m_wrappers.Delete(pos);
+    m_indices.erase(pos);
+    m_wrappers.erase(pos);
 }
 
 inline void ColumnSubtableParent::SubtableMap::update_from_parents()
@@ -319,8 +319,8 @@ inline void ColumnSubtableParent::SubtableMap::invalidate_subtables()
         t->invalidate();
     }
 
-    m_indices.Clear(); // FIXME: Can we rely on Array::Clear() never failing????
-    m_wrappers.Clear();
+    m_indices.clear(); // FIXME: Can we rely on Array::clear() never failing????
+    m_wrappers.clear();
 }
 
 inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,

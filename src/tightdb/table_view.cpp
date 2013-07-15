@@ -79,7 +79,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
 
     // Array object instantiation must NOT allocate initial memory (capacity)
     // with 'new' because it will lead to mem leak. The column keeps ownership
-    // of the payload in array and will free it itself later, so we must not call Destroy() on array.
+    // of the payload in array and will free it itself later, so we must not call destroy() on array.
     ArrType arr((Array::no_prealloc_tag()));
     size_t leaf_start = 0;
     size_t leaf_end = 0;
@@ -242,7 +242,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
     }
 
     vals.ReferenceSort(ref);
-    vals.Destroy();
+    vals.destroy();
 
     for (size_t t = 0; t < m_refs.size(); t++) {
         size_t r  = to_size_t(ref.get(t));
@@ -250,10 +250,10 @@ void TableViewBase::sort(size_t column, bool Ascending)
         result.add(rr);
     }
 
-    ref.Destroy();
+    ref.destroy();
 
     // Copy result to m_refs (todo, there might be a shortcut)
-    m_refs.Clear();
+    m_refs.clear();
     if (Ascending) {
         for (size_t t = 0; t < ref.size(); t++) {
             size_t v = to_size_t(result.get(t));
@@ -266,7 +266,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
             m_refs.add(v);
         }
     }
-    result.Destroy();
+    result.destroy();
 }
 
 void TableViewBase::to_json(ostream& out) const
@@ -318,7 +318,7 @@ void TableView::remove(size_t ndx)
     m_table->remove(real_ndx);
 
     // Update refs
-    m_refs.Delete(ndx);
+    m_refs.erase(ndx);
     m_refs.IncrementIf(ndx, -1);
 }
 
@@ -336,7 +336,7 @@ void TableView::clear()
         m_table->remove(ndx);
     }
 
-    m_refs.Clear();
+    m_refs.clear();
 }
 
 

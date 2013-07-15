@@ -68,7 +68,7 @@ public:
                 ArrayParent* parent, std::size_t ndx_in_parent, std::size_t ref);
 
     ~ColumnMixed();
-    void Destroy();
+    void destroy() TIGHTDB_OVERRIDE;
 
     void set_parent(ArrayParent* parent, size_t pndx);
     void UpdateFromParent();
@@ -118,7 +118,7 @@ public:
 
     void add() TIGHTDB_OVERRIDE { insert_int(Size(), 0); }
     void insert(size_t ndx) TIGHTDB_OVERRIDE { insert_int(ndx, 0); invalidate_subtables(); }
-    void Clear() TIGHTDB_OVERRIDE;
+    void clear() TIGHTDB_OVERRIDE;
     void erase(size_t ndx) TIGHTDB_OVERRIDE;
     void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
     void fill(size_t count);

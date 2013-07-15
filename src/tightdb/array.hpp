@@ -279,7 +279,7 @@ public:
     size_t size() const TIGHTDB_NOEXCEPT {return m_len;}
     bool is_empty() const TIGHTDB_NOEXCEPT {return m_len == 0;}
 
-    void Insert(size_t ndx, int64_t value);
+    void insert(size_t ndx, int64_t value);
     void add(int64_t value);
     void set(size_t ndx, int64_t value);
     template<size_t w> void Set(size_t ndx, int64_t value);
@@ -291,8 +291,8 @@ public:
 
     int64_t operator[](size_t ndx) const TIGHTDB_NOEXCEPT {return get(ndx);}
     int64_t back() const TIGHTDB_NOEXCEPT;
-    void Delete(size_t ndx);
-    void Clear();
+    void erase(size_t ndx);
+    void clear();
 
     // Direct access methods
     const Array* GetBlock(size_t ndx, Array& arr, size_t& off,
@@ -310,7 +310,7 @@ public:
     void SetAllToZero();
     void Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);
     void IncrementIf(int64_t limit, int64_t value);
-    void Adjust(size_t start, int64_t diff);
+    void adjust(size_t start, int64_t diff);
 
     size_t FindPos(int64_t value) const TIGHTDB_NOEXCEPT;
     size_t FindPos2(int64_t value) const TIGHTDB_NOEXCEPT;
@@ -325,7 +325,7 @@ public:
     bool minimum(int64_t& result, size_t start = 0, size_t end = (size_t)-1) const;
     void sort(void);
     void ReferenceSort(Array &ref);
-    void Resize(size_t count);
+    void resize(size_t count);
 
     /// Returns true if type is not coldef_InnerNode
     bool is_leaf() const TIGHTDB_NOEXCEPT { return !m_isNode; }
@@ -340,7 +340,7 @@ public:
     void SetIsIndexNode(bool value) { set_header_indexflag(value); }
     Array GetSubArray(size_t ndx) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array may cause the parent to be modified too.
     size_t get_ref() const TIGHTDB_NOEXCEPT { return m_ref; }
-    void Destroy();
+    void destroy();
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_alloc; }
 
@@ -1168,7 +1168,7 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
 
         // Clean-up
         newRefs.set_type(coldef_Normal); // avoid recursive del
-        newRefs.Destroy();
+        newRefs.destroy();
 
         return refs_pos; // Return position
     }
@@ -1209,7 +1209,7 @@ inline void Array::move_assign(Array& a)
     // the referenced data. This is important because TableView, for
     // example, relies on long chains of moves to be optimized away
     // completely. This change should be a 'no-brainer'.
-    Destroy();
+    destroy();
     update_ref(a.get_ref());
     a.Invalidate();
 }

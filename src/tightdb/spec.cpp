@@ -36,7 +36,7 @@ void Spec::init_from_ref(size_t ref, ArrayParent* parent, size_t ndx_in_parent)
 
 void Spec::destroy()
 {
-    m_specSet.Destroy();
+    m_specSet.destroy();
 }
 
 size_t Spec::get_ref() const
@@ -179,19 +179,19 @@ void Spec::remove_column(size_t column_ndx)
         const size_t subspec_ref = m_subSpecs.get_as_ref(subspec_ndx);
 
         Array subspec_top(subspec_ref, NULL, 0, m_specSet.get_alloc());
-        subspec_top.Destroy(); // recursively delete entire subspec
-        m_subSpecs.Delete(subspec_ndx);
+        subspec_top.destroy(); // recursively delete entire subspec
+        m_subSpecs.erase(subspec_ndx);
     }
 
     // Delete the actual name and type entries
     m_names.erase(column_ndx);
-    m_spec.Delete(type_ndx);
+    m_spec.erase(type_ndx);
 
     // If there are an attribute, we have to delete that as well
     if (type_ndx > 0) {
         const ColumnType type_prefix = ColumnType(m_spec.get(type_ndx-1));
         if (type_prefix >= col_attr_Indexed)
-            m_spec.Delete(type_ndx-1);
+            m_spec.erase(type_ndx-1);
     }
 }
 
@@ -371,7 +371,7 @@ void Spec::set_column_attr(size_t ndx, ColumnType attr)
         if (type >= col_attr_Indexed) {
             if (column_ndx == ndx) {
                 // if column already has an attr, we replace it
-                if (attr == col_attr_None) m_spec.Delete(i);
+                if (attr == col_attr_None) m_spec.erase(i);
                 else m_spec.set(i, attr);
                 return;
             }
@@ -379,7 +379,7 @@ void Spec::set_column_attr(size_t ndx, ColumnType attr)
         else {
             if (column_ndx == ndx) {
                 // prefix type with attr
-                m_spec.Insert(i, attr);
+                m_spec.insert(i, attr);
                 return;
             }
             ++column_ndx;

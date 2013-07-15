@@ -69,7 +69,7 @@ void VerifiedString::Delete(size_t ndx)
 void VerifiedString::Clear()
 {
     v.clear();
-    u.Clear();
+    u.clear();
     TIGHTDB_ASSERT(v.size() == u.Size());
     TIGHTDB_ASSERT(ConditionalVerify());
 }
@@ -105,7 +105,7 @@ void VerifiedString::find_all(Array& c, StringData value, size_t start, size_t e
         }
     }
 
-    c.Clear();
+    c.clear();
 
     u.find_all(c, value);
     size_t cs = c.size();
@@ -146,5 +146,5 @@ bool VerifiedString::ConditionalVerify()
 
 void VerifiedString::Destroy()
 {
-    u.Destroy();
+    u.destroy();
 }

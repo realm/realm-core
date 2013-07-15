@@ -174,7 +174,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
 
         // Find the subnode containing the item
         size_t node_ndx = offsets.FindPos(ndx);
-        if (node_ndx == (size_t)-1) {
+        if (node_ndx == size_t(-1)) {
             // node can never be empty, so try to fit in last item
             node_ndx = offsets.size()-1;
         }
@@ -229,8 +229,8 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
                 const size_t ref = refs.get_as_ref(i);
                 newNode.NodeAdd<C>(ref);
             }
-            offsets.Resize(node_ndx);
-            refs.Resize(node_ndx);
+            offsets.resize(node_ndx);
+            refs.resize(node_ndx);
             return NodeChange(NodeChange::split, get_ref(), newNode.get_ref());
         }
     }
@@ -258,7 +258,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
             for (size_t i = ndx; i < count; ++i) {
                 newList.add(static_cast<C*>(this)->LeafGet(i));
             }
-            static_cast<C*>(this)->Resize(ndx);
+            static_cast<C*>(this)->resize(ndx);
 
             return NodeChange(NodeChange::split, get_ref(), newList.get_ref());
         }
@@ -291,8 +291,8 @@ template<class C> void ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
 
     // Insert new ref
     const size_t refSize = new_col.Size();
-    offsets.Insert(ndx+1, newOffset + refSize);
-    refs.Insert(ndx+1, new_ref);
+    offsets.insert(ndx+1, newOffset + refSize);
+    refs.insert(ndx+1, new_ref);
 
 #ifdef TIGHTDB_DEBUG
     TIGHTDB_ASSERT((newSize + refSize) - oldSize == 1); // insert should only add one item
@@ -314,15 +314,15 @@ template<class C> void ColumnBase::NodeInsert(size_t ndx, size_t ref)
     TIGHTDB_ASSERT(ndx <= offsets.size());
     TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
 
-    const C col(ref, (Array*)NULL, 0, m_array->get_alloc());
+    const C col(ref, NULL, 0, m_array->get_alloc());
     const size_t refSize = col.Size();
     const int64_t newOffset = (ndx ? offsets.get(ndx-1) : 0) + refSize;
 
-    offsets.Insert(ndx, newOffset);
+    offsets.insert(ndx, newOffset);
     if (ndx+1 < offsets.size()) {
         offsets.Increment(refSize, ndx+1);
     }
-    refs.Insert(ndx, ref);
+    refs.insert(ndx, ref);
 }
 
 template<class C> void ColumnBase::NodeAdd(size_t ref)
@@ -332,7 +332,7 @@ template<class C> void ColumnBase::NodeAdd(size_t ref)
 
     Array offsets = NodeGetOffsets();
     Array refs = NodeGetRefs();
-    const C col(ref, (Array*)NULL, 0, m_array->get_alloc());
+    const C col(ref, NULL, 0, m_array->get_alloc());
 
     TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
 
@@ -353,7 +353,7 @@ template<typename T, class C> void ColumnBase::TreeDelete(size_t ndx)
 
         // Find the subnode containing the item
         const size_t node_ndx = offsets.FindPos(ndx);
-        TIGHTDB_ASSERT(node_ndx != (size_t)-1);
+        TIGHTDB_ASSERT(node_ndx != size_t(-1));
 
         // Calc index in subnode
         const size_t offset = node_ndx ? to_ref(offsets.get(node_ndx-1)) : 0;
@@ -365,14 +365,14 @@ template<typename T, class C> void ColumnBase::TreeDelete(size_t ndx)
 
         // Remove ref in node
         if (target.is_empty()) {
-            offsets.Delete(node_ndx);
-            refs.Delete(node_ndx);
-            target.Destroy();
+            offsets.erase(node_ndx);
+            refs.erase(node_ndx);
+            target.destroy();
         }
 
         if (offsets.is_empty()) {
             // All items deleted, we can revert to being array
-            static_cast<C*>(this)->Clear();
+            static_cast<C*>(this)->clear();
         }
         else {
             // Update lower offsets

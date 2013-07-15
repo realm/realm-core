@@ -20,7 +20,7 @@ void ColumnSubtableParent::move_last_over(size_t ndx) {
     if (ref_columns != 0) {
         Allocator& alloc = get_alloc();
         Array columns(ref_columns, NULL, 0, alloc);
-        columns.Destroy();
+        columns.destroy();
     }
 
     const size_t ndx_last = Size()-1;
@@ -28,7 +28,7 @@ void ColumnSubtableParent::move_last_over(size_t ndx) {
 
     set(ndx, v);
 
-    // We do a Column::Delete() to avoid
+    // We do a Column::erase() to avoid
     // recursive delete of the copied table(s)
     Column::erase(ndx_last);
 }
@@ -111,7 +111,7 @@ void ColumnTable::erase(size_t ndx)
     if (ref_columns != 0) {
         Allocator& alloc = get_alloc();
         Array columns(ref_columns, 0, 0, alloc);
-        columns.Destroy();
+        columns.destroy();
     }
 
     Column::erase(ndx);
@@ -119,7 +119,7 @@ void ColumnTable::erase(size_t ndx)
     invalidate_subtables();
 }
 
-void ColumnTable::ClearTable(size_t ndx)
+void ColumnTable::clear_table(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < Size());
 
@@ -129,7 +129,7 @@ void ColumnTable::ClearTable(size_t ndx)
     // Delete sub-tree
     Allocator& alloc = get_alloc();
     Array columns(ref_columns, 0, 0, alloc);
-    columns.Destroy();
+    columns.destroy();
 
     // Mark as empty table
     set(ndx, 0);

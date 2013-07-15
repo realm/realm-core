@@ -36,7 +36,7 @@ public:
                          Allocator& = Allocator::get_default());
     ~AdaptiveStringColumn();
 
-    void Destroy();
+    void destroy() TIGHTDB_OVERRIDE;
 
     std::size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
@@ -48,8 +48,8 @@ public:
     void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, StringData()); }
     void insert(std::size_t ndx, StringData);
     void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
-    void Clear() TIGHTDB_OVERRIDE;
-    void Resize(std::size_t ndx);
+    void clear() TIGHTDB_OVERRIDE;
+    void resize(std::size_t ndx);
     void fill(std::size_t count);
     void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
 

@@ -45,7 +45,7 @@ TEST(StringIndex_BuildIndex)
     CHECK_EQUAL(6, r6);
 
     // Clean up
-    col.Destroy();
+    col.destroy();
 }
 
 TEST(StringIndex_DeleteAll)
@@ -103,7 +103,7 @@ TEST(StringIndex_DeleteAll)
 #endif
 
     // Clean up
-    col.Destroy();
+    col.destroy();
 }
 
 TEST(StringIndex_Delete)
@@ -151,7 +151,7 @@ TEST(StringIndex_Delete)
 #endif
 
     // Clean up
-    col.Destroy();
+    col.destroy();
 }
 
 TEST(StringIndex_Insert)
@@ -199,7 +199,7 @@ TEST(StringIndex_Insert)
     CHECK_EQUAL(7, col.find_first(s6));
 
     // Clean up
-    col.Destroy();
+    col.destroy();
 }
 
 TEST(StringIndex_Set)
@@ -246,7 +246,7 @@ TEST(StringIndex_Set)
     CHECK_EQUAL(4, col.find_first(s6));
 
     // Clean up
-    col.Destroy();
+    col.destroy();
 }
 
 TEST(StringIndex_Count)
@@ -280,7 +280,7 @@ TEST(StringIndex_Count)
     CHECK_EQUAL(4, c4);
 
     // Clean up
-    col.Destroy();
+    col.destroy();
 }
 
 TEST(StringIndex_Distinct)
@@ -313,8 +313,8 @@ TEST(StringIndex_Distinct)
     CHECK_EQUAL(6, result[3]); // s4 = Tom
 
     // Clean up
-    result.Destroy();
-    col.Destroy();
+    result.destroy();
+    col.destroy();
 }
 
 #if 0 // fixme
@@ -354,6 +354,6 @@ TEST(StringIndex_FindAllNoCopy)
     CHECK_EQUAL(9, results.Get(3));
 
     // Clean up
-    col.Destroy();
+    col.destroy();
 }
 #endif

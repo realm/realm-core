@@ -12,10 +12,10 @@ ColumnMixed::~ColumnMixed()
     delete m_array;
 }
 
-void ColumnMixed::Destroy()
+void ColumnMixed::destroy()
 {
     if (m_array != NULL)
-        m_array->Destroy();
+        m_array->destroy();
 }
 
 void ColumnMixed::set_parent(ArrayParent *parent, size_t pndx)
@@ -118,7 +118,7 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType newtype)
                 // Delete entire table
                 const size_t ref = m_refs->get_as_ref(ndx);
                 Array top(ref, 0, 0, m_array->get_alloc());
-                top.Destroy();
+                top.destroy();
                 break;
             }
             default:
@@ -154,12 +154,12 @@ void ColumnMixed::move_last_over(size_t ndx)
     m_refs->move_last_over(ndx);
 }
 
-void ColumnMixed::Clear()
+void ColumnMixed::clear()
 {
-    m_types->Clear();
-    m_refs->Clear();
+    m_types->clear();
+    m_refs->clear();
     if (m_data)
-        m_data->Clear();
+        m_data->clear();
 }
 
 DataType ColumnMixed::get_type(size_t ndx) const TIGHTDB_NOEXCEPT

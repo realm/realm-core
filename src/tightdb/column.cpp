@@ -178,12 +178,12 @@ Array* merge(const Array& arrayList)
     }
 
     // Clean-up
-    leftHalf.Destroy();
-    rightHalf.Destroy();
+    leftHalf.destroy();
+    rightHalf.destroy();
     if (left)
-        left->Destroy();
+        left->destroy();
     if (right)
-        right->Destroy();
+        right->destroy();
     delete left;
     delete right;
 
@@ -195,7 +195,7 @@ Array* merge(const Array& arrayList)
 //     indexlists:  Array of pointers to non-instantiated Arrays of index numbers into valuelist
 // Output:
 //     indexresult: Array of indexes into valuelist, sorted with respect to values in valuelist
-// TODO: Set owner of created arrays and Destroy/delete them if created by merge_references()
+// TODO: Set owner of created arrays and destroy/delete them if created by merge_references()
 void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
 {
     if (indexlists->size() == 1) {
@@ -320,11 +320,11 @@ Column::~Column()
     delete m_index; // does not destroy index!
 }
 
-void Column::Destroy()
+void Column::destroy()
 {
     ClearIndex();
     if (m_array)
-        m_array->Destroy();
+        m_array->destroy();
 }
 
 
@@ -375,9 +375,9 @@ const Column Column::GetSubColumn(size_t ndx) const
 }
 */
 
-void Column::Clear()
+void Column::clear()
 {
-    m_array->Clear();
+    m_array->clear();
     if (m_array->IsNode())
         m_array->set_type(Array::coldef_Normal);
 }
@@ -407,7 +407,7 @@ void Column::insert(size_t ndx, int64_t value)
     // Update index
     if (m_index) {
         const bool isLast = (ndx+1 == Size());
-        m_index->Insert(ndx, value, isLast);
+        m_index->insert(ndx, value, isLast);
     }
 
 #ifdef TIGHTDB_DEBUG
@@ -484,16 +484,16 @@ void Column::sort(size_t start, size_t end)
             set(t, sorted->get(t));
         }
 
-        sorted->Destroy();
+        sorted->destroy();
         delete sorted;
     }
 
     // Clean-up
-    arr.Destroy();
+    arr.destroy();
 }
 
 
-// TODO: Set owner of created arrays and Destroy/delete them if created by merge_references()
+// TODO: Set owner of created arrays and destroy/delete them if created by merge_references()
 void Column::ReferenceSort(size_t start, size_t end, Column& ref)
 {
     Array values; // pointers to non-instantiated arrays of values
@@ -590,8 +590,8 @@ void Column::erase(size_t ndx)
             break;
 
         size_t ref = refs.get_as_ref(0);
-        refs.Delete(0); // avoid destroying subtree
-        m_array->Destroy();
+        refs.erase(0); // avoid destroying subtree
+        m_array->destroy();
         m_array->update_ref(ref);
     }
 
@@ -780,9 +780,9 @@ Index& Column::GetIndex()
 void Column::ClearIndex()
 {
     if (m_index) {
-        m_index->Destroy();
+        m_index->destroy();
         delete m_index;
-        m_index = NULL;
+        m_index = 0;
     }
 }
 

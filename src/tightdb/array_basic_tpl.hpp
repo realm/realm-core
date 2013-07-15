@@ -63,7 +63,7 @@ inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT : Array(no_pr
 
 
 template<typename T>
-inline void BasicArray<T>::Clear()
+inline void BasicArray<T>::clear()
 {
     CopyOnWrite(); // Throws
 
@@ -75,7 +75,7 @@ inline void BasicArray<T>::Clear()
 template<typename T>
 inline void BasicArray<T>::add(T value)
 {
-    Insert(m_len, value);
+    insert(m_len, value);
 }
 
 
@@ -109,7 +109,7 @@ inline void BasicArray<T>::set(size_t ndx, T value)
 }
 
 template<typename T>
-void BasicArray<T>::Insert(size_t ndx, T value)
+void BasicArray<T>::insert(size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx <= m_len);
 
@@ -136,7 +136,7 @@ void BasicArray<T>::Insert(size_t ndx, T value)
 }
 
 template<typename T>
-void BasicArray<T>::Delete(size_t ndx)
+void BasicArray<T>::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_len);
 

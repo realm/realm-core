@@ -53,7 +53,7 @@ void Index::BuildIndex(const Column& src)
     // Brute-force build-up
     // TODO: sort and merge
     for (size_t i = 0; i < src.Size(); ++i) {
-        Insert(i, src.get(i), true);
+        insert(i, src.get(i), true);
     }
 
 #ifdef TIGHTDB_DEBUG
@@ -64,7 +64,7 @@ void Index::BuildIndex(const Column& src)
 void Index::set(size_t ndx, int64_t oldValue, int64_t newValue)
 {
     erase(ndx, oldValue, true); // set isLast to avoid updating refs
-    Insert(ndx, newValue, true); // set isLast to avoid updating refs
+    insert(ndx, newValue, true); // set isLast to avoid updating refs
 }
 
 void Index::erase(size_t ndx, int64_t value, bool isLast)
@@ -78,8 +78,8 @@ void Index::erase(size_t ndx, int64_t value, bool isLast)
         if (refs.size() > 1) break;
 
         const size_t ref = refs.get_as_ref(0);
-        refs.Delete(0); // avoid deleting subtree
-        m_array->Destroy();
+        refs.erase(0); // avoid deleting subtree
+        m_array->destroy();
         m_array->update_ref(ref);
     }
 
@@ -103,8 +103,8 @@ bool Index::DoDelete(size_t ndx, int64_t value)
             if (node.DoDelete(ndx, value)) {
                 // Update the ref
                 if (node.is_empty()) {
-                    refs.Delete(pos);
-                    node.Destroy();
+                    refs.erase(pos);
+                    node.destroy();
                 }
                 else {
                     const int64_t maxval = node.MaxValue();
@@ -119,8 +119,8 @@ bool Index::DoDelete(size_t ndx, int64_t value)
     else {
         do {
             if (refs.get(pos) == int(ndx)) {
-                values.Delete(pos);
-                refs.Delete(pos);
+                values.erase(pos);
+                refs.erase(pos);
                 return true;
             }
             else ++pos;
@@ -129,7 +129,7 @@ bool Index::DoDelete(size_t ndx, int64_t value)
     return false;
 }
 
-void Index::Insert(size_t ndx, int64_t value, bool isLast)
+void Index::insert(size_t ndx, int64_t value, bool isLast)
 {
     // If it is last item in column, we don't have to update refs
     if (!isLast) UpdateRefs(ndx, 1);
@@ -178,8 +178,8 @@ void Index::LeafInsert(size_t ref, int64_t value)
         refs.add(ref);
     }
     else {
-        values.Insert(ins_pos, value);
-        refs.Insert(ins_pos, ref);
+        values.insert(ins_pos, value);
+        refs.insert(ins_pos, ref);
     }
 }
 
@@ -202,8 +202,8 @@ void Index::NodeAdd(size_t ref)
         refs.add(ref);
     }
     else {
-        offsets.Insert(ins_pos, maxval);
-        refs.Insert(ins_pos, ref);
+        offsets.insert(ins_pos, maxval);
+        refs.insert(ins_pos, ref);
     }
 }
 
@@ -265,8 +265,8 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
             for (size_t i = node_ndx; i < len; ++i) {
                 newNode.NodeAdd(to_size_t(refs.get(i)));
             }
-            offsets.Resize(node_ndx);
-            refs.Resize(node_ndx);
+            offsets.resize(node_ndx);
+            refs.resize(node_ndx);
             return NodeChange(NodeChange::split, get_ref(), newNode.get_ref());
         }
     }
@@ -291,7 +291,7 @@ Column::NodeChange Index::DoInsert(size_t ndx, int64_t value)
             for (size_t i = ndx; i < m_array->size(); ++i) {
                 newList.add(m_array->get(i));
             }
-            m_array->Resize(ndx);
+            m_array->resize(ndx);
 
             return NodeChange(NodeChange::split, get_ref(), newList.get_ref());
         }
