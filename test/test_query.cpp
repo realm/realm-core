@@ -947,6 +947,28 @@ TEST(TestQueryFloat)
     CHECK_EQUAL(1.13f, q2.col_float.minimum());
     CHECK_EQUAL(3.20, q2.col_double.maximum());
     CHECK_EQUAL(2.21, q2.col_double.minimum());
+
+    size_t count = 0;
+    // ... NO conditions
+    CHECK_EQUAL(1.20f, t.where().col_float.maximum(&count));
+    CHECK_EQUAL(5, count);
+    CHECK_EQUAL(1.10f, t.where().col_float.minimum(&count));
+    CHECK_EQUAL(5, count);
+    CHECK_EQUAL(3.20, t.where().col_double.maximum(&count));
+    CHECK_EQUAL(5, count);
+    CHECK_EQUAL(2.20, t.where().col_double.minimum(&count));
+    CHECK_EQUAL(5, count);
+
+    // ... with conditions
+    CHECK_EQUAL(1.20f, q2.col_float.maximum(&count));
+    CHECK_EQUAL(2, count);
+    CHECK_EQUAL(1.13f, q2.col_float.minimum(&count));
+    CHECK_EQUAL(2, count);
+    CHECK_EQUAL(3.20, q2.col_double.maximum(&count));
+    CHECK_EQUAL(2, count);
+    CHECK_EQUAL(2.21, q2.col_double.minimum(&count));
+    CHECK_EQUAL(2, count);
+
 }
 
 
@@ -1170,11 +1192,11 @@ TEST(TestQueryFindAll_range_or_monkey2)
 
         CHECK_EQUAL(s1, s2);
         for (size_t t = 0; t < a.size(); t++) {
-            size_t i1 = a.GetAsSizeT(t);
+            size_t i1 = to_size_t(a.get(t));
             size_t i2 = tv1.get_source_ndx(t);
             CHECK_EQUAL(i1, i2);
         }
-        a.Destroy();
+        a.destroy();
     }
 
 }

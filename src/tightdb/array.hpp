@@ -245,8 +245,14 @@ public:
     // sequence of column types.
     bool operator==(const Array& a) const;
 
-    void SetType(ColumnDef type);
-    void UpdateRef(size_t ref);
+    void set_type(ColumnDef type);
+
+    /// Reinitialize this array accessor to point to the specified new
+    /// underlying array, and if it has a parent, update the parent to
+    /// point to the new array. The updating of the parent only works
+    /// if this array was initialized with the correct parent
+    /// reference.
+    void update_ref(size_t ref);
 
     /// Construct a complete copy of this array (including its
     /// subarrays) using the specified allocator and return just the
@@ -260,8 +266,8 @@ public:
     static size_t create_empty_array(ColumnDef, Allocator&);
 
     // Parent tracking
-    bool HasParent() const TIGHTDB_NOEXCEPT {return m_parent != NULL;}
-    void SetParent(ArrayParent *parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
+    bool has_parent() const TIGHTDB_NOEXCEPT { return m_parent != 0; }
+    void set_parent(ArrayParent *parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
     void UpdateParentNdx(int diff) {m_parentNdx += diff;}
     ArrayParent *GetParent() const TIGHTDB_NOEXCEPT {return m_parent;}
     size_t GetParentNdx() const TIGHTDB_NOEXCEPT {return m_parentNdx;}
@@ -273,21 +279,20 @@ public:
     size_t size() const TIGHTDB_NOEXCEPT {return m_len;}
     bool is_empty() const TIGHTDB_NOEXCEPT {return m_len == 0;}
 
-    void Insert(size_t ndx, int64_t value);
+    void insert(size_t ndx, int64_t value);
     void add(int64_t value);
-    void Set(size_t ndx, int64_t value);
+    void set(size_t ndx, int64_t value);
     template<size_t w> void Set(size_t ndx, int64_t value);
 
-    int64_t Get(size_t ndx) const TIGHTDB_NOEXCEPT;
+    int64_t get(size_t ndx) const TIGHTDB_NOEXCEPT;
     template<size_t w> int64_t Get(size_t ndx) const TIGHTDB_NOEXCEPT;
 
-    size_t GetAsRef(size_t ndx) const TIGHTDB_NOEXCEPT;
-    size_t GetAsSizeT(size_t ndx) const TIGHTDB_NOEXCEPT;
+    size_t get_as_ref(size_t ndx) const TIGHTDB_NOEXCEPT;
 
-    int64_t operator[](size_t ndx) const TIGHTDB_NOEXCEPT {return Get(ndx);}
+    int64_t operator[](size_t ndx) const TIGHTDB_NOEXCEPT {return get(ndx);}
     int64_t back() const TIGHTDB_NOEXCEPT;
-    void Delete(size_t ndx);
-    void Clear();
+    void erase(size_t ndx);
+    void clear();
 
     // Direct access methods
     const Array* GetBlock(size_t ndx, Array& arr, size_t& off,
@@ -305,9 +310,40 @@ public:
     void SetAllToZero();
     void Increment(int64_t value, size_t start=0, size_t end=(size_t)-1);
     void IncrementIf(int64_t limit, int64_t value);
-    template <size_t w> void Adjust(size_t start, int64_t diff);
-    void Adjust(size_t start, int64_t diff);
-    template <size_t w> bool Increment(int64_t value, size_t start, size_t end);
+    void adjust(size_t start, int64_t diff);
+
+    //@{
+
+    /// Find the lower/upper bound in a sorted sequence.
+    ///
+    /// <pre>
+    ///
+    ///   3 3 3 4 4 4 5 6 7 9 9 9
+    ///   ^     ^     ^     ^     ^
+    ///   |     |     |     |     |
+    ///   |     |     |     |      -- Lower and upper bound of 15
+    ///   |     |     |     |
+    ///   |     |     |      -- Lower and upper bound of 8
+    ///   |     |     |
+    ///   |     |      -- Upper bound of 4
+    ///   |     |
+    ///   |      -- Lower bound of 4
+    ///   |
+    ///    -- Lower and upper bound of 1
+    ///
+    /// </pre>
+    ///
+    /// These functions are functionally identical to
+    /// std::lower_bound() and std::upper_bound().
+    ///
+    /// We currently use binary search. See for example
+    /// http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
+    ///
+    /// It may be worth considering if overall efficiency can be
+    /// improved by doing a linear search for short sequences.
+    std::size_t lower_bound(int64_t value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound(int64_t value) const TIGHTDB_NOEXCEPT;
+    //@}
 
     size_t FindPos(int64_t value) const TIGHTDB_NOEXCEPT;
     size_t FindPos2(int64_t value) const TIGHTDB_NOEXCEPT;
@@ -316,31 +352,27 @@ public:
     void Preset(int64_t min, int64_t max, size_t count);
     void Preset(size_t bitwidth, size_t count);
 
-    void FindAllHamming(Array& result, uint64_t value, size_t maxdist, size_t offset=0) const;
     int64_t sum(size_t start = 0, size_t end = (size_t)-1) const;
     size_t count(int64_t value) const;
     bool maximum(int64_t& result, size_t start = 0, size_t end = (size_t)-1) const;
     bool minimum(int64_t& result, size_t start = 0, size_t end = (size_t)-1) const;
     void sort(void);
     void ReferenceSort(Array &ref);
-    void Resize(size_t count);
+    void resize(size_t count);
 
     /// Returns true if type is not coldef_InnerNode
     bool is_leaf() const TIGHTDB_NOEXCEPT { return !m_isNode; }
 
     /// Returns true if type is either coldef_HasRefs or coldef_InnerNode
-    bool HasRefs() const TIGHTDB_NOEXCEPT { return m_hasRefs; }
-
-    // FIXME: Remove this, wrong terminology
-    bool IsNode() const TIGHTDB_NOEXCEPT { return m_isNode; }
+    bool has_refs() const TIGHTDB_NOEXCEPT { return m_hasRefs; }
 
     bool IsIndexNode() const  TIGHTDB_NOEXCEPT { return get_indexflag_from_header(); }
     void SetIsIndexNode(bool value) { set_header_indexflag(value); }
     Array GetSubArray(size_t ndx) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array may cause the parent to be modified too.
-    size_t GetRef() const TIGHTDB_NOEXCEPT { return m_ref; }
-    void Destroy();
+    size_t get_ref() const TIGHTDB_NOEXCEPT { return m_ref; }
+    void destroy();
 
-    Allocator& GetAllocator() const TIGHTDB_NOEXCEPT {return m_alloc;}
+    Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_alloc; }
 
     // Serialization
     template<class S> size_t Write(S& target, bool recurse=true, bool persist=false) const;
@@ -399,19 +431,19 @@ public:
                          Callback callback) const;
 
     template <class cond, Action action, size_t foreign_width, class Callback, size_t width>
-    bool CompareLeafs4(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                        Callback callback) const;
 
     template <class cond, Action action, class Callback, size_t bitwidth, size_t foreign_bitwidth>
-    bool CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                       Callback callback) const;
 
     template <class cond, Action action, class Callback>
-    bool CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                       Callback callback) const;
 
     template <class cond, Action action, size_t width, class Callback>
-    bool CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                       Callback callback) const;
 
     // SSE find for the four functions Equal/NotEqual/Less/Greater
@@ -510,7 +542,7 @@ protected:
     void init_from_ref(size_t ref) TIGHTDB_NOEXCEPT;
 //    void AddPositiveLocal(int64_t value);
 
-    void CreateFromHeader(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
+    void init_from_header(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
     void CreateFromHeaderDirect(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
     void update_ref_in_parent();
 
@@ -775,7 +807,7 @@ inline Array::Array(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator&
     update_ref_in_parent();
 }
 
-// Creates new array (but invalid, call UpdateRef or SetType to init)
+// Creates new array (but invalid, call update_ref() or set_type() to init)
 inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
     m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false),
     m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {}
@@ -786,7 +818,7 @@ inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
 inline Array::Array(const Array& src) TIGHTDB_NOEXCEPT:
     ArrayParent(), m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc)
 {
-    const size_t ref = src.GetRef();
+    const size_t ref = src.get_ref();
     init_from_ref(ref);
     src.Invalidate();
 }
@@ -805,13 +837,20 @@ inline Array::Array(const Array& array, Allocator& alloc):
 inline Array::Array(no_prealloc_tag) TIGHTDB_NOEXCEPT: m_alloc(Allocator::get_default()) {}
 
 
+inline void Array::update_ref(std::size_t ref)
+{
+    init_from_ref(ref);
+    update_ref_in_parent();
+}
+
+
 inline int64_t Array::back() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_len);
-    return Get(m_len-1);
+    return get(m_len-1);
 }
 
-inline int64_t Array::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_len);
     return (this->*m_getter)(ndx);
@@ -833,19 +872,12 @@ inline int64_t Array::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 */
 }
 
-inline std::size_t Array::GetAsRef(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline std::size_t Array::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_len);
     TIGHTDB_ASSERT(m_hasRefs);
-    const int64_t v = Get(ndx);
+    const int64_t v = get(ndx);
     return to_ref(v);
-}
-
-inline std::size_t Array::GetAsSizeT(std::size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < m_len);
-    const int64_t v = Get(ndx);
-    return to_size_t(v);
 }
 
 
@@ -854,7 +886,7 @@ inline Array Array::GetSubArray(std::size_t ndx) const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(ndx < m_len);
     TIGHTDB_ASSERT(m_hasRefs);
 
-    const std::size_t ref = std::size_t(Get(ndx));
+    const std::size_t ref = std::size_t(get(ndx));
     TIGHTDB_ASSERT(ref);
 
     // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying
@@ -866,7 +898,7 @@ inline Array Array::GetSubArray(std::size_t ndx) const TIGHTDB_NOEXCEPT
 inline bool Array::is_index_node(std::size_t ref, const Allocator& alloc)
 {
     TIGHTDB_ASSERT(ref);
-    return get_indexflag_from_header(static_cast<char*>(alloc.Translate(ref)));
+    return get_indexflag_from_header(static_cast<char*>(alloc.translate(ref)));
 }
 
 
@@ -1143,7 +1175,7 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
         // First write out all sub-arrays
         const size_t count = size();
         for (size_t i = 0; i < count; ++i) {
-            const size_t ref = GetAsRef(i);
+            const size_t ref = get_as_ref(i);
             if (ref == 0 || ref & 0x1) {
                 // zero-refs and refs that are not 64-aligned do not point to sub-trees
                 newRefs.add(ref);
@@ -1153,7 +1185,7 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
                 newRefs.add(ref);
             }
             else {
-                const Array sub(ref, NULL, 0, GetAllocator());
+                const Array sub(ref, NULL, 0, get_alloc());
                 const size_t sub_pos = sub.Write(out, true, persist);
                 TIGHTDB_ASSERT((sub_pos & 0x7) == 0); // 64bit alignment
                 newRefs.add(sub_pos);
@@ -1165,8 +1197,8 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
         const size_t refs_pos = newRefs.Write(out, false, persist);
 
         // Clean-up
-        newRefs.SetType(coldef_Normal); // avoid recursive del
-        newRefs.Destroy();
+        newRefs.set_type(coldef_Normal); // avoid recursive del
+        newRefs.destroy();
 
         return refs_pos; // Return position
     }
@@ -1207,8 +1239,8 @@ inline void Array::move_assign(Array& a)
     // the referenced data. This is important because TableView, for
     // example, relies on long chains of moves to be optimized away
     // completely. This change should be a 'no-brainer'.
-    Destroy();
-    UpdateRef(a.GetRef());
+    destroy();
+    update_ref(a.get_ref());
     a.Invalidate();
 }
 
@@ -1226,12 +1258,12 @@ inline void Array::update_ref_in_parent()
 
 inline void Array::update_child_ref(size_t child_ndx, size_t new_ref)
 {
-    Set(child_ndx, new_ref);
+    set(child_ndx, new_ref);
 }
 
 inline size_t Array::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 {
-    return GetAsRef(child_ndx);
+    return get_as_ref(child_ndx);
 }
 
 
@@ -1981,7 +2013,7 @@ TIGHTDB_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* da
 #endif //TIGHTDB_COMPILER_SSE
 
 template <class cond, Action action, class Callback>
-bool Array::CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                          Callback callback) const
 {
     cond c;
@@ -1993,8 +2025,8 @@ bool Array::CompareLeafs(Array* foreign, size_t start, size_t end, size_t basein
     int64_t v;
 
     // We can compare first element without checking for out-of-range
-    v = Get(start);
-    if (c(v, foreign->Get(start))) {
+    v = get(start);
+    if (c(v, foreign->get(start))) {
         if (!find_action<action, Callback>(start + baseindex, v, state, callback))
             return false;
     }
@@ -2002,18 +2034,18 @@ bool Array::CompareLeafs(Array* foreign, size_t start, size_t end, size_t basein
     start++;
 
     if (start + 3 < end) {
-        v = Get(start);
-        if (c(v, foreign->Get(start)))
+        v = get(start);
+        if (c(v, foreign->get(start)))
             if (!find_action<action, Callback>(start + baseindex, v, state, callback))
                 return false;
 
-        v = Get(start + 1);
-        if (c(v, foreign->Get(start + 1)))
+        v = get(start + 1);
+        if (c(v, foreign->get(start + 1)))
             if (!find_action<action, Callback>(start + 1 + baseindex, v, state, callback))
                 return false;
 
-        v = Get(start + 2);
-        if (c(v, foreign->Get(start + 2)))
+        v = get(start + 2);
+        if (c(v, foreign->get(start + 2)))
             if (!find_action<action, Callback>(start + 2 + baseindex, v, state, callback))
                 return false;
 
@@ -2029,7 +2061,7 @@ bool Array::CompareLeafs(Array* foreign, size_t start, size_t end, size_t basein
 }
 
 
-template <class cond, Action action, size_t width, class Callback> bool Array::CompareLeafs(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
+template <class cond, Action action, size_t width, class Callback> bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     size_t fw = foreign->m_width;
     bool r;
@@ -2039,7 +2071,7 @@ template <class cond, Action action, size_t width, class Callback> bool Array::C
 
 
 template <class cond, Action action, size_t width, class Callback, size_t foreign_width>
-bool Array::CompareLeafs4(Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
+bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                           Callback callback) const
 {
     cond c;

@@ -134,22 +134,22 @@ void Group::create_from_file(const string& filename, OpenMode mode, bool do_init
 // Create a new memory structure and attach this group instance to it.
 void Group::create()
 {
-    m_tables.SetType(Array::coldef_HasRefs); // FIXME: Why is this not done in Group() like the rest of the arrays?
+    m_tables.set_type(Array::coldef_HasRefs); // FIXME: Why is this not done in Group() like the rest of the arrays?
 
-    m_top.add(m_tableNames.GetRef());
-    m_top.add(m_tables.GetRef());
-    m_top.add(m_freePositions.GetRef());
-    m_top.add(m_freeLengths.GetRef());
+    m_top.add(m_tableNames.get_ref());
+    m_top.add(m_tables.get_ref());
+    m_top.add(m_freePositions.get_ref());
+    m_top.add(m_freeLengths.get_ref());
 
     // Set parent info
-    m_tableNames.SetParent(&m_top, 0);
-    m_tables.SetParent(&m_top, 1);
-    m_freePositions.SetParent(&m_top, 2);
-    m_freeLengths.SetParent(&m_top, 3);
+    m_tableNames.set_parent(&m_top, 0);
+    m_tables.set_parent(&m_top, 1);
+    m_freePositions.set_parent(&m_top, 2);
+    m_freeLengths.set_parent(&m_top, 3);
 
     if (m_freeVersions.IsValid()) {
-        m_top.add(m_freeVersions.GetRef());
-        m_freeVersions.SetParent(&m_top, 4);
+        m_top.add(m_freeVersions.get_ref());
+        m_freeVersions.set_parent(&m_top, 4);
     }
 }
 
@@ -158,13 +158,13 @@ void Group::create_from_ref(size_t top_ref)
 {
     // Instantiate top arrays
     if (top_ref == 0) {
-        m_top.SetType(Array::coldef_HasRefs);
-        m_tables.SetType(Array::coldef_HasRefs);
-        m_tableNames.SetType(Array::coldef_Normal);
-        m_freePositions.SetType(Array::coldef_Normal);
-        m_freeLengths.SetType(Array::coldef_Normal);
+        m_top.set_type(Array::coldef_HasRefs);
+        m_tables.set_type(Array::coldef_HasRefs);
+        m_tableNames.set_type(Array::coldef_Normal);
+        m_freePositions.set_type(Array::coldef_Normal);
+        m_freeLengths.set_type(Array::coldef_Normal);
         if (m_is_shared) {
-            m_freeVersions.SetType(Array::coldef_Normal);
+            m_freeVersions.set_type(Array::coldef_Normal);
         }
 
         create();
@@ -176,31 +176,31 @@ void Group::create_from_ref(size_t top_ref)
             m_freeVersions.add(0);
     }
     else {
-        m_top.UpdateRef(top_ref);
+        m_top.update_ref(top_ref);
         const size_t top_size = m_top.size();
         TIGHTDB_ASSERT(top_size >= 2);
 
-        const size_t n_ref = m_top.GetAsSizeT(0);
-        const size_t t_ref = m_top.GetAsSizeT(1);
-        m_tableNames.UpdateRef(n_ref);
-        m_tables.UpdateRef(t_ref);
-        m_tableNames.SetParent(&m_top, 0);
-        m_tables.SetParent(&m_top, 1);
+        const size_t n_ref = m_top.get_as_ref(0);
+        const size_t t_ref = m_top.get_as_ref(1);
+        m_tableNames.update_ref(n_ref);
+        m_tables.update_ref(t_ref);
+        m_tableNames.set_parent(&m_top, 0);
+        m_tables.set_parent(&m_top, 1);
 
         // Serialized files do not have free space markers
         // at all, and files that are not shared does not
         // need version info for free space.
         if (top_size >= 4) {
-            const size_t fp_ref = m_top.GetAsSizeT(2);
-            const size_t fl_ref = m_top.GetAsSizeT(3);
-            m_freePositions.UpdateRef(fp_ref);
-            m_freeLengths.UpdateRef(fl_ref);
-            m_freePositions.SetParent(&m_top, 2);
-            m_freeLengths.SetParent(&m_top, 3);
+            const size_t fp_ref = m_top.get_as_ref(2);
+            const size_t fl_ref = m_top.get_as_ref(3);
+            m_freePositions.update_ref(fp_ref);
+            m_freeLengths.update_ref(fl_ref);
+            m_freePositions.set_parent(&m_top, 2);
+            m_freeLengths.set_parent(&m_top, 3);
         }
         if (top_size == 5) {
-            m_freeVersions.UpdateRef(m_top.GetAsSizeT(4));
-            m_freeVersions.SetParent(&m_top, 4);
+            m_freeVersions.update_ref(m_top.get_as_ref(4));
+            m_freeVersions.set_parent(&m_top, 4);
         }
 
         // Make room for pointers to cached tables
@@ -222,24 +222,24 @@ void Group::init_shared()
         // Serialized files have no free space tracking
         // at all so we have to add the basic free lists
         if (m_top.size() == 2) {
-            m_freePositions.SetType(Array::coldef_Normal);
-            m_freeLengths.SetType(Array::coldef_Normal);
-            m_top.add(m_freePositions.GetRef());
-            m_top.add(m_freeLengths.GetRef());
-            m_freePositions.SetParent(&m_top, 2);
-            m_freeLengths.SetParent(&m_top, 3);
+            m_freePositions.set_type(Array::coldef_Normal);
+            m_freeLengths.set_type(Array::coldef_Normal);
+            m_top.add(m_freePositions.get_ref());
+            m_top.add(m_freeLengths.get_ref());
+            m_freePositions.set_parent(&m_top, 2);
+            m_freeLengths.set_parent(&m_top, 3);
         }
 
         // Files that have only been used in single thread
         // mode do not have version tracking for the free lists
         if (m_top.size() == 4) {
             const size_t count = m_freePositions.size();
-            m_freeVersions.SetType(Array::coldef_Normal);
+            m_freeVersions.set_type(Array::coldef_Normal);
             for (size_t i = 0; i < count; ++i) {
                 m_freeVersions.add(0);
             }
-            m_top.add(m_freeVersions.GetRef());
-            m_freeVersions.SetParent(&m_top, 4);
+            m_top.add(m_freeVersions.get_ref());
+            m_freeVersions.set_parent(&m_top, 4);
         }
     }
 }
@@ -264,11 +264,11 @@ void Group::reset_to_new()
     m_freeLengths.Invalidate();
     m_freeVersions.Invalidate();
 
-    m_tableNames.SetParent(NULL, 0);
-    m_tables.SetParent(NULL, 0);
-    m_freePositions.SetParent(NULL, 0);
-    m_freeLengths.SetParent(NULL, 0);
-    m_freeVersions.SetParent(NULL, 0);
+    m_tableNames.set_parent(0, 0);
+    m_tables.set_parent(0, 0);
+    m_freePositions.set_parent(0, 0);
+    m_freeLengths.set_parent(0, 0);
+    m_freeVersions.set_parent(0, 0);
 }
 
 void Group::rollback()
@@ -288,10 +288,10 @@ Group::~Group()
         clear_cache();
 
         // Recursively deletes entire tree
-        m_top.Destroy();
+        m_top.destroy();
     }
 
-    m_cachedtables.Destroy();
+    m_cachedtables.destroy();
 }
 
 void Group::invalidate()
@@ -308,11 +308,11 @@ void Group::invalidate()
     m_freeVersions.Invalidate();
 
     // FIXME: I (Kristian) had to add these to avoid a problem when resurrecting the arrays in create_from_ref() (top_ref==0). The problem is that if the parent is left as non-null, then Array::Alloc() will attempt to update the parent array, but the parent array is still empty at that point. I don't, however, think this is a sufficiently good fix? Alexander?
-    m_tables.SetParent(0,0);
-    m_tableNames.SetParent(0,0);
-    m_freePositions.SetParent(0,0);
-    m_freeLengths.SetParent(0,0);
-    m_freeVersions.SetParent(0,0);
+    m_tables.set_parent(0,0);
+    m_tableNames.set_parent(0,0);
+    m_freePositions.set_parent(0,0);
+    m_freeLengths.set_parent(0,0);
+    m_freeVersions.set_parent(0,0);
 
     // Reads may allocate some temproary state that we have
     // to clean up
@@ -326,12 +326,12 @@ Table* Group::get_table_ptr(size_t ndx)
     TIGHTDB_ASSERT(ndx < m_tables.size());
 
     // Get table from cache if exists, else create
-    Table* table = reinterpret_cast<Table*>(m_cachedtables.Get(ndx));
+    Table* table = reinterpret_cast<Table*>(m_cachedtables.get(ndx));
     if (!table) {
-        const size_t ref = m_tables.GetAsRef(ndx);
+        const size_t ref = m_tables.get_as_ref(ndx);
         Table::UnbindGuard t(new Table(Table::RefCountTag(), m_alloc, ref, this, ndx)); // Throws
         t->bind_ref(); // Increase reference count to 1
-        m_cachedtables.Set(ndx, intptr_t(t.get())); // FIXME: intptr_t is not guaranteed to exists, even in C++11
+        m_cachedtables.set(ndx, intptr_t(t.get())); // FIXME: intptr_t is not guaranteed to exists, even in C++11
         // This group shares ownership of the table, so leave
         // reference count at 1.
         table = t.release();
@@ -426,7 +426,7 @@ size_t Group::commit(size_t current_version, size_t readlock_version, bool persi
 void Group::update_refs(size_t topRef)
 {
     // Update top with the new (persistent) ref
-    m_top.UpdateRef(topRef);
+    m_top.update_ref(topRef);
     TIGHTDB_ASSERT(m_top.size() >= 2);
 
     // Now we can update it's child arrays
@@ -456,7 +456,7 @@ void Group::update_refs(size_t topRef)
     // Also update cached tables
     const size_t count = m_cachedtables.size();
     for (size_t i = 0; i < count; ++i) {
-        Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
+        Table* const t = reinterpret_cast<Table*>(m_cachedtables.get(i));
         if (t) {
             t->UpdateFromParent();
         }
@@ -480,10 +480,10 @@ void Group::update_from_shared(size_t top_ref, size_t len)
     }
 
     // If the top has not changed, everything is up-to-date
-    if (!isRemapped && top_ref == m_top.GetRef()) return;
+    if (!isRemapped && top_ref == m_top.get_ref()) return;
 
     // Update group arrays
-    m_top.UpdateRef(top_ref);
+    m_top.update_ref(top_ref);
     TIGHTDB_ASSERT(m_top.size() >= 2);
     const bool nameschanged = !m_tableNames.UpdateFromParent();
     m_tables.UpdateFromParent();
@@ -512,7 +512,7 @@ void Group::update_from_shared(size_t top_ref, size_t len)
         //TODO: account for changed spec
         const size_t count = m_cachedtables.size();
         for (size_t i = 0; i < count; ++i) {
-            Table* const t = reinterpret_cast<Table*>(m_cachedtables.Get(i));
+            Table* const t = reinterpret_cast<Table*>(m_cachedtables.get(i));
             if (t) {
                 t->UpdateFromParent();
             }
@@ -599,8 +599,8 @@ void Group::Verify() const
         if (count_p) {
             // Check for alignment
             for (size_t i = 0; i < count_p; ++i) {
-                const size_t p = m_freePositions.GetAsSizeT(i);
-                const size_t l = m_freeLengths.GetAsSizeT(i);
+                const size_t p = to_size_t(m_freePositions.get(i));
+                const size_t l = to_size_t(m_freeLengths.get(i));
                 TIGHTDB_ASSERT((p & 0x7) == 0); // 64bit alignment
                 TIGHTDB_ASSERT((l & 0x7) == 0); // 64bit alignment
             }
@@ -609,11 +609,11 @@ void Group::Verify() const
 
             // Segments should be ordered and without overlap
             for (size_t i = 0; i < count_p-1; ++i) {
-                const size_t pos1 = m_freePositions.GetAsSizeT(i);
-                const size_t pos2 = m_freePositions.GetAsSizeT(i+1);
+                const size_t pos1 = to_size_t(m_freePositions.get(i));
+                const size_t pos2 = to_size_t(m_freePositions.get(i+1));
                 TIGHTDB_ASSERT(pos1 < pos2);
 
-                const size_t len1 = m_freeLengths.GetAsSizeT(i);
+                const size_t len1 = to_size_t(m_freeLengths.get(i));
                 TIGHTDB_ASSERT(len1 != 0);
                 TIGHTDB_ASSERT(len1 < filelen);
 
@@ -707,13 +707,13 @@ void Group::zero_free_space(size_t file_size, size_t readlock_version)
 
     File::Map<char> map(m_alloc.m_file, File::access_ReadWrite, file_size);
 
-    const size_t count = m_freePositions.size();
+    size_t count = m_freePositions.size();
     for (size_t i = 0; i < count; ++i) {
-        const size_t v = m_freeVersions.GetAsSizeT(i); // todo, remove assizet when 64 bit
+        size_t v = to_size_t(m_freeVersions.get(i)); // todo, remove assizet when 64 bit
         if (v >= m_readlock_version) continue;
 
-        const size_t pos = m_freePositions.GetAsSizeT(i);
-        const size_t len = m_freeLengths.GetAsSizeT(i);
+        size_t pos = to_size_t(m_freePositions.get(i));
+        size_t len = to_size_t(m_freeLengths.get(i));
 
         char* p = map.get_addr() + pos;
         fill(p, p+len, 0);

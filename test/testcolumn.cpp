@@ -17,14 +17,14 @@ Column db_setup::c;
 TEST_FIXTURE(db_setup, Column_IsEmpty)
 {
     CHECK(c.is_empty());
-    CHECK_EQUAL(c.Size(), (size_t)0);
+    CHECK_EQUAL(c.size(), (size_t)0);
 }
 
 TEST_FIXTURE(db_setup, Column_Add0)
 {
     c.add(0);
     CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.Size(), (size_t)1);
+    CHECK_EQUAL(c.size(), (size_t)1);
 }
 
 TEST_FIXTURE(db_setup, Column_Add1)
@@ -32,7 +32,7 @@ TEST_FIXTURE(db_setup, Column_Add1)
     c.add(1);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.Size(), 2);
+    CHECK_EQUAL(c.size(), 2);
 }
 
 TEST_FIXTURE(db_setup, Column_Add2)
@@ -41,7 +41,7 @@ TEST_FIXTURE(db_setup, Column_Add2)
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
     CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.Size(), 3);
+    CHECK_EQUAL(c.size(), 3);
 }
 
 TEST_FIXTURE(db_setup, Column_Add3)
@@ -51,7 +51,7 @@ TEST_FIXTURE(db_setup, Column_Add3)
     CHECK_EQUAL(c.get(1), 1);
     CHECK_EQUAL(c.get(2), 2);
     CHECK_EQUAL(c.get(3), 3);
-    CHECK_EQUAL(c.Size(), 4);
+    CHECK_EQUAL(c.size(), 4);
 }
 
 TEST_FIXTURE(db_setup, Column_Add4)
@@ -62,7 +62,7 @@ TEST_FIXTURE(db_setup, Column_Add4)
     CHECK_EQUAL(c.get(2), 2);
     CHECK_EQUAL(c.get(3), 3);
     CHECK_EQUAL(c.get(4), 4);
-    CHECK_EQUAL(c.Size(), 5);
+    CHECK_EQUAL(c.size(), 5);
 }
 
 TEST_FIXTURE(db_setup, Column_Add5)
@@ -74,7 +74,7 @@ TEST_FIXTURE(db_setup, Column_Add5)
     CHECK_EQUAL(c.get(3), 3);
     CHECK_EQUAL(c.get(4), 4);
     CHECK_EQUAL(c.get(5), 16);
-    CHECK_EQUAL(c.Size(), 6);
+    CHECK_EQUAL(c.size(), 6);
 }
 
 TEST_FIXTURE(db_setup, Column_Add6)
@@ -87,7 +87,7 @@ TEST_FIXTURE(db_setup, Column_Add6)
     CHECK_EQUAL(c.get(4), 4);
     CHECK_EQUAL(c.get(5), 16);
     CHECK_EQUAL(c.get(6), 256);
-    CHECK_EQUAL(c.Size(), 7);
+    CHECK_EQUAL(c.size(), 7);
 }
 
 TEST_FIXTURE(db_setup, Column_Add7)
@@ -101,7 +101,7 @@ TEST_FIXTURE(db_setup, Column_Add7)
     CHECK_EQUAL(c.get(5), 16);
     CHECK_EQUAL(c.get(6), 256);
     CHECK_EQUAL(c.get(7), 65536);
-    CHECK_EQUAL(c.Size(), 8);
+    CHECK_EQUAL(c.size(), 8);
 }
 
 TEST_FIXTURE(db_setup, Column_Add8)
@@ -116,15 +116,15 @@ TEST_FIXTURE(db_setup, Column_Add8)
     CHECK_EQUAL(c.get(6), 256);
     CHECK_EQUAL(c.get(7), 65536);
     CHECK_EQUAL(c.get(8), 4294967296LL);
-    CHECK_EQUAL(c.Size(), 9);
+    CHECK_EQUAL(c.size(), 9);
 }
 
 TEST_FIXTURE(db_setup, Column_AddNeg1)
 {
-    c.Clear();
+    c.clear();
     c.add(-1);
 
-    CHECK_EQUAL(c.Size(), 1);
+    CHECK_EQUAL(c.size(), 1);
     CHECK_EQUAL(c.get(0), -1);
 }
 
@@ -132,7 +132,7 @@ TEST_FIXTURE(db_setup, Column_AddNeg2)
 {
     c.add(-256);
 
-    CHECK_EQUAL(c.Size(), 2);
+    CHECK_EQUAL(c.size(), 2);
     CHECK_EQUAL(c.get(0), -1);
     CHECK_EQUAL(c.get(1), -256);
 }
@@ -141,7 +141,7 @@ TEST_FIXTURE(db_setup, Column_AddNeg3)
 {
     c.add(-65536);
 
-    CHECK_EQUAL(c.Size(), 3);
+    CHECK_EQUAL(c.size(), 3);
     CHECK_EQUAL(c.get(0), -1);
     CHECK_EQUAL(c.get(1), -256);
     CHECK_EQUAL(c.get(2), -65536);
@@ -151,7 +151,7 @@ TEST_FIXTURE(db_setup, Column_AddNeg4)
 {
     c.add(-4294967296LL);
 
-    CHECK_EQUAL(c.Size(), 4);
+    CHECK_EQUAL(c.size(), 4);
     CHECK_EQUAL(c.get(0), -1);
     CHECK_EQUAL(c.get(1), -256);
     CHECK_EQUAL(c.get(2), -65536);
@@ -165,7 +165,7 @@ TEST_FIXTURE(db_setup, Column_Set)
     c.set(2, 1);
     c.set(3, 0);
 
-    CHECK_EQUAL(c.Size(), 4);
+    CHECK_EQUAL(c.size(), 4);
     CHECK_EQUAL(c.get(0), 3);
     CHECK_EQUAL(c.get(1), 2);
     CHECK_EQUAL(c.get(2), 1);
@@ -175,7 +175,7 @@ TEST_FIXTURE(db_setup, Column_Set)
 TEST_FIXTURE(db_setup, Column_Insert1)
 {
     // Set up some initial values
-    c.Clear();
+    c.clear();
     c.add(0);
     c.add(1);
     c.add(2);
@@ -184,7 +184,7 @@ TEST_FIXTURE(db_setup, Column_Insert1)
     // Insert in middle
     c.insert(2, 16);
 
-    CHECK_EQUAL(c.Size(), 5);
+    CHECK_EQUAL(c.size(), 5);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
     CHECK_EQUAL(c.get(2), 16);
@@ -197,7 +197,7 @@ TEST_FIXTURE(db_setup, Column_Insert2)
     // Insert at top
     c.insert(0, 256);
 
-    CHECK_EQUAL(c.Size(), 6);
+    CHECK_EQUAL(c.size(), 6);
     CHECK_EQUAL(c.get(0), 256);
     CHECK_EQUAL(c.get(1), 0);
     CHECK_EQUAL(c.get(2), 1);
@@ -211,7 +211,7 @@ TEST_FIXTURE(db_setup, Column_Insert3)
     // Insert at bottom
     c.insert(6, 65536);
 
-    CHECK_EQUAL(c.Size(), 7);
+    CHECK_EQUAL(c.size(), 7);
     CHECK_EQUAL(c.get(0), 256);
     CHECK_EQUAL(c.get(1), 0);
     CHECK_EQUAL(c.get(2), 1);
@@ -245,7 +245,7 @@ TEST_FIXTURE(db_setup, Column_Delete1)
     // Delete from middle
     c.erase(3);
 
-    CHECK_EQUAL(c.Size(), 6);
+    CHECK_EQUAL(c.size(), 6);
     CHECK_EQUAL(c.get(0), 256);
     CHECK_EQUAL(c.get(1), 0);
     CHECK_EQUAL(c.get(2), 1);
@@ -259,7 +259,7 @@ TEST_FIXTURE(db_setup, Column_Delete2)
     // Delete from top
     c.erase(0);
 
-    CHECK_EQUAL(c.Size(), 5);
+    CHECK_EQUAL(c.size(), 5);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
     CHECK_EQUAL(c.get(2), 2);
@@ -272,7 +272,7 @@ TEST_FIXTURE(db_setup, Column_Delete3)
     // Delete from bottom
     c.erase(4);
 
-    CHECK_EQUAL(c.Size(), 4);
+    CHECK_EQUAL(c.size(), 4);
     CHECK_EQUAL(c.get(0), 0);
     CHECK_EQUAL(c.get(1), 1);
     CHECK_EQUAL(c.get(2), 2);
@@ -288,7 +288,7 @@ TEST_FIXTURE(db_setup, Column_DeleteAll)
     c.erase(0);
 
     CHECK(c.is_empty());
-    CHECK_EQUAL(0, c.Size());
+    CHECK_EQUAL(0, c.size());
 }
 
 
@@ -303,7 +303,7 @@ TEST_FIXTURE(db_setup, Column_Find1)
 TEST_FIXTURE(db_setup, Column_Find2)
 {
     // zero-bit width
-    c.Clear();
+    c.clear();
     c.add(0);
     c.add(0);
 
@@ -424,14 +424,14 @@ TEST_FIXTURE(db_setup, Column_FindLeafs)
     CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE*4, res9);
     CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE*5-1, res10);
 
-    a.Destroy();
+    a.destroy();
 }
 
 /* Partial find is not fully implemented yet
 #define PARTIAL_COUNT 100
 TEST_FIXTURE(db_setup, Column_PartialFind1)
 {
-    c.Clear();
+    c.clear();
 
     for (size_t i = 0; i < PARTIAL_COUNT; ++i) {
         c.add(i);
@@ -445,7 +445,7 @@ TEST_FIXTURE(db_setup, Column_PartialFind1)
 
 TEST_FIXTURE(db_setup, Column_HeaderParse)
 {
-    Column column(c.GetRef(), (Array*)NULL, 0);
+    Column column(c.get_ref(), NULL, 0);
     const bool isEqual = (c == column);
     CHECK(isEqual);
 }
@@ -453,7 +453,7 @@ TEST_FIXTURE(db_setup, Column_HeaderParse)
 TEST_FIXTURE(db_setup, Column_Destroy)
 {
     // clean up (ALWAYS PUT THIS LAST)
-    c.Destroy();
+    c.destroy();
 }
 
 /*
@@ -474,19 +474,19 @@ TEST(Column_Sort)
 
     a.sort();
 
-    CHECK_EQUAL(0, a.Get(0));
-    CHECK_EQUAL(2, a.Get(1));
-    CHECK_EQUAL(3, a.Get(2));
-    CHECK_EQUAL(12, a.Get(3));
-    CHECK_EQUAL(17, a.Get(4));
-    CHECK_EQUAL(25, a.Get(5));
-    CHECK_EQUAL(34, a.Get(6));
-    CHECK_EQUAL(40, a.Get(7));
-    CHECK_EQUAL(50, a.Get(8));
-    CHECK_EQUAL(51, a.Get(9));
+    CHECK_EQUAL(0, a.get(0));
+    CHECK_EQUAL(2, a.get(1));
+    CHECK_EQUAL(3, a.get(2));
+    CHECK_EQUAL(12, a.get(3));
+    CHECK_EQUAL(17, a.get(4));
+    CHECK_EQUAL(25, a.get(5));
+    CHECK_EQUAL(34, a.get(6));
+    CHECK_EQUAL(40, a.get(7));
+    CHECK_EQUAL(50, a.get(8));
+    CHECK_EQUAL(51, a.get(9));
 
     // Cleanup
-    a.Destroy();
+    a.destroy();
 }
 */
 
@@ -511,15 +511,15 @@ TEST(Column_FindAll_IntMin)
 
     size_t i = 0;
     size_t j = 0;
-    while (i < c.Size()){
+    while (i < c.size()){
         if (c.get(i) == value)
-            CHECK_EQUAL(int64_t(i), r.Get(j++));
+            CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
     }
 
     // Cleanup
-    c.Destroy();
-    r.Destroy();
+    c.destroy();
+    r.destroy();
 }
 
 TEST(Column_FindAll_IntMax)
@@ -543,36 +543,17 @@ TEST(Column_FindAll_IntMax)
 
     size_t i = 0;
     size_t j = 0;
-    while (i < c.Size()){
+    while (i < c.size()){
         if (c.get(i) == value)
-            CHECK_EQUAL(int64_t(i), r.Get(j++));
+            CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
     }
 
     // Cleanup
-    c.Destroy();
-    r.Destroy();
+    c.destroy();
+    r.destroy();
 }
 
-/*
-TEST(Column_FindHamming)
-{
-    Column col;
-    for (size_t i = 0; i < 10; ++i) {
-        col.add(0x5555555555555555LL);
-        col.add(0x3333333333333333LL);
-    }
-
-    Array res;
-    col.find_all_hamming(res, 0x3333333333333332LL, 2);
-
-    CHECK_EQUAL(10, res.size()); // Half should match
-
-    // Clean up
-    col.Destroy();
-    res.Destroy();
-}
-*/
 
 TEST(Column_FindSorted)
 {
@@ -613,7 +594,7 @@ TEST(Column_FindSorted)
     CHECK_EQUAL(19, pos); // insert position
 
     // Clean up
-    col.Destroy();
+    col.destroy();
 }
 
 TEST(Column_Average)
@@ -629,7 +610,7 @@ TEST(Column_Average)
     CHECK_EQUAL(30, c.average(1,2));    // second
     CHECK_EQUAL(20, c.average(0,2));    // both
 
-    c.Destroy();
+    c.destroy();
 }
 
 TEST(Column_Sum_Average)
@@ -646,7 +627,7 @@ TEST(Column_Sum_Average)
     CHECK_EQUAL(123, c.sum());
     CHECK_EQUAL(123, c.average());
 
-    c.Clear();
+    c.clear();
 
     for (int i = 0; i < 100; i++) {
         c.add(i);
@@ -692,7 +673,7 @@ TEST(Column_Sum_Average)
     CHECK_EQUAL(sum, c.sum(55, 79));
     CHECK_EQUAL(sum/(79.0-55.0), c.average(55, 79));
 
-    c.Destroy();
+    c.destroy();
 }
 
 
@@ -706,7 +687,7 @@ TEST(Column_Max)
     t = c.maximum();
     CHECK_EQUAL(1, t);
 
-    c.Destroy();
+    c.destroy();
 }
 
 
@@ -725,7 +706,7 @@ TEST(Column_Max2)
     int64_t t = c.maximum(51, 81);
     CHECK_EQUAL(11, t);
 
-    c.Destroy();
+    c.destroy();
 }
 
 TEST(Column_Min)
@@ -738,7 +719,7 @@ TEST(Column_Min)
     t = c.minimum();
     CHECK_EQUAL(1, t);
 
-    c.Destroy();
+    c.destroy();
 }
 
 
@@ -757,7 +738,7 @@ TEST(Column_Min2)
     int64_t t = c.minimum(51, 81);
     CHECK_EQUAL(9, t);
 
-    c.Destroy();
+    c.destroy();
 }
 
 /*
@@ -774,7 +755,7 @@ TEST(Column_Sort2)
         CHECK(c.get(t) >= c.get(t - 1));
     }
 
-    c.Destroy();
+    c.destroy();
 }
 */
 
@@ -787,13 +768,13 @@ TEST(Column_prepend_many)
     Column a;
 
     for (size_t items = 0; items < 3000; ++items) {
-        a.Clear();
+        a.clear();
         for (size_t j = 0; j < items + 1; ++j) {
             a.insert(0, j);
         }
         a.insert(items, 444);
     }
-    a.Destroy();
+    a.destroy();
 }
 
 #endif

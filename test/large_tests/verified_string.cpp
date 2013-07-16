@@ -23,33 +23,33 @@ void VerifiedString::VerifyNeighbours(size_t ndx)
         TIGHTDB_ASSERT(v[ndx + 1] == u.get(ndx + 1));
 }
 
-void VerifiedString::add(const char * value)
+void VerifiedString::add(StringData value)
 {
     v.push_back(value);
     u.add(value);
-    TIGHTDB_ASSERT(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.size());
     VerifyNeighbours(v.size());
     TIGHTDB_ASSERT(ConditionalVerify());
 }
 
 
-void VerifiedString::Insert(size_t ndx, const char * value)
+void VerifiedString::Insert(size_t ndx, StringData value)
 {
     v.insert(v.begin() + ndx, value);
     u.insert(ndx, value);
-    TIGHTDB_ASSERT(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.size());
     VerifyNeighbours(ndx);
     TIGHTDB_ASSERT(ConditionalVerify());
 }
 
 
-const char *VerifiedString::Get(size_t ndx)
+StringData VerifiedString::get(size_t ndx)
 {
     TIGHTDB_ASSERT(v[ndx] == u.get(ndx));
-    return v[ndx].c_str();
+    return v[ndx];
 }
 
-void VerifiedString::Set(size_t ndx, const char *value)
+void VerifiedString::set(size_t ndx, StringData value)
 {
     v[ndx] = value;
     u.set(ndx, value);
@@ -61,7 +61,7 @@ void VerifiedString::Delete(size_t ndx)
 {
     v.erase(v.begin() + ndx);
     u.erase(ndx);
-    TIGHTDB_ASSERT(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.size());
     VerifyNeighbours(ndx);
     TIGHTDB_ASSERT(ConditionalVerify());
 }
@@ -69,12 +69,12 @@ void VerifiedString::Delete(size_t ndx)
 void VerifiedString::Clear()
 {
     v.clear();
-    u.Clear();
-    TIGHTDB_ASSERT(v.size() == u.Size());
+    u.clear();
+    TIGHTDB_ASSERT(v.size() == u.size());
     TIGHTDB_ASSERT(ConditionalVerify());
 }
 
-size_t VerifiedString::find_first(const char *value)
+size_t VerifiedString::find_first(StringData value)
 {
     std::vector<string>::iterator it = std::find(v.begin(), v.end(), value);
     size_t ndx = std::distance(v.begin(), it);
@@ -84,14 +84,14 @@ size_t VerifiedString::find_first(const char *value)
     return ndx;
 }
 
-size_t VerifiedString::Size()
+size_t VerifiedString::size()
 {
-    TIGHTDB_ASSERT(v.size() == u.Size());
+    TIGHTDB_ASSERT(v.size() == u.size());
     return v.size();
 }
 
 // todo/fixme, end ignored
-void VerifiedString::find_all(Array &c, const char *value, size_t start, size_t end)
+void VerifiedString::find_all(Array& c, StringData value, size_t start, size_t end)
 {
     std::vector<string>::iterator ita = v.begin() + start;
     std::vector<string>::iterator itb = v.begin() + (end == size_t(-1) ? v.size() : end);
@@ -105,14 +105,14 @@ void VerifiedString::find_all(Array &c, const char *value, size_t start, size_t 
         }
     }
 
-    c.Clear();
+    c.clear();
 
     u.find_all(c, value);
     size_t cs = c.size();
     if (cs != result.size())
         TIGHTDB_ASSERT(false);
     for (size_t t = 0; t < result.size(); ++t) {
-        if (result[t] != size_t(c.Get(t)))
+        if (result[t] != size_t(c.get(t)))
             TIGHTDB_ASSERT(false);
     }
 
@@ -121,8 +121,8 @@ void VerifiedString::find_all(Array &c, const char *value, size_t start, size_t 
 
 bool VerifiedString::Verify()
 {
-    TIGHTDB_ASSERT(u.Size() == v.size());
-    if (u.Size() != v.size())
+    TIGHTDB_ASSERT(u.size() == v.size());
+    if (u.size() != v.size())
         return false;
 
     for (size_t t = 0; t < v.size(); ++t) {
@@ -146,5 +146,5 @@ bool VerifiedString::ConditionalVerify()
 
 void VerifiedString::Destroy()
 {
-    u.Destroy();
+    u.destroy();
 }

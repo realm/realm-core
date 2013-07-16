@@ -33,9 +33,9 @@ public:
                  Allocator& = Allocator::get_default());
     ~ColumnBinary();
 
-    void Destroy();
+    void destroy() TIGHTDB_OVERRIDE;
 
-    size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
     BinaryData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
@@ -46,8 +46,8 @@ public:
     void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, BinaryData()); }
     void insert(std::size_t ndx, BinaryData value);
     void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
-    void Resize(std::size_t ndx);
-    void Clear() TIGHTDB_OVERRIDE;
+    void resize(std::size_t ndx);
+    void clear() TIGHTDB_OVERRIDE;
     void fill(std::size_t count);
     void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
 
@@ -62,11 +62,11 @@ public:
     bool HasIndex() const {return false;}
     void BuildIndex(Index&) {}
     void ClearIndex() {}
-    size_t FindWithIndex(int64_t) const {return (size_t)-1;}
+    size_t FindWithIndex(int64_t) const { return size_t(-1); }
 
-    size_t GetRef() const {return m_array->GetRef();}
-    void SetParent(ArrayParent *parent, size_t pndx) {m_array->SetParent(parent, pndx);}
-    void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
+    size_t get_ref() const { return m_array->get_ref(); }
+    void set_parent(ArrayParent *parent, size_t pndx) { m_array->set_parent(parent, pndx); }
+    void UpdateParentNdx(int diff) { m_array->UpdateParentNdx(diff); }
 
     /// Compare two binary columns for equality.
     bool compare(const ColumnBinary&) const;
@@ -78,7 +78,7 @@ public:
 protected:
     friend class ColumnBase;
 
-    void UpdateRef(size_t ref);
+    void update_ref(size_t ref);
 
     BinaryData LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
     void LeafSet(size_t ndx, BinaryData value);
@@ -103,7 +103,7 @@ private:
 
 inline BinaryData ColumnBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
     return ArrayBinary::column_get(m_array, ndx);
 }
 
@@ -116,12 +116,12 @@ inline StringData ColumnBinary::get_string(std::size_t ndx) const TIGHTDB_NOEXCE
 
 inline void ColumnBinary::add(BinaryData value)
 {
-    insert(Size(), value);
+    insert(size(), value);
 }
 
 inline void ColumnBinary::add_string(StringData value)
 {
-    insert_string(Size(), value);
+    insert_string(size(), value);
 }
 
 } // namespace tightdb

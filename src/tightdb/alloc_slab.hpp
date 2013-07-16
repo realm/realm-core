@@ -78,7 +78,7 @@ public:
     MemRef Alloc(size_t size) TIGHTDB_OVERRIDE;
     MemRef ReAlloc(size_t ref, const void* p, size_t size) TIGHTDB_OVERRIDE;
     void   Free(size_t ref, const void* p) TIGHTDB_OVERRIDE; // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
-    void*  Translate(size_t ref) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void*  translate(size_t ref) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     bool   IsReadOnly(size_t ref) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     size_t GetTopRef() const TIGHTDB_NOEXCEPT;

@@ -66,7 +66,7 @@ MemRef SlabAlloc::Alloc(size_t size)
             }
 #endif // TIGHTDB_DEBUG
 
-            void* const pointer = Translate(location);
+            void* const pointer = translate(location);
             return MemRef(pointer, location);
         }
     }
@@ -188,7 +188,7 @@ MemRef SlabAlloc::ReAlloc(size_t ref, const void* p, size_t size)
     return space;
 }
 
-void* SlabAlloc::Translate(size_t ref) const TIGHTDB_NOEXCEPT
+void* SlabAlloc::translate(size_t ref) const TIGHTDB_NOEXCEPT
 {
     if (ref < m_baseline) return const_cast<char*>(m_data) + ref;
     else {
