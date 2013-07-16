@@ -1985,7 +1985,9 @@ bool Array::CompareLeafs(Array* foreign, size_t start, size_t end, size_t basein
                          Callback callback) const
 {
     cond c;
-    TIGHTDB_ASSERT(start < end);
+    TIGHTDB_ASSERT(start <= end);
+    if(start == end)
+        return true;
 
 
     int64_t v;
