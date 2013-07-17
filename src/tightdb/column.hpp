@@ -58,7 +58,7 @@ public:
     //virtual void ClearIndex() = 0;
     virtual void SetIndexRef(size_t, ArrayParent*, size_t) {}
 
-    virtual size_t get_ref() const = 0;
+    virtual ref_type get_ref() const = 0;
     virtual void set_parent(ArrayParent* parent, size_t pndx) {m_array->set_parent(parent, pndx);}
     virtual void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
     virtual void UpdateFromParent() {m_array->UpdateFromParent();}
@@ -195,14 +195,14 @@ public:
 
 
     // Index
-    bool HasIndex() const {return m_index != NULL;}
+    bool HasIndex() const { return m_index != NULL; }
     Index& GetIndex();
     void BuildIndex(Index& index);
     void ClearIndex();
     size_t FindWithIndex(int64_t value) const;
 
-    size_t get_ref() const {return m_array->get_ref();}
-    Allocator& get_alloc() const TIGHTDB_NOEXCEPT {return m_array->get_alloc();}
+    ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
+    Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
     Array* GetArray(void) {return m_array;}
 
     void sort();
@@ -220,7 +220,7 @@ public:
 protected:
     friend class ColumnBase;
     void Create();
-    void update_ref(size_t ref);
+    void update_ref(ref_type ref);
 
     // Node functions
     int64_t LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT { return m_array->get(ndx); }

@@ -304,14 +304,14 @@ void Column::Create()
     }
 }
 
-void Column::update_ref(size_t ref)
+void Column::update_ref(ref_type ref)
 {
     m_array->update_ref(ref);
 }
 
 bool Column::operator==(const Column& column) const
 {
-    return *m_array == *(column.m_array);
+    return *m_array == *column.m_array;
 }
 
 Column::~Column()

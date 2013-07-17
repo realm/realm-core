@@ -128,7 +128,7 @@ public:
     void BuildIndex(Index& index) { static_cast<void>(index); }
     void ClearIndex() {}
 
-    size_t get_ref() const {return m_array->get_ref();}
+    ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
 
     /// Compare two mixed columns for equality.
     bool compare(const ColumnMixed&) const;
