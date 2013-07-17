@@ -505,6 +505,8 @@ TEST_FIXTURE(db_setup_array, Array_LowerUpperBound)
     CHECK_EQUAL(7, a.lower_bound(80)); CHECK_EQUAL(8, a.upper_bound(80));
     CHECK_EQUAL(8, a.lower_bound(81)); CHECK_EQUAL(8, a.upper_bound(81));
     CHECK_EQUAL(8, a.lower_bound(82)); CHECK_EQUAL(8, a.upper_bound(82));
+
+    a.destroy();
 }
 
 TEST(Array_Sort)
