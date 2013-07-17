@@ -252,7 +252,7 @@ public:
     /// point to the new array. The updating of the parent only works
     /// if this array was initialized with the correct parent
     /// reference.
-    void update_ref(size_t ref);
+    void update_ref(ref_type ref);
 
     /// Construct a complete copy of this array (including its
     /// subarrays) using the specified allocator and return just the
@@ -269,8 +269,8 @@ public:
     bool has_parent() const TIGHTDB_NOEXCEPT { return m_parent != 0; }
     void set_parent(ArrayParent *parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
     void UpdateParentNdx(int diff) {m_parentNdx += diff;}
-    ArrayParent *GetParent() const TIGHTDB_NOEXCEPT {return m_parent;}
-    size_t GetParentNdx() const TIGHTDB_NOEXCEPT {return m_parentNdx;}
+    ArrayParent* get_parent() const TIGHTDB_NOEXCEPT { return m_parent; }
+    std::size_t get_ndx_in_parent() const TIGHTDB_NOEXCEPT { return m_parentNdx; }
     bool UpdateFromParent() TIGHTDB_NOEXCEPT;
 
     bool IsValid() const TIGHTDB_NOEXCEPT {return m_data != NULL;}
@@ -369,7 +369,7 @@ public:
     bool IsIndexNode() const  TIGHTDB_NOEXCEPT { return get_indexflag_from_header(); }
     void SetIsIndexNode(bool value) { set_header_indexflag(value); }
     Array GetSubArray(size_t ndx) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array may cause the parent to be modified too.
-    size_t get_ref() const TIGHTDB_NOEXCEPT { return m_ref; }
+    ref_type get_ref() const TIGHTDB_NOEXCEPT { return m_ref; }
     void destroy();
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_alloc; }
@@ -837,7 +837,7 @@ inline Array::Array(const Array& array, Allocator& alloc):
 inline Array::Array(no_prealloc_tag) TIGHTDB_NOEXCEPT: m_alloc(Allocator::get_default()) {}
 
 
-inline void Array::update_ref(std::size_t ref)
+inline void Array::update_ref(ref_type ref)
 {
     init_from_ref(ref);
     update_ref_in_parent();

@@ -405,12 +405,12 @@ size_t* Spec::record_subspec_path(const Array* root_subspecs, size_t* begin,
     TIGHTDB_ASSERT(begin < end);
     const Array* spec_set = &m_specSet;
     for (;;) {
-        const size_t subspec_ndx = spec_set->GetParentNdx();
+        size_t subspec_ndx = spec_set->get_ndx_in_parent();
         *begin++ = subspec_ndx;
-        const Array* const parent_subspecs = static_cast<const Array*>(spec_set->GetParent());
+        const Array* parent_subspecs = static_cast<const Array*>(spec_set->get_parent());
         if (parent_subspecs == root_subspecs) break;
         if (begin == end) return 0; // Error, not enough space in buffer
-        spec_set = static_cast<const Array*>(parent_subspecs->GetParent());
+        spec_set = static_cast<const Array*>(parent_subspecs->get_parent());
     }
     return begin;
 }

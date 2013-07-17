@@ -73,8 +73,8 @@ public:
     void SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx);
     void RemoveIndex() { m_index = 0; }
 
-    size_t get_ref() const { return m_array->get_ref(); }
-    Allocator& get_alloc() const { return m_array->get_alloc(); }
+    ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
+    Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
     void set_parent(ArrayParent* parent, size_t pndx) { m_array->set_parent(parent, pndx); }
 
     // Optimizing data layout
@@ -127,7 +127,7 @@ public:
 
 protected:
     friend class ColumnBase;
-    void update_ref(size_t ref);
+    void update_ref(ref_type ref);
 
     StringData LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
     void LeafSet(size_t ndx, StringData value);

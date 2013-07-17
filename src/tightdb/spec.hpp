@@ -173,8 +173,8 @@ inline Spec::Spec(const Spec& s):
     m_names(s.m_specSet.get_alloc()), m_subSpecs(s.m_specSet.get_alloc())
 {
     const size_t ref    = s.m_specSet.get_ref();
-    ArrayParent *parent = s.m_specSet.GetParent();
-    const size_t pndx   = s.m_specSet.GetParentNdx();
+    ArrayParent *parent = s.m_specSet.get_parent();
+    const size_t pndx   = s.m_specSet.get_ndx_in_parent();
 
     init_from_ref(ref, parent, pndx);
 }

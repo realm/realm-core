@@ -75,15 +75,15 @@ void AdaptiveStringColumn::destroy()
 }
 
 
-void AdaptiveStringColumn::update_ref(size_t ref)
+void AdaptiveStringColumn::update_ref(ref_type ref)
 {
     TIGHTDB_ASSERT(get_coldef_from_ref(ref, m_array->get_alloc()) == Array::coldef_InnerNode); // Can only be called when creating node
 
     if (!root_is_leaf())
         m_array->update_ref(ref);
     else {
-        ArrayParent *const parent = m_array->GetParent();
-        const size_t pndx   = m_array->GetParentNdx();
+        ArrayParent* parent = m_array->get_parent();
+        size_t pndx = m_array->get_ndx_in_parent();
 
         // Replace the string array with int array for node
         Array* array = new Array(ref, parent, pndx, m_array->get_alloc());
@@ -153,7 +153,7 @@ void AdaptiveStringColumn::clear()
     if (!m_array->is_leaf()) {
         // Revert to string array
         m_array->destroy();
-        Array* array = new ArrayString(m_array->GetParent(), m_array->GetParentNdx(), m_array->get_alloc());
+        Array* array = new ArrayString(m_array->get_parent(), m_array->get_ndx_in_parent(), m_array->get_alloc());
         delete m_array;
         m_array = array;
     }
@@ -365,9 +365,9 @@ void AdaptiveStringColumn::LeafSet(size_t ndx, StringData value)
     newarray->set(ndx, value);
 
     // Update parent to point to new array
-    ArrayParent *const parent = oldarray->GetParent();
+    ArrayParent* parent = oldarray->get_parent();
     if (parent) {
-        const size_t pndx = oldarray->GetParentNdx();
+        size_t pndx = oldarray->get_ndx_in_parent();
         parent->update_child_ref(pndx, newarray->get_ref());
         newarray->set_parent(parent, pndx);
     }
@@ -402,9 +402,9 @@ void AdaptiveStringColumn::LeafInsert(size_t ndx, StringData value)
     newarray->insert(ndx, value);
 
     // Update parent to point to new array
-    ArrayParent *const parent = oldarray->GetParent();
+    ArrayParent* parent = oldarray->get_parent();
     if (parent) {
-        const size_t pndx = oldarray->GetParentNdx();
+        size_t pndx = oldarray->get_ndx_in_parent();
         parent->update_child_ref(pndx, newarray->get_ref());
         newarray->set_parent(parent, pndx);
     }

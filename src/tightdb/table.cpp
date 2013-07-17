@@ -346,22 +346,22 @@ Table::~Table()
         // This is a table with a shared spec, and its lifetime is
         // managed by reference counting, so we must let our parent
         // know about our demise.
-        ArrayParent* parent = m_columns.GetParent();
+        ArrayParent* parent = m_columns.get_parent();
         TIGHTDB_ASSERT(parent);
         TIGHTDB_ASSERT(m_ref_count == 0);
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
-        static_cast<Parent*>(parent)->child_destroyed(m_columns.GetParentNdx());
+        static_cast<Parent*>(parent)->child_destroyed(m_columns.get_ndx_in_parent());
         ClearCachedColumns();
         return;
     }
 
     // This is a table with an independent spec.
-    if (ArrayParent* parent = m_top.GetParent()) {
+    if (ArrayParent* parent = m_top.get_parent()) {
         // This is a table whose lifetime is managed by reference
         // counting, so we must let our parent know about our demise.
         TIGHTDB_ASSERT(m_ref_count == 0);
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
-        static_cast<Parent*>(parent)->child_destroyed(m_top.GetParentNdx());
+        static_cast<Parent*>(parent)->child_destroyed(m_top.get_ndx_in_parent());
         ClearCachedColumns();
         return;
     }
