@@ -1236,7 +1236,7 @@ size_t Array::clone(const char* header, Allocator& alloc, Allocator& clone_alloc
         // are, it means that it should not be interpreted as a ref.
         bool is_subarray = value != 0 && (value & 0x1) == 0;
         if (is_subarray) {
-            size_t ref = value;
+            size_t ref = to_ref(value);
             const char* subheader = static_cast<char*>(alloc.translate(ref));
             size_t new_ref = clone(subheader, alloc, clone_alloc);
             value = new_ref;
