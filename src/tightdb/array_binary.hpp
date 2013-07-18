@@ -30,8 +30,8 @@ class ArrayBinary: public Array {
 public:
     explicit ArrayBinary(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                          Allocator& = Allocator::get_default());
-    ArrayBinary(ref_type ref, ArrayParent*, std::size_t ndx_in_parent,
-                Allocator& = Allocator::get_default());
+    ArrayBinary(ref_type, ArrayParent*, std::size_t ndx_in_parent,
+                Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
 
     bool is_empty() const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT;
@@ -52,7 +52,7 @@ public:
     static BinaryData get_direct(Allocator&, const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
-    void ToDot(std::ostream& out, const char* title=NULL) const;
+    void ToDot(std::ostream& out, const char* title = 0) const;
 #endif // TIGHTDB_DEBUG
 
 private:

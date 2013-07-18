@@ -251,7 +251,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         switch (ndx) {
             case 0:             // insert before
                 return NodeChange(NodeChange::insert_before, newList.get_ref());
-            case -1: // insert after
+            case size_t(-1): // insert after
                 return NodeChange(NodeChange::insert_after, newList.get_ref());
             default: // split
             {
@@ -682,10 +682,8 @@ void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
 
         find_all(results, value);
 
-        const size_t has_match = results.find_first(i);
-        if (has_match == not_found) {
-            TIGHTDB_ASSERT(false);
-        }
+        size_t ndx = results.find_first(i);
+        TIGHTDB_ASSERT(ndx != not_found);
         results.clear();
     }
     results.destroy(); // clean-up

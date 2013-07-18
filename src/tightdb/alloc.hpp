@@ -68,12 +68,12 @@ public:
     virtual MemRef Alloc(std::size_t size);
 
     /// \throw std::bad_alloc If insufficient memory was available.
-    virtual MemRef ReAlloc(std::size_t ref, const void* addr, std::size_t size);
+    virtual MemRef ReAlloc(ref_type ref, const void* addr, std::size_t size);
 
     // FIXME: SlabAlloc::Free() should be modified such than this method never throws.
-    virtual void Free(std::size_t, const void* addr);
+    virtual void Free(ref_type, const void* addr);
 
-    virtual void* translate(ref_type ref) const TIGHTDB_NOEXCEPT;
+    virtual void* translate(ref_type) const TIGHTDB_NOEXCEPT;
     virtual bool IsReadOnly(ref_type) const TIGHTDB_NOEXCEPT;
 
     static Allocator& get_default() TIGHTDB_NOEXCEPT;

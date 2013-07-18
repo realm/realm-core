@@ -60,7 +60,7 @@ public:
 
     /// Find the lower bound for the specified value assuming that the
     /// elements are already sorted according to
-    /// StringData::operator<(). This operation is semantically
+    /// StringData::operator<(). This operation is functionally
     /// identical to std::lower_bound().
     std::size_t lower_bound(StringData value) const TIGHTDB_NOEXCEPT;
     FindRes find_all_indexref(StringData value, size_t& dst) const;
@@ -156,11 +156,6 @@ inline StringData AdaptiveStringColumn::get(std::size_t ndx) const TIGHTDB_NOEXC
 {
     TIGHTDB_ASSERT(ndx < size());
     return m_array->string_column_get(ndx);
-}
-
-inline void AdaptiveStringColumn::add(StringData str)
-{
-    insert(size(), str);
 }
 
 inline std::size_t AdaptiveStringColumn::lower_bound(StringData value) const TIGHTDB_NOEXCEPT

@@ -21,13 +21,14 @@ ArrayBinary::ArrayBinary(ArrayParent* parent, size_t pndx, Allocator& alloc):
     m_blob.set_parent(this, 1);
 }
 
-ArrayBinary::ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
+ArrayBinary::ArrayBinary(ref_type ref, ArrayParent* parent, size_t pndx,
+                         Allocator& alloc) TIGHTDB_NOEXCEPT:
     Array(ref, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
     m_blob(Array::get_as_ref(1), 0, 0, alloc)
 {
     TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
     TIGHTDB_ASSERT(Array::size() == 2);
-    TIGHTDB_ASSERT(m_blob.size() ==(size_t)(m_offsets.is_empty() ? 0 : m_offsets.back()));
+    TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : to_size_t(m_offsets.back())));
 
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);

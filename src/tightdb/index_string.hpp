@@ -43,6 +43,7 @@ public:
     void erase(size_t row_ndx, StringData value, bool is_last = false);
     void clear() TIGHTDB_OVERRIDE;
 
+    using Column::insert;
     using Column::erase;
 
     size_t count(StringData value) const;

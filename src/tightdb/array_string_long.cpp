@@ -21,9 +21,10 @@ ArrayStringLong::ArrayStringLong(ArrayParent* parent, size_t pndx, Allocator& al
     m_blob.set_parent(this, 1);
 }
 
-ArrayStringLong::ArrayStringLong(ref_type ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
+ArrayStringLong::ArrayStringLong(ref_type ref, ArrayParent* parent, size_t pndx,
+                                 Allocator& alloc) TIGHTDB_NOEXCEPT:
     Array(ref, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
-    m_blob(Array::get_as_ref(1), NULL, 0, alloc)
+    m_blob(Array::get_as_ref(1), 0, 0, alloc)
 {
     TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
     TIGHTDB_ASSERT(Array::size() == 2);
@@ -32,9 +33,6 @@ ArrayStringLong::ArrayStringLong(ref_type ref, ArrayParent* parent, size_t pndx,
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
 }
-
-// Creates new array (but invalid, call update_ref() to init)
-//ArrayStringLong::ArrayStringLong(Allocator& alloc) : Array(alloc) {}
 
 void ArrayStringLong::add(StringData value)
 {

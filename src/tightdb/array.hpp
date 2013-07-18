@@ -39,13 +39,13 @@ Searching: The main finding function is:
 #define TIGHTDB_ARRAY_HPP
 
 #include <cmath>
-#include <stdint.h> // unint8_t etc
 #include <cstdlib> // size_t
 #include <cstring> // memmove
 #include <utility>
 #include <vector>
 #include <ostream>
-#include <stdio.h>
+
+#include <stdint.h> // unint8_t etc
 
 #include <tightdb/meta.hpp>
 #include <tightdb/assert.hpp>
@@ -187,17 +187,15 @@ protected:
 };
 
 
-/**
- * An Array can be copied, but it will leave the source in a truncated
- * (and therfore unusable) state.
- *
- * \note The parent information in an array ('pointer to parent' and
- * 'index in parent') may be valid even when the array is not valid,
- * that is IsValid() returns false.
- *
- * FIXME: Array should be endowed with proper copy and move semantics
- * like TableView is.
- */
+/// An Array can be copied, but it will leave the source in a
+/// truncated (and therfore unusable) state.
+///
+/// \note The parent information in an array ('pointer to parent' and
+/// 'index in parent') may be valid even when the array is not valid,
+/// that is IsValid() returns false.
+///
+/// FIXME: Array should be endowed with proper copy and move semantics
+/// like TableView is.
 class Array: public ArrayParent {
 public:
 
@@ -212,11 +210,11 @@ public:
 
     /// Create a new array, and if \a parent and \a ndx_in_parent are
     /// specified, update the parent to point to this new array.
-    explicit Array(Type type = type_Normal, ArrayParent* = 0, size_t ndx_in_parent = 0,
+    explicit Array(Type type = type_Normal, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                    Allocator& = Allocator::get_default());
 
-    /// Initialize an array wrapper from the specified array.
-    explicit Array(size_t ref, ArrayParent* = 0, size_t ndx_in_parent = 0,
+    /// Initialize an array wrapper from the specified array ref.
+    explicit Array(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                    Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
 
     /// Create an array in the invalid state (a null array).
@@ -539,10 +537,10 @@ private:
 protected:
     friend class GroupWriter;
     friend class AdaptiveStringColumn;
-    void init_from_ref(size_t ref) TIGHTDB_NOEXCEPT;
+    void init_from_ref(ref_type) TIGHTDB_NOEXCEPT;
 //    void AddPositiveLocal(int64_t value);
 
-    void init_from_header(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
+    void init_from_header(char* header, ref_type = 0) TIGHTDB_NOEXCEPT;
     void CreateFromHeaderDirect(char* header, size_t ref=0) TIGHTDB_NOEXCEPT;
     void update_ref_in_parent();
 
@@ -791,18 +789,19 @@ public:
 
 
 
-inline Array::Array(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc) TIGHTDB_NOEXCEPT:
+inline Array::Array(ref_type ref, ArrayParent* parent, std::size_t pndx,
+                    Allocator& alloc) TIGHTDB_NOEXCEPT:
     m_data(0), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
     m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
 {
     init_from_ref(ref);
 }
 
-inline Array::Array(Type type, ArrayParent* parent, size_t pndx, Allocator& alloc):
+inline Array::Array(Type type, ArrayParent* parent, std::size_t pndx, Allocator& alloc):
     m_data(0), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
     m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
 {
-    const size_t ref = create_empty_array(type, alloc); // Throws
+    ref_type ref = create_empty_array(type, alloc); // Throws
     init_from_ref(ref);
     update_ref_in_parent();
 }
@@ -818,7 +817,7 @@ inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
 inline Array::Array(const Array& src) TIGHTDB_NOEXCEPT:
     ArrayParent(), m_parent(src.m_parent), m_parentNdx(src.m_parentNdx), m_alloc(src.m_alloc)
 {
-    const size_t ref = src.get_ref();
+    ref_type ref = src.get_ref();
     init_from_ref(ref);
     src.Invalidate();
 }
@@ -827,7 +826,7 @@ inline Array::Array(const Array& array, Allocator& alloc):
     m_data(0), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
     m_parent(0), m_parentNdx(0), m_alloc(alloc), m_lbound(0), m_ubound(0)
 {
-    std::size_t ref = array.clone(alloc); // Throws
+    ref_type ref = array.clone(alloc); // Throws
     init_from_ref(ref);
 }
 

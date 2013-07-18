@@ -14,6 +14,8 @@ using namespace std;
 
 namespace {
 
+const size_t short_string_max_size = 15;
+
 tightdb::Array::Type get_type_from_ref(tightdb::ref_type ref, tightdb::Allocator& alloc)
 {
     const char* header = static_cast<char*>(alloc.translate(ref));
@@ -229,15 +231,19 @@ void AdaptiveStringColumn::set(size_t ndx, StringData str)
     TreeSet<StringData, AdaptiveStringColumn>(ndx, str);
 }
 
-void AdaptiveStringColumn::insert(size_t ndx, StringData str)
+void AdaptiveStringColumn::add(StringData value)
+{
+    insert(size(), value);
+}
+
+void AdaptiveStringColumn::insert(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx <= size());
-
-    TreeInsert<StringData, AdaptiveStringColumn>(ndx, str);
+    TreeInsert<StringData, AdaptiveStringColumn>(ndx, value);
 
     if (m_index) {
-        const bool isLast = (ndx+1 == size());
-        m_index->insert(ndx, str, isLast);
+        bool is_last = ndx == size()-1;
+        m_index->insert(ndx, value, is_last);
     }
 }
 
@@ -387,7 +393,7 @@ void AdaptiveStringColumn::LeafInsert(size_t ndx, StringData value)
         static_cast<ArrayStringLong*>(m_array)->insert(ndx, value);
         return;
     }
-    if (value.size() < 16) {
+    if (value.size() <= short_string_max_size) {
         static_cast<ArrayString*>(m_array)->insert(ndx, value);
         return;
     }

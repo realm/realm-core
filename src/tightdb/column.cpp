@@ -16,21 +16,12 @@ namespace {
 
 using namespace tightdb;
 
-Column GetColumnFromRef(Array &parent, size_t ndx)
+Column get_column_from_ref(Array& parent, size_t ndx)
 {
     TIGHTDB_ASSERT(parent.has_refs());
     TIGHTDB_ASSERT(ndx < parent.size());
     return Column(parent.get_as_ref(ndx), &parent, ndx, parent.get_alloc());
 }
-
-/*
-const Column GetColumnFromRef(const Array& parent, size_t ndx)
-{
-    TIGHTDB_ASSERT(parent.has_refs());
-    TIGHTDB_ASSERT(ndx < parent.size());
-    return Column((size_t)parent.Get(ndx), &parent, ndx);
-}
-*/
 
 // Pre-declare local functions
 bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
@@ -263,6 +254,7 @@ bool ColumnBase::is_node_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCE
     return is_node;
 }
 
+
 Column::Column(Allocator& alloc): m_index(0)
 {
     m_array = new Array(Array::type_Normal, 0, 0, alloc);
@@ -357,24 +349,6 @@ void Column::SetHasRefs()
     m_array->set_type(Array::type_HasRefs);
 }
 
-/*
-Column Column::GetSubColumn(size_t ndx)
-{
-    TIGHTDB_ASSERT(ndx < m_len);
-    TIGHTDB_ASSERT(m_hasRefs);
-
-    return Column((void*)ListGet(ndx), this, ndx);
-}
-
-const Column Column::GetSubColumn(size_t ndx) const
-{
-    TIGHTDB_ASSERT(ndx < m_len);
-    TIGHTDB_ASSERT(m_hasRefs);
-
-    return Column((void*)ListGet(ndx), this, ndx);
-}
-*/
-
 void Column::clear()
 {
     m_array->clear();
@@ -401,13 +375,12 @@ void Column::add(int64_t value)
 void Column::insert(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx <= size());
-
     TreeInsert<int64_t, Column>(ndx, value);
 
     // Update index
     if (m_index) {
-        const bool isLast = (ndx+1 == size());
-        m_index->insert(ndx, value, isLast);
+        bool is_last = ndx+1 == size();
+        m_index->insert(ndx, value, is_last);
     }
 
 #ifdef TIGHTDB_DEBUG
@@ -624,7 +597,7 @@ void Column::Increment64(int64_t value, size_t start, size_t end)
     Array refs = NodeGetRefs();
     size_t count = refs.size();
     for (size_t i = 0; i < count; ++i) {
-        Column col = ::GetColumnFromRef(refs, i);
+        Column col = get_column_from_ref(refs, i);
         col.Increment64(value);
     }
 }
@@ -636,7 +609,7 @@ void Column::IncrementIf(int64_t limit, int64_t value)
         Array refs = NodeGetRefs();
         size_t count = refs.size();
         for (size_t i = 0; i < count; ++i) {
-            Column col = ::GetColumnFromRef(refs, i);
+            Column col = get_column_from_ref(refs, i);
             col.IncrementIf(limit, value);
         }
     }
@@ -808,6 +781,8 @@ bool Column::compare(const Column& c) const
     }
     return true;
 }
+
+
 
 
 #ifdef TIGHTDB_DEBUG

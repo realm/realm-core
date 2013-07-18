@@ -30,15 +30,15 @@ template<typename T> class BasicArray: public Array {
 public:
     explicit BasicArray(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                         Allocator& = Allocator::get_default());
-    BasicArray(ref_type ref, ArrayParent*, std::size_t ndx_in_parent,
+    BasicArray(ref_type, ArrayParent*, std::size_t ndx_in_parent,
                Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
     explicit BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT;
 
-    T get(size_t ndx) const TIGHTDB_NOEXCEPT;
+    T get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add(T value);
-    void set(size_t ndx, T value);
-    void insert(size_t ndx, T value);
-    void erase(size_t ndx);
+    void set(std::size_t ndx, T value);
+    void insert(std::size_t ndx, T value);
+    void erase(std::size_t ndx);
     void clear();
 
     size_t Find(T target, size_t start, size_t end) const;
@@ -61,7 +61,7 @@ private:
     virtual WidthType GetWidthType() const { return wtype_Multiply; }
 
     template<bool find_max> bool minmax(T& result, size_t start, size_t end) const;
-    static size_t create_empty_basic_array(Allocator& alloc);
+    static ref_type create_empty_basic_array(Allocator& alloc);
 };
 
 

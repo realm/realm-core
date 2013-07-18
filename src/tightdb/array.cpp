@@ -28,11 +28,33 @@ namespace tightdb {
 //
 //  1: isNode  2: hasRefs  3: indexflag 4: multiplier 5: width (packed in 3 bits)
 
-void Array::init_from_ref(size_t ref) TIGHTDB_NOEXCEPT
+void Array::init_from_ref(ref_type ref) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ref);
     char* header = static_cast<char*>(m_alloc.translate(ref));
     init_from_header(header, ref);
+}
+
+void Array::init_from_header(char* header, ref_type ref) TIGHTDB_NOEXCEPT
+{
+    // Parse header
+    m_isNode   = get_isnode_from_header(header);
+    m_hasRefs  = get_hasrefs_from_header(header);
+    m_width    = get_width_from_header(header);
+    m_len      = get_len_from_header(header);
+
+    // Capacity is how many items there are room for
+    size_t byte_capacity = get_capacity_from_header(header);
+    // FIXME: Avoid calling virtual method CalcItemCount() here,
+    // instead calculate the capacity in a way similar to what is done
+    // in get_byte_size_from_header(). The virtual call makes "life"
+    // hard for constructors in derived array classes.
+    m_capacity = CalcItemCount(byte_capacity, m_width);
+
+    m_ref = ref;
+    m_data = header + 8;
+
+    SetWidth(m_width);
 }
 
 // FIXME: This is a very crude and error prone misuse of Array,
@@ -60,24 +82,6 @@ void Array::CreateFromHeaderDirect(char* header, size_t ref) TIGHTDB_NOEXCEPT
     // We only need limited info for direct read-only use
     m_width    = get_width_from_header(header);
     m_len      = get_len_from_header(header);
-
-    m_ref = ref;
-    m_data = header + 8;
-
-    SetWidth(m_width);
-}
-
-void Array::init_from_header(char* header, size_t ref) TIGHTDB_NOEXCEPT
-{
-    // Parse header
-    m_isNode   = get_isnode_from_header(header);
-    m_hasRefs  = get_hasrefs_from_header(header);
-    m_width    = get_width_from_header(header);
-    m_len      = get_len_from_header(header);
-    const size_t byte_capacity = get_capacity_from_header(header);
-
-    // Capacity is how many items there are room for
-    m_capacity = CalcItemCount(byte_capacity, m_width);
 
     m_ref = ref;
     m_data = header + 8;

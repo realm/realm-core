@@ -29,7 +29,7 @@ class ArrayBlob: public Array {
 public:
     explicit ArrayBlob(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                        Allocator& = Allocator::get_default());
-    ArrayBlob(ref_type ref, const ArrayParent*, std::size_t ndx_in_parent,
+    ArrayBlob(ref_type, ArrayParent*, std::size_t ndx_in_parent,
               Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
     explicit ArrayBlob(Allocator&) TIGHTDB_NOEXCEPT;
 
@@ -41,14 +41,14 @@ public:
     void insert(std::size_t pos, const char* data, std::size_t size, bool add_zero_term = false);
     void replace(std::size_t begin, std::size_t end, const char* data, std::size_t size,
                  bool add_zero_term = false);
-    void erase(size_t begin, size_t end);
-    void resize(size_t size);
+    void erase(std::size_t begin, std::size_t end);
+    void resize(std::size_t size);
     void clear();
 
     static const char* get_direct(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
-    void ToDot(std::ostream& out, const char* title=NULL) const;
+    void ToDot(std::ostream& out, const char* title = 0) const;
 #endif // TIGHTDB_DEBUG
 
 private:
@@ -70,13 +70,13 @@ inline ArrayBlob::ArrayBlob(ArrayParent* parent, std::size_t pndx, Allocator& al
     set_header_wtype(wtype_Ignore);
 }
 
-inline ArrayBlob::ArrayBlob(std::size_t ref, const ArrayParent* parent, std::size_t pndx,
+inline ArrayBlob::ArrayBlob(ref_type ref, ArrayParent* parent, std::size_t pndx,
                             Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
 {
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
     init_from_ref(ref);
-    set_parent(const_cast<ArrayParent *>(parent), pndx);
+    set_parent(parent, pndx);
 }
 
 // Creates new array (but invalid, call update_ref() to init)

@@ -25,7 +25,7 @@
 namespace tightdb {
 
 template<typename T>
-inline size_t BasicArray<T>::create_empty_basic_array(Allocator& alloc)
+inline ref_type BasicArray<T>::create_empty_basic_array(Allocator& alloc)
 {
     std::size_t capacity = Array::initial_capacity;
     MemRef mem_ref = alloc.Alloc(capacity); // Throws
@@ -94,7 +94,7 @@ inline T BasicArray<T>::column_get(const Array* root, std::size_t ndx) TIGHTDB_N
 
 
 template<typename T>
-inline void BasicArray<T>::set(size_t ndx, T value)
+inline void BasicArray<T>::set(std::size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx < m_len);
 
@@ -107,7 +107,7 @@ inline void BasicArray<T>::set(size_t ndx, T value)
 }
 
 template<typename T>
-void BasicArray<T>::insert(size_t ndx, T value)
+void BasicArray<T>::insert(std::size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx <= m_len);
 
@@ -134,7 +134,7 @@ void BasicArray<T>::insert(size_t ndx, T value)
 }
 
 template<typename T>
-void BasicArray<T>::erase(size_t ndx)
+void BasicArray<T>::erase(std::size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_len);
 

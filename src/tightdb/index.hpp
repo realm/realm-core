@@ -35,10 +35,11 @@ public:
 
     void BuildIndex(const Column& c);
 
-    void insert(size_t ndx, int64_t value, bool isLast=false);
-    void erase(size_t ndx, int64_t value, bool isLast=false);
-    void set(size_t ndx, int64_t oldValue, int64_t newValue);
+    void insert(size_t ndx, int64_t value, bool is_last=false);
+    void erase(size_t ndx, int64_t value, bool is_last=false);
+    void set(size_t ndx, int64_t old_value, int64_t new_value);
 
+    using Column::insert;
     using Column::erase;
 
     size_t find_first(int64_t value) const;
