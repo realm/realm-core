@@ -36,7 +36,7 @@ public:
     void clear() TIGHTDB_OVERRIDE
     {
         m_array->clear();
-        if (!m_array->is_leaf()) m_array->set_type(Array::coldef_HasRefs);
+        if (!m_array->is_leaf()) m_array->set_type(Array::type_HasRefs);
         invalidate_subtables();
     }
 
@@ -279,8 +279,8 @@ inline Table* ColumnSubtableParent::SubtableMap::find(size_t subtable_ndx) const
 inline void ColumnSubtableParent::SubtableMap::insert(size_t subtable_ndx, Table* wrapper)
 {
     if (!m_indices.IsValid()) {
-        m_indices.set_type(Array::coldef_Normal);
-        m_wrappers.set_type(Array::coldef_Normal);
+        m_indices.set_type(Array::type_Normal);
+        m_wrappers.set_type(Array::type_Normal);
     }
     m_indices.add(subtable_ndx);
     m_wrappers.add(reinterpret_cast<unsigned long>(wrapper));
@@ -325,7 +325,7 @@ inline void ColumnSubtableParent::SubtableMap::invalidate_subtables()
 
 inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
                                                   const Table* table, std::size_t column_ndx):
-    Column(Array::coldef_HasRefs, alloc),
+    Column(Array::type_HasRefs, alloc),
     m_table(table), m_index(column_ndx),
     m_subtable_map(Allocator::get_default()) {}
 

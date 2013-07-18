@@ -42,14 +42,14 @@ public:
 
     virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT {return false;}
 
-    virtual size_t size() const TIGHTDB_NOEXCEPT = 0;
+    virtual std::size_t size() const TIGHTDB_NOEXCEPT = 0;
 
     virtual void add() = 0; // Add an entry to this column using the columns default value
-    virtual void insert(size_t ndx) = 0; // Insert an entry into this column using the columns default value
+    virtual void insert(std::size_t ndx) = 0; // Insert an entry into this column using the columns default value
     virtual void clear() = 0;
-    virtual void erase(size_t ndx) = 0;
-    virtual void move_last_over(size_t ndx) = 0;
-    void resize(size_t size) { m_array->resize(size); }
+    virtual void erase(std::size_t ndx) = 0;
+    virtual void move_last_over(std::size_t ndx) = 0;
+    void resize(std::size_t size) { m_array->resize(size); }
 
     // Indexing
     virtual bool HasIndex() const = 0;
@@ -58,7 +58,7 @@ public:
     //virtual void ClearIndex() = 0;
     virtual void SetIndexRef(size_t, ArrayParent*, size_t) {}
 
-    virtual size_t get_ref() const = 0;
+    virtual ref_type get_ref() const = 0;
     virtual void set_parent(ArrayParent* parent, size_t pndx) {m_array->set_parent(parent, pndx);}
     virtual void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
     virtual void UpdateFromParent() {m_array->UpdateFromParent();}
@@ -135,14 +135,14 @@ protected:
 
 
 
-class Column : public ColumnBase {
+class Column: public ColumnBase {
 public:
     explicit Column(Allocator&);
-    Column(Array::ColumnDef, Allocator&);
-    Column(Array::ColumnDef = Array::coldef_Normal, ArrayParent* = 0, size_t ndx_in_parent = 0,
+    Column(Array::Type, Allocator&);
+    Column(Array::Type = Array::type_Normal, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
            Allocator& = Allocator::get_default());
-    Column(size_t ref, ArrayParent* = 0, size_t ndx_in_parent = 0,
-           Allocator& = Allocator::get_default()); // Throws
+    explicit Column(ref_type ref, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                    Allocator& = Allocator::get_default()); // Throws
     Column(const Column&); // FIXME: Constness violation
     ~Column();
 
@@ -155,19 +155,19 @@ public:
     void UpdateParentNdx(int diff);
     void SetHasRefs();
 
-    size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    std::size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
     // Getting and setting values
-    int64_t get(size_t ndx) const TIGHTDB_NOEXCEPT;
-    size_t get_as_ref(size_t ndx) const TIGHTDB_NOEXCEPT;
+    int64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    ref_type get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     int64_t Back() const TIGHTDB_NOEXCEPT {return get(size()-1);}
-    void set(size_t ndx, int64_t value);
-    void insert(size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
-    void insert(size_t ndx, int64_t value);
+    void set(std::size_t ndx, int64_t value);
+    void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
+    void insert(std::size_t ndx, int64_t value);
     void add() TIGHTDB_OVERRIDE { add(0); }
     void add(int64_t value);
-    void fill(size_t count);
+    void fill(std::size_t count);
 
     size_t  count(int64_t target) const;
     int64_t sum(size_t start = 0, size_t end = -1) const;
@@ -195,14 +195,14 @@ public:
 
 
     // Index
-    bool HasIndex() const {return m_index != NULL;}
+    bool HasIndex() const { return m_index != NULL; }
     Index& GetIndex();
     void BuildIndex(Index& index);
     void ClearIndex();
     size_t FindWithIndex(int64_t value) const;
 
-    size_t get_ref() const {return m_array->get_ref();}
-    Allocator& get_alloc() const TIGHTDB_NOEXCEPT {return m_array->get_alloc();}
+    ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
+    Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
     Array* GetArray(void) {return m_array;}
 
     void sort();
@@ -222,7 +222,7 @@ public:
 protected:
     friend class ColumnBase;
     void Create();
-    void update_ref(size_t ref);
+    void update_ref(ref_type ref);
 
     // Node functions
     int64_t LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT { return m_array->get(ndx); }
@@ -255,7 +255,7 @@ inline int64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     return m_array->column_get(ndx);
 }
 
-inline std::size_t Column::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline ref_type Column::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     return to_ref(get(ndx));
 }

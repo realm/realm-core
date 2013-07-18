@@ -505,6 +505,8 @@ TEST_FIXTURE(db_setup_array, Array_LowerUpperBound)
     CHECK_EQUAL(7, a.lower_bound(80)); CHECK_EQUAL(8, a.upper_bound(80));
     CHECK_EQUAL(8, a.lower_bound(81)); CHECK_EQUAL(8, a.upper_bound(81));
     CHECK_EQUAL(8, a.lower_bound(82)); CHECK_EQUAL(8, a.upper_bound(82));
+
+    a.destroy();
 }
 
 TEST(Array_Sort)
@@ -1394,7 +1396,7 @@ TEST(ArrayCopy)
     CHECK_EQUAL(4, b.get(4));
 
     // With sub-arrays
-    Array c(Array::coldef_HasRefs);
+    Array c(Array::type_HasRefs);
     c.add(a.get_ref());
 
     Array d(c, Allocator::get_default());

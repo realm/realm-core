@@ -82,7 +82,6 @@ TEST(CountLimit)
 {
     PeopleTable2 table;
 
-// @@EndFold@@
     table.add("Mary",  14);
     table.add("Joe",   17);
     table.add("Alice", 42);
@@ -108,7 +107,7 @@ TEST(CountLimit)
 
 TEST(TestQueryStrIndexCrash)
 {
-    // Rasmus "8" index crash 
+    // Rasmus "8" index crash
     for(int iter = 0; iter < 5; iter++)
     {
         Group group;
@@ -123,7 +122,7 @@ TEST(TestQueryStrIndexCrash)
         for(int i = 0; i < 2000; i++) {
             int v = rand() % 10;
             if(v == 8) {
-                eights++;            
+                eights++;
             }
             char dst[100];
             memset(dst, 0, sizeof(dst));
@@ -135,7 +134,7 @@ TEST(TestQueryStrIndexCrash)
         table->set_index(0);
         TableView v = table->where().equal(0, StringData("8")).find_all();
         CHECK_EQUAL(eights, v.size());
-    
+
         v = table->where().equal(0, StringData("10")).find_all();
 
         v = table->where().equal(0, StringData("8")).find_all();
@@ -374,7 +373,6 @@ TEST(TestQueryHuge)
         size_t res7 = 0;
         size_t res8 = 0;
 
-        
         size_t start = rand() % 6000;
         size_t end = start + rand() % (6000 - start);
         size_t limit;

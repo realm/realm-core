@@ -16,7 +16,7 @@ MemRef Allocator::Alloc(size_t size)
     throw bad_alloc();
 }
 
-MemRef Allocator::ReAlloc(size_t, const void* addr, size_t size)
+MemRef Allocator::ReAlloc(ref_type, const void* addr, size_t size)
 {
     void* new_addr = realloc(const_cast<void*>(addr), size);
     if (TIGHTDB_LIKELY(new_addr)) return MemRef(new_addr, reinterpret_cast<size_t>(new_addr));
@@ -24,17 +24,17 @@ MemRef Allocator::ReAlloc(size_t, const void* addr, size_t size)
     throw bad_alloc();
 }
 
-void Allocator::Free(size_t, const void* addr)
+void Allocator::Free(ref_type, const void* addr)
 {
     free(const_cast<void*>(addr));
 }
 
-void* Allocator::translate(size_t ref) const TIGHTDB_NOEXCEPT
+void* Allocator::translate(ref_type ref) const TIGHTDB_NOEXCEPT
 {
     return reinterpret_cast<void*>(ref);
 }
 
-bool Allocator::IsReadOnly(size_t) const TIGHTDB_NOEXCEPT
+bool Allocator::IsReadOnly(ref_type) const TIGHTDB_NOEXCEPT
 {
     return false;
 }

@@ -16,21 +16,12 @@ namespace {
 
 using namespace tightdb;
 
-Column GetColumnFromRef(Array &parent, size_t ndx)
+Column get_column_from_ref(Array& parent, size_t ndx)
 {
     TIGHTDB_ASSERT(parent.has_refs());
     TIGHTDB_ASSERT(ndx < parent.size());
     return Column(parent.get_as_ref(ndx), &parent, ndx, parent.get_alloc());
 }
-
-/*
-const Column GetColumnFromRef(const Array& parent, size_t ndx)
-{
-    TIGHTDB_ASSERT(parent.has_refs());
-    TIGHTDB_ASSERT(ndx < parent.size());
-    return Column((size_t)parent.Get(ndx), &parent, ndx);
-}
-*/
 
 // Pre-declare local functions
 bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, void* state);
@@ -246,7 +237,7 @@ bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, voi
 
 namespace tightdb {
 
-size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT
+size_t ColumnBase::get_size_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
     Array a(ref, 0, 0, alloc);
     if (a.is_leaf())
@@ -256,32 +247,33 @@ size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXC
     return size_t(offsets.back());
 }
 
-bool ColumnBase::is_node_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT
+bool ColumnBase::is_node_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    const uint8_t* const header = reinterpret_cast<uint8_t*>(alloc.translate(ref));
-    const bool isNode = (header[0] & 0x80) != 0;
-    return isNode;
+    const uint8_t* header = reinterpret_cast<uint8_t*>(alloc.translate(ref));
+    bool is_node = (header[0] & 0x80) != 0;
+    return is_node;
 }
+
 
 Column::Column(Allocator& alloc): m_index(0)
 {
-    m_array = new Array(Array::coldef_Normal, 0, 0, alloc);
+    m_array = new Array(Array::type_Normal, 0, 0, alloc);
     Create();
 }
 
-Column::Column(Array::ColumnDef type, Allocator& alloc): m_index(0)
+Column::Column(Array::Type type, Allocator& alloc): m_index(0)
 {
     m_array = new Array(type, 0, 0, alloc);
     Create();
 }
 
-Column::Column(Array::ColumnDef type, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(0)
+Column::Column(Array::Type type, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(0)
 {
     m_array = new Array(type, parent, pndx, alloc);
     Create();
 }
 
-Column::Column(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(0)
+Column::Column(ref_type ref, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(0)
 {
     m_array = new Array(ref, parent, pndx, alloc);
 }
@@ -297,21 +289,21 @@ void Column::Create()
 {
     // Add subcolumns for nodes
     if (!root_is_leaf()) {
-        Array offsets(Array::coldef_Normal, 0, 0, m_array->get_alloc());
-        Array refs(Array::coldef_HasRefs, 0, 0, m_array->get_alloc());
+        Array offsets(Array::type_Normal, 0, 0, m_array->get_alloc());
+        Array refs(Array::type_HasRefs, 0, 0, m_array->get_alloc());
         m_array->add(offsets.get_ref());
         m_array->add(refs.get_ref());
     }
 }
 
-void Column::update_ref(size_t ref)
+void Column::update_ref(ref_type ref)
 {
     m_array->update_ref(ref);
 }
 
 bool Column::operator==(const Column& column) const
 {
-    return *m_array == *(column.m_array);
+    return *m_array == *column.m_array;
 }
 
 Column::~Column()
@@ -354,32 +346,14 @@ void Column::UpdateParentNdx(int diff)
 // Used by column b-tree code to ensure all leaf having same type
 void Column::SetHasRefs()
 {
-    m_array->set_type(Array::coldef_HasRefs);
+    m_array->set_type(Array::type_HasRefs);
 }
-
-/*
-Column Column::GetSubColumn(size_t ndx)
-{
-    TIGHTDB_ASSERT(ndx < m_len);
-    TIGHTDB_ASSERT(m_hasRefs);
-
-    return Column((void*)ListGet(ndx), this, ndx);
-}
-
-const Column Column::GetSubColumn(size_t ndx) const
-{
-    TIGHTDB_ASSERT(ndx < m_len);
-    TIGHTDB_ASSERT(m_hasRefs);
-
-    return Column((void*)ListGet(ndx), this, ndx);
-}
-*/
 
 void Column::clear()
 {
     m_array->clear();
     if (!m_array->is_leaf())
-        m_array->set_type(Array::coldef_Normal);
+        m_array->set_type(Array::type_Normal);
 }
 
 void Column::set(size_t ndx, int64_t value)
@@ -401,13 +375,12 @@ void Column::add(int64_t value)
 void Column::insert(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx <= size());
-
     TreeInsert<int64_t, Column>(ndx, value);
 
     // Update index
     if (m_index) {
-        const bool isLast = (ndx+1 == size());
-        m_index->insert(ndx, value, isLast);
+        bool is_last = ndx+1 == size();
+        m_index->insert(ndx, value, is_last);
     }
 
 #ifdef TIGHTDB_DEBUG
@@ -624,7 +597,7 @@ void Column::Increment64(int64_t value, size_t start, size_t end)
     Array refs = NodeGetRefs();
     size_t count = refs.size();
     for (size_t i = 0; i < count; ++i) {
-        Column col = ::GetColumnFromRef(refs, i);
+        Column col = get_column_from_ref(refs, i);
         col.Increment64(value);
     }
 }
@@ -636,7 +609,7 @@ void Column::IncrementIf(int64_t limit, int64_t value)
         Array refs = NodeGetRefs();
         size_t count = refs.size();
         for (size_t i = 0; i < count; ++i) {
-            Column col = ::GetColumnFromRef(refs, i);
+            Column col = get_column_from_ref(refs, i);
             col.IncrementIf(limit, value);
         }
     }

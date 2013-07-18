@@ -11,8 +11,8 @@ using namespace std;
 namespace tightdb {
 
 ArrayStringLong::ArrayStringLong(ArrayParent* parent, size_t pndx, Allocator& alloc):
-    Array(coldef_HasRefs, parent, pndx, alloc),
-    m_offsets(coldef_Normal, NULL, 0, alloc), m_blob(NULL, 0, alloc)
+    Array(type_HasRefs, parent, pndx, alloc),
+    m_offsets(type_Normal, 0, 0, alloc), m_blob(0, 0, alloc)
 {
     // Add subarrays for long string
     Array::add(m_offsets.get_ref());
@@ -21,20 +21,18 @@ ArrayStringLong::ArrayStringLong(ArrayParent* parent, size_t pndx, Allocator& al
     m_blob.set_parent(this, 1);
 }
 
-ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
-    Array(ref, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), NULL, 0, alloc),
-    m_blob(Array::get_as_ref(1), NULL, 0, alloc)
+ArrayStringLong::ArrayStringLong(ref_type ref, ArrayParent* parent, size_t pndx,
+                                 Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(ref, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
+    m_blob(Array::get_as_ref(1), 0, 0, alloc)
 {
     TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
     TIGHTDB_ASSERT(Array::size() == 2);
-    TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : (size_t)m_offsets.back()));
+    TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : to_size_t(m_offsets.back())));
 
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
 }
-
-// Creates new array (but invalid, call update_ref() to init)
-//ArrayStringLong::ArrayStringLong(Allocator& alloc) : Array(alloc) {}
 
 void ArrayStringLong::add(StringData value)
 {

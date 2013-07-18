@@ -27,18 +27,19 @@ namespace tightdb {
 class Index: public Column {
 public:
     Index();
-    Index(Array::ColumnDef, Array* = 0, size_t pndx=0);
-    Index(size_t ref);
-    Index(size_t ref, Array* parent, size_t pndx);
+    explicit Index(Array::Type, Array* = 0, std::size_t ndx_in_parent = 0);
+    explicit Index(ref_type ref);
+    Index(ref_type ref, Array* parent, std::size_t ndx_in_parent);
 
     bool is_empty() const;
 
     void BuildIndex(const Column& c);
 
-    void insert(size_t ndx, int64_t value, bool isLast=false);
-    void erase(size_t ndx, int64_t value, bool isLast=false);
-    void set(size_t ndx, int64_t oldValue, int64_t newValue);
+    void insert(size_t ndx, int64_t value, bool is_last=false);
+    void erase(size_t ndx, int64_t value, bool is_last=false);
+    void set(size_t ndx, int64_t old_value, int64_t new_value);
 
+    using Column::insert;
     using Column::erase;
 
     size_t find_first(int64_t value) const;

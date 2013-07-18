@@ -27,10 +27,10 @@ namespace tightdb {
 
 class ArrayStringLong: public Array {
 public:
-    ArrayStringLong(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                    Allocator& = Allocator::get_default());
-    ArrayStringLong(std::size_t ref, ArrayParent*, std::size_t ndx_in_parent,
-                    Allocator& = Allocator::get_default());
+    explicit ArrayStringLong(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                             Allocator& = Allocator::get_default());
+    ArrayStringLong(ref_type, ArrayParent*, std::size_t ndx_in_parent,
+                    Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
 
     bool is_empty() const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT;

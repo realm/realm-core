@@ -615,7 +615,7 @@ const C& Table::GetColumn(size_t ndx) const TIGHTDB_NOEXCEPT
 inline bool Table::has_shared_spec() const
 {
     const Array& top_array = m_top.IsValid() ? m_top : m_columns;
-    ArrayParent* parent = top_array.GetParent();
+    ArrayParent* parent = top_array.get_parent();
     if (!parent) return false;
     TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
     return static_cast<Parent*>(parent)->subtables_have_shared_spec();
@@ -644,9 +644,9 @@ private:
 
 inline std::size_t Table::create_empty_table(Allocator& alloc)
 {
-    Array top(Array::coldef_HasRefs, 0, 0, alloc);
+    Array top(Array::type_HasRefs, 0, 0, alloc);
     top.add(Spec::create_empty_spec(alloc));
-    top.add(Array::create_empty_array(Array::coldef_HasRefs, alloc)); // Columns
+    top.add(Array::create_empty_array(Array::type_HasRefs, alloc)); // Columns
     return top.get_ref();
 }
 
@@ -923,10 +923,10 @@ inline size_t* Table::record_subspec_path(const Spec* spec, size_t* begin,
 inline size_t* Table::record_subtable_path(size_t* begin, size_t* end) const TIGHTDB_NOEXCEPT
 {
     const Array& real_top = m_top.IsValid() ? m_top : m_columns;
-    const size_t index_in_parent = real_top.GetParentNdx();
+    std::size_t index_in_parent = real_top.get_ndx_in_parent();
     TIGHTDB_ASSERT(begin < end);
     *begin++ = index_in_parent;
-    ArrayParent* parent = real_top.GetParent();
+    ArrayParent* parent = real_top.get_parent();
     TIGHTDB_ASSERT(parent);
     TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
     return static_cast<Parent*>(parent)->record_subtable_path(begin, end);

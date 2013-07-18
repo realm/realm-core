@@ -346,10 +346,10 @@ private:
 // ownership of the underlying memory, causes lots of problems with
 // robustness both here and in other places.
 inline Group::Group():
-    m_top(Array::coldef_HasRefs, NULL, 0, m_alloc), m_tables(m_alloc), m_tableNames(NULL, 0, m_alloc),
-    m_freePositions(Array::coldef_Normal, NULL, 0, m_alloc),
-    m_freeLengths(Array::coldef_Normal, NULL, 0, m_alloc),
-    m_freeVersions(Array::coldef_Normal, NULL, 0, m_alloc), m_is_shared(false)
+    m_top(Array::type_HasRefs, 0, 0, m_alloc), m_tables(m_alloc), m_tableNames(0, 0, m_alloc),
+    m_freePositions(Array::type_Normal, 0, 0, m_alloc),
+    m_freeLengths(Array::type_Normal, 0, 0, m_alloc),
+    m_freeVersions(Array::type_Normal, 0, 0, m_alloc), m_is_shared(false)
 {
     // FIXME: Arrays are leaked when create() throws
     create();
@@ -547,7 +547,7 @@ template<class S> size_t Group::write_to_stream(S& out) const
     // When serializing to disk we dont want
     // to include free space tracking as serialized
     // files are written without any free space.
-    Array top(Array::coldef_HasRefs, NULL, 0, const_cast<SlabAlloc&>(m_alloc)); // FIXME: Another aspect of the poor constness behavior in Array class. What can we do?
+    Array top(Array::type_HasRefs, 0, 0, const_cast<SlabAlloc&>(m_alloc)); // FIXME: Another aspect of the poor constness behavior in Array class. What can we do?
     top.add(m_top.get(0));
     top.add(m_top.get(1));
 
