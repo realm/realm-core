@@ -24,15 +24,15 @@ int32_t create_key(const char* begin, const char* end)
 
 
 StringIndex::StringIndex(void* target_column, StringGetter get_func, Allocator& alloc):
-    Column(Array::coldef_HasRefs, NULL, 0, alloc), m_target_column(target_column), m_get_func(get_func)
+    Column(Array::type_HasRefs, 0, 0, alloc), m_target_column(target_column), m_get_func(get_func)
 {
     Create();
 }
 
-StringIndex::StringIndex(Array::ColumnDef type, Allocator& alloc):
-    Column(type, NULL, 0, alloc), m_target_column(NULL), m_get_func(NULL)
+StringIndex::StringIndex(Array::Type type, Allocator& alloc):
+    Column(type, 0, 0, alloc), m_target_column(0), m_get_func(0)
 {
-    TIGHTDB_ASSERT(type == Array::coldef_InnerNode); // only used for node creation at this point
+    TIGHTDB_ASSERT(type == Array::type_InnerColumnNode); // only used for node creation at this point
 
     // Mark that this is part of index
     // (as opposed to columns under leafs)
@@ -41,7 +41,7 @@ StringIndex::StringIndex(Array::ColumnDef type, Allocator& alloc):
     // no need to call create as sub-arrays have been created by column constructor
 }
 
-StringIndex::StringIndex(size_t ref, ArrayParent* parent, size_t pndx, void* target_column, StringGetter get_func, Allocator& alloc)
+StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t pndx, void* target_column, StringGetter get_func, Allocator& alloc)
 : Column(ref, parent, pndx, alloc), m_target_column(target_column), m_get_func(get_func)
 {
     TIGHTDB_ASSERT(Array::is_index_node(ref, alloc));
@@ -55,8 +55,8 @@ void StringIndex::Create()
 
     // Add subcolumns for leafs
     Allocator& alloc = m_array->get_alloc();
-    Array values(Array::coldef_Normal, NULL, 0, alloc);
-    Array refs(Array::coldef_HasRefs, NULL, 1, alloc);
+    Array values(Array::type_Normal, NULL, 0, alloc);
+    Array refs(Array::type_HasRefs, NULL, 1, alloc);
     m_array->add(values.get_ref());
     m_array->add(refs.get_ref());
     values.set_parent(m_array, 0);
@@ -139,21 +139,21 @@ void StringIndex::TreeInsert(size_t row_ndx, int32_t key, size_t offset, StringD
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
-            StringIndex newNode(Array::coldef_InnerNode, m_array->get_alloc());
+            StringIndex newNode(Array::type_InnerColumnNode, m_array->get_alloc());
             newNode.NodeAddKey(nc.ref1);
             newNode.NodeAddKey(get_ref());
             update_ref(newNode.get_ref());
             return;
         }
         case NodeChange::insert_after: {
-            StringIndex newNode(Array::coldef_InnerNode, m_array->get_alloc());
+            StringIndex newNode(Array::type_InnerColumnNode, m_array->get_alloc());
             newNode.NodeAddKey(get_ref());
             newNode.NodeAddKey(nc.ref1);
             update_ref(newNode.get_ref());
             return;
         }
         case NodeChange::split: {
-            StringIndex newNode(Array::coldef_InnerNode, m_array->get_alloc());
+            StringIndex newNode(Array::type_InnerColumnNode, m_array->get_alloc());
             newNode.NodeAddKey(nc.ref1);
             newNode.NodeAddKey(nc.ref2);
             update_ref(newNode.get_ref());
@@ -200,7 +200,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         }
 
         // Else create new node
-        StringIndex newNode(Array::coldef_InnerNode, m_array->get_alloc());
+        StringIndex newNode(Array::type_InnerColumnNode, m_array->get_alloc());
         if (nc.type == NodeChange::split) {
             // update offset for left node
             int32_t lastKey = target.GetLastKey();
@@ -251,7 +251,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         switch (ndx) {
             case 0:             // insert before
                 return NodeChange(NodeChange::insert_before, newList.get_ref());
-            case -1: // insert after
+            case size_t(-1): // insert after
                 return NodeChange(NodeChange::insert_after, newList.get_ref());
             default: // split
             {
@@ -364,7 +364,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, StringD
         StringData v2 = get(row_ndx2);
         if (v2 == value) {
             // convert to list (in sorted order)
-            Array row_list(Array::coldef_Normal, NULL, 0, alloc);
+            Array row_list(Array::type_Normal, NULL, 0, alloc);
             row_list.add(row_ndx < row_ndx2 ? row_ndx : row_ndx2);
             row_list.add(row_ndx < row_ndx2 ? row_ndx2 : row_ndx);
             refs.set(ins_pos, row_list.get_ref());
@@ -682,10 +682,8 @@ void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
 
         find_all(results, value);
 
-        const size_t has_match = results.find_first(i);
-        if (has_match == not_found) {
-            TIGHTDB_ASSERT(false);
-        }
+        size_t ndx = results.find_first(i);
+        TIGHTDB_ASSERT(ndx != not_found);
         results.clear();
     }
     results.destroy(); // clean-up

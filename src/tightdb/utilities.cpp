@@ -139,8 +139,11 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
     return;
 }
 
-// popcount
-#if defined(_MSC_VER) && _MSC_VER >= 1500
+// popcount, counts number of set (1) bits in argument. Intrinsics has been disabled because it's just 10-20% faster 
+// than fallback method, so a runtime-detection of support would be more expensive in total. Popcount is supported
+// with SSE42 but not with SSE3, and we don't want separate builds for each architecture - hence a runtime check would
+// be required.
+#if 0 // defined(_MSC_VER) && _MSC_VER >= 1500
     #include <intrin.h>
     int fast_popcount32(int32_t x)
     {
@@ -157,7 +160,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
             return __popcnt((unsigned)(x)) + __popcnt((unsigned)(x >> 32));
         }
     #endif
-#elif defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
+#elif 0 // defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
     #define fast_popcount32 __builtin_popcount
     #if ULONG_MAX == 0xffffffff
         int fast_popcount64(int64_t x)
@@ -176,13 +179,13 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
     };
 
     // Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
-    inline int fast_popcount32(uint32_t x)
+    int fast_popcount32(int32_t x)
     {
         return a_popcount_bits[255 & x] + a_popcount_bits[255 & x>> 8] + a_popcount_bits[255 & x>>16] + a_popcount_bits[255 & x>>24];
     }
-    inline int fast_popcount64(uint64_t x)
+    int fast_popcount64(int64_t x)
     {
-        return fast_popcount32(x) + fast_popcount32(x >> 32);
+        return fast_popcount32(static_cast<int32_t>(x)) + fast_popcount32(static_cast<int32_t>(x >> 32));
     }
 
 #endif // select best popcount implementations

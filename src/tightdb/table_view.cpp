@@ -57,7 +57,7 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
 
 // count_target argument is only used for act_Count. Ignored for other actions
 template <int function, typename T, typename R, class ColType>
-R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx, T count_target = static_cast<T>(0)) const
+R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx, T count_target) const
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, ColumnTypeTraits<T>::id);
     TIGHTDB_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count);

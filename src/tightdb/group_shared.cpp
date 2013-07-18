@@ -769,7 +769,7 @@ void SharedGroup::low_level_commit(size_t new_version)
         // following modification of 'info->current_version'
         // effectively participates in a "data race". Please see the
         // FIXME in SharedGroup::has_changed() for more info.
-        info->current_version = new_version;
+        info->current_version = new_version;//FIXME src\tightdb\group_shared.cpp(772): warning C4267: '=' : conversion from 'size_t' to 'volatile uint32_t', possible loss of data
     }
 
     // Save last version for has_changed()

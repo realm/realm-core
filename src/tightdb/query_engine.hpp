@@ -811,7 +811,7 @@ public:
         m_condition_column_idx = column;
         m_child = 0;
         m_dT = 10.0;
-        m_leaf = NULL;
+        m_long = false; m_leaf = NULL;
 
         // FIXME: Store these in std::string instead.
         // FIXME: Why are these sizes 6 times the required size?
@@ -898,7 +898,7 @@ protected:
 
     bool m_long;
     size_t m_end_s;
-    size_t m_first_s;
+//    size_t m_first_s;
     size_t m_leaf_start;
 };
 
@@ -1025,7 +1025,7 @@ public:
         char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
         std::copy(v.data(), v.data()+v.size(), data);
         m_value = StringData(data, v.size());
-        m_leaf = NULL;
+        m_long = false; m_leaf = NULL;
         m_index_getter = 0;
         m_index_matches = 0;
         m_index_matches_destroy = false;
@@ -1208,7 +1208,7 @@ private:
     ArrayParent *m_leaf;
     bool m_long;
     size_t m_leaf_end;
-    size_t m_first_s;
+//    size_t m_first_s;
     size_t m_leaf_start;
 
     // Used for index lookup

@@ -28,11 +28,33 @@ namespace tightdb {
 //
 //  1: isNode  2: hasRefs  3: indexflag 4: multiplier 5: width (packed in 3 bits)
 
-void Array::init_from_ref(size_t ref) TIGHTDB_NOEXCEPT
+void Array::init_from_ref(ref_type ref) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ref);
     char* header = static_cast<char*>(m_alloc.translate(ref));
     init_from_header(header, ref);
+}
+
+void Array::init_from_header(char* header, ref_type ref) TIGHTDB_NOEXCEPT
+{
+    // Parse header
+    m_isNode   = get_isnode_from_header(header);
+    m_hasRefs  = get_hasrefs_from_header(header);
+    m_width    = get_width_from_header(header);
+    m_len      = get_len_from_header(header);
+
+    // Capacity is how many items there are room for
+    size_t byte_capacity = get_capacity_from_header(header);
+    // FIXME: Avoid calling virtual method CalcItemCount() here,
+    // instead calculate the capacity in a way similar to what is done
+    // in get_byte_size_from_header(). The virtual call makes "life"
+    // hard for constructors in derived array classes.
+    m_capacity = CalcItemCount(byte_capacity, m_width);
+
+    m_ref = ref;
+    m_data = header + 8;
+
+    SetWidth(m_width);
 }
 
 // FIXME: This is a very crude and error prone misuse of Array,
@@ -67,26 +89,8 @@ void Array::CreateFromHeaderDirect(char* header, size_t ref) TIGHTDB_NOEXCEPT
     SetWidth(m_width);
 }
 
-void Array::init_from_header(char* header, size_t ref) TIGHTDB_NOEXCEPT
-{
-    // Parse header
-    m_isNode   = get_isnode_from_header(header);
-    m_hasRefs  = get_hasrefs_from_header(header);
-    m_width    = get_width_from_header(header);
-    m_len      = get_len_from_header(header);
-    const size_t byte_capacity = get_capacity_from_header(header);
 
-    // Capacity is how many items there are room for
-    m_capacity = CalcItemCount(byte_capacity, m_width);
-
-    m_ref = ref;
-    m_data = header + 8;
-
-    SetWidth(m_width);
-}
-
-
-void Array::set_type(ColumnDef type)
+void Array::set_type(Type type)
 {
     // If we are reviving an invalidated array
     // we need to reset state first
@@ -101,9 +105,9 @@ void Array::set_type(ColumnDef type)
 
     bool is_node = false, has_refs = false;
     switch (type) {
-        case coldef_Normal:                               break;
-        case coldef_InnerNode: has_refs = is_node = true; break;
-        case coldef_HasRefs:   has_refs = true;           break;
+        case type_Normal:                                     break;
+        case type_InnerColumnNode: has_refs = is_node = true; break;
+        case type_HasRefs:         has_refs = true;           break;
     }
     m_isNode  = is_node;
     m_hasRefs = has_refs;
@@ -1236,7 +1240,7 @@ size_t Array::clone(const char* header, Allocator& alloc, Allocator& clone_alloc
         // are, it means that it should not be interpreted as a ref.
         bool is_subarray = value != 0 && (value & 0x1) == 0;
         if (is_subarray) {
-            size_t ref = value;
+            size_t ref = to_ref(value);
             const char* subheader = static_cast<char*>(alloc.translate(ref));
             size_t new_ref = clone(subheader, alloc, clone_alloc);
             value = new_ref;
@@ -1283,13 +1287,13 @@ void Array::CopyOnWrite()
 }
 
 
-size_t Array::create_empty_array(ColumnDef type, WidthType width_type, Allocator& alloc)
+size_t Array::create_empty_array(Type type, WidthType width_type, Allocator& alloc)
 {
     bool is_node = false, has_refs = false;
     switch (type) {
-        case coldef_Normal:                               break;
-        case coldef_InnerNode: has_refs = is_node = true; break;
-        case coldef_HasRefs:   has_refs = true;           break;
+        case type_Normal:                                     break;
+        case type_InnerColumnNode: has_refs = is_node = true; break;
+        case type_HasRefs:         has_refs = true;           break;
     }
 
     const size_t capacity = initial_capacity;

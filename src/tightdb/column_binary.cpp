@@ -40,15 +40,15 @@ void ColumnBinary::destroy()
         static_cast<ArrayBinary*>(m_array)->destroy();
 }
 
-void ColumnBinary::update_ref(size_t ref)
+void ColumnBinary::update_ref(ref_type ref)
 {
     TIGHTDB_ASSERT(is_node_from_ref(ref, m_array->get_alloc())); // Can only be called when creating node
 
     if (!root_is_leaf())
         m_array->update_ref(ref);
     else {
-        ArrayParent *const parent = m_array->GetParent();
-        const size_t pndx   = m_array->GetParentNdx();
+        ArrayParent* parent = m_array->get_parent();
+        size_t pndx   = m_array->get_ndx_in_parent();
 
         // Replace the Binary array with int array for node
         Array* array = new Array(ref, parent, pndx, m_array->get_alloc());
@@ -87,11 +87,11 @@ size_t ColumnBinary::size() const  TIGHTDB_NOEXCEPT
 void ColumnBinary::clear()
 {
     if (!m_array->is_leaf()) {
-        ArrayParent *const parent = m_array->GetParent();
-        const size_t pndx = m_array->GetParentNdx();
+        ArrayParent* parent = m_array->get_parent();
+        size_t pndx = m_array->get_ndx_in_parent();
 
         // Revert to binary array
-        ArrayBinary* const array = new ArrayBinary(parent, pndx, m_array->get_alloc());
+        ArrayBinary* array = new ArrayBinary(parent, pndx, m_array->get_alloc());
         if (parent)
             parent->update_child_ref(pndx, array->get_ref());
 
