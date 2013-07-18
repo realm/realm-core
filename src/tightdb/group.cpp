@@ -122,7 +122,7 @@ void Group::create_from_file(const string& filename, OpenMode mode, bool do_init
 
     if (!do_init)  return;
 
-    const size_t top_ref = m_alloc.GetTopRef();
+    ref_type top_ref = m_alloc.GetTopRef();
 
     // if we just created shared group, we have to wait with
     // actually creating it's datastructures until first write
@@ -134,7 +134,7 @@ void Group::create_from_file(const string& filename, OpenMode mode, bool do_init
 // Create a new memory structure and attach this group instance to it.
 void Group::create()
 {
-    m_tables.set_type(Array::coldef_HasRefs); // FIXME: Why is this not done in Group() like the rest of the arrays?
+    m_tables.set_type(Array::type_HasRefs); // FIXME: Why is this not done in Group() like the rest of the arrays?
 
     m_top.add(m_tableNames.get_ref());
     m_top.add(m_tables.get_ref());
@@ -158,13 +158,13 @@ void Group::create_from_ref(size_t top_ref)
 {
     // Instantiate top arrays
     if (top_ref == 0) {
-        m_top.set_type(Array::coldef_HasRefs);
-        m_tables.set_type(Array::coldef_HasRefs);
-        m_tableNames.set_type(Array::coldef_Normal);
-        m_freePositions.set_type(Array::coldef_Normal);
-        m_freeLengths.set_type(Array::coldef_Normal);
+        m_top.set_type(Array::type_HasRefs);
+        m_tables.set_type(Array::type_HasRefs);
+        m_tableNames.set_type(Array::type_Normal);
+        m_freePositions.set_type(Array::type_Normal);
+        m_freeLengths.set_type(Array::type_Normal);
         if (m_is_shared) {
-            m_freeVersions.set_type(Array::coldef_Normal);
+            m_freeVersions.set_type(Array::type_Normal);
         }
 
         create();
@@ -222,8 +222,8 @@ void Group::init_shared()
         // Serialized files have no free space tracking
         // at all so we have to add the basic free lists
         if (m_top.size() == 2) {
-            m_freePositions.set_type(Array::coldef_Normal);
-            m_freeLengths.set_type(Array::coldef_Normal);
+            m_freePositions.set_type(Array::type_Normal);
+            m_freeLengths.set_type(Array::type_Normal);
             m_top.add(m_freePositions.get_ref());
             m_top.add(m_freeLengths.get_ref());
             m_freePositions.set_parent(&m_top, 2);
@@ -234,7 +234,7 @@ void Group::init_shared()
         // mode do not have version tracking for the free lists
         if (m_top.size() == 4) {
             const size_t count = m_freePositions.size();
-            m_freeVersions.set_type(Array::coldef_Normal);
+            m_freeVersions.set_type(Array::type_Normal);
             for (size_t i = 0; i < count; ++i) {
                 m_freeVersions.add(0);
             }

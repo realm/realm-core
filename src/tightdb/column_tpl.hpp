@@ -141,21 +141,21 @@ template<typename T, class C> void ColumnBase::TreeInsert(size_t ndx, T value)
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
-            Column newNode(Array::coldef_InnerNode, m_array->get_alloc());
+            Column newNode(Array::type_InnerColumnNode, m_array->get_alloc());
             newNode.NodeAdd<C>(nc.ref1);
             newNode.NodeAdd<C>(get_ref());
             static_cast<C*>(this)->update_ref(newNode.get_ref());
             return;
         }
         case NodeChange::insert_after: {
-            Column newNode(Array::coldef_InnerNode, m_array->get_alloc());
+            Column newNode(Array::type_InnerColumnNode, m_array->get_alloc());
             newNode.NodeAdd<C>(get_ref());
             newNode.NodeAdd<C>(nc.ref1);
             static_cast<C*>(this)->update_ref(newNode.get_ref());
             return;
         }
         case NodeChange::split: {
-            Column newNode(Array::coldef_InnerNode, m_array->get_alloc());
+            Column newNode(Array::type_InnerColumnNode, m_array->get_alloc());
             newNode.NodeAdd<C>(nc.ref1);
             newNode.NodeAdd<C>(nc.ref2);
             static_cast<C*>(this)->update_ref(newNode.get_ref());
@@ -203,7 +203,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         }
 
         // Else create new node
-        Column newNode(Array::coldef_InnerNode, m_array->get_alloc());
+        Column newNode(Array::type_InnerColumnNode, m_array->get_alloc());
         if (nc.type == NodeChange::split) {
             // update offset for left node
             const size_t newsize = target.size();

@@ -26,12 +26,12 @@
 namespace tightdb {
 
 
-class ArrayBinary : public Array {
+class ArrayBinary: public Array {
 public:
-    ArrayBinary(ArrayParent* parent=NULL, size_t pndx=0,
-                Allocator& alloc = Allocator::get_default());
-    ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx,
-                Allocator& alloc = Allocator::get_default());
+    explicit ArrayBinary(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                         Allocator& = Allocator::get_default());
+    ArrayBinary(ref_type ref, ArrayParent*, std::size_t ndx_in_parent,
+                Allocator& = Allocator::get_default());
 
     bool is_empty() const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT;

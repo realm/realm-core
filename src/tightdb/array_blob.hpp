@@ -25,13 +25,13 @@
 namespace tightdb {
 
 
-class ArrayBlob : public Array {
+class ArrayBlob: public Array {
 public:
-    ArrayBlob(ArrayParent *parent=NULL, size_t pndx=0,
-              Allocator& alloc = Allocator::get_default());
-    ArrayBlob(size_t ref, const ArrayParent *parent, size_t pndx,
-              Allocator& alloc = Allocator::get_default()) TIGHTDB_NOEXCEPT;
-    ArrayBlob(Allocator& alloc) TIGHTDB_NOEXCEPT;
+    explicit ArrayBlob(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                       Allocator& = Allocator::get_default());
+    ArrayBlob(ref_type ref, const ArrayParent*, std::size_t ndx_in_parent,
+              Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
+    explicit ArrayBlob(Allocator&) TIGHTDB_NOEXCEPT;
 
     const char* get(std::size_t pos) const TIGHTDB_NOEXCEPT;
 
@@ -62,15 +62,15 @@ private:
 
 // Implementation:
 
-inline ArrayBlob::ArrayBlob(ArrayParent *parent, std::size_t pndx, Allocator& alloc):
-    Array(coldef_Normal, parent, pndx, alloc)
+inline ArrayBlob::ArrayBlob(ArrayParent* parent, std::size_t pndx, Allocator& alloc):
+    Array(type_Normal, parent, pndx, alloc)
 {
     // Manually set wtype as array constructor in initiatializer list
     // will not be able to call correct virtual function
     set_header_wtype(wtype_Ignore);
 }
 
-inline ArrayBlob::ArrayBlob(std::size_t ref, const ArrayParent *parent, std::size_t pndx,
+inline ArrayBlob::ArrayBlob(std::size_t ref, const ArrayParent* parent, std::size_t pndx,
                             Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
 {
     // Manually create array as doing it in initializer list

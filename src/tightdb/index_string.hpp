@@ -20,26 +20,27 @@
 #ifndef TIGHTDB_INDEX_STRING_HPP
 #define TIGHTDB_INDEX_STRING_HPP
 
+#include <iostream>
+
 #include <tightdb/column.hpp>
 #include <tightdb/column_string.hpp>
-#include <iostream>
 
 namespace tightdb {
 
-typedef StringData (*StringGetter)(void*, size_t);
+typedef StringData (*StringGetter)(void*, std::size_t);
 
 class StringIndex: public Column {
 public:
     StringIndex(void* target_column, StringGetter get_func, Allocator&);
-    StringIndex(Array::ColumnDef, Allocator&);
-    StringIndex(size_t ref, ArrayParent*, size_t pndx, void* target_column, StringGetter get_func, Allocator&);
+    StringIndex(Array::Type, Allocator&);
+    StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, void* target_column, StringGetter get_func, Allocator&);
     void SetTarget(void* target_column, StringGetter get_func);
 
     bool is_empty() const;
 
-    void insert(size_t row_ndx, StringData value, bool isLast=false);
-    void set(size_t row_ndx, StringData oldValue, StringData newValue);
-    void erase(size_t row_ndx, StringData value, bool isLast=false);
+    void insert(size_t row_ndx, StringData value, bool is_last = false);
+    void set(size_t row_ndx, StringData oldValue, StringData new_value);
+    void erase(size_t row_ndx, StringData value, bool is_last = false);
     void clear() TIGHTDB_OVERRIDE;
 
     using Column::erase;

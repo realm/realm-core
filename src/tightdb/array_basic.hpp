@@ -22,17 +22,16 @@
 
 #include <tightdb/array.hpp>
 
-//
-// A BasicArray can currently only be used for simple unstructured types like float, double.
-//
-
 namespace tightdb {
 
-template<typename T>
-class BasicArray : public Array {
+/// A BasicArray can currently only be used for simple unstructured
+/// types like float, double.
+template<typename T> class BasicArray: public Array {
 public:
-    explicit BasicArray(ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=Allocator::get_default());
-    BasicArray(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc=Allocator::get_default()) TIGHTDB_NOEXCEPT;
+    explicit BasicArray(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                        Allocator& = Allocator::get_default());
+    BasicArray(ref_type ref, ArrayParent*, std::size_t ndx_in_parent,
+               Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
     explicit BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT;
 
     T get(size_t ndx) const TIGHTDB_NOEXCEPT;

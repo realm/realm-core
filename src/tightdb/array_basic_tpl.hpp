@@ -27,39 +27,37 @@ namespace tightdb {
 template<typename T>
 inline size_t BasicArray<T>::create_empty_basic_array(Allocator& alloc)
 {
-    const size_t capacity = Array::initial_capacity;
-    const MemRef mem_ref = alloc.Alloc(capacity); // Throws
+    std::size_t capacity = Array::initial_capacity;
+    MemRef mem_ref = alloc.Alloc(capacity); // Throws
 
     init_header(static_cast<char*>(mem_ref.pointer), false, false, wtype_Multiply,
-                sizeof(T), 0, capacity);
+                sizeof (T), 0, capacity);
 
     return mem_ref.ref;
 }
 
 template<typename T>
-inline BasicArray<T>::BasicArray(ArrayParent *parent, size_t ndx_in_parent, Allocator& alloc):
+inline BasicArray<T>::BasicArray(ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
     Array(alloc)
 {
-    const size_t ref = create_empty_basic_array(alloc); // Throws
+    ref_type ref = create_empty_basic_array(alloc); // Throws
     init_from_ref(ref);
     set_parent(parent, ndx_in_parent);
     update_ref_in_parent();
 }
 
 template<typename T>
-inline BasicArray<T>::BasicArray(size_t ref, ArrayParent *parent, size_t ndx_in_parent,
-                               Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
+inline BasicArray<T>::BasicArray(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
+                                 Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
 {
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
     init_from_ref(ref);
-    set_parent(const_cast<ArrayParent *>(parent), ndx_in_parent);
+    set_parent(const_cast<ArrayParent*>(parent), ndx_in_parent);
 }
 
 template<typename T>
-inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT : Array(no_prealloc_tag())
-{
-}
+inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT: Array(no_prealloc_tag()) {}
 
 
 template<typename T>

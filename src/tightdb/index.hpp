@@ -27,9 +27,9 @@ namespace tightdb {
 class Index: public Column {
 public:
     Index();
-    Index(Array::ColumnDef, Array* = 0, size_t pndx=0);
-    Index(size_t ref);
-    Index(size_t ref, Array* parent, size_t pndx);
+    explicit Index(Array::Type, Array* = 0, std::size_t ndx_in_parent = 0);
+    explicit Index(ref_type ref);
+    Index(ref_type ref, Array* parent, std::size_t ndx_in_parent);
 
     bool is_empty() const;
 

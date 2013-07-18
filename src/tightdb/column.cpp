@@ -246,7 +246,7 @@ bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, voi
 
 namespace tightdb {
 
-size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT
+size_t ColumnBase::get_size_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
     Array a(ref, 0, 0, alloc);
     if (a.is_leaf())
@@ -256,32 +256,32 @@ size_t ColumnBase::get_size_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXC
     return size_t(offsets.back());
 }
 
-bool ColumnBase::is_node_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT
+bool ColumnBase::is_node_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    const uint8_t* const header = reinterpret_cast<uint8_t*>(alloc.translate(ref));
-    const bool isNode = (header[0] & 0x80) != 0;
-    return isNode;
+    const uint8_t* header = reinterpret_cast<uint8_t*>(alloc.translate(ref));
+    bool is_node = (header[0] & 0x80) != 0;
+    return is_node;
 }
 
 Column::Column(Allocator& alloc): m_index(0)
 {
-    m_array = new Array(Array::coldef_Normal, 0, 0, alloc);
+    m_array = new Array(Array::type_Normal, 0, 0, alloc);
     Create();
 }
 
-Column::Column(Array::ColumnDef type, Allocator& alloc): m_index(0)
+Column::Column(Array::Type type, Allocator& alloc): m_index(0)
 {
     m_array = new Array(type, 0, 0, alloc);
     Create();
 }
 
-Column::Column(Array::ColumnDef type, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(0)
+Column::Column(Array::Type type, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(0)
 {
     m_array = new Array(type, parent, pndx, alloc);
     Create();
 }
 
-Column::Column(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(0)
+Column::Column(ref_type ref, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(0)
 {
     m_array = new Array(ref, parent, pndx, alloc);
 }
@@ -297,8 +297,8 @@ void Column::Create()
 {
     // Add subcolumns for nodes
     if (!root_is_leaf()) {
-        Array offsets(Array::coldef_Normal, 0, 0, m_array->get_alloc());
-        Array refs(Array::coldef_HasRefs, 0, 0, m_array->get_alloc());
+        Array offsets(Array::type_Normal, 0, 0, m_array->get_alloc());
+        Array refs(Array::type_HasRefs, 0, 0, m_array->get_alloc());
         m_array->add(offsets.get_ref());
         m_array->add(refs.get_ref());
     }
@@ -354,7 +354,7 @@ void Column::UpdateParentNdx(int diff)
 // Used by column b-tree code to ensure all leaf having same type
 void Column::SetHasRefs()
 {
-    m_array->set_type(Array::coldef_HasRefs);
+    m_array->set_type(Array::type_HasRefs);
 }
 
 /*
@@ -379,7 +379,7 @@ void Column::clear()
 {
     m_array->clear();
     if (!m_array->is_leaf())
-        m_array->set_type(Array::coldef_Normal);
+        m_array->set_type(Array::type_Normal);
 }
 
 void Column::set(size_t ndx, int64_t value)

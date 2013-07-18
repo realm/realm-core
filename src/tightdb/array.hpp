@@ -204,15 +204,15 @@ public:
 //    void state_init(int action, QueryState *state);
 //    bool match(int action, size_t index, int64_t value, QueryState *state);
 
-    enum ColumnDef {
-        coldef_Normal,
-        coldef_InnerNode, ///< Inner node of B-tree
-        coldef_HasRefs
+    enum Type {
+        type_Normal,
+        type_InnerColumnNode, ///< Inner node of B+-tree
+        type_HasRefs
     };
 
     /// Create a new array, and if \a parent and \a ndx_in_parent are
     /// specified, update the parent to point to this new array.
-    explicit Array(ColumnDef type = coldef_Normal, ArrayParent* = 0, size_t ndx_in_parent = 0,
+    explicit Array(Type type = type_Normal, ArrayParent* = 0, size_t ndx_in_parent = 0,
                    Allocator& = Allocator::get_default());
 
     /// Initialize an array wrapper from the specified array.
@@ -245,7 +245,7 @@ public:
     // sequence of column types.
     bool operator==(const Array& a) const;
 
-    void set_type(ColumnDef type);
+    void set_type(Type type);
 
     /// Reinitialize this array accessor to point to the specified new
     /// underlying array, and if it has a parent, update the parent to
@@ -263,7 +263,7 @@ public:
 
     /// Construct an empty array of the specified type and return just
     /// the reference to the underlying memory.
-    static size_t create_empty_array(ColumnDef, Allocator&);
+    static size_t create_empty_array(Type, Allocator&);
 
     // Parent tracking
     bool has_parent() const TIGHTDB_NOEXCEPT { return m_parent != 0; }
@@ -273,11 +273,11 @@ public:
     std::size_t get_ndx_in_parent() const TIGHTDB_NOEXCEPT { return m_parentNdx; }
     bool UpdateFromParent() TIGHTDB_NOEXCEPT;
 
-    bool IsValid() const TIGHTDB_NOEXCEPT {return m_data != NULL;}
-    void Invalidate() const TIGHTDB_NOEXCEPT {m_data = NULL;}
+    bool IsValid() const TIGHTDB_NOEXCEPT { return m_data != 0; }
+    void Invalidate() const TIGHTDB_NOEXCEPT { m_data = 0; }
 
-    size_t size() const TIGHTDB_NOEXCEPT {return m_len;}
-    bool is_empty() const TIGHTDB_NOEXCEPT {return m_len == 0;}
+    size_t size() const TIGHTDB_NOEXCEPT { return m_len; }
+    bool is_empty() const TIGHTDB_NOEXCEPT { return m_len == 0; }
 
     void insert(size_t ndx, int64_t value);
     void add(int64_t value);
@@ -360,10 +360,10 @@ public:
     void ReferenceSort(Array &ref);
     void resize(size_t count);
 
-    /// Returns true if type is not coldef_InnerNode
+    /// Returns true if type is not type_InnerColumnNode
     bool is_leaf() const TIGHTDB_NOEXCEPT { return !m_isNode; }
 
-    /// Returns true if type is either coldef_HasRefs or coldef_InnerNode
+    /// Returns true if type is either type_HasRefs or type_InnerColumnNode
     bool has_refs() const TIGHTDB_NOEXCEPT { return m_hasRefs; }
 
     bool IsIndexNode() const  TIGHTDB_NOEXCEPT { return get_indexflag_from_header(); }
@@ -512,7 +512,7 @@ public:
     static std::size_t get_capacity_from_header(const char*) TIGHTDB_NOEXCEPT;
     static bool get_isnode_from_header(const char*) TIGHTDB_NOEXCEPT; // DEPRECATED!
 
-    static ColumnDef get_coldef_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static Type get_type_from_header(const char*) TIGHTDB_NOEXCEPT;
 
     /// Get the number of bytes currently in use by the specified
     /// array. This includes the array header, but it does not include
@@ -622,7 +622,7 @@ private:
 
 protected:
     static const std::size_t initial_capacity = 128;
-    static std::size_t create_empty_array(ColumnDef, WidthType, Allocator&);
+    static std::size_t create_empty_array(Type, WidthType, Allocator&);
     static std::size_t clone(const char* header, Allocator& alloc, Allocator& clone_alloc);
 
     void update_child_ref(size_t child_ndx, size_t new_ref) TIGHTDB_OVERRIDE;
@@ -792,14 +792,14 @@ public:
 
 
 inline Array::Array(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc) TIGHTDB_NOEXCEPT:
-    m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
+    m_data(0), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
     m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
 {
     init_from_ref(ref);
 }
 
-inline Array::Array(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator& alloc):
-    m_data(NULL), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
+inline Array::Array(Type type, ArrayParent* parent, size_t pndx, Allocator& alloc):
+    m_data(0), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
     m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
 {
     const size_t ref = create_empty_array(type, alloc); // Throws
@@ -809,8 +809,8 @@ inline Array::Array(ColumnDef type, ArrayParent* parent, size_t pndx, Allocator&
 
 // Creates new array (but invalid, call update_ref() or set_type() to init)
 inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
-    m_data(NULL), m_ref(0), m_len(0), m_capacity(0), m_width((size_t)-1), m_isNode(false),
-    m_parent(NULL), m_parentNdx(0), m_alloc(alloc) {}
+    m_data(0), m_ref(0), m_len(0), m_capacity(0), m_width(size_t(-1)), m_isNode(false),
+    m_parent(0), m_parentNdx(0), m_alloc(alloc) {}
 
 // Copy-constructor
 // Note that this array now own the ref. Should only be used when
@@ -1092,13 +1092,13 @@ inline void Array::set_header_isnode(bool value) TIGHTDB_NOEXCEPT
 }
 
 
-inline Array::ColumnDef Array::get_coldef_from_header(const char* header) TIGHTDB_NOEXCEPT
+inline Array::Type Array::get_type_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
     if (!get_isleaf_from_header(header))
-        return coldef_InnerNode;
+        return type_InnerColumnNode;
     if (get_hasrefs_from_header(header))
-        return coldef_HasRefs;
-    return coldef_Normal;
+        return type_HasRefs;
+    return type_Normal;
 }
 
 
@@ -1166,7 +1166,7 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
 
     if (recurse && m_hasRefs) {
         // Temp array for updated refs
-        Array newRefs(m_isNode ? coldef_InnerNode : coldef_HasRefs);
+        Array newRefs(m_isNode ? type_InnerColumnNode : type_HasRefs);
 
         // Make sure that all flags are retained
         if (IsIndexNode())
@@ -1185,7 +1185,7 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
                 newRefs.add(ref);
             }
             else {
-                const Array sub(ref, NULL, 0, get_alloc());
+                const Array sub(ref, 0, 0, get_alloc());
                 const size_t sub_pos = sub.Write(out, true, persist);
                 TIGHTDB_ASSERT((sub_pos & 0x7) == 0); // 64bit alignment
                 newRefs.add(sub_pos);
@@ -1197,7 +1197,7 @@ template<class S> size_t Array::Write(S& out, bool recurse, bool persist) const
         const size_t refs_pos = newRefs.Write(out, false, persist);
 
         // Clean-up
-        newRefs.set_type(coldef_Normal); // avoid recursive del
+        newRefs.set_type(type_Normal); // avoid recursive del
         newRefs.destroy();
 
         return refs_pos; // Return position
@@ -1244,7 +1244,7 @@ inline void Array::move_assign(Array& a)
     a.Invalidate();
 }
 
-inline size_t Array::create_empty_array(ColumnDef type, Allocator& alloc)
+inline size_t Array::create_empty_array(Type type, Allocator& alloc)
 {
     return create_empty_array(type, wtype_Bits, alloc); // Throws
 }

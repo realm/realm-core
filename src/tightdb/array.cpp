@@ -86,7 +86,7 @@ void Array::init_from_header(char* header, size_t ref) TIGHTDB_NOEXCEPT
 }
 
 
-void Array::set_type(ColumnDef type)
+void Array::set_type(Type type)
 {
     // If we are reviving an invalidated array
     // we need to reset state first
@@ -101,9 +101,9 @@ void Array::set_type(ColumnDef type)
 
     bool is_node = false, has_refs = false;
     switch (type) {
-        case coldef_Normal:                               break;
-        case coldef_InnerNode: has_refs = is_node = true; break;
-        case coldef_HasRefs:   has_refs = true;           break;
+        case type_Normal:                                     break;
+        case type_InnerColumnNode: has_refs = is_node = true; break;
+        case type_HasRefs:         has_refs = true;           break;
     }
     m_isNode  = is_node;
     m_hasRefs = has_refs;
@@ -1283,13 +1283,13 @@ void Array::CopyOnWrite()
 }
 
 
-size_t Array::create_empty_array(ColumnDef type, WidthType width_type, Allocator& alloc)
+size_t Array::create_empty_array(Type type, WidthType width_type, Allocator& alloc)
 {
     bool is_node = false, has_refs = false;
     switch (type) {
-        case coldef_Normal:                               break;
-        case coldef_InnerNode: has_refs = is_node = true; break;
-        case coldef_HasRefs:   has_refs = true;           break;
+        case type_Normal:                                     break;
+        case type_InnerColumnNode: has_refs = is_node = true; break;
+        case type_HasRefs:         has_refs = true;           break;
     }
 
     const size_t capacity = initial_capacity;

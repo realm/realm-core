@@ -11,8 +11,8 @@ namespace tightdb {
 
 
 ArrayBinary::ArrayBinary(ArrayParent* parent, size_t pndx, Allocator& alloc):
-    Array(coldef_HasRefs, parent, pndx, alloc),
-    m_offsets(coldef_Normal, NULL, 0, alloc), m_blob(NULL, 0, alloc)
+    Array(type_HasRefs, parent, pndx, alloc),
+    m_offsets(type_Normal, 0, 0, alloc), m_blob(0, 0, alloc)
 {
     // Add subarrays for long string
     Array::add(m_offsets.get_ref());
@@ -22,8 +22,8 @@ ArrayBinary::ArrayBinary(ArrayParent* parent, size_t pndx, Allocator& alloc):
 }
 
 ArrayBinary::ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
-    Array(ref, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), NULL, 0, alloc),
-    m_blob(Array::get_as_ref(1), NULL, 0, alloc)
+    Array(ref, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
+    m_blob(Array::get_as_ref(1), 0, 0, alloc)
 {
     TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
     TIGHTDB_ASSERT(Array::size() == 2);

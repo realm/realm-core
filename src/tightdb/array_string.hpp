@@ -28,11 +28,11 @@ namespace tightdb {
 
 class ArrayString: public Array {
 public:
-    ArrayString(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+    explicit ArrayString(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                 Allocator& = Allocator::get_default());
-    ArrayString(size_t ref, const ArrayParent*, std::size_t ndx_in_parent,
+    ArrayString(ref_type ref, const ArrayParent*, std::size_t ndx_in_parent,
                 Allocator& = Allocator::get_default());
-    ArrayString(Allocator&);
+    explicit ArrayString(Allocator&);
 
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add();
@@ -75,13 +75,13 @@ private:
 
 inline std::size_t ArrayString::create_empty_string_array(Allocator& alloc)
 {
-    return create_empty_array(coldef_Normal, wtype_Multiply, alloc); // Throws
+    return create_empty_array(type_Normal, wtype_Multiply, alloc); // Throws
 }
 
-inline ArrayString::ArrayString(ArrayParent *parent, std::size_t ndx_in_parent,
+inline ArrayString::ArrayString(ArrayParent* parent, std::size_t ndx_in_parent,
                                 Allocator& alloc): Array(alloc)
 {
-    std::size_t ref = create_empty_string_array(alloc); // Throws
+    ref_type ref = create_empty_string_array(alloc); // Throws
     init_from_ref(ref);
     set_parent(parent, ndx_in_parent);
     update_ref_in_parent();
