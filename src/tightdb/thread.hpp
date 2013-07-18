@@ -78,10 +78,10 @@ public:
 private:
     pthread_mutex_t m_impl;
 
-    static TIGHTDB_NORETURN void init_failed(int);
-    static TIGHTDB_NORETURN void attr_init_failed(int);
-    static TIGHTDB_NORETURN void destroy_failed(int) TIGHTDB_NOEXCEPT;
-    static TIGHTDB_NORETURN void lock_failed(int) TIGHTDB_NOEXCEPT;
+    TIGHTDB_NORETURN static void init_failed(int);
+    TIGHTDB_NORETURN static void attr_init_failed(int);
+    TIGHTDB_NORETURN static void destroy_failed(int) TIGHTDB_NOEXCEPT;
+    TIGHTDB_NORETURN static void lock_failed(int) TIGHTDB_NOEXCEPT;
 
     friend class CondVar;
 };
@@ -125,9 +125,9 @@ public:
 private:
     pthread_cond_t m_impl;
 
-    static TIGHTDB_NORETURN void init_failed(int);
-    static TIGHTDB_NORETURN void attr_init_failed(int);
-    static TIGHTDB_NORETURN void destroy_failed(int) TIGHTDB_NOEXCEPT;
+    TIGHTDB_NORETURN static void init_failed(int);
+    TIGHTDB_NORETURN static void attr_init_failed(int);
+    TIGHTDB_NORETURN static void destroy_failed(int) TIGHTDB_NOEXCEPT;
 };
 
 

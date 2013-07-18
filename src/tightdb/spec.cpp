@@ -16,7 +16,7 @@ Spec::~Spec()
 #endif
 }
 
-void Spec::init_from_ref(size_t ref, ArrayParent* parent, size_t ndx_in_parent)
+void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     m_specSet.update_ref(ref);
     m_specSet.set_parent(parent, ndx_in_parent);
@@ -39,12 +39,12 @@ void Spec::destroy()
     m_specSet.destroy();
 }
 
-size_t Spec::get_ref() const
+ref_type Spec::get_ref() const
 {
     return m_specSet.get_ref();
 }
 
-void Spec::update_ref(size_t ref, ArrayParent* parent, size_t pndx)
+void Spec::update_ref(ref_type ref, ArrayParent* parent, size_t pndx)
 {
     init_from_ref(ref, parent, pndx);
 }
@@ -82,7 +82,7 @@ size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
     if (type == type_Table) {
         // SubSpecs array is only there when there are subtables
         if (m_specSet.size() == 2) {
-            m_subSpecs.set_type(Array::coldef_HasRefs);
+            m_subSpecs.set_type(Array::type_HasRefs);
             //m_subSpecs.set_type((ColumnDef)4);
             //return;
             m_specSet.add(m_subSpecs.get_ref());
@@ -92,9 +92,9 @@ size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
         Allocator& alloc = m_specSet.get_alloc();
 
         // Create spec for new subtable
-        Array spec(Array::coldef_Normal, NULL, 0, alloc);
-        ArrayString names(NULL, 0, alloc);
-        Array spec_set(Array::coldef_HasRefs, NULL, 0, alloc);
+        Array spec(Array::type_Normal, 0, 0, alloc);
+        ArrayString names(0, 0, alloc);
+        Array spec_set(Array::type_HasRefs, 0, 0, alloc);
         spec_set.add(spec.get_ref());
         spec_set.add(names.get_ref());
 
@@ -178,7 +178,7 @@ void Spec::remove_column(size_t column_ndx)
         const size_t subspec_ndx = get_subspec_ndx(column_ndx);
         const size_t subspec_ref = m_subSpecs.get_as_ref(subspec_ndx);
 
-        Array subspec_top(subspec_ref, NULL, 0, m_specSet.get_alloc());
+        Array subspec_top(subspec_ref, 0, 0, m_specSet.get_alloc());
         subspec_top.destroy(); // recursively delete entire subspec
         m_subSpecs.erase(subspec_ndx);
     }
@@ -235,7 +235,7 @@ const Spec Spec::get_subtable_spec(size_t column_ndx) const
     Allocator& alloc = m_specSet.get_alloc();
     const size_t ref = m_subSpecs.get_as_ref(subspec_ndx);
 
-    return Spec(m_table, alloc, ref, NULL, 0);
+    return Spec(m_table, alloc, ref, 0, 0);
 }
 
 size_t Spec::get_subspec_ndx(size_t column_ndx) const
@@ -251,7 +251,7 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const
     return pos;
 }
 
-size_t Spec::get_subspec_ref(size_t subspec_ndx) const
+ref_type Spec::get_subspec_ref(size_t subspec_ndx) const
 {
     TIGHTDB_ASSERT(subspec_ndx < m_subSpecs.size());
 
@@ -405,12 +405,12 @@ size_t* Spec::record_subspec_path(const Array* root_subspecs, size_t* begin,
     TIGHTDB_ASSERT(begin < end);
     const Array* spec_set = &m_specSet;
     for (;;) {
-        const size_t subspec_ndx = spec_set->GetParentNdx();
+        size_t subspec_ndx = spec_set->get_ndx_in_parent();
         *begin++ = subspec_ndx;
-        const Array* const parent_subspecs = static_cast<const Array*>(spec_set->GetParent());
+        const Array* parent_subspecs = static_cast<const Array*>(spec_set->get_parent());
         if (parent_subspecs == root_subspecs) break;
         if (begin == end) return 0; // Error, not enough space in buffer
-        spec_set = static_cast<const Array*>(parent_subspecs->GetParent());
+        spec_set = static_cast<const Array*>(parent_subspecs->get_parent());
     }
     return begin;
 }
@@ -452,7 +452,7 @@ void Spec::to_dot(ostream& out, StringData) const
         // Write out subspecs
         for (size_t i = 0; i < count; ++i) {
             const size_t ref = m_subSpecs.get_as_ref(i);
-            const Spec s(m_table, alloc, ref, NULL, 0);
+            const Spec s(m_table, alloc, ref, 0, 0);
 
             s.to_dot(out);
         }

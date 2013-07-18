@@ -76,11 +76,11 @@ public:
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
     MemRef Alloc(size_t size) TIGHTDB_OVERRIDE;
-    MemRef ReAlloc(size_t ref, const void* p, size_t size) TIGHTDB_OVERRIDE;
-    void   Free(size_t ref, const void* p) TIGHTDB_OVERRIDE; // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
-    void*  translate(size_t ref) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    MemRef ReAlloc(ref_type ref, const void* p, size_t size) TIGHTDB_OVERRIDE;
+    void   Free(ref_type, const void* p) TIGHTDB_OVERRIDE; // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
+    void*  translate(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    bool   IsReadOnly(size_t ref) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    bool   IsReadOnly(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     size_t GetTopRef() const TIGHTDB_NOEXCEPT;
     size_t GetTotalSize() const;
 

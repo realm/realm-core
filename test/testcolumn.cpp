@@ -17,14 +17,14 @@ Column db_setup::c;
 TEST_FIXTURE(db_setup, Column_IsEmpty)
 {
     CHECK(c.is_empty());
-    CHECK_EQUAL(c.size(), (size_t)0);
+    CHECK_EQUAL(c.size(), size_t(0));
 }
 
 TEST_FIXTURE(db_setup, Column_Add0)
 {
     c.add(0);
     CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.size(), (size_t)1);
+    CHECK_EQUAL(c.size(), size_t(1));
 }
 
 TEST_FIXTURE(db_setup, Column_Add1)

@@ -38,7 +38,7 @@ template<> struct AggReturnType<float> {
 
 
 template<typename T>
-class BasicColumn : public ColumnBase {
+class BasicColumn: public ColumnBase {
 public:
     BasicColumn(Allocator& = Allocator::get_default());
     BasicColumn(size_t ref, ArrayParent* = 0, size_t ndx_in_parent = 0,
@@ -79,7 +79,7 @@ public:
     void ClearIndex() {}
     size_t FindWithIndex(int64_t) const { return size_t(-1); }
 
-    size_t get_ref() const TIGHTDB_OVERRIDE { return m_array->get_ref(); }
+    ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
     void set_parent(ArrayParent* parent, size_t pndx) TIGHTDB_OVERRIDE { m_array->set_parent(parent, pndx); }
 
     /// Compare two columns for equality.
@@ -92,7 +92,7 @@ public:
 private:
     friend class ColumnBase;
 
-    void update_ref(size_t ref);
+    void update_ref(ref_type ref);
 
     T LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
     void LeafSet(size_t ndx, T value);

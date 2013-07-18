@@ -67,7 +67,7 @@ public:
 
     // Aggregate functions
     template <int function, typename T, typename R, class ColType>
-    R aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx, T count_target) const;
+    R aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx, T count_target = T(0)) const;
 
 
     // TODO, FIXME: rename int versions
