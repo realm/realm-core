@@ -898,7 +898,7 @@ protected:
 
     bool m_long;
     size_t m_end_s;
-    size_t m_first_s;
+//    size_t m_first_s;
     size_t m_leaf_start;
 };
 
@@ -1208,7 +1208,7 @@ private:
     ArrayParent *m_leaf;
     bool m_long;
     size_t m_leaf_end;
-    size_t m_first_s;
+//    size_t m_first_s;
     size_t m_leaf_start;
 
     // Used for index lookup

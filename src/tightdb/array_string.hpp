@@ -28,11 +28,11 @@ namespace tightdb {
 
 class ArrayString: public Array {
 public:
-    ArrayString(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                Allocator& = Allocator::get_default());
-    ArrayString(size_t ref, const ArrayParent*, std::size_t ndx_in_parent,
-                Allocator& = Allocator::get_default());
-    ArrayString(Allocator&);
+    explicit ArrayString(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                         Allocator& = Allocator::get_default());
+    ArrayString(ref_type, ArrayParent*, std::size_t ndx_in_parent,
+                Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
+    explicit ArrayString(Allocator&) TIGHTDB_NOEXCEPT;
 
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add();
@@ -50,7 +50,7 @@ public:
 
     /// Construct an empty string array and return just the reference
     /// to the underlying memory.
-    static std::size_t create_empty_string_array(Allocator&);
+    static ref_type create_empty_string_array(Allocator&);
 
     /// Compare two string arrays for equality.
     bool Compare(const ArrayString&) const;
@@ -73,33 +73,35 @@ private:
 
 // Implementation:
 
-inline std::size_t ArrayString::create_empty_string_array(Allocator& alloc)
+inline ref_type ArrayString::create_empty_string_array(Allocator& alloc)
 {
-    return create_empty_array(coldef_Normal, wtype_Multiply, alloc); // Throws
+    return create_empty_array(type_Normal, wtype_Multiply, alloc); // Throws
 }
 
-inline ArrayString::ArrayString(ArrayParent *parent, std::size_t ndx_in_parent,
+inline ArrayString::ArrayString(ArrayParent* parent, std::size_t ndx_in_parent,
                                 Allocator& alloc): Array(alloc)
 {
-    std::size_t ref = create_empty_string_array(alloc); // Throws
+    ref_type ref = create_empty_string_array(alloc); // Throws
     init_from_ref(ref);
     set_parent(parent, ndx_in_parent);
     update_ref_in_parent();
 }
 
-inline ArrayString::ArrayString(std::size_t ref, const ArrayParent *parent,
-                                std::size_t ndx_in_parent, Allocator& alloc): Array(alloc)
+inline ArrayString::ArrayString(ref_type ref, ArrayParent* parent,
+                                std::size_t ndx_in_parent, Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(alloc)
 {
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
     init_from_ref(ref);
-    set_parent(const_cast<ArrayParent *>(parent), ndx_in_parent);
+    set_parent(parent, ndx_in_parent);
 }
 
 // Creates new array (but invalid, call update_ref() to init)
-inline ArrayString::ArrayString(Allocator& alloc): Array(alloc) {}
+inline ArrayString::ArrayString(Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc) {}
 
-inline StringData ArrayString::get_from_header(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT
+inline StringData ArrayString::get_from_header(const char* header,
+                                               std::size_t ndx) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_len_from_header(header));
     std::size_t width = get_width_from_header(header);

@@ -105,7 +105,7 @@ MemRef SlabAlloc::Alloc(size_t size)
 // FIXME: We need to come up with a way to make Free() a method that
 // never throws. This is essential for exception safety in large parts
 // of the TightDB API.
-void SlabAlloc::Free(size_t ref, const void* p)
+void SlabAlloc::Free(ref_type ref, const void* p)
 {
     // Free space in read only segment is tracked separately
     const bool isReadOnly = IsReadOnly(ref);
@@ -188,7 +188,7 @@ MemRef SlabAlloc::ReAlloc(size_t ref, const void* p, size_t size)
     return space;
 }
 
-void* SlabAlloc::translate(size_t ref) const TIGHTDB_NOEXCEPT
+void* SlabAlloc::translate(ref_type ref) const TIGHTDB_NOEXCEPT
 {
     if (ref < m_baseline) return const_cast<char*>(m_data) + ref;
     else {
@@ -200,7 +200,7 @@ void* SlabAlloc::translate(size_t ref) const TIGHTDB_NOEXCEPT
     }
 }
 
-bool SlabAlloc::IsReadOnly(size_t ref) const TIGHTDB_NOEXCEPT
+bool SlabAlloc::IsReadOnly(ref_type ref) const TIGHTDB_NOEXCEPT
 {
     return ref < m_baseline;
 }

@@ -14,11 +14,11 @@ ColumnMixed::~ColumnMixed()
 
 void ColumnMixed::destroy()
 {
-    if (m_array != NULL)
+    if (m_array != 0)
         m_array->destroy();
 }
 
-void ColumnMixed::set_parent(ArrayParent *parent, size_t pndx)
+void ColumnMixed::set_parent(ArrayParent* parent, size_t pndx)
 {
     m_array->set_parent(parent, pndx);
 }
@@ -37,9 +37,9 @@ void ColumnMixed::UpdateFromParent()
 
 void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx)
 {
-    m_array = new Array(Array::coldef_HasRefs, NULL, 0, alloc);
+    m_array = new Array(Array::type_HasRefs, 0, 0, alloc);
 
-    m_types = new Column(Array::coldef_Normal, alloc);
+    m_types = new Column(Array::type_Normal, alloc);
     m_refs  = new RefsColumn(alloc, table, column_ndx);
 
     m_array->add(m_types->get_ref());
@@ -55,8 +55,8 @@ void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx
     m_array = new Array(ref, parent, ndx_in_parent, alloc);
     TIGHTDB_ASSERT(m_array->size() == 2 || m_array->size() == 3);
 
-    const size_t types_ref = m_array->get_as_ref(0);
-    const size_t refs_ref  = m_array->get_as_ref(1);
+    ref_type types_ref = m_array->get_as_ref(0);
+    ref_type refs_ref  = m_array->get_as_ref(1);
 
     m_types = new Column(types_ref, m_array, 0, alloc);
     m_refs  = new RefsColumn(alloc, table, column_ndx, m_array, 1, refs_ref);
@@ -65,7 +65,7 @@ void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx
     // Binary column with values that does not fit in refs
     // is only there if needed
     if (m_array->size() == 3) {
-        const size_t data_ref = m_array->get_as_ref(2);
+        ref_type data_ref = m_array->get_as_ref(2);
         m_data = new ColumnBinary(data_ref, m_array, 2, alloc);
     }
 }
@@ -79,7 +79,7 @@ void ColumnMixed::InitDataColumn()
 
     // Create new data column for items that do not fit in refs
     m_data = new ColumnBinary(m_array->get_alloc());
-    const size_t ref = m_data->get_ref();
+    ref_type ref = m_data->get_ref();
 
     m_array->add(ref);
     m_data->set_parent(m_array, 2);

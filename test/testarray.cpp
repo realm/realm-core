@@ -1396,7 +1396,7 @@ TEST(ArrayCopy)
     CHECK_EQUAL(4, b.get(4));
 
     // With sub-arrays
-    Array c(Array::coldef_HasRefs);
+    Array c(Array::type_HasRefs);
     c.add(a.get_ref());
 
     Array d(c, Allocator::get_default());

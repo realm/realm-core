@@ -14,10 +14,12 @@ using namespace std;
 
 namespace {
 
-tightdb::Array::ColumnDef get_coldef_from_ref(size_t ref, tightdb::Allocator& alloc)
+const size_t short_string_max_size = 15;
+
+tightdb::Array::Type get_type_from_ref(tightdb::ref_type ref, tightdb::Allocator& alloc)
 {
     const char* header = static_cast<char*>(alloc.translate(ref));
-    return tightdb::Array::get_coldef_from_header(header);
+    return tightdb::Array::get_type_from_header(header);
 }
 
 // Getter function for string index
@@ -31,22 +33,23 @@ tightdb::StringData get_string(void* column, size_t ndx)
 
 namespace tightdb {
 
-AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc) : m_index(NULL)
+AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc): m_index(0)
 {
-    m_array = new ArrayString(NULL, 0, alloc);
+    m_array = new ArrayString(0, 0, alloc);
 }
 
-AdaptiveStringColumn::AdaptiveStringColumn(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc) : m_index(NULL)
+AdaptiveStringColumn::AdaptiveStringColumn(ref_type ref, ArrayParent* parent, size_t pndx,
+                                           Allocator& alloc): m_index(0)
 {
-    Array::ColumnDef type = get_coldef_from_ref(ref, alloc);
+    Array::Type type = get_type_from_ref(ref, alloc);
     switch (type) {
-        case Array::coldef_InnerNode:
+        case Array::type_InnerColumnNode:
             m_array = new Array(ref, parent, pndx, alloc);
             break;
-        case Array::coldef_HasRefs:
+        case Array::type_HasRefs:
             m_array = new ArrayStringLong(ref, parent, pndx, alloc);
             break;
-        case Array::coldef_Normal:
+        case Array::type_Normal:
             m_array = new ArrayString(ref, parent, pndx, alloc);
             break;
     }
@@ -77,7 +80,8 @@ void AdaptiveStringColumn::destroy()
 
 void AdaptiveStringColumn::update_ref(ref_type ref)
 {
-    TIGHTDB_ASSERT(get_coldef_from_ref(ref, m_array->get_alloc()) == Array::coldef_InnerNode); // Can only be called when creating node
+    // Can only be called when creating node
+    TIGHTDB_ASSERT(get_type_from_ref(ref, m_array->get_alloc()) == Array::type_InnerColumnNode);
 
     if (!root_is_leaf())
         m_array->update_ref(ref);
@@ -227,15 +231,19 @@ void AdaptiveStringColumn::set(size_t ndx, StringData str)
     TreeSet<StringData, AdaptiveStringColumn>(ndx, str);
 }
 
-void AdaptiveStringColumn::insert(size_t ndx, StringData str)
+void AdaptiveStringColumn::add(StringData value)
+{
+    insert(size(), value);
+}
+
+void AdaptiveStringColumn::insert(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx <= size());
-
-    TreeInsert<StringData, AdaptiveStringColumn>(ndx, str);
+    TreeInsert<StringData, AdaptiveStringColumn>(ndx, value);
 
     if (m_index) {
-        const bool isLast = (ndx+1 == size());
-        m_index->insert(ndx, str, isLast);
+        bool is_last = ndx == size()-1;
+        m_index->insert(ndx, value, is_last);
     }
 }
 
@@ -385,7 +393,7 @@ void AdaptiveStringColumn::LeafInsert(size_t ndx, StringData value)
         static_cast<ArrayStringLong*>(m_array)->insert(ndx, value);
         return;
     }
-    if (value.size() < 16) {
+    if (value.size() <= short_string_max_size) {
         static_cast<ArrayString*>(m_array)->insert(ndx, value);
         return;
     }

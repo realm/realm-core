@@ -66,7 +66,7 @@ void Table::CreateColumns()
 
     // Instantiate first if we have an empty table (from zero-ref)
     if (!m_columns.IsValid()) {
-        m_columns.set_type(Array::coldef_HasRefs);
+        m_columns.set_type(Array::type_HasRefs);
     }
 
     size_t subtable_count = 0;
@@ -85,7 +85,7 @@ void Table::CreateColumns()
         case type_Bool:
         case type_Date:
             {
-                Column* c = new Column(Array::coldef_Normal, alloc);
+                Column* c = new Column(Array::type_Normal, alloc);
                 m_columns.add(c->get_ref());
                 c->set_parent(&m_columns, ref_pos);
                 new_col = c;
@@ -483,7 +483,7 @@ size_t Table::do_add_column(DataType type)
     case type_Bool:
     case type_Date:
         {
-            Column* c = new Column(Array::coldef_Normal, alloc);
+            Column* c = new Column(Array::type_Normal, alloc);
             m_columns.add(c->get_ref());
             c->set_parent(&m_columns, m_columns.size()-1);
             new_col = c;
@@ -723,7 +723,7 @@ void Table::validate_column_type(const ColumnBase& column, ColumnType coltype, s
 
 size_t Table::clone_columns(Allocator& alloc) const
 {
-    Array new_columns(Array::coldef_HasRefs, 0, 0, alloc);
+    Array new_columns(Array::type_HasRefs, 0, 0, alloc);
     size_t n = get_column_count();
     for (size_t i=0; i<n; ++i) {
         size_t new_col_ref;
@@ -753,7 +753,7 @@ size_t Table::clone(Allocator& alloc) const
     if (m_top.IsValid())
         return m_top.clone(alloc); // Throws
 
-    Array new_top(Array::coldef_HasRefs, 0, 0, alloc); // Throws
+    Array new_top(Array::type_HasRefs, 0, 0, alloc); // Throws
     new_top.add(m_spec_set.m_specSet.clone(alloc)); // Throws
     new_top.add(m_columns.clone(alloc)); // Throws
     return new_top.get_ref();
