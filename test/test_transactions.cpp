@@ -416,9 +416,16 @@ private:
         try {
             thread(e.m_index, e.m_database_path);
         }
+        catch (exception& alias) {
+            e.m_error = true;
+            cerr << alias.what()<<" exception thrown in thread \n";
+        }
+
         catch (...) {
             e.m_error = true;
+            cerr << "unknown ... exception in thread \n";
         }
+
         return 0;
     }
 };
