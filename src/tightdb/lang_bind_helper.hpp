@@ -78,10 +78,6 @@ public:
     static void insert_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
                                 const Table& source);
 
-    /// Like insert_subtable() but overwrites the specified cell
-    /// rather than inserting a new one.
-    static void set_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
-                             const Table& source);
 
     /// Calls parent.insert_mixed_subtable(col_ndx, row_ndx, &source).
     static void insert_mixed_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
@@ -190,11 +186,6 @@ inline void LangBindHelper::insert_subtable(Table& parent, std::size_t col_ndx,
     parent.insert_subtable(col_ndx, row_ndx, &source);
 }
 
-inline void LangBindHelper::set_subtable(Table& parent, std::size_t col_ndx,
-                                         std::size_t row_ndx, const Table& source)
-{
-    parent.set_subtable(col_ndx, row_ndx, &source);
-}
 
 inline void LangBindHelper::insert_mixed_subtable(Table& parent, std::size_t col_ndx,
                                                   std::size_t row_ndx, const Table& source)
