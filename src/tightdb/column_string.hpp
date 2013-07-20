@@ -20,9 +20,10 @@
 #ifndef TIGHTDB_COLUMN_STRING_HPP
 #define TIGHTDB_COLUMN_STRING_HPP
 
-#include <tightdb/column.hpp>
+#include <tightdb/unique_ptr.hpp>
 #include <tightdb/array_string.hpp>
 #include <tightdb/array_string_long.hpp>
+#include <tightdb/column.hpp>
 
 namespace tightdb {
 
@@ -31,9 +32,9 @@ class StringIndex;
 
 class AdaptiveStringColumn: public ColumnBase {
 public:
-    AdaptiveStringColumn(Allocator& = Allocator::get_default());
-    AdaptiveStringColumn(std::size_t ref, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                         Allocator& = Allocator::get_default());
+    explicit AdaptiveStringColumn(Allocator& = Allocator::get_default());
+    explicit AdaptiveStringColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                                  Allocator& = Allocator::get_default());
     ~AdaptiveStringColumn();
 
     void destroy() TIGHTDB_OVERRIDE;
@@ -75,7 +76,7 @@ public:
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
-    void set_parent(ArrayParent* parent, size_t pndx) { m_array->set_parent(parent, pndx); }
+    void set_parent(ArrayParent* parent, std::size_t pndx) { m_array->set_parent(parent, pndx); }
 
     // Optimizing data layout
     bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;
@@ -143,6 +144,8 @@ protected:
 #endif // TIGHTDB_DEBUG
 
 private:
+    static const size_t short_string_max_size = 15;
+
     StringIndex* m_index;
 };
 

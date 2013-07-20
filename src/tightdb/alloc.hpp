@@ -52,7 +52,7 @@ struct MemRef {
 };
 
 // FIXME: Casting a pointer to std::size_t is inherently nonportable
-// (see the default definition of Allocator::Alloc()). For example,
+// (see the default definition of Allocator::alloc()). For example,
 // systems exist where pointers are 64 bits and std::size_t is 32. One
 // idea would be to use a different type for refs such as
 // std::uintptr_t, the problem with this one is that while it is
@@ -65,16 +65,16 @@ struct MemRef {
 class Allocator {
 public:
     /// \throw std::bad_alloc If insufficient memory was available.
-    virtual MemRef Alloc(std::size_t size);
+    virtual MemRef alloc(std::size_t size);
 
     /// \throw std::bad_alloc If insufficient memory was available.
-    virtual MemRef ReAlloc(ref_type ref, const void* addr, std::size_t size);
+    virtual MemRef realloc(ref_type ref, const void* addr, std::size_t size);
 
-    // FIXME: SlabAlloc::Free() should be modified such than this method never throws.
-    virtual void Free(ref_type, const void* addr);
+    // FIXME: SlabAlloc::free() should be modified such than this method never throws.
+    virtual void free(ref_type, const void* addr);
 
     virtual void* translate(ref_type) const TIGHTDB_NOEXCEPT;
-    virtual bool IsReadOnly(ref_type) const TIGHTDB_NOEXCEPT;
+    virtual bool is_read_only(ref_type) const TIGHTDB_NOEXCEPT;
 
     static Allocator& get_default() TIGHTDB_NOEXCEPT;
 

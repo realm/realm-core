@@ -372,7 +372,7 @@ public:
 protected:
     friend class BasicTable;
 
-    Query(const BasicTable<Spec>& table): Spec::template ColNames<QueryCol, Query*>(this), m_impl((Table&)table) {}
+    Query(const BasicTable<Spec>& table): Spec::template ColNames<QueryCol, Query*>(this), m_impl(table) {}
 
 private:
     tightdb::Query m_impl;

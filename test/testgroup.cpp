@@ -56,7 +56,7 @@ TEST(Group_Invalid1)
 
     // Try to open non-existing file
     // (read-only files have to exists to before opening)
-    CHECK_THROW(Group("table_test.tightdb", Group::mode_ReadOnly), File::NotFound);
+    CHECK_THROW(Group("table_test.tightdb"), File::NotFound);
 }
 
 TEST(Group_Invalid2)
@@ -77,7 +77,7 @@ TEST(Group_Serialize0)
     toDisk.write("table_test.tightdb");
 
     // Load the group
-    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
+    Group fromDisk("table_test.tightdb");
 
     // Create new table in group
     TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
@@ -117,7 +117,7 @@ TEST(Group_Read0)
 {
     // Load the group and let it clean up without loading
     // any tables
-    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
+    Group fromDisk("table_test.tightdb");
 }
 
 TEST(Group_Serialize1)
@@ -147,7 +147,7 @@ TEST(Group_Serialize1)
     toDisk.write("table_test.tightdb");
 
     // Load the table
-    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
+    Group fromDisk("table_test.tightdb");
     TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t->get_column_count());
@@ -178,7 +178,7 @@ TEST(Group_Read1)
 {
     // Load the group and let it clean up without loading
     // any tables
-    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
+    Group fromDisk("table_test.tightdb");
 }
 
 TEST(Group_Serialize2)
@@ -205,7 +205,7 @@ TEST(Group_Serialize2)
     toDisk.write("table_test.tightdb");
 
     // Load the tables
-    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
+    Group fromDisk("table_test.tightdb");
     TestTableGroup::Ref t1 = fromDisk.get_table<TestTableGroup>("test1");
     TestTableGroup::Ref t2 = fromDisk.get_table<TestTableGroup>("test2");
     (void)t2;
@@ -239,7 +239,7 @@ TEST(Group_Serialize3)
     toDisk.write("table_test.tightdb");
 
     // Load the table
-    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
+    Group fromDisk("table_test.tightdb");
     TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
     (void)t;
 
@@ -550,7 +550,7 @@ TEST(Group_Subtable)
     g.write("subtables.tightdb");
 
     // Read back tables
-    Group g2("subtables.tightdb", Group::mode_ReadOnly);
+    Group g2("subtables.tightdb");
     TableRef table2 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
@@ -642,7 +642,7 @@ TEST(Group_Subtable)
     g2.write("subtables2.tightdb");
 
     // Read back tables
-    Group g3("subtables2.tightdb", Group::mode_ReadOnly);
+    Group g3("subtables2.tightdb");
     TableRef table3 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
@@ -738,7 +738,7 @@ TEST(Group_MultiLevelSubtables)
 
     // Non-mixed
     {
-        Group g("subtables.tightdb", Group::mode_ReadOnly);
+        Group g("subtables.tightdb");
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(1, 0);
@@ -760,7 +760,7 @@ TEST(Group_MultiLevelSubtables)
         g.write("subtables2.tightdb");
     }
     {
-        Group g("subtables2.tightdb", Group::mode_ReadOnly);
+        Group g("subtables2.tightdb");
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(1, 0);
@@ -782,7 +782,7 @@ TEST(Group_MultiLevelSubtables)
 
     // Mixed
     {
-        Group g("subtables3.tightdb", Group::mode_ReadOnly);
+        Group g("subtables3.tightdb");
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(2, 0);
@@ -804,7 +804,7 @@ TEST(Group_MultiLevelSubtables)
         g.write("subtables4.tightdb");
     }
     {
-        Group g("subtables4.tightdb", Group::mode_ReadOnly);
+        Group g("subtables4.tightdb");
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(2, 0);

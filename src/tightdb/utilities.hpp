@@ -32,24 +32,12 @@
 #include <tightdb/assert.hpp>
 #include <tightdb/safe_int_ops.hpp>
 
-#if defined(__GNUC__)
-    #define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
-#elif defined(_MSC_VER)
-    #define TIGHTDB_FORCEINLINE __forceinline
-#elif defined(__HP_aCC)
-    #define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
-#elif defined(__xlC__ )
-    #define TIGHTDB_FORCEINLINE inline
-#else
-    #error TEXT("Compiler version not detectable")
-#endif
-
-/* GCC defines __i386__ and __x86_64__ */
+// GCC defines __i386__ and __x86_64__
 #if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
     #define TIGHTDB_X86_OR_X64
 #endif
 
-/* GCC defines __arm__ */
+// GCC defines __arm__
 #ifdef __arm__
 #  define TIGHTDB_ARCH_ARM
 #endif

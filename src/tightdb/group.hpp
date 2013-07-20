@@ -179,9 +179,9 @@ public:
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
     /// Returns the number of tables in this group.
-    size_t size() const;
+    std::size_t size() const;
 
-    StringData get_table_name(size_t table_ndx) const;
+    StringData get_table_name(std::size_t table_ndx) const;
     bool has_table(StringData name) const;
 
     /// Check whether this group has a table with the specified name
@@ -247,10 +247,10 @@ public:
     void print() const;
     void print_free() const;
     MemStats stats();
-    void enable_mem_diagnostics(bool enable=true) {m_alloc.EnableDebug(enable);}
+    void enable_mem_diagnostics(bool enable = true) { m_alloc.EnableDebug(enable); }
     void to_dot(std::ostream& out) const;
     void to_dot() const; // For GDB
-    void zero_free_space(size_t file_size, size_t readlock_version);
+    void zero_free_space(std::size_t file_size, std::size_t readlock_version);
 #endif // TIGHTDB_DEBUG
 
 protected:
@@ -262,35 +262,35 @@ protected:
     void invalidate();
     bool in_initial_state() const;
     void init_shared();
-    size_t commit(size_t current_version, size_t readlock_version, bool persist);
+    std::size_t commit(std::size_t current_version, std::size_t readlock_version, bool persist);
     void rollback();
 
-    SlabAlloc& get_allocator() {return m_alloc;}
-    Array& get_top_array() {return m_top;}
+    SlabAlloc& get_allocator() { return m_alloc; }
+    Array& get_top_array() { return m_top; }
 
     // Recursively update all internal refs after commit
-    void update_refs(size_t top_ref);
+    void update_refs(ref_type top_ref);
 
-    void update_from_shared(size_t top_ref, size_t len);
+    void update_from_shared(ref_type top_ref, std::size_t len);
     void reset_to_new();
 
-    void update_child_ref(size_t subtable_ndx, size_t new_ref) TIGHTDB_OVERRIDE
+    void update_child_ref(std::size_t subtable_ndx, ref_type new_ref) TIGHTDB_OVERRIDE
     {
         m_tables.set(subtable_ndx, new_ref);
     }
 
     void child_destroyed(std::size_t) TIGHTDB_OVERRIDE {} // Ignore
 
-    size_t get_child_ref(size_t subtable_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    ref_type get_child_ref(std::size_t subtable_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         return m_tables.get_as_ref(subtable_ndx);
     }
 
     void create(); // FIXME: Could be private
-    void create_from_ref(size_t top_ref);
+    void create_from_ref(ref_type top_ref);
 
     // May throw WriteError
-    template<class S> size_t write_to_stream(S& out) const;
+    template<class S> std::size_t write_to_stream(S& out) const;
 
     // Member variables
     SlabAlloc m_alloc;
@@ -302,7 +302,7 @@ protected:
     Array m_freeVersions;
     mutable Array m_cachedtables;
     const bool m_is_shared;
-    size_t m_readlock_version;
+    std::size_t m_readlock_version;
 
 private:
     struct shared_tag {};
@@ -317,8 +317,8 @@ private:
     template<class T> T* get_table_ptr(StringData name);
     template<class T> const T* get_table_ptr(StringData name) const;
 
-    Table* get_table_ptr(size_t ndx);
-    const Table* get_table_ptr(size_t ndx) const;
+    Table* get_table_ptr(std::size_t ndx);
+    const Table* get_table_ptr(std::size_t ndx) const;
     Table* create_new_table(StringData name);
 
     void clear_cache();
@@ -406,7 +406,7 @@ inline void Group::open(BinaryData buffer, bool take_ownership)
     TIGHTDB_ASSERT(!is_attached());
     TIGHTDB_ASSERT(buffer.data());
     m_alloc.attach_buffer(buffer.data(), buffer.size(), take_ownership);
-    create_from_ref(m_alloc.GetTopRef()); // FIXME: Throws and leaves the Group in peril
+    create_from_ref(m_alloc.get_top_ref()); // FIXME: Throws and leaves the Group in peril
 }
 
 inline bool Group::is_attached() const TIGHTDB_NOEXCEPT
@@ -446,24 +446,24 @@ inline const Table* Group::get_table_ptr(std::size_t ndx) const
 inline bool Group::has_table(StringData name) const
 {
     if (!m_top.IsValid()) return false;
-    const size_t i = m_tableNames.find_first(name);
-    return i != size_t(-1);
+    std::size_t i = m_tableNames.find_first(name);
+    return i != std::size_t(-1);
 }
 
 template<class T> inline bool Group::has_table(StringData name) const
 {
     if (!m_top.IsValid()) return false;
-    const size_t i = m_tableNames.find_first(name);
-    if (i == size_t(-1)) return false;
-    const Table* const table = get_table_ptr(i);
+    std::size_t i = m_tableNames.find_first(name);
+    if (i == std::size_t(-1)) return false;
+    const Table* table = get_table_ptr(i);
     return T::matches_dynamic_spec(&table->get_spec());
 }
 
 inline Table* Group::get_table_ptr(StringData name)
 {
     TIGHTDB_ASSERT(m_top.IsValid());
-    const size_t ndx = m_tableNames.find_first(name);
-    if (ndx != size_t(-1)) {
+    std::size_t ndx = m_tableNames.find_first(name);
+    if (ndx != std::size_t(-1)) {
         // Get table from cache
         return get_table_ptr(ndx);
     }
@@ -474,8 +474,8 @@ inline Table* Group::get_table_ptr(StringData name)
 inline Table* Group::get_table_ptr(StringData name, bool& was_created)
 {
     TIGHTDB_ASSERT(m_top.IsValid());
-    const size_t ndx = m_tableNames.find_first(name);
-    if (ndx != size_t(-1)) {
+    std::size_t ndx = m_tableNames.find_first(name);
+    if (ndx != std::size_t(-1)) {
         was_created = false;
         // Get table from cache
         return get_table_ptr(ndx);
@@ -497,13 +497,13 @@ template<class T> inline T* Group::get_table_ptr(StringData name)
     TIGHTDB_ASSERT(!has_table(name) || has_table<T>(name));
 
     TIGHTDB_ASSERT(m_top.IsValid());
-    const size_t ndx = m_tableNames.find_first(name);
-    if (ndx != size_t(-1)) {
+    std::size_t ndx = m_tableNames.find_first(name);
+    if (ndx != std::size_t(-1)) {
         // Get table from cache
         return static_cast<T*>(get_table_ptr(ndx));
     }
 
-    T* const table = static_cast<T*>(create_new_table(name));
+    T* table = static_cast<T*>(create_new_table(name));
     table->set_dynamic_spec(); // FIXME: May fail
     return table;
 }
@@ -539,7 +539,7 @@ inline void Group::commit()
     commit(-1, -1, true);
 }
 
-template<class S> size_t Group::write_to_stream(S& out) const
+template<class S> std::size_t Group::write_to_stream(S& out) const
 {
     // Space for file header
     out.write(SlabAlloc::default_header, sizeof SlabAlloc::default_header);
@@ -553,7 +553,7 @@ template<class S> size_t Group::write_to_stream(S& out) const
 
     // Recursively write all arrays
     const uint64_t topPos = top.Write(out); // FIXME: Why does this not return char*?
-    const size_t byte_size = out.getpos();
+    const std::size_t byte_size = out.getpos();
 
     // Write top ref
     // (since we initially set the last bit in the file header to
@@ -590,7 +590,7 @@ void Group::to_json(S& out) const
 
     out << "{";
 
-    for (size_t i = 0; i < m_tables.size(); ++i) {
+    for (std::size_t i = 0; i < m_tables.size(); ++i) {
         StringData name = m_tableNames.get(i);
         const Table* table = get_table_ptr(i);
 
@@ -606,8 +606,8 @@ void Group::to_json(S& out) const
 
 inline void Group::clear_cache()
 {
-    const size_t count = m_cachedtables.size();
-    for (size_t i = 0; i < count; ++i) {
+    std::size_t count = m_cachedtables.size();
+    for (std::size_t i = 0; i < count; ++i) {
         if (Table* const t = reinterpret_cast<Table*>(m_cachedtables.get(i))) {
             t->invalidate();
             t->unbind_ref();
