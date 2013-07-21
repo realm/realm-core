@@ -45,25 +45,25 @@ public:
     using Column::add;
     using Column::insert;
 
-    size_t count(StringData value) const;
-    size_t find_first(StringData value, size_t begin=0, size_t end=-1) const;
-    void find_all(Array& res, StringData value, size_t begin=0, size_t end=-1) const;
-    FindRes find_all_indexref(StringData value, size_t& dst) const;
+    std::size_t count(StringData value) const;
+    size_t find_first(StringData value, std::size_t begin=0, std::size_t end=-1) const;
+    void find_all(Array& res, StringData value, std::size_t begin=0, std::size_t end=-1) const;
+    FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
-    size_t count(size_t key_index) const;
-    size_t find_first(size_t key_index, size_t begin=0, size_t end=-1) const;
-    void find_all(Array& res, size_t key_index, size_t begin=0, size_t end=-1) const;
+    std::size_t count(std::size_t key_index) const;
+    std::size_t find_first(std::size_t key_index, std::size_t begin=0, std::size_t end=-1) const;
+    void find_all(Array& res, std::size_t key_index, std::size_t begin=0, std::size_t end=-1) const;
 
     void UpdateParentNdx(int diff);
     void UpdateFromParent();
 
     // Index
-    bool HasIndex() const {return m_index != NULL;}
-    const StringIndex& GetIndex() const {return *m_index;}
+    bool HasIndex() const { return m_index != 0; }
+    const StringIndex& GetIndex() const { return *m_index; }
     StringIndex& CreateIndex();
-    void SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx);
-    void ReuseIndex(StringIndex& index);
-    void RemoveIndex() {m_index = NULL;}
+    void SetIndexRef(ref_type, ArrayParent*, std::size_t ndx_in_parent);
+    void ReuseIndex(StringIndex&);
+    void RemoveIndex() { m_index = 0; }
 
     // Compare two string columns for equality
     bool compare(const AdaptiveStringColumn&) const;
@@ -73,17 +73,30 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-    void ToDot(std::ostream& out, StringData title) const;
-#endif // TIGHTDB_DEBUG
+    void to_dot(std::ostream&, StringData title) const;
+#endif
 
-    size_t GetKeyNdx(StringData value) const;
-    size_t GetKeyNdxOrAdd(StringData value);
+    std::size_t GetKeyNdx(StringData value) const;
+    std::size_t GetKeyNdxOrAdd(StringData value);
 
 private:
     // Member variables
     AdaptiveStringColumn m_keys;
     StringIndex* m_index;
 };
+
+
+
+
+
+// Implementation:
+
+inline StringData ColumnStringEnum::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < Column::size());
+    std::size_t key_ndx = Column::get_as_ref(ndx);
+    return m_keys.get(key_ndx);
+}
 
 
 } // namespace tightdb

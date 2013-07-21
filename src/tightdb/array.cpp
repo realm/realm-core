@@ -58,11 +58,13 @@ void Array::init_from_ref(ref_type ref) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ref);
     char* header = m_alloc.translate(ref);
-    init_from_header(header, ref);
+    init_from_mem(MemRef(header, ref));
 }
 
-void Array::init_from_header(char* header, ref_type ref) TIGHTDB_NOEXCEPT
+void Array::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
 {
+    char* header = mem.m_addr;
+
     // Parse header
     m_isNode   = get_isnode_from_header(header);
     m_hasRefs  = get_hasrefs_from_header(header);
@@ -77,7 +79,7 @@ void Array::init_from_header(char* header, ref_type ref) TIGHTDB_NOEXCEPT
     // hard for constructors in derived array classes.
     m_capacity = CalcItemCount(byte_capacity, m_width);
 
-    m_ref = ref;
+    m_ref = mem.m_ref;
     m_data = header + 8;
 
     SetWidth(m_width);
@@ -1239,7 +1241,7 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
     }
 
     Array new_array(clone_alloc);
-    new_array.init_from_header(clone_header, mem_ref.m_ref);
+    new_array.init_from_mem(mem_ref);
 
     size_t n = array.size();
     for (size_t i = 0; i < n; ++i) {
@@ -1789,7 +1791,7 @@ void Array::Verify() const
     TIGHTDB_ASSERT(ref_in_parent == (IsValid() ? m_ref : 0));
 }
 
-void Array::ToDot(ostream& out, StringData title) const
+void Array::to_dot(ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
 
@@ -2189,63 +2191,10 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off,
         return this;
     }
 
-    pair<const char*, size_t> p = find_leaf(this, ndx);
-    arr.CreateFromHeaderDirect(const_cast<char*>(p.first));
+    pair<MemRef, size_t> p = find_btree_leaf(ndx);
+    arr.CreateFromHeaderDirect(p.first.m_addr);
     off = ndx - p.second;
     return &arr;
-}
-
-
-// Get value direct through column b-tree without instatiating any Arrays.
-int64_t Array::column_get(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    if (is_leaf()) return get(ndx);
-    pair<const char*, size_t> p = find_leaf(this, ndx);
-    const char* data = get_data_from_header(p.first);
-    int width = get_width_from_header(p.first);
-    return get_direct(data, width, p.second);
-}
-
-StringData Array::string_column_get(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    if (is_leaf()) {
-        if (has_refs()) {
-            return static_cast<const ArrayStringLong*>(this)->get(ndx);
-        }
-        return static_cast<const ArrayString*>(this)->get(ndx);
-    }
-
-    pair<const char*, size_t> p = find_leaf(this, ndx);
-    const char* header = p.first;
-    ndx = p.second;
-
-    if (!get_hasrefs_from_header(header)) {
-        return ArrayString::get_from_header(header, ndx); // short strings
-    }
-
-    // long strings
-    int width = get_width_from_header(header);
-    pair<size_t, size_t> p2;
-    TIGHTDB_TEMPEX(p2 = ::get_two_as_size, width, (header, 0));
-    const size_t offsets_ref = p2.first;
-    const size_t blob_ref    = p2.second;
-
-    header = m_alloc.translate(offsets_ref);
-    width  = get_width_from_header(header);
-    size_t begin, end;
-    if (0 < ndx) {
-        TIGHTDB_TEMPEX(p2 = ::get_two_as_size, width, (header, ndx-1));
-        begin = p2.first;
-        end   = p2.second;
-    }
-    else {
-        begin = 0;
-        end   = to_size_t(get_direct(get_data_from_header(header), width, 0));
-    }
-    --end; // Discount the terminating zero
-
-    header = m_alloc.translate(blob_ref);
-    return StringData(ArrayBlob::get_from_header(header, begin), end-begin);
 }
 
 // Find value direct through column b-tree without instatiating any Arrays.
@@ -2368,8 +2317,10 @@ top:
                 if (!sub_isnode)
                     row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
                 else {
-                    const Array sub(ref, NULL, 0, m_alloc);
-                    row_ref = to_size_t(sub.column_get(0));
+                    Array sub(ref, 0, 0, m_alloc);
+                    pair<MemRef, size_t> p = sub.find_btree_leaf(0);
+                    const char* leaf_header = p.first.m_addr;
+                    row_ref = to_size_t(get(leaf_header, 0));
                 }
 
                 // If the last byte in the stored key is zero, we know that we have
@@ -2753,27 +2704,27 @@ top:
 }
 
 
-pair<const char*, size_t> Array::find_leaf(const Array* root, size_t i) TIGHTDB_NOEXCEPT
+pair<MemRef, size_t> Array::find_btree_leaf(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!root->is_leaf());
-    ref_type offsets_ref = root->get_as_ref(0);
-    ref_type refs_ref    = root->get_as_ref(1);
+    TIGHTDB_ASSERT(!is_leaf());
+    ref_type offsets_ref = get_as_ref(0);
+    ref_type refs_ref    = get_as_ref(1);
     for (;;) {
-        const char* header = root->m_alloc.translate(offsets_ref);
+        char* header = m_alloc.translate(offsets_ref);
         int width = get_width_from_header(header);
         pair<size_t, size_t> p;
-        TIGHTDB_TEMPEX(p = find_child, width, (header, i));
+        TIGHTDB_TEMPEX(p = find_child, width, (header, ndx));
         size_t child_ndx       = p.first;
         size_t elem_ndx_offset = p.second;
-        i -= elem_ndx_offset; // local index
+        ndx -= elem_ndx_offset; // local index
 
-        header = root->m_alloc.translate(refs_ref);
+        header = m_alloc.translate(refs_ref);
         width = get_width_from_header(header);
         ref_type child_ref = to_ref(get_direct(get_data_from_header(header), width, child_ndx));
 
-        header = root->m_alloc.translate(child_ref);
+        header = m_alloc.translate(child_ref);
         bool child_is_leaf = !get_isnode_from_header(header);
-        if (child_is_leaf) return make_pair(header, i);
+        if (child_is_leaf) return make_pair(MemRef(header, child_ref), ndx);
 
         width = get_width_from_header(header);
         TIGHTDB_TEMPEX(p = ::get_two_as_size, width, (header, 0));
@@ -2782,45 +2733,14 @@ pair<const char*, size_t> Array::find_leaf(const Array* root, size_t i) TIGHTDB_
     }
 }
 
-
-pair<ref_type, size_t> Array::find_leaf_ref(const Array* root, size_t i) TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(!root->is_leaf());
-    ref_type offsets_ref = root->get_as_ref(0);
-    ref_type refs_ref    = root->get_as_ref(1);
-    for (;;) {
-        const char* header = root->m_alloc.translate(offsets_ref);
-        int width = get_width_from_header(header);
-        pair<size_t, size_t> p;
-        TIGHTDB_TEMPEX(p = find_child, width, (header, i));
-        size_t child_ndx       = p.first;
-        size_t elem_ndx_offset = p.second;
-        i -= elem_ndx_offset; // local index
-
-        header = root->m_alloc.translate(refs_ref);
-        width = get_width_from_header(header);
-        ref_type child_ref = to_ref(get_direct(get_data_from_header(header), width, child_ndx));
-
-        header = root->m_alloc.translate(child_ref);
-        bool child_is_leaf = !get_isnode_from_header(header);
-        if (child_is_leaf) return make_pair(child_ref, i);
-
-        width = get_width_from_header(header);
-        TIGHTDB_TEMPEX(p = ::get_two_as_size, width, (header, 0));
-        offsets_ref = p.first;
-        refs_ref    = p.second;
-    }
-}
-
-size_t Array::get_as_size(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
+int64_t Array::get(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
-    int width        = get_width_from_header(header);
-    int64_t v        = get_direct(data, width, ndx);
-    return size_t(v);
+    int width = get_width_from_header(header);
+    return get_direct(data, width, ndx);
 }
 
-pair<size_t, size_t> Array::get_two_as_size(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
+pair<size_t, size_t> Array::get_size_pair(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 {
     pair<size_t, size_t> p;
     int width = get_width_from_header(header);

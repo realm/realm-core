@@ -333,7 +333,7 @@ void ColumnMixed::Verify() const
     }
 }
 
-void ColumnMixed::ToDot(ostream& out, StringData title) const
+void ColumnMixed::to_dot(ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
 
@@ -343,7 +343,7 @@ void ColumnMixed::ToDot(ostream& out, StringData title) const
         out << "\\n'" << title << "'";
     out << "\";" << endl;
 
-    m_array->ToDot(out, "mixed_top");
+    m_array->to_dot(out, "mixed_top");
 
     // Write sub-tables
     size_t count = size();
@@ -355,11 +355,11 @@ void ColumnMixed::ToDot(ostream& out, StringData title) const
         subtable->to_dot(out);
     }
 
-    m_types->ToDot(out, "types");
-    m_refs->ToDot(out, "refs");
+    m_types->to_dot(out, "types");
+    m_refs->to_dot(out, "refs");
 
     if (m_array->size() > 2) {
-        m_data->ToDot(out, "data");
+        m_data->to_dot(out, "data");
     }
 
     out << "}" << endl;

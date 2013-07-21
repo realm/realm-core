@@ -49,13 +49,6 @@ void ColumnStringEnum::UpdateFromParent()
     m_keys.UpdateFromParent();
 }
 
-StringData ColumnStringEnum::get(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < Column::size());
-    size_t key_ndx = Column::get_as_ref(ndx);
-    return m_keys.get(key_ndx);
-}
-
 void ColumnStringEnum::add(StringData value)
 {
     insert(Column::size(), value);
@@ -233,10 +226,10 @@ StringIndex& ColumnStringEnum::CreateIndex()
     return *m_index;
 }
 
-void ColumnStringEnum::SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx)
+void ColumnStringEnum::SetIndexRef(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
-    TIGHTDB_ASSERT(m_index == NULL);
-    m_index = new StringIndex(ref, parent, pndx, this, &get_string, m_array->get_alloc());
+    TIGHTDB_ASSERT(!m_index);
+    m_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string, m_array->get_alloc());
 }
 
 void ColumnStringEnum::ReuseIndex(StringIndex& index)
@@ -256,17 +249,17 @@ void ColumnStringEnum::Verify() const
     Column::Verify();
 }
 
-void ColumnStringEnum::ToDot(ostream& out, StringData title) const
+void ColumnStringEnum::to_dot(ostream& out, StringData title) const
 {
-    const size_t ref = m_keys.get_ref();
+    ref_type ref = m_keys.get_ref();
 
     out << "subgraph cluster_columnstringenum" << ref << " {" << endl;
     out << " label = \"ColumnStringEnum";
     if (0 < title.size()) out << "\\n'" << title << "'";
     out << "\";" << endl;
 
-    m_keys.ToDot(out, "keys");
-    Column::ToDot(out, "values");
+    m_keys.to_dot(out, "keys");
+    Column::to_dot(out, "values");
 
     out << "}" << endl;
 }

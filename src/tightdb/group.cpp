@@ -679,9 +679,9 @@ void Group::to_dot(ostream& out) const
     out << "subgraph cluster_group {" << endl;
     out << " label = \"Group\";" << endl;
 
-    m_top.ToDot(out, "group_top");
-    m_tableNames.ToDot(out, "table_names");
-    m_tables.ToDot(out, "tables");
+    m_top.to_dot(out, "group_top");
+    m_tableNames.to_dot(out, "table_names");
+    m_tables.to_dot(out, "tables");
 
     // Tables
     for (size_t i = 0; i < m_tables.size(); ++i) {

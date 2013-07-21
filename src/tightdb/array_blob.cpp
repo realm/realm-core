@@ -51,7 +51,7 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
 
 #ifdef TIGHTDB_DEBUG
 
-void ArrayBlob::ToDot(ostream& out, const char* title) const
+void ArrayBlob::to_dot(ostream& out, const char* title) const
 {
     ref_type ref = get_ref();
 

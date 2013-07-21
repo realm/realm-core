@@ -30,6 +30,8 @@ class ArrayString: public Array {
 public:
     explicit ArrayString(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                          Allocator& = Allocator::get_default());
+    ArrayString(MemRef, ArrayParent*, std::size_t ndx_in_parent,
+                Allocator&) TIGHTDB_NOEXCEPT;
     ArrayString(ref_type, ArrayParent*, std::size_t ndx_in_parent,
                 Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
     explicit ArrayString(Allocator&) TIGHTDB_NOEXCEPT;
@@ -46,8 +48,6 @@ public:
     void find_all(Array& result, StringData value, std::size_t add_offset = 0,
                   std::size_t begin = 0, std::size_t end = -1);
 
-    static StringData get_from_header(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
-
     /// Construct an empty string array and return just the reference
     /// to the underlying memory.
     static ref_type create_empty_string_array(Allocator&);
@@ -55,10 +55,16 @@ public:
     /// Compare two string arrays for equality.
     bool Compare(const ArrayString&) const;
 
+    /// Get the specified element without the cost of constructing an
+    /// array instance. If an array instance is already available, or
+    /// you need to get multiple values, then this method will be
+    /// slower.
+    static StringData get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void StringStats() const;
     //void ToDot(FILE* f) const;
-    void ToDot(std::ostream& out, StringData title = StringData()) const;
+    void to_dot(std::ostream& out, StringData title = StringData()) const;
 #endif // TIGHTDB_DEBUG
 
 private:
@@ -88,6 +94,16 @@ inline ArrayString::ArrayString(ArrayParent* parent, std::size_t ndx_in_parent,
     update_ref_in_parent();
 }
 
+inline ArrayString::ArrayString(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
+                                Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(alloc)
+{
+    // Manually create array as doing it in initializer list
+    // will not be able to call correct virtual functions
+    init_from_mem(mem);
+    set_parent(parent, ndx_in_parent);
+}
+
 inline ArrayString::ArrayString(ref_type ref, ArrayParent *parent, std::size_t ndx_in_parent,
                                 Allocator& alloc) TIGHTDB_NOEXCEPT:
     Array(alloc)
@@ -100,21 +116,6 @@ inline ArrayString::ArrayString(ref_type ref, ArrayParent *parent, std::size_t n
 
 // Creates new array (but invalid, call update_ref() to init)
 inline ArrayString::ArrayString(Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc) {}
-
-inline StringData ArrayString::get_from_header(const char* header,
-                                               std::size_t ndx) TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < get_len_from_header(header));
-    std::size_t width = get_width_from_header(header);
-    if (width == 0) return StringData("", 0);
-    const char* data = get_data_from_header(header) + (ndx * width);
-// FIXME: The following line is a temporary fix, and will soon be
-// replaced by the commented line that follows it. See
-// https://github.com/Tightdb/tightdb/pull/84
-    std::size_t size = std::char_traits<char>::length(data);
-//    std::size_t size = (width-1) - data[width-1];
-    return StringData(data, size);
-}
 
 inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
@@ -137,6 +138,20 @@ inline void ArrayString::add(StringData value)
 inline void ArrayString::add()
 {
     add(StringData()); // Throws
+}
+
+inline StringData ArrayString::get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < get_len_from_header(header));
+    std::size_t width = get_width_from_header(header);
+    if (width == 0) return StringData("", 0);
+    const char* data = get_data_from_header(header) + (ndx * width);
+// FIXME: The following line is a temporary fix, and will soon be
+// replaced by the commented line that follows it. See
+// https://github.com/Tightdb/tightdb/pull/84
+    std::size_t size = std::char_traits<char>::length(data);
+//    std::size_t size = (width-1) - data[width-1];
+    return StringData(data, size);
 }
 
 
