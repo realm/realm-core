@@ -84,16 +84,19 @@ public:
     ref_type get_top_ref() const TIGHTDB_NOEXCEPT;
     std::size_t get_total_size() const;
 
-    bool   CanPersist() const;
-    std::size_t GetFileLen() const { return m_baseline; }
-    void   free_all(std::size_t filesize = std::size_t(-1));
-    bool   remap(std::size_t filesize); // Returns false if remapping was not necessary
+    /// Get the size of the attached file or buffer. This size is not
+    /// affected by new allocations. After attachment it can be
+    /// modified only by a call to remap().
+    std::size_t get_base_size() const { return m_baseline; }
+
+    void   free_all(std::size_t file_size = std::size_t(-1));
+    bool   remap(std::size_t file_size); // Returns false if remapping was not necessary
 
 #ifdef TIGHTDB_DEBUG
-    void EnableDebug(bool enable) { m_debugOut = enable; }
+    void enable_debug(bool enable) { m_debug_out = enable; }
     void Verify() const;
     bool is_all_free() const;
-    void Print() const;
+    void print() const;
 #endif // TIGHTDB_DEBUG
 
 private:
@@ -104,8 +107,8 @@ private:
 
     // Define internal tables
     TIGHTDB_TABLE_2(Slabs,
-                    offset,     Int,
-                    pointer,    Int)
+                    ref_end, Int, // One plus last ref targeting this slab
+                    addr,    Int) // Memory pointer to this slab
     TIGHTDB_TABLE_2(FreeSpace,
                     ref,    Int,
                     size,   Int)
@@ -117,14 +120,14 @@ private:
     FreeMode    m_free_mode;
     std::size_t m_baseline; // Also size of memory mapped portion of database file
     Slabs       m_slabs;
-    FreeSpace   m_freeSpace;
-    FreeSpace   m_freeReadOnly;
+    FreeSpace   m_free_space;
+    FreeSpace   m_free_read_only;
 
 #ifdef TIGHTDB_DEBUG
-    bool        m_debugOut;
+    bool        m_debug_out;
 #endif
 
-    const FreeSpace& GetFreespace() const { return m_freeReadOnly; }
+    const FreeSpace& GetFreespace() const { return m_free_read_only; }
     bool validate_buffer(const char* data, std::size_t len) const;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -144,7 +147,7 @@ inline SlabAlloc::SlabAlloc()
     m_baseline = 8;
 
 #ifdef TIGHTDB_DEBUG
-    m_debugOut = false;
+    m_debug_out = false;
 #endif
 }
 
