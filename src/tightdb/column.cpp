@@ -135,42 +135,42 @@ void merge_core(const Array& a0, const Array& a1, Array& res)
 //     ArrayList: An array of references to non-instantiated Arrays of values. The values in each array must be in sorted order
 // Return value:
 //     Merge-sorted array of all values
-Array* merge(const Array& arrayList)
+Array* merge(const Array& array_list)
 {
-    const size_t size = arrayList.size();
+    size_t size = array_list.size();
 
     if (size == 1)
         return NULL; // already sorted
 
-    Array leftHalf, rightHalf;
+    Array left_half, right_half;
     const size_t leftSize = size / 2;
     for (size_t t = 0; t < leftSize; ++t)
-        leftHalf.add(arrayList.get(t));
+        left_half.add(array_list.get(t));
     for (size_t t = leftSize; t < size; ++t)
-        rightHalf.add(arrayList.get(t));
+        right_half.add(array_list.get(t));
 
     // We merge left-half-first instead of bottom-up so that we access the same data in each call
     // so that it's in cache, at least for the first few iterations until lists get too long
-    Array* left = merge(leftHalf);
-    Array* right = merge(rightHalf);
+    Array* left = merge(left_half);
+    Array* right = merge(right_half);
     Array* res = new Array();
 
     if (left && right)
         merge_core(*left, *right, *res);
     else if (left) {
-        const size_t ref = rightHalf.get_as_ref(0);
-        Array right0(ref, NULL);
+        ref_type ref = right_half.get_as_ref(0);
+        Array right0(ref, 0);
         merge_core(*left, right0, *res);
     }
     else if (right) {
-        const size_t ref = leftHalf.get_as_ref(0);
-        Array left0(ref, NULL);
+        ref_type ref = left_half.get_as_ref(0);
+        Array left0(ref, 0);
         merge_core(left0, *right, *res);
     }
 
     // Clean-up
-    leftHalf.destroy();
-    rightHalf.destroy();
+    left_half.destroy();
+    right_half.destroy();
     if (left)
         left->destroy();
     if (right)
@@ -207,10 +207,10 @@ void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
         rightI.add(indexlists->get(t));
     }
 
-    Array *li;
-    Array *ri;
+    Array* li;
+    Array* ri;
 
-    Array *resI = new Array();
+    Array* resI = new Array;
 
     // We merge left-half-first instead of bottom-up so that we access the same data in each call
     // so that it's in cache, at least for the first few iterations until lists get too long
@@ -227,7 +227,7 @@ bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, voi
     static_cast<void>(start);
     static_cast<void>(caller_offset);
     Array* p = static_cast<Array*>(state);
-    const size_t ref = a->get_ref();
+    ref_type ref = a->get_ref();
     p->add(int64_t(ref)); // todo, check cast
     return true;
 }
@@ -247,11 +247,12 @@ size_t ColumnBase::get_size_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOE
     return size_t(offsets.back());
 }
 
-bool ColumnBase::is_node_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
+bool ColumnBase::root_is_leaf_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    const uint8_t* header = reinterpret_cast<uint8_t*>(alloc.translate(ref));
-    bool is_node = (header[0] & 0x80) != 0;
-    return is_node;
+    const char* header = alloc.translate(ref);
+    const unsigned char* header_2 = reinterpret_cast<const unsigned char*>(header);
+    bool root_is_leaf = (header_2[0] & 0x80) == 0;
+    return root_is_leaf;
 }
 
 
@@ -324,7 +325,7 @@ bool Column::is_empty() const TIGHTDB_NOEXCEPT
 {
     if (root_is_leaf())
         return m_array->is_empty();
-    const Array offsets = NodeGetOffsets();
+    Array offsets = NodeGetOffsets();
     return offsets.is_empty();
 }
 
@@ -332,8 +333,8 @@ size_t Column::size() const TIGHTDB_NOEXCEPT
 {
     if (root_is_leaf())
         return m_array->size();
-    const Array offsets = NodeGetOffsets();
-    return offsets.is_empty() ? 0 : size_t(offsets.back());
+    Array offsets = NodeGetOffsets();
+    return offsets.is_empty() ? 0 : to_size_t(offsets.back());
 }
 
 void Column::UpdateParentNdx(int diff)
@@ -358,13 +359,13 @@ void Column::clear()
 
 void Column::set(size_t ndx, int64_t value)
 {
-    const int64_t oldVal = m_index ? get(ndx) : 0; // cache oldval for index
+    int64_t old_val = m_index ? get(ndx) : 0; // cache oldval for index
 
     TreeSet<int64_t, Column>(ndx, value);
 
     // Update index
     if (m_index)
-        m_index->set(ndx, oldVal, value);
+        m_index->set(ndx, old_val, value);
 }
 
 void Column::add(int64_t value)
@@ -423,7 +424,7 @@ double Column::average(size_t start, size_t end) const
         end = size();
     size_t size = end - start;
     int64_t sum = aggregate<int64_t, int64_t, act_Sum, None>(0, start, end, NULL);
-    double avg = double( sum ) / double( size == 0 ? 1 : size );
+    double avg = double(sum) / double(size == 0 ? 1 : size);
     return avg;
 }
 
@@ -442,9 +443,9 @@ int64_t Column::maximum(size_t start, size_t end) const
 void Column::sort(size_t start, size_t end)
 {
     Array arr;
-    TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, (void *)&arr);
+    TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, &arr);
     for (size_t t = 0; t < arr.size(); t++) {
-        const size_t ref = to_ref(arr.get(t));
+        ref_type ref = arr.get_as_ref(t);
         Array a(ref);
         a.sort();
     }
@@ -452,7 +453,7 @@ void Column::sort(size_t start, size_t end)
     Array* sorted = merge(arr);
     if (sorted) {
         // Todo, this is a bit slow. Add bulk insert or the like to Column
-        const size_t count = sorted->size();
+        size_t count = sorted->size();
         for (size_t t = 0; t < count; ++t) {
             set(t, sorted->get(t));
         }
@@ -472,12 +473,12 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
     Array values; // pointers to non-instantiated arrays of values
     Array indexes; // pointers to instantiated arrays of index pointers
     Array all_values;
-    TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, (void *)&values);
+    TreeVisitLeafs<Array, Column>(start, end, 0, callme_arrays, &values);
 
     size_t offset = 0;
     for (size_t t = 0; t < values.size(); t++) {
-        Array *i = new Array();
-        size_t ref = values.get_as_ref(t);
+        Array* i = new Array();
+        ref_type ref = values.get_as_ref(t);
         Array v(ref);
         for (size_t j = 0; j < v.size(); j++)
             all_values.add(v.get(j));
@@ -488,7 +489,7 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
         indexes.add(int64_t(i));
     }
 
-    Array *ResI;
+    Array* ResI;
 
     merge_references(&all_values, &indexes, &ResI);
 
@@ -496,11 +497,13 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
         ref.add(ResI->get(t));
 }
 
-size_t ColumnBase::GetRefSize(size_t ref) const
+size_t ColumnBase::GetRefSize(ref_type ref) const
 {
     // parse the length part of 8byte header
-    const uint8_t* const header = (uint8_t*)m_array->get_alloc().translate(ref);
-    return (header[1] << 16) + (header[2] << 8) + header[3];
+    Allocator& alloc = m_array->get_alloc();
+    const char* header = alloc.translate(ref);
+    const unsigned char* header_2 = reinterpret_cast<const unsigned char*>(header);
+    return (header_2[1] << 16) + (header_2[2] << 8) + header_2[3];
 }
 
 Array ColumnBase::NodeGetOffsets() const TIGHTDB_NOEXCEPT
@@ -523,14 +526,14 @@ void ColumnBase::NodeUpdateOffsets(size_t ndx)
     Array refs = NodeGetRefs();
     TIGHTDB_ASSERT(ndx < offsets.size());
 
-    const int64_t newSize = GetRefSize(refs.get_as_ref(ndx));
-    const int64_t oldSize = offsets.get(ndx) - (ndx ? offsets.get(ndx-1) : 0);
-    const int64_t diff = newSize - oldSize;
+    int64_t new_size = GetRefSize(refs.get_as_ref(ndx));
+    int64_t old_size = offsets.get(ndx) - (ndx ? offsets.get(ndx-1) : 0);
+    int64_t diff = new_size - old_size;
 
     offsets.Increment(diff, ndx);
 }
 
-void ColumnBase::NodeAddKey(size_t ref)
+void ColumnBase::NodeAddKey(ref_type ref)
 {
     TIGHTDB_ASSERT(ref);
     TIGHTDB_ASSERT(!root_is_leaf());
@@ -539,11 +542,11 @@ void ColumnBase::NodeAddKey(size_t ref)
     Array refs = NodeGetRefs();
     TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
 
-    const Array new_top(ref, NULL, 0,m_array->get_alloc());
-    const Array new_offsets(new_top.get_as_ref(0), NULL, 0,m_array->get_alloc());
+    Array new_top(ref, 0, 0,m_array->get_alloc());
+    Array new_offsets(new_top.get_as_ref(0), 0, 0,m_array->get_alloc());
     TIGHTDB_ASSERT(!new_offsets.is_empty());
 
-    const int64_t key = new_offsets.back();
+    int64_t key = new_offsets.back();
     offsets.add(key);
     refs.add(ref);
 }
@@ -552,7 +555,7 @@ void Column::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < size());
 
-    const int64_t oldVal = m_index ? get(ndx) : 0; // cache oldval for index
+    int64_t old_val = m_index ? get(ndx) : 0; // cache oldval for index
 
     TreeDelete<int64_t, Column>(ndx);
 
@@ -562,7 +565,7 @@ void Column::erase(size_t ndx)
         if (refs.size() != 1)
             break;
 
-        size_t ref = refs.get_as_ref(0);
+        ref_type ref = refs.get_as_ref(0);
         refs.erase(0); // avoid destroying subtree
         m_array->destroy();
         m_array->update_ref(ref);
@@ -570,8 +573,8 @@ void Column::erase(size_t ndx)
 
     // Update index
     if (m_index) {
-        bool isLast = (ndx == size());
-        m_index->erase(ndx, oldVal, isLast);
+        bool is_last = (ndx == size());
+        m_index->erase(ndx, old_val, is_last);
     }
 }
 
@@ -579,7 +582,7 @@ void Column::move_last_over(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx+1 < size());
 
-    size_t ndx_last = size()-1;
+    size_t ndx_last = size() - 1;
     int64_t v = get(ndx_last);
 
     set(ndx, v);
@@ -632,7 +635,7 @@ size_t Column::find_first(int64_t value, size_t start, size_t end) const
 
 void Column::find_all(Array& result, int64_t value, size_t caller_offset, size_t start, size_t end) const
 {
-    (void)caller_offset;
+    static_cast<void>(caller_offset);
     TIGHTDB_ASSERT(start <= size());
     TIGHTDB_ASSERT(end == size_t(-1) || end <= size());
     if (is_empty())
@@ -640,7 +643,7 @@ void Column::find_all(Array& result, int64_t value, size_t caller_offset, size_t
     TreeFindAll<int64_t, Column>(result, value, 0, start, end);
 }
 
-void Column::LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const
+void Column::LeafFindAll(Array& result, int64_t value, size_t add_offset, size_t start, size_t end) const
 {
     m_array->find_all(result, value, add_offset, start, end);
 }
@@ -653,7 +656,7 @@ size_t Column::find_pos(int64_t target) const TIGHTDB_NOEXCEPT
         return m_array->FindPos(target);
     }
 
-    const int len = int(size());
+    int len = int(size());
     int low = -1;
     int high = len;
 
@@ -683,7 +686,7 @@ size_t Column::find_pos2(int64_t target) const TIGHTDB_NOEXCEPT
         return m_array->FindPos2(target);
     }
 
-    const int len = int(size());
+    int len = int(size());
     int low = -1;
     int high = len;
 
@@ -691,7 +694,7 @@ size_t Column::find_pos2(int64_t target) const TIGHTDB_NOEXCEPT
     // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
     // Finds position of closest value BIGGER OR EQUAL to the target
     while (high - low > 1) {
-        size_t probe = ((unsigned int)low + (unsigned int)high) >> 1;
+        size_t probe = (unsigned(low) + unsigned(high)) >> 1;
         int64_t v = get(probe);
 
         if (v < target)
@@ -711,7 +714,7 @@ bool Column::find_sorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
         return m_array->FindPosSorted(target, pos);
     }
 
-    const size_t len = size();
+    size_t len = size();
     size_t low = size_t(-1);
     size_t high = len;
 
@@ -772,7 +775,7 @@ void Column::sort()
 
 bool Column::compare(const Column& c) const
 {
-    const size_t n = size();
+    size_t n = size();
     if (c.size() != n)
         return false;
     for (size_t i=0; i<n; ++i) {
@@ -800,65 +803,62 @@ void Column::foreach(const Array* parent, Array::ForEachOp<int64_t>* op) TIGHTDB
     }
 }
 
-
 #ifdef TIGHTDB_DEBUG
 
 void Column::Print() const
 {
-    if (!root_is_leaf()) {
-        cout << "Node: " << hex << m_array->get_ref() << dec << "\n";
-
-        const Array offsets = NodeGetOffsets();
-        const Array refs = NodeGetRefs();
-
-        for (size_t i = 0; i < refs.size(); ++i) {
-            cout << " " << i << ": " << offsets.get(i) << " " << hex << refs.get(i) << dec <<"\n";
-        }
-        for (size_t i = 0; i < refs.size(); ++i) {
-            const Column col(refs.get_as_ref(i));
-            col.Print();
-        }
-    }
-    else {
+    if (root_is_leaf()) {
         m_array->Print();
+        return;
+    }
+
+    cout << "Node: " << hex << m_array->get_ref() << dec << "\n";
+
+    Array offsets = NodeGetOffsets();
+    Array refs    = NodeGetRefs();
+
+    for (size_t i = 0; i < refs.size(); ++i) {
+        cout << " " << i << ": " << offsets.get(i) << " " << hex << refs.get(i) << dec <<"\n";
+    }
+    for (size_t i = 0; i < refs.size(); ++i) {
+        Column col(refs.get_as_ref(i));
+        col.Print();
     }
 }
 
 void Column::Verify() const
 {
-    if (!root_is_leaf()) {
-        TIGHTDB_ASSERT(m_array->size() == 2);
-        //TIGHTDB_ASSERT(m_hasRefs);
-
-        const Array offsets = NodeGetOffsets();
-        const Array refs = NodeGetRefs();
-        offsets.Verify();
-        refs.Verify();
-        TIGHTDB_ASSERT(refs.has_refs());
-        TIGHTDB_ASSERT(offsets.size() == refs.size());
-
-        size_t off = 0;
-        for (size_t i = 0; i < refs.size(); ++i) {
-            const size_t ref = size_t(refs.get(i));
-            TIGHTDB_ASSERT(ref);
-
-            const Column col(ref, NULL, 0, m_array->get_alloc());
-            col.Verify();
-
-            off += col.size();
-            const size_t node_off = size_t(offsets.get(i));
-            if (node_off != off) {
-                TIGHTDB_ASSERT(false);
-            }
-        }
-    }
-    else
+    if (root_is_leaf()) {
         m_array->Verify();
+        return;
+    }
+
+    TIGHTDB_ASSERT(m_array->size() == 2);
+
+    Array offsets = NodeGetOffsets();
+    Array refs    = NodeGetRefs();
+    offsets.Verify();
+    refs.Verify();
+    TIGHTDB_ASSERT(refs.has_refs());
+    TIGHTDB_ASSERT(offsets.size() == refs.size());
+
+    size_t expected_offset = 0;
+    for (size_t i = 0; i < refs.size(); ++i) {
+        ref_type ref = refs.get_as_ref(i);
+        TIGHTDB_ASSERT(ref);
+
+        Column col(ref, 0, 0, m_array->get_alloc());
+        col.Verify();
+
+        expected_offset += col.size();
+        size_t actual_offset = to_size_t(offsets.get(i));
+        TIGHTDB_ASSERT(actual_offset == expected_offset);
+    }
 }
 
 void ColumnBase::ToDot(ostream& out, StringData title) const
 {
-    const size_t ref = get_ref();
+    ref_type ref = get_ref();
 
     out << "subgraph cluster_column" << ref << " {" << endl;
     out << " label = \"Column";
@@ -872,29 +872,30 @@ void ColumnBase::ToDot(ostream& out, StringData title) const
 
 void ColumnBase::ArrayToDot(ostream& out, const Array& array) const
 {
-    if (!array.is_leaf()) {
-        const Array offsets = array.GetSubArray(0);
-        const Array refs    = array.GetSubArray(1);
-        const size_t ref    = array.get_ref();
-
-        out << "subgraph cluster_node" << ref << " {" << endl;
-        out << " label = \"Node\";" << endl;
-
-        array.ToDot(out);
-        offsets.ToDot(out, "offsets");
-
-        out << "}" << endl;
-
-        refs.ToDot(out, "refs");
-
-        const size_t count = refs.size();
-        for (size_t i = 0; i < count; ++i) {
-            const Array r = refs.GetSubArray(i);
-            ArrayToDot(out, r);
-        }
-    }
-    else
+    if (array.is_leaf()) {
         LeafToDot(out, array);
+        return;
+    }
+
+    Array offsets = array.GetSubArray(0);
+    Array refs    = array.GetSubArray(1);
+    ref_type ref    = array.get_ref();
+
+    out << "subgraph cluster_node" << ref << " {" << endl;
+    out << " label = \"Node\";" << endl;
+
+    array.ToDot(out);
+    offsets.ToDot(out, "offsets");
+
+    out << "}" << endl;
+
+    refs.ToDot(out, "refs");
+
+    size_t count = refs.size();
+    for (size_t i = 0; i < count; ++i) {
+        Array r = refs.GetSubArray(i);
+        ArrayToDot(out, r);
+    }
 }
 
 void ColumnBase::LeafToDot(ostream& out, const Array& array) const

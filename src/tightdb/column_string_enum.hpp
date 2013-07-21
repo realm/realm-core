@@ -29,8 +29,8 @@ class StringIndex;
 
 class ColumnStringEnum: public Column {
 public:
-    ColumnStringEnum(size_t ref_keys, size_t ref_values, ArrayParent* parent=NULL, size_t pndx=0,
-                     Allocator& alloc = Allocator::get_default());
+    ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* = 0,
+                     std::size_t ndx_in_parent = 0, Allocator& = Allocator::get_default());
     ~ColumnStringEnum();
     void destroy() TIGHTDB_OVERRIDE;
 

@@ -39,8 +39,8 @@ public:
                               StringData name);
     Spec add_subtable_column(StringData name);
 
-    void rename_column(std::size_t column_ndx, StringData newname);
-    void rename_column(const std::vector<std::size_t>& column_ids, StringData newname);
+    void rename_column(std::size_t column_ndx, StringData new_name);
+    void rename_column(const std::vector<std::size_t>& column_ids, StringData new_name);
     void remove_column(std::size_t column_ndx);
     void remove_column(const std::vector<std::size_t>& column_ids);
 
@@ -110,18 +110,18 @@ private:
 
     /// Construct an empty spec and return just the reference to the
     /// underlying memory.
-    static std::size_t create_empty_spec(Allocator&);
+    static ref_type create_empty_spec(Allocator&);
 
-    size_t do_add_subcolumn(const std::vector<std::size_t>& column_ids, std::size_t pos,
-                            DataType type, StringData name);
+    std::size_t do_add_subcolumn(const std::vector<std::size_t>& column_ids, std::size_t pos,
+                                 DataType type, StringData name);
     void do_remove_column(const std::vector<std::size_t>& column_ids, std::size_t pos);
     void do_rename_column(const std::vector<std::size_t>& column_ids, std::size_t pos,
                           StringData name);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // Precondition: 1 <= end - begin
-    size_t* record_subspec_path(const Array* root_subspecs, size_t* begin,
-                                size_t* end) const TIGHTDB_NOEXCEPT;
+    std::size_t* record_subspec_path(const Array* root_subspecs, std::size_t* begin,
+                                     std::size_t* end) const TIGHTDB_NOEXCEPT;
     friend class Replication;
 #endif
 
@@ -163,11 +163,11 @@ inline Spec::Spec(const Table* table, Allocator& alloc, ArrayParent* parent,
 }
 
 // Create Spec from ref
-inline Spec::Spec(const Table* table, Allocator& alloc, std::size_t ref, ArrayParent* parent,
-                  std::size_t pndx):
+inline Spec::Spec(const Table* table, Allocator& alloc, ref_type ref, ArrayParent* parent,
+                  std::size_t ndx_in_parent):
     m_table(table), m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
 {
-    init_from_ref(ref, parent, pndx);
+    init_from_ref(ref, parent, ndx_in_parent);
 }
 
 inline Spec::Spec(const Spec& s):

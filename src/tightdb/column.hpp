@@ -21,7 +21,7 @@
 #define TIGHTDB_COLUMN_HPP
 
 #include <stdint.h> // unint8_t etc
-#include <cstdlib> // size_t
+#include <cstdlib> // std::size_t
 
 #include <tightdb/array.hpp>
 #include <tightdb/query_conditions.hpp>
@@ -40,7 +40,7 @@ public:
 
     virtual void SetHasRefs() {};
 
-    virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT {return false;}
+    virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT { return false; }
 
     virtual std::size_t size() const TIGHTDB_NOEXCEPT = 0;
 
@@ -56,12 +56,12 @@ public:
     //virtual Index& GetIndex() = 0;
     //virtual void BuildIndex(Index& index) = 0;
     //virtual void ClearIndex() = 0;
-    virtual void SetIndexRef(size_t, ArrayParent*, size_t) {}
+    virtual void SetIndexRef(std::size_t, ArrayParent*, std::size_t) {}
 
     virtual ref_type get_ref() const = 0;
-    virtual void set_parent(ArrayParent* parent, size_t pndx) {m_array->set_parent(parent, pndx);}
-    virtual void UpdateParentNdx(int diff) {m_array->UpdateParentNdx(diff);}
-    virtual void UpdateFromParent() {m_array->UpdateFromParent();}
+    virtual void set_parent(ArrayParent* parent, std::size_t pndx) { m_array->set_parent(parent, pndx); }
+    virtual void UpdateParentNdx(int diff) { m_array->UpdateParentNdx(diff); }
+    virtual void UpdateFromParent() { m_array->UpdateFromParent(); }
 
     virtual void invalidate_subtables_virtual() {}
 
@@ -73,12 +73,13 @@ public:
 #endif // TIGHTDB_DEBUG
 
     template<class C, class A>
-    A* TreeGetArray(size_t start, size_t *first, size_t *last) const;
+    A* TreeGetArray(std::size_t start, std::size_t* first, std::size_t* last) const;
 
-    template<typename T, class C, class F>
-    size_t TreeFind(T value, size_t start, size_t end) const;
+    template<class T, class C, class F>
+    std::size_t TreeFind(T value, std::size_t start, std::size_t end) const;
 
-    const Array* GetBlock(size_t ndx, Array& arr, size_t& off, bool use_retval = false) const
+    const Array* GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
+                          bool use_retval = false) const
     {
         return m_array->GetBlock(ndx, arr, off, use_retval);
     }
@@ -96,37 +97,37 @@ protected:
 
     // Tree functions
 public:
-    template<typename T, class C> T TreeGet(size_t ndx) const; // FIXME: This one should probably be eliminated or redesiged because it throws due to dynamic memory allocation
+    template<class T, class C> T TreeGet(std::size_t ndx) const; // FIXME: This one should probably be eliminated or redesiged because it throws due to dynamic memory allocation
 protected:
-    template<typename T, class C> void TreeSet(size_t ndx, T value);
-    template<typename T, class C> void TreeInsert(size_t ndx, T value);
-    template<typename T, class C> NodeChange DoInsert(size_t ndx, T value);
-    template<typename T, class C> void TreeDelete(size_t ndx);
-    template<typename T, class C> void TreeFindAll(Array &result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
-    template<typename T, class C> void TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, bool (*call)(T *arr, size_t start, size_t end, size_t caller_offset, void *state), void *state) const;
-    template<typename T, class C, class S> size_t TreeWrite(S& out, size_t& pos) const;
+    template<class T, class C> void TreeSet(std::size_t ndx, T value);
+    template<class T, class C> void TreeInsert(std::size_t ndx, T value);
+    template<class T, class C> NodeChange DoInsert(std::size_t ndx, T value);
+    template<class T, class C> void TreeDelete(std::size_t ndx);
+    template<class T, class C> void TreeFindAll(Array &result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
+    template<class T, class C> void TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, bool (*call)(T* arr, size_t start, size_t end, size_t caller_offset, void* state), void* state) const;
+    template<class T, class C, class S> std::size_t TreeWrite(S& out, size_t& pos) const;
 
     // Node functions
     bool root_is_leaf() const TIGHTDB_NOEXCEPT { return m_array->is_leaf(); }
     Array NodeGetOffsets() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
     Array NodeGetRefs() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
-    template<class C> void NodeInsert(size_t ndx, size_t ref);
-    template<class C> void NodeAdd(size_t ref);
-    void NodeAddKey(size_t ref);
-    void NodeUpdateOffsets(size_t ndx);
-    template<class C> void NodeInsertSplit(size_t ndx, size_t newRef);
-    size_t GetRefSize(size_t ref) const;
+    template<class C> void NodeInsert(std::size_t ndx, ref_type ref);
+    template<class C> void NodeAdd(ref_type ref);
+    void NodeAddKey(ref_type ref);
+    void NodeUpdateOffsets(std::size_t ndx);
+    template<class C> void NodeInsertSplit(std::size_t ndx, ref_type new_ref);
+    std::size_t GetRefSize(ref_type) const;
 
-    static size_t get_size_from_ref(size_t ref, Allocator&) TIGHTDB_NOEXCEPT;
-    static bool is_node_from_ref(size_t ref, Allocator& alloc) TIGHTDB_NOEXCEPT;
+    static std::size_t get_size_from_ref(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
+    static bool root_is_leaf_from_ref(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
 
-    template <typename T, typename R, Action action, class condition>
-        R aggregate(T target, size_t start, size_t end, size_t *matchcount) const;
+    template <class T, class R, Action action, class condition>
+    R aggregate(T target, std::size_t start, std::size_t end, std::size_t* matchcount) const;
 
 
 #ifdef TIGHTDB_DEBUG
-    void ArrayToDot(std::ostream& out, const Array& array) const;
-    virtual void LeafToDot(std::ostream& out, const Array& array) const;
+    void ArrayToDot(std::ostream&, const Array&) const;
+    virtual void LeafToDot(std::ostream&, const Array&) const;
 #endif // TIGHTDB_DEBUG
 
     // Member variables
@@ -139,9 +140,9 @@ class Column: public ColumnBase {
 public:
     explicit Column(Allocator&);
     Column(Array::Type, Allocator&);
-    Column(Array::Type = Array::type_Normal, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-           Allocator& = Allocator::get_default());
-    explicit Column(ref_type ref, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+    explicit Column(Array::Type = Array::type_Normal, ArrayParent* = 0,
+                    std::size_t ndx_in_parent = 0, Allocator& = Allocator::get_default());
+    explicit Column(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                     Allocator& = Allocator::get_default()); // Throws
     Column(const Column&); // FIXME: Constness violation
     ~Column();
@@ -161,7 +162,7 @@ public:
     // Getting and setting values
     int64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     ref_type get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    int64_t Back() const TIGHTDB_NOEXCEPT {return get(size()-1);}
+    int64_t Back() const TIGHTDB_NOEXCEPT { return get(size()-1); }
     void set(std::size_t ndx, int64_t value);
     void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
     void insert(std::size_t ndx, int64_t value);
@@ -169,41 +170,40 @@ public:
     void add(int64_t value);
     void fill(std::size_t count);
 
-    size_t  count(int64_t target) const;
-    int64_t sum(size_t start = 0, size_t end = -1) const;
-    int64_t maximum(size_t start = 0, size_t end = -1) const;
-    int64_t minimum(size_t start = 0, size_t end = -1) const;
-    double  average(size_t start = 0, size_t end = -1) const;
+    std::size_t count(int64_t target) const;
+    int64_t sum(std::size_t start = 0, std::size_t end = -1) const;
+    int64_t maximum(std::size_t start = 0, std::size_t end = -1) const;
+    int64_t minimum(std::size_t start = 0, std::size_t end = -1) const;
+    double  average(std::size_t start = 0, std::size_t end = -1) const;
 
-    void sort(size_t start, size_t end);
-    void ReferenceSort(size_t start, size_t end, Column &ref);
+    void sort(std::size_t start, std::size_t end);
+    void ReferenceSort(std::size_t start, std::size_t end, Column& ref);
     void clear() TIGHTDB_OVERRIDE;
-    void erase(size_t ndx) TIGHTDB_OVERRIDE;
-    void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
+    void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
 
-    void Increment64(int64_t value, size_t start=0, size_t end=-1);
+    void Increment64(int64_t value, std::size_t start=0, std::size_t end=-1);
     void IncrementIf(int64_t limit, int64_t value);
 
-    size_t find_first(int64_t value, size_t start=0, size_t end=-1) const;
+    size_t find_first(int64_t value, std::size_t start=0, std::size_t end=-1) const;
     void   find_all(Array& result, int64_t value, size_t caller_offset=0, size_t start=0, size_t end=-1) const;
     size_t find_pos(int64_t value) const TIGHTDB_NOEXCEPT;
     size_t find_pos2(int64_t value) const TIGHTDB_NOEXCEPT;
-    bool   find_sorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT;
+    bool   find_sorted(int64_t target, std::size_t& pos) const TIGHTDB_NOEXCEPT;
 
     // Query support methods
-    void LeafFindAll(Array &result, int64_t value, size_t add_offset, size_t start, size_t end) const;
+    void LeafFindAll(Array& result, int64_t value, size_t add_offset, size_t start, size_t end) const;
 
 
     // Index
-    bool HasIndex() const { return m_index != NULL; }
+    bool HasIndex() const { return m_index != 0; }
     Index& GetIndex();
     void BuildIndex(Index& index);
     void ClearIndex();
-    size_t FindWithIndex(int64_t value) const;
+    std::size_t FindWithIndex(int64_t value) const;
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
-    Array* GetArray(void) {return m_array;}
 
     void sort();
 
@@ -225,22 +225,24 @@ protected:
     void update_ref(ref_type ref);
 
     // Node functions
-    int64_t LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT { return m_array->get(ndx); }
-    void LeafSet(size_t ndx, int64_t value) { m_array->set(ndx, value); }
-    void LeafInsert(size_t ndx, int64_t value) { m_array->insert(ndx, value); }
-    void LeafDelete(size_t ndx) { m_array->erase(ndx); }
-    template<class F> size_t LeafFind(int64_t value, size_t start, size_t end) const
+    int64_t LeafGet(std::size_t ndx) const TIGHTDB_NOEXCEPT { return m_array->get(ndx); }
+    void LeafSet(std::size_t ndx, int64_t value) { m_array->set(ndx, value); }
+    void LeafInsert(std::size_t ndx, int64_t value) { m_array->insert(ndx, value); }
+    void LeafDelete(std::size_t ndx) { m_array->erase(ndx); }
+    template<class F> size_t LeafFind(int64_t value, std::size_t start, std::size_t end) const
     {
         return m_array->find_first<F>(value, start, end);
     }
 
-    void DoSort(size_t lo, size_t hi);
+    void DoSort(std::size_t lo, std::size_t hi);
 
     // Member variables
     Index* m_index;
 
 private:
-    Column &operator=(Column const &); // not allowed
+    Column& operator=(const Column&); // not allowed
+
+    class TreeTraits;
 
     static void foreach(const Array* parent, Array::ForEachOp<int64_t>*) TIGHTDB_NOEXCEPT;
 };

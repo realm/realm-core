@@ -20,9 +20,10 @@
 #ifndef TIGHTDB_COLUMN_STRING_HPP
 #define TIGHTDB_COLUMN_STRING_HPP
 
-#include <tightdb/column.hpp>
+#include <tightdb/unique_ptr.hpp>
 #include <tightdb/array_string.hpp>
 #include <tightdb/array_string_long.hpp>
+#include <tightdb/column.hpp>
 
 namespace tightdb {
 
@@ -31,9 +32,9 @@ class StringIndex;
 
 class AdaptiveStringColumn: public ColumnBase {
 public:
-    AdaptiveStringColumn(Allocator& = Allocator::get_default());
-    AdaptiveStringColumn(std::size_t ref, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                         Allocator& = Allocator::get_default());
+    explicit AdaptiveStringColumn(Allocator& = Allocator::get_default());
+    explicit AdaptiveStringColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                                  Allocator& = Allocator::get_default());
     ~AdaptiveStringColumn();
 
     void destroy() TIGHTDB_OVERRIDE;
@@ -75,7 +76,7 @@ public:
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
-    void set_parent(ArrayParent* parent, size_t pndx) { m_array->set_parent(parent, pndx); }
+    void set_parent(ArrayParent* parent, std::size_t pndx) { m_array->set_parent(parent, pndx); }
 
     // Optimizing data layout
     bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;
@@ -85,15 +86,16 @@ public:
 
     bool GetBlock(size_t ndx, ArrayParent** ap, size_t& off) const
     {
+        Allocator& alloc = m_array->get_alloc();
         if (!root_is_leaf()) {
             std::pair<size_t, size_t> p = m_array->find_leaf_ref(m_array, ndx);
-            bool longstr = m_array->get_hasrefs_from_header(static_cast<const char*>(m_array->get_alloc().translate(p.first)));
+            bool longstr = m_array->get_hasrefs_from_header(alloc.translate(p.first));
             if (longstr) {
-                ArrayStringLong* asl2 = new ArrayStringLong(p.first, NULL, 0, m_array->get_alloc());
+                ArrayStringLong* asl2 = new ArrayStringLong(p.first, 0, 0, alloc);
                 *ap = asl2;
             }
             else {
-                ArrayString* as2 = new ArrayString(p.first, NULL, 0, m_array->get_alloc());
+                ArrayString* as2 = new ArrayString(p.first, 0, 0, alloc);
                 *ap = as2;
             }
             off = ndx - p.second;
@@ -102,12 +104,12 @@ public:
         else {
             off = 0;
             if (IsLongStrings()) {
-                ArrayStringLong* asl2 = new ArrayStringLong(m_array->get_ref(), NULL, 0, m_array->get_alloc());
+                ArrayStringLong* asl2 = new ArrayStringLong(m_array->get_ref(), 0, 0, alloc);
                 *ap = asl2;
                 return true;
             }
             else {
-                ArrayString* as2 = new ArrayString(m_array->get_ref(), NULL, 0, m_array->get_alloc());
+                ArrayString* as2 = new ArrayString(m_array->get_ref(), 0, 0, alloc);
                 *ap = as2;
                 return false;
             }
@@ -145,6 +147,8 @@ protected:
 #endif // TIGHTDB_DEBUG
 
 private:
+    static const size_t short_string_max_size = 15;
+
     StringIndex* m_index;
 
     static void foreach(const Array* parent, Array::ForEachOp<StringData>*) TIGHTDB_NOEXCEPT;

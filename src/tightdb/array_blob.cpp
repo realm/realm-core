@@ -21,7 +21,7 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
         ++add_size;
     size_t new_size = m_len - remove_size + add_size;
     // also updates header
-    Alloc(new_size, 1); // Throws
+    alloc(new_size, 1); // Throws
 
     char* base = reinterpret_cast<char*>(m_data);
     char* modify_begin = base + begin;
@@ -53,7 +53,7 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
 
 void ArrayBlob::ToDot(ostream& out, const char* title) const
 {
-    const size_t ref = get_ref();
+    ref_type ref = get_ref();
 
     if (title) {
         out << "subgraph cluster_" << ref << " {" << endl;

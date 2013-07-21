@@ -14,11 +14,9 @@ using namespace std;
 
 namespace {
 
-const size_t short_string_max_size = 15;
-
 tightdb::Array::Type get_type_from_ref(tightdb::ref_type ref, tightdb::Allocator& alloc)
 {
-    const char* header = static_cast<char*>(alloc.translate(ref));
+    const char* header = alloc.translate(ref);
     return tightdb::Array::get_type_from_header(header);
 }
 

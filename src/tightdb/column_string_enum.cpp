@@ -16,9 +16,11 @@ tightdb::StringData get_string(void* column, size_t ndx)
 
 namespace tightdb {
 
-ColumnStringEnum::ColumnStringEnum(size_t ref_keys, size_t ref_values, ArrayParent* parent,
-                                   size_t pndx, Allocator& alloc):
-    Column(ref_values, parent, pndx+1, alloc), m_keys(ref_keys, parent, pndx, alloc), m_index(NULL) {}
+ColumnStringEnum::ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* parent,
+                                   size_t ndx_in_parent, Allocator& alloc):
+    Column(values, parent, ndx_in_parent+1, alloc), // Throws
+    m_keys(keys,   parent, ndx_in_parent,   alloc), // Throws
+    m_index(0) {}
 
 ColumnStringEnum::~ColumnStringEnum()
 {
@@ -80,12 +82,12 @@ void ColumnStringEnum::insert(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx <= Column::size());
 
-    const size_t key_ndx = GetKeyNdxOrAdd(value);
+    size_t key_ndx = GetKeyNdxOrAdd(value);
     Column::insert(ndx, key_ndx);
 
     if (m_index) {
-        const bool isLast = ndx+1 == size();
-        m_index->insert(ndx, value, isLast);
+        bool is_last = ndx+1 == size();
+        m_index->insert(ndx, value, is_last);
     }
 }
 
@@ -98,9 +100,9 @@ void ColumnStringEnum::erase(size_t ndx)
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
     if (m_index) {
-        StringData oldVal = get(ndx);
-        const bool isLast = ndx == size();
-        m_index->erase(ndx, oldVal, isLast);
+        StringData old_val = get(ndx);
+        const bool is_last = ndx == size();
+        m_index->erase(ndx, old_val, is_last);
     }
 
     Column::erase(ndx);
@@ -183,11 +185,11 @@ size_t ColumnStringEnum::GetKeyNdx(StringData value) const
 
 size_t ColumnStringEnum::GetKeyNdxOrAdd(StringData value)
 {
-    const size_t res = m_keys.find_first(value);
+    size_t res = m_keys.find_first(value);
     if (res != size_t(-1)) return res;
     else {
         // Add key if it does not exist
-        const size_t pos = m_keys.size();
+        size_t pos = m_keys.size();
         m_keys.add(value);
         return pos;
     }

@@ -36,6 +36,7 @@ TEST(InsertSubtable)
 }
 
 
+// FIXME: Move this test to test_table.cpp
 TEST(SetSubtable)
 {
     Table t;
@@ -56,7 +57,7 @@ TEST(SetSubtable)
     t2.insert_int(1, 1, 100);
     t2.insert_done();
 
-    LangBindHelper::set_subtable(t, 0, 0, t2);
+    t.set_subtable( 0, 0, &t2);
 
     TableRef sub = t.get_subtable(0, 0);
 

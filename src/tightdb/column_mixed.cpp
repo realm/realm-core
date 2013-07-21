@@ -18,9 +18,9 @@ void ColumnMixed::destroy()
         m_array->destroy();
 }
 
-void ColumnMixed::set_parent(ArrayParent* parent, size_t pndx)
+void ColumnMixed::set_parent(ArrayParent* parent, size_t ndx_in_parent)
 {
-    m_array->set_parent(parent, pndx);
+    m_array->set_parent(parent, ndx_in_parent);
 }
 
 void ColumnMixed::UpdateFromParent()
@@ -202,11 +202,11 @@ void ColumnMixed::set_string(size_t ndx, StringData value)
 
     // See if we can reuse data position
     if (type == mixcol_String) {
-        size_t ref = m_refs->get_as_ref(ndx) >> 1;
+        ref_type ref = m_refs->get_as_ref(ndx) >> 1;
         m_data->set_string(ref, value);
     }
     else if (type == mixcol_Binary) {
-        size_t ref = m_refs->get_as_ref(ndx) >> 1;
+        ref_type ref = m_refs->get_as_ref(ndx) >> 1;
         m_data->set_string(ref, value);
         m_types->set(ndx, mixcol_String);
     }
@@ -215,11 +215,11 @@ void ColumnMixed::set_string(size_t ndx, StringData value)
         clear_value(ndx, mixcol_String);
 
         // Add value to data column
-        const size_t ref = m_data->size();
+        size_t ref = m_data->size();
         m_data->add_string(value);
 
         // Shift value one bit and set lowest bit to indicate that this is not a ref
-        const int64_t v = (ref << 1) + 1;
+        int64_t v = (ref << 1) + 1;
 
         m_types->set(ndx, mixcol_String);
         m_refs->set(ndx, v);
@@ -231,16 +231,16 @@ void ColumnMixed::set_binary(size_t ndx, BinaryData value)
     TIGHTDB_ASSERT(ndx < m_types->size());
     InitDataColumn();
 
-    const MixedColType type = MixedColType(m_types->get(ndx));
+    MixedColType type = MixedColType(m_types->get(ndx));
 
     // See if we can reuse data position
     if (type == mixcol_String) {
-        const size_t ref = m_refs->get_as_ref(ndx) >> 1;
+        ref_type ref = m_refs->get_as_ref(ndx) >> 1;
         m_data->set(ref, value);
         m_types->set(ndx, mixcol_Binary);
     }
     else if (type == mixcol_Binary) {
-        const size_t ref = m_refs->get_as_ref(ndx) >> 1;
+        ref_type ref = m_refs->get_as_ref(ndx) >> 1;
         m_data->set(ref, value);
     }
     else {
@@ -248,11 +248,11 @@ void ColumnMixed::set_binary(size_t ndx, BinaryData value)
         clear_value(ndx, mixcol_Binary);
 
         // Add value to data column
-        const size_t ref = m_data->size();
+        size_t ref = m_data->size();
         m_data->add(value);
 
         // Shift value one bit and set lowest bit to indicate that this is not a ref
-        const int64_t v = (ref << 1) + 1;
+        int64_t v = (ref << 1) + 1;
 
         m_types->set(ndx, mixcol_Binary);
         m_refs->set(ndx, v);
@@ -266,7 +266,7 @@ bool ColumnMixed::compare(const ColumnMixed& c) const
         return false;
 
     for (size_t i=0; i<n; ++i) {
-        const DataType type = get_type(i);
+        DataType type = get_type(i);
         if (c.get_type(i) != type)
             return false;
         switch (type) {
@@ -318,14 +318,14 @@ void ColumnMixed::Verify() const
         m_data->Verify();
 
     // types and refs should be in sync
-    const size_t types_len = m_types->size();
-    const size_t refs_len  = m_refs->size();
+    size_t types_len = m_types->size();
+    size_t refs_len  = m_refs->size();
     TIGHTDB_ASSERT(types_len == refs_len);
 
     // Verify each sub-table
-    const size_t count = size();
+    size_t count = size();
     for (size_t i = 0; i < count; ++i) {
-        const int64_t v = m_refs->get(i);
+        int64_t v = m_refs->get(i);
         if (v == 0 || v & 0x1)
             continue;
         ConstTableRef subtable = m_refs->get_subtable(i);
@@ -335,7 +335,7 @@ void ColumnMixed::Verify() const
 
 void ColumnMixed::ToDot(ostream& out, StringData title) const
 {
-    const size_t ref = get_ref();
+    ref_type ref = get_ref();
 
     out << "subgraph cluster_columnmixed" << ref << " {" << endl;
     out << " label = \"ColumnMixed";
@@ -346,9 +346,9 @@ void ColumnMixed::ToDot(ostream& out, StringData title) const
     m_array->ToDot(out, "mixed_top");
 
     // Write sub-tables
-    const size_t count = size();
+    size_t count = size();
     for (size_t i = 0; i < count; ++i) {
-        const MixedColType type = MixedColType(m_types->get(i));
+        MixedColType type = MixedColType(m_types->get(i));
         if (type != mixcol_Table)
             continue;
         ConstTableRef subtable = m_refs->get_subtable(i);

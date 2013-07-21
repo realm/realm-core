@@ -37,12 +37,12 @@ template<> struct AggReturnType<float> {
 };
 
 
-template<typename T>
+template<class T>
 class BasicColumn: public ColumnBase {
 public:
-    BasicColumn(Allocator& = Allocator::get_default());
-    BasicColumn(size_t ref, ArrayParent* = 0, size_t ndx_in_parent = 0,
-                Allocator& = Allocator::get_default());
+    explicit BasicColumn(Allocator& = Allocator::get_default());
+    explicit BasicColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                         Allocator& = Allocator::get_default());
     ~BasicColumn();
 
     void destroy() TIGHTDB_OVERRIDE;
