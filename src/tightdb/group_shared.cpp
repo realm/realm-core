@@ -171,7 +171,7 @@ retry:
             // Set initial values
             info->version  = 0;
             info->flags    = dlevel; // durability level is fixed from creation
-            info->filesize = alloc.GetFileLen();
+            info->filesize = alloc.get_base_size();
             info->infosize = uint32_t(len);
             info->current_top = alloc.get_top_ref();
             info->current_version = 0;
@@ -758,7 +758,7 @@ void SharedGroup::low_level_commit(size_t new_version)
 
     // Get the new top ref
     const SlabAlloc& alloc = m_group.get_allocator();
-    size_t new_filesize = alloc.GetFileLen();
+    size_t new_filesize = alloc.get_base_size();
 
     // Update reader info
     {
@@ -768,7 +768,7 @@ void SharedGroup::low_level_commit(size_t new_version)
         // FIXME: Due to lack of adequate synchronization, the
         // following modification of 'info->current_version'
         // effectively participates in a "data race". Please see the
-        // FIXME in SharedGroup::has_changed() for more info.
+        // 'FIXME' in SharedGroup::has_changed() for more info.
         info->current_version = new_version;//FIXME src\tightdb\group_shared.cpp(772): warning C4267: '=' : conversion from 'size_t' to 'volatile uint32_t', possible loss of data
     }
 
