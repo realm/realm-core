@@ -84,7 +84,7 @@ public:
     /// thrown. Note that InvalidDatabase is among these derived
     /// exception types.
     void open(const std::string& file, bool no_create = false,
-              DurabilityLevel dlevel=durability_Full);
+              DurabilityLevel dlevel = durability_Full);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
@@ -150,7 +150,7 @@ private:
 
     // Member variables
     Group                 m_group;
-    size_t                m_version;
+    std::size_t           m_version;
     File                  m_file;
     File::Map<SharedInfo> m_file_map; // Never remapped
     File::Map<SharedInfo> m_reader_map;
@@ -169,17 +169,17 @@ private:
     struct ReadCount;
 
     // Ring buffer managment
-    bool       ringbuf_is_empty() const TIGHTDB_NOEXCEPT;
-    size_t     ringbuf_size() const TIGHTDB_NOEXCEPT;
-    size_t     ringbuf_capacity() const TIGHTDB_NOEXCEPT;
-    bool       ringbuf_is_first(size_t ndx) const TIGHTDB_NOEXCEPT;
-    void       ringbuf_remove_first() TIGHTDB_NOEXCEPT;
-    size_t     ringbuf_find(uint32_t version) const TIGHTDB_NOEXCEPT;
-    ReadCount& ringbuf_get(size_t ndx) TIGHTDB_NOEXCEPT;
-    ReadCount& ringbuf_get_first() TIGHTDB_NOEXCEPT;
-    ReadCount& ringbuf_get_last() TIGHTDB_NOEXCEPT;
-    void       ringbuf_put(const ReadCount& v);
-    void       ringbuf_expand();
+    bool        ringbuf_is_empty() const TIGHTDB_NOEXCEPT;
+    std::size_t ringbuf_size() const TIGHTDB_NOEXCEPT;
+    std::size_t ringbuf_capacity() const TIGHTDB_NOEXCEPT;
+    bool        ringbuf_is_first(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    void        ringbuf_remove_first() TIGHTDB_NOEXCEPT;
+    std::size_t ringbuf_find(uint32_t version) const TIGHTDB_NOEXCEPT;
+    ReadCount&  ringbuf_get(std::size_t ndx) TIGHTDB_NOEXCEPT;
+    ReadCount&  ringbuf_get_first() TIGHTDB_NOEXCEPT;
+    ReadCount&  ringbuf_get_last() TIGHTDB_NOEXCEPT;
+    void        ringbuf_put(const ReadCount& v);
+    void        ringbuf_expand();
 
     // Must be called only by someone that has a lock on the write
     // mutex.
@@ -272,20 +272,20 @@ private:
 // Implementation:
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel):
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<size_t>::max())
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
 {
     open(file, no_create, dlevel);
 }
 
 
 inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<size_t>::max()) {}
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()) {}
 
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
 inline SharedGroup::SharedGroup(Replication::Provider& repl_provider):
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<size_t>::max())
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
 {
     open(repl_provider);
 }

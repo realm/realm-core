@@ -2,6 +2,7 @@
 #include <vector>
 #include <sstream>
 #include <fstream>
+#include <iostream>
 #include <iomanip>
 
 #include <pthread.h>
@@ -416,9 +417,16 @@ private:
         try {
             thread(e.m_index, e.m_database_path);
         }
+        catch (exception& ex) {
+            e.m_error = true;
+            cerr << "Exception thrown in thread "<<e.m_index<<": "<<ex.what()<<"\n";
+        }
+
         catch (...) {
             e.m_error = true;
+            cerr << "Unknown exception thrown in thread "<<e.m_index<<"\n";
         }
+
         return 0;
     }
 };

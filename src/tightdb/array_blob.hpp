@@ -52,8 +52,9 @@ public:
 #endif // TIGHTDB_DEBUG
 
 private:
-    size_t CalcByteLen(size_t count, size_t width) const TIGHTDB_OVERRIDE;
-    size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    std::size_t CalcByteLen(std::size_t count, std::size_t width) const TIGHTDB_OVERRIDE;
+    std::size_t CalcItemCount(std::size_t bytes,
+                              std::size_t width) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     WidthType GetWidthType() const TIGHTDB_OVERRIDE { return wtype_Ignore; }
 };
 

@@ -86,7 +86,7 @@ void ArrayStringLong::resize(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    const size_t len = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t len = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
 
     m_offsets.resize(ndx);
     m_blob.resize(len);
@@ -115,7 +115,7 @@ size_t ArrayStringLong::count(StringData value, size_t begin, size_t end) const
 
 size_t ArrayStringLong::find_first(StringData value, size_t begin, size_t end) const
 {
-    const size_t n = m_offsets.size();
+    size_t n = m_offsets.size();
     if (end == size_t(-1)) end = n;
     TIGHTDB_ASSERT(begin <= n && end <= n && begin <= end);
 
@@ -147,7 +147,7 @@ void ArrayStringLong::find_all(Array& result, StringData value, size_t add_offse
 
 void ArrayStringLong::ToDot(ostream& out, StringData title) const
 {
-    const size_t ref = get_ref();
+    ref_type ref = get_ref();
 
     out << "subgraph cluster_arraystringlong" << ref << " {" << endl;
     out << " label = \"ArrayStringLong";

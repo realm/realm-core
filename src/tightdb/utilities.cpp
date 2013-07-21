@@ -46,25 +46,25 @@ void cpuid_init()
 
 void* round_up(void* p, size_t align)
 {
-    size_t r = ((size_t)p % align == 0 ? 0 : align - (size_t)p % align);
-    return (char *)p + r;
+    size_t r = size_t(p) % align == 0 ? 0 : align - size_t(p) % align;
+    return static_cast<char *>(p) + r;
 }
 
 void* round_down(void* p, size_t align)
 {
-    size_t r = (size_t)p;
-    return (void *)(r & (~(align - 1)));
+    size_t r = size_t(p);
+    return reinterpret_cast<void *>(r & ~(align - 1));
 }
 
 size_t round_up(size_t p, size_t align)
 {
-    size_t r = ((size_t)p % align == 0 ? 0 : align - (size_t)p % align);
+    size_t r = p % align == 0 ? 0 : align - p % align;
     return p + r;
 }
 
 size_t round_down(size_t p, size_t align)
 {
-    size_t r = (size_t)p;
+    size_t r = p;
     return r & (~(align - 1));
 }
 
@@ -91,7 +91,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
     while (t->remainder_len < 8 && len > 0)
     {
         t->remainder = t->remainder >> 8;
-        t->remainder = t->remainder | (unsigned long long)*data << (7*8);
+        t->remainder = t->remainder | static_cast<unsigned long long>(*data) << (7*8);
         t->remainder_len++;
         data++;
         len--;
@@ -111,13 +111,13 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
     while (len >= 8)
     {
 #ifdef TIGHTDB_X86_OR_X64
-        t->a_val += (*(unsigned long long *)data) * t->b_val;
+        t->a_val += (*reinterpret_cast<unsigned long long*>(data)) * t->b_val;
 #else
         unsigned long long l = 0;
         for (unsigned int i = 0; i < 8; i++)
         {
             l = l >> 8;
-            l = l | (unsigned long long)*(data + i) << (7*8);
+            l = l | static_cast<unsigned long long>(*(data + i)) << (7*8);
         }
         t->a_val += l * t->b_val;
 #endif
@@ -129,7 +129,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
     while (len > 0)
     {
         t->remainder = t->remainder >> 8;
-        t->remainder = t->remainder | (unsigned long long)*data << (7*8);
+        t->remainder = t->remainder | static_cast<unsigned long long>(*data) << (7*8);
         t->remainder_len++;
         data++;
         len--;

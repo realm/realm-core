@@ -39,8 +39,8 @@ public:
     void insert(std::size_t ndx, StringData value);
     void erase(std::size_t ndx);
 
-    size_t count(StringData value, std::size_t begin = 0, std::size_t end = -1) const;
-    size_t find_first(StringData value, std::size_t begin = 0 , std::size_t end = -1) const;
+    std::size_t count(StringData value, std::size_t begin = 0, std::size_t end = -1) const;
+    std::size_t find_first(StringData value, std::size_t begin = 0 , std::size_t end = -1) const;
     void find_all(Array& result, StringData value, std::size_t add_offset = 0,
                   std::size_t begin = 0, std::size_t end = -1);
 
@@ -60,8 +60,9 @@ public:
 #endif // TIGHTDB_DEBUG
 
 private:
-    size_t CalcByteLen(size_t count, size_t width) const TIGHTDB_OVERRIDE;
-    size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    std::size_t CalcByteLen(std::size_t count, std::size_t width) const TIGHTDB_OVERRIDE;
+    std::size_t CalcItemCount(std::size_t bytes,
+                              std::size_t width) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     WidthType GetWidthType() const TIGHTDB_OVERRIDE { return wtype_Multiply; }
 };
 
@@ -85,8 +86,8 @@ inline ArrayString::ArrayString(ArrayParent* parent, std::size_t ndx_in_parent,
     update_ref_in_parent();
 }
 
-inline ArrayString::ArrayString(ref_type ref, ArrayParent* parent,
-                                std::size_t ndx_in_parent, Allocator& alloc) TIGHTDB_NOEXCEPT:
+inline ArrayString::ArrayString(ref_type ref, ArrayParent *parent, std::size_t ndx_in_parent,
+                                Allocator& alloc) TIGHTDB_NOEXCEPT:
     Array(alloc)
 {
     // Manually create array as doing it in initializer list

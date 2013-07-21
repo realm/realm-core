@@ -28,8 +28,8 @@ class Index: public Column {
 public:
     Index();
     explicit Index(Array::Type, Array* = 0, std::size_t ndx_in_parent = 0);
-    explicit Index(ref_type ref);
-    Index(ref_type ref, Array* parent, std::size_t ndx_in_parent);
+    explicit Index(ref_type);
+    Index(ref_type, Array* parent, std::size_t ndx_in_parent);
 
     bool is_empty() const;
 
