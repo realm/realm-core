@@ -249,8 +249,9 @@ size_t ColumnBase::get_size_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOE
 
 bool ColumnBase::root_is_leaf_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    const uint8_t* header = static_cast<uint8_t*>(alloc.translate(ref));
-    bool root_is_leaf = (header[0] & 0x80) == 0;
+    const char* header = alloc.translate(ref);
+    const unsigned char* header_2 = reinterpret_cast<const unsigned char*>(header);
+    bool root_is_leaf = (header_2[0] & 0x80) == 0;
     return root_is_leaf;
 }
 
@@ -499,8 +500,10 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
 size_t ColumnBase::GetRefSize(ref_type ref) const
 {
     // parse the length part of 8byte header
-    const uint8_t* header = static_cast<uint8_t*>(m_array->get_alloc().translate(ref));
-    return (header[1] << 16) + (header[2] << 8) + header[3];
+    Allocator& alloc = m_array->get_alloc();
+    const char* header = alloc.translate(ref);
+    const unsigned char* header_2 = reinterpret_cast<const unsigned char*>(header);
+    return (header_2[1] << 16) + (header_2[2] << 8) + header_2[3];
 }
 
 Array ColumnBase::NodeGetOffsets() const TIGHTDB_NOEXCEPT

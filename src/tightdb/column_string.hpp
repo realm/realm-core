@@ -86,15 +86,16 @@ public:
 
     bool GetBlock(size_t ndx, ArrayParent** ap, size_t& off) const
     {
+        Allocator& alloc = m_array->get_alloc();
         if (!root_is_leaf()) {
             std::pair<size_t, size_t> p = m_array->find_leaf_ref(m_array, ndx);
-            bool longstr = m_array->get_hasrefs_from_header(static_cast<const char*>(m_array->get_alloc().translate(p.first)));
+            bool longstr = m_array->get_hasrefs_from_header(alloc.translate(p.first));
             if (longstr) {
-                ArrayStringLong* asl2 = new ArrayStringLong(p.first, NULL, 0, m_array->get_alloc());
+                ArrayStringLong* asl2 = new ArrayStringLong(p.first, 0, 0, alloc);
                 *ap = asl2;
             }
             else {
-                ArrayString* as2 = new ArrayString(p.first, NULL, 0, m_array->get_alloc());
+                ArrayString* as2 = new ArrayString(p.first, 0, 0, alloc);
                 *ap = as2;
             }
             off = ndx - p.second;
@@ -103,12 +104,12 @@ public:
         else {
             off = 0;
             if (IsLongStrings()) {
-                ArrayStringLong* asl2 = new ArrayStringLong(m_array->get_ref(), NULL, 0, m_array->get_alloc());
+                ArrayStringLong* asl2 = new ArrayStringLong(m_array->get_ref(), 0, 0, alloc);
                 *ap = asl2;
                 return true;
             }
             else {
-                ArrayString* as2 = new ArrayString(m_array->get_ref(), NULL, 0, m_array->get_alloc());
+                ArrayString* as2 = new ArrayString(m_array->get_ref(), 0, 0, alloc);
                 *ap = as2;
                 return false;
             }

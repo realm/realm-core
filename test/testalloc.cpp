@@ -5,9 +5,9 @@ using namespace tightdb;
 
 namespace {
 
-void set_capacity(void* p, size_t size)
+void set_capacity(char* p, size_t size)
 {
-    uint8_t* header = static_cast<uint8_t*>(p);
+    unsigned char* header = reinterpret_cast<unsigned char*>(p);
     header[4] = (size >> 16) & 0x000000FF;
     header[5] = (size >> 8) & 0x000000FF;
     header[6] = size & 0x000000FF;
@@ -35,9 +35,9 @@ TEST(Alloc1)
     CHECK_EQUAL(0, intptr_t(mr3.pointer) & 0x7);
 
     // Do refs translate correctly
-    CHECK_EQUAL(mr1.pointer, alloc.translate(mr1.ref));
-    CHECK_EQUAL(mr2.pointer, alloc.translate(mr2.ref));
-    CHECK_EQUAL(mr3.pointer, alloc.translate(mr3.ref));
+    CHECK_EQUAL(static_cast<void*>(mr1.pointer), alloc.translate(mr1.ref));
+    CHECK_EQUAL(static_cast<void*>(mr2.pointer), alloc.translate(mr2.ref));
+    CHECK_EQUAL(static_cast<void*>(mr3.pointer), alloc.translate(mr3.ref));
 
     alloc.free(mr3.ref, mr3.pointer);
     alloc.free(mr2.ref, mr2.pointer);

@@ -904,7 +904,7 @@ inline Array Array::GetSubArray(std::size_t ndx) const TIGHTDB_NOEXCEPT
 inline bool Array::is_index_node(ref_type ref, const Allocator& alloc)
 {
     TIGHTDB_ASSERT(ref);
-    return get_indexflag_from_header(static_cast<char*>(alloc.translate(ref)));
+    return get_indexflag_from_header(alloc.translate(ref));
 }
 
 

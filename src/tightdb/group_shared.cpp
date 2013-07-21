@@ -291,7 +291,7 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 const Group& SharedGroup::begin_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-    TIGHTDB_ASSERT(m_group.get_allocator().IsAllFree());
+    TIGHTDB_ASSERT(m_group.get_allocator().is_all_free());
 
     size_t new_topref = 0;
     size_t new_filesize = 0;
@@ -383,7 +383,7 @@ void SharedGroup::end_read()
 Group& SharedGroup::begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-    TIGHTDB_ASSERT(m_group.get_allocator().IsAllFree());
+    TIGHTDB_ASSERT(m_group.get_allocator().is_all_free());
 
     SharedInfo* info = m_file_map.get_addr();
 

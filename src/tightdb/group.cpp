@@ -279,7 +279,7 @@ void Group::rollback()
     invalidate();
 
     // Clear all changes made during transaction
-//    m_alloc.FreeAll(); FIXME: Not needed if we keep the call to invalidate() above.
+//    m_alloc.free_all(); FIXME: Not needed if we keep the call to invalidate() above.
 }
 
 Group::~Group()
@@ -317,7 +317,7 @@ void Group::invalidate()
     // Reads may allocate some temproary state that we have
     // to clean up
     // TODO: This is also done in commit(), fix to do it only once
-    m_alloc.FreeAll();
+    m_alloc.free_all();
 }
 
 Table* Group::get_table_ptr(size_t ndx)
@@ -373,7 +373,7 @@ BinaryData Group::write_to_mem() const
     TIGHTDB_ASSERT(m_top.IsValid());
 
     // Get max possible size of buffer
-    size_t max_size = m_alloc.GetTotalSize();
+    size_t max_size = m_alloc.get_total_size();
 
     MemoryOStream out(max_size);
     size_t size = write_to_stream(out);
@@ -415,9 +415,9 @@ size_t Group::commit(size_t current_version, size_t readlock_version, bool persi
 #endif
     }
     else {
-        TIGHTDB_ASSERT(m_alloc.IsAllFree());
+        TIGHTDB_ASSERT(m_alloc.is_all_free());
         invalidate();
-        TIGHTDB_ASSERT(m_alloc.IsAllFree());
+        TIGHTDB_ASSERT(m_alloc.is_all_free());
     }
 
     return top_pos;
@@ -468,7 +468,7 @@ void Group::update_from_shared(ref_type top_ref, size_t len)
     TIGHTDB_ASSERT(top_ref < len);
 
     // Update memory mapping if needed
-    bool is_remapped = m_alloc.ReMap(len);
+    bool is_remapped = m_alloc.remap(len);
 
     // If our last look at the file was when it
     // was empty, we may have to re-create the group

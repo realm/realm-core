@@ -30,8 +30,7 @@ inline ref_type BasicArray<T>::create_empty_basic_array(Allocator& alloc)
     std::size_t capacity = Array::initial_capacity;
     MemRef mem_ref = alloc.alloc(capacity); // Throws
 
-    init_header(static_cast<char*>(mem_ref.pointer), false, false, wtype_Multiply,
-                sizeof (T), 0, capacity);
+    init_header(mem_ref.pointer, false, false, wtype_Multiply, sizeof (T), 0, capacity);
 
     return mem_ref.ref;
 }

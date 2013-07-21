@@ -57,7 +57,7 @@ namespace tightdb {
 void Array::init_from_ref(ref_type ref) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ref);
-    char* header = static_cast<char*>(m_alloc.translate(ref));
+    char* header = m_alloc.translate(ref);
     init_from_header(header, ref);
 }
 
@@ -170,7 +170,7 @@ bool Array::UpdateFromParent() TIGHTDB_NOEXCEPT
     else {
         // If the file has been remapped it might have
         // moved to a new location
-        char* m = static_cast<char*>(m_alloc.translate(m_ref));
+        char* m = m_alloc.translate(m_ref);
         if (m_data-8 != m) {
             m_data = m + 8;
             return true;
@@ -1206,7 +1206,7 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
 
         // Create the new array
         MemRef mem_ref = clone_alloc.alloc(size); // Throws
-        char* clone_header = static_cast<char*>(mem_ref.pointer);
+        char* clone_header = mem_ref.pointer;
 
         // Copy contents
         const char* src_begin = header;
@@ -1228,7 +1228,7 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
 
     // Create new empty array of refs
     MemRef mem_ref = clone_alloc.alloc(initial_capacity); // Throws
-    char* clone_header = static_cast<char*>(mem_ref.pointer);
+    char* clone_header = mem_ref.pointer;
     {
         bool is_node = get_isnode_from_header(header);
         bool has_refs = true;
@@ -1251,7 +1251,7 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
         bool is_subarray = value != 0 && (value & 0x1) == 0;
         if (is_subarray) {
             ref_type ref = to_ref(value);
-            const char* subheader = static_cast<char*>(alloc.translate(ref));
+            const char* subheader = alloc.translate(ref);
             ref_type new_ref = clone(subheader, alloc, clone_alloc);
             value = new_ref;
         }
@@ -1268,15 +1268,15 @@ void Array::CopyOnWrite()
 
     // Calculate size in bytes (plus a bit of matchcount room for expansion)
     size_t len = CalcByteLen(m_len, m_width);
-    const size_t rest = (~len & 0x7)+1;
+    size_t rest = (~len & 0x7)+1;
     if (rest < 8) len += rest; // 64bit blocks
-    const size_t new_len = len + 64;
+    size_t new_len = len + 64;
 
     // Create new copy of array
     MemRef mref = m_alloc.alloc(new_len); // Throws
     const char* old_begin = get_header_from_data(m_data);
     const char* old_end   = m_data + len;
-    char* new_begin = static_cast<char*>(mref.pointer);
+    char* new_begin = mref.pointer;
     copy(old_begin, old_end, new_begin);
 
     ref_type old_ref = m_ref;
@@ -1309,7 +1309,7 @@ ref_type Array::create_empty_array(Type type, WidthType width_type, Allocator& a
     size_t capacity = initial_capacity;
     MemRef mem_ref = alloc.alloc(capacity); // Throws
 
-    init_header(static_cast<char*>(mem_ref.pointer), is_node, has_refs, width_type, 0, 0, capacity);
+    init_header(mem_ref.pointer, is_node, has_refs, width_type, 0, 0, capacity);
 
     return mem_ref.ref;
 }
@@ -1337,14 +1337,14 @@ void Array::alloc(size_t count, size_t width)
             char* header;
             if (!m_data) {
                 mem_ref = m_alloc.alloc(capacity_bytes); // Throws
-                header = static_cast<char*>(mem_ref.pointer);
+                header = mem_ref.pointer;
                 init_header(header, m_isNode, m_hasRefs, GetWidthType(), int(width), count,
                             capacity_bytes);
             }
             else {
                 header = get_header_from_data(m_data);
                 mem_ref = m_alloc.realloc(m_ref, header, capacity_bytes); // Throws
-                header = static_cast<char*>(mem_ref.pointer);
+                header = mem_ref.pointer;
                 set_header_width(int(width), header);
                 set_header_len(count, header);
                 set_header_capacity(capacity_bytes, header);
@@ -2230,7 +2230,7 @@ StringData Array::string_column_get(size_t ndx) const TIGHTDB_NOEXCEPT
     const size_t offsets_ref = p2.first;
     const size_t blob_ref    = p2.second;
 
-    header = static_cast<char*>(m_alloc.translate(offsets_ref));
+    header = m_alloc.translate(offsets_ref);
     width  = get_width_from_header(header);
     size_t begin, end;
     if (0 < ndx) {
@@ -2244,14 +2244,14 @@ StringData Array::string_column_get(size_t ndx) const TIGHTDB_NOEXCEPT
     }
     --end; // Discount the terminating zero
 
-    header = static_cast<char*>(m_alloc.translate(blob_ref));
+    header = m_alloc.translate(blob_ref);
     return StringData(ArrayBlob::get_from_header(header, begin), end-begin);
 }
 
 // Find value direct through column b-tree without instatiating any Arrays.
 size_t Array::ColumnFind(int64_t target, ref_type ref, Array& cache) const
 {
-    char* header = static_cast<char*>(m_alloc.translate(ref));
+    char* header = m_alloc.translate(ref);
     bool is_node = get_isnode_from_header(header);
 
     if (is_node) {
@@ -2262,12 +2262,12 @@ size_t Array::ColumnFind(int64_t target, ref_type ref, Array& cache) const
         ref_type ref_offsets = to_ref(get_direct(data, width, 0));
         ref_type ref_refs    = to_ref(get_direct(data, width, 1));
 
-        const char* offsets_header = static_cast<char*>(m_alloc.translate(ref_offsets));
+        const char* offsets_header = m_alloc.translate(ref_offsets);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t offsets_width  = get_width_from_header(offsets_header);
         size_t offsets_len = get_len_from_header(offsets_header);
 
-        const char* refs_header = static_cast<char*>(m_alloc.translate(ref_refs));
+        const char* refs_header = m_alloc.translate(ref_refs);
         const char* refs_data = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
 
@@ -2315,7 +2315,7 @@ top:
         ref_type ref_refs    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
-        const char* offsets_header = static_cast<char*>(m_alloc.translate(ref_offsets));
+        const char* offsets_header = m_alloc.translate(ref_offsets);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
@@ -2323,14 +2323,14 @@ top:
         if (pos == not_found) return not_found;
 
         // Get entry under key
-        const char* refs_header = static_cast<char*>(m_alloc.translate(ref_refs));
+        const char* refs_header = m_alloc.translate(ref_refs);
         const char* refs_data = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
         ref_type ref = to_ref(get_direct(refs_data, refs_width, pos));
 
         if (is_node) {
             // Set vars for next iteration
-            header  = static_cast<char*>(m_alloc.translate(ref));
+            header  = m_alloc.translate(ref);
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_node = get_isnode_from_header(header);
@@ -2353,7 +2353,7 @@ top:
                 else return not_found;
             }
 
-            const char* sub_header = static_cast<char*>(m_alloc.translate(ref));
+            const char* sub_header = m_alloc.translate(ref);
             const bool sub_isindex = get_indexflag_from_header(sub_header);
 
             // List of matching row indexes
@@ -2382,7 +2382,7 @@ top:
             }
 
             // Recurse into sub-index;
-            header  = static_cast<char*>(m_alloc.translate(ref));
+            header  = m_alloc.translate(ref);
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_node = get_isnode_from_header(header);
@@ -2415,7 +2415,7 @@ top:
         ref_type ref_refs    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
-        const char* offsets_header = static_cast<char*>(m_alloc.translate(ref_offsets));
+        const char* offsets_header = m_alloc.translate(ref_offsets);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
@@ -2423,14 +2423,14 @@ top:
         if (pos == not_found) return; // not_found
 
         // Get entry under key
-        const char* refs_header = static_cast<char*>(m_alloc.translate(ref_refs));
+        const char* refs_header = m_alloc.translate(ref_refs);
         const char* refs_data = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
         ref_type ref = to_ref(get_direct(refs_data, refs_width, pos));
 
         if (is_node) {
             // Set vars for next iteration
-            header  = static_cast<char*>(m_alloc.translate(ref));
+            header  = m_alloc.translate(ref);
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_node = get_isnode_from_header(header);
@@ -2459,7 +2459,7 @@ top:
                 else return; // not_found
             }
 
-            const char* sub_header = static_cast<char*>(m_alloc.translate(ref));
+            const char* sub_header = m_alloc.translate(ref);
             const bool sub_isindex = get_indexflag_from_header(sub_header);
 
             // List of matching row indexes
@@ -2513,7 +2513,7 @@ top:
             }
 
             // Recurse into sub-index;
-            header  = static_cast<char*>(m_alloc.translate(ref));
+            header  = m_alloc.translate(ref);
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_node = get_isnode_from_header(header);
@@ -2546,7 +2546,7 @@ top:
         ref_type ref_refs    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
-        const char* offsets_header = static_cast<char*>(m_alloc.translate(ref_offsets));
+        const char* offsets_header = m_alloc.translate(ref_offsets);
         const char* offsets_data   = get_data_from_header(offsets_header);
         size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
@@ -2554,14 +2554,14 @@ top:
         if (pos == not_found) return FindRes_not_found;
 
         // Get entry under key
-        const char* refs_header = static_cast<char*>(m_alloc.translate(ref_refs));
+        const char* refs_header = m_alloc.translate(ref_refs);
         const char* refs_data   = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
         ref_type ref = to_ref(get_direct(refs_data, refs_width, pos));
 
         if (is_node) {
             // Set vars for next iteration
-            header  = static_cast<char*>(m_alloc.translate(ref));
+            header  = m_alloc.translate(ref);
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_node = get_isnode_from_header(header);
@@ -2590,7 +2590,7 @@ top:
                 else return FindRes_not_found; // not_found
             }
 
-            const char* sub_header  = static_cast<char*>(m_alloc.translate(ref));
+            const char* sub_header  = m_alloc.translate(ref);
             const bool  sub_isindex = get_indexflag_from_header(sub_header);
 
             // List of matching row indexes
@@ -2631,7 +2631,7 @@ top:
             }
 
             // Recurse into sub-index;
-            header  = static_cast<char*>(m_alloc.translate(ref));
+            header  = m_alloc.translate(ref);
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_node = get_isnode_from_header(header);
@@ -2665,7 +2665,7 @@ top:
         ref_type ref_refs    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
-        const char* offsets_header = static_cast<char*>(m_alloc.translate(ref_offsets));
+        const char* offsets_header = m_alloc.translate(ref_offsets);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
@@ -2673,14 +2673,14 @@ top:
         if (pos == not_found) return 0;
 
         // Get entry under key
-        const char* refs_header = static_cast<char*>(m_alloc.translate(ref_refs));
+        const char* refs_header = m_alloc.translate(ref_refs);
         const char* refs_data = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
         ref_type ref = to_ref(get_direct(refs_data, refs_width, pos));
 
         if (is_node) {
             // Set vars for next iteration
-            header  = static_cast<char*>(m_alloc.translate(ref));
+            header  = m_alloc.translate(ref);
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_node = get_isnode_from_header(header);
@@ -2703,7 +2703,7 @@ top:
                 else return 0;
             }
 
-            const char* sub_header = static_cast<char*>(m_alloc.translate(ref));
+            const char* sub_header = m_alloc.translate(ref);
             const bool sub_isindex = get_indexflag_from_header(sub_header);
 
             // List of matching row indexes
@@ -2742,7 +2742,7 @@ top:
             }
 
             // Recurse into sub-index;
-            header  = static_cast<char*>(m_alloc.translate(ref));
+            header  = m_alloc.translate(ref);
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_node = get_isnode_from_header(header);
@@ -2759,7 +2759,7 @@ pair<const char*, size_t> Array::find_leaf(const Array* root, size_t i) TIGHTDB_
     ref_type offsets_ref = root->get_as_ref(0);
     ref_type refs_ref    = root->get_as_ref(1);
     for (;;) {
-        const char* header = static_cast<char*>(root->m_alloc.translate(offsets_ref));
+        const char* header = root->m_alloc.translate(offsets_ref);
         int width = get_width_from_header(header);
         pair<size_t, size_t> p;
         TIGHTDB_TEMPEX(p = find_child, width, (header, i));
@@ -2767,11 +2767,11 @@ pair<const char*, size_t> Array::find_leaf(const Array* root, size_t i) TIGHTDB_
         size_t elem_ndx_offset = p.second;
         i -= elem_ndx_offset; // local index
 
-        header = static_cast<char*>(root->m_alloc.translate(refs_ref));
+        header = root->m_alloc.translate(refs_ref);
         width = get_width_from_header(header);
         ref_type child_ref = to_ref(get_direct(get_data_from_header(header), width, child_ndx));
 
-        header = static_cast<char*>(root->m_alloc.translate(child_ref));
+        header = root->m_alloc.translate(child_ref);
         bool child_is_leaf = !get_isnode_from_header(header);
         if (child_is_leaf) return make_pair(header, i);
 
@@ -2789,7 +2789,7 @@ pair<ref_type, size_t> Array::find_leaf_ref(const Array* root, size_t i) TIGHTDB
     ref_type offsets_ref = root->get_as_ref(0);
     ref_type refs_ref    = root->get_as_ref(1);
     for (;;) {
-        const char* header = static_cast<char*>(root->m_alloc.translate(offsets_ref));
+        const char* header = root->m_alloc.translate(offsets_ref);
         int width = get_width_from_header(header);
         pair<size_t, size_t> p;
         TIGHTDB_TEMPEX(p = find_child, width, (header, i));
@@ -2797,11 +2797,11 @@ pair<ref_type, size_t> Array::find_leaf_ref(const Array* root, size_t i) TIGHTDB
         size_t elem_ndx_offset = p.second;
         i -= elem_ndx_offset; // local index
 
-        header = static_cast<char*>(root->m_alloc.translate(refs_ref));
+        header = root->m_alloc.translate(refs_ref);
         width = get_width_from_header(header);
         ref_type child_ref = to_ref(get_direct(get_data_from_header(header), width, child_ndx));
 
-        header = static_cast<char*>(root->m_alloc.translate(child_ref));
+        header = root->m_alloc.translate(child_ref);
         bool child_is_leaf = !get_isnode_from_header(header);
         if (child_is_leaf) return make_pair(child_ref, i);
 

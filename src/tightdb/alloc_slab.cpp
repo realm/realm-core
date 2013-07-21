@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 
 #include <tightdb/safe_int_ops.hpp>
@@ -19,7 +20,7 @@ const char SlabAlloc::default_header[24] = {
 SlabAlloc::~SlabAlloc()
 {
 #ifdef TIGHTDB_DEBUG
-    if (!IsAllFree()) {
+    if (!is_all_free()) {
         m_slabs.print();
         m_freeSpace.print();
         TIGHTDB_ASSERT(false);  // FIXME: Should this assert be here?
@@ -34,9 +35,9 @@ SlabAlloc::~SlabAlloc()
     // Release memory
     if (m_data) {
         switch (m_free_mode) {
-            case free_Noop:                                                        break;
-            case free_Unalloc: ::free(const_cast<char*>(m_data));                  break;
-            case free_Unmap:   File::unmap(const_cast<char*>(m_data), m_baseline); break;
+            case free_Noop:                                     break;
+            case free_Unalloc: ::free(m_data);                  break;
+            case free_Unmap:   File::unmap(m_data, m_baseline); break;
         }
     }
 }
@@ -66,7 +67,7 @@ MemRef SlabAlloc::alloc(size_t size)
             }
 #endif // TIGHTDB_DEBUG
 
-            void* pointer = translate(location);
+            char* pointer = translate(location);
             return MemRef(pointer, location);
         }
     }
@@ -80,7 +81,7 @@ MemRef SlabAlloc::alloc(size_t size)
 
     // Allocate memory
     TIGHTDB_ASSERT(0 < newsize);
-    void* slab = new char[newsize]; // Throws
+    char* slab = new char[newsize]; // Throws
 
     // Add to slab table
     Slabs::Cursor s = m_slabs.add(); // FIXME: Use the immediate form add()
@@ -105,7 +106,7 @@ MemRef SlabAlloc::alloc(size_t size)
 // FIXME: We need to come up with a way to make free() a method that
 // never throws. This is essential for exception safety in large parts
 // of the TightDB API.
-void SlabAlloc::free(ref_type ref, const void* p)
+void SlabAlloc::free(ref_type ref, const char* p)
 {
     // Free space in read only segment is tracked separately
     bool read_only = is_read_only(ref);
@@ -158,7 +159,7 @@ void SlabAlloc::free(ref_type ref, const void* p)
     if (!is_merged) free_space.add(ref, size);
 }
 
-MemRef SlabAlloc::realloc(size_t ref, const void* p, size_t size)
+MemRef SlabAlloc::realloc(size_t ref, const char* p, size_t size)
 {
     TIGHTDB_ASSERT((size & 0x7) == 0); // only allow sizes that are multibles of 8
 
@@ -169,10 +170,10 @@ MemRef SlabAlloc::realloc(size_t ref, const void* p, size_t size)
 
     /*if (doCopy) {*/  //TODO: allow realloc without copying
         // Get size of old segment
-    size_t old_size = Array::get_capacity_from_header(static_cast<const char*>(p));
+    size_t old_size = Array::get_capacity_from_header(p);
 
     // Copy existing segment
-    memcpy(space.pointer, p, old_size);
+    copy(p, p+old_size, space.pointer);
 
     // Add old segment to freelist
     free(ref, p); // FIXME: Unfortunately, this one can throw
@@ -188,9 +189,9 @@ MemRef SlabAlloc::realloc(size_t ref, const void* p, size_t size)
     return space;
 }
 
-void* SlabAlloc::translate(ref_type ref) const TIGHTDB_NOEXCEPT
+char* SlabAlloc::translate(ref_type ref) const TIGHTDB_NOEXCEPT
 {
-    if (ref < m_baseline) return const_cast<char*>(m_data) + ref;
+    if (ref < m_baseline) return m_data + ref;
     else {
         size_t ndx = m_slabs.column().offset.find_pos(ref);
         TIGHTDB_ASSERT(ndx != not_found);
@@ -273,7 +274,7 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
 }
 
 
-void SlabAlloc::attach_buffer(const char* data, size_t size, bool take_ownership)
+void SlabAlloc::attach_buffer(char* data, size_t size, bool take_ownership)
 {
     // Verify the data structures
     if (!validate_buffer(data, size)) throw InvalidDatabase();
@@ -338,27 +339,27 @@ ref_type SlabAlloc::get_top_ref() const TIGHTDB_NOEXCEPT
     // is valid
     size_t valid_ref = file_header[23] & 0x1;
 
-    const uint64_t* top_refs = reinterpret_cast<const uint64_t*>(m_data);
+    const uint64_t* top_refs = reinterpret_cast<uint64_t*>(m_data);
     ref_type ref = to_ref(top_refs[valid_ref]);
     TIGHTDB_ASSERT(ref < m_baseline);
 
     return ref;
 }
 
-size_t SlabAlloc::GetTotalSize() const
+size_t SlabAlloc::get_total_size() const
 {
     if (m_slabs.is_empty()) {
         return m_baseline;
     }
     else {
-        return to_ref(m_slabs.back().offset);
+        return to_size_t(m_slabs.back().offset);
     }
 }
 
-void SlabAlloc::FreeAll(size_t filesize)
+void SlabAlloc::free_all(size_t file_size)
 {
-    TIGHTDB_ASSERT(filesize >= m_baseline);
-    TIGHTDB_ASSERT((filesize & 0x7) == 0 || filesize == size_t(-1)); // 64bit alignment
+    TIGHTDB_ASSERT(file_size >= m_baseline);
+    TIGHTDB_ASSERT((file_size & 0x7) == 0 || file_size == size_t(-1)); // 64-bit alignment
 
     // Free all scratch space (done after all data has
     // been commited to persistent space)
@@ -378,32 +379,32 @@ void SlabAlloc::FreeAll(size_t filesize)
     }
 
     // If the file size have changed, we need to remap the readonly buffer
-    if (filesize != size_t(-1))
-        ReMap(filesize);
+    if (file_size != size_t(-1))
+        remap(file_size);
 
-    TIGHTDB_ASSERT(IsAllFree());
+    TIGHTDB_ASSERT(is_all_free());
 }
 
-bool SlabAlloc::ReMap(size_t filesize)
+bool SlabAlloc::remap(size_t file_size)
 {
     TIGHTDB_ASSERT(m_freeReadOnly.is_empty());
     TIGHTDB_ASSERT(m_slabs.size() == m_freeSpace.size());
 
     // We only need to remap the readonly buffer
     // if the file size have changed.
-    if (filesize == m_baseline) return false;
+    if (file_size == m_baseline) return false;
 
-    TIGHTDB_ASSERT(filesize >= m_baseline);
-    TIGHTDB_ASSERT((filesize & 0x7) == 0); // 64bit alignment
+    TIGHTDB_ASSERT(m_baseline <= file_size);
+    TIGHTDB_ASSERT((file_size & 0x7) == 0); // 64bit alignment
 
     void* addr =
-        m_file.remap(const_cast<char*>(m_data), m_baseline, File::access_ReadOnly, filesize);
+        m_file.remap(m_data, m_baseline, File::access_ReadOnly, file_size);
 
-    m_data     = static_cast<const char*>(addr);
-    m_baseline = filesize;
+    m_data = static_cast<char*>(addr);
+    m_baseline = file_size;
 
     // Rebase slabs and free list
-    size_t new_offset = filesize;
+    size_t new_offset = file_size;
     size_t count = m_slabs.size();
     for (size_t i = 0; i < count; ++i) {
         FreeSpace::Cursor c = m_freeSpace[i];
@@ -418,7 +419,7 @@ bool SlabAlloc::ReMap(size_t filesize)
 
 #ifdef TIGHTDB_DEBUG
 
-bool SlabAlloc::IsAllFree() const
+bool SlabAlloc::is_all_free() const
 {
     if (m_freeSpace.size() != m_slabs.size()) return false;
 

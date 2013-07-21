@@ -71,28 +71,28 @@ public:
     /// Attach this allocator to the specified memory buffer.
     ///
     /// \throw InvalidDatabase
-    void attach_buffer(const char* data, std::size_t size, bool take_ownership);
+    void attach_buffer(char* data, std::size_t size, bool take_ownership);
 
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
     MemRef alloc(std::size_t size) TIGHTDB_OVERRIDE;
-    MemRef realloc(ref_type, const void*, std::size_t size) TIGHTDB_OVERRIDE;
-    void   free(ref_type, const void*) TIGHTDB_OVERRIDE; // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
-    void*  translate(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    MemRef realloc(ref_type, const char*, std::size_t size) TIGHTDB_OVERRIDE;
+    void   free(ref_type, const char*) TIGHTDB_OVERRIDE; // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
+    char*  translate(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     bool   is_read_only(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     ref_type get_top_ref() const TIGHTDB_NOEXCEPT;
-    std::size_t GetTotalSize() const;
+    std::size_t get_total_size() const;
 
     bool   CanPersist() const;
     std::size_t GetFileLen() const { return m_baseline; }
-    void   FreeAll(std::size_t filesize = std::size_t(-1));
-    bool   ReMap(std::size_t filesize); // Returns false if remapping was not necessary
+    void   free_all(std::size_t filesize = std::size_t(-1));
+    bool   remap(std::size_t filesize); // Returns false if remapping was not necessary
 
 #ifdef TIGHTDB_DEBUG
     void EnableDebug(bool enable) { m_debugOut = enable; }
     void Verify() const;
-    bool IsAllFree() const;
+    bool is_all_free() const;
     void Print() const;
 #endif // TIGHTDB_DEBUG
 
@@ -113,7 +113,7 @@ private:
     static const char default_header[24];
 
     File        m_file;
-    const char* m_data;
+    char*       m_data;
     FreeMode    m_free_mode;
     std::size_t m_baseline; // Also size of memory mapped portion of database file
     Slabs       m_slabs;
@@ -150,7 +150,7 @@ inline SlabAlloc::SlabAlloc()
 
 inline bool SlabAlloc::is_attached() const  TIGHTDB_NOEXCEPT
 {
-    return (m_data != 0);
+    return m_data != 0;
 }
 
 } // namespace tightdb

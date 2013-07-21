@@ -405,7 +405,7 @@ inline void Group::open(BinaryData buffer, bool take_ownership)
 {
     TIGHTDB_ASSERT(!is_attached());
     TIGHTDB_ASSERT(buffer.data());
-    m_alloc.attach_buffer(buffer.data(), buffer.size(), take_ownership);
+    m_alloc.attach_buffer(const_cast<char*>(buffer.data()), buffer.size(), take_ownership);
     create_from_ref(m_alloc.get_top_ref()); // FIXME: Throws and leaves the Group in peril
 }
 

@@ -46,8 +46,8 @@ inline ref_type to_ref(int64_t v) TIGHTDB_NOEXCEPT
 
 struct MemRef {
     MemRef(): pointer(0), ref(0) {}
-    MemRef(void* p, ref_type r): pointer(p), ref(r) {}
-    void* pointer;
+    MemRef(char* p, ref_type r): pointer(p), ref(r) {}
+    char* pointer;
     ref_type ref;
 };
 
@@ -68,12 +68,12 @@ public:
     virtual MemRef alloc(std::size_t size);
 
     /// \throw std::bad_alloc If insufficient memory was available.
-    virtual MemRef realloc(ref_type ref, const void* addr, std::size_t size);
+    virtual MemRef realloc(ref_type ref, const char* addr, std::size_t size);
 
     // FIXME: SlabAlloc::free() should be modified such than this method never throws.
-    virtual void free(ref_type, const void* addr);
+    virtual void free(ref_type, const char* addr);
 
-    virtual void* translate(ref_type) const TIGHTDB_NOEXCEPT;
+    virtual char* translate(ref_type) const TIGHTDB_NOEXCEPT;
     virtual bool is_read_only(ref_type) const TIGHTDB_NOEXCEPT;
 
     static Allocator& get_default() TIGHTDB_NOEXCEPT;
