@@ -54,7 +54,7 @@ void ArrayString::set(size_t ndx, StringData value)
         TIGHTDB_ASSERT(value.size() < new_width);
 
         // FIXME: Should we try to avoid double copying when realloc fails to preserve the address?
-        Alloc(m_len, new_width); // Throws
+        alloc(m_len, new_width); // Throws
 
         char* base = m_data;
         char* new_end = base + m_len*new_width;
@@ -135,7 +135,7 @@ void ArrayString::insert(size_t ndx, StringData value)
     size_t new_width = max(m_width, ::round_up(value.size()));
 
     // Make room for the new value
-    Alloc(m_len+1, new_width); // Throws
+    alloc(m_len+1, new_width); // Throws
 
     if (0 < value.size() || 0 < m_width) {
         char* base = m_data;
@@ -268,9 +268,9 @@ void ArrayString::erase(size_t ndx)
 
     // move data backwards after deletion
     if (ndx < m_len-1) {
-        char* const new_begin = m_data + ndx*m_width;
-        char* const old_begin = new_begin + m_width;
-        char* const old_end   = m_data + m_len*m_width;
+        char* new_begin = m_data + ndx*m_width;
+        char* old_begin = new_begin + m_width;
+        char* old_end   = m_data + m_len*m_width;
         copy(old_begin, old_end, new_begin);
     }
 
@@ -291,7 +291,7 @@ size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEX
 {
     if (width == 0) return size_t(-1); // zero-width gives infinite space
 
-    const size_t bytes_without_header = bytes - 8;
+    size_t bytes_without_header = bytes - 8;
     return bytes_without_header / width;
 }
 
@@ -393,14 +393,14 @@ void ArrayString::StringStats() const
 
     for (size_t i = 0; i < m_len; ++i) {
         StringData str = get(i);
-        const size_t len = str.size() + 1;
+        size_t len = str.size() + 1;
         total += len;
         if (len > longest) longest = len;
     }
 
-    const size_t size = m_len * m_width;
-    const size_t zeroes = size - total;
-    const size_t zavg = zeroes / (m_len ? m_len : 1); // avoid possible div by zero
+    size_t size = m_len * m_width;
+    size_t zeroes = size - total;
+    size_t zavg = zeroes / (m_len ? m_len : 1); // avoid possible div by zero
 
     cout << "Count: " << m_len << "\n";
     cout << "Width: " << m_width << "\n";
@@ -431,7 +431,7 @@ void ArrayString::ToDot(FILE* f) const
 
 void ArrayString::ToDot(ostream& out, StringData title) const
 {
-    const size_t ref = get_ref();
+    ref_type ref = get_ref();
 
     if (title.size() > 0) {
         out << "subgraph cluster_" << ref << " {" << endl;

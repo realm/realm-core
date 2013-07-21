@@ -371,9 +371,9 @@ TEST(ColumnStringAutoEnumerate)
     }
 
     // Create StringEnum
-    size_t keys;
-    size_t values;
-    const bool res = c.AutoEnumerate(keys, values);
+    ref_type keys;
+    ref_type values;
+    bool res = c.AutoEnumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
 
@@ -386,11 +386,11 @@ TEST(ColumnStringAutoEnumerate)
     }
 
     // Search for a value that does not exist
-    const size_t res1 = e.find_first("nonexist");
+    size_t res1 = e.find_first("nonexist");
     CHECK_EQUAL(size_t(-1), res1);
 
     // Search for an existing value
-    const size_t res2 = e.find_first("klmop");
+    size_t res2 = e.find_first("klmop");
     CHECK_EQUAL(4, res2);
 
     // Cleanup
@@ -412,9 +412,9 @@ TEST(ColumnStringAutoEnumerateIndex)
     }
 
     // Create StringEnum
-    size_t keys;
-    size_t values;
-    const bool res = c.AutoEnumerate(keys, values);
+    ref_type keys;
+    ref_type values;
+    bool res = c.AutoEnumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
 
@@ -423,7 +423,7 @@ TEST(ColumnStringAutoEnumerateIndex)
     CHECK(e.HasIndex());
 
     // Search for a value that does not exist
-    const size_t res1 = e.find_first("nonexist");
+    size_t res1 = e.find_first("nonexist");
     CHECK_EQUAL(not_found, res1);
 
     Array results;
@@ -431,7 +431,7 @@ TEST(ColumnStringAutoEnumerateIndex)
     CHECK(results.is_empty());
 
     // Search for an existing value
-    const size_t res2 = e.find_first("klmop");
+    size_t res2 = e.find_first("klmop");
     CHECK_EQUAL(4, res2);
 
     e.find_all(results, "klmop");
@@ -444,9 +444,9 @@ TEST(ColumnStringAutoEnumerateIndex)
 
     // Set a value
     e.set(1, "newval");
-    const size_t res3 = e.count("a");
-    const size_t res4 = e.count("bc");
-    const size_t res5 = e.count("newval");
+    size_t res3 = e.count("a");
+    size_t res4 = e.count("bc");
+    size_t res5 = e.count("newval");
     CHECK_EQUAL(5, res3);
     CHECK_EQUAL(4, res4);
     CHECK_EQUAL(1, res5);
@@ -458,20 +458,20 @@ TEST(ColumnStringAutoEnumerateIndex)
 
     // Insert a value
     e.insert(4, "newval");
-    const size_t res6 = e.count("newval");
+    size_t res6 = e.count("newval");
     CHECK_EQUAL(2, res6);
 
     // Delete values
     e.erase(1);
     e.erase(0);
-    const size_t res7 = e.count("a");
-    const size_t res8 = e.count("newval");
+    size_t res7 = e.count("a");
+    size_t res8 = e.count("newval");
     CHECK_EQUAL(4, res7);
     CHECK_EQUAL(1, res8);
 
     // Clear all
     e.clear();
-    const size_t res9 = e.count("a");
+    size_t res9 = e.count("a");
     CHECK_EQUAL(0, res9);
 
     // Cleanup
@@ -498,9 +498,9 @@ TEST(ColumnStringAutoEnumerateIndexReuse)
     CHECK(c.HasIndex());
 
     // Create StringEnum
-    size_t keys;
-    size_t values;
-    const bool res = c.AutoEnumerate(keys, values);
+    ref_type keys;
+    ref_type values;
+    bool res = c.AutoEnumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
 
@@ -510,11 +510,11 @@ TEST(ColumnStringAutoEnumerateIndexReuse)
     CHECK(e.HasIndex());
 
     // Search for a value that does not exist
-    const size_t res1 = e.find_first("nonexist");
+    size_t res1 = e.find_first("nonexist");
     CHECK_EQUAL(not_found, res1);
 
     // Search for an existing value
-    const size_t res2 = e.find_first("klmop");
+    size_t res2 = e.find_first("klmop");
     CHECK_EQUAL(4, res2);
 
     // Cleanup

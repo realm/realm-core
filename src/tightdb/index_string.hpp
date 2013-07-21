@@ -33,7 +33,8 @@ class StringIndex: public Column {
 public:
     StringIndex(void* target_column, StringGetter get_func, Allocator&);
     StringIndex(Array::Type, Allocator&);
-    StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, void* target_column, StringGetter get_func, Allocator&);
+    StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, void* target_column,
+                StringGetter get_func, Allocator&);
     void SetTarget(void* target_column, StringGetter get_func);
 
     bool is_empty() const;

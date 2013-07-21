@@ -52,7 +52,7 @@ public:
     /// \param column_ndx If this column is used as part of a table
     /// you must pass the logical index of the column within that
     /// table. Otherwise you should pass zero.
-    ColumnMixed(Allocator& alloc, const Table* table, std::size_t column_ndx);
+    ColumnMixed(Allocator&, const Table* table, std::size_t column_ndx);
 
     /// Create a mixed column wrapper and attach it to a preexisting
     /// underlying structure of arrays.
@@ -64,34 +64,34 @@ public:
     /// \param column_ndx If this column is used as part of a table
     /// you must pass the logical index of the column within that
     /// table. Otherwise you should pass zero.
-    ColumnMixed(Allocator& alloc, const Table* table, std::size_t column_ndx,
-                ArrayParent* parent, std::size_t ndx_in_parent, std::size_t ref);
+    ColumnMixed(Allocator&, const Table* table, std::size_t column_ndx,
+                ArrayParent*, std::size_t ndx_in_parent, ref_type);
 
     ~ColumnMixed();
     void destroy() TIGHTDB_OVERRIDE;
 
-    void set_parent(ArrayParent* parent, size_t pndx);
+    void set_parent(ArrayParent*, std::size_t ndx_in_parent);
     void UpdateFromParent();
 
-    DataType get_type(size_t ndx) const TIGHTDB_NOEXCEPT;
-    size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_types->size(); }
+    DataType get_type(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_types->size(); }
     bool is_empty() const TIGHTDB_NOEXCEPT { return m_types->is_empty(); }
 
-    int64_t get_int(size_t ndx) const;
-    bool get_bool(size_t ndx) const;
-    Date get_date(size_t ndx) const;
-    float get_float(size_t ndx) const;
-    double get_double(size_t ndx) const;
-    StringData get_string(size_t ndx) const;
-    BinaryData get_binary(size_t ndx) const;
+    int64_t get_int(std::size_t ndx) const;
+    bool get_bool(std::size_t ndx) const;
+    Date get_date(std::size_t ndx) const;
+    float get_float(std::size_t ndx) const;
+    double get_double(std::size_t ndx) const;
+    StringData get_string(std::size_t ndx) const;
+    BinaryData get_binary(std::size_t ndx) const;
 
     /// The returned array ref is zero if the specified row does not
     /// contain a subtable.
-    size_t get_subtable_ref(std::size_t row_idx) const TIGHTDB_NOEXCEPT;
+    ref_type get_subtable_ref(std::size_t row_idx) const TIGHTDB_NOEXCEPT;
 
     /// The returned size is zero if the specified row does not
     /// contain a subtable.
-    size_t get_subtable_size(std::size_t row_idx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_subtable_size(std::size_t row_idx) const TIGHTDB_NOEXCEPT;
 
     /// Returns null if the specified row does not contain a subtable,
     /// otherwise the returned table pointer must end up being wrapped
@@ -198,7 +198,7 @@ public:
     RefsColumn(Allocator& alloc, const Table* table, std::size_t column_ndx):
         ColumnSubtableParent(alloc, table, column_ndx) {}
     RefsColumn(Allocator& alloc, const Table* table, std::size_t column_ndx,
-               ArrayParent* parent, std::size_t ndx_in_parent, std::size_t ref):
+               ArrayParent* parent, std::size_t ndx_in_parent, ref_type ref):
         ColumnSubtableParent(alloc, table, column_ndx, parent, ndx_in_parent, ref) {}
     using ColumnSubtableParent::get_subtable_ptr;
     using ColumnSubtableParent::get_subtable;

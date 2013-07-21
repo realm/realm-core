@@ -75,7 +75,7 @@ size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
     // We can set column attribute on creation
     // TODO: add to replication log
     if (attr != col_attr_None) {
-        const size_t column_ndx = m_names.size()-1;
+        size_t column_ndx = m_names.size() - 1;
         set_column_attr(column_ndx, attr);
     }
 
@@ -99,7 +99,7 @@ size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
         spec_set.add(names.get_ref());
 
         // Add to list of subspecs
-        const size_t ref = spec_set.get_ref();
+        ref_type ref = spec_set.get_ref();
         m_subSpecs.add(ref);
     }
 
@@ -119,7 +119,7 @@ size_t Spec::add_subcolumn(const vector<size_t>& column_path, DataType type, Str
 
 size_t Spec::do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, DataType type, StringData name)
 {
-    const size_t column_ndx = column_ids[pos];
+    size_t column_ndx = column_ids[pos];
     Spec subspec = get_subtable_spec(column_ndx);
 
     if (pos == column_ids.size()-1) {
@@ -132,7 +132,7 @@ size_t Spec::do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, Data
 
 Spec Spec::add_subtable_column(StringData name)
 {
-    const size_t column_ndx = m_names.size();
+    size_t column_ndx = m_names.size();
     add_column(type_Table, name);
 
     return get_subtable_spec(column_ndx);
@@ -154,7 +154,7 @@ void Spec::rename_column(const vector<size_t>& column_ids, StringData name)
 
 void Spec::do_rename_column(const vector<size_t>& column_ids, size_t pos, StringData name)
 {
-    const size_t column_ndx = column_ids[pos];
+    size_t column_ndx = column_ids[pos];
 
     if (pos == column_ids.size()-1) {
         rename_column(column_ndx, name);
@@ -169,14 +169,14 @@ void Spec::remove_column(size_t column_ndx)
 {
     TIGHTDB_ASSERT(column_ndx < m_spec.size());
 
-    const size_t type_ndx = get_column_type_pos(column_ndx);
+    size_t type_ndx = get_column_type_pos(column_ndx);
 
     // If the column is a subtable column, we have to delete
     // the subspec(s) as well
-    const ColumnType type = ColumnType(m_spec.get(type_ndx));
+    ColumnType type = ColumnType(m_spec.get(type_ndx));
     if (type == col_type_Table) {
-        const size_t subspec_ndx = get_subspec_ndx(column_ndx);
-        const size_t subspec_ref = m_subSpecs.get_as_ref(subspec_ndx);
+        size_t subspec_ndx = get_subspec_ndx(column_ndx);
+        ref_type subspec_ref = m_subSpecs.get_as_ref(subspec_ndx);
 
         Array subspec_top(subspec_ref, 0, 0, m_specSet.get_alloc());
         subspec_top.destroy(); // recursively delete entire subspec
@@ -189,19 +189,20 @@ void Spec::remove_column(size_t column_ndx)
 
     // If there are an attribute, we have to delete that as well
     if (type_ndx > 0) {
-        const ColumnType type_prefix = ColumnType(m_spec.get(type_ndx-1));
+        ColumnType type_prefix = ColumnType(m_spec.get(type_ndx-1));
         if (type_prefix >= col_attr_Indexed)
             m_spec.erase(type_ndx-1);
     }
 }
 
-void Spec::remove_column(const vector<size_t>& column_ids) {
+void Spec::remove_column(const vector<size_t>& column_ids)
+{
     do_remove_column(column_ids, 0);
 }
 
 void Spec::do_remove_column(const vector<size_t>& column_ids, size_t pos)
 {
-    const size_t column_ndx = column_ids[pos];
+    size_t column_ndx = column_ids[pos];
 
     if (pos == column_ids.size()-1) {
         remove_column(column_ndx);
@@ -217,10 +218,10 @@ Spec Spec::get_subtable_spec(size_t column_ndx)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_column_type(column_ndx) == type_Table);
 
-    const size_t subspec_ndx = get_subspec_ndx(column_ndx);
+    size_t subspec_ndx = get_subspec_ndx(column_ndx);
 
     Allocator& alloc = m_specSet.get_alloc();
-    const size_t ref = m_subSpecs.get_as_ref(subspec_ndx);
+    ref_type ref = m_subSpecs.get_as_ref(subspec_ndx);
 
     return Spec(m_table, alloc, ref, &m_subSpecs, subspec_ndx);
 }
@@ -230,17 +231,17 @@ const Spec Spec::get_subtable_spec(size_t column_ndx) const
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_column_type(column_ndx) == type_Table);
 
-    const size_t subspec_ndx = get_subspec_ndx(column_ndx);
+    size_t subspec_ndx = get_subspec_ndx(column_ndx);
 
     Allocator& alloc = m_specSet.get_alloc();
-    const size_t ref = m_subSpecs.get_as_ref(subspec_ndx);
+    ref_type ref = m_subSpecs.get_as_ref(subspec_ndx);
 
     return Spec(m_table, alloc, ref, 0, 0);
 }
 
 size_t Spec::get_subspec_ndx(size_t column_ndx) const
 {
-    const size_t type_ndx = get_column_type_pos(column_ndx);
+    size_t type_ndx = get_column_type_pos(column_ndx);
 
     // The subspec array only keep info for subtables
     // so we need to count up to it's position
@@ -311,7 +312,7 @@ DataType Spec::get_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
 
-    const ColumnType type = get_real_column_type(ndx);
+    ColumnType type = get_real_column_type(ndx);
 
     // Hide internal types
     if (type == col_type_StringEnum) return type_String;
@@ -325,8 +326,7 @@ void Spec::set_column_type(size_t column_ndx, ColumnType type)
 
     size_t type_ndx = 0;
     size_t column_count = 0;
-    const size_t count = m_spec.size();
-
+    size_t count = m_spec.size();
     for (;type_ndx < count; ++type_ndx) {
         ColumnType t = ColumnType(m_spec.get(type_ndx));
         if (t >= col_attr_Indexed) continue; // ignore attributes
@@ -435,7 +435,7 @@ void Spec::Verify() const
 
 void Spec::to_dot(ostream& out, StringData) const
 {
-    const size_t ref = m_specSet.get_ref();
+    ref_type ref = m_specSet.get_ref();
 
     out << "subgraph cluster_specset" << ref << " {" << endl;
     out << " label = \"specset\";" << endl;
@@ -446,14 +446,13 @@ void Spec::to_dot(ostream& out, StringData) const
     if (m_subSpecs.IsValid()) {
         m_subSpecs.ToDot(out, "subspecs");
 
-        const size_t count = m_subSpecs.size();
         Allocator& alloc = m_specSet.get_alloc();
 
         // Write out subspecs
+        size_t count = m_subSpecs.size();
         for (size_t i = 0; i < count; ++i) {
-            const size_t ref = m_subSpecs.get_as_ref(i);
-            const Spec s(m_table, alloc, ref, 0, 0);
-
+            ref_type ref = m_subSpecs.get_as_ref(i);
+            Spec s(m_table, alloc, ref, 0, 0);
             s.to_dot(out);
         }
     }

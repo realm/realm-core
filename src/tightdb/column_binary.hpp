@@ -26,11 +26,11 @@
 namespace tightdb {
 
 
-class ColumnBinary : public ColumnBase {
+class ColumnBinary: public ColumnBase {
 public:
-    ColumnBinary(Allocator& = Allocator::get_default());
-    ColumnBinary(size_t ref, ArrayParent* = 0, size_t ndx_in_parent = 0,
-                 Allocator& = Allocator::get_default());
+    explicit ColumnBinary(Allocator& = Allocator::get_default());
+    explicit ColumnBinary(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                          Allocator& = Allocator::get_default());
     ~ColumnBinary();
 
     void destroy() TIGHTDB_OVERRIDE;
@@ -59,13 +59,13 @@ public:
     void insert_string(std::size_t ndx, StringData value);
 
     // Index
-    bool HasIndex() const {return false;}
+    bool HasIndex() const { return false; }
     void BuildIndex(Index&) {}
     void ClearIndex() {}
     size_t FindWithIndex(int64_t) const { return size_t(-1); }
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
-    void set_parent(ArrayParent *parent, size_t pndx) { m_array->set_parent(parent, pndx); }
+    void set_parent(ArrayParent* parent, size_t pndx) { m_array->set_parent(parent, pndx); }
     void UpdateParentNdx(int diff) { m_array->UpdateParentNdx(diff); }
 
     /// Compare two binary columns for equality.

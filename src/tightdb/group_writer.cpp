@@ -117,7 +117,7 @@ size_t GroupWriter::commit()
     // Clear old allocs
     // and remap if file size has changed
     SlabAlloc& alloc = m_group.get_allocator();
-    alloc.FreeAll(m_file_map.get_size());
+    alloc.free_all(m_file_map.get_size());
 
     // Return top_pos so that it can be saved in lock file used
     // for coordination
