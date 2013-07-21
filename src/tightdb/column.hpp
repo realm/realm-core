@@ -239,7 +239,6 @@ protected:
 
 private:
     Column &operator=(const Column&); // not allowed
-    class TreeTraits;
 };
 
 
