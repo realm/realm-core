@@ -242,8 +242,6 @@ protected:
 private:
     Column& operator=(const Column&); // not allowed
 
-    class TreeTraits;
-
     static void foreach(const Array* parent, Array::ForEachOp<int64_t>*) TIGHTDB_NOEXCEPT;
 };
 
