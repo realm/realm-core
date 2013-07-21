@@ -45,10 +45,10 @@ inline ref_type to_ref(int64_t v) TIGHTDB_NOEXCEPT
 }
 
 struct MemRef {
-    MemRef(): pointer(0), ref(0) {}
-    MemRef(char* p, ref_type r): pointer(p), ref(r) {}
-    char* pointer;
-    ref_type ref;
+    MemRef(): m_addr(0), m_ref(0) {}
+    MemRef(char* addr, ref_type ref): m_addr(addr), m_ref(ref) {}
+    char* m_addr;
+    ref_type m_ref;
 };
 
 // FIXME: Casting a pointer to std::size_t is inherently nonportable
@@ -64,9 +64,13 @@ struct MemRef {
 
 class Allocator {
 public:
+    /// The specified size must not be zero.
+    ///
     /// \throw std::bad_alloc If insufficient memory was available.
     virtual MemRef alloc(std::size_t size);
 
+    /// The specified size must not be zero.
+    ///
     /// \throw std::bad_alloc If insufficient memory was available.
     virtual MemRef realloc(ref_type ref, const char* addr, std::size_t size);
 
