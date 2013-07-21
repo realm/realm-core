@@ -171,7 +171,7 @@ void Group::create_from_ref(ref_type top_ref)
 
         // Everything but header is free space
         m_freePositions.add(sizeof SlabAlloc::default_header);
-        m_freeLengths.add(m_alloc.GetFileLen() - sizeof SlabAlloc::default_header);
+        m_freeLengths.add(m_alloc.get_base_size() - sizeof SlabAlloc::default_header);
         if (m_is_shared)
             m_freeVersions.add(0);
     }
@@ -389,7 +389,8 @@ size_t Group::commit(size_t current_version, size_t readlock_version, bool persi
     TIGHTDB_ASSERT(readlock_version <= current_version);
 
     // FIXME: Under what circumstances can this even happen????
-    if (!m_alloc.CanPersist()) throw runtime_error("Cannot persist");
+    // FIXME: What about when a user owned read-only buffer is attached? 
+    if (!m_alloc.is_attached()) throw runtime_error("Cannot persist");
 
     // If we have an empty db file, we can just serialize directly
     //if (m_alloc.get_top_ref() == 0) {}
@@ -604,7 +605,7 @@ void Group::Verify() const
                 TIGHTDB_ASSERT((l & 0x7) == 0); // 64bit alignment
             }
 
-            size_t filelen = m_alloc.GetFileLen();
+            size_t filelen = m_alloc.get_base_size();
 
             // Segments should be ordered and without overlap
             for (size_t i = 0; i < count_p-1; ++i) {
@@ -645,7 +646,7 @@ MemStats Group::stats()
 
 void Group::print() const
 {
-    m_alloc.Print();
+    m_alloc.print();
 }
 
 void Group::print_free() const

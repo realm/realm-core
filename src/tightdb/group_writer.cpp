@@ -11,7 +11,7 @@ using namespace tightdb;
 GroupWriter::GroupWriter(Group& group, bool doPersist) :
     m_group(group), m_alloc(group.get_allocator()), m_current_version(0), m_doPersist(doPersist)
 {
-    m_file_map.map(m_alloc.m_file, File::access_ReadWrite, m_alloc.GetFileLen());
+    m_file_map.map(m_alloc.m_file, File::access_ReadWrite, m_alloc.get_base_size());
 }
 
 void GroupWriter::SetVersions(size_t current, size_t readlock)

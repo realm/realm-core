@@ -853,7 +853,11 @@ public:
         return Base::m_table->get_impl()->find_sorted_int(col_idx, value, pos);
     }
 
-    // FIXME: What does this function do? It is used by SlabAlloc. Table::find_pos_int() is protected. Something is not right!
+    // FIXME: This function was added because it is used by
+    // SlabAlloc::translate(). Table::find_pos_int() is protected, so
+    // it is weird that it needs to be public here. The right solution
+    // is to replace it with general purpose lower_bound() and
+    // upper_bound() functions that assume a sorted column.
     std::size_t find_pos(int64_t value) const TIGHTDB_NOEXCEPT
     {
         return Base::m_table->find_pos_int(col_idx, value);

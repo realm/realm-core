@@ -1206,7 +1206,7 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
 
         // Create the new array
         MemRef mem_ref = clone_alloc.alloc(size); // Throws
-        char* clone_header = mem_ref.pointer;
+        char* clone_header = mem_ref.m_addr;
 
         // Copy contents
         const char* src_begin = header;
@@ -1217,7 +1217,7 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
         // Update with correct capacity
         set_header_capacity(size, clone_header);
 
-        return mem_ref.ref;
+        return mem_ref.m_ref;
     }
 
     // Refs are integers, and integers arrays use wtype_Bits.
@@ -1228,7 +1228,7 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
 
     // Create new empty array of refs
     MemRef mem_ref = clone_alloc.alloc(initial_capacity); // Throws
-    char* clone_header = mem_ref.pointer;
+    char* clone_header = mem_ref.m_addr;
     {
         bool is_node = get_isnode_from_header(header);
         bool has_refs = true;
@@ -1239,7 +1239,7 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
     }
 
     Array new_array(clone_alloc);
-    new_array.init_from_header(clone_header, mem_ref.ref);
+    new_array.init_from_header(clone_header, mem_ref.m_ref);
 
     size_t n = array.size();
     for (size_t i = 0; i < n; ++i) {
@@ -1259,7 +1259,7 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
         new_array.add(value);
     }
 
-    return mem_ref.ref;
+    return mem_ref.m_ref;
 }
 
 void Array::CopyOnWrite()
@@ -1276,13 +1276,13 @@ void Array::CopyOnWrite()
     MemRef mref = m_alloc.alloc(new_len); // Throws
     const char* old_begin = get_header_from_data(m_data);
     const char* old_end   = m_data + len;
-    char* new_begin = mref.pointer;
+    char* new_begin = mref.m_addr;
     copy(old_begin, old_end, new_begin);
 
     ref_type old_ref = m_ref;
 
     // Update internal data
-    m_ref = mref.ref;
+    m_ref = mref.m_ref;
     m_data = get_data_from_header(new_begin);
     m_capacity = CalcItemCount(new_len, m_width);
 
@@ -1309,9 +1309,9 @@ ref_type Array::create_empty_array(Type type, WidthType width_type, Allocator& a
     size_t capacity = initial_capacity;
     MemRef mem_ref = alloc.alloc(capacity); // Throws
 
-    init_header(mem_ref.pointer, is_node, has_refs, width_type, 0, 0, capacity);
+    init_header(mem_ref.m_addr, is_node, has_refs, width_type, 0, 0, capacity);
 
-    return mem_ref.ref;
+    return mem_ref.m_ref;
 }
 
 
@@ -1337,21 +1337,21 @@ void Array::alloc(size_t count, size_t width)
             char* header;
             if (!m_data) {
                 mem_ref = m_alloc.alloc(capacity_bytes); // Throws
-                header = mem_ref.pointer;
+                header = mem_ref.m_addr;
                 init_header(header, m_isNode, m_hasRefs, GetWidthType(), int(width), count,
                             capacity_bytes);
             }
             else {
                 header = get_header_from_data(m_data);
                 mem_ref = m_alloc.realloc(m_ref, header, capacity_bytes); // Throws
-                header = mem_ref.pointer;
+                header = mem_ref.m_addr;
                 set_header_width(int(width), header);
                 set_header_len(count, header);
                 set_header_capacity(capacity_bytes, header);
             }
 
             // Update wrapper objects
-            m_ref      = mem_ref.ref;
+            m_ref      = mem_ref.m_ref;
             m_data     = get_data_from_header(header);
             m_capacity = CalcItemCount(capacity_bytes, width);
             // FIXME: Trouble when this one throws. We will then leave
