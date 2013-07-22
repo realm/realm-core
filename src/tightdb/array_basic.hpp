@@ -53,7 +53,11 @@ public:
     /// Compare two arrays for equality.
     bool Compare(const BasicArray<T>&) const;
 
-    static T column_get(const Array* root, std::size_t ndx) TIGHTDB_NOEXCEPT;
+    /// Get the specified element without the cost of constructing an
+    /// array instance. If an array instance is already available, or
+    /// you need to get multiple values, then this method will be
+    /// slower.
+    static T get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
 
     void foreach(ForEachOp<T>*) const TIGHTDB_NOEXCEPT;
     static void foreach(const Array*, ForEachOp<T>*) TIGHTDB_NOEXCEPT;

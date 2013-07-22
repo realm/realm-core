@@ -1318,7 +1318,7 @@ void Table::insert_binary(size_t column_ndx, size_t ndx, BinaryData value)
 }
 
 
-Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const
+Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(ndx < m_size);
@@ -2657,7 +2657,7 @@ void Table::to_dot(ostream& out, StringData title) const
         out << " label = \"TopLevelTable";
         if (0 < title.size()) out << "\\n'" << title << "'";
         out << "\";" << endl;
-        m_top.ToDot(out, "table_top");
+        m_top.to_dot(out, "table_top");
         const Spec& specset = get_spec();
         specset.to_dot(out);
     }
@@ -2668,21 +2668,21 @@ void Table::to_dot(ostream& out, StringData title) const
         out << "\";" << endl;
     }
 
-    ToDotInternal(out);
+    to_dot_internal(out);
 
     out << "}" << endl;
 }
 
-void Table::ToDotInternal(ostream& out) const
+void Table::to_dot_internal(ostream& out) const
 {
-    m_columns.ToDot(out, "columns");
+    m_columns.to_dot(out, "columns");
 
     // Columns
     size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
         const ColumnBase& column = GetColumnBase(i);
         StringData name = get_column_name(i);
-        column.ToDot(out, name);
+        column.to_dot(out, name);
     }
 }
 

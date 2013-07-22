@@ -180,7 +180,7 @@ public:
     double      get_double(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     StringData  get_string(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     BinaryData  get_binary(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    Mixed       get_mixed(std::size_t column_ndx, std::size_t row_ndx) const; // FIXME: Should be modified so it never throws
+    Mixed       get_mixed(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     DataType    get_mixed_type(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     // Set cell values
@@ -414,8 +414,8 @@ protected:
 
 
 #ifdef TIGHTDB_DEBUG
-    void ToDotInternal(std::ostream& out) const;
-#endif // TIGHTDB_DEBUG
+    void to_dot_internal(std::ostream&) const;
+#endif
 
     // Member variables
     std::size_t m_size;

@@ -37,7 +37,7 @@ namespace tightdb {
 // Pre-declarations
 class ColumnBinary;
 
-class ColumnMixed : public ColumnBase {
+class ColumnMixed: public ColumnBase {
 public:
     /// Create a free-standing mixed column.
     ColumnMixed();
@@ -77,13 +77,13 @@ public:
     std::size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_types->size(); }
     bool is_empty() const TIGHTDB_NOEXCEPT { return m_types->is_empty(); }
 
-    int64_t get_int(std::size_t ndx) const;
-    bool get_bool(std::size_t ndx) const;
-    Date get_date(std::size_t ndx) const;
-    float get_float(std::size_t ndx) const;
-    double get_double(std::size_t ndx) const;
-    StringData get_string(std::size_t ndx) const;
-    BinaryData get_binary(std::size_t ndx) const;
+    int64_t get_int(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    bool get_bool(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    Date get_date(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    float get_float(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    double get_double(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    StringData get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    BinaryData get_binary(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
     /// The returned array ref is zero if the specified row does not
     /// contain a subtable.
@@ -140,56 +140,56 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-    void ToDot(std::ostream& out, StringData title) const;
+    void to_dot(std::ostream&, StringData title) const;
 #endif // TIGHTDB_DEBUG
 
 private:
-    void Create(Allocator& alloc, const Table* table, size_t column_ndx);
-    void Create(Allocator& alloc, const Table* table, size_t column_ndx,
-                ArrayParent* parent, size_t ndx_in_parent, size_t ref);
-    void InitDataColumn();
-
     enum MixedColType {
         // NOTE: below numbers must be kept in sync with ColumnType
         // Column types used in Mixed
         mixcol_Int         =  0,
         mixcol_Bool        =  1,
         mixcol_String      =  2,
-                           // 3, used for STRING_ENUM in ColumnType
+        //                    3, used for STRING_ENUM in ColumnType
         mixcol_Binary      =  4,
         mixcol_Table       =  5,
         mixcol_Mixed       =  6,
         mixcol_Date        =  7,
-                           // 8, used for RESERVED1 in ColumnType
+        //                    8, used for RESERVED1 in ColumnType
         mixcol_Float       =  9,
         mixcol_Double      = 10, // Positive Double
         mixcol_DoubleNeg   = 11, // Negative Double
         mixcol_IntNeg      = 12  // Negative Integers
     };
 
+    class RefsColumn;
+
+    /// Stores the MixedColType of each value at the given index. For
+    /// values that uses all 64 bits, the type also encodes the sign
+    /// bit by having distinct types for positive negative values.
+    Column* m_types;
+
+    /// Bit 0 is used to indicate if it's a 'ref'. If not, the data
+    /// value is stored (shifted 1 bit left), and the sign bit is
+    /// encoded in the type storeed in m_types at the corresponding
+    /// index.
+    RefsColumn* m_refs;
+
+    /// For string and binary data types, the bytes are stored here.
+    ColumnBinary* m_data;
+
+    void Create(Allocator& alloc, const Table* table, size_t column_ndx);
+    void Create(Allocator& alloc, const Table* table, size_t column_ndx,
+                ArrayParent* parent, size_t ndx_in_parent, size_t ref);
+    void InitDataColumn();
+
     void clear_value(size_t ndx, MixedColType newtype);
 
     // Get/set/insert 64-bit values in m_refs/m_types
-    int64_t get_value(size_t ndx) const;
+    int64_t get_value(size_t ndx) const TIGHTDB_NOEXCEPT;
     void set_value(size_t ndx, int64_t value, MixedColType coltype);
     void insert_int64(size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
     void set_int64(size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
-
-    class RefsColumn;
-
-    // Member variables:
-
-    // 'm_types' stores the ColumnType of each value at the given index.
-    // For values that uses all 64 bit's the datatype also stores this bit.
-    // (By having a type for both positive numbers, and another type for negative numbers)
-    Column*       m_types;
-
-    // Bit 0 is used to indicate if it's a reference.
-    // If not, the data value is stored (shifted 1 bit left). And the sign bit is stored in m_types.
-    RefsColumn*   m_refs;
-
-    // m_data holds any Binary/String data - if needed.
-    ColumnBinary* m_data;
 };
 
 

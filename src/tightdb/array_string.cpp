@@ -437,7 +437,7 @@ void ArrayString::StringStats() const
 }
 
 /*
-void ArrayString::ToDot(FILE* f) const
+void ArrayString::to_dot(FILE* f) const
 {
     const size_t ref = getRef();
 
@@ -453,7 +453,7 @@ void ArrayString::ToDot(FILE* f) const
 }
 */
 
-void ArrayString::ToDot(ostream& out, StringData title) const
+void ArrayString::to_dot(ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
 

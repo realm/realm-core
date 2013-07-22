@@ -164,9 +164,9 @@ void ColumnTable::Verify() const
     }
 }
 
-void ColumnTable::LeafToDot(ostream& out, const Array& array) const
+void ColumnTable::leaf_to_dot(ostream& out, const Array& array) const
 {
-    array.ToDot(out);
+    array.to_dot(out);
 
     size_t count = array.size();
     for (size_t i = 0; i < count; ++i) {

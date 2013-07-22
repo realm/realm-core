@@ -79,7 +79,7 @@ void round(SharedGroup& db, int index)
             table->add(0, false, moja, time_t(), "", BinaryData(0,0), 0, Mixed(int64_t()));
             const char binary_data[] = { 7, 6, 5, 7, 6, 5, 4, 3, 113 };
             table->add(749321, true, kumi_na_tatu, time_t(99992), "click",
-                       BinaryData(binary_data, sizeof(binary_data)), 0, Mixed("fido"));
+                       BinaryData(binary_data, sizeof binary_data), 0, Mixed("fido"));
         }
         wt.commit();
     }
@@ -413,7 +413,7 @@ private:
 
     static void* run(void* arg)
     {
-        ThreadWrapper &e = *static_cast<ThreadWrapper*>(arg);
+        ThreadWrapper& e = *static_cast<ThreadWrapper*>(arg);
         try {
             thread(e.m_index, e.m_database_path);
         }

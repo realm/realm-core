@@ -158,7 +158,13 @@ template<class T>
 T BasicColumn<T>::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < size());
-    return BasicArray<T>::column_get(m_array, ndx);
+    if (root_is_leaf())
+        return static_cast<const BasicArray<T>*>(m_array)->get(ndx);
+
+    std::pair<MemRef, std::size_t> p = m_array->find_btree_leaf(ndx);
+    const char* leaf_header = p.first.m_addr;
+    std::size_t ndx_in_leaf = p.second;
+    return BasicArray<T>::get(leaf_header, ndx_in_leaf);
 }
 
 template<class T>
@@ -284,9 +290,9 @@ void BasicColumn<T>::LeafToDot(std::ostream& out, const Array& array) const
 {
     // Rebuild array to get correct type
     ref_type ref = array.get_ref();
-    BasicArray<T> newArray(ref, 0, 0, array.get_alloc());
+    BasicArray<T> new_array(ref, 0, 0, array.get_alloc());
 
-    newArray.ToDot(out);
+    new_array.to_dot(out);
 }
 
 #endif // TIGHTDB_DEBUG
