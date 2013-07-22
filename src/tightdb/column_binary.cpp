@@ -13,14 +13,14 @@ ColumnBinary::ColumnBinary(Allocator& alloc)
     m_array = new ArrayBinary(NULL, 0, alloc);
 }
 
-ColumnBinary::ColumnBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc)
+ColumnBinary::ColumnBinary(ref_type ref, ArrayParent* parent, size_t pndx, Allocator& alloc)
 {
-    const bool isNode = is_node_from_ref(ref, alloc);
-    if (isNode) {
-        m_array = new Array(ref, parent, pndx, alloc);
+    bool root_is_leaf = root_is_leaf_from_ref(ref, alloc);
+    if (root_is_leaf) {
+        m_array = new ArrayBinary(ref, parent, pndx, alloc);
     }
     else {
-        m_array = new ArrayBinary(ref, parent, pndx, alloc);
+        m_array = new Array(ref, parent, pndx, alloc);
     }
 }
 
@@ -42,68 +42,65 @@ void ColumnBinary::destroy()
 
 void ColumnBinary::update_ref(ref_type ref)
 {
-    TIGHTDB_ASSERT(is_node_from_ref(ref, m_array->get_alloc())); // Can only be called when creating node
+    TIGHTDB_ASSERT(!root_is_leaf_from_ref(ref, m_array->get_alloc())); // Can only be called when creating node
 
-    if (!root_is_leaf())
+    if (!root_is_leaf()) {
         m_array->update_ref(ref);
-    else {
-        ArrayParent* parent = m_array->get_parent();
-        size_t pndx   = m_array->get_ndx_in_parent();
-
-        // Replace the Binary array with int array for node
-        Array* array = new Array(ref, parent, pndx, m_array->get_alloc());
-        delete m_array;
-        m_array = array;
-
-        // Update ref in parent
-        if (parent)
-            parent->update_child_ref(pndx, ref);
+        return;
     }
+
+    ArrayParent* parent = m_array->get_parent();
+    size_t pndx   = m_array->get_ndx_in_parent();
+
+    // Replace the Binary array with int array for node
+    Array* array = new Array(ref, parent, pndx, m_array->get_alloc());
+    delete m_array;
+    m_array = array;
+
+    // Update ref in parent
+    if (parent)
+        parent->update_child_ref(pndx, ref);
 }
 
 bool ColumnBinary::is_empty() const TIGHTDB_NOEXCEPT
 {
-    if (!root_is_leaf()) {
-        const Array offsets = NodeGetOffsets();
-        return offsets.is_empty();
-    }
-    else {
+    if (root_is_leaf())
         return static_cast<ArrayBinary*>(m_array)->is_empty();
-    }
+
+    Array offsets = NodeGetOffsets();
+    return offsets.is_empty();
 }
 
 size_t ColumnBinary::size() const  TIGHTDB_NOEXCEPT
 {
-    if (!root_is_leaf())  {
-        const Array offsets = NodeGetOffsets();
-        const size_t size = offsets.is_empty() ? 0 : size_t(offsets.back());
-        return size;
-    }
-    else {
+    if (root_is_leaf())
         return static_cast<ArrayBinary*>(m_array)->size();
-    }
+
+    Array offsets = NodeGetOffsets();
+    size_t size = offsets.is_empty() ? 0 : to_size_t(offsets.back());
+    return size;
 }
 
 void ColumnBinary::clear()
 {
-    if (!m_array->is_leaf()) {
-        ArrayParent* parent = m_array->get_parent();
-        size_t pndx = m_array->get_ndx_in_parent();
-
-        // Revert to binary array
-        ArrayBinary* array = new ArrayBinary(parent, pndx, m_array->get_alloc());
-        if (parent)
-            parent->update_child_ref(pndx, array->get_ref());
-
-        // Remove original node
-        m_array->destroy();
-        delete m_array;
-
-        m_array = array;
-    }
-    else {
+    if (m_array->is_leaf()) {
         static_cast<ArrayBinary*>(m_array)->clear();
+        return;
     }
+
+    ArrayParent* parent = m_array->get_parent();
+    size_t pndx = m_array->get_ndx_in_parent();
+
+    // Revert to binary array
+    ArrayBinary* array = new ArrayBinary(parent, pndx, m_array->get_alloc());
+    if (parent)
+        parent->update_child_ref(pndx, array->get_ref());
+
+    // Remove original node
+    m_array->destroy();
+    delete m_array;
+
+    m_array = array;
 }
 
 void ColumnBinary::set(size_t ndx, BinaryData bin)
@@ -226,13 +223,12 @@ void ColumnBinary::LeafDelete(size_t ndx)
 
 #ifdef TIGHTDB_DEBUG
 
-void ColumnBinary::LeafToDot(ostream& out, const Array& array) const
+void ColumnBinary::leaf_to_dot(ostream& out, const Array& array) const
 {
     // Rebuild array to get correct type
-    const size_t ref = array.get_ref();
-    const ArrayBinary binarray(ref, NULL, 0, array.get_alloc());
-
-    binarray.ToDot(out);
+    ref_type ref = array.get_ref();
+    ArrayBinary binarray(ref, 0, 0, array.get_alloc());
+    binarray.to_dot(out);
 }
 
 #endif // TIGHTDB_DEBUG

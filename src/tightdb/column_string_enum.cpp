@@ -16,9 +16,11 @@ tightdb::StringData get_string(void* column, size_t ndx)
 
 namespace tightdb {
 
-ColumnStringEnum::ColumnStringEnum(size_t ref_keys, size_t ref_values, ArrayParent* parent,
-                                   size_t pndx, Allocator& alloc):
-    Column(ref_values, parent, pndx+1, alloc), m_keys(ref_keys, parent, pndx, alloc), m_index(NULL) {}
+ColumnStringEnum::ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* parent,
+                                   size_t ndx_in_parent, Allocator& alloc):
+    Column(values, parent, ndx_in_parent+1, alloc), // Throws
+    m_keys(keys,   parent, ndx_in_parent,   alloc), // Throws
+    m_index(0) {}
 
 ColumnStringEnum::~ColumnStringEnum()
 {
@@ -47,13 +49,6 @@ void ColumnStringEnum::UpdateFromParent()
     m_keys.UpdateFromParent();
 }
 
-StringData ColumnStringEnum::get(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < Column::size());
-    size_t key_ndx = Column::get_as_ref(ndx);
-    return m_keys.get(key_ndx);
-}
-
 void ColumnStringEnum::add(StringData value)
 {
     insert(Column::size(), value);
@@ -80,12 +75,12 @@ void ColumnStringEnum::insert(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx <= Column::size());
 
-    const size_t key_ndx = GetKeyNdxOrAdd(value);
+    size_t key_ndx = GetKeyNdxOrAdd(value);
     Column::insert(ndx, key_ndx);
 
     if (m_index) {
-        const bool isLast = ndx+1 == size();
-        m_index->insert(ndx, value, isLast);
+        bool is_last = ndx+1 == size();
+        m_index->insert(ndx, value, is_last);
     }
 }
 
@@ -98,9 +93,9 @@ void ColumnStringEnum::erase(size_t ndx)
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
     if (m_index) {
-        StringData oldVal = get(ndx);
-        const bool isLast = ndx == size();
-        m_index->erase(ndx, oldVal, isLast);
+        StringData old_val = get(ndx);
+        const bool is_last = ndx == size();
+        m_index->erase(ndx, old_val, is_last);
     }
 
     Column::erase(ndx);
@@ -183,11 +178,11 @@ size_t ColumnStringEnum::GetKeyNdx(StringData value) const
 
 size_t ColumnStringEnum::GetKeyNdxOrAdd(StringData value)
 {
-    const size_t res = m_keys.find_first(value);
+    size_t res = m_keys.find_first(value);
     if (res != size_t(-1)) return res;
     else {
         // Add key if it does not exist
-        const size_t pos = m_keys.size();
+        size_t pos = m_keys.size();
         m_keys.add(value);
         return pos;
     }
@@ -231,10 +226,10 @@ StringIndex& ColumnStringEnum::CreateIndex()
     return *m_index;
 }
 
-void ColumnStringEnum::SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx)
+void ColumnStringEnum::SetIndexRef(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
-    TIGHTDB_ASSERT(m_index == NULL);
-    m_index = new StringIndex(ref, parent, pndx, this, &get_string, m_array->get_alloc());
+    TIGHTDB_ASSERT(!m_index);
+    m_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string, m_array->get_alloc());
 }
 
 void ColumnStringEnum::ReuseIndex(StringIndex& index)
@@ -254,17 +249,17 @@ void ColumnStringEnum::Verify() const
     Column::Verify();
 }
 
-void ColumnStringEnum::ToDot(ostream& out, StringData title) const
+void ColumnStringEnum::to_dot(ostream& out, StringData title) const
 {
-    const size_t ref = m_keys.get_ref();
+    ref_type ref = m_keys.get_ref();
 
     out << "subgraph cluster_columnstringenum" << ref << " {" << endl;
     out << " label = \"ColumnStringEnum";
     if (0 < title.size()) out << "\\n'" << title << "'";
     out << "\";" << endl;
 
-    m_keys.ToDot(out, "keys");
-    Column::ToDot(out, "values");
+    m_keys.to_dot(out, "keys");
+    Column::to_dot(out, "values");
 
     out << "}" << endl;
 }

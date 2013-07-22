@@ -26,7 +26,7 @@ namespace tightdb {
 
 /// A BasicArray can currently only be used for simple unstructured
 /// types like float, double.
-template<typename T> class BasicArray: public Array {
+template<class T> class BasicArray: public Array {
 public:
     explicit BasicArray(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                         Allocator& = Allocator::get_default());
@@ -53,15 +53,19 @@ public:
     /// Compare two arrays for equality.
     bool Compare(const BasicArray<T>&) const;
 
-    static T column_get(const Array* root, std::size_t ndx) TIGHTDB_NOEXCEPT;
+    /// Get the specified element without the cost of constructing an
+    /// array instance. If an array instance is already available, or
+    /// you need to get multiple values, then this method will be
+    /// slower.
+    static T get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
 
 private:
-    virtual size_t CalcByteLen(size_t count, size_t width) const;
-    virtual size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT;
+    virtual std::size_t CalcByteLen(std::size_t count, std::size_t width) const;
+    virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const TIGHTDB_NOEXCEPT;
     virtual WidthType GetWidthType() const { return wtype_Multiply; }
 
     template<bool find_max> bool minmax(T& result, size_t start, size_t end) const;
-    static ref_type create_empty_basic_array(Allocator& alloc);
+    static ref_type create_empty_basic_array(Allocator&);
 };
 
 

@@ -14,11 +14,9 @@ using namespace std;
 
 namespace {
 
-const size_t short_string_max_size = 15;
-
 tightdb::Array::Type get_type_from_ref(tightdb::ref_type ref, tightdb::Allocator& alloc)
 {
-    const char* header = static_cast<char*>(alloc.translate(ref));
+    const char* header = alloc.translate(ref);
     return tightdb::Array::get_type_from_header(header);
 }
 
@@ -64,13 +62,17 @@ AdaptiveStringColumn::~AdaptiveStringColumn()
 
 void AdaptiveStringColumn::destroy()
 {
-    if (!root_is_leaf())
-        m_array->destroy();
-    else if (IsLongStrings()) {
-        static_cast<ArrayStringLong*>(m_array)->destroy();
+    if (root_is_leaf()) {
+        bool long_strings = m_array->has_refs();
+        if (long_strings) {
+            static_cast<ArrayStringLong*>(m_array)->destroy();
+        }
+        else {
+            static_cast<ArrayString*>(m_array)->destroy();
+        }
     }
     else {
-        static_cast<ArrayString*>(m_array)->destroy();
+        m_array->destroy();
     }
 
     if (m_index)
@@ -125,48 +127,50 @@ void AdaptiveStringColumn::SetIndexRef(size_t ref, ArrayParent* parent, size_t p
 
 bool AdaptiveStringColumn::is_empty() const TIGHTDB_NOEXCEPT
 {
-    if (!root_is_leaf()) {
-        const Array offsets = NodeGetOffsets();
-        return offsets.is_empty();
-    }
-    else if (IsLongStrings()) {
-        return static_cast<ArrayStringLong*>(m_array)->is_empty();
-    }
-    else {
+    if (root_is_leaf()) {
+        bool long_strings = m_array->has_refs();
+        if (long_strings) {
+            return static_cast<ArrayStringLong*>(m_array)->is_empty();
+        }
         return static_cast<ArrayString*>(m_array)->is_empty();
     }
+
+    Array offsets = NodeGetOffsets();
+    return offsets.is_empty();
 }
 
 size_t AdaptiveStringColumn::size() const TIGHTDB_NOEXCEPT
 {
-    if (!root_is_leaf())  {
-        const Array offsets = NodeGetOffsets();
-        const size_t size = offsets.is_empty() ? 0 : size_t(offsets.back());
-        return size;
-    }
-    else if (IsLongStrings()) {
-        return static_cast<ArrayStringLong*>(m_array)->size();
-    }
-    else {
+    if (root_is_leaf()) {
+        bool long_strings = m_array->has_refs();
+        if (long_strings) {
+            return static_cast<ArrayStringLong*>(m_array)->size();
+        }
         return static_cast<ArrayString*>(m_array)->size();
     }
+
+    Array offsets = NodeGetOffsets();
+    size_t size = offsets.is_empty() ? 0 : size_t(offsets.back());
+    return size;
 }
 
 void AdaptiveStringColumn::clear()
 {
-    if (!m_array->is_leaf()) {
-        // Revert to string array
-        m_array->destroy();
-        Array* array = new ArrayString(m_array->get_parent(), m_array->get_ndx_in_parent(), m_array->get_alloc());
-        delete m_array;
-        m_array = array;
+    if (root_is_leaf()) {
+        bool long_strings = m_array->has_refs();
+        if (long_strings) {
+            static_cast<ArrayStringLong*>(m_array)->clear();
+        }
+        else {
+            static_cast<ArrayString*>(m_array)->clear();
+        }
     }
-    else if (IsLongStrings()) {
-        static_cast<ArrayStringLong*>(m_array)->clear();
-    }
-    else {
-        static_cast<ArrayString*>(m_array)->clear();
-    }
+
+    // Revert to string array
+    m_array->destroy();
+    Array* array = new ArrayString(m_array->get_parent(), m_array->get_ndx_in_parent(), m_array->get_alloc());
+    delete m_array;
+    m_array = array;
 
     if (m_index)
         m_index->clear();
@@ -176,7 +180,8 @@ void AdaptiveStringColumn::resize(size_t ndx)
 {
     TIGHTDB_ASSERT(root_is_leaf()); // currently only available on leaf level (used by b-tree code)
 
-    if (IsLongStrings()) {
+    bool long_strings = m_array->has_refs();
+    if (long_strings) {
         static_cast<ArrayStringLong*>(m_array)->resize(ndx);
     }
     else {
@@ -289,22 +294,21 @@ size_t AdaptiveStringColumn::count(StringData target) const
 
     size_t count = 0;
 
-    if (!m_array->is_leaf()) {
-        const Array refs = NodeGetRefs();
-        const size_t n = refs.size();
-
-        for (size_t i = 0; i < n; ++i) {
-            const size_t ref = refs.get_as_ref(i);
-            const AdaptiveStringColumn col(ref, NULL, 0, m_array->get_alloc());
-
-            count += col.count(target);
-        }
-    }
-    else {
-        if (IsLongStrings())
+    if (root_is_leaf()) {
+        bool long_strings = m_array->has_refs();
+        if (long_strings)
             count += static_cast<ArrayStringLong*>(m_array)->count(target);
         else
             count += static_cast<ArrayString*>(m_array)->count(target);
+    }
+    else {
+        Array refs = NodeGetRefs();
+        size_t n = refs.size();
+        for (size_t i = 0; i < n; ++i) {
+            ref_type ref = refs.get_as_ref(i);
+            AdaptiveStringColumn col(ref, 0, 0, m_array->get_alloc());
+            count += col.count(target);
+        }
     }
 
     return count;
@@ -341,7 +345,8 @@ FindRes AdaptiveStringColumn::find_all_indexref(StringData value, size_t& dst) c
 
 StringData AdaptiveStringColumn::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    if (IsLongStrings()) {
+    bool long_strings = m_array->has_refs();
+    if (long_strings) {
         return static_cast<ArrayStringLong*>(m_array)->get(ndx);
     }
     else {
@@ -352,7 +357,8 @@ StringData AdaptiveStringColumn::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
 void AdaptiveStringColumn::LeafSet(size_t ndx, StringData value)
 {
     // Easy to set if the strings fit
-    if (IsLongStrings()) {
+    bool long_strings = m_array->has_refs();
+    if (long_strings) {
         static_cast<ArrayStringLong*>(m_array)->set(ndx, value);
         return;
     }
@@ -362,26 +368,26 @@ void AdaptiveStringColumn::LeafSet(size_t ndx, StringData value)
     }
 
     // Replace string array with long string array
-    ArrayStringLong* const newarray =
+    ArrayStringLong* const new_array =
         new ArrayStringLong(static_cast<Array*>(0), 0, m_array->get_alloc());
 
     // Copy strings to new array
     ArrayString* const oldarray = static_cast<ArrayString*>(m_array);
     for (size_t i = 0; i < oldarray->size(); ++i) {
-        newarray->add(oldarray->get(i));
+        new_array->add(oldarray->get(i));
     }
-    newarray->set(ndx, value);
+    new_array->set(ndx, value);
 
     // Update parent to point to new array
     ArrayParent* parent = oldarray->get_parent();
     if (parent) {
         size_t pndx = oldarray->get_ndx_in_parent();
-        parent->update_child_ref(pndx, newarray->get_ref());
-        newarray->set_parent(parent, pndx);
+        parent->update_child_ref(pndx, new_array->get_ref());
+        new_array->set_parent(parent, pndx);
     }
 
     // Replace string array with long string array
-    m_array = newarray;
+    m_array = new_array;
     oldarray->destroy();
     delete oldarray;
 }
@@ -389,7 +395,8 @@ void AdaptiveStringColumn::LeafSet(size_t ndx, StringData value)
 void AdaptiveStringColumn::LeafInsert(size_t ndx, StringData value)
 {
     // Easy to insert if the strings fit
-    if (IsLongStrings()) {
+    bool long_strings = m_array->has_refs();
+    if (long_strings) {
         static_cast<ArrayStringLong*>(m_array)->insert(ndx, value);
         return;
     }
@@ -399,33 +406,34 @@ void AdaptiveStringColumn::LeafInsert(size_t ndx, StringData value)
     }
 
     // Replace string array with long string array
-    ArrayStringLong* const newarray = new ArrayStringLong(static_cast<Array*>(0), 0, m_array->get_alloc());
+    ArrayStringLong* const new_array = new ArrayStringLong(static_cast<Array*>(0), 0, m_array->get_alloc());
 
     // Copy strings to new array
     ArrayString* const oldarray = static_cast<ArrayString*>(m_array);
     const size_t n = oldarray->size();
     for (size_t i=0; i<n; ++i) {
-        newarray->add(oldarray->get(i));
+        new_array->add(oldarray->get(i));
     }
-    newarray->insert(ndx, value);
+    new_array->insert(ndx, value);
 
     // Update parent to point to new array
     ArrayParent* parent = oldarray->get_parent();
     if (parent) {
         size_t pndx = oldarray->get_ndx_in_parent();
-        parent->update_child_ref(pndx, newarray->get_ref());
-        newarray->set_parent(parent, pndx);
+        parent->update_child_ref(pndx, new_array->get_ref());
+        new_array->set_parent(parent, pndx);
     }
 
     // Replace string array with long string array
-    m_array = newarray;
+    m_array = new_array;
     oldarray->destroy();
     delete oldarray;
 }
 
 template<class> size_t AdaptiveStringColumn::LeafFind(StringData value, size_t begin, size_t end) const
 {
-    if (IsLongStrings()) {
+    bool long_strings = m_array->has_refs();
+    if (long_strings) {
         return static_cast<ArrayStringLong*>(m_array)->find_first(value, begin, end);
     }
     return static_cast<ArrayString*>(m_array)->find_first(value, begin, end);
@@ -433,7 +441,8 @@ template<class> size_t AdaptiveStringColumn::LeafFind(StringData value, size_t b
 
 void AdaptiveStringColumn::LeafFindAll(Array &result, StringData value, size_t add_offset, size_t begin, size_t end) const
 {
-    if (IsLongStrings()) {
+    bool long_strings = m_array->has_refs();
+    if (long_strings) {
         return static_cast<ArrayStringLong*>(m_array)->find_all(result, value, add_offset, begin, end);
     }
     return static_cast<ArrayString*>(m_array)->find_all(result, value, add_offset, begin, end);
@@ -442,7 +451,8 @@ void AdaptiveStringColumn::LeafFindAll(Array &result, StringData value, size_t a
 
 void AdaptiveStringColumn::LeafDelete(size_t ndx)
 {
-    if (IsLongStrings()) {
+    bool long_strings = m_array->has_refs();
+    if (long_strings) {
         static_cast<ArrayStringLong*>(m_array)->erase(ndx);
     }
     else {
@@ -509,19 +519,19 @@ void AdaptiveStringColumn::Verify() const
     }
 }
 
-void AdaptiveStringColumn::LeafToDot(ostream& out, const Array& array) const
+void AdaptiveStringColumn::leaf_to_dot(ostream& out, const Array& array) const
 {
-    const bool isLongStrings = array.has_refs(); // has_refs() indicates long string array
+    bool long_strings = array.has_refs(); // has_refs() indicates long string array
 
-    if (isLongStrings) {
+    if (long_strings) {
         // ArrayStringLong has more members than Array, so we have to
         // really instantiate it (it is not enough with a cast)
-        const size_t ref = array.get_ref();
-        ArrayStringLong str_array(ref, static_cast<Array*>(0), 0, array.get_alloc());
-        str_array.ToDot(out);
+        ref_type ref = array.get_ref();
+        ArrayStringLong str_array(ref, 0, 0, array.get_alloc());
+        str_array.to_dot(out);
     }
     else {
-        static_cast<const ArrayString&>(array).ToDot(out);
+        static_cast<const ArrayString&>(array).to_dot(out);
     }
 }
 

@@ -20,9 +20,10 @@
 #ifndef TIGHTDB_COLUMN_STRING_HPP
 #define TIGHTDB_COLUMN_STRING_HPP
 
-#include <tightdb/column.hpp>
+#include <tightdb/unique_ptr.hpp>
 #include <tightdb/array_string.hpp>
 #include <tightdb/array_string_long.hpp>
+#include <tightdb/column.hpp>
 
 namespace tightdb {
 
@@ -31,9 +32,9 @@ class StringIndex;
 
 class AdaptiveStringColumn: public ColumnBase {
 public:
-    AdaptiveStringColumn(Allocator& = Allocator::get_default());
-    AdaptiveStringColumn(std::size_t ref, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                         Allocator& = Allocator::get_default());
+    explicit AdaptiveStringColumn(Allocator& = Allocator::get_default());
+    explicit AdaptiveStringColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                                  Allocator& = Allocator::get_default());
     ~AdaptiveStringColumn();
 
     void destroy() TIGHTDB_OVERRIDE;
@@ -75,7 +76,7 @@ public:
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
-    void set_parent(ArrayParent* parent, size_t pndx) { m_array->set_parent(parent, pndx); }
+    void set_parent(ArrayParent* parent, std::size_t pndx) { m_array->set_parent(parent, pndx); }
 
     // Optimizing data layout
     bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;
@@ -83,47 +84,39 @@ public:
     /// Compare two string columns for equality.
     bool compare(const AdaptiveStringColumn&) const;
 
-    bool GetBlock(size_t ndx, ArrayParent** ap, size_t& off) const
+    bool GetBlock(std::size_t ndx, ArrayParent** ap, std::size_t& off) const
     {
-        if (!root_is_leaf()) {
-            std::pair<size_t, size_t> p = m_array->find_leaf_ref(m_array, ndx);
-            bool longstr = m_array->get_hasrefs_from_header(static_cast<const char*>(m_array->get_alloc().translate(p.first)));
-            if (longstr) {
-                ArrayStringLong* asl2 = new ArrayStringLong(p.first, NULL, 0, m_array->get_alloc());
-                *ap = asl2;
-            }
-            else {
-                ArrayString* as2 = new ArrayString(p.first, NULL, 0, m_array->get_alloc());
-                *ap = as2;
-            }
-            off = ndx - p.second;
-            return longstr;
-        }
-        else {
+        Allocator& alloc = m_array->get_alloc();
+        if (root_is_leaf()) {
             off = 0;
-            if (IsLongStrings()) {
-                ArrayStringLong* asl2 = new ArrayStringLong(m_array->get_ref(), NULL, 0, m_array->get_alloc());
+            bool long_strings = m_array->has_refs();
+            if (long_strings) {
+                ArrayStringLong* asl2 = new ArrayStringLong(m_array->get_ref(), 0, 0, alloc);
                 *ap = asl2;
                 return true;
             }
-            else {
-                ArrayString* as2 = new ArrayString(m_array->get_ref(), NULL, 0, m_array->get_alloc());
-                *ap = as2;
-                return false;
-            }
+            ArrayString* as2 = new ArrayString(m_array->get_ref(), 0, 0, alloc);
+            *ap = as2;
+            return false;
         }
 
-        TIGHTDB_ASSERT(false);
+        std::pair<MemRef, std::size_t> p = m_array->find_btree_leaf(ndx);
+        bool long_strings = Array::get_hasrefs_from_header(p.first.m_addr);
+        if (long_strings) {
+            ArrayStringLong* asl2 = new ArrayStringLong(p.first, 0, 0, alloc);
+            *ap = asl2;
+        }
+        else {
+            ArrayString* as2 = new ArrayString(p.first, 0, 0, alloc);
+            *ap = as2;
+        }
+        off = ndx - p.second;
+        return long_strings;
     }
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-#endif // TIGHTDB_DEBUG
-
-    // Assumes that this column has only a single leaf node, no
-    // internal nodes. In this case has_refs() indicates a long string
-    // array.
-    bool IsLongStrings() const TIGHTDB_NOEXCEPT { return m_array->has_refs(); }
+#endif
 
 protected:
     friend class ColumnBase;
@@ -139,10 +132,12 @@ protected:
     void LeafDelete(size_t ndx);
 
 #ifdef TIGHTDB_DEBUG
-    virtual void LeafToDot(std::ostream& out, const Array& array) const;
-#endif // TIGHTDB_DEBUG
+    virtual void leaf_to_dot(std::ostream& out, const Array& array) const;
+#endif
 
 private:
+    static const size_t short_string_max_size = 15;
+
     StringIndex* m_index;
 };
 
@@ -155,7 +150,20 @@ private:
 inline StringData AdaptiveStringColumn::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < size());
-    return m_array->string_column_get(ndx);
+    if (root_is_leaf()) {
+        if (m_array->has_refs()) {
+            return static_cast<const ArrayStringLong*>(m_array)->get(ndx);
+        }
+        return static_cast<const ArrayString*>(m_array)->get(ndx);
+    }
+
+    std::pair<MemRef, std::size_t> p = m_array->find_btree_leaf(ndx);
+    const char* leaf_header = p.first.m_addr;
+    std::size_t ndx_in_leaf = p.second;
+    bool long_strings = Array::get_hasrefs_from_header(leaf_header);
+    if (long_strings)
+        return ArrayStringLong::get(leaf_header, ndx_in_leaf, m_array->get_alloc());
+    return ArrayString::get(leaf_header, ndx_in_leaf);
 }
 
 inline std::size_t AdaptiveStringColumn::lower_bound(StringData value) const TIGHTDB_NOEXCEPT

@@ -171,9 +171,9 @@ retry:
             // Set initial values
             info->version  = 0;
             info->flags    = dlevel; // durability level is fixed from creation
-            info->filesize = alloc.GetFileLen();
-            info->infosize = (uint32_t)len;
-            info->current_top = alloc.GetTopRef();
+            info->filesize = alloc.get_base_size();
+            info->infosize = uint32_t(len);
+            info->current_top = alloc.get_top_ref();
             info->current_version = 0;
             info->capacity = 32-1;
             info->put_pos  = 0;
@@ -291,7 +291,7 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 const Group& SharedGroup::begin_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-    TIGHTDB_ASSERT(m_group.get_allocator().IsAllFree());
+    TIGHTDB_ASSERT(m_group.get_allocator().is_all_free());
 
     size_t new_topref = 0;
     size_t new_filesize = 0;
@@ -383,7 +383,7 @@ void SharedGroup::end_read()
 Group& SharedGroup::begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-    TIGHTDB_ASSERT(m_group.get_allocator().IsAllFree());
+    TIGHTDB_ASSERT(m_group.get_allocator().is_all_free());
 
     SharedInfo* info = m_file_map.get_addr();
 
@@ -578,8 +578,8 @@ void SharedGroup::ringbuf_expand()
         info2->get_pos += excount;
     }
 
-    info2->infosize = (uint32_t)new_filesize; // notify other processes of expansion
-    info2->capacity = (uint32_t)new_entry_count - 1;
+    info2->infosize = uint32_t(new_filesize); // notify other processes of expansion
+    info2->capacity = uint32_t(new_entry_count) - 1;
 }
 
 size_t SharedGroup::ringbuf_find(uint32_t version) const TIGHTDB_NOEXCEPT
@@ -613,7 +613,7 @@ void SharedGroup::test_ringbuf()
     // Fill buffer (within capacity)
     const size_t capacity = ringbuf_capacity()-1;
     for (size_t i = 0; i < capacity; ++i) {
-        const ReadCount r = {1, (uint32_t)i};
+        const ReadCount r = {1, uint32_t(i)};
         ringbuf_put(r);
         TIGHTDB_ASSERT(ringbuf_get_last().count == i);
     }
@@ -628,7 +628,7 @@ void SharedGroup::test_ringbuf()
 
     // Fill buffer and force split
     for (size_t i = 0; i < capacity; ++i) {
-        const ReadCount r = {1, (uint32_t)i};
+        const ReadCount r = {1, uint32_t(i)};
         ringbuf_put(r);
         TIGHTDB_ASSERT(ringbuf_get_last().count == i);
     }
@@ -639,7 +639,7 @@ void SharedGroup::test_ringbuf()
         ringbuf_remove_first();
     }
     for (size_t i = 0; i < capacity/2; ++i) {
-        const ReadCount r = {1, (uint32_t)i};
+        const ReadCount r = {1, uint32_t(i)};
         ringbuf_put(r);
     }
     for (size_t i = 0; i < capacity; ++i) {
@@ -650,7 +650,7 @@ void SharedGroup::test_ringbuf()
     // Fill buffer above capacity (forcing it to expand)
     size_t capacity_plus = ringbuf_capacity() + 16;
     for (size_t i = 0; i < capacity_plus; ++i) {
-        const ReadCount r = {1, (uint32_t)i};
+        const ReadCount r = {1, uint32_t(i)};
         ringbuf_put(r);
         TIGHTDB_ASSERT(ringbuf_get_last().count == i);
     }
@@ -665,7 +665,7 @@ void SharedGroup::test_ringbuf()
     // Fill buffer above capacity again (forcing it to expand with overlap)
     capacity_plus = ringbuf_capacity() + 16;
     for (size_t i = 0; i < capacity_plus; ++i) {
-        const ReadCount r = {1, (uint32_t)i};
+        const ReadCount r = {1, uint32_t(i)};
         ringbuf_put(r);
         TIGHTDB_ASSERT(ringbuf_get_last().count == i);
     }
@@ -680,7 +680,7 @@ void SharedGroup::test_ringbuf()
 
 void SharedGroup::zero_free_space()
 {
-    SharedInfo* const info = m_file_map.get_addr();
+    SharedInfo* info = m_file_map.get_addr();
 
     // Get version info
     size_t current_version;
@@ -758,7 +758,7 @@ void SharedGroup::low_level_commit(size_t new_version)
 
     // Get the new top ref
     const SlabAlloc& alloc = m_group.get_allocator();
-    size_t new_filesize = alloc.GetFileLen();
+    size_t new_filesize = alloc.get_base_size();
 
     // Update reader info
     {
@@ -768,7 +768,7 @@ void SharedGroup::low_level_commit(size_t new_version)
         // FIXME: Due to lack of adequate synchronization, the
         // following modification of 'info->current_version'
         // effectively participates in a "data race". Please see the
-        // FIXME in SharedGroup::has_changed() for more info.
+        // 'FIXME' in SharedGroup::has_changed() for more info.
         info->current_version = new_version;//FIXME src\tightdb\group_shared.cpp(772): warning C4267: '=' : conversion from 'size_t' to 'volatile uint32_t', possible loss of data
     }
 

@@ -33,7 +33,8 @@ class StringIndex: public Column {
 public:
     StringIndex(void* target_column, StringGetter get_func, Allocator&);
     StringIndex(Array::Type, Allocator&);
-    StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, void* target_column, StringGetter get_func, Allocator&);
+    StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, void* target_column,
+                StringGetter get_func, Allocator&);
     void SetTarget(void* target_column, StringGetter get_func);
 
     bool is_empty() const;
@@ -57,8 +58,8 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     void verify_entries(const AdaptiveStringColumn& column) const;
-    void to_dot() const {to_dot(std::cerr);}
-    void to_dot(std::ostream& out) const;
+    void to_dot() const { to_dot(std::cerr); }
+    void to_dot(std::ostream&) const;
 #endif
 
 protected:
@@ -86,9 +87,9 @@ protected:
     StringGetter m_get_func;
 
 #ifdef TIGHTDB_DEBUG
-    void ToDot(std::ostream& out, StringData title = StringData()) const;
-    void ArrayToDot(std::ostream& out, const Array& array) const;
-    void KeysToDot(std::ostream& out, const Array& array, StringData title = StringData()) const;
+    void to_dot_2(std::ostream&, StringData title = StringData()) const;
+    void array_to_dot(std::ostream&, const Array&) const;
+    void keys_to_dot(std::ostream&, const Array&, StringData title = StringData()) const;
 #endif
 };
 
