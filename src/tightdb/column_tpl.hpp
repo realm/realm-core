@@ -83,29 +83,6 @@ template<class T> T GetColumnFromRef(Array& parent, size_t ndx) // Throws
     return T(size_t(parent.get(ndx)), &parent, ndx, parent.get_alloc()); // Throws
 }
 
-template<class T, class C> T ColumnBase::TreeGet(size_t ndx) const
-{
-    if (!root_is_leaf()) {
-        // Get subnode table
-        const Array offsets = NodeGetOffsets();
-        Array refs = NodeGetRefs();
-
-        // Find the subnode containing the item
-        const size_t node_ndx = offsets.FindPos(ndx);
-
-        // Calc index in subnode
-        const size_t offset = node_ndx ? to_ref(offsets.get(node_ndx-1)) : 0;
-        const size_t local_ndx = ndx - offset;
-
-        // Get item
-        const C target = GetColumnFromRef<C>(refs, node_ndx); // Throws
-        return target.template TreeGet<T,C>(local_ndx);
-    }
-    else {
-        return static_cast<const C*>(this)->LeafGet(ndx);
-    }
-}
-
 template<class T, class C> void ColumnBase::TreeSet(size_t ndx, T value)
 {
     //const T oldVal = m_index ? get(ndx) : 0; // cache oldval for index

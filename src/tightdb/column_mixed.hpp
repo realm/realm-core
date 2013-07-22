@@ -141,7 +141,7 @@ public:
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream&, StringData title) const;
-#endif // TIGHTDB_DEBUG
+#endif
 
 private:
     enum MixedColType {

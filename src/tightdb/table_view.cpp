@@ -87,7 +87,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
 
     R res = static_cast<R>(0);
 
-    T first = column->template TreeGet<T, ColType>(to_size_t(m_refs.get(0)));
+    T first = column->get(to_size_t(m_refs.get(0)));
 
     if(function == act_Count)
         res = static_cast<R>((first == count_target ? 1 : 0));

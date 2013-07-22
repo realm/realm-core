@@ -545,9 +545,9 @@ public:
 #ifdef TIGHTDB_DEBUG
     void Print() const;
     void Verify() const;
-    void to_dot(std::ostream& out, StringData title = StringData()) const;
+    void to_dot(std::ostream&, StringData title = StringData()) const;
     void Stats(MemStats& stats) const;
-#endif // TIGHTDB_DEBUG
+#endif
 
 private:
     typedef bool (*CallbackDummy)(int64_t);

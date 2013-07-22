@@ -55,7 +55,7 @@ public:
     static BinaryData get(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
-    void to_dot(std::ostream& out, const char* title = 0) const;
+    void to_dot(std::ostream&, const char* title = 0) const;
 #endif
 
 private:

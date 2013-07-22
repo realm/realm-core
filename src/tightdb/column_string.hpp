@@ -132,7 +132,7 @@ protected:
     void LeafDelete(size_t ndx);
 
 #ifdef TIGHTDB_DEBUG
-    virtual void leaf_to_dot(std::ostream& out, const Array& array) const;
+    virtual void leaf_to_dot(std::ostream&, const Array& array) const;
 #endif
 
 private:

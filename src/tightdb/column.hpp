@@ -86,8 +86,8 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     virtual void Verify() const = 0; // Must be upper case to avoid conflict with macro in ObjC
-    virtual void to_dot(std::ostream& out, StringData title = StringData()) const;
-#endif // TIGHTDB_DEBUG
+    virtual void to_dot(std::ostream&, StringData title = StringData()) const;
+#endif
 
     template<class C, class A>
     A* TreeGetArray(std::size_t start, std::size_t* first, std::size_t* last) const;
@@ -113,9 +113,6 @@ protected:
     };
 
     // Tree functions
-public:
-    template<class T, class C> T TreeGet(std::size_t ndx) const; // FIXME: This one should probably be eliminated or redesiged because it throws due to dynamic memory allocation
-protected:
     template<class T, class C> void TreeSet(std::size_t ndx, T value);
     template<class T, class C> void TreeInsert(std::size_t ndx, T value);
     template<class T, class C> NodeChange DoInsert(std::size_t ndx, T value);
@@ -145,7 +142,7 @@ protected:
 #ifdef TIGHTDB_DEBUG
     void array_to_dot(std::ostream&, const Array&) const;
     virtual void leaf_to_dot(std::ostream&, const Array&) const;
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Member variables
     mutable Array* m_array; // FIXME: This should not be mutable, the problem is again the const-violating moving copy constructor
@@ -232,7 +229,7 @@ public:
     void Print() const;
     virtual void Verify() const;
     MemStats Stats() const;
-#endif // TIGHTDB_DEBUG
+#endif
 
 protected:
     friend class ColumnBase;
