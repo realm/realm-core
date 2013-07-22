@@ -87,7 +87,7 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
-#endif // TIGHTDB_DEBUG
+#endif
 
 private:
     friend class ColumnBase;
@@ -103,8 +103,8 @@ private:
     void LeafFindAll(Array& result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
 #ifdef TIGHTDB_DEBUG
-    virtual void LeafToDot(std::ostream& out, const Array& array) const;
-#endif // TIGHTDB_DEBUG
+    virtual void LeafToDot(std::ostream&, const Array& array) const;
+#endif
 
     template <typename R, Action action, class cond>
     R aggregate(T target, size_t start, size_t end, size_t *matchcount = 0) const;

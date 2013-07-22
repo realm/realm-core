@@ -77,8 +77,8 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-    void to_dot(std::ostream& out, StringData title = StringData()) const;
-#endif // TIGHTDB_DEBUG
+    void to_dot(std::ostream&, StringData title = StringData()) const;
+#endif
 
 private:
     friend class Table;

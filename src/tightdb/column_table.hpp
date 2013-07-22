@@ -200,12 +200,12 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-#endif // TIGHTDB_DEBUG
+#endif
 
 protected:
 #ifdef TIGHTDB_DEBUG
-    virtual void leaf_to_dot(std::ostream& out, const Array& array) const;
-#endif // TIGHTDB_DEBUG
+    virtual void leaf_to_dot(std::ostream&, const Array& array) const;
+#endif
 
     // Member variables
     ref_type m_ref_specSet;

@@ -57,8 +57,8 @@ public:
     static StringData get(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
-    void to_dot(std::ostream& out, StringData title = StringData()) const;
-#endif // TIGHTDB_DEBUG
+    void to_dot(std::ostream&, StringData title = StringData()) const;
+#endif
 
 private:
     Array m_offsets;

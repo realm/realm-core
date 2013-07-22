@@ -50,7 +50,7 @@ public:
     static const char* get(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
-    void to_dot(std::ostream& out, const char* title = 0) const;
+    void to_dot(std::ostream&, const char* title = 0) const;
 #endif
 
 private:
