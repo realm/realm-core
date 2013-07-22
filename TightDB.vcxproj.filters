@@ -363,6 +363,9 @@
     <ClInclude Include="test\pthread_test.hpp">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="src\tightdb\sequential_getter.h">
+      <Filter>src\include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="pthreads">

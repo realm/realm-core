@@ -1402,6 +1402,9 @@ template<size_t width> void Array::SetWidth() TIGHTDB_NOEXCEPT
     Getter temp_getter = &Array::Get<width>;
     m_getter = temp_getter;
 
+    ChunkGetter temp_chunk_getter = &Array::get_chunk<width>;
+    m_chunk_getter = temp_chunk_getter;
+
     Setter temp_setter = &Array::Set<width>;
     m_setter = temp_setter;
 
@@ -1421,6 +1424,18 @@ template<size_t width> void Array::SetWidth() TIGHTDB_NOEXCEPT
 template<size_t w> int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     return GetUniversal<w>((const char *)m_data, ndx);
+}
+
+template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT
+{
+    res[0] = GetUniversal<w>((const char *)m_data, ndx + 0);
+    res[1] = GetUniversal<w>((const char *)m_data, ndx + 1);
+    res[2] = GetUniversal<w>((const char *)m_data, ndx + 2);
+    res[3] = GetUniversal<w>((const char *)m_data, ndx + 3);
+    res[4] = GetUniversal<w>((const char *)m_data, ndx + 4);
+    res[5] = GetUniversal<w>((const char *)m_data, ndx + 5);
+    res[6] = GetUniversal<w>((const char *)m_data, ndx + 6);
+    res[7] = GetUniversal<w>((const char *)m_data, ndx + 7);
 }
 
 #ifdef _MSC_VER

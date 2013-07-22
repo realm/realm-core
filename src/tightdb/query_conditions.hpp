@@ -149,6 +149,33 @@ struct GreaterEqual {
 };
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 } // namespace tightdb
 
 #endif // TIGHTDB_QUERY_CONDITIONS_HPP
