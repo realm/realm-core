@@ -227,7 +227,7 @@ void Array::destroy()
     }
 
     char* header = get_header_from_data(m_data);
-    m_alloc.free(m_ref, header);
+    m_alloc.free_(m_ref, header);
     m_data = 0;
 }
 
@@ -1295,7 +1295,7 @@ void Array::CopyOnWrite()
 
     // Mark original as deleted, so that the space can be reclaimed in
     // future commits, when no versions are using it anymore
-    m_alloc.free(old_ref, old_begin);
+    m_alloc.free_(old_ref, old_begin);
 }
 
 
@@ -1345,7 +1345,7 @@ void Array::alloc(size_t count, size_t width)
             }
             else {
                 header = get_header_from_data(m_data);
-                mem_ref = m_alloc.realloc(m_ref, header, capacity_bytes); // Throws
+                mem_ref = m_alloc.realloc_(m_ref, header, capacity_bytes); // Throws
                 header = mem_ref.m_addr;
                 set_header_width(int(width), header);
                 set_header_len(count, header);
