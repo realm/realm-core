@@ -150,7 +150,7 @@ double TableViewBase::maximum_double(size_t column_ndx) const
 }
 Date TableViewBase::maximum_date(size_t column_ndx) const
 {
-    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0.0);
+    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0);
 }
 
 // Minimum
@@ -169,7 +169,7 @@ double TableViewBase::minimum_double(size_t column_ndx) const
 }
 Date TableViewBase::minimum_date(size_t column_ndx) const
 {
-    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0.0);
+    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0);
 }
 
 // Average
