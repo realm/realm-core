@@ -223,13 +223,12 @@ void ColumnBinary::LeafDelete(size_t ndx)
 
 #ifdef TIGHTDB_DEBUG
 
-void ColumnBinary::LeafToDot(ostream& out, const Array& array) const
+void ColumnBinary::leaf_to_dot(ostream& out, const Array& array) const
 {
     // Rebuild array to get correct type
-    const size_t ref = array.get_ref();
-    const ArrayBinary binarray(ref, NULL, 0, array.get_alloc());
-
-    binarray.ToDot(out);
+    ref_type ref = array.get_ref();
+    ArrayBinary binarray(ref, 0, 0, array.get_alloc());
+    binarray.to_dot(out);
 }
 
 #endif // TIGHTDB_DEBUG

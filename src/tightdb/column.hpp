@@ -35,21 +35,38 @@ class Index;
 
 class ColumnBase {
 public:
-    virtual ~ColumnBase() {};
-    virtual void destroy() = 0;
+    /// Get the number of entries in this column.
+    virtual std::size_t size() const TIGHTDB_NOEXCEPT = 0;
+
+    /// Add an entry to this column using the columns default value.
+    virtual void add() = 0;
+
+    /// Insert an entry into this column using the columns default
+    /// value.
+    virtual void insert(std::size_t ndx) = 0;
+
+    /// Remove all entries from this column.
+    virtual void clear() = 0;
+
+    /// Remove the specified entry from this column.
+    virtual void erase(std::size_t ndx) = 0;
+
+    virtual void move_last_over(std::size_t ndx) = 0;
+
+    // FIXME: Carefull with this one. It resizes the root node, not
+    // the column. Depending on what it is used for, either rename to
+    // resize_root() or upgrade to handle proper column
+    // resizing. Check if it is used at all. Same for various specific
+    // column types such as AdaptiveStringColumn.
+    void resize(std::size_t size) { m_array->resize(size); }
 
     virtual void SetHasRefs() {};
 
     virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT { return false; }
 
-    virtual std::size_t size() const TIGHTDB_NOEXCEPT = 0;
+    virtual void destroy() = 0;
 
-    virtual void add() = 0; // Add an entry to this column using the columns default value
-    virtual void insert(std::size_t ndx) = 0; // Insert an entry into this column using the columns default value
-    virtual void clear() = 0;
-    virtual void erase(std::size_t ndx) = 0;
-    virtual void move_last_over(std::size_t ndx) = 0;
-    void resize(std::size_t size) { m_array->resize(size); }
+    virtual ~ColumnBase() {};
 
     // Indexing
     virtual bool HasIndex() const = 0;
@@ -69,7 +86,7 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     virtual void Verify() const = 0; // Must be upper case to avoid conflict with macro in ObjC
-    virtual void ToDot(std::ostream& out, StringData title = StringData()) const;
+    virtual void to_dot(std::ostream& out, StringData title = StringData()) const;
 #endif // TIGHTDB_DEBUG
 
     template<class C, class A>
@@ -126,8 +143,8 @@ protected:
 
 
 #ifdef TIGHTDB_DEBUG
-    void ArrayToDot(std::ostream&, const Array&) const;
-    virtual void LeafToDot(std::ostream&, const Array&) const;
+    void array_to_dot(std::ostream&, const Array&) const;
+    virtual void leaf_to_dot(std::ostream&, const Array&) const;
 #endif // TIGHTDB_DEBUG
 
     // Member variables
@@ -248,7 +265,14 @@ private:
 
 inline int64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    return m_array->column_get(ndx);
+    TIGHTDB_ASSERT(ndx < size());
+    if (root_is_leaf())
+        return m_array->get(ndx);
+
+    std::pair<MemRef, std::size_t> p = m_array->find_btree_leaf(ndx);
+    const char* leaf_header = p.first.m_addr;
+    std::size_t ndx_in_leaf = p.second;
+    return Array::get(leaf_header, ndx_in_leaf);
 }
 
 inline ref_type Column::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT

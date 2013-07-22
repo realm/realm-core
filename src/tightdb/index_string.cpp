@@ -76,16 +76,17 @@ int32_t StringIndex::GetLastKey() const
     return int32_t(offsets.back());
 }
 
-void StringIndex::set(size_t ndx, StringData oldValue, StringData newValue)
+void StringIndex::set(size_t ndx, StringData old_value, StringData new_value)
 {
-    erase(ndx, oldValue, true); // set isLast to avoid updating refs
-    insert(ndx, newValue, true); // set isLast to avoid updating refs
+    bool is_last = true; // To avoid updating refs
+    erase(ndx, old_value, is_last);
+    insert(ndx, new_value, is_last);
 }
 
-void StringIndex::insert(size_t row_ndx, StringData value, bool isLast)
+void StringIndex::insert(size_t row_ndx, StringData value, bool is_last)
 {
     // If it is last item in column, we don't have to update refs
-    if (!isLast) UpdateRefs(row_ndx, 1);
+    if (!is_last) UpdateRefs(row_ndx, 1);
 
     InsertWithOffset(row_ndx, 0, value);
 }
@@ -533,7 +534,7 @@ void StringIndex::clear()
     refs.clear();
 }
 
-void StringIndex::erase(size_t row_ndx, StringData value, bool isLast)
+void StringIndex::erase(size_t row_ndx, StringData value, bool is_last)
 {
     DoDelete(row_ndx, value, 0);
 
@@ -543,14 +544,14 @@ void StringIndex::erase(size_t row_ndx, StringData value, bool isLast)
         TIGHTDB_ASSERT(refs.size() != 0); // node cannot be empty
         if (refs.size() > 1) break;
 
-        size_t ref = refs.get_as_ref(0);
+        ref_type ref = refs.get_as_ref(0);
         refs.erase(0); // avoid deleting subtree
         m_array->destroy();
         m_array->update_ref(ref);
     }
 
     // If it is last item in column, we don't have to update refs
-    if (!isLast) UpdateRefs(row_ndx, -1);
+    if (!is_last) UpdateRefs(row_ndx, -1);
 }
 
 void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
@@ -567,7 +568,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
     TIGHTDB_ASSERT(pos != not_found);
 
     if (!m_array->is_leaf()) {
-        size_t ref = refs.get_as_ref(pos);
+        ref_type ref = refs.get_as_ref(pos);
         StringIndex node(ref, &refs, pos, m_target_column, m_get_func, alloc);
         node.DoDelete(row_ndx, value, offset);
 
@@ -637,12 +638,12 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
     TIGHTDB_ASSERT(pos != not_found);
 
     if (!m_array->is_leaf()) {
-        size_t ref = refs.get_as_ref(pos);
+        ref_type ref = refs.get_as_ref(pos);
         StringIndex node(ref, &refs, pos, m_target_column, m_get_func, alloc);
         node.do_update_ref(value, row_ndx, new_row_ndx, offset);
     }
     else {
-        const int64_t ref = refs.get(pos);
+        int64_t ref = refs.get(pos);
         if (ref & 1) {
             TIGHTDB_ASSERT((uint64_t(ref) >> 1) == uint64_t(row_ndx));
             size_t shifted = (new_row_ndx << 1) + 1; // shift to indicate literal
@@ -666,7 +667,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
 
 bool StringIndex::is_empty() const
 {
-    const Array values = m_array->GetSubArray(0);
+    Array values = m_array->GetSubArray(0);
     return values.is_empty();
 }
 
@@ -676,7 +677,7 @@ void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
 {
     Array results;
 
-    const size_t count = column.size();
+    size_t count = column.size();
     for (size_t i = 0; i < count; ++i) {
         StringData value = column.get(i);
 
@@ -693,66 +694,66 @@ void StringIndex::to_dot(ostream& out) const
 {
     out << "digraph G {" << endl;
 
-    ToDot(out);
+    to_dot_2(out);
 
     out << "}" << endl;
 }
 
 
-void StringIndex::ToDot(ostream& out, StringData title) const
+void StringIndex::to_dot_2(ostream& out, StringData title) const
 {
-    const size_t ref = get_ref();
+    ref_type ref = get_ref();
 
     out << "subgraph cluster_stringindex" << ref << " {" << endl;
     out << " label = \"StringIndex";
     if (0 < title.size()) out << "\\n'" << title << "'";
     out << "\";" << endl;
 
-    ArrayToDot(out, *m_array);
+    array_to_dot(out, *m_array);
 
     out << "}" << endl;
 }
 
-void StringIndex::ArrayToDot(ostream& out, const Array& array) const
+void StringIndex::array_to_dot(ostream& out, const Array& array) const
 {
-    if (array.has_refs()) {
-        const Array offsets = array.GetSubArray(0);
-        const Array refs    = array.GetSubArray(1);
-        const size_t ref    = array.get_ref();
+    if (!array.has_refs()) {
+        array.to_dot(out);
+        return;
+    }
 
-        if (!array.is_leaf()) {
-            out << "subgraph cluster_stringindex_node" << ref << " {" << endl;
-            out << " label = \"Node\";" << endl;
-        }
-        else {
-            out << "subgraph cluster_stringindex_leaf" << ref << " {" << endl;
-            out << " label = \"Leaf\";" << endl;
-        }
+    Array offsets = array.GetSubArray(0);
+    Array refs    = array.GetSubArray(1);
+    ref_type ref  = array.get_ref();
 
-        array.ToDot(out);
-        KeysToDot(out, offsets, "keys");
-
-        out << "}" << endl;
-
-        refs.ToDot(out, "refs");
-
-        const size_t count = refs.size();
-        for (size_t i = 0; i < count; ++i) {
-            const size_t ref = refs.get_as_ref(i);
-            if (ref & 1) continue; // ignore literals
-
-            const Array r = refs.GetSubArray(i);
-            ArrayToDot(out, r);
-        }
+    if (array.is_leaf()) {
+        out << "subgraph cluster_stringindex_leaf" << ref << " {" << endl;
+        out << " label = \"Leaf\";" << endl;
     }
     else {
-        array.ToDot(out);
+        out << "subgraph cluster_stringindex_node" << ref << " {" << endl;
+        out << " label = \"Node\";" << endl;
+    }
+
+    array.to_dot(out);
+    keys_to_dot(out, offsets, "keys");
+
+    out << "}" << endl;
+
+    refs.to_dot(out, "refs");
+
+    size_t count = refs.size();
+    for (size_t i = 0; i < count; ++i) {
+        int64_t v = refs.get(i);
+        if (v & 1) continue; // ignore literals
+
+        Array r = refs.GetSubArray(i);
+        array_to_dot(out, r);
     }
 }
 
-void StringIndex::KeysToDot(ostream& out, const Array& array, StringData title) const
+void StringIndex::keys_to_dot(ostream& out, const Array& array, StringData title) const
 {
-    const size_t ref = array.get_ref();
+    ref_type ref = array.get_ref();
 
     if (0 < title.size()) {
         out << "subgraph cluster_" << ref << " {" << endl;
@@ -771,9 +772,9 @@ void StringIndex::KeysToDot(ostream& out, const Array& array, StringData title) 
     out << "</FONT></TD>" << endl;
 
     // Values
-    const size_t count = array.size();
+    size_t count = array.size();
     for (size_t i = 0; i < count; ++i) {
-        const uint64_t v =  array.get(i); // Never right shift signed values
+        uint64_t v =  array.get(i); // Never right shift signed values
 
         char str[5] = "\0\0\0\0";
         str[3] = char(v & 0xFF);

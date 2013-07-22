@@ -21,9 +21,24 @@ ArrayStringLong::ArrayStringLong(ArrayParent* parent, size_t pndx, Allocator& al
     m_blob.set_parent(this, 1);
 }
 
-ArrayStringLong::ArrayStringLong(ref_type ref, ArrayParent* parent, size_t pndx,
+ArrayStringLong::ArrayStringLong(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
                                  Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(ref, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
+    Array(mem, parent, ndx_in_parent, alloc),
+    m_offsets(Array::get_as_ref(0), 0, 0, alloc),
+    m_blob(Array::get_as_ref(1), 0, 0, alloc)
+{
+    TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
+    TIGHTDB_ASSERT(Array::size() == 2);
+    TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : to_size_t(m_offsets.back())));
+
+    m_offsets.set_parent(this, 0);
+    m_blob.set_parent(this, 1);
+}
+
+ArrayStringLong::ArrayStringLong(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
+                                 Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(ref, parent, ndx_in_parent, alloc),
+    m_offsets(Array::get_as_ref(0), 0, 0, alloc),
     m_blob(Array::get_as_ref(1), 0, 0, alloc)
 {
     TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
@@ -143,9 +158,35 @@ void ArrayStringLong::find_all(Array& result, StringData value, size_t add_offse
 }
 
 
+StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc) TIGHTDB_NOEXCEPT
+{
+    pair<size_t, size_t> p = get_size_pair(header, 0);
+    ref_type offsets_ref = p.first;
+    ref_type blob_ref    = p.second;
+
+    const char* offsets_header = alloc.translate(offsets_ref);
+    size_t begin, end;
+    if (0 < ndx) {
+        p = get_size_pair(offsets_header, ndx-1);
+        begin = p.first;
+        end   = p.second;
+    }
+    else {
+        begin = 0;
+        end   = to_size_t(Array::get(offsets_header, 0));
+    }
+    --end; // Discount the terminating zero
+
+    const char* blob_header = alloc.translate(blob_ref);
+    const char* data = ArrayBlob::get(blob_header, begin);
+    size_t size = end - begin;
+    return StringData(data, size);
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
-void ArrayStringLong::ToDot(ostream& out, StringData title) const
+void ArrayStringLong::to_dot(ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
 
@@ -154,9 +195,9 @@ void ArrayStringLong::ToDot(ostream& out, StringData title) const
     if (0 < title.size()) out << "\\n'" << title << "'";
     out << "\";" << endl;
 
-    Array::ToDot(out, "stringlong_top");
-    m_offsets.ToDot(out, "offsets");
-    m_blob.ToDot(out, "blob");
+    Array::to_dot(out, "stringlong_top");
+    m_offsets.to_dot(out, "offsets");
+    m_blob.to_dot(out, "blob");
 
     out << "}" << endl;
 }

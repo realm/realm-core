@@ -256,6 +256,7 @@ bool ColumnBase::root_is_leaf_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_N
 }
 
 
+
 Column::Column(Allocator& alloc): m_index(0)
 {
     m_array = new Array(Array::type_Normal, 0, 0, alloc);
@@ -840,7 +841,7 @@ void Column::Verify() const
     }
 }
 
-void ColumnBase::ToDot(ostream& out, StringData title) const
+void ColumnBase::to_dot(ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
 
@@ -849,42 +850,42 @@ void ColumnBase::ToDot(ostream& out, StringData title) const
     if (0 < title.size()) out << "\\n'" << title << "'";
     out << "\";" << endl;
 
-    ArrayToDot(out, *m_array);
+    array_to_dot(out, *m_array);
 
     out << "}" << endl;
 }
 
-void ColumnBase::ArrayToDot(ostream& out, const Array& array) const
+void ColumnBase::array_to_dot(ostream& out, const Array& array) const
 {
     if (array.is_leaf()) {
-        LeafToDot(out, array);
+        leaf_to_dot(out, array);
         return;
     }
 
     Array offsets = array.GetSubArray(0);
     Array refs    = array.GetSubArray(1);
-    ref_type ref    = array.get_ref();
+    ref_type ref  = array.get_ref();
 
     out << "subgraph cluster_node" << ref << " {" << endl;
     out << " label = \"Node\";" << endl;
 
-    array.ToDot(out);
-    offsets.ToDot(out, "offsets");
+    array.to_dot(out);
+    offsets.to_dot(out, "offsets");
 
     out << "}" << endl;
 
-    refs.ToDot(out, "refs");
+    refs.to_dot(out, "refs");
 
     size_t count = refs.size();
     for (size_t i = 0; i < count; ++i) {
         Array r = refs.GetSubArray(i);
-        ArrayToDot(out, r);
+        array_to_dot(out, r);
     }
 }
 
-void ColumnBase::LeafToDot(ostream& out, const Array& array) const
+void ColumnBase::leaf_to_dot(ostream& out, const Array& array) const
 {
-    array.ToDot(out);
+    array.to_dot(out);
 }
 
 MemStats Column::Stats() const

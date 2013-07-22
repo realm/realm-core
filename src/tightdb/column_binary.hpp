@@ -86,8 +86,8 @@ protected:
     void LeafDelete(size_t ndx);
 
 #ifdef TIGHTDB_DEBUG
-    virtual void LeafToDot(std::ostream& out, const Array& array) const;
-#endif // TIGHTDB_DEBUG
+    virtual void leaf_to_dot(std::ostream& out, const Array& array) const;
+#endif
 
 private:
     void add(StringData value) { add_string(value); }
@@ -104,7 +104,13 @@ private:
 inline BinaryData ColumnBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < size());
-    return ArrayBinary::column_get(m_array, ndx);
+    if (root_is_leaf())
+        return static_cast<const ArrayBinary*>(m_array)->get(ndx);
+
+    std::pair<MemRef, std::size_t> p = m_array->find_btree_leaf(ndx);
+    const char* leaf_header = p.first.m_addr;
+    std::size_t ndx_in_leaf = p.second;
+    return ArrayBinary::get(leaf_header, ndx_in_leaf, m_array->get_alloc());
 }
 
 inline StringData ColumnBinary::get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT
