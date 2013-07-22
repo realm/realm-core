@@ -35,8 +35,6 @@ public:
 
     const char* get(std::size_t pos) const TIGHTDB_NOEXCEPT;
 
-    static const char* get_from_header(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT;
-
     void add(const char* data, std::size_t size, bool add_zero_term = false);
     void insert(std::size_t pos, const char* data, std::size_t size, bool add_zero_term = false);
     void replace(std::size_t begin, std::size_t end, const char* data, std::size_t size,
@@ -45,11 +43,15 @@ public:
     void resize(std::size_t size);
     void clear();
 
-    static const char* get_direct(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT;
+    /// Get the specified element without the cost of constructing an
+    /// array instance. If an array instance is already available, or
+    /// you need to get multiple values, then this method will be
+    /// slower.
+    static const char* get(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
-    void ToDot(std::ostream& out, const char* title = 0) const;
-#endif // TIGHTDB_DEBUG
+    void to_dot(std::ostream& out, const char* title = 0) const;
+#endif
 
 private:
     std::size_t CalcByteLen(std::size_t count, std::size_t width) const TIGHTDB_OVERRIDE;
@@ -88,11 +90,6 @@ inline const char* ArrayBlob::get(std::size_t pos) const TIGHTDB_NOEXCEPT
     return m_data + pos;
 }
 
-inline const char* ArrayBlob::get_from_header(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT
-{
-    return get_data_from_header(header) + pos;
-}
-
 inline void ArrayBlob::add(const char* data, std::size_t size, bool add_zero_term)
 {
     replace(m_len, m_len, data, size, add_zero_term);
@@ -120,7 +117,7 @@ inline void ArrayBlob::clear()
     replace(0, m_len, 0, 0);
 }
 
-inline const char* ArrayBlob::get_direct(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT
+inline const char* ArrayBlob::get(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
     return data + pos;

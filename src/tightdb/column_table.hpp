@@ -204,7 +204,7 @@ public:
 
 protected:
 #ifdef TIGHTDB_DEBUG
-    virtual void LeafToDot(std::ostream& out, const Array& array) const;
+    virtual void leaf_to_dot(std::ostream& out, const Array& array) const;
 #endif // TIGHTDB_DEBUG
 
     // Member variables

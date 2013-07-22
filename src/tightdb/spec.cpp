@@ -440,11 +440,11 @@ void Spec::to_dot(ostream& out, StringData) const
     out << "subgraph cluster_specset" << ref << " {" << endl;
     out << " label = \"specset\";" << endl;
 
-    m_specSet.ToDot(out);
-    m_spec.ToDot(out, "spec");
-    m_names.ToDot(out, "names");
+    m_specSet.to_dot(out);
+    m_spec.to_dot(out, "spec");
+    m_names.to_dot(out, "names");
     if (m_subSpecs.IsValid()) {
-        m_subSpecs.ToDot(out, "subspecs");
+        m_subSpecs.to_dot(out, "subspecs");
 
         Allocator& alloc = m_specSet.get_alloc();
 

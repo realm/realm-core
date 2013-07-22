@@ -83,12 +83,10 @@ template<class T> inline T BasicArray<T>::get(std::size_t ndx) const TIGHTDB_NOE
 
 
 template<class T>
-inline T BasicArray<T>::column_get(const Array* root, std::size_t ndx) TIGHTDB_NOEXCEPT
+inline T BasicArray<T>::get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT
 {
-    if (root->is_leaf()) return static_cast<const BasicArray*>(root)->get(ndx);
-    std::pair<const char*, std::size_t> p = find_leaf(root, ndx);
-    const char* data = get_data_from_header(p.first);
-    return *(reinterpret_cast<const T*>(data) + p.second);
+    const char* data = get_data_from_header(header);
+    return *(reinterpret_cast<const T*>(data) + ndx);
 }
 
 

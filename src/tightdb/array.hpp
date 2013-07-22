@@ -213,7 +213,14 @@ public:
     explicit Array(Type type = type_Normal, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                    Allocator& = Allocator::get_default());
 
-    /// Initialize an array wrapper from the specified array ref.
+    /// Initialize an array wrapper from the specified memory
+    /// reference.
+    Array(MemRef, ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
+
+    /// Initialize an array wrapper from the specified memory
+    /// reference. Note that the version taking a MemRef argument is
+    /// slightly faster, because it does not need to map the 'ref' to
+    /// a memory pointer.
     explicit Array(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                    Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
 
@@ -265,8 +272,8 @@ public:
 
     // Parent tracking
     bool has_parent() const TIGHTDB_NOEXCEPT { return m_parent != 0; }
-    void set_parent(ArrayParent *parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
-    void UpdateParentNdx(int diff) {m_parentNdx += diff;}
+    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
+    void UpdateParentNdx(int diff) { m_parentNdx += diff; }
     ArrayParent* get_parent() const TIGHTDB_NOEXCEPT { return m_parent; }
     std::size_t get_ndx_in_parent() const TIGHTDB_NOEXCEPT { return m_parentNdx; }
     bool UpdateFromParent() TIGHTDB_NOEXCEPT;
@@ -287,7 +294,7 @@ public:
 
     ref_type get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
-    int64_t operator[](std::size_t ndx) const TIGHTDB_NOEXCEPT {return get(ndx);}
+    int64_t operator[](std::size_t ndx) const TIGHTDB_NOEXCEPT { return get(ndx); }
     int64_t back() const TIGHTDB_NOEXCEPT;
     void erase(std::size_t ndx);
     void clear();
@@ -295,8 +302,6 @@ public:
     // Direct access methods
     const Array* GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
                           bool use_retval = false) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array
-    int64_t column_get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    StringData string_column_get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     std::size_t ColumnFind(int64_t target, ref_type ref, Array& cache) const;
 
     typedef StringData (*StringGetter)(void*, std::size_t); // Pre-declare getter function from string index
@@ -479,16 +484,30 @@ public:
     bool FindGTLT(int64_t v, uint64_t chunk, QueryState<int64_t>* state, std::size_t baseindex,
                   Callback callback) const;
 
+    /// Find the leaf node corresponding to the specified tree-level
+    /// index. This array instance must be the root node of a B+-tree,
+    /// and that root node must not itself be a leaf. This implies, of
+    /// course, that the tree must not be empty.
+    ///
+    /// Despite the fact that the returned MemRef object appear to
+    /// allow modification of the referenced memory, the caller must
+    /// consider the memory reference as being const-qualified.
+    ///
+    /// \return (leaf_header, leaf_ndx) where 'leaf_header' points to
+    /// the the header of the located leaf, and 'leaf_ndx' is the
+    /// local index within that leaf corresponding to the specified
+    /// tree-level index.
+    std::pair<MemRef, std::size_t> find_btree_leaf(std::size_t elem_ndx) const TIGHTDB_NOEXCEPT;
+
+    /// Get the specified element without the cost of constructing an
+    /// array instance. If an array instance is already available, or
+    /// you need to get multiple values, then this method will be
+    /// slower.
+    static int64_t get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+
     /// The meaning of 'width' depends on the context in which this
     /// array is used.
     std::size_t get_width() const TIGHTDB_NOEXCEPT { return m_width; }
-
-#ifdef TIGHTDB_DEBUG
-    void Print() const;
-    void Verify() const;
-    void ToDot(std::ostream& out, StringData title = StringData()) const;
-    void Stats(MemStats& stats) const;
-#endif // TIGHTDB_DEBUG
 
     // FIXME: Should not be mutable
     // FIXME: Should not be public
@@ -523,6 +542,13 @@ public:
     /// is guaranteed to be a multiple of 8 (i.e., 64-bit aligned).
     static std::size_t get_byte_size_from_header(const char*) TIGHTDB_NOEXCEPT;
 
+#ifdef TIGHTDB_DEBUG
+    void Print() const;
+    void Verify() const;
+    void to_dot(std::ostream& out, StringData title = StringData()) const;
+    void Stats(MemStats& stats) const;
+#endif // TIGHTDB_DEBUG
+
 private:
     typedef bool (*CallbackDummy)(int64_t);
 
@@ -543,10 +569,11 @@ private:
 protected:
     friend class GroupWriter;
     friend class AdaptiveStringColumn;
+
+    void init_from_mem(MemRef) TIGHTDB_NOEXCEPT;
     void init_from_ref(ref_type) TIGHTDB_NOEXCEPT;
 //    void AddPositiveLocal(int64_t value);
 
-    void init_from_header(char* header, ref_type = 0) TIGHTDB_NOEXCEPT;
     void CreateFromHeaderDirect(char* header, ref_type = 0) TIGHTDB_NOEXCEPT;
     void update_ref_in_parent();
 
@@ -589,24 +616,8 @@ protected:
     void alloc(std::size_t count, std::size_t width);
     void CopyOnWrite();
 
-    // Find the leaf node corresponding to the specified column-level
-    // index. The specified array must be the root node of a B+ tree,
-    // and that root node must not itself be a leaf. This implies, of
-    // course, that the column must not be empty.
-    //
-    // \return (leaf_header, leaf_index) where 'leaf_header' is a
-    // pointer to the header of the located leaf, and 'leaf_index' is
-    // the local index within that leaf corresponding to the specified
-    // column-level index.
-    static std::pair<const char*, std::size_t> find_leaf(const Array* root,
-                                                         std::size_t i) TIGHTDB_NOEXCEPT;
-    static std::pair<ref_type, std::size_t> find_leaf_ref(const Array* root,
-                                                          std::size_t i) TIGHTDB_NOEXCEPT;
-
-    static std::size_t get_as_size(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
-
-    static std::pair<std::size_t, std::size_t> get_two_as_size(const char* header,
-                                                               std::size_t ndx) TIGHTDB_NOEXCEPT;
+    static std::pair<std::size_t, std::size_t> get_size_pair(const char* header,
+                                                             std::size_t ndx) TIGHTDB_NOEXCEPT;
 
 private:
     std::size_t m_ref;
@@ -799,14 +810,6 @@ public:
 
 
 
-inline Array::Array(ref_type ref, ArrayParent* parent, std::size_t pndx,
-                    Allocator& alloc) TIGHTDB_NOEXCEPT:
-    m_data(0), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
-    m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
-{
-    init_from_ref(ref);
-}
-
 inline Array::Array(Type type, ArrayParent* parent, std::size_t pndx, Allocator& alloc):
     m_data(0), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
     m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
@@ -814,6 +817,22 @@ inline Array::Array(Type type, ArrayParent* parent, std::size_t pndx, Allocator&
     ref_type ref = create_empty_array(type, alloc); // Throws
     init_from_ref(ref);
     update_ref_in_parent();
+}
+
+inline Array::Array(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
+                    Allocator& alloc) TIGHTDB_NOEXCEPT:
+    m_data(0), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
+    m_parent(parent), m_parentNdx(ndx_in_parent), m_alloc(alloc), m_lbound(0), m_ubound(0)
+{
+    init_from_mem(mem);
+}
+
+inline Array::Array(ref_type ref, ArrayParent* parent, std::size_t pndx,
+                    Allocator& alloc) TIGHTDB_NOEXCEPT:
+    m_data(0), m_len(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
+    m_parent(parent), m_parentNdx(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
+{
+    init_from_ref(ref);
 }
 
 // Creates new array (but invalid, call update_ref() or set_type() to init)
@@ -887,7 +906,6 @@ inline ref_type Array::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
     int64_t v = get(ndx);
     return to_ref(v);
 }
-
 
 inline Array Array::GetSubArray(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
