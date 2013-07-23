@@ -395,14 +395,14 @@ public:
         size_t r = start - 1;
         for (;;) {
             if (local_matches == local_limit) {
-                m_dD = double(r - start) / (local_matches + 1);
+                m_dD = double(r - start) / (local_matches + 1.1);
                 return r + 1;
             }
 
             // Find first match in this condition node
             r = find_first_local(r + 1, end);
             if (r == end) {
-                m_dD = double(r - start) / (local_matches + 1);
+                m_dD = double(r - start) / (local_matches + 1.1);
                 return end;
             }
 
