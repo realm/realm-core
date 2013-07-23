@@ -65,6 +65,13 @@ Query::~Query()
     }
 }
 
+Query& Query::expression(CCompareBase* compare)
+{
+    ParentNode* const p = new ExpressionNode(compare);
+    UpdatePointers(p, &p->m_child);
+    return *this;
+}
+
 // Makes query search only in rows contained in tv
 Query& Query::tableview(const TableView& tv)
 {
