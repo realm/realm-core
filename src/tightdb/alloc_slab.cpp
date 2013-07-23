@@ -214,7 +214,7 @@ char* SlabAlloc::translate(ref_type ref) const TIGHTDB_NOEXCEPT
         TIGHTDB_ASSERT(ndx != not_found);
 
         size_t offset = ndx ? to_size_t(m_slabs[ndx-1].ref_end) : m_baseline;
-        intptr_t addr = m_slabs[ndx].addr.get();
+        intptr_t addr = intptr_t(m_slabs[ndx].addr.get());
         return reinterpret_cast<char*>(addr) + (ref - offset);
     }
 }
