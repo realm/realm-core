@@ -1428,35 +1428,36 @@ template<size_t w> int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 
 template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT
 {
-    if(ndx + 8 < m_len) {
-#if TIGHTDB_X86_OR_X64
-        uint64_t buf = Get<64>(ndx / 64 * w);
-        
-        res[0] = (buf >> 0*4) & 0xf;
-        res[1] = (buf >> 1*4) & 0xf;
-        res[2] = (buf >> 2*4) & 0xf;
-        res[3] = (buf >> 3*4) & 0xf;
-        res[4] = (buf >> 4*4) & 0xf;
-        res[5] = (buf >> 5*4) & 0xf;
-        res[6] = (buf >> 6*4) & 0xf;
-        res[7] = (buf >> 7*4) & 0xf;
+    TIGHTDB_ASSERT(ndx < m_len);
 
-
-#else
-        res[0] = GetUniversal<w>((const char *)m_data, ndx + 0);
-        res[1] = GetUniversal<w>((const char *)m_data, ndx + 1);
-        res[2] = GetUniversal<w>((const char *)m_data, ndx + 2);
-        res[3] = GetUniversal<w>((const char *)m_data, ndx + 3);
-        res[4] = GetUniversal<w>((const char *)m_data, ndx + 4);
-        res[5] = GetUniversal<w>((const char *)m_data, ndx + 5);
-        res[6] = GetUniversal<w>((const char *)m_data, ndx + 6);
-        res[7] = GetUniversal<w>((const char *)m_data, ndx + 7);
-#endif
+    if(TIGHTDB_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 16 < m_len) {
+        uint64_t c;
+        if(w == 1) {
+            c = *reinterpret_cast<uint16_t*>(m_data + ndx / 8);
+            c >>= ndx - ndx / 8 * 8;
+        }
+        else if(w == 2) {
+            c = *reinterpret_cast<uint32_t*>(m_data + ndx / 4);
+            c >>= ndx - ndx / 4 * 4;
+        }
+        else if(w == 4) {
+            c = *reinterpret_cast<uint64_t*>(m_data + ndx / 2);
+            c >>= ndx - ndx / 4 * 2;
+        }
+        uint64_t mask = (w == 64 ? ~0ULL : ((1ULL << (w == 64 ? 0 : w)) - 1ULL));
+        res[0] = (c >> 0 * w) & mask;
+        res[1] = (c >> 1 * w) & mask;
+        res[2] = (c >> 2 * w) & mask;
+        res[3] = (c >> 3 * w) & mask;
+        res[4] = (c >> 4 * w) & mask;
+        res[5] = (c >> 5 * w) & mask;
+        res[6] = (c >> 6 * w) & mask;
+        res[7] = (c >> 7 * w) & mask;
     }
-    else
-        for(size_t i = ndx; i < m_len; i++)
-            res[i] = GetUniversal<w>((const char *)m_data, ndx + i);
-
+    else {
+        for(size_t i = 0; i < m_len && i < 8; i++) 
+            res[i] = Get<w>(ndx + i);
+    }
 }
 
 #ifdef _MSC_VER
