@@ -35,8 +35,6 @@
 
 namespace tightdb {
 
-using std::size_t;
-
 class TableView;
 class ConstTableView;
 class StringIndex;
@@ -135,145 +133,152 @@ public:
     Spec&       get_spec();
     const Spec& get_spec() const;
     void        update_from_spec(); // Must not be called for a table with shared spec
-    size_t      add_column(DataType type, StringData name); // Add a column dynamically
-    size_t      add_subcolumn(const std::vector<size_t>& column_path, DataType type, StringData name);
-    void        remove_column(size_t column_ndx);
-    void        remove_column(const std::vector<size_t>& column_path);
-    void        rename_column(size_t column_ndx, StringData name);
-    void        rename_column(const std::vector<size_t>& column_path, StringData name);
+    std::size_t add_column(DataType type, StringData name); // Add a column dynamically
+    std::size_t add_subcolumn(const std::vector<std::size_t>& column_path, DataType type, StringData name);
+    void        remove_column(std::size_t column_ndx);
+    void        remove_column(const std::vector<std::size_t>& column_path);
+    void        rename_column(std::size_t column_ndx, StringData name);
+    void        rename_column(const std::vector<std::size_t>& column_path, StringData name);
 
     // Table size and deletion
-    bool        is_empty() const TIGHTDB_NOEXCEPT {return m_size == 0;}
-    size_t      size() const TIGHTDB_NOEXCEPT {return m_size;}
+    bool        is_empty() const TIGHTDB_NOEXCEPT { return m_size == 0; }
+    std::size_t size() const TIGHTDB_NOEXCEPT { return m_size; }
     void        clear();
 
     // Column information
-    size_t      get_column_count() const TIGHTDB_NOEXCEPT;
-    StringData  get_column_name(size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    size_t      get_column_index(StringData name) const;
-    DataType    get_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_column_count() const TIGHTDB_NOEXCEPT;
+    StringData  get_column_name(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_column_index(StringData name) const;
+    DataType    get_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     // Row handling
-    size_t      add_empty_row(size_t num_rows = 1);
-    void        insert_empty_row(size_t row_ndx, size_t num_rows = 1);
-    void        remove(size_t row_ndx);
-    void        remove_last() {if (!is_empty()) remove(m_size-1);}
-    void        move_last_over(size_t ndx);
+    std::size_t add_empty_row(std::size_t num_rows = 1);
+    void        insert_empty_row(std::size_t row_ndx, std::size_t num_rows = 1);
+    void        remove(std::size_t row_ndx);
+    void        remove_last() { if (!is_empty()) remove(m_size-1); }
+    void        move_last_over(std::size_t ndx);
 
     // Insert row
     // NOTE: You have to insert values in ALL columns followed by insert_done().
-    void insert_int(size_t column_ndx, size_t row_ndx, int64_t value);
-    void insert_bool(size_t column_ndx, size_t row_ndx, bool value);
-    void insert_date(size_t column_ndx, size_t row_ndx, Date value);
-    template<class E> void insert_enum(size_t column_ndx, size_t row_ndx, E value);
-    void insert_float(size_t column_ndx, size_t row_ndx, float value);
-    void insert_double(size_t column_ndx, size_t row_ndx, double value);
-    void insert_string(size_t column_ndx, size_t row_ndx, StringData value);
-    void insert_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
-    void insert_subtable(size_t column_ndx, size_t row_ndx); // Insert empty table
-    void insert_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
+    void insert_int(std::size_t column_ndx, std::size_t row_ndx, int64_t value);
+    void insert_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
+    void insert_date(std::size_t column_ndx, std::size_t row_ndx, Date value);
+    template<class E> void insert_enum(std::size_t column_ndx, std::size_t row_ndx, E value);
+    void insert_float(std::size_t column_ndx, std::size_t row_ndx, float value);
+    void insert_double(std::size_t column_ndx, std::size_t row_ndx, double value);
+    void insert_string(std::size_t column_ndx, std::size_t row_ndx, StringData value);
+    void insert_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData value);
+    void insert_subtable(std::size_t column_ndx, std::size_t row_ndx); // Insert empty table
+    void insert_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
     void insert_done();
 
     // Get cell values
-    int64_t     get_int(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    bool        get_bool(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    Date        get_date(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    float       get_float(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    double      get_double(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    StringData  get_string(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
-    DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    int64_t     get_int(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    bool        get_bool(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    Date        get_date(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    float       get_float(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    double      get_double(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    StringData  get_string(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    BinaryData  get_binary(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    Mixed       get_mixed(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    DataType    get_mixed_type(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     // Set cell values
-    void set_int(size_t column_ndx, size_t row_ndx, int64_t value);
-    void set_bool(size_t column_ndx, size_t row_ndx, bool value);
-    void set_date(size_t column_ndx, size_t row_ndx, Date value);
-    template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
-    void set_float(size_t column_ndx, size_t row_ndx, float value);
-    void set_double(size_t column_ndx, size_t row_ndx, double value);
-    void set_string(size_t column_ndx, size_t row_ndx, StringData value);
-    void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
-    void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
-    void add_int(size_t column_ndx, int64_t value);
+    void set_int(std::size_t column_ndx, std::size_t row_ndx, int64_t value);
+    void set_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
+    void set_date(std::size_t column_ndx, std::size_t row_ndx, Date value);
+    template<class E> void set_enum(std::size_t column_ndx, std::size_t row_ndx, E value);
+    void set_float(std::size_t column_ndx, std::size_t row_ndx, float value);
+    void set_double(std::size_t column_ndx, std::size_t row_ndx, double value);
+    void set_string(std::size_t column_ndx, std::size_t row_ndx, StringData value);
+    void set_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData value);
+    void set_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
+
+
+    void add_int(std::size_t column_ndx, int64_t value);
+
+    /// Like insert_subtable(std::size_t, std::size_t, const Table*)
+    /// but overwrites the specified cell rather than inserting a new
+    /// one.
+    void set_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
 
     // Sub-tables (works on columns whose type is either 'subtable' or
     // 'mixed', for a value in a mixed column that is not a subtable,
     // get_subtable() returns null, get_subtable_size() returns zero,
     // and clear_subtable() replaces the value with an empty table.)
-    TableRef       get_subtable(size_t column_ndx, size_t row_ndx);
-    ConstTableRef  get_subtable(size_t column_ndx, size_t row_ndx) const;
-    size_t         get_subtable_size(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    void           clear_subtable(size_t column_ndx, size_t row_ndx);
+    TableRef       get_subtable(std::size_t column_ndx, std::size_t row_ndx);
+    ConstTableRef  get_subtable(std::size_t column_ndx, std::size_t row_ndx) const;
+    size_t         get_subtable_size(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    void           clear_subtable(std::size_t column_ndx, std::size_t row_ndx);
 
     // Indexing
-    bool has_index(size_t column_ndx) const;
-    void set_index(size_t column_ndx) {set_index(column_ndx, true);}
+    bool has_index(std::size_t column_ndx) const;
+    void set_index(std::size_t column_ndx) {set_index(column_ndx, true);}
 
     // Aggregate functions
-    size_t  count_int(size_t column_ndx, int64_t value) const;
-    size_t  count_string(size_t column_ndx, StringData value) const;
-    size_t  count_float(size_t column_ndx, float value) const;
-    size_t  count_double(size_t column_ndx, double value) const;
+    std::size_t  count_int(std::size_t column_ndx, int64_t value) const;
+    std::size_t  count_string(std::size_t column_ndx, StringData value) const;
+    std::size_t  count_float(std::size_t column_ndx, float value) const;
+    std::size_t  count_double(std::size_t column_ndx, double value) const;
 
-    int64_t sum(size_t column_ndx) const;
-    double  sum_float(size_t column_ndx) const;
-    double  sum_double(size_t column_ndx) const;
+    int64_t sum(std::size_t column_ndx) const;
+    double  sum_float(std::size_t column_ndx) const;
+    double  sum_double(std::size_t column_ndx) const;
     // FIXME: What to return for below when table empty? 0?
-    int64_t maximum(size_t column_ndx) const;
-    float   maximum_float(size_t column_ndx) const;
-    double  maximum_double(size_t column_ndx) const;
-    int64_t minimum(size_t column_ndx) const;
-    float   minimum_float(size_t column_ndx) const;
-    double  minimum_double(size_t column_ndx) const;
-    double  average(size_t column_ndx) const;
-    double  average_float(size_t column_ndx) const;
-    double  average_double(size_t column_ndx) const;
+    int64_t maximum(std::size_t column_ndx) const;
+    float   maximum_float(std::size_t column_ndx) const;
+    double  maximum_double(std::size_t column_ndx) const;
+    int64_t minimum(std::size_t column_ndx) const;
+    float   minimum_float(std::size_t column_ndx) const;
+    double  minimum_double(std::size_t column_ndx) const;
+    double  average(std::size_t column_ndx) const;
+    double  average_float(std::size_t column_ndx) const;
+    double  average_double(std::size_t column_ndx) const;
 
     // Searching
-    size_t         lookup(StringData value) const;
-    size_t         find_first_int(size_t column_ndx, int64_t value) const;
-    size_t         find_first_bool(size_t column_ndx, bool value) const;
-    size_t         find_first_date(size_t column_ndx, Date value) const;
-    size_t         find_first_float(size_t column_ndx, float value) const;
-    size_t         find_first_double(size_t column_ndx, double value) const;
-    size_t         find_first_string(size_t column_ndx, StringData value) const;
-    size_t         find_first_binary(size_t column_ndx, BinaryData value) const;
+    std::size_t    lookup(StringData value) const;
+    std::size_t    find_first_int(std::size_t column_ndx, int64_t value) const;
+    std::size_t    find_first_bool(std::size_t column_ndx, bool value) const;
+    std::size_t    find_first_date(std::size_t column_ndx, Date value) const;
+    std::size_t    find_first_float(std::size_t column_ndx, float value) const;
+    std::size_t    find_first_double(std::size_t column_ndx, double value) const;
+    std::size_t    find_first_string(std::size_t column_ndx, StringData value) const;
+    std::size_t    find_first_binary(std::size_t column_ndx, BinaryData value) const;
 
-    bool           find_sorted_int(size_t column_ndx, int64_t value, size_t& pos) const;
+    bool           find_sorted_int(std::size_t column_ndx, int64_t value, std::size_t& pos) const;
 
-    TableView      find_all_int(size_t column_ndx, int64_t value);
-    ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
-    TableView      find_all_bool(size_t column_ndx, bool value);
-    ConstTableView find_all_bool(size_t column_ndx, bool value) const;
-    TableView      find_all_date(size_t column_ndx, Date value);
-    ConstTableView find_all_date(size_t column_ndx, Date value) const;
-    TableView      find_all_float(size_t column_ndx, float value);
-    ConstTableView find_all_float(size_t column_ndx, float value) const;
-    TableView      find_all_double(size_t column_ndx, double value);
-    ConstTableView find_all_double(size_t column_ndx, double value) const;
-    TableView      find_all_string(size_t column_ndx, StringData value);
-    ConstTableView find_all_string(size_t column_ndx, StringData value) const;
-    TableView      find_all_binary(size_t column_ndx, BinaryData value);
-    ConstTableView find_all_binary(size_t column_ndx, BinaryData value) const;
+    TableView      find_all_int(std::size_t column_ndx, int64_t value);
+    ConstTableView find_all_int(std::size_t column_ndx, int64_t value) const;
+    TableView      find_all_bool(std::size_t column_ndx, bool value);
+    ConstTableView find_all_bool(std::size_t column_ndx, bool value) const;
+    TableView      find_all_date(std::size_t column_ndx, Date value);
+    ConstTableView find_all_date(std::size_t column_ndx, Date value) const;
+    TableView      find_all_float(std::size_t column_ndx, float value);
+    ConstTableView find_all_float(std::size_t column_ndx, float value) const;
+    TableView      find_all_double(std::size_t column_ndx, double value);
+    ConstTableView find_all_double(std::size_t column_ndx, double value) const;
+    TableView      find_all_string(std::size_t column_ndx, StringData value);
+    ConstTableView find_all_string(std::size_t column_ndx, StringData value) const;
+    TableView      find_all_binary(std::size_t column_ndx, BinaryData value);
+    ConstTableView find_all_binary(std::size_t column_ndx, BinaryData value) const;
 
-    TableView      distinct(size_t column_ndx);
-    ConstTableView distinct(size_t column_ndx) const;
+    TableView      distinct(std::size_t column_ndx);
+    ConstTableView distinct(std::size_t column_ndx) const;
 
-    TableView      get_sorted_view(size_t column_ndx, bool ascending=true);
-    ConstTableView get_sorted_view(size_t column_ndx, bool ascending=true) const;
+    TableView      get_sorted_view(std::size_t column_ndx, bool ascending = true);
+    ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;
 
     // Queries
-    Query       where() {return Query(*this);}
-    const Query where() const {return Query(*this);} // FIXME: There is no point in returning a const Query. We need a ConstQuery class.
+    Query       where() { return Query(*this); }
+    const Query where() const { return Query(*this); } // FIXME: There is no point in returning a const Query. We need a ConstQuery class.
 
     // Optimizing
     void optimize();
 
     // Conversion
     void to_json(std::ostream& out) const;
-    void to_string(std::ostream& out, size_t limit=500) const;
-    void row_to_string(size_t row_ndx, std::ostream& out) const;
+    void to_string(std::ostream& out, std::size_t limit = 500) const;
+    void row_to_string(std::size_t row_ndx, std::ostream& out) const;
 
     // Get a reference to this table
     TableRef get_table_ref() { return TableRef(this); }
@@ -293,40 +298,40 @@ public:
     // Debug
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-    void to_dot(std::ostream& out, StringData title = StringData()) const;
+    void to_dot(std::ostream&, StringData title = StringData()) const;
     void print() const;
     MemStats stats() const;
-#endif // TIGHTDB_DEBUG
+#endif
 
-    const ColumnBase& GetColumnBase(size_t column_ndx) const TIGHTDB_NOEXCEPT; // FIXME: Move this to private section next to the non-const version
-    ColumnType get_real_column_type(size_t column_ndx) const TIGHTDB_NOEXCEPT; // FIXME: Used by various node types in <tightdb/query_engine.hpp>
+    const ColumnBase& GetColumnBase(std::size_t column_ndx) const TIGHTDB_NOEXCEPT; // FIXME: Move this to private section next to the non-const version
+    ColumnType get_real_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT; // FIXME: Used by various node types in <tightdb/query_engine.hpp>
 
     class Parent;
 
 protected:
-    size_t find_pos_int(size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT;
+    std::size_t find_pos_int(std::size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT;
 
     // FIXME: Most of the things that are protected here, could instead be private
     // Direct Column access
-    template <class T, ColumnType col_type> T& GetColumn(size_t ndx);
-    template <class T, ColumnType col_type> const T& GetColumn(size_t ndx) const TIGHTDB_NOEXCEPT;
-    Column& GetColumn(size_t column_ndx);
-    const Column& GetColumn(size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    ColumnFloat& GetColumnFloat(size_t column_ndx);
-    const ColumnFloat& GetColumnFloat(size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    ColumnDouble& GetColumnDouble(size_t column_ndx);
-    const ColumnDouble& GetColumnDouble(size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    AdaptiveStringColumn& GetColumnString(size_t column_ndx);
-    const AdaptiveStringColumn& GetColumnString(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    template <class T, ColumnType col_type> T& GetColumn(std::size_t ndx);
+    template <class T, ColumnType col_type> const T& GetColumn(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    Column& GetColumn(std::size_t column_ndx);
+    const Column& GetColumn(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnFloat& GetColumnFloat(std::size_t column_ndx);
+    const ColumnFloat& GetColumnFloat(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnDouble& GetColumnDouble(std::size_t column_ndx);
+    const ColumnDouble& GetColumnDouble(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    AdaptiveStringColumn& GetColumnString(std::size_t column_ndx);
+    const AdaptiveStringColumn& GetColumnString(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
-    ColumnBinary& GetColumnBinary(size_t column_ndx);
-    const ColumnBinary& GetColumnBinary(size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    ColumnStringEnum& GetColumnStringEnum(size_t column_ndx);
-    const ColumnStringEnum& GetColumnStringEnum(size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    ColumnTable& GetColumnTable(size_t column_ndx);
-    const ColumnTable& GetColumnTable(size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    ColumnMixed& GetColumnMixed(size_t column_ndx);
-    const ColumnMixed& GetColumnMixed(size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnBinary& GetColumnBinary(std::size_t column_ndx);
+    const ColumnBinary& GetColumnBinary(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnStringEnum& GetColumnStringEnum(std::size_t column_ndx);
+    const ColumnStringEnum& GetColumnStringEnum(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnTable& GetColumnTable(std::size_t column_ndx);
+    const ColumnTable& GetColumnTable(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnMixed& GetColumnMixed(std::size_t column_ndx);
+    const ColumnMixed& GetColumnMixed(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
     /// Used when the lifetime of a table is managed by reference
     /// counting. The lifetime of free-standing tables allocated on
@@ -337,8 +342,7 @@ protected:
 
     /// Construct a wrapper for a table with independent spec, and
     /// whose lifetime is managed by reference counting.
-    Table(RefCountTag, Allocator& alloc, size_t top_ref,
-          Parent* parent, size_t ndx_in_parent);
+    Table(RefCountTag, Allocator&, ref_type top_ref, Parent*, std::size_t ndx_in_parent);
 
     /// Construct a wrapper for a table with shared spec, and whose
     /// lifetime is managed by reference counting.
@@ -346,39 +350,39 @@ protected:
     /// It is possible to construct a 'null' table by passing zero for
     /// \a columns_ref, in this case the columns will be created on
     /// demand.
-    Table(RefCountTag, Allocator& alloc, size_t spec_ref, size_t columns_ref,
-          Parent* parent, size_t ndx_in_parent);
+    Table(RefCountTag, Allocator&, ref_type spec_ref, ref_type columns_ref,
+          Parent*, std::size_t ndx_in_parent);
 
-    void init_from_ref(size_t top_ref, ArrayParent* parent, size_t ndx_in_parent);
-    void init_from_ref(size_t spec_ref, size_t columns_ref,
-                       ArrayParent* parent, size_t ndx_in_parent);
+    void init_from_ref(ref_type top_ref, ArrayParent*, std::size_t ndx_in_parent);
+    void init_from_ref(ref_type spec_ref, ref_type columns_ref,
+                       ArrayParent*, std::size_t ndx_in_parent);
     void CreateColumns();
     void CacheColumns();
     void ClearCachedColumns();
 
     // Specification
-    size_t GetColumnRefPos(size_t column_ndx) const;
-    void   UpdateColumnRefs(size_t column_ndx, int diff);
+    std::size_t GetColumnRefPos(std::size_t column_ndx) const;
+    void   UpdateColumnRefs(std::size_t column_ndx, int diff);
     void   UpdateFromParent();
-    void   do_remove_column(const std::vector<size_t>& column_ids, size_t pos);
-    void   do_remove_column(size_t column_ndx);
-    size_t do_add_column(DataType type);
-    void   do_add_subcolumn(const std::vector<size_t>& column_path, size_t pos, DataType type);
+    void   do_remove_column(const std::vector<std::size_t>& column_ids, std::size_t pos);
+    void   do_remove_column(std::size_t column_ndx);
+    std::size_t do_add_column(DataType type);
+    void   do_add_subcolumn(const std::vector<std::size_t>& column_path, std::size_t pos, DataType type);
 
-    void   set_index(size_t column_ndx, bool update_spec);
+    void   set_index(std::size_t column_ndx, bool update_spec);
 
     // Support function for conversions
-    void to_json_row(size_t row_ndx, std::ostream& out) const;
-    void to_string_header(std::ostream& out, std::vector<size_t>& widths) const;
-    void to_string_row(size_t row_ndx, std::ostream& out, const std::vector<size_t>& widths) const;
+    void to_json_row(std::size_t row_ndx, std::ostream& out) const;
+    void to_string_header(std::ostream& out, std::vector<std::size_t>& widths) const;
+    void to_string_row(std::size_t row_ndx, std::ostream& out, const std::vector<std::size_t>& widths) const;
 
 
 #ifdef TIGHTDB_DEBUG
-    void ToDotInternal(std::ostream& out) const;
-#endif // TIGHTDB_DEBUG
+    void to_dot_internal(std::ostream&) const;
+#endif
 
     // Member variables
-    size_t m_size;
+    std::size_t m_size;
 
     // On-disk format
     Array m_top;
@@ -392,13 +396,13 @@ protected:
     ///
     /// The returned table pointer must always end up being wrapped in
     /// a TableRef.
-    Table* get_subtable_ptr(size_t col_idx, size_t row_idx);
+    Table* get_subtable_ptr(std::size_t col_idx, std::size_t row_idx);
 
     /// Get the subtable at the specified column and row index.
     ///
     /// The returned table pointer must always end up being wrapped in
     /// a ConstTableRef.
-    const Table* get_subtable_ptr(size_t col_idx, size_t row_idx) const;
+    const Table* get_subtable_ptr(std::size_t col_idx, std::size_t row_idx) const;
 
     /// Compare the rows of two tables under the assumption that the
     /// two tables have the same spec, and therefore the same sequence
@@ -413,10 +417,6 @@ protected:
     /// get_column_type()).
     void insert_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
 
-    /// Like insert_subtable(std::size_t, std::size_t, const Table*)
-    /// but overwrites the specified cell rather than inserting a new
-    /// one.
-    void set_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
 
     void insert_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
 
@@ -445,7 +445,7 @@ private:
     /// started.
     void invalidate();
 
-    mutable size_t m_ref_count;
+    mutable std::size_t m_ref_count;
     mutable const StringIndex* m_lookup_index;
 
     void bind_ref() const TIGHTDB_NOEXCEPT { ++m_ref_count; }
@@ -457,13 +457,13 @@ private:
     std::pair<const Array*, const Array*> get_string_column_roots(std::size_t col_ndx) const
         TIGHTDB_NOEXCEPT;
 
-    ColumnBase& GetColumnBase(size_t column_ndx);
+    ColumnBase& GetColumnBase(std::size_t column_ndx);
     void InstantiateBeforeChange();
-    void validate_column_type(const ColumnBase& column, ColumnType expected_type, size_t ndx) const;
+    void validate_column_type(const ColumnBase& column, ColumnType expected_type, std::size_t ndx) const;
 
     /// Construct an empty table with independent spec and return just
     /// the reference to the underlying memory.
-    static std::size_t create_empty_table(Allocator&);
+    static ref_type create_empty_table(Allocator&);
 
     /// Construct a copy of the columns array of this table using the
     /// specified allocator and return just the ref to that array.
@@ -481,9 +481,9 @@ private:
     struct LocalTransactLog;
     LocalTransactLog transact_log() TIGHTDB_NOEXCEPT;
     // Condition: 1 <= end - begin
-    size_t* record_subspec_path(const Spec*, size_t* begin, size_t* end) const TIGHTDB_NOEXCEPT;
+    std::size_t* record_subspec_path(const Spec*, std::size_t* begin, std::size_t* end) const TIGHTDB_NOEXCEPT;
     // Condition: 1 <= end - begin
-    size_t* record_subtable_path(size_t* begin, size_t* end) const TIGHTDB_NOEXCEPT;
+    std::size_t* record_subtable_path(std::size_t* begin, std::size_t* end) const TIGHTDB_NOEXCEPT;
     friend class Replication;
 #endif
 
@@ -506,10 +506,10 @@ protected:
     virtual bool subtables_have_shared_spec() { return false; }
 
     /// Must be called whenever a child Table is destroyed.
-    virtual void child_destroyed(size_t child_ndx) = 0;
+    virtual void child_destroyed(std::size_t child_ndx) = 0;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    virtual size_t* record_subtable_path(size_t* begin, size_t* end) TIGHTDB_NOEXCEPT;
+    virtual std::size_t* record_subtable_path(std::size_t* begin, std::size_t* end) TIGHTDB_NOEXCEPT;
 #endif
 };
 
@@ -548,7 +548,7 @@ inline DataType Table::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 }
 
 template <class C, ColumnType coltype>
-C& Table::GetColumn(size_t ndx)
+C& Table::GetColumn(std::size_t ndx)
 {
     ColumnBase& column = GetColumnBase(ndx);
 #ifdef TIGHTDB_DEBUG
@@ -558,7 +558,7 @@ C& Table::GetColumn(size_t ndx)
 }
 
 template <class C, ColumnType coltype>
-const C& Table::GetColumn(size_t ndx) const TIGHTDB_NOEXCEPT
+const C& Table::GetColumn(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     const ColumnBase& column = GetColumnBase(ndx);
 #ifdef TIGHTDB_DEBUG
@@ -571,7 +571,7 @@ const C& Table::GetColumn(size_t ndx) const TIGHTDB_NOEXCEPT
 inline bool Table::has_shared_spec() const
 {
     const Array& top_array = m_top.IsValid() ? m_top : m_columns;
-    ArrayParent* parent = top_array.GetParent();
+    ArrayParent* parent = top_array.get_parent();
     if (!parent) return false;
     TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
     return static_cast<Parent*>(parent)->subtables_have_shared_spec();
@@ -598,88 +598,94 @@ private:
     Table* m_table;
 };
 
-inline std::size_t Table::create_empty_table(Allocator& alloc)
+inline ref_type Table::create_empty_table(Allocator& alloc)
 {
-    Array top(Array::coldef_HasRefs, 0, 0, alloc);
+    Array top(Array::type_HasRefs, 0, 0, alloc);
     top.add(Spec::create_empty_spec(alloc));
-    top.add(Array::create_empty_array(Array::coldef_HasRefs, alloc)); // Columns
+    top.add(Array::create_empty_array(Array::type_HasRefs, alloc)); // Columns
     return top.get_ref();
 }
 
 inline Table::Table(Allocator& alloc):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1), m_lookup_index(NULL)
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1),
+    m_lookup_index(0)
 {
-    size_t ref = create_empty_table(alloc); // Throws
+    ref_type ref = create_empty_table(alloc); // Throws
     init_from_ref(ref, 0, 0);
 }
 
 inline Table::Table(const Table& t, Allocator& alloc):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1), m_lookup_index(NULL)
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1),
+    m_lookup_index(0)
 {
-    size_t ref = t.clone(alloc); // Throws
+    ref_type ref = t.clone(alloc); // Throws
     init_from_ref(ref, 0, 0);
 }
 
-inline Table::Table(RefCountTag, Allocator& alloc, size_t top_ref,
-                    Parent* parent, size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0), m_lookup_index(NULL)
+inline Table::Table(RefCountTag, Allocator& alloc, ref_type top_ref,
+                    Parent* parent, std::size_t ndx_in_parent):
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0),
+    m_lookup_index(0)
 {
     init_from_ref(top_ref, parent, ndx_in_parent);
 }
 
-inline Table::Table(RefCountTag, Allocator& alloc, size_t spec_ref, size_t columns_ref,
-                    Parent* parent, size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0), m_lookup_index(NULL)
+inline Table::Table(RefCountTag, Allocator& alloc, ref_type spec_ref, ref_type columns_ref,
+                    Parent* parent, std::size_t ndx_in_parent):
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0),
+    m_lookup_index(0)
 {
     init_from_ref(spec_ref, columns_ref, parent, ndx_in_parent);
 }
 
 inline TableRef Table::create(Allocator& alloc)
 {
-    std::size_t ref = create_empty_table(alloc); // Throws
-    Table* const table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
+    ref_type ref = create_empty_table(alloc); // Throws
+    Table* table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
     return table->get_table_ref();
 }
 
 inline TableRef Table::copy(Allocator& alloc) const
 {
-    std::size_t ref = clone(alloc); // Throws
-    Table* const table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
+    ref_type ref = clone(alloc); // Throws
+    Table* table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
     return table->get_table_ref();
 }
 
 
-inline void Table::insert_bool(size_t column_ndx, size_t row_ndx, bool value)
+inline void Table::insert_bool(std::size_t column_ndx, std::size_t row_ndx, bool value)
 {
     insert_int(column_ndx, row_ndx, value);
 }
 
-inline void Table::insert_date(size_t column_ndx, size_t row_ndx, Date value)
+inline void Table::insert_date(std::size_t column_ndx, std::size_t row_ndx, Date value)
 {
     insert_int(column_ndx, row_ndx, value.get_date());
 }
 
-template<class E> inline void Table::insert_enum(size_t column_ndx, size_t row_ndx, E value)
+template<class E>
+inline void Table::insert_enum(std::size_t column_ndx, std::size_t row_ndx, E value)
 {
     insert_int(column_ndx, row_ndx, value);
 }
 
-inline void Table::insert_subtable(size_t col_ndx, size_t row_ndx)
+inline void Table::insert_subtable(std::size_t col_ndx, std::size_t row_ndx)
 {
     insert_subtable(col_ndx, row_ndx, 0); // Null stands for an empty table
 }
 
-template<class E> inline void Table::set_enum(size_t column_ndx, size_t row_ndx, E value)
+template<class E>
+inline void Table::set_enum(std::size_t column_ndx, std::size_t row_ndx, E value)
 {
     set_int(column_ndx, row_ndx, value);
 }
 
-inline TableRef Table::get_subtable(size_t column_ndx, size_t row_ndx)
+inline TableRef Table::get_subtable(std::size_t column_ndx, std::size_t row_ndx)
 {
     return TableRef(get_subtable_ptr(column_ndx, row_ndx));
 }
 
-inline ConstTableRef Table::get_subtable(size_t column_ndx, size_t row_ndx) const
+inline ConstTableRef Table::get_subtable(std::size_t column_ndx, std::size_t row_ndx) const
 {
     return ConstTableRef(get_subtable_ptr(column_ndx, row_ndx));
 }
@@ -708,12 +714,12 @@ inline void Table::set_into_mixed(Table* parent, std::size_t col_ndx, std::size_
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
 struct Table::LocalTransactLog {
-    template<class T> void set_value(size_t column_ndx, size_t row_ndx, const T& value)
+    template<class T> void set_value(std::size_t column_ndx, std::size_t row_ndx, const T& value)
     {
         if (m_repl) m_repl->set_value(m_table, column_ndx, row_ndx, value); // Throws
     }
 
-    template<class T> void insert_value(size_t column_ndx, size_t row_ndx, const T& value)
+    template<class T> void insert_value(std::size_t column_ndx, std::size_t row_ndx, const T& value)
     {
         if (m_repl) m_repl->insert_value(m_table, column_ndx, row_ndx, value); // Throws
     }
@@ -775,8 +781,8 @@ inline Table::LocalTransactLog Table::transact_log() TIGHTDB_NOEXCEPT
     return LocalTransactLog(m_top.get_alloc().get_replication(), this);
 }
 
-inline size_t* Table::record_subspec_path(const Spec* spec, size_t* begin,
-                                          size_t* end) const TIGHTDB_NOEXCEPT
+inline std::size_t* Table::record_subspec_path(const Spec* spec, std::size_t* begin,
+                                               std::size_t* end) const TIGHTDB_NOEXCEPT
 {
     if (spec != &m_spec_set) {
         TIGHTDB_ASSERT(m_spec_set.m_subSpecs.IsValid());
@@ -785,19 +791,21 @@ inline size_t* Table::record_subspec_path(const Spec* spec, size_t* begin,
     return begin;
 }
 
-inline size_t* Table::record_subtable_path(size_t* begin, size_t* end) const TIGHTDB_NOEXCEPT
+inline std::size_t* Table::record_subtable_path(std::size_t* begin,
+                                                std::size_t* end) const TIGHTDB_NOEXCEPT
 {
     const Array& real_top = m_top.IsValid() ? m_top : m_columns;
-    const size_t index_in_parent = real_top.GetParentNdx();
+    std::size_t index_in_parent = real_top.get_ndx_in_parent();
     TIGHTDB_ASSERT(begin < end);
     *begin++ = index_in_parent;
-    ArrayParent* parent = real_top.GetParent();
+    ArrayParent* parent = real_top.get_parent();
     TIGHTDB_ASSERT(parent);
     TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
     return static_cast<Parent*>(parent)->record_subtable_path(begin, end);
 }
 
-inline size_t* Table::Parent::record_subtable_path(size_t* begin, size_t*) TIGHTDB_NOEXCEPT
+inline std::size_t* Table::Parent::record_subtable_path(std::size_t* begin,
+                                                        std::size_t*) TIGHTDB_NOEXCEPT
 {
     return begin;
 }

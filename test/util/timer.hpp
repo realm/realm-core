@@ -30,24 +30,34 @@ namespace test_util {
 
 class Timer {
 public:
-    void start() { m_start = get_timer_ticks(); }
+    enum Type {
+        type_UserTime, // Counting only while the process is running (if supported)
+        type_RealTime
+    };
 
-    /// Returns elapsed time in seconds (counting only while the
-    /// process is running).
+    Timer(Type type = type_RealTime): m_type(type) { reset(); }
+
+    void reset() { m_start = get_timer_ticks(); }
+
+    /// Returns elapsed time in seconds since last call to reset().
     double get_elapsed_time() const
     {
         return calc_elapsed_seconds(get_timer_ticks() - m_start);
     }
 
+    /// Same as get_elapsed_time().
     operator double() const { return get_elapsed_time(); }
 
+    /// Format the elapsed time on the form 0h00m, 00m00s, 00.00s, or
+    /// 000.0ms depending on magnitude.
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const Timer&);
 
 private:
+    const Type m_type;
     uint_fast64_t m_start;
 
-    static uint_fast64_t get_timer_ticks();
+    uint_fast64_t get_timer_ticks() const;
     static double calc_elapsed_seconds(uint_fast64_t ticks);
 };
 

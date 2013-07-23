@@ -9,9 +9,9 @@ using namespace tightdb;
 
 // todo, test (int) cast
 GroupWriter::GroupWriter(Group& group, bool doPersist) :
-    m_group(group), m_alloc(group.get_allocator()), m_doPersist(doPersist)
+    m_group(group), m_alloc(group.get_allocator()), m_current_version(0), m_doPersist(doPersist)
 {
-    m_file_map.map(m_alloc.m_file, File::access_ReadWrite, m_alloc.GetFileLen());
+    m_file_map.map(m_alloc.m_file, File::access_ReadWrite, m_alloc.get_base_size());
 }
 
 void GroupWriter::SetVersions(size_t current, size_t readlock)
@@ -48,9 +48,6 @@ size_t GroupWriter::commit()
     const SlabAlloc::FreeSpace& freeSpace = m_group.get_allocator().GetFreespace();
     const size_t fcount = freeSpace.size();
 
-    // FIXME: In some cases, m_current_version is uninitialized (has
-    // an undefined value) at this point. This is reported by
-    // valgrind.
     for (size_t i = 0; i < fcount; ++i) {
         SlabAlloc::FreeSpace::ConstCursor r = freeSpace[i];
         add_free_space(to_size_t(r.ref), to_size_t(r.size), to_size_t(m_current_version));
@@ -119,7 +116,7 @@ size_t GroupWriter::commit()
     // Clear old allocs
     // and remap if file size has changed
     SlabAlloc& alloc = m_group.get_allocator();
-    alloc.FreeAll(m_file_map.get_size());
+    alloc.free_all(m_file_map.get_size());
 
     // Return top_pos so that it can be saved in lock file used
     // for coordination

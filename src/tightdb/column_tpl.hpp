@@ -53,8 +53,8 @@ template<class cond> struct ColumnTypeTraits2<cond, double> {
 };
 
 
-template <typename T, typename R, Action action, class condition>
-R ColumnBase::aggregate(T target, size_t start, size_t end, size_t *matchcount) const
+template <class T, class R, Action action, class condition>
+R ColumnBase::aggregate(T target, size_t start, size_t end, size_t* matchcount) const
 {
     typedef typename ColumnTypeTraits2<condition,T>::column_type ColType;
     typedef typename ColumnTypeTraits2<condition,T>::node_type NodeType;
@@ -64,12 +64,12 @@ R ColumnBase::aggregate(T target, size_t start, size_t end, size_t *matchcount) 
 
     NodeType node(target, 0);
 
-    node.QuickInit((ColType*)this, target);
+    node.QuickInit(const_cast<ColType*>(static_cast<const ColType*>(this)), target);
     QueryState<R> state;
     state.init(action, NULL, size_t(-1));
 
-    ColType* column = (ColType*)this;
-    SequentialGetter<T> sg( column );
+    ColType* column = const_cast<ColType*>(static_cast<const ColType*>(this));
+    SequentialGetter<T> sg(column);
     node.template aggregate_local<action, R, T>(&state, start, end, size_t(-1), &sg, matchcount);
 
     return state.m_state;
@@ -83,30 +83,7 @@ template<class T> T GetColumnFromRef(Array& parent, size_t ndx) // Throws
     return T(size_t(parent.get(ndx)), &parent, ndx, parent.get_alloc()); // Throws
 }
 
-template<typename T, class C> T ColumnBase::TreeGet(size_t ndx) const
-{
-    if (!root_is_leaf()) {
-        // Get subnode table
-        const Array offsets = NodeGetOffsets();
-        Array refs = NodeGetRefs();
-
-        // Find the subnode containing the item
-        const size_t node_ndx = offsets.FindPos(ndx);
-
-        // Calc index in subnode
-        const size_t offset = node_ndx ? to_ref(offsets.get(node_ndx-1)) : 0;
-        const size_t local_ndx = ndx - offset;
-
-        // Get item
-        const C target = GetColumnFromRef<C>(refs, node_ndx); // Throws
-        return target.template TreeGet<T,C>(local_ndx);
-    }
-    else {
-        return static_cast<const C*>(this)->LeafGet(ndx);
-    }
-}
-
-template<typename T, class C> void ColumnBase::TreeSet(size_t ndx, T value)
+template<class T, class C> void ColumnBase::TreeSet(size_t ndx, T value)
 {
     //const T oldVal = m_index ? get(ndx) : 0; // cache oldval for index
 
@@ -134,28 +111,28 @@ template<typename T, class C> void ColumnBase::TreeSet(size_t ndx, T value)
     //if (m_index) m_index->set(ndx, oldVal, value);
 }
 
-template<typename T, class C> void ColumnBase::TreeInsert(size_t ndx, T value)
+template<class T, class C> void ColumnBase::TreeInsert(size_t ndx, T value)
 {
     const NodeChange nc = DoInsert<T,C>(ndx, value);
     switch (nc.type) {
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
-            Column newNode(Array::coldef_InnerNode, m_array->get_alloc());
+            Column newNode(Array::type_InnerColumnNode, m_array->get_alloc());
             newNode.NodeAdd<C>(nc.ref1);
             newNode.NodeAdd<C>(get_ref());
             static_cast<C*>(this)->update_ref(newNode.get_ref());
             return;
         }
         case NodeChange::insert_after: {
-            Column newNode(Array::coldef_InnerNode, m_array->get_alloc());
+            Column newNode(Array::type_InnerColumnNode, m_array->get_alloc());
             newNode.NodeAdd<C>(get_ref());
             newNode.NodeAdd<C>(nc.ref1);
             static_cast<C*>(this)->update_ref(newNode.get_ref());
             return;
         }
         case NodeChange::split: {
-            Column newNode(Array::coldef_InnerNode, m_array->get_alloc());
+            Column newNode(Array::type_InnerColumnNode, m_array->get_alloc());
             newNode.NodeAdd<C>(nc.ref1);
             newNode.NodeAdd<C>(nc.ref2);
             static_cast<C*>(this)->update_ref(newNode.get_ref());
@@ -165,7 +142,7 @@ template<typename T, class C> void ColumnBase::TreeInsert(size_t ndx, T value)
     TIGHTDB_ASSERT(false);
 }
 
-template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx, T value)
+template<class T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx, T value)
 {
     if (!root_is_leaf()) {
         // Get subnode table
@@ -203,7 +180,7 @@ template<typename T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx
         }
 
         // Else create new node
-        Column newNode(Array::coldef_InnerNode, m_array->get_alloc());
+        Column newNode(Array::type_InnerColumnNode, m_array->get_alloc());
         if (nc.type == NodeChange::split) {
             // update offset for left node
             const size_t newsize = target.size();
@@ -341,7 +318,7 @@ template<class C> void ColumnBase::NodeAdd(size_t ref)
     refs.add(ref);
 }
 
-template<typename T, class C> void ColumnBase::TreeDelete(size_t ndx)
+template<class T, class C> void ColumnBase::TreeDelete(size_t ndx)
 {
     if (root_is_leaf()) {
         static_cast<C*>(this)->LeafDelete(ndx);
@@ -382,7 +359,7 @@ template<typename T, class C> void ColumnBase::TreeDelete(size_t ndx)
 }
 
 
-template<typename T, class C, class F>
+template<class T, class C, class F>
 size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
 {
     // Use index if possible
@@ -447,7 +424,7 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
     }
 }
 
-template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset, size_t start, size_t end) const
+template<class T, class C> void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset, size_t start, size_t end) const
 {
     if (root_is_leaf()) {
         return static_cast<const C*>(this)->LeafFindAll(result, value, add_offset, start, end);
@@ -488,7 +465,7 @@ template<typename T, class C> void ColumnBase::TreeFindAll(Array &result, T valu
 
 
 
-template<typename T, class C>
+template<class T, class C>
 void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
                                 bool (*call)(T *arr, size_t start, size_t end,
                                              size_t caller_offset, void *state),

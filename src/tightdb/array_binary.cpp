@@ -11,8 +11,8 @@ namespace tightdb {
 
 
 ArrayBinary::ArrayBinary(ArrayParent* parent, size_t pndx, Allocator& alloc):
-    Array(coldef_HasRefs, parent, pndx, alloc),
-    m_offsets(coldef_Normal, NULL, 0, alloc), m_blob(NULL, 0, alloc)
+    Array(type_HasRefs, parent, pndx, alloc),
+    m_offsets(type_Normal, 0, 0, alloc), m_blob(0, 0, alloc)
 {
     // Add subarrays for long string
     Array::add(m_offsets.get_ref());
@@ -21,13 +21,14 @@ ArrayBinary::ArrayBinary(ArrayParent* parent, size_t pndx, Allocator& alloc):
     m_blob.set_parent(this, 1);
 }
 
-ArrayBinary::ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
-    Array(ref, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), NULL, 0, alloc),
-    m_blob(Array::get_as_ref(1), NULL, 0, alloc)
+ArrayBinary::ArrayBinary(ref_type ref, ArrayParent* parent, size_t pndx,
+                         Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(ref, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
+    m_blob(Array::get_as_ref(1), 0, 0, alloc)
 {
     TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
     TIGHTDB_ASSERT(Array::size() == 2);
-    TIGHTDB_ASSERT(m_blob.size() ==(size_t)(m_offsets.is_empty() ? 0 : m_offsets.back()));
+    TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : to_size_t(m_offsets.back())));
 
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
@@ -49,9 +50,9 @@ void ArrayBinary::set(size_t ndx, BinaryData value)
     TIGHTDB_ASSERT(ndx < m_offsets.size());
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    const size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
-    const size_t current_end = to_size_t(m_offsets.get(ndx));
-    const ssize_t diff =  (start + value.size()) - current_end;
+    size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t current_end = to_size_t(m_offsets.get(ndx));
+    ssize_t diff =  (start + value.size()) - current_end;
 
     m_blob.replace(start, current_end, value.data(), value.size());
     m_offsets.adjust(ndx, diff);
@@ -62,7 +63,7 @@ void ArrayBinary::insert(size_t ndx, BinaryData value)
     TIGHTDB_ASSERT(ndx <= m_offsets.size());
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    const size_t pos = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t pos = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
 
     m_blob.insert(pos, value.data(), value.size());
     m_offsets.insert(ndx, pos + value.size());
@@ -74,9 +75,9 @@ void ArrayBinary::set_string(size_t ndx, StringData value)
     TIGHTDB_ASSERT(ndx < m_offsets.size());
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    const size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
-    const size_t current_end = to_size_t(m_offsets.get(ndx));
-    const ssize_t diff =  (start + value.size() + 1) - current_end;
+    size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t current_end = to_size_t(m_offsets.get(ndx));
+    ssize_t diff =  (start + value.size() + 1) - current_end;
 
     bool add_zero_term = true;
     m_blob.replace(start, current_end, value.data(), value.size(), add_zero_term);
@@ -88,7 +89,7 @@ void ArrayBinary::insert_string(size_t ndx, StringData value)
     TIGHTDB_ASSERT(ndx <= m_offsets.size());
     TIGHTDB_ASSERT(value.size() == 0 || value.data());
 
-    const size_t pos = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t pos = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
 
     bool add_zero_term = true;
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
@@ -100,8 +101,8 @@ void ArrayBinary::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    const size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
-    const size_t end = to_size_t(m_offsets.get(ndx));
+    size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t end = to_size_t(m_offsets.get(ndx));
 
     m_blob.erase(start, end);
     m_offsets.erase(ndx);
@@ -112,7 +113,7 @@ void ArrayBinary::resize(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    const size_t len = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t len = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
 
     m_offsets.resize(ndx);
     m_blob.resize(len);
@@ -124,39 +125,39 @@ void ArrayBinary::clear()
     m_offsets.clear();
 }
 
-BinaryData ArrayBinary::get_direct(Allocator& alloc, const char* header, size_t ndx) TIGHTDB_NOEXCEPT
+BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    pair<size_t, size_t> p = Array::get_two_as_size(header, 0);
-    const char* offsets_header = static_cast<char*>(alloc.translate(p.first));
-    const char* blob_header = static_cast<char*>(alloc.translate(p.second));
+    pair<size_t, size_t> p = Array::get_size_pair(header, 0);
+    const char* offsets_header = alloc.translate(p.first);
+    const char* blob_header = alloc.translate(p.second);
     size_t begin, end;
     if (ndx) {
-        pair<size_t, size_t> p2 = Array::get_two_as_size(offsets_header, ndx-1);
+        pair<size_t, size_t> p2 = Array::get_size_pair(offsets_header, ndx-1);
         begin = p2.first;
         end   = p2.second;
     }
     else {
         begin = 0;
-        end   = Array::get_as_size(offsets_header, ndx);
+        end   = to_size_t(Array::get(offsets_header, ndx));
     }
-    return BinaryData(ArrayBlob::get_direct(blob_header, begin), end-begin);
+    return BinaryData(ArrayBlob::get(blob_header, begin), end-begin);
 }
 
 
 #ifdef TIGHTDB_DEBUG
 
-void ArrayBinary::ToDot(ostream& out, const char* title) const
+void ArrayBinary::to_dot(ostream& out, const char* title) const
 {
-    const size_t ref = get_ref();
+    ref_type ref = get_ref();
 
     out << "subgraph cluster_binary" << ref << " {" << endl;
     out << " label = \"ArrayBinary";
     if (title) out << "\\n'" << title << "'";
     out << "\";" << endl;
 
-    Array::ToDot(out, "binary_top");
-    m_offsets.ToDot(out, "offsets");
-    m_blob.ToDot(out, "blob");
+    Array::to_dot(out, "binary_top");
+    m_offsets.to_dot(out, "offsets");
+    m_blob.to_dot(out, "blob");
 
     out << "}" << endl;
 }

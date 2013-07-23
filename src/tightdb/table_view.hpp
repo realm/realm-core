@@ -65,7 +65,8 @@ public:
     size_t find_first_string(size_t column_ndx, StringData value) const;
     size_t find_first_binary(size_t column_ndx, BinaryData value) const;
 
-    // Aggregate functions
+    // Aggregate functions. count_target is ignored by all <int function> except Count. Hack because of bug in optional
+    // arguments in clang and vs2010 (fixed in 2012)
     template <int function, typename T, typename R, class ColType>
     R aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx, T count_target) const;
 
@@ -197,6 +198,7 @@ public:
     void set_string(size_t column_ndx, size_t row_ndx, StringData value);
     void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
+    void set_subtable(size_t column_ndx,size_t row_ndx, const Table* table);
     void add_int(size_t column_ndx, int64_t value);
 
     // Deleting
@@ -739,6 +741,15 @@ inline void TableView::set_mixed(size_t column_ndx, size_t row_ndx, Mixed value)
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     m_table->set_mixed(column_ndx, real_ndx, value);
 }
+
+//this will not work if the column type is mixed
+inline void TableView::set_subtable(size_t column_ndx, size_t row_ndx, const Table* value)
+{
+    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Table);
+    const size_t real_ndx = size_t(m_refs.get(row_ndx));
+    m_table->set_subtable(column_ndx, real_ndx, value);
+}
+
 
 inline void TableView::add_int(size_t column_ndx, int64_t value)
 {

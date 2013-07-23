@@ -22,24 +22,23 @@
 
 #include <tightdb/array.hpp>
 
-//
-// A BasicArray can currently only be used for simple unstructured types like float, double.
-//
-
 namespace tightdb {
 
-template<typename T>
-class BasicArray : public Array {
+/// A BasicArray can currently only be used for simple unstructured
+/// types like float, double.
+template<class T> class BasicArray: public Array {
 public:
-    explicit BasicArray(ArrayParent* parent=NULL, size_t pndx=0, Allocator& alloc=Allocator::get_default());
-    BasicArray(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc=Allocator::get_default()) TIGHTDB_NOEXCEPT;
+    explicit BasicArray(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                        Allocator& = Allocator::get_default());
+    BasicArray(ref_type, ArrayParent*, std::size_t ndx_in_parent,
+               Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
     explicit BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT;
 
-    T get(size_t ndx) const TIGHTDB_NOEXCEPT;
+    T get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add(T value);
-    void set(size_t ndx, T value);
-    void insert(size_t ndx, T value);
-    void erase(size_t ndx);
+    void set(std::size_t ndx, T value);
+    void insert(std::size_t ndx, T value);
+    void erase(std::size_t ndx);
     void clear();
 
     size_t Find(T target, size_t start, size_t end) const;
@@ -54,15 +53,19 @@ public:
     /// Compare two arrays for equality.
     bool Compare(const BasicArray<T>&) const;
 
-    static T column_get(const Array* root, std::size_t ndx) TIGHTDB_NOEXCEPT;
+    /// Get the specified element without the cost of constructing an
+    /// array instance. If an array instance is already available, or
+    /// you need to get multiple values, then this method will be
+    /// slower.
+    static T get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
 
 private:
-    virtual size_t CalcByteLen(size_t count, size_t width) const;
-    virtual size_t CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT;
+    virtual std::size_t CalcByteLen(std::size_t count, std::size_t width) const;
+    virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const TIGHTDB_NOEXCEPT;
     virtual WidthType GetWidthType() const { return wtype_Multiply; }
 
     template<bool find_max> bool minmax(T& result, size_t start, size_t end) const;
-    static size_t create_empty_basic_array(Allocator& alloc);
+    static ref_type create_empty_basic_array(Allocator&);
 };
 
 

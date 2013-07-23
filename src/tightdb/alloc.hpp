@@ -45,14 +45,14 @@ inline ref_type to_ref(int64_t v) TIGHTDB_NOEXCEPT
 }
 
 struct MemRef {
-    MemRef(): pointer(0), ref(0) {}
-    MemRef(void* p, ref_type r): pointer(p), ref(r) {}
-    void* pointer;
-    ref_type ref;
+    MemRef(): m_addr(0), m_ref(0) {}
+    MemRef(char* addr, ref_type ref): m_addr(addr), m_ref(ref) {}
+    char* m_addr;
+    ref_type m_ref;
 };
 
 // FIXME: Casting a pointer to std::size_t is inherently nonportable
-// (see the default definition of Allocator::Alloc()). For example,
+// (see the default definition of Allocator::alloc()). For example,
 // systems exist where pointers are 64 bits and std::size_t is 32. One
 // idea would be to use a different type for refs such as
 // std::uintptr_t, the problem with this one is that while it is
@@ -64,17 +64,28 @@ struct MemRef {
 
 class Allocator {
 public:
+    /// The specified size must not be zero.
+    ///
     /// \throw std::bad_alloc If insufficient memory was available.
-    virtual MemRef Alloc(std::size_t size);
+    virtual MemRef alloc(std::size_t size);
 
+    /// The specified size must not be zero.
+    ///
     /// \throw std::bad_alloc If insufficient memory was available.
-    virtual MemRef ReAlloc(std::size_t ref, const void* addr, std::size_t size);
+    ///
+    /// Note: The underscore was added because the name \c realloc
+    /// would conflict with a macro on the Windows platform.
+    virtual MemRef realloc_(ref_type ref, const char* addr, std::size_t size);
 
-    // FIXME: SlabAlloc::Free() should be modified such than this method never throws.
-    virtual void Free(std::size_t, const void* addr);
+    // FIXME: SlabAlloc::free_() should be modified such than this
+    // method never throws.
+    ///
+    /// Note: The underscore was added because the name \c free would
+    /// conflict with a macro on the Windows platform.
+    virtual void free_(ref_type, const char* addr);
 
-    virtual void* translate(ref_type ref) const TIGHTDB_NOEXCEPT;
-    virtual bool IsReadOnly(ref_type) const TIGHTDB_NOEXCEPT;
+    virtual char* translate(ref_type) const TIGHTDB_NOEXCEPT;
+    virtual bool is_read_only(ref_type) const TIGHTDB_NOEXCEPT;
 
     static Allocator& get_default() TIGHTDB_NOEXCEPT;
 

@@ -32,19 +32,7 @@
 #include <tightdb/assert.hpp>
 #include <tightdb/safe_int_ops.hpp>
 
-#if defined(__GNUC__)
-    #define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
-#elif defined(_MSC_VER)
-    #define TIGHTDB_FORCEINLINE __forceinline
-#elif defined(__HP_aCC)
-    #define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
-#elif defined(__xlC__ )
-    #define TIGHTDB_FORCEINLINE inline
-#else
-    #error TEXT("Compiler version not detectable")
-#endif
-
-/* GCC defines __i386__ and __x86_64__ */
+// GCC defines __i386__ and __x86_64__
 #if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
     #define TIGHTDB_X86_OR_X64
     #define TIGHTDB_X86_OR_X64_TRUE true
@@ -52,8 +40,7 @@
     #define TIGHTDB_X86_OR_X64_TRUE false
 #endif
 
-
-/* GCC defines __arm__ */
+// GCC defines __arm__
 #ifdef __arm__
 #  define TIGHTDB_ARCH_ARM
 #endif
@@ -143,11 +130,11 @@ inline std::size_t to_size_t(int64_t v) TIGHTDB_NOEXCEPT
 
 
 template<typename ReturnType, typename OriginalType>
-ReturnType TypePunning( OriginalType variable )
+ReturnType type_punning( OriginalType variable ) TIGHTDB_NOEXCEPT
 {
     union {
-        OriginalType    in;
-        ReturnType      out;
+        OriginalType in;
+        ReturnType   out;
     };
     out = ReturnType(); // Clear all bits in case ReturnType is larger than OriginalType
     in = variable;

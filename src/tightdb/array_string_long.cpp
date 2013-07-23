@@ -11,8 +11,8 @@ using namespace std;
 namespace tightdb {
 
 ArrayStringLong::ArrayStringLong(ArrayParent* parent, size_t pndx, Allocator& alloc):
-    Array(coldef_HasRefs, parent, pndx, alloc),
-    m_offsets(coldef_Normal, NULL, 0, alloc), m_blob(NULL, 0, alloc)
+    Array(type_HasRefs, parent, pndx, alloc),
+    m_offsets(type_Normal, 0, 0, alloc), m_blob(0, 0, alloc)
 {
     // Add subarrays for long string
     Array::add(m_offsets.get_ref());
@@ -21,20 +21,33 @@ ArrayStringLong::ArrayStringLong(ArrayParent* parent, size_t pndx, Allocator& al
     m_blob.set_parent(this, 1);
 }
 
-ArrayStringLong::ArrayStringLong(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc):
-    Array(ref, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), NULL, 0, alloc),
-    m_blob(Array::get_as_ref(1), NULL, 0, alloc)
+ArrayStringLong::ArrayStringLong(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
+                                 Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(mem, parent, ndx_in_parent, alloc),
+    m_offsets(Array::get_as_ref(0), 0, 0, alloc),
+    m_blob(Array::get_as_ref(1), 0, 0, alloc)
 {
     TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
     TIGHTDB_ASSERT(Array::size() == 2);
-    TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : (size_t)m_offsets.back()));
+    TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : to_size_t(m_offsets.back())));
 
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
 }
 
-// Creates new array (but invalid, call update_ref() to init)
-//ArrayStringLong::ArrayStringLong(Allocator& alloc) : Array(alloc) {}
+ArrayStringLong::ArrayStringLong(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
+                                 Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(ref, parent, ndx_in_parent, alloc),
+    m_offsets(Array::get_as_ref(0), 0, 0, alloc),
+    m_blob(Array::get_as_ref(1), 0, 0, alloc)
+{
+    TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
+    TIGHTDB_ASSERT(Array::size() == 2);
+    TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : to_size_t(m_offsets.back())));
+
+    m_offsets.set_parent(this, 0);
+    m_blob.set_parent(this, 1);
+}
 
 void ArrayStringLong::add(StringData value)
 {
@@ -88,7 +101,7 @@ void ArrayStringLong::resize(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    const size_t len = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t len = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
 
     m_offsets.resize(ndx);
     m_blob.resize(len);
@@ -117,7 +130,7 @@ size_t ArrayStringLong::count(StringData value, size_t begin, size_t end) const
 
 size_t ArrayStringLong::find_first(StringData value, size_t begin, size_t end) const
 {
-    const size_t n = m_offsets.size();
+    size_t n = m_offsets.size();
     if (end == size_t(-1)) end = n;
     TIGHTDB_ASSERT(begin <= n && end <= n && begin <= end);
 
@@ -145,20 +158,46 @@ void ArrayStringLong::find_all(Array& result, StringData value, size_t add_offse
 }
 
 
+StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc) TIGHTDB_NOEXCEPT
+{
+    pair<size_t, size_t> p = get_size_pair(header, 0);
+    ref_type offsets_ref = p.first;
+    ref_type blob_ref    = p.second;
+
+    const char* offsets_header = alloc.translate(offsets_ref);
+    size_t begin, end;
+    if (0 < ndx) {
+        p = get_size_pair(offsets_header, ndx-1);
+        begin = p.first;
+        end   = p.second;
+    }
+    else {
+        begin = 0;
+        end   = to_size_t(Array::get(offsets_header, 0));
+    }
+    --end; // Discount the terminating zero
+
+    const char* blob_header = alloc.translate(blob_ref);
+    const char* data = ArrayBlob::get(blob_header, begin);
+    size_t size = end - begin;
+    return StringData(data, size);
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
-void ArrayStringLong::ToDot(ostream& out, StringData title) const
+void ArrayStringLong::to_dot(ostream& out, StringData title) const
 {
-    const size_t ref = get_ref();
+    ref_type ref = get_ref();
 
     out << "subgraph cluster_arraystringlong" << ref << " {" << endl;
     out << " label = \"ArrayStringLong";
     if (0 < title.size()) out << "\\n'" << title << "'";
     out << "\";" << endl;
 
-    Array::ToDot(out, "stringlong_top");
-    m_offsets.ToDot(out, "offsets");
-    m_blob.ToDot(out, "blob");
+    Array::to_dot(out, "stringlong_top");
+    m_offsets.to_dot(out, "offsets");
+    m_blob.to_dot(out, "blob");
 
     out << "}" << endl;
 }

@@ -26,12 +26,12 @@
 namespace tightdb {
 
 
-class ArrayBinary : public Array {
+class ArrayBinary: public Array {
 public:
-    ArrayBinary(ArrayParent* parent=NULL, size_t pndx=0,
-                Allocator& alloc = Allocator::get_default());
-    ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx,
-                Allocator& alloc = Allocator::get_default());
+    explicit ArrayBinary(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                         Allocator& = Allocator::get_default());
+    ArrayBinary(ref_type, ArrayParent*, std::size_t ndx_in_parent,
+                Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
 
     bool is_empty() const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT;
@@ -48,12 +48,15 @@ public:
     void set_string(std::size_t ndx, StringData value);
     void insert_string(std::size_t ndx, StringData value);
 
-    static BinaryData column_get(const Array* root, std::size_t ndx) TIGHTDB_NOEXCEPT;
-    static BinaryData get_direct(Allocator&, const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+    /// Get the specified element without the cost of constructing an
+    /// array instance. If an array instance is already available, or
+    /// you need to get multiple values, then this method will be
+    /// slower.
+    static BinaryData get(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
-    void ToDot(std::ostream& out, const char* title=NULL) const;
-#endif // TIGHTDB_DEBUG
+    void to_dot(std::ostream&, const char* title = 0) const;
+#endif
 
 private:
     Array m_offsets;
@@ -83,13 +86,6 @@ inline BinaryData ArrayBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     std::size_t begin = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     std::size_t end   = to_size_t(m_offsets.get(ndx));
     return BinaryData(m_blob.get(begin), end-begin);
-}
-
-inline BinaryData ArrayBinary::column_get(const Array* root, std::size_t ndx) TIGHTDB_NOEXCEPT
-{
-    if (root->is_leaf()) return static_cast<const ArrayBinary*>(root)->get(ndx);
-    std::pair<const char*, std::size_t> p = find_leaf(root, ndx);
-    return get_direct(root->get_alloc(), p.first, p.second);
 }
 
 

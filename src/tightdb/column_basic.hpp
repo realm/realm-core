@@ -37,12 +37,12 @@ template<> struct AggReturnType<float> {
 };
 
 
-template<typename T>
-class BasicColumn : public ColumnBase {
+template<class T>
+class BasicColumn: public ColumnBase {
 public:
-    BasicColumn(Allocator& = Allocator::get_default());
-    BasicColumn(size_t ref, ArrayParent* = 0, size_t ndx_in_parent = 0,
-                Allocator& = Allocator::get_default());
+    explicit BasicColumn(Allocator& = Allocator::get_default());
+    explicit BasicColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                         Allocator& = Allocator::get_default());
     ~BasicColumn();
 
     void destroy() TIGHTDB_OVERRIDE;
@@ -79,7 +79,7 @@ public:
     void ClearIndex() {}
     size_t FindWithIndex(int64_t) const { return size_t(-1); }
 
-    size_t get_ref() const TIGHTDB_OVERRIDE { return m_array->get_ref(); }
+    ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
     void set_parent(ArrayParent* parent, size_t pndx) TIGHTDB_OVERRIDE { m_array->set_parent(parent, pndx); }
 
     /// Compare two columns for equality.
@@ -87,12 +87,12 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
-#endif // TIGHTDB_DEBUG
+#endif
 
 private:
     friend class ColumnBase;
 
-    void update_ref(size_t ref);
+    void update_ref(ref_type ref);
 
     T LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
     void LeafSet(size_t ndx, T value);
@@ -103,8 +103,8 @@ private:
     void LeafFindAll(Array& result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
 #ifdef TIGHTDB_DEBUG
-    virtual void LeafToDot(std::ostream& out, const Array& array) const;
-#endif // TIGHTDB_DEBUG
+    virtual void LeafToDot(std::ostream&, const Array& array) const;
+#endif
 
     template <typename R, Action action, class cond>
     R aggregate(T target, size_t start, size_t end, size_t *matchcount = 0) const;
