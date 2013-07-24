@@ -2208,15 +2208,15 @@ size_t Array::ColumnFind(int64_t target, ref_type ref, Array& cache) const
         size_t width = get_width_from_header(header);
 
         // Get subnode table
-        ref_type ref_offsets = to_ref(get_direct(data, width, 0));
-        ref_type ref_refs    = to_ref(get_direct(data, width, 1));
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
-        const char* offsets_header = m_alloc.translate(ref_offsets);
+        const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t offsets_width  = get_width_from_header(offsets_header);
         size_t offsets_len = get_len_from_header(offsets_header);
 
-        const char* refs_header = m_alloc.translate(ref_refs);
+        const char* refs_header = m_alloc.translate(refs_ref);
         const char* refs_data = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
 
@@ -2260,11 +2260,11 @@ top:
 
     for (;;) {
         // Get subnode table
-        ref_type ref_offsets = to_ref(get_direct(data, width, 0));
-        ref_type ref_refs    = to_ref(get_direct(data, width, 1));
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(ref_offsets);
+        const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
@@ -2272,7 +2272,7 @@ top:
         if (pos == not_found) return not_found;
 
         // Get entry under key
-        const char* refs_header = m_alloc.translate(ref_refs);
+        const char* refs_header = m_alloc.translate(refs_ref);
         const char* refs_data = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
         ref_type ref = to_ref(get_direct(refs_data, refs_width, pos));
@@ -2362,11 +2362,11 @@ top:
 
     for (;;) {
         // Get subnode table
-        ref_type ref_offsets = to_ref(get_direct(data, width, 0));
-        ref_type ref_refs    = to_ref(get_direct(data, width, 1));
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(ref_offsets);
+        const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
@@ -2374,7 +2374,7 @@ top:
         if (pos == not_found) return; // not_found
 
         // Get entry under key
-        const char* refs_header = m_alloc.translate(ref_refs);
+        const char* refs_header = m_alloc.translate(refs_ref);
         const char* refs_data = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
         ref_type ref = to_ref(get_direct(refs_data, refs_width, pos));
@@ -2493,11 +2493,11 @@ top:
 
     for (;;) {
         // Get subnode table
-        ref_type ref_offsets = to_ref(get_direct(data, width, 0));
-        ref_type ref_refs    = to_ref(get_direct(data, width, 1));
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(ref_offsets);
+        const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data   = get_data_from_header(offsets_header);
         size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
@@ -2505,7 +2505,7 @@ top:
         if (pos == not_found) return FindRes_not_found;
 
         // Get entry under key
-        const char* refs_header = m_alloc.translate(ref_refs);
+        const char* refs_header = m_alloc.translate(refs_ref);
         const char* refs_data   = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
         ref_type ref = to_ref(get_direct(refs_data, refs_width, pos));
@@ -2612,11 +2612,11 @@ top:
 
     for (;;) {
         // Get subnode table
-        ref_type ref_offsets = to_ref(get_direct(data, width, 0));
-        ref_type ref_refs    = to_ref(get_direct(data, width, 1));
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(ref_offsets);
+        const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
@@ -2624,7 +2624,7 @@ top:
         if (pos == not_found) return 0;
 
         // Get entry under key
-        const char* refs_header = m_alloc.translate(ref_refs);
+        const char* refs_header = m_alloc.translate(refs_ref);
         const char* refs_data = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
         ref_type ref = to_ref(get_direct(refs_data, refs_width, pos));
