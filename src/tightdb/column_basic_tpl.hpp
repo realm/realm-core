@@ -255,7 +255,7 @@ void BasicColumn<T>::LeafDelete(std::size_t ndx)
 #ifdef TIGHTDB_DEBUG
 
 template<class T>
-void BasicColumn<T>::LeafToDot(std::ostream& out, const Array& array) const
+void BasicColumn<T>::leaf_to_dot(std::ostream& out, const Array& array) const
 {
     // Rebuild array to get correct type
     ref_type ref = array.get_ref();

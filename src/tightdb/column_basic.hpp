@@ -103,7 +103,7 @@ private:
     void LeafFindAll(Array& result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
 #ifdef TIGHTDB_DEBUG
-    virtual void LeafToDot(std::ostream&, const Array& array) const;
+    virtual void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
 #endif
 
     template <typename R, Action action, class cond>
