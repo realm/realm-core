@@ -65,7 +65,7 @@ Query::~Query()
     }
 }
 
-Query& Query::expression(CCompareBase* compare)
+Query& Query::expression(ComparerBase* compare)
 {
     ParentNode* const p = new ExpressionNode(compare);
     UpdatePointers(p, &p->m_child);

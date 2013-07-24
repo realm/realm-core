@@ -101,10 +101,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/array_basic.hpp>
-
-
-#include <tightdb/sequential_getter.h>
-
+#include <tightdb/query_expression.h>
 
 namespace tightdb {
 
@@ -124,8 +121,6 @@ const size_t probe_matches = 4;
 const size_t bitwidth_time_unit = 64;
 
 typedef bool (*CallbackDummy)(int64_t);
-
-
 
 class ParentNode {
 public:
@@ -1295,7 +1290,7 @@ class ExpressionNode: public ParentNode {
 
 public:    
 
-    ExpressionNode(CCompareBase* compare) 
+    ExpressionNode(ComparerBase* compare) 
     {
         m_child = 0;
         m_compare = compare;
@@ -1307,7 +1302,7 @@ public:
         return res;
     }
     
-    CCompareBase* m_compare;
+    ComparerBase* m_compare;
 };
 
 

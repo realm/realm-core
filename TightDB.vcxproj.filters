@@ -363,7 +363,7 @@
     <ClInclude Include="test\pthread_test.hpp">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\sequential_getter.h">
+    <ClInclude Include="src\tightdb\query_expression.h">
       <Filter>src\include</Filter>
     </ClInclude>
   </ItemGroup>

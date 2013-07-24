@@ -1,19 +1,12 @@
-
-
-#ifndef TIGHTDB_SEQUENTIAL_GETTER_HPP
-#define TIGHTDB_SEQUENTIAL_GETTER_HPP
-
+#ifndef TIGHTDB_QUERY_EXPRESSION_HPP
+#define TIGHTDB_QUERY_EXPRESSION_HPP
 
 #include "column_fwd.hpp"
 
 class ArrayFloat;
 class ArrayDouble;
 
-
-
 namespace tightdb {
-
-
 
 template<class T> struct ColumnTypeTraits;
 
@@ -55,7 +48,6 @@ template<class T, Action A> struct ColumnTypeTraitsSum {
 template<> struct ColumnTypeTraitsSum<float, act_Sum> {
     typedef double sum_type;
 };
-
 
 
 struct SequentialGetterBase { virtual ~SequentialGetterBase() {} };
@@ -127,10 +119,10 @@ private:
 };
 
 
-// Performance note: If members were declared as an 8-entry array, VS2010 emits slower code compared to declaring them
-// as separately named members - both if you address them individually/unrolled and in loops. THIS STRUCT MUST CONTAIN 
-// ONLY PLAIN-OLD-DATATYPES (no virt. functions, no constructor) 
-struct quad
+// Performance note: If members are declared as an 8-entry array, VS2010 emits slower code compared to declaring them
+// as separately named members - both if you address them individually/unrolled and if you use loops. gcc is equally slow
+// in either case
+struct Chunk
 {
     int64_t ma;
     int64_t mb;
@@ -144,10 +136,11 @@ struct quad
     static const size_t elements = 8;
 
     int64_t* first() {
+        TIGHTDB_STATIC_ASSERT(sizeof(Chunk) == elements * sizeof(ma), "Elements must be concecutive and without padding - keep Chunk a POD");
         return &ma;
     }
 
-    template <class TOperator> TIGHTDB_FORCEINLINE void fun(quad& q1, quad& q2) {
+    template <class TOperator> TIGHTDB_FORCEINLINE void fun(Chunk& q1, Chunk& q2) {
         TOperator o;
         ma = o(q1.ma, q2.ma);
         mb = o(q1.mb, q2.mb);
@@ -169,53 +162,51 @@ struct quad
         mg = v;
         mh = v;
     }
-
-
 };
 
 
-
-
-struct CExpression
+struct Expression
 {
-    TIGHTDB_FORCEINLINE virtual void evaluate(size_t i, quad& result) = 0;
+    TIGHTDB_FORCEINLINE virtual void evaluate(size_t i, Chunk& result) = 0;
 };
 
-struct CConst
+
+struct ConstantBase
 {
 };
 
-template <int64_t v> struct CConstant : public CExpression, public CConst
+
+template <int64_t v> struct StaticConstant : public Expression, public ConstantBase
 {
-    TIGHTDB_FORCEINLINE void evaluate(size_t i, quad& result) {
+    TIGHTDB_FORCEINLINE void evaluate(size_t i, Chunk& result) {
         result.set_all(v);
     }
 
 };
 
 
-struct CDynConstant : public CExpression, public CConst
+struct DynamicConstant : public Expression, public ConstantBase
 {
-    CDynConstant(int64_t v) {
-        for(size_t t = 0; t < quad::elements; t++)
+    DynamicConstant(int64_t v) {
+        for(size_t t = 0; t < Chunk::elements; t++)
             mq.first()[t] = v;
     }
 
-    TIGHTDB_FORCEINLINE void evaluate(size_t i, quad& result) {
+    TIGHTDB_FORCEINLINE void evaluate(size_t i, Chunk& result) {
         result = mq;
     }
     int64_t c;
-    quad mq;
+    Chunk mq;
 };
 
 
-struct CColumn : public CExpression
+struct ColumnExpression : public Expression
 {
-    CColumn(Column* c) {
+    ColumnExpression(Column* c) {
         sg.init(c);
     }
 
-    TIGHTDB_FORCEINLINE void evaluate(size_t i, quad& result) {
+    TIGHTDB_FORCEINLINE void evaluate(size_t i, Chunk& result) {
         sg.cache_next(i);
         sg.m_array_ptr->get_chunk(i - sg.m_leaf_start, result.first());
     }
@@ -223,32 +214,32 @@ struct CColumn : public CExpression
 };
 
 
-
-template <class oper, class TLeft = CExpression, class TRight = CExpression> struct COperator : public CExpression
+template <class oper, class TLeft = Expression, class TRight = Expression> struct COperator : public Expression
 {
     COperator(TLeft* left, TRight* right) {
         m_left = left;
         m_right = right;
     };
 
-    TIGHTDB_FORCEINLINE void evaluate(size_t i, quad& result) {
-        quad q;
-
-        if(SameType<TLeft, CDynConstant>::value && SameType<TRight, CColumn>::value) {
-            static_cast<CColumn*>(static_cast<CExpression*>(m_right))->CColumn::evaluate(i, result); 
-            result.fun<oper>(static_cast<CDynConstant*>(static_cast<CExpression*>(m_left))->CDynConstant::mq, result);
+    TIGHTDB_FORCEINLINE void evaluate(size_t i, Chunk& result) {
+        // The first three special handlers make VS2010 create faster code even though the last general case may be
+        // semantically equivalent; the general case emit push/pop for vast amounts of state, for unknown reasons. gcc
+        // is equally slow in either case
+        if(SameType<TLeft, DynamicConstant>::value && SameType<TRight, ColumnExpression>::value) {
+            static_cast<ColumnExpression*>(static_cast<Expression*>(m_right))->ColumnExpression::evaluate(i, result); 
+            result.fun<oper>(static_cast<DynamicConstant*>(static_cast<Expression*>(m_left))->DynamicConstant::mq, result);
         }
-        else if(SameType<TLeft, CColumn>::value && SameType<TRight, CDynConstant>::value) {
-            static_cast<CColumn*>(static_cast<CExpression*>(m_left))->CColumn::evaluate(i, result); 
-            result.fun<oper>(static_cast<CDynConstant*>(static_cast<CExpression*>(m_right))->CDynConstant::mq, result);
+        else if(SameType<TLeft, ColumnExpression>::value && SameType<TRight, DynamicConstant>::value) {
+            static_cast<ColumnExpression*>(static_cast<Expression*>(m_left))->ColumnExpression::evaluate(i, result); 
+            result.fun<oper>(static_cast<DynamicConstant*>(static_cast<Expression*>(m_right))->DynamicConstant::mq, result);
         }
-        else if(SameType<TLeft, CDynConstant>::value && SameType<TRight, CDynConstant>::value) {
-            result.fun<oper>(static_cast<CDynConstant*>(static_cast<CExpression*>(m_right))->CDynConstant::mq, 
-                             static_cast<CDynConstant*>(static_cast<CExpression*>(m_left))->CDynConstant::mq);
+        else if(SameType<TLeft, DynamicConstant>::value && SameType<TRight, DynamicConstant>::value) {
+            result.fun<oper>(static_cast<DynamicConstant*>(static_cast<Expression*>(m_right))->DynamicConstant::mq, 
+                             static_cast<DynamicConstant*>(static_cast<Expression*>(m_left))->DynamicConstant::mq);
         }
         else {
-            quad q1;
-            quad q2;
+            Chunk q1;
+            Chunk q2;
             static_cast<TLeft*>(m_left)->TLeft::evaluate(i, q1);
             static_cast<TRight*>(m_right)->TRight::evaluate(i, q2); 
             result.fun<oper>(q1, q2);
@@ -260,17 +251,15 @@ template <class oper, class TLeft = CExpression, class TRight = CExpression> str
 };
 
 
-
-
-struct CCompareBase
+struct ComparerBase
 {
     virtual size_t Compare(size_t start, size_t end) = 0;
 };
 
 
-template <class TCond> struct CCompare : public CCompareBase
+template <class TCond> struct Comparer : public ComparerBase
 {
-    CCompare(CExpression* e1, CExpression* e2) 
+    Comparer(Expression* e1, Expression* e2) 
     {
         m_e1 = e1;
         m_e2 = e2;
@@ -278,11 +267,11 @@ template <class TCond> struct CCompare : public CCompareBase
 
     size_t Compare(size_t start, size_t end) {
         TCond c;
-        quad q1;
-        quad q2;
+        Chunk q1;
+        Chunk q2;
         size_t i;
 
-        for(i = start; i + quad::elements < end; i += quad::elements) {
+        for(i = start; i + Chunk::elements < end; i += Chunk::elements) {
             m_e1->evaluate(i, q1);
             m_e2->evaluate(i, q2);
 
@@ -317,14 +306,10 @@ template <class TCond> struct CCompare : public CCompareBase
         return end;
     }
     
-    CExpression* m_e1;
-    CExpression* m_e2;
-
+    Expression* m_e1;
+    Expression* m_e2;
 };
-
-
-
 
 }
 
-#endif // TIGHTDB_SEQUENTIAL_GETTER_HPP
+#endif // TIGHTDB_QUERY_EXPRESSION_HPP

@@ -104,15 +104,15 @@ int main(int argc, char* argv[])
 
         a.set(9998, 30);
 
-        CColumn* col = new CColumn(&a);
-        CDynConstant* cc1 = new CDynConstant(20);
-        CExpression* cc2 = new CDynConstant(50);
+        ColumnExpression* col = new ColumnExpression(&a);
+        DynamicConstant* cc1 = new DynamicConstant(20);
+        Expression* cc2 = new DynamicConstant(50);
 
-//        CExpression* ck = new COperator<plus2>(cc1, col);
-//        CExpression* ck = new COperator<plus2, CDynConstant, CColumn>(cc1, col);          //
-        CExpression* ck = new COperator<plus2, CColumn, CDynConstant>(col, cc1);           // slow
-//        CExpression* ck = new COperator<plus2>(col, cc1);           // slow
-        CCompareBase *e = new CCompare<Equal>(col, cc2);
+//        Expression* ck = new COperator<plus2>(cc1, col);
+//        Expression* ck = new COperator<plus2, DynamicConstant, ColumnExpression>(cc1, col);          //
+        Expression* ck = new COperator<plus2, ColumnExpression, DynamicConstant>(col, cc1);           // slow
+//        Expression* ck = new COperator<plus2>(col, cc1);           // slow
+        ComparerBase *e = new Comparer<Equal>(col, cc2);
 
 
 
