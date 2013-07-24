@@ -1290,19 +1290,27 @@ class ExpressionNode: public ParentNode {
 
 public:    
 
-    ExpressionNode(ComparerBase* compare) 
+    ExpressionNode(CompareBase* compare) 
     {
         m_child = 0;
         m_compare = compare;
     }
 
+    void init(const Table& table) 
+    {
+     //   m_table = &table;
+        m_compare->set_table(&table);
+        if (m_child)
+            m_child->init(table);
+    }
+
     size_t find_first_local(size_t start, size_t end)
     {
-        size_t res = m_compare->Compare(start, end);
+        size_t res = m_compare->compare(start, end);
         return res;
     }
     
-    ComparerBase* m_compare;
+    CompareBase* m_compare;
 };
 
 

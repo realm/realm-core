@@ -6,6 +6,9 @@
 #include "testsettings.hpp"
 #include <stdlib.h> // itoa()
 
+#include <tightdb/column.hpp>
+#include <tightdb/query_expression.h>
+
 using namespace tightdb;
 
 namespace {
@@ -76,6 +79,44 @@ TIGHTDB_TABLE_2(PeopleTable2,
 
 
 } // anonymous namespace
+
+
+TEST(QueryExpressions1)
+{
+    
+    Table table;
+    table.add_column(type_Int, "first1");
+    table.add_column(type_Int, "second1");
+
+
+    for (int i = 0; i < 10100; i++) {
+        table.add_empty_row();
+        table.set_int(0, i,  rand() % 10 );
+        table.set_int(1, i, 0);
+    }
+
+#if 0
+        // Slow dynamic, 360 ms
+        ExpressionBase* col = new ColumnExpression(&a);
+        ExpressionBase* cc1 = new DynamicConstant(20);
+        ExpressionBase* cc2 = new DynamicConstant(50);  
+        ExpressionBase* ck = new Expression<Plus>(col, cc1);  
+
+#else
+        // Fast static, 313
+        ColumnExpression* col = new ColumnExpression(0);
+        DynamicConstant* cc1 = new DynamicConstant(20);
+        DynamicConstant* cc2 = new DynamicConstant(50);  
+        ExpressionBase* ck = new Expression<Plus, ColumnExpression, DynamicConstant>(col, cc1);  
+
+#endif
+        
+        CompareBase *e = new Compare<Equal>(ck, cc2);
+
+    tightdb::TableView t1;
+    t1 = table.where().expression(e).find_all();
+}
+
 
 
 TEST(CountLimit)

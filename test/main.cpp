@@ -8,7 +8,7 @@
 #include <tightdb/utilities.hpp>
 
 
-#include <tightdb/sequential_getter.h>
+#include <tightdb/query_expression.h>
 
 #define USE_VLD
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
@@ -61,12 +61,6 @@ struct CustomTestReporter: TestReporter {
 
 } // anonymous namespace
 
-struct plus2 { 
-    int64_t operator()(int64_t v1, int64_t v2) const {return v1 + v2;} 
-};
-
-
-
 
 // *******************************************************************************************************************
 //
@@ -104,15 +98,30 @@ int main(int argc, char* argv[])
 
         a.set(9998, 30);
 
-        ColumnExpression* col = new ColumnExpression(&a);
-        DynamicConstant* cc1 = new DynamicConstant(20);
-        Expression* cc2 = new DynamicConstant(50);
 
-//        Expression* ck = new COperator<plus2>(cc1, col);
-//        Expression* ck = new COperator<plus2, DynamicConstant, ColumnExpression>(cc1, col);          //
-        Expression* ck = new COperator<plus2, ColumnExpression, DynamicConstant>(col, cc1);           // slow
-//        Expression* ck = new COperator<plus2>(col, cc1);           // slow
-        ComparerBase *e = new Comparer<Equal>(col, cc2);
+
+
+#if 0
+        // Slow dynamic, 360 ms
+        ExpressionBase* col = new ColumnExpression(&a);
+        ExpressionBase* cc1 = new DynamicConstant(20);
+        ExpressionBase* cc2 = new DynamicConstant(50);  
+        ExpressionBase* ck = new Expression<plus2>(col, cc1);  
+
+#else
+        // Fast static, 313
+//        ColumnExpression* col = new ColumnExpression(&a);
+        ColumnExpression* col = new ColumnExpression(0);
+        DynamicConstant* cc1 = new DynamicConstant(20);
+        DynamicConstant* cc2 = new DynamicConstant(50);  
+        ExpressionBase* ck = new Expression<Plus, ColumnExpression, DynamicConstant>(col, cc1);  
+
+#endif
+        
+
+
+
+        CompareBase *e = new Compare<Equal>(ck, cc2);
 
 
 
@@ -143,7 +152,7 @@ int main(int argc, char* argv[])
                 timer.Start();
                 for(int i = 0; i < 10000; i++) {
                     t1 = table.where().expression(e).find_all();
-                //    m = e->Compare(0, 10000);
+                //    m = e->compare(0, 10000);
 
                 }
                 
@@ -186,6 +195,7 @@ int main(int argc, char* argv[])
 
 
         
+
 
         return 0;
 }

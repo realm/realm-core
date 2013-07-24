@@ -5,6 +5,7 @@
 
 class ArrayFloat;
 class ArrayDouble;
+//class Column;
 
 namespace tightdb {
 
@@ -119,6 +120,23 @@ private:
 };
 
 
+struct Plus { 
+    int64_t operator()(int64_t v1, int64_t v2) const {return v1 + v2;} 
+};
+
+struct Minus { 
+    int64_t operator()(int64_t v1, int64_t v2) const {return v1 - v2;} 
+};
+
+struct Mul { 
+    int64_t operator()(int64_t v1, int64_t v2) const {return v1 * v2;} 
+};
+
+struct Div { 
+    int64_t operator()(int64_t v1, int64_t v2) const {return v1 / v2;} 
+};
+
+
 // Performance note: If members are declared as an 8-entry array, VS2010 emits slower code compared to declaring them
 // as separately named members - both if you address them individually/unrolled and if you use loops. gcc is equally slow
 // in either case
@@ -165,18 +183,23 @@ struct Chunk
 };
 
 
-struct Expression
+struct ExpressionBase
 {
     TIGHTDB_FORCEINLINE virtual void evaluate(size_t i, Chunk& result) = 0;
+    
+    virtual void set_table(const Table* table) { }
+
+    const Table* m_table;
 };
 
 
 struct ConstantBase
 {
+//    TIGHTDB_FORCEINLINE virtual void evaluate(size_t i, Chunk& result) = 0;
 };
 
 
-template <int64_t v> struct StaticConstant : public Expression, public ConstantBase
+template <int64_t v> struct StaticConstant : public ExpressionBase, public ConstantBase
 {
     TIGHTDB_FORCEINLINE void evaluate(size_t i, Chunk& result) {
         result.set_all(v);
@@ -185,7 +208,7 @@ template <int64_t v> struct StaticConstant : public Expression, public ConstantB
 };
 
 
-struct DynamicConstant : public Expression, public ConstantBase
+struct DynamicConstant : public ExpressionBase, public ConstantBase
 {
     DynamicConstant(int64_t v) {
         for(size_t t = 0; t < Chunk::elements; t++)
@@ -200,10 +223,22 @@ struct DynamicConstant : public Expression, public ConstantBase
 };
 
 
-struct ColumnExpression : public Expression
+struct ColumnExpression : public ExpressionBase
 {
+/*
     ColumnExpression(Column* c) {
         sg.init(c);
+    }
+
+*/
+    virtual void set_table(const Table* table) {
+        m_table = table; 
+        Column* c = (Column*)&m_table->GetColumnBase(m_column);
+        sg.init(c);
+    }
+
+    ColumnExpression(size_t column) {
+        m_column = column;
     }
 
     TIGHTDB_FORCEINLINE void evaluate(size_t i, Chunk& result) {
@@ -211,37 +246,52 @@ struct ColumnExpression : public Expression
         sg.m_array_ptr->get_chunk(i - sg.m_leaf_start, result.first());
     }
     SequentialGetter<int64_t> sg;
+    size_t m_column;
 };
 
 
-template <class oper, class TLeft = Expression, class TRight = Expression> struct COperator : public Expression
+template <class oper, class TLeft = ExpressionBase, class TRight = ExpressionBase> struct Expression : public ExpressionBase
 {
-    COperator(TLeft* left, TRight* right) {
+    Expression(TLeft* left, TRight* right) {
         m_left = left;
         m_right = right;
     };
 
+    void set_table(const Table* table)
+    {
+        m_left->set_table(table);
+        m_right->set_table(table);
+    }
+
     TIGHTDB_FORCEINLINE void evaluate(size_t i, Chunk& result) {
-        // The first three special handlers make VS2010 create faster code even though the last general case may be
+        // The first four special handlers make VS2010 create faster code even though the last general case may be
         // semantically equivalent; the general case emit push/pop for vast amounts of state, for unknown reasons. gcc
         // is equally slow in either case
+
         if(SameType<TLeft, DynamicConstant>::value && SameType<TRight, ColumnExpression>::value) {
-            static_cast<ColumnExpression*>(static_cast<Expression*>(m_right))->ColumnExpression::evaluate(i, result); 
-            result.fun<oper>(static_cast<DynamicConstant*>(static_cast<Expression*>(m_left))->DynamicConstant::mq, result);
+            static_cast<ColumnExpression*>(static_cast<ExpressionBase*>(m_right))->ColumnExpression::evaluate(i, result); 
+            result.fun<oper>(static_cast<DynamicConstant*>(static_cast<ExpressionBase*>(m_left))->DynamicConstant::mq, result);
         }
         else if(SameType<TLeft, ColumnExpression>::value && SameType<TRight, DynamicConstant>::value) {
-            static_cast<ColumnExpression*>(static_cast<Expression*>(m_left))->ColumnExpression::evaluate(i, result); 
-            result.fun<oper>(static_cast<DynamicConstant*>(static_cast<Expression*>(m_right))->DynamicConstant::mq, result);
+            static_cast<ColumnExpression*>(static_cast<ExpressionBase*>(m_left))->ColumnExpression::evaluate(i, result); 
+            result.fun<oper>(static_cast<DynamicConstant*>(static_cast<ExpressionBase*>(m_right))->DynamicConstant::mq, result);
         }
         else if(SameType<TLeft, DynamicConstant>::value && SameType<TRight, DynamicConstant>::value) {
-            result.fun<oper>(static_cast<DynamicConstant*>(static_cast<Expression*>(m_right))->DynamicConstant::mq, 
-                             static_cast<DynamicConstant*>(static_cast<Expression*>(m_left))->DynamicConstant::mq);
+            result.fun<oper>(static_cast<DynamicConstant*>(static_cast<ExpressionBase*>(m_right))->DynamicConstant::mq, 
+                             static_cast<DynamicConstant*>(static_cast<ExpressionBase*>(m_left))->DynamicConstant::mq);
+        }
+        else if(!SameType<TLeft, ExpressionBase>::value && !SameType<TRight, ExpressionBase>::value) {
+            Chunk q1;
+            Chunk q2;
+            static_cast<TLeft*>(m_left)->TLeft::evaluate(i, q1);
+            static_cast<TRight*>(m_right)->TRight::evaluate(i, q2);
+            result.fun<oper>(q1, q2);        
         }
         else {
             Chunk q1;
             Chunk q2;
-            static_cast<TLeft*>(m_left)->TLeft::evaluate(i, q1);
-            static_cast<TRight*>(m_right)->TRight::evaluate(i, q2); 
+            m_left->evaluate(i, q1);
+            m_right->evaluate(i, q2); 
             result.fun<oper>(q1, q2);
         }
     }
@@ -251,21 +301,28 @@ template <class oper, class TLeft = Expression, class TRight = Expression> struc
 };
 
 
-struct ComparerBase
+struct CompareBase
 {
-    virtual size_t Compare(size_t start, size_t end) = 0;
+    virtual size_t compare(size_t start, size_t end) = 0;
+    virtual void set_table(const Table* table) = 0;
 };
 
 
-template <class TCond> struct Comparer : public ComparerBase
+template <class TCond> struct Compare : public CompareBase
 {
-    Comparer(Expression* e1, Expression* e2) 
+    Compare(ExpressionBase* e1, ExpressionBase* e2) 
     {
         m_e1 = e1;
         m_e2 = e2;
     }
 
-    size_t Compare(size_t start, size_t end) {
+    void set_table(const Table* table) 
+    {
+        m_e1->set_table(table);
+        m_e2->set_table(table);
+    }
+
+    size_t compare(size_t start, size_t end) {
         TCond c;
         Chunk q1;
         Chunk q2;
@@ -306,8 +363,8 @@ template <class TCond> struct Comparer : public ComparerBase
         return end;
     }
     
-    Expression* m_e1;
-    Expression* m_e2;
+    ExpressionBase* m_e1;
+    ExpressionBase* m_e2;
 };
 
 }
