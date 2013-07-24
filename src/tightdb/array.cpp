@@ -1446,9 +1446,14 @@ template<size_t w> int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 
 template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT
 {
+    // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
+    // exceed array length; in this case, remainder of res[8] will be left untouched.
+
     TIGHTDB_ASSERT(ndx < m_len);
 
     if(TIGHTDB_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 16 < m_len) {
+        // This method is *multiple* times faster than performing 8 times Get<w>, even if unrolled. Apparently compilers
+        // can't figure out to optimize it.
         uint64_t c;
         if(w == 1) {
             c = *reinterpret_cast<uint16_t*>(m_data + ndx / 8);
@@ -1463,14 +1468,15 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
             c >>= ndx - ndx / 4 * 2;
         }
         uint64_t mask = (w == 64 ? ~0ULL : ((1ULL << (w == 64 ? 0 : w)) - 1ULL));
-        res[0] = (c >> 0 * w) & mask;
-        res[1] = (c >> 1 * w) & mask;
-        res[2] = (c >> 2 * w) & mask;
-        res[3] = (c >> 3 * w) & mask;
-        res[4] = (c >> 4 * w) & mask;
-        res[5] = (c >> 5 * w) & mask;
-        res[6] = (c >> 6 * w) & mask;
-        res[7] = (c >> 7 * w) & mask;
+        // The '?' is to avoid warnings about shifting too much
+        res[0] = (c >> 0 * (w > 4 ? 0 : w)) & mask;
+        res[1] = (c >> 1 * (w > 4 ? 0 : w)) & mask;
+        res[2] = (c >> 2 * (w > 4 ? 0 : w)) & mask;
+        res[3] = (c >> 3 * (w > 4 ? 0 : w)) & mask;
+        res[4] = (c >> 4 * (w > 4 ? 0 : w)) & mask;
+        res[5] = (c >> 5 * (w > 4 ? 0 : w)) & mask;
+        res[6] = (c >> 6 * (w > 4 ? 0 : w)) & mask;
+        res[7] = (c >> 7 * (w > 4 ? 0 : w)) & mask;
     }
     else {
         for(size_t i = 0; i < m_len && i < 8; i++) 

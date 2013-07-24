@@ -155,6 +155,7 @@ struct Chunk
 
     int64_t* first() {
         TIGHTDB_STATIC_ASSERT(sizeof(Chunk) == elements * sizeof(ma), "Elements must be concecutive and without padding - keep Chunk a POD");
+
         return &ma;
     }
 
@@ -193,11 +194,7 @@ struct ExpressionBase
 };
 
 
-struct ConstantBase
-{
-//    TIGHTDB_FORCEINLINE virtual void evaluate(size_t i, Chunk& result) = 0;
-};
-
+struct ConstantBase { };
 
 template <int64_t v> struct StaticConstant : public ExpressionBase, public ConstantBase
 {
@@ -225,12 +222,6 @@ struct DynamicConstant : public ExpressionBase, public ConstantBase
 
 struct ColumnExpression : public ExpressionBase
 {
-/*
-    ColumnExpression(Column* c) {
-        sg.init(c);
-    }
-
-*/
     virtual void set_table(const Table* table) {
         m_table = table; 
         Column* c = (Column*)&m_table->GetColumnBase(m_column);
@@ -249,7 +240,8 @@ struct ColumnExpression : public ExpressionBase
     size_t m_column;
 };
 
-
+// This class performs an arithmetic operation (+, -, *, /) on two expressions. It lets you specify left and right operand
+// types at compile time for extra speed, or you can leave it out for dynamic expressions built at runtime
 template <class oper, class TLeft = ExpressionBase, class TRight = ExpressionBase> struct Expression : public ExpressionBase
 {
     Expression(TLeft* left, TRight* right) {
@@ -264,8 +256,8 @@ template <class oper, class TLeft = ExpressionBase, class TRight = ExpressionBas
     }
 
     TIGHTDB_FORCEINLINE void evaluate(size_t i, Chunk& result) {
-        // The first four special handlers make VS2010 create faster code even though the last general case may be
-        // semantically equivalent; the general case emit push/pop for vast amounts of state, for unknown reasons. gcc
+        // The first three special handlers make VS2010 create faster code even though the fourth general case may be
+        // semantically equivalent; the general case emits push/pop for vast amounts of state, for unknown reasons. gcc
         // is equally slow in either case
 
         if(SameType<TLeft, DynamicConstant>::value && SameType<TRight, ColumnExpression>::value) {
@@ -280,18 +272,21 @@ template <class oper, class TLeft = ExpressionBase, class TRight = ExpressionBas
             result.fun<oper>(static_cast<DynamicConstant*>(static_cast<ExpressionBase*>(m_right))->DynamicConstant::mq, 
                              static_cast<DynamicConstant*>(static_cast<ExpressionBase*>(m_left))->DynamicConstant::mq);
         }
-        else if(!SameType<TLeft, ExpressionBase>::value && !SameType<TRight, ExpressionBase>::value) {
-            Chunk q1;
-            Chunk q2;
-            static_cast<TLeft*>(m_left)->TLeft::evaluate(i, q1);
-            static_cast<TRight*>(m_right)->TRight::evaluate(i, q2);
-            result.fun<oper>(q1, q2);        
-        }
         else {
             Chunk q1;
             Chunk q2;
-            m_left->evaluate(i, q1);
-            m_right->evaluate(i, q2); 
+
+            // Avoid vtable lookup when possible. Required even with 'final' keyword in C++11.
+            if(!SameType<TLeft, ExpressionBase>::value)
+                static_cast<TLeft*>(m_left)->TLeft::evaluate(i, q1);
+            else
+                m_left->evaluate(i, q1);
+
+            if(!SameType<TRight, ExpressionBase>::value)
+                static_cast<TRight*>(m_right)->TRight::evaluate(i, q2);
+            else
+                m_right->evaluate(i, q2); 
+
             result.fun<oper>(q1, q2);
         }
     }

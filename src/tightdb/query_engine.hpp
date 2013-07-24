@@ -1275,17 +1275,7 @@ protected:
     SequentialGetter<TConditionValue> m_getter2;
 };
 
-
-// *******************************************************************************************************************
-//
-//
-//
-// *******************************************************************************************************************
-
-
-
-
-    
+// For expressions like col1 / col2 + 123 > col4 * 100
 class ExpressionNode: public ParentNode {
 
 public:    
@@ -1298,7 +1288,6 @@ public:
 
     void init(const Table& table) 
     {
-     //   m_table = &table;
         m_compare->set_table(&table);
         if (m_child)
             m_child->init(table);
