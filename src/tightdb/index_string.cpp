@@ -56,6 +56,8 @@ void StringIndex::Create()
     // Add subcolumns for leafs
     Allocator& alloc = m_array->get_alloc();
     Array values(Array::type_Normal, NULL, 0, alloc);
+values.add(0x7FFFFFFF);
+values.erase(0);
     Array refs(Array::type_HasRefs, NULL, 1, alloc);
     m_array->add(values.get_ref());
     m_array->add(refs.get_ref());
