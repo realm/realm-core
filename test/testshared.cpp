@@ -815,6 +815,28 @@ TEST(Shared_FromSerialized)
     }
 }
 
+
+TEST(StringIndex_Bug1)
+{
+    File::try_remove("x.tightdb");
+    File::try_remove("x.tightdb.lock");
+    SharedGroup sg("x.tightdb");
+
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("a");
+        table->add_column(type_String, "b");
+        table->set_index(0);  // Not adding index makes it work
+        table->add_empty_row();
+        wt.commit();
+    }
+
+    {
+        ReadTransaction rt(sg);
+    }
+}
+
+
 namespace {
 void randstr(char* res, size_t len) {
     for (size_t i = 0; i < len; ++i) {
@@ -823,7 +845,7 @@ void randstr(char* res, size_t len) {
 }
 }
 
-TEST(StringIndex_Bug)
+TEST(StringIndex_Bug2)
 {
     File::try_remove("indexbug.tightdb");
     File::try_remove("indexbug.tightdb.lock");
