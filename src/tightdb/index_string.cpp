@@ -355,7 +355,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, int32_t key, size_t offset, StringD
         return true;
     }
 
-    const size_t ref = refs.get_as_ref(ins_pos);
+    const size_t ref = to_size_t(refs.get(ins_pos));
     const size_t sub_offset = offset + 4;
     Allocator& alloc = m_array->get_alloc();
 
@@ -500,12 +500,12 @@ void StringIndex::UpdateRefs(size_t pos, int diff)
     }
     else {
         for (size_t i = 0; i < count; ++i) {
-            size_t ref = refs.get_as_ref(i);
+            int64_t ref = refs.get(i);
 
             // low bit set indicate literal ref (shifted)
             if (ref & 1) {
                 //const size_t r = (ref >> 1); Please NEVER right shift signed values - result varies btw Intel/AMD
-                size_t r = ref >> 1;
+                size_t r = size_t(uint64_t(ref) >> 1);
                 if (r >= pos) {
                     size_t adjusted_ref = ((r + diff) << 1)+1;
                     refs.set(i, adjusted_ref);
@@ -513,12 +513,12 @@ void StringIndex::UpdateRefs(size_t pos, int diff)
             }
             else {
                 // A real ref either points to a list or a sub-index
-                if (Array::is_index_node(ref, alloc)) {
-                    StringIndex ndx(ref, &refs, i, m_target_column, m_get_func, alloc);
+                if (Array::is_index_node(to_ref(ref), alloc)) {
+                    StringIndex ndx(to_ref(ref), &refs, i, m_target_column, m_get_func, alloc);
                     ndx.UpdateRefs(pos, diff);
                 }
                 else {
-                    Column sub(ref, &refs, i, alloc);
+                    Column sub(to_ref(ref), &refs, i, alloc);
                     sub.IncrementIf(pos, diff);
                 }
             }
@@ -585,7 +585,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
         }
     }
     else {
-        const int64_t ref = refs.get(pos);
+        int64_t ref = refs.get(pos);
         if (ref & 1) {
             TIGHTDB_ASSERT((uint64_t(ref) >> 1) == uint64_t(row_ndx));
             values.erase(pos);

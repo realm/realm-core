@@ -97,30 +97,30 @@ public:
     /// by an instance of BasicTableRef.
     Table* get_subtable_ptr(std::size_t row_idx) const;
 
-    void set_int(size_t ndx, int64_t value);
-    void set_bool(size_t ndx, bool value);
-    void set_date(size_t ndx, Date value);
-    void set_float(size_t ndx, float value);
-    void set_double(size_t ndx, double value);
-    void set_string(size_t ndx, StringData value);
-    void set_binary(size_t ndx, BinaryData value);
-    void set_subtable(size_t ndx, const Table*);
+    void set_int(std::size_t ndx, int64_t value);
+    void set_bool(std::size_t ndx, bool value);
+    void set_date(std::size_t ndx, Date value);
+    void set_float(std::size_t ndx, float value);
+    void set_double(std::size_t ndx, double value);
+    void set_string(std::size_t ndx, StringData value);
+    void set_binary(std::size_t ndx, BinaryData value);
+    void set_subtable(std::size_t ndx, const Table*);
 
-    void insert_int(size_t ndx, int64_t value);
-    void insert_bool(size_t ndx, bool value);
-    void insert_date(size_t ndx, Date value);
-    void insert_float(size_t ndx, float value);
-    void insert_double(size_t ndx, double value);
-    void insert_string(size_t ndx, StringData value);
-    void insert_binary(size_t ndx, BinaryData value);
-    void insert_subtable(size_t ndx, const Table*);
+    void insert_int(std::size_t ndx, int64_t value);
+    void insert_bool(std::size_t ndx, bool value);
+    void insert_date(std::size_t ndx, Date value);
+    void insert_float(std::size_t ndx, float value);
+    void insert_double(std::size_t ndx, double value);
+    void insert_string(std::size_t ndx, StringData value);
+    void insert_binary(std::size_t ndx, BinaryData value);
+    void insert_subtable(std::size_t ndx, const Table*);
 
     void add() TIGHTDB_OVERRIDE { insert_int(size(), 0); }
-    void insert(size_t ndx) TIGHTDB_OVERRIDE { insert_int(ndx, 0); invalidate_subtables(); }
+    void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert_int(ndx, 0); invalidate_subtables(); }
     void clear() TIGHTDB_OVERRIDE;
-    void erase(size_t ndx) TIGHTDB_OVERRIDE;
-    void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
-    void fill(size_t count);
+    void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
+    void fill(std::size_t count);
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
 
@@ -172,18 +172,18 @@ private:
     /// For string and binary data types, the bytes are stored here.
     ColumnBinary* m_data;
 
-    void Create(Allocator& alloc, const Table* table, size_t column_ndx);
-    void Create(Allocator& alloc, const Table* table, size_t column_ndx,
-                ArrayParent* parent, size_t ndx_in_parent, size_t ref);
+    void Create(Allocator& alloc, const Table* table, std::size_t column_ndx);
+    void Create(Allocator& alloc, const Table* table, std::size_t column_ndx,
+                ArrayParent* parent, std::size_t ndx_in_parent, ref_type ref);
     void InitDataColumn();
 
-    void clear_value(size_t ndx, MixedColType newtype);
+    void clear_value(std::size_t ndx, MixedColType newtype);
 
     // Get/set/insert 64-bit values in m_refs/m_types
-    int64_t get_value(size_t ndx) const TIGHTDB_NOEXCEPT;
-    void set_value(size_t ndx, int64_t value, MixedColType coltype);
-    void insert_int64(size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
-    void set_int64(size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
+    int64_t get_value(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    void set_value(std::size_t ndx, int64_t value, MixedColType coltype);
+    void insert_int64(std::size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
+    void set_int64(std::size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
 };
 
 

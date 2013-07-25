@@ -93,7 +93,7 @@ private:
 inline StringData ColumnStringEnum::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < Column::size());
-    std::size_t key_ndx = Column::get_as_ref(ndx);
+    std::size_t key_ndx = to_size_t(Column::get(ndx));
     return m_keys.get(key_ndx);
 }
 
