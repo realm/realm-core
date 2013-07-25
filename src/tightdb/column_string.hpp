@@ -67,12 +67,11 @@ public:
     FindRes find_all_indexref(StringData value, size_t& dst) const;
 
     // Index
-    bool HasIndex() const { return m_index != 0; }
-    const StringIndex& GetIndex() const { return *m_index; }
-    StringIndex& PullIndex() {StringIndex& ndx = *m_index; m_index = 0; return ndx;}
-    StringIndex& CreateIndex();
-    void SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx);
-    void RemoveIndex() { m_index = 0; }
+    bool has_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_index != 0; }
+    void set_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_OVERRIDE;
+    const StringIndex& get_index() const { return *m_index; }
+    StringIndex* release_index() TIGHTDB_NOEXCEPT { StringIndex* i = m_index; m_index = 0; return i;}
+    StringIndex& create_index();
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }

@@ -35,7 +35,7 @@ public:
     StringIndex(Array::Type, Allocator&);
     StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, void* target_column,
                 StringGetter get_func, Allocator&);
-    void SetTarget(void* target_column, StringGetter get_func);
+    void set_target(void* target_column, StringGetter get_func) TIGHTDB_NOEXCEPT;
 
     bool is_empty() const;
 

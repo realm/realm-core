@@ -63,7 +63,7 @@ void StringIndex::Create()
     refs.set_parent(m_array, 1);
 }
 
-void StringIndex::SetTarget(void* target_column, StringGetter get_func)
+void StringIndex::set_target(void* target_column, StringGetter get_func) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(target_column);
     m_target_column = target_column;

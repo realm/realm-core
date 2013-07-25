@@ -73,12 +73,6 @@ public:
     size_t find_first(T value, size_t start=0 , size_t end=-1) const;
     void find_all(Array& result, T value, size_t start = 0, size_t end = -1) const;
 
-    // Index
-    bool HasIndex() const TIGHTDB_OVERRIDE { return false; }
-    void BuildIndex(Index&) {}
-    void ClearIndex() {}
-    size_t FindWithIndex(int64_t) const { return size_t(-1); }
-
     ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
     void set_parent(ArrayParent* parent, size_t pndx) TIGHTDB_OVERRIDE { m_array->set_parent(parent, pndx); }
 

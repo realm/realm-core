@@ -27,7 +27,6 @@
 #include <tightdb/column_table.hpp>
 #include <tightdb/column_binary.hpp>
 #include <tightdb/table.hpp>
-#include <tightdb/index.hpp>
 #include <tightdb/utilities.hpp>
 
 
@@ -122,11 +121,6 @@ public:
     void erase(size_t ndx) TIGHTDB_OVERRIDE;
     void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
     void fill(size_t count);
-
-    // Indexing
-    bool HasIndex() const {return false;}
-    void BuildIndex(Index& index) { static_cast<void>(index); }
-    void ClearIndex() {}
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
 
