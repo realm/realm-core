@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <algorithm>
 
 #include <tightdb/array.hpp>
@@ -5,12 +6,13 @@
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/query.hpp>
 #include <tightdb/query_engine.hpp>
-#include <cstdio>
 
 using namespace std;
 using namespace tightdb;
 
+namespace {
 const size_t thread_chunk_size = 1000;
+}
 
 Query::Query(Table& table) : m_table(table.get_table_ref())
 {

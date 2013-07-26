@@ -96,7 +96,7 @@ template<class T, class C> void ColumnBase::TreeSet(size_t ndx, T value)
         const size_t node_ndx = offsets.FindPos(ndx);
 
         // Calc index in subnode
-        const size_t offset = node_ndx ? to_ref(offsets.get(node_ndx-1)) : 0;
+        const size_t offset = node_ndx ? to_size_t(offsets.get(node_ndx-1)) : 0;
         const size_t local_ndx = ndx - offset;
 
         // Set item
@@ -157,7 +157,7 @@ template<class T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx, T
         }
 
         // Calc index in subnode
-        const size_t offset = node_ndx ? to_ref(offsets.get(node_ndx-1)) : 0;
+        const size_t offset = node_ndx ? to_size_t(offsets.get(node_ndx-1)) : 0;
         const size_t local_ndx = ndx - offset;
 
         // Get sublist
@@ -184,7 +184,7 @@ template<class T, class C> Column::NodeChange ColumnBase::DoInsert(size_t ndx, T
         if (nc.type == NodeChange::split) {
             // update offset for left node
             const size_t newsize = target.size();
-            const size_t preoffset = node_ndx ? to_ref(offsets.get(node_ndx-1)) : 0;
+            const size_t preoffset = node_ndx ? to_size_t(offsets.get(node_ndx-1)) : 0;
             offsets.set(node_ndx, preoffset + newsize);
 
             newNode.NodeAdd<C>(nc.ref2);
@@ -258,11 +258,11 @@ template<class C> void ColumnBase::NodeInsertSplit(size_t ndx, size_t new_ref)
     const C new_col(new_ref, NULL, 0, m_array->get_alloc());
 
     // Update original size
-    const size_t offset = ndx ? to_ref(offsets.get(ndx-1)) : 0;
+    const size_t offset = ndx ? to_size_t(offsets.get(ndx-1)) : 0;
     const size_t newSize = orig_col.size();
     const size_t newOffset = offset + newSize;
 #ifdef TIGHTDB_DEBUG
-    const size_t oldSize = to_ref(offsets.get(ndx)) - offset;
+    const size_t oldSize = to_size_t(offsets.get(ndx)) - offset;
 #endif
     offsets.set(ndx, newOffset);
 
@@ -333,7 +333,7 @@ template<class T, class C> void ColumnBase::TreeDelete(size_t ndx)
         TIGHTDB_ASSERT(node_ndx != size_t(-1));
 
         // Calc index in subnode
-        const size_t offset = node_ndx ? to_ref(offsets.get(node_ndx-1)) : 0;
+        const size_t offset = node_ndx ? to_size_t(offsets.get(node_ndx-1)) : 0;
         const size_t local_ndx = ndx - offset;
 
         // Get sublist
@@ -379,10 +379,10 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
 
         if (start == 0 && end == size_t(-1)) {
             for (size_t i = 0; i < count; ++i) {
-                const C col(size_t(refs.get(i)), NULL, 0, m_array->get_alloc());
-                const size_t ndx = col.template TreeFind<T, C, F>(value, 0, size_t(-1));
+                C col(size_t(refs.get(i)), 0, 0, m_array->get_alloc());
+                size_t ndx = col.template TreeFind<T,C,F>(value, 0, size_t(-1));
                 if (ndx != size_t(-1)) {
-                    const size_t offset = i ? to_ref(offsets.get(i-1)) : 0;
+                    size_t offset = i ? to_size_t(offsets.get(i-1)) : 0;
                     return offset + ndx;
                 }
             }
@@ -390,16 +390,16 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
         else {
             // partial search
             size_t i = offsets.FindPos(start);
-            size_t offset = i ? to_ref(offsets.get(i-1)) : 0;
+            size_t offset = i ? to_size_t(offsets.get(i-1)) : 0;
             size_t s = start - offset;
             size_t e = (end == size_t(-1) || int(end) >= offsets.get(i)) ? size_t(-1) : end - offset;
 
             for (;;) {
-                const C col(size_t(refs.get(i)), NULL, 0, m_array->get_alloc());
+                C col(size_t(refs.get(i)), 0, 0, m_array->get_alloc());
 
-                const size_t ndx = col.template TreeFind<T, C, F>(value, s, e);
+                size_t ndx = col.template TreeFind<T,C,F>(value, s, e);
                 if (ndx != not_found) {
-                    const size_t offset = i ? to_ref(offsets.get(i-1)) : 0;
+                    size_t offset = i ? to_size_t(offsets.get(i-1)) : 0;
                     return offset + ndx;
                 }
 
@@ -408,10 +408,10 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
 
                 s = 0;
                 if (end != size_t(-1)) {
-                    if (end >= to_ref(offsets.get(i)))
+                    if (end >= to_size_t(offsets.get(i)))
                         e = size_t(-1);
                     else {
-                        offset = to_ref(offsets.get(i-1));
+                        offset = to_size_t(offsets.get(i-1));
                         if (offset >= end)
                             break;
                         e = end - offset;
@@ -435,15 +435,15 @@ template<class T, class C> void ColumnBase::TreeFindAll(Array &result, T value, 
         const Array refs = NodeGetRefs();
         const size_t count = refs.size();
         size_t i = offsets.FindPos(start);
-        size_t offset = i ? to_ref(offsets.get(i-1)) : 0;
+        size_t offset = i ? to_size_t(offsets.get(i-1)) : 0;
         size_t s = start - offset;
         size_t e = (end == size_t(-1) || int(end) >= offsets.get(i)) ? size_t(-1) : end - offset;
 
         for (;;) {
             const size_t ref = refs.get_as_ref(i);
-            const C col(ref, NULL, 0, m_array->get_alloc());
+            const C col(ref, 0, 0, m_array->get_alloc());
 
-            size_t add = i ? to_ref(offsets.get(i-1)) : 0;
+            size_t add = i ? to_size_t(offsets.get(i-1)) : 0;
             add += add_offset;
             col.template TreeFindAll<T, C>(result, value, add, s, e);
             ++i;
@@ -451,9 +451,9 @@ template<class T, class C> void ColumnBase::TreeFindAll(Array &result, T value, 
 
             s = 0;
             if (end != size_t(-1)) {
-                if (end >= to_ref(offsets.get(i))) e = size_t(-1);
+                if (end >= to_size_t(offsets.get(i))) e = size_t(-1);
                 else {
-                    offset = to_ref(offsets.get(i-1));
+                    offset = to_size_t(offsets.get(i-1));
                     if (offset >= end)
                         return;
                     e = end - offset;
@@ -482,15 +482,15 @@ void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
         const Array refs = NodeGetRefs();
         const size_t count = refs.size();
         size_t i = offsets.FindPos(start);
-        size_t offset = i ? to_ref(offsets.get(i-1)) : 0;
+        size_t offset = i ? to_size_t(offsets.get(i-1)) : 0;
         size_t s = start - offset;
         size_t e = (end == size_t(-1) || int(end) >= offsets.get(i)) ? size_t(-1) : end - offset;
 
         for (;;) {
             const size_t ref = refs.get_as_ref(i);
-            const C col(ref, NULL, 0, m_array->get_alloc());
+            const C col(ref, 0, 0, m_array->get_alloc());
 
-            size_t add = i ? to_ref(offsets.get(i-1)) : 0;
+            size_t add = i ? to_size_t(offsets.get(i-1)) : 0;
             add += caller_offset;
             col.template TreeVisitLeafs<T, C>(s, e, add, call, state);
             ++i;
@@ -498,9 +498,9 @@ void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
 
             s = 0;
             if (end != size_t(-1)) {
-                if (end >= to_ref(offsets.get(i))) e = size_t(-1);
+                if (end >= to_size_t(offsets.get(i))) e = size_t(-1);
                 else {
-                    offset = to_ref(offsets.get(i-1));
+                    offset = to_size_t(offsets.get(i-1));
                     if (offset >= end)
                         return;
                     e = end - offset;

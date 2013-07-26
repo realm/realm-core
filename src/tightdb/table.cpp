@@ -7,7 +7,6 @@
 
 #include <tightdb/config.h>
 #include <tightdb/table.hpp>
-#include <tightdb/index.hpp>
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/column_basic.hpp>
@@ -81,50 +80,44 @@ void Table::CreateColumns()
         ColumnBase* new_col = 0;
 
         switch (type) {
-        case type_Int:
-        case type_Bool:
-        case type_Date:
-            {
+            case type_Int:
+            case type_Bool:
+            case type_Date: {
                 Column* c = new Column(Array::type_Normal, alloc);
                 m_columns.add(c->get_ref());
                 c->set_parent(&m_columns, ref_pos);
                 new_col = c;
+                break;
             }
-            break;
-        case type_Float:
-            {
+            case type_Float: {
                 ColumnFloat* c = new ColumnFloat(alloc);
                 m_columns.add(c->get_ref());
                 c->set_parent(&m_columns, ref_pos);
                 new_col = c;
+                break;
             }
-            break;
-        case type_Double:
-            {
+            case type_Double: {
                 ColumnDouble* c = new ColumnDouble(alloc);
                 m_columns.add(c->get_ref());
                 c->set_parent(&m_columns, ref_pos);
                 new_col = c;
+                break;
             }
-            break;
-        case type_String:
-            {
+            case type_String: {
                 AdaptiveStringColumn* c = new AdaptiveStringColumn(alloc);
                 m_columns.add(c->get_ref());
                 c->set_parent(&m_columns, ref_pos);
                 new_col = c;
+                break;
             }
-            break;
-        case type_Binary:
-            {
+            case type_Binary: {
                 ColumnBinary* c = new ColumnBinary(alloc);
                 m_columns.add(c->get_ref());
                 c->set_parent(&m_columns, ref_pos);
                 new_col = c;
+                break;
             }
-            break;
-        case type_Table:
-            {
+            case type_Table: {
                 size_t column_ndx = m_cols.size();
                 ref_type subspec_ref = m_spec_set.get_subspec_ref(subtable_count);
                 ColumnTable* c = new ColumnTable(alloc, this, column_ndx, subspec_ref);
@@ -132,26 +125,25 @@ void Table::CreateColumns()
                 c->set_parent(&m_columns, ref_pos);
                 new_col = c;
                 ++subtable_count;
+                break;
             }
-            break;
-        case type_Mixed:
-            {
+            case type_Mixed: {
                 size_t column_ndx = m_cols.size();
                 ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx);
                 m_columns.add(c->get_ref());
                 c->set_parent(&m_columns, ref_pos);
                 new_col = c;
+                break;
             }
-            break;
 
             // Attributes
-        case col_attr_Indexed:
-        case col_attr_Unique:
-            attr = type;
-            continue; // attr prefix column types)
+            case col_attr_Indexed:
+            case col_attr_Unique:
+                attr = type;
+                continue; // attr prefix column types)
 
-        default:
-            TIGHTDB_ASSERT(false);
+            default:
+                TIGHTDB_ASSERT(false);
         }
 
         // Cache Columns
@@ -212,56 +204,49 @@ void Table::CacheColumns()
         ColumnBase* new_col = 0;
         size_t colsize = size_t(-1);
         switch (type) {
-        case type_Int:
-        case type_Bool:
-        case type_Date:
-            {
+            case type_Int:
+            case type_Bool:
+            case type_Date: {
                 Column* c = new Column(ref, &m_columns, ndx_in_parent, alloc);
                 colsize = c->size();
                 new_col = c;
+                break;
             }
-            break;
-        case type_Float:
-            {
+            case type_Float: {
                 ColumnFloat* c = new ColumnFloat(ref, &m_columns, ndx_in_parent, alloc);
                 colsize = c->size();
                 new_col = c;
             }
-            break;
-        case type_Double:
-            {
+                break;
+            case type_Double: {
                 ColumnDouble* c = new ColumnDouble(ref, &m_columns, ndx_in_parent, alloc);
                 colsize = c->size();
                 new_col = c;
+                break;
             }
-            break;
-        case type_String:
-            {
+            case type_String: {
                 AdaptiveStringColumn* c =
                     new AdaptiveStringColumn(ref, &m_columns, ndx_in_parent, alloc);
                 colsize = c->size();
                 new_col = c;
+                break;
             }
-            break;
-        case type_Binary:
-            {
+            case type_Binary: {
                 ColumnBinary* c = new ColumnBinary(ref, &m_columns, ndx_in_parent, alloc);
                 colsize = c->size();
                 new_col = c;
+                break;
             }
-            break;
-        case col_type_StringEnum:
-            {
+            case col_type_StringEnum: {
                 ref_type values_ref = m_columns.get_as_ref(ndx_in_parent+1);
                 ColumnStringEnum* c =
                     new ColumnStringEnum(ref, values_ref, &m_columns, ndx_in_parent, alloc);
                 colsize = c->size();
                 new_col = c;
                 ++ndx_in_parent; // advance one matchcount pos to account for keys/values pair
+                break;
             }
-            break;
-        case type_Table:
-            {
+            case type_Table: {
                 size_t column_ndx = m_cols.size();
                 ref_type spec_ref = m_spec_set.get_subspec_ref(subtable_count);
                 ColumnTable* c = new ColumnTable(alloc, this, column_ndx, &m_columns, ndx_in_parent,
@@ -269,26 +254,25 @@ void Table::CacheColumns()
                 colsize = c->size();
                 new_col = c;
                 ++subtable_count;
+                break;
             }
-            break;
-        case type_Mixed:
-            {
+            case type_Mixed: {
                 size_t column_ndx = m_cols.size();
                 ColumnMixed* c =
                     new ColumnMixed(alloc, this, column_ndx, &m_columns, ndx_in_parent, ref);
                 colsize = c->size();
                 new_col = c;
+                break;
             }
-            break;
 
-            // Attributes (prefixing column types)
-        case col_attr_Indexed:
-        case col_attr_Unique:
-            attr = type;
-            continue;
+            case col_attr_Indexed:
+            case col_attr_Unique:
+                // Attributes (prefixing column types)
+                attr = type;
+                continue;
 
-        default:
-            TIGHTDB_ASSERT(false);
+            default:
+                TIGHTDB_ASSERT(false);
         }
 
         m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, even in C++11
@@ -301,7 +285,7 @@ void Table::CacheColumns()
 
             size_t pndx = ndx_in_parent + 1;
             ref_type index_ref = m_columns.get_as_ref(pndx);
-            new_col->SetIndexRef(index_ref, &m_columns, pndx);
+            new_col->set_index_ref(index_ref, &m_columns, pndx);
 
             ++ndx_in_parent; // advance one matchcount pos to account for index
             attr = col_attr_None;
@@ -576,7 +560,7 @@ void Table::do_remove_column(size_t column_ndx)
 
     // Delete the cached column
     ColumnBase* column = reinterpret_cast<ColumnBase*>(m_cols.get(column_ndx));
-    bool has_index = column->HasIndex();
+    bool has_index = column->has_index();
     column->invalidate_subtables_virtual();
     column->destroy();
     delete column;
@@ -642,7 +626,7 @@ bool Table::has_index(size_t column_ndx) const
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     const ColumnBase& col = GetColumnBase(column_ndx);
-    return col.HasIndex();
+    return col.has_index();
 }
 
 void Table::set_index(size_t column_ndx, bool update_spec)
@@ -659,7 +643,7 @@ void Table::set_index(size_t column_ndx, bool update_spec)
         AdaptiveStringColumn& col = GetColumnString(column_ndx);
 
         // Create the index
-        StringIndex& ndx = col.CreateIndex();
+        StringIndex& ndx = col.create_index();
         ndx.set_parent(&m_columns, column_pos+1);
         ndx_ref = ndx.get_ref();
     }
@@ -667,7 +651,7 @@ void Table::set_index(size_t column_ndx, bool update_spec)
         ColumnStringEnum& col = GetColumnStringEnum(column_ndx);
 
         // Create the index
-        StringIndex& ndx = col.CreateIndex();
+        StringIndex& ndx = col.create_index();
         ndx.set_parent(&m_columns, column_pos+1);
         ndx_ref = ndx.get_ref();
     }
@@ -1583,18 +1567,18 @@ size_t Table::lookup(StringData value) const
         ColumnType type = get_real_column_type(0);
         if (type == col_type_String) {
             const AdaptiveStringColumn& column = GetColumnString(0);
-            if (!column.HasIndex())
+            if (!column.has_index())
                 return column.find_first(value);
             else {
-                m_lookup_index = &column.GetIndex();
+                m_lookup_index = &column.get_index();
             }
         }
         else if (type == col_type_StringEnum) {
             const ColumnStringEnum& column = GetColumnStringEnum(0);
-            if (!column.HasIndex())
+            if (!column.has_index())
                 return column.find_first(value);
             else {
-                m_lookup_index = &column.GetIndex();
+                m_lookup_index = &column.get_index();
             }
         }
         else return not_found; // invalid column type
@@ -1855,13 +1839,13 @@ TableView Table::distinct(size_t column_ndx)
     ColumnType type = get_real_column_type(column_ndx);
     if (type == col_type_String) {
         const AdaptiveStringColumn& column = GetColumnString(column_ndx);
-        const StringIndex& ndx = column.GetIndex();
+        const StringIndex& ndx = column.get_index();
         ndx.distinct(refs);
     }
     else {
         TIGHTDB_ASSERT(type == col_type_StringEnum);
         const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
-        const StringIndex& ndx = column.GetIndex();
+        const StringIndex& ndx = column.get_index();
         ndx.distinct(refs);
     }
     return move(tv);
@@ -1878,13 +1862,13 @@ ConstTableView Table::distinct(size_t column_ndx) const
     ColumnType type = get_real_column_type(column_ndx);
     if (type == col_type_String) {
         const AdaptiveStringColumn& column = GetColumnString(column_ndx);
-        const StringIndex& ndx = column.GetIndex();
+        const StringIndex& ndx = column.get_index();
         ndx.distinct(refs);
     }
     else {
         TIGHTDB_ASSERT(type == col_type_StringEnum);
         const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
-        const StringIndex& ndx = column.GetIndex();
+        const StringIndex& ndx = column.get_index();
         ndx.distinct(refs);
     }
     return move(tv);
@@ -1966,9 +1950,9 @@ void Table::optimize()
             m_cols.set(i, intptr_t(e));
 
             // Inherit any existing index
-            if (column->HasIndex()) {
-                StringIndex& ndx = column->PullIndex();
-                e->ReuseIndex(ndx);
+            if (column->has_index()) {
+                StringIndex* index = column->release_index();
+                e->install_index(index);
             }
 
             // Clean up the old column

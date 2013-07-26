@@ -32,7 +32,7 @@ double Timer::calc_elapsed_seconds(uint_fast64_t ticks)
 #elif defined __APPLE__
 
 
-uint_fast64_t Timer::get_timer_ticks()
+uint_fast64_t Timer::get_timer_ticks() const
 {
     return mach_absolute_time();
 }

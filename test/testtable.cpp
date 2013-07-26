@@ -14,9 +14,11 @@
 using namespace std;
 using namespace tightdb;
 
+namespace {
 TIGHTDB_TABLE_2(TupleTableType,
                 first,  Int,
                 second, String)
+}
 
 #ifndef TIGHTDB_BYPASS_OPTIMIZE_CRASH_BUG
 TEST(TestOptimizeCrash)

@@ -1209,17 +1209,17 @@ template<class S> std::size_t Array::Write(S& out, bool recurse, bool persist) c
         // First write out all sub-arrays
         std::size_t count = size();
         for (size_t i = 0; i < count; ++i) {
-            ref_type ref = get_as_ref(i);
+            int64_t ref = get(i);
             if (ref == 0 || ref & 0x1) {
                 // zero-refs and refs that are not 64-aligned do not point to sub-trees
                 new_refs.add(ref);
             }
-            else if (persist && m_alloc.is_read_only(ref)) {
+            else if (persist && m_alloc.is_read_only(to_ref(ref))) {
                 // Ignore un-changed arrays when persisting
                 new_refs.add(ref);
             }
             else {
-                Array sub(ref, 0, 0, get_alloc());
+                Array sub(to_ref(ref), 0, 0, get_alloc());
                 size_t sub_pos = sub.Write(out, true, persist);
                 TIGHTDB_ASSERT((sub_pos & 0x7) == 0); // 64bit alignment
                 new_refs.add(sub_pos);

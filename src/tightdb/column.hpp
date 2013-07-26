@@ -31,7 +31,6 @@ namespace tightdb {
 
 // Pre-definitions
 class Column;
-class Index;
 
 class ColumnBase {
 public:
@@ -69,11 +68,8 @@ public:
     virtual ~ColumnBase() {};
 
     // Indexing
-    virtual bool HasIndex() const = 0;
-    //virtual Index& GetIndex() = 0;
-    //virtual void BuildIndex(Index& index) = 0;
-    //virtual void ClearIndex() = 0;
-    virtual void SetIndexRef(std::size_t, ArrayParent*, std::size_t) {}
+    virtual bool has_index() const TIGHTDB_NOEXCEPT { return false; }
+    virtual void set_index_ref(ref_type, ArrayParent*, std::size_t) {}
 
     virtual ref_type get_ref() const = 0;
     virtual void set_parent(ArrayParent* parent, std::size_t pndx) { m_array->set_parent(parent, pndx); }
@@ -208,14 +204,6 @@ public:
     // Query support methods
     void LeafFindAll(Array& result, int64_t value, size_t add_offset, size_t start, size_t end) const;
 
-
-    // Index
-    bool HasIndex() const { return m_index != 0; }
-    Index& GetIndex();
-    void BuildIndex(Index& index);
-    void ClearIndex();
-    std::size_t FindWithIndex(int64_t value) const;
-
     ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
 
@@ -247,9 +235,6 @@ protected:
     }
 
     void DoSort(std::size_t lo, std::size_t hi);
-
-    // Member variables
-    Index* m_index;
 
 private:
     Column &operator=(const Column&); // not allowed

@@ -7,7 +7,6 @@
 #include <iomanip>
 
 #include <tightdb/column.hpp>
-#include <tightdb/index.hpp>
 #include <tightdb/query_engine.hpp>
 
 using namespace std;
@@ -257,30 +256,30 @@ bool ColumnBase::root_is_leaf_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_N
 
 
 
-Column::Column(Allocator& alloc): m_index(0)
+Column::Column(Allocator& alloc)
 {
     m_array = new Array(Array::type_Normal, 0, 0, alloc);
     Create();
 }
 
-Column::Column(Array::Type type, Allocator& alloc): m_index(0)
+Column::Column(Array::Type type, Allocator& alloc)
 {
     m_array = new Array(type, 0, 0, alloc);
     Create();
 }
 
-Column::Column(Array::Type type, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(0)
+Column::Column(Array::Type type, ArrayParent* parent, size_t pndx, Allocator& alloc)
 {
     m_array = new Array(type, parent, pndx, alloc);
     Create();
 }
 
-Column::Column(ref_type ref, ArrayParent* parent, size_t pndx, Allocator& alloc): m_index(0)
+Column::Column(ref_type ref, ArrayParent* parent, size_t pndx, Allocator& alloc)
 {
     m_array = new Array(ref, parent, pndx, alloc);
 }
 
-Column::Column(const Column& column): ColumnBase(), m_index(0)
+Column::Column(const Column& column): ColumnBase()
 {
     m_array = column.m_array; // we now own array
     // FIXME: Unfortunate hidden constness violation here
@@ -311,12 +310,10 @@ bool Column::operator==(const Column& column) const
 Column::~Column()
 {
     delete m_array;
-    delete m_index; // does not destroy index!
 }
 
 void Column::destroy()
 {
-    ClearIndex();
     if (m_array)
         m_array->destroy();
 }
@@ -341,8 +338,6 @@ size_t Column::size() const TIGHTDB_NOEXCEPT
 void Column::UpdateParentNdx(int diff)
 {
     m_array->UpdateParentNdx(diff);
-    if (m_index)
-        m_index->UpdateParentNdx(diff);
 }
 
 // Used by column b-tree code to ensure all leaf having same type
@@ -360,13 +355,7 @@ void Column::clear()
 
 void Column::set(size_t ndx, int64_t value)
 {
-    int64_t old_val = m_index ? get(ndx) : 0; // cache oldval for index
-
     TreeSet<int64_t, Column>(ndx, value);
-
-    // Update index
-    if (m_index)
-        m_index->set(ndx, old_val, value);
 }
 
 void Column::add(int64_t value)
@@ -379,12 +368,6 @@ void Column::insert(size_t ndx, int64_t value)
     TIGHTDB_ASSERT(ndx <= size());
     TreeInsert<int64_t, Column>(ndx, value);
 
-    // Update index
-    if (m_index) {
-        bool is_last = ndx+1 == size();
-        m_index->insert(ndx, value, is_last);
-    }
-
 #ifdef TIGHTDB_DEBUG
     Verify();
 #endif
@@ -393,7 +376,6 @@ void Column::insert(size_t ndx, int64_t value)
 void Column::fill(size_t count)
 {
     TIGHTDB_ASSERT(is_empty());
-    TIGHTDB_ASSERT(!m_index);
 
     // Fill column with default values
     // TODO: this is a very naive approach
@@ -556,8 +538,6 @@ void Column::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < size());
 
-    int64_t old_val = m_index ? get(ndx) : 0; // cache oldval for index
-
     TreeDelete<int64_t, Column>(ndx);
 
     // Flatten tree if possible
@@ -570,12 +550,6 @@ void Column::erase(size_t ndx)
         refs.erase(0); // avoid destroying subtree
         m_array->destroy();
         m_array->update_ref(ref);
-    }
-
-    // Update index
-    if (m_index) {
-        bool is_last = (ndx == size());
-        m_index->erase(ndx, old_val, is_last);
     }
 }
 
@@ -737,36 +711,6 @@ bool Column::find_sorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
         return false;
     else
         return get(high) == target;
-}
-
-
-size_t Column::FindWithIndex(int64_t target) const
-{
-    TIGHTDB_ASSERT(m_index);
-    TIGHTDB_ASSERT(m_index->size() == size());
-
-    return m_index->find_first(target);
-}
-
-Index& Column::GetIndex()
-{
-    TIGHTDB_ASSERT(m_index);
-    return *m_index;
-}
-
-void Column::ClearIndex()
-{
-    if (m_index) {
-        m_index->destroy();
-        delete m_index;
-        m_index = 0;
-    }
-}
-
-void Column::BuildIndex(Index& index)
-{
-    index.BuildIndex(*this);
-    m_index = &index; // Keep ref to index
 }
 
 void Column::sort()

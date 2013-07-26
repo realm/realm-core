@@ -58,12 +58,6 @@ public:
     void set_string(std::size_t ndx, StringData value);
     void insert_string(std::size_t ndx, StringData value);
 
-    // Index
-    bool HasIndex() const { return false; }
-    void BuildIndex(Index&) {}
-    void ClearIndex() {}
-    std::size_t FindWithIndex(int64_t) const { return std::size_t(-1); }
-
     ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
     void set_parent(ArrayParent* parent, std::size_t pndx) { m_array->set_parent(parent, pndx); }
     void UpdateParentNdx(int diff) { m_array->UpdateParentNdx(diff); }
@@ -86,7 +80,7 @@ protected:
     void LeafDelete(std::size_t ndx);
 
 #ifdef TIGHTDB_DEBUG
-    virtual void leaf_to_dot(std::ostream&, const Array& array) const;
+    virtual void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
 #endif
 
 private:
