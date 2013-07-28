@@ -164,7 +164,7 @@ void StringIndex::TreeInsert(size_t row_ndx, int32_t key, size_t offset, StringD
     TIGHTDB_ASSERT(false);
 }
 
-Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t offset, StringData value)
+StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t offset, StringData value)
 {
     if (!root_is_leaf()) {
         // Get subnode table
@@ -672,6 +672,26 @@ bool StringIndex::is_empty() const
     Array values = m_array->GetSubArray(0);
     return values.is_empty();
 }
+
+
+void StringIndex::NodeAddKey(ref_type ref)
+{
+    TIGHTDB_ASSERT(ref);
+    TIGHTDB_ASSERT(!root_is_leaf());
+
+    Array offsets = NodeGetOffsets();
+    Array refs = NodeGetRefs();
+    TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
+
+    Array new_top(ref, 0, 0, m_array->get_alloc());
+    Array new_offsets(new_top.get_as_ref(0), 0, 0,m_array->get_alloc());
+    TIGHTDB_ASSERT(!new_offsets.is_empty());
+
+    int64_t key = new_offsets.back();
+    offsets.add(key);
+    refs.add(ref);
+}
+
 
 #ifdef TIGHTDB_DEBUG
 

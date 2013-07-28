@@ -89,7 +89,7 @@ void ColumnTable::fill(size_t count)
     // TODO: this is a very naive approach
     // we could speedup by creating full nodes directly
     for (size_t i = 0; i < count; ++i) {
-        TreeInsert<int64_t, Column>(i, 0); // zero-ref indicates empty table
+        add(0); // zero-ref indicates empty table
     }
 }
 

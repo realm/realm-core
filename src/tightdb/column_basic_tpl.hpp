@@ -177,14 +177,15 @@ void BasicColumn<T>::set(std::size_t ndx, T value)
 template<class T>
 void BasicColumn<T>::add(T value)
 {
-    insert(size(), value);
+    do_insert(npos, value);
 }
 
 template<class T>
 void BasicColumn<T>::insert(std::size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx <= size());
-    TreeInsert<T, BasicColumn<T> >(ndx, value);
+    if (size() <= ndx) ndx = npos;
+    do_insert(ndx, value);
 }
 
 template<class T>
@@ -196,7 +197,7 @@ void BasicColumn<T>::fill(std::size_t count)
     // TODO: this is a very naive approach
     // we could speedup by creating full nodes directly
     for (std::size_t i = 0; i < count; ++i) {
-        TreeInsert<T, BasicColumn<T> >(i, 0);
+        add(T());
     }
 
 #ifdef TIGHTDB_DEBUG
@@ -228,21 +229,9 @@ void BasicColumn<T>::erase(std::size_t ndx)
 }
 
 template<class T>
-T BasicColumn<T>::LeafGet(std::size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    return static_cast<BasicArray<T>*>(m_array)->get(ndx);
-}
-
-template<class T>
 void BasicColumn<T>::LeafSet(std::size_t ndx, T value)
 {
     static_cast<BasicArray<T>*>(m_array)->set(ndx, value);
-}
-
-template<class T>
-void BasicColumn<T>::LeafInsert(std::size_t ndx, T value)
-{
-    static_cast<BasicArray<T>*>(m_array)->insert(ndx, value);
 }
 
 template<class T>
@@ -326,6 +315,37 @@ T BasicColumn<T>::maximum(std::size_t start, std::size_t end) const
 {
     return ColumnBase::aggregate<T, T, act_Max, None>(0, start, end, 0);
 }
+
+
+template<class T> void BasicColumn<T>::do_insert(std::size_t ndx, T value)
+{
+    TIGHTDB_ASSERT(ndx == npos || ndx < size());
+    ref_type new_sibling_ref;
+    Array::TreeInsert<BasicColumn<T> > state;
+    if (root_is_leaf()) {
+        TIGHTDB_ASSERT(ndx == npos || ndx < TIGHTDB_MAX_LIST_SIZE);
+        BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array);
+        new_sibling_ref = leaf->btree_leaf_insert(ndx, value, state);
+    }
+    else {
+        state.m_value = value;
+        new_sibling_ref = m_array->btree_insert(ndx, state);
+    }
+
+    if (TIGHTDB_UNLIKELY(new_sibling_ref))
+        introduce_new_root(new_sibling_ref, state);
+}
+
+template<class T> TIGHTDB_FORCEINLINE
+ref_type BasicColumn<T>::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
+                                     std::size_t ndx_in_parent,
+                                     Allocator& alloc, std::size_t insert_ndx,
+                                     Array::TreeInsert<BasicColumn<T> >& state)
+{
+    BasicArray<T> leaf(leaf_mem, &parent, ndx_in_parent, alloc);
+    return leaf.btree_leaf_insert(insert_ndx, state.m_value, state);
+}
+
 
 } // namespace tightdb
 
