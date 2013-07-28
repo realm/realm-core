@@ -62,13 +62,21 @@ public:
     void to_dot(std::ostream&) const;
 #endif
 
-protected:
+private:
     void Create();
 
     void InsertWithOffset(size_t row_ndx, size_t offset, StringData value);
     void InsertRowList(size_t ref, size_t offset, StringData value);
     int32_t GetLastKey() const;
     void UpdateRefs(size_t pos, int diff);
+
+    struct NodeChange {
+        size_t ref1;
+        size_t ref2;
+        enum ChangeType { none, insert_before, insert_after, split } type;
+        NodeChange(ChangeType t, size_t r1=0, size_t r2=0) : ref1(r1), ref2(r2), type(t) {}
+        NodeChange() : ref1(0), ref2(0), type(none) {}
+    };
 
     // B-Tree functions
     void TreeInsert(size_t row_ndx, int32_t key, size_t offset, StringData value);
@@ -85,6 +93,8 @@ protected:
     // Member variables
     void* m_target_column;
     StringGetter m_get_func;
+
+    void NodeAddKey(ref_type ref);
 
 #ifdef TIGHTDB_DEBUG
     void to_dot_2(std::ostream&, StringData title = StringData()) const;

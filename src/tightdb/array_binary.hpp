@@ -40,21 +40,21 @@ public:
 
     BinaryData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
-    void add(BinaryData value);
-    void set(std::size_t ndx, BinaryData value);
-    void insert(std::size_t ndx, BinaryData value);
+    void add(BinaryData value, bool add_zero_term = false);
+    void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
+    void insert(std::size_t ndx, BinaryData value, bool add_zero_term = false);
     void erase(std::size_t ndx);
     void resize(std::size_t ndx);
     void clear();
-
-    void set_string(std::size_t ndx, StringData value);
-    void insert_string(std::size_t ndx, StringData value);
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
     static BinaryData get(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
+
+    ref_type btree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term,
+                               TreeInsertBase& state);
 
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, const char* title = 0) const;

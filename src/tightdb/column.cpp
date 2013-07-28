@@ -255,6 +255,28 @@ bool ColumnBase::root_is_leaf_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_N
 }
 
 
+void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state)
+{
+    Array* orig_root = m_array;
+    Allocator& alloc = orig_root->get_alloc();
+
+    Array new_refs(alloc), new_offsets(alloc);
+    new_refs.set_type(Array::type_HasRefs);
+    new_offsets.set_type(Array::type_Normal);
+    new_refs.add(orig_root->get_ref());
+    new_refs.add(new_sibling_ref);
+    new_offsets.add(state.m_split_offset);
+    new_offsets.add(state.m_split_size);
+
+    ArrayParent* parent = orig_root->get_parent();
+    size_t ndx_in_parent = orig_root->get_ndx_in_parent();
+    UniquePtr<Array> new_root(new Array(Array::type_InnerColumnNode, parent, ndx_in_parent, alloc));
+    new_root->add(new_offsets.get_ref());
+    new_root->add(new_refs.get_ref());
+    delete orig_root;
+    m_array = new_root.release();
+}
+
 
 Column::Column(Allocator& alloc)
 {
@@ -358,21 +380,6 @@ void Column::set(size_t ndx, int64_t value)
     TreeSet<int64_t, Column>(ndx, value);
 }
 
-void Column::add(int64_t value)
-{
-    insert(size(), value);
-}
-
-void Column::insert(size_t ndx, int64_t value)
-{
-    TIGHTDB_ASSERT(ndx <= size());
-    TreeInsert<int64_t, Column>(ndx, value);
-
-#ifdef TIGHTDB_DEBUG
-    Verify();
-#endif
-}
-
 void Column::fill(size_t count)
 {
     TIGHTDB_ASSERT(is_empty());
@@ -381,7 +388,7 @@ void Column::fill(size_t count)
     // TODO: this is a very naive approach
     // we could speedup by creating full nodes directly
     for (size_t i = 0; i < count; ++i) {
-        TreeInsert<int64_t, Column>(i, 0);
+        add(0);
     }
 
 #ifdef TIGHTDB_DEBUG
@@ -499,39 +506,6 @@ Array ColumnBase::NodeGetRefs() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(!root_is_leaf());
     return m_array->GetSubArray(1); // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
-}
-
-void ColumnBase::NodeUpdateOffsets(size_t ndx)
-{
-    TIGHTDB_ASSERT(!root_is_leaf());
-
-    Array offsets = NodeGetOffsets();
-    Array refs = NodeGetRefs();
-    TIGHTDB_ASSERT(ndx < offsets.size());
-
-    int64_t new_size = GetRefSize(refs.get_as_ref(ndx));
-    int64_t old_size = offsets.get(ndx) - (ndx ? offsets.get(ndx-1) : 0);
-    int64_t diff = new_size - old_size;
-
-    offsets.Increment(diff, ndx);
-}
-
-void ColumnBase::NodeAddKey(ref_type ref)
-{
-    TIGHTDB_ASSERT(ref);
-    TIGHTDB_ASSERT(!root_is_leaf());
-
-    Array offsets = NodeGetOffsets();
-    Array refs = NodeGetRefs();
-    TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
-
-    Array new_top(ref, 0, 0, m_array->get_alloc());
-    Array new_offsets(new_top.get_as_ref(0), 0, 0,m_array->get_alloc());
-    TIGHTDB_ASSERT(!new_offsets.is_empty());
-
-    int64_t key = new_offsets.back();
-    offsets.add(key);
-    refs.add(ref);
 }
 
 void Column::erase(size_t ndx)
@@ -730,6 +704,28 @@ bool Column::compare(const Column& c) const
     return true;
 }
 
+
+void Column::do_insert(size_t ndx, int64_t value)
+{
+    TIGHTDB_ASSERT(ndx == npos || ndx < size());
+    ref_type new_sibling_ref;
+    Array::TreeInsert<Column> state;
+    if (root_is_leaf()) {
+        TIGHTDB_ASSERT(ndx == npos || ndx < TIGHTDB_MAX_LIST_SIZE);
+        new_sibling_ref = m_array->btree_leaf_insert(ndx, value, state);
+    }
+    else {
+        state.m_value = value;
+        new_sibling_ref = m_array->btree_insert(ndx, state);
+    }
+
+    if (TIGHTDB_UNLIKELY(new_sibling_ref))
+        introduce_new_root(new_sibling_ref, state);
+
+#ifdef TIGHTDB_DEBUG
+    Verify();
+#endif
+}
 
 
 #ifdef TIGHTDB_DEBUG

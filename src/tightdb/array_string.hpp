@@ -61,6 +61,8 @@ public:
     /// slower.
     static StringData get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
 
+    ref_type btree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase& state);
+
 #ifdef TIGHTDB_DEBUG
     void StringStats() const;
     //void to_dot(FILE* f) const;
