@@ -179,7 +179,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         }
 
         // Get sublist
-        const size_t ref = refs.get_as_ref(node_ndx);
+        ref_type ref = refs.get_as_ref(node_ndx);
         StringIndex target(ref, &refs, node_ndx, m_target_column, m_get_func, m_array->get_alloc());
 
         // Insert item
@@ -210,7 +210,9 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
             newNode.NodeAddKey(nc.ref2);
             ++node_ndx;
         }
-        else newNode.NodeAddKey(nc.ref1);
+        else {
+            newNode.NodeAddKey(nc.ref1);
+        }
 
         switch (node_ndx) {
             case 0:             // insert before
@@ -221,9 +223,9 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
                 else return NodeChange(NodeChange::insert_after, newNode.get_ref());
             default:            // split
                 // Move items after split to new node
-                const size_t len = refs.size();
+                size_t len = refs.size();
                 for (size_t i = node_ndx; i < len; ++i) {
-                    size_t ref = refs.get_as_ref(i);
+                    ref_type ref = refs.get_as_ref(i);
                     newNode.NodeAddKey(ref);
                 }
                 offsets.resize(node_ndx);

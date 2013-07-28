@@ -78,7 +78,7 @@ public:
     void set_parent(ArrayParent* parent, std::size_t pndx) { m_array->set_parent(parent, pndx); }
 
     // Optimizing data layout
-    bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;
+    bool auto_enumerate(ref_type& keys, ref_type& values) const;
 
     /// Compare two string columns for equality.
     bool compare(const AdaptiveStringColumn&) const;

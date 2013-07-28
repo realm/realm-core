@@ -140,8 +140,9 @@ protected:
     virtual void leaf_to_dot(std::ostream&, const Array&) const;
 #endif
 
-    // Member variables
-    mutable Array* m_array; // FIXME: This should not be mutable, the problem is again the const-violating moving copy constructor
+    // FIXME: This should not be mutable, the problem is again the
+    // const-violating moving copy constructor.
+    mutable Array* m_array;
 };
 
 

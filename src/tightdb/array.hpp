@@ -80,7 +80,13 @@ enum Action {act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll,
 
 template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 
-const std::size_t not_found = std::size_t(-1);
+/// Special index value. It has various meanings depending on
+/// context. It is returned by some search functions to indicate 'not
+/// found'. It is similar in function to std::string::npos.
+const std::size_t npos = std::size_t(-1);
+
+/// Alias for tightdb::npos.
+const std::size_t not_found = npos;
 
  /* wid == 16/32 likely when accessing offsets in B tree */
 #define TIGHTDB_TEMPEX(fun, wid, arg) \
@@ -361,6 +367,10 @@ public:
     bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1)) const;
     void sort();
     void ReferenceSort(Array& ref);
+
+    // FIXME: Carefull with this one. It handles only shortening
+    // operations. Either rename to truncate() or implement expanding
+    // case.
     void resize(std::size_t count);
 
     /// Returns true if type is not type_InnerColumnNode
@@ -374,6 +384,7 @@ public:
     Array GetSubArray(std::size_t ndx) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array may cause the parent to be modified too.
     ref_type get_ref() const TIGHTDB_NOEXCEPT { return m_ref; }
     void destroy();
+    static void destroy(ref_type, Allocator&);
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_alloc; }
 
@@ -483,6 +494,7 @@ public:
     template<bool gt, Action action, std::size_t width, class Callback>
     bool FindGTLT(int64_t v, uint64_t chunk, QueryState<int64_t>* state, std::size_t baseindex,
                   Callback callback) const;
+
 
     /// Find the leaf node corresponding to the specified tree-level
     /// index. This array instance must be the root node of a B+-tree,
@@ -923,6 +935,14 @@ inline bool Array::is_index_node(ref_type ref, const Allocator& alloc)
 {
     TIGHTDB_ASSERT(ref);
     return get_indexflag_from_header(alloc.translate(ref));
+}
+
+
+inline void Array::destroy(ref_type ref, Allocator& alloc)
+{
+    Array array(alloc);
+    array.init_from_ref(ref);
+    array.destroy();
 }
 
 

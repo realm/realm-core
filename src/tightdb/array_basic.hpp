@@ -30,6 +30,8 @@ template<class T> class BasicArray: public Array {
 public:
     explicit BasicArray(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                         Allocator& = Allocator::get_default());
+    BasicArray(MemRef, ArrayParent*, std::size_t ndx_in_parent,
+               Allocator&) TIGHTDB_NOEXCEPT;
     BasicArray(ref_type, ArrayParent*, std::size_t ndx_in_parent,
                Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
     explicit BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT;

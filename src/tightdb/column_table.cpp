@@ -33,14 +33,6 @@ void ColumnSubtableParent::move_last_over(size_t ndx) {
     Column::erase(ndx_last);
 }
 
-bool ColumnTable::has_subtable(size_t ndx) const
-{
-    TIGHTDB_ASSERT(ndx < size());
-
-    ref_type ref_columns = get_as_ref(ndx);
-    return (ref_columns != 0);
-}
-
 size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     // FIXME: If the table object is cached, it is possible to get the
@@ -48,11 +40,11 @@ size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
     // presence of the cached object and use it when available.
     TIGHTDB_ASSERT(ndx < size());
 
-    ref_type ref_columns = get_as_ref(ndx);
-    if (ref_columns == 0) return 0;
+    ref_type columns_ref = get_as_ref(ndx);
+    if (columns_ref == 0) return 0;
 
-    ref_type ref_first_col = Array(ref_columns, 0, 0, get_alloc()).get_as_ref(0);
-    return get_size_from_ref(ref_first_col, get_alloc());
+    ref_type first_col_ref = Array(columns_ref, 0, 0, get_alloc()).get_as_ref(0);
+    return get_size_from_ref(first_col_ref, get_alloc());
 }
 
 void ColumnTable::add()

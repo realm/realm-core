@@ -46,6 +46,16 @@ inline BasicArray<T>::BasicArray(ArrayParent* parent, std::size_t ndx_in_parent,
 }
 
 template<class T>
+inline BasicArray<T>::BasicArray(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
+                                 Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
+{
+    // Manually create array as doing it in initializer list
+    // will not be able to call correct virtual functions
+    init_from_mem(mem);
+    set_parent(parent, ndx_in_parent);
+}
+
+template<class T>
 inline BasicArray<T>::BasicArray(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
                                  Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
 {

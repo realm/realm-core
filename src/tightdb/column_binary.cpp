@@ -26,18 +26,18 @@ ColumnBinary::ColumnBinary(ref_type ref, ArrayParent* parent, size_t pndx, Alloc
 
 ColumnBinary::~ColumnBinary()
 {
-    if (!root_is_leaf())
-        delete m_array;
-    else
+    if (root_is_leaf())
         delete static_cast<ArrayBinary*>(m_array);
+    else
+        delete m_array;
 }
 
 void ColumnBinary::destroy()
 {
-    if (!root_is_leaf())
-        m_array->destroy();
-    else
+    if (root_is_leaf())
         static_cast<ArrayBinary*>(m_array)->destroy();
+    else
+        m_array->destroy();
 }
 
 void ColumnBinary::update_ref(ref_type ref)

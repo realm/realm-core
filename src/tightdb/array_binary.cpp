@@ -34,8 +34,18 @@ ArrayBinary::ArrayBinary(ref_type ref, ArrayParent* parent, size_t pndx,
     m_blob.set_parent(this, 1);
 }
 
-// Creates new array (but invalid, call update_ref() to init)
-//ArrayBinary::ArrayBinary(Allocator& alloc) : Array(alloc) {}
+ArrayBinary::ArrayBinary(MemRef mem, ArrayParent* parent, size_t pndx,
+                         Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(mem, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
+    m_blob(Array::get_as_ref(1), 0, 0, alloc)
+{
+    TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
+    TIGHTDB_ASSERT(Array::size() == 2);
+    TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : to_size_t(m_offsets.back())));
+
+    m_offsets.set_parent(this, 0);
+    m_blob.set_parent(this, 1);
+}
 
 void ArrayBinary::add(BinaryData value)
 {

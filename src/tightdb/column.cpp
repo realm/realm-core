@@ -525,7 +525,7 @@ void ColumnBase::NodeAddKey(ref_type ref)
     Array refs = NodeGetRefs();
     TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
 
-    Array new_top(ref, 0, 0,m_array->get_alloc());
+    Array new_top(ref, 0, 0, m_array->get_alloc());
     Array new_offsets(new_top.get_as_ref(0), 0, 0,m_array->get_alloc());
     TIGHTDB_ASSERT(!new_offsets.is_empty());
 

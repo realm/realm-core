@@ -30,6 +30,8 @@ class ArrayBinary: public Array {
 public:
     explicit ArrayBinary(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                          Allocator& = Allocator::get_default());
+    ArrayBinary(MemRef, ArrayParent*, std::size_t ndx_in_parent,
+                Allocator&) TIGHTDB_NOEXCEPT;
     ArrayBinary(ref_type, ArrayParent*, std::size_t ndx_in_parent,
                 Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
 

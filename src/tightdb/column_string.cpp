@@ -460,7 +460,7 @@ void AdaptiveStringColumn::LeafDelete(size_t ndx)
     }
 }
 
-bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) const
+bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_ref) const
 {
     AdaptiveStringColumn keys(m_array->get_alloc());
 
@@ -492,8 +492,8 @@ bool AdaptiveStringColumn::AutoEnumerate(size_t& ref_keys, size_t& ref_values) c
         values.add(pos);
     }
 
-    ref_keys   = keys.get_ref();
-    ref_values = values.get_ref();
+    keys_ref   = keys.get_ref();
+    values_ref = values.get_ref();
     return true;
 }
 

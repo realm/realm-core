@@ -132,6 +132,8 @@ public:
     // Overriding virtual method.
     void invalidate_subtables_virtual();
 
+    static ref_type create(std::size_t num_default_values, Allocator&);
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream&, StringData title) const;
