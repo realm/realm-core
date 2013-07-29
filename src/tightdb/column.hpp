@@ -100,18 +100,8 @@ public:
 protected:
     friend class StringIndex;
 
-    struct NodeChange {
-        size_t ref1;
-        size_t ref2;
-        enum ChangeType { none, insert_before, insert_after, split } type;
-        NodeChange(ChangeType t, size_t r1=0, size_t r2=0) : ref1(r1), ref2(r2), type(t) {}
-        NodeChange() : ref1(0), ref2(0), type(none) {}
-    };
-
     // Tree functions
     template<class T, class C> void TreeSet(std::size_t ndx, T value);
-    template<class T, class C> void TreeInsert(std::size_t ndx, T value);
-    template<class T, class C> NodeChange DoInsert(std::size_t ndx, T value);
     template<class T, class C> void TreeDelete(std::size_t ndx);
     template<class T, class C> void TreeFindAll(Array &result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
     template<class T, class C> void TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, bool (*call)(T* arr, size_t start, size_t end, size_t caller_offset, void* state), void* state) const;
@@ -121,11 +111,6 @@ protected:
     bool root_is_leaf() const TIGHTDB_NOEXCEPT { return m_array->is_leaf(); }
     Array NodeGetOffsets() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
     Array NodeGetRefs() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
-    template<class C> void NodeInsert(std::size_t ndx, ref_type ref);
-    template<class C> void NodeAdd(ref_type ref);
-    void NodeAddKey(ref_type ref);
-    void NodeUpdateOffsets(std::size_t ndx);
-    template<class C> void NodeInsertSplit(std::size_t ndx, ref_type new_ref);
     std::size_t GetRefSize(ref_type) const;
 
     static std::size_t get_size_from_ref(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
@@ -143,12 +128,18 @@ protected:
     // FIXME: This should not be mutable, the problem is again the
     // const-violating moving copy constructor.
     mutable Array* m_array;
+
+    /// Introduce a new root node which increments the height of the
+    /// tree by one.
+    void introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state);
 };
 
 
 
 class Column: public ColumnBase {
 public:
+    typedef int64_t value_type;
+
     explicit Column(Allocator&);
     Column(Array::Type, Allocator&);
     explicit Column(Array::Type = Array::type_Normal, ArrayParent* = 0,
@@ -226,9 +217,7 @@ protected:
     void update_ref(ref_type ref);
 
     // Node functions
-    int64_t LeafGet(std::size_t ndx) const TIGHTDB_NOEXCEPT { return m_array->get(ndx); }
     void LeafSet(std::size_t ndx, int64_t value) { m_array->set(ndx, value); }
-    void LeafInsert(std::size_t ndx, int64_t value) { m_array->insert(ndx, value); }
     void LeafDelete(std::size_t ndx) { m_array->erase(ndx); }
     template<class F> size_t LeafFind(int64_t value, std::size_t start, std::size_t end) const
     {
@@ -238,7 +227,15 @@ protected:
     void DoSort(std::size_t lo, std::size_t hi);
 
 private:
+    friend class Array;
+
     Column &operator=(const Column&); // not allowed
+
+    void do_insert(std::size_t ndx, int64_t value);
+
+    // Called by Array::btree_insert().
+    static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
+                                Allocator&, std::size_t insert_ndx, Array::TreeInsert<Column>&);
 };
 
 
@@ -261,6 +258,27 @@ inline int64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 inline ref_type Column::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     return to_ref(get(ndx));
+}
+
+inline void Column::add(int64_t value)
+{
+    do_insert(npos, value);
+}
+
+inline void Column::insert(std::size_t ndx, int64_t value)
+{
+    TIGHTDB_ASSERT(ndx <= size());
+    if (size() <= ndx) ndx = npos;
+    do_insert(ndx, value);
+}
+
+TIGHTDB_FORCEINLINE
+ref_type Column::leaf_insert(MemRef leaf_mem, ArrayParent& parent, std::size_t ndx_in_parent,
+                             Allocator& alloc, std::size_t insert_ndx,
+                             Array::TreeInsert<Column>& state)
+{
+    Array leaf(leaf_mem, &parent, ndx_in_parent, alloc);
+    return leaf.btree_leaf_insert(insert_ndx, state.m_value, state);
 }
 
 

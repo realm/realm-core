@@ -61,6 +61,8 @@ public:
     /// slower.
     static T get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
 
+    ref_type btree_leaf_insert(std::size_t ndx, T, TreeInsertBase& state);
+
 private:
     virtual std::size_t CalcByteLen(std::size_t count, std::size_t width) const;
     virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const TIGHTDB_NOEXCEPT;
