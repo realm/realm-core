@@ -39,8 +39,7 @@ inline ref_type to_ref(int64_t v) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(!int_cast_has_overflow<ref_type>(v));
     // Check that v is divisible by 8 (64-bit aligned).
-    // FIXME: Enable the following assert!
-    // TIGHTDB_ASSERT(v % 8 == 0);
+    TIGHTDB_ASSERT(v % 8 == 0);
     return ref_type(v);
 }
 
@@ -72,10 +71,17 @@ public:
     /// The specified size must not be zero.
     ///
     /// \throw std::bad_alloc If insufficient memory was available.
-    virtual MemRef realloc(ref_type ref, const char* addr, std::size_t size);
+    ///
+    /// Note: The underscore was added because the name \c realloc
+    /// would conflict with a macro on the Windows platform.
+    virtual MemRef realloc_(ref_type ref, const char* addr, std::size_t size);
 
-    // FIXME: SlabAlloc::free() should be modified such than this method never throws.
-    virtual void free(ref_type, const char* addr);
+    // FIXME: SlabAlloc::free_() should be modified such than this
+    // method never throws.
+    ///
+    /// Note: The underscore was added because the name \c free would
+    /// conflict with a macro on the Windows platform.
+    virtual void free_(ref_type, const char* addr);
 
     virtual char* translate(ref_type) const TIGHTDB_NOEXCEPT;
     virtual bool is_read_only(ref_type) const TIGHTDB_NOEXCEPT;

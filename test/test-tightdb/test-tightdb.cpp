@@ -66,7 +66,7 @@ int main()
 
     // Search small integer column
     {
-        timer.start();
+        timer.reset();
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
@@ -81,7 +81,7 @@ int main()
 
     // Search byte-size integer column
     {
-        timer.start();
+        timer.reset();
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
@@ -96,7 +96,7 @@ int main()
 
     // Search string column
     {
-        timer.start();
+        timer.reset();
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < 100; ++i) {
@@ -111,7 +111,7 @@ int main()
 
     // Add index
     {
-        timer.start();
+        timer.reset();
 
         table.column().first.set_index();
 
@@ -122,7 +122,7 @@ int main()
 
     // Search with index
     {
-        timer.start();
+        timer.reset();
 
         for (size_t i = 0; i < 100000; ++i) {
             const size_t n = rand() % 1000;

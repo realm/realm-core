@@ -30,6 +30,8 @@ template<class T> class BasicArray: public Array {
 public:
     explicit BasicArray(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                         Allocator& = Allocator::get_default());
+    BasicArray(MemRef, ArrayParent*, std::size_t ndx_in_parent,
+               Allocator&) TIGHTDB_NOEXCEPT;
     BasicArray(ref_type, ArrayParent*, std::size_t ndx_in_parent,
                Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
     explicit BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT;
@@ -58,6 +60,8 @@ public:
     /// you need to get multiple values, then this method will be
     /// slower.
     static T get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+
+    ref_type btree_leaf_insert(std::size_t ndx, T, TreeInsertBase& state);
 
 private:
     virtual std::size_t CalcByteLen(std::size_t count, std::size_t width) const;

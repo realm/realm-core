@@ -80,7 +80,13 @@ enum Action {act_ReturnFirst, act_Sum, act_Max, act_Min, act_Count, act_FindAll,
 
 template<class T> inline T no0(T v) { return v == 0 ? 1 : v; }
 
-const std::size_t not_found = std::size_t(-1);
+/// Special index value. It has various meanings depending on
+/// context. It is returned by some search functions to indicate 'not
+/// found'. It is similar in function to std::string::npos.
+const std::size_t npos = std::size_t(-1);
+
+/// Alias for tightdb::npos.
+const std::size_t not_found = npos;
 
  /* wid == 16/32 likely when accessing offsets in B tree */
 #define TIGHTDB_TEMPEX(fun, wid, arg) \
@@ -361,6 +367,10 @@ public:
     bool minimum(int64_t& result, std::size_t start = 0, std::size_t end = std::size_t(-1)) const;
     void sort();
     void ReferenceSort(Array& ref);
+
+    // FIXME: Carefull with this one. It handles only shortening
+    // operations. Either rename to truncate() or implement expanding
+    // case.
     void resize(std::size_t count);
 
     /// Returns true if type is not type_InnerColumnNode
@@ -374,6 +384,7 @@ public:
     Array GetSubArray(std::size_t ndx) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array may cause the parent to be modified too.
     ref_type get_ref() const TIGHTDB_NOEXCEPT { return m_ref; }
     void destroy();
+    static void destroy(ref_type, Allocator&);
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_alloc; }
 
@@ -484,6 +495,7 @@ public:
     bool FindGTLT(int64_t v, uint64_t chunk, QueryState<int64_t>* state, std::size_t baseindex,
                   Callback callback) const;
 
+
     /// Find the leaf node corresponding to the specified tree-level
     /// index. This array instance must be the root node of a B+-tree,
     /// and that root node must not itself be a leaf. This implies, of
@@ -498,6 +510,25 @@ public:
     /// local index within that leaf corresponding to the specified
     /// tree-level index.
     std::pair<MemRef, std::size_t> find_btree_leaf(std::size_t elem_ndx) const TIGHTDB_NOEXCEPT;
+
+    struct TreeInsertBase {
+        std::size_t m_split_offset;
+        std::size_t m_split_size;
+    };
+
+    template<class TreeTraits> struct TreeInsert: TreeInsertBase {
+        typename TreeTraits::value_type m_value;
+    };
+
+    /// Insert a value into a B+-tree at the specified tree-level
+    /// index. This array instance must be the root node of a B+-tree,
+    /// and that root node must not itself be a leaf. This implies, of
+    /// course, that the tree must not be empty.
+    template<class TreeTraits>
+    ref_type btree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& state);
+
+    ref_type btree_leaf_insert(std::size_t ndx, int64_t, TreeInsertBase& state);
+
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
@@ -545,9 +576,9 @@ public:
 #ifdef TIGHTDB_DEBUG
     void Print() const;
     void Verify() const;
-    void to_dot(std::ostream& out, StringData title = StringData()) const;
+    void to_dot(std::ostream&, StringData title = StringData()) const;
     void Stats(MemStats& stats) const;
-#endif // TIGHTDB_DEBUG
+#endif
 
 private:
     typedef bool (*CallbackDummy)(int64_t);
@@ -565,6 +596,12 @@ private:
 
     template<size_t w> int64_t sum(size_t start, size_t end) const;
     template<size_t w> size_t FindPos(int64_t target) const TIGHTDB_NOEXCEPT;
+
+    /// Insert new child after original. If the parent has to be
+    /// split, this function returns the \c ref to the new parent
+    /// node.
+    static ref_type insert_btree_child(Array& offsets, Array& refs, std::size_t orig_child_ndx,
+                                       ref_type new_sibling_ref, TreeInsertBase& state);
 
 protected:
     friend class GroupWriter;
@@ -926,6 +963,14 @@ inline bool Array::is_index_node(ref_type ref, const Allocator& alloc)
 }
 
 
+inline void Array::destroy(ref_type ref, Allocator& alloc)
+{
+    Array array(alloc);
+    array.init_from_ref(ref);
+    array.destroy();
+}
+
+
 
 //-------------------------------------------------
 
@@ -1199,17 +1244,17 @@ template<class S> std::size_t Array::Write(S& out, bool recurse, bool persist) c
         // First write out all sub-arrays
         std::size_t count = size();
         for (size_t i = 0; i < count; ++i) {
-            ref_type ref = get_as_ref(i);
+            int64_t ref = get(i);
             if (ref == 0 || ref & 0x1) {
                 // zero-refs and refs that are not 64-aligned do not point to sub-trees
                 new_refs.add(ref);
             }
-            else if (persist && m_alloc.is_read_only(ref)) {
+            else if (persist && m_alloc.is_read_only(to_ref(ref))) {
                 // Ignore un-changed arrays when persisting
                 new_refs.add(ref);
             }
             else {
-                Array sub(ref, 0, 0, get_alloc());
+                Array sub(to_ref(ref), 0, 0, get_alloc());
                 size_t sub_pos = sub.Write(out, true, persist);
                 TIGHTDB_ASSERT((sub_pos & 0x7) == 0); // 64bit alignment
                 new_refs.add(sub_pos);
@@ -1288,6 +1333,62 @@ inline void Array::update_child_ref(size_t child_ndx, ref_type new_ref)
 inline ref_type Array::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 {
     return get_as_ref(child_ndx);
+}
+
+
+template<class TreeTraits>
+ref_type Array::btree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& state)
+{
+    Allocator& alloc = get_alloc();
+    ref_type offsets_ref = get_as_ref(0);
+    Array offsets(offsets_ref, this, 0, alloc);
+    ref_type refs_ref = get_as_ref(1);
+    Array refs(refs_ref, this, 1, alloc);
+    TIGHTDB_ASSERT(0 < refs.size());
+    TIGHTDB_ASSERT(offsets.size() == refs.size());
+    TIGHTDB_ASSERT(elem_ndx == npos || elem_ndx <= to_size_t(offsets.get(refs.size()-1)));
+    std::size_t child_ndx, child_elem_ndx;
+    if (elem_ndx == npos) {
+        // Optimization for append
+        child_ndx = refs.size() - 1;
+        child_elem_ndx = npos;
+    }
+    else if (elem_ndx == 0) {
+        // Optimization for prepend
+        child_ndx = 0;
+        child_elem_ndx = 0;
+    }
+    else {
+        // There is a choise to be made when the element is to be
+        // inserted between two subtrees. It can either be appended to
+        // the first subtree, or it can be prepended to the second
+        // one. We currently always append to the first subtree. It is
+        // essentially a matter of using the lower vs. the upper bound
+        // when searching in in the offsets array.
+        child_ndx = offsets.lower_bound(elem_ndx);
+        TIGHTDB_ASSERT(child_ndx < refs.size());
+        std::size_t elem_ndx_offset = child_ndx == 0 ? 0 : to_size_t(offsets.get(child_ndx-1));
+        child_elem_ndx = elem_ndx - elem_ndx_offset;
+    }
+    ref_type child_ref = refs.get(child_ndx), new_sibling_ref;
+    char* child_header = static_cast<char*>(alloc.translate(child_ref));
+    bool child_is_leaf = !get_isnode_from_header(child_header);
+    if (child_is_leaf) {
+        TIGHTDB_ASSERT(child_elem_ndx == npos || child_elem_ndx <= TIGHTDB_MAX_LIST_SIZE);
+        new_sibling_ref = TreeTraits::leaf_insert(MemRef(child_header, child_ref), refs,
+                                                  child_ndx, alloc, child_elem_ndx, state);
+    }
+    else {
+        Array child(MemRef(child_header, child_ref), &refs, child_ndx, alloc);
+        new_sibling_ref = child.btree_insert(child_elem_ndx, state);
+    }
+
+    if (TIGHTDB_LIKELY(!new_sibling_ref)) {
+        offsets.adjust(child_ndx, 1);
+        return 0;
+    }
+
+    return insert_btree_child(offsets, refs, child_ndx, new_sibling_ref, state);
 }
 
 

@@ -400,7 +400,6 @@
     <ClCompile Include="src\tightdb\group.cpp" />
     <ClCompile Include="src\tightdb\group_shared.cpp" />
     <ClCompile Include="src\tightdb\group_writer.cpp" />
-    <ClCompile Include="src\tightdb\index.cpp" />
     <ClCompile Include="src\tightdb\index_string.cpp" />
     <ClCompile Include="src\tightdb\query.cpp" />
     <ClCompile Include="src\tightdb\spec.cpp" />
@@ -617,7 +616,6 @@
     <ClInclude Include="src\tightdb\group.hpp" />
     <ClInclude Include="src\tightdb\group_shared.hpp" />
     <ClInclude Include="src\tightdb\group_writer.hpp" />
-    <ClInclude Include="src\tightdb\index.hpp" />
     <ClInclude Include="src\tightdb\index_string.hpp" />
     <ClInclude Include="src\tightdb\lang_bind_helper.hpp" />
     <ClInclude Include="src\tightdb\meta.hpp" />

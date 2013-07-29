@@ -248,10 +248,10 @@ public:
     void print_free() const;
     MemStats stats();
     void enable_mem_diagnostics(bool enable = true) { m_alloc.enable_debug(enable); }
-    void to_dot(std::ostream& out) const;
+    void to_dot(std::ostream&) const;
     void to_dot() const; // For GDB
     void zero_free_space(std::size_t file_size, std::size_t readlock_version);
-#endif // TIGHTDB_DEBUG
+#endif
 
 protected:
     friend class GroupWriter;

@@ -129,16 +129,43 @@ public:
     /// spec. Such an ancestor will always exist.
     bool has_shared_spec() const;
 
-    // Schema handling (see also <tightdb/spec.hpp>)
-    Spec&       get_spec();
+
+    //@{
+
+    /// Schema handling.
+    ///
+    /// Only the const qualified get_spec() and has_index() may be
+    /// called for a table with shared spec. All the other methods may
+    /// be called only for a top-level table or a subtable in a mixed
+    /// column.
+    ///
+    /// With the exception of get_spec() (with and without const
+    /// qualification,) and has_index(), all of these methods will
+    /// invalidate all subtable accessors (instances of Table) having
+    /// this table as direct or indirect ancestor.
+    ///
+    /// \param column_path A list of column indexes. For
+    /// add_subcolumn() this list must contain at least one
+    /// element. For remove_subcolumn() and rename_subcolumn() this
+    /// list must contain at least two element. The first index
+    /// specifies a column, C1, of this table, the next index
+    /// specifies a column, C2, of the spec of C1, and so forth.
+    ///
+    /// \sa Spec
+    Spec& get_spec();
     const Spec& get_spec() const;
-    void        update_from_spec(); // Must not be called for a table with shared spec
+    void update_from_spec(); // Must not be called for a table with shared spec
     std::size_t add_column(DataType type, StringData name); // Add a column dynamically
-    std::size_t add_subcolumn(const std::vector<std::size_t>& column_path, DataType type, StringData name);
-    void        remove_column(std::size_t column_ndx);
-    void        remove_column(const std::vector<std::size_t>& column_path);
-    void        rename_column(std::size_t column_ndx, StringData name);
-    void        rename_column(const std::vector<std::size_t>& column_path, StringData name);
+    std::size_t add_subcolumn(const std::vector<std::size_t>& column_path, DataType type,
+                              StringData name);
+    void remove_column(std::size_t column_ndx);
+    void remove_subcolumn(const std::vector<std::size_t>& column_path);
+    void rename_column(std::size_t column_ndx, StringData name);
+    void rename_subcolumn(const std::vector<std::size_t>& column_path, StringData name);
+    bool has_index(std::size_t column_ndx) const;
+    void set_index(std::size_t column_ndx);
+    //@}
+
 
     // Table size and deletion
     bool        is_empty() const TIGHTDB_NOEXCEPT { return m_size == 0; }
@@ -210,10 +237,6 @@ public:
     ConstTableRef  get_subtable(std::size_t column_ndx, std::size_t row_ndx) const;
     size_t         get_subtable_size(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     void           clear_subtable(std::size_t column_ndx, std::size_t row_ndx);
-
-    // Indexing
-    bool has_index(std::size_t column_ndx) const;
-    void set_index(std::size_t column_ndx) {set_index(column_ndx, true);}
 
     // Aggregate functions
     std::size_t  count_int(std::size_t column_ndx, int64_t value) const;
@@ -298,10 +321,10 @@ public:
     // Debug
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-    void to_dot(std::ostream& out, StringData title = StringData()) const;
+    void to_dot(std::ostream&, StringData title = StringData()) const;
     void print() const;
     MemStats stats() const;
-#endif // TIGHTDB_DEBUG
+#endif
 
     const ColumnBase& GetColumnBase(std::size_t column_ndx) const TIGHTDB_NOEXCEPT; // FIXME: Move this to private section next to the non-const version
     ColumnType get_real_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT; // FIXME: Used by various node types in <tightdb/query_engine.hpp>
@@ -361,15 +384,15 @@ protected:
     void ClearCachedColumns();
 
     // Specification
-    std::size_t GetColumnRefPos(std::size_t column_ndx) const;
-    void   UpdateColumnRefs(std::size_t column_ndx, int diff);
-    void   UpdateFromParent();
-    void   do_remove_column(const std::vector<std::size_t>& column_ids, std::size_t pos);
-    void   do_remove_column(std::size_t column_ndx);
-    std::size_t do_add_column(DataType type);
-    void   do_add_subcolumn(const std::vector<std::size_t>& column_path, std::size_t pos, DataType type);
+    void UpdateColumnRefs(std::size_t column_ndx, int diff);
+    void UpdateFromParent();
+    std::size_t do_add_column(DataType);
+    void do_add_subcolumn(const std::vector<std::size_t>& column_path, std::size_t pos, DataType);
+    static void do_remove_column(Array& column_refs, const Spec::ColumnInfo&);
+    void do_remove_subcolumn(const std::vector<std::size_t>& column_path,
+                             std::size_t column_path_ndx, const Spec::ColumnInfo&);
 
-    void   set_index(std::size_t column_ndx, bool update_spec);
+    void set_index(std::size_t column_ndx, bool update_spec);
 
     // Support function for conversions
     void to_json_row(std::size_t row_ndx, std::ostream& out) const;
@@ -445,6 +468,9 @@ private:
     /// started.
     void invalidate();
 
+    /// Invalidate all subtables.
+    void invalidate_subtables();
+
     mutable std::size_t m_ref_count;
     mutable const StringIndex* m_lookup_index;
 
@@ -461,21 +487,26 @@ private:
     void InstantiateBeforeChange();
     void validate_column_type(const ColumnBase& column, ColumnType expected_type, std::size_t ndx) const;
 
-    /// Construct an empty table with independent spec and return just
+    /// Create an empty table with independent spec and return just
     /// the reference to the underlying memory.
     static ref_type create_empty_table(Allocator&);
+
+    /// Create a column of the specified type, fill it with the
+    /// specified number of default values, and return just the
+    /// reference to the underlying memory.
+    static ref_type create_column(DataType column_type, size_t num_default_values, Allocator&);
 
     /// Construct a copy of the columns array of this table using the
     /// specified allocator and return just the ref to that array.
     ///
     /// In the clone, no string column will be of the enumeration
     /// type.
-    std::size_t clone_columns(Allocator&) const;
+    ref_type clone_columns(Allocator&) const;
 
     /// Construct a complete copy of this table (including its spec)
     /// using the specified allocator and return just the ref to the
     /// new top array.
-    std::size_t clone(Allocator&) const;
+    ref_type clone(Allocator&) const;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     struct LocalTransactLog;
@@ -636,6 +667,12 @@ inline Table::Table(RefCountTag, Allocator& alloc, ref_type spec_ref, ref_type c
     m_lookup_index(0)
 {
     init_from_ref(spec_ref, columns_ref, parent, ndx_in_parent);
+}
+
+inline void Table::set_index(std::size_t column_ndx)
+{
+    invalidate_subtables();
+    set_index(column_ndx, true);
 }
 
 inline TableRef Table::create(Allocator& alloc)

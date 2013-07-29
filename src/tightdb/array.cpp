@@ -227,7 +227,7 @@ void Array::destroy()
     }
 
     char* header = get_header_from_data(m_data);
-    m_alloc.free(m_ref, header);
+    m_alloc.free_(m_ref, header);
     m_data = 0;
 }
 
@@ -1295,7 +1295,7 @@ void Array::CopyOnWrite()
 
     // Mark original as deleted, so that the space can be reclaimed in
     // future commits, when no versions are using it anymore
-    m_alloc.free(old_ref, old_begin);
+    m_alloc.free_(old_ref, old_begin);
 }
 
 
@@ -1345,7 +1345,7 @@ void Array::alloc(size_t count, size_t width)
             }
             else {
                 header = get_header_from_data(m_data);
-                mem_ref = m_alloc.realloc(m_ref, header, capacity_bytes); // Throws
+                mem_ref = m_alloc.realloc_(m_ref, header, capacity_bytes); // Throws
                 header = mem_ref.m_addr;
                 set_header_width(int(width), header);
                 set_header_len(count, header);
@@ -1631,7 +1631,7 @@ template<size_t w> void Array::sort()
 
         // Count occurences of each value
         for (size_t t = lo; t <= hi; t++) {
-            size_t i = to_ref(Get<w>(t) - min);
+            size_t i = to_size_t(Get<w>(t) - min); // FIXME: The value of (Get<w>(t) - min) cannot necessarily be stored in size_t.
             count[i]++;
         }
 
@@ -1764,6 +1764,95 @@ bool Array::Compare(const Array& c) const
     }
 
     return true;
+}
+
+
+ref_type Array::insert_btree_child(Array& offsets, Array& refs, size_t orig_child_ndx,
+                                   ref_type new_sibling_ref, TreeInsertBase& state)
+{
+    size_t elem_ndx_offset = orig_child_ndx == 0 ? 0 : offsets.get(orig_child_ndx-1);
+
+    // When a node is split the new node must always be inserted after
+    // the original
+    size_t insert_ndx = orig_child_ndx + 1;
+
+    size_t node_size = refs.size();
+    TIGHTDB_ASSERT(insert_ndx <= node_size);
+    if (TIGHTDB_LIKELY(node_size < TIGHTDB_MAX_LIST_SIZE)) {
+        refs.insert(insert_ndx, new_sibling_ref);
+        offsets.set(orig_child_ndx, elem_ndx_offset + state.m_split_offset);
+        offsets.insert(insert_ndx, elem_ndx_offset + state.m_split_size);
+        offsets.adjust(insert_ndx + 1, 1);
+        return 0; // Parent node was not split
+    }
+
+    // Split parent node
+    Allocator& alloc = refs.get_alloc();
+    Array new_refs(alloc), new_offsets(alloc);
+    new_refs.set_type(type_HasRefs);
+    new_offsets.set_type(type_Normal);
+    size_t new_split_offset, new_split_size;
+    if (insert_ndx == TIGHTDB_MAX_LIST_SIZE) {
+        new_split_offset = elem_ndx_offset + state.m_split_offset;
+        new_split_size   = elem_ndx_offset + state.m_split_size;
+        offsets.set(orig_child_ndx, new_split_offset);
+        new_refs.add(new_sibling_ref);
+        new_offsets.add(state.m_split_size - state.m_split_offset);
+    }
+    else {
+        new_split_offset = elem_ndx_offset + state.m_split_size;
+        size_t offset = 0;
+        for (size_t i = insert_ndx; i < node_size; ++i) {
+            new_refs.add(refs.get(i));
+            offset = offsets.get(i) + 1;
+            new_offsets.add(offset - new_split_offset);
+        }
+        new_split_size = offset; // From last iteration
+        refs.resize(insert_ndx);
+        refs.add(new_sibling_ref);
+        offsets.resize(insert_ndx);
+        offsets.set(orig_child_ndx, elem_ndx_offset + state.m_split_offset);
+        offsets.add(new_split_offset);
+    }
+
+    state.m_split_offset = new_split_offset;
+    state.m_split_size   = new_split_size;
+
+    Array new_node(alloc);
+    new_node.set_type(type_InnerColumnNode);
+    new_node.add(new_offsets.get_ref());
+    new_node.add(new_refs.get_ref());
+    return new_node.get_ref();
+}
+
+
+ref_type Array::btree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& state)
+{
+    size_t leaf_size = size();
+    TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_LIST_SIZE);
+    if (leaf_size < ndx) ndx = leaf_size;
+    if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_LIST_SIZE)) {
+        insert(ndx, value);
+        return 0; // Leaf was not split
+    }
+
+    // Split leaf node
+    Array new_leaf(get_alloc());
+    new_leaf.set_type(has_refs() ? type_HasRefs : type_Normal);
+    if (ndx == leaf_size) {
+        new_leaf.add(value);
+        state.m_split_offset = ndx;
+    }
+    else {
+        for (size_t i = ndx; i != leaf_size; ++i) {
+            new_leaf.add(get(i));
+        }
+        resize(ndx);
+        add(value);
+        state.m_split_offset = ndx + 1;
+    }
+    state.m_split_size = leaf_size + 1;
+    return new_leaf.get_ref();
 }
 
 
@@ -2008,8 +2097,8 @@ template<int width>
 inline pair<size_t, size_t> get_two_as_size(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 {
     const char* data = tightdb::Array::get_data_from_header(header);
-    return make_pair(tightdb::to_ref(get_direct<width>(data, ndx+0)),
-                     tightdb::to_ref(get_direct<width>(data, ndx+1)));
+    return make_pair(tightdb::to_size_t(get_direct<width>(data, ndx+0)),
+                     tightdb::to_size_t(get_direct<width>(data, ndx+1)));
 }
 
 
@@ -2208,15 +2297,15 @@ size_t Array::ColumnFind(int64_t target, ref_type ref, Array& cache) const
         size_t width = get_width_from_header(header);
 
         // Get subnode table
-        ref_type ref_offsets = to_ref(get_direct(data, width, 0));
-        ref_type ref_refs    = to_ref(get_direct(data, width, 1));
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
-        const char* offsets_header = m_alloc.translate(ref_offsets);
+        const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t offsets_width  = get_width_from_header(offsets_header);
         size_t offsets_len = get_len_from_header(offsets_header);
 
-        const char* refs_header = m_alloc.translate(ref_refs);
+        const char* refs_header = m_alloc.translate(refs_ref);
         const char* refs_data = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
 
@@ -2260,11 +2349,11 @@ top:
 
     for (;;) {
         // Get subnode table
-        ref_type ref_offsets = to_ref(get_direct(data, width, 0));
-        ref_type ref_refs    = to_ref(get_direct(data, width, 1));
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(ref_offsets);
+        const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
@@ -2272,14 +2361,14 @@ top:
         if (pos == not_found) return not_found;
 
         // Get entry under key
-        const char* refs_header = m_alloc.translate(ref_refs);
+        const char* refs_header = m_alloc.translate(refs_ref);
         const char* refs_data = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
-        ref_type ref = to_ref(get_direct(refs_data, refs_width, pos));
+        int64_t ref = get_direct(refs_data, refs_width, pos);
 
         if (is_node) {
             // Set vars for next iteration
-            header  = m_alloc.translate(ref);
+            header  = m_alloc.translate(to_ref(ref));
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_node = get_isnode_from_header(header);
@@ -2291,7 +2380,7 @@ top:
         if (stored_key == key) {
             // Literal row index
             if (ref & 1) {
-                const size_t row_ref = (ref >> 1);
+                size_t row_ref = size_t(uint64_t(ref) >> 1);
 
                 // If the last byte in the stored key is zero, we know that we have
                 // compared against the entire (target) string
@@ -2302,7 +2391,7 @@ top:
                 else return not_found;
             }
 
-            const char* sub_header = m_alloc.translate(ref);
+            const char* sub_header = m_alloc.translate(to_ref(ref));
             const bool sub_isindex = get_indexflag_from_header(sub_header);
 
             // List of matching row indexes
@@ -2317,7 +2406,7 @@ top:
                 if (!sub_isnode)
                     row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
                 else {
-                    Array sub(ref, 0, 0, m_alloc);
+                    Array sub(to_ref(ref), 0, 0, m_alloc);
                     pair<MemRef, size_t> p = sub.find_btree_leaf(0);
                     const char* leaf_header = p.first.m_addr;
                     row_ref = to_size_t(get(leaf_header, 0));
@@ -2333,7 +2422,7 @@ top:
             }
 
             // Recurse into sub-index;
-            header  = m_alloc.translate(ref);
+            header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_node = get_isnode_from_header(header);
@@ -2362,11 +2451,11 @@ top:
 
     for (;;) {
         // Get subnode table
-        ref_type ref_offsets = to_ref(get_direct(data, width, 0));
-        ref_type ref_refs    = to_ref(get_direct(data, width, 1));
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(ref_offsets);
+        const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
@@ -2374,14 +2463,14 @@ top:
         if (pos == not_found) return; // not_found
 
         // Get entry under key
-        const char* refs_header = m_alloc.translate(ref_refs);
+        const char* refs_header = m_alloc.translate(refs_ref);
         const char* refs_data = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
-        ref_type ref = to_ref(get_direct(refs_data, refs_width, pos));
+        int64_t ref = get_direct(refs_data, refs_width, pos);
 
         if (is_node) {
             // Set vars for next iteration
-            header  = m_alloc.translate(ref);
+            header  = m_alloc.translate(to_ref(ref));
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_node = get_isnode_from_header(header);
@@ -2393,7 +2482,7 @@ top:
         if (stored_key == key) {
             // Literal row index
             if (ref & 1) {
-                const size_t row_ref = (ref >> 1);
+                size_t row_ref = size_t(uint64_t(ref) >> 1);
 
                 // If the last byte in the stored key is zero, we know that we have
                 // compared against the entire (target) string
@@ -2410,7 +2499,7 @@ top:
                 else return; // not_found
             }
 
-            const char* sub_header = m_alloc.translate(ref);
+            const char* sub_header = m_alloc.translate(to_ref(ref));
             const bool sub_isindex = get_indexflag_from_header(sub_header);
 
             // List of matching row indexes
@@ -2441,7 +2530,7 @@ top:
                     }
                 }
                 else {
-                    const Column sub(ref, NULL, 0, m_alloc);
+                    const Column sub(to_ref(ref), 0, 0, m_alloc);
                     const size_t first_row_ref = to_size_t(sub.get(0));
 
                     // If the last byte in the stored key is not zero, we have
@@ -2464,7 +2553,7 @@ top:
             }
 
             // Recurse into sub-index;
-            header  = m_alloc.translate(ref);
+            header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_node = get_isnode_from_header(header);
@@ -2493,11 +2582,11 @@ top:
 
     for (;;) {
         // Get subnode table
-        ref_type ref_offsets = to_ref(get_direct(data, width, 0));
-        ref_type ref_refs    = to_ref(get_direct(data, width, 1));
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(ref_offsets);
+        const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data   = get_data_from_header(offsets_header);
         size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
@@ -2505,14 +2594,14 @@ top:
         if (pos == not_found) return FindRes_not_found;
 
         // Get entry under key
-        const char* refs_header = m_alloc.translate(ref_refs);
+        const char* refs_header = m_alloc.translate(refs_ref);
         const char* refs_data   = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
-        ref_type ref = to_ref(get_direct(refs_data, refs_width, pos));
+        int64_t ref = get_direct(refs_data, refs_width, pos);
 
         if (is_node) {
             // Set vars for next iteration
-            header  = m_alloc.translate(ref);
+            header  = m_alloc.translate(to_ref(ref));
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_node = get_isnode_from_header(header);
@@ -2524,7 +2613,7 @@ top:
         if (stored_key == key) {
             // Literal row index
             if (ref & 1) {
-                const size_t row_ref = (ref >> 1);
+                size_t row_ref = size_t(uint64_t(ref) >> 1);
 
                 // If the last byte in the stored key is zero, we know that we have
                 // compared against the entire (target) string
@@ -2541,7 +2630,7 @@ top:
                 else return FindRes_not_found; // not_found
             }
 
-            const char* sub_header  = m_alloc.translate(ref);
+            const char* sub_header  = m_alloc.translate(to_ref(ref));
             const bool  sub_isindex = get_indexflag_from_header(sub_header);
 
             // List of matching row indexes
@@ -2564,7 +2653,7 @@ top:
                     }
                 }
                 else {
-                    const Column sub(ref, NULL, 0, m_alloc);
+                    const Column sub(to_ref(ref), 0, 0, m_alloc);
                     const size_t first_row_ref = to_size_t(sub.get(0));
 
                     // If the last byte in the stored key is not zero, we have
@@ -2582,7 +2671,7 @@ top:
             }
 
             // Recurse into sub-index;
-            header  = m_alloc.translate(ref);
+            header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_node = get_isnode_from_header(header);
@@ -2612,11 +2701,11 @@ top:
 
     for (;;) {
         // Get subnode table
-        ref_type ref_offsets = to_ref(get_direct(data, width, 0));
-        ref_type ref_refs    = to_ref(get_direct(data, width, 1));
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(ref_offsets);
+        const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
@@ -2624,14 +2713,14 @@ top:
         if (pos == not_found) return 0;
 
         // Get entry under key
-        const char* refs_header = m_alloc.translate(ref_refs);
+        const char* refs_header = m_alloc.translate(refs_ref);
         const char* refs_data = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
-        ref_type ref = to_ref(get_direct(refs_data, refs_width, pos));
+        int64_t ref = get_direct(refs_data, refs_width, pos);
 
         if (is_node) {
             // Set vars for next iteration
-            header  = m_alloc.translate(ref);
+            header  = m_alloc.translate(to_ref(ref));
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_node = get_isnode_from_header(header);
@@ -2643,7 +2732,7 @@ top:
         if (stored_key == key) {
             // Literal row index
             if (ref & 1) {
-                const size_t row_ref = (ref >> 1);
+                const size_t row_ref = size_t((uint64_t(ref) >> 1));
 
                 // If the last byte in the stored key is zero, we know that we have
                 // compared against the entire (target) string
@@ -2654,7 +2743,7 @@ top:
                 else return 0;
             }
 
-            const char* sub_header = m_alloc.translate(ref);
+            const char* sub_header = m_alloc.translate(to_ref(ref));
             const bool sub_isindex = get_indexflag_from_header(sub_header);
 
             // List of matching row indexes
@@ -2677,7 +2766,7 @@ top:
                     row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
                 }
                 else {
-                    const Column sub(ref, NULL, 0, m_alloc);
+                    const Column sub(to_ref(ref), 0, 0, m_alloc);
                     sub_count = sub.size();
 
                     // If the last byte in the stored key is zero, we know that we have
@@ -2693,7 +2782,7 @@ top:
             }
 
             // Recurse into sub-index;
-            header  = m_alloc.translate(ref);
+            header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_node = get_isnode_from_header(header);
