@@ -80,7 +80,7 @@ TIGHTDB_TABLE_2(PeopleTable2,
 
 } // anonymous namespace
 
-
+/*
 TEST(QueryExpressions1)
 {
     
@@ -97,27 +97,27 @@ TEST(QueryExpressions1)
 
 #if 0
         // Slow dynamic, 360 ms
-        ExpressionBase* col = new ColumnExpression(&a);
-        ExpressionBase* cc1 = new DynamicConstant(20);
-        ExpressionBase* cc2 = new DynamicConstant(50);  
-        ExpressionBase* ck = new Expression<Plus>(col, cc1);  
+        Subexpr* col = new Columns(&a);
+        Subexpr* cc1 = new Constant(20);
+        Subexpr* cc2 = new Constant(50);  
+        Subexpr* ck = new Operator<Plus>(col, cc1);  
 
 #else
         // Fast static, 313
-        ColumnExpression* col = new ColumnExpression(0);
-        DynamicConstant* cc1 = new DynamicConstant(20);
-        DynamicConstant* cc2 = new DynamicConstant(50);  
-        ExpressionBase* ck = new Expression<Plus, ColumnExpression, DynamicConstant>(col, cc1);  
+        Columns* col = new Columns(0);
+        Constant* cc1 = new Constant(20);
+        Constant* cc2 = new Constant(50);  
+        Subexpr* ck = new Operator<Plus, Columns, Constant>(col, cc1);  
 
 #endif
         
-        CompareBase *e = new Compare<Equal>(ck, cc2);
+        Expression *e = new Compare<Equal>(ck, cc2);
 
     tightdb::TableView t1;
     t1 = table.where().expression(e).find_all();
 }
 
-
+*/
 
 TEST(CountLimit)
 {

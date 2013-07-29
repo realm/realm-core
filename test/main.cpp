@@ -89,6 +89,8 @@ int main(int argc, char* argv[])
 
 
 
+// ll
+
 
 
         Column a;
@@ -97,31 +99,44 @@ int main(int argc, char* argv[])
             a.add(rand() % 10);
 
         a.set(9998, 30);
+/*
+plus (int float) -> float float
+
+compare(int float) -> float float
 
 
 
+*/
 
-#if 0
-        // Slow dynamic, 360 ms
-        ExpressionBase* col = new ColumnExpression(&a);
-        ExpressionBase* cc1 = new DynamicConstant(20);
-        ExpressionBase* cc2 = new DynamicConstant(50);  
-        ExpressionBase* ck = new Expression<plus2>(col, cc1);  
+
+       
+
+        // 633
+#if 1
+        // Slow dynamic, 250 ms
+        Subexpr* col = new Columns<int64_t>(0);
+        Subexpr* colf = new Columns<float>(1.234);
+        Subexpr* cc1 = new Value<int64_t>(20);
+        Subexpr* cc2 = new Value<int64_t>(50);  
+        Subexpr* ck0 = new Operator<int64_t, Plus<int64_t> >(col, cc1);  
+        Subexpr* ck = new Operator<float, Plus<float> >(colf, ck0);  
+
+
 
 #else
-        // Fast static, 313
-//        ColumnExpression* col = new ColumnExpression(&a);
-        ColumnExpression* col = new ColumnExpression(0);
-        DynamicConstant* cc1 = new DynamicConstant(20);
-        DynamicConstant* cc2 = new DynamicConstant(50);  
-        ExpressionBase* ck = new Expression<Plus, ColumnExpression, DynamicConstant>(col, cc1);  
+        // Fast static, 190
+//        Columns* col = new Columns(&a);
+        Columns* col = new Columns(0);
+        Constant* cc1 = new Constant(20);
+        Constant* cc2 = new Constant(50);  
+        Subexpr* ck = new Operator<Plus, Columns, Constant>(col, cc1);  
 
 #endif
         
 
 
 
-        CompareBase *e = new Compare<Equal>(ck, cc2);
+        Expression *e = new Compare<Equal, float>(ck, cc2);
 
 
 
@@ -146,7 +161,7 @@ int main(int argc, char* argv[])
         {
             volatile size_t m;
             unsigned int best = -1;
-            for(int y = 0; y < 80; y++)
+            for(int y = 0; y < 20; y++)
             {
                 UnitTest::Timer timer;
                 timer.Start();
@@ -166,7 +181,7 @@ int main(int argc, char* argv[])
 
 
 
-
+        /*
 
 
         {
@@ -192,7 +207,7 @@ int main(int argc, char* argv[])
             }
             cerr << best << "  " << m << "\n";
         }
-
+        */
 
         
 
@@ -200,3 +215,7 @@ int main(int argc, char* argv[])
         return 0;
 }
  
+
+// 638
+
+// 545   568

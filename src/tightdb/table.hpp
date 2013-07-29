@@ -494,7 +494,7 @@ private:
     friend class ColumnSubtableParent;
     friend class LangBindHelper;
     friend class TableViewBase;
-    friend class ColumnExpression;
+    template<class T> friend class Columns;
 };
 
 

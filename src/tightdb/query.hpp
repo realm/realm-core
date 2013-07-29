@@ -46,14 +46,14 @@ class Table;
 class TableView;
 class ConstTableView;
 class Array;
-class CompareBase;
+class Expression;
 
 class Query {
 public:
     Query(const Query& copy); // FIXME: Try to remove this
     ~Query();
 
-    Query& expression(CompareBase* compare);
+    Query& expression(Expression* compare);
 
     // Conditions: Query only rows contained in tv
     Query& tableview(const TableView& tv);

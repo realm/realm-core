@@ -122,6 +122,117 @@ const size_t bitwidth_time_unit = 64;
 
 typedef bool (*CallbackDummy)(int64_t);
 
+template<class T> struct ColumnTypeTraits;
+
+template<> struct ColumnTypeTraits<int64_t> {
+    typedef Column column_type;
+    typedef Array array_type;
+    typedef int64_t sum_type;
+    static const DataType id = type_Int;
+};
+template<> struct ColumnTypeTraits<bool> {
+    typedef Column column_type;
+    typedef Array array_type;
+    typedef int64_t sum_type;
+    static const DataType id = type_Bool;
+};
+template<> struct ColumnTypeTraits<float> {
+    typedef ColumnFloat column_type;
+    typedef ArrayFloat array_type;
+    typedef double sum_type;
+    static const DataType id = type_Float;
+};
+template<> struct ColumnTypeTraits<double> {
+    typedef ColumnDouble column_type;
+    typedef ArrayDouble array_type;
+    typedef double sum_type;
+    static const DataType id = type_Double;
+};
+template<> struct ColumnTypeTraits<Date> {
+    typedef Column column_type;
+    typedef Array array_type;
+    typedef int64_t sum_type;
+    static const DataType id = type_Int;
+};
+// Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
+template<class T, Action A> struct ColumnTypeTraitsSum {
+    typedef T sum_type;
+};
+
+template<> struct ColumnTypeTraitsSum<float, act_Sum> {
+    typedef double sum_type;
+};
+
+
+struct SequentialGetterBase { virtual ~SequentialGetterBase() {} };
+
+template<class T>class SequentialGetter : public SequentialGetterBase {
+public:
+    typedef typename ColumnTypeTraits<T>::column_type ColType;
+    typedef typename ColumnTypeTraits<T>::array_type ArrayType;
+
+    SequentialGetter() : m_array((Array::no_prealloc_tag()))
+    {
+    }
+
+    SequentialGetter(const Table& table, size_t column_ndx) : m_array((Array::no_prealloc_tag()))
+    {
+        if (column_ndx != not_found)
+            m_column = static_cast<const ColType*>(&table.GetColumnBase(column_ndx));
+        m_leaf_end = 0;
+    }
+
+    SequentialGetter(ColType* column) : m_array((Array::no_prealloc_tag()))
+    {
+        init(column);
+    }
+
+    void init (ColType* column) {
+        m_column = column;
+        m_leaf_end = 0;
+    }
+
+    TIGHTDB_FORCEINLINE bool cache_next(size_t index)
+    {
+        // Return wether or not leaf array has changed (could be useful to know for caller)
+        if (index >= m_leaf_end || index < m_leaf_start) {
+            // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
+            // leave m_array untouched. Else call init_from_header() on m_array (more time consuming) and return pointer to m_array.
+            m_array_ptr = static_cast<const ArrayType*>(m_column->GetBlock(index, m_array, m_leaf_start, true));
+            const size_t leaf_size = m_array_ptr->size();
+            m_leaf_end = m_leaf_start + leaf_size;
+            return true;
+        }
+        return false;
+    }
+
+    TIGHTDB_FORCEINLINE T get_next(size_t index)
+    {
+        cache_next(index);
+        T av = m_array_ptr->get(index - m_leaf_start);
+        return av;
+    }
+
+    size_t local_end(size_t global_end)
+    {
+        if (global_end > m_leaf_end)
+            return m_leaf_end - m_leaf_start;
+        else
+            return global_end - m_leaf_start;
+    }
+
+    size_t m_leaf_start;
+    size_t m_leaf_end;
+    const ColType* m_column;
+
+    // See reason for having both a pointer and instance above
+    const ArrayType* m_array_ptr;
+private:
+    // Never access through m_array because it's uninitialized if column is just a leaf
+    ArrayType m_array;
+};
+
+
 class ParentNode {
 public:
     ParentNode() : m_is_integer_node(false), m_table(NULL) {}
@@ -1280,7 +1391,7 @@ class ExpressionNode: public ParentNode {
 
 public:    
 
-    ExpressionNode(CompareBase* compare) 
+    ExpressionNode(Expression* compare) 
     {
         m_child = 0;
         m_compare = compare;
@@ -1299,7 +1410,7 @@ public:
         return res;
     }
     
-    CompareBase* m_compare;
+    Expression* m_compare;
 };
 
 
