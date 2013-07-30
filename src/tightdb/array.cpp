@@ -1810,6 +1810,95 @@ bool Array::Compare(const Array& c) const
 }
 
 
+ref_type Array::insert_btree_child(Array& offsets, Array& refs, size_t orig_child_ndx,
+                                   ref_type new_sibling_ref, TreeInsertBase& state)
+{
+    size_t elem_ndx_offset = orig_child_ndx == 0 ? 0 : offsets.get(orig_child_ndx-1);
+
+    // When a node is split the new node must always be inserted after
+    // the original
+    size_t insert_ndx = orig_child_ndx + 1;
+
+    size_t node_size = refs.size();
+    TIGHTDB_ASSERT(insert_ndx <= node_size);
+    if (TIGHTDB_LIKELY(node_size < TIGHTDB_MAX_LIST_SIZE)) {
+        refs.insert(insert_ndx, new_sibling_ref);
+        offsets.set(orig_child_ndx, elem_ndx_offset + state.m_split_offset);
+        offsets.insert(insert_ndx, elem_ndx_offset + state.m_split_size);
+        offsets.adjust(insert_ndx + 1, 1);
+        return 0; // Parent node was not split
+    }
+
+    // Split parent node
+    Allocator& alloc = refs.get_alloc();
+    Array new_refs(alloc), new_offsets(alloc);
+    new_refs.set_type(type_HasRefs);
+    new_offsets.set_type(type_Normal);
+    size_t new_split_offset, new_split_size;
+    if (insert_ndx == TIGHTDB_MAX_LIST_SIZE) {
+        new_split_offset = elem_ndx_offset + state.m_split_offset;
+        new_split_size   = elem_ndx_offset + state.m_split_size;
+        offsets.set(orig_child_ndx, new_split_offset);
+        new_refs.add(new_sibling_ref);
+        new_offsets.add(state.m_split_size - state.m_split_offset);
+    }
+    else {
+        new_split_offset = elem_ndx_offset + state.m_split_size;
+        size_t offset = 0;
+        for (size_t i = insert_ndx; i < node_size; ++i) {
+            new_refs.add(refs.get(i));
+            offset = offsets.get(i) + 1;
+            new_offsets.add(offset - new_split_offset);
+        }
+        new_split_size = offset; // From last iteration
+        refs.resize(insert_ndx);
+        refs.add(new_sibling_ref);
+        offsets.resize(insert_ndx);
+        offsets.set(orig_child_ndx, elem_ndx_offset + state.m_split_offset);
+        offsets.add(new_split_offset);
+    }
+
+    state.m_split_offset = new_split_offset;
+    state.m_split_size   = new_split_size;
+
+    Array new_node(alloc);
+    new_node.set_type(type_InnerColumnNode);
+    new_node.add(new_offsets.get_ref());
+    new_node.add(new_refs.get_ref());
+    return new_node.get_ref();
+}
+
+
+ref_type Array::btree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& state)
+{
+    size_t leaf_size = size();
+    TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_LIST_SIZE);
+    if (leaf_size < ndx) ndx = leaf_size;
+    if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_LIST_SIZE)) {
+        insert(ndx, value);
+        return 0; // Leaf was not split
+    }
+
+    // Split leaf node
+    Array new_leaf(get_alloc());
+    new_leaf.set_type(has_refs() ? type_HasRefs : type_Normal);
+    if (ndx == leaf_size) {
+        new_leaf.add(value);
+        state.m_split_offset = ndx;
+    }
+    else {
+        for (size_t i = ndx; i != leaf_size; ++i) {
+            new_leaf.add(get(i));
+        }
+        resize(ndx);
+        add(value);
+        state.m_split_offset = ndx + 1;
+    }
+    state.m_split_size = leaf_size + 1;
+    return new_leaf.get_ref();
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 void Array::Print() const

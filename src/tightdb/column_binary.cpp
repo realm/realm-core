@@ -26,18 +26,18 @@ ColumnBinary::ColumnBinary(ref_type ref, ArrayParent* parent, size_t pndx, Alloc
 
 ColumnBinary::~ColumnBinary()
 {
-    if (!root_is_leaf())
-        delete m_array;
-    else
+    if (root_is_leaf())
         delete static_cast<ArrayBinary*>(m_array);
+    else
+        delete m_array;
 }
 
 void ColumnBinary::destroy()
 {
-    if (!root_is_leaf())
-        m_array->destroy();
-    else
+    if (root_is_leaf())
         static_cast<ArrayBinary*>(m_array)->destroy();
+    else
+        m_array->destroy();
 }
 
 void ColumnBinary::update_ref(ref_type ref)
@@ -109,22 +109,10 @@ void ColumnBinary::set(size_t ndx, BinaryData bin)
     TreeSet<BinaryData, ColumnBinary>(ndx, bin);
 }
 
-void ColumnBinary::insert(size_t ndx, BinaryData bin)
-{
-    TIGHTDB_ASSERT(ndx <= size());
-    TreeInsert<BinaryData, ColumnBinary>(ndx, bin);
-}
-
 void ColumnBinary::set_string(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < size());
     TreeSet<StringData, ColumnBinary>(ndx, value);
-}
-
-void ColumnBinary::insert_string(size_t ndx, StringData value)
-{
-    TIGHTDB_ASSERT(ndx <= size());
-    TreeInsert<StringData, ColumnBinary>(ndx, value);
 }
 
 void ColumnBinary::fill(size_t count)
@@ -135,7 +123,7 @@ void ColumnBinary::fill(size_t count)
     // TODO: this is a very naive approach
     // we could speedup by creating full nodes directly
     for (size_t i = 0; i < count; ++i) {
-        TreeInsert<BinaryData, ColumnBinary>(i, BinaryData());
+        add(BinaryData());
     }
 
 #ifdef TIGHTDB_DEBUG
@@ -190,36 +178,55 @@ bool ColumnBinary::compare(const ColumnBinary& c) const
     return true;
 }
 
-BinaryData ColumnBinary::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    const ArrayBinary* const array = static_cast<ArrayBinary*>(m_array);
-    return array->get(ndx);
-}
-
 void ColumnBinary::LeafSet(size_t ndx, BinaryData value)
 {
     static_cast<ArrayBinary*>(m_array)->set(ndx, value);
 }
 
-void ColumnBinary::LeafInsert(size_t ndx, BinaryData value)
-{
-    static_cast<ArrayBinary*>(m_array)->insert(ndx, value);
-}
-
 void ColumnBinary::LeafSet(size_t ndx, StringData value)
 {
-    static_cast<ArrayBinary*>(m_array)->set_string(ndx, value);
-}
-
-void ColumnBinary::LeafInsert(size_t ndx, StringData value)
-{
-    static_cast<ArrayBinary*>(m_array)->insert_string(ndx, value);
+    BinaryData value_2(value.data(), value.size());
+    bool add_zero_term = true;
+    static_cast<ArrayBinary*>(m_array)->set(ndx, value_2, add_zero_term);
 }
 
 void ColumnBinary::LeafDelete(size_t ndx)
 {
     static_cast<ArrayBinary*>(m_array)->erase(ndx);
 }
+
+
+void ColumnBinary::do_insert(size_t ndx, BinaryData value, bool add_zero_term)
+{
+    TIGHTDB_ASSERT(ndx == npos || ndx < size());
+    ref_type new_sibling_ref;
+    InsertState state;
+    if (root_is_leaf()) {
+        TIGHTDB_ASSERT(ndx == npos || ndx < TIGHTDB_MAX_LIST_SIZE);
+        ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
+        new_sibling_ref = leaf->btree_leaf_insert(ndx, value, add_zero_term, state);
+    }
+    else {
+        state.m_value = value;
+        state.m_add_zero_term = add_zero_term;
+        new_sibling_ref = m_array->btree_insert(ndx, state);
+    }
+
+    if (TIGHTDB_UNLIKELY(new_sibling_ref))
+        introduce_new_root(new_sibling_ref, state);
+}
+
+
+ref_type ColumnBinary::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
+                                   size_t ndx_in_parent, Allocator& alloc,
+                                   size_t insert_ndx,
+                                   Array::TreeInsert<ColumnBinary>& state)
+{
+    ArrayBinary leaf(leaf_mem, &parent, ndx_in_parent, alloc);
+    InsertState& state_2 = static_cast<InsertState&>(state);
+    return leaf.btree_leaf_insert(insert_ndx, state.m_value, state_2.m_add_zero_term, state);
+}
+
 
 #ifdef TIGHTDB_DEBUG
 

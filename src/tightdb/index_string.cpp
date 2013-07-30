@@ -164,7 +164,7 @@ void StringIndex::TreeInsert(size_t row_ndx, int32_t key, size_t offset, StringD
     TIGHTDB_ASSERT(false);
 }
 
-Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t offset, StringData value)
+StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t offset, StringData value)
 {
     if (!root_is_leaf()) {
         // Get subnode table
@@ -179,7 +179,7 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
         }
 
         // Get sublist
-        const size_t ref = refs.get_as_ref(node_ndx);
+        ref_type ref = refs.get_as_ref(node_ndx);
         StringIndex target(ref, &refs, node_ndx, m_target_column, m_get_func, m_array->get_alloc());
 
         // Insert item
@@ -210,7 +210,9 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
             newNode.NodeAddKey(nc.ref2);
             ++node_ndx;
         }
-        else newNode.NodeAddKey(nc.ref1);
+        else {
+            newNode.NodeAddKey(nc.ref1);
+        }
 
         switch (node_ndx) {
             case 0:             // insert before
@@ -221,9 +223,9 @@ Column::NodeChange StringIndex::DoInsert(size_t row_ndx, int32_t key, size_t off
                 else return NodeChange(NodeChange::insert_after, newNode.get_ref());
             default:            // split
                 // Move items after split to new node
-                const size_t len = refs.size();
+                size_t len = refs.size();
                 for (size_t i = node_ndx; i < len; ++i) {
-                    size_t ref = refs.get_as_ref(i);
+                    ref_type ref = refs.get_as_ref(i);
                     newNode.NodeAddKey(ref);
                 }
                 offsets.resize(node_ndx);
@@ -670,6 +672,26 @@ bool StringIndex::is_empty() const
     Array values = m_array->GetSubArray(0);
     return values.is_empty();
 }
+
+
+void StringIndex::NodeAddKey(ref_type ref)
+{
+    TIGHTDB_ASSERT(ref);
+    TIGHTDB_ASSERT(!root_is_leaf());
+
+    Array offsets = NodeGetOffsets();
+    Array refs = NodeGetRefs();
+    TIGHTDB_ASSERT(offsets.size() < TIGHTDB_MAX_LIST_SIZE);
+
+    Array new_top(ref, 0, 0, m_array->get_alloc());
+    Array new_offsets(new_top.get_as_ref(0), 0, 0,m_array->get_alloc());
+    TIGHTDB_ASSERT(!new_offsets.is_empty());
+
+    int64_t key = new_offsets.back();
+    offsets.add(key);
+    refs.add(ref);
+}
+
 
 #ifdef TIGHTDB_DEBUG
 

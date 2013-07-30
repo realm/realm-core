@@ -32,6 +32,8 @@ class StringIndex;
 
 class AdaptiveStringColumn: public ColumnBase {
 public:
+    typedef StringData value_type;
+
     explicit AdaptiveStringColumn(Allocator& = Allocator::get_default());
     explicit AdaptiveStringColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                                   Allocator& = Allocator::get_default());
@@ -78,7 +80,7 @@ public:
     void set_parent(ArrayParent* parent, std::size_t pndx) { m_array->set_parent(parent, pndx); }
 
     // Optimizing data layout
-    bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;
+    bool auto_enumerate(ref_type& keys, ref_type& values) const;
 
     /// Compare two string columns for equality.
     bool compare(const AdaptiveStringColumn&) const;
@@ -121,9 +123,7 @@ protected:
     friend class ColumnBase;
     void update_ref(ref_type ref);
 
-    StringData LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
     void LeafSet(size_t ndx, StringData value);
-    void LeafInsert(size_t ndx, StringData value);
     template<class F> size_t LeafFind(StringData value, size_t begin, size_t end) const;
     void LeafFindAll(Array& result, StringData value, size_t add_offset = 0,
                      size_t begin = 0, size_t end = -1) const;
@@ -135,9 +135,20 @@ protected:
 #endif
 
 private:
+    friend class Array;
+
     static const size_t short_string_max_size = 15;
 
     StringIndex* m_index;
+
+    void do_insert(std::size_t ndx, StringData value);
+
+    // Called by Array::btree_insert().
+    static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
+                                Allocator&, std::size_t insert_ndx,
+                                Array::TreeInsert<AdaptiveStringColumn>& state);
+
+    static void copy_leaf(const ArrayString&, ArrayStringLong&);
 };
 
 
@@ -183,6 +194,18 @@ inline std::size_t AdaptiveStringColumn::lower_bound(StringData value) const TIG
         }
     }
     return i;
+}
+
+inline void AdaptiveStringColumn::add(StringData value)
+{
+    do_insert(npos, value);
+}
+
+inline void AdaptiveStringColumn::insert(size_t ndx, StringData value)
+{
+    TIGHTDB_ASSERT(ndx <= size());
+    if (size() <= ndx) ndx = npos;
+    do_insert(ndx, value);
 }
 
 

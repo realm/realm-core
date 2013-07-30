@@ -77,6 +77,13 @@ inline void ColumnMixed::invalidate_subtables_virtual()
     invalidate_subtables();
 }
 
+inline ref_type ColumnMixed::create(std::size_t size, Allocator& alloc)
+{
+    ColumnMixed c(alloc, 0, 0);
+    c.fill(size);
+    return c.get_ref();
+}
+
 
 //
 // Getters

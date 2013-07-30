@@ -40,6 +40,8 @@ template<> struct AggReturnType<float> {
 template<class T>
 class BasicColumn: public ColumnBase {
 public:
+    typedef T value_type;
+
     explicit BasicColumn(Allocator& = Allocator::get_default());
     explicit BasicColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                          Allocator& = Allocator::get_default());
@@ -84,17 +86,23 @@ public:
 #endif
 
 private:
+    friend class Array;
     friend class ColumnBase;
 
     void update_ref(ref_type ref);
 
-    T LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
     void LeafSet(size_t ndx, T value);
-    void LeafInsert(size_t ndx, T value);
     void LeafDelete(size_t ndx);
 
     template<class F> size_t LeafFind(T value, size_t start, size_t end) const;
     void LeafFindAll(Array& result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
+
+    void do_insert(std::size_t ndx, T value);
+
+    // Called by Array::btree_insert().
+    static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
+                                Allocator&, std::size_t insert_ndx,
+                                Array::TreeInsert<BasicColumn<T> >&);
 
 #ifdef TIGHTDB_DEBUG
     virtual void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;

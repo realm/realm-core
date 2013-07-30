@@ -248,38 +248,38 @@ TEST(Column_monkeytest2)
 //          if (rand() % 10 == 0) printf("Input bitwidth around ~%d, , a.Size()=%d\n", (int)current_bitwidth, (int)a.Size());
 
             if (!(rand2() % (ITER_PER_BITWIDTH / 100))) {
-                trend = (unsigned int)rand2() % 10;
-                a.find_first(rand2((int)current_bitwidth));
-                a.find_all(res, rand2((int)current_bitwidth));
-                size_t start = rand2() % (a.Size() + 1);
-                a.Sum(start, start + rand2() % (a.Size() + 1 - start));
-                a.maximum(start, start + rand2() % (a.Size() + 1 - start));
-                a.minimum(start, start + rand2() % (a.Size() + 1 - start));
+                trend = unsigned(rand2()) % 10;
+                a.find_first(rand2(int(current_bitwidth)));
+                a.find_all(res, rand2(int(current_bitwidth)));
+                size_t start = rand2() % (a.size() + 1);
+                a.sum(start, start + rand2() % (a.size() + 1 - start));
+                a.maximum(start, start + rand2() % (a.size() + 1 - start));
+                a.minimum(start, start + rand2() % (a.size() + 1 - start));
             }
 
-            if (rand2() % 10 > trend && a.Size() < ITER_PER_BITWIDTH / 100) {
-                uint64_t l = rand2((int)current_bitwidth);
+            if (rand2() % 10 > trend && a.size() < ITER_PER_BITWIDTH / 100) {
+                uint64_t l = rand2(int(current_bitwidth));
                 if (rand2() % 2 == 0) {
                     // Insert
-                    const size_t pos = rand2() % (a.Size() + 1);
-                    a.Insert(pos, l);
+                    size_t pos = rand2() % (a.size() + 1);
+                    a.insert(pos, l);
                 }
                 else {
                     // Add
                     a.add(l);
                 }
             }
-            else if (a.Size() > 0) {
+            else if (a.size() > 0) {
                 // Delete
-                const size_t i = rand2() % a.Size();
-                a.Delete(i);
+                size_t i = rand2() % a.size();
+                a.erase(i);
             }
         }
     }
 
     // Cleanup
-    a.Destroy();
-    res.Destroy();
+    a.destroy();
+    res.destroy();
 }
 
 #endif

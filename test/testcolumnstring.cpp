@@ -373,7 +373,7 @@ TEST(ColumnStringAutoEnumerate)
     // Create StringEnum
     ref_type keys;
     ref_type values;
-    bool res = c.AutoEnumerate(keys, values);
+    bool res = c.auto_enumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
 
@@ -414,7 +414,7 @@ TEST(ColumnStringAutoEnumerateIndex)
     // Create StringEnum
     ref_type keys;
     ref_type values;
-    bool res = c.AutoEnumerate(keys, values);
+    bool res = c.auto_enumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
 
@@ -500,7 +500,7 @@ TEST(ColumnStringAutoEnumerateIndexReuse)
     // Create StringEnum
     ref_type keys;
     ref_type values;
-    bool res = c.AutoEnumerate(keys, values);
+    bool res = c.auto_enumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
 
@@ -742,7 +742,7 @@ TEST(AdaptiveStringColumnCount)
     // Create StringEnum
     size_t keys;
     size_t values;
-    const bool res = asc.AutoEnumerate(keys, values);
+    const bool res = asc.auto_enumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
 
