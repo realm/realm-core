@@ -14,9 +14,11 @@
 using namespace std;
 using namespace tightdb;
 
+namespace {
 TIGHTDB_TABLE_2(TupleTableType,
                 first,  Int,
                 second, String)
+}
 
 #ifndef TIGHTDB_BYPASS_OPTIMIZE_CRASH_BUG
 TEST(TestOptimizeCrash)
@@ -1194,7 +1196,7 @@ TEST(Table_Spec_RenameColumns)
 
     // Rename sub-column
     column_path.push_back(0); // third
-    table->rename_column(column_path, "sub_1st");
+    table->rename_subcolumn(column_path, "sub_1st");
 
     // Get the sub-table
     {
@@ -1269,7 +1271,7 @@ TEST(Table_Spec_DeleteColumns)
     column_path.push_back(1); // sub_second
 
     // Remove a column in sub-table
-    table->remove_column(column_path);
+    table->remove_subcolumn(column_path);
 
     // Get the sub-table again and see if the values
     // still match.
@@ -1973,6 +1975,128 @@ TEST(Table_Test_Clear_With_Subtable_AND_Group)
 
     table->clear();
 }
+
+
+//set a subtable in an already exisitng row by providing an existing subtable as the example to copy
+TEST(Table_SetSubTableByExample)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    // Create specification with sub-table
+    table->add_column(type_Int,    "first");
+    table->add_column(type_String, "second");
+    table->add_column(type_Table,  "third");
+
+    // Create path to sub-table column
+    vector<size_t> column_path;
+    column_path.push_back(2); // third
+
+    table->add_subcolumn(column_path, type_Int,    "sub_first");
+    table->add_subcolumn(column_path, type_String, "sub_second");
+
+    // Add a row
+    table->insert_int(0, 0, 4);
+    table->insert_string(1, 0, "Hello");
+    table->insert_subtable(2, 0);
+    table->insert_done();
+
+    // create a freestanding table to be used as a source by set_subtable 
+
+    Table  sub = Table();
+    sub.add_column(type_Int,"sub_first");
+    sub.add_column(type_String,"sub_second");
+    sub.add_empty_row();
+    sub.set_int(0,0,42);
+    sub.set_string(1,0,"forty two");
+    sub.add_empty_row();
+    sub.set_int(0,1,3);
+    sub.set_string(1,1,"PI");
+
+    // Get the sub-table back for inspection
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+        CHECK(subtable->is_empty());
+
+        //add a subtable into the row, resembling the sub we just created
+        table->set_subtable(2,0,&sub);
+
+        TableRef subtable2 = table->get_subtable(2, 0);
+
+        CHECK_EQUAL(42,     subtable2->get_int(0, 0));
+        CHECK_EQUAL("forty two", subtable2->get_string(1, 0));
+        CHECK_EQUAL(3,     subtable2->get_int(0, 1));
+        CHECK_EQUAL("PI", subtable2->get_string(1,1));
+    }
+}
+
+//In the tableview class, set a subtable in an already exisitng row by providing an existing subtable as the example to copy
+TEST(TableView_SetSubTableByExample)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    // Create specification with sub-table
+    table->add_column(type_Int,    "first");
+    table->add_column(type_String, "second");
+    table->add_column(type_Table,  "third");
+
+    // Create path to sub-table column
+    vector<size_t> column_path;
+    column_path.push_back(2); // third
+
+    table->add_subcolumn(column_path, type_Int,    "sub_first");
+    table->add_subcolumn(column_path, type_String, "sub_second");
+
+    // Add two rows
+    table->insert_int(0, 0, 4);
+    table->insert_string(1, 0, "Hello");
+    table->insert_subtable(2, 0);// create a freestanding table to be used as a source by set_subtable
+    table->insert_done();
+
+    table->insert_int(0, 1, 8);
+    table->insert_string(1, 1, "Hi!, Hello?");
+    table->insert_subtable(2, 1);
+    table->insert_done();
+
+    Table  sub = Table();
+    sub.add_column(type_Int,"sub_first");
+    sub.add_column(type_String,"sub_second");
+    sub.add_empty_row();
+    sub.set_int(0,0,42);
+    sub.set_string(1,0,"forty two");
+    sub.add_empty_row();
+    sub.set_int(0,1,3);
+    sub.set_string(1,1,"PI");
+
+    //create a tableview with the table as source
+
+    TableView view = table->find_all_int(0,8);//select the second of the two rows
+
+    // Verify the sub table is empty
+    {
+        TableRef subtable = view.get_subtable(2, 0);
+        CHECK(subtable->is_empty());
+
+        //add a subtable into the second table row (first view row), resembling the sub we just created
+        view.set_subtable(2,0,&sub);
+
+        TableRef subtable2 = view.get_subtable(2, 0);//fetch back the subtable from the view
+
+        CHECK_EQUAL(42,     subtable2->get_int(0, 0));
+        CHECK_EQUAL("forty two", subtable2->get_string(1, 0));
+        CHECK_EQUAL(3,     subtable2->get_int(0, 1));
+        CHECK_EQUAL("PI", subtable2->get_string(1,1));
+
+        TableRef subtable3 = table->get_subtable(2, 1);//fetch back the subtable from the table.
+
+        CHECK_EQUAL(42,     subtable3->get_int(0, 0));
+        CHECK_EQUAL("forty two", subtable3->get_string(1, 0));
+        CHECK_EQUAL(3,     subtable3->get_int(0, 1));
+        CHECK_EQUAL("PI", subtable3->get_string(1,1));
+    }
+}
+
 
 
 TEST(Table_SubtableWithParentChange)

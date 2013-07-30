@@ -46,6 +46,16 @@ inline BasicArray<T>::BasicArray(ArrayParent* parent, std::size_t ndx_in_parent,
 }
 
 template<class T>
+inline BasicArray<T>::BasicArray(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
+                                 Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
+{
+    // Manually create array as doing it in initializer list
+    // will not be able to call correct virtual functions
+    init_from_mem(mem);
+    set_parent(parent, ndx_in_parent);
+}
+
+template<class T>
 inline BasicArray<T>::BasicArray(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
                                  Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
 {
@@ -296,6 +306,38 @@ template<class T>
 bool BasicArray<T>::minimum(T& result, std::size_t start, std::size_t end) const
 {
     return minmax<false>(result, start, end);
+}
+
+
+template<class T>
+ref_type BasicArray<T>::btree_leaf_insert(size_t ndx, T value, TreeInsertBase& state)
+{
+    size_t leaf_size = size();
+    TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_LIST_SIZE);
+    if (leaf_size < ndx) ndx = leaf_size;
+    if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_LIST_SIZE)) {
+        insert(ndx, value);
+        return 0; // Leaf was not split
+    }
+
+    // Split leaf node
+    BasicArray<T> new_leaf(0, 0, get_alloc());
+    if (ndx == leaf_size) {
+        new_leaf.add(value);
+        state.m_split_offset = ndx;
+    }
+    else {
+        // FIXME: Could be optimized by first resizing the target
+        // array, then copy elements with std::copy().
+        for (size_t i = ndx; i != leaf_size; ++i) {
+            new_leaf.add(get(i));
+        }
+        resize(ndx);
+        add(value);
+        state.m_split_offset = ndx + 1;
+    }
+    state.m_split_size = leaf_size + 1;
+    return new_leaf.get_ref();
 }
 
 

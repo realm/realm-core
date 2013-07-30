@@ -50,7 +50,7 @@ void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx
 }
 
 void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx,
-                         ArrayParent* parent, size_t ndx_in_parent, size_t ref)
+                         ArrayParent* parent, size_t ndx_in_parent, ref_type ref)
 {
     m_array = new Array(ref, parent, ndx_in_parent, alloc);
     TIGHTDB_ASSERT(m_array->size() == 2 || m_array->size() == 3);
@@ -85,7 +85,7 @@ void ColumnMixed::InitDataColumn()
     m_data->set_parent(m_array, 2);
 }
 
-void ColumnMixed::clear_value(size_t ndx, MixedColType newtype)
+void ColumnMixed::clear_value(size_t ndx, MixedColType new_type)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
 
@@ -103,20 +103,20 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType newtype)
             case mixcol_Binary: {
                 // If item is in middle of the column, we just clear
                 // it to avoid having to adjust refs to following items
-                // TODO: this is a leak. We should adjust
-                const size_t ref = m_refs->get_as_ref(ndx) >> 1;
-                if (ref == m_data->size()-1)
-                    m_data->erase(ref);
+                // FIXME: this is a leak. We should adjust
+                size_t data_ndx = size_t(uint64_t(m_refs->get(ndx)) >> 1);
+                if (data_ndx == m_data->size()-1)
+                    m_data->erase(data_ndx);
                 else
                     // FIXME: But this will lead to unbounded in-file
                     // leaking in for(;;) { insert_binary(i, ...);
                     // erase(i); }
-                    m_data->set(ref, BinaryData());
+                    m_data->set(data_ndx, BinaryData());
                 break;
             }
             case mixcol_Table: {
                 // Delete entire table
-                const size_t ref = m_refs->get_as_ref(ndx);
+                ref_type ref = m_refs->get_as_ref(ndx);
                 Array top(ref, 0, 0, m_array->get_alloc());
                 top.destroy();
                 break;
@@ -125,8 +125,8 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType newtype)
                 TIGHTDB_ASSERT(false);
         }
     }
-    if (type != newtype)
-        m_types->set(ndx, newtype);
+    if (type != new_type)
+        m_types->set(ndx, new_type);
     m_refs->set(ndx, 0);
 }
 
@@ -202,12 +202,12 @@ void ColumnMixed::set_string(size_t ndx, StringData value)
 
     // See if we can reuse data position
     if (type == mixcol_String) {
-        ref_type ref = m_refs->get_as_ref(ndx) >> 1;
-        m_data->set_string(ref, value);
+        size_t data_ndx = size_t(uint64_t(m_refs->get(ndx)) >> 1);
+        m_data->set_string(data_ndx, value);
     }
     else if (type == mixcol_Binary) {
-        ref_type ref = m_refs->get_as_ref(ndx) >> 1;
-        m_data->set_string(ref, value);
+        size_t data_ndx = size_t(uint64_t(m_refs->get(ndx)) >> 1);
+        m_data->set_string(data_ndx, value);
         m_types->set(ndx, mixcol_String);
     }
     else {
@@ -215,11 +215,11 @@ void ColumnMixed::set_string(size_t ndx, StringData value)
         clear_value(ndx, mixcol_String);
 
         // Add value to data column
-        size_t ref = m_data->size();
+        size_t data_ndx = m_data->size();
         m_data->add_string(value);
 
         // Shift value one bit and set lowest bit to indicate that this is not a ref
-        int64_t v = (ref << 1) + 1;
+        int64_t v = int64_t((uint64_t(data_ndx) << 1) + 1);
 
         m_types->set(ndx, mixcol_String);
         m_refs->set(ndx, v);
@@ -235,24 +235,24 @@ void ColumnMixed::set_binary(size_t ndx, BinaryData value)
 
     // See if we can reuse data position
     if (type == mixcol_String) {
-        ref_type ref = m_refs->get_as_ref(ndx) >> 1;
-        m_data->set(ref, value);
+        size_t data_ndx = size_t(uint64_t(m_refs->get(ndx)) >> 1);
+        m_data->set(data_ndx, value);
         m_types->set(ndx, mixcol_Binary);
     }
     else if (type == mixcol_Binary) {
-        ref_type ref = m_refs->get_as_ref(ndx) >> 1;
-        m_data->set(ref, value);
+        size_t data_ndx = size_t(uint64_t(m_refs->get(ndx)) >> 1);
+        m_data->set(data_ndx, value);
     }
     else {
         // Remove refs or binary data
         clear_value(ndx, mixcol_Binary);
 
         // Add value to data column
-        size_t ref = m_data->size();
+        size_t data_ndx = m_data->size();
         m_data->add(value);
 
         // Shift value one bit and set lowest bit to indicate that this is not a ref
-        int64_t v = (ref << 1) + 1;
+        int64_t v = int64_t((uint64_t(data_ndx) << 1) + 1);
 
         m_types->set(ndx, mixcol_Binary);
         m_refs->set(ndx, v);

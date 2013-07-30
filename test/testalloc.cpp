@@ -39,9 +39,9 @@ TEST(Alloc1)
     CHECK_EQUAL(static_cast<void*>(mr2.m_addr), alloc.translate(mr2.m_ref));
     CHECK_EQUAL(static_cast<void*>(mr3.m_addr), alloc.translate(mr3.m_ref));
 
-    alloc.free(mr3.m_ref, mr3.m_addr);
-    alloc.free(mr2.m_ref, mr2.m_addr);
-    alloc.free(mr1.m_ref, mr1.m_addr);
+    alloc.free_(mr3.m_ref, mr3.m_addr);
+    alloc.free_(mr2.m_ref, mr2.m_addr);
+    alloc.free_(mr1.m_ref, mr1.m_addr);
 
     // SlabAlloc destructor will verify that all is free'd
 }

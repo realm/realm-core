@@ -123,7 +123,7 @@ MemRef SlabAlloc::alloc(size_t size)
 // FIXME: We need to come up with a way to make free() a method that
 // never throws. This is essential for exception safety in large parts
 // of the TightDB API.
-void SlabAlloc::free(ref_type ref, const char* addr)
+void SlabAlloc::free_(ref_type ref, const char* addr)
 {
     // Free space in read only segment is tracked separately
     bool read_only = is_read_only(ref);
@@ -175,7 +175,7 @@ void SlabAlloc::free(ref_type ref, const char* addr)
     if (!is_merged) free_space.add(ref, size);
 }
 
-MemRef SlabAlloc::realloc(size_t ref, const char* addr, size_t size)
+MemRef SlabAlloc::realloc_(size_t ref, const char* addr, size_t size)
 {
     TIGHTDB_ASSERT(0 < size);
     TIGHTDB_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
@@ -193,7 +193,7 @@ MemRef SlabAlloc::realloc(size_t ref, const char* addr, size_t size)
     copy(addr, addr+old_size, new_mem.m_addr);
 
     // Add old segment to freelist
-    free(ref, addr); // FIXME: Unfortunately, this one can throw
+    free_(ref, addr); // FIXME: Unfortunately, this one can throw
     //}
 
 #ifdef TIGHTDB_DEBUG
@@ -214,7 +214,7 @@ char* SlabAlloc::translate(ref_type ref) const TIGHTDB_NOEXCEPT
         TIGHTDB_ASSERT(ndx != not_found);
 
         size_t offset = ndx ? to_size_t(m_slabs[ndx-1].ref_end) : m_baseline;
-        intptr_t addr = m_slabs[ndx].addr.get();
+        intptr_t addr = intptr_t(m_slabs[ndx].addr.get());
         return reinterpret_cast<char*>(addr) + (ref - offset);
     }
 }

@@ -227,7 +227,7 @@ void ColumnStringEnum::ForEachIndexOp::handle_chunk(const int64_t* begin, const 
 }
 
 
-StringIndex& ColumnStringEnum::CreateIndex()
+StringIndex& ColumnStringEnum::create_index()
 {
     TIGHTDB_ASSERT(m_index == NULL);
 
@@ -244,18 +244,18 @@ StringIndex& ColumnStringEnum::CreateIndex()
     return *m_index;
 }
 
-void ColumnStringEnum::SetIndexRef(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
+void ColumnStringEnum::set_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     TIGHTDB_ASSERT(!m_index);
     m_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string, m_array->get_alloc());
 }
 
-void ColumnStringEnum::ReuseIndex(StringIndex& index)
+void ColumnStringEnum::install_index(StringIndex* index) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_index == NULL);
 
-    index.SetTarget(this, &get_string);
-    m_index = &index; // we now own this index
+    index->set_target(this, &get_string);
+    m_index = index; // we now own this index
 }
 
 

@@ -15,9 +15,9 @@ namespace {
 // Support functions for monkey test
 uint64_t rand2(int bitwidth = 64)
 {
-    uint64_t i = (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand();
+    uint64_t i = int64_t(rand()) * int64_t(rand()) * int64_t(rand()) * int64_t(rand()) * int64_t(rand());
     if (bitwidth < 64) {
-        const uint64_t mask = ((1ULL << bitwidth) - 1ULL);
+        uint64_t mask = ((1ULL << bitwidth) - 1ULL);
         i &= mask;
     }
     return i;
@@ -56,33 +56,33 @@ TEST(ColumnString_monkeytest2)
 //          if (rand() % 10 == 0) printf("Input bitwidth around ~%d, , a.Size()=%d\n", (int)current_bitwidth, (int)a.Size());
 
         if (!(rand2() % (ITER / 100))) {
-            trend = (unsigned int)rand2() % 10;
+            trend = unsigned(rand2()) % 10;
 
             a.find_first(randstring().c_str());
             a.find_all(res, randstring().c_str());
         }
 
-        if (rand2() % 10 > trend && a.Size() < ITER / 100) {
+        if (rand2() % 10 > trend && a.size() < ITER / 100) {
             if (rand2() % 2 == 0) {
                 // Insert
-                const size_t pos = rand2() % (a.Size() + 1);
-                a.Insert(pos, randstring().c_str());
+                size_t pos = rand2() % (a.size() + 1);
+                a.insert(pos, randstring().c_str());
             }
             else {
                 // Add
                 a.add(randstring().c_str());
             }
         }
-        else if (a.Size() > 0) {
+        else if (a.size() > 0) {
             // Delete
-            const size_t i = rand2() % a.Size();
-            a.Delete(i);
+            size_t i = rand2() % a.size();
+            a.erase(i);
         }
     }
 
     // Cleanup
-    a.Destroy();
-    res.Destroy();
+    a.destroy();
+    res.destroy();
 }
 
 #endif

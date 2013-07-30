@@ -55,7 +55,8 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
 
 // Aggregates ----------------------------------------------------
 
-// count_target argument is only used for act_Count. Ignored for other actions
+// count_target is ignored by all <int function> except Count. Hack because of bug in optional
+// arguments in clang and vs2010 (fixed in 2012)
 template <int function, typename T, typename R, class ColType>
 R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx, T count_target) const
 {
@@ -87,7 +88,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
 
     R res = static_cast<R>(0);
 
-    T first = column->template TreeGet<T, ColType>(to_size_t(m_refs.get(0)));
+    T first = column->get(to_size_t(m_refs.get(0)));
 
     if(function == act_Count)
         res = static_cast<R>((first == count_target ? 1 : 0));
@@ -122,68 +123,68 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
 
 int64_t TableViewBase::sum(size_t column_ndx) const
 {
-    return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx);
+    return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, 0);
 }
 double TableViewBase::sum_float(size_t column_ndx) const
 {
-    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx);
+    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx, 0.0);
 }
 double TableViewBase::sum_double(size_t column_ndx) const
 {
-    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx);
+    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx, 0.0);
 }
 
 // Maximum
 
 int64_t TableViewBase::maximum(size_t column_ndx) const
 {
-    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx);
+    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0);
 }
 float TableViewBase::maximum_float(size_t column_ndx) const
 {
-    return aggregate<act_Max, float>(&ColumnFloat::maximum, column_ndx);
+    return aggregate<act_Max, float>(&ColumnFloat::maximum, column_ndx, 0.0);
 }
 double TableViewBase::maximum_double(size_t column_ndx) const
 {
-    return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx);
+    return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx, 0.0);
 }
 Date TableViewBase::maximum_date(size_t column_ndx) const
 {
-    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx);
+    return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0);
 }
 
 // Minimum
 
 int64_t TableViewBase::minimum(size_t column_ndx) const
 {
-    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx);
+    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0);
 }
 float TableViewBase::minimum_float(size_t column_ndx) const
 {
-    return aggregate<act_Min, float>(&ColumnFloat::minimum, column_ndx);
+    return aggregate<act_Min, float>(&ColumnFloat::minimum, column_ndx, 0.0);
 }
 double TableViewBase::minimum_double(size_t column_ndx) const
 {
-    return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx);
+    return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx, 0.0);
 }
 Date TableViewBase::minimum_date(size_t column_ndx) const
 {
-    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx);
+    return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0);
 }
 
 // Average
 
 double TableViewBase::average(size_t column_ndx) const
 {
-    return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx) / static_cast<double>(size());
+    return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, 0) / static_cast<double>(size());
 }
 double TableViewBase::average_float(size_t column_ndx) const
 {
-    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx) / static_cast<double>(size());
+    return aggregate<act_Sum, float>(&ColumnFloat::sum, column_ndx, 0.0) / static_cast<double>(size());
 }
 double TableViewBase::average_double(size_t column_ndx) const
 {
-    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx) / static_cast<double>(size());
+    return aggregate<act_Sum, double>(&ColumnDouble::sum, column_ndx, 0.0) / static_cast<double>(size());
 }
 
 // Count

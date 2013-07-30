@@ -58,12 +58,11 @@ public:
     void UpdateFromParent();
 
     // Index
-    bool HasIndex() const { return m_index != 0; }
-    const StringIndex& GetIndex() const { return *m_index; }
-    StringIndex& CreateIndex();
-    void SetIndexRef(ref_type, ArrayParent*, std::size_t ndx_in_parent);
-    void ReuseIndex(StringIndex&);
-    void RemoveIndex() { m_index = 0; }
+    bool has_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_index != 0; }
+    void set_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_OVERRIDE;
+    const StringIndex& get_index() const { return *m_index; }
+    StringIndex& create_index();
+    void install_index(StringIndex*) TIGHTDB_NOEXCEPT;
 
     // Compare two string columns for equality
     bool compare(const AdaptiveStringColumn&) const;
@@ -118,7 +117,7 @@ inline void ColumnStringEnum::foreach(Array::ForEachOp<StringData>* op) const TI
 inline StringData ColumnStringEnum::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < Column::size());
-    std::size_t key_ndx = Column::get_as_ref(ndx);
+    std::size_t key_ndx = to_size_t(Column::get(ndx));
     return m_keys.get(key_ndx);
 }
 

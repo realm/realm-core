@@ -32,6 +32,8 @@ class StringIndex;
 
 class AdaptiveStringColumn: public ColumnBase {
 public:
+    typedef StringData value_type;
+
     explicit AdaptiveStringColumn(Allocator& = Allocator::get_default());
     explicit AdaptiveStringColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                                   Allocator& = Allocator::get_default());
@@ -67,19 +69,18 @@ public:
     FindRes find_all_indexref(StringData value, size_t& dst) const;
 
     // Index
-    bool HasIndex() const { return m_index != 0; }
-    const StringIndex& GetIndex() const { return *m_index; }
-    StringIndex& PullIndex() {StringIndex& ndx = *m_index; m_index = 0; return ndx;}
-    StringIndex& CreateIndex();
-    void SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx);
-    void RemoveIndex() { m_index = 0; }
+    bool has_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_index != 0; }
+    void set_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_OVERRIDE;
+    const StringIndex& get_index() const { return *m_index; }
+    StringIndex* release_index() TIGHTDB_NOEXCEPT { StringIndex* i = m_index; m_index = 0; return i;}
+    StringIndex& create_index();
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
     void set_parent(ArrayParent* parent, std::size_t pndx) { m_array->set_parent(parent, pndx); }
 
     // Optimizing data layout
-    bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;
+    bool auto_enumerate(ref_type& keys, ref_type& values) const;
 
     /// Compare two string columns for equality.
     bool compare(const AdaptiveStringColumn&) const;
@@ -124,9 +125,7 @@ protected:
     friend class ColumnBase;
     void update_ref(ref_type ref);
 
-    StringData LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
     void LeafSet(size_t ndx, StringData value);
-    void LeafInsert(size_t ndx, StringData value);
     template<class F> size_t LeafFind(StringData value, size_t begin, size_t end) const;
     void LeafFindAll(Array& result, StringData value, size_t add_offset = 0,
                      size_t begin = 0, size_t end = -1) const;
@@ -134,13 +133,24 @@ protected:
     void LeafDelete(size_t ndx);
 
 #ifdef TIGHTDB_DEBUG
-    virtual void leaf_to_dot(std::ostream& out, const Array& array) const;
+    virtual void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
 #endif
 
 private:
+    friend class Array;
+
     static const size_t short_string_max_size = 15;
 
     StringIndex* m_index;
+
+    void do_insert(std::size_t ndx, StringData value);
+
+    // Called by Array::btree_insert().
+    static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
+                                Allocator&, std::size_t insert_ndx,
+                                Array::TreeInsert<AdaptiveStringColumn>& state);
+
+    static void copy_leaf(const ArrayString&, ArrayStringLong&);
 
     static void foreach(const Array* parent, Array::ForEachOp<StringData>*) TIGHTDB_NOEXCEPT;
 };
@@ -189,6 +199,19 @@ inline std::size_t AdaptiveStringColumn::lower_bound(StringData value) const TIG
     }
     return i;
 }
+
+inline void AdaptiveStringColumn::add(StringData value)
+{
+    do_insert(npos, value);
+}
+
+inline void AdaptiveStringColumn::insert(size_t ndx, StringData value)
+{
+    TIGHTDB_ASSERT(ndx <= size());
+    if (size() <= ndx) ndx = npos;
+    do_insert(ndx, value);
+}
+
 
 inline void AdaptiveStringColumn::foreach(Array::ForEachOp<StringData>* op) const TIGHTDB_NOEXCEPT
 {

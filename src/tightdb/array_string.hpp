@@ -61,13 +61,15 @@ public:
     /// slower.
     static StringData get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
 
+    ref_type btree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase& state);
+
     void foreach(ForEachOp<StringData>*) const TIGHTDB_NOEXCEPT;
     static void foreach(const Array*, ForEachOp<StringData>*) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
     void StringStats() const;
-    //void ToDot(FILE* f) const;
-    void to_dot(std::ostream& out, StringData title = StringData()) const;
+    //void to_dot(FILE*) const;
+    void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
 private:
