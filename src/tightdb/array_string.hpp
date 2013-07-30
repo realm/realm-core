@@ -61,11 +61,13 @@ public:
     /// slower.
     static StringData get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
 
+    ref_type btree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase& state);
+
 #ifdef TIGHTDB_DEBUG
     void StringStats() const;
-    //void ToDot(FILE* f) const;
-    void to_dot(std::ostream& out, StringData title = StringData()) const;
-#endif // TIGHTDB_DEBUG
+    //void to_dot(FILE* f) const;
+    void to_dot(std::ostream&, StringData title = StringData()) const;
+#endif
 
 private:
     std::size_t CalcByteLen(std::size_t count, std::size_t width) const TIGHTDB_OVERRIDE;

@@ -373,7 +373,7 @@ TEST(ColumnStringAutoEnumerate)
     // Create StringEnum
     ref_type keys;
     ref_type values;
-    bool res = c.AutoEnumerate(keys, values);
+    bool res = c.auto_enumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
 
@@ -414,13 +414,13 @@ TEST(ColumnStringAutoEnumerateIndex)
     // Create StringEnum
     ref_type keys;
     ref_type values;
-    bool res = c.AutoEnumerate(keys, values);
+    bool res = c.auto_enumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
 
     // Set index
-    e.CreateIndex();
-    CHECK(e.HasIndex());
+    e.create_index();
+    CHECK(e.has_index());
 
     // Search for a value that does not exist
     size_t res1 = e.find_first("nonexist");
@@ -494,20 +494,20 @@ TEST(ColumnStringAutoEnumerateIndexReuse)
     }
 
     // Set index
-    c.CreateIndex();
-    CHECK(c.HasIndex());
+    c.create_index();
+    CHECK(c.has_index());
 
     // Create StringEnum
     ref_type keys;
     ref_type values;
-    bool res = c.AutoEnumerate(keys, values);
+    bool res = c.auto_enumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
 
     // Reuse the index from original column
-    StringIndex& ndx = c.PullIndex();
-    e.ReuseIndex(ndx);
-    CHECK(e.HasIndex());
+    StringIndex* index = c.release_index();
+    e.install_index(index);
+    CHECK(e.has_index());
 
     // Search for a value that does not exist
     size_t res1 = e.find_first("nonexist");
@@ -742,7 +742,7 @@ TEST(AdaptiveStringColumnCount)
     // Create StringEnum
     size_t keys;
     size_t values;
-    const bool res = asc.AutoEnumerate(keys, values);
+    const bool res = asc.auto_enumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
 
@@ -778,8 +778,8 @@ TEST(AdaptiveStringColumnIndex)
     asc.add("15");
     asc.add("HEJSA"); // 16
 
-    asc.CreateIndex();
-    CHECK(asc.HasIndex());
+    asc.create_index();
+    CHECK(asc.has_index());
 
     const size_t count0 = asc.count("HEJ");
     const size_t count1 = asc.count("HEJSA");

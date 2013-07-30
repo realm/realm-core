@@ -32,7 +32,7 @@ double Timer::calc_elapsed_seconds(uint_fast64_t ticks)
 #elif defined __APPLE__
 
 
-uint_fast64_t Timer::get_timer_ticks()
+uint_fast64_t Timer::get_timer_ticks() const
 {
     return mach_absolute_time();
 }
@@ -64,26 +64,49 @@ double Timer::calc_elapsed_seconds(uint_fast64_t ticks)
 
 namespace {
 
-struct InitialTime {
-    timespec m_ts;
-    InitialTime()
+#ifdef CLOCK_MONOTONIC_RAW
+const clockid_t real_time_clock_id = CLOCK_MONOTONIC_RAW; // (since Linux 2.6.28; Linux-specific)
+#else
+const clockid_t real_time_clock_id = CLOCK_MONOTONIC;
+#endif
+
+const clockid_t user_time_clock_id = CLOCK_PROCESS_CPUTIME_ID;
+
+
+struct InitialTimes {
+    timespec m_real, m_user;
+    InitialTimes()
     {
-        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &m_ts);
+        clock_gettime(real_time_clock_id, &m_real);
+        clock_gettime(user_time_clock_id, &m_user);
     }
 };
 
 } // anonymous namespace
 
-uint_fast64_t Timer::get_timer_ticks()
+uint_fast64_t Timer::get_timer_ticks() const
 {
-    static const InitialTime init;
-    timespec ts;
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
-    if (ts.tv_nsec < init.m_ts.tv_nsec) {
-        ts.tv_sec  -= 1;
-        ts.tv_nsec += 1000000000;
+    static const InitialTimes init_times;
+    clockid_t clock_id = clockid_t();
+    const timespec* init_time = 0;
+    switch (m_type) {
+        case type_RealTime:
+            clock_id = real_time_clock_id;
+            init_time = &init_times.m_real;
+            break;
+        case type_UserTime:
+            clock_id = user_time_clock_id;
+            init_time = &init_times.m_user;
+            break;
     }
-    return uint_fast64_t(ts.tv_sec - init.m_ts.tv_sec) * 1000000000 + (ts.tv_nsec - init.m_ts.tv_nsec);
+    timespec time;
+    clock_gettime(clock_id, &time);
+    if (time.tv_nsec < init_time->tv_nsec) {
+        time.tv_sec  -= 1;
+        time.tv_nsec += 1000000000;
+    }
+    return uint_fast64_t(time.tv_sec - init_time->tv_sec) *
+        1000000000 + (time.tv_nsec - init_time->tv_nsec);
 }
 
 double Timer::calc_elapsed_seconds(uint_fast64_t ticks)

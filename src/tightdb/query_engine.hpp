@@ -395,14 +395,14 @@ public:
         size_t r = start - 1;
         for (;;) {
             if (local_matches == local_limit) {
-                m_dD = double(r - start) / (local_matches + 1);
+                m_dD = double(r - start) / (local_matches + 1.1);
                 return r + 1;
             }
 
             // Find first match in this condition node
             r = find_first_local(r + 1, end);
             if (r == end) {
-                m_dD = double(r - start) / (local_matches + 1);
+                m_dD = double(r - start) / (local_matches + 1.1);
                 return end;
             }
 
@@ -1070,14 +1070,14 @@ public:
             m_dT = 1.0;
             m_key_ndx = ((const ColumnStringEnum*)m_condition_column)->GetKeyNdx(m_value);
         }
-        else if (m_condition_column->HasIndex()) {
+        else if (m_condition_column->has_index()) {
             m_dT = 0.0;
         }
         else {
             m_dT = 10.0;
         }
 
-        if (m_condition_column->HasIndex()) {
+        if (m_condition_column->has_index()) {
             m_index.clear();
 
             FindRes fr;
@@ -1132,7 +1132,7 @@ public:
         TIGHTDB_ASSERT(m_table);
 
         for (size_t s = start; s < end; ++s) {
-            if (m_condition_column->HasIndex()) {
+            if (m_condition_column->has_index()) {
 
                 // Indexed string column
                 size_t f = not_found;

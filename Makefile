@@ -16,6 +16,11 @@ benchmark-prealloc: minimal
 performance: minimal
 	@$(MAKE) -C test performance
 
+# Build the add/insert benchmarking program
+.PHONY: benchmark-insert-add
+benchmark-insert-add: minimal
+	@$(MAKE) -C test benchmark-insert-add
+
 # Run coverage analysis after building everything, this time using LCOV
 .PHONY: lcov
 lcov: test-cover

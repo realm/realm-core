@@ -90,8 +90,8 @@ public:
     void reserve(std::size_t);
 
     MemRef alloc(std::size_t size) TIGHTDB_OVERRIDE;
-    MemRef realloc(ref_type, const char*, std::size_t size) TIGHTDB_OVERRIDE;
-    void   free(ref_type, const char*) TIGHTDB_OVERRIDE; // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
+    MemRef realloc_(ref_type, const char*, std::size_t size) TIGHTDB_OVERRIDE;
+    void   free_(ref_type, const char*) TIGHTDB_OVERRIDE; // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
     char*  translate(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     bool   is_read_only(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;

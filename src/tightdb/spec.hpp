@@ -47,7 +47,8 @@ public:
     // FIXME: It seems that the application must make sure that the
     // parent Spec object is kept alive for at least as long as the
     // spec that is returned. This also has implications for language
-    // bindings such as Java.
+    // bindings such as Java. The reason is that the parent pointers
+    // must stay valid.
     Spec get_subtable_spec(std::size_t column_ndx);
     // FIXME: Returning a const Spec is futile since Spec has a public
     // copy constructor.
@@ -77,11 +78,16 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-    void to_dot(std::ostream& out, StringData title = StringData()) const;
-#endif // TIGHTDB_DEBUG
+    void to_dot(std::ostream&, StringData title = StringData()) const;
+#endif
 
 private:
-    friend class Table;
+    // Member variables
+    const Table* const m_table;
+    Array m_specSet;
+    Array m_spec;
+    ArrayString m_names;
+    Array m_subSpecs;
 
     Spec(const Table*, Allocator&); // Uninitialized
     Spec(const Table*, Allocator&, ArrayParent*, std::size_t ndx_in_parent);
@@ -118,6 +124,16 @@ private:
     void do_rename_column(const std::vector<std::size_t>& column_ids, std::size_t pos,
                           StringData name);
 
+    struct ColumnInfo {
+        std::size_t m_column_ref_ndx; ///< Index within Table::m_columns
+        bool m_has_index;
+        ColumnInfo(): m_column_ref_ndx(0), m_has_index(false) {}
+    };
+
+    void get_column_info(std::size_t column_ndx, ColumnInfo&) const;
+    void get_subcolumn_info(const std::vector<std::size_t>& column_path,
+                            std::size_t column_path_ndx, ColumnInfo&) const;
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     // Precondition: 1 <= end - begin
     std::size_t* record_subspec_path(const Array* root_subspecs, std::size_t* begin,
@@ -125,12 +141,7 @@ private:
     friend class Replication;
 #endif
 
-    // Member variables
-    const Table* const m_table;
-    Array m_specSet;
-    Array m_spec;
-    ArrayString m_names;
-    Array m_subSpecs;
+    friend class Table;
 };
 
 
