@@ -7,7 +7,7 @@
 #include <stdlib.h> // itoa()
 
 #include <tightdb/column.hpp>
-#include <tightdb/query_expression.h>
+//#include <tightdb/query_expression.h>
 
 using namespace tightdb;
 

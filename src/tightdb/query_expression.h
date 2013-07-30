@@ -1,16 +1,7 @@
 #ifndef TIGHTDB_QUERY_EXPRESSION_HPP
 #define TIGHTDB_QUERY_EXPRESSION_HPP
 
-//#include "column_fwd.hpp"
-//#include "column_basic.hpp"
-#include "column.hpp"
-
-//#include <tightdb/column_basic.hpp>
-
-//class ArrayDouble;
-
-namespace tightdb {
-
+// namespace tightdb {
 
 template<class T>struct Plus { 
     T operator()(T v1, T v2) const {return v1 + v2;} 
@@ -25,28 +16,29 @@ template <class T> struct Power {
 };
 
 
-struct ValueBase 
+class ValueBase 
 {
+public:
     static const size_t elements = 8;
-    virtual void put_ints(ValueBase* c) = 0;
-    virtual void put_floats(ValueBase* c) = 0;
+    virtual void output_ints(ValueBase* destination) = 0;
+    virtual void output_floats(ValueBase* destination) = 0;
     virtual void get(ValueBase* destination) = 0;
 };
 
-struct Subexpr
+class Subexpr
 {
-    TIGHTDB_FORCEINLINE virtual void evaluate(size_t i, ValueBase* destination) = 0;
-    
+public:
+    TIGHTDB_FORCEINLINE virtual void evaluate(size_t i, ValueBase* destination) = 0; 
     virtual void set_table(const Table* table) { }
-
     const Table* m_table;
 };
 
 // Performance note: If members are declared as an 8-entry array, VS2010 emits slower code compared to declaring them
 // as separately named members - both if you address them individually/unrolled and if you use loops. gcc is equally slow
 // in either case
-template<class T> struct Value : public ValueBase, public Subexpr
+template<class T> class Value : public ValueBase, public Subexpr
 {
+public:
     Value() { 
     }
 
@@ -64,68 +56,72 @@ template<class T> struct Value : public ValueBase, public Subexpr
             m_v[t] = o(q1.m_v[t], q2.m_v[t]);
     }
 
-    template<class U> TIGHTDB_FORCEINLINE void put(ValueBase* c)
+    template<class U> TIGHTDB_FORCEINLINE void output(ValueBase* destination)
     {
-        Value<U>* c2 = static_cast<Value<U>*>(c);
+        Value<U>* c2 = static_cast<Value<U>*>(destination);
         for(size_t t = 0; t < ValueBase::elements; t++)
-            c2->m_v[t] = m_v[t];
+            c2->m_v[t] = static_cast<U>(m_v[t]);
     }
 
-    TIGHTDB_FORCEINLINE void put_ints(ValueBase* c)
+    TIGHTDB_FORCEINLINE void output_ints(ValueBase* destination)
     {
-        put<int64_t>(c);
+        output<int64_t>(destination);
     }
 
-    TIGHTDB_FORCEINLINE void put_floats(ValueBase* c)
+    TIGHTDB_FORCEINLINE void output_floats(ValueBase* destination)
     {
-        put<float>(c);
+        output<float>(destination);
     }
 
-    TIGHTDB_FORCEINLINE void get(ValueBase* destination)
+    TIGHTDB_FORCEINLINE void get(ValueBase* source)
     {
         if(SameType<T, int64_t>::value)
-            destination->put_ints(this);
+            source->output_ints(this);
         else
-            destination->put_floats(this);
+            source->output_floats(this);
     }
-
     
     T m_v[elements];
-    
 };
 
 
-template <class T> struct Columns : public Subexpr
+template <class T> class Columns : public Subexpr
 {
-    virtual void set_table(const Table* table) {
-        m_table = table; 
-        ci = (Column*)&m_table->GetColumnBase(m_column);
-//        cf = (ColumnFloat*)ci;
-        //        sg.init(c);
-    }
-
+public:
     Columns(size_t column) {
         m_column = column;
+    }
 
+    virtual void set_table(const Table* table) {
+        m_table = table;
+        typedef typename ColumnTypeTraits<T>::column_type ColType;
+        ColType* c;
+        c = (ColType*)&table->GetColumnBase(m_column);
+        sg.init(c);
     }
 
     TIGHTDB_FORCEINLINE void evaluate(size_t i, ValueBase* destination) {
-        destination->get(&c);
-//        cf->get(i);
-//        sg.cache_next(i);
-//        sg.m_array_ptr->put_chunk(i - sg.m_leaf_start, result.first());
+        sg.cache_next(i);
+        if(SameType<T, int64_t>::value) {
+            sg.m_array_ptr->get_chunk(i - sg.m_leaf_start, ((Value<int64_t>*)destination)->m_v);
+        }
+        else {
+            Value<T> v;            
+            for(size_t t = 0; t < ValueBase::elements && i + t < sg.m_leaf_end; t++)
+                v.m_v[t] = sg.get_next(i + t);
+            destination->get(&v);
+        }
     }
-//    SequentialGetter<int64_t> sg;
-    Value<T> c;
-    size_t m_column;
 
-//    ColumnFloat* cf;
-    Column* ci;
+private:
+    SequentialGetter<T> sg;
+    size_t m_column;
 };
 
 
-template <class T, class oper> struct Operator : public Subexpr
+template <class T, class oper> class Operator : public Subexpr
 {
+public:
     Operator(Subexpr* left, Subexpr* right) {
         m_left = left;
         m_right = right;
@@ -149,20 +145,23 @@ template <class T, class oper> struct Operator : public Subexpr
         destination->get(&result);
     }
 
+private:
     Subexpr* m_left;
     Subexpr* m_right;
 };
 
 
-struct Expression
+class Expression
 {
+public:
     virtual size_t compare(size_t start, size_t end) = 0;
     virtual void set_table(const Table* table) = 0;
 };
 
 
-template <class TCond, class T> struct Compare : public Expression
+template <class TCond, class T> class Compare : public Expression
 {
+public:
     Compare(Subexpr* e1, Subexpr* e2) 
     {
         m_e1 = e1;
@@ -198,11 +197,10 @@ template <class TCond, class T> struct Compare : public Expression
         return end; // no match
     }
     
-    
+private: 
     Subexpr* m_e1;
     Subexpr* m_e2;
 };
 
-}
-
+//}
 #endif // TIGHTDB_QUERY_EXPRESSION_HPP

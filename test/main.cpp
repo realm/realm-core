@@ -6,9 +6,9 @@
 #include <tightdb.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/utilities.hpp>
+#include <tightdb/query_engine.hpp>
 
-
-#include <tightdb/query_expression.h>
+//#include <tightdb/query_expression.h>
 
 #define USE_VLD
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
@@ -78,46 +78,31 @@ int main(int argc, char* argv[])
 
     Table table;
     table.add_column(type_Int, "first1");
-    table.add_column(type_Int, "second1");
+    table.add_column(type_Float, "second1");
 
 
     for (int i = 0; i < 10100; i++) {
         table.add_empty_row();
         table.set_int(0, i,  rand() % 10 );
-        table.set_int(1, i, 0);
+        table.set_float(1, i, float(rand() % 10));
     }
 
-
-
-// ll
-
-
-
-        Column a;
-
-        for(size_t t = 0; t < 10100; t++)
-            a.add(rand() % 10);
-
-        a.set(9998, 30);
-/*
-plus (int float) -> float float
-
-compare(int float) -> float float
-
-
-
-*/
-
-
-       
+    table.set_int(0, 10000, 20);
+    table.set_float(1, 10000, 20.0);
 
         // 633
 #if 1
         // Slow dynamic, 250 ms
+        //== col 
+
+//        fcol(1) + (icol(0) + 20) > 50.0
+
         Subexpr* col = new Columns<int64_t>(0);
-        Subexpr* colf = new Columns<float>(1.234);
+        Subexpr* colf = new Columns<float>(1);
+
         Subexpr* cc1 = new Value<int64_t>(20);
-        Subexpr* cc2 = new Value<int64_t>(50);  
+        Subexpr* cc2 = new Value<float>(50.0);  
+
         Subexpr* ck0 = new Operator<int64_t, Plus<int64_t> >(col, cc1);  
         Subexpr* ck = new Operator<float, Plus<float> >(colf, ck0);  
 
@@ -132,30 +117,13 @@ compare(int float) -> float float
         Subexpr* ck = new Operator<Plus, Columns, Constant>(col, cc1);  
 
 #endif
-        
 
-
-
-        Expression *e = new Compare<Equal, float>(ck, cc2);
-
-
-
-
-
+        Expression *e = new Compare<Greater, float>(ck, cc2);
 
 
     tightdb::TableView t1;
 
-
-
-
-
-
-
-
-
-
-
+    size_t match = 0;
 
 
         {
@@ -166,7 +134,7 @@ compare(int float) -> float float
                 UnitTest::Timer timer;
                 timer.Start();
                 for(int i = 0; i < 10000; i++) {
-                    t1 = table.where().expression(e).find_all();
+                    match = table.where().expression(e).find_next();
                 //    m = e->compare(0, 10000);
 
                 }
@@ -176,7 +144,7 @@ compare(int float) -> float float
                     best = t;
 
             }
-            cerr << best << "  " << m << "\n";
+            cerr << best << ", match = " <<  match << "\n";
         }
 
 
@@ -209,7 +177,9 @@ compare(int float) -> float float
         }
         */
 
-        
+         CustomTestReporter reporter;
+    TestRunner runner(reporter);
+    const int res = runner.RunTestsIf(Test::GetTestList(), 0, True(), 0);
 
 
         return 0;

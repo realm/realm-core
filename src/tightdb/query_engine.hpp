@@ -101,7 +101,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/array_basic.hpp>
-#include <tightdb/query_expression.h>
+//#include <tightdb/query_expression.h>
 
 namespace tightdb {
 
@@ -1386,6 +1386,10 @@ protected:
     SequentialGetter<TConditionValue> m_getter2;
 };
 
+
+#include "query_expression.h"
+
+
 // For expressions like col1 / col2 + 123 > col4 * 100
 class ExpressionNode: public ParentNode {
 
@@ -1417,5 +1421,9 @@ public:
 
 
 } // namespace tightdb
+
+
+
+
 
 #endif // TIGHTDB_QUERY_ENGINE_HPP

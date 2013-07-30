@@ -70,7 +70,9 @@ pthread_mutex_init (pthread_mutex_t * mutex, const pthread_mutexattr_t * attr)
 #error ERROR [__FILE__, line __LINE__]: Process shared mutexes are not supported yet.
 
 #else
+          // IF YOU PAGEFAULT HERE, IT'S LIKELY CAUSED BY DATABASE RESIDING ON NETWORK SHARE (WINDOWS + *NIX)
           mutex->is_shared = 1;
+          // ^^^^ Look above
 
           // Create unique and random mutex name. UuidCreate() needs linking with Rpcrt4.lib, so we use CoCreateGuid() 
           // instead. That way end-user won't need to mess with Visual Studio project settings
