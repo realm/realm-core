@@ -16,9 +16,10 @@
 
 #include <tightdb.hpp>
 #include <tightdb/file.hpp>
-#include <tightdb/group_shared.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/utilities.hpp>
+#include <tightdb/thread.hpp>
+#include <tightdb/bind.hpp>
 
 #include "testsettings.hpp"
 
@@ -80,9 +81,8 @@ TIGHTDB_FORCEINLINE void randsleep(void)
 
 void deletefile(const char* file)
 {
-    struct stat buf;
     File::try_remove(file);
-    CHECK(stat(file, &buf) != 0);
+    CHECK(!File::exists(file));
 }
 
 #ifdef STRESSTEST1
@@ -191,45 +191,58 @@ TEST(Transactions_Stress1)
 // *
 // *************************************************************************************
 
-const size_t THREADS2 =   30;
-const size_t ITER2 =    2000;
-const size_t GROUPS2 =    30;
+namespace {
 
-void* create_groups(void* arg)
+const int      THREADS2 = 30;
+const int      ITER2    = 2000;
+const unsigned GROUPS2  = 30;
+
+void create_groups(int thread_ndx)
 {
-    (void)arg;
+    try {
+        std::vector<SharedGroup*> groups;
 
-    std::vector<SharedGroup*> group;
+        for (int i = 0; i < ITER2; ++i) {
+            // Repeatedly create a group or destroy a group or do nothing
+            int action = rand() % 2;
 
-    for (size_t t = 0; t < ITER2; ++t) {
-        // Repeatedly create a group or destroy a group or do nothing
-        int action = rand() % 2;
-
-        if (action == 0 && group.size() < GROUPS2) {
-            group.push_back(new SharedGroup("database.tightdb"));
+            if (action == 0 && groups.size() < GROUPS2) {
+                groups.push_back(new SharedGroup("database.tightdb"));
+            }
+            else if (action == 1 && groups.size() > 0) {
+                size_t g = rand() % groups.size();
+                delete groups[g];
+                groups.erase(groups.begin() + g);
+            }
         }
-        else if (action == 1 && group.size() > 0) {
-            size_t g = rand() % group.size();
-            delete group[g];
-            group.erase(group.begin() + g);
-        }
+
+        // Delete any remaining group to avoid memory and lock file leaks
+        for (size_t i=0; i<groups.size(); ++i)
+            delete groups[i];
     }
-    return NULL;
+    catch (exception& e) {
+        cerr << "Thread " << thread_ndx << " failed: " << e.what() << "\n";
+    }
+    catch (...) {
+        cerr << "Thread " << thread_ndx << " failed (unknown excpetion)\n";
+    }
 }
+
+} // anonymous namespace
 
 TEST(Transactions_Stress2)
 {
     srand(123);
-    pthread_t threads[THREADS2];
+    Thread threads[THREADS2];
 
     deletefile("database.tightdb");
     deletefile("database.tightdb.lock");
 
-    for (size_t t = 0; t < THREADS2; t++)
-        pthread_create(&threads[t], NULL, create_groups, (void*)t);
+    for (int i = 0; i < THREADS2; ++i)
+        threads[i].start(bind(create_groups, i));
 
-    for (size_t t = 0; t < THREADS2; t++)
-        pthread_join(threads[t], NULL);
+    for (int i = 0; i < THREADS2; ++i)
+        threads[i].join();
 }
 #endif
 
