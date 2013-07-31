@@ -111,7 +111,6 @@ protected:
     bool root_is_leaf() const TIGHTDB_NOEXCEPT { return m_array->is_leaf(); }
     Array NodeGetOffsets() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
     Array NodeGetRefs() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
-    std::size_t GetRefSize(ref_type) const;
 
     static std::size_t get_size_from_ref(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
     static bool root_is_leaf_from_ref(ref_type, Allocator&) TIGHTDB_NOEXCEPT;

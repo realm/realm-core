@@ -239,7 +239,7 @@ TEST(Transactions_Stress2)
     deletefile("database.tightdb.lock");
 
     for (int i = 0; i < THREADS2; ++i)
-        threads[i].start(bind(create_groups, i));
+        threads[i].start(util::bind(create_groups, i));
 
     for (int i = 0; i < THREADS2; ++i)
         threads[i].join();

@@ -31,7 +31,7 @@ class Table;
 
 class Spec {
 public:
-    Spec(const Spec& s);
+    Spec(const Spec&);
     ~Spec();
 
     std::size_t add_column(DataType type, StringData name, ColumnType attr = col_attr_None);

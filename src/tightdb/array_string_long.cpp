@@ -101,10 +101,10 @@ void ArrayStringLong::resize(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    size_t len = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t size = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
 
     m_offsets.resize(ndx);
-    m_blob.resize(len);
+    m_blob.resize(size);
 }
 
 void ArrayStringLong::clear()

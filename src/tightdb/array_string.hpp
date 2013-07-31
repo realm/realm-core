@@ -121,7 +121,7 @@ inline ArrayString::ArrayString(Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
 
 inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(ndx < m_size);
     if (m_width == 0) return StringData("", 0);
     const char* data = m_data + (ndx * m_width);
 // FIXME: The following line is a temporary fix, and will soon be
@@ -134,7 +134,7 @@ inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 
 inline void ArrayString::add(StringData value)
 {
-    insert(m_len, value); // Throws
+    insert(m_size, value); // Throws
 }
 
 inline void ArrayString::add()
@@ -144,7 +144,7 @@ inline void ArrayString::add()
 
 inline StringData ArrayString::get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < get_len_from_header(header));
+    TIGHTDB_ASSERT(ndx < get_size_from_header(header));
     std::size_t width = get_width_from_header(header);
     if (width == 0) return StringData("", 0);
     const char* data = get_data_from_header(header) + (ndx * width);
