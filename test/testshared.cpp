@@ -8,6 +8,13 @@
 using namespace std;
 using namespace tightdb;
 
+
+TEST(Shared_Unattached)
+{
+    SharedGroup sg((SharedGroup::unattached_tag()));
+}
+
+
 namespace {
 
 TIGHTDB_TABLE_4(TestTableShared,
