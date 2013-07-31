@@ -1357,7 +1357,7 @@ ref_type Array::btree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& state
         std::size_t elem_ndx_offset = child_ndx == 0 ? 0 : to_size_t(offsets.get(child_ndx-1));
         child_elem_ndx = elem_ndx - elem_ndx_offset;
     }
-    ref_type child_ref = refs.get(child_ndx), new_sibling_ref;
+    ref_type child_ref = refs.get_as_ref(child_ndx), new_sibling_ref;
     char* child_header = static_cast<char*>(alloc.translate(child_ref));
     bool child_is_leaf = get_isleaf_from_header(child_header);
     if (child_is_leaf) {

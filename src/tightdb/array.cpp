@@ -1798,7 +1798,7 @@ bool Array::Compare(const Array& c) const
 ref_type Array::insert_btree_child(Array& offsets, Array& refs, size_t orig_child_ndx,
                                    ref_type new_sibling_ref, TreeInsertBase& state)
 {
-    size_t elem_ndx_offset = orig_child_ndx == 0 ? 0 : offsets.get(orig_child_ndx-1);
+    size_t elem_ndx_offset = orig_child_ndx == 0 ? 0 : size_t(offsets.get(orig_child_ndx-1));
 
     // When a node is split the new node must always be inserted after
     // the original
@@ -1832,7 +1832,7 @@ ref_type Array::insert_btree_child(Array& offsets, Array& refs, size_t orig_chil
         size_t offset = 0;
         for (size_t i = insert_ndx; i < node_size; ++i) {
             new_refs.add(refs.get(i));
-            offset = offsets.get(i) + 1;
+            offset = size_t(offsets.get(i)) + 1;
             new_offsets.add(offset - new_split_offset);
         }
         new_split_size = offset; // From last iteration
@@ -2655,7 +2655,7 @@ top:
                     res_ref = row_ref;
                     return FindRes_single; // found single
                 }
-                else return FindRes_not_found; // not_found
+                return FindRes_not_found; // not_found
             }
 
             const char* sub_header  = m_alloc.translate(to_ref(ref));
@@ -2694,7 +2694,7 @@ top:
                 }
 
                 // Return a reference to the result column
-                res_ref = ref;
+                res_ref = to_ref(ref);
                 return FindRes_column; // column of matches
             }
 
