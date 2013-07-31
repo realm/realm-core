@@ -15,7 +15,7 @@ libtightdb_a_SOURCES = terminate.cpp string_buffer.cpp file.cpp thread.cpp utf8.
 utilities.cpp alloc.cpp alloc_slab.cpp array.cpp array_string.cpp array_string_long.cpp \
 array_binary.cpp array_blob.cpp column.cpp column_string.cpp column_string_enum.cpp \
 column_binary.cpp column_table.cpp column_mixed.cpp spec.cpp table.cpp table_view.cpp group.cpp \
-group_writer.cpp group_shared.cpp index.cpp index_string.cpp query.cpp lang_bind_helper.cpp
+group_writer.cpp group_shared.cpp index_string.cpp query.cpp lang_bind_helper.cpp
 
 ifneq ($(TIGHTDB_ENABLE_REPLICATION),)
 libtightdb_a_SOURCES += replication.cpp
@@ -40,7 +40,7 @@ endif
 # The meaning of this version string is identical to the one defined
 # by GNU Libtool. See also
 # http://www.gnu.org/software/libtool/manual/libtool.html#Libtool-versioning
-libtightdb_a_VERSION = 2:0:0
+libtightdb_a_VERSION = 3:0:0
 
 tightdb_config_SOURCES = config.cpp
 

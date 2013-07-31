@@ -1070,14 +1070,14 @@ public:
             m_dT = 1.0;
             m_key_ndx = ((const ColumnStringEnum*)m_condition_column)->GetKeyNdx(m_value);
         }
-        else if (m_condition_column->HasIndex()) {
+        else if (m_condition_column->has_index()) {
             m_dT = 0.0;
         }
         else {
             m_dT = 10.0;
         }
 
-        if (m_condition_column->HasIndex()) {
+        if (m_condition_column->has_index()) {
             m_index.clear();
 
             FindRes fr;
@@ -1132,7 +1132,7 @@ public:
         TIGHTDB_ASSERT(m_table);
 
         for (size_t s = start; s < end; ++s) {
-            if (m_condition_column->HasIndex()) {
+            if (m_condition_column->has_index()) {
 
                 // Indexed string column
                 size_t f = not_found;

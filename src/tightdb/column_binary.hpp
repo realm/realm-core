@@ -28,6 +28,8 @@ namespace tightdb {
 
 class ColumnBinary: public ColumnBase {
 public:
+    typedef BinaryData value_type;
+
     explicit ColumnBinary(Allocator& = Allocator::get_default());
     explicit ColumnBinary(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                           Allocator& = Allocator::get_default());
@@ -58,12 +60,6 @@ public:
     void set_string(std::size_t ndx, StringData value);
     void insert_string(std::size_t ndx, StringData value);
 
-    // Index
-    bool HasIndex() const { return false; }
-    void BuildIndex(Index&) {}
-    void ClearIndex() {}
-    std::size_t FindWithIndex(int64_t) const { return std::size_t(-1); }
-
     ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
     void set_parent(ArrayParent* parent, std::size_t pndx) { m_array->set_parent(parent, pndx); }
     void UpdateParentNdx(int diff) { m_array->UpdateParentNdx(diff); }
@@ -80,9 +76,7 @@ protected:
 
     void update_ref(ref_type ref);
 
-    BinaryData LeafGet(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void LeafSet(std::size_t ndx, BinaryData value);
-    void LeafInsert(std::size_t ndx, BinaryData value);
     void LeafDelete(std::size_t ndx);
 
 #ifdef TIGHTDB_DEBUG
@@ -90,10 +84,22 @@ protected:
 #endif
 
 private:
+    friend class Array;
+
     void add(StringData value) { add_string(value); }
     void set(std::size_t ndx, StringData value) { set_string(ndx, value); }
     void LeafSet(std::size_t ndx, StringData value);
-    void LeafInsert(std::size_t ndx, StringData value);
+
+    void do_insert(std::size_t ndx, BinaryData value, bool add_zero_term);
+
+    // Called by Array::btree_insert().
+    static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
+                                Allocator&, std::size_t insert_ndx,
+                                Array::TreeInsert<ColumnBinary>& state);
+
+    struct InsertState: Array::TreeInsert<ColumnBinary> {
+        bool m_add_zero_term;
+    };
 };
 
 
@@ -122,12 +128,32 @@ inline StringData ColumnBinary::get_string(std::size_t ndx) const TIGHTDB_NOEXCE
 
 inline void ColumnBinary::add(BinaryData value)
 {
-    insert(size(), value);
+    bool add_zero_term = false;
+    do_insert(npos, value, add_zero_term);
+}
+
+inline void ColumnBinary::insert(std::size_t ndx, BinaryData value)
+{
+    TIGHTDB_ASSERT(ndx <= size());
+    if (size() <= ndx) ndx = npos;
+    bool add_zero_term = false;
+    do_insert(ndx, value, add_zero_term);
 }
 
 inline void ColumnBinary::add_string(StringData value)
 {
-    insert_string(size(), value);
+    BinaryData value_2(value.data(), value.size());
+    bool add_zero_term = true;
+    do_insert(npos, value_2, add_zero_term);
+}
+
+inline void ColumnBinary::insert_string(std::size_t ndx, StringData value)
+{
+    TIGHTDB_ASSERT(ndx <= size());
+    if (size() <= ndx) ndx = npos;
+    BinaryData value_2(value.data(), value.size());
+    bool add_zero_term = true;
+    do_insert(ndx, value_2, add_zero_term);
 }
 
 } // namespace tightdb

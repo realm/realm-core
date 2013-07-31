@@ -11,7 +11,7 @@
 using namespace std;
 using namespace tightdb;
 
-void VerifiedString::VerifyNeighbours(size_t ndx)
+void VerifiedString::verify_neighbours(size_t ndx)
 {
     if (v.size() > ndx)
         TIGHTDB_ASSERT(v[ndx] == u.get(ndx));
@@ -28,18 +28,18 @@ void VerifiedString::add(StringData value)
     v.push_back(value);
     u.add(value);
     TIGHTDB_ASSERT(v.size() == u.size());
-    VerifyNeighbours(v.size());
-    TIGHTDB_ASSERT(ConditionalVerify());
+    verify_neighbours(v.size());
+    TIGHTDB_ASSERT(conditional_verify());
 }
 
 
-void VerifiedString::Insert(size_t ndx, StringData value)
+void VerifiedString::insert(size_t ndx, StringData value)
 {
     v.insert(v.begin() + ndx, value);
     u.insert(ndx, value);
     TIGHTDB_ASSERT(v.size() == u.size());
-    VerifyNeighbours(ndx);
-    TIGHTDB_ASSERT(ConditionalVerify());
+    verify_neighbours(ndx);
+    TIGHTDB_ASSERT(conditional_verify());
 }
 
 
@@ -53,25 +53,25 @@ void VerifiedString::set(size_t ndx, StringData value)
 {
     v[ndx] = value;
     u.set(ndx, value);
-    VerifyNeighbours(ndx);
-    TIGHTDB_ASSERT(ConditionalVerify());
+    verify_neighbours(ndx);
+    TIGHTDB_ASSERT(conditional_verify());
 }
 
-void VerifiedString::Delete(size_t ndx)
+void VerifiedString::erase(size_t ndx)
 {
     v.erase(v.begin() + ndx);
     u.erase(ndx);
     TIGHTDB_ASSERT(v.size() == u.size());
-    VerifyNeighbours(ndx);
-    TIGHTDB_ASSERT(ConditionalVerify());
+    verify_neighbours(ndx);
+    TIGHTDB_ASSERT(conditional_verify());
 }
 
-void VerifiedString::Clear()
+void VerifiedString::clear()
 {
     v.clear();
     u.clear();
     TIGHTDB_ASSERT(v.size() == u.size());
-    TIGHTDB_ASSERT(ConditionalVerify());
+    TIGHTDB_ASSERT(conditional_verify());
 }
 
 size_t VerifiedString::find_first(StringData value)
@@ -134,7 +134,7 @@ bool VerifiedString::Verify()
 }
 
 // makes it run amortized the same time complexity as original, even though the row count grows
-bool VerifiedString::ConditionalVerify()
+bool VerifiedString::conditional_verify()
 {
     if ((uint64_t(rand()) * uint64_t(rand()))  % (v.size() / 10 + 1) == 0) {
         return Verify();
@@ -144,7 +144,7 @@ bool VerifiedString::ConditionalVerify()
     }
 }
 
-void VerifiedString::Destroy()
+void VerifiedString::destroy()
 {
     u.destroy();
 }

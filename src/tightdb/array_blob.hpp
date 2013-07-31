@@ -92,7 +92,7 @@ inline const char* ArrayBlob::get(std::size_t pos) const TIGHTDB_NOEXCEPT
 
 inline void ArrayBlob::add(const char* data, std::size_t size, bool add_zero_term)
 {
-    replace(m_len, m_len, data, size, add_zero_term);
+    replace(m_size, m_size, data, size, add_zero_term);
 }
 
 inline void ArrayBlob::insert(std::size_t pos, const char* data, std::size_t size,
@@ -106,15 +106,15 @@ inline void ArrayBlob::erase(std::size_t start, std::size_t end)
     replace(start, end, 0, 0);
 }
 
-inline void ArrayBlob::resize(std::size_t len)
+inline void ArrayBlob::resize(std::size_t size)
 {
-    TIGHTDB_ASSERT(len <= m_len);
-    replace(len, m_len, 0, 0);
+    TIGHTDB_ASSERT(size <= m_size);
+    replace(size, m_size, 0, 0);
 }
 
 inline void ArrayBlob::clear()
 {
-    replace(0, m_len, 0, 0);
+    replace(0, m_size, 0, 0);
 }
 
 inline const char* ArrayBlob::get(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT
@@ -125,12 +125,12 @@ inline const char* ArrayBlob::get(const char* header, std::size_t pos) TIGHTDB_N
 
 inline std::size_t ArrayBlob::CalcByteLen(std::size_t count, std::size_t) const
 {
-    return 8 + count; // include room for header
+    return header_size + count;
 }
 
 inline std::size_t ArrayBlob::CalcItemCount(std::size_t bytes, std::size_t) const TIGHTDB_NOEXCEPT
 {
-    return bytes - 8;
+    return bytes - header_size;
 }
 
 

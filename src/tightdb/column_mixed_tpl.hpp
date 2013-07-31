@@ -77,6 +77,13 @@ inline void ColumnMixed::invalidate_subtables_virtual()
     invalidate_subtables();
 }
 
+inline ref_type ColumnMixed::create(std::size_t size, Allocator& alloc)
+{
+    ColumnMixed c(alloc, 0, 0);
+    c.fill(size);
+    return c.get_ref();
+}
+
 
 //
 // Getters
@@ -155,8 +162,8 @@ inline StringData ColumnMixed::get_string(std::size_t ndx) const TIGHTDB_NOEXCEP
     TIGHTDB_ASSERT(m_types->get(ndx) == mixcol_String);
     TIGHTDB_ASSERT(m_data);
 
-    size_t offset = to_size_t(m_refs->get(ndx)) >> 1;
-    return m_data->get_string(offset);
+    std::size_t data_ndx = std::size_t(int64_t(m_refs->get(ndx)) >> 1);
+    return m_data->get_string(data_ndx);
 }
 
 inline BinaryData ColumnMixed::get_binary(std::size_t ndx) const TIGHTDB_NOEXCEPT
@@ -165,8 +172,8 @@ inline BinaryData ColumnMixed::get_binary(std::size_t ndx) const TIGHTDB_NOEXCEP
     TIGHTDB_ASSERT(m_types->get(ndx) == mixcol_Binary);
     TIGHTDB_ASSERT(m_data);
 
-    size_t offset = to_size_t(m_refs->get(ndx)) >> 1;
-    return m_data->get(offset);
+    std::size_t data_ndx = std::size_t(uint64_t(m_refs->get(ndx)) >> 1);
+    return m_data->get(data_ndx);
 }
 
 //
@@ -318,11 +325,11 @@ inline void ColumnMixed::insert_string(std::size_t ndx, StringData value)
     TIGHTDB_ASSERT(ndx <= m_types->size());
     InitDataColumn();
 
-    ref_type ref = m_data->size();
+    std::size_t data_ndx = m_data->size();
     m_data->add_string(value);
 
     // Shift value one bit and set lowest bit to indicate that this is not a ref
-    int64_t v = (ref << 1) + 1;
+    int64_t v = int64_t((uint64_t(data_ndx) << 1) + 1);
 
     m_types->insert(ndx, mixcol_String);
     m_refs->insert(ndx, v);
@@ -333,11 +340,11 @@ inline void ColumnMixed::insert_binary(std::size_t ndx, BinaryData value)
     TIGHTDB_ASSERT(ndx <= m_types->size());
     InitDataColumn();
 
-    ref_type ref = m_data->size();
+    std::size_t data_ndx = m_data->size();
     m_data->add(value);
 
     // Shift value one bit and set lowest bit to indicate that this is not a ref
-    int64_t v = (ref << 1) + 1;
+    int64_t v = int64_t((uint64_t(data_ndx) << 1) + 1);
 
     m_types->insert(ndx, mixcol_Binary);
     m_refs->insert(ndx, v);
