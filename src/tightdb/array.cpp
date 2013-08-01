@@ -49,10 +49,35 @@ size_t bit_width(int64_t v)
 namespace tightdb {
 
 // Header format (8 bytes):
-// |--------|--------|--------|--------|--------|--------|--------|--------|
-// |12344555|          length          |         capacity         |reserved|
 //
-//  1: isNode  2: hasRefs  3: indexflag 4: multiplier 5: width (packed in 3 bits)
+// |--------|--------|--------|--------|--------|--------|--------|--------|
+// |12344555|           size           |         capacity         |reserved|
+//
+//  1: 'not_leaf' (inner node of B+-tree).
+//
+//  2: 'has_refs' (elements whose first bit is zero are refs to subarrays).
+//
+//  3: 'index_flag'
+//
+//  4: 'width_scheme' (2 bits)
+//
+//      value  |  meaning of 'width'  |  number of bytes used after header
+//      -------|----------------------|------------------------------------
+//        0    |  number of bits      |  ceil(width * size / 8)
+//        1    |  number of bytes     |  width * size
+//        2    |  ignored             |  size
+//
+//  5: 'width_ndx' (3 bits)
+//
+//      'width_ndx'       |  0 |  1 |  2 |  3 |  4 |  5 |  6 |  7 |
+//      ------------------|----|----|----|----|----|----|----|----|
+//      value of 'width'  |  0 |  1 |  2 |  4 |  8 | 16 | 32 | 64 |
+//
+//
+// 'size' (aka length) is the number of elements in the array.
+//
+// 'capacity' is the total number of bytes allocated for this array
+// including the header.
 
 void Array::init_from_ref(ref_type ref) TIGHTDB_NOEXCEPT
 {
@@ -66,10 +91,10 @@ void Array::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
     char* header = mem.m_addr;
 
     // Parse header
-    m_isNode   = get_isnode_from_header(header);
+    m_isNode   = !get_isleaf_from_header(header);
     m_hasRefs  = get_hasrefs_from_header(header);
     m_width    = get_width_from_header(header);
-    m_len      = get_len_from_header(header);
+    m_size     = get_size_from_header(header);
 
     // Capacity is how many items there are room for
     size_t byte_capacity = get_capacity_from_header(header);
@@ -80,9 +105,9 @@ void Array::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
     m_capacity = CalcItemCount(byte_capacity, m_width);
 
     m_ref = mem.m_ref;
-    m_data = header + 8;
+    m_data = get_data_from_header(header);
 
-    SetWidth(m_width);
+    set_width(m_width);
 }
 
 // FIXME: This is a very crude and error prone misuse of Array,
@@ -109,12 +134,12 @@ void Array::CreateFromHeaderDirect(char* header, ref_type ref) TIGHTDB_NOEXCEPT
     // Parse header
     // We only need limited info for direct read-only use
     m_width    = get_width_from_header(header);
-    m_len      = get_len_from_header(header);
+    m_size     = get_size_from_header(header);
 
     m_ref = ref;
-    m_data = header + 8;
+    m_data = get_data_from_header(header);
 
-    SetWidth(m_width);
+    set_width(m_width);
 }
 
 
@@ -125,29 +150,29 @@ void Array::set_type(Type type)
     if (!m_data) {
         m_ref = 0;
         m_capacity = 0;
-        m_len = 0;
+        m_size = 0;
         m_width = size_t(-1);
     }
 
-    if (m_ref) CopyOnWrite(); // Throws
+    if (m_ref) copy_on_write(); // Throws
 
-    bool is_node = false, has_refs = false;
+    bool is_leaf = false, has_refs = false;
     switch (type) {
-        case type_Normal:                                     break;
-        case type_InnerColumnNode: has_refs = is_node = true; break;
-        case type_HasRefs:         has_refs = true;           break;
+        case type_Normal:          is_leaf  = true;           break;
+        case type_InnerColumnNode: has_refs = true;           break;
+        case type_HasRefs:         has_refs = is_leaf = true; break;
     }
-    m_isNode  = is_node;
+    m_isNode  = !is_leaf;
     m_hasRefs = has_refs;
 
     if (!m_data) {
         // Create array
         alloc(0, 0);
-        SetWidth(0);
+        set_width(0);
     }
     else {
         // Update Header
-        set_header_isnode(is_node);
+        set_header_isleaf(is_leaf);
         set_header_hasrefs(has_refs);
     }
 }
@@ -163,7 +188,7 @@ bool Array::UpdateFromParent() TIGHTDB_NOEXCEPT
 
     // After commit to disk, the array may have moved
     // so get ref from parent and see if it has changed
-    ref_type new_ref = m_parent->get_child_ref(m_parentNdx);
+    ref_type new_ref = m_parent->get_child_ref(m_ndx_in_parent);
 
     if (new_ref != m_ref) {
         init_from_ref(new_ref);
@@ -172,9 +197,10 @@ bool Array::UpdateFromParent() TIGHTDB_NOEXCEPT
     else {
         // If the file has been remapped it might have
         // moved to a new location
-        char* m = m_alloc.translate(m_ref);
-        if (m_data-8 != m) {
-            m_data = m + 8;
+        char* header = m_alloc.translate(m_ref);
+        char* data = get_data_from_header(header);
+        if (m_data != data) {
+            m_data = data;
             return true;
         }
     }
@@ -186,9 +212,9 @@ bool Array::UpdateFromParent() TIGHTDB_NOEXCEPT
 void Array::Preset(size_t bitwidth, size_t count)
 {
     clear();
-    SetWidth(bitwidth);
+    set_width(bitwidth);
     alloc(count, bitwidth); // Throws
-    m_len = count;
+    m_size = count;
     for (size_t n = 0; n < count; n++)
         set(n, 0);
 }
@@ -199,10 +225,10 @@ void Array::Preset(int64_t min, int64_t max, size_t count)
     Preset(w, count);
 }
 
-void Array::set_parent(ArrayParent *parent, size_t pndx) TIGHTDB_NOEXCEPT
+void Array::set_parent(ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT
 {
     m_parent = parent;
-    m_parentNdx = pndx;
+    m_ndx_in_parent = ndx_in_parent;
 }
 
 void Array::destroy()
@@ -210,7 +236,7 @@ void Array::destroy()
     if (!m_data) return;
 
     if (m_hasRefs) {
-        for (size_t i = 0; i < m_len; ++i) {
+        for (size_t i = 0; i < m_size; ++i) {
             int64_t v = get(i);
 
             // null-refs signify empty sub-trees
@@ -233,7 +259,7 @@ void Array::destroy()
 
 void Array::clear()
 {
-    CopyOnWrite(); // Throws
+    copy_on_write(); // Throws
 
     // Make sure we don't have any dangling references
     if (m_hasRefs) {
@@ -254,51 +280,51 @@ void Array::clear()
     }
 
     // Truncate size to zero (but keep capacity)
-    m_len      = 0;
+    m_size     = 0;
     m_capacity = CalcItemCount(get_capacity_from_header(), 0);
-    SetWidth(0);
+    set_width(0);
 
     // Update header
-    set_header_len(0);
+    set_header_size(0);
     set_header_width(0);
 }
 
 void Array::erase(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(ndx < m_size);
 
     // Check if we need to copy before modifying
-    CopyOnWrite(); // Throws
+    copy_on_write(); // Throws
 
     // Move values below deletion up
     if (m_width < 8) {
-        for (size_t i = ndx+1; i < m_len; ++i) {
+        for (size_t i = ndx+1; i < m_size; ++i) {
             int64_t v = (this->*m_getter)(i);
             (this->*m_setter)(i-1, v);
         }
     }
-    else if (ndx < m_len-1) {
+    else if (ndx < m_size-1) {
         // when byte sized, use memmove
 // FIXME: Should probably be optimized as a simple division by 8.
         size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
         char* base = reinterpret_cast<char*>(m_data);
         char* dst_begin = base + ndx*w;
         const char* src_begin = dst_begin + w;
-        const char* src_end   = base + m_len*w;
+        const char* src_end   = base + m_size*w;
         copy(src_begin, src_end, dst_begin);
     }
 
-    // Update length (also in header)
-    --m_len;
-    set_header_len(m_len);
+    // Update size (also in header)
+    --m_size;
+    set_header_size(m_size);
 }
 
 void Array::set(size_t ndx, int64_t value)
 {
-    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(ndx < m_size);
 
     // Check if we need to copy before modifying
-    CopyOnWrite(); // Throws
+    copy_on_write(); // Throws
 
     // Make room for the new value
     size_t width = m_width;
@@ -309,11 +335,11 @@ void Array::set(size_t ndx, int64_t value)
     bool do_expand = (width > m_width);
     if (do_expand) {
         Getter old_getter = m_getter;    // Save old getter before width expansion
-        alloc(m_len, width); // Throws
-        SetWidth(width);
+        alloc(m_size, width); // Throws
+        set_width(width);
 
         // Expand the old values
-        int k = int(m_len);
+        int k = int(m_size);
         while (--k >= 0) {
             int64_t v = (this->*old_getter)(k);
             (this->*m_setter)(k, v);
@@ -333,24 +359,24 @@ void Array::AddPositiveLocal(int64_t value)
     TIGHTDB_ASSERT(&m_alloc == &Allocator::get_default());
 
     if (value <= m_ubound) {
-        if (m_len < m_capacity) {
-            (this->*m_setter)(m_len, value);
-            ++m_len;
-            set_header_len(m_len);
+        if (m_size < m_capacity) {
+            (this->*m_setter)(m_size, value);
+            ++m_size;
+            set_header_size(m_size);
             return;
         }
     }
 
-    insert(m_len, value);
+    insert(m_size, value);
 }
 */
 
 void Array::insert(size_t ndx, int64_t value)
 {
-    TIGHTDB_ASSERT(ndx <= m_len);
+    TIGHTDB_ASSERT(ndx <= m_size);
 
     // Check if we need to copy before modifying
-    CopyOnWrite(); // Throws
+    copy_on_write(); // Throws
 
     // Make room for the new value
     size_t width = m_width;
@@ -362,28 +388,28 @@ void Array::insert(size_t ndx, int64_t value)
 
     bool do_expand = m_width < width;
     if (do_expand) {
-        alloc(m_len+1, width); // Throws
-        SetWidth(width);
+        alloc(m_size+1, width); // Throws
+        set_width(width);
     }
     else {
-        alloc(m_len+1, m_width); // Throws
+        alloc(m_size+1, m_width); // Throws
     }
 
     // Move values below insertion (may expand)
     if (do_expand || m_width < 8) {
-        int k = int(m_len);
+        int k = int(m_size);
         while (--k >= int(ndx)) {
             int64_t v = (this->*old_getter)(k);
             (this->*m_setter)(k+1, v);
         }
     }
-    else if (ndx != m_len) {
+    else if (ndx != m_size) {
         // when byte sized and no expansion, use memmove
 // FIXME: Optimize by simply dividing by 8 (or shifting right by 3 bit positions)
         size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
         char* base = reinterpret_cast<char*>(m_data);
         char* src_begin = base + ndx*w;
-        char* src_end   = base + m_len*w;
+        char* src_end   = base + m_size*w;
         char* dst_end   = src_end + w;
         copy_backward(src_begin, src_end, dst_end);
     }
@@ -400,34 +426,34 @@ void Array::insert(size_t ndx, int64_t value)
         }
     }
 
-    // Update length
+    // Update size
     // (no need to do it in header as it has been done by Alloc)
-    ++m_len;
+    ++m_size;
 }
 
 
 void Array::add(int64_t value)
 {
-    insert(m_len, value);
+    insert(m_size, value);
 }
 
 void Array::resize(size_t count)
 {
-    TIGHTDB_ASSERT(count <= m_len);
+    TIGHTDB_ASSERT(count <= m_size);
 
-    CopyOnWrite(); // Throws
+    copy_on_write(); // Throws
 
-    // Update length (also in header)
-    m_len = count;
-    set_header_len(m_len);
+    // Update size (also in header)
+    m_size = count;
+    set_header_size(m_size);
 }
 
 void Array::SetAllToZero()
 {
-    CopyOnWrite(); // Throws
+    copy_on_write(); // Throws
 
     m_capacity = CalcItemCount(get_capacity_from_header(), 0);
-    SetWidth(0);
+    set_width(0);
 
     // Update header
     set_header_width(0);
@@ -435,9 +461,9 @@ void Array::SetAllToZero()
 
 void Array::Increment(int64_t value, size_t start, size_t end)
 {
-    if (end == size_t(-1)) end = m_len;
-    TIGHTDB_ASSERT(start < m_len);
-    TIGHTDB_ASSERT(end >= start && end <= m_len);
+    if (end == size_t(-1)) end = m_size;
+    TIGHTDB_ASSERT(start < m_size);
+    TIGHTDB_ASSERT(end >= start && end <= m_size);
 
     // Increment range
     for (size_t i = start; i < end; ++i) {
@@ -448,7 +474,7 @@ void Array::Increment(int64_t value, size_t start, size_t end)
 void Array::IncrementIf(int64_t limit, int64_t value)
 {
     // Update (incr or decrement) values bigger or equal to the limit
-    for (size_t i = 0; i < m_len; ++i) {
+    for (size_t i = 0; i < m_size; ++i) {
         int64_t v = get(i);
         if (v >= limit)
             set(i, v + value);
@@ -457,9 +483,9 @@ void Array::IncrementIf(int64_t limit, int64_t value)
 
 void Array::adjust(size_t start, int64_t diff)
 {
-    TIGHTDB_ASSERT(start <= m_len);
+    TIGHTDB_ASSERT(start <= m_size);
 
-    size_t n = m_len;
+    size_t n = m_size;
     for (size_t i = start; i < n; ++i) {
         int64_t v = get(i);
         set(i, v + diff);
@@ -475,7 +501,7 @@ void Array::adjust(size_t start, int64_t diff)
 template<size_t w> size_t Array::FindPos(int64_t target) const TIGHTDB_NOEXCEPT
 {
     size_t low = size_t(-1);
-    size_t high = m_len;
+    size_t high = m_size;
 
     // Binary search based on:
     // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
@@ -490,7 +516,7 @@ template<size_t w> size_t Array::FindPos(int64_t target) const TIGHTDB_NOEXCEPT
         else
             low = probe;
     }
-    if (high == m_len)
+    if (high == m_size)
         return not_found;
     else
         return high;
@@ -505,7 +531,7 @@ size_t Array::FindPos(int64_t target) const TIGHTDB_NOEXCEPT
 size_t Array::FindPos2(int64_t target) const TIGHTDB_NOEXCEPT
 {
     size_t low = size_t(-1);
-    size_t high = m_len;
+    size_t high = m_size;
 
     // Binary search based on:
     // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
@@ -520,7 +546,7 @@ size_t Array::FindPos2(int64_t target) const TIGHTDB_NOEXCEPT
         else
             high = probe;
     }
-    if (high == m_len)
+    if (high == m_size)
         return not_found;
     else
         return high;
@@ -531,7 +557,7 @@ size_t Array::FindPos2(int64_t target) const TIGHTDB_NOEXCEPT
 bool Array::FindPosSorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
 {
     size_t low = size_t(-1);
-    size_t high = m_len;
+    size_t high = m_size;
 
     // Binary search based on:
     // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
@@ -548,7 +574,7 @@ bool Array::FindPosSorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
     }
 
     pos = high;
-    if (high == m_len)
+    if (high == m_size)
         return false;
     else
         return (get(high) == target);
@@ -561,33 +587,33 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     // Reference implementation to illustrate and test behaviour
     size_t ref = 0;
     size_t idx;
-    for (idx = start; idx < m_len; ++idx) {
+    for (idx = start; idx < m_size; ++idx) {
         if (get(idx) >= target) {
             ref = idx;
             break;
         }
     }
-    if (idx == m_len)
+    if (idx == m_size)
         ref = not_found;
 #endif
 
     size_t ret;
 
-    if (start >= m_len) {ret = not_found; goto exit;}
+    if (start >= m_size) {ret = not_found; goto exit;}
 
-    if (start + 2 < m_len) {
+    if (start + 2 < m_size) {
         if (get(start) >= target) {ret = start; goto exit;} else ++start;
         if (get(start) >= target) {ret = start; goto exit;} else ++start;
     }
 
     // Todo, use templated get<width> from this point for performance
-    if (target > get(m_len - 1)) {ret = not_found; goto exit;}
+    if (target > get(m_size - 1)) {ret = not_found; goto exit;}
 
     size_t add;
     add = 1;
 
     for (;;) {
-        if (start + add < m_len && get(start + add) < target)
+        if (start + add < m_size && get(start + add) < target)
             start += add;
         else
             break;
@@ -597,8 +623,8 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     size_t high;
     high = start + add + 1;
 
-    if (high > m_len)
-        high = m_len;
+    if (high > m_size)
+        high = m_size;
 
    // if (start > 0)
         start--;
@@ -753,10 +779,10 @@ template<bool eq, size_t width> size_t FindZero(uint64_t v)
 template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t start, size_t end) const
 {
     if (end == size_t(-1))
-        end = m_len;
-    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
+        end = m_size;
+    TIGHTDB_ASSERT(start < m_size && end <= m_size && start < end);
 
-    if (m_len == 0)
+    if (m_size == 0)
         return false;
 
     if (w == 0) {
@@ -838,8 +864,8 @@ int64_t Array::sum(size_t start, size_t end) const
 
 template<size_t w> int64_t Array::sum(size_t start, size_t end) const
 {
-    if (end == size_t(-1)) end = m_len;
-    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
+    if (end == size_t(-1)) end = m_size;
+    TIGHTDB_ASSERT(start < m_size && end <= m_size && start < end);
 
     if (w == 0)
         return 0;
@@ -1004,7 +1030,7 @@ size_t Array::count(int64_t value) const
 {
     const uint64_t* next = reinterpret_cast<uint64_t*>(m_data);
     size_t count = 0;
-    const size_t end = m_len;
+    const size_t end = m_size;
     size_t i = 0;
 
     // static values needed for fast population count
@@ -1014,7 +1040,7 @@ size_t Array::count(int64_t value) const
     const uint64_t h01 = 0x0101010101010101ULL;
 
     if (m_width == 0) {
-        if (value == 0) return m_len;
+        if (value == 0) return m_size;
         else return 0;
     }
     else if (m_width == 1) {
@@ -1171,12 +1197,12 @@ size_t Array::count(int64_t value) const
 
 size_t Array::GetByteSize(bool align) const
 {
-    size_t len = CalcByteLen(m_len, m_width);
+    size_t size = CalcByteLen(m_size, m_width);
     if (align) {
-        size_t rest = (~len & 0x7) + 1;
-        if (rest < 8) len += rest; // 64bit blocks
+        size_t rest = (~size & 0x7) + 1;
+        if (rest < 8) size += rest; // 64bit blocks
     }
-    return len;
+    return size;
 }
 
 size_t Array::CalcByteLen(size_t count, size_t width) const
@@ -1184,7 +1210,7 @@ size_t Array::CalcByteLen(size_t count, size_t width) const
     // FIXME: This arithemtic could overflow. Consider using <tightdb/safe_int_ops.hpp>
     size_t bits = count * width;
     size_t bytes = (bits+7) / 8; // round up
-    return bytes + 8; // add room for 8 byte header
+    return bytes + header_size; // add room for 8 byte header
 }
 
 size_t Array::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
@@ -1192,7 +1218,7 @@ size_t Array::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
     if (width == 0)
         return numeric_limits<size_t>::max(); // zero width gives infinite space
 
-    size_t bytes_data = bytes - 8; // ignore 8 byte header
+    size_t bytes_data = bytes - header_size; // ignore 8 byte header
     size_t total_bits = bytes_data * 8;
     return total_bits / width;
 }
@@ -1232,12 +1258,12 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
     MemRef mem_ref = clone_alloc.alloc(initial_capacity); // Throws
     char* clone_header = mem_ref.m_addr;
     {
-        bool is_node = get_isnode_from_header(header);
+        bool is_leaf = get_isleaf_from_header(header);
         bool has_refs = true;
         WidthType width_type = wtype_Bits;
         int width = 0;
-        size_t length = 0;
-        init_header(clone_header, is_node, has_refs, width_type, width, length, initial_capacity);
+        size_t size = 0;
+        init_header(clone_header, is_leaf, has_refs, width_type, width, size, initial_capacity);
     }
 
     Array new_array(clone_alloc);
@@ -1264,20 +1290,20 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
     return mem_ref.m_ref;
 }
 
-void Array::CopyOnWrite()
+void Array::copy_on_write()
 {
     if (!m_alloc.is_read_only(m_ref)) return;
 
     // Calculate size in bytes (plus a bit of matchcount room for expansion)
-    size_t len = CalcByteLen(m_len, m_width);
-    size_t rest = (~len & 0x7)+1;
-    if (rest < 8) len += rest; // 64bit blocks
-    size_t new_len = len + 64;
+    size_t size = CalcByteLen(m_size, m_width);
+    size_t rest = (~size & 0x7)+1;
+    if (rest < 8) size += rest; // 64bit blocks
+    size_t new_size = size + 64;
 
     // Create new copy of array
-    MemRef mref = m_alloc.alloc(new_len); // Throws
+    MemRef mref = m_alloc.alloc(new_size); // Throws
     const char* old_begin = get_header_from_data(m_data);
-    const char* old_end   = m_data + len;
+    const char* old_end   = m_data + size;
     char* new_begin = mref.m_addr;
     copy(old_begin, old_end, new_begin);
 
@@ -1286,10 +1312,10 @@ void Array::CopyOnWrite()
     // Update internal data
     m_ref = mref.m_ref;
     m_data = get_data_from_header(new_begin);
-    m_capacity = CalcItemCount(new_len, m_width);
+    m_capacity = CalcItemCount(new_size, m_width);
 
     // Update capacity in header
-    set_header_capacity(new_len); // uses m_data to find header, so m_data must be initialized correctly first
+    set_header_capacity(new_size); // uses m_data to find header, so m_data must be initialized correctly first
 
     update_ref_in_parent();
 
@@ -1301,26 +1327,28 @@ void Array::CopyOnWrite()
 
 ref_type Array::create_empty_array(Type type, WidthType width_type, Allocator& alloc)
 {
-    bool is_node = false, has_refs = false;
+    bool is_leaf = false, has_refs = false;
     switch (type) {
-        case type_Normal:                                     break;
-        case type_InnerColumnNode: has_refs = is_node = true; break;
-        case type_HasRefs:         has_refs = true;           break;
+        case type_Normal:          is_leaf = true;            break;
+        case type_InnerColumnNode: has_refs = true;           break;
+        case type_HasRefs:         has_refs = is_leaf = true; break;
     }
 
     size_t capacity = initial_capacity;
     MemRef mem_ref = alloc.alloc(capacity); // Throws
 
-    init_header(mem_ref.m_addr, is_node, has_refs, width_type, 0, 0, capacity);
+    int width = 0;
+    size_t size = 0;
+    init_header(mem_ref.m_addr, is_leaf, has_refs, width_type, width, size, capacity);
 
     return mem_ref.m_ref;
 }
 
 
-void Array::alloc(size_t count, size_t width)
+void Array::alloc(size_t size, size_t width)
 {
-    if (m_capacity < count || width != m_width) {
-        size_t needed_bytes   = CalcByteLen(count, width);
+    if (m_capacity < size || width != m_width) {
+        size_t needed_bytes   = CalcByteLen(size, width);
         size_t capacity_bytes = m_capacity ? get_capacity_from_header() : 0; // space currently available in bytes
 
         if (capacity_bytes < needed_bytes) {
@@ -1340,7 +1368,7 @@ void Array::alloc(size_t count, size_t width)
             if (!m_data) {
                 mem_ref = m_alloc.alloc(capacity_bytes); // Throws
                 header = mem_ref.m_addr;
-                init_header(header, m_isNode, m_hasRefs, GetWidthType(), int(width), count,
+                init_header(header, !m_isNode, m_hasRefs, GetWidthType(), int(width), size,
                             capacity_bytes);
             }
             else {
@@ -1348,7 +1376,7 @@ void Array::alloc(size_t count, size_t width)
                 mem_ref = m_alloc.realloc_(m_ref, header, capacity_bytes); // Throws
                 header = mem_ref.m_addr;
                 set_header_width(int(width), header);
-                set_header_len(count, header);
+                set_header_size(size, header);
                 set_header_capacity(capacity_bytes, header);
             }
 
@@ -1367,16 +1395,16 @@ void Array::alloc(size_t count, size_t width)
     }
 
     // Update header
-    set_header_len(count);
+    set_header_size(size);
 }
 
 
-void Array::SetWidth(size_t width) TIGHTDB_NOEXCEPT
+void Array::set_width(size_t width) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_TEMPEX(SetWidth, width, ());
+    TIGHTDB_TEMPEX(set_width, width, ());
 }
 
-template<size_t width> void Array::SetWidth() TIGHTDB_NOEXCEPT
+template<size_t width> void Array::set_width() TIGHTDB_NOEXCEPT
 {
     if (width == 0) {
         m_lbound = 0;
@@ -1538,35 +1566,35 @@ void Array::ReferenceSort(Array& ref)
 
 template<size_t w>void Array::ReferenceSort(Array& ref)
 {
-    if (m_len < 2)
+    if (m_size < 2)
         return;
 
     int64_t min;
     int64_t max;
 
     // in avg case QuickSort is O(n*log(n)) and CountSort O(n + range), and memory usage is sizeof(size_t)*range for CountSort.
-    // So we chose range < m_len as treshold for deciding which to use
+    // So we chose range < m_size as treshold for deciding which to use
 
     // If range isn't suited for CountSort, it's *probably* discovered very early, within first few values, in most practical cases,
     // and won't add much wasted work. Max wasted work is O(n) which isn't much compared to QuickSort.
 
-//  bool b = MinMax<w>(0, m_len, m_len, &min, &max); // auto detect
-//  bool b = MinMax<w>(0, m_len, -1, &min, &max); // force count sort
-    bool b = MinMax<w>(0, m_len, 0, &min, &max); // force quicksort
+//  bool b = MinMax<w>(0, m_size, m_size, &min, &max); // auto detect
+//  bool b = MinMax<w>(0, m_size, -1, &min, &max); // force count sort
+    bool b = MinMax<w>(0, m_size, 0, &min, &max); // force quicksort
 
     if (b) {
         Array res;
         Array count;
 
         // Todo, Preset crashes for unknown reasons but would be faster.
-//      res.Preset(0, m_len, m_len);
-//      count.Preset(0, m_len, max - min + 1);
+//      res.Preset(0, m_size, m_size);
+//      count.Preset(0, m_size, max - min + 1);
 
         for (int64_t t = 0; t < max - min + 1; t++)
             count.add(0);
 
         // Count occurences of each value
-        for (size_t t = 0; t < m_len; t++) {
+        for (size_t t = 0; t < m_size; t++) {
             size_t i = to_ref(Get<w>(t) - min);
             count.set(i, count.get(i) + 1);
         }
@@ -1576,10 +1604,10 @@ template<size_t w>void Array::ReferenceSort(Array& ref)
             count.set(t, count.get(t) + count.get(t - 1));
         }
 
-        for (size_t t = 0; t < m_len; t++)
+        for (size_t t = 0; t < m_size; t++)
             res.add(0);
 
-        for (size_t t = m_len; t > 0; t--) {
+        for (size_t t = m_size; t > 0; t--) {
             size_t v = to_ref(Get<w>(t - 1) - min);
             size_t i = count.get_as_ref(v);
             count.set(v, count.get(v) - 1);
@@ -1601,18 +1629,18 @@ template<size_t w>void Array::ReferenceSort(Array& ref)
 // Sort array
 template<size_t w> void Array::sort()
 {
-    if (m_len < 2)
+    if (m_size < 2)
         return;
 
     size_t lo = 0;
-    size_t hi = m_len - 1;
+    size_t hi = m_size - 1;
     vector<size_t> count;
     int64_t min;
     int64_t max;
     bool b = false;
 
     // in avg case QuickSort is O(n*log(n)) and CountSort O(n + range), and memory usage is sizeof(size_t)*range for CountSort.
-    // Se we chose range < m_len as treshold for deciding which to use
+    // Se we chose range < m_size as treshold for deciding which to use
     if (m_width <= 8) {
         max = m_ubound;
         min = m_lbound;
@@ -1622,7 +1650,7 @@ template<size_t w> void Array::sort()
         // If range isn't suited for CountSort, it's *probably* discovered very early, within first few values,
         // in most practical cases, and won't add much wasted work. Max wasted work is O(n) which isn't much
         // compared to QuickSort.
-        b = MinMax<w>(lo, hi + 1, m_len, &min, &max);
+        b = MinMax<w>(lo, hi + 1, m_size, &min, &max);
     }
 
     if (b) {
@@ -1631,7 +1659,7 @@ template<size_t w> void Array::sort()
 
         // Count occurences of each value
         for (size_t t = lo; t <= hi; t++) {
-            size_t i = to_ref(Get<w>(t) - min);
+            size_t i = to_size_t(Get<w>(t) - min); // FIXME: The value of (Get<w>(t) - min) cannot necessarily be stored in size_t.
             count[i]++;
         }
 
@@ -1654,7 +1682,7 @@ template<size_t w> void Array::sort()
 
 void Array::ReferenceQuickSort(Array& ref)
 {
-    TIGHTDB_TEMPEX(ReferenceQuickSort, m_width, (0, m_len - 1, ref));
+    TIGHTDB_TEMPEX(ReferenceQuickSort, m_width, (0, m_size - 1, ref));
 }
 
 template<size_t w> void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& ref)
@@ -1767,6 +1795,95 @@ bool Array::Compare(const Array& c) const
 }
 
 
+ref_type Array::insert_btree_child(Array& offsets, Array& refs, size_t orig_child_ndx,
+                                   ref_type new_sibling_ref, TreeInsertBase& state)
+{
+    size_t elem_ndx_offset = orig_child_ndx == 0 ? 0 : offsets.get(orig_child_ndx-1);
+
+    // When a node is split the new node must always be inserted after
+    // the original
+    size_t insert_ndx = orig_child_ndx + 1;
+
+    size_t node_size = refs.size();
+    TIGHTDB_ASSERT(insert_ndx <= node_size);
+    if (TIGHTDB_LIKELY(node_size < TIGHTDB_MAX_LIST_SIZE)) {
+        refs.insert(insert_ndx, new_sibling_ref);
+        offsets.set(orig_child_ndx, elem_ndx_offset + state.m_split_offset);
+        offsets.insert(insert_ndx, elem_ndx_offset + state.m_split_size);
+        offsets.adjust(insert_ndx + 1, 1);
+        return 0; // Parent node was not split
+    }
+
+    // Split parent node
+    Allocator& alloc = refs.get_alloc();
+    Array new_refs(alloc), new_offsets(alloc);
+    new_refs.set_type(type_HasRefs);
+    new_offsets.set_type(type_Normal);
+    size_t new_split_offset, new_split_size;
+    if (insert_ndx == TIGHTDB_MAX_LIST_SIZE) {
+        new_split_offset = elem_ndx_offset + state.m_split_offset;
+        new_split_size   = elem_ndx_offset + state.m_split_size;
+        offsets.set(orig_child_ndx, new_split_offset);
+        new_refs.add(new_sibling_ref);
+        new_offsets.add(state.m_split_size - state.m_split_offset);
+    }
+    else {
+        new_split_offset = elem_ndx_offset + state.m_split_size;
+        size_t offset = 0;
+        for (size_t i = insert_ndx; i < node_size; ++i) {
+            new_refs.add(refs.get(i));
+            offset = offsets.get(i) + 1;
+            new_offsets.add(offset - new_split_offset);
+        }
+        new_split_size = offset; // From last iteration
+        refs.resize(insert_ndx);
+        refs.add(new_sibling_ref);
+        offsets.resize(insert_ndx);
+        offsets.set(orig_child_ndx, elem_ndx_offset + state.m_split_offset);
+        offsets.add(new_split_offset);
+    }
+
+    state.m_split_offset = new_split_offset;
+    state.m_split_size   = new_split_size;
+
+    Array new_node(alloc);
+    new_node.set_type(type_InnerColumnNode);
+    new_node.add(new_offsets.get_ref());
+    new_node.add(new_refs.get_ref());
+    return new_node.get_ref();
+}
+
+
+ref_type Array::btree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& state)
+{
+    size_t leaf_size = size();
+    TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_LIST_SIZE);
+    if (leaf_size < ndx) ndx = leaf_size;
+    if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_LIST_SIZE)) {
+        insert(ndx, value);
+        return 0; // Leaf was not split
+    }
+
+    // Split leaf node
+    Array new_leaf(get_alloc());
+    new_leaf.set_type(has_refs() ? type_HasRefs : type_Normal);
+    if (ndx == leaf_size) {
+        new_leaf.add(value);
+        state.m_split_offset = ndx;
+    }
+    else {
+        for (size_t i = ndx; i != leaf_size; ++i) {
+            new_leaf.add(get(i));
+        }
+        resize(ndx);
+        add(value);
+        state.m_split_offset = ndx + 1;
+    }
+    state.m_split_size = leaf_size + 1;
+    return new_leaf.get_ref();
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 void Array::Print() const
@@ -1787,7 +1904,7 @@ void Array::Verify() const
     // Check that parent is set correctly
     if (!m_parent) return;
 
-    ref_type ref_in_parent = m_parent->get_child_ref(m_parentNdx);
+    ref_type ref_in_parent = m_parent->get_child_ref(m_ndx_in_parent);
     TIGHTDB_ASSERT(ref_in_parent == (IsValid() ? m_ref : 0));
 }
 
@@ -1812,7 +1929,7 @@ void Array::to_dot(ostream& out, StringData title) const
     out << "</FONT></TD>" << endl;
 
     // Values
-    for (size_t i = 0; i < m_len; ++i) {
+    for (size_t i = 0; i < m_size; ++i) {
         int64_t v =  get(i);
         if (m_hasRefs) {
             // zero-refs and refs that are not 64-aligned do not point to sub-trees
@@ -1828,7 +1945,7 @@ void Array::to_dot(ostream& out, StringData title) const
     if (0 < title.size()) out << "}" << endl;
 
     if (m_hasRefs) {
-        for (size_t i = 0; i < m_len; ++i) {
+        for (size_t i = 0; i < m_size; ++i) {
             int64_t target = get(i);
             if (target == 0 || target & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
 
@@ -1843,14 +1960,14 @@ void Array::to_dot(ostream& out, StringData title) const
 void Array::Stats(MemStats& stats) const
 {
     size_t capacity_bytes = get_capacity_from_header();
-    size_t bytes_used     = CalcByteLen(m_len, m_width);
+    size_t bytes_used     = CalcByteLen(m_size, m_width);
 
     MemStats m(capacity_bytes, bytes_used, 1);
     stats.add(m);
 
     // Add stats for all sub-arrays
     if (m_hasRefs) {
-        for (size_t i = 0; i < m_len; ++i) {
+        for (size_t i = 0; i < m_size; ++i) {
             int64_t v = get(i);
             if (v == 0 || v & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
 
@@ -1943,7 +2060,7 @@ inline size_t lower_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
     const char* data = Array::get_data_from_header(header);
 
     size_t i = 0;
-    size_t size = Array::get_len_from_header(header);
+    size_t size = Array::get_size_from_header(header);
 
     while (0 < size) {
         size_t half = size / 2;
@@ -1969,7 +2086,7 @@ inline size_t upper_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
     const char* data = Array::get_data_from_header(header);
 
     size_t i = 0;
-    size_t size = Array::get_len_from_header(header);
+    size_t size = Array::get_size_from_header(header);
 
     while (0 < size) {
         size_t half = size / 2;
@@ -2008,17 +2125,17 @@ template<int width>
 inline pair<size_t, size_t> get_two_as_size(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 {
     const char* data = tightdb::Array::get_data_from_header(header);
-    return make_pair(tightdb::to_ref(get_direct<width>(data, ndx+0)),
-                     tightdb::to_ref(get_direct<width>(data, ndx+1)));
+    return make_pair(tightdb::to_size_t(get_direct<width>(data, ndx+0)),
+                     tightdb::to_size_t(get_direct<width>(data, ndx+1)));
 }
 
 
 size_t FindPos2Direct_32(const char* const header, const char* const data, int32_t target)
 {
-    const size_t len = tightdb::Array::get_len_from_header(header);
+    const size_t size = tightdb::Array::get_size_from_header(header);
 
     int low = -1;
-    int high = int(len); // FIXME: Conversion to 'int' is prone to overflow
+    int high = int(size); // FIXME: Conversion to 'int' is prone to overflow
 
     // Binary search based on:
     // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
@@ -2031,7 +2148,7 @@ size_t FindPos2Direct_32(const char* const header, const char* const data, int32
         if (v < target) low = int(probe);
         else            high = int(probe);
     }
-    if (high == int(len)) return size_t(-1);
+    if (high == int(size)) return size_t(-1);
     else return size_t(high);
 }
 
@@ -2053,8 +2170,8 @@ size_t Array::upper_bound(int64_t value) const TIGHTDB_NOEXCEPT
 
 void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t start, size_t end) const
 {
-    if (end == size_t(-1)) end = m_len;
-    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
+    if (end == size_t(-1)) end = m_size;
+    TIGHTDB_ASSERT(start < m_size && end <= m_size && start < end);
 
     QueryState<int64_t> state;
     state.init(act_FindAll, &result, static_cast<size_t>(-1));
@@ -2201,28 +2318,28 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off,
 size_t Array::ColumnFind(int64_t target, ref_type ref, Array& cache) const
 {
     char* header = m_alloc.translate(ref);
-    bool is_node = get_isnode_from_header(header);
+    bool is_leaf = get_isleaf_from_header(header);
 
-    if (is_node) {
+    if (!is_leaf) {
         const char* data = get_data_from_header(header);
         size_t width = get_width_from_header(header);
 
         // Get subnode table
-        ref_type ref_offsets = to_ref(get_direct(data, width, 0));
-        ref_type ref_refs    = to_ref(get_direct(data, width, 1));
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
-        const char* offsets_header = m_alloc.translate(ref_offsets);
+        const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t offsets_width  = get_width_from_header(offsets_header);
-        size_t offsets_len = get_len_from_header(offsets_header);
+        size_t offsets_size = get_size_from_header(offsets_header);
 
-        const char* refs_header = m_alloc.translate(ref_refs);
+        const char* refs_header = m_alloc.translate(refs_ref);
         const char* refs_data = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
 
         // Iterate over nodes until we find a match
         size_t offset = 0;
-        for (size_t i = 0; i < offsets_len; ++i) {
+        for (size_t i = 0; i < offsets_size; ++i) {
             ref_type ref = to_ref(get_direct(refs_data, refs_width, i));
             size_t result = ColumnFind(target, ref, cache);
             if (result != not_found)
@@ -2248,7 +2365,7 @@ size_t Array::IndexStringFindFirst(StringData value, void* column, StringGetter 
     const char* data   = m_data;
     const char* header;
     size_t width = m_width;
-    bool is_node = m_isNode;
+    bool is_leaf = !m_isNode;
 
 top:
     // Create 4 byte index key
@@ -2260,11 +2377,11 @@ top:
 
     for (;;) {
         // Get subnode table
-        ref_type ref_offsets = to_ref(get_direct(data, width, 0));
-        ref_type ref_refs    = to_ref(get_direct(data, width, 1));
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(ref_offsets);
+        const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
@@ -2272,17 +2389,17 @@ top:
         if (pos == not_found) return not_found;
 
         // Get entry under key
-        const char* refs_header = m_alloc.translate(ref_refs);
+        const char* refs_header = m_alloc.translate(refs_ref);
         const char* refs_data = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
-        ref_type ref = to_ref(get_direct(refs_data, refs_width, pos));
+        int64_t ref = get_direct(refs_data, refs_width, pos);
 
-        if (is_node) {
+        if (!is_leaf) {
             // Set vars for next iteration
-            header  = m_alloc.translate(ref);
+            header  = m_alloc.translate(to_ref(ref));
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
-            is_node = get_isnode_from_header(header);
+            is_leaf = get_isleaf_from_header(header);
             continue;
         }
 
@@ -2291,7 +2408,7 @@ top:
         if (stored_key == key) {
             // Literal row index
             if (ref & 1) {
-                const size_t row_ref = (ref >> 1);
+                size_t row_ref = size_t(uint64_t(ref) >> 1);
 
                 // If the last byte in the stored key is zero, we know that we have
                 // compared against the entire (target) string
@@ -2302,22 +2419,22 @@ top:
                 else return not_found;
             }
 
-            const char* sub_header = m_alloc.translate(ref);
+            const char* sub_header = m_alloc.translate(to_ref(ref));
             const bool sub_isindex = get_indexflag_from_header(sub_header);
 
             // List of matching row indexes
             if (!sub_isindex) {
                 const char* sub_data = get_data_from_header(sub_header);
                 const size_t sub_width  = get_width_from_header(sub_header);
-                const bool sub_isnode = get_isnode_from_header(sub_header);
+                const bool sub_isleaf = get_isleaf_from_header(sub_header);
 
                 // In most cases the row list will just be an array but there
                 // might be so many matches that it has branched into a column
                 size_t row_ref;
-                if (!sub_isnode)
+                if (sub_isleaf)
                     row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
                 else {
-                    Array sub(ref, 0, 0, m_alloc);
+                    Array sub(to_ref(ref), 0, 0, m_alloc);
                     pair<MemRef, size_t> p = sub.find_btree_leaf(0);
                     const char* leaf_header = p.first.m_addr;
                     row_ref = to_size_t(get(leaf_header, 0));
@@ -2333,10 +2450,10 @@ top:
             }
 
             // Recurse into sub-index;
-            header  = m_alloc.translate(ref);
+            header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
-            is_node = get_isnode_from_header(header);
+            is_leaf = get_isleaf_from_header(header);
             goto top;
         }
         else return not_found;
@@ -2350,7 +2467,7 @@ void Array::IndexStringFindAll(Array& result, StringData value, void* column, St
     const char* data = m_data;
     const char* header;
     size_t width = m_width;
-    bool is_node = m_isNode;
+    bool is_leaf = !m_isNode;
 
 top:
     // Create 4 byte index key
@@ -2362,11 +2479,11 @@ top:
 
     for (;;) {
         // Get subnode table
-        ref_type ref_offsets = to_ref(get_direct(data, width, 0));
-        ref_type ref_refs    = to_ref(get_direct(data, width, 1));
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(ref_offsets);
+        const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
@@ -2374,17 +2491,17 @@ top:
         if (pos == not_found) return; // not_found
 
         // Get entry under key
-        const char* refs_header = m_alloc.translate(ref_refs);
+        const char* refs_header = m_alloc.translate(refs_ref);
         const char* refs_data = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
-        ref_type ref = to_ref(get_direct(refs_data, refs_width, pos));
+        int64_t ref = get_direct(refs_data, refs_width, pos);
 
-        if (is_node) {
+        if (!is_leaf) {
             // Set vars for next iteration
-            header  = m_alloc.translate(ref);
+            header  = m_alloc.translate(to_ref(ref));
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
-            is_node = get_isnode_from_header(header);
+            is_leaf = get_isleaf_from_header(header);
             continue;
         }
 
@@ -2393,7 +2510,7 @@ top:
         if (stored_key == key) {
             // Literal row index
             if (ref & 1) {
-                const size_t row_ref = (ref >> 1);
+                size_t row_ref = size_t(uint64_t(ref) >> 1);
 
                 // If the last byte in the stored key is zero, we know that we have
                 // compared against the entire (target) string
@@ -2410,16 +2527,16 @@ top:
                 else return; // not_found
             }
 
-            const char* sub_header = m_alloc.translate(ref);
+            const char* sub_header = m_alloc.translate(to_ref(ref));
             const bool sub_isindex = get_indexflag_from_header(sub_header);
 
             // List of matching row indexes
             if (!sub_isindex) {
-                const bool sub_isnode = get_isnode_from_header(sub_header);
+                const bool sub_isleaf = get_isleaf_from_header(sub_header);
 
                 // In most cases the row list will just be an array but there
                 // might be so many matches that it has branched into a column
-                if (!sub_isnode) {
+                if (sub_isleaf) {
                     const size_t sub_width = get_width_from_header(sub_header);
                     const char* sub_data = get_data_from_header(sub_header);
                     const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
@@ -2433,15 +2550,15 @@ top:
                     }
 
                     // Copy all matches into result array
-                    const size_t sub_len  = get_len_from_header(sub_header);
+                    const size_t sub_size  = get_size_from_header(sub_header);
 
-                    for (size_t i = 0; i < sub_len; ++i) {
+                    for (size_t i = 0; i < sub_size; ++i) {
                         size_t row_ref = to_size_t(get_direct(sub_data, sub_width, i));
                         result.add(row_ref);
                     }
                 }
                 else {
-                    const Column sub(ref, NULL, 0, m_alloc);
+                    const Column sub(to_ref(ref), 0, 0, m_alloc);
                     const size_t first_row_ref = to_size_t(sub.get(0));
 
                     // If the last byte in the stored key is not zero, we have
@@ -2453,9 +2570,9 @@ top:
                     }
 
                     // Copy all matches into result array
-                    const size_t sub_len  = sub.size();
+                    const size_t sub_size  = sub.size();
 
-                    for (size_t i = 0; i < sub_len; ++i) {
+                    for (size_t i = 0; i < sub_size; ++i) {
                         size_t row_ref = to_size_t(sub.get(i));
                         result.add(row_ref);
                     }
@@ -2464,10 +2581,10 @@ top:
             }
 
             // Recurse into sub-index;
-            header  = m_alloc.translate(ref);
+            header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
-            is_node = get_isnode_from_header(header);
+            is_leaf = get_isleaf_from_header(header);
             goto top;
         }
         else return; // not_found
@@ -2481,7 +2598,7 @@ FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void*
     const char* data = m_data;
     const char* header;
     size_t width = m_width;
-    bool is_node = m_isNode;
+    bool is_leaf = !m_isNode;
 
 top:
     // Create 4 byte index key
@@ -2493,11 +2610,11 @@ top:
 
     for (;;) {
         // Get subnode table
-        ref_type ref_offsets = to_ref(get_direct(data, width, 0));
-        ref_type ref_refs    = to_ref(get_direct(data, width, 1));
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(ref_offsets);
+        const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data   = get_data_from_header(offsets_header);
         size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
@@ -2505,17 +2622,17 @@ top:
         if (pos == not_found) return FindRes_not_found;
 
         // Get entry under key
-        const char* refs_header = m_alloc.translate(ref_refs);
+        const char* refs_header = m_alloc.translate(refs_ref);
         const char* refs_data   = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
-        ref_type ref = to_ref(get_direct(refs_data, refs_width, pos));
+        int64_t ref = get_direct(refs_data, refs_width, pos);
 
-        if (is_node) {
+        if (!is_leaf) {
             // Set vars for next iteration
-            header  = m_alloc.translate(ref);
+            header  = m_alloc.translate(to_ref(ref));
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
-            is_node = get_isnode_from_header(header);
+            is_leaf = get_isleaf_from_header(header);
             continue;
         }
 
@@ -2524,7 +2641,7 @@ top:
         if (stored_key == key) {
             // Literal row index
             if (ref & 1) {
-                const size_t row_ref = (ref >> 1);
+                size_t row_ref = size_t(uint64_t(ref) >> 1);
 
                 // If the last byte in the stored key is zero, we know that we have
                 // compared against the entire (target) string
@@ -2541,16 +2658,16 @@ top:
                 else return FindRes_not_found; // not_found
             }
 
-            const char* sub_header  = m_alloc.translate(ref);
+            const char* sub_header  = m_alloc.translate(to_ref(ref));
             const bool  sub_isindex = get_indexflag_from_header(sub_header);
 
             // List of matching row indexes
             if (!sub_isindex) {
-                const bool sub_isnode = get_isnode_from_header(sub_header);
+                const bool sub_isleaf = get_isleaf_from_header(sub_header);
 
                 // In most cases the row list will just be an array but there
                 // might be so many matches that it has branched into a column
-                if (!sub_isnode) {
+                if (sub_isleaf) {
                     const size_t sub_width = get_width_from_header(sub_header);
                     const char*  sub_data  = get_data_from_header(sub_header);
                     const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
@@ -2564,7 +2681,7 @@ top:
                     }
                 }
                 else {
-                    const Column sub(ref, NULL, 0, m_alloc);
+                    const Column sub(to_ref(ref), 0, 0, m_alloc);
                     const size_t first_row_ref = to_size_t(sub.get(0));
 
                     // If the last byte in the stored key is not zero, we have
@@ -2582,10 +2699,10 @@ top:
             }
 
             // Recurse into sub-index;
-            header  = m_alloc.translate(ref);
+            header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
-            is_node = get_isnode_from_header(header);
+            is_leaf = get_isleaf_from_header(header);
             goto top;
         }
         else return FindRes_not_found; // not_found
@@ -2600,7 +2717,7 @@ size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_
     const char* data   = m_data;
     const char* header;
     size_t width = m_width;
-    bool is_node = m_isNode;
+    bool is_leaf = !m_isNode;
 
 top:
     // Create 4 byte index key
@@ -2612,11 +2729,11 @@ top:
 
     for (;;) {
         // Get subnode table
-        ref_type ref_offsets = to_ref(get_direct(data, width, 0));
-        ref_type ref_refs    = to_ref(get_direct(data, width, 1));
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
-        const char* offsets_header = m_alloc.translate(ref_offsets);
+        const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data = get_data_from_header(offsets_header);
         size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
 
@@ -2624,17 +2741,17 @@ top:
         if (pos == not_found) return 0;
 
         // Get entry under key
-        const char* refs_header = m_alloc.translate(ref_refs);
+        const char* refs_header = m_alloc.translate(refs_ref);
         const char* refs_data = get_data_from_header(refs_header);
         size_t refs_width  = get_width_from_header(refs_header);
-        ref_type ref = to_ref(get_direct(refs_data, refs_width, pos));
+        int64_t ref = get_direct(refs_data, refs_width, pos);
 
-        if (is_node) {
+        if (!is_leaf) {
             // Set vars for next iteration
-            header  = m_alloc.translate(ref);
+            header  = m_alloc.translate(to_ref(ref));
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
-            is_node = get_isnode_from_header(header);
+            is_leaf = get_isleaf_from_header(header);
             continue;
         }
 
@@ -2643,7 +2760,7 @@ top:
         if (stored_key == key) {
             // Literal row index
             if (ref & 1) {
-                const size_t row_ref = (ref >> 1);
+                const size_t row_ref = size_t((uint64_t(ref) >> 1));
 
                 // If the last byte in the stored key is zero, we know that we have
                 // compared against the entire (target) string
@@ -2654,19 +2771,19 @@ top:
                 else return 0;
             }
 
-            const char* sub_header = m_alloc.translate(ref);
+            const char* sub_header = m_alloc.translate(to_ref(ref));
             const bool sub_isindex = get_indexflag_from_header(sub_header);
 
             // List of matching row indexes
             if (!sub_isindex) {
-                const bool sub_isnode = get_isnode_from_header(sub_header);
+                const bool sub_isleaf = get_isleaf_from_header(sub_header);
                 size_t sub_count;
                 size_t row_ref;
 
                 // In most cases the row list will just be an array but there
                 // might be so many matches that it has branched into a column
-                if (!sub_isnode) {
-                    sub_count  = get_len_from_header(sub_header);
+                if (sub_isleaf) {
+                    sub_count  = get_size_from_header(sub_header);
 
                     // If the last byte in the stored key is zero, we know that we have
                     // compared against the entire (target) string
@@ -2677,7 +2794,7 @@ top:
                     row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
                 }
                 else {
-                    const Column sub(ref, NULL, 0, m_alloc);
+                    const Column sub(to_ref(ref), 0, 0, m_alloc);
                     sub_count = sub.size();
 
                     // If the last byte in the stored key is zero, we know that we have
@@ -2693,10 +2810,10 @@ top:
             }
 
             // Recurse into sub-index;
-            header  = m_alloc.translate(ref);
+            header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
-            is_node = get_isnode_from_header(header);
+            is_leaf = get_isleaf_from_header(header);
             goto top;
         }
         else return 0;
@@ -2723,7 +2840,7 @@ pair<MemRef, size_t> Array::find_btree_leaf(size_t ndx) const TIGHTDB_NOEXCEPT
         ref_type child_ref = to_ref(get_direct(get_data_from_header(header), width, child_ndx));
 
         header = m_alloc.translate(child_ref);
-        bool child_is_leaf = !get_isnode_from_header(header);
+        bool child_is_leaf = get_isleaf_from_header(header);
         if (child_is_leaf) return make_pair(MemRef(header, child_ref), ndx);
 
         width = get_width_from_header(header);

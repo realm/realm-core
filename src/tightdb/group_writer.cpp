@@ -35,9 +35,9 @@ size_t GroupWriter::commit()
 
     // Ensure that the freelist arrays are are themselves added to
     // (the allocator) free list
-    fpositions.CopyOnWrite();
-    flengths.CopyOnWrite();
-    if (is_shared) fversions.CopyOnWrite();
+    fpositions.copy_on_write();
+    flengths.copy_on_write();
+    if (is_shared) fversions.copy_on_write();
 
     // Recursively write all changed arrays
     // (but not top yet, as it contains refs to free lists which are changing)
@@ -408,7 +408,7 @@ void GroupWriter::dump()
     bool is_shared    = m_group.m_is_shared;
 
     size_t count = flengths.size();
-    cout << "count: " << count << ", m_len = " << m_file_map.get_size() << ", version >= " << m_readlock_version << "\n";
+    cout << "count: " << count << ", m_size = " << m_file_map.get_size() << ", version >= " << m_readlock_version << "\n";
     if (!is_shared) {
         for (size_t i = 0; i < count; ++i) {
             cout << i << ": " << fpositions.get(i) << ", " << flengths.get(i) << "\n";

@@ -398,6 +398,78 @@ size_t Spec::get_column_index(StringData name) const
     return m_names.find_first(name);
 }
 
+
+void Spec::get_column_info(size_t column_ndx, ColumnInfo& info) const
+{
+    size_t type_attr_ndx = 0;
+    size_t column_ref_ndx = 0;
+    bool has_index = false;
+    size_t i = 0;
+    size_t type_attr_count = get_type_attr_count();
+    for (;; ++type_attr_ndx) {
+        TIGHTDB_ASSERT(type_attr_ndx != get_type_attr_count());
+        if (type_attr_ndx == type_attr_count)
+            return;
+        ColumnType type_attr = get_type_attr(type_attr_ndx);
+        switch (type_attr) {
+            case col_type_Int:
+            case col_type_Bool:
+            case col_type_String:
+            case col_type_StringEnum:
+            case col_type_Binary:
+            case col_type_Table:
+            case col_type_Mixed:
+            case col_type_Date:
+            case col_type_Reserved1:
+            case col_type_Float:
+            case col_type_Double:
+            case col_type_Reserved4:
+                TIGHTDB_ASSERT(type_attr != col_type_Reserved1);
+                TIGHTDB_ASSERT(type_attr != col_type_Reserved4);
+                if (i == column_ndx) {
+                    info.m_column_ref_ndx = column_ref_ndx;
+                    info.m_has_index = has_index;
+                    return;
+                }
+                ++i;
+                ++column_ref_ndx;
+                if (type_attr == col_type_StringEnum) ++column_ref_ndx;
+                if (has_index) ++column_ref_ndx;
+                has_index = false;
+                continue;
+            case col_attr_Indexed:
+                has_index = true;
+                continue;
+            case col_attr_Unique:
+            case col_attr_Sorted:
+            case col_attr_None:
+                // These are not yet used
+                break;
+        }
+        TIGHTDB_ASSERT(false);
+    }
+}
+
+
+void Spec::get_subcolumn_info(const vector<size_t>& column_path, size_t column_path_ndx,
+                              ColumnInfo& info) const
+{
+    TIGHTDB_ASSERT(1 <= column_path.size());
+    TIGHTDB_ASSERT(column_path_ndx <= column_path.size() - 1);
+    size_t column_ndx = column_path[column_path_ndx];
+    bool is_last = column_path.size() <= column_path_ndx + 1;
+    if (is_last) {
+        get_column_info(column_ndx, info);
+        return;
+    }
+
+    size_t subspec_ndx = get_subspec_ndx(column_ndx);
+    ref_type subspec_ref = get_subspec_ref(subspec_ndx);
+    Spec subspec(0, m_specSet.get_alloc(), subspec_ref, 0, 0);
+    subspec.get_subcolumn_info(column_path, column_path_ndx+1, info);
+}
+
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
 size_t* Spec::record_subspec_path(const Array* root_subspecs, size_t* begin,
                                   size_t* end) const TIGHTDB_NOEXCEPT

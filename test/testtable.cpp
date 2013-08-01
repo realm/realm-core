@@ -14,9 +14,11 @@
 using namespace std;
 using namespace tightdb;
 
+namespace {
 TIGHTDB_TABLE_2(TupleTableType,
                 first,  Int,
                 second, String)
+}
 
 #ifndef TIGHTDB_BYPASS_OPTIMIZE_CRASH_BUG
 TEST(TestOptimizeCrash)
@@ -1194,7 +1196,7 @@ TEST(Table_Spec_RenameColumns)
 
     // Rename sub-column
     column_path.push_back(0); // third
-    table->rename_column(column_path, "sub_1st");
+    table->rename_subcolumn(column_path, "sub_1st");
 
     // Get the sub-table
     {
@@ -1269,7 +1271,7 @@ TEST(Table_Spec_DeleteColumns)
     column_path.push_back(1); // sub_second
 
     // Remove a column in sub-table
-    table->remove_column(column_path);
+    table->remove_subcolumn(column_path);
 
     // Get the sub-table again and see if the values
     // still match.
@@ -2049,15 +2051,13 @@ TEST(TableView_SetSubTableByExample)
     // Add two rows
     table->insert_int(0, 0, 4);
     table->insert_string(1, 0, "Hello");
-    table->insert_subtable(2, 0);// create a freestanding table to be used as a source by set_subtable 
+    table->insert_subtable(2, 0);// create a freestanding table to be used as a source by set_subtable
     table->insert_done();
 
     table->insert_int(0, 1, 8);
     table->insert_string(1, 1, "Hi!, Hello?");
     table->insert_subtable(2, 1);
     table->insert_done();
-    
-
 
     Table  sub = Table();
     sub.add_column(type_Int,"sub_first");

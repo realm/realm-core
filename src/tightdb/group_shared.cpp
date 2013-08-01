@@ -220,6 +220,8 @@ retry:
 
 SharedGroup::~SharedGroup()
 {
+    if (!is_attached()) return;
+
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION

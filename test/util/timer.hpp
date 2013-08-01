@@ -71,7 +71,7 @@ template<class Ch, class Tr>
 std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Timer& timer)
 {
     double seconds_float = timer;
-    uint_fast64_t rounded_minutes = std::floor(seconds_float/60 + 0.5);
+    uint_fast64_t rounded_minutes = uint_fast64_t(std::floor(seconds_float/60 + 0.5));
     if (60 <= rounded_minutes) {
         // 1h0m -> inf
         uint_fast64_t hours             = rounded_minutes / 60;
@@ -80,7 +80,7 @@ std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Ti
         out << remaining_minutes << "m";
     }
     else {
-        uint_fast64_t rounded_seconds = std::floor(seconds_float + 0.5);
+        uint_fast64_t rounded_seconds = uint_fast64_t(std::floor(seconds_float + 0.5));
         if (60 <= rounded_seconds) {
             // 1m0s -> 59m59s
             uint_fast64_t minutes           = rounded_seconds / 60;
@@ -89,7 +89,7 @@ std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Ti
             out << remaining_seconds << "s";
         }
         else {
-            uint_fast64_t rounded_centies = std::floor(seconds_float*100 + 0.5);
+            uint_fast64_t rounded_centies = uint_fast64_t(std::floor(seconds_float*100 + 0.5));
             if (100 <= rounded_centies) {
                 // 1s -> 59.99s
                 uint_fast64_t seconds           = rounded_centies / 100;
@@ -108,7 +108,8 @@ std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Ti
             }
             else {
                 // 0ms -> 999.9ms
-                uint_fast64_t rounded_centi_centies = std::floor(seconds_float*10000 + 0.5);
+                uint_fast64_t rounded_centi_centies =
+                    uint_fast64_t(std::floor(seconds_float*10000 + 0.5));
                 uint_fast64_t millis                  = rounded_centi_centies / 10;
                 uint_fast64_t remaining_centi_centies = rounded_centi_centies - millis*10;
                 out << millis;

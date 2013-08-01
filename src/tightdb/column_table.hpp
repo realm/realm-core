@@ -109,6 +109,8 @@ protected:
     /// type.
     ref_type clone_table_columns(const Table*);
 
+    static ref_type create(std::size_t size, Allocator&);
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     std::size_t* record_subtable_path(std::size_t* begin,
                                       std::size_t* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
@@ -166,7 +168,6 @@ public:
                 ArrayParent*, std::size_t ndx_in_parent,
                 ref_type spec_ref, ref_type column_ref);
 
-    bool has_subtable(std::size_t ndx) const;
     std::size_t get_subtable_size(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
     /// The returned table pointer must always end up being wrapped in
@@ -196,21 +197,21 @@ public:
 
     void invalidate_subtables_virtual() TIGHTDB_OVERRIDE;
 
-    void set_specref(ref_type ref) { m_ref_specSet = ref; }
+    static ref_type create(std::size_t size, Allocator&);
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
 #endif
 
 protected:
-#ifdef TIGHTDB_DEBUG
-    virtual void leaf_to_dot(std::ostream&, const Array& array) const;
-#endif
-
     // Member variables
-    ref_type m_ref_specSet;
+    const ref_type m_ref_specSet;
 
     bool subtables_have_shared_spec() TIGHTDB_OVERRIDE { return true; }
+
+#ifdef TIGHTDB_DEBUG
+    virtual void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
+#endif
 };
 
 
@@ -364,6 +365,13 @@ inline ref_type ColumnSubtableParent::clone_table_columns(const Table* t)
     return t->clone_columns(m_array->get_alloc());
 }
 
+inline ref_type ColumnSubtableParent::create(std::size_t size, Allocator& alloc)
+{
+    Column c(Array::type_HasRefs, alloc);
+    c.fill(size);
+    return c.get_ref();
+}
+
 
 inline ColumnTable::ColumnTable(Allocator& alloc, const Table* table, std::size_t column_ndx,
                                 ref_type spec_ref):
@@ -383,6 +391,11 @@ inline void ColumnTable::add(const Table* subtable)
 inline void ColumnTable::invalidate_subtables_virtual()
 {
     invalidate_subtables();
+}
+
+inline ref_type ColumnTable::create(std::size_t size, Allocator& alloc)
+{
+    return ColumnSubtableParent::create(size, alloc);
 }
 
 

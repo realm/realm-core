@@ -101,10 +101,10 @@ void ArrayStringLong::resize(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    size_t len = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t size = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
 
     m_offsets.resize(ndx);
-    m_blob.resize(len);
+    m_blob.resize(size);
 }
 
 void ArrayStringLong::clear()
@@ -181,6 +181,35 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
     const char* data = ArrayBlob::get(blob_header, begin);
     size_t size = end - begin;
     return StringData(data, size);
+}
+
+
+ref_type ArrayStringLong::btree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
+{
+    size_t leaf_size = size();
+    TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_LIST_SIZE);
+    if (leaf_size < ndx) ndx = leaf_size;
+    if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_LIST_SIZE)) {
+        insert(ndx, value);
+        return 0; // Leaf was not split
+    }
+
+    // Split leaf node
+    ArrayStringLong new_leaf(0, 0, get_alloc());
+    if (ndx == leaf_size) {
+        new_leaf.add(value);
+        state.m_split_offset = ndx;
+    }
+    else {
+        for (size_t i = ndx; i != leaf_size; ++i) {
+            new_leaf.add(get(i));
+        }
+        resize(ndx);
+        add(value);
+        state.m_split_offset = ndx + 1;
+    }
+    state.m_split_size = leaf_size + 1;
+    return new_leaf.get_ref();
 }
 
 
