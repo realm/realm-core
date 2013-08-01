@@ -2462,7 +2462,7 @@ top:
         size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
 
         // If key is outside range, we know there can be no match
-        if (pos == not_found) return; // not_found
+        if (pos == offsets_size) return; // not_found
 
         // Get entry under key
         const char* refs_header = m_alloc.translate(refs_ref);
@@ -2593,7 +2593,7 @@ top:
         size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
 
         // If key is outside range, we know there can be no match
-        if (pos == not_found) return FindRes_not_found;
+        if (pos == offsets_size) return FindRes_not_found;
 
         // Get entry under key
         const char* refs_header = m_alloc.translate(refs_ref);
@@ -2712,7 +2712,7 @@ top:
         size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
 
         // If key is outside range, we know there can be no match
-        if (pos == not_found) return 0;
+        if (pos == offsets_size) return 0;
 
         // Get entry under key
         const char* refs_header = m_alloc.translate(refs_ref);
