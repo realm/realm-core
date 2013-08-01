@@ -70,7 +70,9 @@ pthread_mutex_init (pthread_mutex_t * mutex, const pthread_mutexattr_t * attr)
 #error ERROR [__FILE__, line __LINE__]: Process shared mutexes are not supported yet.
 
 #else
-          // IF YOU PAGEFAULT HERE, IT'S LIKELY CAUSED BY DATABASE RESIDING ON NETWORK SHARE (WINDOWS + *NIX)
+          // IF YOU PAGEFAULT HERE, IT'S LIKELY CAUSED BY DATABASE RESIDING ON NETWORK SHARE (WINDOWS + *NIX). Memory 
+          // mapping is not coherent there. Note that this issue is NOT pthread related. Only reason why it happens in 
+          // this mutex->is_shared is that mutex coincidentally happens to be the first member that shared group accesses.
           mutex->is_shared = 1;
           // ^^^^ Look above
 

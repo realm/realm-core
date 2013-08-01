@@ -8,8 +8,6 @@
 #include <tightdb/utilities.hpp>
 #include <tightdb/query_engine.hpp>
 
-//#include <tightdb/query_expression.h>
-
 #define USE_VLD
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
     #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
@@ -90,13 +88,12 @@ int main(int argc, char* argv[])
     table.set_int(0, 10000, 20);
     table.set_float(1, 10000, 20.0);
 
-        // 633
-#if 1
-        // Slow dynamic, 250 ms
-        //== col 
+
+
 
 //        fcol(1) + (icol(0) + 20) > 50.0
 
+#if 0
         Subexpr* col = new Columns<int64_t>(0);
         Subexpr* colf = new Columns<float>(1);
 
@@ -106,19 +103,22 @@ int main(int argc, char* argv[])
         Subexpr* ck0 = new Operator<int64_t, Plus<int64_t> >(col, cc1);  
         Subexpr* ck = new Operator<float, Plus<float> >(colf, ck0);  
 
-
-
+        Expression *e = new Compare<Greater, float>(ck, cc2);
 #else
-        // Fast static, 190
-//        Columns* col = new Columns(&a);
-        Columns* col = new Columns(0);
-        Constant* cc1 = new Constant(20);
-        Constant* cc2 = new Constant(50);  
-        Subexpr* ck = new Operator<Plus, Columns, Constant>(col, cc1);  
+        Columns<int64_t>* col = new Columns<int64_t>(0);
+        Columns<float>* colf = new Columns<float>(1);
+
+        Value<int64_t>* cc1 = new Value<int64_t>(20);
+        Value<float>* cc2 = new Value<float>(50.0);  
+
+        Operator<int64_t, Plus<int64_t>, Columns<int64_t>, Value<int64_t>>* ck0 = new Operator<int64_t, Plus<int64_t>, Columns<int64_t>, Value<int64_t>>(col, cc1);  
+        Subexpr* ck = new Operator<float, Plus<float>, Columns<float>, Operator<int64_t, Plus<int64_t>, Columns<int64_t>, Value<int64_t>>>(colf, ck0);  
+
+        Expression *e = new Compare<Greater, float, Subexpr, Value<float>>(ck, cc2);
+
 
 #endif
 
-        Expression *e = new Compare<Greater, float>(ck, cc2);
 
 
     tightdb::TableView t1;

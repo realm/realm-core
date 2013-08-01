@@ -15,14 +15,13 @@ template <class T> struct Power {
     T operator()(T v) const {v * v;} 
 };
 
-
 class ValueBase 
 {
 public:
     static const size_t elements = 8;
     virtual void output_ints(ValueBase* destination) = 0;
     virtual void output_floats(ValueBase* destination) = 0;
-    virtual void get(ValueBase* destination) = 0;
+    virtual void fetch(ValueBase* destination) = 0;
 };
 
 class Subexpr
@@ -33,9 +32,7 @@ public:
     const Table* m_table;
 };
 
-// Performance note: If members are declared as an 8-entry array, VS2010 emits slower code compared to declaring them
-// as separately named members - both if you address them individually/unrolled and if you use loops. gcc is equally slow
-// in either case
+
 template<class T> class Value : public ValueBase, public Subexpr
 {
 public:
@@ -47,13 +44,13 @@ public:
     }
 
     TIGHTDB_FORCEINLINE void evaluate(size_t i, ValueBase* destination) {
-        destination->get(this);
+        destination->fetch(this);
     }
 
-    template <class TOperator> TIGHTDB_FORCEINLINE void fun(Value& q1, Value& q2) {
+    template <class TOperator> TIGHTDB_FORCEINLINE void fun(Value* left, Value* right) {
         TOperator o;
         for(size_t t = 0; t < ValueBase::elements; t++)
-            m_v[t] = o(q1.m_v[t], q2.m_v[t]);
+            m_v[t] = o(left->m_v[t], right->m_v[t]);
     }
 
     template<class U> TIGHTDB_FORCEINLINE void output(ValueBase* destination)
@@ -73,7 +70,7 @@ public:
         output<float>(destination);
     }
 
-    TIGHTDB_FORCEINLINE void get(ValueBase* source)
+    TIGHTDB_FORCEINLINE void fetch(ValueBase* source)
     {
         if(SameType<T, int64_t>::value)
             source->output_ints(this);
@@ -81,6 +78,8 @@ public:
             source->output_floats(this);
     }
     
+    // Performance note: Declaring values as separately named members generates faster (10% or so) code in VS2010, 
+    // compared to array, even if the array accesses elements individually instead of in for-loops.
     T m_v[elements];
 };
 
@@ -101,16 +100,16 @@ public:
     }
 
     TIGHTDB_FORCEINLINE void evaluate(size_t i, ValueBase* destination) {
+        Value<T> v;            
         sg.cache_next(i);
         if(SameType<T, int64_t>::value) {
-            sg.m_array_ptr->get_chunk(i - sg.m_leaf_start, ((Value<int64_t>*)destination)->m_v);
+            sg.m_array_ptr->get_chunk(i - sg.m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
         }
         else {
-            Value<T> v;            
             for(size_t t = 0; t < ValueBase::elements && i + t < sg.m_leaf_end; t++)
                 v.m_v[t] = sg.get_next(i + t);
-            destination->get(&v);
         }
+        destination->fetch(&v);
     }
 
 private:
@@ -119,10 +118,10 @@ private:
 };
 
 
-template <class T, class oper> class Operator : public Subexpr
+template <class T, class oper, class TLeft = Subexpr, class TRight = Subexpr> class Operator : public Subexpr
 {
 public:
-    Operator(Subexpr* left, Subexpr* right) {
+    Operator(TLeft* left, TRight* right) {
         m_left = left;
         m_right = right;
     };
@@ -134,20 +133,40 @@ public:
     }
 
     TIGHTDB_FORCEINLINE void evaluate(size_t i, ValueBase* destination) {
-        Value<T> q1;
-        Value<T> q2;
-
-        m_left->evaluate(i, &q1);
-        m_right->evaluate(i, &q2); 
-
         Value<T> result;
-        result.template fun<oper>(q1, q2);
-        destination->get(&result);
+        Value<T> left;
+        Value<T> right;
+
+        // Optimize for Constant <operator> Column and Column <operator> Constant
+        if(SameType<TLeft, Value<T>>::value && SameType<TRight, Columns<T>>::value) {
+            m_right->evaluate(i, &right);
+            result.template fun<oper>(static_cast<Value<T>*>(static_cast<Subexpr*>(m_left)), &right);
+        }
+        else if(SameType<TRight, Value<T>>::value && SameType<TLeft, Columns<T>>::value) {
+            m_left->evaluate(i, &left);
+            result.template fun<oper>(static_cast<Value<T>*>(static_cast<Subexpr*>(m_right)), &left);
+        }
+        else {
+            // Avoid vtable lookups. Qualifying is apparently required even with 'final' keyword in C++11
+            if(!SameType<TLeft, Subexpr>::value)
+                m_left->TLeft::evaluate(i, &left);
+            else
+                m_left->evaluate(i, &left);
+    
+            if(!SameType<TRight, Subexpr>::value)
+                m_right->TRight::evaluate(i, &right);
+            else
+                m_right->evaluate(i, &right);
+
+            result.template fun<oper>(&left, &right);
+        }
+
+        destination->fetch(&result);
     }
 
 private:
-    Subexpr* m_left;
-    Subexpr* m_right;
+    TLeft* m_left;
+    TRight* m_right;
 };
 
 
@@ -159,48 +178,115 @@ public:
 };
 
 
-template <class TCond, class T> class Compare : public Expression
+template <class TCond, class T, class TLeft = Subexpr, class TRight = Subexpr> class Compare : public Expression
 {
 public:
-    Compare(Subexpr* e1, Subexpr* e2) 
+    Compare(TLeft* left, TRight* right) 
     {
-        m_e1 = e1;
-        m_e2 = e2;
+        m_left = left;
+        m_right = right;
     }
 
     void set_table(const Table* table) 
     {
-        m_e1->set_table(table);
-        m_e2->set_table(table);
+        m_left->set_table(table);
+        m_right->set_table(table);
     }
 
     size_t compare(size_t start, size_t end) {
         TCond c;
-        Value<T> q1;
-        Value<T> q2;
+        Value<T> vleft;
+        Value<T> vright;
 
-        for(; start < end; start += ValueBase::elements) {
-            m_e1->evaluate(start, &q1);
-            m_e2->evaluate(start, &q2);
-            
-            if(start + ValueBase::elements < end) {
-                for(size_t t = 0; t < ValueBase::elements; t++)
-                    if(c(q1.m_v[t], q2.m_v[t]))
-                        return start + t;
-            }
-            else {
-                for(size_t t = 0; start + t < end; t++) 
-                    if(c(q1.m_v[t], q2.m_v[t]))
-                        return start + t;
-            }
+        Value<T>* pleft = &vleft;
+        Value<T>* pright = &vright;
+
+        // Whole chunks
+        for(; start + ValueBase::elements < end; start += ValueBase::elements) {
+            if(!SameType<TLeft, Value<T>>::value)
+                m_left->evaluate(start, pleft);
+            else
+                pleft = static_cast<Value<T>*>(static_cast<Subexpr*>(m_left));
+    
+            if(!SameType<TRight, Value<T>>::value)
+                m_right->evaluate(start, pright);
+            else
+                pright = static_cast<Value<T>*>(static_cast<Subexpr*>(m_right));
+
+            // 665 ms unrolled vs 698 (vs2010)
+            if(c(pleft->m_v[0], pright->m_v[0]))
+                return start + 0;          
+            if(c(pleft->m_v[1], pright->m_v[1]))
+                return start + 1;          
+            if(c(pleft->m_v[2], pright->m_v[2]))
+                return start + 2;          
+            if(c(pleft->m_v[3], pright->m_v[3]))
+                return start + 3;          
+            if(c(pleft->m_v[4], pright->m_v[4]))
+                return start + 4;          
+            if(c(pleft->m_v[5], pright->m_v[5]))
+                return start + 5;          
+            if(c(pleft->m_v[6], pright->m_v[6]))
+                return start + 6;          
+            if(c(pleft->m_v[7], pright->m_v[7]))
+                return start + 7;          
         }
+
+        // Partial remainder
+        if(start < end) {
+            m_left->evaluate(start, &vleft);
+            m_right->evaluate(start, &vright);
+
+            for(size_t t = 0; start + t < end; t++) 
+                if(c(vleft.m_v[t], vright.m_v[t]))
+                    return start + t;
+        }
+
         return end; // no match
     }
     
 private: 
-    Subexpr* m_e1;
-    Subexpr* m_e2;
+    TLeft* m_left;
+    TRight* m_right;
 };
 
 //}
 #endif // TIGHTDB_QUERY_EXPRESSION_HPP
+
+
+
+
+
+
+/*
+
+
+
+        TCond c;
+        Value<T> vleft;
+        Value<T> vright;
+
+
+
+
+        for(; start < end; start += ValueBase::elements) {
+            m_left->evaluate(start, &vleft);
+            m_right->evaluate(start, &vright);          
+
+            if(start + ValueBase::elements < end) {
+                for(size_t t = 0; t < ValueBase::elements; t++)
+                    if(c(vleft.m_v[t], vright.m_v[t]))
+                        return start + t;
+            }
+            else {
+                for(size_t t = 0; start + t < end; t++) 
+                    if(c(vleft.m_v[t], vright.m_v[t]))
+                        return start + t;
+            }
+        }
+
+
+
+        return end; // no match
+
+        */
