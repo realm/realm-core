@@ -327,23 +327,20 @@ void Array::set(size_t ndx, int64_t value)
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
-    // Make room for the new value
-    size_t width = m_width;
-
-    if (value < m_lbound || value > m_ubound)
-        width = bit_width(value);
-
-    bool do_expand = (width > m_width);
+    bool do_expand = value < m_lbound || value > m_ubound;
     if (do_expand) {
+        size_t width = bit_width(value);
+        TIGHTDB_ASSERT(width > m_width);
         Getter old_getter = m_getter;    // Save old getter before width expansion
         alloc(m_size, width); // Throws
         set_width(width);
 
         // Expand the old values
-        int k = int(m_size);
-        while (--k >= 0) {
-            int64_t v = (this->*old_getter)(k);
-            (this->*m_setter)(k, v);
+        size_t i = m_size;
+        while (i != 0) {
+            --i;
+            int64_t v = (this->*old_getter)(i);
+            (this->*m_setter)(i, v);
         }
     }
 
@@ -398,10 +395,11 @@ void Array::insert(size_t ndx, int64_t value)
 
     // Move values below insertion (may expand)
     if (do_expand || m_width < 8) {
-        int k = int(m_size);
-        while (--k >= int(ndx)) {
-            int64_t v = (this->*old_getter)(k);
-            (this->*m_setter)(k+1, v);
+        size_t i = m_size;
+        while (i > ndx) {
+            --i;
+            int64_t v = (this->*old_getter)(i);
+            (this->*m_setter)(i, v);
         }
     }
     else if (ndx != m_size) {
@@ -420,10 +418,11 @@ void Array::insert(size_t ndx, int64_t value)
 
     // Expand values above insertion
     if (do_expand) {
-        int k = int(ndx);
-        while (--k >= 0) {
-            int64_t v = (this->*old_getter)(k);
-            (this->*m_setter)(k, v);
+        size_t i = ndx;
+        while (i != 0) {
+            --i;
+            int64_t v = (this->*old_getter)(i);
+            (this->*m_setter)(i, v);
         }
     }
 
@@ -447,6 +446,30 @@ void Array::resize(size_t count)
     // Update size (also in header)
     m_size = count;
     set_header_size(m_size);
+}
+
+void Array::ensure_minimum_width(int64_t value)
+{
+    if (value >= m_lbound && value <= m_ubound) return;
+
+    // Check if we need to copy before modifying
+    copy_on_write(); // Throws
+
+    // Make room for the new value
+    size_t width = bit_width(value);
+    TIGHTDB_ASSERT(width > m_width);
+
+    Getter old_getter = m_getter;    // Save old getter before width expansion
+    alloc(m_size, width); // Throws
+    set_width(width);
+
+    // Expand the old values
+    size_t i = m_size;
+    while (i != 0) {
+        --i;
+        int64_t v = (this->*old_getter)(i);
+        (this->*m_setter)(i, v);
+    }
 }
 
 void Array::SetAllToZero()

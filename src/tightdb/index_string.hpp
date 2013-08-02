@@ -32,7 +32,6 @@ typedef StringData (*StringGetter)(void*, std::size_t);
 class StringIndex: public Column {
 public:
     StringIndex(void* target_column, StringGetter get_func, Allocator&);
-    StringIndex(Array::Type, Allocator&);
     StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, void* target_column,
                 StringGetter get_func, Allocator&);
     void set_target(void* target_column, StringGetter get_func) TIGHTDB_NOEXCEPT;
@@ -67,6 +66,9 @@ public:
     static key_type create_key(StringData) TIGHTDB_NOEXCEPT;
 
 private:
+    struct transient_tag {};
+    StringIndex(transient_tag, Allocator&);
+
     void Create();
 
     void InsertWithOffset(size_t row_ndx, size_t offset, StringData value);

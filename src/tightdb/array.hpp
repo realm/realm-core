@@ -305,6 +305,10 @@ public:
     void erase(std::size_t ndx);
     void clear();
 
+    /// If neccessary, expand the representation so that it can store
+    /// the specified value.
+    void ensure_minimum_width(int64_t value);
+
     // Direct access methods
     const Array* GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
                           bool use_retval = false) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array

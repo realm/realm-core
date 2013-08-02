@@ -12,16 +12,10 @@ StringIndex::StringIndex(void* target_column, StringGetter get_func, Allocator& 
     Create();
 }
 
-StringIndex::StringIndex(Array::Type type, Allocator& alloc):
-    Column(type, 0, 0, alloc), m_target_column(0), m_get_func(0)
+StringIndex::StringIndex(transient_tag, Allocator& alloc):
+    Column(Array::type_HasRefs, 0, 0, alloc), m_target_column(0), m_get_func(0)
 {
-    TIGHTDB_ASSERT(type == Array::type_InnerColumnNode); // only used for node creation at this point
-
-    // Mark that this is part of index
-    // (as opposed to columns under leafs)
-    m_array->SetIsIndexNode(true);
-
-    // no need to call create as sub-arrays have been created by column constructor
+    Create();
 }
 
 StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t pndx, void* target_column, StringGetter get_func, Allocator& alloc)
@@ -38,10 +32,9 @@ void StringIndex::Create()
 
     // Add subcolumns for leafs
     Allocator& alloc = m_array->get_alloc();
-    Array values(Array::type_Normal, NULL, 0, alloc);
-values.add(0x7FFFFFFF);
-values.erase(0);
-    Array refs(Array::type_HasRefs, NULL, 1, alloc);
+    Array values(Array::type_Normal, 0, 0, alloc);
+    values.ensure_minimum_width(0x7FFFFFFF); // This ensures 31 bits plus a sign bit
+    Array refs(Array::type_HasRefs, 0, 1, alloc);
     m_array->add(values.get_ref());
     m_array->add(refs.get_ref());
     values.set_parent(m_array, 0);
@@ -122,24 +115,24 @@ void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, String
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
-            StringIndex newNode(Array::type_InnerColumnNode, m_array->get_alloc());
-            newNode.NodeAddKey(nc.ref1);
-            newNode.NodeAddKey(get_ref());
-            update_ref(newNode.get_ref());
+            StringIndex new_node(transient_tag(), m_array->get_alloc());
+            new_node.NodeAddKey(nc.ref1);
+            new_node.NodeAddKey(get_ref());
+            update_ref(new_node.get_ref());
             return;
         }
         case NodeChange::insert_after: {
-            StringIndex newNode(Array::type_InnerColumnNode, m_array->get_alloc());
-            newNode.NodeAddKey(get_ref());
-            newNode.NodeAddKey(nc.ref1);
-            update_ref(newNode.get_ref());
+            StringIndex new_node(transient_tag(), m_array->get_alloc());
+            new_node.NodeAddKey(get_ref());
+            new_node.NodeAddKey(nc.ref1);
+            update_ref(new_node.get_ref());
             return;
         }
         case NodeChange::split: {
-            StringIndex newNode(Array::type_InnerColumnNode, m_array->get_alloc());
-            newNode.NodeAddKey(nc.ref1);
-            newNode.NodeAddKey(nc.ref2);
-            update_ref(newNode.get_ref());
+            StringIndex new_node(transient_tag(), m_array->get_alloc());
+            new_node.NodeAddKey(nc.ref1);
+            new_node.NodeAddKey(nc.ref2);
+            update_ref(new_node.get_ref());
             return;
         }
     }
@@ -183,43 +176,43 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         }
 
         // Else create new node
-        StringIndex newNode(Array::type_InnerColumnNode, m_array->get_alloc());
+        StringIndex new_node(transient_tag(), m_array->get_alloc());
         if (nc.type == NodeChange::split) {
             // update offset for left node
             key_type last_key = target.GetLastKey();
             offsets.set(node_ndx, last_key);
 
-            newNode.NodeAddKey(nc.ref2);
+            new_node.NodeAddKey(nc.ref2);
             ++node_ndx;
         }
         else {
-            newNode.NodeAddKey(nc.ref1);
+            new_node.NodeAddKey(nc.ref1);
         }
 
         switch (node_ndx) {
             case 0:             // insert before
-                return NodeChange(NodeChange::insert_before, newNode.get_ref());
+                return NodeChange(NodeChange::insert_before, new_node.get_ref());
             case TIGHTDB_MAX_LIST_SIZE: // insert after
                 if (nc.type == NodeChange::split)
-                    return NodeChange(NodeChange::split, get_ref(), newNode.get_ref());
-                else return NodeChange(NodeChange::insert_after, newNode.get_ref());
+                    return NodeChange(NodeChange::split, get_ref(), new_node.get_ref());
+                else return NodeChange(NodeChange::insert_after, new_node.get_ref());
             default:            // split
                 // Move items after split to new node
                 size_t len = refs.size();
                 for (size_t i = node_ndx; i < len; ++i) {
                     ref_type ref = refs.get_as_ref(i);
-                    newNode.NodeAddKey(ref);
+                    new_node.NodeAddKey(ref);
                 }
                 offsets.resize(node_ndx);
                 refs.resize(node_ndx);
-                return NodeChange(NodeChange::split, get_ref(), newNode.get_ref());
+                return NodeChange(NodeChange::split, get_ref(), new_node.get_ref());
         }
     }
     else {
         // Is there room in the list?
         Array old_offsets = m_array->GetSubArray(0);
-        const size_t count = old_offsets.size();
-        const bool noextend = count >= TIGHTDB_MAX_LIST_SIZE;
+        size_t count = old_offsets.size();
+        bool noextend = count >= TIGHTDB_MAX_LIST_SIZE;
 
         // See if we can fit entry into current leaf
         // Works if there is room or it can join existing entries
@@ -227,22 +220,21 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
             return NodeChange::none;
 
         // Create new list for item
-        StringIndex newList(m_target_column, m_get_func, m_array->get_alloc());
+        StringIndex new_list(transient_tag(), m_array->get_alloc());
 
-        newList.LeafInsert(row_ndx, key, offset, value);
+        new_list.LeafInsert(row_ndx, key, offset, value);
 
-        const size_t ndx = old_offsets.FindPos2(key);
-
+        size_t ndx = old_offsets.FindPos2(key);
         switch (ndx) {
             case 0:             // insert before
-                return NodeChange(NodeChange::insert_before, newList.get_ref());
+                return NodeChange(NodeChange::insert_before, new_list.get_ref());
             case size_t(-1): // insert after
-                return NodeChange(NodeChange::insert_after, newList.get_ref());
+                return NodeChange(NodeChange::insert_after, new_list.get_ref());
             default: // split
             {
                 Array old_refs = m_array->GetSubArray(1);
-                Array new_offsets = newList.m_array->GetSubArray(0);
-                Array new_refs = newList.m_array->GetSubArray(1);
+                Array new_offsets = new_list.m_array->GetSubArray(0);
+                Array new_refs = new_list.m_array->GetSubArray(1);
                 // Move items after split to new list
                 for (size_t i = ndx; i < count; ++i) {
                     int64_t v2 = old_offsets.get(i);
@@ -254,7 +246,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
                 old_offsets.resize(ndx);
                 old_refs.resize(ndx);
 
-                return NodeChange(NodeChange::split, get_ref(), newList.get_ref());
+                return NodeChange(NodeChange::split, get_ref(), new_list.get_ref());
             }
         }
     }
@@ -355,7 +347,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
         }
         else {
             // convert to sub-index
-            StringIndex sub_index(m_target_column, m_get_func, alloc);
+            StringIndex sub_index(transient_tag(), alloc);
             sub_index.InsertWithOffset(row_ndx2, sub_offset, v2);
             sub_index.InsertWithOffset(row_ndx, sub_offset, value);
             refs.set(ins_pos, sub_index.get_ref());
@@ -386,7 +378,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
             }
         }
         else {
-            StringIndex sub_index(m_target_column, m_get_func, alloc);
+            StringIndex sub_index(transient_tag(), alloc);
             sub_index.InsertRowList(sub.get_ref(), sub_offset, v2);
             sub_index.InsertWithOffset(row_ndx, sub_offset, value);
             refs.set(ins_pos, sub_index.get_ref());
@@ -437,7 +429,7 @@ void StringIndex::distinct(Array& result) const
     if (!m_array->is_leaf()) {
         for (size_t i = 0; i < count; ++i) {
             size_t ref = refs.get_as_ref(i);
-            const StringIndex ndx(ref, NULL, 0, m_target_column, m_get_func, alloc);
+            const StringIndex ndx(ref, 0, 0, m_target_column, m_get_func, alloc);
             ndx.distinct(result);
         }
     }
