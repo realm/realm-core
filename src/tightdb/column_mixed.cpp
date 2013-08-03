@@ -259,7 +259,7 @@ void ColumnMixed::set_binary(size_t ndx, BinaryData value)
     }
 }
 
-bool ColumnMixed::compare_mixed_entries(const ColumnMixed& c) const
+bool ColumnMixed::compare_mixed(const ColumnMixed& c) const
 {
     const size_t n = size();
     if (c.size() != n)

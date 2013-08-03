@@ -380,22 +380,22 @@ void BasicArray_Compare()
     C f1, f2;
 
     // Empty list
-    CHECK_EQUAL(true, f1.compare_entries(f2));
-    CHECK_EQUAL(true, f2.compare_entries(f1));
+    CHECK_EQUAL(true, f1.compare(f2));
+    CHECK_EQUAL(true, f2.compare(f1));
 
     // Add some values
     T values[] = { T(1.1), T(2.2), T(-1.0), T(5.5), T(1.1), T(4.4)};
     for (size_t i=0; i<6; ++i) {
         f1.add(values[i]);
         f2.add(values[i]);
-        CHECK_EQUAL(true, f1.compare_entries(f2));
+        CHECK_EQUAL(true, f1.compare(f2));
     }
 
     f1.erase(0);
-    CHECK_EQUAL(false, f1.compare_entries(f2));
+    CHECK_EQUAL(false, f1.compare(f2));
 
     f2.erase(0);
-    CHECK_EQUAL(true, f1.compare_entries(f2));
+    CHECK_EQUAL(true, f1.compare(f2));
 
     f1.destroy();    // cleanup
     f2.destroy();

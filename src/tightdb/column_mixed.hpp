@@ -125,7 +125,7 @@ public:
     ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
 
     /// Compare two mixed columns for equality.
-    bool compare_mixed_entries(const ColumnMixed&) const;
+    bool compare_mixed(const ColumnMixed&) const;
 
     void invalidate_subtables();
 

@@ -210,10 +210,10 @@ char* SlabAlloc::translate(ref_type ref) const TIGHTDB_NOEXCEPT
 {
     if (ref < m_baseline) return m_data + ref;
     else {
-        size_t ndx = m_slabs.column().ref_end.find_pos(ref);
-        TIGHTDB_ASSERT(ndx != not_found);
+        size_t ndx = m_slabs.column().ref_end.upper_bound(ref);
+        TIGHTDB_ASSERT(ndx != m_slabs.size());
 
-        size_t offset = ndx ? to_size_t(m_slabs[ndx-1].ref_end) : m_baseline;
+        size_t offset = ndx == 0 ? m_baseline : to_size_t(m_slabs[ndx-1].ref_end);
         intptr_t addr = intptr_t(m_slabs[ndx].addr.get());
         return reinterpret_cast<char*>(addr) + (ref - offset);
     }
@@ -437,7 +437,7 @@ bool SlabAlloc::is_all_free() const
         size_t size = to_ref(c.ref_end) - ref;
 
         size_t r = m_free_space.column().ref.find_first(ref);
-        if (r == size_t(-1)) return false;
+        if (r == not_found) return false;
         if (size != size_t(m_free_space[r].size)) return false;
 
         ref = to_ref(c.ref_end);
@@ -453,8 +453,8 @@ void SlabAlloc::Verify() const
         FreeSpace::ConstCursor c = m_free_space[i];
         ref_type ref = to_ref(c.ref);
 
-        size_t ndx = m_slabs.column().ref_end.find_pos(ref);
-        TIGHTDB_ASSERT(ndx != size_t(-1));
+        size_t ndx = m_slabs.column().ref_end.upper_bound(ref);
+        TIGHTDB_ASSERT(ndx != m_slabs.size());
 
         size_t slab_end = to_ref(m_slabs[ndx].ref_end);
         size_t free_end = ref + to_ref(c.size);

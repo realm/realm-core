@@ -43,17 +43,16 @@ public:
     void erase(std::size_t ndx);
     void clear();
 
-    size_t Find(T target, size_t start, size_t end) const;
-    size_t find_first(T value, size_t start=0 , size_t end=-1) const;
-    void find_all(Array& result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1);
+    std::size_t find_first(T value, std::size_t begin = 0 , std::size_t end = npos) const;
+    void find_all(Array& result, T value, std::size_t add_offset = 0,
+                  std::size_t begin = 0, std::size_t end = npos) const;
 
-    size_t count(T value, size_t start=0, size_t end=-1) const;
-    // Unused: double sum(size_t start=0, size_t end=-1) const;
-    bool maximum(T& result, size_t start=0, size_t end=-1) const;
-    bool minimum(T& result, size_t start=0, size_t end=-1) const;
+    std::size_t count(T value, std::size_t begin = 0, std::size_t end = npos) const;
+    bool maximum(T& result, std::size_t begin = 0, std::size_t end = npos) const;
+    bool minimum(T& result, std::size_t begin = 0, std::size_t end = npos) const;
 
     /// Compare two arrays for equality.
-    bool compare_entries(const BasicArray<T>&) const;
+    bool compare(const BasicArray<T>&) const;
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
@@ -63,12 +62,17 @@ public:
 
     ref_type btree_leaf_insert(std::size_t ndx, T, TreeInsertBase& state);
 
+    std::size_t lower_bound(T value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound(T value) const TIGHTDB_NOEXCEPT;
+
 private:
+    std::size_t find(T target, std::size_t begin, std::size_t end) const;
+
     virtual std::size_t CalcByteLen(std::size_t count, std::size_t width) const;
     virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const TIGHTDB_NOEXCEPT;
     virtual WidthType GetWidthType() const { return wtype_Multiply; }
 
-    template<bool find_max> bool minmax(T& result, size_t start, size_t end) const;
+    template<bool find_max> bool minmax(T& result, std::size_t begin, std::size_t end) const;
     static ref_type create_empty_basic_array(Allocator&);
 };
 

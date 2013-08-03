@@ -508,93 +508,6 @@ void Array::adjust(size_t start, int64_t diff)
 }
 
 
-// Binary search based on:
-// http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
-// Finds position of largest value SMALLER than the target (for lookups in
-// nodes)
-// Todo: rename to LastLessThan()
-template<size_t w> size_t Array::FindPos(int64_t target) const TIGHTDB_NOEXCEPT
-{
-    size_t low = size_t(-1);
-    size_t high = m_size;
-
-    // Binary search based on:
-    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
-    // Finds position of largest value SMALLER than the target (for lookups in
-    // nodes)
-    while (high - low > 1) {
-        size_t probe = (low + high) >> 1;
-        int64_t v = Get<w>(probe);
-
-        if (v > target)
-            high = probe;
-        else
-            low = probe;
-    }
-    if (high == m_size)
-        return not_found;
-    else
-        return high;
-}
-
-size_t Array::FindPos(int64_t target) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_TEMPEX(return FindPos, m_width, (target));
-}
-
-// BM FIXME: Rename to something better... // FirstGTE()
-size_t Array::FindPos2(int64_t target) const TIGHTDB_NOEXCEPT
-{
-    size_t low = size_t(-1);
-    size_t high = m_size;
-
-    // Binary search based on:
-    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
-    // Finds position of closest value BIGGER OR EQUAL to the target (for
-    // lookups in indexes)
-    while (high - low > 1) {
-        size_t probe = (low + high) >> 1;
-        int64_t v = get(probe);
-
-        if (v < target)
-            low = probe;
-        else
-            high = probe;
-    }
-    if (high == m_size)
-        return not_found;
-    else
-        return high;
-}
-
-// Finds either value, or if not in set, insert position
-// used both for lookups and maintaining order in sorted lists
-bool Array::FindPosSorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
-{
-    size_t low = size_t(-1);
-    size_t high = m_size;
-
-    // Binary search based on:
-    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
-    // Finds position of closest value BIGGER OR EQUAL to the target (for
-    // lookups in indexes)
-    while (high - low > 1) {
-        size_t probe = (low + high) >> 1;
-        int64_t v = get(probe);
-
-        if (v < target)
-            low = probe;
-        else
-            high = probe;
-    }
-
-    pos = high;
-    if (high == m_size)
-        return false;
-    else
-        return (get(high) == target);
-}
-
 // return first element E for which E >= target or return -1 if none. Array must be sorted
 size_t Array::FindGTE(int64_t target, size_t start) const
 {
@@ -650,8 +563,8 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     orig_high = high;
 
     while (high - start > 1) {
-        const size_t probe = (start + high) / 2;
-        const int64_t v = get(probe);
+        size_t probe = (start + high) / 2; // FIXME: Prone to overflow - see lower_bound() for a solution
+        int64_t v = get(probe);
         if (v < target)
             start = probe;
         else
@@ -1798,7 +1711,7 @@ vector<int64_t> Array::ToVector() const
     return v;
 }
 
-bool Array::compare_ints(const Array& a) const
+bool Array::compare_int(const Array& a) const
 {
     if (a.size() != size()) return false;
 
@@ -2101,7 +2014,7 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_
         size_t half = size_2 / 2;
         size_t mid = i + half;
         int64_t probe = get_direct<width>(data, mid);
-        if (probe <= value) {
+        if (!(value < probe)) {
             i = mid + 1;
             size_2 -= half + 1;
         }
@@ -2147,12 +2060,12 @@ inline pair<size_t, size_t> get_two_as_size(const char* header, size_t ndx) TIGH
 namespace tightdb {
 
 
-size_t Array::lower_bound(int64_t value) const TIGHTDB_NOEXCEPT
+size_t Array::lower_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_TEMPEX(return ::lower_bound, m_width, (m_data, m_size, value));
 }
 
-size_t Array::upper_bound(int64_t value) const TIGHTDB_NOEXCEPT
+size_t Array::upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_TEMPEX(return ::upper_bound, m_width, (m_data, m_size, value));
 }

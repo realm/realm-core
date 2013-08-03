@@ -316,25 +316,21 @@ public:
     void adjust(std::size_t start, int64_t diff);
 
     //@{
-
-    /// Find the lower/upper bound in a sorted sequence.
+    /// Find the lower/upper bound in an integer sequence sorted in
+    /// ascending order.
     ///
-    /// <pre>
-    ///
-    ///   3 3 3 4 4 4 5 6 7 9 9 9
-    ///   ^     ^     ^     ^     ^
-    ///   |     |     |     |     |
-    ///   |     |     |     |      -- Lower and upper bound of 15
-    ///   |     |     |     |
-    ///   |     |     |      -- Lower and upper bound of 8
-    ///   |     |     |
-    ///   |     |      -- Upper bound of 4
-    ///   |     |
-    ///   |      -- Lower bound of 4
-    ///   |
-    ///    -- Lower and upper bound of 1
-    ///
-    /// </pre>
+    ///     3 3 3 4 4 4 5 6 7 9 9 9
+    ///     ^     ^     ^     ^     ^
+    ///     |     |     |     |     |
+    ///     |     |     |     |      -- Lower and upper bound of 15
+    ///     |     |     |     |
+    ///     |     |     |      -- Lower and upper bound of 8
+    ///     |     |     |
+    ///     |     |      -- Upper bound of 4
+    ///     |     |
+    ///     |      -- Lower bound of 4
+    ///     |
+    ///      -- Lower and upper bound of 1
     ///
     /// These functions are functionally identical to
     /// std::lower_bound() and std::upper_bound().
@@ -344,13 +340,10 @@ public:
     ///
     /// It may be worth considering if overall efficiency can be
     /// improved by doing a linear search for short sequences.
-    std::size_t lower_bound(int64_t value) const TIGHTDB_NOEXCEPT;
-    std::size_t upper_bound(int64_t value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound_int(int64_t value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT;
     //@}
 
-    std::size_t FindPos(int64_t value) const TIGHTDB_NOEXCEPT;
-    std::size_t FindPos2(int64_t value) const TIGHTDB_NOEXCEPT;
-    bool FindPosSorted(int64_t target, std::size_t& pos) const TIGHTDB_NOEXCEPT;
     std::size_t FindGTE(int64_t target, std::size_t start) const;
     void Preset(int64_t min, int64_t max, std::size_t count);
     void Preset(std::size_t bitwidth, std::size_t count);
@@ -394,7 +387,7 @@ public:
     std::vector<int64_t> ToVector() const;
 
     /// Compare two arrays for equality.
-    bool compare_ints(const Array&) const;
+    bool compare_int(const Array&) const;
 
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
     bool find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,
@@ -596,7 +589,6 @@ private:
     template<size_t w> void ReferenceSort(Array& ref);
 
     template<size_t w> int64_t sum(size_t start, size_t end) const;
-    template<size_t w> size_t FindPos(int64_t target) const TIGHTDB_NOEXCEPT;
 
     /// Insert new child after original. If the parent has to be
     /// split, this function returns the \c ref to the new parent
@@ -1346,7 +1338,7 @@ ref_type Array::btree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& state
         // one. We currently always append to the first subtree. It is
         // essentially a matter of using the lower vs. the upper bound
         // when searching in in the offsets array.
-        child_ndx = offsets.lower_bound(elem_ndx);
+        child_ndx = offsets.lower_bound_int(elem_ndx);
         TIGHTDB_ASSERT(child_ndx < refs.size());
         std::size_t elem_ndx_offset = child_ndx == 0 ? 0 : to_size_t(offsets.get(child_ndx-1));
         child_elem_ndx = elem_ndx - elem_ndx_offset;

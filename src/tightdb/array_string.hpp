@@ -28,6 +28,8 @@ namespace tightdb {
 
 class ArrayString: public Array {
 public:
+    typedef StringData value_type;
+
     explicit ArrayString(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                          Allocator& = Allocator::get_default());
     ArrayString(MemRef, ArrayParent*, std::size_t ndx_in_parent,
@@ -53,7 +55,7 @@ public:
     static ref_type create_empty_string_array(Allocator&);
 
     /// Compare two string arrays for equality.
-    bool compare_strings(const ArrayString&) const;
+    bool compare_string(const ArrayString&) const;
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or

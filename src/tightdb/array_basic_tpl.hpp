@@ -92,7 +92,7 @@ inline void BasicArray<T>::add(T value)
 
 template<class T> inline T BasicArray<T>::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    return *(reinterpret_cast<T*>(m_data) + ndx);
+    return *(reinterpret_cast<const T*>(m_data) + ndx);
 }
 
 
@@ -100,6 +100,10 @@ template<class T>
 inline T BasicArray<T>::get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
+    // FIXME: This casting assumes that T can be aliged on an 8-type
+    // boundary, since data is known only to be aligned on an 8-byte
+    // boundary. This restricts portability. The same problem recurs
+    // several times in the remainder of this file.
     return *(reinterpret_cast<const T*>(data) + ndx);
 }
 
@@ -167,13 +171,13 @@ void BasicArray<T>::erase(std::size_t ndx)
 }
 
 template<class T>
-bool BasicArray<T>::compare_entries(const BasicArray<T>& c) const
+bool BasicArray<T>::compare(const BasicArray<T>& a) const
 {
-    for (size_t i = 0; i < size(); ++i) {
-        if (get(i) != c.get(i))
-            return false;
-    }
-    return true;
+    size_t n = size();
+    if (a.size() != n) return false;
+    const T* data_1 = reinterpret_cast<const T*>(m_data);
+    const T* data_2 = reinterpret_cast<const T*>(a.m_data);
+    return std::equal(data_1, data_1+n, data_2);
 }
 
 
@@ -187,43 +191,36 @@ std::size_t BasicArray<T>::CalcByteLen(std::size_t count, std::size_t) const
 template<class T>
 std::size_t BasicArray<T>::CalcItemCount(std::size_t bytes, std::size_t) const TIGHTDB_NOEXCEPT
 {
-    // fixme: ??? what about width = 0? return -1?
+    // FIXME: ??? what about width = 0? return -1?
 
     std::size_t bytes_without_header = bytes - header_size;
     return bytes_without_header / sizeof (T);
 }
 
 template<class T>
-std::size_t BasicArray<T>::Find(T target, std::size_t start, std::size_t end) const
+std::size_t BasicArray<T>::find(T value, std::size_t begin, std::size_t end) const
 {
-    if (end == std::size_t(-1))
+    if (end == npos)
         end = m_size;
-    if (start >= end)
-        return not_found;
-    TIGHTDB_ASSERT(start < m_size && end <= m_size && start < end);
-    if (m_size == 0)
-        return not_found; // empty list
-
-    for (std::size_t i = start; i < end; ++i) {
-        if (target == get(i))
-            return i;
-    }
-    return not_found;
+    TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
+    const T* data = reinterpret_cast<const T*>(m_data);
+    const T* i = std::find(data + begin, data + end, value);
+    return i == data + end ? not_found : i - data;
 }
 
 template<class T>
-std::size_t BasicArray<T>::find_first(T value, std::size_t start, std::size_t end) const
+inline std::size_t BasicArray<T>::find_first(T value, std::size_t begin, std::size_t end) const
 {
-    return Find(value, start, end);
+    return this->find(value, begin, end);
 }
 
 template<class T>
 void BasicArray<T>::find_all(Array& result, T value, std::size_t add_offset,
-                             std::size_t start, std::size_t end)
+                             std::size_t begin, std::size_t end) const
 {
-    std::size_t first = start - 1;
+    std::size_t first = begin - 1;
     for (;;) {
-        first = Find(value, first + 1, end);
+        first = this->find(value, first + 1, end);
         if (first != not_found)
             result.add(first + add_offset);
         else
@@ -232,52 +229,41 @@ void BasicArray<T>::find_all(Array& result, T value, std::size_t add_offset,
 }
 
 template<class T>
-std::size_t BasicArray<T>::count(T value, std::size_t start, std::size_t end) const
+std::size_t BasicArray<T>::count(T value, std::size_t begin, std::size_t end) const
 {
-    std::size_t count = 0;
-    std::size_t lastmatch = start - 1;
-    for (;;) {
-        lastmatch = Find(value, lastmatch+1, end);
-        if (lastmatch != not_found)
-            ++count;
-        else
-            break;
-    }
-    return count;
+    if (end == npos)
+        end = m_size;
+    TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
+    const T* data = reinterpret_cast<const T*>(m_data);
+    return std::count(data + begin, data + end, value);
 }
 
 #if 0
 // currently unused
 template<class T>
-double BasicArray<T>::sum(std::size_t start, std::size_t end) const
+double BasicArray<T>::sum(std::size_t begin, std::size_t end) const
 {
-    if (end == std::size_t(-1))
+    if (end == npos)
         end = m_size;
-    if (m_size == 0)
-        return 0;
-    TIGHTDB_ASSERT(start < m_size && end <= m_size && start < end);
-
-    R sum = 0;
-    for (std::size_t i = start; i < end; ++i) {
-        sum += get(i);
-    }
-    return sum;
+    TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
+    const T* data = reinterpret_cast<const T*>(m_data);
+    return std::accumulate(data + begin, data + end, double(0));
 }
 #endif
 
 template<class T> template<bool find_max>
-bool BasicArray<T>::minmax(T& result, std::size_t start, std::size_t end) const
+bool BasicArray<T>::minmax(T& result, std::size_t begin, std::size_t end) const
 {
-    if (end == std::size_t(-1))
+    if (end == npos)
         end = m_size;
     if (m_size == 0)
         return false;
-    TIGHTDB_ASSERT(start < m_size && end <= m_size && start < end);
+    TIGHTDB_ASSERT(begin < m_size && end <= m_size && begin < end);
 
-    T m = get(start);
-    ++start;
-    for (; start < end; ++start) {
-        T val = get(start);
+    T m = get(begin);
+    ++begin;
+    for (; begin < end; ++begin) {
+        T val = get(begin);
         if (find_max ? val > m : val < m)
             m = val;
     }
@@ -286,15 +272,15 @@ bool BasicArray<T>::minmax(T& result, std::size_t start, std::size_t end) const
 }
 
 template<class T>
-bool BasicArray<T>::maximum(T& result, std::size_t start, std::size_t end) const
+bool BasicArray<T>::maximum(T& result, std::size_t begin, std::size_t end) const
 {
-    return minmax<true>(result, start, end);
+    return minmax<true>(result, begin, end);
 }
 
 template<class T>
-bool BasicArray<T>::minimum(T& result, std::size_t start, std::size_t end) const
+bool BasicArray<T>::minimum(T& result, std::size_t begin, std::size_t end) const
 {
-    return minmax<false>(result, start, end);
+    return minmax<false>(result, begin, end);
 }
 
 
@@ -327,6 +313,22 @@ ref_type BasicArray<T>::btree_leaf_insert(size_t ndx, T value, TreeInsertBase& s
     }
     state.m_split_size = leaf_size + 1;
     return new_leaf.get_ref();
+}
+
+template<class T>
+inline std::size_t BasicArray<T>::lower_bound(T value) const TIGHTDB_NOEXCEPT
+{
+    const T* begin = reinterpret_cast<const T*>(m_data);
+    const T* end = begin + size();
+    return std::lower_bound(begin, end, value) - begin;
+}
+
+template<class T>
+inline std::size_t BasicArray<T>::upper_bound(T value) const TIGHTDB_NOEXCEPT
+{
+    const T* begin = reinterpret_cast<const T*>(m_data);
+    const T* end = begin + size();
+    return std::upper_bound(begin, end, value) - begin;
 }
 
 

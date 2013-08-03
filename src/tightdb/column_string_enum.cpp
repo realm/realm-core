@@ -188,7 +188,7 @@ size_t ColumnStringEnum::GetKeyNdxOrAdd(StringData value)
     }
 }
 
-bool ColumnStringEnum::compare_strings(const AdaptiveStringColumn& c) const
+bool ColumnStringEnum::compare_string(const AdaptiveStringColumn& c) const
 {
     const size_t n = size();
     if (c.size() != n) return false;
@@ -198,7 +198,7 @@ bool ColumnStringEnum::compare_strings(const AdaptiveStringColumn& c) const
     return true;
 }
 
-bool ColumnStringEnum::compare_strings(const ColumnStringEnum& c) const
+bool ColumnStringEnum::compare_string(const ColumnStringEnum& c) const
 {
     const size_t n = size();
     if (c.size() != n) return false;

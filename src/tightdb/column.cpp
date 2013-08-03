@@ -534,102 +534,12 @@ void Column::LeafFindAll(Array& result, int64_t value, size_t add_offset, size_t
     m_array->find_all(result, value, add_offset, start, end);
 }
 
-size_t Column::find_pos(int64_t target) const TIGHTDB_NOEXCEPT
-{
-    // NOTE: Binary search only works if the column is sorted
-
-    if (root_is_leaf()) {
-        return m_array->FindPos(target);
-    }
-
-    int len = int(size());
-    int low = -1;
-    int high = len;
-
-    // Binary search based on:
-    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
-    // Finds position of largest value SMALLER than the target
-    while (high - low > 1) {
-        size_t probe = (unsigned(low) + unsigned(high)) >> 1;
-        int64_t v = get(probe);
-
-        if (v > target)
-            high = int(probe);
-        else
-            low  = int(probe);
-    }
-    if (high == len)
-        return not_found;
-    else
-        return high;
-}
-
-size_t Column::find_pos2(int64_t target) const TIGHTDB_NOEXCEPT
-{
-    // NOTE: Binary search only works if the column is sorted
-
-    if (root_is_leaf()) {
-        return m_array->FindPos2(target);
-    }
-
-    int len = int(size());
-    int low = -1;
-    int high = len;
-
-    // Binary search based on:
-    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
-    // Finds position of closest value BIGGER OR EQUAL to the target
-    while (high - low > 1) {
-        size_t probe = (unsigned(low) + unsigned(high)) >> 1;
-        int64_t v = get(probe);
-
-        if (v < target)
-            low  = int(probe);
-        else
-            high = int(probe);
-    }
-    if (high == len)
-        return not_found;
-    else
-        return high;
-}
-
-bool Column::find_sorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
-{
-    if (root_is_leaf()) {
-        return m_array->FindPosSorted(target, pos);
-    }
-
-    size_t len = size();
-    size_t low = size_t(-1);
-    size_t high = len;
-
-    // Binary search based on:
-    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
-    // Finds position of closest value BIGGER OR EQUAL to the target
-    while (high - low > 1) {
-        size_t probe = (low + high) >> 1;
-        int64_t v = get(probe);
-
-        if (v < target)
-            low  = probe;
-        else
-            high = probe;
-    }
-
-    pos = high;
-    if (high == len)
-        return false;
-    else
-        return get(high) == target;
-}
-
 void Column::sort()
 {
     sort(0, size());
 }
 
-bool Column::compare_ints(const Column& c) const
+bool Column::compare_int(const Column& c) const
 {
     size_t n = size();
     if (c.size() != n)

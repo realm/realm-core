@@ -193,7 +193,7 @@ public:
     void fill(std::size_t count);
 
     /// Compare two subtable columns for equality.
-    bool compare_tables(const ColumnTable&) const;
+    bool compare_table(const ColumnTable&) const;
 
     void invalidate_subtables_virtual() TIGHTDB_OVERRIDE;
 

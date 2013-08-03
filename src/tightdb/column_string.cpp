@@ -406,7 +406,7 @@ bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_r
         StringData v = get(i);
 
         // Insert keys in sorted order, ignoring duplicates
-        size_t pos = keys.lower_bound(v);
+        size_t pos = keys.lower_bound_string(v);
         if (pos != keys.size() && keys.get(pos) == v)
             continue;
 
@@ -423,7 +423,7 @@ bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_r
     Column values(m_array->get_alloc());
     for (size_t i=0; i<n; ++i) {
         StringData v = get(i);
-        size_t pos = keys.lower_bound(v);
+        size_t pos = keys.lower_bound_string(v);
         TIGHTDB_ASSERT(pos != keys.size());
         values.add(pos);
     }
@@ -433,7 +433,7 @@ bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_r
     return true;
 }
 
-bool AdaptiveStringColumn::compare_strings(const AdaptiveStringColumn& c) const
+bool AdaptiveStringColumn::compare_string(const AdaptiveStringColumn& c) const
 {
     const size_t n = size();
     if (c.size() != n)

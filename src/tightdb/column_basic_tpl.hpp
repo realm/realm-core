@@ -206,7 +206,7 @@ void BasicColumn<T>::fill(std::size_t count)
 }
 
 template<class T>
-bool BasicColumn<T>::compare_entries(const BasicColumn& c) const
+bool BasicColumn<T>::compare(const BasicColumn& c) const
 {
     std::size_t n = size();
     if (c.size() != n)
@@ -344,6 +344,23 @@ ref_type BasicColumn<T>::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
 {
     BasicArray<T> leaf(leaf_mem, &parent, ndx_in_parent, alloc);
     return leaf.btree_leaf_insert(insert_ndx, state.m_value, state);
+}
+
+
+template<class T> inline std::size_t BasicColumn<T>::lower_bound(T value) const TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        return static_cast<const BasicArray<T>*>(m_array)->lower_bound(value);
+    }
+    return ColumnBase::lower_bound(*this, value);
+}
+
+template<class T> inline std::size_t BasicColumn<T>::upper_bound(T value) const TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        return static_cast<const BasicArray<T>*>(m_array)->upper_bound(value);
+    }
+    return ColumnBase::upper_bound(*this, value);
 }
 
 

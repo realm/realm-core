@@ -221,15 +221,15 @@ void GroupWriter::add_free_space(size_t pos, size_t len, size_t version)
     Array& fpositions    = m_group.m_freePositions;
     Array& flengths      = m_group.m_freeLengths;
     Array& fversions     = m_group.m_freeVersions;
-    const bool is_shared = m_group.m_is_shared;
+    bool is_shared = m_group.m_is_shared;
 
     // We always want to keep the list of free space in
     // sorted order (by position) to facilitate merge of
     // adjecendant segments. We can find the correct
     // insert postion by binary search
-    const size_t p = fpositions.FindPos2(pos);
+    size_t p = fpositions.lower_bound_int(pos);
 
-    if (p == not_found) {
+    if (p == fpositions.size()) {
         fpositions.add(pos);
         flengths.add(len);
         if (is_shared) fversions.add(version);

@@ -166,7 +166,7 @@ void ColumnBinary::move_last_over(size_t ndx)
     erase(ndx_last);
 }
 
-bool ColumnBinary::compare_binaries(const ColumnBinary& c) const
+bool ColumnBinary::compare_binary(const ColumnBinary& c) const
 {
     const size_t n = size();
     if (c.size() != n)

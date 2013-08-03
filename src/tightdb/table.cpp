@@ -1647,15 +1647,6 @@ size_t Table::find_first_int(size_t column_ndx, int64_t value) const
     return column.find_first(value);
 }
 
-bool Table::find_sorted_int(size_t column_ndx, int64_t value, size_t& pos) const
-{
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Int);
-    const Column& column = GetColumn(column_ndx);
-
-    return column.find_sorted(value, pos);
-}
-
 size_t Table::find_first_bool(size_t column_ndx, bool value) const
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
@@ -1701,22 +1692,15 @@ size_t Table::find_first_string(size_t column_ndx, StringData value) const
         const AdaptiveStringColumn& column = GetColumnString(column_ndx);
         return column.find_first(value);
     }
-    else {
-        TIGHTDB_ASSERT(type == col_type_StringEnum);
-        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
-        return column.find_first(value);
-    }
+    TIGHTDB_ASSERT(type == col_type_StringEnum);
+    const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
+    return column.find_first(value);
 }
 
 size_t Table::find_first_binary(size_t, BinaryData) const
 {
     // FIXME: Implement this!
     throw runtime_error("Not implemented");
-}
-
-size_t Table::find_pos_int(size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT
-{
-    return GetColumn(column_ndx).find_pos(value);
 }
 
 TableView Table::find_all_int(size_t column_ndx, int64_t value)
@@ -1960,6 +1944,71 @@ ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
     tv.sort(column_ndx, ascending);
 
     return move(tv);
+}
+
+
+size_t Table::lower_bound_int(size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT
+{
+    return GetColumn(column_ndx).lower_bound_int(value);
+}
+
+size_t Table::upper_bound_int(size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT
+{
+    return GetColumn(column_ndx).upper_bound_int(value);
+}
+
+size_t Table::lower_bound_bool(size_t column_ndx, bool value) const TIGHTDB_NOEXCEPT
+{
+    return GetColumn(column_ndx).lower_bound_int(value);
+}
+
+size_t Table::upper_bound_bool(size_t column_ndx, bool value) const TIGHTDB_NOEXCEPT
+{
+    return GetColumn(column_ndx).upper_bound_int(value);
+}
+
+size_t Table::lower_bound_float(size_t column_ndx, float value) const TIGHTDB_NOEXCEPT
+{
+    return GetColumnFloat(column_ndx).lower_bound(value);
+}
+
+size_t Table::upper_bound_float(size_t column_ndx, float value) const TIGHTDB_NOEXCEPT
+{
+    return GetColumnFloat(column_ndx).upper_bound(value);
+}
+
+size_t Table::lower_bound_double(size_t column_ndx, double value) const TIGHTDB_NOEXCEPT
+{
+    return GetColumnDouble(column_ndx).lower_bound(value);
+}
+
+size_t Table::upper_bound_double(size_t column_ndx, double value) const TIGHTDB_NOEXCEPT
+{
+    return GetColumnDouble(column_ndx).upper_bound(value);
+}
+
+size_t Table::lower_bound_string(size_t column_ndx, StringData value) const TIGHTDB_NOEXCEPT
+{
+    ColumnType type = get_real_column_type(column_ndx);
+    if (type == col_type_String) {
+        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
+        return column.lower_bound_string(value);
+    }
+    TIGHTDB_ASSERT(type == col_type_StringEnum);
+    const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
+    return column.lower_bound_string(value);
+}
+
+size_t Table::upper_bound_string(size_t column_ndx, StringData value) const TIGHTDB_NOEXCEPT
+{
+    ColumnType type = get_real_column_type(column_ndx);
+    if (type == col_type_String) {
+        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
+        return column.upper_bound_string(value);
+    }
+    TIGHTDB_ASSERT(type == col_type_StringEnum);
+    const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
+    return column.upper_bound_string(value);
 }
 
 void Table::optimize()
@@ -2489,19 +2538,19 @@ bool Table::compare_rows(const Table& t) const
             case col_type_Date: {
                 const Column& c1 = GetColumn(i);
                 const Column& c2 = t.GetColumn(i);
-                if (!c1.compare_ints(c2)) return false;
+                if (!c1.compare_int(c2)) return false;
                 break;
             }
             case col_type_Float: {
                 const ColumnFloat& c1 = GetColumnFloat(i);
                 const ColumnFloat& c2 = t.GetColumnFloat(i);
-                if (!c1.compare_entries(c2)) return false;
+                if (!c1.compare(c2)) return false;
                 break;
             }
             case col_type_Double: {
                 const ColumnDouble& c1 = GetColumnDouble(i);
                 const ColumnDouble& c2 = t.GetColumnDouble(i);
-                if (!c1.compare_entries(c2)) return false;
+                if (!c1.compare(c2)) return false;
                 break;
             }
             case col_type_String: {
@@ -2509,12 +2558,12 @@ bool Table::compare_rows(const Table& t) const
                 ColumnType type2 = t.get_real_column_type(i);
                 if (type2 == col_type_String) {
                     const AdaptiveStringColumn& c2 = t.GetColumnString(i);
-                    if (!c1.compare_strings(c2)) return false;
+                    if (!c1.compare_string(c2)) return false;
                 }
                 else {
                     TIGHTDB_ASSERT(type2 == col_type_StringEnum);
                     const ColumnStringEnum& c2 = t.GetColumnStringEnum(i);
-                    if (!c2.compare_strings(c1)) return false;
+                    if (!c2.compare_string(c1)) return false;
                 }
                 break;
             }
@@ -2523,31 +2572,31 @@ bool Table::compare_rows(const Table& t) const
                 ColumnType type2 = t.get_real_column_type(i);
                 if (type2 == col_type_StringEnum) {
                     const ColumnStringEnum& c2 = t.GetColumnStringEnum(i);
-                    if (!c1.compare_strings(c2)) return false;
+                    if (!c1.compare_string(c2)) return false;
                 }
                 else {
                     TIGHTDB_ASSERT(type2 == col_type_String);
                     const AdaptiveStringColumn& c2 = t.GetColumnString(i);
-                    if (!c1.compare_strings(c2)) return false;
+                    if (!c1.compare_string(c2)) return false;
                 }
                 break;
             }
             case col_type_Binary: {
                 const ColumnBinary& c1 = GetColumnBinary(i);
                 const ColumnBinary& c2 = t.GetColumnBinary(i);
-                if (!c1.compare_binaries(c2)) return false;
+                if (!c1.compare_binary(c2)) return false;
                 break;
             }
             case col_type_Table: {
                 const ColumnTable& c1 = GetColumnTable(i);
                 const ColumnTable& c2 = t.GetColumnTable(i);
-                if (!c1.compare_tables(c2)) return false;
+                if (!c1.compare_table(c2)) return false;
                 break;
             }
             case col_type_Mixed: {
                 const ColumnMixed& c1 = GetColumnMixed(i);
                 const ColumnMixed& c2 = t.GetColumnMixed(i);
-                if (!c1.compare_mixed_entries(c2)) return false;
+                if (!c1.compare_mixed(c2)) return false;
                 break;
             }
             default:

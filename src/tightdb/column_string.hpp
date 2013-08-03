@@ -61,11 +61,15 @@ public:
     void find_all(Array& result, StringData value, std::size_t start = 0,
                   std::size_t end = -1) const;
 
-    /// Find the lower bound for the specified value assuming that the
-    /// elements are already sorted according to
-    /// StringData::operator<(). This operation is functionally
-    /// identical to std::lower_bound().
-    std::size_t lower_bound(StringData value) const TIGHTDB_NOEXCEPT;
+    //@{
+
+    /// Find the lower/upper bound for the specified value assuming
+    /// that the elements are already sorted in ascending order
+    /// according to StringData::operator<().
+    std::size_t lower_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
+    //@{
+
     FindRes find_all_indexref(StringData value, size_t& dst) const;
 
     // Index
@@ -83,7 +87,7 @@ public:
     bool auto_enumerate(ref_type& keys, ref_type& values) const;
 
     /// Compare two string columns for equality.
-    bool compare_strings(const AdaptiveStringColumn&) const;
+    bool compare_string(const AdaptiveStringColumn&) const;
 
     bool GetBlock(std::size_t ndx, ArrayParent** ap, std::size_t& off) const
     {
@@ -176,26 +180,6 @@ inline StringData AdaptiveStringColumn::get(std::size_t ndx) const TIGHTDB_NOEXC
     return ArrayString::get(leaf_header, ndx_in_leaf);
 }
 
-inline std::size_t AdaptiveStringColumn::lower_bound(StringData value) const TIGHTDB_NOEXCEPT
-{
-    std::size_t i = 0;
-    std::size_t size = this->size();
-
-    while (0 < size) {
-        std::size_t half = size / 2;
-        std::size_t mid = i + half;
-        StringData probe = get(mid);
-        if (probe < value) {
-            i = mid + 1;
-            size -= half + 1;
-        }
-        else {
-            size = half;
-        }
-    }
-    return i;
-}
-
 inline void AdaptiveStringColumn::add(StringData value)
 {
     do_insert(npos, value);
@@ -206,6 +190,35 @@ inline void AdaptiveStringColumn::insert(size_t ndx, StringData value)
     TIGHTDB_ASSERT(ndx <= size());
     if (size() <= ndx) ndx = npos;
     do_insert(ndx, value);
+}
+
+
+inline std::size_t AdaptiveStringColumn::lower_bound_string(StringData value) const TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        bool long_strings = m_array->has_refs();
+        if (long_strings) {
+            const ArrayStringLong* leaf = static_cast<const ArrayStringLong*>(m_array);
+            return ColumnBase::lower_bound(*leaf, value);
+        }
+        const ArrayString* leaf = static_cast<const ArrayString*>(m_array);
+        return ColumnBase::lower_bound(*leaf, value);
+    }
+    return ColumnBase::lower_bound(*this, value);
+}
+
+inline std::size_t AdaptiveStringColumn::upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        bool long_strings = m_array->has_refs();
+        if (long_strings) {
+            const ArrayStringLong* leaf = static_cast<const ArrayStringLong*>(m_array);
+            return ColumnBase::upper_bound(*leaf, value);
+        }
+        const ArrayString* leaf = static_cast<const ArrayString*>(m_array);
+        return ColumnBase::upper_bound(*leaf, value);
+    }
+    return ColumnBase::upper_bound(*this, value);
 }
 
 

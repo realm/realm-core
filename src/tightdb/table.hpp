@@ -131,7 +131,6 @@ public:
 
 
     //@{
-
     /// Schema handling.
     ///
     /// Only the const qualified get_spec() and has_index() may be
@@ -268,8 +267,6 @@ public:
     std::size_t    find_first_string(std::size_t column_ndx, StringData value) const;
     std::size_t    find_first_binary(std::size_t column_ndx, BinaryData value) const;
 
-    bool           find_sorted_int(std::size_t column_ndx, int64_t value, std::size_t& pos) const;
-
     TableView      find_all_int(std::size_t column_ndx, int64_t value);
     ConstTableView find_all_int(std::size_t column_ndx, int64_t value) const;
     TableView      find_all_bool(std::size_t column_ndx, bool value);
@@ -290,6 +287,40 @@ public:
 
     TableView      get_sorted_view(std::size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;
+
+    //@{
+    /// Find the lower/upper bound according to a column that is
+    /// already sorted in ascending order.
+    ///
+    ///     3 3 3 4 4 4 5 6 7 9 9 9
+    ///     ^     ^     ^     ^     ^
+    ///     |     |     |     |     |
+    ///     |     |     |     |      -- Lower and upper bound of 15
+    ///     |     |     |     |
+    ///     |     |     |      -- Lower and upper bound of 8
+    ///     |     |     |
+    ///     |     |      -- Upper bound of 4
+    ///     |     |
+    ///     |      -- Lower bound of 4
+    ///     |
+    ///      -- Lower and upper bound of 1
+    ///
+    /// These functions are similar to std::lower_bound() and
+    /// std::upper_bound().
+    ///
+    /// The string versions assume that the column is already sorted
+    /// according to StringData::operator<().
+    std::size_t lower_bound_int(std::size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_int(std::size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound_bool(std::size_t column_ndx, bool value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_bool(std::size_t column_ndx, bool value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound_float(std::size_t column_ndx, float value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_float(std::size_t column_ndx, float value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound_double(std::size_t column_ndx, double value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_double(std::size_t column_ndx, double value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound_string(std::size_t column_ndx, StringData value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_string(std::size_t column_ndx, StringData value) const TIGHTDB_NOEXCEPT;
+    //@}
 
     // Queries
     Query       where() { return Query(*this); }
@@ -332,8 +363,6 @@ public:
     class Parent;
 
 protected:
-    std::size_t find_pos_int(std::size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT;
-
     // FIXME: Most of the things that are protected here, could instead be private
     // Direct Column access
     template <class T, ColumnType col_type> T& GetColumn(std::size_t ndx);

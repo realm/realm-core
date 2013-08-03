@@ -74,8 +74,8 @@ void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
     Array values = m_array->GetSubArray(0);
     Array refs = m_array->GetSubArray(1);
 
-    size_t ins_pos = values.FindPos2(key);
-    if (ins_pos == not_found) {
+    size_t ins_pos = values.lower_bound_int(key);
+    if (ins_pos == values.size()) {
         // When key is outside current range, we can just add it
         values.add(key);
         refs.add(ref);
@@ -133,8 +133,8 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         Array refs = NodeGetRefs();
 
         // Find the subnode containing the item
-        size_t node_ndx = offsets.FindPos2(key);
-        if (node_ndx == size_t(-1)) {
+        size_t node_ndx = offsets.lower_bound_int(key);
+        if (node_ndx == offsets.size()) {
             // node can never be empty, so try to fit in last item
             node_ndx = offsets.size()-1;
         }
@@ -210,31 +210,34 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
 
         new_list.LeafInsert(row_ndx, key, offset, value);
 
-        size_t ndx = old_offsets.FindPos2(key);
-        switch (ndx) {
-            case 0:             // insert before
-                return NodeChange(NodeChange::insert_before, new_list.get_ref());
-            case size_t(-1): // insert after
-                return NodeChange(NodeChange::insert_after, new_list.get_ref());
-            default: // split
-            {
-                Array old_refs = m_array->GetSubArray(1);
-                Array new_offsets = new_list.m_array->GetSubArray(0);
-                Array new_refs = new_list.m_array->GetSubArray(1);
-                // Move items after split to new list
-                for (size_t i = ndx; i < count; ++i) {
-                    int64_t v2 = old_offsets.get(i);
-                    int64_t v3 = old_refs.get(i);
+        size_t ndx = old_offsets.lower_bound_int(key);
 
-                    new_offsets.add(v2);
-                    new_refs.add(v3);
-                }
-                old_offsets.resize(ndx);
-                old_refs.resize(ndx);
-
-                return NodeChange(NodeChange::split, get_ref(), new_list.get_ref());
-            }
+        // insert before
+        if (ndx == 0) {
+            return NodeChange(NodeChange::insert_before, new_list.get_ref());
         }
+
+        // insert after
+        if (ndx == old_offsets.size()) {
+            return NodeChange(NodeChange::insert_after, new_list.get_ref());
+        }
+
+        // split
+        Array old_refs = m_array->GetSubArray(1);
+        Array new_offsets = new_list.m_array->GetSubArray(0);
+        Array new_refs = new_list.m_array->GetSubArray(1);
+        // Move items after split to new list
+        for (size_t i = ndx; i < count; ++i) {
+            int64_t v2 = old_offsets.get(i);
+            int64_t v3 = old_refs.get(i);
+
+            new_offsets.add(v2);
+            new_refs.add(v3);
+        }
+        old_offsets.resize(ndx);
+        old_refs.resize(ndx);
+
+        return NodeChange(NodeChange::split, get_ref(), new_list.get_ref());
     }
 
     TIGHTDB_ASSERT(false); // never reach here
@@ -293,8 +296,8 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
     Array values = m_array->GetSubArray(0);
     Array refs = m_array->GetSubArray(1);
 
-    size_t ins_pos = values.FindPos2(key);
-    if (ins_pos == not_found) {
+    size_t ins_pos = values.lower_bound_int(key);
+    if (ins_pos == values.size()) {
         if (noextend) return false;
 
         // When key is outside current range, we can just add it
@@ -356,8 +359,8 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
             if (row_ndx > last_ref)
                 sub.add(row_ndx);
             else {
-                size_t pos = sub.find_pos2(row_ndx);
-                if (pos == not_found)
+                size_t pos = sub.lower_bound_int(row_ndx);
+                if (pos == sub.size())
                     sub.add(row_ndx);
                 else
                     sub.insert(pos, row_ndx);
@@ -524,8 +527,8 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
     // Create 4 byte index key
     key_type key = create_key(value.substr(offset));
 
-    const size_t pos = values.FindPos2(key);
-    TIGHTDB_ASSERT(pos != not_found);
+    const size_t pos = values.lower_bound_int(key);
+    TIGHTDB_ASSERT(pos != values.size());
 
     if (!m_array->is_leaf()) {
         ref_type ref = refs.get_as_ref(pos);
@@ -593,8 +596,8 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
     // Create 4 byte index key
     key_type key = create_key(value.substr(offset));
 
-    size_t pos = values.FindPos2(key);
-    TIGHTDB_ASSERT(pos != not_found);
+    size_t pos = values.lower_bound_int(key);
+    TIGHTDB_ASSERT(pos != values.size());
 
     if (!m_array->is_leaf()) {
         ref_type ref = refs.get_as_ref(pos);

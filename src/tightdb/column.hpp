@@ -112,6 +112,15 @@ protected:
     template<class T, class C> void TreeVisitLeafs(size_t start, size_t end, size_t caller_offset, bool (*call)(T* arr, size_t start, size_t end, size_t caller_offset, void* state), void* state) const;
     template<class T, class C, class S> std::size_t TreeWrite(S& out, size_t& pos) const;
 
+    //@{
+    /// \tparam L Any type with an appropriate `value_type`, %size(),
+    /// and %get() members.
+    template<class L, class T>
+    std::size_t lower_bound(const L& list, T value) const TIGHTDB_NOEXCEPT;
+    template<class L, class T>
+    std::size_t upper_bound(const L& list, T value) const TIGHTDB_NOEXCEPT;
+    //@}
+
     // Node functions
     bool root_is_leaf() const TIGHTDB_NOEXCEPT { return m_array->is_leaf(); }
     Array NodeGetOffsets() const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array. This constitutes a real problem, because modifying the returned array genrally causes the parent to be modified too.
@@ -189,9 +198,14 @@ public:
 
     size_t find_first(int64_t value, std::size_t start=0, std::size_t end=-1) const;
     void   find_all(Array& result, int64_t value, size_t caller_offset=0, size_t start=0, size_t end=-1) const;
-    size_t find_pos(int64_t value) const TIGHTDB_NOEXCEPT;
-    size_t find_pos2(int64_t value) const TIGHTDB_NOEXCEPT;
-    bool   find_sorted(int64_t target, std::size_t& pos) const TIGHTDB_NOEXCEPT;
+
+    //@{
+    /// Find the lower/upper bound for the specified value assuming
+    /// that the elements are already sorted in ascending order
+    /// according to ordinary integer comparison.
+    std::size_t lower_bound_int(int64_t value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT;
+    //@}
 
     // Query support methods
     void LeafFindAll(Array& result, int64_t value, size_t add_offset, size_t start, size_t end) const;
@@ -202,7 +216,7 @@ public:
     void sort();
 
     /// Compare two columns for equality.
-    bool compare_ints(const Column&) const;
+    bool compare_int(const Column&) const;
 
     // Debug
 #ifdef TIGHTDB_DEBUG
@@ -243,6 +257,46 @@ private:
 
 
 // Implementation:
+
+template<class L, class T>
+std::size_t ColumnBase::lower_bound(const L& list, T value) const TIGHTDB_NOEXCEPT
+{
+    std::size_t i = 0;
+    std::size_t size = list.size();
+    while (0 < size) {
+        std::size_t half = size / 2;
+        std::size_t mid = i + half;
+        typename L::value_type probe = list.get(mid);
+        if (probe < value) {
+            i = mid + 1;
+            size -= half + 1;
+        }
+        else {
+            size = half;
+        }
+    }
+    return i;
+}
+
+template<class L, class T>
+std::size_t ColumnBase::upper_bound(const L& list, T value) const TIGHTDB_NOEXCEPT
+{
+    size_t i = 0;
+    size_t size = list.size();
+    while (0 < size) {
+        size_t half = size / 2;
+        size_t mid = i + half;
+        typename L::value_type probe = list.get(mid);
+        if (!(value < probe)) {
+            i = mid + 1;
+            size -= half + 1;
+        }
+        else {
+            size = half;
+        }
+    }
+    return i;
+}
 
 inline Column::Column(Allocator& alloc):
     ColumnBase(new Array(Array::type_Normal, 0, 0, alloc))
@@ -328,6 +382,23 @@ ref_type Column::leaf_insert(MemRef leaf_mem, ArrayParent& parent, std::size_t n
 {
     Array leaf(leaf_mem, &parent, ndx_in_parent, alloc);
     return leaf.btree_leaf_insert(insert_ndx, state.m_value, state);
+}
+
+
+inline std::size_t Column::lower_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        return m_array->lower_bound_int(value);
+    }
+    return ColumnBase::lower_bound(*this, value);
+}
+
+inline std::size_t Column::upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        return m_array->upper_bound_int(value);
+    }
+    return ColumnBase::upper_bound(*this, value);
 }
 
 

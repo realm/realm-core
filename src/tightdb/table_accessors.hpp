@@ -826,21 +826,6 @@ public:
         return Base::m_table->get_impl()->find_first_int(col_idx, value);
     }
 
-    bool find_sorted(int64_t value, std::size_t& pos) const
-    {
-        return Base::m_table->get_impl()->find_sorted_int(col_idx, value, pos);
-    }
-
-    // FIXME: This function was added because it is used by
-    // SlabAlloc::translate(). Table::find_pos_int() is protected, so
-    // it is weird that it needs to be public here. The right solution
-    // is to replace it with general purpose lower_bound() and
-    // upper_bound() functions that assume a sorted column.
-    std::size_t find_pos(int64_t value) const TIGHTDB_NOEXCEPT
-    {
-        return Base::m_table->find_pos_int(col_idx, value);
-    }
-
     BasicTableView<typename Base::RealTable> find_all(int64_t value) const
     {
         return Base::m_table->get_impl()->find_all_int(col_idx, value);
@@ -875,6 +860,16 @@ public:
     {
         Base::m_table->get_impl()->add_int(col_idx, value);
         return *this;
+    }
+
+    std::size_t lower_bound(int64_t value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->lower_bound_int(col_idx, value);
+    }
+
+    std::size_t upper_bound(int64_t value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->upper_bound_int(col_idx, value);
     }
 };
 
@@ -929,6 +924,16 @@ public:
         Base::m_table->get_impl()->add_float(col_idx, value);
         return *this;
     }
+
+    std::size_t lower_bound(float value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->lower_bound_float(col_idx, value);
+    }
+
+    std::size_t upper_bound(float value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->upper_bound_float(col_idx, value);
+    }
 };
 
 
@@ -982,6 +987,16 @@ public:
         Base::m_table->get_impl()->add_double(col_idx, value);
         return *this;
     }
+
+    std::size_t lower_bound(float value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->lower_bound_double(col_idx, value);
+    }
+
+    std::size_t upper_bound(float value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->upper_bound_double(col_idx, value);
+    }
 };
 
 
@@ -1002,6 +1017,16 @@ public:
     BasicTableView<typename Base::RealTable> find_all(bool value) const
     {
         return Base::m_table->get_impl()->find_all_bool(col_idx, value);
+    }
+
+    std::size_t lower_bound(bool value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->lower_bound_bool(col_idx, value);
+    }
+
+    std::size_t upper_bound(bool value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->upper_bound_bool(col_idx, value);
     }
 };
 
@@ -1087,6 +1112,16 @@ public:
     BasicTableView<typename Base::RealTable> distinct() const
     {
         return Base::m_table->get_impl()->distinct(col_idx);
+    }
+
+    std::size_t lower_bound(StringData value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->lower_bound_string(col_idx, value);
+    }
+
+    std::size_t upper_bound(StringData value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->upper_bound_string(col_idx, value);
     }
 };
 
