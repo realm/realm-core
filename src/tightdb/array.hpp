@@ -246,16 +246,6 @@ public:
 
     virtual ~Array() TIGHTDB_NOEXCEPT {}
 
-    // FIXME: This operator does not compare the arrays, it compares
-    // just the data pointers. This is hugely counterintuitive. If
-    // this kind of comparison is needed, it should be provided as
-    // an ordinary function. Proper (deep) array comparison is
-    // probably something that we want too, and that is what we should
-    // use operator==() for. For example, proper array comparison
-    // would be usefull for checking whether two tables have the same
-    // sequence of column types.
-    bool operator==(const Array& a) const;
-
     void set_type(Type type);
 
     /// Reinitialize this array accessor to point to the specified new
@@ -404,7 +394,7 @@ public:
     std::vector<int64_t> ToVector() const;
 
     /// Compare two arrays for equality.
-    bool Compare(const Array&) const;
+    bool compare_ints(const Array&) const;
 
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
     bool find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,

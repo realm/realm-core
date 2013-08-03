@@ -446,8 +446,8 @@ TEST_FIXTURE(db_setup, Column_PartialFind1)
 TEST_FIXTURE(db_setup, Column_HeaderParse)
 {
     Column column(c.get_ref(), NULL, 0);
-    const bool isEqual = (c == column);
-    CHECK(isEqual);
+    bool is_equal = c.compare_ints(column);
+    CHECK(is_equal);
 }
 
 TEST_FIXTURE(db_setup, Column_Destroy)

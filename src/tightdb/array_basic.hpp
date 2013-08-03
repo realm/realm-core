@@ -53,7 +53,7 @@ public:
     bool minimum(T& result, size_t start=0, size_t end=-1) const;
 
     /// Compare two arrays for equality.
-    bool Compare(const BasicArray<T>&) const;
+    bool compare_entries(const BasicArray<T>&) const;
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or

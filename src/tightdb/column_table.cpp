@@ -127,7 +127,7 @@ void ColumnTable::clear_table(size_t ndx)
     set(ndx, 0);
 }
 
-bool ColumnTable::compare(const ColumnTable& c) const
+bool ColumnTable::compare_tables(const ColumnTable& c) const
 {
     size_t n = size();
     if (c.size() != n) return false;

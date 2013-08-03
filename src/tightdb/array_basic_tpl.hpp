@@ -167,7 +167,7 @@ void BasicArray<T>::erase(std::size_t ndx)
 }
 
 template<class T>
-bool BasicArray<T>::Compare(const BasicArray<T>& c) const
+bool BasicArray<T>::compare_entries(const BasicArray<T>& c) const
 {
     for (size_t i = 0; i < size(); ++i) {
         if (get(i) != c.get(i))

@@ -65,8 +65,8 @@ public:
     void install_index(StringIndex*) TIGHTDB_NOEXCEPT;
 
     // Compare two string columns for equality
-    bool compare(const AdaptiveStringColumn&) const;
-    bool compare(const ColumnStringEnum&) const;
+    bool compare_strings(const AdaptiveStringColumn&) const;
+    bool compare_strings(const ColumnStringEnum&) const;
 
     const Array* get_enum_root_array() const TIGHTDB_NOEXCEPT { return m_keys.get_root_array(); }
 

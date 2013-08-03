@@ -2489,19 +2489,19 @@ bool Table::compare_rows(const Table& t) const
             case col_type_Date: {
                 const Column& c1 = GetColumn(i);
                 const Column& c2 = t.GetColumn(i);
-                if (!c1.compare(c2)) return false;
+                if (!c1.compare_ints(c2)) return false;
                 break;
             }
             case col_type_Float: {
                 const ColumnFloat& c1 = GetColumnFloat(i);
                 const ColumnFloat& c2 = t.GetColumnFloat(i);
-                if (!c1.compare(c2)) return false;
+                if (!c1.compare_entries(c2)) return false;
                 break;
             }
             case col_type_Double: {
                 const ColumnDouble& c1 = GetColumnDouble(i);
                 const ColumnDouble& c2 = t.GetColumnDouble(i);
-                if (!c1.compare(c2)) return false;
+                if (!c1.compare_entries(c2)) return false;
                 break;
             }
             case col_type_String: {
@@ -2509,12 +2509,12 @@ bool Table::compare_rows(const Table& t) const
                 ColumnType type2 = t.get_real_column_type(i);
                 if (type2 == col_type_String) {
                     const AdaptiveStringColumn& c2 = t.GetColumnString(i);
-                    if (!c1.compare(c2)) return false;
+                    if (!c1.compare_strings(c2)) return false;
                 }
                 else {
                     TIGHTDB_ASSERT(type2 == col_type_StringEnum);
                     const ColumnStringEnum& c2 = t.GetColumnStringEnum(i);
-                    if (!c2.compare(c1)) return false;
+                    if (!c2.compare_strings(c1)) return false;
                 }
                 break;
             }
@@ -2523,31 +2523,31 @@ bool Table::compare_rows(const Table& t) const
                 ColumnType type2 = t.get_real_column_type(i);
                 if (type2 == col_type_StringEnum) {
                     const ColumnStringEnum& c2 = t.GetColumnStringEnum(i);
-                    if (!c1.compare(c2)) return false;
+                    if (!c1.compare_strings(c2)) return false;
                 }
                 else {
                     TIGHTDB_ASSERT(type2 == col_type_String);
                     const AdaptiveStringColumn& c2 = t.GetColumnString(i);
-                    if (!c1.compare(c2)) return false;
+                    if (!c1.compare_strings(c2)) return false;
                 }
                 break;
             }
             case col_type_Binary: {
                 const ColumnBinary& c1 = GetColumnBinary(i);
                 const ColumnBinary& c2 = t.GetColumnBinary(i);
-                if (!c1.compare(c2)) return false;
+                if (!c1.compare_binaries(c2)) return false;
                 break;
             }
             case col_type_Table: {
                 const ColumnTable& c1 = GetColumnTable(i);
                 const ColumnTable& c2 = t.GetColumnTable(i);
-                if (!c1.compare(c2)) return false;
+                if (!c1.compare_tables(c2)) return false;
                 break;
             }
             case col_type_Mixed: {
                 const ColumnMixed& c1 = GetColumnMixed(i);
                 const ColumnMixed& c2 = t.GetColumnMixed(i);
-                if (!c1.compare(c2)) return false;
+                if (!c1.compare_mixed_entries(c2)) return false;
                 break;
             }
             default:

@@ -490,8 +490,8 @@ size_t* Spec::record_subspec_path(const Array* root_subspecs, size_t* begin,
 
 bool Spec::operator==(const Spec& spec) const
 {
-    if (!m_spec.Compare(spec.m_spec)) return false;
-    if (!m_names.Compare(spec.m_names)) return false;
+    if (!m_spec.compare_ints(spec.m_spec)) return false;
+    if (!m_names.compare_strings(spec.m_names)) return false;
     return true;
 }
 

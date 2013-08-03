@@ -53,7 +53,7 @@ public:
     static ref_type create_empty_string_array(Allocator&);
 
     /// Compare two string arrays for equality.
-    bool Compare(const ArrayString&) const;
+    bool compare_strings(const ArrayString&) const;
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or

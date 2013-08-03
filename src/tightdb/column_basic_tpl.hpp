@@ -206,7 +206,7 @@ void BasicColumn<T>::fill(std::size_t count)
 }
 
 template<class T>
-bool BasicColumn<T>::compare(const BasicColumn& c) const
+bool BasicColumn<T>::compare_entries(const BasicColumn& c) const
 {
     std::size_t n = size();
     if (c.size() != n)

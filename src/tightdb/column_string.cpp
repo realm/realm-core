@@ -433,7 +433,7 @@ bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_r
     return true;
 }
 
-bool AdaptiveStringColumn::compare(const AdaptiveStringColumn& c) const
+bool AdaptiveStringColumn::compare_strings(const AdaptiveStringColumn& c) const
 {
     const size_t n = size();
     if (c.size() != n)

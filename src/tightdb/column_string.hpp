@@ -83,7 +83,7 @@ public:
     bool auto_enumerate(ref_type& keys, ref_type& values) const;
 
     /// Compare two string columns for equality.
-    bool compare(const AdaptiveStringColumn&) const;
+    bool compare_strings(const AdaptiveStringColumn&) const;
 
     bool GetBlock(std::size_t ndx, ArrayParent** ap, std::size_t& off) const
     {

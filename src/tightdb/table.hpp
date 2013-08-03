@@ -404,17 +404,6 @@ protected:
     void to_dot_internal(std::ostream&) const;
 #endif
 
-    // Member variables
-    std::size_t m_size;
-
-    // On-disk format
-    Array m_top;
-    Array m_columns;
-    Spec m_spec_set;
-
-    // Cached columns
-    Array m_cols;
-
     /// Get the subtable at the specified column and row index.
     ///
     /// The returned table pointer must always end up being wrapped in
@@ -450,6 +439,20 @@ protected:
     void set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
 
 private:
+    // Number of rows in this table
+    std::size_t m_size;
+
+    // On-disk format
+    Array m_top;
+    Array m_columns;
+    Spec m_spec_set;
+
+    // Column accessor instances
+    Array m_cols;
+
+    mutable std::size_t m_ref_count;
+    mutable const StringIndex* m_lookup_index;
+
     Table& operator=(const Table&); // Disable copying assignment
 
     /// Put this table wrapper into the invalid state, which detaches
@@ -470,9 +473,6 @@ private:
 
     /// Invalidate all subtables.
     void invalidate_subtables();
-
-    mutable std::size_t m_ref_count;
-    mutable const StringIndex* m_lookup_index;
 
     void bind_ref() const TIGHTDB_NOEXCEPT { ++m_ref_count; }
     void unbind_ref() const { if (--m_ref_count == 0) delete this; } // FIXME: Cannot be noexcept since ~Table() may throw

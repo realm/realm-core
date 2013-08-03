@@ -372,7 +372,7 @@ void ArrayString::find_all(Array& result, StringData value, size_t add_offset,
     }
 }
 
-bool ArrayString::Compare(const ArrayString& c) const
+bool ArrayString::compare_strings(const ArrayString& c) const
 {
     if (c.size() != size()) return false;
 

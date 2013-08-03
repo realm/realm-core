@@ -178,11 +178,6 @@ void Array::set_type(Type type)
     }
 }
 
-bool Array::operator==(const Array& a) const
-{
-    return m_data == a.m_data;
-}
-
 bool Array::UpdateFromParent() TIGHTDB_NOEXCEPT
 {
     if (!m_parent) return false;
@@ -1803,12 +1798,12 @@ vector<int64_t> Array::ToVector() const
     return v;
 }
 
-bool Array::Compare(const Array& c) const
+bool Array::compare_ints(const Array& a) const
 {
-    if (c.size() != size()) return false;
+    if (a.size() != size()) return false;
 
     for (size_t i = 0; i < size(); ++i) {
-        if (get(i) != c.get(i)) return false;
+        if (get(i) != a.get(i)) return false;
     }
 
     return true;

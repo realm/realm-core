@@ -155,8 +155,6 @@ public:
 
     bool IsIntColumn() const TIGHTDB_NOEXCEPT { return true; }
 
-    bool operator==(const Column& column) const;
-
     void UpdateParentNdx(int diff);
     void SetHasRefs();
 
@@ -204,7 +202,7 @@ public:
     void sort();
 
     /// Compare two columns for equality.
-    bool compare(const Column&) const;
+    bool compare_ints(const Column&) const;
 
     // Debug
 #ifdef TIGHTDB_DEBUG

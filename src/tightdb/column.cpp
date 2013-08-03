@@ -286,11 +286,6 @@ void Column::create()
     }
 }
 
-bool Column::operator==(const Column& column) const
-{
-    return *m_array == *column.m_array;
-}
-
 
 bool Column::is_empty() const TIGHTDB_NOEXCEPT
 {
@@ -634,7 +629,7 @@ void Column::sort()
     sort(0, size());
 }
 
-bool Column::compare(const Column& c) const
+bool Column::compare_ints(const Column& c) const
 {
     size_t n = size();
     if (c.size() != n)
