@@ -116,7 +116,7 @@ public:
     }
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
+    void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
 #endif
 
 protected:
@@ -131,7 +131,7 @@ protected:
     void LeafDelete(size_t ndx);
 
 #ifdef TIGHTDB_DEBUG
-    virtual void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
+    void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
 #endif
 
 private:

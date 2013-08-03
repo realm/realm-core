@@ -135,8 +135,8 @@ public:
     static ref_type create(std::size_t num_default_values, Allocator&);
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-    void to_dot(std::ostream&, StringData title) const;
+    void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
+    void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
 #endif
 
 private:

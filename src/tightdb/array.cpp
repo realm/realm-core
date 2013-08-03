@@ -15,6 +15,7 @@
 #include <tightdb/column.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
+#include <tightdb/index_string.hpp>
 #include <tightdb/utilities.hpp>
 
 using namespace std;
@@ -326,23 +327,20 @@ void Array::set(size_t ndx, int64_t value)
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
-    // Make room for the new value
-    size_t width = m_width;
-
-    if (value < m_lbound || value > m_ubound)
-        width = bit_width(value);
-
-    bool do_expand = (width > m_width);
+    bool do_expand = value < m_lbound || value > m_ubound;
     if (do_expand) {
+        size_t width = bit_width(value);
+        TIGHTDB_ASSERT(width > m_width);
         Getter old_getter = m_getter;    // Save old getter before width expansion
         alloc(m_size, width); // Throws
         set_width(width);
 
         // Expand the old values
-        int k = int(m_size);
-        while (--k >= 0) {
-            int64_t v = (this->*old_getter)(k);
-            (this->*m_setter)(k, v);
+        size_t i = m_size;
+        while (i != 0) {
+            --i;
+            int64_t v = (this->*old_getter)(i);
+            (this->*m_setter)(i, v);
         }
     }
 
@@ -378,16 +376,12 @@ void Array::insert(size_t ndx, int64_t value)
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
-    // Make room for the new value
-    size_t width = m_width;
-
-    if (value < m_lbound || value > m_ubound)
-        width = bit_width(value);
-
     Getter old_getter = m_getter;    // Save old getter before potential width expansion
 
-    bool do_expand = m_width < width;
+    bool do_expand = value < m_lbound || value > m_ubound;
     if (do_expand) {
+        size_t width = bit_width(value);
+        TIGHTDB_ASSERT(width > m_width);
         alloc(m_size+1, width); // Throws
         set_width(width);
     }
@@ -397,10 +391,11 @@ void Array::insert(size_t ndx, int64_t value)
 
     // Move values below insertion (may expand)
     if (do_expand || m_width < 8) {
-        int k = int(m_size);
-        while (--k >= int(ndx)) {
-            int64_t v = (this->*old_getter)(k);
-            (this->*m_setter)(k+1, v);
+        size_t i = m_size;
+        while (i > ndx) {
+            --i;
+            int64_t v = (this->*old_getter)(i);
+            (this->*m_setter)(i+1, v);
         }
     }
     else if (ndx != m_size) {
@@ -419,10 +414,11 @@ void Array::insert(size_t ndx, int64_t value)
 
     // Expand values above insertion
     if (do_expand) {
-        int k = int(ndx);
-        while (--k >= 0) {
-            int64_t v = (this->*old_getter)(k);
-            (this->*m_setter)(k, v);
+        size_t i = ndx;
+        while (i != 0) {
+            --i;
+            int64_t v = (this->*old_getter)(i);
+            (this->*m_setter)(i, v);
         }
     }
 
@@ -446,6 +442,30 @@ void Array::resize(size_t count)
     // Update size (also in header)
     m_size = count;
     set_header_size(m_size);
+}
+
+void Array::ensure_minimum_width(int64_t value)
+{
+    if (value >= m_lbound && value <= m_ubound) return;
+
+    // Check if we need to copy before modifying
+    copy_on_write(); // Throws
+
+    // Make room for the new value
+    size_t width = bit_width(value);
+    TIGHTDB_ASSERT(width > m_width);
+
+    Getter old_getter = m_getter;    // Save old getter before width expansion
+    alloc(m_size, width); // Throws
+    set_width(width);
+
+    // Expand the old values
+    size_t i = m_size;
+    while (i != 0) {
+        --i;
+        int64_t v = (this->*old_getter)(i);
+        (this->*m_setter)(i, v);
+    }
 }
 
 void Array::SetAllToZero()
@@ -2053,25 +2073,22 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) TIGHTDB_NO
 // It may be worth considering if overall efficiency can be improved
 // by doing a linear search for short sequences.
 template<int width>
-inline size_t lower_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
+inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
     using namespace tightdb;
 
-    const char* data = Array::get_data_from_header(header);
-
     size_t i = 0;
-    size_t size = Array::get_size_from_header(header);
-
-    while (0 < size) {
-        size_t half = size / 2;
+    size_t size_2 = size;
+    while (0 < size_2) {
+        size_t half = size_2 / 2;
         size_t mid = i + half;
         int64_t probe = get_direct<width>(data, mid);
         if (probe < value) {
             i = mid + 1;
-            size -= half + 1;
+            size_2 -= half + 1;
         }
         else {
-            size = half;
+            size_2 = half;
         }
     }
     return i;
@@ -2079,25 +2096,22 @@ inline size_t lower_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
 
 // See lower_bound()
 template<int width>
-inline size_t upper_bound(const char* header, int64_t value) TIGHTDB_NOEXCEPT
+inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
     using namespace tightdb;
 
-    const char* data = Array::get_data_from_header(header);
-
     size_t i = 0;
-    size_t size = Array::get_size_from_header(header);
-
-    while (0 < size) {
-        size_t half = size / 2;
+    size_t size_2 = size;
+    while (0 < size_2) {
+        size_t half = size_2 / 2;
         size_t mid = i + half;
         int64_t probe = get_direct<width>(data, mid);
         if (probe <= value) {
             i = mid + 1;
-            size -= half + 1;
+            size_2 -= half + 1;
         }
         else {
-            size = half;
+            size_2 = half;
         }
     }
     return i;
@@ -2114,9 +2128,11 @@ template<int width> inline pair<size_t, size_t>
 find_child(const char* offsets_header, size_t elem_ndx) TIGHTDB_NOEXCEPT
 {
     using namespace tightdb;
-    size_t child_ndx = upper_bound<width>(offsets_header, elem_ndx);
+    const char* offsets_data = Array::get_data_from_header(offsets_header);
+    size_t offsets_size = Array::get_size_from_header(offsets_header);
+    size_t child_ndx = upper_bound<width>(offsets_data, offsets_size, elem_ndx);
     size_t elem_ndx_offset = child_ndx == 0 ? 0 :
-        to_size_t(get_direct<width>(Array::get_data_from_header(offsets_header), child_ndx-1));
+        to_size_t(get_direct<width>(offsets_data, child_ndx-1));
     return make_pair(child_ndx, elem_ndx_offset);
 }
 
@@ -2130,41 +2146,20 @@ inline pair<size_t, size_t> get_two_as_size(const char* header, size_t ndx) TIGH
 }
 
 
-size_t FindPos2Direct_32(const char* const header, const char* const data, int32_t target)
-{
-    const size_t size = tightdb::Array::get_size_from_header(header);
+} // anonymous namespace
 
-    int low = -1;
-    int high = int(size); // FIXME: Conversion to 'int' is prone to overflow
-
-    // Binary search based on:
-    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
-    // Finds position of closest value BIGGER OR EQUAL to the target (for
-    // lookups in indexes)
-    while (high - low > 1) {
-        const size_t probe = (unsigned(low) + unsigned(high)) >> 1;
-        const int64_t v = get_direct<32>(data, probe);
-
-        if (v < target) low = int(probe);
-        else            high = int(probe);
-    }
-    if (high == int(size)) return size_t(-1);
-    else return size_t(high);
-}
-
-}
 
 namespace tightdb {
 
 
 size_t Array::lower_bound(int64_t value) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_TEMPEX(return ::lower_bound, m_width, (get_header_from_data(m_data), value));
+    TIGHTDB_TEMPEX(return ::lower_bound, m_width, (m_data, m_size, value));
 }
 
 size_t Array::upper_bound(int64_t value) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_TEMPEX(return ::upper_bound, m_width, (get_header_from_data(m_data), value));
+    TIGHTDB_TEMPEX(return ::upper_bound, m_width, (m_data, m_size, value));
 }
 
 
@@ -2360,20 +2355,17 @@ size_t Array::ColumnFind(int64_t target, ref_type ref, Array& cache) const
 
 size_t Array::IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const
 {
-    const char* v = value.data();
-    const char* v_end = v + value.size();
+    StringData value_2 = value;
     const char* data   = m_data;
     const char* header;
     size_t width = m_width;
     bool is_leaf = !m_isNode;
+    typedef StringIndex::key_type key_type;
+    key_type key;
 
 top:
     // Create 4 byte index key
-    int32_t key = 0;
-    if (v != v_end) key  = (int32_t(*v++) << 24);
-    if (v != v_end) key |= (int32_t(*v++) << 16);
-    if (v != v_end) key |= (int32_t(*v++) << 8);
-    if (v != v_end) key |=  int32_t(*v++);
+    key = StringIndex::create_key(value_2);
 
     for (;;) {
         // Get subnode table
@@ -2383,10 +2375,11 @@ top:
         // Find the position matching the key
         const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data = get_data_from_header(offsets_header);
-        size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
+        size_t offsets_size = get_size_from_header(offsets_header);
+        size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
 
         // If key is outside range, we know there can be no match
-        if (pos == not_found) return not_found;
+        if (pos == offsets_size) return not_found;
 
         // Get entry under key
         const char* refs_header = m_alloc.translate(refs_ref);
@@ -2403,7 +2396,7 @@ top:
             continue;
         }
 
-        int32_t stored_key = int32_t(get_direct<32>(offsets_data, pos));
+        key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
 
         if (stored_key == key) {
             // Literal row index
@@ -2454,6 +2447,8 @@ top:
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_leaf = get_isleaf_from_header(header);
+            if (value_2.size() <= 4) value_2 = StringData();
+            else value_2 = value_2.substr(4);
             goto top;
         }
         else return not_found;
@@ -2462,20 +2457,17 @@ top:
 
 void Array::IndexStringFindAll(Array& result, StringData value, void* column, StringGetter get_func) const
 {
-    const char* v = value.data();
-    const char* v_end = v + value.size();
+    StringData value_2 = value;
     const char* data = m_data;
     const char* header;
     size_t width = m_width;
     bool is_leaf = !m_isNode;
+    typedef StringIndex::key_type key_type;
+    key_type key;
 
 top:
     // Create 4 byte index key
-    int32_t key = 0;
-    if (v != v_end) key  = (int32_t(*v++) << 24);
-    if (v != v_end) key |= (int32_t(*v++) << 16);
-    if (v != v_end) key |= (int32_t(*v++) << 8);
-    if (v != v_end) key |=  int32_t(*v++);
+    key = StringIndex::create_key(value_2);
 
     for (;;) {
         // Get subnode table
@@ -2485,10 +2477,11 @@ top:
         // Find the position matching the key
         const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data = get_data_from_header(offsets_header);
-        size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
+        size_t offsets_size = get_size_from_header(offsets_header);
+        size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
 
         // If key is outside range, we know there can be no match
-        if (pos == not_found) return; // not_found
+        if (pos == offsets_size) return; // not_found
 
         // Get entry under key
         const char* refs_header = m_alloc.translate(refs_ref);
@@ -2505,7 +2498,7 @@ top:
             continue;
         }
 
-        int32_t stored_key = int32_t(get_direct<32>(offsets_data, pos));
+        key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
 
         if (stored_key == key) {
             // Literal row index
@@ -2585,6 +2578,8 @@ top:
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_leaf = get_isleaf_from_header(header);
+            if (value_2.size() <= 4) value_2 = StringData();
+            else value_2 = value_2.substr(4);
             goto top;
         }
         else return; // not_found
@@ -2593,20 +2588,17 @@ top:
 
 FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const
 {
-    const char* v = value.data();
-    const char* v_end = v + value.size();
+    StringData value_2 = value;
     const char* data = m_data;
     const char* header;
     size_t width = m_width;
     bool is_leaf = !m_isNode;
+    typedef StringIndex::key_type key_type;
+    key_type key;
 
 top:
     // Create 4 byte index key
-    int32_t key = 0;
-    if (v != v_end) key  = (int32_t(*v++) << 24);
-    if (v != v_end) key |= (int32_t(*v++) << 16);
-    if (v != v_end) key |= (int32_t(*v++) << 8);
-    if (v != v_end) key |=  int32_t(*v++);
+    key = StringIndex::create_key(value_2);
 
     for (;;) {
         // Get subnode table
@@ -2616,10 +2608,11 @@ top:
         // Find the position matching the key
         const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data   = get_data_from_header(offsets_header);
-        size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
+        size_t offsets_size = get_size_from_header(offsets_header);
+        size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
 
         // If key is outside range, we know there can be no match
-        if (pos == not_found) return FindRes_not_found;
+        if (pos == offsets_size) return FindRes_not_found;
 
         // Get entry under key
         const char* refs_header = m_alloc.translate(refs_ref);
@@ -2636,7 +2629,7 @@ top:
             continue;
         }
 
-        int32_t stored_key = int32_t(get_direct<32>(offsets_data, pos));
+        key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
 
         if (stored_key == key) {
             // Literal row index
@@ -2703,6 +2696,8 @@ top:
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_leaf = get_isleaf_from_header(header);
+            if (value_2.size() <= 4) value_2 = StringData();
+            else value_2 = value_2.substr(4);
             goto top;
         }
         else return FindRes_not_found; // not_found
@@ -2712,20 +2707,17 @@ top:
 size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_func) const
 
 {
-    const char* v = value.data();
-    const char* v_end = v + value.size();
+    StringData value_2 = value;
     const char* data   = m_data;
     const char* header;
     size_t width = m_width;
     bool is_leaf = !m_isNode;
+    typedef StringIndex::key_type key_type;
+    key_type key;
 
 top:
     // Create 4 byte index key
-    int32_t key = 0;
-    if (v != v_end) key  = (int32_t(*v++) << 24);
-    if (v != v_end) key |= (int32_t(*v++) << 16);
-    if (v != v_end) key |= (int32_t(*v++) << 8);
-    if (v != v_end) key |=  int32_t(*v++);
+    key = StringIndex::create_key(value_2);
 
     for (;;) {
         // Get subnode table
@@ -2735,10 +2727,11 @@ top:
         // Find the position matching the key
         const char* offsets_header = m_alloc.translate(offsets_ref);
         const char* offsets_data = get_data_from_header(offsets_header);
-        size_t pos = FindPos2Direct_32(offsets_header, offsets_data, key); // keys are always 32 bits wide
+        size_t offsets_size = get_size_from_header(offsets_header);
+        size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
 
         // If key is outside range, we know there can be no match
-        if (pos == not_found) return 0;
+        if (pos == offsets_size) return 0;
 
         // Get entry under key
         const char* refs_header = m_alloc.translate(refs_ref);
@@ -2755,7 +2748,7 @@ top:
             continue;
         }
 
-        int32_t stored_key = int32_t(get_direct<32>(offsets_data, pos));
+        key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
 
         if (stored_key == key) {
             // Literal row index
@@ -2814,6 +2807,8 @@ top:
             data    = get_data_from_header(header);
             width   = get_width_from_header(header);
             is_leaf = get_isleaf_from_header(header);
+            if (value_2.size() <= 4) value_2 = StringData();
+            else value_2 = value_2.substr(4);
             goto top;
         }
         else return 0;
