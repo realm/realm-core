@@ -113,7 +113,8 @@ StringIndex& AdaptiveStringColumn::create_index()
     const size_t count = size();
     for (size_t i = 0; i < count; ++i) {
         StringData value = get(i);
-        m_index->insert(i, value, true);
+        bool is_last = true;
+        m_index->insert(i, value, is_last);
     }
 
     return *m_index;

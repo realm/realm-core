@@ -98,7 +98,12 @@ public:
     }
 
 protected:
-    friend class StringIndex;
+    // FIXME: This should not be mutable, the problem is again the
+    // const-violating moving copy constructor.
+    mutable Array* m_array;
+
+    ColumnBase() TIGHTDB_NOEXCEPT {}
+    ColumnBase(Array* root) TIGHTDB_NOEXCEPT: m_array(root) {}
 
     // Tree functions
     template<class T, class C> void TreeSet(std::size_t ndx, T value);
@@ -124,13 +129,11 @@ protected:
     virtual void leaf_to_dot(std::ostream&, const Array&) const;
 #endif
 
-    // FIXME: This should not be mutable, the problem is again the
-    // const-violating moving copy constructor.
-    mutable Array* m_array;
-
     /// Introduce a new root node which increments the height of the
     /// tree by one.
     void introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state);
+
+    friend class StringIndex;
 };
 
 
@@ -206,13 +209,13 @@ public:
     // Debug
 #ifdef TIGHTDB_DEBUG
     void Print() const;
-    virtual void Verify() const;
+    virtual void Verify() const TIGHTDB_OVERRIDE;
     MemStats Stats() const;
 #endif
 
 protected:
-    friend class ColumnBase;
-    void Create();
+    Column(Array* root);
+    void create();
     void update_ref(ref_type ref);
 
     // Node functions
@@ -226,8 +229,6 @@ protected:
     void DoSort(std::size_t lo, std::size_t hi);
 
 private:
-    friend class Array;
-
     Column &operator=(const Column&); // not allowed
 
     void do_insert(std::size_t ndx, int64_t value);
@@ -235,12 +236,63 @@ private:
     // Called by Array::btree_insert().
     static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
                                 Allocator&, std::size_t insert_ndx, Array::TreeInsert<Column>&);
+
+    friend class Array;
+    friend class ColumnBase;
 };
 
 
 
 
 // Implementation:
+
+inline Column::Column(Allocator& alloc):
+    ColumnBase(new Array(Array::type_Normal, 0, 0, alloc))
+{
+    create();
+}
+
+inline Column::Column(Array::Type type, Allocator& alloc):
+    ColumnBase(new Array(type, 0, 0, alloc))
+{
+    create();
+}
+
+inline Column::Column(Array::Type type, ArrayParent* parent, std::size_t ndx_in_parent,
+                      Allocator& alloc):
+    ColumnBase(new Array(type, parent, ndx_in_parent, alloc))
+{
+    create();
+}
+
+inline Column::Column(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
+                      Allocator& alloc):
+    ColumnBase(new Array(ref, parent, ndx_in_parent, alloc)) {}
+
+inline Column::Column(const Column& column): ColumnBase(column.m_array)
+{
+    // we now own array
+    // FIXME: Unfortunate hidden constness violation here
+    column.m_array = 0;       // so invalidate source
+}
+
+inline Column::Column(Array* root): ColumnBase(root) {}
+
+inline Column::~Column()
+{
+    delete m_array;
+}
+
+inline void Column::update_ref(ref_type ref)
+{
+    m_array->update_ref(ref);
+}
+
+inline void Column::destroy()
+{
+    if (m_array)
+        m_array->destroy();
+}
 
 inline int64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {

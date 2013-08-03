@@ -645,23 +645,23 @@ void Table::set_index(size_t column_ndx, bool update_spec)
     Spec::ColumnInfo info;
     m_spec_set.get_column_info(column_ndx, info);
     size_t column_pos = info.m_column_ref_ndx;
-    size_t ndx_ref = -1;
+    ref_type index_ref = 0;
 
     if (ct == col_type_String) {
         AdaptiveStringColumn& col = GetColumnString(column_ndx);
 
         // Create the index
-        StringIndex& ndx = col.create_index();
-        ndx.set_parent(&m_columns, column_pos+1);
-        ndx_ref = ndx.get_ref();
+        StringIndex& index = col.create_index();
+        index.set_parent(&m_columns, column_pos+1);
+        index_ref = index.get_ref();
     }
     else if (ct == col_type_StringEnum) {
         ColumnStringEnum& col = GetColumnStringEnum(column_ndx);
 
         // Create the index
-        StringIndex& ndx = col.create_index();
-        ndx.set_parent(&m_columns, column_pos+1);
-        ndx_ref = ndx.get_ref();
+        StringIndex& index = col.create_index();
+        index.set_parent(&m_columns, column_pos+1);
+        index_ref = index.get_ref();
     }
     else {
         TIGHTDB_ASSERT(false);
@@ -669,7 +669,7 @@ void Table::set_index(size_t column_ndx, bool update_spec)
     }
 
     // Insert ref into columns list after the owning column
-    m_columns.insert(column_pos+1, ndx_ref);
+    m_columns.insert(column_pos+1, index_ref);
     UpdateColumnRefs(column_ndx+1, 1);
 
     // Update spec
@@ -1889,14 +1889,14 @@ TableView Table::distinct(size_t column_ndx)
     ColumnType type = get_real_column_type(column_ndx);
     if (type == col_type_String) {
         const AdaptiveStringColumn& column = GetColumnString(column_ndx);
-        const StringIndex& ndx = column.get_index();
-        ndx.distinct(refs);
+        const StringIndex& index = column.get_index();
+        index.distinct(refs);
     }
     else {
         TIGHTDB_ASSERT(type == col_type_StringEnum);
         const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
-        const StringIndex& ndx = column.get_index();
-        ndx.distinct(refs);
+        const StringIndex& index = column.get_index();
+        index.distinct(refs);
     }
     return move(tv);
 }
@@ -1912,14 +1912,14 @@ ConstTableView Table::distinct(size_t column_ndx) const
     ColumnType type = get_real_column_type(column_ndx);
     if (type == col_type_String) {
         const AdaptiveStringColumn& column = GetColumnString(column_ndx);
-        const StringIndex& ndx = column.get_index();
-        ndx.distinct(refs);
+        const StringIndex& index = column.get_index();
+        index.distinct(refs);
     }
     else {
         TIGHTDB_ASSERT(type == col_type_StringEnum);
         const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
-        const StringIndex& ndx = column.get_index();
-        ndx.distinct(refs);
+        const StringIndex& index = column.get_index();
+        index.distinct(refs);
     }
     return move(tv);
 }

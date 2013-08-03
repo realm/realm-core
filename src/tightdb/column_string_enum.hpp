@@ -71,8 +71,8 @@ public:
     const Array* get_enum_root_array() const TIGHTDB_NOEXCEPT { return m_keys.get_root_array(); }
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-    void to_dot(std::ostream&, StringData title) const;
+    void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
+    void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
 #endif
 
     std::size_t GetKeyNdx(StringData value) const;

@@ -275,38 +275,7 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
     m_array = new_root.release();
 }
 
-
-Column::Column(Allocator& alloc)
-{
-    m_array = new Array(Array::type_Normal, 0, 0, alloc);
-    Create();
-}
-
-Column::Column(Array::Type type, Allocator& alloc)
-{
-    m_array = new Array(type, 0, 0, alloc);
-    Create();
-}
-
-Column::Column(Array::Type type, ArrayParent* parent, size_t pndx, Allocator& alloc)
-{
-    m_array = new Array(type, parent, pndx, alloc);
-    Create();
-}
-
-Column::Column(ref_type ref, ArrayParent* parent, size_t pndx, Allocator& alloc)
-{
-    m_array = new Array(ref, parent, pndx, alloc);
-}
-
-Column::Column(const Column& column): ColumnBase()
-{
-    m_array = column.m_array; // we now own array
-    // FIXME: Unfortunate hidden constness violation here
-    column.m_array = 0;       // so invalidate source
-}
-
-void Column::Create()
+void Column::create()
 {
     // Add subcolumns for nodes
     if (!root_is_leaf()) {
@@ -317,25 +286,9 @@ void Column::Create()
     }
 }
 
-void Column::update_ref(ref_type ref)
-{
-    m_array->update_ref(ref);
-}
-
 bool Column::operator==(const Column& column) const
 {
     return *m_array == *column.m_array;
-}
-
-Column::~Column()
-{
-    delete m_array;
-}
-
-void Column::destroy()
-{
-    if (m_array)
-        m_array->destroy();
 }
 
 
