@@ -383,8 +383,8 @@ public:
     /// Returns true if type is either type_HasRefs or type_InnerColumnNode
     bool has_refs() const TIGHTDB_NOEXCEPT { return m_hasRefs; }
 
-    bool IsIndexNode() const  TIGHTDB_NOEXCEPT { return get_indexflag_from_header(); }
-    void SetIsIndexNode(bool value) { set_header_indexflag(value); }
+    bool is_index_node() const  TIGHTDB_NOEXCEPT { return get_indexflag_from_header(); }
+    void set_is_index_node(bool value) { set_header_indexflag(value); }
 
     // FIXME: Constness is not propagated to the sub-array. This
     // constitutes a real problem, because modifying the returned
@@ -1229,8 +1229,8 @@ template<class S> std::size_t Array::Write(S& out, bool recurse, bool persist) c
         Array new_refs(m_isNode ? type_InnerColumnNode : type_HasRefs);
 
         // Make sure that all flags are retained
-        if (IsIndexNode())
-            new_refs.SetIsIndexNode(true);
+        if (is_index_node())
+            new_refs.set_is_index_node(true);
 
         // First write out all sub-arrays
         std::size_t count = size();

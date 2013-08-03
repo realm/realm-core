@@ -376,16 +376,12 @@ void Array::insert(size_t ndx, int64_t value)
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
-    // Make room for the new value
-    size_t width = m_width;
-
-    if (value < m_lbound || value > m_ubound)
-        width = bit_width(value);
-
     Getter old_getter = m_getter;    // Save old getter before potential width expansion
 
-    bool do_expand = m_width < width;
+    bool do_expand = value < m_lbound || value > m_ubound;
     if (do_expand) {
+        size_t width = bit_width(value);
+        TIGHTDB_ASSERT(width > m_width);
         alloc(m_size+1, width); // Throws
         set_width(width);
     }
@@ -399,7 +395,7 @@ void Array::insert(size_t ndx, int64_t value)
         while (i > ndx) {
             --i;
             int64_t v = (this->*old_getter)(i);
-            (this->*m_setter)(i, v);
+            (this->*m_setter)(i+1, v);
         }
     }
     else if (ndx != m_size) {

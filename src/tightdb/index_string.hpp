@@ -58,7 +58,7 @@ public:
 #ifdef TIGHTDB_DEBUG
     void verify_entries(const AdaptiveStringColumn& column) const;
     void to_dot() const { to_dot(std::cerr); }
-    void to_dot(std::ostream&) const;
+    void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
     typedef uint_fast32_t key_type;
@@ -66,10 +66,10 @@ public:
     static key_type create_key(StringData) TIGHTDB_NOEXCEPT;
 
 private:
-    struct transient_tag {};
-    StringIndex(transient_tag, Allocator&);
+    struct inner_node_tag {};
+    StringIndex(inner_node_tag, Allocator&);
 
-    void Create();
+    static Array* create_node(Allocator&, bool is_leaf);
 
     void InsertWithOffset(size_t row_ndx, size_t offset, StringData value);
     void InsertRowList(size_t ref, size_t offset, StringData value);
@@ -113,6 +113,22 @@ private:
 
 
 // Implementation:
+
+inline StringIndex::StringIndex(void* target_column, StringGetter get_func, Allocator& alloc):
+    Column(create_node(alloc, true)), // Throws
+    m_target_column(target_column), m_get_func(get_func) {}
+
+inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc):
+    Column(create_node(alloc, false)), // Throws
+    m_target_column(0), m_get_func(0) {}
+
+inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
+                                void* target_column, StringGetter get_func, Allocator& alloc):
+    Column(ref, parent, ndx_in_parent, alloc), m_target_column(target_column), m_get_func(get_func)
+{
+    TIGHTDB_ASSERT(Array::is_index_node(ref, alloc));
+}
+
 
 inline StringIndex::key_type StringIndex::create_key(StringData str) TIGHTDB_NOEXCEPT
 {

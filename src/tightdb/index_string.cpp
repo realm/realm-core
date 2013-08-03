@@ -6,39 +6,25 @@ using namespace std;
 using namespace tightdb;
 
 
-StringIndex::StringIndex(void* target_column, StringGetter get_func, Allocator& alloc):
-    Column(Array::type_HasRefs, 0, 0, alloc), m_target_column(target_column), m_get_func(get_func)
+Array* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 {
-    Create();
-}
+    Array::Type type = is_leaf ? Array::type_HasRefs : Array::type_InnerColumnNode;
+    UniquePtr<Array> top(new Array(type, 0, 0, alloc));
 
-StringIndex::StringIndex(transient_tag, Allocator& alloc):
-    Column(Array::type_HasRefs, 0, 0, alloc), m_target_column(0), m_get_func(0)
-{
-    Create();
-}
-
-StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t pndx, void* target_column, StringGetter get_func, Allocator& alloc)
-: Column(ref, parent, pndx, alloc), m_target_column(target_column), m_get_func(get_func)
-{
-    TIGHTDB_ASSERT(Array::is_index_node(ref, alloc));
-}
-
-void StringIndex::Create()
-{
     // Mark that this is part of index
     // (as opposed to columns under leafs)
-    m_array->SetIsIndexNode(true);
+    top->set_is_index_node(true);
 
     // Add subcolumns for leafs
-    Allocator& alloc = m_array->get_alloc();
     Array values(Array::type_Normal, 0, 0, alloc);
     values.ensure_minimum_width(0x7FFFFFFF); // This ensures 31 bits plus a sign bit
     Array refs(Array::type_HasRefs, 0, 1, alloc);
-    m_array->add(values.get_ref());
-    m_array->add(refs.get_ref());
-    values.set_parent(m_array, 0);
-    refs.set_parent(m_array, 1);
+    top->add(values.get_ref());
+    top->add(refs.get_ref());
+    values.set_parent(top.get(), 0);
+    refs.set_parent(top.get(), 1);
+
+    return top.release();
 }
 
 void StringIndex::set_target(void* target_column, StringGetter get_func) TIGHTDB_NOEXCEPT
@@ -115,21 +101,21 @@ void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, String
         case NodeChange::none:
             return;
         case NodeChange::insert_before: {
-            StringIndex new_node(transient_tag(), m_array->get_alloc());
+            StringIndex new_node(inner_node_tag(), m_array->get_alloc());
             new_node.NodeAddKey(nc.ref1);
             new_node.NodeAddKey(get_ref());
             update_ref(new_node.get_ref());
             return;
         }
         case NodeChange::insert_after: {
-            StringIndex new_node(transient_tag(), m_array->get_alloc());
+            StringIndex new_node(inner_node_tag(), m_array->get_alloc());
             new_node.NodeAddKey(get_ref());
             new_node.NodeAddKey(nc.ref1);
             update_ref(new_node.get_ref());
             return;
         }
         case NodeChange::split: {
-            StringIndex new_node(transient_tag(), m_array->get_alloc());
+            StringIndex new_node(inner_node_tag(), m_array->get_alloc());
             new_node.NodeAddKey(nc.ref1);
             new_node.NodeAddKey(nc.ref2);
             update_ref(new_node.get_ref());
@@ -176,7 +162,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         }
 
         // Else create new node
-        StringIndex new_node(transient_tag(), m_array->get_alloc());
+        StringIndex new_node(inner_node_tag(), m_array->get_alloc());
         if (nc.type == NodeChange::split) {
             // update offset for left node
             key_type last_key = target.GetLastKey();
@@ -219,8 +205,8 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         if (LeafInsert(row_ndx, key, offset, value, noextend))
             return NodeChange::none;
 
-        // Create new list for item
-        StringIndex new_list(transient_tag(), m_array->get_alloc());
+        // Create new list for item (a leaf)
+        StringIndex new_list(m_target_column, m_get_func, m_array->get_alloc());
 
         new_list.LeafInsert(row_ndx, key, offset, value);
 
@@ -313,7 +299,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
 
         // When key is outside current range, we can just add it
         values.add(key);
-        size_t shifted = (row_ndx << 1) + 1; // shift to indicate literal
+        int64_t shifted = int64_t((uint64_t(row_ndx) << 1) + 1); // shift to indicate literal
         refs.add(shifted);
         return true;
     }
@@ -325,29 +311,29 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
         if (noextend) return false;
 
         values.insert(ins_pos, key);
-        size_t shifted = (row_ndx << 1) + 1; // shift to indicate literal
+        int64_t shifted = int64_t((uint64_t(row_ndx) << 1) + 1); // shift to indicate literal
         refs.insert(ins_pos, shifted);
         return true;
     }
 
-    const size_t ref = to_size_t(refs.get(ins_pos));
-    const size_t sub_offset = offset + 4;
+    int64_t ref = refs.get(ins_pos);
+    size_t sub_offset = offset + 4;
     Allocator& alloc = m_array->get_alloc();
 
     // Single match (lowest bit set indicates literal row_ndx)
     if (ref & 1) {
-        const size_t row_ndx2 = ref >> 1;
+        size_t row_ndx2 = size_t(uint64_t(ref) >> 1);
         StringData v2 = get(row_ndx2);
         if (v2 == value) {
             // convert to list (in sorted order)
-            Array row_list(Array::type_Normal, NULL, 0, alloc);
+            Array row_list(Array::type_Normal, 0, 0, alloc);
             row_list.add(row_ndx < row_ndx2 ? row_ndx : row_ndx2);
             row_list.add(row_ndx < row_ndx2 ? row_ndx2 : row_ndx);
             refs.set(ins_pos, row_list.get_ref());
         }
         else {
             // convert to sub-index
-            StringIndex sub_index(transient_tag(), alloc);
+            StringIndex sub_index(m_target_column, m_get_func, m_array->get_alloc());
             sub_index.InsertWithOffset(row_ndx2, sub_offset, v2);
             sub_index.InsertWithOffset(row_ndx, sub_offset, value);
             refs.set(ins_pos, sub_index.get_ref());
@@ -357,17 +343,17 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
 
     // If there alrady is a list of matches, we see if we fit there
     // or it has to be split into a sub-index
-    if (!Array::is_index_node(ref, alloc)) {
-        Column sub(ref, &refs, ins_pos, alloc);
+    if (!Array::is_index_node(to_ref(ref), alloc)) {
+        Column sub(to_ref(ref), &refs, ins_pos, alloc);
 
-        const size_t r1 = size_t(sub.get(0));
+        size_t r1 = size_t(sub.get(0));
         StringData v2 = get(r1);
         if (v2 ==  value) {
             // find insert position (the list has to be kept in sorted order)
             // In most cases we refs will be added to the end. So we test for that
             // first to see if we can avoid the binary search for insert position
-            size_t lastRef = size_t(sub.Back());
-            if (row_ndx > lastRef)
+            size_t last_ref = size_t(sub.Back());
+            if (row_ndx > last_ref)
                 sub.add(row_ndx);
             else {
                 size_t pos = sub.find_pos2(row_ndx);
@@ -378,7 +364,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
             }
         }
         else {
-            StringIndex sub_index(transient_tag(), alloc);
+            StringIndex sub_index(m_target_column, m_get_func, m_array->get_alloc());
             sub_index.InsertRowList(sub.get_ref(), sub_offset, v2);
             sub_index.InsertWithOffset(row_ndx, sub_offset, value);
             refs.set(ins_pos, sub_index.get_ref());
@@ -387,7 +373,7 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
     }
 
     // sub-index
-    StringIndex sub_index(ref, &refs, ins_pos, m_target_column, m_get_func, alloc);
+    StringIndex sub_index(to_ref(ref), &refs, ins_pos, m_target_column, m_get_func, alloc);
     sub_index.InsertWithOffset(row_ndx, sub_offset, value);
 
     return true;
@@ -683,11 +669,11 @@ void StringIndex::verify_entries(const AdaptiveStringColumn& column) const
     results.destroy(); // clean-up
 }
 
-void StringIndex::to_dot(ostream& out) const
+void StringIndex::to_dot(ostream& out, StringData title) const
 {
     out << "digraph G {" << endl;
 
-    to_dot_2(out);
+    to_dot_2(out, title);
 
     out << "}" << endl;
 }

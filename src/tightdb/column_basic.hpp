@@ -82,7 +82,7 @@ public:
     bool compare(const BasicColumn&) const;
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
+    void Verify() const TIGHTDB_OVERRIDE {}; // Must be upper case to avoid conflict with macro in ObjC
 #endif
 
 private:
@@ -105,7 +105,7 @@ private:
                                 Array::TreeInsert<BasicColumn<T> >&);
 
 #ifdef TIGHTDB_DEBUG
-    virtual void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
+    void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
 #endif
 
     template <typename R, Action action, class cond>

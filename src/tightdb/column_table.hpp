@@ -200,7 +200,7 @@ public:
     static ref_type create(std::size_t size, Allocator&);
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
+    void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
 #endif
 
 protected:
@@ -210,7 +210,7 @@ protected:
     bool subtables_have_shared_spec() TIGHTDB_OVERRIDE { return true; }
 
 #ifdef TIGHTDB_DEBUG
-    virtual void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
+    void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
 #endif
 };
 
