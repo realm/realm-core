@@ -22,20 +22,20 @@ namespace tightdb {
 
 inline ColumnMixed::ColumnMixed(): m_data(0)
 {
-    Create(Allocator::get_default(), 0, 0);
+    create(Allocator::get_default(), 0, 0);
 }
 
 inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* table, std::size_t column_ndx):
     m_data(0)
 {
-    Create(alloc, table, column_ndx);
+    create(alloc, table, column_ndx);
 }
 
 inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* table, std::size_t column_ndx,
                                 ArrayParent* parent, std::size_t ndx_in_parent, ref_type ref):
     m_data(0)
 {
-    Create(alloc, table, column_ndx, parent, ndx_in_parent, ref);
+    create(alloc, table, column_ndx, parent, ndx_in_parent, ref);
 }
 
 inline ref_type ColumnMixed::get_subtable_ref(std::size_t row_idx) const TIGHTDB_NOEXCEPT
@@ -323,7 +323,7 @@ inline void ColumnMixed::insert_date(std::size_t ndx, Date value)
 inline void ColumnMixed::insert_string(std::size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx <= m_types->size());
-    InitDataColumn();
+    init_data_column();
 
     std::size_t data_ndx = m_data->size();
     m_data->add_string(value);
@@ -338,7 +338,7 @@ inline void ColumnMixed::insert_string(std::size_t ndx, StringData value)
 inline void ColumnMixed::insert_binary(std::size_t ndx, BinaryData value)
 {
     TIGHTDB_ASSERT(ndx <= m_types->size());
-    InitDataColumn();
+    init_data_column();
 
     std::size_t data_ndx = m_data->size();
     m_data->add(value);

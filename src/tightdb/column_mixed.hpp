@@ -69,8 +69,7 @@ public:
     ~ColumnMixed();
     void destroy() TIGHTDB_OVERRIDE;
 
-    void set_parent(ArrayParent*, std::size_t ndx_in_parent);
-    void UpdateFromParent();
+    void update_from_parent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     DataType get_type(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_types->size(); }
@@ -122,8 +121,6 @@ public:
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
     void fill(std::size_t count);
 
-    ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
-
     /// Compare two mixed columns for equality.
     bool compare_mixed(const ColumnMixed&) const;
 
@@ -174,16 +171,16 @@ private:
     /// For string and binary data types, the bytes are stored here.
     ColumnBinary* m_data;
 
-    void Create(Allocator& alloc, const Table* table, std::size_t column_ndx);
-    void Create(Allocator& alloc, const Table* table, std::size_t column_ndx,
-                ArrayParent* parent, std::size_t ndx_in_parent, ref_type ref);
-    void InitDataColumn();
+    void create(Allocator&, const Table*, std::size_t column_ndx);
+    void create(Allocator&, const Table*, std::size_t column_ndx,
+                ArrayParent*, std::size_t ndx_in_parent, ref_type);
+    void init_data_column();
 
-    void clear_value(std::size_t ndx, MixedColType newtype);
+    void clear_value(std::size_t ndx, MixedColType new_type);
 
     // Get/set/insert 64-bit values in m_refs/m_types
     int64_t get_value(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    void set_value(std::size_t ndx, int64_t value, MixedColType coltype);
+    void set_value(std::size_t ndx, int64_t value, MixedColType);
     void insert_int64(std::size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
     void set_int64(std::size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
 };

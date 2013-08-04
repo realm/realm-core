@@ -79,10 +79,6 @@ public:
     StringIndex* release_index() TIGHTDB_NOEXCEPT { StringIndex* i = m_index; m_index = 0; return i;}
     StringIndex& create_index();
 
-    ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
-    Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
-    void set_parent(ArrayParent* parent, std::size_t pndx) { m_array->set_parent(parent, pndx); }
-
     // Optimizing data layout
     bool auto_enumerate(ref_type& keys, ref_type& values) const;
 

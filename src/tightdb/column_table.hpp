@@ -29,7 +29,7 @@ namespace tightdb {
 /// Base class for any type of column that can contain subtables.
 class ColumnSubtableParent: public Column, public Table::Parent {
 public:
-    void UpdateFromParent();
+    void update_from_parent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void invalidate_subtables();
 
@@ -61,7 +61,7 @@ protected:
     ColumnSubtableParent(Allocator&, const Table*, std::size_t column_ndx);
 
     ColumnSubtableParent(Allocator&, const Table*, std::size_t column_ndx,
-                         ArrayParent* parent, std::size_t ndx_in_parent, ref_type ref);
+                         ArrayParent*, std::size_t ndx_in_parent, ref_type);
 
     /// Get the subtable at the specified index.
     ///
@@ -115,9 +115,11 @@ protected:
     std::size_t* record_subtable_path(std::size_t* begin,
                                       std::size_t* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
-        if (end == begin) return 0; // Error, not enough space in buffer
+        if (end == begin)
+            return 0; // Error, not enough space in buffer
         *begin++ = m_index;
-        if (end == begin) return 0; // Error, not enough space in buffer
+        if (end == begin)
+            return 0; // Error, not enough space in buffer
         return m_table->record_subtable_path(begin, end);
     }
 #endif // TIGHTDB_ENABLE_REPLICATION
@@ -130,7 +132,7 @@ private:
         Table* find(std::size_t subtable_ndx) const;
         void insert(std::size_t subtable_ndx, Table* wrapper);
         void remove(std::size_t subtable_ndx);
-        void update_from_parents();
+        void update_from_parents() TIGHTDB_NOEXCEPT;
         void invalidate_subtables();
     private:
         Array m_indices;
@@ -220,9 +222,9 @@ protected:
 
 // Implementation
 
-inline void ColumnSubtableParent::UpdateFromParent()
+inline void ColumnSubtableParent::update_from_parent() TIGHTDB_NOEXCEPT
 {
-    if (!m_array->UpdateFromParent()) return;
+    if (!m_array->update_from_parent()) return;
     m_subtable_map.update_from_parents();
 }
 
@@ -230,7 +232,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) c
 {
     TIGHTDB_ASSERT(subtable_ndx < size());
 
-    Table *subtable = m_subtable_map.find(subtable_ndx);
+    Table* subtable = m_subtable_map.find(subtable_ndx);
     if (!subtable) {
         ref_type top_ref = get_as_ref(subtable_ndx);
         Allocator& alloc = get_alloc();
@@ -248,7 +250,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx,
 {
     TIGHTDB_ASSERT(subtable_ndx < size());
 
-    Table *subtable = m_subtable_map.find(subtable_ndx);
+    Table* subtable = m_subtable_map.find(subtable_ndx);
     if (!subtable) {
         ref_type columns_ref = get_as_ref(subtable_ndx);
         Allocator& alloc = get_alloc();
@@ -299,14 +301,14 @@ inline void ColumnSubtableParent::SubtableMap::remove(std::size_t subtable_ndx)
     m_wrappers.erase(pos);
 }
 
-inline void ColumnSubtableParent::SubtableMap::update_from_parents()
+inline void ColumnSubtableParent::SubtableMap::update_from_parents() TIGHTDB_NOEXCEPT
 {
     if (!m_indices.IsValid()) return;
 
-    std::size_t count = m_wrappers.size();
-    for (std::size_t i = 0; i < count; ++i) {
+    std::size_t n = m_wrappers.size();
+    for (std::size_t i = 0; i < n; ++i) {
         Table* t = reinterpret_cast<Table*>(m_wrappers.get(i));
-        t->UpdateFromParent();
+        t->update_from_parent();
     }
 }
 

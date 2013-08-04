@@ -71,17 +71,27 @@ public:
     virtual bool has_index() const TIGHTDB_NOEXCEPT { return false; }
     virtual void set_index_ref(ref_type, ArrayParent*, std::size_t) {}
 
-    virtual ref_type get_ref() const = 0;
-    virtual void set_parent(ArrayParent* parent, std::size_t pndx) { m_array->set_parent(parent, pndx); }
-    virtual void UpdateParentNdx(int diff) { m_array->UpdateParentNdx(diff); }
-    virtual void UpdateFromParent() { m_array->UpdateFromParent(); }
+    virtual void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT { m_array->adjust_ndx_in_parent(diff); }
+    virtual void update_from_parent() TIGHTDB_NOEXCEPT { m_array->update_from_parent(); }
 
     virtual void invalidate_subtables_virtual() {}
 
+    Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
+
+    // FIXME: Should be moved into concrete derivatives, since not all
+    // column types have a unique root (string enum).
+    ref_type get_ref() const TIGHTDB_NOEXCEPT { return m_array->get_ref(); }
+
+    // FIXME: Should be moved into concrete derivatives, since not all
+    // column types have a unique root (string enum).
+    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT { m_array->set_parent(parent, ndx_in_parent); }
+
+    // FIXME: Should be moved into concrete derivatives, since not all
+    // column types have a unique root (string enum).
     const Array* get_root_array() const TIGHTDB_NOEXCEPT { return m_array; }
 
 #ifdef TIGHTDB_DEBUG
-    virtual void Verify() const = 0; // Must be upper case to avoid conflict with macro in ObjC
+    virtual void Verify() const = 0; // Must be upper case to avoid conflict with macro in Objective-C
     virtual void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
@@ -164,7 +174,6 @@ public:
 
     bool IsIntColumn() const TIGHTDB_NOEXCEPT { return true; }
 
-    void UpdateParentNdx(int diff);
     void SetHasRefs();
 
     std::size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -209,9 +218,6 @@ public:
 
     // Query support methods
     void LeafFindAll(Array& result, int64_t value, size_t add_offset, size_t start, size_t end) const;
-
-    ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
-    Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
 
     void sort();
 

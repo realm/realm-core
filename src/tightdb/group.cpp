@@ -431,20 +431,20 @@ void Group::update_refs(ref_type top_ref)
     TIGHTDB_ASSERT(m_top.size() >= 2);
 
     // Now we can update it's child arrays
-    m_tableNames.UpdateFromParent();
+    m_tableNames.update_from_parent();
 
     // No free-info in serialized databases
     // and version info is only in shared,
     if (m_top.size() >= 4) {
-        m_freePositions.UpdateFromParent();
-        m_freeLengths.UpdateFromParent();
+        m_freePositions.update_from_parent();
+        m_freeLengths.update_from_parent();
     }
     else {
         m_freePositions.Invalidate();
         m_freeLengths.Invalidate();
     }
     if (m_top.size() == 5) {
-        m_freeVersions.UpdateFromParent();
+        m_freeVersions.update_from_parent();
     }
     else {
         m_freeVersions.Invalidate();
@@ -452,14 +452,14 @@ void Group::update_refs(ref_type top_ref)
 
     // if the tables have not been modfied we don't
     // need to update cached tables
-    if (!m_tables.UpdateFromParent()) return;
+    if (!m_tables.update_from_parent()) return;
 
     // Also update cached tables
-    size_t count = m_cachedtables.size();
-    for (size_t i = 0; i < count; ++i) {
+    size_t n = m_cachedtables.size();
+    for (size_t i = 0; i < n; ++i) {
         Table* const t = reinterpret_cast<Table*>(m_cachedtables.get(i));
         if (t) {
-            t->UpdateFromParent();
+            t->update_from_parent();
         }
     }
 }
@@ -486,13 +486,13 @@ void Group::update_from_shared(ref_type top_ref, size_t len)
     // Update group arrays
     m_top.update_ref(top_ref);
     TIGHTDB_ASSERT(m_top.size() >= 2);
-    bool names_changed = !m_tableNames.UpdateFromParent();
-    m_tables.UpdateFromParent();
+    bool names_changed = !m_tableNames.update_from_parent();
+    m_tables.update_from_parent();
     if (m_top.size() > 2) {
-        m_freePositions.UpdateFromParent();
-        m_freeLengths.UpdateFromParent();
+        m_freePositions.update_from_parent();
+        m_freeLengths.update_from_parent();
         if (m_top.size() > 4) {
-            m_freeVersions.UpdateFromParent();
+            m_freeVersions.update_from_parent();
         }
     }
 
@@ -503,19 +503,18 @@ void Group::update_from_shared(ref_type top_ref, size_t len)
         clear_cache();
 
         // Make room for new pointers to cached tables
-        size_t table_count = m_tables.size();
-        for (size_t i = 0; i < table_count; ++i) {
+        size_t n = m_tables.size();
+        for (size_t i = 0; i < n; ++i) {
             m_cachedtables.add(0);
         }
     }
     else {
         // Update cached tables
         //TODO: account for changed spec
-        size_t count = m_cachedtables.size();
-        for (size_t i = 0; i < count; ++i) {
-            Table* t = reinterpret_cast<Table*>(m_cachedtables.get(i));
-            if (t) {
-                t->UpdateFromParent();
+        size_t n = m_cachedtables.size();
+        for (size_t i = 0; i < n; ++i) {
+            if (Table* t = reinterpret_cast<Table*>(m_cachedtables.get(i))) {
+                t->update_from_parent();
             }
         }
     }

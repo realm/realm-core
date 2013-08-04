@@ -303,11 +303,6 @@ size_t Column::size() const TIGHTDB_NOEXCEPT
     return offsets.is_empty() ? 0 : to_size_t(offsets.back());
 }
 
-void Column::UpdateParentNdx(int diff)
-{
-    m_array->UpdateParentNdx(diff);
-}
-
 // Used by column b-tree code to ensure all leaf having same type
 void Column::SetHasRefs()
 {
@@ -630,7 +625,7 @@ void Column::Verify() const
 
 void ColumnBase::to_dot(ostream& out, StringData title) const
 {
-    ref_type ref = get_ref();
+    ref_type ref = m_array->get_ref();
 
     out << "subgraph cluster_column" << ref << " {" << endl;
     out << " label = \"Column";

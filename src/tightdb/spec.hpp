@@ -96,11 +96,11 @@ private:
     void init_from_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent);
     void destroy();
 
-    ref_type get_ref() const;
+    ref_type get_ref() const TIGHTDB_NOEXCEPT;
     void update_ref(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0);
 
-    bool update_from_parent();
-    void set_parent(ArrayParent*, std::size_t ndx_in_parent);
+    bool update_from_parent() TIGHTDB_NOEXCEPT;
+    void set_parent(ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
 
     void set_column_type(std::size_t column_ndx, ColumnType type);
     void set_column_attr(std::size_t column_ndx, ColumnType attr);

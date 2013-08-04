@@ -269,10 +269,10 @@ public:
     // Parent tracking
     bool has_parent() const TIGHTDB_NOEXCEPT { return m_parent != 0; }
     void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
-    void UpdateParentNdx(int diff) { m_ndx_in_parent += diff; }
+    void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT { m_ndx_in_parent += diff; }
     ArrayParent* get_parent() const TIGHTDB_NOEXCEPT { return m_parent; }
     std::size_t get_ndx_in_parent() const TIGHTDB_NOEXCEPT { return m_ndx_in_parent; }
-    bool UpdateFromParent() TIGHTDB_NOEXCEPT;
+    bool update_from_parent() TIGHTDB_NOEXCEPT;
 
     bool IsValid() const TIGHTDB_NOEXCEPT { return m_data != 0; }
     void Invalidate() const TIGHTDB_NOEXCEPT { m_data = 0; }

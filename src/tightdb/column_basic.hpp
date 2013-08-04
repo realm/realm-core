@@ -76,15 +76,11 @@ public:
     void find_all(Array& result, T value, size_t start = 0, size_t end = -1) const;
 
     //@{
-
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order.
     std::size_t lower_bound(T value) const TIGHTDB_NOEXCEPT;
     std::size_t upper_bound(T value) const TIGHTDB_NOEXCEPT;
     //@{
-
-    ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
-    void set_parent(ArrayParent* parent, size_t pndx) TIGHTDB_OVERRIDE { m_array->set_parent(parent, pndx); }
 
     /// Compare two columns for equality.
     bool compare(const BasicColumn&) const;

@@ -39,7 +39,7 @@ void Spec::destroy()
     m_specSet.destroy();
 }
 
-ref_type Spec::get_ref() const
+ref_type Spec::get_ref() const TIGHTDB_NOEXCEPT
 {
     return m_specSet.get_ref();
 }
@@ -49,22 +49,22 @@ void Spec::update_ref(ref_type ref, ArrayParent* parent, size_t pndx)
     init_from_ref(ref, parent, pndx);
 }
 
-void Spec::set_parent(ArrayParent* parent, size_t pndx)
+void Spec::set_parent(ArrayParent* parent, size_t pndx) TIGHTDB_NOEXCEPT
 {
     m_specSet.set_parent(parent, pndx);
 }
 
-bool Spec::update_from_parent()
+bool Spec::update_from_parent() TIGHTDB_NOEXCEPT
 {
-    if (m_specSet.UpdateFromParent()) {
-        m_spec.UpdateFromParent();
-        m_names.UpdateFromParent();
+    if (m_specSet.update_from_parent()) {
+        m_spec.update_from_parent();
+        m_names.update_from_parent();
         if (m_specSet.size() == 3) {
-            m_subSpecs.UpdateFromParent();
+            m_subSpecs.update_from_parent();
         }
         return true;
     }
-    else return false;
+    return false;
 }
 
 size_t Spec::add_column(DataType type, StringData name, ColumnType attr)

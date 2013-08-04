@@ -178,7 +178,7 @@ void Array::set_type(Type type)
     }
 }
 
-bool Array::UpdateFromParent() TIGHTDB_NOEXCEPT
+bool Array::update_from_parent() TIGHTDB_NOEXCEPT
 {
     if (!m_parent) return false;
 
