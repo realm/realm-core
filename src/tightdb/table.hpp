@@ -292,6 +292,13 @@ public:
     /// Find the lower/upper bound according to a column that is
     /// already sorted in ascending order.
     ///
+    /// For an integer column at index 0, and an integer value `v`,
+    /// lower_bound_int(0,v) returns the index `l` of the first row
+    /// such that `get_int(0,l) >= v`, and upper_bound_int(0,v)
+    /// returns the index `u` of the first row such that `get_int(0,u)
+    /// > v`. In both cases, if no such row is found, the returned
+    /// value is the number of rows in the table.
+    ///
     ///     3 3 3 4 4 4 5 6 7 9 9 9
     ///     ^     ^     ^     ^     ^
     ///     |     |     |     |     |
@@ -308,8 +315,8 @@ public:
     /// These functions are similar to std::lower_bound() and
     /// std::upper_bound().
     ///
-    /// The string versions assume that the column is already sorted
-    /// according to StringData::operator<().
+    /// The string versions assume that the column is sorted according
+    /// to StringData::operator<().
     std::size_t lower_bound_int(std::size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT;
     std::size_t upper_bound_int(std::size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT;
     std::size_t lower_bound_bool(std::size_t column_ndx, bool value) const TIGHTDB_NOEXCEPT;

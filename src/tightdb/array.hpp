@@ -316,8 +316,15 @@ public:
     void adjust(std::size_t start, int64_t diff);
 
     //@{
-    /// Find the lower/upper bound in an integer sequence sorted in
-    /// ascending order.
+    /// Find the lower/upper bound of the specified value in a
+    /// sequence of integers which must already be sorted ascendingly.
+    ///
+    /// For an integer value `v`, lower_bound_int(v) returns the index
+    /// `l` of the first element such that `get(l) >= v`, and
+    /// upper_bound_int(v) returns the index `u` of the first element
+    /// such that `get(u) > v`. In both cases, if no such element is
+    /// found, the returned value is the number of elements in the
+    /// array.
     ///
     ///     3 3 3 4 4 4 5 6 7 9 9 9
     ///     ^     ^     ^     ^     ^
@@ -332,14 +339,14 @@ public:
     ///     |
     ///      -- Lower and upper bound of 1
     ///
-    /// These functions are functionally identical to
-    /// std::lower_bound() and std::upper_bound().
+    /// These functions are similar to std::lower_bound() and
+    /// std::upper_bound().
     ///
     /// We currently use binary search. See for example
     /// http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
     ///
-    /// It may be worth considering if overall efficiency can be
-    /// improved by doing a linear search for short sequences.
+    /// FIXME: It may be worth considering if overall efficiency can
+    /// be improved by doing a linear search for short sequences.
     std::size_t lower_bound_int(int64_t value) const TIGHTDB_NOEXCEPT;
     std::size_t upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT;
     //@}
