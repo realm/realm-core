@@ -292,12 +292,12 @@ public:
     /// Find the lower/upper bound according to a column that is
     /// already sorted in ascending order.
     ///
-    /// For an integer column at index 0, and an integer value `v`,
-    /// lower_bound_int(0,v) returns the index `l` of the first row
-    /// such that `get_int(0,l) >= v`, and upper_bound_int(0,v)
-    /// returns the index `u` of the first row such that `get_int(0,u)
-    /// > v`. In both cases, if no such row is found, the returned
-    /// value is the number of rows in the table.
+    /// For an integer column at index 0, and an integer value '`v`',
+    /// lower_bound_int(0,v) returns the index '`l`' of the first row
+    /// such that `get_int(0,l) &ge; v`, and upper_bound_int(0,v)
+    /// returns the index '`u`' of the first row such that
+    /// `get_int(0,u) &gt; v`. In both cases, if no such row is found,
+    /// the returned value is the number of rows in the table.
     ///
     ///     3 3 3 4 4 4 5 6 7 9 9 9
     ///     ^     ^     ^     ^     ^

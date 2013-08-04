@@ -319,12 +319,12 @@ public:
     /// Find the lower/upper bound of the specified value in a
     /// sequence of integers which must already be sorted ascendingly.
     ///
-    /// For an integer value `v`, lower_bound_int(v) returns the index
-    /// `l` of the first element such that `get(l) >= v`, and
-    /// upper_bound_int(v) returns the index `u` of the first element
-    /// such that `get(u) > v`. In both cases, if no such element is
-    /// found, the returned value is the number of elements in the
-    /// array.
+    /// For an integer value '`v`', lower_bound_int(v) returns the
+    /// index '`l`' of the first element such that `get(l) &ge; v`,
+    /// and upper_bound_int(v) returns the index '`u`' of the first
+    /// element such that `get(u) &gt; v`. In both cases, if no such
+    /// element is found, the returned value is the number of elements
+    /// in the array.
     ///
     ///     3 3 3 4 4 4 5 6 7 9 9 9
     ///     ^     ^     ^     ^     ^
