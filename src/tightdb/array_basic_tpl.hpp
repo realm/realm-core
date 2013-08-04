@@ -100,10 +100,10 @@ template<class T>
 inline T BasicArray<T>::get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
-    // FIXME: This casting assumes that T can be aliged on an 8-type
-    // boundary, since data is known only to be aligned on an 8-byte
-    // boundary. This restricts portability. The same problem recurs
-    // several times in the remainder of this file.
+    // FIXME: This casting assumes that T can be aliged on an 8-bype
+    // boundary (since data is aligned on an 8-byte boundary.) This
+    // restricts portability. The same problem recurs several times in
+    // the remainder of this file.
     return *(reinterpret_cast<const T*>(data) + ndx);
 }
 
