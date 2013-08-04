@@ -829,7 +829,7 @@ CATEGORIES :
   - g_dyn_table_upper_bound_double:
   - g_dyn_table_lower_bound_string:
   - g_dyn_table_upper_bound_string:
-      TITLE    : lower_bound_* / upper_bound_*
+      TITLE    : lower_bound_* , upper_bound_*
       NAMES    : [ lower_bound_int,upper_bound_int, lower_bound_bool, upper_bound_bool,
                    lower_bound_float, upper_bound_float, lower_bound_double, upper_bound_double,
                    lower_bound_string, upper_bound_string ]
@@ -868,11 +868,11 @@ CATEGORIES :
                  std::size_t lower_bound_string(std::size_t column_ndx, StringData value) const noexcept;
                  std::size_t upper_bound_string(std::size_t column_ndx, StringData value) const noexcept;
       CONST    : True
-      NOEXCEPT : True
+      # NOEXCEPT : True
       PARAMS:
       - NAME   : column_ndx
         TYPES  : std::size_t
-         DESCR : The index of a sorted column whose type matches the
+        DESCR  : The index of a sorted column whose type matches the
                  suffix of the function name. These functions have
                  undefined behaviour if the specified column index is
                  out of bounds or does not correspond to a column of
@@ -881,7 +881,7 @@ CATEGORIES :
                  the returned index is then unspecified, it is still
                  guaranteed to be within the usual range.
       - NAME   : value
-        TYPES  : [ std::int64_t, bool, float, double, StringData ]
+        TYPES  : [ int64_t, bool, float, double, StringData ]
         DESCR  : The value whose bound is queried for.
       RETURN:
         TYPES  : std::size_t
