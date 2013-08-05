@@ -447,7 +447,7 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    BinaryData get() const // FIXME: Should be modified so it never throws
+    BinaryData get() const TIGHTDB_NOEXCEPT
     {
         return Base::m_table->get_impl()->get_binary(col_idx, Base::m_row_idx);
     }
@@ -457,33 +457,11 @@ public:
         Base::m_table->get_impl()->set_binary(col_idx, Base::m_row_idx, value);
     }
 
-    operator BinaryData() const { return get(); } // FIXME: Should be modified so it never throws
+    operator BinaryData() const TIGHTDB_NOEXCEPT { return get(); }
     const FieldAccessor& operator=(const BinaryData& value) const { set(value); return *this; }
 
-/*
-    friend bool operator==(const FieldAccessor& a, const BinaryData& b) // FIXME: Should be modified so it never throws
-    {
-        return a.get() == b;
-    }
-
-    friend bool operator!=(const FieldAccessor& a, const BinaryData& b) // FIXME: Should be modified so it never throws
-    {
-        return a.get() != b;
-    }
-
-    friend bool operator==(const BinaryData& a, const FieldAccessor& b) // FIXME: Should be modified so it never throws
-    {
-        return a == b.get();
-    }
-
-    friend bool operator!=(const BinaryData& a, const FieldAccessor& b) // FIXME: Should be modified so it never throws
-    {
-        return a != b.get();
-    }
-*/
-
-    const char* data() const { return get().data(); } // FIXME: Should be modified so it never throws
-    std::size_t size() const { return get().size(); } // FIXME: Should be modified so it never throws
+    const char* data() const TIGHTDB_NOEXCEPT { return get().data(); }
+    std::size_t size() const TIGHTDB_NOEXCEPT { return get().size(); }
 
 
     explicit FieldAccessor(typename Base::Init i) TIGHTDB_NOEXCEPT: Base(i) {}
@@ -593,7 +571,7 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    Mixed get() const // FIXME: Should be modified so it never throws
+    Mixed get() const TIGHTDB_NOEXCEPT
     {
         return Base::m_table->get_impl()->get_mixed(col_idx, Base::m_row_idx);
     }
@@ -603,7 +581,7 @@ public:
         Base::m_table->get_impl()->set_mixed(col_idx, Base::m_row_idx, value);
     }
 
-    operator Mixed() const { return get(); } // FIXME: Should be modified so it never throws
+    operator Mixed() const TIGHTDB_NOEXCEPT { return get(); }
 
     const FieldAccessor& operator=(const Mixed& value) const
     {
@@ -616,19 +594,19 @@ public:
         return Base::m_table->get_impl()->get_mixed_type(col_idx, Base::m_row_idx);
     }
 
-    int64_t get_int() const { return get().get_int(); } // FIXME: Should be modified so it never throws
+    int64_t get_int() const TIGHTDB_NOEXCEPT { return get().get_int(); }
 
-    bool get_bool() const { return get().get_bool(); } // FIXME: Should be modified so it never throws
+    bool get_bool() const TIGHTDB_NOEXCEPT { return get().get_bool(); }
 
-    Date get_date() const { return get().get_date(); } // FIXME: Should be modified so it never throws
+    Date get_date() const TIGHTDB_NOEXCEPT { return get().get_date(); }
 
-    float get_float() const { return get().get_float(); } // FIXME: Should be modified so it never throws
+    float get_float() const TIGHTDB_NOEXCEPT { return get().get_float(); }
 
-    double get_double() const { return get().get_double(); } // FIXME: Should be modified so it never throws
+    double get_double() const TIGHTDB_NOEXCEPT { return get().get_double(); }
 
-    StringData get_string() const { return get().get_string(); } // FIXME: Should be modified so it never throws
+    StringData get_string() const TIGHTDB_NOEXCEPT { return get().get_string(); }
 
-    BinaryData get_binary() const { return get().get_binary(); } // FIXME: Should be modified so it never throws
+    BinaryData get_binary() const TIGHTDB_NOEXCEPT { return get().get_binary(); }
 
     bool is_subtable() const TIGHTDB_NOEXCEPT { return get_type() == type_Table; }
 
@@ -651,22 +629,22 @@ public:
         return Base::m_table->get_impl()->get_subtable_size(col_idx, Base::m_row_idx);
     }
 
-    template<class T> friend bool operator==(const FieldAccessor& a, const T& b) // FIXME: Should be modified so it never throws
+    template<class T> friend bool operator==(const FieldAccessor& a, const T& b) TIGHTDB_NOEXCEPT
     {
         return a.get() == b;
     }
 
-    template<class T> friend bool operator!=(const FieldAccessor& a, const T& b) // FIXME: Should be modified so it never throws
+    template<class T> friend bool operator!=(const FieldAccessor& a, const T& b) TIGHTDB_NOEXCEPT
     {
         return a.get() != b;
     }
 
-    template<class T> friend bool operator==(const T& a, const FieldAccessor& b) // FIXME: Should be modified so it never throws
+    template<class T> friend bool operator==(const T& a, const FieldAccessor& b) TIGHTDB_NOEXCEPT
     {
         return a == b.get();
     }
 
-    template<class T> friend bool operator!=(const T& a, const FieldAccessor& b) // FIXME: Should be modified so it never throws
+    template<class T> friend bool operator!=(const T& a, const FieldAccessor& b) TIGHTDB_NOEXCEPT
     {
         return a != b.get();
     }
@@ -848,17 +826,6 @@ public:
         return Base::m_table->get_impl()->find_first_int(col_idx, value);
     }
 
-    bool find_sorted(int64_t value, std::size_t& pos) const
-    {
-        return Base::m_table->get_impl()->find_sorted_int(col_idx, value, pos);
-    }
-
-    // FIXME: What does this function do? It is used by SlabAlloc. Table::find_pos_int() is protected. Something is not right!
-    std::size_t find_pos(int64_t value) const TIGHTDB_NOEXCEPT
-    {
-        return Base::m_table->find_pos_int(col_idx, value);
-    }
-
     BasicTableView<typename Base::RealTable> find_all(int64_t value) const
     {
         return Base::m_table->get_impl()->find_all_int(col_idx, value);
@@ -893,6 +860,16 @@ public:
     {
         Base::m_table->get_impl()->add_int(col_idx, value);
         return *this;
+    }
+
+    std::size_t lower_bound(int64_t value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->lower_bound_int(col_idx, value);
+    }
+
+    std::size_t upper_bound(int64_t value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->upper_bound_int(col_idx, value);
     }
 };
 
@@ -947,6 +924,16 @@ public:
         Base::m_table->get_impl()->add_float(col_idx, value);
         return *this;
     }
+
+    std::size_t lower_bound(float value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->lower_bound_float(col_idx, value);
+    }
+
+    std::size_t upper_bound(float value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->upper_bound_float(col_idx, value);
+    }
 };
 
 
@@ -1000,6 +987,16 @@ public:
         Base::m_table->get_impl()->add_double(col_idx, value);
         return *this;
     }
+
+    std::size_t lower_bound(float value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->lower_bound_double(col_idx, value);
+    }
+
+    std::size_t upper_bound(float value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->upper_bound_double(col_idx, value);
+    }
 };
 
 
@@ -1020,6 +1017,16 @@ public:
     BasicTableView<typename Base::RealTable> find_all(bool value) const
     {
         return Base::m_table->get_impl()->find_all_bool(col_idx, value);
+    }
+
+    std::size_t lower_bound(bool value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->lower_bound_bool(col_idx, value);
+    }
+
+    std::size_t upper_bound(bool value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->upper_bound_bool(col_idx, value);
     }
 };
 
@@ -1054,6 +1061,16 @@ private:
 
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
+
+    Date maximum() const
+    {
+        return Base::m_table->get_impl()->maximum_date(col_idx);
+    }
+
+    Date minimum() const
+    {
+        return Base::m_table->get_impl()->minimum_date(col_idx);
+    }
 
     std::size_t find_first(Date value) const
     {
@@ -1095,6 +1112,16 @@ public:
     BasicTableView<typename Base::RealTable> distinct() const
     {
         return Base::m_table->get_impl()->distinct(col_idx);
+    }
+
+    std::size_t lower_bound(StringData value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->lower_bound_string(col_idx, value);
+    }
+
+    std::size_t upper_bound(StringData value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->upper_bound_string(col_idx, value);
     }
 };
 
@@ -1151,7 +1178,6 @@ public:
 /// \tparam Taboid Matches either 'BasicTable<Spec>' or
 /// 'BasicTableView<Tab>'. Neither may be const-qualified.
 ///
-
 /// FIXME: These do not belong in this file!
 template<class Taboid, int col_idx, class Type> class QueryColumn;
 

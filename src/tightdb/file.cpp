@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
+#include <algorithm>
 
 #ifdef _WIN32
 #  define NOMINMAX
@@ -84,7 +85,7 @@ string get_last_error_msg(const char* prefix, DWORD err)
     DWORD size =
         FormatMessageA(flags, 0, err, language_id, buffer.data()+offset,
                        static_cast<DWORD>(max_msg_size), 0);
-    if (TIGHTDB_LIKELY(0 < size)) return string(buffer.data(), offset+size);
+    if (0 < size) return string(buffer.data(), offset+size);
     buffer.resize(offset);
     buffer.append_c_str("Unknown error");
     return buffer.str();
@@ -174,7 +175,7 @@ string make_temp_dir()
 
     StringBuffer buffer;
     buffer.append_c_str(P_tmpdir "/tightdb_XXXXXX");
-    if (TIGHTDB_UNLIKELY(mkdtemp(buffer.c_str()) == 0)) throw runtime_error("mkdtemp() failed");
+    if (mkdtemp(buffer.c_str()) == 0) throw runtime_error("mkdtemp() failed");
     return buffer.str();
 
 #endif
@@ -215,7 +216,7 @@ void File::open(const string& path, AccessMode a, CreateMode c, int flags)
     DWORD flags_and_attributes = 0;
     HANDLE handle = CreateFileA(path.c_str(), desired_access, share_mode, 0,
                                 creation_disposition, flags_and_attributes, 0);
-    if (TIGHTDB_LIKELY(handle != INVALID_HANDLE_VALUE)) {
+    if (handle != INVALID_HANDLE_VALUE) {
         m_handle    = handle;
         m_have_lock = false;
         return;
@@ -247,7 +248,7 @@ void File::open(const string& path, AccessMode a, CreateMode c, int flags)
     if (flags & flag_Trunc)  flags2 |= O_TRUNC;
     if (flags & flag_Append) flags2 |= O_APPEND;
     int fd = ::open(path.c_str(), flags2, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
-    if (TIGHTDB_LIKELY(0 <= fd)) {
+    if (0 <= fd) {
         m_fd = fd;
         return;
     }
@@ -301,44 +302,103 @@ void File::close() TIGHTDB_NOEXCEPT
 }
 
 
+size_t File::read(char* data, size_t size)
+{
+    TIGHTDB_ASSERT(is_attached());
+
+#ifdef _WIN32 // Windows version
+
+    char* const data_0 = data;
+    while (0 < size) {
+        DWORD n = numeric_limits<DWORD>::max();
+        if (int_less_than(size, n))
+            n = static_cast<DWORD>(size);
+        DWORD r = 0;
+        if (!ReadFile(m_handle, data, n, &r, 0))
+            goto error;
+        if (r == 0)
+            break;
+        TIGHTDB_ASSERT(r <= n);
+        size -= size_t(r);
+        data += size_t(r);
+    }
+    return data - data_0;
+
+  error:
+    DWORD err = GetLastError(); // Eliminate any risk of clobbering
+    string msg = get_last_error_msg("ReadFile() failed: ", err);
+    throw runtime_error(msg);
+
+#else // POSIX version
+
+    char* const data_0 = data;
+    while (0 < size) {
+        // POSIX requires that 'n' is less than or equal to SSIZE_MAX
+        size_t n = min(size, size_t(SSIZE_MAX));
+        ssize_t r = ::read(m_fd, data, n);
+        if (r == 0)
+            break;
+        if (r < 0)
+            goto error;
+        TIGHTDB_ASSERT(size_t(r) <= n);
+        size -= size_t(r);
+        data += size_t(r);
+    }
+    return data - data_0;
+
+  error:
+    int err = errno; // Eliminate any risk of clobbering
+    string msg = get_errno_msg("read(): failed: ", err);
+    switch (err) {
+        case ENOBUFS:
+        case ENOMEM:  throw ResourceAllocError(msg);
+        default:      throw runtime_error(msg);
+    }
+
+#endif
+}
+
+
 void File::write(const char* data, size_t size)
 {
     TIGHTDB_ASSERT(is_attached());
 
 #ifdef _WIN32 // Windows version
 
-    DWORD max_write = numeric_limits<DWORD>::max();
-    while (int_less_than(max_write, size)) {
-        write(data, max_write);
-        size -= max_write;
-        data += max_write;
+    while (0 < size) {
+        DWORD n = numeric_limits<DWORD>::max();
+        if (int_less_than(size, n))
+            n = static_cast<DWORD>(size);
+        DWORD r = 0;
+        if (!WriteFile(m_handle, data, n, &r, 0))
+            goto error;
+        TIGHTDB_ASSERT(r == n); // Partial writes are not possible.
+        size -= size_t(r);
+        data += size_t(r);
     }
+    return;
 
-    DWORD n = 0;
-    if (TIGHTDB_LIKELY(WriteFile(m_handle, data, static_cast<DWORD>(size), &n, 0))) {
-        TIGHTDB_ASSERT(n == static_cast<DWORD>(size));
-        return;
-    }
-
+  error:
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     string msg = get_last_error_msg("WriteFile() failed: ", err);
     throw runtime_error(msg);
 
 #else // POSIX version
 
-    // POSIX requires that size is less than or equal to SSIZE_MAX
-    while (int_less_than(SSIZE_MAX, size)) {
-        write(data, SSIZE_MAX);
-        size -= SSIZE_MAX;
-        data += SSIZE_MAX;
+    while (0 < size) {
+        // POSIX requires that 'n' is less than or equal to SSIZE_MAX
+        size_t n = min(size, size_t(SSIZE_MAX));
+        ssize_t r = ::write(m_fd, data, n);
+        if (r < 0)
+            goto error;
+        TIGHTDB_ASSERT(r != 0);
+        TIGHTDB_ASSERT(size_t(r) <= n);
+        size -= size_t(r);
+        data += size_t(r);
     }
+    return;
 
-    ssize_t r = ::write(m_fd, data, size);
-    if (TIGHTDB_LIKELY(0 <= r)) {
-        TIGHTDB_ASSERT(int_equal_to(r, size));
-        return;
-    }
-
+  error:
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("write(): failed: ", err);
     switch (err) {
@@ -358,10 +418,10 @@ File::SizeType File::get_size() const
 #ifdef _WIN32 // Windows version
 
     LARGE_INTEGER large_int;
-    if (TIGHTDB_LIKELY(GetFileSizeEx(m_handle, &large_int))) {
+    if (GetFileSizeEx(m_handle, &large_int)) {
         SizeType size;
         if (int_cast_with_overflow_detect(large_int.QuadPart, size))
-            throw runtime_error("File size is too large");
+            throw runtime_error("File size overflow");
         return size;
     }
     throw runtime_error("GetFileSizeEx() failed");
@@ -369,7 +429,12 @@ File::SizeType File::get_size() const
 #else // POSIX version
 
     struct stat statbuf;
-    if (TIGHTDB_LIKELY(::fstat(m_fd, &statbuf) == 0)) return statbuf.st_size;
+    if (::fstat(m_fd, &statbuf) == 0) {
+        SizeType size;
+        if (int_cast_with_overflow_detect(statbuf.st_size, size))
+            throw runtime_error("File size overflow");
+        return size;
+    }
     throw runtime_error("fstat() failed");
 
 #endif
@@ -384,14 +449,18 @@ void File::resize(SizeType size)
 
     seek(size);
 
-    if (TIGHTDB_UNLIKELY(!SetEndOfFile(m_handle)))
+    if (!SetEndOfFile(m_handle))
         throw runtime_error("SetEndOfFile() failed");
 
 #else // POSIX version
 
+    off_t size2;
+    if (int_cast_with_overflow_detect(size, size2))
+        throw runtime_error("File size overflow");
+
     // POSIX specifies that introduced bytes read as zero. This is not
     // required by File::resize().
-    if (TIGHTDB_LIKELY(::ftruncate(m_fd, size) == 0)) return;
+    if (::ftruncate(m_fd, size2) == 0) return;
     throw runtime_error("ftruncate() failed");
 
 #endif
@@ -404,7 +473,11 @@ void File::alloc(SizeType offset, size_t size)
 
 #if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
-    if (TIGHTDB_LIKELY(::posix_fallocate(m_fd, offset, size) == 0)) return;
+    off_t size2;
+    if (int_cast_with_overflow_detect(size, size2))
+        throw runtime_error("File size overflow");
+
+    if (::posix_fallocate(m_fd, offset, size2) == 0) return;
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("posix_fallocate() failed: ", err);
     switch (err) {
@@ -438,14 +511,18 @@ void File::seek(SizeType position)
 
     LARGE_INTEGER large_int;
     if (int_cast_with_overflow_detect(position, large_int.QuadPart))
-        throw runtime_error("File size is too large");
+        throw runtime_error("File position overflow");
 
-    if (TIGHTDB_UNLIKELY(!SetFilePointerEx(m_handle, large_int, 0, FILE_BEGIN)))
+    if (!SetFilePointerEx(m_handle, large_int, 0, FILE_BEGIN))
         throw runtime_error("SetFilePointerEx() failed");
 
 #else // POSIX version
 
-    if (TIGHTDB_LIKELY(0 <= ::lseek(m_fd, position, SEEK_SET))) return;
+    off_t position2;
+    if (int_cast_with_overflow_detect(position, position2))
+        throw runtime_error("File position overflow");
+
+    if (0 <= ::lseek(m_fd, position2, SEEK_SET)) return;
     throw runtime_error("lseek() failed");
 
 #endif
@@ -462,12 +539,12 @@ void File::sync()
 
 #ifdef _WIN32 // Windows version
 
-    if (TIGHTDB_LIKELY(FlushFileBuffers(m_handle))) return;
+    if (FlushFileBuffers(m_handle)) return;
     throw runtime_error("FlushFileBuffers() failed");
 
 #else // POSIX version
 
-    if (TIGHTDB_LIKELY(::fsync(m_fd) == 0)) return;
+    if (::fsync(m_fd) == 0) return;
     throw runtime_error("fsync() failed");
 
 #endif
@@ -491,7 +568,9 @@ bool File::lock(bool exclusive, bool non_blocking)
     if (non_blocking) flags |= LOCKFILE_FAIL_IMMEDIATELY;
     OVERLAPPED overlapped;
     memset(&overlapped, 0, sizeof overlapped);
-    if (TIGHTDB_LIKELY(LockFileEx(m_handle, flags, 0, 1, 0, &overlapped))) {
+    overlapped.Offset = 0;        // Just for clarity
+    overlapped.OffsetHigh = 0;    // Just for clarity
+    if (LockFileEx(m_handle, flags, 0, 1, 0, &overlapped)) {
         m_have_lock = true;
         return true;
     }
@@ -522,9 +601,9 @@ bool File::lock(bool exclusive, bool non_blocking)
 
     int operation = exclusive ? LOCK_EX : LOCK_SH;
     if (non_blocking) operation |=  LOCK_NB;
-    if (TIGHTDB_LIKELY(flock(m_fd, operation) == 0)) return true;
+    if (flock(m_fd, operation) == 0) return true;
     int err = errno; // Eliminate any risk of clobbering
-    if (TIGHTDB_LIKELY(err == EWOULDBLOCK)) return false;
+    if (err == EWOULDBLOCK) return false;
     string msg = get_errno_msg("flock() failed: ", err);
     if (err == ENOLCK) throw ResourceAllocError(msg);
     throw runtime_error(msg);
@@ -605,7 +684,7 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
         case access_ReadOnly:                      break;
     }
     void* addr = ::mmap(0, size, prot, MAP_SHARED, m_fd, 0);
-    if (TIGHTDB_LIKELY(addr != MAP_FAILED)) return addr;
+    if (addr != MAP_FAILED) return addr;
 
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("mmap() failed: ", err);
@@ -646,7 +725,7 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
     static_cast<void>(a);
     static_cast<void>(map_flags);
     void* new_addr = ::mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE);
-    if (TIGHTDB_LIKELY(new_addr != MAP_FAILED)) return new_addr;
+    if (new_addr != MAP_FAILED) return new_addr;
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("mremap(): failed: ", err);
     switch (err) {
@@ -666,53 +745,16 @@ void File::sync_map(void* addr, size_t size)
 {
 #ifdef _WIN32 // Windows version
 
-    if (TIGHTDB_LIKELY(FlushViewOfFile(addr, size))) return;
+    if (FlushViewOfFile(addr, size)) return;
     throw runtime_error("FlushViewOfFile() failed");
 
 #else // POSIX version
 
-    if (TIGHTDB_LIKELY(::msync(addr, size, MS_SYNC) == 0)) return;
+    if (::msync(addr, size, MS_SYNC) == 0) return;
     int err = errno; // Eliminate any risk of clobbering
     throw runtime_error(get_errno_msg("msync() failed: ", err));
 
 #endif
-}
-
-
-FILE* File::open_stdio_file(const string& path, Mode m)
-{
-    const char* mode = 0;
-    switch (m) {
-        case mode_Read:   mode = "rb";  break;
-        case mode_Update: mode = "rb+"; break;
-        case mode_Write:  mode = "wb+"; break;
-        case mode_Append: mode = "ab+"; break;
-    }
-    FILE* file = fopen(path.c_str(), mode);
-    if (TIGHTDB_LIKELY(file)) return file;
-
-    int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("fopen() failed: ", err);
-    // Note: The following error codes are defined by POSIX, and
-    // Windows follows POSIX in this respect, however, Windows
-    // probably never produce most of these.
-    switch (err) {
-        case EACCES:
-        case EROFS:
-        case ETXTBSY:       throw PermissionDenied(msg);
-        case ENOENT:        throw NotFound(msg);
-        case EISDIR:
-        case ELOOP:
-        case ENAMETOOLONG:
-        case ENOTDIR:
-        case ENXIO:         throw AccessError(msg);
-        case EMFILE:
-        case ENFILE:
-        case ENOSR:
-        case ENOSPC:
-        case ENOMEM:        throw ResourceAllocError(msg);
-        default:            throw runtime_error(msg);
-    }
 }
 
 
@@ -771,8 +813,67 @@ bool File::try_remove(const string& path)
 }
 
 
+bool File::is_same_file(const File& f) const
+{
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(f.is_attached());
+
+#ifdef _WIN32 // Windows version
+
+    // FIXME: This version does not work on ReFS.
+    BY_HANDLE_FILE_INFORMATION file_info;
+    if (GetFileInformationByHandle(m_handle, &file_info)) {
+        DWORD vol_serial_num = file_info.dwVolumeSerialNumber;
+        DWORD file_ndx_high  = file_info.nFileIndexHigh;
+        DWORD file_ndx_low   = file_info.nFileIndexLow;
+        if (GetFileInformationByHandle(f.m_handle, &file_info)) {
+            return vol_serial_num == file_info.dwVolumeSerialNumber &&
+                file_ndx_high == file_info.nFileIndexHigh &&
+                file_ndx_low  == file_info.nFileIndexLow;
+        }
+    }
+
+/* FIXME: Here is how to do it on Windows Server 2012 and onwards. This new
+   solution correctly handles file identification on ReFS.
+
+    FILE_ID_INFO file_id_info;
+    if (GetFileInformationByHandleEx(m_handle, FileIdInfo, &file_id_info, sizeof file_id_info)) {
+        ULONGLONG vol_serial_num = file_id_info.VolumeSerialNumber;
+        EXT_FILE_ID_128 file_id     = file_id_info.FileId;
+        if (GetFileInformationByHandleEx(f.m_handle, FileIdInfo, &file_id_info,
+                                         sizeof file_id_info)) {
+            return vol_serial_num == file_id_info.VolumeSerialNumber &&
+                file_id == file_id_info.FileId;
+        }
+    }
+*/
+
+    DWORD err = GetLastError(); // Eliminate any risk of clobbering
+    string msg = get_last_error_msg("GetFileInformationByHandleEx() failed: ", err);
+    throw runtime_error(msg);
+
+#else // POSIX version
+
+    struct stat statbuf;
+    if (::fstat(m_fd, &statbuf) == 0) {
+        dev_t device_id = statbuf.st_dev;
+        ino_t inode_num = statbuf.st_ino;
+        if (::fstat(f.m_fd, &statbuf) == 0) {
+            return device_id == statbuf.st_dev && inode_num == statbuf.st_ino;
+        }
+    }
+    int err = errno; // Eliminate any risk of clobbering
+    string msg = get_errno_msg("fstat() failed: ", err);
+    throw runtime_error(msg);
+
+#endif
+}
+
+
 bool File::is_removed() const
 {
+    TIGHTDB_ASSERT(is_attached());
+
 #ifdef _WIN32 // Windows version
 
     return false; // An open file cannot be deleted on Windows
@@ -780,7 +881,7 @@ bool File::is_removed() const
 #else // POSIX version
 
     struct stat statbuf;
-    if (TIGHTDB_LIKELY(::fstat(m_fd, &statbuf) == 0)) return statbuf.st_nlink == 0;
+    if (::fstat(m_fd, &statbuf) == 0) return statbuf.st_nlink == 0;
     throw runtime_error("fstat() failed");
 
 #endif

@@ -3,44 +3,148 @@
 //
 
 
-// Max length of a line is 120 characters -----------------------------------------------------------------------------
+// Lines should never exceed 120 characters ---------------------------------------------------------------------------
 
-#define TIGHTDB_MY_DEF 1                    // All defines are uppercase and prefixed TIGHTDB
 
-class tightdb {                             // "{" on same line
-    void my_func(int a, int b);             // function and variable identifiers with lowercase and "_" if needed
+// Macro names use uppercase and have "TIGHTDB_" as prefix. Non-macro
+// names never use all uppercase.
 
-    int        m_var1;                      // class member variables prefixed with "m_".
-    static int s_var1;                      // static variables are prefixed with "s_"
-}
+#define TIGHTDB_MY_MACRO 1
 
-void tightdb::my_func(int a,
-                      int b)
-// IF multiple parameters are made on multiple lines, align identation
-// Function "{" on seperate line. Yes - it's inconsistent...but we like it
+
+// A function name uses lowercase and its parts are separated by
+// underscores.
+
+my_type my_func()
 {
-    // Indentation is 4 spaces - not TAB
-    char* ptr;                              // Pointer "*" belongs to the type
-    const char* const ptr;                  // Const placement
+    // Put the opening brace of a function body in the next line below
+    // the function prototype. This also applies to class member
+    // functions.
 
-    // Single statement if, ok without {}
-    if (1)                                  // space between keywords and first "("
-        do();                               // Single statement on seperate line
+    // Put all other opening braces on the same line as the syntax
+    // element to which the brace is subordinate.
 
-    // "{" on same line, "}" on seperate
-    if (1) {
+    // Use 4 spaces per indentation level (no tabs please).
+
+    if (...) {
+        // ...
     }
-    else {                                  // else on seperate line
-    }
-
-    // space between expressions and operators
-    if (a && b)
-        do();
-
-    const size_t count = t.size();          // seperate var for function call "size"
-    for (size_t i; i < count; ++i) {        // ++i - NOT i++
+    else {
+        // ...
     }
 
+    // Always put subordinate statements on a new line (to ease
+    // debugging).
+
+    if (...)
+        return ...;
+    else
+        return ...;
+
+    // No space between type and '*' or '&'
+    int* foo1 = ...;
+    int& foo2 = ...;
+
+    // 'const' goes before the type
+    const int foo3 = ...;
+
+    // ... but not when 'const' operates on a pointer type
+    const int* foo3 = ...; // 'const' operates in 'int' not 'int*'
+    int* const foo4 = ...; // 'const' operates on 'int*'
+    int* const* const foo5 = ...;
 }
 
+
+void my_func_2()
+{
+    // This indentation and brace placement style agrees with K&R
+    // style except for the 'extra' indentation of 'cases' in a switch
+    // statement.
+
+    switch (...) {
+        case type_Foo: {
+            // ...
+            break;
+        }
+        case type_FooBar: {
+            // ...
+            break;
+        }
+    }
+
+    try {
+        // ...
+    }
+    catch (...) {
+        // ...
+    }
+}
+
+
+
+// A name space name uses lowercase and its parts are separated by
+// underscores.
+
+namespace my_namespace {
+
+// No indentation inside name spaces.
+
+
+// A Class name uses CamelCase with uppercase initial.
+
+template<class T> class MyClass: public Base {
+public:
+    MyClass(...): Base(...), m_bar(7), ... { ... }
+
+    MyClass(...):
+        Base(...), m_bar(7), ...
+    {
+        // ...
+    }
+
+private:
+    // Static member variables have prefix 's_'.
+    static int s_foo;
+
+    // Regular member variables have prefix 'm_'.
+    int m_bar;
+};
+
+
+} // namespace my_namespace
+
+
+
+// Names of values of an enumeration are composed of two parts
+// separated by an underscore. The first part is a common lowercase
+// prefix. The second part identifies the value and uses CamelCase
+// with uppercase initial.
+
+enum mode {
+    mode_Foo,
+    mode_FooBar
+};
+
+
+
+// Order of class members (roughly):
+
+class MyClass2 {
+public:
+    // Types
+
+    // Static variables
+    // Regular variables
+
+    // Static functions
+    // Regular functions
+
+protected:
+    // Same as 'public'
+
+private:
+    // Same as 'public'
+
+    // Friends
+};
 

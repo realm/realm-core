@@ -35,13 +35,12 @@
  *      59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  */
 
-#pragma warning(disable:4310)
-#pragma warning(disable:4273)
-#pragma warning (disable : 4306)
-#pragma warning (disable : 4305)
-
 #include "pthread.h"
 #include "implement.h"
+
+#if defined(__CLEANUP_C)
+# include <setjmp.h>
+#endif
 
 /*
  * ptw32_throw
@@ -51,8 +50,19 @@
  * 'implicit' POSIX threads for each of the possible language modes (C,
  * C++, and SEH).
  */
+#if defined(_MSC_VER)
+/*
+ * Ignore the warning:
+ * "C++ exception specification ignored except to indicate that
+ * the function is not __declspec(nothrow)."
+ */
+#pragma warning(disable:4290)
+#endif
 void
 ptw32_throw (DWORD exception)
+#if defined(__CLEANUP_CXX)
+  throw(ptw32_exception_cancel,ptw32_exception_exit)
+#endif
 {
   /*
    * Don't use pthread_self() to avoid creating an implicit POSIX thread handle
@@ -60,9 +70,11 @@ ptw32_throw (DWORD exception)
    */
   ptw32_thread_t * sp = (ptw32_thread_t *) pthread_getspecific (ptw32_selfThreadKey);
 
-#ifdef __CLEANUP_SEH
+#if defined(__CLEANUP_SEH)
   DWORD exceptionInformation[3];
 #endif
+
+  sp->state = PThreadStateExiting;
 
   if (exception != PTW32_EPS_CANCEL && exception != PTW32_EPS_EXIT)
     {
@@ -78,17 +90,22 @@ ptw32_throw (DWORD exception)
        * explicit thread exit here after cleaning up POSIX
        * residue (i.e. cleanup handlers, POSIX thread handle etc).
        */
+#if ! (defined(__MINGW64__) || defined(__MINGW32__)) || defined (__MSVCRT__) || defined (__DMC__)
       unsigned exitCode = 0;
 
       switch (exception)
 	{
 	case PTW32_EPS_CANCEL:
-	  exitCode = (unsigned) PTHREAD_CANCELED;
+	  exitCode = (unsigned)(size_t) PTHREAD_CANCELED;
 	  break;
 	case PTW32_EPS_EXIT:
-	  exitCode = (unsigned) sp->exitStatus;;
+	  if (NULL != sp)
+	    {
+	      exitCode = (unsigned)(size_t) sp->exitStatus;
+	    }
 	  break;
 	}
+#endif
 
 #if defined(PTW32_STATIC_LIB)
 
@@ -96,7 +113,7 @@ ptw32_throw (DWORD exception)
 
 #endif
 
-#if ! defined (__MINGW32__) || defined (__MSVCRT__) || defined (__DMC__)
+#if ! (defined(__MINGW64__) || defined(__MINGW32__)) || defined (__MSVCRT__) || defined (__DMC__)
       _endthreadex (exitCode);
 #else
       _endthread ();
@@ -104,7 +121,7 @@ ptw32_throw (DWORD exception)
 
     }
 
-#ifdef __CLEANUP_SEH
+#if defined(__CLEANUP_SEH)
 
 
   exceptionInformation[0] = (DWORD) (exception);
@@ -115,14 +132,14 @@ ptw32_throw (DWORD exception)
 
 #else /* __CLEANUP_SEH */
 
-#ifdef __CLEANUP_C
+#if defined(__CLEANUP_C)
 
   ptw32_pop_cleanup_all (1);
   longjmp (sp->start_mark, exception);
 
 #else /* __CLEANUP_C */
 
-#ifdef __CLEANUP_CXX
+#if defined(__CLEANUP_CXX)
 
   switch (exception)
     {
@@ -160,13 +177,13 @@ ptw32_pop_cleanup_all (int execute)
 DWORD
 ptw32_get_exception_services_code (void)
 {
-#ifdef __CLEANUP_SEH
+#if defined(__CLEANUP_SEH)
 
   return EXCEPTION_PTW32_SERVICES;
 
 #else
 
-  return (DWORD) NULL;
+  return (DWORD)0;
 
 #endif
 }

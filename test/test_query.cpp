@@ -1,10 +1,12 @@
+#include <cstdlib> // itoa()
+#include <vector>
+
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
-#include <vector>
 #include "testsettings.hpp"
 
-
+using namespace std;
 using namespace tightdb;
 
 namespace {
@@ -69,17 +71,87 @@ TIGHTDB_TABLE_5(GATable,
                      event_1, Int,
                      event_2, Int)
 
+TIGHTDB_TABLE_2(PeopleTable2,
+                name, String,
+                age, Int)
+
+
 } // anonymous namespace
 
 
-TEST(QueryTwoColsEqualVaryWidthAndValues) 
+TEST(CountLimit)
 {
-    std::vector<size_t> ints1;
-    std::vector<size_t> ints2;
-    std::vector<size_t> ints3;
+    PeopleTable2 table;
 
-    std::vector<size_t> floats;
-    std::vector<size_t> doubles;
+    table.add("Mary",  14);
+    table.add("Joe",   17);
+    table.add("Alice", 42);
+    table.add("Jack",  22);
+    table.add("Bob",   50);
+    table.add("Frank", 12);
+
+    // Select rows where age < 18
+    PeopleTable2::Query query = table.where().age.less(18);
+
+    // Count all matching rows of entire table
+    size_t count1 = query.count();
+    CHECK_EQUAL(3, count1);
+
+    // Very fast way to test if there are at least 2 matches in the table
+    size_t count2 = query.count(0, size_t(-1), 2);
+    CHECK_EQUAL(2, count2);
+
+    // Count matches in latest 3 rows
+    size_t count3 = query.count(table.size() - 3, table.size());
+    CHECK_EQUAL(1, count3);
+}
+
+TEST(TestQueryStrIndexCrash)
+{
+    // Rasmus "8" index crash
+    for(int iter = 0; iter < 5; iter++)
+    {
+        Group group;
+        TableRef table = group.get_table("test");
+
+        Spec& s = table->get_spec();
+        s.add_column(type_String, "first");
+        table->update_from_spec();
+
+        int64_t eights = 0;
+
+        for(int i = 0; i < 2000; i++) {
+            int v = rand() % 10;
+            if(v == 8) {
+                eights++;
+            }
+            char dst[100];
+            memset(dst, 0, sizeof(dst));
+            sprintf(dst,"%d",v);
+            table->insert_string(0, i, dst);
+            table->insert_done();
+        }
+
+        table->set_index(0);
+        TableView v = table->where().equal(0, StringData("8")).find_all();
+        CHECK_EQUAL(eights, v.size());
+
+        v = table->where().equal(0, StringData("10")).find_all();
+
+        v = table->where().equal(0, StringData("8")).find_all();
+        CHECK_EQUAL(eights, v.size());
+    }
+}
+
+
+TEST(QueryTwoColsEqualVaryWidthAndValues)
+{
+    vector<size_t> ints1;
+    vector<size_t> ints2;
+    vector<size_t> ints3;
+
+    vector<size_t> floats;
+    vector<size_t> doubles;
 
     Table table;
     table.add_column(type_Int, "first1");
@@ -169,11 +241,11 @@ TEST(QueryTwoColsEqualVaryWidthAndValues)
         CHECK_EQUAL(doubles[t], t5.get_source_ndx(t));
 }
 
-TEST(QueryTwoColsVaryOperators) 
+TEST(QueryTwoColsVaryOperators)
 {
-    std::vector<size_t> ints1;
-    std::vector<size_t> floats;
-    std::vector<size_t> doubles;
+    vector<size_t> ints1;
+    vector<size_t> floats;
+    vector<size_t> doubles;
 
     Table table;
     table.add_column(type_Int, "first1");
@@ -236,7 +308,7 @@ TEST(QueryTwoColsVaryOperators)
 
 
 
-TEST(QueryTwoCols0) 
+TEST(QueryTwoCols0)
 {
     Table table;
     table.add_column(type_Int, "first1");
@@ -254,11 +326,10 @@ TEST(QueryTwoCols0)
 
     tightdb::TableView t2 = table.where().less_int(size_t(0), size_t(1)).find_all();
     CHECK_EQUAL(0, t2.size());
-    
 }
 
 
-TEST(QueryTwoColsNoRows) 
+TEST(QueryTwoColsNoRows)
 {
     Table table;
     table.add_column(type_Int, "first1");
@@ -268,7 +339,7 @@ TEST(QueryTwoColsNoRows)
     CHECK_EQUAL(not_found, table.where().not_equal_int(size_t(0), size_t(1)).find_next());
 }
 
-TEST(TestQueryHuge) 
+TEST(TestQueryHuge)
 {
 #if TEST_DURATION == 0
     for (int N = 0; N < 2; N++) {
@@ -290,8 +361,8 @@ TEST(TestQueryHuge)
         size_t mdist2 = 1;
         size_t mdist3 = 1;
 
-        std::string first;
-        std::string second;
+        string first;
+        string second;
         int64_t third;
 
         size_t res1 = 0;
@@ -303,8 +374,16 @@ TEST(TestQueryHuge)
         size_t res7 = 0;
         size_t res8 = 0;
 
+        size_t start = rand() % 6000;
+        size_t end = start + rand() % (6000 - start);
+        size_t limit;
+        if(rand() % 2 == 0)
+            limit = rand() % 10000;
+        else
+            limit = size_t(-1);
 
-        size_t blocksize = rand() % 1200 + 1;
+
+        size_t blocksize = rand() % 800 + 1;
 
         for (size_t row = 0; row < 6000; row++) {
 
@@ -312,8 +391,7 @@ TEST(TestQueryHuge)
                 long1 = (rand() % 2 == 0);
                 long2 = (rand() % 2 == 0);
 
-                if (rand() % 2 == 0)
-                {
+                if (rand() % 2 == 0) {
                     mdist1 = rand() % 500 + 1;
                     mdist2 = rand() % 500 + 1;
                     mdist3 = rand() % 500 + 1;
@@ -339,7 +417,7 @@ TEST(TestQueryHuge)
                 else
                     first = "B";
             }
-        
+
             if (long2) {
                 if (rand() % mdist2 == 0)
                     second = "longlonglonglonglonglonglong A";
@@ -358,32 +436,37 @@ TEST(TestQueryHuge)
             else
                 third = 2;
 
-            tt[row].first = first.c_str();
-            tt[row].second = second.c_str();
-            tt[row].third = third;
+            tt[row].first  = first;
+            tt[row].second = second;
+            tt[row].third  = third;
 
-            if (first == "A" && second == "A" && third == 1)
+
+
+
+
+
+            if ((row >= start && row < end && limit > res1) && (first == "A" && second == "A" && third == 1))
                 res1++;
 
-            if ((first == "A" || second == "A") && third == 1)
+            if ((row >= start && row < end && limit > res2) && ((first == "A" || second == "A") && third == 1))
                 res2++;
 
-            if (first == "A" && (second == "A" || third == 1))
+            if ((row >= start && row < end && limit > res3) && (first == "A" && (second == "A" || third == 1)))
                 res3++;
 
-            if (second == "A" && (first == "A" || third == 1))
+            if ((row >= start && row < end && limit > res4) && (second == "A" && (first == "A" || third == 1)))
                 res4++;
 
-            if (first == "A" || second == "A" || third == 1)
+            if ((row >= start && row < end && limit > res5) && (first == "A" || second == "A" || third == 1))
                 res5++;
 
-            if (first != "A" && second == "A" && third == 1)
+            if ((row >= start && row < end && limit > res6) && (first != "A" && second == "A" && third == 1))
                 res6++;
 
-            if (first != "longlonglonglonglonglonglong A" && second == "A" && third == 1)
+            if ((row >= start && row < end && limit > res7) && (first != "longlonglonglonglonglonglong A" && second == "A" && third == 1))
                 res7++;
 
-            if (first != "longlonglonglonglonglonglong A" && second == "A" && third == 2)
+            if ((row >= start && row < end && limit > res8) && (first != "longlonglonglonglonglonglong A" && second == "A" && third == 2))
                 res8++;
         }
 
@@ -395,58 +478,60 @@ TEST(TestQueryHuge)
                 tt.column().first.set_index();
             else if (t == 3)
                 tt.column().second.set_index();
-            else if (t == 4)
-                tt.column().third.set_index();
 
 
-            v = tt.where().first.equal("A").second.equal("A").third.equal(1).find_all();
-            CHECK_EQUAL(res1, v.size());
-    
-            v = tt.where().second.equal("A").first.equal("A").third.equal(1).find_all();
+
+            v = tt.where().first.equal("A").second.equal("A").third.equal(1).find_all(start, end, limit);
             CHECK_EQUAL(res1, v.size());
 
-            v = tt.where().third.equal(1).second.equal("A").first.equal("A").find_all();
+            v = tt.where().second.equal("A").first.equal("A").third.equal(1).find_all(start, end, limit);
             CHECK_EQUAL(res1, v.size());
 
-            v = tt.where().group().first.equal("A").Or().second.equal("A").end_group().third.equal(1).find_all();
+            v = tt.where().third.equal(1).second.equal("A").first.equal("A").find_all(start, end, limit);
+            CHECK_EQUAL(res1, v.size());
+
+            v = tt.where().group().first.equal("A").Or().second.equal("A").end_group().third.equal(1).find_all(start, end, limit);
             CHECK_EQUAL(res2, v.size());
-    
-            v = tt.where().first.equal("A").group().second.equal("A").Or().third.equal(1).end_group().find_all();
+
+            v = tt.where().first.equal("A").group().second.equal("A").Or().third.equal(1).end_group().find_all(start, end, limit);
             CHECK_EQUAL(res3, v.size());
 
-            v = tt.where().group().first.equal("A").Or().third.equal(1).end_group().second.equal("A").find_all();
+            TripleTable::Query q = tt.where().group().first.equal("A").Or().third.equal(1).end_group().second.equal("A");
+            v = q.find_all(start, end, limit);
             CHECK_EQUAL(res4, v.size());
 
-            v = tt.where().first.equal("A").Or().second.equal("A").Or().third.equal(1).find_all();
+            v = tt.where().group().first.equal("A").Or().third.equal(1).end_group().second.equal("A").find_all(start, end, limit);
+            CHECK_EQUAL(res4, v.size());
+
+            v = tt.where().first.equal("A").Or().second.equal("A").Or().third.equal(1).find_all(start, end, limit);
             CHECK_EQUAL(res5, v.size());
 
-            v = tt.where().first.not_equal("A").second.equal("A").third.equal(1).find_all();
+            v = tt.where().first.not_equal("A").second.equal("A").third.equal(1).find_all(start, end, limit);
             CHECK_EQUAL(res6, v.size());
 
-            v = tt.where().first.not_equal("longlonglonglonglonglonglong A").second.equal("A").third.equal(1).find_all();
+            v = tt.where().first.not_equal("longlonglonglonglonglonglong A").second.equal("A").third.equal(1).find_all(start, end, limit);
             CHECK_EQUAL(res7, v.size());
 
-            v = tt.where().first.not_equal("longlonglonglonglonglonglong A").second.equal("A").third.equal(2).find_all();
+            v = tt.where().first.not_equal("longlonglonglonglonglonglong A").second.equal("A").third.equal(2).find_all(start, end, limit);
             CHECK_EQUAL(res8, v.size());
-        }        
-
+        }
     }
 }
 
 TEST(TestQueryStrIndex3)
 {
-    // Create two columns where query match-density varies alot throughout the rows. This forces the query engine to 
+    // Create two columns where query match-density varies alot throughout the rows. This forces the query engine to
     // jump back and forth between the two conditions and test edge cases in these transitions. Tests combinations of
     // linear scan, enum and index
 
 #ifdef TIGHTDB_DEBUG
-    for (int N = 0; N < 4; N++) { 
+    for (int N = 0; N < 4; N++) {
 #else
-    for (int N = 0; N < 20; N++) { 
+    for (int N = 0; N < 20; N++) {
 #endif
         TupleTableType ttt;
- 
-        std::vector<size_t> vec;
+
+        vector<size_t> vec;
         size_t row = 0;
 
         size_t n = 0;
@@ -479,13 +564,13 @@ TEST(TestQueryStrIndex3)
                         ttt.add(1, "AA");
                     else
                         ttt.add(1, "BB");
-                
+
                 row++;
             }
         }
-    
+
         TupleTableType::View v;
-        
+
         // Both linear scans
         v = ttt.where().second.equal("AA").first.equal(0).find_all();
         CHECK_EQUAL(vec.size(), v.size());
@@ -547,8 +632,8 @@ TEST(TestQueryStrIndex2)
 
     int64_t s;
 
-	for (int i = 0; i < 100; i++) {
-	    ttt.add(1, "AA");
+    for (int i = 0; i < 100; i++) {
+        ttt.add(1, "AA");
     }
     ttt.add(1, "BB");
     ttt.column().second.set_index();
@@ -568,25 +653,25 @@ TEST(TestQueryStrEnum)
 {
     TupleTableType ttt;
 
-	int aa;
-	int64_t s;
+    int aa;
+    int64_t s;
 
-	for (int i = 0; i < 100; i++) {
-		ttt.clear();
-		aa = 0;
-		for (size_t t = 0; t < 2000; t++) {
-			if (rand() % 3 == 0) {
-				ttt.add(1, "AA");
-				aa++;
-			}
-			else {
-				ttt.add(1, "BB");
-			}
-		}
-		ttt.optimize();
-		s = ttt.where().second.equal("AA").count();
-		CHECK_EQUAL(aa, s);
-	}
+    for (int i = 0; i < 100; i++) {
+        ttt.clear();
+        aa = 0;
+        for (size_t t = 0; t < 2000; t++) {
+            if (rand() % 3 == 0) {
+                ttt.add(1, "AA");
+                aa++;
+            }
+            else {
+                ttt.add(1, "BB");
+            }
+        }
+        ttt.optimize();
+        s = ttt.where().second.equal("AA").count();
+        CHECK_EQUAL(aa, s);
+    }
 
 }
 
@@ -594,40 +679,40 @@ TEST(TestQueryStrEnum)
 TEST(TestQueryStrIndex)
 {
 #ifdef TIGHTDB_DEBUG
-	size_t itera = 4;
-	size_t iterb = 100;
+    size_t itera = 4;
+    size_t iterb = 100;
 #else
-	size_t itera = 100;
-	size_t iterb = 2000;
+    size_t itera = 100;
+    size_t iterb = 2000;
 #endif
-	
-	int aa;
-	int64_t s;
 
-	for (size_t i = 0; i < itera; i++) {
-		TupleTableType ttt;
-		aa = 0;
-		for (size_t t = 0; t < iterb; t++) {
-			if (rand() % 3 == 0) {
-				ttt.add(1, "AA");
-				aa++;
-			}
-			else {
-				ttt.add(1, "BB");
-			}
-		}
+    int aa;
+    int64_t s;
 
-		s = ttt.where().second.equal("AA").count();
-		CHECK_EQUAL(aa, s);
+    for (size_t i = 0; i < itera; i++) {
+        TupleTableType ttt;
+        aa = 0;
+        for (size_t t = 0; t < iterb; t++) {
+            if (rand() % 3 == 0) {
+                ttt.add(1, "AA");
+                aa++;
+            }
+            else {
+                ttt.add(1, "BB");
+            }
+        }
 
-		ttt.optimize();
-		s = ttt.where().second.equal("AA").count();
-		CHECK_EQUAL(aa, s);
+        s = ttt.where().second.equal("AA").count();
+        CHECK_EQUAL(aa, s);
 
-		ttt.column().second.set_index();
-		s = ttt.where().second.equal("AA").count();
-		CHECK_EQUAL(aa, s);
-	}
+        ttt.optimize();
+        s = ttt.where().second.equal("AA").count();
+        CHECK_EQUAL(aa, s);
+
+        ttt.column().second.set_index();
+        s = ttt.where().second.equal("AA").count();
+        CHECK_EQUAL(aa, s);
+    }
 
 }
 
@@ -646,6 +731,7 @@ TEST(Group_GameAnalytics)
             t->add("10", "US", "1.0", r1, r2);
         }
         t->optimize();
+        File::try_remove("ga_test.tightdb");
         g.write("ga_test.tightdb");
     }
 
@@ -762,15 +848,15 @@ TEST(TestQueryFloat4)
 {
     FloatTable3 t;
 
-    t.add(std::numeric_limits<float>::max(), std::numeric_limits<double>::max(), 11111);
-    t.add(std::numeric_limits<float>::infinity(), std::numeric_limits<double>::infinity(), 11111);
+    t.add(numeric_limits<float>::max(), numeric_limits<double>::max(), 11111);
+    t.add(numeric_limits<float>::infinity(), numeric_limits<double>::infinity(), 11111);
     t.add(12345.0, 12345.0, 11111);
 
     FloatTable3::Query q1 = t.where();
     float a1 = q1.col_float.maximum();
     double a2 = q1.col_double.maximum();
-    CHECK_EQUAL(std::numeric_limits<float>::infinity(), a1);
-    CHECK_EQUAL(std::numeric_limits<double>::infinity(), a2);
+    CHECK_EQUAL(numeric_limits<float>::infinity(), a1);
+    CHECK_EQUAL(numeric_limits<double>::infinity(), a2);
 
 
     FloatTable3::Query q2 = t.where();
@@ -857,6 +943,28 @@ TEST(TestQueryFloat)
     CHECK_EQUAL(1.13f, q2.col_float.minimum());
     CHECK_EQUAL(3.20, q2.col_double.maximum());
     CHECK_EQUAL(2.21, q2.col_double.minimum());
+
+    size_t count = 0;
+    // ... NO conditions
+    CHECK_EQUAL(1.20f, t.where().col_float.maximum(&count));
+    CHECK_EQUAL(5, count);
+    CHECK_EQUAL(1.10f, t.where().col_float.minimum(&count));
+    CHECK_EQUAL(5, count);
+    CHECK_EQUAL(3.20, t.where().col_double.maximum(&count));
+    CHECK_EQUAL(5, count);
+    CHECK_EQUAL(2.20, t.where().col_double.minimum(&count));
+    CHECK_EQUAL(5, count);
+
+    // ... with conditions
+    CHECK_EQUAL(1.20f, q2.col_float.maximum(&count));
+    CHECK_EQUAL(2, count);
+    CHECK_EQUAL(1.13f, q2.col_float.minimum(&count));
+    CHECK_EQUAL(2, count);
+    CHECK_EQUAL(3.20, q2.col_double.maximum(&count));
+    CHECK_EQUAL(2, count);
+    CHECK_EQUAL(2.21, q2.col_double.minimum(&count));
+    CHECK_EQUAL(2, count);
+
 }
 
 
@@ -1080,11 +1188,11 @@ TEST(TestQueryFindAll_range_or_monkey2)
 
         CHECK_EQUAL(s1, s2);
         for (size_t t = 0; t < a.size(); t++) {
-            size_t i1 = a.GetAsSizeT(t);
+            size_t i1 = to_size_t(a.get(t));
             size_t i2 = tv1.get_source_ndx(t);
             CHECK_EQUAL(i1, i2);
         }
-        a.Destroy();
+        a.destroy();
     }
 
 }
@@ -1128,9 +1236,9 @@ TEST(TestQuerySimpleStr)
     ttt.add(5, "X");
     ttt.add(6, "X");
     TupleTableType::Query q = ttt.where().second.equal("X");
-	size_t c = q.count();
+    size_t c = q.count();
 
-	CHECK_EQUAL(4, c);
+    CHECK_EQUAL(4, c);
 }
 
 TEST(TestQueryDelete)
@@ -1582,8 +1690,8 @@ TEST(TestQueryLongEnum)
             ttt.add(6, "aaaaaaaaaaaaaaaaaa");
         }
     }
-	ttt.optimize();
-	TupleTableType::Query q1 = ttt.where().first.equal(2).second.not_equal("aaaaaaaaaaaaaaaaaa");
+    ttt.optimize();
+    TupleTableType::Query q1 = ttt.where().first.equal(2).second.not_equal("aaaaaaaaaaaaaaaaaa");
 
     // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
     //q1.set_threads(5);
@@ -2203,7 +2311,7 @@ TEST(TestQueryUnicode3)
     CHECK_EQUAL(3, tv4.get_source_ndx(0));
 }
 
-#endif 
+#endif
 
 TEST(TestQueryFindAll_BeginsUNICODE)
 {
@@ -2273,7 +2381,7 @@ TEST(TestQueryFindAll_ContainsUNICODE)
 TEST(TestQuerySyntaxCheck)
 {
     TupleTableType ttt;
-    std::string s;
+    string s;
 
     ttt.add(1, "a");
     ttt.add(2, "a");
@@ -2529,6 +2637,85 @@ TEST(TestQuery_Subtables_Typed)
 }
 
 
+TEST(TestQuery_AllTypes_DynamicallyTyped)
+{
+    Table table;
+    {
+        Spec& spec = table.get_spec();
+        spec.add_column(type_Bool,   "boo");
+        spec.add_column(type_Int,    "int");
+        spec.add_column(type_Float,  "flt");
+        spec.add_column(type_Double, "dbl");
+        spec.add_column(type_String, "str");
+        spec.add_column(type_Binary, "bin");
+        spec.add_column(type_Date,   "dat");
+        {
+            Spec subspec = spec.add_subtable_column("tab");
+            subspec.add_column(type_Int, "sub_int");
+        }
+        spec.add_column(type_Mixed,  "mix");
+    }
+    table.update_from_spec();
+
+    const char bin[4] = { 0, 1, 2, 3 };
+    BinaryData bin1(bin, sizeof bin / 2);
+    BinaryData bin2(bin, sizeof bin);
+    time_t time_now = time(0);
+    Mixed mix_int(int64_t(1));
+    Mixed mix_subtab((Mixed::subtable_tag()));
+
+    table.add_empty_row();
+    table.set_bool   (0, 0, false);
+    table.set_int    (1, 0, 54);
+    table.set_float  (2, 0, 0.7f);
+    table.set_double (3, 0, 0.8);
+    table.set_string (4, 0, "foo");
+    table.set_binary (5, 0, bin1);
+    table.set_date   (6, 0, 0);
+    table.set_mixed  (8, 0, mix_int);
+
+    table.add_empty_row();
+    table.set_bool   (0, 1, true);
+    table.set_int    (1, 1, 506);
+    table.set_float  (2, 1, 7.7f);
+    table.set_double (3, 1, 8.8);
+    table.set_string (4, 1, "banach");
+    table.set_binary (5, 1, bin2);
+    table.set_date   (6, 1, time_now);
+    TableRef subtab = table.get_subtable(7, 1);
+    subtab->add_empty_row();
+    subtab->set_int(0, 0, 100);
+    table.set_mixed  (8, 1, mix_subtab);
+
+    CHECK_EQUAL(1, table.where().equal(0, false).count());
+    CHECK_EQUAL(1, table.where().equal(1, int64_t(54)).count());
+    CHECK_EQUAL(1, table.where().equal(2, 0.7f).count());
+    CHECK_EQUAL(1, table.where().equal(3, 0.8).count());
+    CHECK_EQUAL(1, table.where().equal(4, "foo").count());
+    CHECK_EQUAL(1, table.where().equal(5, bin1).count());
+    CHECK_EQUAL(1, table.where().equal_date(6, 0).count());
+//    CHECK_EQUAL(1, table.where().equal(7, subtab).count());
+//    CHECK_EQUAL(1, table.where().equal(8, mix_int).count());
+
+    Query query = table.where().equal(0, false);
+
+    CHECK_EQUAL(54, query.minimum(1));
+    CHECK_EQUAL(54, query.maximum(1));
+    CHECK_EQUAL(54, query.sum(1));
+    CHECK_EQUAL(54, query.average(1));
+
+    CHECK_EQUAL(0.7f, query.minimum_float(2));
+    CHECK_EQUAL(0.7f, query.maximum_float(2));
+    CHECK_EQUAL(0.7f, query.sum_float(2));
+    CHECK_EQUAL(0.7f, query.average_float(2));
+
+    CHECK_EQUAL(0.8, query.minimum_double(3));
+    CHECK_EQUAL(0.8, query.maximum_double(3));
+    CHECK_EQUAL(0.8, query.sum_double(3));
+    CHECK_EQUAL(0.8, query.average_double(3));
+}
+
+
 namespace {
 TIGHTDB_TABLE_1(TestQuerySub,
                 age,  Int)
@@ -2545,7 +2732,7 @@ TIGHTDB_TABLE_9(TestQueryAllTypes,
                 mixed_col,  Mixed)
 }
 
-TEST(TestQuery_AllTypes)
+TEST(TestQuery_AllTypes_StaticallyTyped)
 {
     TestQueryAllTypes table;
 
@@ -2553,39 +2740,38 @@ TEST(TestQuery_AllTypes)
     BinaryData bin1(bin, sizeof bin / 2);
     BinaryData bin2(bin, sizeof bin);
     time_t time_now = time(0);
-//    TestQuerySub subtab1;
-    TestQuerySub subtab2;
-    subtab2.add(100);
-    Mixed mix_int_1(int64_t(1));
-//    Mixed mix_subtab(subtab2);
+    TestQuerySub subtab;
+    subtab.add(100);
+    Mixed mix_int(int64_t(1));
+    Mixed mix_subtab((Mixed::subtable_tag()));
 
-    table.add(false,  54, 0.7f, 0.8, "foo",    bin1, 0,        0,        mix_int_1);
-    table.add(true,  506, 7.7f, 8.8, "banach", bin2, time_now, &subtab2, mix_int_1);
+    table.add(false,  54, 0.7f, 0.8, "foo",    bin1, 0,        0,       mix_int);
+    table.add(true,  506, 7.7f, 8.8, "banach", bin2, time_now, &subtab, mix_subtab);
 
     CHECK_EQUAL(1, table.where().bool_col.equal(false).count());
     CHECK_EQUAL(1, table.where().int_col.equal(54).count());
     CHECK_EQUAL(1, table.where().float_col.equal(0.7f).count());
     CHECK_EQUAL(1, table.where().double_col.equal(0.8).count());
     CHECK_EQUAL(1, table.where().string_col.equal("foo").count());
-//    CHECK_EQUAL(1, table.where().binary_col.equal(bin1).count());
+    CHECK_EQUAL(1, table.where().binary_col.equal(bin1).count());
     CHECK_EQUAL(1, table.where().date_col.equal(0).count());
-//    CHECK_EQUAL(1, table.where().table_col.equal(subtab1).count());
-//    CHECK_EQUAL(1, table.where().mixed_col.equal(mix_int_1).count());
+//    CHECK_EQUAL(1, table.where().table_col.equal(subtab).count());
+//    CHECK_EQUAL(1, table.where().mixed_col.equal(mix_int).count());
 
     TestQueryAllTypes::Query query = table.where().bool_col.equal(false);
 
-    CHECK_EQUAL(query.int_col.minimum(), 54);
-    CHECK_EQUAL(query.int_col.maximum(), 54);
-    CHECK_EQUAL(query.int_col.sum(),     54);
-    CHECK_EQUAL(query.int_col.average(), 54);
+    CHECK_EQUAL(54, query.int_col.minimum());
+    CHECK_EQUAL(54, query.int_col.maximum());
+    CHECK_EQUAL(54, query.int_col.sum());
+    CHECK_EQUAL(54, query.int_col.average());
 
-    CHECK_EQUAL(query.float_col.minimum(), 0.7f);
-    CHECK_EQUAL(query.float_col.maximum(), 0.7f);
-    CHECK_EQUAL(query.float_col.sum(),     0.7f);
-    CHECK_EQUAL(query.float_col.average(), 0.7f);
+    CHECK_EQUAL(0.7f, query.float_col.minimum());
+    CHECK_EQUAL(0.7f, query.float_col.maximum());
+    CHECK_EQUAL(0.7f, query.float_col.sum());
+    CHECK_EQUAL(0.7f, query.float_col.average());
 
-    CHECK_EQUAL(query.double_col.minimum(), 0.8);
-    CHECK_EQUAL(query.double_col.maximum(), 0.8);
-    CHECK_EQUAL(query.double_col.sum(),     0.8);
-    CHECK_EQUAL(query.double_col.average(), 0.8);
+    CHECK_EQUAL(0.8, query.double_col.minimum());
+    CHECK_EQUAL(0.8, query.double_col.maximum());
+    CHECK_EQUAL(0.8, query.double_col.sum());
+    CHECK_EQUAL(0.8, query.double_col.average());
 }

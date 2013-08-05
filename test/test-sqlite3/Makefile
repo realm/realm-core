@@ -1,22 +1,8 @@
 NOINST_PROGRAMS = test-sqlite3
 
-test_sqlite3_SOURCES = sqlite3.c $(wildcard *.cpp)
+test_sqlite3_SOURCES = sqlite3.c test-sqlite3.cpp
+test_sqlite3_LIBS  = ../util/test-util.a
 test_sqlite3_LDFLAGS = -ldl
-
-ifeq ($(MSYSTEM), MINGW32)
-test_sqlite3_SOURCES += ../Support/win32/mem.cpp
-else
-test_sqlite3_SOURCES += ../Support/posix/mem.cpp
-test_sqlite3_LDFLAGS += -lproc
-endif
-
-ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)
-test_sqlite3_CFLAGS  += -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
-test_sqlite3_LDFLAGS += $(shell pkg-config unittest++ --libs)
-else
-test_sqlite3_CFLAGS  += -I../UnitTest++/src
-test_sqlite3_LDFLAGS += -L../UnitTest++ -lUnitTest++
-endif
 
 include ../../generic.mk
 

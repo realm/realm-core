@@ -1,11 +1,12 @@
 // @@Example: ex_cpp_typed_query_constructor @@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 
-void main()
+int main()
 {
     PeopleTable table;
 

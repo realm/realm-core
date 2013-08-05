@@ -38,9 +38,8 @@
 #include "implement.h"
 
 /* ignore warning "unreferenced formal parameter" */
-#ifdef _MSC_VER
+#if defined(_MSC_VER)
 #pragma warning( disable : 4100 )
-#pragma warning(disable:4273)
 #endif
 
 int

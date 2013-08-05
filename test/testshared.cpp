@@ -8,6 +8,13 @@
 using namespace std;
 using namespace tightdb;
 
+
+TEST(Shared_Unattached)
+{
+    SharedGroup sg((SharedGroup::unattached_tag()));
+}
+
+
 namespace {
 
 TIGHTDB_TABLE_4(TestTableShared,
@@ -17,8 +24,6 @@ TIGHTDB_TABLE_4(TestTableShared,
                 fourth, String)
 
 } // anonymous namespace
-
-#ifndef _WIN32 // Shared PTHREAD mutexes appear not to work on Windows
 
 TEST(Shared_Initial)
 {
@@ -43,7 +48,9 @@ TEST(Shared_Initial)
     }
 
     // Verify that lock file was deleted after use
+#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
+#endif
 }
 
 TEST(Shared_Initial_Mem)
@@ -69,8 +76,11 @@ TEST(Shared_Initial_Mem)
     }
 
     // Verify that both db and lock file was deleted after use
+#ifndef _WIN32 // GroupShared cannot clean lock/db file on Windows
     CHECK(!File::exists("test_shared.tightdb"));
     CHECK(!File::exists("test_shared.tightdb.lock"));
+#endif
+
 }
 
 TEST(Shared_Initial2)
@@ -115,7 +125,9 @@ TEST(Shared_Initial2)
     }
 
     // Verify that lock file was deleted after use
+#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
+#endif
 }
 
 TEST(Shared_Initial2_Mem)
@@ -160,8 +172,10 @@ TEST(Shared_Initial2_Mem)
     }
 
     // Verify that both db and lock file was deleted after use
+#ifndef _WIN32 // GroupShared cannot clean lock/db file on Windows
     CHECK(!File::exists("test_shared.tightdb"));
     CHECK(!File::exists("test_shared.tightdb.lock"));
+#endif
 }
 
 TEST(Shared1)
@@ -251,7 +265,9 @@ TEST(Shared1)
     }
 
     // Verify that lock file was deleted after use
+#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
+#endif
 }
 
 TEST(Shared_rollback)
@@ -318,7 +334,9 @@ TEST(Shared_rollback)
     }
 
     // Verify that lock file was deleted after use
+#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
+#endif
 }
 
 TEST(Shared_Writes)
@@ -357,7 +375,9 @@ TEST(Shared_Writes)
     }
 
     // Verify that lock file was deleted after use
+#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
+#endif
 }
 
 namespace {
@@ -495,7 +515,9 @@ TEST(Shared_WriterThreads)
     }
 
     // Verify that lock file was deleted after use
+#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
+#endif
 }
 
 
@@ -800,6 +822,28 @@ TEST(Shared_FromSerialized)
     }
 }
 
+
+TEST(StringIndex_Bug1)
+{
+    File::try_remove("x.tightdb");
+    File::try_remove("x.tightdb.lock");
+    SharedGroup sg("x.tightdb");
+
+    {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("a");
+        table->add_column(type_String, "b");
+        table->set_index(0);  // Not adding index makes it work
+        table->add_empty_row();
+        wt.commit();
+    }
+
+    {
+        ReadTransaction rt(sg);
+    }
+}
+
+
 namespace {
 void randstr(char* res, size_t len) {
     for (size_t i = 0; i < len; ++i) {
@@ -808,7 +852,7 @@ void randstr(char* res, size_t len) {
 }
 }
 
-TEST(StringIndex_Bug)
+TEST(StringIndex_Bug2)
 {
     File::try_remove("indexbug.tightdb");
     File::try_remove("indexbug.tightdb.lock");
@@ -860,5 +904,3 @@ TEST(StringIndex_Bug)
         }
     }
 }
-
-#endif // Shared PTHREAD mutexes appear not to work on Windows

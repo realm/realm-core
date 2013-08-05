@@ -1,6 +1,7 @@
 // @@Example: ex_cpp_typed_query_delete @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_2(PeopleTable,
                 name, String,
@@ -11,12 +12,12 @@ int main()
     PeopleTable table;
 
 // @@EndFold@@
-    table.add("Mary",  14);  // match
-    table.add("Joe",   17);  // match
+    table.add("Mary",  13);  // match
+    table.add("Joe",   20);  // match
     table.add("Alice", 42);
-    table.add("Jack",  22);  // match
+    table.add("Jack",  17);  // match
     table.add("Bob",   50);
-    table.add("Frank", 12);  // match
+    table.add("Frank", 18);  // match
 
     // Delete rows where age >= 13 && age <= 20
     PeopleTable::Query query = table.where().age.between(13, 20);

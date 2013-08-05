@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <algorithm>
 
 #include <tightdb/array.hpp>
@@ -5,12 +6,13 @@
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/query.hpp>
 #include <tightdb/query_engine.hpp>
-#include <cstdio>
 
 using namespace std;
 using namespace tightdb;
 
+namespace {
 const size_t thread_chunk_size = 1000;
+}
 
 Query::Query(Table& table) : m_table(table.get_table_ref())
 {
@@ -255,7 +257,35 @@ Query& Query::not_equal_double(size_t column_ndx1, size_t column_ndx2)
 }
 
 
-
+// int constant vs column (we need those because '1234' is ambiguous, can convert to float/double/int64_t)
+Query& Query::equal(size_t column_ndx, int value)
+{
+    return equal(column_ndx, static_cast<int64_t>(value));
+}
+Query& Query::not_equal(size_t column_ndx, int value)
+{
+    return not_equal(column_ndx, static_cast<int64_t>(value));
+}
+Query& Query::greater(size_t column_ndx, int value)
+{
+    return greater(column_ndx, static_cast<int64_t>(value));
+}
+Query& Query::greater_equal(size_t column_ndx, int value)
+{
+    return greater_equal(column_ndx, static_cast<int64_t>(value));
+}
+Query& Query::less_equal(size_t column_ndx, int value)
+{
+    return less_equal(column_ndx, static_cast<int64_t>(value));
+}
+Query& Query::less(size_t column_ndx, int value)
+{
+    return less(column_ndx, static_cast<int64_t>(value));
+}
+Query& Query::between(size_t column_ndx, int from, int to)
+{
+    return between(column_ndx, static_cast<int64_t>(from), static_cast<int64_t>(to));
+}
 
 // int64 constant vs column
 Query& Query::equal(size_t column_ndx, int64_t value)
@@ -378,7 +408,9 @@ Query& Query::between(size_t column_ndx, double from, double to)
     return *this;
 }
 
-// STRINGS
+
+// Strings, StringData()
+
 Query& Query::equal(size_t column_ndx, StringData value, bool case_sensitive)
 {
     ParentNode* p;
@@ -441,7 +473,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end) const
         end = m_table->size();
 
     const ColType& column =
-        m_table->GetColumn<ColType, ColumnType(ColumnTypeTraits<T>::id)>(column_ndx);
+        m_table->get_column<ColType, ColumnType(ColumnTypeTraits<T>::id)>(column_ndx);
 
     if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; aggregate range

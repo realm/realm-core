@@ -125,7 +125,7 @@ int main() {
         cout << i << ": " << diskTable[i].name << endl;
 
     // Write same group to memory buffer
-    BinaryData buffer = group.write_to_mem(size);
+    BinaryData buffer = group.write_to_mem();
 
     // Load a group from memory (and print contents)
     Group fromMem(buffer);

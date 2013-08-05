@@ -1,5 +1,6 @@
 // @@Example: ex_cpp_dyn_query_do @@
 #include <tightdb.hpp>
+#include <assert.h>
 
 using namespace tightdb;
 using namespace std;
@@ -52,9 +53,9 @@ int main()
 
     TableView view = query.find_all();
     assert(view.size() == 3);
-    assert(!strcmp(view.get_string(0, 0), "Mary"));
-    assert(!strcmp(view.get_string(0, 1), "Joe"));
-    assert(!strcmp(view.get_string(0, 2), "Alice"));
+    assert(view.get_string(0, 0) == "Mary");
+    assert(view.get_string(0, 1) == "Joe");
+    assert(view.get_string(0, 2) == "Alice");
 // @@EndShow@@
 }
 // @@EndExample@@

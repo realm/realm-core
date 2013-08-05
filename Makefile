@@ -13,6 +13,11 @@ benchmark: minimal
 performance: minimal
 	@$(MAKE) -C test performance
 
+# Build the add/insert benchmarking program
+.PHONY: benchmark-insert-add
+benchmark-insert-add: minimal
+	@$(MAKE) -C test benchmark-insert-add
+
 # Run coverage analysis after building everything, this time using LCOV
 .PHONY: lcov
 lcov: test-cover
@@ -33,6 +38,20 @@ testcase: minimal
 testcase-debug: debug
 	@$(MAKE) -C test testcase-debug
 
+# Check documentation examples
+.PHONY: check-doc-ex clean-doc-ex
+check-doc-ex: debug
+	@$(MAKE) -C doc/ref_cpp/examples test-debug
+clean-doc-ex:
+	@$(MAKE) -C doc/ref_cpp/examples clean
+
 # Used by build.sh
+.PHONY: get-libdir get-cc get-cxx get-ld
 get-libdir:
 	@echo $(libdir)
+get-cc:
+	@echo $(CC)
+get-cxx:
+	@echo $(CXX)
+get-ld:
+	@echo $(LD)

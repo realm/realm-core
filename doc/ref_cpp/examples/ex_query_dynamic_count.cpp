@@ -1,6 +1,7 @@
 // @@Example: ex_cpp_dyn_query_count @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_2(PeopleTable,
                 name, String,

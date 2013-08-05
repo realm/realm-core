@@ -2,6 +2,7 @@
 #include <vector>
 #include <sstream>
 #include <fstream>
+#include <iostream>
 #include <iomanip>
 
 #include <pthread.h>
@@ -54,11 +55,18 @@ TIGHTDB_TABLE_8(MyTable,
 const int num_threads = 23;
 const int num_rounds  = 2;
 
-#ifdef TIGHTDB_BYPASS_BINARYDATA_BUG
-    const size_t max_bin_size = 512;
-#else
-    const size_t max_bin_size = 1024;
-#endif
+// FIXME: TightDB currently imposes a limitation on the number of
+// elements in any array node. It must not exceed 2**24. Because a
+// single array is used to hold all the strings (or blobs) of a leaf
+// in the B+-tree, the maximum size of a stored string (and of a
+// stored blob) can be calculated as (2**24 /
+// TIGHTDB_MAX_LIST_SIZE). It is extremely unfortunate that the string
+// size limitation is a function of TIGHTDB_MAX_LIST_SIZE. The
+// limitation should be entirely removed, but that requires a
+// non-trivial change that will also break the file format.
+const size_t max_blob_size = 0x1000000 / TIGHTDB_MAX_LIST_SIZE / 2; // Dividing by two to be on the safe side.
+const size_t max_string_size = max_blob_size - 1; // Discount the mandatory null-terminator.
+
 
 void round(SharedGroup& db, int index)
 {
@@ -71,7 +79,7 @@ void round(SharedGroup& db, int index)
             table->add(0, false, moja, time_t(), "", BinaryData(0,0), 0, Mixed(int64_t()));
             const char binary_data[] = { 7, 6, 5, 7, 6, 5, 4, 3, 113 };
             table->add(749321, true, kumi_na_tatu, time_t(99992), "click",
-                       BinaryData(binary_data, sizeof(binary_data)), 0, Mixed("fido"));
+                       BinaryData(binary_data, sizeof binary_data), 0, Mixed("fido"));
         }
         wt.commit();
     }
@@ -174,7 +182,7 @@ void round(SharedGroup& db, int index)
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MySubtable::Ref subtable = table[0].eta;
         MySubsubtable::Ref subsubtable = subtable[0].bar;
-        const size_t size = (512 + index%1024) * max_bin_size;
+        const size_t size = ((512 + index%1024) * 1024) % max_blob_size;
         mem_buf<char> data(size);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index) * 677 % 256);
@@ -193,7 +201,7 @@ void round(SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #11
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        const size_t size = (512 + (333 + 677*index) % 1024) * max_bin_size;
+        const size_t size = ((512 + (333 + 677*index) % 1024) * 1024) % max_blob_size;
         mem_buf<char> data(size);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index+73) * 677 % 256);
@@ -405,21 +413,26 @@ private:
 
     static void* run(void* arg)
     {
-        ThreadWrapper &e = *static_cast<ThreadWrapper*>(arg);
+        ThreadWrapper& e = *static_cast<ThreadWrapper*>(arg);
         try {
             thread(e.m_index, e.m_database_path);
         }
+        catch (exception& ex) {
+            e.m_error = true;
+            cerr << "Exception thrown in thread "<<e.m_index<<": "<<ex.what()<<"\n";
+        }
+
         catch (...) {
             e.m_error = true;
+            cerr << "Unknown exception thrown in thread "<<e.m_index<<"\n";
         }
+
         return 0;
     }
 };
 
 } // anonymous namespace
 
-
-#ifndef _WIN32 // Shared PTHREAD mutexes appear not to work on Windows
 
 TEST(Transactions)
 {
@@ -481,7 +494,7 @@ TEST(Transactions)
         MySubsubtable::ConstRef subsubtable = subtable[0].bar;
         for (int i=0; i<num_threads; ++i) {
             CHECK_EQUAL(1000+i, subsubtable[i].value);
-            const size_t size = (512 + i%1024) * max_bin_size;
+            const size_t size = ((512 + i%1024) * 1024) % max_blob_size;
             mem_buf<char> data(size);
             for (size_t j=0; j<size; ++j)
                 data[j] = static_cast<unsigned char>((j+i) * 677 % 256);
@@ -549,5 +562,3 @@ TEST(Transactions)
     }
     // End of read transaction
 }
-
-#endif // Shared PTHREAD mutexes appear not to work on Windows

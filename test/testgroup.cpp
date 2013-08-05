@@ -56,7 +56,7 @@ TEST(Group_Invalid1)
 
     // Try to open non-existing file
     // (read-only files have to exists to before opening)
-    CHECK_THROW(Group("table_test.tightdb", Group::mode_ReadOnly), File::NotFound);
+    CHECK_THROW(Group("table_test.tightdb"), File::NotFound);
 }
 
 TEST(Group_Invalid2)
@@ -77,7 +77,7 @@ TEST(Group_Serialize0)
     toDisk.write("table_test.tightdb");
 
     // Load the group
-    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
+    Group fromDisk("table_test.tightdb");
 
     // Create new table in group
     TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
@@ -94,11 +94,30 @@ TEST(Group_Serialize0)
     CHECK_EQUAL(Wed,    t[0].fourth);
 }
 
+TEST(Group_Overwrite)
+{
+    File::try_remove("test_overwrite.tightdb");
+    {
+        Group g;
+        g.write("test_overwrite.tightdb");
+        CHECK_THROW(g.write("test_overwrite.tightdb"), File::Exists);
+    }
+    {
+        Group g("test_overwrite.tightdb");
+        CHECK_THROW(g.write("test_overwrite.tightdb"), File::Exists);
+    }
+    {
+        Group g;
+        File::try_remove("test_overwrite.tightdb");
+        g.write("test_overwrite.tightdb");
+    }
+}
+
 TEST(Group_Read0)
 {
     // Load the group and let it clean up without loading
     // any tables
-    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
+    Group fromDisk("table_test.tightdb");
 }
 
 TEST(Group_Serialize1)
@@ -128,7 +147,7 @@ TEST(Group_Serialize1)
     toDisk.write("table_test.tightdb");
 
     // Load the table
-    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
+    Group fromDisk("table_test.tightdb");
     TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
 
     CHECK_EQUAL(4, t->get_column_count());
@@ -159,7 +178,7 @@ TEST(Group_Read1)
 {
     // Load the group and let it clean up without loading
     // any tables
-    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
+    Group fromDisk("table_test.tightdb");
 }
 
 TEST(Group_Serialize2)
@@ -186,7 +205,7 @@ TEST(Group_Serialize2)
     toDisk.write("table_test.tightdb");
 
     // Load the tables
-    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
+    Group fromDisk("table_test.tightdb");
     TestTableGroup::Ref t1 = fromDisk.get_table<TestTableGroup>("test1");
     TestTableGroup::Ref t2 = fromDisk.get_table<TestTableGroup>("test2");
     (void)t2;
@@ -220,7 +239,7 @@ TEST(Group_Serialize3)
     toDisk.write("table_test.tightdb");
 
     // Load the table
-    Group fromDisk("table_test.tightdb", Group::mode_ReadOnly);
+    Group fromDisk("table_test.tightdb");
     TestTableGroup::Ref t = fromDisk.get_table<TestTableGroup>("test");
     (void)t;
 
@@ -378,7 +397,7 @@ TEST(Group_Persist)
     File::try_remove("testdb.tightdb");
 
     // Create new database
-    Group db("testdb.tightdb");
+    Group db("testdb.tightdb", Group::mode_ReadWrite);
 
     // Insert some data
     TableRef table = db.get_table("test");
@@ -527,10 +546,11 @@ TEST(Group_Subtable)
         }
     }
 
+    File::try_remove("subtables.tightdb");
     g.write("subtables.tightdb");
 
     // Read back tables
-    Group g2("subtables.tightdb", Group::mode_ReadOnly);
+    Group g2("subtables.tightdb");
     TableRef table2 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
@@ -618,10 +638,11 @@ TEST(Group_Subtable)
         }
     }
 
+    File::try_remove("subtables2.tightdb");
     g2.write("subtables2.tightdb");
 
     // Read back tables
-    Group g3("subtables2.tightdb", Group::mode_ReadOnly);
+    Group g3("subtables2.tightdb");
     TableRef table3 = g2.get_table("test");
 
     for (int i=0; i<n; ++i) {
@@ -711,12 +732,13 @@ TEST(Group_MultiLevelSubtables)
             }
             b->add_empty_row();
         }
+        File::try_remove("subtables.tightdb");
         g.write("subtables.tightdb");
     }
 
     // Non-mixed
     {
-        Group g("subtables.tightdb", Group::mode_ReadOnly);
+        Group g("subtables.tightdb");
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(1, 0);
@@ -734,10 +756,11 @@ TEST(Group_MultiLevelSubtables)
         // get a second ref to B (compare)
         CHECK_EQUAL(a->get_subtable(1, 0), b);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661012);
+        File::try_remove("subtables2.tightdb");
         g.write("subtables2.tightdb");
     }
     {
-        Group g("subtables2.tightdb", Group::mode_ReadOnly);
+        Group g("subtables2.tightdb");
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(1, 0);
@@ -753,12 +776,13 @@ TEST(Group_MultiLevelSubtables)
         // Get third ref to B and verify last mod
         b = a->get_subtable(1, 0);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661013);
+        File::try_remove("subtables3.tightdb");
         g.write("subtables3.tightdb");
     }
 
     // Mixed
     {
-        Group g("subtables3.tightdb", Group::mode_ReadOnly);
+        Group g("subtables3.tightdb");
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(2, 0);
@@ -776,10 +800,11 @@ TEST(Group_MultiLevelSubtables)
         // get a second ref to B (compare)
         CHECK_EQUAL(a->get_subtable(1, 0), b);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661012);
+        File::try_remove("subtables4.tightdb");
         g.write("subtables4.tightdb");
     }
     {
-        Group g("subtables4.tightdb", Group::mode_ReadOnly);
+        Group g("subtables4.tightdb");
         TableRef table = g.get_table("test");
         // Get A as subtable
         TableRef a = table->get_subtable(2, 0);
@@ -795,6 +820,7 @@ TEST(Group_MultiLevelSubtables)
         // Get third ref to B and verify last mod
         b = a->get_subtable(1, 0);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661013);
+        File::try_remove("subtables5.tightdb");
         g.write("subtables5.tightdb");
     }
 }
@@ -846,6 +872,20 @@ TEST(Group_InvalidateTables)
     CHECK(!subtable1->is_valid());
     CHECK(!subtable2->is_valid());
     CHECK(!subtable3->is_valid());
+}
+
+TEST(Group_toJSON)
+{
+    Group g;
+    TestTableGroup::Ref table = g.get_table<TestTableGroup>("test");
+
+    table->add("jeff",     1, true, Wed);
+    table->add("jim",      1, true, Wed);
+    std::ostringstream ss;
+    ss.sync_with_stdio(false); // for performance
+    g.to_json(ss);
+    const std::string str = ss.str();
+    CHECK(str.length() > 0);
 }
 
 TEST(Group_Index_String)

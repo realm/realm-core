@@ -68,7 +68,7 @@ void Replication::select_table(const Table* table)
     transact_log_reserve(&buf, 1 + (1+max_elems_per_chunk)*max_enc_bytes_per_int); // Throws
     *buf++ = 'T';
     TIGHTDB_ASSERT(1 <= end - begin);
-    const ptrdiff_t level = (end - begin) / 2;
+    const size_t level = (end - begin) / 2;
     buf = encode_int(buf, level);
     for (;;) {
         for (int i=0; i<max_elems_per_chunk; ++i) {
@@ -105,7 +105,7 @@ void Replication::select_spec(const Table* table, const Spec* spec)
     const int max_elems_per_chunk = 8; // FIXME: Use smaller number when compiling in debug mode
     transact_log_reserve(&buf, 1 + (1+max_elems_per_chunk)*max_enc_bytes_per_int); // Throws
     *buf++ = 'S';
-    const ptrdiff_t level = end - begin;
+    const size_t level = end - begin;
     buf = encode_int(buf, level);
     if (begin == end)
         goto good;

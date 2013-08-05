@@ -1,44 +1,83 @@
 TightDB
 =======
 
-Dependencies
-------------
+This README file explains how to build and install the TightDB core
+library.
 
-### Ubuntu 10.04, 12.04
+
+Prerequisites
+-------------
+
+To build the TightDB core library, you need the standard set of build
+tools. This includes a C/C++ compiler and GNU make. TightDB is
+thoroughly tested with both GCC and Clang. It is known to work with
+GCC 4.2 and newer, as well as with Clang 3.0 and newer.
+
+If you are going to modify the TightDB core library, you will need
+Cheetah for Python (http://www.cheetahtemplate.org). It is needed
+because some source files are generated from Cheetah templates.
+
+To run the test suite, you will need "UnitTest++"
+(http://unittest-cpp.sourceforge.net), however, a bundled fallback
+version will be used if `pkg-config unittest++ --exists` fails.
+
+Finally, to run the benchmarking suite (make benchmark) on Linux, you
+will need the development part of the 'procps' library.
+
+The following is a suggestion of how to install the prerequisites on
+each of our major platforms:
+
+### Ubuntu 10.04 and 12.04
 
     sudo apt-get install build-essential
-    #   For regenerating <tightdb/table-macros.hpp>
     sudo apt-get install python-cheetah
-    #   For testing:
     sudo apt-get install libunittest++-dev
-    #   For benchmarking:
     sudo apt-get install libproc-dev
 
-### Fedora 17
+### Ubuntu 13.04, Linux Mint 15
+
+    sudo apt-get install build-essential
+    sudo apt-get install python-cheetah
+    sudo apt-get install libunittest++-dev
+    sudo apt-get install libprocps0-dev
+
+### Fedora 17 and 18, Amazon Linux 2012.09
 
     sudo yum install gcc gcc-c++
-    #   For regenerating <tightdb/table-macros.hpp>
     sudo yum install python-cheetah
-    #  For benchmarking:
     sudo yum install procps-devel
 
-### OS X 10.8
+### Mac OS X 10.7 and 10.8
 
-    Install Xcode
-    Install command line tools (via Xcode)
+On Mac OS X, the build procedure uses Clang as the C/C++
+compiler. Clang comes with Xcode, so install Xcode if it is not
+already installed. If you have a version that preceeds 4.2, we
+recommend that you upgrade. This will ensure that the Clang version is
+at least 3.0. Run the following command in the command prompt to see
+if you have Xcode installed, and, if so, what version it is:
 
-Note: The TightDB source code comes bundled with a fallback version of
-UnitTest++ which will be used when testing, if the 'pkg-config'
-program does not exists, or if 'pkg-config unittest++ --exists' does
-not succeed.
+    xcodebuild -version
+
+Make sure you also install "Command line tools" found under the
+preferences pane "Downloads" in Xcode.
+
+Download the latest version of Python Cheetah
+(https://pypi.python.org/packages/source/C/Cheetah/Cheetah-2.4.4.tar.gz),
+then:
+
+    tar xf Cheetah-2.4.4.tar.gz
+    cd Cheetah-2.4.4/
+    sudo python setup.py install
 
 
 Building, testing, and installing
 ---------------------------------
 
+    sh build.sh config
     sh build.sh clean
     sh build.sh build
     sh build.sh test
+    sh build.sh test-debug
     sudo sh build.sh install
     sh build.sh test-intalled
 
@@ -70,6 +109,77 @@ GCC. Here is an example:
 
     g++  my_app.cpp  `tightdb-config --cflags --libs`
 
+After building, you might want to see exactly what will be installed,
+without actually instyalling anything. This can be done as follows:
+
+    DESTDIR=/tmp/check sh build.sh install && find /tmp/check -type f
+
+
+Building for iPhone
+-------------------
+
+On Mac OS X it is possible to build a version of the TightDB core
+library for iOS (the iPhone OS). It requires that the iPhoneOS and
+iPhoneSimulator SDKs for Xcode are installed.
+
+Run the following command to build the TightDB core library for
+iPhone:
+
+    sh build.sh build-iphone
+
+This produces the following files and directories:
+
+    iphone-lib/include/
+    iphone-lib/libtightdb-ios.a
+    iphone-lib/libtightdb-ios-dbg.a
+    iphone-lib/tightdb-config
+    iphone-lib/tightdb-config-dbg
+
+The `include` directory holds a copy of the header files, which are
+identical to the ones installed by `sh build.sh install`. There are
+two versions of the static library, one that is compiled with
+optimization, and one that is compiled for debugging. Each one
+contains code compiled for both iPhone and for the iPhone
+simulator. Each one also comes with a `config` program that can be
+used to enquire about required compiler and linker flags.
+
+
+Configuration
+-------------
+
+It is possible to install into a non-default location by running the
+following command before building and installing:
+
+    sh build.sh config [PREFIX]
+
+Here, `PREFIX` is the installation prefix. If it is not specified, it
+defaults to `/usr/local`.
+
+To use a nondefault compiler, or a compiler in a nondefault location,
+set the environment variable `CC` before calling `sh build.sh build`
+or `sh build.sh bin-dist`, as in the following example:
+
+    CC=clang sh build.sh bin-dist all
+
+There are also a number of environment variables that serve to enable
+or disable special features during building:
+
+Set `TIGHTDB_ENABLE_REPLICATION` to a nonempty value to enable
+replication. For example:
+
+    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh src-dist all
+
+
+Packaging
+---------
+
+It is possible to create Debian packages (`.deb`) by running the
+following command:
+
+    dpkg-buildpackage -rfakeroot
+
+The packages will be signed by the maintainer's signature.
+
 
 Building a distribution package
 -------------------------------
@@ -97,21 +207,3 @@ package:
 
 This will produce a package whose name and whose top-level directory
 is named according to the tag.
-
-
-Configuration
--------------
-
-To use a nondefault compiler, or a compiler in a nondefault location,
-set the environment variable `CC` before calling `sh build.sh build`
-or `sh build.sh bin-dist`, as in the following example:
-
-    CC=clang sh build.sh bin-dist all
-
-There are also a number of environment variables that serve to enable
-or disable special features during building:
-
-Set `TIGHTDB_ENABLE_REPLICATION` to a nonempty value to enable
-replication. For example:
-
-    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh src-dist all

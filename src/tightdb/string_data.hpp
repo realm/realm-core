@@ -31,8 +31,8 @@ namespace tightdb {
 
 /// A reference to a chunk of character data.
 ///
-/// This class does not own the referenced memory, nor does it in any
-/// other way attempt to manage the lifetime of it.
+/// An instance of this class does not own the referenced memory, nor
+/// does it in any other way attempt to manage the lifetime of it.
 ///
 /// For compatibility with C style strings, when a string is stored in
 /// a TightDB database, it is always followed by a terminating null
@@ -74,8 +74,13 @@ public:
     friend bool operator==(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
     friend bool operator!=(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
 
+    //@{
     /// Trivial bytewise lexicographical comparison.
     friend bool operator<(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
+    friend bool operator>(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
+    friend bool operator<=(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
+    friend bool operator>=(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
+    //@}
 
     bool begins_with(StringData) const TIGHTDB_NOEXCEPT;
     bool ends_with(StringData) const TIGHTDB_NOEXCEPT;
@@ -127,6 +132,21 @@ inline bool operator<(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
 {
     return std::lexicographical_compare(a.m_data, a.m_data + a.m_size,
                                         b.m_data, b.m_data + b.m_size);
+}
+
+inline bool operator>(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
+{
+    return b < a;
+}
+
+inline bool operator<=(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
+{
+    return !(b < a);
+}
+
+inline bool operator>=(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
+{
+    return !(a < b);
 }
 
 inline bool StringData::begins_with(StringData d) const TIGHTDB_NOEXCEPT
