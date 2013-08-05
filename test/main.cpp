@@ -144,7 +144,7 @@ int main(int argc, char* argv[])
         File::try_remove(argv[argc - 1]);
 
     in_file = open_files(argv[argc - 2]);
-    Group group(argv[argc - 1]);
+    Group group(argv[argc - 1], Group::mode_ReadWrite);
     TableRef table2 = group.get_table("table");
     Table &table = *table2;
 

@@ -459,12 +459,16 @@ payload:
         // non-conforming, some CSV files can contain non-quoted line breaks, so we need to test if we can't test for
         // new record by just testing for 0a/0d.
         size_t fields = payload.back().size();
-        while(src[m_curpos] != Separator && src[m_curpos] != 0 && ((src[m_curpos] != 0xd && src[m_curpos] != 0xa) || (fields < m_fields && m_fields != size_t(-1)) )) {
+
+        while ((src[m_curpos] == Separator && payload.size() > 0  && payload[0].size() == payload[payload.size() - 1].size())    ||    (src[m_curpos] != Separator    && src[m_curpos] != 0 && ((src[m_curpos] != 0xd && src[m_curpos] != 0xa) || (fields < m_fields && m_fields != size_t(-1)) ))) {
             payload.back().back().push_back(src[m_curpos]);
             m_curpos++;
         }
         
     }
+
+    if(payload.size() == 72)
+        int s = 213;
 
     if(src[m_curpos] == 0)
         goto end;
