@@ -144,7 +144,8 @@ int main(int argc, char* argv[])
         File::try_remove(argv[argc - 1]);
 
     in_file = open_files(argv[argc - 2]);
-    Group group(argv[argc - 1], Group::mode_ReadWrite);
+    string path = argv[argc - 1];
+    Group group;
     TableRef table2 = group.get_table("table");
     Table &table = *table2;
 
@@ -174,7 +175,7 @@ int main(int argc, char* argv[])
         exit(-1);
     }
 
-    group.commit();
+    group.write(path);
 
     if(!quiet_flag)
         cout << "Imported " << imported_rows << " rows into table named 'table'\n";
