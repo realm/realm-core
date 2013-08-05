@@ -416,24 +416,24 @@ inline bool Group::is_attached() const TIGHTDB_NOEXCEPT
 
 inline bool Group::is_empty() const TIGHTDB_NOEXCEPT
 {
-    if (!m_top.IsValid()) return true;
+    if (!m_top.is_attached()) return true;
     return m_tableNames.is_empty();
 }
 
 inline bool Group::in_initial_state() const
 {
-    return !m_top.IsValid();
+    return !m_top.is_attached();
 }
 
 inline std::size_t Group::size() const
 {
-    if (!m_top.IsValid()) return 0;
+    if (!m_top.is_attached()) return 0;
     return m_tableNames.size();
 }
 
 inline StringData Group::get_table_name(std::size_t table_ndx) const
 {
-    TIGHTDB_ASSERT(m_top.IsValid());
+    TIGHTDB_ASSERT(m_top.is_attached());
     TIGHTDB_ASSERT(table_ndx < m_tableNames.size());
     return m_tableNames.get(table_ndx);
 }
@@ -445,14 +445,14 @@ inline const Table* Group::get_table_ptr(std::size_t ndx) const
 
 inline bool Group::has_table(StringData name) const
 {
-    if (!m_top.IsValid()) return false;
+    if (!m_top.is_attached()) return false;
     std::size_t i = m_tableNames.find_first(name);
     return i != std::size_t(-1);
 }
 
 template<class T> inline bool Group::has_table(StringData name) const
 {
-    if (!m_top.IsValid()) return false;
+    if (!m_top.is_attached()) return false;
     std::size_t i = m_tableNames.find_first(name);
     if (i == std::size_t(-1)) return false;
     const Table* table = get_table_ptr(i);
@@ -461,7 +461,7 @@ template<class T> inline bool Group::has_table(StringData name) const
 
 inline Table* Group::get_table_ptr(StringData name)
 {
-    TIGHTDB_ASSERT(m_top.IsValid());
+    TIGHTDB_ASSERT(m_top.is_attached());
     std::size_t ndx = m_tableNames.find_first(name);
     if (ndx != std::size_t(-1)) {
         // Get table from cache
@@ -473,7 +473,7 @@ inline Table* Group::get_table_ptr(StringData name)
 
 inline Table* Group::get_table_ptr(StringData name, bool& was_created)
 {
-    TIGHTDB_ASSERT(m_top.IsValid());
+    TIGHTDB_ASSERT(m_top.is_attached());
     std::size_t ndx = m_tableNames.find_first(name);
     if (ndx != std::size_t(-1)) {
         was_created = false;
@@ -496,7 +496,7 @@ template<class T> inline T* Group::get_table_ptr(StringData name)
     TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
     TIGHTDB_ASSERT(!has_table(name) || has_table<T>(name));
 
-    TIGHTDB_ASSERT(m_top.IsValid());
+    TIGHTDB_ASSERT(m_top.is_attached());
     std::size_t ndx = m_tableNames.find_first(name);
     if (ndx != std::size_t(-1)) {
         // Get table from cache
@@ -583,7 +583,7 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
 template<class S>
 void Group::to_json(S& out) const
 {
-    if (!m_top.IsValid()) {
+    if (!m_top.is_attached()) {
         out << "{}";
         return;
     }

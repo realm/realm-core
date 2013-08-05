@@ -63,10 +63,10 @@ void Table::init_from_ref(ref_type spec_ref, ref_type columns_ref,
 // Create columns as well as column accessors.
 void Table::create_columns()
 {
-    TIGHTDB_ASSERT(!m_columns.IsValid() || m_columns.is_empty()); // only on initial creation
+    TIGHTDB_ASSERT(!m_columns.is_attached() || m_columns.is_empty()); // only on initial creation
 
     // Instantiate first if we have an empty table (from zero-ref)
-    if (!m_columns.IsValid()) {
+    if (!m_columns.is_attached()) {
         m_columns.set_type(Array::type_HasRefs);
     }
 
@@ -189,7 +189,7 @@ void Table::invalidate_subtables()
 void Table::instantiate_before_change()
 {
     // Empty (zero-ref'ed) tables need to be instantiated before first modification
-    if (!m_columns.IsValid())
+    if (!m_columns.is_attached())
         create_columns();
 }
 
@@ -319,7 +319,7 @@ void Table::cache_columns()
 
 void Table::clear_cached_columns()
 {
-    TIGHTDB_ASSERT(m_cols.IsValid());
+    TIGHTDB_ASSERT(m_cols.is_attached());
 
     size_t count = m_cols.size();
     for (size_t i = 0; i < count; ++i) {
@@ -341,7 +341,7 @@ Table::~Table()
         return;
     }
 
-    if (!m_top.IsValid()) {
+    if (!m_top.is_attached()) {
         // This is a table with a shared spec, and its lifetime is
         // managed by reference counting, so we must let our parent
         // know about our demise.
@@ -784,11 +784,11 @@ ref_type Table::clone_columns(Allocator& alloc) const
 
 ref_type Table::clone(Allocator& alloc) const
 {
-    if (m_top.IsValid())
+    if (m_top.is_attached())
         return m_top.clone(alloc); // Throws
 
     Array new_top(Array::type_HasRefs, 0, 0, alloc); // Throws
-    new_top.add(m_spec_set.m_specSet.clone(alloc)); // Throws
+    new_top.add(m_spec_set.m_top.clone(alloc)); // Throws
     new_top.add(m_columns.clone(alloc)); // Throws
     return new_top.get_ref();
 }
@@ -2078,7 +2078,7 @@ void Table::adjust_column_ndx_in_parent(size_t column_ndx_begin, int diff) TIGHT
 void Table::update_from_parent() TIGHTDB_NOEXCEPT
 {
     // There is no top for sub-tables sharing spec
-    if (m_top.IsValid()) {
+    if (m_top.is_attached()) {
         if (!m_top.update_from_parent()) return;
     }
 
@@ -2639,9 +2639,9 @@ pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) 
 
 void Table::Verify() const
 {
-    if (m_top.IsValid()) m_top.Verify();
+    if (m_top.is_attached()) m_top.Verify();
     m_columns.Verify();
-    if (m_columns.IsValid()) {
+    if (m_columns.is_attached()) {
         size_t column_count = get_column_count();
         TIGHTDB_ASSERT(column_count == m_cols.size());
 
@@ -2712,7 +2712,7 @@ void Table::Verify() const
 
 void Table::to_dot(ostream& out, StringData title) const
 {
-    if (m_top.IsValid()) {
+    if (m_top.is_attached()) {
         out << "subgraph cluster_topleveltable" << m_top.get_ref() << " {" << endl;
         out << " label = \"TopLevelTable";
         if (0 < title.size()) out << "\\n'" << title << "'";
@@ -2825,7 +2825,7 @@ void Table::print() const
 MemStats Table::stats() const
 {
     MemStats stats;
-    m_top.Stats(stats);
+    m_top.stats(stats);
 
     return stats;
 }

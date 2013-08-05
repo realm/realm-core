@@ -84,10 +84,10 @@ public:
 private:
     // Member variables
     const Table* const m_table;
-    Array m_specSet;
+    Array m_top;
     Array m_spec;
     ArrayString m_names;
-    Array m_subSpecs;
+    Array m_subspecs;
 
     Spec(const Table*, Allocator&); // Uninitialized
     Spec(const Table*, Allocator&, ArrayParent*, std::size_t ndx_in_parent);
@@ -111,7 +111,7 @@ private:
     std::size_t get_column_type_pos(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_subspec_ndx(std::size_t column_ndx) const;
     std::size_t get_subspec_ref(std::size_t subspec_ndx) const;
-    std::size_t get_num_subspecs() const { return m_subSpecs.IsValid() ? m_subSpecs.size() : 0; }
+    std::size_t get_num_subspecs() const TIGHTDB_NOEXCEPT;
     Spec get_subspec_by_ndx(std::size_t subspec_ndx);
 
     /// Construct an empty spec and return just the reference to the
@@ -149,6 +149,11 @@ private:
 
 // Implementation:
 
+inline std::size_t Spec::get_num_subspecs() const TIGHTDB_NOEXCEPT
+{
+    return m_subspecs.is_attached() ? m_subspecs.size() : 0;
+}
+
 inline ref_type Spec::create_empty_spec(Allocator& alloc)
 {
     // The 'spec_set' contains the specification (types and names) of
@@ -162,12 +167,12 @@ inline ref_type Spec::create_empty_spec(Allocator& alloc)
 
 // Uninitialized Spec (call update_ref() to init)
 inline Spec::Spec(const Table* table, Allocator& alloc):
-    m_table(table), m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc) {}
+    m_table(table), m_top(alloc), m_spec(alloc), m_names(alloc), m_subspecs(alloc) {}
 
 // Create a new Spec
 inline Spec::Spec(const Table* table, Allocator& alloc, ArrayParent* parent,
                   std::size_t ndx_in_parent):
-    m_table(table), m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
+    m_table(table), m_top(alloc), m_spec(alloc), m_names(alloc), m_subspecs(alloc)
 {
     ref_type ref = create_empty_spec(alloc); // Throws
     init_from_ref(ref, parent, ndx_in_parent);
@@ -176,18 +181,18 @@ inline Spec::Spec(const Table* table, Allocator& alloc, ArrayParent* parent,
 // Create Spec from ref
 inline Spec::Spec(const Table* table, Allocator& alloc, ref_type ref, ArrayParent* parent,
                   std::size_t ndx_in_parent):
-    m_table(table), m_specSet(alloc), m_spec(alloc), m_names(alloc), m_subSpecs(alloc)
+    m_table(table), m_top(alloc), m_spec(alloc), m_names(alloc), m_subspecs(alloc)
 {
     init_from_ref(ref, parent, ndx_in_parent);
 }
 
 inline Spec::Spec(const Spec& s):
-    m_table(s.m_table), m_specSet(s.m_specSet.get_alloc()), m_spec(s.m_specSet.get_alloc()),
-    m_names(s.m_specSet.get_alloc()), m_subSpecs(s.m_specSet.get_alloc())
+    m_table(s.m_table), m_top(s.m_top.get_alloc()), m_spec(s.m_top.get_alloc()),
+    m_names(s.m_top.get_alloc()), m_subspecs(s.m_top.get_alloc())
 {
-    ref_type ref        = s.m_specSet.get_ref();
-    ArrayParent* parent = s.m_specSet.get_parent();
-    std::size_t pndx    = s.m_specSet.get_ndx_in_parent();
+    ref_type ref        = s.m_top.get_ref();
+    ArrayParent* parent = s.m_top.get_parent();
+    std::size_t pndx    = s.m_top.get_ndx_in_parent();
 
     init_from_ref(ref, parent, pndx);
 }
@@ -195,9 +200,9 @@ inline Spec::Spec(const Spec& s):
 
 inline Spec Spec::get_subspec_by_ndx(std::size_t subspec_ndx)
 {
-    Allocator& alloc = m_specSet.get_alloc();
-    ref_type ref = m_subSpecs.get_as_ref(subspec_ndx);
-    return Spec(m_table, alloc, ref, &m_subSpecs, subspec_ndx);
+    Allocator& alloc = m_top.get_alloc();
+    ref_type ref = m_subspecs.get_as_ref(subspec_ndx);
+    return Spec(m_table, alloc, ref, &m_subspecs, subspec_ndx);
 }
 
 

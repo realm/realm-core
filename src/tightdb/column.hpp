@@ -226,9 +226,9 @@ public:
 
     // Debug
 #ifdef TIGHTDB_DEBUG
-    void Print() const;
+    void print() const;
     virtual void Verify() const TIGHTDB_OVERRIDE;
-    MemStats Stats() const;
+    MemStats stats() const;
 #endif
 
 protected:

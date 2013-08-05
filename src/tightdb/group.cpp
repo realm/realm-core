@@ -147,7 +147,7 @@ void Group::create()
     m_freePositions.set_parent(&m_top, 2);
     m_freeLengths.set_parent(&m_top, 3);
 
-    if (m_freeVersions.IsValid()) {
+    if (m_freeVersions.is_attached()) {
         m_top.add(m_freeVersions.get_ref());
         m_freeVersions.set_parent(&m_top, 4);
     }
@@ -213,7 +213,7 @@ void Group::create_from_ref(ref_type top_ref)
 
 void Group::init_shared()
 {
-    if (m_freeVersions.IsValid()) {
+    if (m_freeVersions.is_attached()) {
         // If free space tracking is enabled
         // we just have to reset it
         m_freeVersions.SetAllToZero();
@@ -247,7 +247,7 @@ void Group::init_shared()
 void Group::reset_to_new()
 {
     TIGHTDB_ASSERT(m_alloc.get_top_ref() == 0);
-    if (!m_top.IsValid()) {
+    if (!m_top.is_attached()) {
         return; // already in new state
     }
 
@@ -257,12 +257,12 @@ void Group::reset_to_new()
 
     clear_cache();
 
-    m_top.Invalidate();
-    m_tables.Invalidate();
-    m_tableNames.Invalidate();
-    m_freePositions.Invalidate();
-    m_freeLengths.Invalidate();
-    m_freeVersions.Invalidate();
+    m_top.detach();
+    m_tables.detach();
+    m_tableNames.detach();
+    m_freePositions.detach();
+    m_freeLengths.detach();
+    m_freeVersions.detach();
 
     m_tableNames.set_parent(0, 0);
     m_tables.set_parent(0, 0);
@@ -284,7 +284,7 @@ void Group::rollback()
 
 Group::~Group()
 {
-    if (m_top.IsValid()) {
+    if (m_top.is_attached()) {
         clear_cache();
 
         // Recursively deletes entire tree
@@ -300,12 +300,12 @@ void Group::invalidate()
     // touch the unferlying data (that may no longer be valid)
     clear_cache();
 
-    m_top.Invalidate();
-    m_tables.Invalidate();
-    m_tableNames.Invalidate();
-    m_freePositions.Invalidate();
-    m_freeLengths.Invalidate();
-    m_freeVersions.Invalidate();
+    m_top.detach();
+    m_tables.detach();
+    m_tableNames.detach();
+    m_freePositions.detach();
+    m_freeLengths.detach();
+    m_freeVersions.detach();
 
     // FIXME: I (Kristian) had to add these to avoid a problem when resurrecting the arrays in create_from_ref() (top_ref==0). The problem is that if the parent is left as non-null, then Array::alloc() will attempt to update the parent array, but the parent array is still empty at that point. I don't, however, think this is a sufficiently good fix? Alexander?
     m_tables.set_parent(0,0);
@@ -322,7 +322,7 @@ void Group::invalidate()
 
 Table* Group::get_table_ptr(size_t ndx)
 {
-    TIGHTDB_ASSERT(m_top.IsValid());
+    TIGHTDB_ASSERT(m_top.is_attached());
     TIGHTDB_ASSERT(ndx < m_tables.size());
 
     // Get table from cache if exists, else create
@@ -362,7 +362,7 @@ Table* Group::create_new_table(StringData name)
 
 void Group::write(const string& path) const
 {
-    TIGHTDB_ASSERT(m_top.IsValid());
+    TIGHTDB_ASSERT(m_top.is_attached());
 
     FileOStream out(path);
     write_to_stream(out);
@@ -370,7 +370,7 @@ void Group::write(const string& path) const
 
 BinaryData Group::write_to_mem() const
 {
-    TIGHTDB_ASSERT(m_top.IsValid());
+    TIGHTDB_ASSERT(m_top.is_attached());
 
     // Get max possible size of buffer
     size_t max_size = m_alloc.get_total_size();
@@ -385,7 +385,7 @@ BinaryData Group::write_to_mem() const
 // NOTE: This method must not modify *this if m_shared is false.
 size_t Group::commit(size_t current_version, size_t readlock_version, bool persist)
 {
-    TIGHTDB_ASSERT(m_top.IsValid());
+    TIGHTDB_ASSERT(m_top.is_attached());
     TIGHTDB_ASSERT(readlock_version <= current_version);
 
     // FIXME: Under what circumstances can this even happen????
@@ -440,14 +440,14 @@ void Group::update_refs(ref_type top_ref)
         m_freeLengths.update_from_parent();
     }
     else {
-        m_freePositions.Invalidate();
-        m_freeLengths.Invalidate();
+        m_freePositions.detach();
+        m_freeLengths.detach();
     }
     if (m_top.size() == 5) {
         m_freeVersions.update_from_parent();
     }
     else {
-        m_freeVersions.Invalidate();
+        m_freeVersions.detach();
     }
 
     // if the tables have not been modfied we don't
@@ -577,21 +577,21 @@ void Group::Verify() const
 {
     // The file may have been created but not yet used
     // (so no structure has been initialized)
-    if (m_is_shared && m_alloc.get_top_ref() == 0 && !m_top.IsValid()) {
-        TIGHTDB_ASSERT(!m_tables.IsValid());
+    if (m_is_shared && m_alloc.get_top_ref() == 0 && !m_top.is_attached()) {
+        TIGHTDB_ASSERT(!m_tables.is_attached());
         return;
     }
 
     // Verify free lists
-    if (m_freePositions.IsValid()) {
-        TIGHTDB_ASSERT(m_freeLengths.IsValid());
+    if (m_freePositions.is_attached()) {
+        TIGHTDB_ASSERT(m_freeLengths.is_attached());
 
         size_t count_p = m_freePositions.size();
         size_t count_l = m_freeLengths.size();
         TIGHTDB_ASSERT(count_p == count_l);
 
         if (m_is_shared) {
-            TIGHTDB_ASSERT(m_freeVersions.IsValid());
+            TIGHTDB_ASSERT(m_freeVersions.is_attached());
             TIGHTDB_ASSERT(count_p == m_freeVersions.size());
         }
 
@@ -637,7 +637,7 @@ void Group::Verify() const
 MemStats Group::stats()
 {
     MemStats stats;
-    m_top.Stats(stats);
+    m_top.stats(stats);
 
     return stats;
 }
@@ -650,11 +650,11 @@ void Group::print() const
 
 void Group::print_free() const
 {
-    if (!m_freePositions.IsValid()) {
+    if (!m_freePositions.is_attached()) {
         printf("none\n");
         return;
     }
-    bool has_versions = m_freeVersions.IsValid();
+    bool has_versions = m_freeVersions.is_attached();
 
     size_t count = m_freePositions.size();
     for (size_t i = 0; i < count; ++i) {

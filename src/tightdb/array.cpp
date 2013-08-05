@@ -146,9 +146,9 @@ void Array::CreateFromHeaderDirect(char* header, ref_type ref) TIGHTDB_NOEXCEPT
 
 void Array::set_type(Type type)
 {
-    // If we are reviving an invalidated array
-    // we need to reset state first
-    if (!m_data) {
+    // If we are reviving a previously unattached accessor we need to
+    // reset state first
+    if (!is_attached()) {
         m_ref = 0;
         m_capacity = 0;
         m_size = 0;
@@ -166,7 +166,7 @@ void Array::set_type(Type type)
     m_isNode  = !is_leaf;
     m_hasRefs = has_refs;
 
-    if (!m_data) {
+    if (!is_attached()) {
         // Create array
         alloc(0, 0);
         set_width(0);
@@ -180,6 +180,8 @@ void Array::set_type(Type type)
 
 bool Array::update_from_parent() TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(is_attached());
+
     if (!m_parent) return false;
 
     // After commit to disk, the array may have moved
@@ -1814,7 +1816,7 @@ ref_type Array::btree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& sta
 
 #ifdef TIGHTDB_DEBUG
 
-void Array::Print() const
+void Array::print() const
 {
     cout << hex << get_ref() << dec << ": (" << size() << ") ";
     for (size_t i = 0; i < size(); ++i) {
@@ -1826,14 +1828,15 @@ void Array::Print() const
 
 void Array::Verify() const
 {
-    TIGHTDB_ASSERT(!IsValid() || (m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 ||
-                                  m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64));
+    TIGHTDB_ASSERT(!is_attached() ||
+                   (m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 ||
+                    m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64));
 
     // Check that parent is set correctly
     if (!m_parent) return;
 
     ref_type ref_in_parent = m_parent->get_child_ref(m_ndx_in_parent);
-    TIGHTDB_ASSERT(ref_in_parent == (IsValid() ? m_ref : 0));
+    TIGHTDB_ASSERT(ref_in_parent == (is_attached() ? m_ref : 0));
 }
 
 void Array::to_dot(ostream& out, StringData title) const
@@ -1885,7 +1888,7 @@ void Array::to_dot(ostream& out, StringData title) const
     out << endl;
 }
 
-void Array::Stats(MemStats& stats) const
+void Array::stats(MemStats& stats) const
 {
     size_t capacity_bytes = get_capacity_from_header();
     size_t bytes_used     = CalcByteLen(m_size, m_width);
@@ -1900,7 +1903,7 @@ void Array::Stats(MemStats& stats) const
             if (v == 0 || v & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
 
             Array sub(to_ref(v), 0, 0, get_alloc());
-            sub.Stats(stats);
+            sub.stats(stats);
         }
     }
 }

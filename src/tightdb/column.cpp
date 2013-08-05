@@ -572,10 +572,10 @@ void Column::do_insert(size_t ndx, int64_t value)
 
 #ifdef TIGHTDB_DEBUG
 
-void Column::Print() const
+void Column::print() const
 {
     if (root_is_leaf()) {
-        m_array->Print();
+        m_array->print();
         return;
     }
 
@@ -589,7 +589,7 @@ void Column::Print() const
     }
     for (size_t i = 0; i < refs.size(); ++i) {
         Column col(refs.get_as_ref(i));
-        col.Print();
+        col.print();
     }
 }
 
@@ -670,10 +670,10 @@ void ColumnBase::leaf_to_dot(ostream& out, const Array& array) const
     array.to_dot(out);
 }
 
-MemStats Column::Stats() const
+MemStats Column::stats() const
 {
     MemStats stats;
-    m_array->Stats(stats);
+    m_array->stats(stats);
 
     return stats;
 }

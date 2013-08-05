@@ -193,15 +193,58 @@ protected:
 };
 
 
-/// An Array can be copied, but it will leave the source in a
-/// truncated (and therfore unusable) state.
+/// Provides access to individual array nodes of the database.
 ///
-/// \note The parent information in an array ('pointer to parent' and
-/// 'index in parent') may be valid even when the array is not valid,
-/// that is IsValid() returns false.
+/// This class serves purely as an accessor, it assumes no ownership
+/// of the referenced memory.
 ///
-/// FIXME: Array should be endowed with proper copy and move semantics
-/// like TableView is.
+/// An array accessor can be in one of two states: attached or
+/// unattached. It is in the attached state if, and only if
+/// is_attached() returns true. Most non-static member functions of
+/// this class have undefined behaviour if the accessor is in the
+/// unattached state. The exceptions are: ~Array(), is_attached(),
+/// detach(), set_type(), update_ref(), has_parent(), get_parent(),
+/// set_parent(), get_ndx_in_parent(), adjust_ndx_in_parent().
+///
+/// An array accessor contains information about the parent of the
+/// referenced array node. This 'reverse' reference is not explicitely
+/// present in the underlying node hierarchy, but it is needed when
+/// modifying an array. A modification may lead to relocation of the
+/// undeerlying array node, and the parent must be updated
+/// accordingly. Since this applies recursivly all the way to the root
+/// node, it is essential that the entire chain of parent accessors is
+/// constructed and propperly maintained when a particular array is
+/// modified.
+///
+/// The parent reference (`pointer to parent`, `index in parent`) is
+/// updated independently from the state of attachment to an
+/// underlying node. In particular, the parent reference remains valid
+/// and is unannfected by changes in attachment. These two aspects of
+/// the state of the accessor is updated independently, and it is
+/// entirely the responsibility of the caller to update them such that
+/// they are consistent with the underlying node hierarchy before
+/// calling any method that modifies the underlying array node.
+///
+/// FIXME: This class currently has a copy constructor, but it does
+/// not provide valid copy semantics in any sense. It violates
+/// constness by detaching the original. It attempts to do what a
+/// moving constructor could do in C++11, but as it currently is, it
+/// is completely defunct. There are three options for a fix of which
+/// the third is most attractive but hardest to implement: (1) Keep
+/// the copy constructor but stop detaching the original. For this to
+/// work, it is important that the constness of the accessor has
+/// nothing to do with the constness of the underlying memory,
+/// otherwise constness can be violated simply by copying the
+/// accessor. (2) Disallov copying but associate the constness of the
+/// accessor with the constness of the underlying memory. (3) Provide
+/// full ownership semantics like is done for Table accessors, and
+/// provide a proper copy constructor that really produces a copy of
+/// the array. For this to work, the class should assume ownership if,
+/// and only if there is no parent. A copy produced by a copy
+/// constructor will not have a parent. Even if the original was part
+/// of a database, the copy will be free-standing, that is, not be
+/// part of any database. For intra, or inter database copying, one
+/// would have to also specify the target allocator.
 class Array: public ArrayParent {
 public:
 
@@ -216,6 +259,10 @@ public:
 
     /// Create a new array, and if \a parent and \a ndx_in_parent are
     /// specified, update the parent to point to this new array.
+    ///
+    /// Note that if no parent is specified, the caller assumes
+    /// ownership of the allocated underlying node. It is not owned by
+    /// the accessor.
     explicit Array(Type type = type_Normal, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                    Allocator& = Allocator::get_default());
 
@@ -230,7 +277,7 @@ public:
     explicit Array(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                    Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
 
-    /// Create an array in the invalid state (a null array).
+    /// Create an array in the unattached state.
     explicit Array(Allocator&) TIGHTDB_NOEXCEPT;
 
     /// FIXME: This is an attempt at a moving constructor - but it violates constness in an unfortunate way.
@@ -246,7 +293,14 @@ public:
 
     virtual ~Array() TIGHTDB_NOEXCEPT {}
 
-    void set_type(Type type);
+    /// If this accessor is currently in the unattached state, create
+    /// a new underlying array node of the specified type and attach
+    /// to it. Otherwise, just change the type of the attached array
+    /// node.
+    ///
+    /// Note that the caller assumes ownership of the allocated
+    /// underlying node. It is not owned by the accessor.
+    void set_type(Type);
 
     /// Reinitialize this array accessor to point to the specified new
     /// underlying array, and if it has a parent, update the parent to
@@ -268,14 +322,36 @@ public:
 
     // Parent tracking
     bool has_parent() const TIGHTDB_NOEXCEPT { return m_parent != 0; }
-    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
-    void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT { m_ndx_in_parent += diff; }
     ArrayParent* get_parent() const TIGHTDB_NOEXCEPT { return m_parent; }
+
+    /// Setting a new parent affects ownership of the attached array
+    /// node, if any. If a non-null parent is specified, and there was
+    /// no parent originally, then the caller passes ownership to the
+    /// parent, and vice versa. This assumes, of course, that the
+    /// change in parentship reflect a corresponding change in the
+    /// list of children in the affected parents.
+    void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
+
     std::size_t get_ndx_in_parent() const TIGHTDB_NOEXCEPT { return m_ndx_in_parent; }
+    void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT { m_ndx_in_parent += diff; }
+
+    /// When there is a chance that this array node has been modified
+    /// and possibly relocated, this function will update the accessor
+    /// such that it becomes valid again. Of course, this is allowed
+    /// only when the parent continues to exist and it continues to
+    /// have some child at the same index as the child that this
+    /// accessosr was originally attached to. Even then, one must be
+    /// carefull, because the new child at that index, may be a
+    /// completely different one in a logical sense.
+    ///
+    /// FIXME: What is the point of this one? When can it ever be used safely?
     bool update_from_parent() TIGHTDB_NOEXCEPT;
 
-    bool IsValid() const TIGHTDB_NOEXCEPT { return m_data != 0; }
-    void Invalidate() const TIGHTDB_NOEXCEPT { m_data = 0; }
+    bool is_attached() const TIGHTDB_NOEXCEPT { return m_data != 0; }
+
+    /// Detach from the underlying array node. This method has no
+    /// effect if the accessor is currently unattached (idempotency).
+    void detach() TIGHTDB_NOEXCEPT { m_data = 0; }
 
     std::size_t size() const TIGHTDB_NOEXCEPT { return m_size; }
     bool is_empty() const TIGHTDB_NOEXCEPT { return m_size == 0; }
@@ -572,10 +648,10 @@ public:
     static std::size_t get_byte_size_from_header(const char*) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
-    void Print() const;
+    void print() const;
     void Verify() const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
-    void Stats(MemStats& stats) const;
+    void stats(MemStats& stats) const;
 #endif
 
 protected:
@@ -869,7 +945,7 @@ inline Array::Array(ref_type ref, ArrayParent* parent, std::size_t pndx,
     init_from_ref(ref);
 }
 
-// Creates new array (but invalid, call update_ref() or set_type() to init)
+// Creates new unattached accessor (call update_ref() or set_type() to attach.
 inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
     m_data(0), m_ref(0), m_size(0), m_capacity(0), m_width(std::size_t(-1)), m_isNode(false),
     m_parent(0), m_ndx_in_parent(0), m_alloc(alloc) {}
@@ -883,7 +959,7 @@ inline Array::Array(const Array& src) TIGHTDB_NOEXCEPT:
 {
     ref_type ref = src.get_ref();
     init_from_ref(ref);
-    src.Invalidate();
+    const_cast<Array&>(src).detach(); // FIXME: Const-violation here!!!
 }
 
 inline Array::Array(const Array& array, Allocator& alloc):
@@ -897,7 +973,7 @@ inline Array::Array(const Array& array, Allocator& alloc):
 // Fastest way to instantiate an Array. For use with GetDirect() that only fills out m_width, m_data
 // and a few other basic things needed for read-only access. Or for use if you just want a way to call
 // some methods written in Array.*
-inline Array::Array(no_prealloc_tag) TIGHTDB_NOEXCEPT: m_alloc(Allocator::get_default()) {}
+inline Array::Array(no_prealloc_tag) TIGHTDB_NOEXCEPT: m_alloc(*static_cast<Allocator*>(0)) {}
 
 
 inline void Array::update_ref(ref_type ref)
@@ -1208,7 +1284,7 @@ inline void Array::init_header(char* header, bool is_leaf, bool has_refs, WidthT
 
 template<class S> std::size_t Array::Write(S& out, bool recurse, bool persist) const
 {
-    TIGHTDB_ASSERT(IsValid());
+    TIGHTDB_ASSERT(is_attached());
 
     // Ignore un-changed arrays when persisting
     if (persist && m_alloc.is_read_only(m_ref)) return m_ref;
@@ -1265,7 +1341,7 @@ template<class S> std::size_t Array::Write(S& out, bool recurse, bool persist) c
 
 template<class S> void Array::WriteAt(std::size_t pos, S& out) const
 {
-    TIGHTDB_ASSERT(IsValid());
+    TIGHTDB_ASSERT(is_attached());
 
     // TODO: replace capacity with checksum
 
@@ -1290,7 +1366,7 @@ inline void Array::move_assign(Array& a)
     // completely. This change should be a 'no-brainer'.
     destroy();
     update_ref(a.get_ref());
-    a.Invalidate();
+    a.detach();
 }
 
 inline ref_type Array::create_empty_array(Type type, Allocator& alloc)
