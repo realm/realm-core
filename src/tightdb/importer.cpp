@@ -486,7 +486,7 @@ payload:
                 // We don't use n-versions of printf because windows needs some macro tweaking for it
                 char buf[500];
                 string s = payload[payload.size() - 1][0];
-                if(s.length > 100)
+                if(s.length() > 100)
                     s = s.substr(0, 100);
                 sprintf(buf, "Wrong number of delimitors around line %lld (+|- 3) in csv file. First few characters of line: %s", static_cast<unsigned long long>(m_row - 1),  s.c_str());
                 throw runtime_error(buf);                 
