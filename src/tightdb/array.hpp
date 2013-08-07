@@ -464,8 +464,8 @@ public:
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_alloc; }
 
     // Serialization
-    template<class S> std::size_t Write(S& target, bool recurse = true, bool persist = false) const;
-    template<class S> void WriteAt(std::size_t pos, S& out) const;
+    template<class S> std::size_t write(S& target, bool recurse = true, bool persist = false) const;
+    template<class S> void write_at(std::size_t pos, S& out) const;
     std::size_t GetByteSize(bool align = false) const;
     std::vector<int64_t> ToVector() const;
 
@@ -1282,7 +1282,7 @@ inline void Array::init_header(char* header, bool is_leaf, bool has_refs, WidthT
 
 //-------------------------------------------------
 
-template<class S> std::size_t Array::Write(S& out, bool recurse, bool persist) const
+template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) const
 {
     TIGHTDB_ASSERT(is_attached());
 
@@ -1311,7 +1311,7 @@ template<class S> std::size_t Array::Write(S& out, bool recurse, bool persist) c
             }
             else {
                 Array sub(to_ref(ref), 0, 0, get_alloc());
-                size_t sub_pos = sub.Write(out, true, persist);
+                size_t sub_pos = sub.write(out, true, persist);
                 TIGHTDB_ASSERT((sub_pos & 0x7) == 0); // 64bit alignment
                 new_refs.add(sub_pos);
             }
@@ -1319,7 +1319,7 @@ template<class S> std::size_t Array::Write(S& out, bool recurse, bool persist) c
 
         // Write out the replacement array
         // (but don't write sub-tree as it has alredy been written)
-        size_t refs_pos = new_refs.Write(out, false, persist);
+        size_t refs_pos = new_refs.write(out, false, persist);
 
         // Clean-up
         new_refs.set_type(type_Normal); // avoid recursive del
@@ -1339,7 +1339,7 @@ template<class S> std::size_t Array::Write(S& out, bool recurse, bool persist) c
     return array_pos; // Return position of this array
 }
 
-template<class S> void Array::WriteAt(std::size_t pos, S& out) const
+template<class S> void Array::write_at(std::size_t pos, S& out) const
 {
     TIGHTDB_ASSERT(is_attached());
 
@@ -1348,7 +1348,7 @@ template<class S> void Array::WriteAt(std::size_t pos, S& out) const
     // Write array
     const char* header = get_header_from_data(m_data);
     std::size_t size = get_byte_size_from_header(header);
-    out.WriteAt(pos, header, size);
+    out.write_at(pos, header, size);
 }
 
 inline ref_type Array::clone(Allocator& clone_alloc) const

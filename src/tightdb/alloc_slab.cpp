@@ -349,7 +349,7 @@ ref_type SlabAlloc::get_top_ref() const TIGHTDB_NOEXCEPT
 
     // Last bit in info block indicates which top_ref block
     // is valid
-    size_t valid_ref = file_header[23] & 0x1;
+    int valid_ref = file_header[23] & 0x1;
 
     const uint64_t* top_refs = reinterpret_cast<uint64_t*>(m_data);
     ref_type ref = to_ref(top_refs[valid_ref]);

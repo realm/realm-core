@@ -112,7 +112,7 @@ private:
 
 namespace tightdb {
 
-void Group::create_from_file(const string& filename, OpenMode mode, bool do_init)
+void Group::attach_file(const string& filename, OpenMode mode, bool do_init)
 {
     // Memory map file
     // This leaves the group ready, but in invalid state
@@ -128,7 +128,7 @@ void Group::create_from_file(const string& filename, OpenMode mode, bool do_init
     // actually creating it's datastructures until first write
     if (m_is_shared && top_ref == 0) return;
 
-    create_from_ref(top_ref); // FIXME: Throws and leaves the Group in peril
+    init_from_ref(top_ref); // FIXME: Throws and leaves the Group in peril
 }
 
 // Create a new memory structure and attach this group instance to it.
@@ -154,7 +154,7 @@ void Group::create()
 }
 
 // Attach this group instance to a preexisting memory structure.
-void Group::create_from_ref(ref_type top_ref)
+void Group::init_from_ref(ref_type top_ref)
 {
     // Instantiate top arrays
     if (top_ref == 0) {
@@ -307,7 +307,7 @@ void Group::invalidate()
     m_freeLengths.detach();
     m_freeVersions.detach();
 
-    // FIXME: I (Kristian) had to add these to avoid a problem when resurrecting the arrays in create_from_ref() (top_ref==0). The problem is that if the parent is left as non-null, then Array::alloc() will attempt to update the parent array, but the parent array is still empty at that point. I don't, however, think this is a sufficiently good fix? Alexander?
+    // FIXME: I (Kristian) had to add these to avoid a problem when resurrecting the arrays in init_from_ref() (top_ref==0). The problem is that if the parent is left as non-null, then Array::alloc() will attempt to update the parent array, but the parent array is still empty at that point. I don't, however, think this is a sufficiently good fix? Alexander?
     m_tables.set_parent(0,0);
     m_tableNames.set_parent(0,0);
     m_freePositions.set_parent(0,0);
@@ -382,15 +382,12 @@ BinaryData Group::write_to_mem() const
     return BinaryData(data, size);
 }
 
-// NOTE: This method must not modify *this if m_shared is false.
+// NOTE: This method must not modify *this if m_is_shared is false.
 size_t Group::commit(size_t current_version, size_t readlock_version, bool persist)
 {
+    TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_top.is_attached());
     TIGHTDB_ASSERT(readlock_version <= current_version);
-
-    // FIXME: Under what circumstances can this even happen????
-    // FIXME: What about when a user owned read-only buffer is attached? 
-    if (!m_alloc.is_attached()) throw runtime_error("Cannot persist");
 
     // If we have an empty db file, we can just serialize directly
     //if (m_alloc.get_top_ref() == 0) {}
@@ -399,14 +396,16 @@ size_t Group::commit(size_t current_version, size_t readlock_version, bool persi
 
     if (m_is_shared) {
         m_readlock_version = readlock_version;
-        out.SetVersions(current_version, readlock_version);
+        out.set_versions(current_version, readlock_version);
     }
 
     // Recursively write all changed arrays to end of file
-    const size_t top_pos = out.commit();
+    size_t top_pos = out.commit();
 
     // If the group is persisiting in single-thread (un-shared) mode
     // we have to make sure that the group stays valid after commit
+    // FIXME: Move this to Group::commit() (the version that takes no
+    // arguments).
     if (!m_is_shared) {
         // Recusively update refs in all active tables (columns, arrays..)
         update_refs(top_pos);
@@ -476,7 +475,7 @@ void Group::update_from_shared(ref_type top_ref, size_t len)
     if (in_initial_state() || top_ref == 0) {
         if (top_ref == 0)
             reset_to_new();    // may have been a rollback
-        create_from_ref(top_ref);
+        init_from_ref(top_ref);
         return;
     }
 

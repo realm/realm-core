@@ -257,7 +257,7 @@ protected:
     friend class GroupWriter;
     friend class SharedGroup;
 
-    void create_from_file(const std::string& filename, OpenMode, bool do_init);
+    void attach_file(const std::string& filename, OpenMode, bool do_init);
 
     void invalidate();
     bool in_initial_state() const;
@@ -287,7 +287,7 @@ protected:
     }
 
     void create(); // FIXME: Could be private
-    void create_from_ref(ref_type top_ref);
+    void init_from_ref(ref_type top_ref);
 
     // May throw WriteError
     template<class S> std::size_t write_to_stream(S& out) const;
@@ -398,7 +398,7 @@ inline Group::Group(shared_tag) TIGHTDB_NOEXCEPT:
 inline void Group::open(const std::string& file, OpenMode mode)
 {
     TIGHTDB_ASSERT(!is_attached());
-    create_from_file(file, mode, true);
+    attach_file(file, mode, true);
 }
 
 inline void Group::open(BinaryData buffer, bool take_ownership)
@@ -406,7 +406,7 @@ inline void Group::open(BinaryData buffer, bool take_ownership)
     TIGHTDB_ASSERT(!is_attached());
     TIGHTDB_ASSERT(buffer.data());
     m_alloc.attach_buffer(const_cast<char*>(buffer.data()), buffer.size(), take_ownership);
-    create_from_ref(m_alloc.get_top_ref()); // FIXME: Throws and leaves the Group in peril
+    init_from_ref(m_alloc.get_top_ref()); // FIXME: Throws and leaves the Group in peril
 }
 
 inline bool Group::is_attached() const TIGHTDB_NOEXCEPT
@@ -552,14 +552,14 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
     top.add(m_top.get(1));
 
     // Recursively write all arrays
-    const uint64_t topPos = top.Write(out); // FIXME: Why does this not return char*?
+    const uint64_t top_pos = top.write(out); // FIXME: Why does this not return char*?
     const std::size_t byte_size = out.getpos();
 
     // Write top ref
     // (since we initially set the last bit in the file header to
     //  zero, it is the first ref block that is valid)
     out.seek(0);
-    out.write(reinterpret_cast<const char*>(&topPos), 8);
+    out.write(reinterpret_cast<const char*>(&top_pos), 8);
 
     // FIXME: To be 100% robust with respect to being able to detect
     // afterwards whether the file was completely written, we would

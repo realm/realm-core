@@ -8,17 +8,17 @@ using namespace std;
 using namespace tightdb;
 
 // todo, test (int) cast
-GroupWriter::GroupWriter(Group& group, bool doPersist) :
-    m_group(group), m_alloc(group.get_allocator()), m_current_version(0), m_doPersist(doPersist)
+GroupWriter::GroupWriter(Group& group, bool do_persist) :
+    m_group(group), m_alloc(group.get_allocator()), m_current_version(0), m_do_persist(do_persist)
 {
     m_file_map.map(m_alloc.m_file, File::access_ReadWrite, m_alloc.get_base_size());
 }
 
-void GroupWriter::SetVersions(size_t current, size_t readlock)
+void GroupWriter::set_versions(size_t current, size_t read_lock)
 {
-    TIGHTDB_ASSERT(readlock <= current);
+    TIGHTDB_ASSERT(read_lock <= current);
     m_current_version  = current;
-    m_readlock_version = readlock;
+    m_readlock_version = read_lock;
 }
 
 size_t GroupWriter::commit()
@@ -41,8 +41,8 @@ size_t GroupWriter::commit()
 
     // Recursively write all changed arrays
     // (but not top yet, as it contains refs to free lists which are changing)
-    const size_t n_pos = m_group.m_tableNames.Write(*this, true, true);
-    const size_t t_pos = m_group.m_tables.Write(*this, true, true);
+    const size_t n_pos = m_group.m_tableNames.write(*this, true, true);
+    const size_t t_pos = m_group.m_tables.write(*this, true, true);
 
     // Add free space created during this commit to free lists
     const SlabAlloc::FreeSpace& freeSpace = m_group.get_allocator().GetFreespace();
@@ -99,19 +99,19 @@ size_t GroupWriter::commit()
     flengths.set(res_ndx, rest);
 
     // Write free lists
-    fpositions.WriteAt(res_pos, *this);
-    flengths.WriteAt(fl_pos, *this);
-    if (is_shared) fversions.WriteAt(fv_pos, *this);
+    fpositions.write_at(res_pos, *this);
+    flengths.write_at(fl_pos, *this);
+    if (is_shared) fversions.write_at(fv_pos, *this);
 
     // Write top
-    top.WriteAt(top_pos, *this);
+    top.write_at(top_pos, *this);
 
     // In swap-only mode, we just use the file as backing for the shared
     // memory. So we never actually flush the data to disk (the OS may do
     // so for swapping though). Note that this means that the file on disk
     // may very likely be in an invalid state.
-    if (m_doPersist)
-        DoCommit(top_pos);
+    if (m_do_persist)
+        do_commit(top_pos);
 
     // Clear old allocs
     // and remap if file size has changed
@@ -137,12 +137,12 @@ size_t GroupWriter::write(const char* p, size_t n)
     return pos;
 }
 
-void GroupWriter::WriteAt(size_t pos, const char* p, size_t n)
+void GroupWriter::write_at(size_t pos, const char* p, size_t n)
 {
-    char* const dest = m_file_map.get_addr() + pos;
+    char* dest = m_file_map.get_addr() + pos;
 
-    char* const mmap_end = m_file_map.get_addr() + m_file_map.get_size();
-    char* const copy_end = dest + n;
+    char* mmap_end = m_file_map.get_addr() + m_file_map.get_size();
+    char* copy_end = dest + n;
     TIGHTDB_ASSERT(copy_end <= mmap_end);
     static_cast<void>(mmap_end);
     static_cast<void>(copy_end);
@@ -150,7 +150,7 @@ void GroupWriter::WriteAt(size_t pos, const char* p, size_t n)
     copy(p, p+n, dest);
 }
 
-void GroupWriter::DoCommit(uint64_t topPos)
+void GroupWriter::do_commit(uint64_t top_pos)
 {
     // Write data
     m_file_map.sync();
@@ -158,17 +158,17 @@ void GroupWriter::DoCommit(uint64_t topPos)
     // File header is 24 bytes, composed of three 64bit
     // blocks. The two first being top_refs (only one valid
     // at a time) and the last being the info block.
-    char* const file_header = m_file_map.get_addr();
+    char* file_header = m_file_map.get_addr();
 
-    // Last byte in info block indicates which top_ref block
-    // is valid
-    const size_t current_valid_ref = file_header[23] & 0x1;
-    const char new_valid_ref = current_valid_ref == 0 ? 1 : 0;
+    // Least significant bit in last byte of file header indicates
+    // which top_ref block is valid
+    int current_valid_ref = file_header[23] & 0x1;
+    int new_valid_ref = current_valid_ref ^ 0x1;
 
     // Update top ref pointer
-    uint64_t* const top_refs = reinterpret_cast<uint64_t*>(m_file_map.get_addr());
-    top_refs[size_t(new_valid_ref)] = topPos;
-    file_header[23] = new_valid_ref; // swap
+    uint64_t* top_refs = reinterpret_cast<uint64_t*>(file_header);
+    top_refs[new_valid_ref] = top_pos;
+    file_header[23] = char(new_valid_ref); // swap
 
     // Write new header to disk
     m_file_map.sync();
@@ -419,10 +419,6 @@ void GroupWriter::dump()
             cout << i << ": " << fpositions.get(i) << ", " << flengths.get(i) << " - " << fversions.get(i) << "\n";
         }
     }
-}
-
-void GroupWriter::ZeroFreeSpace()
-{
 }
 
 #endif

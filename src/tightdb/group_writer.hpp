@@ -35,20 +35,19 @@ class GroupWriter {
 public:
     GroupWriter(Group& group, bool doPersist);
 
-    void SetVersions(std::size_t current, std::size_t readlock);
+    void set_versions(std::size_t current, std::size_t readlock);
 
     std::size_t commit();
 
     size_t write(const char* p, std::size_t n);
-    void WriteAt(std::size_t pos, const char* p, std::size_t n);
+    void write_at(std::size_t pos, const char* p, std::size_t n);
 
 #ifdef TIGHTDB_DEBUG
     void dump();
-    void ZeroFreeSpace();
 #endif
 
 private:
-    void DoCommit(uint64_t topPos);
+    void do_commit(uint64_t topPos);
 
     std::size_t get_free_space(size_t len);
     std::size_t reserve_free_space(size_t len, size_t start=0);
@@ -61,7 +60,7 @@ private:
     std::size_t     m_current_version;
     std::size_t     m_readlock_version;
     File::Map<char> m_file_map;
-    bool            m_doPersist;
+    bool            m_do_persist;
 };
 
 
