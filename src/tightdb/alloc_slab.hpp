@@ -57,9 +57,11 @@ public:
     /// allowed. When used by SharedGroup, concurrency is allowed, but
     /// read_only and no_create must both be false in this case.
     ///
-    /// \param is_shared Must be true iff we are called on behalf of SharedGroup.
+    /// \param is_shared Must be true if, and only if we are called on
+    /// behalf of SharedGroup.
     ///
-    /// \param read_only Open the file in read-only mode. This implies \a no_create.
+    /// \param read_only Open the file in read-only mode. This implies
+    /// \a no_create.
     ///
     /// \param no_create Fail if the file does not already exist.
     ///
@@ -69,29 +71,32 @@ public:
     /// Attach this allocator to the specified memory buffer.
     ///
     /// \throw InvalidDatabase
-    void attach_buffer(const char* data, size_t size, bool take_ownership);
+    void attach_buffer(char* data, std::size_t size, bool take_ownership);
 
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
-    MemRef Alloc(size_t size) TIGHTDB_OVERRIDE;
-    MemRef ReAlloc(size_t ref, const void* p, size_t size) TIGHTDB_OVERRIDE;
-    void   Free(size_t ref, const void* p) TIGHTDB_OVERRIDE; // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
-    void*  Translate(size_t ref) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    MemRef alloc(std::size_t size) TIGHTDB_OVERRIDE;
+    MemRef realloc_(ref_type, const char*, std::size_t size) TIGHTDB_OVERRIDE;
+    void   free_(ref_type, const char*) TIGHTDB_OVERRIDE; // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
+    char*  translate(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    bool   IsReadOnly(size_t ref) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    size_t GetTopRef() const TIGHTDB_NOEXCEPT;
-    size_t GetTotalSize() const;
+    bool   is_read_only(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    ref_type get_top_ref() const TIGHTDB_NOEXCEPT;
+    std::size_t get_total_size() const;
 
-    bool   CanPersist() const;
-    size_t GetFileLen() const {return m_baseline;}
-    void   FreeAll(size_t filesize=(size_t)-1);
-    bool   ReMap(size_t filesize); // Returns false if remapping was not necessary
+    /// Get the size of the attached file or buffer. This size is not
+    /// affected by new allocations. After attachment it can be
+    /// modified only by a call to remap().
+    std::size_t get_base_size() const { return m_baseline; }
+
+    void   free_all(std::size_t file_size = std::size_t(-1));
+    bool   remap(std::size_t file_size); // Returns false if remapping was not necessary
 
 #ifdef TIGHTDB_DEBUG
-    void EnableDebug(bool enable) {m_debugOut = enable;}
+    void enable_debug(bool enable) { m_debug_out = enable; }
     void Verify() const;
-    bool IsAllFree() const;
-    void Print() const;
+    bool is_all_free() const;
+    void print() const;
 #endif // TIGHTDB_DEBUG
 
 private:
@@ -102,8 +107,8 @@ private:
 
     // Define internal tables
     TIGHTDB_TABLE_2(Slabs,
-                    offset,     Int,
-                    pointer,    Int)
+                    ref_end, Int, // One plus last ref targeting this slab
+                    addr,    Int) // Memory pointer to this slab
     TIGHTDB_TABLE_2(FreeSpace,
                     ref,    Int,
                     size,   Int)
@@ -111,19 +116,19 @@ private:
     static const char default_header[24];
 
     File        m_file;
-    const char* m_data;
+    char*       m_data;
     FreeMode    m_free_mode;
-    size_t      m_baseline; // Also size of memory mapped portion of database file
+    std::size_t m_baseline; // Also size of memory mapped portion of database file
     Slabs       m_slabs;
-    FreeSpace   m_freeSpace;
-    FreeSpace   m_freeReadOnly;
+    FreeSpace   m_free_space;
+    FreeSpace   m_free_read_only;
 
 #ifdef TIGHTDB_DEBUG
-    bool        m_debugOut;
+    bool        m_debug_out;
 #endif
 
-    const FreeSpace& GetFreespace() const {return m_freeReadOnly;}
-    bool validate_buffer(const char* data, size_t len) const;
+    const FreeSpace& GetFreespace() const { return m_free_read_only; }
+    bool validate_buffer(const char* data, std::size_t len) const;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_replication() const TIGHTDB_NOEXCEPT { return m_replication; }
@@ -142,13 +147,13 @@ inline SlabAlloc::SlabAlloc()
     m_baseline = 8;
 
 #ifdef TIGHTDB_DEBUG
-    m_debugOut = false;
+    m_debug_out = false;
 #endif
 }
 
 inline bool SlabAlloc::is_attached() const  TIGHTDB_NOEXCEPT
 {
-    return (m_data != NULL);
+    return m_data != 0;
 }
 
 } // namespace tightdb

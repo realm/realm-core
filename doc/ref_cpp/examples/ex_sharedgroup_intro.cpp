@@ -1,9 +1,12 @@
 // @@Example: ex_sharedgroup_intro @@
+// @@Fold@@
+#include <cassert>
 #include <tightdb.hpp>
-#include <assert.h>
+#include <tightdb/file.hpp>
 
 using namespace tightdb;
 
+// @@EndFold@@
 // Define schema for sub-table
 TIGHTDB_TABLE_2(PhoneTable,
                   type,   String,
@@ -16,7 +19,7 @@ TIGHTDB_TABLE_4(PeopleTable,
                   hired,  Bool,
                   phones, Subtable<PhoneTable>)
 
-int main()
+void func()
 {
     // Create a new shared group
     SharedGroup db("shared_db.tightdb");
@@ -55,4 +58,12 @@ int main()
         assert(view.size() == 1 && view[0].name == "jessica");
     }
 }
+// @@Fold@@
+
+int main()
+{
+    func();
+    File::remove("shared_db.tightdb");
+}
+// @@EndFold@@
 // @@EndExample@@

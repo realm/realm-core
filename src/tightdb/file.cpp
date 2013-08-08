@@ -318,7 +318,7 @@ size_t File::read(char* data, size_t size)
             goto error;
         if (r == 0)
             break;
-        TIGHTDB_ASSERT(r == n); // Partial reads are not possible.
+        TIGHTDB_ASSERT(r <= n);
         size -= size_t(r);
         data += size_t(r);
     }
@@ -421,7 +421,7 @@ File::SizeType File::get_size() const
     if (GetFileSizeEx(m_handle, &large_int)) {
         SizeType size;
         if (int_cast_with_overflow_detect(large_int.QuadPart, size))
-            throw runtime_error("File size is too large");
+            throw runtime_error("File size overflow");
         return size;
     }
     throw runtime_error("GetFileSizeEx() failed");
@@ -429,7 +429,12 @@ File::SizeType File::get_size() const
 #else // POSIX version
 
     struct stat statbuf;
-    if (::fstat(m_fd, &statbuf) == 0) return statbuf.st_size;
+    if (::fstat(m_fd, &statbuf) == 0) {
+        SizeType size;
+        if (int_cast_with_overflow_detect(statbuf.st_size, size))
+            throw runtime_error("File size overflow");
+        return size;
+    }
     throw runtime_error("fstat() failed");
 
 #endif
@@ -449,9 +454,13 @@ void File::resize(SizeType size)
 
 #else // POSIX version
 
+    off_t size2;
+    if (int_cast_with_overflow_detect(size, size2))
+        throw runtime_error("File size overflow");
+
     // POSIX specifies that introduced bytes read as zero. This is not
     // required by File::resize().
-    if (::ftruncate(m_fd, size) == 0) return;
+    if (::ftruncate(m_fd, size2) == 0) return;
     throw runtime_error("ftruncate() failed");
 
 #endif
@@ -464,7 +473,11 @@ void File::alloc(SizeType offset, size_t size)
 
 #if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
-    if (::posix_fallocate(m_fd, offset, size) == 0) return;
+    off_t size2;
+    if (int_cast_with_overflow_detect(size, size2))
+        throw runtime_error("File size overflow");
+
+    if (::posix_fallocate(m_fd, offset, size2) == 0) return;
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("posix_fallocate() failed: ", err);
     switch (err) {
@@ -498,14 +511,18 @@ void File::seek(SizeType position)
 
     LARGE_INTEGER large_int;
     if (int_cast_with_overflow_detect(position, large_int.QuadPart))
-        throw runtime_error("File size is too large");
+        throw runtime_error("File position overflow");
 
     if (!SetFilePointerEx(m_handle, large_int, 0, FILE_BEGIN))
         throw runtime_error("SetFilePointerEx() failed");
 
 #else // POSIX version
 
-    if (0 <= ::lseek(m_fd, position, SEEK_SET)) return;
+    off_t position2;
+    if (int_cast_with_overflow_detect(position, position2))
+        throw runtime_error("File position overflow");
+
+    if (0 <= ::lseek(m_fd, position2, SEEK_SET)) return;
     throw runtime_error("lseek() failed");
 
 #endif

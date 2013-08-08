@@ -105,7 +105,7 @@ int main()
 
     // Search small integer column
     {
-        timer.start();
+        timer.reset();
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < TESTS; ++i) {
@@ -120,7 +120,7 @@ int main()
 
     // Search byte-sized integer column
     {
-        timer.start();
+        timer.reset();
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < TESTS; ++i) {
@@ -135,7 +135,7 @@ int main()
 
     // Search string column
     {
-        timer.start();
+        timer.reset();
 
         // Do a search over entire column (value not found)
         const string target = "abcde";
@@ -152,7 +152,7 @@ int main()
     // Add index
     multimap<int, TestTable> mapTable;
     {
-        timer.start();
+        timer.reset();
 
         // Copy data to map
         for (vector<TestTable>::const_iterator p = table.begin(); p != table.end(); ++p) {
@@ -169,7 +169,7 @@ int main()
 
     // Search with index
     {
-        timer.start();
+        timer.reset();
 
         for (size_t i = 0; i < TESTS*10; ++i) {
             const size_t n = rand() % 1000;

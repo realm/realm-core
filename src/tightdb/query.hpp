@@ -57,7 +57,7 @@ public:
     Query& tableview(const TableView& tv);
     Query& tableview(const Array& arr);
 
-    // Conditions: int
+    // Conditions: int64_t
     Query& equal(size_t column_ndx, int64_t value);
     Query& not_equal(size_t column_ndx, int64_t value);
     Query& greater(size_t column_ndx, int64_t value);
@@ -65,6 +65,15 @@ public:
     Query& less(size_t column_ndx, int64_t value);
     Query& less_equal(size_t column_ndx, int64_t value);
     Query& between(size_t column_ndx, int64_t from, int64_t to);
+
+    // Conditions: int (we need those because conversion from '1234' is ambiguous with float/double)
+    Query& equal(size_t column_ndx, int value);
+    Query& not_equal(size_t column_ndx, int value);
+    Query& greater(size_t column_ndx, int value);
+    Query& greater_equal(size_t column_ndx, int value);
+    Query& less(size_t column_ndx, int value);
+    Query& less_equal(size_t column_ndx, int value);
+    Query& between(size_t column_ndx, int from, int to);
 
     // Conditions: 2 int columns
     Query& equal_int(size_t column_ndx1, size_t column_ndx2);

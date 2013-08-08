@@ -164,4 +164,14 @@
 #endif
 
 
+#if defined(__GNUC__) || defined(__HP_aCC)
+    #define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+    #define TIGHTDB_FORCEINLINE __forceinline
+#else
+    #define TIGHTDB_FORCEINLINE inline
+#endif
+
+
+
 #endif /* TIGHTDB_CONFIG_H */

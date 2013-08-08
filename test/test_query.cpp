@@ -1,11 +1,12 @@
+#include <cstdlib> // itoa()
 #include <vector>
 
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
 #include "testsettings.hpp"
-#include <stdlib.h> // itoa()
 
+using namespace std;
 using namespace tightdb;
 
 namespace {
@@ -70,12 +71,44 @@ TIGHTDB_TABLE_5(GATable,
                      event_1, Int,
                      event_2, Int)
 
+TIGHTDB_TABLE_2(PeopleTable2,
+                name, String,
+                age, Int)
+
+
 } // anonymous namespace
 
 
+TEST(CountLimit)
+{
+    PeopleTable2 table;
+
+    table.add("Mary",  14);
+    table.add("Joe",   17);
+    table.add("Alice", 42);
+    table.add("Jack",  22);
+    table.add("Bob",   50);
+    table.add("Frank", 12);
+
+    // Select rows where age < 18
+    PeopleTable2::Query query = table.where().age.less(18);
+
+    // Count all matching rows of entire table
+    size_t count1 = query.count();
+    CHECK_EQUAL(3, count1);
+
+    // Very fast way to test if there are at least 2 matches in the table
+    size_t count2 = query.count(0, size_t(-1), 2);
+    CHECK_EQUAL(2, count2);
+
+    // Count matches in latest 3 rows
+    size_t count3 = query.count(table.size() - 3, table.size());
+    CHECK_EQUAL(1, count3);
+}
+
 TEST(TestQueryStrIndexCrash)
 {
-    // Rasmus "8" index crash 
+    // Rasmus "8" index crash
     for(int iter = 0; iter < 5; iter++)
     {
         Group group;
@@ -90,7 +123,7 @@ TEST(TestQueryStrIndexCrash)
         for(int i = 0; i < 2000; i++) {
             int v = rand() % 10;
             if(v == 8) {
-                eights++;            
+                eights++;
             }
             char dst[100];
             memset(dst, 0, sizeof(dst));
@@ -102,7 +135,7 @@ TEST(TestQueryStrIndexCrash)
         table->set_index(0);
         TableView v = table->where().equal(0, StringData("8")).find_all();
         CHECK_EQUAL(eights, v.size());
-    
+
         v = table->where().equal(0, StringData("10")).find_all();
 
         v = table->where().equal(0, StringData("8")).find_all();
@@ -113,12 +146,12 @@ TEST(TestQueryStrIndexCrash)
 
 TEST(QueryTwoColsEqualVaryWidthAndValues)
 {
-    std::vector<size_t> ints1;
-    std::vector<size_t> ints2;
-    std::vector<size_t> ints3;
+    vector<size_t> ints1;
+    vector<size_t> ints2;
+    vector<size_t> ints3;
 
-    std::vector<size_t> floats;
-    std::vector<size_t> doubles;
+    vector<size_t> floats;
+    vector<size_t> doubles;
 
     Table table;
     table.add_column(type_Int, "first1");
@@ -210,9 +243,9 @@ TEST(QueryTwoColsEqualVaryWidthAndValues)
 
 TEST(QueryTwoColsVaryOperators)
 {
-    std::vector<size_t> ints1;
-    std::vector<size_t> floats;
-    std::vector<size_t> doubles;
+    vector<size_t> ints1;
+    vector<size_t> floats;
+    vector<size_t> doubles;
 
     Table table;
     table.add_column(type_Int, "first1");
@@ -328,8 +361,8 @@ TEST(TestQueryHuge)
         size_t mdist2 = 1;
         size_t mdist3 = 1;
 
-        std::string first;
-        std::string second;
+        string first;
+        string second;
         int64_t third;
 
         size_t res1 = 0;
@@ -341,8 +374,16 @@ TEST(TestQueryHuge)
         size_t res7 = 0;
         size_t res8 = 0;
 
+        size_t start = rand() % 6000;
+        size_t end = start + rand() % (6000 - start);
+        size_t limit;
+        if(rand() % 2 == 0)
+            limit = rand() % 10000;
+        else
+            limit = size_t(-1);
 
-        size_t blocksize = rand() % 1200 + 1;
+
+        size_t blocksize = rand() % 800 + 1;
 
         for (size_t row = 0; row < 6000; row++) {
 
@@ -350,8 +391,7 @@ TEST(TestQueryHuge)
                 long1 = (rand() % 2 == 0);
                 long2 = (rand() % 2 == 0);
 
-                if (rand() % 2 == 0)
-                {
+                if (rand() % 2 == 0) {
                     mdist1 = rand() % 500 + 1;
                     mdist2 = rand() % 500 + 1;
                     mdist3 = rand() % 500 + 1;
@@ -396,32 +436,37 @@ TEST(TestQueryHuge)
             else
                 third = 2;
 
-            tt[row].first = first.c_str();
-            tt[row].second = second.c_str();
-            tt[row].third = third;
+            tt[row].first  = first;
+            tt[row].second = second;
+            tt[row].third  = third;
 
-            if (first == "A" && second == "A" && third == 1)
+
+
+
+
+
+            if ((row >= start && row < end && limit > res1) && (first == "A" && second == "A" && third == 1))
                 res1++;
 
-            if ((first == "A" || second == "A") && third == 1)
+            if ((row >= start && row < end && limit > res2) && ((first == "A" || second == "A") && third == 1))
                 res2++;
 
-            if (first == "A" && (second == "A" || third == 1))
+            if ((row >= start && row < end && limit > res3) && (first == "A" && (second == "A" || third == 1)))
                 res3++;
 
-            if (second == "A" && (first == "A" || third == 1))
+            if ((row >= start && row < end && limit > res4) && (second == "A" && (first == "A" || third == 1)))
                 res4++;
 
-            if (first == "A" || second == "A" || third == 1)
+            if ((row >= start && row < end && limit > res5) && (first == "A" || second == "A" || third == 1))
                 res5++;
 
-            if (first != "A" && second == "A" && third == 1)
+            if ((row >= start && row < end && limit > res6) && (first != "A" && second == "A" && third == 1))
                 res6++;
 
-            if (first != "longlonglonglonglonglonglong A" && second == "A" && third == 1)
+            if ((row >= start && row < end && limit > res7) && (first != "longlonglonglonglonglonglong A" && second == "A" && third == 1))
                 res7++;
 
-            if (first != "longlonglonglonglonglonglong A" && second == "A" && third == 2)
+            if ((row >= start && row < end && limit > res8) && (first != "longlonglonglonglonglonglong A" && second == "A" && third == 2))
                 res8++;
         }
 
@@ -433,38 +478,41 @@ TEST(TestQueryHuge)
                 tt.column().first.set_index();
             else if (t == 3)
                 tt.column().second.set_index();
-            else if (t == 4)
-                tt.column().third.set_index();
 
 
-            v = tt.where().first.equal("A").second.equal("A").third.equal(1).find_all();
+
+            v = tt.where().first.equal("A").second.equal("A").third.equal(1).find_all(start, end, limit);
             CHECK_EQUAL(res1, v.size());
 
-            v = tt.where().second.equal("A").first.equal("A").third.equal(1).find_all();
+            v = tt.where().second.equal("A").first.equal("A").third.equal(1).find_all(start, end, limit);
             CHECK_EQUAL(res1, v.size());
 
-            v = tt.where().third.equal(1).second.equal("A").first.equal("A").find_all();
+            v = tt.where().third.equal(1).second.equal("A").first.equal("A").find_all(start, end, limit);
             CHECK_EQUAL(res1, v.size());
 
-            v = tt.where().group().first.equal("A").Or().second.equal("A").end_group().third.equal(1).find_all();
+            v = tt.where().group().first.equal("A").Or().second.equal("A").end_group().third.equal(1).find_all(start, end, limit);
             CHECK_EQUAL(res2, v.size());
 
-            v = tt.where().first.equal("A").group().second.equal("A").Or().third.equal(1).end_group().find_all();
+            v = tt.where().first.equal("A").group().second.equal("A").Or().third.equal(1).end_group().find_all(start, end, limit);
             CHECK_EQUAL(res3, v.size());
 
-            v = tt.where().group().first.equal("A").Or().third.equal(1).end_group().second.equal("A").find_all();
+            TripleTable::Query q = tt.where().group().first.equal("A").Or().third.equal(1).end_group().second.equal("A");
+            v = q.find_all(start, end, limit);
             CHECK_EQUAL(res4, v.size());
 
-            v = tt.where().first.equal("A").Or().second.equal("A").Or().third.equal(1).find_all();
+            v = tt.where().group().first.equal("A").Or().third.equal(1).end_group().second.equal("A").find_all(start, end, limit);
+            CHECK_EQUAL(res4, v.size());
+
+            v = tt.where().first.equal("A").Or().second.equal("A").Or().third.equal(1).find_all(start, end, limit);
             CHECK_EQUAL(res5, v.size());
 
-            v = tt.where().first.not_equal("A").second.equal("A").third.equal(1).find_all();
+            v = tt.where().first.not_equal("A").second.equal("A").third.equal(1).find_all(start, end, limit);
             CHECK_EQUAL(res6, v.size());
 
-            v = tt.where().first.not_equal("longlonglonglonglonglonglong A").second.equal("A").third.equal(1).find_all();
+            v = tt.where().first.not_equal("longlonglonglonglonglonglong A").second.equal("A").third.equal(1).find_all(start, end, limit);
             CHECK_EQUAL(res7, v.size());
 
-            v = tt.where().first.not_equal("longlonglonglonglonglonglong A").second.equal("A").third.equal(2).find_all();
+            v = tt.where().first.not_equal("longlonglonglonglonglonglong A").second.equal("A").third.equal(2).find_all(start, end, limit);
             CHECK_EQUAL(res8, v.size());
         }
     }
@@ -483,7 +531,7 @@ TEST(TestQueryStrIndex3)
 #endif
         TupleTableType ttt;
 
-        std::vector<size_t> vec;
+        vector<size_t> vec;
         size_t row = 0;
 
         size_t n = 0;
@@ -800,15 +848,15 @@ TEST(TestQueryFloat4)
 {
     FloatTable3 t;
 
-    t.add(std::numeric_limits<float>::max(), std::numeric_limits<double>::max(), 11111);
-    t.add(std::numeric_limits<float>::infinity(), std::numeric_limits<double>::infinity(), 11111);
+    t.add(numeric_limits<float>::max(), numeric_limits<double>::max(), 11111);
+    t.add(numeric_limits<float>::infinity(), numeric_limits<double>::infinity(), 11111);
     t.add(12345.0, 12345.0, 11111);
 
     FloatTable3::Query q1 = t.where();
     float a1 = q1.col_float.maximum();
     double a2 = q1.col_double.maximum();
-    CHECK_EQUAL(std::numeric_limits<float>::infinity(), a1);
-    CHECK_EQUAL(std::numeric_limits<double>::infinity(), a2);
+    CHECK_EQUAL(numeric_limits<float>::infinity(), a1);
+    CHECK_EQUAL(numeric_limits<double>::infinity(), a2);
 
 
     FloatTable3::Query q2 = t.where();
@@ -895,6 +943,28 @@ TEST(TestQueryFloat)
     CHECK_EQUAL(1.13f, q2.col_float.minimum());
     CHECK_EQUAL(3.20, q2.col_double.maximum());
     CHECK_EQUAL(2.21, q2.col_double.minimum());
+
+    size_t count = 0;
+    // ... NO conditions
+    CHECK_EQUAL(1.20f, t.where().col_float.maximum(&count));
+    CHECK_EQUAL(5, count);
+    CHECK_EQUAL(1.10f, t.where().col_float.minimum(&count));
+    CHECK_EQUAL(5, count);
+    CHECK_EQUAL(3.20, t.where().col_double.maximum(&count));
+    CHECK_EQUAL(5, count);
+    CHECK_EQUAL(2.20, t.where().col_double.minimum(&count));
+    CHECK_EQUAL(5, count);
+
+    // ... with conditions
+    CHECK_EQUAL(1.20f, q2.col_float.maximum(&count));
+    CHECK_EQUAL(2, count);
+    CHECK_EQUAL(1.13f, q2.col_float.minimum(&count));
+    CHECK_EQUAL(2, count);
+    CHECK_EQUAL(3.20, q2.col_double.maximum(&count));
+    CHECK_EQUAL(2, count);
+    CHECK_EQUAL(2.21, q2.col_double.minimum(&count));
+    CHECK_EQUAL(2, count);
+
 }
 
 
@@ -1118,11 +1188,11 @@ TEST(TestQueryFindAll_range_or_monkey2)
 
         CHECK_EQUAL(s1, s2);
         for (size_t t = 0; t < a.size(); t++) {
-            size_t i1 = a.GetAsSizeT(t);
+            size_t i1 = to_size_t(a.get(t));
             size_t i2 = tv1.get_source_ndx(t);
             CHECK_EQUAL(i1, i2);
         }
-        a.Destroy();
+        a.destroy();
     }
 
 }
@@ -2310,7 +2380,7 @@ TEST(TestQueryFindAll_ContainsUNICODE)
 TEST(TestQuerySyntaxCheck)
 {
     TupleTableType ttt;
-    std::string s;
+    string s;
 
     ttt.add(1, "a");
     ttt.add(2, "a");

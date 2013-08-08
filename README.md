@@ -15,7 +15,7 @@ GCC 4.2 and newer, as well as with Clang 3.0 and newer.
 
 If you are going to modify the TightDB core library, you will need
 Cheetah for Python (http://www.cheetahtemplate.org). It is needed
-because some source files are generated.
+because some source files are generated from Cheetah templates.
 
 To run the test suite, you will need "UnitTest++"
 (http://unittest-cpp.sourceforge.net), however, a bundled fallback
@@ -34,7 +34,7 @@ each of our major platforms:
     sudo apt-get install libunittest++-dev
     sudo apt-get install libproc-dev
 
-### Ubuntu 13.04
+### Ubuntu 13.04, Linux Mint 15
 
     sudo apt-get install build-essential
     sudo apt-get install python-cheetah
@@ -61,7 +61,7 @@ if you have Xcode installed, and, if so, what version it is:
 Make sure you also install "Command line tools" found under the
 preferences pane "Downloads" in Xcode.
 
-Download the latest version of Python cheetah
+Download the latest version of Python Cheetah
 (https://pypi.python.org/packages/source/C/Cheetah/Cheetah-2.4.4.tar.gz),
 then:
 
@@ -113,6 +113,35 @@ After building, you might want to see exactly what will be installed,
 without actually instyalling anything. This can be done as follows:
 
     DESTDIR=/tmp/check sh build.sh install && find /tmp/check -type f
+
+
+Building for iPhone
+-------------------
+
+On Mac OS X it is possible to build a version of the TightDB core
+library for iOS (the iPhone OS). It requires that the iPhoneOS and
+iPhoneSimulator SDKs for Xcode are installed.
+
+Run the following command to build the TightDB core library for
+iPhone:
+
+    sh build.sh build-iphone
+
+This produces the following files and directories:
+
+    iphone-lib/include/
+    iphone-lib/libtightdb-ios.a
+    iphone-lib/libtightdb-ios-dbg.a
+    iphone-lib/tightdb-config
+    iphone-lib/tightdb-config-dbg
+
+The `include` directory holds a copy of the header files, which are
+identical to the ones installed by `sh build.sh install`. There are
+two versions of the static library, one that is compiled with
+optimization, and one that is compiled for debugging. Each one
+contains code compiled for both iPhone and for the iPhone
+simulator. Each one also comes with a `config` program that can be
+used to enquire about required compiler and linker flags.
 
 
 Configuration

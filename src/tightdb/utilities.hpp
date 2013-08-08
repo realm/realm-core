@@ -30,25 +30,14 @@
 #endif
 
 #include <tightdb/assert.hpp>
+#include <tightdb/safe_int_ops.hpp>
 
-#if defined(__GNUC__)
-    #define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
-#elif defined(_MSC_VER)
-    #define TIGHTDB_FORCEINLINE __forceinline
-#elif defined(__HP_aCC)
-    #define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
-#elif defined(__xlC__ )
-    #define TIGHTDB_FORCEINLINE inline
-#else
-    #error TEXT("Compiler version not detectable")
-#endif
-
-/* GCC defines __i386__ and __x86_64__ */
+// GCC defines __i386__ and __x86_64__
 #if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
     #define TIGHTDB_X86_OR_X64
 #endif
 
-/* GCC defines __arm__ */
+// GCC defines __arm__
 #ifdef __arm__
 #  define TIGHTDB_ARCH_ARM
 #endif
@@ -111,7 +100,6 @@ typedef struct {
     unsigned long long result;
 } checksum_t;
 
-std::size_t to_ref(int64_t) TIGHTDB_NOEXCEPT;
 std::size_t to_size_t(int64_t) TIGHTDB_NOEXCEPT;
 void cpuid_init();
 unsigned long long checksum(unsigned char* data, size_t len);
@@ -130,34 +118,20 @@ int fast_popcount64(int64_t x);
 
 // Implementation:
 
-inline std::size_t to_ref(int64_t v) TIGHTDB_NOEXCEPT
-{
-#ifdef TIGHTDB_DEBUG
-    uint64_t m = std::size_t(-1);
-    TIGHTDB_ASSERT(uint64_t(v) <= m);
-    // FIXME: Must also check that v is divisible by 8 (64-bit aligned).
-#endif
-    return std::size_t(v);
-}
-
 // Safe cast from 64 to 32 bits on 32 bit architecture. Differs from to_ref() by not testing alignment and REF-bitflag.
 inline std::size_t to_size_t(int64_t v) TIGHTDB_NOEXCEPT
 {
-#ifdef TIGHTDB_DEBUG
-    uint64_t m = std::size_t(-1);
-    TIGHTDB_ASSERT(uint64_t(v) <= m);
-    // FIXME: Should probably be TIGHTDB_ASSERT(0 <= v && uint64_t(v) <= numeric_limits<size_t>::max());
-#endif
+    TIGHTDB_ASSERT(!int_cast_has_overflow<std::size_t>(v));
     return std::size_t(v);
 }
 
 
 template<typename ReturnType, typename OriginalType>
-ReturnType TypePunning( OriginalType variable )
+ReturnType type_punning( OriginalType variable ) TIGHTDB_NOEXCEPT
 {
     union {
-        OriginalType    in;
-        ReturnType      out;
+        OriginalType in;
+        ReturnType   out;
     };
     out = ReturnType(); // Clear all bits in case ReturnType is larger than OriginalType
     in = variable;

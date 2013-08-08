@@ -13,6 +13,24 @@ Format:
 ==================
 
 
+2013-08-03 (Kristian Spangsege)
++ Table::find_sorted_int() replaced by Table::lower_bound_int() and Table::upper_bound_int() as these are standardized and provide more flexibility.
++ Addition of Table::lower_bound_bool() and Table::upper_bound_bool().
++ Addition of Table::lower_bound_float() and Table::upper_bound_float().
++ Addition of Table::lower_bound_double() and Table::upper_bound_double().
++ Addition of Table::lower_bound_string() and Table::upper_bound_string(). They rely on simple byte-wise lexicographical comparison. No Unicode or locale dependent collation is taken into account. Comparison occurs exactly as defined by std::lexicographical_compare in the C++ STL.
+
+
+2013-06-25 (Kristian Spangsege)
+. The default group open mode has been changed from Group::mode_Normal
+  (read/write) to Group::mode_ReadOnly. This makes it possible to open
+  a read-only file without specifying a special open mode. Also, since
+  changed groups are generally written to new files, there is rarely a
+  need for the group to be opened in read/write mode.
+. Group::mode_Normal has been renamed to Group::mode_ReadWrite since it is no longer a normal mode.
+. Group::mode_NoCreate has been renamed to Group::mode_ReadWriteNoCreate for clarity.
+
+
 2013-06-05 (Kristian Spangsege)
 . Group::write(path) now throws File::Exists if 'path' already exists in the file system.
 

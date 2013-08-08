@@ -1,5 +1,6 @@
 // @@Example: ex_cpp_dyn_query_startsWith @@
 #include <tightdb.hpp>
+#include <assert.h>
 
 using namespace tightdb;
 using namespace std;
@@ -24,8 +25,8 @@ int main()
     // Find names (column 0) ending with "oe", case sensitive
     TableView view1 = table->where().ends_with(0, "oe").find_all();
     assert(view1.size() == 2);
-    assert(!strcmp(view1.get_string(0, 0), "Joe"));
-    assert(!strcmp(view1.get_string(0, 1), "oe"));
+    assert(view1.get_string(0, 0) == "Joe");
+    assert(view1.get_string(0, 1) == "oe");
 
     // Will find none because search is case sensitive
     TableView view2 = table->where().ends_with(0, "OE").find_all();
@@ -36,8 +37,8 @@ int main()
     TableView view3 = table->where().ends_with(0, "oE", false).find_all();
 
     assert(view3.size() == 2);
-    assert(!strcmp(view3.get_string(0, 0), "Joe"));
-    assert(!strcmp(view3.get_string(0, 1), "oe"));
+    assert(view3.get_string(0, 0), "Joe");
+    assert(view3.get_string(0, 1), "oe");
 #endif
 // @@EndShow@@
 }

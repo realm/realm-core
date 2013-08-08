@@ -1,6 +1,7 @@
 // @@Example: ex_cpp_group_constructor_plain @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <tightdb/file.hpp>
 
 using namespace tightdb;
 
@@ -9,7 +10,7 @@ TIGHTDB_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 
-int main()
+void func()
 {
     Group g;
     PeopleTable::Ref table = g.get_table<PeopleTable>("people");
@@ -20,4 +21,12 @@ int main()
 
     g.write("people.tightdb");
 }
+// @@Fold@@
+
+int main()
+{
+    func();
+    File::remove("people.tightdb");
+}
+// @@EndFold@@
 // @@EndExample@@

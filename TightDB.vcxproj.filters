@@ -85,9 +85,6 @@
     <ClCompile Include="src\tightdb\group_writer.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\tightdb\index.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="src\tightdb\query.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -304,9 +301,6 @@
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\group_writer.hpp">
-      <Filter>src\include</Filter>
-    </ClInclude>
-    <ClInclude Include="src\tightdb\index.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\lang_bind_helper.hpp">

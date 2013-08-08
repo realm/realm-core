@@ -45,7 +45,7 @@ TEST_FIXTURE(db_setup_binary, ArrayBinarySet)
 
 TEST_FIXTURE(db_setup_binary, ArrayBinaryAdd)
 {
-    c.Clear();
+    c.clear();
     CHECK_EQUAL(0, c.size());
 
     c.add(BinaryData("abc", 4));
@@ -64,7 +64,7 @@ TEST_FIXTURE(db_setup_binary, ArrayBinaryAdd)
 TEST_FIXTURE(db_setup_binary, ArrayBinarySet2)
 {
     // {shrink, grow} x {first, middle, last, single}
-    c.Clear();
+    c.clear();
 
     c.add(BinaryData("abc", 4));
     c.set(0, BinaryData("de", 3)); // shrink single
@@ -118,7 +118,7 @@ TEST_FIXTURE(db_setup_binary, ArrayBinarySet2)
 
 TEST_FIXTURE(db_setup_binary, ArrayBinaryInsert)
 {
-    c.Clear();
+    c.clear();
 
     c.insert(0, BinaryData("abc", 4)); // single
     CHECK_EQUAL("abc", c.get(0).data());
@@ -151,9 +151,9 @@ TEST_FIXTURE(db_setup_binary, ArrayBinaryInsert)
     CHECK_EQUAL(5, c.size());
 }
 
-TEST_FIXTURE(db_setup_binary, ArrayBinaryDelete)
+TEST_FIXTURE(db_setup_binary, ArrayBinaryErase)
 {
-    c.Clear();
+    c.clear();
 
     c.add(BinaryData("a", 2));
     c.add(BinaryData("bc", 3));
@@ -161,29 +161,29 @@ TEST_FIXTURE(db_setup_binary, ArrayBinaryDelete)
     c.add(BinaryData("ghij", 5));
     c.add(BinaryData("klmno", 6));
 
-    c.Delete(0); // first
+    c.erase(0); // first
     CHECK_EQUAL("bc", c.get(0).data());
     CHECK_EQUAL("def", c.get(1).data());
     CHECK_EQUAL("ghij", c.get(2).data());
     CHECK_EQUAL("klmno", c.get(3).data());
     CHECK_EQUAL(4, c.size());
 
-    c.Delete(3); // last
+    c.erase(3); // last
     CHECK_EQUAL("bc", c.get(0).data());
     CHECK_EQUAL("def", c.get(1).data());
     CHECK_EQUAL("ghij", c.get(2).data());
     CHECK_EQUAL(3, c.size());
 
-    c.Delete(1); // middle
+    c.erase(1); // middle
     CHECK_EQUAL("bc", c.get(0).data());
     CHECK_EQUAL("ghij", c.get(1).data());
     CHECK_EQUAL(2, c.size());
 
-    c.Delete(0); // single
+    c.erase(0); // single
     CHECK_EQUAL("ghij", c.get(0).data());
     CHECK_EQUAL(1, c.size());
 
-    c.Delete(0); // all
+    c.erase(0); // all
     CHECK_EQUAL(0, c.size());
     CHECK(c.is_empty());
 }
@@ -191,5 +191,5 @@ TEST_FIXTURE(db_setup_binary, ArrayBinaryDelete)
 TEST_FIXTURE(db_setup_binary, ArrayBinary_Destroy)
 {
     // clean up (ALWAYS PUT THIS LAST)
-    c.Destroy();
+    c.destroy();
 }

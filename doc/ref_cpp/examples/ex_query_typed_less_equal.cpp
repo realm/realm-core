@@ -1,6 +1,7 @@
 // @@Example: ex_cpp_typed_query_lessThanOrEqual @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_2(PeopleTable,
                 name,  String,
@@ -21,8 +22,8 @@ int main()
 // @@Fold@@
 
     assert(view1.size() == 2);
-    assert(!strcmp(view1[0].name, "Mary"));
-    assert(!strcmp(view1[1].name, "Jill"));
+    assert(view1[0].name == "Mary");
+    assert(view1[1].name == "Jill");
 }
 // @@EndFold@@
 // @@EndExample@@

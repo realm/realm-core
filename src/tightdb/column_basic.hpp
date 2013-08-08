@@ -37,17 +37,19 @@ template<> struct AggReturnType<float> {
 };
 
 
-template<typename T>
-class BasicColumn : public ColumnBase {
+template<class T>
+class BasicColumn: public ColumnBase {
 public:
-    BasicColumn(Allocator& = Allocator::get_default());
-    BasicColumn(size_t ref, ArrayParent* = 0, size_t ndx_in_parent = 0,
-                Allocator& = Allocator::get_default());
+    typedef T value_type;
+
+    explicit BasicColumn(Allocator& = Allocator::get_default());
+    explicit BasicColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                         Allocator& = Allocator::get_default());
     ~BasicColumn();
 
-    void Destroy();
+    void destroy() TIGHTDB_OVERRIDE;
 
-    size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
     T get(size_t ndx) const TIGHTDB_NOEXCEPT;
@@ -57,8 +59,8 @@ public:
     void insert(size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
     void insert(size_t ndx, T value);
     void erase(size_t ndx) TIGHTDB_OVERRIDE;
-    void Clear() TIGHTDB_OVERRIDE;
-    void Resize(size_t ndx);
+    void clear() TIGHTDB_OVERRIDE;
+    void resize(size_t ndx);
     void fill(size_t count);
     // Experimental. Overwrites the row at ndx with the last row and removes the last row. For unordered tables.
     void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
@@ -73,38 +75,42 @@ public:
     size_t find_first(T value, size_t start=0 , size_t end=-1) const;
     void find_all(Array& result, T value, size_t start = 0, size_t end = -1) const;
 
-    // Index
-    bool HasIndex() const TIGHTDB_OVERRIDE {return false;}
-    void BuildIndex(Index&) {}
-    void ClearIndex() {}
-    size_t FindWithIndex(int64_t) const {return size_t(-1);}
-
-    size_t GetRef() const TIGHTDB_OVERRIDE {return m_array->GetRef();}
-    void SetParent(ArrayParent* parent, size_t pndx) TIGHTDB_OVERRIDE {m_array->SetParent(parent, pndx);}
+    //@{
+    /// Find the lower/upper bound for the specified value assuming
+    /// that the elements are already sorted in ascending order.
+    std::size_t lower_bound(T value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound(T value) const TIGHTDB_NOEXCEPT;
+    //@{
 
     /// Compare two columns for equality.
     bool compare(const BasicColumn&) const;
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
-#endif // TIGHTDB_DEBUG
+    void Verify() const TIGHTDB_OVERRIDE {}; // Must be upper case to avoid conflict with macro in ObjC
+#endif
 
 private:
+    friend class Array;
     friend class ColumnBase;
 
-    void UpdateRef(size_t ref);
+    void update_ref(ref_type ref);
 
-    T LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
     void LeafSet(size_t ndx, T value);
-    void LeafInsert(size_t ndx, T value);
     void LeafDelete(size_t ndx);
 
     template<class F> size_t LeafFind(T value, size_t start, size_t end) const;
     void LeafFindAll(Array& result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
 
+    void do_insert(std::size_t ndx, T value);
+
+    // Called by Array::btree_insert().
+    static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
+                                Allocator&, std::size_t insert_ndx,
+                                Array::TreeInsert<BasicColumn<T> >&);
+
 #ifdef TIGHTDB_DEBUG
-    virtual void LeafToDot(std::ostream& out, const Array& array) const;
-#endif // TIGHTDB_DEBUG
+    void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
+#endif
 
     template <typename R, Action action, class cond>
     R aggregate(T target, size_t start, size_t end, size_t *matchcount = 0) const;

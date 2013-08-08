@@ -43,7 +43,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -62,7 +62,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -400,7 +400,6 @@
     <ClCompile Include="src\tightdb\group.cpp" />
     <ClCompile Include="src\tightdb\group_shared.cpp" />
     <ClCompile Include="src\tightdb\group_writer.cpp" />
-    <ClCompile Include="src\tightdb\index.cpp" />
     <ClCompile Include="src\tightdb\index_string.cpp" />
     <ClCompile Include="src\tightdb\query.cpp" />
     <ClCompile Include="src\tightdb\spec.cpp" />
@@ -558,7 +557,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="test\test_file.cpp" />
+    <ClCompile Include="test\test_file.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="test\test_query.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
@@ -612,7 +616,6 @@
     <ClInclude Include="src\tightdb\group.hpp" />
     <ClInclude Include="src\tightdb\group_shared.hpp" />
     <ClInclude Include="src\tightdb\group_writer.hpp" />
-    <ClInclude Include="src\tightdb\index.hpp" />
     <ClInclude Include="src\tightdb\index_string.hpp" />
     <ClInclude Include="src\tightdb\lang_bind_helper.hpp" />
     <ClInclude Include="src\tightdb\meta.hpp" />

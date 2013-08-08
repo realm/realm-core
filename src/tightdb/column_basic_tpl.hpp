@@ -31,168 +31,173 @@ template<class T, class F> class BasicNode;
 template<class T> class SequentialGetter;
 
 
-template<typename T>
+template<class T>
 BasicColumn<T>::BasicColumn(Allocator& alloc)
 {
-    m_array = new BasicArray<T>(NULL, 0, alloc);
+    m_array = new BasicArray<T>(0, 0, alloc);
 }
 
-template<typename T>
-BasicColumn<T>::BasicColumn(size_t ref, ArrayParent* parent, size_t pndx, Allocator& alloc)
+template<class T>
+BasicColumn<T>::BasicColumn(ref_type ref, ArrayParent* parent, std::size_t pndx, Allocator& alloc)
 {
-    const bool isNode = is_node_from_ref(ref, alloc);
-    if (isNode)
-        m_array = new Array(ref, parent, pndx, alloc);
-    else
+    bool root_is_leaf = root_is_leaf_from_ref(ref, alloc);
+    if (root_is_leaf)
         m_array = new BasicArray<T>(ref, parent, pndx, alloc);
+    else
+        m_array = new Array(ref, parent, pndx, alloc);
 }
 
-template<typename T>
+template<class T>
 BasicColumn<T>::~BasicColumn()
 {
-    if (IsNode())
-        delete m_array;
-    else
+    if (root_is_leaf())
         delete static_cast<BasicArray<T>*>(m_array);
-}
-
-template<typename T>
-void BasicColumn<T>::Destroy()
-{
-    if (IsNode())
-        m_array->Destroy();
     else
-        static_cast<BasicArray<T>*>(m_array)->Destroy();
-}
-
-
-template<typename T>
-void BasicColumn<T>::UpdateRef(size_t ref)
-{
-    TIGHTDB_ASSERT(is_node_from_ref(ref, m_array->GetAllocator())); // Can only be called when creating node
-
-    if (IsNode())
-        m_array->UpdateRef(ref);
-    else {
-        ArrayParent* const parent = m_array->GetParent();
-        const size_t pndx = m_array->GetParentNdx();
-
-        // Replace the generic array with int array for node
-        Array* array = new Array(ref, parent, pndx, m_array->GetAllocator());
         delete m_array;
-        m_array = array;
-
-        // Update ref in parent
-        if (parent)
-            parent->update_child_ref(pndx, ref);
-    }
 }
 
-template<typename T>
+template<class T>
+void BasicColumn<T>::destroy()
+{
+    if (root_is_leaf())
+        static_cast<BasicArray<T>*>(m_array)->destroy();
+    else
+        m_array->destroy();
+}
+
+
+template<class T>
+void BasicColumn<T>::update_ref(ref_type ref)
+{
+    TIGHTDB_ASSERT(!root_is_leaf_from_ref(ref, m_array->get_alloc())); // Can only be called when creating node
+
+    if (!root_is_leaf()) {
+        m_array->update_ref(ref);
+        return;
+    }
+
+    ArrayParent* parent = m_array->get_parent();
+    std::size_t pndx = m_array->get_ndx_in_parent();
+
+    // Replace the generic array with int array for node
+    Array* array = new Array(ref, parent, pndx, m_array->get_alloc());
+    delete m_array;
+    m_array = array;
+
+    // Update ref in parent
+    if (parent)
+        parent->update_child_ref(pndx, ref);
+}
+
+template<class T>
 bool BasicColumn<T>::is_empty() const TIGHTDB_NOEXCEPT
 {
-    if (IsNode()) {
-        const Array offsets = NodeGetOffsets();
-        return offsets.is_empty();
-    }
-    else {
+    if (root_is_leaf())
         return static_cast<BasicArray<T>*>(m_array)->is_empty();
-    }
+
+    Array offsets = NodeGetOffsets();
+    return offsets.is_empty();
 }
 
-template<typename T>
-size_t BasicColumn<T>::Size() const TIGHTDB_NOEXCEPT
+template<class T>
+std::size_t BasicColumn<T>::size() const TIGHTDB_NOEXCEPT
 {
-    if (IsNode())  {
-        const Array offsets = NodeGetOffsets();
-        const size_t size = offsets.is_empty() ? 0 : size_t(offsets.back());
-        return size;
-    }
-    else {
+    if (root_is_leaf())
         return m_array->size();
+
+    Array offsets = NodeGetOffsets();
+    std::size_t size = offsets.is_empty() ? 0 : to_size_t(offsets.back());
+    return size;
+}
+
+template<class T>
+void BasicColumn<T>::clear()
+{
+    if (m_array->is_leaf()) {
+        static_cast<BasicArray<T>*>(m_array)->clear();
+        return;
     }
+
+    ArrayParent* parent = m_array->get_parent();
+    std::size_t pndx = m_array->get_ndx_in_parent();
+
+    // Revert to generic array
+    BasicArray<T>* array = new BasicArray<T>(parent, pndx, m_array->get_alloc());
+    if (parent)
+        parent->update_child_ref(pndx, array->get_ref());
+
+    // Remove original node
+    m_array->destroy();
+    delete m_array;
+
+    m_array = array;
 }
 
-template<typename T>
-void BasicColumn<T>::Clear()
+template<class T>
+void BasicColumn<T>::resize(std::size_t ndx)
 {
-    if (m_array->IsNode()) {
-        ArrayParent *const parent = m_array->GetParent();
-        const size_t pndx = m_array->GetParentNdx();
-
-        // Revert to generic array
-        BasicArray<T>* array = new BasicArray<T>(parent, pndx, m_array->GetAllocator());
-        if (parent)
-            parent->update_child_ref(pndx, array->GetRef());
-
-        // Remove original node
-        m_array->Destroy();
-        delete m_array;
-
-        m_array = array;
-    }
-    else
-        static_cast<BasicArray<T>*>(m_array)->Clear();
+    TIGHTDB_ASSERT(root_is_leaf()); // currently only available on leaf level (used by b-tree code)
+    TIGHTDB_ASSERT(ndx < size());
+    static_cast<BasicArray<T>*>(m_array)->resize(ndx);
 }
 
-template<typename T>
-void BasicColumn<T>::Resize(size_t ndx)
+template<class T>
+void BasicColumn<T>::move_last_over(std::size_t ndx)
 {
-    TIGHTDB_ASSERT(!IsNode()); // currently only available on leaf level (used by b-tree code)
-    TIGHTDB_ASSERT(ndx < Size());
-    static_cast<BasicArray<T>*>(m_array)->Resize(ndx);
-}
+    TIGHTDB_ASSERT(ndx+1 < size());
 
-template<typename T>
-void BasicColumn<T>::move_last_over(size_t ndx)
-{
-    TIGHTDB_ASSERT(ndx+1 < Size());
-
-    const size_t ndx_last = Size()-1;
-    const T v = get(ndx_last);
+    std::size_t ndx_last = size()-1;
+    T v = get(ndx_last);
 
     set(ndx, v);
     erase(ndx_last);
 }
 
 
-template<typename T>
-T BasicColumn<T>::get(size_t ndx) const TIGHTDB_NOEXCEPT
+template<class T>
+T BasicColumn<T>::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < Size());
-    return BasicArray<T>::column_get(m_array, ndx);
+    TIGHTDB_ASSERT(ndx < size());
+    if (root_is_leaf())
+        return static_cast<const BasicArray<T>*>(m_array)->get(ndx);
+
+    std::pair<MemRef, std::size_t> p = m_array->find_btree_leaf(ndx);
+    const char* leaf_header = p.first.m_addr;
+    std::size_t ndx_in_leaf = p.second;
+    return BasicArray<T>::get(leaf_header, ndx_in_leaf);
 }
 
-template<typename T>
-void BasicColumn<T>::set(size_t ndx, T value)
+template<class T>
+void BasicColumn<T>::set(std::size_t ndx, T value)
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
     TreeSet<T,BasicColumn<T> >(ndx, value);
 }
 
-template<typename T>
+template<class T>
 void BasicColumn<T>::add(T value)
 {
-    insert(Size(), value);
+    do_insert(npos, value);
 }
 
-template<typename T>
-void BasicColumn<T>::insert(size_t ndx, T value)
+template<class T>
+void BasicColumn<T>::insert(std::size_t ndx, T value)
 {
-    TIGHTDB_ASSERT(ndx <= Size());
-    TreeInsert<T, BasicColumn<T> >(ndx, value);
+    TIGHTDB_ASSERT(ndx <= size());
+    if (size() <= ndx) ndx = npos;
+    do_insert(ndx, value);
 }
 
-template<typename T>
-void BasicColumn<T>::fill(size_t count)
+template<class T>
+void BasicColumn<T>::fill(std::size_t count)
 {
     TIGHTDB_ASSERT(is_empty());
 
     // Fill column with default values
     // TODO: this is a very naive approach
     // we could speedup by creating full nodes directly
-    for (size_t i = 0; i < count; ++i) {
-        TreeInsert<T, BasicColumn<T> >(i, 0);
+    for (std::size_t i = 0; i < count; ++i) {
+        add(T());
     }
 
 #ifdef TIGHTDB_DEBUG
@@ -200,15 +205,15 @@ void BasicColumn<T>::fill(size_t count)
 #endif
 }
 
-template<typename T>
+template<class T>
 bool BasicColumn<T>::compare(const BasicColumn& c) const
 {
-    const size_t n = Size();
-    if (c.Size() != n)
+    std::size_t n = size();
+    if (c.size() != n)
         return false;
-    for (size_t i=0; i<n; ++i) {
-        const T v1 = get(i);
-        const T v2 = c.get(i);
+    for (std::size_t i=0; i<n; ++i) {
+        T v1 = get(i);
+        T v2 = c.get(i);
         if (v1 == v2)
             return false;
     }
@@ -216,244 +221,148 @@ bool BasicColumn<T>::compare(const BasicColumn& c) const
 }
 
 
-template<typename T>
-void BasicColumn<T>::erase(size_t ndx)
+template<class T>
+void BasicColumn<T>::erase(std::size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < Size());
+    TIGHTDB_ASSERT(ndx < size());
     TreeDelete<T, BasicColumn<T> >(ndx);
 }
 
-template<typename T>
-T BasicColumn<T>::LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT
+template<class T>
+void BasicColumn<T>::LeafSet(std::size_t ndx, T value)
 {
-    return static_cast<BasicArray<T>*>(m_array)->Get(ndx);
+    static_cast<BasicArray<T>*>(m_array)->set(ndx, value);
 }
 
-template<typename T>
-void BasicColumn<T>::LeafSet(size_t ndx, T value)
+template<class T>
+void BasicColumn<T>::LeafDelete(std::size_t ndx)
 {
-    static_cast<BasicArray<T>*>(m_array)->Set(ndx, value);
-}
-
-template<typename T>
-void BasicColumn<T>::LeafInsert(size_t ndx, T value)
-{
-    static_cast<BasicArray<T>*>(m_array)->Insert(ndx, value);
-}
-
-template<typename T>
-void BasicColumn<T>::LeafDelete(size_t ndx)
-{
-    static_cast<BasicArray<T>*>(m_array)->Delete(ndx);
+    static_cast<BasicArray<T>*>(m_array)->erase(ndx);
 }
 
 
 #ifdef TIGHTDB_DEBUG
 
-template<typename T>
-void BasicColumn<T>::LeafToDot(std::ostream& out, const Array& array) const
+template<class T>
+void BasicColumn<T>::leaf_to_dot(std::ostream& out, const Array& array) const
 {
     // Rebuild array to get correct type
-    const size_t ref = array.GetRef();
-    const BasicArray<T> newArray(ref, NULL, 0, array.GetAllocator());
+    ref_type ref = array.get_ref();
+    BasicArray<T> new_array(ref, 0, 0, array.get_alloc());
 
-    newArray.ToDot(out);
+    new_array.to_dot(out);
 }
 
 #endif // TIGHTDB_DEBUG
 
 
-template<typename T> template<class F>
-size_t BasicColumn<T>::LeafFind(T value, size_t start, size_t end) const
+template<class T> template<class F>
+std::size_t BasicColumn<T>::LeafFind(T value, std::size_t start, std::size_t end) const
 {
     return static_cast<BasicArray<T>*>(m_array)->find_first(value, start, end);
 }
 
-template<typename T>
-void BasicColumn<T>::LeafFindAll(Array &result, T value, size_t add_offset, size_t start, size_t end) const
+template<class T>
+void BasicColumn<T>::LeafFindAll(Array &result, T value, std::size_t add_offset,
+                                 std::size_t start, std::size_t end) const
 {
     return static_cast<BasicArray<T>*>(m_array)->find_all(result, value, add_offset, start, end);
 }
 
-template<typename T>
-size_t BasicColumn<T>::find_first(T value, size_t start, size_t end) const
+template<class T>
+std::size_t BasicColumn<T>::find_first(T value, std::size_t start, std::size_t end) const
 {
     return TreeFind<T, BasicColumn<T>, Equal>(value, start, end);
 }
 
-template<typename T>
-void BasicColumn<T>::find_all(Array &result, T value, size_t start, size_t end) const
+template<class T>
+void BasicColumn<T>::find_all(Array &result, T value, std::size_t start, std::size_t end) const
 {
     TreeFindAll<T, BasicColumn<T> >(result, value, 0, start, end);
 }
 
-
-#if 1
-
-template<typename T>
-size_t BasicColumn<T>::count(T target) const
+template<class T>
+std::size_t BasicColumn<T>::count(T target) const
 {
-    return size_t(ColumnBase::aggregate<T, int64_t, act_Count, Equal>(target, 0, Size(), NULL));
+    return std::size_t(ColumnBase::aggregate<T, int64_t, act_Count, Equal>(target, 0, size(), 0));
 }
 
-template<typename T>
-typename BasicColumn<T>::SumType BasicColumn<T>::sum(size_t start, size_t end) const
+template<class T>
+typename BasicColumn<T>::SumType BasicColumn<T>::sum(std::size_t start, std::size_t end) const
 {
-    return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, NULL);
+    return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, 0);
 }
 
-template<typename T>
-double BasicColumn<T>::average(size_t start, size_t end) const
+template<class T>
+double BasicColumn<T>::average(std::size_t start, std::size_t end) const
 {
-    if (end == size_t(-1))
-        end = Size();
-    size_t size = end - start;
-    double sum1 = ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, NULL);
+    if (end == std::size_t(-1))
+        end = size();
+    std::size_t size = end - start;
+    double sum1 = ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, 0);
     double avg = sum1 / ( size == 0 ? 1 : size );
     return avg;
 }
 
-template<typename T>
-T BasicColumn<T>::minimum(size_t start, size_t end) const
+template<class T>
+T BasicColumn<T>::minimum(std::size_t start, std::size_t end) const
 {
-    return ColumnBase::aggregate<T, T, act_Min, None>(0, start, end, NULL);
+    return ColumnBase::aggregate<T, T, act_Min, None>(0, start, end, 0);
 }
 
-template<typename T>
-T BasicColumn<T>::maximum(size_t start, size_t end) const
+template<class T>
+T BasicColumn<T>::maximum(std::size_t start, std::size_t end) const
 {
-    return ColumnBase::aggregate<T, T, act_Max, None>(0, start, end, NULL);
+    return ColumnBase::aggregate<T, T, act_Max, None>(0, start, end, 0);
 }
 
-/*
-template<typename T>
-void BasicColumn<T>::sort(size_t start, size_t end)
+
+template<class T> void BasicColumn<T>::do_insert(std::size_t ndx, T value)
 {
-    // TODO
-    assert(0);
-}
-*/
-
-#else
-
-// Alternative 'naive' reference implementation - useful for reference performance testing.
-// TODO: test performance of column aggregates
-
-template<typename T>
-size_t BasicColumn<T>::count(T target) const
-{
-    size_t count = 0;
-
-    if (m_array->IsNode()) {
-        const Array refs = NodeGetRefs();
-        const size_t n = refs.size();
-
-        for (size_t i = 0; i < n; ++i) {
-            const size_t ref = refs.GetAsRef(i);
-            const BasicColumn<T> col(ref, NULL, 0, m_array->GetAllocator());
-
-            count += col.count(target);
-        }
+    TIGHTDB_ASSERT(ndx == npos || ndx < size());
+    ref_type new_sibling_ref;
+    Array::TreeInsert<BasicColumn<T> > state;
+    if (root_is_leaf()) {
+        TIGHTDB_ASSERT(ndx == npos || ndx < TIGHTDB_MAX_LIST_SIZE);
+        BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array);
+        new_sibling_ref = leaf->btree_leaf_insert(ndx, value, state);
     }
     else {
-        count += ((BasicArray<T>*)m_array)->count(target);
+        state.m_value = value;
+        new_sibling_ref = m_array->btree_insert(ndx, state);
     }
-    return count;
+
+    if (TIGHTDB_UNLIKELY(new_sibling_ref))
+        introduce_new_root(new_sibling_ref, state);
 }
 
-template<typename T>
-T BasicColumn<T>::sum(size_t start, size_t end) const
+template<class T> TIGHTDB_FORCEINLINE
+ref_type BasicColumn<T>::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
+                                     std::size_t ndx_in_parent,
+                                     Allocator& alloc, std::size_t insert_ndx,
+                                     Array::TreeInsert<BasicColumn<T> >& state)
 {
-    if (end == size_t(-1))
-        end = Size();
-
-    double sum = 0;
-
-    if (m_array->IsNode()) {
-        const Array refs = NodeGetRefs();
-        const size_t n = refs.size();
-
-        for (size_t i = start; i < n; ++i) {
-            const size_t ref = refs.GetAsRef(i);
-            const BasicColumn<T> col(ref, NULL, 0, m_array->GetAllocator());
-
-            sum += col.sum(start, end);
-        }
-    }
-    else {
-        sum += ((BasicArray<T>*)m_array)->sum(start, end);
-    }
-    return sum;
+    BasicArray<T> leaf(leaf_mem, &parent, ndx_in_parent, alloc);
+    return leaf.btree_leaf_insert(insert_ndx, state.m_value, state);
 }
 
-template<typename T>
-double BasicColumn<T>::average(size_t start, size_t end) const
+
+template<class T> inline std::size_t BasicColumn<T>::lower_bound(T value) const TIGHTDB_NOEXCEPT
 {
-    if (end == size_t(-1))
-        end = Size();
-    size_t size = end - start;
-    double sum2 = sum(start, end);
-    double avg = sum2 / double( size == 0 ? 1 : size );
-    return avg;
+    if (root_is_leaf()) {
+        return static_cast<const BasicArray<T>*>(m_array)->lower_bound(value);
+    }
+    return ColumnBase::lower_bound(*this, value);
 }
 
-// #include <iostream>
-
-template<typename T>
-T BasicColumn<T>::minimum(size_t start, size_t end) const
+template<class T> inline std::size_t BasicColumn<T>::upper_bound(T value) const TIGHTDB_NOEXCEPT
 {
-    if (end == size_t(-1))
-        end = Size();
-
-    T min_val = T(987.0);
-    if (m_array->IsNode()) {
-        const Array refs = NodeGetRefs();
-        const size_t n = refs.size();
-
-        for (size_t i = start; i < n; ++i) {
-            const size_t ref = refs.GetAsRef(i);
-            const BasicColumn<T> col(ref, NULL, 0, m_array->GetAllocator());
-            T val = col.minimum(start, end);
-            if (val < min_val || i == start) {
-                //std::cout << "Min " << i << ": " << min_val << " new val: " << val << "\n";
-                val = min_val;
-            }
-        }
+    if (root_is_leaf()) {
+        return static_cast<const BasicArray<T>*>(m_array)->upper_bound(value);
     }
-    else {
-       // std::cout << "array-min before: " << min_val;
-        ((BasicArray<T>*)m_array)->minimum(min_val, start, end);
-       // std::cout << " after: " << min_val << "\n";
-    }
-    return min_val;
+    return ColumnBase::upper_bound(*this, value);
 }
 
-template<typename T>
-T BasicColumn<T>::maximum(size_t start, size_t end) const
-{
-    if (end == size_t(-1))
-        end = Size();
-
-    T max_val = T(0.0);
-    if (m_array->IsNode()) {
-        const Array refs = NodeGetRefs();
-        const size_t n = refs.size();
-
-        for (size_t i = start; i < n; ++i) {
-            const size_t ref = refs.GetAsRef(i);
-            const BasicColumn<T> col(ref, NULL, 0, m_array->GetAllocator());
-            T val = col.maximum(start, end);
-            if (val > max_val || i == start)
-                val = max_val;
-        }
-    }
-    else {
-        ((BasicArray<T>*)m_array)->maximum(max_val, start, end);
-    }
-    return max_val;
-}
-
-#endif // reference implementation of aggregates
 
 } // namespace tightdb
 

@@ -29,61 +29,95 @@ class StringIndex;
 
 class ColumnStringEnum: public Column {
 public:
-    ColumnStringEnum(size_t ref_keys, size_t ref_values, ArrayParent* parent=NULL, size_t pndx=0,
-                     Allocator& alloc = Allocator::get_default());
+    typedef StringData value_type;
+
+    ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* = 0,
+                     std::size_t ndx_in_parent = 0, Allocator& = Allocator::get_default());
     ~ColumnStringEnum();
-    void Destroy();
+    void destroy() TIGHTDB_OVERRIDE;
 
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add(StringData value);
     void set(std::size_t ndx, StringData value);
     void insert(std::size_t ndx, StringData value);
     void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
-    void Clear() TIGHTDB_OVERRIDE;
+    void clear() TIGHTDB_OVERRIDE;
 
     using Column::move_last_over;
     using Column::add;
     using Column::insert;
 
-    size_t count(StringData value) const;
-    size_t find_first(StringData value, size_t begin=0, size_t end=-1) const;
-    void find_all(Array& res, StringData value, size_t begin=0, size_t end=-1) const;
-    FindRes find_all_indexref(StringData value, size_t& dst) const;
+    std::size_t count(StringData value) const;
+    size_t find_first(StringData value, std::size_t begin=0, std::size_t end=-1) const;
+    void find_all(Array& res, StringData value, std::size_t begin=0, std::size_t end=-1) const;
+    FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
-    size_t count(size_t key_index) const;
-    size_t find_first(size_t key_index, size_t begin=0, size_t end=-1) const;
-    void find_all(Array& res, size_t key_index, size_t begin=0, size_t end=-1) const;
+    std::size_t count(std::size_t key_index) const;
+    std::size_t find_first(std::size_t key_index, std::size_t begin=0, std::size_t end=-1) const;
+    void find_all(Array& res, std::size_t key_index, std::size_t begin=0, std::size_t end=-1) const;
 
-    void UpdateParentNdx(int diff);
-    void UpdateFromParent();
+    //@{
+
+    /// Find the lower/upper bound for the specified value assuming
+    /// that the elements are already sorted in ascending order
+    /// according to StringData::operator<().
+    std::size_t lower_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
+    //@{
+
+    void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void update_from_parent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     // Index
-    bool HasIndex() const {return m_index != NULL;}
-    const StringIndex& GetIndex() const {return *m_index;}
-    StringIndex& CreateIndex();
-    void SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx);
-    void ReuseIndex(StringIndex& index);
-    void RemoveIndex() {m_index = NULL;}
+    bool has_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_index != 0; }
+    void set_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_OVERRIDE;
+    const StringIndex& get_index() const { return *m_index; }
+    StringIndex& create_index();
+    void install_index(StringIndex*) TIGHTDB_NOEXCEPT;
 
     // Compare two string columns for equality
-    bool compare(const AdaptiveStringColumn&) const;
-    bool compare(const ColumnStringEnum&) const;
+    bool compare_string(const AdaptiveStringColumn&) const;
+    bool compare_string(const ColumnStringEnum&) const;
 
     const Array* get_enum_root_array() const TIGHTDB_NOEXCEPT { return m_keys.get_root_array(); }
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-    void ToDot(std::ostream& out, StringData title) const;
-#endif // TIGHTDB_DEBUG
+    void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
+    void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
+#endif
 
-    size_t GetKeyNdx(StringData value) const;
-    size_t GetKeyNdxOrAdd(StringData value);
+    std::size_t GetKeyNdx(StringData value) const;
+    std::size_t GetKeyNdxOrAdd(StringData value);
 
 private:
     // Member variables
     AdaptiveStringColumn m_keys;
     StringIndex* m_index;
 };
+
+
+
+
+
+// Implementation:
+
+inline StringData ColumnStringEnum::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < Column::size());
+    std::size_t key_ndx = to_size_t(Column::get(ndx));
+    return m_keys.get(key_ndx);
+}
+
+
+inline std::size_t ColumnStringEnum::lower_bound_string(StringData value) const TIGHTDB_NOEXCEPT
+{
+    return ColumnBase::lower_bound(*this, value);
+}
+
+inline std::size_t ColumnStringEnum::upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT
+{
+    return ColumnBase::upper_bound(*this, value);
+}
 
 
 } // namespace tightdb

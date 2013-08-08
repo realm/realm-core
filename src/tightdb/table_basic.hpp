@@ -151,12 +151,12 @@ public:
     ///
     RowAccessor back(int rel_idx = -1) TIGHTDB_NOEXCEPT
     {
-        return RowAccessor(std::make_pair(this, m_size+rel_idx));
+        return RowAccessor(std::make_pair(this, size()+rel_idx));
     }
 
     ConstRowAccessor back(int rel_idx = -1) const TIGHTDB_NOEXCEPT
     {
-        return ConstRowAccessor(std::make_pair(this, m_size+rel_idx));
+        return ConstRowAccessor(std::make_pair(this, size()+rel_idx));
     }
 
     RowAccessor add() { return RowAccessor(std::make_pair(this, add_empty_row())); }
@@ -372,7 +372,7 @@ public:
 protected:
     friend class BasicTable;
 
-    Query(const BasicTable<Spec>& table): Spec::template ColNames<QueryCol, Query*>(this), m_impl((Table&)table) {}
+    Query(const BasicTable<Spec>& table): Spec::template ColNames<QueryCol, Query*>(this), m_impl(table) {}
 
 private:
     tightdb::Query m_impl;

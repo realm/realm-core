@@ -148,7 +148,12 @@ template<> struct ColumnTypeTraits<double> {
     typedef double sum_type;
     static const DataType id = type_Double;
 };
-
+template<> struct ColumnTypeTraits<Date> {
+    typedef Column column_type;
+    typedef Array array_type;
+    typedef int64_t sum_type;
+    static const DataType id = type_Int;
+};
 // Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
 template<class T, Action A> struct ColumnTypeTraitsSum {
     typedef T sum_type;
@@ -173,16 +178,17 @@ public:
     SequentialGetter(const Table& table, size_t column_ndx) : m_array((Array::no_prealloc_tag()))
     {
         if (column_ndx != not_found)
-            m_column = (ColType *)&table.GetColumnBase(column_ndx);
+            m_column = static_cast<const ColType*>(&table.get_column_base(column_ndx));
         m_leaf_end = 0;
     }
 
-    SequentialGetter(ColType* column) : m_array((Array::no_prealloc_tag()))
+    SequentialGetter(const ColType* column) : m_array((Array::no_prealloc_tag()))
     {
         init(column);
     }
 
-    void init (ColType* column) {
+    void init (const ColType* column)
+    {
         m_column = column;
         m_leaf_end = 0;
     }
@@ -192,8 +198,8 @@ public:
         // Return wether or not leaf array has changed (could be useful to know for caller)
         if (index >= m_leaf_end) {
             // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
-            // leave m_array untouched. Else call CreateFromHeader() on m_array (more time consuming) and return pointer to m_array.
-            m_array_ptr = (ArrayType*)m_column->GetBlock(index, m_array, m_leaf_start, true);
+            // leave m_array untouched. Else call init_from_header() on m_array (more time consuming) and return pointer to m_array.
+            m_array_ptr = static_cast<const ArrayType*>(m_column->GetBlock(index, m_array, m_leaf_start, true));
             const size_t leaf_size = m_array_ptr->size();
             m_leaf_end = m_leaf_start + leaf_size;
             return true;
@@ -204,7 +210,7 @@ public:
     TIGHTDB_FORCEINLINE T get_next(size_t index)
     {
         cache_next(index);
-        T av = m_array_ptr->Get(index - m_leaf_start);
+        T av = m_array_ptr->get(index - m_leaf_start);
         return av;
     }
 
@@ -218,10 +224,10 @@ public:
 
     size_t m_leaf_start;
     size_t m_leaf_end;
-    ColType* m_column;
+    const ColType* m_column;
 
     // See reason for having both a pointer and instance above
-    ArrayType* m_array_ptr;
+    const ArrayType* m_array_ptr;
 private:
     // Never access through m_array because it's uninitialized if column is just a leaf
     ArrayType m_array;
@@ -253,7 +259,7 @@ public:
         bool operator ()(ParentNode const* a, ParentNode const* b) const { return (a->cost() < b->cost()); }
     };
 
-    double cost(void) const
+    double cost() const
     {
         return 8 * bitwidth_time_unit / m_dD + m_dT; // dt = 1/64 to 1. Match dist is 8 times more important than bitwidth
     }
@@ -295,7 +301,7 @@ public:
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
 
-    virtual ParentNode* child_criteria(void)
+    virtual ParentNode* child_criteria()
     {
         return m_child;
     }
@@ -384,20 +390,20 @@ public:
         // in a tight loop if so (instead of testing if there are sub criterias after each match). Harder: Specialize
         // data type array to make array call match() directly on each match, like for integers.
 
-        (void)matchcount;
+        static_cast<void>(matchcount);
         size_t local_matches = 0;
 
         size_t r = start - 1;
         for (;;) {
             if (local_matches == local_limit) {
-                m_dD = double(r - start) / local_matches;
+                m_dD = double(r - start) / (local_matches + 1.1);
                 return r + 1;
             }
 
             // Find first match in this condition node
             r = find_first_local(r + 1, end);
             if (r == end) {
-                m_dD = double(r - start) / local_matches;
+                m_dD = double(r - start) / (local_matches + 1.1);
                 return end;
             }
 
@@ -423,13 +429,15 @@ public:
                     av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
                 }
                 TIGHTDB_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != NULL);
-                static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av), CallbackDummy());
+                bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av), CallbackDummy());
+                if(!cont)
+                    return static_cast<size_t>(-1);
              }
         }
     }
 
 
-    virtual std::string Verify(void)
+    virtual std::string Verify()
     {
         if (error_code != "")
             return error_code;
@@ -474,7 +482,7 @@ public:
 
         m_next = 0;
         if (m_size > 0)
-            m_max = m_arr.GetAsSizeT(m_size - 1);
+            m_max = to_size_t(m_arr.get(m_size-1));
         if (m_child) m_child->init(table);
     }
 
@@ -485,7 +493,7 @@ public:
             return end;
 
         m_next = r;
-        return m_arr.GetAsSizeT(r);
+        return to_size_t(m_arr.get(r));
     }
 
 protected:
@@ -536,7 +544,7 @@ public:
         return end;
     }
 
-    ParentNode* child_criteria(void)
+    ParentNode* child_criteria()
     {
         return m_child2;
     }
@@ -577,7 +585,7 @@ public:
     void init(const Table& table)
     {
         m_dD = 100.0;
-        m_condition_column = (ColType*)&table.GetColumnBase(m_condition_column_idx);
+        m_condition_column = static_cast<const ColType*>(&table.get_column_base(m_condition_column_idx));
         m_table = &table;
         m_leaf_end = 0;
         if (m_child)
@@ -601,7 +609,7 @@ public:
             m_children[c]->m_probes++;
             size_t m = m_children[c]->find_first_local(i, i + 1);
             if (m != i)
-                return (m_local_matches != m_local_limit);
+                return true; //(m_local_matches != m_local_limit);
         }
 
         bool b;
@@ -613,10 +621,7 @@ public:
             b = state->template match<TAction, false>(i, 0, TSourceColumn(0), CallbackDummy());
         }
 
-        if (m_local_matches == m_local_limit)
-            return false;
-        else
-            return b;
+        return b;
     }
 
     size_t aggregate_call_specialized(Action TAction, DataType col_id, QueryStateBase* st,
@@ -634,7 +639,6 @@ public:
         else if (TAction == act_Sum && col_id == type_Int)
             ret = aggregate_local<act_Sum, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == act_Sum && col_id == type_Float)
-            // todo, fixme, see if we must let sum return a double even when summing a float coltype
             ret = aggregate_local<act_Sum, float, void>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == act_Sum && col_id == type_Double)
             ret = aggregate_local<act_Sum, double, void>(st, start, end, local_limit, source_column, matchcount);
@@ -701,13 +705,17 @@ public:
             if (m_conds <= 1 && (source_column == NULL ||
                 (SameType<TSourceColumn, int64_t>::value
                  && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))) {
-                m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
+                bool cont = m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
+                if(!cont)
+                    return static_cast<size_t>(-1);
             }
             else {
                 QueryState<int64_t> jumpstate; // todo optimize by moving outside for loop
                 m_source_column = source_column;
-                m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, &jumpstate,
+                bool cont = m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, &jumpstate,
                              std::bind1st(std::mem_fun(&IntegerNode::template match_callback<TAction, TSourceColumn>), this));
+                if(!cont)
+                    return static_cast<size_t>(-1);
             }
 
             if (m_local_matches == m_local_limit)
@@ -746,7 +754,7 @@ public:
 
             // Do search directly on cached leaf array
             if (start + 1 == end) {
-                if (condition(m_array.Get(start - m_leaf_start), m_value))
+                if (condition(m_array.get(start - m_leaf_start), m_value))
                     return start;
                 else
                     return end;
@@ -776,7 +784,7 @@ public:
 protected:
 
     size_t m_last_local_match;
-    ColType* m_condition_column;                // Column on which search criteria is applied
+    const ColType* m_condition_column;                // Column on which search criteria is applied
     Array m_array;
     size_t m_leaf_start;
     size_t m_leaf_end;
@@ -804,7 +812,7 @@ public:
         m_condition_column_idx = column;
         m_child = 0;
         m_dT = 10.0;
-        m_leaf = NULL;
+        m_long = false; m_leaf = NULL;
 
         // FIXME: Store these in std::string instead.
         // FIXME: Why are these sizes 6 times the required size?
@@ -840,7 +848,7 @@ public:
         m_matches = 0;
         m_end_s = 0;
         m_table = &table;
-        m_condition_column = &table.GetColumnBase(m_condition_column_idx);
+        m_condition_column = &table.get_column_base(m_condition_column_idx);
         m_column_type = table.get_real_column_type(m_condition_column_idx);
 
         if (m_child)
@@ -869,7 +877,7 @@ public:
                     m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
                     m_end_s = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
                 }
-                
+
                 t = (m_long ? static_cast<ArrayStringLong*>(m_leaf)->get(s - m_leaf_start) : static_cast<ArrayString*>(m_leaf)->get(s - m_leaf_start));
             }
             if (cond(m_value, m_ucase, m_lcase, t))
@@ -891,7 +899,7 @@ protected:
 
     bool m_long;
     size_t m_end_s;
-    size_t m_first_s;
+//    size_t m_first_s;
     size_t m_leaf_start;
 };
 
@@ -923,7 +931,7 @@ public:
     {
         m_dD = 100.0;
         m_table = &table;
-        m_condition_column.m_column = (ColType*)(&table.GetColumnBase(m_condition_column_idx));
+        m_condition_column.m_column = static_cast<const ColType*>(&table.get_column_base(m_condition_column_idx));
         m_condition_column.m_leaf_end = 0;
 
         if (m_child)
@@ -973,7 +981,7 @@ public:
     {
         m_dD = 100.0;
         m_table = &table;
-        m_condition_column = (const ColumnBinary*)&table.GetColumnBase(m_condition_column_idx);
+        m_condition_column = static_cast<const ColumnBinary*>(&table.get_column_base(m_condition_column_idx));
         m_column_type = table.get_real_column_type(m_condition_column_idx);
 
         if (m_child)
@@ -1018,7 +1026,7 @@ public:
         char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
         std::copy(v.data(), v.data()+v.size(), data);
         m_value = StringData(data, v.size());
-        m_leaf = NULL;
+        m_long = false; m_leaf = NULL;
         m_index_getter = 0;
         m_index_matches = 0;
         m_index_matches_destroy = false;
@@ -1028,18 +1036,18 @@ public:
         deallocate();
         delete[] m_value.data();
         m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
-        m_index.Destroy();
+        m_index.destroy();
     }
 
-    void deallocate() 
+    void deallocate()
     {
-        // Must be called after each query execution too free temporary resources used by the execution. Run in 
+        // Must be called after each query execution too free temporary resources used by the execution. Run in
         // destructor, but also in Init because a user could define a query once and execute it multiple times.
         m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
         m_leaf = NULL;
 
         if (m_index_matches_destroy)
-            m_index_matches->Destroy();
+            m_index_matches->destroy();
 
         m_index_matches_destroy = false;
 
@@ -1056,22 +1064,22 @@ public:
         m_dD = 10.0;
         m_leaf_end = 0;
         m_table = &table;
-        m_condition_column = &table.GetColumnBase(m_condition_column_idx);
+        m_condition_column = &table.get_column_base(m_condition_column_idx);
         m_column_type = table.get_real_column_type(m_condition_column_idx);
 
         if (m_column_type == col_type_StringEnum) {
             m_dT = 1.0;
             m_key_ndx = ((const ColumnStringEnum*)m_condition_column)->GetKeyNdx(m_value);
         }
-        else if (m_condition_column->HasIndex()) {
+        else if (m_condition_column->has_index()) {
             m_dT = 0.0;
         }
         else {
             m_dT = 10.0;
         }
 
-        if (m_condition_column->HasIndex()) {
-            m_index.Clear();
+        if (m_condition_column->has_index()) {
+            m_index.clear();
 
             FindRes fr;
             size_t index_ref;
@@ -1090,28 +1098,28 @@ public:
                 m_index_matches_destroy = true;        // we own m_index_matches, so we must destroy it
             }
             else if (fr == FindRes_column) {
-                // todo: Apparently we can't use m_index.GetAllocator() because it uses default allocator which simply makes 
-                // Translate(x) = x. Shouldn't it inherit owner column's allocator?!
+                // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which simply makes
+                // translate(x) = x. Shouldn't it inherit owner column's allocator?!
                 if (m_column_type == col_type_StringEnum) {
-                    m_index_matches = new Column(index_ref, 0, 0, static_cast<const ColumnStringEnum*>(m_condition_column)->GetAllocator());
+                    m_index_matches = new Column(index_ref, 0, 0, static_cast<const ColumnStringEnum*>(m_condition_column)->get_alloc());
                 }
                 else {
-                    m_index_matches = new Column(index_ref, 0, 0, static_cast<const AdaptiveStringColumn*>(m_condition_column)->GetAllocator());
+                    m_index_matches = new Column(index_ref, 0, 0, static_cast<const AdaptiveStringColumn*>(m_condition_column)->get_alloc());
                 }
             }
             else if (fr == FindRes_not_found) {
-                m_index_matches = new Column();
+                m_index_matches = new Column;
                 m_index_matches_destroy = true;        // we own m_index_matches, so we must destroy it
             }
 
             last_indexed = 0;
 
             m_index_getter = new SequentialGetter<int64_t>(m_index_matches);
-            m_index_size = m_index_getter->m_column->Size();
+            m_index_size = m_index_getter->m_column->size();
 
         }
         else if (m_column_type != col_type_String) {
-            m_cse.m_column = (ColumnStringEnum*)m_condition_column;
+            m_cse.m_column = static_cast<const ColumnStringEnum*>(m_condition_column);
             m_cse.m_leaf_end = 0;
             m_cse.m_leaf_start = 0;
         }
@@ -1125,7 +1133,7 @@ public:
         TIGHTDB_ASSERT(m_table);
 
         for (size_t s = start; s < end; ++s) {
-            if (m_condition_column->HasIndex()) {
+            if (m_condition_column->has_index()) {
 
                 // Indexed string column
                 size_t f = not_found;
@@ -1138,7 +1146,7 @@ public:
                         last_indexed = m_index_getter->m_leaf_end;
                     }
                     else {
-                        s = m_index_getter->m_array_ptr->GetAsSizeT(f);
+                        s = to_size_t(m_index_getter->m_array_ptr->get(f));
                         if (s > end)
                             return end;
                         else {
@@ -1195,13 +1203,13 @@ private:
     size_t last_indexed;
 
     // Used for linear scan through enum-string
-    SequentialGetter<int64_t> m_cse;  
+    SequentialGetter<int64_t> m_cse;
 
     // Used for linear scan through short/long-string
-    ArrayParent *m_leaf;                
+    ArrayParent *m_leaf;
     bool m_long;
     size_t m_leaf_end;
-    size_t m_first_s;
+//    size_t m_first_s;
     size_t m_leaf_start;
 
     // Used for index lookup
@@ -1268,7 +1276,7 @@ public:
         return end;
     }
 
-    virtual std::string Verify(void)
+    virtual std::string Verify()
     {
         if (error_code != "")
             return error_code;
@@ -1322,10 +1330,10 @@ public:
         m_dD = 100.0;
         m_table = &table;
 
-        ColType* c = (ColType*)&table.GetColumnBase(m_condition_column_idx1);
+        const ColType* c = static_cast<const ColType*>(&table.get_column_base(m_condition_column_idx1));
         m_getter1.init(c);
 
-        c = (ColType*)&table.GetColumnBase(m_condition_column_idx2);
+        c = static_cast<const ColType*>(&table.get_column_base(m_condition_column_idx2));
         m_getter2.init(c);
 
         if (m_child)
@@ -1350,7 +1358,7 @@ public:
                     s = m_getter1.m_leaf_end;
                 else
                 return to_size_t(qs.m_state) + m_getter1.m_leaf_start;
-            } 
+            }
             else {
                 // This is for float and double.
                 TConditionValue v1 = m_getter1.get_next(s);

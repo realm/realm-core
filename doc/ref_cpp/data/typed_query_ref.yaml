@@ -481,7 +481,8 @@ CATEGORIES :
         DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : [int64_t, double, double]
-        DESCR  : The sum.
+        DESCR  : &g_typed_query_sum_return_descr
+                 The sum.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_sum
