@@ -85,7 +85,8 @@ public:
     /// thrown. Note that InvalidDatabase is among these derived
     /// exception types.
     void open(const std::string& file, bool no_create = false,
-              DurabilityLevel dlevel = durability_Full);
+              DurabilityLevel dlevel = durability_Full,
+              bool is_backend = false);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 

@@ -348,7 +348,7 @@ void SharedGroup::do_async_commits()
 #endif
             begin_read();
             size_t current_version = m_version;
-            size_t current_top_ref = m_group.get_top_array().GetRef();
+            size_t current_top_ref = m_group.get_top_array().get_ref();
 
             GroupWriter writer(m_group, true);
             writer.DoCommit(current_top_ref);
