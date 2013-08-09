@@ -187,11 +187,17 @@ retry:
             // In async mode we need a separate process to do the async commits
             // We start it up here during init so that it only get started once
             if (dlevel == durability_Async) {
+
                 if (fork() == 0) {
-                    unattached_tag tag;
-                    SharedGroup async_committer(tag);
-                    async_committer.open(file, true, durability_Async, true);
+                    m_file.close();
+                    execl("/usr/local/bin/tightdbd", 
+                          "/usr/local/bin/tightdbd", 
+                          file.c_str(), (char*) NULL);
+                    printf("ERROR: Failed to start tightdb async commit daemon\n");
+                    exit(1);
+                    // FIXME: undetectable if daemon dies/fails to start
                 }
+
             }
 
             // FIXME: This downgrading of the lock is not guaranteed to be atomic
@@ -331,7 +337,6 @@ void SharedGroup::do_async_commits()
     begin_read();
     size_t last_version = m_version;
     m_group.invalidate();
-
     while(true) {
         // If we can get an exclusive lock, we know that we are
         // the last process using the db so we can close down
@@ -341,6 +346,7 @@ void SharedGroup::do_async_commits()
         }
 
         if (has_changed()) {
+            printf("Syncing...%f\n", m_file);
             // Get a read lock on the (current) version that we want
             // to commit to disk.
 #ifdef TIGHTDB_DEBUG

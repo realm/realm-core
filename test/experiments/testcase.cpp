@@ -27,33 +27,49 @@ inline bool check_equal(const char* a, const char* b) { return strcmp(a, b) == 0
 
 
 namespace {
+TIGHTDB_TABLE_4(TestTableShared,
+                first,  Int,
+                second, Int,
+                third,  Bool,
+                fourth, String)
+
+
 } // anonymous namespace
 
 
 int main()
 {
-    Table table;
+    // Clean up old state
+    File::try_remove("asynctest.tightdb");
+    File::try_remove("asynctest.tightdb.lock");
 
-    table.add_column(type_Table,  "third");
-
-    vector<size_t> column_path;
-    column_path.push_back(0);
-    table.add_subcolumn(column_path, type_Int,    "sub_first");
-
-    table.insert_subtable(0, 0);
-    table.insert_done();
-
+    // Do some changes in a async db
     {
-        TableRef subtable = table.get_subtable(0, 0);
-        subtable->insert_int(0, 0, 42);
-        subtable->insert_done();
+        SharedGroup db("asynctest.tightdb", false, SharedGroup::durability_Async);
+
+        for (size_t n = 0; n < 100; ++n) {
+            //printf("t %d\n", (int)n);
+            WriteTransaction wt(db);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            t1->add(1, n, false, "test");
+            wt.commit();
+        }
     }
 
-    column_path.clear();
-    column_path.push_back(0);
-    table.add_subcolumn(column_path, type_Int, "sub_third");
+    // Wait for async_commit process to shutdown
+    while (File::exists("asynctest.tightdb.lock")) {
+        sleep(1);
+    }
 
-    table.Verify();
+    // Read the db again in normal mode to verify
+    {
+        SharedGroup db("asynctest.tightdb");
 
-    TableRef subtable = table.get_subtable(0, 0);
+        for (size_t n = 0; n < 100; ++n) {
+            ReadTransaction rt(db);
+            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+            CHECK(t1->size() == 100);
+        }
+    }
+
 }
