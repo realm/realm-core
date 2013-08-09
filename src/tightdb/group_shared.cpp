@@ -1,4 +1,5 @@
 #include <pthread.h>
+#include <fcntl.h>
 
 #include <tightdb/terminate.hpp>
 #include <tightdb/safe_int_ops.hpp>
@@ -189,7 +190,11 @@ retry:
             if (dlevel == durability_Async) {
 
                 if (fork() == 0) {
-                    m_file.close();
+                    /* close all descriptors: */
+                    int i,k;
+                    for (i=getdtablesize();i>=0;--i) close(i); 
+                    i=::open("/dev/null",O_RDWR); 
+                    dup(i); dup(i);
                     execl("/usr/local/bin/tightdbd", 
                           "/usr/local/bin/tightdbd", 
                           file.c_str(), (char*) NULL);
@@ -346,7 +351,6 @@ void SharedGroup::do_async_commits()
         }
 
         if (has_changed()) {
-            printf("Syncing...%f\n", m_file);
             // Get a read lock on the (current) version that we want
             // to commit to disk.
 #ifdef TIGHTDB_DEBUG
