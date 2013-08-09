@@ -2254,10 +2254,25 @@ TEST(Table_LanguageBindings)
 
 TEST(Table_MultipleColumn)
 {
-
     Table table;
     table.add_column(type_Int, "first");
     table.add_column(type_Int, "first");
     CHECK_EQUAL(table.get_column_count(), 2);
     CHECK_EQUAL(table.get_column_index("first"), 0);
+}
+
+
+TEST(Table_FormerLeakCase)
+{
+    Table sub;
+    sub.add_column(type_Int, "a");
+
+    Table root;
+    Spec& s = root.get_spec();
+    Spec subs = s.add_subtable_column("b");
+    subs.add_column(type_Int, "a");
+    root.update_from_spec();
+    root.add_empty_row(1);
+    root.set_subtable(0, 0, &sub);
+    root.set_subtable(0, 0, 0);
 }
