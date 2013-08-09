@@ -174,6 +174,9 @@ public:
 
     bool IsIntColumn() const TIGHTDB_NOEXCEPT { return true; }
 
+    // FIXME: Careful with this one, it assumes that the column
+    // consists of a single leaf. It should probably not be a public
+    // function.
     void SetHasRefs();
 
     std::size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -198,7 +201,11 @@ public:
 
     void sort(std::size_t start, std::size_t end);
     void ReferenceSort(std::size_t start, std::size_t end, Column& ref);
+
+    // FIXME: Be careful, clear() currently forgets if the leaf type
+    // is Array::type_HasRefs.
     void clear() TIGHTDB_OVERRIDE;
+
     void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
 

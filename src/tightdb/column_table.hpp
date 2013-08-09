@@ -33,15 +33,6 @@ public:
 
     void invalidate_subtables();
 
-    void clear() TIGHTDB_OVERRIDE
-    {
-        m_array->clear();
-        if (!m_array->is_leaf()) m_array->set_type(Array::type_HasRefs);
-        invalidate_subtables();
-    }
-
-    void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
-
 protected:
     /// A pointer to the table that this column is part of. For a
     /// free-standing column, this pointer is null.
@@ -83,17 +74,11 @@ protected:
 
     /// This method must be used only for subtables with shared spec,
     /// i.e. for elements of a ColumnTable.
-    TableRef get_subtable(std::size_t subtable_ndx, ref_type spec_ref) const
-    {
-        return TableRef(get_subtable_ptr(subtable_ndx, spec_ref));
-    }
+    TableRef get_subtable(std::size_t subtable_ndx, ref_type spec_ref) const;
 
     /// This method must be used only for subtables with independent
     /// specs, i.e. for elements of a ColumnMixed.
-    TableRef get_subtable(std::size_t subtable_ndx) const
-    {
-        return TableRef(get_subtable_ptr(subtable_ndx));
-    }
+    TableRef get_subtable(std::size_t subtable_ndx) const;
 
     void update_child_ref(std::size_t subtable_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
     ref_type get_child_ref(std::size_t subtable_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -113,16 +98,8 @@ protected:
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     std::size_t* record_subtable_path(std::size_t* begin,
-                                      std::size_t* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
-    {
-        if (end == begin)
-            return 0; // Error, not enough space in buffer
-        *begin++ = m_index;
-        if (end == begin)
-            return 0; // Error, not enough space in buffer
-        return m_table->record_subtable_path(begin, end);
-    }
-#endif // TIGHTDB_ENABLE_REPLICATION
+                                      std::size_t* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+#endif
 
 private:
     struct SubtableMap {
@@ -194,6 +171,10 @@ public:
     void clear_table(std::size_t ndx);
     void fill(std::size_t count);
 
+    void clear() TIGHTDB_OVERRIDE;
+
+    void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
+
     /// Compare two subtable columns for equality.
     bool compare_table(const ColumnTable&) const;
 
@@ -205,9 +186,10 @@ public:
     void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
 #endif
 
-protected:
-    // Member variables
+private:
     const ref_type m_spec_ref;
+
+    void destroy_subtable(std::size_t ndx);
 
 #ifdef TIGHTDB_DEBUG
     void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
@@ -259,6 +241,17 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx,
         if (was_empty && m_table) m_table->bind_ref();
     }
     return subtable;
+}
+
+inline TableRef ColumnSubtableParent::get_subtable(std::size_t subtable_ndx,
+                                                   ref_type spec_ref) const
+{
+    return TableRef(get_subtable_ptr(subtable_ndx, spec_ref));
+}
+
+inline TableRef ColumnSubtableParent::get_subtable(std::size_t subtable_ndx) const
+{
+    return TableRef(get_subtable_ptr(subtable_ndx));
 }
 
 inline ColumnSubtableParent::SubtableMap::~SubtableMap()
@@ -371,6 +364,19 @@ inline ref_type ColumnSubtableParent::create(std::size_t size, Allocator& alloc)
     c.fill(size);
     return c.get_ref();
 }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+std::size_t* ColumnSubtableParent::record_subtable_path(std::size_t* begin,
+                                                        std::size_t* end) TIGHTDB_NOEXCEPT
+{
+    if (end == begin)
+        return 0; // Error, not enough space in buffer
+    *begin++ = m_index;
+    if (end == begin)
+        return 0; // Error, not enough space in buffer
+    return m_table->record_subtable_path(begin, end);
+}
+#endif // TIGHTDB_ENABLE_REPLICATION
 
 
 inline ColumnTable::ColumnTable(Allocator& alloc, const Table* table, std::size_t column_ndx,

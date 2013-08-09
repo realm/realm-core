@@ -12,27 +12,6 @@ void ColumnSubtableParent::child_destroyed(size_t subtable_ndx)
     if (m_table && m_subtable_map.empty()) m_table->unbind_ref();
 }
 
-void ColumnSubtableParent::move_last_over(size_t ndx) {
-    TIGHTDB_ASSERT(ndx+1 < size());
-
-    // Delete sub-tree
-    ref_type ref_columns = get_as_ref(ndx);
-    if (ref_columns != 0) {
-        Allocator& alloc = get_alloc();
-        Array columns(ref_columns, 0, 0, alloc);
-        columns.destroy();
-    }
-
-    size_t ndx_last = size()-1;
-    int64_t v = get(ndx_last);
-
-    set(ndx, v);
-
-    // We do a Column::erase() to avoid
-    // recursive delete of the copied table(s)
-    Column::erase(ndx_last);
-}
-
 size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     // FIXME: If the table object is cached, it is possible to get the
@@ -49,19 +28,18 @@ size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
 
 void ColumnTable::add()
 {
-    invalidate_subtables();
     add(0); // Null-pointer indicates empty table
 }
 
 void ColumnTable::insert(size_t ndx)
 {
-    invalidate_subtables();
     insert(ndx, 0); // Null-pointer indicates empty table
 }
 
 void ColumnTable::insert(size_t ndx, const Table* subtable)
 {
     TIGHTDB_ASSERT(ndx <= size());
+    invalidate_subtables(); // FIXME: Rename to detach_subtable_accessors().
 
     ref_type columns_ref = 0;
     if (subtable)
@@ -73,6 +51,8 @@ void ColumnTable::insert(size_t ndx, const Table* subtable)
 void ColumnTable::set(size_t ndx, const Table* subtable)
 {
     TIGHTDB_ASSERT(ndx < size());
+    invalidate_subtables(); // FIXME: Rename to detach_subtable_accessors().
+    destroy_subtable(ndx);
 
     ref_type columns_ref = 0;
     if (subtable)
@@ -81,14 +61,14 @@ void ColumnTable::set(size_t ndx, const Table* subtable)
     Column::set(ndx, columns_ref);
 }
 
-void ColumnTable::fill(size_t count)
+void ColumnTable::fill(size_t n)
 {
     TIGHTDB_ASSERT(is_empty());
 
     // Fill column with default values
     // TODO: this is a very naive approach
     // we could speedup by creating full nodes directly
-    for (size_t i = 0; i < count; ++i) {
+    for (size_t i = 0; i < n; ++i) {
         add(0); // zero-ref indicates empty table
     }
 }
@@ -96,35 +76,41 @@ void ColumnTable::fill(size_t count)
 void ColumnTable::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < size());
-
-    ref_type ref_columns = get_as_ref(ndx);
-
-    // Delete sub-tree
-    if (ref_columns != 0) {
-        Allocator& alloc = get_alloc();
-        Array columns(ref_columns, 0, 0, alloc);
-        columns.destroy();
-    }
-
+    invalidate_subtables(); // FIXME: Rename to detach_subtable_accessors().
+    destroy_subtable(ndx);
     Column::erase(ndx);
-
-    invalidate_subtables();
 }
 
-void ColumnTable::clear_table(size_t ndx)
+void ColumnTable::clear()
 {
-    TIGHTDB_ASSERT(ndx < size());
+    invalidate_subtables();
+    Column::clear();
+    // FIXME: This one is needed because Column::clear() forgets about
+    // the leaf type. A better solution should probably be found.
+    m_array->set_type(Array::type_HasRefs);
+}
 
+void ColumnTable::move_last_over(size_t ndx)
+{
+    TIGHTDB_ASSERT(ndx+1 < size());
+    invalidate_subtables(); // FIXME: Rename to detach_subtable_accessors().
+    destroy_subtable(ndx);
+
+    size_t ndx_last = size()-1;
+    int64_t v = get(ndx_last);
+    Column::set(ndx, v);
+    Column::erase(ndx_last);
+}
+
+void ColumnTable::destroy_subtable(size_t ndx)
+{
     ref_type ref_columns = get_as_ref(ndx);
-    if (ref_columns == 0) return; // already empty
+    if (ref_columns == 0) return; // It was never created
 
     // Delete sub-tree
     Allocator& alloc = get_alloc();
     Array columns(ref_columns, 0, 0, alloc);
     columns.destroy();
-
-    // Mark as empty table
-    set(ndx, 0);
 }
 
 bool ColumnTable::compare_table(const ColumnTable& c) const
@@ -162,7 +148,8 @@ void ColumnTable::leaf_to_dot(ostream& out, const Array& array) const
 
     size_t n = array.size();
     for (size_t i = 0; i < n; ++i) {
-        if (array.get_as_ref(i) == 0) continue;
+        if (array.get_as_ref(i) == 0)
+            continue;
         ConstTableRef subtable = get_subtable(i, m_spec_ref);
         subtable->to_dot(out);
     }

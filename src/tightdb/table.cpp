@@ -917,7 +917,6 @@ void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
     TIGHTDB_ASSERT(row_ndx <= m_size);
 
     ColumnTable& subtables = get_column_table(col_ndx);
-    subtables.invalidate_subtables();
     subtables.insert(row_ndx, table);
 
     // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
@@ -934,7 +933,6 @@ void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
     TIGHTDB_ASSERT(row_ndx < m_size);
 
     ColumnTable& subtables = get_column_table(col_ndx);
-    subtables.invalidate_subtables();
     subtables.set(row_ndx, table);
 
     // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
@@ -951,7 +949,6 @@ void Table::insert_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t
     TIGHTDB_ASSERT(row_ndx <= m_size);
 
     ColumnMixed& mixed_col = get_column_mixed(col_ndx);
-    mixed_col.invalidate_subtables();
     mixed_col.insert_subtable(row_ndx, t);
 
     // FIXME: Replication is not yet able to handle copuing insertion of non-empty tables.
@@ -968,7 +965,6 @@ void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
     TIGHTDB_ASSERT(row_ndx < m_size);
 
     ColumnMixed& mixed_col = get_column_mixed(col_ndx);
-    mixed_col.invalidate_subtables();
     mixed_col.set_subtable(row_ndx, t);
 
     // FIXME: Replication is not yet able to handle copying assignment of non-empty tables.
@@ -1040,8 +1036,7 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
     ColumnType type = get_real_column_type(col_idx);
     if (type == col_type_Table) {
         ColumnTable& subtables = get_column_table(col_idx);
-        subtables.invalidate_subtables();
-        subtables.clear_table(row_idx);
+        subtables.set(row_idx, 0);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
         transact_log().set_value(col_idx, row_idx, Replication::subtable_tag()); // Throws
@@ -1049,7 +1044,6 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
     }
     else if (type == col_type_Mixed) {
         ColumnMixed& subtables = get_column_mixed(col_idx);
-        subtables.invalidate_subtables();
         subtables.set_subtable(row_idx, 0);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1374,8 +1368,6 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
     ColumnMixed& column = get_column_mixed(column_ndx);
     DataType type = value.get_type();
 
-    column.invalidate_subtables();
-
     switch (type) {
         case type_Int:
             column.set_int(ndx, value.get_int());
@@ -1418,8 +1410,6 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value)
 
     ColumnMixed& column = get_column_mixed(column_ndx);
     DataType type = value.get_type();
-
-    column.invalidate_subtables();
 
     switch (type) {
         case type_Int:
