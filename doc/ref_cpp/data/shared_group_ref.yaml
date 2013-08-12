@@ -29,7 +29,7 @@ DESCR      : &g_shared_group_descr
              Processes that share a database file must reside on
              the same host.
 
-             Moreover, the class also provide a transactional
+             Moreover, the class also provides a transactional
              interface to TightDB. Transactions are divided into
              read and write transactions. While read transactions
              do not modify the table and thereby the group, write
@@ -57,8 +57,8 @@ CATEGORIES:
 
                  If your data is transient, and does not need to persist to disk (like for caching or
                  shared state between processes). You can open the shared group in mem-only mode. Then the
-                 file will just be used for identification and backing and will be removed again when there
-                 are no more processes using it.
+                 file will just be used for identification and keeping temporary metadata; it will be
+                 removed again when there are no more processes using it.
 
                  Note that a shared group can only be opened in the mode it was created in.
 
@@ -66,7 +66,7 @@ CATEGORIES:
                  state (2). See open() and is_attached() for more on
                  this.
       SIGNATURE: >
-                 SharedGroup(const std::string& file, bool no_create = false, DurabilityLevel dlevel);
+                 SharedGroup(const std::string& file, bool no_create = false, DurabilityLevel dlevel = durability_Full);
                  SharedGroup(unattached_tag);
       PARAMS:
       - NAME   : file
@@ -103,6 +103,8 @@ CATEGORIES:
       NAMES    : open
       SUMMARY  : &g_shared_group_open_summary
                  Is this SharedGroup instance in its attached state?
+      SIGNATURE: >
+                 open(const std::string& file, bool no_create = false, DurabilityLevel dlevel = durability_Full);
       DESCR    : &g_shared_group_open_descr
                  Attach this SharedGroup instance to the specified
                  database file.
@@ -265,7 +267,7 @@ CATEGORIES:
                  Initiate reading from a shared group.
       DESCR    : &g_shared_group_begin_read_descr
                  >
-                 Begin reading from a shared group. During the read transaction, 
+                 Begin reading from a shared group. During the read transaction,
                  you have a fully consistent immutable view of the group.
       CONST    : True
       RETURN:
@@ -283,4 +285,3 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_end_read
         DESCR  :
-

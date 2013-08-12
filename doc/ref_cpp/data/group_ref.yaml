@@ -61,7 +61,7 @@ CATEGORIES:
       - NAME   : file
         TYPES  : const std::string&
         DESCR  : &g_group_constructor_memory_parm1_descr
-                 Filesystem path of the TightDB database file to be opened.
+                 File system path of the TightDB database file to be opened.
       - NAME   : mode
         TYPES  : Group::OpenMode
         DESCR  : |

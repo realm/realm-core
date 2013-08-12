@@ -187,19 +187,19 @@ CATEGORIES :
                  >
                  This method appends a column of the specified type and name to the table.
                  If it's used in a table which already has rows, the new column will just get
-                 default values (0, "", null) in those rows.
+                 default values in those rows.
 
                  Currently, the following types are supported:
                  <ul>
-                   <li><code>type_Bool</code></li>
-                   <li><code>type_Int</code></li>
-                   <li><code>type_Float</code></li>
-                   <li><code>type_Double</code></li>
-                   <li><code>type_String</code></li>
-                   <li><code>type_Binary</code></li>
-                   <li><code>type_Date</code></li>
-                   <li><code>type_Table</code></li>
-                   <li><code>type_Mixed</code></li>
+                   <li><code>type_Bool</code> (default false)</li>
+                   <li><code>type_Int</code> (default 0)</li>
+                   <li><code>type_Float</code> (default 0.0)</li>
+                   <li><code>type_Double</code> (default 0.0)</li>
+                   <li><code>type_String</code> (default "")</li>
+                   <li><code>type_Binary</code> (default ("")</li>
+                   <li><code>type_Date</code> (default 0 - 1970-01-01 00:00:00)</li>
+                   <li><code>type_Table</code> (default NULL)</li>
+                   <li><code>type_Mixed</code> (default NULL)</li>
                  </ul>
       PARAMS:
       - NAME   : type
@@ -289,7 +289,7 @@ CATEGORIES :
       - NAME   : column_ndx
         TYPES  : size_t
         DESCR  : &g_dyn_table_get_column_name_param1_descr
-                 The column index (starting from 0).
+                 The column index (starting from 0), and it is not checked if the column index is out of range.
       RETURN:
         TYPES  : StringData
         DESCR  : &g_dyn_table_get_column_name_return_descr
@@ -391,7 +391,8 @@ CATEGORIES :
                  Insert empty rows.
       DESCR    : &g_dyn_table_insert_empty_row_descr
                  This method inserts one or more empty rows with default values at a given position.
-                 The default cell values are 0, null, or "", as appropriate to the column types.
+                 The old rows will be shifted downwards i.e., the row numbers will be incremented.
+                 The default cell values are 0, 0.0, null, or "", as appropriate to the column types.
       SIGNATURE: |
                  void insert_empty_row(size_t row_ndx, size_t num_rows = 1)
       PARAMS:
@@ -656,15 +657,11 @@ CATEGORIES :
       DESCR    : &g_dyn_table_set_index_descr
                  This method adds an index to a column, and queries will be faster. But the table
                  will require more memory and inserts will be slower.
-                 Currently only String columns can be indexed.
+                 Currently only String columns can be indexed. Note, index cannot be removed.
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
         DESCR  : *g_dyn_table_get_xxx_parm1_descr
-# TODO: Describe purpose???
-      - NAME   : update_spec
-        TYPES  : bool
-        DESCR  : "If <code>true</code>, the table spec will be updated. Default: <code>true</code>."
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_set_index
         DESCR  :
@@ -1020,8 +1017,13 @@ CATEGORIES :
       NAMES    : [sum, sum_float, sum_double]
       SUMMARY  : &g_dyn_table_sum_summary
                  Calculates the sum.
-      DESCR    : &g_dyn_table_sum_descr
+      DESCR    :
+      - TEXT   : &g_dyn_table_sum_descr
                  This method calculates the sum of all values in the specified column.
+      - TEXT   : >
+                 As the sum of many <code>float</code>
+                 values can be greater than the maximum value of the type, a <code>double</code>
+                 is returned.
       SIGNATURE: |
                  int64_t sum(size_t column_ndx) const;
                  double  sum_float(size_t column_ndx) const;
@@ -1033,7 +1035,7 @@ CATEGORIES :
         DESCR  : &g_dyn_table_sum_parm1_descr
                  The column index (starting from 0) to summarize.
       RETURN:
-        TYPES  : [int64_t, double]
+        TYPES  : [int64_t, double, double]
         DESCR  : &g_dyn_table_sum_return_descr
                  The sum.
       EXAMPLES:
@@ -1130,6 +1132,9 @@ CATEGORIES :
 
                  The JavaScript Object Notation (<a href="http://json.org">JSON</a>)
                  is useful for web/mobile applications and serialization.
+
+                 A table (and subtables) will be formatted as a array of rows, and row will
+                 be formatted as an object.
       CONST    : true
       PARAMS:
       - NAME   : out
