@@ -835,7 +835,8 @@ CATEGORIES :
                    lower_bound_string, upper_bound_string ]
       SUMMARY  : Find the lower/upper bound in a sorted column.
 
-      DESCR    : Find the lower/upper bound of the specified value
+      DESCR:
+      - TEXT   : Find the lower/upper bound of the specified value
                  according to the specified column. The column must
                  already be sorted in ascending order.
 
@@ -847,6 +848,8 @@ CATEGORIES :
                  both cases, if no such row is found, the returned
                  value is the number of rows in the table.
 
+      - TEXT   : |
+                 <pre>
                      3 3 3 4 4 4 5 6 7 9 9 9
                      ^     ^     ^     ^     ^
                      |     |     |     |     |
@@ -859,8 +862,9 @@ CATEGORIES :
                      |      -- Lower bound of 4
                      |
                       -- Lower and upper bound of 1
+                 </pre>
 
-                 The string version assumes the order that is imposed
+      - TEXT   : The string version assumes the order that is imposed
                  by StringData::operator<(). It uses simple byte-wise
                  lexicographical comparison. No Unicode or locale
                  dependent collation is taken into account.
