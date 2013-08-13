@@ -202,8 +202,9 @@ retry:
                     /* close all descriptors: */
                     int i;
                     for (i=m;i>=0;--i) close(i); 
-                    i=::open("/dev/null",O_RDWR); 
-                    dup(i); dup(i);
+                    i=::open("/dev/null",O_RDWR);
+                    int k = dup(i); static_cast<void>(k);
+                    k = dup(i); static_cast<void>(k);
                     // detach from current session:
                     setsid();
                     // start commit daemon executable
