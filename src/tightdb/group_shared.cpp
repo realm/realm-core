@@ -1,5 +1,6 @@
 #include <pthread.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include <tightdb/terminate.hpp>
 #include <tightdb/safe_int_ops.hpp>
@@ -188,19 +189,34 @@ retry:
             // In async mode we need a separate process to do the async commits
             // We start it up here during init so that it only get started once
             if (dlevel == durability_Async) {
-
+                errno = 0; 
+                int m = sysconf(_SC_OPEN_MAX); 
+                if (m < 0) { 
+                    if (errno) { 
+                        // int err = errno; // TODO: include err in exception string 
+                        throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed "); 
+                    } 
+                    throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed with no reason"); 
+                }
                 if (fork() == 0) {
                     /* close all descriptors: */
-                    int i,k;
-                    for (i=getdtablesize();i>=0;--i) close(i); 
+                    int i;
+                    for (i=m;i>=0;--i) close(i); 
                     i=::open("/dev/null",O_RDWR); 
                     dup(i); dup(i);
-                    execl("/usr/local/bin/tightdbd", 
-                          "/usr/local/bin/tightdbd", 
+                    // detach from current session:
+                    setsid();
+                    // start commit daemon executable
+                    const char* exe = getenv("TIGTHDBD_PATH");
+                    if (exe == NULL)
+                        exe = "/usr/local/bin/tightdbd";
+                    execl(exe, exe,
                           file.c_str(), (char*) NULL);
-                    printf("ERROR: Failed to start tightdb async commit daemon\n");
-                    exit(1);
-                    // FIXME: undetectable if daemon dies/fails to start
+                    throw runtime_error("Failed to start async commit");
+                    // NOTE: we do not use the double for parent when spawnign
+                    // the daemon. The double fork pattern is used to guarantee that
+                    // the forked process cannot re-acquire terminal. We do not
+                    // need that guarantee.
                 }
 
             }
@@ -486,7 +502,7 @@ Group& SharedGroup::begin_write()
 
     // Get write lock
     // Note that this will not get released until we call
-    // end_write().
+    // commit() or rollback()
     pthread_mutex_lock(&info->writemutex);
 
     // Get the current top ref
