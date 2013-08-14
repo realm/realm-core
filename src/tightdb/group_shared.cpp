@@ -167,6 +167,7 @@ retry:
             // There is a slight window between opening the file and getting the
             // lock where another process could have deleted the file
             if (m_file.is_removed()) {
+                m_file.close();
                 goto retry;
             }
             // Get size
