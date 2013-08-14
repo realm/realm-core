@@ -49,7 +49,7 @@ class StringIndex;
 /// that BasicTable<> is non-polymorphic, has no destructor, and adds
 /// no extra data members.
 ///
-/// FIXME: Table copying (from any group to any group) could be made
+/// FIXME: Table assignment (from any group to any group) could be made
 /// aliasing safe as follows: Start by cloning source table into
 /// target allocator. On success, assign, and then deallocate any
 /// previous structure at the target.
@@ -60,7 +60,7 @@ class StringIndex;
 /// efficient manner.
 ///
 /// FIXME: When compiling in debug mode, all public table methods
-/// should should TIGHTDB_ASSERT(is_valid()).
+/// should TIGHTDB_ASSERT(is_valid()).
 class Table {
 public:
     /// Construct a new freestanding top-level table with static
@@ -131,7 +131,6 @@ public:
 
 
     //@{
-
     /// Schema handling.
     ///
     /// Only the const qualified get_spec() and has_index() may be
@@ -268,8 +267,6 @@ public:
     std::size_t    find_first_string(std::size_t column_ndx, StringData value) const;
     std::size_t    find_first_binary(std::size_t column_ndx, BinaryData value) const;
 
-    bool           find_sorted_int(std::size_t column_ndx, int64_t value, std::size_t& pos) const;
-
     TableView      find_all_int(std::size_t column_ndx, int64_t value);
     ConstTableView find_all_int(std::size_t column_ndx, int64_t value) const;
     TableView      find_all_bool(std::size_t column_ndx, bool value);
@@ -290,6 +287,47 @@ public:
 
     TableView      get_sorted_view(std::size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;
+
+    //@{
+    /// Find the lower/upper bound according to a column that is
+    /// already sorted in ascending order.
+    ///
+    /// For an integer column at index 0, and an integer value '`v`',
+    /// lower_bound_int(0,v) returns the index '`l`' of the first row
+    /// such that `get_int(0,l) &ge; v`, and upper_bound_int(0,v)
+    /// returns the index '`u`' of the first row such that
+    /// `get_int(0,u) &gt; v`. In both cases, if no such row is found,
+    /// the returned value is the number of rows in the table.
+    ///
+    ///     3 3 3 4 4 4 5 6 7 9 9 9
+    ///     ^     ^     ^     ^     ^
+    ///     |     |     |     |     |
+    ///     |     |     |     |      -- Lower and upper bound of 15
+    ///     |     |     |     |
+    ///     |     |     |      -- Lower and upper bound of 8
+    ///     |     |     |
+    ///     |     |      -- Upper bound of 4
+    ///     |     |
+    ///     |      -- Lower bound of 4
+    ///     |
+    ///      -- Lower and upper bound of 1
+    ///
+    /// These functions are similar to std::lower_bound() and
+    /// std::upper_bound().
+    ///
+    /// The string versions assume that the column is sorted according
+    /// to StringData::operator<().
+    std::size_t lower_bound_int(std::size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_int(std::size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound_bool(std::size_t column_ndx, bool value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_bool(std::size_t column_ndx, bool value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound_float(std::size_t column_ndx, float value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_float(std::size_t column_ndx, float value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound_double(std::size_t column_ndx, double value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_double(std::size_t column_ndx, double value) const TIGHTDB_NOEXCEPT;
+    std::size_t lower_bound_string(std::size_t column_ndx, StringData value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_string(std::size_t column_ndx, StringData value) const TIGHTDB_NOEXCEPT;
+    //@}
 
     // Queries
     Query       where() { return Query(*this); }
@@ -326,35 +364,46 @@ public:
     MemStats stats() const;
 #endif
 
-    const ColumnBase& GetColumnBase(std::size_t column_ndx) const TIGHTDB_NOEXCEPT; // FIXME: Move this to private section next to the non-const version
-    ColumnType get_real_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT; // FIXME: Used by various node types in <tightdb/query_engine.hpp>
-
     class Parent;
 
 protected:
-    std::size_t find_pos_int(std::size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT;
+    /// Get the subtable at the specified column and row index.
+    ///
+    /// The returned table pointer must always end up being wrapped in
+    /// a TableRef.
+    Table* get_subtable_ptr(std::size_t col_idx, std::size_t row_idx);
 
-    // FIXME: Most of the things that are protected here, could instead be private
-    // Direct Column access
-    template <class T, ColumnType col_type> T& GetColumn(std::size_t ndx);
-    template <class T, ColumnType col_type> const T& GetColumn(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    Column& GetColumn(std::size_t column_ndx);
-    const Column& GetColumn(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    ColumnFloat& GetColumnFloat(std::size_t column_ndx);
-    const ColumnFloat& GetColumnFloat(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    ColumnDouble& GetColumnDouble(std::size_t column_ndx);
-    const ColumnDouble& GetColumnDouble(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    AdaptiveStringColumn& GetColumnString(std::size_t column_ndx);
-    const AdaptiveStringColumn& GetColumnString(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    /// Get the subtable at the specified column and row index.
+    ///
+    /// The returned table pointer must always end up being wrapped in
+    /// a ConstTableRef.
+    const Table* get_subtable_ptr(std::size_t col_idx, std::size_t row_idx) const;
 
-    ColumnBinary& GetColumnBinary(std::size_t column_ndx);
-    const ColumnBinary& GetColumnBinary(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    ColumnStringEnum& GetColumnStringEnum(std::size_t column_ndx);
-    const ColumnStringEnum& GetColumnStringEnum(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    ColumnTable& GetColumnTable(std::size_t column_ndx);
-    const ColumnTable& GetColumnTable(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
-    ColumnMixed& GetColumnMixed(std::size_t column_ndx);
-    const ColumnMixed& GetColumnMixed(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    /// Compare the rows of two tables under the assumption that the
+    /// two tables have the same spec, and therefore the same sequence
+    /// of columns.
+    bool compare_rows(const Table&) const;
+
+    void insert_into(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
+
+    void set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
+
+private:
+    // Number of rows in this table
+    std::size_t m_size;
+
+    // On-disk format
+    Array m_top;
+    Array m_columns;
+    Spec m_spec_set;
+
+    // Column accessor instances
+    Array m_cols;
+
+    mutable std::size_t m_ref_count;
+    mutable const StringIndex* m_lookup_index;
+
+    Table& operator=(const Table&); // Disable copying assignment
 
     /// Used when the lifetime of a table is managed by reference
     /// counting. The lifetime of free-standing tables allocated on
@@ -379,13 +428,14 @@ protected:
     void init_from_ref(ref_type top_ref, ArrayParent*, std::size_t ndx_in_parent);
     void init_from_ref(ref_type spec_ref, ref_type columns_ref,
                        ArrayParent*, std::size_t ndx_in_parent);
-    void CreateColumns();
-    void CacheColumns();
-    void ClearCachedColumns();
+
+    void create_columns();
+    void cache_columns();
+    void clear_cached_columns();
 
     // Specification
-    void UpdateColumnRefs(std::size_t column_ndx, int diff);
-    void UpdateFromParent();
+    void adjust_column_ndx_in_parent(std::size_t column_ndx_begin, int diff) TIGHTDB_NOEXCEPT;
+    void update_from_parent() TIGHTDB_NOEXCEPT;
     std::size_t do_add_column(DataType);
     void do_add_subcolumn(const std::vector<std::size_t>& column_path, std::size_t pos, DataType);
     static void do_remove_column(Array& column_refs, const Spec::ColumnInfo&);
@@ -399,39 +449,6 @@ protected:
     void to_string_header(std::ostream& out, std::vector<std::size_t>& widths) const;
     void to_string_row(std::size_t row_ndx, std::ostream& out, const std::vector<std::size_t>& widths) const;
 
-
-#ifdef TIGHTDB_DEBUG
-    void to_dot_internal(std::ostream&) const;
-#endif
-
-    // Member variables
-    std::size_t m_size;
-
-    // On-disk format
-    Array m_top;
-    Array m_columns;
-    Spec m_spec_set;
-
-    // Cached columns
-    Array m_cols;
-
-    /// Get the subtable at the specified column and row index.
-    ///
-    /// The returned table pointer must always end up being wrapped in
-    /// a TableRef.
-    Table* get_subtable_ptr(std::size_t col_idx, std::size_t row_idx);
-
-    /// Get the subtable at the specified column and row index.
-    ///
-    /// The returned table pointer must always end up being wrapped in
-    /// a ConstTableRef.
-    const Table* get_subtable_ptr(std::size_t col_idx, std::size_t row_idx) const;
-
-    /// Compare the rows of two tables under the assumption that the
-    /// two tables have the same spec, and therefore the same sequence
-    /// of columns.
-    bool compare_rows(const Table&) const;
-
     /// Assumes that the specified column is a subtable column (in
     /// particular, not a mixed column) and that the specified table
     /// has a spec that is compatible with that column, that is, the
@@ -440,17 +457,9 @@ protected:
     /// get_column_type()).
     void insert_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
 
-
     void insert_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
 
     void set_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
-
-    void insert_into(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
-
-    void set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
-
-private:
-    Table& operator=(const Table&); // Disable copying assignment
 
     /// Put this table wrapper into the invalid state, which detaches
     /// it from the underlying structure of arrays. Also do this
@@ -468,23 +477,42 @@ private:
     /// started.
     void invalidate();
 
-    /// Invalidate all subtables.
+    /// Detach all cached subtable accessors.
     void invalidate_subtables();
-
-    mutable std::size_t m_ref_count;
-    mutable const StringIndex* m_lookup_index;
 
     void bind_ref() const TIGHTDB_NOEXCEPT { ++m_ref_count; }
     void unbind_ref() const { if (--m_ref_count == 0) delete this; } // FIXME: Cannot be noexcept since ~Table() may throw
 
     struct UnbindGuard;
 
+    ColumnType get_real_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+
     const Array* get_column_root(std::size_t col_ndx) const TIGHTDB_NOEXCEPT;
     std::pair<const Array*, const Array*> get_string_column_roots(std::size_t col_ndx) const
         TIGHTDB_NOEXCEPT;
 
-    ColumnBase& GetColumnBase(std::size_t column_ndx);
-    void InstantiateBeforeChange();
+    const ColumnBase& get_column_base(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnBase& get_column_base(std::size_t column_ndx);
+    template <class T, ColumnType col_type> T& get_column(std::size_t ndx);
+    template <class T, ColumnType col_type> const T& get_column(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    Column& get_column(std::size_t column_ndx);
+    const Column& get_column(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnFloat& get_column_float(std::size_t column_ndx);
+    const ColumnFloat& get_column_float(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnDouble& get_column_double(std::size_t column_ndx);
+    const ColumnDouble& get_column_double(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    AdaptiveStringColumn& get_column_string(std::size_t column_ndx);
+    const AdaptiveStringColumn& get_column_string(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnBinary& get_column_binary(std::size_t column_ndx);
+    const ColumnBinary& get_column_binary(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnStringEnum& get_column_string_enum(std::size_t column_ndx);
+    const ColumnStringEnum& get_column_string_enum(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnTable& get_column_table(std::size_t column_ndx);
+    const ColumnTable& get_column_table(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    ColumnMixed& get_column_mixed(std::size_t column_ndx);
+    const ColumnMixed& get_column_mixed(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+
+    void instantiate_before_change();
     void validate_column_type(const ColumnBase& column, ColumnType expected_type, std::size_t ndx) const;
 
     /// Create an empty table with independent spec and return just
@@ -518,6 +546,10 @@ private:
     friend class Replication;
 #endif
 
+#ifdef TIGHTDB_DEBUG
+    void to_dot_internal(std::ostream&) const;
+#endif
+
     friend class Group;
     friend class Query;
     friend class ColumnMixed;
@@ -525,23 +557,26 @@ private:
     friend class ColumnSubtableParent;
     friend class LangBindHelper;
     friend class TableViewBase;
+    template<class> friend class StringNode;
+    template<class> friend class BinaryNode;
+    template<class, class> friend class IntegerNode;
+    template<class, class> friend class BasicNode;
+    template<class, class> friend class TwoColumnsNode;
+    template<class> friend class SequentialGetter;
 };
 
 
 
 class Table::Parent: public ArrayParent {
 protected:
-    friend class Table;
-
-    // ColumnTable must override this method and return true.
-    virtual bool subtables_have_shared_spec() { return false; }
-
     /// Must be called whenever a child Table is destroyed.
     virtual void child_destroyed(std::size_t child_ndx) = 0;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     virtual std::size_t* record_subtable_path(std::size_t* begin, std::size_t* end) TIGHTDB_NOEXCEPT;
 #endif
+
+    friend class Table;
 };
 
 
@@ -579,9 +614,9 @@ inline DataType Table::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 }
 
 template <class C, ColumnType coltype>
-C& Table::GetColumn(std::size_t ndx)
+C& Table::get_column(std::size_t ndx)
 {
-    ColumnBase& column = GetColumnBase(ndx);
+    ColumnBase& column = get_column_base(ndx);
 #ifdef TIGHTDB_DEBUG
     validate_column_type(column, coltype, ndx);
 #endif
@@ -589,9 +624,9 @@ C& Table::GetColumn(std::size_t ndx)
 }
 
 template <class C, ColumnType coltype>
-const C& Table::GetColumn(std::size_t ndx) const TIGHTDB_NOEXCEPT
+const C& Table::get_column(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    const ColumnBase& column = GetColumnBase(ndx);
+    const ColumnBase& column = get_column_base(ndx);
 #ifdef TIGHTDB_DEBUG
     validate_column_type(column, coltype, ndx);
 #endif
@@ -601,16 +636,12 @@ const C& Table::GetColumn(std::size_t ndx) const TIGHTDB_NOEXCEPT
 
 inline bool Table::has_shared_spec() const
 {
-    const Array& top_array = m_top.IsValid() ? m_top : m_columns;
-    ArrayParent* parent = top_array.get_parent();
-    if (!parent) return false;
-    TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
-    return static_cast<Parent*>(parent)->subtables_have_shared_spec();
+    return !m_top.is_attached();
 }
 
 inline Spec& Table::get_spec()
 {
-    TIGHTDB_ASSERT(m_top.IsValid()); // you can only change specs on top-level tables
+    TIGHTDB_ASSERT(!has_shared_spec()); // you can only change specs on top-level tables
     return m_spec_set;
 }
 

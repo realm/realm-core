@@ -369,6 +369,8 @@ public:
 
     class Streambuf;
 
+    /// Used for any I/O related exception. Note the derived exception
+    /// types that are used for various specific types of errors.
     struct AccessError: std::runtime_error {
         AccessError(const std::string& msg): std::runtime_error(msg) {}
     };

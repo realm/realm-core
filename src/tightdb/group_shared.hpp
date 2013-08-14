@@ -338,7 +338,7 @@ inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 
 inline void SharedGroup::reserve(std::size_t size)
 {
-    m_group.get_allocator().reserve(size);
+    m_group.m_alloc.reserve(size);
 }
 
 

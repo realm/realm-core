@@ -42,6 +42,18 @@ struct InvalidDatabase: File::AccessError {
 };
 
 
+/// The allocator that is used to manage the memory of a TightDB
+/// group, i.e., a TightDB database.
+///
+/// Optionally, it can be attached to an pre-existing database (file
+/// or memory buffer) which then becomes an immuatble part of the
+/// managed memory.
+///
+/// To attach a slab allocator to a pre-existing database, call
+/// attach_file() or attach_buffer() before allocating any new memory.
+///
+/// For efficiency, this allocator manages its memory as a set of
+/// slabs.
 class SlabAlloc: public Allocator {
 public:
     /// Construct a slab allocator in the unattached state.
@@ -57,6 +69,9 @@ public:
     /// allowed. When used by SharedGroup, concurrency is allowed, but
     /// read_only and no_create must both be false in this case.
     ///
+    /// \note Behavior is undefined if the this function is called on
+    /// an allocator that has already been used.
+    ///
     /// \param is_shared Must be true if, and only if we are called on
     /// behalf of SharedGroup.
     ///
@@ -70,9 +85,14 @@ public:
 
     /// Attach this allocator to the specified memory buffer.
     ///
+    /// \note Behavior is undefined if the this function is called on
+    /// an allocator that has already been used.
+    ///
     /// \throw InvalidDatabase
     void attach_buffer(char* data, std::size_t size, bool take_ownership);
 
+    /// Returns true if, and only if a pre-existing database has been
+    /// attached to this allocator.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
     /// If a file is attached, reserve disk space now to avoid
@@ -89,34 +109,52 @@ public:
     /// When a memory buffer is attached, this method has no effect.
     void reserve(std::size_t);
 
+    /// Get the 'ref' corresponding to the current root node.
+    ///
+    /// This function may be called only for an attached
+    /// allocator. The effect of calling it on an unattached allocator
+    /// is undefined.
+    ref_type get_top_ref() const TIGHTDB_NOEXCEPT;
+
+    /// Get the size of the attached database file or buffer in number
+    /// of bytes. This size is not affected by new allocations. After
+    /// attachment, it can only be modified by a call to remap().
+    ///
+    /// This function may be called only for an attached
+    /// allocator. The effect of calling it on an unattached allocator
+    /// is undefined.
+    std::size_t get_attached_size() const TIGHTDB_NOEXCEPT;
+
+    /// Get the total amount of managed memory (allocated and
+    /// unallocated).
+    ///
+    /// When a pre-existing database is attached, its size is included
+    /// in the returned number of bytes.
+    std::size_t get_total_size() const;
+
+    /// Mark all managed memory (except the attached file) as free
+    /// space.
+    void free_all();
+
+    /// Remap the attached file such that a prefix of the specified
+    /// size becomes available in memory. If sucessfull,
+    /// get_attached_size() will return the specified new file size.
+    void remap(std::size_t file_size);
+
     MemRef alloc(std::size_t size) TIGHTDB_OVERRIDE;
     MemRef realloc_(ref_type, const char*, std::size_t size) TIGHTDB_OVERRIDE;
     void   free_(ref_type, const char*) TIGHTDB_OVERRIDE; // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
     char*  translate(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
-    bool   is_read_only(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    ref_type get_top_ref() const TIGHTDB_NOEXCEPT;
-    std::size_t get_total_size() const;
-
-    /// Get the size of the attached file or buffer. This size is not
-    /// affected by new allocations. After attachment it can be
-    /// modified only by a call to remap().
-    std::size_t get_base_size() const { return m_baseline; }
-
-    void   free_all(std::size_t file_size = std::size_t(-1));
-    bool   remap(std::size_t file_size); // Returns false if remapping was not necessary
+    bool is_read_only(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void enable_debug(bool enable) { m_debug_out = enable; }
     void Verify() const;
     bool is_all_free() const;
     void print() const;
-#endif // TIGHTDB_DEBUG
+#endif
 
 private:
-    friend class Group;
-    friend class GroupWriter;
-
     enum FreeMode { free_Noop, free_Unalloc, free_Unmap };
 
     // Define internal tables
@@ -141,13 +179,16 @@ private:
     bool        m_debug_out;
 #endif
 
-    const FreeSpace& GetFreespace() const { return m_free_read_only; }
+    const FreeSpace& get_free_read_only() const { return m_free_read_only; }
     bool validate_buffer(const char* data, std::size_t len) const;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_replication() const TIGHTDB_NOEXCEPT { return m_replication; }
     void set_replication(Replication* r) TIGHTDB_NOEXCEPT { m_replication = r; }
 #endif
+
+    friend class Group;
+    friend class GroupWriter;
 };
 
 
@@ -157,7 +198,14 @@ private:
 
 inline SlabAlloc::SlabAlloc()
 {
-    m_data     = 0;
+    // Mark as unattached
+    m_data = 0;
+
+    // We cannot initialize m_baseline to zero, because that would
+    // cause the first invocation of alloc() to return a 'ref' equal
+    // to zero, and zero is by definition not a valid ref. Since all
+    // 'refs' must be a multiple of 8, it is appropriate to use a
+    // value of 8.
     m_baseline = 8;
 
 #ifdef TIGHTDB_DEBUG
@@ -170,10 +218,17 @@ inline bool SlabAlloc::is_attached() const  TIGHTDB_NOEXCEPT
     return m_data != 0;
 }
 
+inline std::size_t SlabAlloc::get_attached_size() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    return m_baseline;
+}
+
 inline void SlabAlloc::reserve(std::size_t size)
 {
     m_file.prealloc_if_supported(0, size);
 }
+
 
 } // namespace tightdb
 

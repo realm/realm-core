@@ -924,6 +924,7 @@ EOF
                 grep -v -f "$TEMP_DIR/transfer/exclude.bre" "$TEMP_DIR/transfer/files2" >"$TEMP_DIR/transfer/files3" || exit 1
                 tar czf "$TEMP_DIR/transfer/core.tar.gz" -T "$TEMP_DIR/transfer/files3" || exit 1
                 (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/transfer/core.tar.gz") || exit 1
+                (cd "$PKG_DIR/tightdb" && pandoc README.md -o README.pdf) || exit 1
                 printf "\nNO_BUILD_ON_INSTALL = 1\n" >> "$PKG_DIR/tightdb/config.mk"
                 INST_HEADERS="$(cd src/tightdb && make get-inst-headers)" || exit 1
                 INST_LIBRARIES="$(cd src/tightdb && make get-inst-libraries)" || exit 1
@@ -1674,6 +1675,7 @@ EOF
         grep -v -f "$TEMP_DIR/exclude.bre" "$TEMP_DIR/files2" >"$TEMP_DIR/files3" || exit 1
         tar czf "$TEMP_DIR/archive.tar.gz" -T "$TEMP_DIR/files3" || exit 1
         (cd "$TARGET_DIR" && tar xzf "$TEMP_DIR/archive.tar.gz") || exit 1
+        (cd "$TARGET_DIR" && pandoc README.md -o README.pdf) || exit 1
         exit 0
         ;;
 
