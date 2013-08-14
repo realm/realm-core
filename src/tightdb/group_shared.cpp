@@ -95,6 +95,8 @@ void spawn_daemon(const string& file)
         // detach from current session:
         setsid();
         // start commit daemon executable
+        // Note that getenv (which is not thread safe) is called in a 
+        // single threaded context. This is ensured by the fork above.
         const char* exe = getenv("TIGHTDBD_PATH");
         if (exe == NULL)
             exe = "/usr/local/bin/tightdbd";
