@@ -7,6 +7,7 @@
 using namespace std;
 using namespace tightdb;
 
+
 // todo, test (int) cast
 GroupWriter::GroupWriter(Group& group) :
     m_group(group), m_alloc(group.m_alloc), m_current_version(0)
@@ -14,12 +15,14 @@ GroupWriter::GroupWriter(Group& group) :
     m_file_map.map(m_alloc.m_file, File::access_ReadWrite, m_alloc.get_attached_size());
 }
 
+
 void GroupWriter::set_versions(size_t current, size_t read_lock)
 {
     TIGHTDB_ASSERT(read_lock <= current);
     m_current_version  = current;
     m_readlock_version = read_lock;
 }
+
 
 size_t GroupWriter::commit(bool do_sync)
 {
@@ -200,10 +203,10 @@ void GroupWriter::merge_free_space()
     size_t n = lengths.size() - 1;
     for (size_t i = 0; i < n; ++i) {
         size_t i2 = i+1;
-        size_t pos1 = to_size_t(positions.get(i));
-        size_t len1 = to_size_t(lengths.get(i));
-        size_t pos2 = to_size_t(positions.get(i2));
-        if (pos2 == pos1 + len1) {
+        size_t pos1  = to_size_t(positions.get(i));
+        size_t size1 = to_size_t(lengths.get(i));
+        size_t pos2  = to_size_t(positions.get(i2));
+        if (pos2 == pos1 + size1) {
             // If this is a shared db, we can only merge
             // segments where no part is currently in use
             if (is_shared) {
@@ -216,8 +219,8 @@ void GroupWriter::merge_free_space()
             }
 
             // Merge
-            size_t len2 = to_size_t(lengths.get(i2));
-            lengths.set(i, len1 + len2);
+            size_t size2 = to_size_t(lengths.get(i2));
+            lengths.set(i, size1 + size2);
             positions.erase(i2);
             lengths.erase(i2);
             if (is_shared)
@@ -230,7 +233,7 @@ void GroupWriter::merge_free_space()
 }
 
 
-void GroupWriter::add_free_space(size_t pos, size_t len, size_t version)
+void GroupWriter::add_free_space(size_t pos, size_t size, size_t version)
 {
     Array& positions = m_group.m_free_positions;
     Array& lengths   = m_group.m_free_lengths;
@@ -245,32 +248,32 @@ void GroupWriter::add_free_space(size_t pos, size_t len, size_t version)
 
     if (p == positions.size()) {
         positions.add(pos);
-        lengths.add(len);
+        lengths.add(size);
         if (is_shared)
             versions.add(version);
     }
     else {
         positions.insert(p, pos);
-        lengths.insert(p, len);
+        lengths.insert(p, size);
         if (is_shared)
             versions.insert(p, version);
     }
 }
 
 
-size_t GroupWriter::reserve_free_space(size_t len, size_t start)
+size_t GroupWriter::reserve_free_space(size_t size)
 {
     Array& positions    = m_group.m_free_positions;
     Array& lengths      = m_group.m_free_lengths;
     Array& versions     = m_group.m_free_versions;
-    const bool is_shared = m_group.m_is_shared;
+    bool is_shared = m_group.m_is_shared;
 
     // Do we have a free space we can reuse?
-    const size_t count = lengths.size();
     size_t ndx = not_found;
-    for (size_t i = start; i < count; ++i) {
-        const size_t free_len = to_size_t(lengths.get(i));
-        if (len <= free_len) {
+    size_t n = lengths.size();
+    for (size_t i = 0; i < n; ++i) {
+        size_t free_size = to_size_t(lengths.get(i));
+        if (size <= free_size) {
             // Only blocks that are not occupied by current
             // readers are allowed to be used.
             if (is_shared) {
@@ -287,16 +290,16 @@ size_t GroupWriter::reserve_free_space(size_t len, size_t start)
 
     if (ndx == not_found) {
         // No free space, so we have to extend the file.
-        ndx = extend_free_space(len);
+        ndx = extend_free_space(size);
     }
 
     // Split segment so we get exactly what was asked for
-    const size_t free_len = to_size_t(lengths.get(ndx));
-    if (len != free_len) {
-        lengths.set(ndx, len);
+    size_t free_size = to_size_t(lengths.get(ndx));
+    if (size != free_size) {
+        lengths.set(ndx, size);
 
-        const size_t pos = to_size_t(positions.get(ndx)) + len;
-        const size_t rest = free_len - len;
+        size_t pos = to_size_t(positions.get(ndx)) + size;
+        size_t rest = free_size - size;
         positions.insert(ndx+1, pos);
         lengths.insert(ndx+1, rest);
         if (is_shared)
@@ -307,27 +310,27 @@ size_t GroupWriter::reserve_free_space(size_t len, size_t start)
 }
 
 
-size_t GroupWriter::get_free_space(size_t len)
+size_t GroupWriter::get_free_space(size_t size)
 {
-    TIGHTDB_ASSERT((len & 0x7) == 0); // 64-bit alignment
+    TIGHTDB_ASSERT((size & 0x7) == 0); // 64-bit alignment
     TIGHTDB_ASSERT((m_file_map.get_size() & 0x7) == 0); // 64-bit alignment
 
     Array& positions = m_group.m_free_positions;
     Array& lengths   = m_group.m_free_lengths;
     Array& versions  = m_group.m_free_versions;
-    const bool is_shared = m_group.m_is_shared;
+    bool is_shared = m_group.m_is_shared;
 
-    const size_t count = lengths.size();
+    size_t count = lengths.size();
 
     // Since we do a 'first fit' search, the top pieces are likely
     // to get smaller and smaller. So if we are looking for a bigger piece
     // we may find it faster by looking further down in the list.
-    const size_t start = len < 1024 ? 0 : count / 2;
+    size_t start = size < 1024 ? 0 : count / 2;
 
     // Do we have a free space we can reuse?
     for (size_t i = start; i < count; ++i) {
-        const size_t free_len = to_size_t(lengths.get(i));
-        if (len <= free_len) {
+        size_t free_size = to_size_t(lengths.get(i));
+        if (size <= free_size) {
             // Only blocks that are not occupied by current
             // readers are allowed to be used.
             if (is_shared) {
@@ -336,10 +339,10 @@ size_t GroupWriter::get_free_space(size_t len)
                     continue;
             }
 
-            const size_t location = to_size_t(positions.get(i));
+            size_t pos = to_size_t(positions.get(i));
 
             // Update free list
-            const size_t rest = free_len - len;
+            size_t rest = free_size - size;
             if (rest == 0) {
                 positions.erase(i);
                 lengths.erase(i);
@@ -348,20 +351,20 @@ size_t GroupWriter::get_free_space(size_t len)
             }
             else {
                 lengths.set(i, rest);
-                positions.set(i, location + len);
+                positions.set(i, pos + size);
             }
 
-            return location;
+            return pos;
         }
     }
 
     // No free space, so we have to expand the file.
-    const size_t old_file_size = m_file_map.get_size();
-    const size_t ext_pos = extend_free_space(len);
+    size_t old_file_size = m_file_map.get_size();
+    size_t ext_pos = extend_free_space(size);
 
     // Claim space from new extension
-    const size_t end  = old_file_size + len;
-    const size_t rest = m_file_map.get_size() - end;
+    size_t end  = old_file_size + size;
+    size_t rest = m_file_map.get_size() - end;
     if (rest) {
         positions.set(ext_pos, end);
         lengths.set(ext_pos, rest);
@@ -377,7 +380,7 @@ size_t GroupWriter::get_free_space(size_t len)
 }
 
 
-size_t GroupWriter::extend_free_space(size_t len)
+size_t GroupWriter::extend_free_space(size_t requested_size)
 {
     Array& positions = m_group.m_free_positions;
     Array& lengths   = m_group.m_free_lengths;
@@ -388,7 +391,7 @@ size_t GroupWriter::extend_free_space(size_t len)
     // performance and to avoid excess fragmentation
     const size_t megabyte = 1024 * 1024;
     const size_t old_file_size = m_file_map.get_size();
-    const size_t needed_size = old_file_size + len;
+    const size_t needed_size = old_file_size + requested_size;
     const size_t rest = needed_size % megabyte;
     const size_t new_file_size = rest ? (needed_size + (megabyte - rest)) : needed_size;
 
@@ -404,23 +407,23 @@ size_t GroupWriter::extend_free_space(size_t len)
 
     m_file_map.remap(m_alloc.m_file, File::access_ReadWrite, new_file_size);
 
-    size_t ext_len = new_file_size - old_file_size;
+    size_t ext_size = new_file_size - old_file_size;
 
     // See if we can merge in new space
     if (!positions.is_empty()) {
-        size_t last_ndx = to_size_t(positions.size()-1);
-        size_t last_len = to_size_t(lengths[last_ndx]);
-        size_t end  = to_size_t(positions[last_ndx] + last_len);
+        size_t last_ndx  = to_size_t(positions.size()-1);
+        size_t last_size = to_size_t(lengths[last_ndx]);
+        size_t end  = to_size_t(positions[last_ndx] + last_size);
         size_t ver  = to_size_t(is_shared ? versions[last_ndx] : 0);
         if (end == old_file_size && ver == 0) {
-            lengths.set(last_ndx, last_len + ext_len);
+            lengths.set(last_ndx, last_size + ext_size);
             return last_ndx;
         }
     }
 
     // Else add new free space
     positions.add(old_file_size);
-    lengths.add(ext_len);
+    lengths.add(ext_size);
     if (is_shared)
         versions.add(0); // new space is always free for writing
 
@@ -438,7 +441,8 @@ void GroupWriter::dump()
     bool is_shared = m_group.m_is_shared;
 
     size_t count = flengths.size();
-    cout << "count: " << count << ", m_size = " << m_file_map.get_size() << ", version >= " << m_readlock_version << "\n";
+    cout << "count: " << count << ", m_size = " << m_file_map.get_size() << ", "
+        "version >= " << m_readlock_version << "\n";
     if (!is_shared) {
         for (size_t i = 0; i < count; ++i) {
             cout << i << ": " << fpositions.get(i) << ", " << flengths.get(i) << "\n";
@@ -446,7 +450,8 @@ void GroupWriter::dump()
     }
     else {
         for (size_t i = 0; i < count; ++i) {
-            cout << i << ": " << fpositions.get(i) << ", " << flengths.get(i) << " - " << fversions.get(i) << "\n";
+            cout << i << ": " << fpositions.get(i) << ", " << flengths.get(i) << " - "
+                "" << fversions.get(i) << "\n";
         }
     }
 }

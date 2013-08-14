@@ -793,7 +793,9 @@ TIGHTDB_TABLE_1(TestSubtableLookup1,
 } // anonymous namespace
 
 
-TEST(Table_SubtableLookup) {
+/*
+TEST(Table_SubtableLookup)
+{
     TestSubtableLookup1 t;
     t.add();
     t.add();
@@ -801,18 +803,19 @@ TEST(Table_SubtableLookup) {
         TestSubtableLookup2::Ref r0 = t[0].subtab;
         r0->add("foo");
         r0->add("bar");
-        const size_t i1 = r0->lookup("bar");
+        size_t i1 = r0->lookup("bar");
         CHECK_EQUAL(1, i1);
-        const size_t i2 = r0->lookup("foobar");
+        size_t i2 = r0->lookup("foobar");
         CHECK_EQUAL(not_found, i2);
     }
 
     {
         TestSubtableLookup2::Ref r1 = t[1].subtab;
-        const size_t i3 = r1->lookup("bar");
+        size_t i3 = r1->lookup("bar");
         CHECK_EQUAL(not_found, i3);
     }
 }
+*/
 
 
 TEST(Table_Distinct)

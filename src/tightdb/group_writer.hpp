@@ -65,11 +65,11 @@ private:
     // Controlled update of physical medium
     void sync(uint64_t top_pos);
 
-    std::size_t get_free_space(std::size_t len);
-    std::size_t reserve_free_space(std::size_t len, std::size_t start=0);
-    void        add_free_space(std::size_t pos, std::size_t len, std::size_t version=0);
+    std::size_t get_free_space(std::size_t size);
+    std::size_t reserve_free_space(std::size_t size);
+    void        add_free_space(std::size_t pos, std::size_t size, std::size_t version = 0);
     void        merge_free_space();
-    std::size_t extend_free_space(std::size_t len);
+    std::size_t extend_free_space(std::size_t requested_size);
 };
 
 
