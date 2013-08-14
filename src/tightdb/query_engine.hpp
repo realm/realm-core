@@ -178,16 +178,17 @@ public:
     SequentialGetter(const Table& table, size_t column_ndx) : m_array((Array::no_prealloc_tag()))
     {
         if (column_ndx != not_found)
-            m_column = static_cast<const ColType*>(&table.GetColumnBase(column_ndx));
+            m_column = static_cast<const ColType*>(&table.get_column_base(column_ndx));
         m_leaf_end = 0;
     }
 
-    SequentialGetter(ColType* column) : m_array((Array::no_prealloc_tag()))
+    SequentialGetter(const ColType* column) : m_array((Array::no_prealloc_tag()))
     {
         init(column);
     }
 
-    void init (ColType* column) {
+    void init (const ColType* column)
+    {
         m_column = column;
         m_leaf_end = 0;
     }
@@ -258,7 +259,7 @@ public:
         bool operator ()(ParentNode const* a, ParentNode const* b) const { return (a->cost() < b->cost()); }
     };
 
-    double cost(void) const
+    double cost() const
     {
         return 8 * bitwidth_time_unit / m_dD + m_dT; // dt = 1/64 to 1. Match dist is 8 times more important than bitwidth
     }
@@ -300,7 +301,7 @@ public:
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
 
-    virtual ParentNode* child_criteria(void)
+    virtual ParentNode* child_criteria()
     {
         return m_child;
     }
@@ -389,7 +390,7 @@ public:
         // in a tight loop if so (instead of testing if there are sub criterias after each match). Harder: Specialize
         // data type array to make array call match() directly on each match, like for integers.
 
-        (void)matchcount;
+        static_cast<void>(matchcount);
         size_t local_matches = 0;
 
         size_t r = start - 1;
@@ -436,7 +437,7 @@ public:
     }
 
 
-    virtual std::string Verify(void)
+    virtual std::string Verify()
     {
         if (error_code != "")
             return error_code;
@@ -543,7 +544,7 @@ public:
         return end;
     }
 
-    ParentNode* child_criteria(void)
+    ParentNode* child_criteria()
     {
         return m_child2;
     }
@@ -584,7 +585,7 @@ public:
     void init(const Table& table)
     {
         m_dD = 100.0;
-        m_condition_column = (ColType*)&table.GetColumnBase(m_condition_column_idx);
+        m_condition_column = static_cast<const ColType*>(&table.get_column_base(m_condition_column_idx));
         m_table = &table;
         m_leaf_end = 0;
         if (m_child)
@@ -783,7 +784,7 @@ public:
 protected:
 
     size_t m_last_local_match;
-    ColType* m_condition_column;                // Column on which search criteria is applied
+    const ColType* m_condition_column;                // Column on which search criteria is applied
     Array m_array;
     size_t m_leaf_start;
     size_t m_leaf_end;
@@ -847,7 +848,7 @@ public:
         m_matches = 0;
         m_end_s = 0;
         m_table = &table;
-        m_condition_column = &table.GetColumnBase(m_condition_column_idx);
+        m_condition_column = &table.get_column_base(m_condition_column_idx);
         m_column_type = table.get_real_column_type(m_condition_column_idx);
 
         if (m_child)
@@ -930,7 +931,7 @@ public:
     {
         m_dD = 100.0;
         m_table = &table;
-        m_condition_column.m_column = (ColType*)(&table.GetColumnBase(m_condition_column_idx));
+        m_condition_column.m_column = static_cast<const ColType*>(&table.get_column_base(m_condition_column_idx));
         m_condition_column.m_leaf_end = 0;
 
         if (m_child)
@@ -980,7 +981,7 @@ public:
     {
         m_dD = 100.0;
         m_table = &table;
-        m_condition_column = (const ColumnBinary*)&table.GetColumnBase(m_condition_column_idx);
+        m_condition_column = static_cast<const ColumnBinary*>(&table.get_column_base(m_condition_column_idx));
         m_column_type = table.get_real_column_type(m_condition_column_idx);
 
         if (m_child)
@@ -1063,7 +1064,7 @@ public:
         m_dD = 10.0;
         m_leaf_end = 0;
         m_table = &table;
-        m_condition_column = &table.GetColumnBase(m_condition_column_idx);
+        m_condition_column = &table.get_column_base(m_condition_column_idx);
         m_column_type = table.get_real_column_type(m_condition_column_idx);
 
         if (m_column_type == col_type_StringEnum) {
@@ -1275,7 +1276,7 @@ public:
         return end;
     }
 
-    virtual std::string Verify(void)
+    virtual std::string Verify()
     {
         if (error_code != "")
             return error_code;
@@ -1329,10 +1330,10 @@ public:
         m_dD = 100.0;
         m_table = &table;
 
-        ColType* c = (ColType*)&table.GetColumnBase(m_condition_column_idx1);
+        const ColType* c = static_cast<const ColType*>(&table.get_column_base(m_condition_column_idx1));
         m_getter1.init(c);
 
-        c = (ColType*)&table.GetColumnBase(m_condition_column_idx2);
+        c = static_cast<const ColType*>(&table.get_column_base(m_condition_column_idx2));
         m_getter2.init(c);
 
         if (m_child)

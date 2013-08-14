@@ -13,18 +13,18 @@ namespace {
 
 const int max_width = 64;
 
-// When len = 0 returns 0
-// When len = 1 returns 4
-// When 2 <= len < 256, returns 2**ceil(log2(len+1)).
-// Thus, 0 < len < 256 implies that len < round_up(len).
-size_t round_up(size_t len)
+// When size = 0 returns 0
+// When size = 1 returns 4
+// When 2 <= size < 256, returns 2**ceil(log2(size+1)).
+// Thus, 0 < size < 256 implies that size < round_up(size).
+size_t round_up(size_t size)
 {
-    if (len < 2) return len << 2;
-    len |= len >> 1;
-    len |= len >> 2;
-    len |= len >> 4;
-    ++len;
-    return len;
+    if (size < 2) return size << 2;
+    size |= size >> 1;
+    size |= size >> 2;
+    size |= size >> 4;
+    ++size;
+    return size;
 }
 
 } // anonymous namespace
@@ -35,11 +35,11 @@ namespace tightdb {
 
 void ArrayString::set(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(ndx < m_size);
     TIGHTDB_ASSERT(value.size() < size_t(max_width)); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
-    CopyOnWrite(); // Throws
+    copy_on_write(); // Throws
 
     // Make room for the new value plus a zero-termination
     if (m_width <= value.size()) {
@@ -54,14 +54,14 @@ void ArrayString::set(size_t ndx, StringData value)
         TIGHTDB_ASSERT(value.size() < new_width);
 
         // FIXME: Should we try to avoid double copying when realloc fails to preserve the address?
-        alloc(m_len, new_width); // Throws
+        alloc(m_size, new_width); // Throws
 
         char* base = m_data;
-        char* new_end = base + m_len*new_width;
+        char* new_end = base + m_size*new_width;
 
         // Expand the old values in reverse order
         if (0 < m_width) {
-            const char* old_end = base + m_len*m_width;
+            const char* old_end = base + m_size*m_width;
             while (new_end != base) {
 // FIXME: The following line is temporarily commented out, but will
 // soon be reinstated. See https://github.com/Tightdb/tightdb/pull/84
@@ -125,25 +125,25 @@ void ArrayString::set(size_t ndx, StringData value)
 
 void ArrayString::insert(size_t ndx, StringData value)
 {
-    TIGHTDB_ASSERT(ndx <= m_len);
+    TIGHTDB_ASSERT(ndx <= m_size);
     TIGHTDB_ASSERT(value.size() < size_t(max_width)); // otherwise we have to use another column type
 
     // Check if we need to copy before modifying
-    CopyOnWrite(); // Throws
+    copy_on_write(); // Throws
 
     // Calc min column width (incl trailing zero-byte)
     size_t new_width = max(m_width, ::round_up(value.size()));
 
     // Make room for the new value
-    alloc(m_len+1, new_width); // Throws
+    alloc(m_size+1, new_width); // Throws
 
     if (0 < value.size() || 0 < m_width) {
         char* base = m_data;
-        const char* old_end = base + m_len*m_width;
-        char*       new_end = base + m_len*new_width + new_width;
+        const char* old_end = base + m_size*m_width;
+        char*       new_end = base + m_size*new_width + new_width;
 
         // Move values after insertion point (may expand)
-        if (ndx != m_len) {
+        if (ndx != m_size) {
             if (TIGHTDB_UNLIKELY(m_width < new_width)) {
                 char* const new_begin = base + ndx*new_width + new_width;
                 if (0 < m_width) {
@@ -256,42 +256,42 @@ void ArrayString::insert(size_t ndx, StringData value)
         }
     }
 
-    ++m_len;
+    ++m_size;
 }
 
 void ArrayString::erase(size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(ndx < m_size);
 
     // Check if we need to copy before modifying
-    CopyOnWrite(); // Throws
+    copy_on_write(); // Throws
 
     // move data backwards after deletion
-    if (ndx < m_len-1) {
+    if (ndx < m_size-1) {
         char* new_begin = m_data + ndx*m_width;
         char* old_begin = new_begin + m_width;
-        char* old_end   = m_data + m_len*m_width;
+        char* old_end   = m_data + m_size*m_width;
         copy(old_begin, old_end, new_begin);
     }
 
-    --m_len;
+    --m_size;
 
-    // Update length in header
-    set_header_len(m_len);
+    // Update size in header
+    set_header_size(m_size);
 }
 
 size_t ArrayString::CalcByteLen(size_t count, size_t width) const
 {
     // FIXME: This arithemtic could overflow. Consider using one of
     // the functions in <tightdb/safe_int_ops.hpp>
-    return 8 + (count * width);
+    return header_size + (count * width);
 }
 
 size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
 {
     if (width == 0) return size_t(-1); // zero-width gives infinite space
 
-    size_t bytes_without_header = bytes - 8;
+    size_t bytes_without_header = bytes - header_size;
     return bytes_without_header / width;
 }
 
@@ -313,8 +313,8 @@ size_t ArrayString::count(StringData value, size_t begin, size_t end) const
 size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
 {
     if (end == size_t(-1))
-        end = m_len;
-    TIGHTDB_ASSERT(begin <= m_len && end <= m_len && begin <= end);
+        end = m_size;
+    TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
 
     if (m_width == 0)
         return value.size() == 0 && begin < end ? begin : size_t(-1);
@@ -372,7 +372,7 @@ void ArrayString::find_all(Array& result, StringData value, size_t add_offset,
     }
 }
 
-bool ArrayString::Compare(const ArrayString& c) const
+bool ArrayString::compare_string(const ArrayString& c) const
 {
     if (c.size() != size()) return false;
 
@@ -443,18 +443,18 @@ void ArrayString::StringStats() const
     size_t total = 0;
     size_t longest = 0;
 
-    for (size_t i = 0; i < m_len; ++i) {
+    for (size_t i = 0; i < m_size; ++i) {
         StringData str = get(i);
-        size_t len = str.size() + 1;
-        total += len;
-        if (len > longest) longest = len;
+        size_t size = str.size() + 1;
+        total += size;
+        if (size > longest) longest = size;
     }
 
-    size_t size = m_len * m_width;
+    size_t size = m_size * m_width;
     size_t zeroes = size - total;
-    size_t zavg = zeroes / (m_len ? m_len : 1); // avoid possible div by zero
+    size_t zavg = zeroes / (m_size ? m_size : 1); // avoid possible div by zero
 
-    cout << "Count: " << m_len << "\n";
+    cout << "Size: " << m_size << "\n";
     cout << "Width: " << m_width << "\n";
     cout << "Total: " << size << "\n";
     cout << "Capacity: " << m_capacity << "\n\n";
@@ -471,7 +471,7 @@ void ArrayString::to_dot(FILE* f) const
 
     fprintf(f, "n%zx [label=\"", ref);
 
-    for (size_t i = 0; i < m_len; ++i) {
+    for (size_t i = 0; i < m_size; ++i) {
         if (i > 0) fprintf(f, " | ");
 
         fprintf(f, "%s", get_c_str(i));
@@ -498,7 +498,7 @@ void ArrayString::to_dot(ostream& out, StringData title) const
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\">";
     out << "0x" << hex << ref << dec << "</FONT></TD>" << endl;
 
-    for (size_t i = 0; i < m_len; ++i) {
+    for (size_t i = 0; i < m_size; ++i) {
         out << "<TD>\"" << get(i) << "\"</TD>" << endl;
     }
 

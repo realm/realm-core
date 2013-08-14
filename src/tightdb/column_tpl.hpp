@@ -89,15 +89,15 @@ template<class T, class C> void ColumnBase::TreeSet(size_t ndx, T value)
 
     if (!root_is_leaf()) {
         // Get subnode table
-        const Array offsets = NodeGetOffsets();
+        Array offsets = NodeGetOffsets();
         Array refs = NodeGetRefs();
 
         // Find the subnode containing the item
-        const size_t node_ndx = offsets.FindPos(ndx);
+        size_t node_ndx = offsets.upper_bound_int(ndx);
 
         // Calc index in subnode
-        const size_t offset = node_ndx ? to_size_t(offsets.get(node_ndx-1)) : 0;
-        const size_t local_ndx = ndx - offset;
+        size_t offset = node_ndx == 0 ? 0 :to_size_t(offsets.get(node_ndx-1));
+        size_t local_ndx = ndx - offset;
 
         // Set item
         C target = GetColumnFromRef<C>(refs, node_ndx);
@@ -122,12 +122,12 @@ template<class T, class C> void ColumnBase::TreeDelete(size_t ndx)
         Array refs = NodeGetRefs();
 
         // Find the subnode containing the item
-        const size_t node_ndx = offsets.FindPos(ndx);
-        TIGHTDB_ASSERT(node_ndx != size_t(-1));
+        size_t node_ndx = offsets.upper_bound_int(ndx);
+        TIGHTDB_ASSERT(node_ndx != offsets.size());
 
         // Calc index in subnode
-        const size_t offset = node_ndx ? to_size_t(offsets.get(node_ndx-1)) : 0;
-        const size_t local_ndx = ndx - offset;
+        size_t offset = node_ndx == 0 ? 0 : to_size_t(offsets.get(node_ndx-1));
+        size_t local_ndx = ndx - offset;
 
         // Get sublist
         C target = GetColumnFromRef<C>(refs, node_ndx);
@@ -182,8 +182,8 @@ size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
         }
         else {
             // partial search
-            size_t i = offsets.FindPos(start);
-            size_t offset = i ? to_size_t(offsets.get(i-1)) : 0;
+            size_t i = offsets.upper_bound_int(start);
+            size_t offset = i == 0 ? 0 : to_size_t(offsets.get(i-1));
             size_t s = start - offset;
             size_t e = (end == size_t(-1) || int(end) >= offsets.get(i)) ? size_t(-1) : end - offset;
 
@@ -227,8 +227,8 @@ template<class T, class C> void ColumnBase::TreeFindAll(Array &result, T value, 
         const Array offsets = NodeGetOffsets();
         const Array refs = NodeGetRefs();
         const size_t count = refs.size();
-        size_t i = offsets.FindPos(start);
-        size_t offset = i ? to_size_t(offsets.get(i-1)) : 0;
+        size_t i = offsets.upper_bound_int(start);
+        size_t offset = i == 0 ? 0 : to_size_t(offsets.get(i-1));
         size_t s = start - offset;
         size_t e = (end == size_t(-1) || int(end) >= offsets.get(i)) ? size_t(-1) : end - offset;
 
@@ -274,8 +274,8 @@ void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
         const Array offsets = NodeGetOffsets();
         const Array refs = NodeGetRefs();
         const size_t count = refs.size();
-        size_t i = offsets.FindPos(start);
-        size_t offset = i ? to_size_t(offsets.get(i-1)) : 0;
+        size_t i = offsets.upper_bound_int(start);
+        size_t offset = i == 0 ? 0 : to_size_t(offsets.get(i-1));
         size_t s = start - offset;
         size_t e = (end == size_t(-1) || int(end) >= offsets.get(i)) ? size_t(-1) : end - offset;
 

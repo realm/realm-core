@@ -61,11 +61,15 @@ public:
     void find_all(Array& result, StringData value, std::size_t start = 0,
                   std::size_t end = -1) const;
 
-    /// Find the lower bound for the specified value assuming that the
-    /// elements are already sorted according to
-    /// StringData::operator<(). This operation is functionally
-    /// identical to std::lower_bound().
-    std::size_t lower_bound(StringData value) const TIGHTDB_NOEXCEPT;
+    //@{
+
+    /// Find the lower/upper bound for the specified value assuming
+    /// that the elements are already sorted in ascending order
+    /// according to StringData::operator<().
+    std::size_t lower_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
+    //@{
+
     FindRes find_all_indexref(StringData value, size_t& dst) const;
 
     // Index
@@ -75,15 +79,11 @@ public:
     StringIndex* release_index() TIGHTDB_NOEXCEPT { StringIndex* i = m_index; m_index = 0; return i;}
     StringIndex& create_index();
 
-    ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
-    Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
-    void set_parent(ArrayParent* parent, std::size_t pndx) { m_array->set_parent(parent, pndx); }
-
     // Optimizing data layout
     bool auto_enumerate(ref_type& keys, ref_type& values) const;
 
     /// Compare two string columns for equality.
-    bool compare(const AdaptiveStringColumn&) const;
+    bool compare_string(const AdaptiveStringColumn&) const;
 
     bool GetBlock(std::size_t ndx, ArrayParent** ap, std::size_t& off) const
     {
@@ -118,13 +118,10 @@ public:
     void foreach(Array::ForEachOp<StringData>*) const TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
+    void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
 #endif
 
 protected:
-    friend class ColumnBase;
-    void update_ref(ref_type ref);
-
     void LeafSet(size_t ndx, StringData value);
     template<class F> size_t LeafFind(StringData value, size_t begin, size_t end) const;
     void LeafFindAll(Array& result, StringData value, size_t add_offset = 0,
@@ -133,12 +130,10 @@ protected:
     void LeafDelete(size_t ndx);
 
 #ifdef TIGHTDB_DEBUG
-    virtual void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
+    void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
 #endif
 
 private:
-    friend class Array;
-
     static const size_t short_string_max_size = 15;
 
     StringIndex* m_index;
@@ -153,6 +148,9 @@ private:
     static void copy_leaf(const ArrayString&, ArrayStringLong&);
 
     static void foreach(const Array* parent, Array::ForEachOp<StringData>*) TIGHTDB_NOEXCEPT;
+
+    friend class Array;
+    friend class ColumnBase;
 };
 
 
@@ -180,26 +178,6 @@ inline StringData AdaptiveStringColumn::get(std::size_t ndx) const TIGHTDB_NOEXC
     return ArrayString::get(leaf_header, ndx_in_leaf);
 }
 
-inline std::size_t AdaptiveStringColumn::lower_bound(StringData value) const TIGHTDB_NOEXCEPT
-{
-    std::size_t i = 0;
-    std::size_t size = this->size();
-
-    while (0 < size) {
-        std::size_t half = size / 2;
-        std::size_t mid = i + half;
-        StringData probe = get(mid);
-        if (probe < value) {
-            i = mid + 1;
-            size -= half + 1;
-        }
-        else {
-            size = half;
-        }
-    }
-    return i;
-}
-
 inline void AdaptiveStringColumn::add(StringData value)
 {
     do_insert(npos, value);
@@ -210,6 +188,35 @@ inline void AdaptiveStringColumn::insert(size_t ndx, StringData value)
     TIGHTDB_ASSERT(ndx <= size());
     if (size() <= ndx) ndx = npos;
     do_insert(ndx, value);
+}
+
+
+inline std::size_t AdaptiveStringColumn::lower_bound_string(StringData value) const TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        bool long_strings = m_array->has_refs();
+        if (long_strings) {
+            const ArrayStringLong* leaf = static_cast<const ArrayStringLong*>(m_array);
+            return ColumnBase::lower_bound(*leaf, value);
+        }
+        const ArrayString* leaf = static_cast<const ArrayString*>(m_array);
+        return ColumnBase::lower_bound(*leaf, value);
+    }
+    return ColumnBase::lower_bound(*this, value);
+}
+
+inline std::size_t AdaptiveStringColumn::upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        bool long_strings = m_array->has_refs();
+        if (long_strings) {
+            const ArrayStringLong* leaf = static_cast<const ArrayStringLong*>(m_array);
+            return ColumnBase::upper_bound(*leaf, value);
+        }
+        const ArrayString* leaf = static_cast<const ArrayString*>(m_array);
+        return ColumnBase::upper_bound(*leaf, value);
+    }
+    return ColumnBase::upper_bound(*this, value);
 }
 
 

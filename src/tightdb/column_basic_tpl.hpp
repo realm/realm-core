@@ -65,30 +65,6 @@ void BasicColumn<T>::destroy()
         m_array->destroy();
 }
 
-
-template<class T>
-void BasicColumn<T>::update_ref(ref_type ref)
-{
-    TIGHTDB_ASSERT(!root_is_leaf_from_ref(ref, m_array->get_alloc())); // Can only be called when creating node
-
-    if (!root_is_leaf()) {
-        m_array->update_ref(ref);
-        return;
-    }
-
-    ArrayParent* parent = m_array->get_parent();
-    std::size_t pndx = m_array->get_ndx_in_parent();
-
-    // Replace the generic array with int array for node
-    Array* array = new Array(ref, parent, pndx, m_array->get_alloc());
-    delete m_array;
-    m_array = array;
-
-    // Update ref in parent
-    if (parent)
-        parent->update_child_ref(pndx, ref);
-}
-
 template<class T>
 bool BasicColumn<T>::is_empty() const TIGHTDB_NOEXCEPT
 {
@@ -375,6 +351,23 @@ ref_type BasicColumn<T>::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
 {
     BasicArray<T> leaf(leaf_mem, &parent, ndx_in_parent, alloc);
     return leaf.btree_leaf_insert(insert_ndx, state.m_value, state);
+}
+
+
+template<class T> inline std::size_t BasicColumn<T>::lower_bound(T value) const TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        return static_cast<const BasicArray<T>*>(m_array)->lower_bound(value);
+    }
+    return ColumnBase::lower_bound(*this, value);
+}
+
+template<class T> inline std::size_t BasicColumn<T>::upper_bound(T value) const TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        return static_cast<const BasicArray<T>*>(m_array)->upper_bound(value);
+    }
+    return ColumnBase::upper_bound(*this, value);
 }
 
 

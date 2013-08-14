@@ -79,29 +79,6 @@ void AdaptiveStringColumn::destroy()
         m_index->destroy();
 }
 
-
-void AdaptiveStringColumn::update_ref(ref_type ref)
-{
-    // Can only be called when creating node
-    TIGHTDB_ASSERT(get_type_from_ref(ref, m_array->get_alloc()) == Array::type_InnerColumnNode);
-
-    if (!root_is_leaf())
-        m_array->update_ref(ref);
-    else {
-        ArrayParent* parent = m_array->get_parent();
-        size_t pndx = m_array->get_ndx_in_parent();
-
-        // Replace the string array with int array for node
-        Array* array = new Array(ref, parent, pndx, m_array->get_alloc());
-        delete m_array;
-        m_array = array;
-
-        // Update ref in parent
-        if (parent)
-            parent->update_child_ref(pndx, ref);
-    }
-}
-
 StringIndex& AdaptiveStringColumn::create_index()
 {
     TIGHTDB_ASSERT(!m_index);
@@ -113,7 +90,8 @@ StringIndex& AdaptiveStringColumn::create_index()
     const size_t count = size();
     for (size_t i = 0; i < count; ++i) {
         StringData value = get(i);
-        m_index->insert(i, value, true);
+        bool is_last = true;
+        m_index->insert(i, value, is_last);
     }
 
     return *m_index;
@@ -194,13 +172,13 @@ void AdaptiveStringColumn::move_last_over(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx+1 < size());
 
-    const size_t ndx_last = size()-1;
+    size_t ndx_last = size() - 1;
     StringData v = get(ndx_last);
 
     if (m_index) {
         // remove the value to be overwritten from index
-        StringData oldVal = get(ndx);
-        m_index->erase(ndx, oldVal, true);
+        StringData old_val = get(ndx);
+        m_index->erase(ndx, old_val, true);
 
         // update index to point to new location
         m_index->update_ref(v, ndx_last, ndx);
@@ -229,8 +207,8 @@ void AdaptiveStringColumn::set(size_t ndx, StringData str)
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
     if (m_index) {
-        StringData oldVal = get(ndx);
-        m_index->set(ndx, oldVal, str);
+        StringData old_val = get(ndx);
+        m_index->set(ndx, old_val, str);
     }
 
     TreeSet<StringData, AdaptiveStringColumn>(ndx, str);
@@ -405,7 +383,7 @@ bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_r
         StringData v = get(i);
 
         // Insert keys in sorted order, ignoring duplicates
-        size_t pos = keys.lower_bound(v);
+        size_t pos = keys.lower_bound_string(v);
         if (pos != keys.size() && keys.get(pos) == v)
             continue;
 
@@ -422,7 +400,7 @@ bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_r
     Column values(m_array->get_alloc());
     for (size_t i=0; i<n; ++i) {
         StringData v = get(i);
-        size_t pos = keys.lower_bound(v);
+        size_t pos = keys.lower_bound_string(v);
         TIGHTDB_ASSERT(pos != keys.size());
         values.add(pos);
     }
@@ -432,7 +410,7 @@ bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_r
     return true;
 }
 
-bool AdaptiveStringColumn::compare(const AdaptiveStringColumn& c) const
+bool AdaptiveStringColumn::compare_string(const AdaptiveStringColumn& c) const
 {
     const size_t n = size();
     if (c.size() != n)
