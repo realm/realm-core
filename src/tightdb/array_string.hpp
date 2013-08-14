@@ -73,7 +73,7 @@ public:
     static ref_type create_empty_array(Allocator&);
 
 #ifdef TIGHTDB_DEBUG
-    void StringStats() const;
+    void string_stats() const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 

@@ -414,7 +414,7 @@ ref_type ArrayString::btree_leaf_insert(size_t ndx, StringData value, TreeInsert
 
 #ifdef TIGHTDB_DEBUG
 
-void ArrayString::StringStats() const
+void ArrayString::string_stats() const
 {
     size_t total = 0;
     size_t longest = 0;
