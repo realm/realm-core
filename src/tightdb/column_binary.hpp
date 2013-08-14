@@ -68,10 +68,6 @@ public:
 #endif
 
 protected:
-    friend class ColumnBase;
-
-    void update_ref(ref_type ref);
-
     void LeafSet(std::size_t ndx, BinaryData value);
     void LeafDelete(std::size_t ndx);
 
@@ -80,8 +76,6 @@ protected:
 #endif
 
 private:
-    friend class Array;
-
     void add(StringData value) { add_string(value); }
     void set(std::size_t ndx, StringData value) { set_string(ndx, value); }
     void LeafSet(std::size_t ndx, StringData value);
@@ -96,6 +90,9 @@ private:
     struct InsertState: Array::TreeInsert<ColumnBinary> {
         bool m_add_zero_term;
     };
+
+    friend class Array;
+    friend class ColumnBase;
 };
 
 

@@ -97,7 +97,6 @@ private:
     void destroy();
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT;
-    void update_ref(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0);
 
     bool update_from_parent() TIGHTDB_NOEXCEPT;
     void set_parent(ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
@@ -160,12 +159,12 @@ inline ref_type Spec::create_empty_spec(Allocator& alloc)
     // all columns and sub-tables
     Array spec_set(Array::type_HasRefs, 0, 0, alloc);
     spec_set.add(Array::create_empty_array(Array::type_Normal, alloc)); // One type for each column
-    spec_set.add(ArrayString::create_empty_string_array(alloc)); // One name for each column
+    spec_set.add(ArrayString::create_empty_array(alloc)); // One name for each column
     return spec_set.get_ref();
 }
 
 
-// Uninitialized Spec (call update_ref() to init)
+// Uninitialized Spec (call init_from_ref() to init)
 inline Spec::Spec(const Table* table, Allocator& alloc):
     m_table(table), m_top(alloc), m_spec(alloc), m_names(alloc), m_subspecs(alloc) {}
 

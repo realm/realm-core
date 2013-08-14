@@ -273,8 +273,8 @@ inline Table* ColumnSubtableParent::SubtableMap::find(std::size_t subtable_ndx) 
 inline void ColumnSubtableParent::SubtableMap::insert(std::size_t subtable_ndx, Table* wrapper)
 {
     if (!m_indexes.is_attached()) {
-        m_indexes.set_type(Array::type_Normal);
-        m_wrappers.set_type(Array::type_Normal);
+        m_indexes.create(Array::type_Normal);
+        m_wrappers.create(Array::type_Normal);
     }
     m_indexes.add(subtable_ndx);
     m_wrappers.add(reinterpret_cast<unsigned long>(wrapper));

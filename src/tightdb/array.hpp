@@ -202,9 +202,10 @@ protected:
 /// unattached. It is in the attached state if, and only if
 /// is_attached() returns true. Most non-static member functions of
 /// this class have undefined behaviour if the accessor is in the
-/// unattached state. The exceptions are: ~Array(), is_attached(),
-/// detach(), set_type(), update_ref(), has_parent(), get_parent(),
-/// set_parent(), get_ndx_in_parent(), adjust_ndx_in_parent().
+/// unattached state. The exceptions are: is_attached(), detach(),
+/// create(), init_from_ref(), init_from_mem(), has_parent(),
+/// get_parent(), set_parent(), get_ndx_in_parent(),
+/// adjust_ndx_in_parent().
 ///
 /// An array accessor contains information about the parent of the
 /// referenced array node. This 'reverse' reference is not explicitely
@@ -263,6 +264,16 @@ public:
     /// Note that if no parent is specified, the caller assumes
     /// ownership of the allocated underlying node. It is not owned by
     /// the accessor.
+    ///
+    /// FIXME: If the Array class is to continue to function as an
+    /// accessor class and have no ownership of the underlying memory,
+    /// then this constructor must be removed. The problem is that
+    /// memory will be leaked when it is used to construct members of
+    /// a bigger class (such as Group) and something fails before the
+    /// constructor of the bigger class completes. Roughly speaking, a
+    /// resource must be allocated in the constructor when, and only
+    /// when it is released in the destructor (RAII). Anything else
+    /// constitutes a "disaster waiting to happen".
     explicit Array(Type type = type_Normal, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                    Allocator& = Allocator::get_default());
 
@@ -293,21 +304,45 @@ public:
 
     virtual ~Array() TIGHTDB_NOEXCEPT {}
 
-    /// If this accessor is currently in the unattached state, create
-    /// a new underlying array node of the specified type and attach
-    /// to it. Otherwise, just change the type of the attached array
-    /// node.
+    /// Create a new empty array of the specified type and attach to
+    /// it. This does not modify the parent reference information.
     ///
     /// Note that the caller assumes ownership of the allocated
     /// underlying node. It is not owned by the accessor.
-    void set_type(Type);
+    void create(Type);
 
     /// Reinitialize this array accessor to point to the specified new
-    /// underlying array, and if it has a parent, update the parent to
-    /// point to the new array. The updating of the parent only works
-    /// if this array was initialized with the correct parent
-    /// reference.
-    void update_ref(ref_type);
+    /// underlying array. This does not modify the parent reference
+    /// information.
+    void init_from_ref(ref_type) TIGHTDB_NOEXCEPT;
+
+    /// Same as init_from_ref(ref_type) but avoid the mapping of 'ref'
+    /// to memory pointer.
+    void init_from_mem(MemRef) TIGHTDB_NOEXCEPT;
+
+    /// Update the parents reference to this child. The requires, of
+    /// course, that the parent information stored in this child is up
+    /// to date. If the parent pointer is set to null, this function
+    /// does nothing.
+    void update_parent();
+
+    /// When there is a chance that this array node has been modified
+    /// and possibly relocated, this function will update the accessor
+    /// such that it becomes valid again. Of course, this is allowed
+    /// only when the parent continues to exist and it continues to
+    /// have some child at the same index as the child that this
+    /// accessosr was originally attached to. Even then, one must be
+    /// carefull, because the new child at that index, may be a
+    /// completely different one in a logical sense.
+    ///
+    /// FIXME: What is the point of this one? When can it ever be used safely?
+    bool update_from_parent() TIGHTDB_NOEXCEPT;
+
+    /// Change the type of an already attached array node.
+    ///
+    /// The effect of calling this function on an unattached accessor
+    /// is undefined.
+    void set_type(Type);
 
     /// Construct a complete copy of this array (including its
     /// subarrays) using the specified allocator and return just the
@@ -328,24 +363,12 @@ public:
     /// node, if any. If a non-null parent is specified, and there was
     /// no parent originally, then the caller passes ownership to the
     /// parent, and vice versa. This assumes, of course, that the
-    /// change in parentship reflect a corresponding change in the
+    /// change in parentship reflects a corresponding change in the
     /// list of children in the affected parents.
     void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
 
     std::size_t get_ndx_in_parent() const TIGHTDB_NOEXCEPT { return m_ndx_in_parent; }
     void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT { m_ndx_in_parent += diff; }
-
-    /// When there is a chance that this array node has been modified
-    /// and possibly relocated, this function will update the accessor
-    /// such that it becomes valid again. Of course, this is allowed
-    /// only when the parent continues to exist and it continues to
-    /// have some child at the same index as the child that this
-    /// accessosr was originally attached to. Even then, one must be
-    /// carefull, because the new child at that index, may be a
-    /// completely different one in a logical sense.
-    ///
-    /// FIXME: What is the point of this one? When can it ever be used safely?
-    bool update_from_parent() TIGHTDB_NOEXCEPT;
 
     bool is_attached() const TIGHTDB_NOEXCEPT { return m_data != 0; }
 
@@ -464,7 +487,11 @@ public:
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_alloc; }
 
     // Serialization
+
+    /// Returns the position in the target where the first byte of
+    /// this array was written.
     template<class S> std::size_t write(S& target, bool recurse = true, bool persist = false) const;
+
     template<class S> void write_at(std::size_t pos, S& out) const;
     std::size_t GetByteSize(bool align = false) const;
     std::vector<int64_t> ToVector() const;
@@ -680,15 +707,9 @@ private:
                                        ref_type new_sibling_ref, TreeInsertBase& state);
 
 protected:
-    friend class GroupWriter;
-    friend class AdaptiveStringColumn;
-
-    void init_from_mem(MemRef) TIGHTDB_NOEXCEPT;
-    void init_from_ref(ref_type) TIGHTDB_NOEXCEPT;
 //    void AddPositiveLocal(int64_t value);
 
     void CreateFromHeaderDirect(char* header, ref_type = 0) TIGHTDB_NOEXCEPT;
-    void update_ref_in_parent();
 
     virtual std::size_t CalcByteLen(std::size_t count, std::size_t width) const;
     virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const TIGHTDB_NOEXCEPT;
@@ -770,6 +791,9 @@ protected:
 
     int64_t m_lbound;       // min number that can be stored with current m_width
     int64_t m_ubound;       // max number that can be stored with current m_width
+
+    friend class GroupWriter;
+    friend class AdaptiveStringColumn;
 };
 
 
@@ -924,9 +948,8 @@ inline Array::Array(Type type, ArrayParent* parent, std::size_t pndx, Allocator&
     m_data(0), m_size(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
     m_parent(parent), m_ndx_in_parent(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
 {
-    ref_type ref = create_empty_array(type, alloc); // Throws
-    init_from_ref(ref);
-    update_ref_in_parent();
+    create(type); // Throws
+    update_parent(); // Throws
 }
 
 inline Array::Array(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
@@ -945,7 +968,8 @@ inline Array::Array(ref_type ref, ArrayParent* parent, std::size_t pndx,
     init_from_ref(ref);
 }
 
-// Creates new unattached accessor (call update_ref() or set_type() to attach.
+// Creates new unattached accessor (call create() or init_from_ref() to
+// attach).
 inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
     m_data(0), m_ref(0), m_size(0), m_capacity(0), m_width(std::size_t(-1)), m_isNode(false),
     m_parent(0), m_ndx_in_parent(0), m_alloc(alloc) {}
@@ -976,10 +1000,10 @@ inline Array::Array(const Array& array, Allocator& alloc):
 inline Array::Array(no_prealloc_tag) TIGHTDB_NOEXCEPT: m_alloc(*static_cast<Allocator*>(0)) {}
 
 
-inline void Array::update_ref(ref_type ref)
+inline void Array::create(Type type)
 {
+    ref_type ref = create_empty_array(type, m_alloc); // Throws
     init_from_ref(ref);
-    update_ref_in_parent();
 }
 
 
@@ -1287,7 +1311,8 @@ template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) c
     TIGHTDB_ASSERT(is_attached());
 
     // Ignore un-changed arrays when persisting
-    if (persist && m_alloc.is_read_only(m_ref)) return m_ref;
+    if (persist && m_alloc.is_read_only(m_ref))
+        return m_ref;
 
     if (recurse && m_hasRefs) {
         // Temp array for updated refs
@@ -1298,8 +1323,8 @@ template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) c
             new_refs.set_is_index_node(true);
 
         // First write out all sub-arrays
-        std::size_t count = size();
-        for (size_t i = 0; i < count; ++i) {
+        std::size_t n = size();
+        for (std::size_t i = 0; i < n; ++i) {
             int64_t ref = get(i);
             if (ref == 0 || ref & 0x1) {
                 // zero-refs and refs that are not 64-aligned do not point to sub-trees
@@ -1311,7 +1336,7 @@ template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) c
             }
             else {
                 Array sub(to_ref(ref), 0, 0, get_alloc());
-                size_t sub_pos = sub.write(out, true, persist);
+                std::size_t sub_pos = sub.write(out, true, persist);
                 TIGHTDB_ASSERT((sub_pos & 0x7) == 0); // 64bit alignment
                 new_refs.add(sub_pos);
             }
@@ -1319,7 +1344,7 @@ template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) c
 
         // Write out the replacement array
         // (but don't write sub-tree as it has alredy been written)
-        size_t refs_pos = new_refs.write(out, false, persist);
+        std::size_t refs_pos = new_refs.write(out, false, persist);
 
         // Clean-up
         new_refs.set_type(type_Normal); // avoid recursive del
@@ -1333,10 +1358,10 @@ template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) c
     // Write array
     const char* header = get_header_from_data(m_data);
     std::size_t size = get_byte_size_from_header(header);
-    size_t array_pos = out.write(header, size);
-    TIGHTDB_ASSERT((array_pos & 0x7) == 0); /// 64bit alignment
+    std::size_t array_pos = out.write(header, size);
+    TIGHTDB_ASSERT((array_pos & 0x7) == 0); /// 64-bit alignment
 
-    return array_pos; // Return position of this array
+    return array_pos;
 }
 
 template<class S> void Array::write_at(std::size_t pos, S& out) const
@@ -1359,13 +1384,15 @@ inline ref_type Array::clone(Allocator& clone_alloc) const
 
 inline void Array::move_assign(Array& a)
 {
+    // FIXME: Be carefull with the old parent info here. Should it be copied?
+
     // FIXME: It will likely be a lot better for the optimizer if we
     // did a member-wise copy, rather than recreating the state from
-    // the referenced data. This is important because TableView, for
+    // the referenced data. This is important because TableView efficiency, for
     // example, relies on long chains of moves to be optimized away
     // completely. This change should be a 'no-brainer'.
     destroy();
-    update_ref(a.get_ref());
+    init_from_ref(a.get_ref());
     a.detach();
 }
 
@@ -1374,10 +1401,10 @@ inline ref_type Array::create_empty_array(Type type, Allocator& alloc)
     return create_empty_array(type, wtype_Bits, alloc); // Throws
 }
 
-inline void Array::update_ref_in_parent()
+inline void Array::update_parent()
 {
-    if (!m_parent) return;
-    m_parent->update_child_ref(m_ndx_in_parent, m_ref);
+    if (m_parent)
+        m_parent->update_child_ref(m_ndx_in_parent, m_ref);
 }
 
 

@@ -259,8 +259,8 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
     Allocator& alloc = orig_root->get_alloc();
 
     Array new_refs(alloc), new_offsets(alloc);
-    new_refs.set_type(Array::type_HasRefs);
-    new_offsets.set_type(Array::type_Normal);
+    new_refs.create(Array::type_HasRefs);
+    new_offsets.create(Array::type_Normal);
     new_refs.add(orig_root->get_ref());
     new_refs.add(new_sibling_ref);
     new_offsets.add(state.m_split_offset);
@@ -301,12 +301,6 @@ size_t Column::size() const TIGHTDB_NOEXCEPT
         return m_array->size();
     Array offsets = NodeGetOffsets();
     return offsets.is_empty() ? 0 : to_size_t(offsets.back());
-}
-
-// Used by column b-tree code to ensure all leaf having same type
-void Column::SetHasRefs()
-{
-    m_array->set_type(Array::type_HasRefs);
 }
 
 void Column::clear()
@@ -455,7 +449,8 @@ void Column::erase(size_t ndx)
         ref_type ref = refs.get_as_ref(0);
         refs.erase(0); // avoid destroying subtree
         m_array->destroy();
-        m_array->update_ref(ref);
+        m_array->init_from_ref(ref);
+        m_array->update_parent(); // Throws
     }
 }
 

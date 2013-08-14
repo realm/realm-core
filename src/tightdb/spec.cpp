@@ -18,18 +18,18 @@ Spec::~Spec()
 
 void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
-    m_top.update_ref(ref);
+    m_top.init_from_ref(ref);
     m_top.set_parent(parent, ndx_in_parent);
     TIGHTDB_ASSERT(m_top.size() == 2 || m_top.size() == 3);
 
-    m_spec.update_ref(m_top.get_as_ref(0));
+    m_spec.init_from_ref(m_top.get_as_ref(0));
     m_spec.set_parent(&m_top, 0);
-    m_names.update_ref(m_top.get_as_ref(1));
+    m_names.init_from_ref(m_top.get_as_ref(1));
     m_names.set_parent(&m_top, 1);
 
     // SubSpecs array is only there when there are subtables
     if (m_top.size() == 3) {
-        m_subspecs.update_ref(m_top.get_as_ref(2));
+        m_subspecs.init_from_ref(m_top.get_as_ref(2));
         m_subspecs.set_parent(&m_top, 2);
     }
 }
@@ -42,11 +42,6 @@ void Spec::destroy()
 ref_type Spec::get_ref() const TIGHTDB_NOEXCEPT
 {
     return m_top.get_ref();
-}
-
-void Spec::update_ref(ref_type ref, ArrayParent* parent, size_t pndx)
-{
-    init_from_ref(ref, parent, pndx);
 }
 
 void Spec::set_parent(ArrayParent* parent, size_t pndx) TIGHTDB_NOEXCEPT
@@ -82,9 +77,11 @@ size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
     if (type == type_Table) {
         // SubSpecs array is only there when there are subtables
         if (m_top.size() == 2) {
-            m_subspecs.set_type(Array::type_HasRefs);
-            //m_subspecs.set_type((ColumnDef)4);
-            //return;
+            // FIXME: Is this check required? Could m_subspecs ever be
+            // attached at this point?
+            if (!m_subspecs.is_attached()) {
+                m_subspecs.create(Array::type_HasRefs);
+            }
             m_top.add(m_subspecs.get_ref());
             m_subspecs.set_parent(&m_top, 2);
         }
