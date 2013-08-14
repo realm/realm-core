@@ -128,19 +128,19 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType new_type)
 void ColumnMixed::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
+    invalidate_subtables();
 
     // Remove refs or binary data
     clear_value(ndx, mixcol_Int);
 
     m_types->erase(ndx);
     m_refs->erase(ndx);
-
-    invalidate_subtables();
 }
 
 void ColumnMixed::move_last_over(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx+1 < size());
+    invalidate_subtables();
 
     // Remove refs or binary data
     clear_value(ndx, mixcol_Int);
@@ -151,6 +151,7 @@ void ColumnMixed::move_last_over(size_t ndx)
 
 void ColumnMixed::clear()
 {
+    invalidate_subtables();
     m_types->clear();
     m_refs->clear();
     if (m_data)
@@ -191,6 +192,7 @@ void ColumnMixed::fill(size_t count)
 void ColumnMixed::set_string(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
+    invalidate_subtables();
     init_data_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
@@ -224,6 +226,7 @@ void ColumnMixed::set_string(size_t ndx, StringData value)
 void ColumnMixed::set_binary(size_t ndx, BinaryData value)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
+    invalidate_subtables();
     init_data_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));

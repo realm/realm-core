@@ -118,7 +118,7 @@ TEST(TestQueryStrIndexCrash)
         s.add_column(type_String, "first");
         table->update_from_spec();
 
-        int64_t eights = 0;
+        size_t eights = 0;
 
         for(int i = 0; i < 2000; i++) {
             int v = rand() % 10;
