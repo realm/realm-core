@@ -246,11 +246,22 @@ retry:
                 spawn_daemon(file);
             }
 
-            // FIXME: This downgrading of the lock is not guaranteed to be atomic
-
             // Downgrade lock to shared now that it is initialized,
             // so other processes can share it as well
-            m_file.unlock();
+            m_file.unlock(); // <- this is implicit in lock_shared, put here
+            //                     for exposition. Removing it has no effect.
+            // FIXME: downgrading of the lock is not guaranteed to be atomic
+            // a different process may obtain exclusive lock and proceed to 
+            // initialize the shared_info, including reinit of the mutexes.
+            // Reinit of initialized mutexes are UNDEFINED ... :-(
+            // Further: it could then proceed with its work, be done, and
+            // again get exclusive access. This time believing to be the sole
+            // client, it will destroy the mutexes (again undefined) and remove
+            // the .lock file. Any later guests at the party will now create
+            // a new .lock file and new semaphores - both the current process
+            // and the newcomers are free to do concurrent access to the
+            // database (there will now be two different sets of mutexes)
+            // this could potentially corrupt the database.
             m_file.lock_shared();
         }
         else {
@@ -316,7 +327,11 @@ SharedGroup::~SharedGroup()
     // mutexes)
 
     // FIXME: This upgrading of the lock is not guaranteed to be atomic
-    m_file.unlock();
+    m_file.unlock(); // <- for exposition only
+    // at this point a different process may gain exclusive access and
+    // proceed to remove the lock file, including destroying the mutexes.
+    // according to posix, destroying already destroyed mutexes cause
+    // UNDEFINED behavior.
     if (!m_file.try_lock_exclusive()) return;
 
     SharedInfo* info = m_file_map.get_addr();
