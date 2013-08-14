@@ -60,19 +60,12 @@ struct CustomTestReporter: TestReporter {
 } // anonymous namespace
 
 
-// *******************************************************************************************************************
-//
-// 
-//
-// *******************************************************************************************************************
-
-
-
-
 
 
 int main(int argc, char* argv[])
 {
+
+
 
     Table table;
     table.add_column(type_Int, "first1");
@@ -85,42 +78,51 @@ int main(int argc, char* argv[])
         table.set_float(1, i, float(rand() % 10));
     }
 
-    table.set_int(0, 10000, 20);
-    table.set_float(1, 10000, 20.0);
+    table.set_int(0, 10003, 20);
+    table.set_float(1, 10003, 20.0);
 
 
+// new-generation syntax:
+        cerr << "555555555555\n";
+
+        Columns<int64_t> first(0);
+        Columns<float> second(1);
+
+        Expression* eee = first + (second + 1) > first;
+        
+        size_t match2 = table.where().expression(eee).find_next();
 
 
-//        fcol(1) + (icol(0) + 20) > 50.0
+// query expressions:
 
-#if 0
-        Subexpr* col = new Columns<int64_t>(0);
-        Subexpr* colf = new Columns<float>(1);
+//        float_column(1) + (int_column(0) + 20) > 50.0
+#if 1
+    // Slow
+    Subexpr* col = new Columns<int64_t>(0);
+    Subexpr* colf = new Columns<float>(1);
 
-        Subexpr* cc1 = new Value<int64_t>(20);
-        Subexpr* cc2 = new Value<float>(50.0);  
+    Subexpr* cc1 = new Value<int64_t>(20);
+    Subexpr* cc2 = new Value<float>(50.0);  
 
-        Subexpr* ck0 = new Operator<int64_t, Plus<int64_t> >(col, cc1);  
-        Subexpr* ck = new Operator<float, Plus<float> >(colf, ck0);  
+    Subexpr* ck0 = new Operator<Plus<int64_t> >(col, cc1);  
+    Subexpr* ck = new Operator<Plus<float> >(colf, ck0);  
 
-        Expression *e = new Compare<Greater, float>(ck, cc2);
+    Expression *e = new Compare<Greater, float>(ck, cc2);
 #else
-        Columns<int64_t>* col = new Columns<int64_t>(0);
-        Columns<float>* colf = new Columns<float>(1);
+    // Fast
+    Columns<int64_t>* col = new Columns<int64_t>(0);
+    Columns<float>* colf = new Columns<float>(1);
 
-        Value<int64_t>* cc1 = new Value<int64_t>(20);
-        Value<float>* cc2 = new Value<float>(50.0);  
+    Value<int64_t>* cc1 = new Value<int64_t>(20);
+    Value<float>* cc2 = new Value<float>(50.0);  
 
-        Operator<int64_t, Plus<int64_t>, Columns<int64_t>, Value<int64_t>>* ck0 = new Operator<int64_t, Plus<int64_t>, Columns<int64_t>, Value<int64_t>>(col, cc1);  
-        Subexpr* ck = new Operator<float, Plus<float>, Columns<float>, Operator<int64_t, Plus<int64_t>, Columns<int64_t>, Value<int64_t>>>(colf, ck0);  
+    Operator<Plus<int64_t>, Columns<int64_t>, Value<int64_t>>* ck0 = new Operator<Plus<int64_t>, Columns<int64_t>, Value<int64_t>>(col, cc1);  
+    Subexpr* ck = new Operator<Plus<float>, Columns<float>, Operator<Plus<int64_t>, Columns<int64_t>, Value<int64_t>>>(colf, ck0);  
 
-        Expression *e = new Compare<Greater, float, Subexpr, Value<float>>(ck, cc2);
-
-
+    Expression *e = new Compare<Greater, float, Subexpr, Value<float>>(ck, cc2);
 #endif
 
-
-
+  
     tightdb::TableView t1;
 
     size_t match = 0;
@@ -133,9 +135,8 @@ int main(int argc, char* argv[])
             {
                 UnitTest::Timer timer;
                 timer.Start();
-                for(int i = 0; i < 10000; i++) {
+                for(int i = 0; i < 10; i++) {
                     match = table.where().expression(e).find_next();
-                //    m = e->compare(0, 10000);
 
                 }
                 
@@ -153,6 +154,7 @@ int main(int argc, char* argv[])
 
 
         {
+        // Static implementation, to compare speed of our dynamic methods above
             volatile size_t m;
             unsigned int best = -1;
             for(int y = 0; y < 1; y++)

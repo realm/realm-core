@@ -7,7 +7,7 @@
 #include <stdlib.h> // itoa()
 
 #include <tightdb/column.hpp>
-//#include <tightdb/query_expression.h>
+#include <tightdb/query_engine.hpp>
 
 using namespace tightdb;
 
@@ -80,44 +80,58 @@ TIGHTDB_TABLE_2(PeopleTable2,
 
 } // anonymous namespace
 
-/*
+
 TEST(QueryExpressions1)
 {
-    
     Table table;
     table.add_column(type_Int, "first1");
-    table.add_column(type_Int, "second1");
+    table.add_column(type_Float, "second1");
 
 
     for (int i = 0; i < 10100; i++) {
         table.add_empty_row();
         table.set_int(0, i,  rand() % 10 );
-        table.set_int(1, i, 0);
+        table.set_float(1, i, float(rand() % 10));
     }
 
-#if 0
-        // Slow dynamic, 360 ms
-        Subexpr* col = new Columns(&a);
-        Subexpr* cc1 = new Constant(20);
-        Subexpr* cc2 = new Constant(50);  
-        Subexpr* ck = new Operator<Plus>(col, cc1);  
+    table.set_int(0, 10000, 20);
+    table.set_float(1, 10000, 20.0);
 
-#else
-        // Fast static, 313
-        Columns* col = new Columns(0);
-        Constant* cc1 = new Constant(20);
-        Constant* cc2 = new Constant(50);  
-        Subexpr* ck = new Operator<Plus, Columns, Constant>(col, cc1);  
+    {
+        Subexpr* col = new Columns<int64_t>(0);
+        Subexpr* colf = new Columns<float>(1);
 
-#endif
-        
-        Expression *e = new Compare<Equal>(ck, cc2);
+        Subexpr* cc1 = new Value<int64_t>(20);
+        Subexpr* cc2 = new Value<float>(50.0);  
 
-    tightdb::TableView t1;
-    t1 = table.where().expression(e).find_all();
+        Subexpr* ck0 = new Operator<Plus<int64_t> >(col, cc1);  
+        Subexpr* ck = new Operator<Plus<float> >(colf, ck0);  
+
+        Expression *e = new Compare<Greater, float>(ck, cc2);
+        size_t match = table.where().expression(e).find_next();
+        CHECK_EQUAL(10000, match);
+    }
+    
+    {
+        Columns<int64_t>* col = new Columns<int64_t>(0);
+        Columns<float>* colf = new Columns<float>(1);
+
+        Value<int64_t>* cc1 = new Value<int64_t>(20);
+        Value<float>* cc2 = new Value<float>(50.0);  
+
+        Operator<Plus<int64_t>, Columns<int64_t>, Value<int64_t> >* ck0 = new Operator<Plus<int64_t>, Columns<int64_t>, Value<int64_t> >(col, cc1);  
+        Subexpr* ck = new Operator<Plus<float>, Columns<float>, Operator<Plus<int64_t>, Columns<int64_t>, Value<int64_t> > >(colf, ck0);  
+
+        Expression *e = new Compare<Greater, float, Subexpr, Value<float> >(ck, cc2);
+
+        size_t match = table.where().expression(e).find_next();
+        CHECK_EQUAL(10000, match);
+    }
+
+ 
 }
 
-*/
+
 
 TEST(CountLimit)
 {
