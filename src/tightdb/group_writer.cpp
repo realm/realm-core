@@ -263,9 +263,9 @@ void GroupWriter::add_free_space(size_t pos, size_t size, size_t version)
 
 size_t GroupWriter::reserve_free_space(size_t size)
 {
-    Array& positions    = m_group.m_free_positions;
-    Array& lengths      = m_group.m_free_lengths;
-    Array& versions     = m_group.m_free_versions;
+    Array& positions = m_group.m_free_positions;
+    Array& lengths   = m_group.m_free_lengths;
+    Array& versions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
 
     // Do we have a free space we can reuse?
