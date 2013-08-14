@@ -785,6 +785,36 @@ TEST(Table_Lookup)
     CHECK_EQUAL(not_found, b7);
 }
 
+namespace {
+TIGHTDB_TABLE_1(TestSubtableLookup2,
+                str, String)
+TIGHTDB_TABLE_1(TestSubtableLookup1,
+                subtab, Subtable<TestSubtableLookup2>)
+} // anonymous namespace
+
+
+TEST(Table_SubtableLookup) {
+    TestSubtableLookup1 t;
+    t.add();
+    t.add();
+    {
+        TestSubtableLookup2::Ref r0 = t[0].subtab;
+        r0->add("foo");
+        r0->add("bar");
+        const size_t i1 = r0->lookup("bar");
+        CHECK_EQUAL(1, i1);
+        const size_t i2 = r0->lookup("foobar");
+        CHECK_EQUAL(not_found, i2);
+    }
+
+    {
+        TestSubtableLookup2::Ref r1 = t[1].subtab;
+        const size_t i3 = r1->lookup("bar");
+        CHECK_EQUAL(not_found, i3);
+    }
+}
+
+
 TEST(Table_Distinct)
 {
     TestTableEnum table;
@@ -2001,7 +2031,7 @@ TEST(Table_SetSubTableByExample)
     table->insert_subtable(2, 0);
     table->insert_done();
 
-    // create a freestanding table to be used as a source by set_subtable 
+    // create a freestanding table to be used as a source by set_subtable
 
     Table  sub = Table();
     sub.add_column(type_Int,"sub_first");
