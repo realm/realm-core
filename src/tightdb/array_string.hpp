@@ -50,10 +50,6 @@ public:
     void find_all(Array& result, StringData value, std::size_t add_offset = 0,
                   std::size_t begin = 0, std::size_t end = -1);
 
-    /// Construct an empty string array and return just the reference
-    /// to the underlying memory.
-    static ref_type create_empty_string_array(Allocator&);
-
     /// Compare two string arrays for equality.
     bool compare_string(const ArrayString&) const;
 
@@ -65,9 +61,19 @@ public:
 
     ref_type btree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase& state);
 
+    /// Create a new empty string array and attach to it. This does
+    /// not modify the parent reference information.
+    ///
+    /// Note that the caller assumes ownership of the allocated
+    /// underlying node. It is not owned by the accessor.
+    void create();
+
+    /// Construct an empty string array and return just the reference
+    /// to the underlying memory.
+    static ref_type create_empty_array(Allocator&);
+
 #ifdef TIGHTDB_DEBUG
     void StringStats() const;
-    //void to_dot(FILE* f) const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
@@ -84,23 +90,16 @@ private:
 
 // Implementation:
 
-inline ref_type ArrayString::create_empty_string_array(Allocator& alloc)
-{
-    return create_empty_array(type_Normal, wtype_Multiply, alloc); // Throws
-}
-
 inline ArrayString::ArrayString(ArrayParent* parent, std::size_t ndx_in_parent,
                                 Allocator& alloc): Array(alloc)
 {
-    ref_type ref = create_empty_string_array(alloc); // Throws
-    init_from_ref(ref);
+    create(); // Throws
     set_parent(parent, ndx_in_parent);
-    update_ref_in_parent();
+    update_parent(); // Throws
 }
 
 inline ArrayString::ArrayString(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
-                                Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(alloc)
+                                Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
 {
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
@@ -108,9 +107,8 @@ inline ArrayString::ArrayString(MemRef mem, ArrayParent* parent, std::size_t ndx
     set_parent(parent, ndx_in_parent);
 }
 
-inline ArrayString::ArrayString(ref_type ref, ArrayParent *parent, std::size_t ndx_in_parent,
-                                Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(alloc)
+inline ArrayString::ArrayString(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
+                                Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
 {
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
@@ -118,8 +116,21 @@ inline ArrayString::ArrayString(ref_type ref, ArrayParent *parent, std::size_t n
     set_parent(parent, ndx_in_parent);
 }
 
-// Creates new array (but invalid, call update_ref() to init)
-inline ArrayString::ArrayString(Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc) {}
+// Creates new array (but invalid, call init_from_ref() to init)
+inline ArrayString::ArrayString(Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
+{
+}
+
+inline void ArrayString::create()
+{
+    ref_type ref = create_empty_array(get_alloc()); // Throws
+    init_from_ref(ref);
+}
+
+inline ref_type ArrayString::create_empty_array(Allocator& alloc)
+{
+    return Array::create_empty_array(type_Normal, wtype_Multiply, alloc); // Throws
+}
 
 inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
