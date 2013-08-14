@@ -72,6 +72,56 @@ private:
 } // anonymous namespace
 
 
+void spawn_daemon(const string& file)
+{
+    errno = 0; 
+    int m = sysconf(_SC_OPEN_MAX); 
+    if (m < 0) { 
+        if (errno) { 
+            // int err = errno; // TODO: include err in exception string 
+            throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed "); 
+        } 
+        throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed with no reason");
+    }
+    int pid = fork();
+    if (0 == pid) {
+        // child process goes here
+        // close all descriptors:
+        int i;
+        for (i=m;i>=0;--i) close(i); 
+        i=::open("/dev/null",O_RDWR);
+        int k = dup(i); static_cast<void>(k);
+        k = dup(i); static_cast<void>(k);
+        // detach from current session:
+        setsid();
+        // start commit daemon executable
+        const char* exe = getenv("TIGHTDBD_PATH");
+        if (exe == NULL)
+            exe = "/usr/local/bin/tightdbd";
+        execl(exe, exe, file.c_str(), (char*) NULL);
+        // if we continue here, exec has failed so return error
+        // if exec succeeds, we don't come back here.
+        exit(1);
+        // child process ends here
+    } else if (pid > 0) {
+        int status;
+        int pid_changed = waitpid(pid, &status, 0);
+        if (pid_changed != pid)
+            throw runtime_error("failed to wait for daemon start");
+        if (!WIFEXITED(status))
+            throw runtime_error("failed starting async commit (exit)");
+        if (WEXITSTATUS(status) == 1)
+            throw runtime_error("async commit daemon not found");
+        if (WEXITSTATUS(status) == 2)
+            throw runtime_error("async commit daemon failed");
+        if (WEXITSTATUS(status) == 3)
+            throw runtime_error("wrong db given to async daemon");
+    } else {
+        // fork failed!
+        throw runtime_error("Failed to spawn async commit");
+    }
+}
+
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
 //
 // According to the 'process sharing example' in the POSIX man page
@@ -190,53 +240,7 @@ retry:
             // In async mode we need a separate process to do the async commits
             // We start it up here during init so that it only get started once
             if (dlevel == durability_Async) {
-                errno = 0; 
-                int m = sysconf(_SC_OPEN_MAX); 
-                if (m < 0) { 
-                    if (errno) { 
-                        // int err = errno; // TODO: include err in exception string 
-                        throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed "); 
-                    } 
-                    throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed with no reason");
-                }
-                int pid = fork();
-                if (0 == pid) {
-                    // child process goes here
-                    // close all descriptors:
-                    int i;
-                    for (i=m;i>=0;--i) close(i); 
-                    i=::open("/dev/null",O_RDWR);
-                    int k = dup(i); static_cast<void>(k);
-                    k = dup(i); static_cast<void>(k);
-                    // detach from current session:
-                    setsid();
-                    // start commit daemon executable
-                    const char* exe = getenv("TIGHTDBD_PATH");
-                    if (exe == NULL)
-                        exe = "/usr/local/bin/tightdbd";
-                    execl(exe, exe,
-                          file.c_str(), (char*) NULL);
-                    // if we continue here, exec has failed so return error
-                    // if exec succeeds, we don't come back here.
-                    exit(1);
-                    // child process ends here
-                } else if (pid > 0) {
-                    int status;
-                    int pid_changed = waitpid(pid, &status, 0);
-                    if (pid_changed != pid)
-                        throw runtime_error("failed to wait for daemon start");
-                    if (!WIFEXITED(status))
-                        throw runtime_error("failed starting async commit (exit)");
-                    if (WEXITSTATUS(status) == 1)
-                        throw runtime_error("async commit daemon not found");
-                    if (WEXITSTATUS(status) == 2)
-                        throw runtime_error("async commit daemon failed");
-                    if (WEXITSTATUS(status) == 3)
-                        throw runtime_error("wrong db given to async daemon");
-                } else {
-                    // fork failed!
-                    throw runtime_error("Failed to spawn async commit");
-                }
+                spawn_daemon(file);
             }
 
             // FIXME: This downgrading of the lock is not guaranteed to be atomic
