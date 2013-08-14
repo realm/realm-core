@@ -1,6 +1,7 @@
 #include <pthread.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <sys/wait.h>
 
 #include <tightdb/terminate.hpp>
 #include <tightdb/safe_int_ops.hpp>
@@ -196,10 +197,12 @@ retry:
                         // int err = errno; // TODO: include err in exception string 
                         throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed "); 
                     } 
-                    throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed with no reason"); 
+                    throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed with no reason");
                 }
-                if (fork() == 0) {
-                    /* close all descriptors: */
+                int pid = fork();
+                if (0 == pid) {
+                    // child process goes here
+                    // close all descriptors:
                     int i;
                     for (i=m;i>=0;--i) close(i); 
                     i=::open("/dev/null",O_RDWR);
@@ -208,18 +211,32 @@ retry:
                     // detach from current session:
                     setsid();
                     // start commit daemon executable
-                    const char* exe = getenv("TIGTHDBD_PATH");
+                    const char* exe = getenv("TIGHTDBD_PATH");
                     if (exe == NULL)
                         exe = "/usr/local/bin/tightdbd";
                     execl(exe, exe,
                           file.c_str(), (char*) NULL);
-                    throw runtime_error("Failed to start async commit");
-                    // NOTE: we do not use the double for parent when spawnign
-                    // the daemon. The double fork pattern is used to guarantee that
-                    // the forked process cannot re-acquire terminal. We do not
-                    // need that guarantee.
+                    // if we continue here, exec has failed so return error
+                    // if exec succeeds, we don't come back here.
+                    exit(1);
+                    // child process ends here
+                } else if (pid > 0) {
+                    int status;
+                    int pid_changed = waitpid(pid, &status, 0);
+                    if (pid_changed != pid)
+                        throw runtime_error("failed to wait for daemon start");
+                    if (!WIFEXITED(status))
+                        throw runtime_error("failed starting async commit (exit)");
+                    if (WEXITSTATUS(status) == 1)
+                        throw runtime_error("async commit daemon not found");
+                    if (WEXITSTATUS(status) == 2)
+                        throw runtime_error("async commit daemon failed");
+                    if (WEXITSTATUS(status) == 3)
+                        throw runtime_error("wrong db given to async daemon");
+                } else {
+                    // fork failed!
+                    throw runtime_error("Failed to spawn async commit");
                 }
-
             }
 
             // FIXME: This downgrading of the lock is not guaranteed to be atomic
@@ -263,7 +280,12 @@ retry:
             // In async mode we need to wait for the commit process to get ready
             // so we wait for first read lock being made by async_commit process
             SharedInfo* const info = m_file_map.get_addr();
-            while (info->put_pos == 0) usleep(2);
+            int maxwait = 500;
+            while (maxwait--) {
+                if (info->put_pos == 0) return;
+                usleep(2);
+            }
+            throw runtime_error("Failed to observe async commit starting");
         }
     }
 }
