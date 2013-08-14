@@ -35,11 +35,21 @@ namespace tightdb {
 /// A separate thread of execution.
 ///
 /// This class is a C++03 compatible reproduction of a subset of
-/// std::thread from C++11.
+/// std::thread from C++11 (when discounting Thread::start()).
 class Thread {
 public:
-    template<class F> explicit Thread(F func);
+    Thread();
     ~Thread();
+
+    template<class F> explicit Thread(F func);
+
+    /// This method is an extension to the API provided by
+    /// std::thread. This method exists because proper move semantics
+    /// is unavailable in C++03. If move semantics had been available,
+    /// calling <tt>start(func)</tt> would have been equivalent to
+    /// <tt>*this = Thread(func)</tt>. Please see
+    /// std::thread::operator=() for details.
+    template<class F> void start(F func);
 
     bool joinable() TIGHTDB_NOEXCEPT;
 
@@ -48,6 +58,10 @@ public:
 private:
     pthread_t m_id;
     bool m_joinable;
+
+    typedef void* (*entry_func_type)(void*);
+
+    void start(entry_func_type, void* arg);
 
     template<class> static void* entry_point(void*) TIGHTDB_NOEXCEPT;
 
@@ -136,15 +150,23 @@ private:
 
 // Implementation:
 
+inline Thread::Thread(): m_joinable(false) {}
+
 template<class F> inline Thread::Thread(F func): m_joinable(true)
 {
-    UniquePtr<F> func2(new F(func));
-    const pthread_attr_t* attr = 0; // Use default thread attributes
-    int r = pthread_create(&m_id, attr, &Thread::entry_point<F>, func2.get());
-    if (TIGHTDB_UNLIKELY(r != 0)) {
-        create_failed(r); // Throws
-    }
+    UniquePtr<F> func2(new F(func)); // Throws
+    start(&Thread::entry_point<F>, func2.get()); // Throws
     func2.release();
+}
+
+template<class F> inline void Thread::start(F func)
+{
+    if (m_joinable)
+        std::terminate();
+    UniquePtr<F> func2(new F(func)); // Throws
+    start(&Thread::entry_point<F>, func2.get()); // Throws
+    func2.release();
+    m_joinable = true;
 }
 
 inline Thread::~Thread()
@@ -170,6 +192,15 @@ inline void Thread::join()
         join_failed(r); // Throws
     }
     m_joinable = false;
+}
+
+inline void Thread::start(entry_func_type entry_func, void* arg)
+{
+    const pthread_attr_t* attr = 0; // Use default thread attributes
+    int r = pthread_create(&m_id, attr, entry_func, arg);
+    if (TIGHTDB_UNLIKELY(r != 0)) {
+        create_failed(r); // Throws
+    }
 }
 
 template<class F> inline void* Thread::entry_point(void* cookie) TIGHTDB_NOEXCEPT

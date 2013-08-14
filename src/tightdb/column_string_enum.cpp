@@ -37,16 +37,16 @@ void ColumnStringEnum::destroy()
         m_index->destroy();
 }
 
-void ColumnStringEnum::UpdateParentNdx(int diff)
+void ColumnStringEnum::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
 {
-    m_keys.UpdateParentNdx(diff);
-    Column::UpdateParentNdx(diff);
+    m_keys.adjust_ndx_in_parent(diff);
+    Column::adjust_ndx_in_parent(diff);
 }
 
-void ColumnStringEnum::UpdateFromParent()
+void ColumnStringEnum::update_from_parent() TIGHTDB_NOEXCEPT
 {
-    m_array->UpdateFromParent();
-    m_keys.UpdateFromParent();
+    m_array->update_from_parent();
+    m_keys.update_from_parent();
 }
 
 void ColumnStringEnum::add(StringData value)
@@ -188,7 +188,7 @@ size_t ColumnStringEnum::GetKeyNdxOrAdd(StringData value)
     }
 }
 
-bool ColumnStringEnum::compare(const AdaptiveStringColumn& c) const
+bool ColumnStringEnum::compare_string(const AdaptiveStringColumn& c) const
 {
     const size_t n = size();
     if (c.size() != n) return false;
@@ -198,7 +198,7 @@ bool ColumnStringEnum::compare(const AdaptiveStringColumn& c) const
     return true;
 }
 
-bool ColumnStringEnum::compare(const ColumnStringEnum& c) const
+bool ColumnStringEnum::compare_string(const ColumnStringEnum& c) const
 {
     const size_t n = size();
     if (c.size() != n) return false;

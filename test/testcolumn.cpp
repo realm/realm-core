@@ -445,9 +445,9 @@ TEST_FIXTURE(db_setup, Column_PartialFind1)
 
 TEST_FIXTURE(db_setup, Column_HeaderParse)
 {
-    Column column(c.get_ref(), NULL, 0);
-    const bool isEqual = (c == column);
-    CHECK(isEqual);
+    Column column(c.get_ref(), 0, 0);
+    bool is_equal = c.compare_int(column);
+    CHECK(is_equal);
 }
 
 TEST_FIXTURE(db_setup, Column_Destroy)
@@ -555,47 +555,43 @@ TEST(Column_FindAll_IntMax)
 }
 
 
-TEST(Column_FindSorted)
+TEST(Column_LowerUpperBound)
 {
     // Create column with sorted members
     Column col;
+    col.add(5);
     for (size_t i = 5; i < 100; i += 5) {
         col.add(i);
     }
 
-    size_t pos;
-    bool res = col.find_sorted(0, pos);
-    CHECK_EQUAL(false, res);
-    CHECK_EQUAL(0, pos); // insert position
+    // before first entry
+    CHECK_EQUAL(0, col.lower_bound_int(0));
+    CHECK_EQUAL(0, col.upper_bound_int(0));
 
-    // first entry
-    res = col.find_sorted(5, pos);
-    CHECK_EQUAL(true, res);
-    CHECK_EQUAL(0, pos); // actual position
+    // first entry (duplicate)
+    CHECK_EQUAL(0, col.lower_bound_int(5));
+    CHECK_EQUAL(2, col.upper_bound_int(5));
 
     // middle entry
-    res = col.find_sorted(50, pos);
-    CHECK_EQUAL(true, res);
-    CHECK_EQUAL(9, pos); // actual position
+    CHECK_EQUAL(10, col.lower_bound_int(50));
+    CHECK_EQUAL(11, col.upper_bound_int(50));
 
     // non-existent middle entry
-    res = col.find_sorted(52, pos);
-    CHECK_EQUAL(false, res);
-    CHECK_EQUAL(10, pos); // insert position
+    CHECK_EQUAL(11, col.lower_bound_int(52));
+    CHECK_EQUAL(11, col.upper_bound_int(52));
 
     // last entry
-    res = col.find_sorted(95, pos);
-    CHECK_EQUAL(true, res);
-    CHECK_EQUAL(18, pos); // actual position
+    CHECK_EQUAL(19, col.lower_bound_int(95));
+    CHECK_EQUAL(20, col.upper_bound_int(95));
 
     // beyond last entry
-    res = col.find_sorted(96, pos);
-    CHECK_EQUAL(false, res);
-    CHECK_EQUAL(19, pos); // insert position
+    CHECK_EQUAL(20, col.lower_bound_int(96));
+    CHECK_EQUAL(20, col.upper_bound_int(96));
 
     // Clean up
     col.destroy();
 }
+
 
 TEST(Column_Average)
 {

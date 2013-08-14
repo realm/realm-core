@@ -249,9 +249,7 @@ size_t ColumnBase::get_size_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOE
 bool ColumnBase::root_is_leaf_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
     const char* header = alloc.translate(ref);
-    const unsigned char* header_2 = reinterpret_cast<const unsigned char*>(header);
-    bool root_is_leaf = (header_2[0] & 0x80) == 0;
-    return root_is_leaf;
+    return Array::get_isleaf_from_header(header);
 }
 
 
@@ -261,8 +259,8 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
     Allocator& alloc = orig_root->get_alloc();
 
     Array new_refs(alloc), new_offsets(alloc);
-    new_refs.set_type(Array::type_HasRefs);
-    new_offsets.set_type(Array::type_Normal);
+    new_refs.create(Array::type_HasRefs);
+    new_offsets.create(Array::type_Normal);
     new_refs.add(orig_root->get_ref());
     new_refs.add(new_sibling_ref);
     new_offsets.add(state.m_split_offset);
@@ -277,38 +275,7 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
     m_array = new_root.release();
 }
 
-
-Column::Column(Allocator& alloc)
-{
-    m_array = new Array(Array::type_Normal, 0, 0, alloc);
-    Create();
-}
-
-Column::Column(Array::Type type, Allocator& alloc)
-{
-    m_array = new Array(type, 0, 0, alloc);
-    Create();
-}
-
-Column::Column(Array::Type type, ArrayParent* parent, size_t pndx, Allocator& alloc)
-{
-    m_array = new Array(type, parent, pndx, alloc);
-    Create();
-}
-
-Column::Column(ref_type ref, ArrayParent* parent, size_t pndx, Allocator& alloc)
-{
-    m_array = new Array(ref, parent, pndx, alloc);
-}
-
-Column::Column(const Column& column): ColumnBase()
-{
-    m_array = column.m_array; // we now own array
-    // FIXME: Unfortunate hidden constness violation here
-    column.m_array = 0;       // so invalidate source
-}
-
-void Column::Create()
+void Column::create()
 {
     // Add subcolumns for nodes
     if (!root_is_leaf()) {
@@ -317,27 +284,6 @@ void Column::Create()
         m_array->add(offsets.get_ref());
         m_array->add(refs.get_ref());
     }
-}
-
-void Column::update_ref(ref_type ref)
-{
-    m_array->update_ref(ref);
-}
-
-bool Column::operator==(const Column& column) const
-{
-    return *m_array == *column.m_array;
-}
-
-Column::~Column()
-{
-    delete m_array;
-}
-
-void Column::destroy()
-{
-    if (m_array)
-        m_array->destroy();
 }
 
 
@@ -355,17 +301,6 @@ size_t Column::size() const TIGHTDB_NOEXCEPT
         return m_array->size();
     Array offsets = NodeGetOffsets();
     return offsets.is_empty() ? 0 : to_size_t(offsets.back());
-}
-
-void Column::UpdateParentNdx(int diff)
-{
-    m_array->UpdateParentNdx(diff);
-}
-
-// Used by column b-tree code to ensure all leaf having same type
-void Column::SetHasRefs()
-{
-    m_array->set_type(Array::type_HasRefs);
 }
 
 void Column::clear()
@@ -487,15 +422,6 @@ void Column::ReferenceSort(size_t start, size_t end, Column& ref)
         ref.add(ResI->get(t));
 }
 
-size_t ColumnBase::GetRefSize(ref_type ref) const
-{
-    // parse the length part of 8byte header
-    Allocator& alloc = m_array->get_alloc();
-    const char* header = alloc.translate(ref);
-    const unsigned char* header_2 = reinterpret_cast<const unsigned char*>(header);
-    return (header_2[1] << 16) + (header_2[2] << 8) + header_2[3];
-}
-
 Array ColumnBase::NodeGetOffsets() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(!root_is_leaf());
@@ -523,7 +449,8 @@ void Column::erase(size_t ndx)
         ref_type ref = refs.get_as_ref(0);
         refs.erase(0); // avoid destroying subtree
         m_array->destroy();
-        m_array->update_ref(ref);
+        m_array->init_from_ref(ref);
+        m_array->update_parent(); // Throws
     }
 }
 
@@ -597,102 +524,12 @@ void Column::LeafFindAll(Array& result, int64_t value, size_t add_offset, size_t
     m_array->find_all(result, value, add_offset, start, end);
 }
 
-size_t Column::find_pos(int64_t target) const TIGHTDB_NOEXCEPT
-{
-    // NOTE: Binary search only works if the column is sorted
-
-    if (root_is_leaf()) {
-        return m_array->FindPos(target);
-    }
-
-    int len = int(size());
-    int low = -1;
-    int high = len;
-
-    // Binary search based on:
-    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
-    // Finds position of largest value SMALLER than the target
-    while (high - low > 1) {
-        size_t probe = (unsigned(low) + unsigned(high)) >> 1;
-        int64_t v = get(probe);
-
-        if (v > target)
-            high = int(probe);
-        else
-            low  = int(probe);
-    }
-    if (high == len)
-        return not_found;
-    else
-        return high;
-}
-
-size_t Column::find_pos2(int64_t target) const TIGHTDB_NOEXCEPT
-{
-    // NOTE: Binary search only works if the column is sorted
-
-    if (root_is_leaf()) {
-        return m_array->FindPos2(target);
-    }
-
-    int len = int(size());
-    int low = -1;
-    int high = len;
-
-    // Binary search based on:
-    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
-    // Finds position of closest value BIGGER OR EQUAL to the target
-    while (high - low > 1) {
-        size_t probe = (unsigned(low) + unsigned(high)) >> 1;
-        int64_t v = get(probe);
-
-        if (v < target)
-            low  = int(probe);
-        else
-            high = int(probe);
-    }
-    if (high == len)
-        return not_found;
-    else
-        return high;
-}
-
-bool Column::find_sorted(int64_t target, size_t& pos) const TIGHTDB_NOEXCEPT
-{
-    if (root_is_leaf()) {
-        return m_array->FindPosSorted(target, pos);
-    }
-
-    size_t len = size();
-    size_t low = size_t(-1);
-    size_t high = len;
-
-    // Binary search based on:
-    // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
-    // Finds position of closest value BIGGER OR EQUAL to the target
-    while (high - low > 1) {
-        size_t probe = (low + high) >> 1;
-        int64_t v = get(probe);
-
-        if (v < target)
-            low  = probe;
-        else
-            high = probe;
-    }
-
-    pos = high;
-    if (high == len)
-        return false;
-    else
-        return get(high) == target;
-}
-
 void Column::sort()
 {
     sort(0, size());
 }
 
-bool Column::compare(const Column& c) const
+bool Column::compare_int(const Column& c) const
 {
     size_t n = size();
     if (c.size() != n)
@@ -730,10 +567,10 @@ void Column::do_insert(size_t ndx, int64_t value)
 
 #ifdef TIGHTDB_DEBUG
 
-void Column::Print() const
+void Column::print() const
 {
     if (root_is_leaf()) {
-        m_array->Print();
+        m_array->print();
         return;
     }
 
@@ -747,7 +584,7 @@ void Column::Print() const
     }
     for (size_t i = 0; i < refs.size(); ++i) {
         Column col(refs.get_as_ref(i));
-        col.Print();
+        col.print();
     }
 }
 
@@ -783,7 +620,7 @@ void Column::Verify() const
 
 void ColumnBase::to_dot(ostream& out, StringData title) const
 {
-    ref_type ref = get_ref();
+    ref_type ref = m_array->get_ref();
 
     out << "subgraph cluster_column" << ref << " {" << endl;
     out << " label = \"Column";
@@ -828,10 +665,10 @@ void ColumnBase::leaf_to_dot(ostream& out, const Array& array) const
     array.to_dot(out);
 }
 
-MemStats Column::Stats() const
+MemStats Column::stats() const
 {
     MemStats stats;
-    m_array->Stats(stats);
+    m_array->stats(stats);
 
     return stats;
 }

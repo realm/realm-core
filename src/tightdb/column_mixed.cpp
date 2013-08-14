@@ -18,24 +18,19 @@ void ColumnMixed::destroy()
         m_array->destroy();
 }
 
-void ColumnMixed::set_parent(ArrayParent* parent, size_t ndx_in_parent)
+void ColumnMixed::update_from_parent() TIGHTDB_NOEXCEPT
 {
-    m_array->set_parent(parent, ndx_in_parent);
-}
-
-void ColumnMixed::UpdateFromParent()
-{
-    if (!m_array->UpdateFromParent())
+    if (!m_array->update_from_parent())
         return;
 
-    m_types->UpdateFromParent();
-    m_refs->UpdateFromParent();
+    m_types->update_from_parent();
+    m_refs->update_from_parent();
     if (m_data)
-        m_data->UpdateFromParent();
+        m_data->update_from_parent();
 }
 
 
-void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx)
+void ColumnMixed::create(Allocator& alloc, const Table* table, size_t column_ndx)
 {
     m_array = new Array(Array::type_HasRefs, 0, 0, alloc);
 
@@ -49,7 +44,7 @@ void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx
     m_refs->set_parent(m_array, 1);
 }
 
-void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx,
+void ColumnMixed::create(Allocator& alloc, const Table* table, size_t column_ndx,
                          ArrayParent* parent, size_t ndx_in_parent, ref_type ref)
 {
     m_array = new Array(ref, parent, ndx_in_parent, alloc);
@@ -70,7 +65,7 @@ void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx
     }
 }
 
-void ColumnMixed::InitDataColumn()
+void ColumnMixed::init_data_column()
 {
     if (m_data)
         return;
@@ -133,19 +128,19 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType new_type)
 void ColumnMixed::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
+    invalidate_subtables();
 
     // Remove refs or binary data
     clear_value(ndx, mixcol_Int);
 
     m_types->erase(ndx);
     m_refs->erase(ndx);
-
-    invalidate_subtables();
 }
 
 void ColumnMixed::move_last_over(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx+1 < size());
+    invalidate_subtables();
 
     // Remove refs or binary data
     clear_value(ndx, mixcol_Int);
@@ -156,6 +151,7 @@ void ColumnMixed::move_last_over(size_t ndx)
 
 void ColumnMixed::clear()
 {
+    invalidate_subtables();
     m_types->clear();
     m_refs->clear();
     if (m_data)
@@ -196,9 +192,10 @@ void ColumnMixed::fill(size_t count)
 void ColumnMixed::set_string(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
-    InitDataColumn();
+    invalidate_subtables();
+    init_data_column();
 
-    const MixedColType type = MixedColType(m_types->get(ndx));
+    MixedColType type = MixedColType(m_types->get(ndx));
 
     // See if we can reuse data position
     if (type == mixcol_String) {
@@ -229,7 +226,8 @@ void ColumnMixed::set_string(size_t ndx, StringData value)
 void ColumnMixed::set_binary(size_t ndx, BinaryData value)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
-    InitDataColumn();
+    invalidate_subtables();
+    init_data_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
 
@@ -259,7 +257,7 @@ void ColumnMixed::set_binary(size_t ndx, BinaryData value)
     }
 }
 
-bool ColumnMixed::compare(const ColumnMixed& c) const
+bool ColumnMixed::compare_mixed(const ColumnMixed& c) const
 {
     const size_t n = size();
     if (c.size() != n)

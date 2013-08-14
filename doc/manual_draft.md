@@ -40,3 +40,14 @@ January 1970, not counting leap seconds.
 Please note that it is not currently possible to store a date that
 preceeds the year 1970. We are working on an improved date/time
 representation that does not have this limitation.
+
+
+
+Misc.:
+------
+
+Due to memory mapping, read/write errors are not reported by the
+library in the usual way. On Linux an application will have to install
+signal handlers to cach such errors. The only exception to this rule
+is Group::write(), which will report write errors by throwing an
+exception.
