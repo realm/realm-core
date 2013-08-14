@@ -137,7 +137,7 @@ void ColumnTable::Verify() const
     for (size_t i = 0; i < n; ++i) {
         // We want to verify any cached table instance so we do not
         // want to skip null refs here.
-        ConstTableRef subtable = get_subtable(i, m_ref_specSet);
+        ConstTableRef subtable = get_subtable(i, m_spec_ref);
         subtable->Verify();
     }
 }
@@ -150,7 +150,7 @@ void ColumnTable::leaf_to_dot(ostream& out, const Array& array) const
     for (size_t i = 0; i < n; ++i) {
         if (array.get_as_ref(i) == 0)
             continue;
-        ConstTableRef subtable = get_subtable(i, m_ref_specSet);
+        ConstTableRef subtable = get_subtable(i, m_spec_ref);
         subtable->to_dot(out);
     }
 }
