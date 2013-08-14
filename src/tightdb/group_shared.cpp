@@ -218,8 +218,13 @@ retry:
             pthread_mutexattr_init(&mattr);
             // FIXME: Must verify availability of optional feature: #ifdef _POSIX_THREAD_PROCESS_SHARED
             pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
-            // FIXME: Should also do pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST). Check for availability with: #if _POSIX_THREADS >= 200809L
             pthread_mutex_init(&info->readmutex, &mattr);
+#if _POSIX_THREADS >= 200809L
+            // Only making writemutex robust - readmutex only covers
+            // our own code, while the writemutex may be held during
+            // execution of arbitrary client code.
+            pthread_mutexattr_setrobust(&mattr, PTHREAD_MUTEX_ROBUST);
+#endif
             pthread_mutex_init(&info->writemutex, &mattr);
             pthread_mutexattr_destroy(&mattr);
 
@@ -548,8 +553,12 @@ Group& SharedGroup::begin_write()
     // Get write lock
     // Note that this will not get released until we call
     // commit() or rollback()
-    pthread_mutex_lock(&info->writemutex);
-
+    int status = pthread_mutex_lock(&info->writemutex);
+#if _POSIX_THREADS >= 200809L
+    if (status == EOWNERDEAD) {
+        pthread_mutex_consistent(&info->writemutex);
+    }
+#endif
     // Get the current top ref
     size_t new_topref   = to_size_t(info->current_top);
     size_t new_filesize = to_size_t(info->filesize);
