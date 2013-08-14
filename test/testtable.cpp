@@ -478,6 +478,141 @@ TEST(Table_Move_All_Types)
     }
 }
 
+
+TEST(Table_DegenerateSubtableSearchAndAggregate)
+{
+    Table parent;
+    {
+        Spec& parent_spec = parent.get_spec();
+        Spec child_spec = parent_spec.add_subtable_column("child");
+
+        // Add all column types
+        child_spec.add_column(type_Int,    "int");    // 0
+        child_spec.add_column(type_Bool,   "bool");   // 1
+        child_spec.add_column(type_Float,  "float");  // 2
+        child_spec.add_column(type_Double, "double"); // 3
+        child_spec.add_column(type_Date,   "date");   // 4
+        child_spec.add_column(type_String, "string"); // 5
+        child_spec.add_column(type_Binary, "binary"); // 6
+        {
+            Spec subspec = child_spec.add_subtable_column("table"); // 7
+            subspec.add_column(type_Int, "i");
+        }
+        child_spec.add_column(type_Mixed,  "mixed");  // 8
+    }
+    parent.update_from_spec();
+
+    parent.add_empty_row(); // Create a degenerate subtable
+
+    ConstTableRef degen_child = parent.get_subtable(0,0); // NOTE: Constness is essential here!!!
+
+
+    // Searching:
+
+    CHECK_EQUAL(not_found, degen_child->lookup(StringData()));
+    CHECK_EQUAL(0, degen_child->distinct(0).size());
+    CHECK_EQUAL(0, degen_child->get_sorted_view(0).size());
+
+    CHECK_EQUAL(not_found, degen_child->find_first_int(0, 0));
+    CHECK_EQUAL(not_found, degen_child->find_first_bool(1, false));
+    CHECK_EQUAL(not_found, degen_child->find_first_float(2, 0));
+    CHECK_EQUAL(not_found, degen_child->find_first_double(3, 0));
+    CHECK_EQUAL(not_found, degen_child->find_first_date(4, Date()));
+    CHECK_EQUAL(not_found, degen_child->find_first_string(5, StringData()));
+//    CHECK_EQUAL(not_found, degen_child->find_first_binary(6, BinaryData())); // Exists but not yet implemented
+//    CHECK_EQUAL(not_found, degen_child->find_first_subtable(7, subtab)); // Not yet implemented
+//    CHECK_EQUAL(not_found, degen_child->find_first_mixed(8, Mixed())); // Not yet implemented
+
+    CHECK_EQUAL(0, degen_child->find_all_int(0, 0).size());
+    CHECK_EQUAL(0, degen_child->find_all_bool(1, false).size());
+    CHECK_EQUAL(0, degen_child->find_all_float(2, 0).size());
+    CHECK_EQUAL(0, degen_child->find_all_double(3, 0).size());
+    CHECK_EQUAL(0, degen_child->find_all_date(4, Date()).size());
+    CHECK_EQUAL(0, degen_child->find_all_string(5, StringData()).size());
+//    CHECK_EQUAL(0, degen_child->find_all_binary(6, BinaryData()).size()); // Exists but not yet implemented
+//    CHECK_EQUAL(0, degen_child->find_all_subtable(7, subtab).size()); // Not yet implemented
+//    CHECK_EQUAL(0, degen_child->find_all_mixed(8, Mixed()).size()); // Not yet implemented
+
+    CHECK_EQUAL(0, degen_child->lower_bound_int(0, 0));
+    CHECK_EQUAL(0, degen_child->lower_bound_bool(1, false));
+    CHECK_EQUAL(0, degen_child->lower_bound_float(2, 0));
+    CHECK_EQUAL(0, degen_child->lower_bound_double(3, 0));
+//    CHECK_EQUAL(0, degen_child->lower_bound_date(4, Date())); // Not yet implemented
+    CHECK_EQUAL(0, degen_child->lower_bound_string(5, StringData()));
+//    CHECK_EQUAL(0, degen_child->lower_bound_binary(6, BinaryData())); // Not yet implemented
+//    CHECK_EQUAL(0, degen_child->lower_bound_subtable(7, subtab)); // Not yet implemented
+//    CHECK_EQUAL(0, degen_child->lower_bound_mixed(8, Mixed())); // Not yet implemented
+
+    CHECK_EQUAL(0, degen_child->upper_bound_int(0, 0));
+    CHECK_EQUAL(0, degen_child->upper_bound_bool(1, false));
+    CHECK_EQUAL(0, degen_child->upper_bound_float(2, 0));
+    CHECK_EQUAL(0, degen_child->upper_bound_double(3, 0));
+//    CHECK_EQUAL(0, degen_child->upper_bound_date(4, Date())); // Not yet implemented
+    CHECK_EQUAL(0, degen_child->upper_bound_string(5, StringData()));
+//    CHECK_EQUAL(0, degen_child->upper_bound_binary(6, BinaryData())); // Not yet implemented
+//    CHECK_EQUAL(0, degen_child->upper_bound_subtable(7, subtab)); // Not yet implemented
+//    CHECK_EQUAL(0, degen_child->upper_bound_mixed(8, Mixed())); // Not yet implemented
+
+
+    // Aggregates:
+
+    CHECK_EQUAL(0, degen_child->count_int(0, 0));
+//    CHECK_EQUAL(0, degen_child->count_bool(1, false)); // Not yet implemented
+    CHECK_EQUAL(0, degen_child->count_float(2, 0));
+    CHECK_EQUAL(0, degen_child->count_double(3, 0));
+//    CHECK_EQUAL(0, degen_child->count_date(4, Date())); // Not yet implemented
+    CHECK_EQUAL(0, degen_child->count_string(5, StringData()));
+//    CHECK_EQUAL(0, degen_child->count_binary(6, BinaryData())); // Not yet implemented
+//    CHECK_EQUAL(0, degen_child->count_subtable(7, subtab)); // Not yet implemented
+//    CHECK_EQUAL(0, degen_child->count_mixed(8, Mixed())); // Not yet implemented
+
+    CHECK_EQUAL(0, degen_child->minimum(0));
+    CHECK_EQUAL(0, degen_child->minimum_float(2));
+    CHECK_EQUAL(0, degen_child->minimum_double(3));
+//    CHECK_EQUAL(Date(), degen_child->minimum_date(4, Date())); // Not yet implemented
+
+    CHECK_EQUAL(0, degen_child->maximum(0));
+    CHECK_EQUAL(0, degen_child->maximum_float(2));
+    CHECK_EQUAL(0, degen_child->maximum_double(3));
+//    CHECK_EQUAL(Date(), degen_child->maximum_date(4, Date())); // Not yet implemented
+
+    CHECK_EQUAL(0, degen_child->sum(0));
+    CHECK_EQUAL(0, degen_child->sum_float(2));
+    CHECK_EQUAL(0, degen_child->sum_double(3));
+
+    CHECK_EQUAL(0, degen_child->average(0));
+    CHECK_EQUAL(0, degen_child->average_float(2));
+    CHECK_EQUAL(0, degen_child->average_double(3));
+
+
+    // Queries:
+
+    // FIXME: Whoops, queries currently does not work on a const
+    // qualified table. Please reanable the following tests when this
+    // is fixed.
+/*
+    CHECK_EQUAL(not_found, degen_child->where().equal(0, int64_t()).find_next());
+    CHECK_EQUAL(not_found, degen_child->where().equal(1, false).find_next());
+    CHECK_EQUAL(not_found, degen_child->where().equal(2, float()).find_next());
+    CHECK_EQUAL(not_found, degen_child->where().equal(3, double()).find_next());
+    CHECK_EQUAL(not_found, degen_child->where().equal_date(4, Date()).find_next());
+    CHECK_EQUAL(not_found, degen_child->where().equal(5, StringData()).find_next());
+    CHECK_EQUAL(not_found, degen_child->where().equal(6, BinaryData()).find_next());
+//    CHECK_EQUAL(not_found, degen_child->where().equal(7, subtab).find_next()); // Not yet implemented
+//    CHECK_EQUAL(not_found, degen_child->where().equal(8, Mixed()).find_next()); // Not yet implemented
+
+    CHECK_EQUAL(not_found, degen_child->where().not_equal(0, int64_t()).find_next());
+    CHECK_EQUAL(not_found, degen_child->where().not_equal(2, float()).find_next());
+    CHECK_EQUAL(not_found, degen_child->where().not_equal(3, double()).find_next());
+    CHECK_EQUAL(not_found, degen_child->where().not_equal_date(4, Date()).find_next());
+    CHECK_EQUAL(not_found, degen_child->where().not_equal(5, StringData()).find_next());
+    CHECK_EQUAL(not_found, degen_child->where().not_equal(6, BinaryData()).find_next());
+//    CHECK_EQUAL(not_found, degen_child->where().not_equal(7, subtab).find_next()); // Not yet implemented
+//    CHECK_EQUAL(not_found, degen_child->where().not_equal(8, Mixed()).find_next()); // Not yet implemented
+*/
+}
+
+
 // enable to generate testfiles for to_string and json below
 #define GENERATE 0
 

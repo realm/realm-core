@@ -330,7 +330,7 @@ public:
     //@}
 
     // Queries
-    Query       where() { return Query(*this); }
+    Query       where()       { return Query(*this); }
     const Query where() const { return Query(*this); } // FIXME: There is no point in returning a const Query. We need a ConstQuery class.
 
     // Optimizing
