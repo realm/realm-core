@@ -74,6 +74,7 @@ private:
 
 void spawn_daemon(const string& file)
 {
+    // determine maximum number of open descriptors
     errno = 0; 
     int m = sysconf(_SC_OPEN_MAX); 
     if (m < 0) { 
@@ -83,17 +84,20 @@ void spawn_daemon(const string& file)
         } 
         throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed with no reason");
     }
+
     int pid = fork();
-    if (0 == pid) {
-        // child process goes here
+    if (0 == pid) { // child process:
+
         // close all descriptors:
         int i;
         for (i=m;i>=0;--i) close(i); 
         i=::open("/dev/null",O_RDWR);
         int k = dup(i); static_cast<void>(k);
         k = dup(i); static_cast<void>(k);
+
         // detach from current session:
         setsid();
+
         // start commit daemon executable
         // Note that getenv (which is not thread safe) is called in a 
         // single threaded context. This is ensured by the fork above.
@@ -101,11 +105,15 @@ void spawn_daemon(const string& file)
         if (exe == NULL)
             exe = "/usr/local/bin/tightdbd";
         execl(exe, exe, file.c_str(), (char*) NULL);
+
         // if we continue here, exec has failed so return error
         // if exec succeeds, we don't come back here.
         exit(1);
         // child process ends here
-    } else if (pid > 0) {
+
+    } else if (pid > 0) { // parent process, fork succeeded:
+
+        // use childs exit code to catch and report any errors:
         int status;
         int pid_changed = waitpid(pid, &status, 0);
         if (pid_changed != pid)
@@ -118,8 +126,9 @@ void spawn_daemon(const string& file)
             throw runtime_error("async commit daemon failed");
         if (WEXITSTATUS(status) == 3)
             throw runtime_error("wrong db given to async daemon");
-    } else {
-        // fork failed!
+
+    } else { // Parent process, fork failed!
+
         throw runtime_error("Failed to spawn async commit");
     }
 }
