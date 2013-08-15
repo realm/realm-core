@@ -232,9 +232,11 @@ retry:
             // Only making writemutex robust - readmutex only covers
             // our own code, while the writemutex may be held during
             // execution of arbitrary client code.
-            pthread_mutexattr_setrobust(&mattr, PTHREAD_MUTEX_ROBUST);
+            if (pthread_mutexattr_setrobust(&mattr, PTHREAD_MUTEX_ROBUST))
+                throw runtime_error("setrobust failed");
 #endif
-            pthread_mutex_init(&info->writemutex, &mattr);
+            if (pthread_mutex_init(&info->writemutex, &mattr))
+                throw runtime_error("mutex_init failed");
             pthread_mutexattr_destroy(&mattr);
 
             SlabAlloc& alloc = m_group.get_allocator();
@@ -314,7 +316,7 @@ retry:
             SharedInfo* const info = m_file_map.get_addr();
             int maxwait = 500;
             while (maxwait--) {
-                if (info->put_pos == 0) return;
+                if (info->put_pos != 0) return;
                 usleep(2);
             }
             throw runtime_error("Failed to observe async commit starting");
