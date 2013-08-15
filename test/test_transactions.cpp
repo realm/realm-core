@@ -5,12 +5,13 @@
 #include <iostream>
 #include <iomanip>
 
-#include <pthread.h>
-
 #include <UnitTest++.h>
 
-#include <tightdb/file.hpp>
 #include <tightdb/group_shared.hpp>
+#include <tightdb/file.hpp>
+#include <tightdb/thread.hpp>
+#include <tightdb/bind.hpp>
+
 #include "testsettings.hpp"
 
 using namespace std;
@@ -387,48 +388,60 @@ void thread(int index, string database_path)
 }
 
 
-struct ThreadWrapper {
-    void run(int index, string database_path)
+class ThreadWrapper {
+public:
+    template<class F> void start(const F& func)
     {
-        m_index         = index;
-        m_database_path = database_path;
-        m_error         = false;
-        const int rc = pthread_create(&m_pthread, 0, &ThreadWrapper::run, this);
-        if (rc != 0) throw runtime_error("pthread_create() failed");
+        m_except = false;
+        m_thread.start(util::bind(&Runner<F>::run, func, this));
     }
 
-    // Returns 'true' on error
+    /// Returns 'true' if thread has thrown an exception. In that case
+    /// the exception message will also be writte to std::cerr.
     bool join()
     {
-        const int rc = pthread_join(m_pthread, 0);
-        if (rc != 0) throw runtime_error("pthread_join() failed");
-        return m_error;
+        string except_msg;
+        if (join(except_msg)) {
+            cerr << "Exception thrown in thread: "<<except_msg<<"\n";
+            return true;
+        }
+        return false;
+    }
+
+    /// Returns 'true' if thread has thrown an exception. In that
+    /// case the exception message will have been assigned to \a
+    /// except_msg.
+    bool join(string& except_msg)
+    {
+        m_thread.join();
+        if (m_except) {
+            except_msg = m_except_msg;
+            return true;
+        }
+        return false;
     }
 
 private:
-    pthread_t m_pthread;
-    int m_index;
-    string m_database_path;
-    bool m_error;
+    Thread m_thread;
+    bool m_except;
+    string m_except_msg;
 
-    static void* run(void* arg)
-    {
-        ThreadWrapper& e = *static_cast<ThreadWrapper*>(arg);
-        try {
-            thread(e.m_index, e.m_database_path);
+    template<class F> struct Runner {
+        static void run(F func, ThreadWrapper* tw)
+        {
+            try {
+                func();
+            }
+            catch (exception& e) {
+                tw->m_except = true;
+                tw->m_except_msg = e.what();
+            }
+            catch (...) {
+                tw->m_except = true;
+                tw->m_except_msg = "Unknown error";
+            }
         }
-        catch (exception& ex) {
-            e.m_error = true;
-            cerr << "Exception thrown in thread "<<e.m_index<<": "<<ex.what()<<"\n";
-        }
-
-        catch (...) {
-            e.m_error = true;
-            cerr << "Unknown exception thrown in thread "<<e.m_index<<"\n";
-        }
-
-        return 0;
-    }
+    };
 };
 
 } // anonymous namespace
@@ -446,12 +459,18 @@ TEST(Transactions)
 
         // Start threads
         for (int i=0; i<num_threads; ++i) {
-            threads[i].run(i, database_path);
+            threads[i].start(util::bind(&thread, i, database_path));
         }
 
         // Wait for threads to finish
         for (int i=0; i<num_threads; ++i) {
-            CHECK(!threads[i].join());
+            bool thread_has_thrown = false;
+            string except_msg;
+            if (threads[i].join(except_msg)) {
+                cerr << "Exception thrown in thread "<<i<<": "<<except_msg<<"\n";
+                thread_has_thrown = true;
+            }
+            CHECK(!thread_has_thrown);
         }
     }
 

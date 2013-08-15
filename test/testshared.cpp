@@ -1,9 +1,9 @@
-#include <pthread.h>
-
 #include <UnitTest++.h>
 
-#include <tightdb/file.hpp>
 #include <tightdb.hpp>
+#include <tightdb/file.hpp>
+#include <tightdb/thread.hpp>
+#include <tightdb/bind.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -428,10 +428,8 @@ TEST(Shared_Writes_SpecialOrder)
 
 namespace  {
 
-void* IncrementEntry(void* arg)
+void increment_entry_thread(size_t row_ndx)
 {
-    const size_t row_ndx = (size_t)arg;
-
     // Open shared db
     SharedGroup sg("test_shared.tightdb");
 
@@ -456,12 +454,11 @@ void* IncrementEntry(void* arg)
             ReadTransaction rt(sg);
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
-            const int64_t v = t[row_ndx].first;
-            const int64_t expected = i+1;
+            int64_t v = t[row_ndx].first;
+            int64_t expected = i+1;
             CHECK_EQUAL(expected, v);
         }
     }
-    return 0;
 }
 
 } // anonymous namespace
@@ -488,18 +485,16 @@ TEST(Shared_WriterThreads)
             wt.commit();
         }
 
-        pthread_t threads[thread_count];
+        Thread threads[thread_count];
 
         // Create all threads
         for (size_t i = 0; i < thread_count; ++i) {
-            const int rc = pthread_create(&threads[i], NULL, IncrementEntry, (void*)i);
-            CHECK_EQUAL(0, rc);
+            threads[i].start(util::bind(&increment_entry_thread, i));
         }
 
         // Wait for all threads to complete
         for (size_t i = 0; i < thread_count; ++i) {
-            const int rc = pthread_join(threads[i], NULL);
-            CHECK_EQUAL(0, rc);
+            threads[i].join();
         }
 
         // Verify that the changes were made
@@ -508,7 +503,7 @@ TEST(Shared_WriterThreads)
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
             for (size_t i = 0; i < thread_count; ++i) {
-                const int64_t v = t[i].first;
+                int64_t v = t[i].first;
                 CHECK_EQUAL(100, v);
             }
         }
