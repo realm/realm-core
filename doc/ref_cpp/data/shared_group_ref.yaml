@@ -107,11 +107,11 @@ CATEGORIES:
       - EXCEPT : &cpp_access_error_except
                  File::AccessError
         DESCR  : &g_access_error_descr
-                 Some other IO error occurred.
+                 An IO error occurred.
       - EXCEPT : &cpp_runtime_error_except
                  std::runtime_error
         DESCR  : &g_runtime_error_descr
-                 Some other error occurred.
+                 A serious error occurred.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_constructor
         DESCR  :
