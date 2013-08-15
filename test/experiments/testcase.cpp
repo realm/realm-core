@@ -37,12 +37,61 @@ TIGHTDB_TABLE_4(TestTableShared,
 } // anonymous namespace
 
 
+namespace  {
+
+void* IncrementEntry(void* arg)
+{
+    try 
+    {
+        const size_t row_ndx = (size_t)arg;
+
+        // Open shared db
+        SharedGroup sg("test_shared.tightdb", 
+                       false, SharedGroup::durability_Async);
+        for (size_t i = 0; i < 100; ++i) {
+            // Increment cell
+            {
+                WriteTransaction wt(sg);
+                TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+                t1[row_ndx].first += 1;
+                // FIXME: For some reason this takes ages when running
+                // inside valgrind, it is probably due to the "extreme
+                // overallocation" bug. The 1000 transactions performed
+                // here can produce a final database file size of more
+                // than 1 GiB. Really! And that is a table with only 10
+                // rows. It is about 1 MiB per transaction.
+                wt.commit();
+            }
+
+            // Verify in new transaction so that we interleave
+            // read and write transactions
+            {
+                ReadTransaction rt(sg);
+                TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
+
+                const int64_t v = t[row_ndx].first;
+                const int64_t expected = i+1;
+                CHECK_EQUAL(expected, v);
+            }
+        }
+    } catch (runtime_error e) {
+        printf("Thread exiting due to runtime exception\n");
+        printf("what(): %s\n", e.what());
+        exit(1);
+    }
+    return 0;
+}
+
+} // anonymous namespace
+
+
 int main()
 {
     // Clean up old state
     File::try_remove("asynctest.tightdb");
     File::try_remove("asynctest.tightdb.lock");
 
+    printf("Single threaded client\n");
     // Do some changes in a async db
     {
         SharedGroup db("asynctest.tightdb", false, SharedGroup::durability_Async);
@@ -71,5 +120,72 @@ int main()
             CHECK(t1->size() == 100);
         }
     }
+
+    // Clean up old state
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock");
+
+    printf("Multithreaded client\n");
+    const size_t thread_count = 10;
+
+    // Do some changes in a async db
+    {
+        SharedGroup sg("test_shared.tightdb", 
+                       false, SharedGroup::durability_Async);
+        // Create first table in group
+        {
+            WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            for (size_t i = 0; i < thread_count; ++i) {
+                t1->add(0, 2, false, "test");
+            }
+            wt.commit();
+        }
+        printf("Spawning test threads\n");
+        pthread_t threads[thread_count];
+
+        // Create all threads
+        for (size_t i = 0; i < thread_count; ++i) {
+            const int rc = pthread_create(&threads[i], NULL, IncrementEntry, (void*)i);
+            CHECK_EQUAL(0, rc);
+        }
+
+        // Wait for all threads to complete
+        for (size_t i = 0; i < thread_count; ++i) {
+            const int rc = pthread_join(threads[i], NULL);
+            CHECK_EQUAL(0, rc);
+        }
+        printf("Threads done, verifying\n");
+
+        // Verify that the changes were made
+        {
+            ReadTransaction rt(sg);
+            TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
+
+            for (size_t i = 0; i < thread_count; ++i) {
+                const int64_t v = t[i].first;
+                CHECK_EQUAL(100, v);
+            }
+        }
+
+    }
+    // Wait for async_commit process to shutdown
+    while (File::exists("test_shared.tightdb.lock")) {
+        sleep(1);
+    }
+
+    // Verify - once more, in sync mode - that the changes were made
+    {
+        printf("Reopening in sync mode and verifying\n");
+        SharedGroup sg("test_shared.tightdb");
+        ReadTransaction rt(sg);
+        TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
+        
+        for (size_t i = 0; i < thread_count; ++i) {
+            const int64_t v = t[i].first;
+            CHECK_EQUAL(100, v);
+        }
+    }
+
 
 }
