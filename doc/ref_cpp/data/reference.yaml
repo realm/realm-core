@@ -43,9 +43,7 @@ DESCR     : &g_introduction_descr
             For multi-threaded or multi-process applications, you can use the {@link class_shared_group}.
             As the {@link class_group} class, the {@link class_shared_group} lets you serialize
             your tables to disk. Moreover, the {@link_class_shared_group} class provides a transaction
-            interface to your tables.
-
-
+            interface to your group.
 
 IMPORT    : []
 

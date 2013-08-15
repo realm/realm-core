@@ -476,7 +476,10 @@ CATEGORIES :
   - g_dyn_query_find_next:
       NAME     : find_next
       DESCR    : &g_dyn_query_find_next_descr
-                 Find next matching row that fullfil the query condition.
+                 >
+                 Find next matching row that fullfil the query condition. To inialize the search,
+                 you can call the method with no parameters as this invocation will find the
+                 first matching row.
       SUMMARY  : &g_dyn_query_find_next_summary
                  Find next match.
       PARAMS:
