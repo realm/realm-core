@@ -978,7 +978,7 @@ CATEGORIES :
   - g_dyn_table_count_double:
   - g_dyn_table_count_string:
       TITLE    : count_*
-      NAMES    : [count, count_float, count_double, count_string]
+      NAMES    : [count_int, count_float, count_double, count_string]
       SUMMARY  : &g_dyn_table_count_summary
                  Count rows with a specfic value.
       DESCR    : &g_dyn_table_count_descr
@@ -987,7 +987,7 @@ CATEGORIES :
                  It is convinient to determine the number briefly compared to using
                  a {@link class_dyn_query} object.
       SIGNATURE: |
-                 size_t count(size_t column_ndx, int64_t target) const;
+                 size_t count_int(size_t column_ndx, int64_t target) const;
                  size_t count_float(size_t column_ndx, float target) const;
                  size_t count_double(size_t column_ndx, double target) const;
                  size_t count_string(size_t column_ndx, StringData target) const;

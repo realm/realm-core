@@ -464,11 +464,12 @@ CATEGORIES :
       CONST    : true
       SIGNATURE: |
                  int64_t sum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
-                 double sum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
+                 double sum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
+                 double sum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
       PARAMS:
       - NAME   : resultcount
         DESCR  : &g_typed_query_number_of_rows_descr
-                 The number of rows to consider.
+                 The number of rows used in the calculation.
         TYPES  : size_t*
       - NAME   : start
         TYPES  : size_t
@@ -523,11 +524,9 @@ CATEGORIES :
   - g_typed_query_maximum:
       NAME     : maximum
   - g_typed_query_maximum_float:
-      NAME     : maximum
+      NAME     : maximum_float
   - g_typed_query_maximum_double:
-      NAME     : maximum
-  - g_typed_query_maximum_date:
-      NAME     : maximum
+      NAME     : maximum_double
       DESCR    : &g_typed_query_maximum_descr
                  This method finds the highest value.
       SUMMARY  : &g_typed_query_maximum_summary
@@ -535,9 +534,8 @@ CATEGORIES :
       CONST    : true
       SIGNATURE: |
                  int64_t maximum(size_t* resultcount, size_t start, size_t end, size_t limit) const;
-                 float   maximum(size_t* resultcount, size_t start, size_t end, size_t limit) const;
-                 double  maximum(size_t* resultcount, size_t start, size_t end, size_t limit) const;
-                 Date    maximum(size_t* resultcount, size_t start, size_t end, size_t limit) const;
+                 float   maximum_float(size_t* resultcount, size_t start, size_t end, size_t limit) const;
+                 double  maximum_double(size_t* resultcount, size_t start, size_t end, size_t limit) const;
       PARAMS:
       - NAME   : resultcount
         DESCR  : *g_typed_query_number_of_rows_descr
@@ -570,8 +568,7 @@ CATEGORIES :
   - g_typed_query_minimum:
   - g_typed_query_minimum_float:
   - g_typed_query_minimum_double:
-  - g_typed_query_minimum_date:
-      NAMES    : [minimum, minimum, minimum, minimum]
+      NAMES    : [minimum, minimum_float, minimum_double]
       DESCR    : &g_typed_query_minimum_descr
                  This method finds the lowest value.
       SUMMARY  : &g_typed_query_minimum_summary
@@ -579,9 +576,8 @@ CATEGORIES :
       CONST    : true
       SIGNATURE: |
                  int64_t minimum(size_t* resultcount, size_t start, size_t end, size_t limit) const;
-                 float   minimum(size_t* resultcount, size_t start, size_t end, size_t limit) const;
-                 double  minimum(size_t* resultcount, size_t start, size_t end, size_t limit) const;
-                 Date    minimum(size_t* resultcount, size_t start, size_t end, size_t limit) const;
+                 float   minimum_float(size_t* resultcount, size_t start, size_t end, size_t limit) const;
+                 double  minimum_double(size_t* resultcount, size_t start, size_t end, size_t limit) const;
       PARAMS:
       - NAME   : resultcount
         DESCR  : *g_typed_query_number_of_rows_descr
