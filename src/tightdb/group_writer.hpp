@@ -24,6 +24,7 @@
 #include <cstdlib> // size_t
 
 #include <tightdb/file.hpp>
+#include <tightdb/alloc.hpp>
 
 namespace tightdb {
 
@@ -33,37 +34,53 @@ class SlabAlloc;
 
 class GroupWriter {
 public:
-    GroupWriter(Group& group, bool doPersist);
+    GroupWriter(Group&);
 
-    void SetVersions(std::size_t current, std::size_t readlock);
+    void set_versions(std::size_t current, std::size_t read_lock);
 
-    std::size_t commit();
+    /// Returns the new top ref.
+    ref_type commit(bool do_sync);
 
-    size_t write(const char* p, std::size_t n);
-    void WriteAt(std::size_t pos, const char* p, std::size_t n);
+    std::size_t get_file_size() const TIGHTDB_NOEXCEPT;
+
+    /// Write the specified chunk into free space.
+    ///
+    /// Returns the position in the file where the first byte was
+    /// written.
+    std::size_t write(const char* data, std::size_t size);
+
+    void write_at(std::size_t pos, const char* data, std::size_t size);
 
 #ifdef TIGHTDB_DEBUG
     void dump();
-    void ZeroFreeSpace();
 #endif
 
 private:
-    void DoCommit(uint64_t topPos);
-
-    std::size_t get_free_space(size_t len);
-    std::size_t reserve_free_space(size_t len, size_t start=0);
-    void        add_free_space(size_t pos, size_t len, size_t version=0);
-    void        merge_free_space();
-    std::size_t extend_free_space(size_t len);
-
     Group&          m_group;
     SlabAlloc&      m_alloc;
     std::size_t     m_current_version;
     std::size_t     m_readlock_version;
     File::Map<char> m_file_map;
-    bool            m_doPersist;
+
+    // Controlled update of physical medium
+    void sync(uint64_t top_pos);
+
+    std::size_t get_free_space(std::size_t size);
+    std::size_t reserve_free_space(std::size_t size);
+    void        add_free_space(std::size_t pos, std::size_t size, std::size_t version = 0);
+    void        merge_free_space();
+    std::size_t extend_free_space(std::size_t requested_size);
 };
 
+
+
+
+// Implementation:
+
+inline std::size_t GroupWriter::get_file_size() const TIGHTDB_NOEXCEPT
+{
+    return m_file_map.get_size();
+}
 
 } // namespace tightdb
 

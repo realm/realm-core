@@ -112,226 +112,188 @@ private:
 
 namespace tightdb {
 
-void Group::create_from_file(const string& filename, OpenMode mode, bool do_init)
+void Group::open(const string& file_path, OpenMode mode)
 {
-    // Memory map file
-    // This leaves the group ready, but in invalid state
+    TIGHTDB_ASSERT(!is_attached());
+    bool is_shared = false;
     bool read_only = mode == mode_ReadOnly;
     bool no_create = mode == mode_ReadWriteNoCreate;
-    m_alloc.attach_file(filename, m_is_shared, read_only, no_create);
-
-    if (!do_init)  return;
-
+    m_alloc.attach_file(file_path, is_shared, read_only, no_create);
     ref_type top_ref = m_alloc.get_top_ref();
-
-    // if we just created shared group, we have to wait with
-    // actually creating it's datastructures until first write
-    if (m_is_shared && top_ref == 0) return;
-
-    create_from_ref(top_ref); // FIXME: Throws and leaves the Group in peril
-}
-
-// Create a new memory structure and attach this group instance to it.
-void Group::create()
-{
-    m_tables.set_type(Array::type_HasRefs); // FIXME: Why is this not done in Group() like the rest of the arrays?
-
-    m_top.add(m_tableNames.get_ref());
-    m_top.add(m_tables.get_ref());
-    m_top.add(m_freePositions.get_ref());
-    m_top.add(m_freeLengths.get_ref());
-
-    // Set parent info
-    m_tableNames.set_parent(&m_top, 0);
-    m_tables.set_parent(&m_top, 1);
-    m_freePositions.set_parent(&m_top, 2);
-    m_freeLengths.set_parent(&m_top, 3);
-
-    if (m_freeVersions.IsValid()) {
-        m_top.add(m_freeVersions.get_ref());
-        m_freeVersions.set_parent(&m_top, 4);
-    }
-}
-
-// Attach this group instance to a preexisting memory structure.
-void Group::create_from_ref(ref_type top_ref)
-{
-    // Instantiate top arrays
+    // FIXME: Must detach file from allocator if the following
+    // throws. Unfortunatly we may already have created a file. If we
+    // cannot avoid that, we must document the fact that a failed open
+    // may still have the effect of creating the file.
     if (top_ref == 0) {
-        m_top.set_type(Array::type_HasRefs);
-        m_tables.set_type(Array::type_HasRefs);
-        m_tableNames.set_type(Array::type_Normal);
-        m_freePositions.set_type(Array::type_Normal);
-        m_freeLengths.set_type(Array::type_Normal);
-        if (m_is_shared) {
-            m_freeVersions.set_type(Array::type_Normal);
-        }
-
-        create();
-
-        // Everything but header is free space
-        m_freePositions.add(sizeof SlabAlloc::default_header);
-        m_freeLengths.add(m_alloc.get_base_size() - sizeof SlabAlloc::default_header);
-        if (m_is_shared)
-            m_freeVersions.add(0);
+        // Attaching to a newly created file
+        create(); // Throws
     }
     else {
-        m_top.update_ref(top_ref);
-        const size_t top_size = m_top.size();
-        TIGHTDB_ASSERT(top_size >= 2);
+        // Attaching to a pre-existing database
+        init_from_ref(top_ref); // Throws
+    }
+}
 
-        const size_t n_ref = m_top.get_as_ref(0);
-        const size_t t_ref = m_top.get_as_ref(1);
-        m_tableNames.update_ref(n_ref);
-        m_tables.update_ref(t_ref);
-        m_tableNames.set_parent(&m_top, 0);
-        m_tables.set_parent(&m_top, 1);
 
-        // Serialized files do not have free space markers
-        // at all, and files that are not shared does not
-        // need version info for free space.
-        if (top_size >= 4) {
-            const size_t fp_ref = m_top.get_as_ref(2);
-            const size_t fl_ref = m_top.get_as_ref(3);
-            m_freePositions.update_ref(fp_ref);
-            m_freeLengths.update_ref(fl_ref);
-            m_freePositions.set_parent(&m_top, 2);
-            m_freeLengths.set_parent(&m_top, 3);
-        }
-        if (top_size == 5) {
-            m_freeVersions.update_ref(m_top.get_as_ref(4));
-            m_freeVersions.set_parent(&m_top, 4);
-        }
+void Group::open(BinaryData buffer, bool take_ownership)
+{
+    TIGHTDB_ASSERT(!is_attached());
+    TIGHTDB_ASSERT(buffer.data());
+    m_alloc.attach_buffer(const_cast<char*>(buffer.data()), buffer.size(), take_ownership);
+    ref_type top_ref = m_alloc.get_top_ref();
+    // FIXME: Must detach allocator if the following fails.
+    if (top_ref == 0) {
+        create(); // Throws
+    }
+    else {
+        init_from_ref(top_ref); // Throws
+    }
+}
 
-        // Make room for pointers to cached tables
-        size_t count = m_tables.size();
-        for (size_t i = 0; i < count; ++i) {
-            m_cachedtables.add(0);
+
+void Group::create()
+{
+    m_top.create(Array::type_HasRefs);
+    m_tables.create(Array::type_HasRefs);
+    m_table_names.create();
+    m_free_positions.create(Array::type_Normal);
+    m_free_lengths.create(Array::type_Normal);
+
+    m_top.add(m_table_names.get_ref());
+    m_top.add(m_tables.get_ref());
+    m_top.add(m_free_positions.get_ref());
+    m_top.add(m_free_lengths.get_ref());
+
+    // We may have been attached to a newly created file, that is, to
+    // a file consisting only of a default header and possible some
+    // free space. In that case, we must add as free space, the size
+    // of the file minus its header.
+    if (m_alloc.is_attached()) {
+        size_t free = m_alloc.get_attached_size() - sizeof SlabAlloc::default_header;
+        if (free > 0) {
+            m_free_positions.add(sizeof SlabAlloc::default_header);
+            m_free_lengths.add(free);
         }
     }
 }
+
+
+void Group::init_from_ref(ref_type top_ref)
+{
+    m_top.init_from_ref(top_ref);
+    size_t top_size = m_top.size();
+    TIGHTDB_ASSERT(top_size >= 2);
+
+    size_t names_ref = m_top.get_as_ref(0);
+    size_t tables_ref = m_top.get_as_ref(1);
+    m_table_names.init_from_ref(names_ref);
+    m_tables.init_from_ref(tables_ref);
+
+    // File created by Group::write() do not have free space markers
+    // at all, and files that are not shared does not need version
+    // info for free space.
+    if (top_size > 2) {
+        TIGHTDB_ASSERT(top_size >= 4);
+        size_t fp_ref = m_top.get_as_ref(2);
+        size_t fl_ref = m_top.get_as_ref(3);
+        m_free_positions.init_from_ref(fp_ref);
+        m_free_lengths.init_from_ref(fl_ref);
+
+        if (top_size > 4) {
+            TIGHTDB_ASSERT(top_size == 5);
+            m_free_versions.init_from_ref(m_top.get_as_ref(4));
+        }
+    }
+
+    // Make room for pointers to cached tables
+    size_t n = m_tables.size();
+    for (size_t i = 0; i < n; ++i) {
+        m_cached_tables.add(0); // Throws
+    }
+}
+
 
 void Group::init_shared()
 {
-    if (m_freeVersions.IsValid()) {
+    // FIXME: Can this be done as part of update_from_shared()?
+
+    if (m_free_versions.is_attached()) {
         // If free space tracking is enabled
         // we just have to reset it
-        m_freeVersions.SetAllToZero();
+        m_free_versions.SetAllToZero();
     }
     else {
         // Serialized files have no free space tracking
         // at all so we have to add the basic free lists
         if (m_top.size() == 2) {
-            m_freePositions.set_type(Array::type_Normal);
-            m_freeLengths.set_type(Array::type_Normal);
-            m_top.add(m_freePositions.get_ref());
-            m_top.add(m_freeLengths.get_ref());
-            m_freePositions.set_parent(&m_top, 2);
-            m_freeLengths.set_parent(&m_top, 3);
+            // FIXME: Is there a risk that these are already
+            // allocated? That would cause a leak.
+            m_free_positions.create(Array::type_Normal);
+            m_free_lengths.create(Array::type_Normal);
+            m_top.add(m_free_positions.get_ref());
+            m_top.add(m_free_lengths.get_ref());
         }
 
         // Files that have only been used in single thread
         // mode do not have version tracking for the free lists
         if (m_top.size() == 4) {
-            const size_t count = m_freePositions.size();
-            m_freeVersions.set_type(Array::type_Normal);
-            for (size_t i = 0; i < count; ++i) {
-                m_freeVersions.add(0);
+            // FIXME: Is there a risk that this one is already
+            // allocated? That would cause a leak.
+            m_free_versions.create(Array::type_Normal);
+            size_t n = m_free_positions.size();
+            for (size_t i = 0; i < n; ++i) {
+                m_free_versions.add(0);
             }
-            m_top.add(m_freeVersions.get_ref());
-            m_freeVersions.set_parent(&m_top, 4);
+            m_top.add(m_free_versions.get_ref());
         }
     }
 }
 
-void Group::reset_to_new()
-{
-    TIGHTDB_ASSERT(m_alloc.get_top_ref() == 0);
-    if (!m_top.IsValid()) {
-        return; // already in new state
-    }
-
-    // A shared group that has just been created and not yet
-    // written to does not have any internal structures yet
-    // (we may have to re-create this after a rollback)
-
-    clear_cache();
-
-    m_top.Invalidate();
-    m_tables.Invalidate();
-    m_tableNames.Invalidate();
-    m_freePositions.Invalidate();
-    m_freeLengths.Invalidate();
-    m_freeVersions.Invalidate();
-
-    m_tableNames.set_parent(0, 0);
-    m_tables.set_parent(0, 0);
-    m_freePositions.set_parent(0, 0);
-    m_freeLengths.set_parent(0, 0);
-    m_freeVersions.set_parent(0, 0);
-}
-
-void Group::rollback()
-{
-    TIGHTDB_ASSERT(m_is_shared);
-
-    // FIXME: I (Kristian) had to add this to avoid double deallocation in ~Group(), but is this the right fix? Alexander?
-    invalidate();
-
-    // Clear all changes made during transaction
-//    m_alloc.free_all(); FIXME: Not needed if we keep the call to invalidate() above.
-}
 
 Group::~Group()
 {
-    if (m_top.IsValid()) {
+    if (m_top.is_attached()) {
         clear_cache();
 
         // Recursively deletes entire tree
         m_top.destroy();
     }
 
-    m_cachedtables.destroy();
+    m_cached_tables.destroy();
 }
+
 
 void Group::invalidate()
 {
-    //TODO: Should only invalidate object wrappers and never
-    // touch the unferlying data (that may no longer be valid)
+    // TODO: Should only invalidate object wrappers and never touch
+    // the underlying data (that may no longer be valid)
     clear_cache();
 
-    m_top.Invalidate();
-    m_tables.Invalidate();
-    m_tableNames.Invalidate();
-    m_freePositions.Invalidate();
-    m_freeLengths.Invalidate();
-    m_freeVersions.Invalidate();
-
-    // FIXME: I (Kristian) had to add these to avoid a problem when resurrecting the arrays in create_from_ref() (top_ref==0). The problem is that if the parent is left as non-null, then Array::alloc() will attempt to update the parent array, but the parent array is still empty at that point. I don't, however, think this is a sufficiently good fix? Alexander?
-    m_tables.set_parent(0,0);
-    m_tableNames.set_parent(0,0);
-    m_freePositions.set_parent(0,0);
-    m_freeLengths.set_parent(0,0);
-    m_freeVersions.set_parent(0,0);
+    m_top.detach();
+    m_tables.detach();
+    m_table_names.detach();
+    m_free_positions.detach();
+    m_free_lengths.detach();
+    m_free_versions.detach();
 
     // Reads may allocate some temproary state that we have
     // to clean up
-    // TODO: This is also done in commit(), fix to do it only once
     m_alloc.free_all();
 }
 
+
 Table* Group::get_table_ptr(size_t ndx)
 {
-    TIGHTDB_ASSERT(m_top.IsValid());
+    TIGHTDB_ASSERT(m_top.is_attached());
     TIGHTDB_ASSERT(ndx < m_tables.size());
 
     // Get table from cache if exists, else create
-    Table* table = reinterpret_cast<Table*>(m_cachedtables.get(ndx));
+    Table* table = reinterpret_cast<Table*>(m_cached_tables.get(ndx));
     if (!table) {
         const size_t ref = m_tables.get_as_ref(ndx);
         Table::UnbindGuard t(new Table(Table::RefCountTag(), m_alloc, ref, this, ndx)); // Throws
         t->bind_ref(); // Increase reference count to 1
-        m_cachedtables.set(ndx, intptr_t(t.get())); // FIXME: intptr_t is not guaranteed to exists, even in C++11
+        m_cached_tables.set(ndx, intptr_t(t.get())); // FIXME: intptr_t is not guaranteed to exists, even in C++11
         // This group shares ownership of the table, so leave
         // reference count at 1.
         table = t.release();
@@ -339,19 +301,21 @@ Table* Group::get_table_ptr(size_t ndx)
     return table;
 }
 
+
 Table* Group::create_new_table(StringData name)
 {
     ref_type ref = Table::create_empty_table(m_alloc); // Throws
     m_tables.add(ref);
-    m_tableNames.add(name);
+    m_table_names.add(name);
     Table::UnbindGuard table(new Table(Table::RefCountTag(), m_alloc,
                                        ref, this, m_tables.size()-1)); // Throws
     table->bind_ref(); // Increase reference count to 1
-    m_cachedtables.add(intptr_t(table.get())); // FIXME: intptr_t is not guaranteed to exists, even in C++11
+    m_cached_tables.add(intptr_t(table.get())); // FIXME: intptr_t is not guaranteed to exists, even in C++11
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* repl = m_alloc.get_replication();
-    if (repl) repl->new_top_level_table(name); // Throws
+    if (repl)
+        repl->new_top_level_table(name); // Throws
 #endif
 
     // This group shares ownership of the table, so leave reference
@@ -362,15 +326,16 @@ Table* Group::create_new_table(StringData name)
 
 void Group::write(const string& path) const
 {
-    TIGHTDB_ASSERT(m_top.IsValid());
+    TIGHTDB_ASSERT(m_top.is_attached());
 
     FileOStream out(path);
     write_to_stream(out);
 }
 
+
 BinaryData Group::write_to_mem() const
 {
-    TIGHTDB_ASSERT(m_top.IsValid());
+    TIGHTDB_ASSERT(m_top.is_attached());
 
     // Get max possible size of buffer
     size_t max_size = m_alloc.get_total_size();
@@ -382,143 +347,111 @@ BinaryData Group::write_to_mem() const
     return BinaryData(data, size);
 }
 
-// NOTE: This method must not modify *this if m_shared is false.
-size_t Group::commit(size_t current_version, size_t readlock_version, bool persist)
+
+void Group::commit()
 {
-    TIGHTDB_ASSERT(m_top.IsValid());
-    TIGHTDB_ASSERT(readlock_version <= current_version);
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(m_top.is_attached());
 
-    // FIXME: Under what circumstances can this even happen????
-    // FIXME: What about when a user owned read-only buffer is attached? 
-    if (!m_alloc.is_attached()) throw runtime_error("Cannot persist");
-
-    // If we have an empty db file, we can just serialize directly
-    //if (m_alloc.get_top_ref() == 0) {}
-
-    GroupWriter out(*this, persist);
-
-    if (m_is_shared) {
-        m_readlock_version = readlock_version;
-        out.SetVersions(current_version, readlock_version);
-    }
+    GroupWriter out(*this);
 
     // Recursively write all changed arrays to end of file
-    const size_t top_pos = out.commit();
+    bool do_sync = true;
+    ref_type top_ref = out.commit(do_sync);
 
-    // If the group is persisiting in single-thread (un-shared) mode
+    // Since the group is persisiting in single-thread (un-shared) mode
     // we have to make sure that the group stays valid after commit
-    if (!m_is_shared) {
-        // Recusively update refs in all active tables (columns, arrays..)
-        update_refs(top_pos);
+
+    // Clear old allocs
+    m_alloc.free_all();
+
+    // Remap file if it has grown
+    size_t new_file_size = out.get_file_size();
+    TIGHTDB_ASSERT(new_file_size >= m_alloc.get_attached_size());
+    if (new_file_size > m_alloc.get_attached_size())
+        m_alloc.remap(new_file_size);
+
+    // Recusively update refs in all active tables (columns, arrays..)
+    update_refs(top_ref);
 
 #ifdef TIGHTDB_DEBUG
-        Verify();
+    Verify();
 #endif
-    }
-    else {
-        TIGHTDB_ASSERT(m_alloc.is_all_free());
-        invalidate();
-        TIGHTDB_ASSERT(m_alloc.is_all_free());
-    }
-
-    return top_pos;
 }
+
 
 void Group::update_refs(ref_type top_ref)
 {
     // Update top with the new (persistent) ref
-    m_top.update_ref(top_ref);
+    m_top.init_from_ref(top_ref);
     TIGHTDB_ASSERT(m_top.size() >= 2);
 
     // Now we can update it's child arrays
-    m_tableNames.update_from_parent();
+    m_table_names.update_from_parent();
 
     // No free-info in serialized databases
     // and version info is only in shared,
     if (m_top.size() >= 4) {
-        m_freePositions.update_from_parent();
-        m_freeLengths.update_from_parent();
+        m_free_positions.update_from_parent();
+        m_free_lengths.update_from_parent();
     }
     else {
-        m_freePositions.Invalidate();
-        m_freeLengths.Invalidate();
+        m_free_positions.detach();
+        m_free_lengths.detach();
     }
     if (m_top.size() == 5) {
-        m_freeVersions.update_from_parent();
+        m_free_versions.update_from_parent();
     }
     else {
-        m_freeVersions.Invalidate();
+        m_free_versions.detach();
     }
 
     // if the tables have not been modfied we don't
     // need to update cached tables
-    if (!m_tables.update_from_parent()) return;
+    //
+    // FIXME: This early-out option is wrong. Equal 'refs' does in no
+    // way guarantee that the table has not been modified.
+    if (!m_tables.update_from_parent())
+        return;
+
+    // FIXME: Be sure that the updating of the table accessors works recursivly
+    // FIXME: Probably move this to a new function
 
     // Also update cached tables
-    size_t n = m_cachedtables.size();
+    size_t n = m_cached_tables.size();
     for (size_t i = 0; i < n; ++i) {
-        Table* const t = reinterpret_cast<Table*>(m_cachedtables.get(i));
+        Table* t = reinterpret_cast<Table*>(m_cached_tables.get(i));
         if (t) {
             t->update_from_parent();
         }
     }
 }
 
-void Group::update_from_shared(ref_type top_ref, size_t len)
-{
-    TIGHTDB_ASSERT(top_ref < len);
 
-    // Update memory mapping if needed
-    bool is_remapped = m_alloc.remap(len);
+void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size)
+{
+    TIGHTDB_ASSERT(new_top_ref < new_file_size);
+
+    // Update memory mapping if database file has grown
+    TIGHTDB_ASSERT(new_file_size >= m_alloc.get_attached_size());
+    if (new_file_size > m_alloc.get_attached_size()) {
+        m_alloc.remap(new_file_size);
+    }
 
     // If our last look at the file was when it
     // was empty, we may have to re-create the group
-    if (in_initial_state() || top_ref == 0) {
-        if (top_ref == 0)
-            reset_to_new();    // may have been a rollback
-        create_from_ref(top_ref);
+    if (new_top_ref == 0) {
+        create(); // Throws
+
+        m_free_versions.create(Array::type_Normal);
+        m_top.add(m_free_versions.get_ref());
+        m_free_versions.add(0);
         return;
     }
 
-    // If the top has not changed, everything is up-to-date
-    if (!is_remapped && top_ref == m_top.get_ref()) return;
-
-    // Update group arrays
-    m_top.update_ref(top_ref);
-    TIGHTDB_ASSERT(m_top.size() >= 2);
-    bool names_changed = !m_tableNames.update_from_parent();
-    m_tables.update_from_parent();
-    if (m_top.size() > 2) {
-        m_freePositions.update_from_parent();
-        m_freeLengths.update_from_parent();
-        if (m_top.size() > 4) {
-            m_freeVersions.update_from_parent();
-        }
-    }
-
-    // If the names of the tables in the group has not changed we know
-    // that it still contains the same tables so we can reuse the
-    // cached versions
-    if (names_changed) {
-        clear_cache();
-
-        // Make room for new pointers to cached tables
-        size_t n = m_tables.size();
-        for (size_t i = 0; i < n; ++i) {
-            m_cachedtables.add(0);
-        }
-    }
-    else {
-        // Update cached tables
-        //TODO: account for changed spec
-        size_t n = m_cachedtables.size();
-        for (size_t i = 0; i < n; ++i) {
-            if (Table* t = reinterpret_cast<Table*>(m_cachedtables.get(i))) {
-                t->update_from_parent();
-            }
-        }
-    }
+    init_from_ref(new_top_ref); // Throws
 }
+
 
 bool Group::operator==(const Group& g) const
 {
@@ -531,6 +464,7 @@ bool Group::operator==(const Group& g) const
     }
     return true;
 }
+
 
 void Group::to_string(ostream& out) const
 {
@@ -571,48 +505,49 @@ void Group::to_string(ostream& out) const
     }
 }
 
+
 #ifdef TIGHTDB_DEBUG
 
 void Group::Verify() const
 {
     // The file may have been created but not yet used
     // (so no structure has been initialized)
-    if (m_is_shared && m_alloc.get_top_ref() == 0 && !m_top.IsValid()) {
-        TIGHTDB_ASSERT(!m_tables.IsValid());
+    if (m_is_shared && m_alloc.get_top_ref() == 0 && !m_top.is_attached()) {
+        TIGHTDB_ASSERT(!m_tables.is_attached());
         return;
     }
 
     // Verify free lists
-    if (m_freePositions.IsValid()) {
-        TIGHTDB_ASSERT(m_freeLengths.IsValid());
+    if (m_free_positions.is_attached()) {
+        TIGHTDB_ASSERT(m_free_lengths.is_attached());
 
-        size_t count_p = m_freePositions.size();
-        size_t count_l = m_freeLengths.size();
+        size_t count_p = m_free_positions.size();
+        size_t count_l = m_free_lengths.size();
         TIGHTDB_ASSERT(count_p == count_l);
 
         if (m_is_shared) {
-            TIGHTDB_ASSERT(m_freeVersions.IsValid());
-            TIGHTDB_ASSERT(count_p == m_freeVersions.size());
+            TIGHTDB_ASSERT(m_free_versions.is_attached());
+            TIGHTDB_ASSERT(count_p == m_free_versions.size());
         }
 
         if (count_p) {
             // Check for alignment
             for (size_t i = 0; i < count_p; ++i) {
-                size_t p = to_size_t(m_freePositions.get(i));
-                size_t l = to_size_t(m_freeLengths.get(i));
+                size_t p = to_size_t(m_free_positions.get(i));
+                size_t l = to_size_t(m_free_lengths.get(i));
                 TIGHTDB_ASSERT((p & 0x7) == 0); // 64bit alignment
                 TIGHTDB_ASSERT((l & 0x7) == 0); // 64bit alignment
             }
 
-            size_t filelen = m_alloc.get_base_size();
+            size_t filelen = m_alloc.get_attached_size();
 
             // Segments should be ordered and without overlap
             for (size_t i = 0; i < count_p-1; ++i) {
-                size_t pos1 = to_size_t(m_freePositions.get(i));
-                size_t pos2 = to_size_t(m_freePositions.get(i+1));
+                size_t pos1 = to_size_t(m_free_positions.get(i));
+                size_t pos2 = to_size_t(m_free_positions.get(i+1));
                 TIGHTDB_ASSERT(pos1 < pos2);
 
-                size_t len1 = to_size_t(m_freeLengths.get(i));
+                size_t len1 = to_size_t(m_free_lengths.get(i));
                 TIGHTDB_ASSERT(len1 != 0);
                 TIGHTDB_ASSERT(len1 < filelen);
 
@@ -620,10 +555,10 @@ void Group::Verify() const
                 TIGHTDB_ASSERT(end <= pos2);
             }
 
-            size_t lastlen = to_size_t(m_freeLengths.back());
+            size_t lastlen = to_size_t(m_free_lengths.back());
             TIGHTDB_ASSERT(lastlen != 0 && lastlen <= filelen);
 
-            size_t end = to_size_t(m_freePositions.back() + lastlen);
+            size_t end = to_size_t(m_free_positions.back() + lastlen);
             TIGHTDB_ASSERT(end <= filelen);
         }
     }
@@ -634,10 +569,11 @@ void Group::Verify() const
     }
 }
 
+
 MemStats Group::stats()
 {
     MemStats stats;
-    m_top.Stats(stats);
+    m_top.stats(stats);
 
     return stats;
 }
@@ -648,28 +584,30 @@ void Group::print() const
     m_alloc.print();
 }
 
+
 void Group::print_free() const
 {
-    if (!m_freePositions.IsValid()) {
+    if (!m_free_positions.is_attached()) {
         printf("none\n");
         return;
     }
-    bool has_versions = m_freeVersions.IsValid();
+    bool has_versions = m_free_versions.is_attached();
 
-    size_t count = m_freePositions.size();
+    size_t count = m_free_positions.size();
     for (size_t i = 0; i < count; ++i) {
-        size_t pos  = to_size_t(m_freePositions[i]);
-        size_t size = to_size_t(m_freeLengths[i]);
+        size_t pos  = to_size_t(m_free_positions[i]);
+        size_t size = to_size_t(m_free_lengths[i]);
         printf("%d: %d %d", int(i), int(pos), int(size));
 
         if (has_versions) {
-            size_t version = to_size_t(m_freeVersions[i]);
+            size_t version = to_size_t(m_free_versions[i]);
             printf(" %d", int(version));
         }
         printf("\n");
     }
     printf("\n");
 }
+
 
 void Group::to_dot(ostream& out) const
 {
@@ -679,7 +617,7 @@ void Group::to_dot(ostream& out) const
     out << " label = \"Group\";" << endl;
 
     m_top.to_dot(out, "group_top");
-    m_tableNames.to_dot(out, "table_names");
+    m_table_names.to_dot(out, "table_names");
     m_tables.to_dot(out, "tables");
 
     // Tables
@@ -693,10 +631,19 @@ void Group::to_dot(ostream& out) const
     out << "}" << endl;
 }
 
+
 void Group::to_dot() const
 {
     to_dot(cerr);
 }
+
+
+void Group::to_dot(const char* file_path) const
+{
+    ofstream out(file_path);
+    to_dot(out);
+}
+
 
 void Group::zero_free_space(size_t file_size, size_t readlock_version)
 {
@@ -706,13 +653,13 @@ void Group::zero_free_space(size_t file_size, size_t readlock_version)
 
     File::Map<char> map(m_alloc.m_file, File::access_ReadWrite, file_size);
 
-    size_t count = m_freePositions.size();
+    size_t count = m_free_positions.size();
     for (size_t i = 0; i < count; ++i) {
-        size_t v = to_size_t(m_freeVersions.get(i)); // todo, remove assizet when 64 bit
+        size_t v = to_size_t(m_free_versions.get(i)); // todo, remove assizet when 64 bit
         if (v >= m_readlock_version) continue;
 
-        size_t pos = to_size_t(m_freePositions.get(i));
-        size_t len = to_size_t(m_freeLengths.get(i));
+        size_t pos = to_size_t(m_free_positions.get(i));
+        size_t len = to_size_t(m_free_lengths.get(i));
 
         char* p = map.get_addr() + pos;
         fill(p, p+len, 0);
