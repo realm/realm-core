@@ -177,7 +177,7 @@ retry:
             // Set initial values
             info->version  = 0;
             info->flags    = dlevel; // durability level is fixed from creation
-            info->filesize = alloc.get_attached_size();
+            info->filesize = alloc.get_baseline();
             info->infosize = uint32_t(len);
             info->current_top = alloc.get_top_ref();
             info->current_version = 0;

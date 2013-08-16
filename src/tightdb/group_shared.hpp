@@ -206,6 +206,11 @@ public:
         m_shared_group.end_read();
     }
 
+    bool has_table(StringData name) const
+    {
+        return get_group().has_table(name);
+    }
+
     ConstTableRef get_table(StringData name) const
     {
         return get_group().get_table(name);

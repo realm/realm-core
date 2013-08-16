@@ -169,7 +169,7 @@ void Group::create()
     // free space. In that case, we must add as free space, the size
     // of the file minus its header.
     if (m_alloc.is_attached()) {
-        size_t free = m_alloc.get_attached_size() - sizeof SlabAlloc::default_header;
+        size_t free = m_alloc.get_baseline() - sizeof SlabAlloc::default_header;
         if (free > 0) {
             m_free_positions.add(sizeof SlabAlloc::default_header);
             m_free_lengths.add(free);
@@ -353,26 +353,45 @@ void Group::commit()
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_top.is_attached());
 
+    // GroupWriter::commit() needs free space tracking information, so
+    // if the attached database does not contain it, we must add it
+    // now. Empty (newly created) database files and database files
+    // created by Group::write() do not have free space tracking
+    // information.
+    if (m_free_positions.is_attached()) {
+        TIGHTDB_ASSERT(m_top.size() >= 2);
+    }
+    else {
+        TIGHTDB_ASSERT(m_top.size() == 2);
+        m_free_positions.create(Array::type_Normal);
+        m_free_lengths.create(Array::type_Normal);
+        m_top.add(m_free_positions.get_ref());
+        m_top.add(m_free_lengths.get_ref());
+    }
+
     GroupWriter out(*this);
 
-    // Recursively write all changed arrays to end of file
+    // Recursively write all changed arrays to the database file
     bool do_sync = true;
     ref_type top_ref = out.commit(do_sync);
 
-    // Since the group is persisiting in single-thread (un-shared) mode
-    // we have to make sure that the group stays valid after commit
+    // Since the group is persisiting in single-thread (un-shared)
+    // mode we have to make sure that the group stays valid after
+    // commit
 
-    // Clear old allocs
+    // Mark all managed space as free
     m_alloc.free_all();
+
+    size_t old_baseline = m_alloc.get_baseline();
 
     // Remap file if it has grown
     size_t new_file_size = out.get_file_size();
-    TIGHTDB_ASSERT(new_file_size >= m_alloc.get_attached_size());
-    if (new_file_size > m_alloc.get_attached_size())
+    TIGHTDB_ASSERT(new_file_size >= m_alloc.get_baseline());
+    if (new_file_size > m_alloc.get_baseline())
         m_alloc.remap(new_file_size);
 
     // Recusively update refs in all active tables (columns, arrays..)
-    update_refs(top_ref);
+    update_refs(top_ref, old_baseline);
 
 #ifdef TIGHTDB_DEBUG
     Verify();
@@ -380,14 +399,23 @@ void Group::commit()
 }
 
 
-void Group::update_refs(ref_type top_ref)
+void Group::update_refs(ref_type top_ref, size_t old_baseline)
 {
-    // Update top with the new (persistent) ref
+    // Array nodes that a part of the previous version of the database
+    // will not be overwritte by Group::commit(). This is necessary
+    // for robustness in the face of abrupt termination of the
+    // process. It also means that we can be sure that an array
+    // remains unchanged across a commit if the new ref is equal to
+    // the old ref and the ref is below the previous basline.
+
+    if (top_ref < old_baseline && m_top.get_ref() == top_ref)
+        return;
+
     m_top.init_from_ref(top_ref);
     TIGHTDB_ASSERT(m_top.size() >= 2);
 
     // Now we can update it's child arrays
-    m_table_names.update_from_parent();
+    m_table_names.update_from_parent(/*old_baseline*/);
 
     // No free-info in serialized databases
     // and version info is only in shared,
@@ -433,8 +461,8 @@ void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size)
     TIGHTDB_ASSERT(new_top_ref < new_file_size);
 
     // Update memory mapping if database file has grown
-    TIGHTDB_ASSERT(new_file_size >= m_alloc.get_attached_size());
-    if (new_file_size > m_alloc.get_attached_size()) {
+    TIGHTDB_ASSERT(new_file_size >= m_alloc.get_baseline());
+    if (new_file_size > m_alloc.get_baseline()) {
         m_alloc.remap(new_file_size);
     }
 
@@ -456,11 +484,13 @@ void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size)
 bool Group::operator==(const Group& g) const
 {
     size_t n = size();
-    if (n != g.size()) return false;
+    if (n != g.size())
+        return false;
     for (size_t i=0; i<n; ++i) {
         const Table* t1 = get_table_ptr(i);
         const Table* t2 = g.get_table_ptr(i);
-        if (*t1 != *t2) return false;
+        if (*t1 != *t2)
+            return false;
     }
     return true;
 }
@@ -510,12 +540,10 @@ void Group::to_string(ostream& out) const
 
 void Group::Verify() const
 {
-    // The file may have been created but not yet used
-    // (so no structure has been initialized)
-    if (m_is_shared && m_alloc.get_top_ref() == 0 && !m_top.is_attached()) {
-        TIGHTDB_ASSERT(!m_tables.is_attached());
+    TIGHTDB_ASSERT(m_top.is_attached() || !is_attached());
+
+    if (!m_top.is_attached())
         return;
-    }
 
     // Verify free lists
     if (m_free_positions.is_attached()) {
@@ -525,8 +553,7 @@ void Group::Verify() const
         size_t count_l = m_free_lengths.size();
         TIGHTDB_ASSERT(count_p == count_l);
 
-        if (m_is_shared) {
-            TIGHTDB_ASSERT(m_free_versions.is_attached());
+        if (m_free_versions.is_attached()) {
             TIGHTDB_ASSERT(count_p == m_free_versions.size());
         }
 
@@ -539,7 +566,7 @@ void Group::Verify() const
                 TIGHTDB_ASSERT((l & 0x7) == 0); // 64bit alignment
             }
 
-            size_t filelen = m_alloc.get_attached_size();
+            size_t filelen = m_alloc.get_baseline();
 
             // Segments should be ordered and without overlap
             for (size_t i = 0; i < count_p-1; ++i) {
@@ -649,14 +676,16 @@ void Group::zero_free_space(size_t file_size, size_t readlock_version)
 {
     static_cast<void>(readlock_version); // FIXME: Why is this parameter not used?
 
-    if (!m_is_shared) return;
+    if (!m_is_shared)
+        return;
 
     File::Map<char> map(m_alloc.m_file, File::access_ReadWrite, file_size);
 
     size_t count = m_free_positions.size();
     for (size_t i = 0; i < count; ++i) {
         size_t v = to_size_t(m_free_versions.get(i)); // todo, remove assizet when 64 bit
-        if (v >= m_readlock_version) continue;
+        if (v >= m_readlock_version)
+            continue;
 
         size_t pos = to_size_t(m_free_positions.get(i));
         size_t len = to_size_t(m_free_lengths.get(i));

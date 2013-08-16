@@ -138,7 +138,7 @@ TEST(Group_Serialize1)
 
 #ifdef TIGHTDB_DEBUG
     to_disk.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Delete old file if there
     File::try_remove("table_test.tightdb");
@@ -153,10 +153,8 @@ TEST(Group_Serialize1)
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(10, t->size());
 
-#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
     CHECK(*table == *t);
-#endif
 
     // Modify both tables
     table[0].first = "test";
@@ -166,12 +164,12 @@ TEST(Group_Serialize1)
     table->remove(1);
     t->remove(1);
 
-#ifdef TIGHTDB_DEBUG
     // Verify that both changed correctly
     CHECK(*table == *t);
+#ifdef TIGHTDB_DEBUG
     to_disk.Verify();
     from_disk.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Group_Read1)
@@ -196,7 +194,7 @@ TEST(Group_Serialize2)
 
 #ifdef TIGHTDB_DEBUG
     to_disk.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Delete old file if there
     File::try_remove("table_test.tightdb");
@@ -211,13 +209,14 @@ TEST(Group_Serialize2)
     static_cast<void>(t2);
     static_cast<void>(t1);
 
-#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
     CHECK(*table1 == *t1);
     CHECK(*table2 == *t2);
+
+#ifdef TIGHTDB_DEBUG
     to_disk.Verify();
     from_disk.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Group_Serialize3)
@@ -230,7 +229,7 @@ TEST(Group_Serialize3)
 
 #ifdef TIGHTDB_DEBUG
     to_disk.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Delete old file if there
     File::try_remove("table_test.tightdb");
@@ -243,13 +242,12 @@ TEST(Group_Serialize3)
     TestTableGroup::Ref t = from_disk.get_table<TestTableGroup>("test");
     static_cast<void>(t);
 
-
-#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
     CHECK(*table == *t);
+#ifdef TIGHTDB_DEBUG
     to_disk.Verify();
     from_disk.Verify();
-#endif // TIGHTDB_DEBUG}
+#endif
 }
 
 TEST(Group_Serialize_Mem)
@@ -270,7 +268,7 @@ TEST(Group_Serialize_Mem)
 
 #ifdef TIGHTDB_DEBUG
     to_mem.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Serialize to memory (we now own the buffer)
     BinaryData buffer = to_mem.write_to_mem();
@@ -282,12 +280,12 @@ TEST(Group_Serialize_Mem)
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(10, t->size());
 
-#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
     CHECK(*table == *t);
+#ifdef TIGHTDB_DEBUG
     to_mem.Verify();
     from_mem.Verify();
-#endif //_DEBUG
+#endif
 }
 
 TEST(Group_Close)
@@ -323,7 +321,7 @@ TEST(Group_Serialize_Optimized)
 
 #ifdef TIGHTDB_DEBUG
     to_mem.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Serialize to memory (we now own the buffer)
     BinaryData buffer = to_mem.write_to_mem();
@@ -335,9 +333,7 @@ TEST(Group_Serialize_Optimized)
     CHECK_EQUAL(4, t->get_column_count());
 
     // Verify that original values are there
-#ifdef TIGHTDB_DEBUG
     CHECK(*table == *t);
-#endif
 
     // Add a row with a known (but unique) value
     table->add("search_target", 9, true, Fri);
@@ -348,7 +344,7 @@ TEST(Group_Serialize_Optimized)
 #ifdef TIGHTDB_DEBUG
     to_mem.Verify();
     from_mem.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Group_Serialize_All)

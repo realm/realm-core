@@ -227,16 +227,14 @@ public:
     /// Commit changes to the attached file. This requires that the
     /// attached file is opened in read/write mode.
     ///
-    /// Do not call this function on a group instance that is managed
-    /// by a shared group. Doing so will result in undefined behavior.
+    /// Calling this function on an unattached group, a free-standing
+    /// group, a group whose attached file is opened in read-only
+    /// mode, a group that is attached to a memory buffer, or a group
+    /// that is managed by a shared group, is an error and will result
+    /// in undefined behavior.
     ///
     /// Table accesors will remain valid across the commit. Note that
     /// this is not the case when working with proper transactions.
-    ///
-    /// FIXME: Must throw an exception if the group is opened in
-    /// read-only mode. Currently this is impossible because the
-    /// information is not stored anywhere. A flag probably needs to be
-    /// added to SlabAlloc.
     void commit();
 
     // Conversion
@@ -273,7 +271,7 @@ private:
     Array m_free_lengths;
     Array m_free_versions;
     mutable Array m_cached_tables;
-    const bool m_is_shared; // FIXME: Currently used only by Verify() when compiling in debug mode
+    const bool m_is_shared;
     std::size_t m_readlock_version;
 
     struct shared_tag {};
@@ -286,8 +284,14 @@ private:
     void invalidate();
     void init_shared();
 
-    // Recursively update all internal refs after commit
-    void update_refs(ref_type top_ref);
+    /// Recursively update refs stored in all cached array
+    /// accessors. This includes cached array accessors in any
+    /// currently attached table accessors. This ensures that the
+    /// group instance itself, as well as any attached table accessor
+    /// that exists across Group::commit() will remain valid. This
+    /// function is not appropriate for use in conjunction with
+    /// commits via shared group.
+    void update_refs(ref_type top_ref, std::size_t old_baseline);
 
     void update_from_shared(ref_type new_top_ref, std::size_t new_file_size);
 

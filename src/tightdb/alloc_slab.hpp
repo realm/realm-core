@@ -109,7 +109,7 @@ public:
     /// This function may be called only for an attached
     /// allocator. The effect of calling it on an unattached allocator
     /// is undefined.
-    std::size_t get_attached_size() const TIGHTDB_NOEXCEPT;
+    std::size_t get_baseline() const TIGHTDB_NOEXCEPT;
 
     /// Get the total amount of managed memory (allocated and
     /// unallocated).
@@ -124,7 +124,7 @@ public:
 
     /// Remap the attached file such that a prefix of the specified
     /// size becomes available in memory. If sucessfull,
-    /// get_attached_size() will return the specified new file size.
+    /// get_baseline() will return the specified new file size.
     void remap(std::size_t file_size);
 
     MemRef alloc(std::size_t size) TIGHTDB_OVERRIDE;
@@ -204,7 +204,7 @@ inline bool SlabAlloc::is_attached() const  TIGHTDB_NOEXCEPT
     return m_data != 0;
 }
 
-inline std::size_t SlabAlloc::get_attached_size() const TIGHTDB_NOEXCEPT
+inline std::size_t SlabAlloc::get_baseline() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
     return m_baseline;

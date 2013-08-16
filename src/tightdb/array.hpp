@@ -388,8 +388,8 @@ public:
     /// effect if the accessor is currently unattached (idempotency).
     void detach() TIGHTDB_NOEXCEPT { m_data = 0; }
 
-    std::size_t size() const TIGHTDB_NOEXCEPT { return m_size; }
-    bool is_empty() const TIGHTDB_NOEXCEPT { return m_size == 0; }
+    std::size_t size() const TIGHTDB_NOEXCEPT;
+    bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
 
     void insert(std::size_t ndx, int64_t value);
     void add(int64_t value);
@@ -1019,14 +1019,23 @@ inline void Array::create(Type type)
 }
 
 
+inline std::size_t Array::size() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    return m_size;
+}
+
+
 inline int64_t Array::back() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_size);
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(m_size > 0);
     return get(m_size - 1);
 }
 
 inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(ndx < m_size);
     return (this->*m_getter)(ndx);
 
@@ -1049,6 +1058,7 @@ inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 
 inline ref_type Array::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_hasRefs);
     int64_t v = get(ndx);
     return to_ref(v);

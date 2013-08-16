@@ -899,3 +899,116 @@ TEST(StringIndex_Bug2)
         }
     }
 }
+
+
+TEST(Shared_MixedWithNonShared)
+{
+    File::try_remove("/tmp/x.tightdb");
+    {
+        // Create empty file without free-space tracking
+        Group g;
+        g.write("/tmp/x.tightdb");
+    }
+    {
+        // See if we can modify with non-shared group
+        Group g("/tmp/x.tightdb", Group::mode_ReadWrite);
+        g.get_table("foo"); // Add table "foo"
+        g.commit();
+    }
+
+    File::try_remove("/tmp/x.tightdb");
+    {
+        // Create non-empty file without free-space tracking
+        Group g;
+        g.get_table("x");
+        g.write("/tmp/x.tightdb");
+    }
+    {
+        // See if we can modify with non-shared group
+        Group g("/tmp/x.tightdb", Group::mode_ReadWrite);
+        g.get_table("foo"); // Add table "foo"
+        g.commit();
+    }
+
+    File::try_remove("/tmp/x.tightdb");
+    {
+        // Create empty file without free-space tracking
+        Group g;
+        g.write("/tmp/x.tightdb");
+    }
+    {
+        // See if we can read and modify with shared group
+        SharedGroup sg("/tmp/x.tightdb");
+        {
+            ReadTransaction rt(sg);
+            CHECK(!rt.has_table("foo"));
+        }
+        {
+            WriteTransaction wt(sg);
+            wt.get_table("foo"); // Add table "foo"
+            wt.commit();
+        }
+    }
+
+    File::try_remove("/tmp/x.tightdb");
+    {
+        // Create non-empty file without free-space tracking
+        Group g;
+        g.get_table("x");
+        g.write("/tmp/x.tightdb");
+    }
+    {
+        // See if we can read and modify with shared group
+        SharedGroup sg("/tmp/x.tightdb");
+        {
+            ReadTransaction rt(sg);
+            CHECK(!rt.has_table("foo"));
+        }
+        {
+            WriteTransaction wt(sg);
+            wt.get_table("foo"); // Add table "foo"
+            wt.commit();
+        }
+    }
+    {
+        SharedGroup sg("/tmp/x.tightdb");
+        {
+            ReadTransaction rt(sg);
+            CHECK(rt.has_table("foo"));
+        }
+    }
+    {
+        // Access using non-shared group
+        Group g("/tmp/x.tightdb", Group::mode_ReadWrite);
+        g.commit();
+    }
+    {
+        // Modify using non-shared group
+        Group g("/tmp/x.tightdb", Group::mode_ReadWrite);
+        g.get_table("bar"); // Add table "bar"
+        g.commit();
+    }
+    {
+        // See if we can still acces using shared group
+        SharedGroup sg("/tmp/x.tightdb");
+        {
+            ReadTransaction rt(sg);
+            CHECK(rt.has_table("foo"));
+            CHECK(rt.has_table("bar"));
+            CHECK(!rt.has_table("baz"));
+        }
+        {
+            WriteTransaction wt(sg);
+            wt.get_table("baz"); // Add table "baz"
+            wt.commit();
+        }
+    }
+    {
+        SharedGroup sg("/tmp/x.tightdb");
+        {
+            ReadTransaction rt(sg);
+            CHECK(rt.has_table("baz"));
+        }
+    }
+    File::remove("/tmp/x.tightdb");
+}
