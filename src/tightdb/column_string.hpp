@@ -120,9 +120,6 @@ public:
 #endif
 
 protected:
-    friend class ColumnBase;
-    void update_ref(ref_type ref);
-
     void LeafSet(size_t ndx, StringData value);
     template<class F> size_t LeafFind(StringData value, size_t begin, size_t end) const;
     void LeafFindAll(Array& result, StringData value, size_t add_offset = 0,
@@ -135,8 +132,6 @@ protected:
 #endif
 
 private:
-    friend class Array;
-
     static const size_t short_string_max_size = 15;
 
     StringIndex* m_index;
@@ -149,6 +144,9 @@ private:
                                 Array::TreeInsert<AdaptiveStringColumn>& state);
 
     static void copy_leaf(const ArrayString&, ArrayStringLong&);
+
+    friend class Array;
+    friend class ColumnBase;
 };
 
 
