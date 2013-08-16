@@ -388,9 +388,11 @@ size_t Group::commit(size_t current_version, size_t readlock_version, bool persi
     TIGHTDB_ASSERT(m_top.IsValid());
     TIGHTDB_ASSERT(readlock_version <= current_version);
 
-    // FIXME: Under what circumstances can this even happen????
+    // Error if file was opened as readonly. 
+    // FIXME: Can other conditions provoke below?
     // FIXME: What about when a user owned read-only buffer is attached? 
-    if (!m_alloc.is_attached()) throw runtime_error("Cannot persist");
+    if (!m_alloc.is_attached())
+        throw runtime_error("Cannot persist");
 
     // If we have an empty db file, we can just serialize directly
     //if (m_alloc.get_top_ref() == 0) {}
@@ -405,7 +407,7 @@ size_t Group::commit(size_t current_version, size_t readlock_version, bool persi
     // Recursively write all changed arrays to end of file
     const size_t top_pos = out.commit();
 
-    // If the group is persisiting in single-thread (un-shared) mode
+    // If the group is persisting in single-thread (un-shared) mode
     // we have to make sure that the group stays valid after commit
     if (!m_is_shared) {
         // Recusively update refs in all active tables (columns, arrays..)

@@ -43,15 +43,14 @@ public:
     Group();
 
     enum OpenMode {
-        /// Open in read-only mode. Fail if the file does not already
-        /// exist.
-        mode_ReadOnly,
-        /// Open in read/write mode. Create the file if it does not
-        /// already exist.
-        mode_ReadWrite,
-        /// Open in read/write mode. Fail if the file does not already
-        /// exist.
-        mode_ReadWriteNoCreate
+        // Don't change values below.
+
+        /// Open in read-only mode. Fail if the file does not already exist.
+        mode_ReadOnly = 0,
+        /// Open in read/write mode. Create the file if it doesn't exist.
+        mode_ReadWrite = 1,
+        /// Open in read/write mode. Fail if the file does not already exist.
+        mode_ReadWriteNoCreate = 2
     };
 
     /// Equivalent to calling open(const std::string&, OpenMode) on a
