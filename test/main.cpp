@@ -88,9 +88,28 @@ int main(int argc, char* argv[])
         Columns<int64_t> first(0);
         Columns<float> second(1);
 
-        Expression* eee = first + (second + 1) > first;
+        Expression* eee = first > first;
+
+
+
+        Expression* eee1 = first + second > 8.9 + first;
+        Expression* eee2 = first + second > first + 8;
+        Expression* eee3 = first + second > 10;
+        Expression* eee4 = second > 8;       
+        Expression* eee5 = second > 8.1;
+        Expression* eee6 = 8.1 > second;
+        Expression* eee7 = first + second > first + int64_t(8);
+        Expression* eee8 = second + 3 > first + int64_t(8);
+       
+        size_t match2;
         
-        size_t match2 = table.where().expression(eee).find_next();
+        match2 = table.where().expression(eee2).find_next();
+
+        match2 = table.where().expression(eee3).find_next();
+
+        match2 = table.where().expression(eee4).find_next();
+
+
 
 
 // query expressions:
@@ -129,8 +148,7 @@ int main(int argc, char* argv[])
 
 
         {
-            volatile size_t m;
-            unsigned int best = -1;
+            int best = -1;
             for(int y = 0; y < 20; y++)
             {
                 UnitTest::Timer timer;
