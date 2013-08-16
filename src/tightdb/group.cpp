@@ -2,6 +2,7 @@
 #include <new>
 #include <algorithm>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 
 #include <tightdb/terminate.hpp>
@@ -389,7 +390,7 @@ size_t Group::commit(size_t current_version, size_t readlock_version, bool persi
     TIGHTDB_ASSERT(readlock_version <= current_version);
 
     // FIXME: Under what circumstances can this even happen????
-    // FIXME: What about when a user owned read-only buffer is attached? 
+    // FIXME: What about when a user owned read-only buffer is attached?
     if (!m_alloc.is_attached()) throw runtime_error("Cannot persist");
 
     // If we have an empty db file, we can just serialize directly
@@ -535,8 +536,9 @@ bool Group::operator==(const Group& g) const
 void Group::to_string(ostream& out) const
 {
     // Calculate widths
-    size_t name_width = 6;
-    size_t rows_width = 4;
+    size_t index_width = 4;
+    size_t name_width = 10;
+    size_t rows_width = 6;
     size_t count = size();
     for (size_t i = 0; i < count; ++i) {
         StringData name = get_table_name(i);
@@ -544,15 +546,14 @@ void Group::to_string(ostream& out) const
 
         ConstTableRef table = get_table(name);
         size_t row_count = table->size();
-        if (rows_width < row_count) rows_width = row_count;
+        if (rows_width < row_count) rows_width = row_count; // FIXME: should be the number of digits in row_count: floor(log10(row_count+1))
     }
 
+
     // Print header
-    out << "   ";
-    out.width(name_width);
-    out << "tables" << "  ";
-    out.width(rows_width);
-    out << "rows\n";
+    out << std::setw(index_width+1) << std::left << " ";
+    out << std::setw(name_width+1)  << std::left << "tables";
+    out << std::setw(rows_width)    << std::left << "rows"    << endl;
 
     // Print tables
     for (size_t i = 0; i < count; ++i) {
@@ -560,14 +561,9 @@ void Group::to_string(ostream& out) const
         ConstTableRef table = get_table(name);
         size_t row_count = table->size();
 
-        out << i << "  ";
-        out.width(name_width);
-        out.setf(ostream::left, ostream::adjustfield);
-        out << name;
-        out << "  ";
-        out.width(rows_width);
-        out.unsetf(ostream::adjustfield);
-        out << row_count << endl;
+        out << std::setw(index_width) << std::right << i           << " ";
+        out << std::setw(name_width)  << std::left  << name.data() << " ";
+        out << std::setw(rows_width)  << std::left  << row_count   << endl;
     }
 }
 

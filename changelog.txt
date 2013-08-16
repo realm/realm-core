@@ -12,6 +12,9 @@ Format:
 
 ==================
 
+2013-08-18 (Kenneth Geisshirt)
+! Group::to_string formatting was incorrect. See https://app.asana.com/0/1441391972580/5659532773181.
+
 
 2013-08-03 (Kristian Spangsege)
 + Table::find_sorted_int() replaced by Table::lower_bound_int() and Table::upper_bound_int() as these are standardized and provide more flexibility.
