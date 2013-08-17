@@ -163,15 +163,12 @@ template <class T, class U> struct Overloads
     Operator<Plus<CommonType> > operator + (U other) { 
        return Operator<Plus<CommonType> > ((Subexpr2<T>*)this, new Value<U>(other)); 
     }
-
     Operator<Minus<CommonType> > operator - (U other) { 
        return Operator<Minus<CommonType> > ((Subexpr2<T>*)this, new Value<U>(other)); 
     }
-
     Operator<Mul<CommonType> > operator * (U other) { 
        return Operator<Mul<CommonType> > ((Subexpr2<T>*)this, new Value<U>(other)); 
     }
-
     Operator<Div<CommonType> > operator / (U other) { 
         return Operator<Div<CommonType> > ((Subexpr2<T>*)this, new Value<U>(other)); 
     }    
@@ -180,41 +177,32 @@ template <class T, class U> struct Overloads
     Operator<Plus<CommonType> > operator + (const Subexpr2<U>& other) { 
         return Operator<Plus<CommonType> > ((Subexpr2<T>*)this, (Subexpr2<U>*)&other); 
     }
-
     Operator<Plus<CommonType> > operator - (const Subexpr2<U>& other) { 
         return Operator<Minus<CommonType> > ((Subexpr2<T>*)this, (Subexpr2<U>*)&other); 
     }
-
     Operator<Plus<CommonType> > operator * (const Subexpr2<U>& other) { 
         return Operator<Mul<CommonType> > ((Subexpr2<T>*)this, (Subexpr2<U>*)&other); 
     }
-
     Operator<Plus<CommonType> > operator / (const Subexpr2<U>& other) { 
         return Operator<Div<CommonType> > ((Subexpr2<T>*)this, (Subexpr2<U>*)&other); 
     }
-
 
     // Compare, right side constant
     Expression* operator > (U other) {
         return new Compare<Greater, CommonType>((Subexpr2<T>*)this, new Value<U>(other));
     }
-
     Expression* operator < (U other) {
         return new Compare<Greater, CommonType>((Subexpr2<T>*)this, new Value<U>(other));
     }
-
     Expression* operator >= (U other) {
         return new Compare<GreaterEqual, CommonType>((Subexpr2<T>*)this, new Value<U>(other));
     }
-
     Expression* operator <= (U other) {
         return new Compare<LessEqual, CommonType>((Subexpr2<T>*)this, new Value<U>(other));
     }
-
     Expression* operator == (U other) {
         return new Compare<Equal, CommonType>((Subexpr2<T>*)this, new Value<U>(other));
     }
-
     Expression* operator != (U other) {
         return new Compare<NotEqual, CommonType>((Subexpr2<T>*)this, new Value<U>(other));
     }
@@ -223,27 +211,21 @@ template <class T, class U> struct Overloads
     Expression* operator == (const Subexpr2<U>& other) { 
         return new Compare<Greater, CommonType>((Subexpr2<T>*)this, (Subexpr2<U>*)&other); 
     }
-
     Expression* operator != (const Subexpr2<U>& other) { 
         return new Compare<NotEqual, CommonType>((Subexpr2<T>*)this, (Subexpr2<U>*)&other); 
     }
-
     Expression* operator > (const Subexpr2<U>& other) { 
         return new Compare<Greater, CommonType>((Subexpr2<T>*)this, (Subexpr2<U>*)&other); 
     }
-
     Expression* operator < (const Subexpr2<U>& other) { 
         return new Compare<Less, CommonType>((Subexpr2<T>*)this, (Subexpr2<U>*)&other); 
     }
-
     Expression* operator >= (const Subexpr2<U>& other) { 
         return new Compare<GreaterEqual, CommonType>((Subexpr2<T>*)this, (Subexpr2<U>*)&other); 
     }
-
     Expression* operator <= (const Subexpr2<U>& other) { 
         return new Compare<LessEqual, CommonType>((Subexpr2<T>*)this, (Subexpr2<U>*)&other); 
     }
-
 };
 
 
@@ -260,52 +242,121 @@ public:
 };
 
 // Compare
-template <class T> Expression* operator > (double lhs, const Subexpr2<T>& rhs) { return new Compare<Greater, typename Common<T, double>::type>(new Value<double>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Expression* operator > (float lhs, const Subexpr2<T>& rhs) { return new Compare<Greater, typename Common<T, float>::type>(new Value<float>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Expression* operator > (int lhs, const Subexpr2<T>& rhs) { return new Compare<Greater, typename Common<T, int>::type>(new Value<int>(lhs), (Subexpr2<T>*)&rhs); }
+template <class T> Expression* operator > (double lhs, const Subexpr2<T>& rhs) { 
+    return new Compare<Greater, typename Common<T, double>::type>(new Value<double>(lhs), (Subexpr2<T>*)&rhs); 
+}
+
+template <class T> Expression* operator > (float lhs, const Subexpr2<T>& rhs) {
+    return new Compare<Greater, typename Common<T, float>::type>(new Value<float>(lhs), (Subexpr2<T>*)&rhs);
+}
+template <class T> Expression* operator > (int lhs, const Subexpr2<T>& rhs) {
+    return new Compare<Greater, typename Common<T, int>::type>(new Value<int>(lhs), (Subexpr2<T>*)&rhs);
+}
 template <class T> Expression* operator > (int64_t lhs, const Subexpr2<T>& rhs) { return new Compare<Greater, typename Common<T, int64_t>::type>(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs); }
 
-template <class T> Expression* operator < (double lhs, const Subexpr2<T>& rhs) { return new Compare<Less, typename Common<T, double>::type>(new Value<double>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Expression* operator < (float lhs, const Subexpr2<T>& rhs) { return new Compare<Less, typename Common<T, float>::type>(new Value<float>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Expression* operator < (int lhs, const Subexpr2<T>& rhs) { return new Compare<Less, typename Common<T, int>::type>(new Value<int>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Expression* operator < (int64_t lhs, const Subexpr2<T>& rhs) { return new Compare<Less, typename Common<T, int64_t>::type>(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs); }
+template <class T> Expression* operator < (double lhs, const Subexpr2<T>& rhs) {
+    return new Compare<Less, typename Common<T, double>::type>(new Value<double>(lhs), (Subexpr2<T>*)&rhs); 
+}
+template <class T> Expression* operator < (float lhs, const Subexpr2<T>& rhs) { 
+    return new Compare<Less, typename Common<T, float>::type>(new Value<float>(lhs), (Subexpr2<T>*)&rhs); 
+}
+template <class T> Expression* operator < (int lhs, const Subexpr2<T>& rhs) {
+    return new Compare<Less, typename Common<T, int>::type>(new Value<int>(lhs), (Subexpr2<T>*)&rhs);
+}
+template <class T> Expression* operator < (int64_t lhs, const Subexpr2<T>& rhs) {
+    return new Compare<Less, typename Common<T, int64_t>::type>(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs); 
+}
 
-template <class T> Expression* operator == (double lhs, const Subexpr2<T>& rhs) { return new Compare<Equal, typename Common<T, double>::type>(new Value<double>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Expression* operator == (float lhs, const Subexpr2<T>& rhs) { return new Compare<Equal, typename Common<T, float>::type>(new Value<float>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Expression* operator == (int lhs, const Subexpr2<T>& rhs) { return new Compare<Equal, typename Common<T, int>::type>(new Value<int>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Expression* operator == (int64_t lhs, const Subexpr2<T>& rhs) { return new Compare<Equal, typename Common<T, int64_t>::type>(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs); }
+template <class T> Expression* operator == (double lhs, const Subexpr2<T>& rhs) { 
+    return new Compare<Equal, typename Common<T, double>::type>(new Value<double>(lhs), (Subexpr2<T>*)&rhs);
+}
+template <class T> Expression* operator == (float lhs, const Subexpr2<T>& rhs) {
+    return new Compare<Equal, typename Common<T, float>::type>(new Value<float>(lhs), (Subexpr2<T>*)&rhs); 
+}
+template <class T> Expression* operator == (int lhs, const Subexpr2<T>& rhs) {
+    return new Compare<Equal, typename Common<T, int>::type>(new Value<int>(lhs), (Subexpr2<T>*)&rhs); 
+}
+template <class T> Expression* operator == (int64_t lhs, const Subexpr2<T>& rhs) { 
+    return new Compare<Equal, typename Common<T, int64_t>::type>(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs); 
+}
 
-template <class T> Expression* operator >= (double lhs, const Subexpr2<T>& rhs) { return new Compare<GreaterEqual, typename Common<T, double>::type>(new Value<double>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Expression* operator >= (float lhs, const Subexpr2<T>& rhs) { return new Compare<GreaterEqual, typename Common<T, float>::type>(new Value<float>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Expression* operator >= (int lhs, const Subexpr2<T>& rhs) { return new Compare<GreaterEqual, typename Common<T, int>::type>(new Value<int>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Expression* operator >= (int64_t lhs, const Subexpr2<T>& rhs) { return new Compare<GreaterEqual, typename Common<T, int64_t>::type>(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs); }
+template <class T> Expression* operator >= (double lhs, const Subexpr2<T>& rhs) {
+    return new Compare<GreaterEqual, typename Common<T, double>::type>(new Value<double>(lhs), (Subexpr2<T>*)&rhs);
+}
+template <class T> Expression* operator >= (float lhs, const Subexpr2<T>& rhs) {
+    return new Compare<GreaterEqual, typename Common<T, float>::type>(new Value<float>(lhs), (Subexpr2<T>*)&rhs);
+}
+template <class T> Expression* operator >= (int lhs, const Subexpr2<T>& rhs) {
+    return new Compare<GreaterEqual, typename Common<T, int>::type>(new Value<int>(lhs), (Subexpr2<T>*)&rhs);
+}
+template <class T> Expression* operator >= (int64_t lhs, const Subexpr2<T>& rhs) {
+    return new Compare<GreaterEqual, typename Common<T, int64_t>::type>(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs); 
+}
 
-template <class T> Expression* operator <= (double lhs, const Subexpr2<T>& rhs) { return new Compare<LessEqual, typename Common<T, double>::type>(new Value<double>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Expression* operator <= (float lhs, const Subexpr2<T>& rhs) { return new Compare<LessEqual, typename Common<T, float>::type>(new Value<float>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Expression* operator <= (int lhs, const Subexpr2<T>& rhs) { return new Compare<LessEqual, typename Common<T, int>::type>(new Value<int>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Expression* operator <= (int64_t lhs, const Subexpr2<T>& rhs) { return new Compare<LessEqual, typename Common<T, int64_t>::type>(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs); }
+template <class T> Expression* operator <= (double lhs, const Subexpr2<T>& rhs) {
+    return new Compare<LessEqual, typename Common<T, double>::type>(new Value<double>(lhs), (Subexpr2<T>*)&rhs); 
+}
+template <class T> Expression* operator <= (float lhs, const Subexpr2<T>& rhs) {
+    return new Compare<LessEqual, typename Common<T, float>::type>(new Value<float>(lhs), (Subexpr2<T>*)&rhs); 
+}
+template <class T> Expression* operator <= (int lhs, const Subexpr2<T>& rhs) {
+    return new Compare<LessEqual, typename Common<T, int>::type>(new Value<int>(lhs), (Subexpr2<T>*)&rhs); 
+}
+template <class T> Expression* operator <= (int64_t lhs, const Subexpr2<T>& rhs) { 
+    return new Compare<LessEqual, typename Common<T, int64_t>::type>(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs);
+}
 
 // Arithmetic
-template <class T> Operator<Plus<typename Common<T, double>::type> > operator + (double lhs, const Subexpr2<T>& rhs) { return Operator<Plus<typename Common<T, double>::type> >(new Value<double>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Operator<Plus<typename Common<T, float>::type> > operator + (float lhs, const Subexpr2<T>& rhs) { return Operator<Plus<typename Common<T, float>::type> >(new Value<float>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Operator<Plus<typename Common<T, int>::type> > operator + (int lhs, const Subexpr2<T>& rhs) { return Operator<Plus<typename Common<T, int>::type> >(new Value<int>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Operator<Plus<typename Common<T, int64_t>::type> > operator + (int64_t lhs, const Subexpr2<T>& rhs) { return Operator<Plus<typename Common<T, int64_t>::type> >(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs); }
+template <class T> Operator<Plus<typename Common<T, double>::type> > operator + (double lhs, const Subexpr2<T>& rhs) { 
+    return Operator<Plus<typename Common<T, double>::type> >(new Value<double>(lhs), (Subexpr2<T>*)&rhs); 
+}
+template <class T> Operator<Plus<typename Common<T, float>::type> > operator + (float lhs, const Subexpr2<T>& rhs) {
+    return Operator<Plus<typename Common<T, float>::type> >(new Value<float>(lhs), (Subexpr2<T>*)&rhs); 
+}
+template <class T> Operator<Plus<typename Common<T, int>::type> > operator + (int lhs, const Subexpr2<T>& rhs) {
+    return Operator<Plus<typename Common<T, int>::type> >(new Value<int>(lhs), (Subexpr2<T>*)&rhs);
+}
+template <class T> Operator<Plus<typename Common<T, int64_t>::type> > operator + (int64_t lhs, const Subexpr2<T>& rhs) { 
+    return Operator<Plus<typename Common<T, int64_t>::type> >(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs);
+}
 
-template <class T> Operator<Minus<typename Common<T, double>::type> > operator - (double lhs, const Subexpr2<T>& rhs) { return Operator<Minus<typename Common<T, double>::type> >(new Value<double>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Operator<Minus<typename Common<T, float>::type> > operator - (float lhs, const Subexpr2<T>& rhs) { return Operator<Minus<typename Common<T, float>::type> >(new Value<float>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Operator<Minus<typename Common<T, int>::type> > operator - (int lhs, const Subexpr2<T>& rhs) { return Operator<Minus<typename Common<T, int>::type> >(new Value<int>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Operator<Minus<typename Common<T, int64_t>::type> > operator - (int64_t lhs, const Subexpr2<T>& rhs) { return Operator<Minus<typename Common<T, int64_t>::type> >(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs); }
+template <class T> Operator<Minus<typename Common<T, double>::type> > operator - (double lhs, const Subexpr2<T>& rhs) {
+    return Operator<Minus<typename Common<T, double>::type> >(new Value<double>(lhs), (Subexpr2<T>*)&rhs); 
+}
+template <class T> Operator<Minus<typename Common<T, float>::type> > operator - (float lhs, const Subexpr2<T>& rhs) { 
+    return Operator<Minus<typename Common<T, float>::type> >(new Value<float>(lhs), (Subexpr2<T>*)&rhs);
+}
+template <class T> Operator<Minus<typename Common<T, int>::type> > operator - (int lhs, const Subexpr2<T>& rhs) { 
+    return Operator<Minus<typename Common<T, int>::type> >(new Value<int>(lhs), (Subexpr2<T>*)&rhs);
+}
+template <class T> Operator<Minus<typename Common<T, int64_t>::type> > operator - (int64_t lhs, const Subexpr2<T>& rhs) { 
+    return Operator<Minus<typename Common<T, int64_t>::type> >(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs); }
 
-template <class T> Operator<Mul<typename Common<T, double>::type> > operator * (double lhs, const Subexpr2<T>& rhs) { return Operator<Mul<typename Common<T, double>::type> >(new Value<double>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Operator<Mul<typename Common<T, float>::type> > operator * (float lhs, const Subexpr2<T>& rhs) { return Operator<Mul<typename Common<T, float>::type> >(new Value<float>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Operator<Mul<typename Common<T, int>::type> > operator * (int lhs, const Subexpr2<T>& rhs) { return Operator<Mul<typename Common<T, int>::type> >(new Value<int>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Operator<Mul<typename Common<T, int64_t>::type> > operator * (int64_t lhs, const Subexpr2<T>& rhs) { return Operator<Mul<typename Common<T, int64_t>::type> >(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs); }
+template <class T> Operator<Mul<typename Common<T, double>::type> > operator * (double lhs, const Subexpr2<T>& rhs) {
+    return Operator<Mul<typename Common<T, double>::type> >(new Value<double>(lhs), (Subexpr2<T>*)&rhs); 
+}
+template <class T> Operator<Mul<typename Common<T, float>::type> > operator * (float lhs, const Subexpr2<T>& rhs) { 
+    return Operator<Mul<typename Common<T, float>::type> >(new Value<float>(lhs), (Subexpr2<T>*)&rhs); 
+}
+template <class T> Operator<Mul<typename Common<T, int>::type> > operator * (int lhs, const Subexpr2<T>& rhs) { 
+    return Operator<Mul<typename Common<T, int>::type> >(new Value<int>(lhs), (Subexpr2<T>*)&rhs);
+}
+template <class T> Operator<Mul<typename Common<T, int64_t>::type> > operator * (int64_t lhs, const Subexpr2<T>& rhs) { 
+    return Operator<Mul<typename Common<T, int64_t>::type> >(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs);
+}
 
-template <class T> Operator<Div<typename Common<T, double>::type> > operator / (double lhs, const Subexpr2<T>& rhs) { return Operator<Div<typename Common<T, double>::type> >(new Value<double>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Operator<Div<typename Common<T, float>::type> > operator / (float lhs, const Subexpr2<T>& rhs) { return Operator<Div<typename Common<T, float>::type> >(new Value<float>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Operator<Div<typename Common<T, int>::type> > operator / (int lhs, const Subexpr2<T>& rhs) { return Operator<Div<typename Common<T, int>::type> >(new Value<int>(lhs), (Subexpr2<T>*)&rhs); }
-template <class T> Operator<Div<typename Common<T, int64_t>::type> > operator / (int64_t lhs, const Subexpr2<T>& rhs) { return Operator<Div<typename Common<T, int64_t>::type> >(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs); }
-
+template <class T> Operator<Div<typename Common<T, double>::type> > operator / (double lhs, const Subexpr2<T>& rhs) { 
+    return Operator<Div<typename Common<T, double>::type> >(new Value<double>(lhs), (Subexpr2<T>*)&rhs);
+}
+template <class T> Operator<Div<typename Common<T, float>::type> > operator / (float lhs, const Subexpr2<T>& rhs) { 
+    return Operator<Div<typename Common<T, float>::type> >(new Value<float>(lhs), (Subexpr2<T>*)&rhs);
+}
+template <class T> Operator<Div<typename Common<T, int>::type> > operator / (int lhs, const Subexpr2<T>& rhs) { return 
+    Operator<Div<typename Common<T, int>::type> >(new Value<int>(lhs), (Subexpr2<T>*)&rhs);
+}
+template <class T> Operator<Div<typename Common<T, int64_t>::type> > operator / (int64_t lhs, const Subexpr2<T>& rhs) { 
+    return Operator<Div<typename Common<T, int64_t>::type> >(new Value<int64_t>(lhs), (Subexpr2<T>*)&rhs);
+}
 
 
 template <class T> class Columns : public Subexpr2<T>
