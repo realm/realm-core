@@ -6,8 +6,6 @@ using namespace std;
 using namespace tightdb;
 
 
-namespace tightdb {
-
 ColumnBinary::ColumnBinary(Allocator& alloc)
 {
     m_array = new ArrayBinary(NULL, 0, alloc);
@@ -217,5 +215,3 @@ void ColumnBinary::leaf_to_dot(ostream& out, const Array& array) const
 }
 
 #endif // TIGHTDB_DEBUG
-
-}

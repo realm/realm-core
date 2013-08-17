@@ -414,7 +414,7 @@ size_t GroupWriter::extend_free_space(size_t requested_size)
         size_t last_ndx  = to_size_t(positions.size()-1);
         size_t last_size = to_size_t(lengths[last_ndx]);
         size_t end  = to_size_t(positions[last_ndx] + last_size);
-        size_t ver  = to_size_t(is_shared ? versions[last_ndx] : 0);
+        size_t ver  = is_shared ? to_size_t(versions[last_ndx]) : 0;
         if (end == old_file_size && ver == 0) {
             lengths.set(last_ndx, last_size + ext_size);
             return last_ndx;

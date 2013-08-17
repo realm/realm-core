@@ -338,17 +338,16 @@ public:
     /// does nothing.
     void update_parent();
 
-    /// When there is a chance that this array node has been modified
-    /// and possibly relocated, this function will update the accessor
-    /// such that it becomes valid again. Of course, this is allowed
-    /// only when the parent continues to exist and it continues to
-    /// have some child at the same index as the child that this
-    /// accessosr was originally attached to. Even then, one must be
-    /// carefull, because the new child at that index, may be a
-    /// completely different one in a logical sense.
+    /// Called in the context of Group::commit() to ensure that
+    /// attached accessors stay valid across a commit. Please note
+    /// that this works only for non-transactional commits. Accessors
+    /// obtained during a transaction are always detached when the
+    /// transaction ends.
     ///
-    /// FIXME: What is the point of this one? When can it ever be used safely?
-    bool update_from_parent() TIGHTDB_NOEXCEPT;
+    /// Returns true if, and only if the array has changed. If the
+    /// array has not cahnged, then its children are guaranteed to
+    /// also not have changed.
+    bool update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
     /// Change the type of an already attached array node.
     ///

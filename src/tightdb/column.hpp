@@ -69,8 +69,14 @@ public:
     virtual bool has_index() const TIGHTDB_NOEXCEPT { return false; }
     virtual void set_index_ref(ref_type, ArrayParent*, std::size_t) {}
 
-    virtual void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT { m_array->adjust_ndx_in_parent(diff); }
-    virtual void update_from_parent() TIGHTDB_NOEXCEPT { m_array->update_from_parent(); }
+    virtual void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT;
+
+    /// Called in the context of Group::commit() to ensure that
+    /// attached table accessors stay valid across a commit. Please
+    /// note that this works only for non-transactional commits. Table
+    /// accessors obtained during a transaction are always detached
+    /// when the transaction ends.
+    virtual void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
     virtual void invalidate_subtables_virtual() {}
 

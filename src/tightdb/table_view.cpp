@@ -3,8 +3,8 @@
 #include <tightdb/column_basic.hpp>
 
 using namespace std;
+using namespace tightdb;
 
-namespace tightdb {
 
 // Searching
 
@@ -338,6 +338,3 @@ void TableView::clear()
 
     m_refs.clear();
 }
-
-
-} // namespace tightdb

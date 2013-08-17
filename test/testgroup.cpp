@@ -416,7 +416,7 @@ TEST(Group_Persist)
 
 #ifdef TIGHTDB_DEBUG
     db.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     CHECK_EQUAL(6, table->get_column_count());
     CHECK_EQUAL(1, table->size());
@@ -437,7 +437,7 @@ TEST(Group_Persist)
 
 #ifdef TIGHTDB_DEBUG
     db.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     CHECK_EQUAL(6, table->get_column_count());
     CHECK_EQUAL(1, table->size());
@@ -1054,5 +1054,5 @@ TEST(Group_ToDot)
     fs.close();
 }
 
-#endif //TIGHTDB_TO_DOT
+#endif // TIGHTDB_TO_DOT
 #endif // TIGHTDB_DEBUG

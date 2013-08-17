@@ -66,7 +66,7 @@ public:
     //@{
 
     void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void update_from_parent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     // Index
     bool has_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_index != 0; }

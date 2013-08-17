@@ -10,8 +10,6 @@ using namespace std;
 using namespace tightdb;
 
 
-namespace tightdb {
-
 const char SlabAlloc::default_header[24] = {
     0,   0,   0,   0,   0,   0,   0,   0,
     0,   0,   0,   0,   0,   0,   0,   0,
@@ -410,7 +408,7 @@ void SlabAlloc::free_all()
 }
 
 
-void SlabAlloc::remap(size_t file_size)
+bool SlabAlloc::remap(size_t file_size)
 {
     TIGHTDB_ASSERT(m_free_read_only.is_empty());
     TIGHTDB_ASSERT(m_slabs.size() == m_free_space.size());
@@ -420,6 +418,8 @@ void SlabAlloc::remap(size_t file_size)
 
     void* addr =
         m_file.remap(m_data, m_baseline, File::access_ReadOnly, file_size);
+
+    bool addr_changed = addr != m_data;
 
     m_data = static_cast<char*>(addr);
     m_baseline = file_size;
@@ -434,6 +434,8 @@ void SlabAlloc::remap(size_t file_size)
 
         m_slabs[i].ref_end = new_offset;
     }
+
+    return addr_changed;
 }
 
 
@@ -545,5 +547,3 @@ void SlabAlloc::print() const
 }
 
 #endif // TIGHTDB_DEBUG
-
-} //namespace tightdb

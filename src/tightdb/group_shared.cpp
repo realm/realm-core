@@ -43,6 +43,7 @@ struct SharedGroup::SharedInfo {
     ReadCount readers[32]; // has to be power of two
 };
 
+
 namespace {
 
 class ScopedMutexLock {

@@ -12,6 +12,7 @@
 using namespace std;
 using namespace tightdb;
 
+
 namespace {
 
 class Initialization {
@@ -110,7 +111,6 @@ private:
 } // anonymous namespace
 
 
-namespace tightdb {
 
 void Group::open(const string& file_path, OpenMode mode)
 {
@@ -193,13 +193,13 @@ void Group::init_from_ref(ref_type top_ref)
     // at all, and files that are not shared does not need version
     // info for free space.
     if (top_size > 2) {
-        TIGHTDB_ASSERT(top_size >= 4);
+        TIGHTDB_ASSERT(top_size == 4 || top_size == 5);
         size_t fp_ref = m_top.get_as_ref(2);
         size_t fl_ref = m_top.get_as_ref(3);
         m_free_positions.init_from_ref(fp_ref);
         m_free_lengths.init_from_ref(fl_ref);
 
-        if (top_size > 4) {
+        if (m_is_shared && top_size > 4) {
             TIGHTDB_ASSERT(top_size == 5);
             m_free_versions.init_from_ref(m_top.get_as_ref(4));
         }
@@ -353,13 +353,13 @@ void Group::commit()
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_top.is_attached());
 
-    // GroupWriter::commit() needs free space tracking information, so
+    // GroupWriter::commit() needs free-space tracking information, so
     // if the attached database does not contain it, we must add it
     // now. Empty (newly created) database files and database files
-    // created by Group::write() do not have free space tracking
+    // created by Group::write() do not have free-space tracking
     // information.
     if (m_free_positions.is_attached()) {
-        TIGHTDB_ASSERT(m_top.size() >= 2);
+        TIGHTDB_ASSERT(m_top.size() == 4 || m_top.size() == 5);
     }
     else {
         TIGHTDB_ASSERT(m_top.size() == 2);
@@ -387,8 +387,13 @@ void Group::commit()
     // Remap file if it has grown
     size_t new_file_size = out.get_file_size();
     TIGHTDB_ASSERT(new_file_size >= m_alloc.get_baseline());
-    if (new_file_size > m_alloc.get_baseline())
-        m_alloc.remap(new_file_size);
+    if (new_file_size > m_alloc.get_baseline()) {
+        if (m_alloc.remap(new_file_size)) {
+            // The file was mapped to a new address, so all array
+            // accessors must be updated.
+            old_baseline = 0;
+        }
+    }
 
     // Recusively update refs in all active tables (columns, arrays..)
     update_refs(top_ref, old_baseline);
@@ -401,6 +406,12 @@ void Group::commit()
 
 void Group::update_refs(ref_type top_ref, size_t old_baseline)
 {
+    TIGHTDB_ASSERT(!m_free_versions.is_attached());
+
+    // After Group::commit() we will always have free space tracking
+    // info.
+    TIGHTDB_ASSERT(m_top.size() == 4 || m_top.size() == 5);
+
     // Array nodes that a part of the previous version of the database
     // will not be overwritte by Group::commit(). This is necessary
     // for robustness in the face of abrupt termination of the
@@ -412,45 +423,24 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline)
         return;
 
     m_top.init_from_ref(top_ref);
-    TIGHTDB_ASSERT(m_top.size() >= 2);
 
     // Now we can update it's child arrays
-    m_table_names.update_from_parent(/*old_baseline*/);
+    m_table_names.update_from_parent(old_baseline);
+    m_free_positions.update_from_parent(old_baseline);
+    m_free_lengths.update_from_parent(old_baseline);
 
-    // No free-info in serialized databases
-    // and version info is only in shared,
-    if (m_top.size() >= 4) {
-        m_free_positions.update_from_parent();
-        m_free_lengths.update_from_parent();
-    }
-    else {
-        m_free_positions.detach();
-        m_free_lengths.detach();
-    }
-    if (m_top.size() == 5) {
-        m_free_versions.update_from_parent();
-    }
-    else {
-        m_free_versions.detach();
-    }
-
-    // if the tables have not been modfied we don't
-    // need to update cached tables
-    //
-    // FIXME: This early-out option is wrong. Equal 'refs' does in no
-    // way guarantee that the table has not been modified.
-    if (!m_tables.update_from_parent())
+    // If m_tables has not been modfied we don't
+    // need to update attached table accessors
+    if (!m_tables.update_from_parent(old_baseline))
         return;
 
-    // FIXME: Be sure that the updating of the table accessors works recursivly
-    // FIXME: Probably move this to a new function
-
-    // Also update cached tables
+    // Update all attached table accessors including those attached to
+    // subtables.
     size_t n = m_cached_tables.size();
     for (size_t i = 0; i < n; ++i) {
         Table* t = reinterpret_cast<Table*>(m_cached_tables.get(i));
         if (t) {
-            t->update_from_parent();
+            t->update_from_parent(old_baseline);
         }
     }
 }
@@ -696,5 +686,3 @@ void Group::zero_free_space(size_t file_size, size_t readlock_version)
 }
 
 #endif // TIGHTDB_DEBUG
-
-} //namespace tightdb

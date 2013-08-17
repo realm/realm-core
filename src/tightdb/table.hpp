@@ -433,9 +433,15 @@ private:
     void cache_columns();
     void clear_cached_columns();
 
+    /// Called in the context of Group::commit() to ensure that
+    /// attached table accessors stay valid across a commit. Please
+    /// note that this works only for non-transactional commits. Table
+    /// accessors obtained during a transaction are always detached
+    /// when the transaction ends.
+    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
+
     // Specification
     void adjust_column_ndx_in_parent(std::size_t column_ndx_begin, int diff) TIGHTDB_NOEXCEPT;
-    void update_from_parent() TIGHTDB_NOEXCEPT;
     std::size_t do_add_column(DataType);
     void do_add_subcolumn(const std::vector<std::size_t>& column_path, std::size_t pos, DataType);
     static void do_remove_column(Array& column_refs, const Spec::ColumnInfo&);
@@ -466,10 +472,10 @@ private:
     /// recursively for subtables. When this function returns,
     /// is_valid() will return false.
     ///
-    /// This function may be called for a table wrapper that is
+    /// This function may be called for a table accessor that is
     /// already in the invalid state (idempotency).
     ///
-    /// It is also valid to call this function for a table wrapper
+    /// It is also valid to call this function for a table accessor
     /// that has not yet been marked as invalid, but whose underlying
     /// structure of arrays have changed in an unpredictable/unknown
     /// way. This generally happens when a modifying table operation

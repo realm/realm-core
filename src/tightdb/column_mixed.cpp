@@ -1,8 +1,8 @@
 #include <tightdb/column_mixed.hpp>
 
 using namespace std;
+using namespace tightdb;
 
-namespace tightdb {
 
 ColumnMixed::~ColumnMixed()
 {
@@ -18,15 +18,15 @@ void ColumnMixed::destroy()
         m_array->destroy();
 }
 
-void ColumnMixed::update_from_parent() TIGHTDB_NOEXCEPT
+void ColumnMixed::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
-    if (!m_array->update_from_parent())
+    if (!m_array->update_from_parent(old_baseline))
         return;
 
-    m_types->update_from_parent();
-    m_refs->update_from_parent();
+    m_types->update_from_parent(old_baseline);
+    m_refs->update_from_parent(old_baseline);
     if (m_data)
-        m_data->update_from_parent();
+        m_data->update_from_parent(old_baseline);
 }
 
 
@@ -268,37 +268,37 @@ bool ColumnMixed::compare_mixed(const ColumnMixed& c) const
         if (c.get_type(i) != type)
             return false;
         switch (type) {
-        case type_Int:
-            if (get_int(i) != c.get_int(i)) return false;
-            break;
-        case type_Bool:
-            if (get_bool(i) != c.get_bool(i)) return false;
-            break;
-        case type_Date:
-            if (get_date(i) != c.get_date(i)) return false;
-            break;
-        case type_Float:
-            if (get_float(i) != c.get_float(i)) return false;
-            break;
-        case type_Double:
-            if (get_double(i) != c.get_double(i)) return false;
-            break;
-        case type_String:
-            if (get_string(i) != c.get_string(i)) return false;
-            break;
-        case type_Binary:
-            if (get_binary(i) != c.get_binary(i)) return false;
-            break;
-        case type_Table: {
+            case type_Int:
+                if (get_int(i) != c.get_int(i)) return false;
+                break;
+            case type_Bool:
+                if (get_bool(i) != c.get_bool(i)) return false;
+                break;
+            case type_Date:
+                if (get_date(i) != c.get_date(i)) return false;
+                break;
+            case type_Float:
+                if (get_float(i) != c.get_float(i)) return false;
+                break;
+            case type_Double:
+                if (get_double(i) != c.get_double(i)) return false;
+                break;
+            case type_String:
+                if (get_string(i) != c.get_string(i)) return false;
+                break;
+            case type_Binary:
+                if (get_binary(i) != c.get_binary(i)) return false;
+                break;
+            case type_Table: {
                 ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
                 ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();
                 if (*t1 != *t2)
                     return false;
+                break;
             }
-            break;
-        case type_Mixed:
-            TIGHTDB_ASSERT(false);
-            break;
+            case type_Mixed:
+                TIGHTDB_ASSERT(false);
+                break;
         }
     }
     return true;
@@ -364,5 +364,3 @@ void ColumnMixed::to_dot(ostream& out, StringData title) const
 }
 
 #endif // TIGHTDB_DEBUG
-
-} // namespace tightdb

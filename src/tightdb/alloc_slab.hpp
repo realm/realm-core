@@ -125,7 +125,10 @@ public:
     /// Remap the attached file such that a prefix of the specified
     /// size becomes available in memory. If sucessfull,
     /// get_baseline() will return the specified new file size.
-    void remap(std::size_t file_size);
+    ///
+    /// \return True if, and only if the memory address of the first
+    /// mapped byte has changed.
+    bool remap(std::size_t file_size);
 
     MemRef alloc(std::size_t size) TIGHTDB_OVERRIDE;
     MemRef realloc_(ref_type, const char*, std::size_t size) TIGHTDB_OVERRIDE;

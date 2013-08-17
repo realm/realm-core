@@ -2,19 +2,19 @@
 #include <tightdb/index_string.hpp>
 
 using namespace std;
+using namespace tightdb;
+
 
 namespace {
 
 // Getter function for string index
-tightdb::StringData get_string(void* column, size_t ndx)
+StringData get_string(void* column, size_t ndx)
 {
-    return static_cast<tightdb::ColumnStringEnum*>(column)->get(ndx);
+    return static_cast<ColumnStringEnum*>(column)->get(ndx);
 }
 
 } // anonymous namespace
 
-
-namespace tightdb {
 
 ColumnStringEnum::ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* parent,
                                    size_t ndx_in_parent, Allocator& alloc):
@@ -43,10 +43,10 @@ void ColumnStringEnum::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
     Column::adjust_ndx_in_parent(diff);
 }
 
-void ColumnStringEnum::update_from_parent() TIGHTDB_NOEXCEPT
+void ColumnStringEnum::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
-    m_array->update_from_parent();
-    m_keys.update_from_parent();
+    m_array->update_from_parent(old_baseline);
+    m_keys.update_from_parent(old_baseline);
 }
 
 void ColumnStringEnum::add(StringData value)
@@ -265,5 +265,3 @@ void ColumnStringEnum::to_dot(ostream& out, StringData title) const
 }
 
 #endif // TIGHTDB_DEBUG
-
-}

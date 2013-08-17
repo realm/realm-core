@@ -29,7 +29,7 @@ namespace tightdb {
 /// Base class for any type of column that can contain subtables.
 class ColumnSubtableParent: public Column, public Table::Parent {
 public:
-    void update_from_parent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void invalidate_subtables();
 
@@ -103,17 +103,17 @@ protected:
 
 private:
     struct SubtableMap {
-        SubtableMap(Allocator& alloc): m_indexes(alloc), m_wrappers(alloc) {}
+        SubtableMap(Allocator& alloc): m_indexes(alloc), m_tables(alloc) {}
         ~SubtableMap();
         bool empty() const TIGHTDB_NOEXCEPT { return !m_indexes.is_attached() || m_indexes.is_empty(); }
         Table* find(std::size_t subtable_ndx) const;
-        void insert(std::size_t subtable_ndx, Table* wrapper);
+        void insert(std::size_t subtable_ndx, Table*);
         void remove(std::size_t subtable_ndx);
-        void update_from_parents() TIGHTDB_NOEXCEPT;
+        void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
         void invalidate_subtables();
     private:
         Array m_indexes;
-        Array m_wrappers;
+        Array m_tables;
     };
 
     mutable SubtableMap m_subtable_map;
@@ -123,8 +123,8 @@ private:
 
 class ColumnTable: public ColumnSubtableParent {
 public:
-    /// Create a subtable column wrapper and have it instantiate a new
-    /// underlying structure of arrays.
+    /// Create a subtable column accessor and have it instantiate a
+    /// new underlying structure of arrays.
     ///
     /// \param table If this column is used as part of a table you must
     /// pass a pointer to that table. Otherwise you must pass null.
@@ -134,7 +134,7 @@ public:
     /// table. Otherwise you should pass zero.
     ColumnTable(Allocator&, const Table* table, std::size_t column_ndx, ref_type spec_ref);
 
-    /// Create a subtable column wrapper and attach it to a
+    /// Create a subtable column accessor and attach it to a
     /// preexisting underlying structure of arrays.
     ///
     /// \param table If this column is used as part of a table you must
@@ -202,12 +202,6 @@ private:
 
 // Implementation
 
-inline void ColumnSubtableParent::update_from_parent() TIGHTDB_NOEXCEPT
-{
-    if (!m_array->update_from_parent()) return;
-    m_subtable_map.update_from_parents();
-}
-
 inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) const
 {
     TIGHTDB_ASSERT(subtable_ndx < size());
@@ -259,69 +253,77 @@ inline ColumnSubtableParent::SubtableMap::~SubtableMap()
     if (m_indexes.is_attached()) {
         TIGHTDB_ASSERT(m_indexes.is_empty());
         m_indexes.destroy();
-        m_wrappers.destroy();
+        m_tables.destroy();
     }
 }
 
 inline Table* ColumnSubtableParent::SubtableMap::find(std::size_t subtable_ndx) const
 {
-    if (!m_indexes.is_attached()) return 0;
+    if (!m_indexes.is_attached())
+        return 0;
     std::size_t pos = m_indexes.find_first(subtable_ndx);
-    return pos != std::size_t(-1) ? reinterpret_cast<Table*>(m_wrappers.get(pos)) : 0;
+    if (pos == not_found)
+        return 0;
+    return reinterpret_cast<Table*>(uintptr_t(m_tables.get(pos)));
 }
 
-inline void ColumnSubtableParent::SubtableMap::insert(std::size_t subtable_ndx, Table* wrapper)
+inline void ColumnSubtableParent::SubtableMap::insert(std::size_t subtable_ndx, Table* table)
 {
     if (!m_indexes.is_attached()) {
         m_indexes.create(Array::type_Normal);
-        m_wrappers.create(Array::type_Normal);
+        m_tables.create(Array::type_Normal);
     }
     m_indexes.add(subtable_ndx);
-    m_wrappers.add(reinterpret_cast<unsigned long>(wrapper));
+    m_tables.add(int64_t(reinterpret_cast<uintptr_t>(table)));
 }
 
 inline void ColumnSubtableParent::SubtableMap::remove(std::size_t subtable_ndx)
 {
     TIGHTDB_ASSERT(m_indexes.is_attached());
     std::size_t pos = m_indexes.find_first(subtable_ndx);
-    TIGHTDB_ASSERT(pos != std::size_t(-1));
-    // FIXME: It is a problem that Array as our most low-level array
-    // construct has too many features to deliver a erase() method
+    TIGHTDB_ASSERT(pos != not_found);
+    // FIXME: It is a problem that Array, as our most low-level array
+    // construct, has too many features to deliver an erase() method
     // that cannot be guaranteed to never throw.
     m_indexes.erase(pos);
-    m_wrappers.erase(pos);
+    m_tables.erase(pos);
 }
 
-inline void ColumnSubtableParent::SubtableMap::update_from_parents() TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::SubtableMap::
+update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT
 {
-    if (!m_indexes.is_attached()) return;
+    if (!m_indexes.is_attached())
+        return;
 
-    std::size_t n = m_wrappers.size();
+    std::size_t n = m_tables.size();
     for (std::size_t i = 0; i < n; ++i) {
-        Table* t = reinterpret_cast<Table*>(m_wrappers.get(i));
-        t->update_from_parent();
+        Table* t = reinterpret_cast<Table*>(uintptr_t(m_tables.get(i)));
+        t->update_from_parent(old_baseline);
     }
 }
 
 inline void ColumnSubtableParent::SubtableMap::invalidate_subtables()
 {
-    if (!m_indexes.is_attached()) return;
+    if (!m_indexes.is_attached())
+        return;
 
-    std::size_t n = m_wrappers.size();
+    std::size_t n = m_tables.size();
     for (std::size_t i=0; i<n; ++i) {
-        Table* t = reinterpret_cast<Table*>(m_wrappers.get(i));
+        Table* t = reinterpret_cast<Table*>(uintptr_t(m_tables.get(i)));
         t->invalidate();
     }
 
     m_indexes.clear(); // FIXME: Can we rely on Array::clear() never failing????
-    m_wrappers.clear();
+    m_tables.clear();
 }
 
 inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
                                                   const Table* table, std::size_t column_ndx):
     Column(Array::type_HasRefs, alloc),
     m_table(table), m_index(column_ndx),
-    m_subtable_map(Allocator::get_default()) {}
+    m_subtable_map(Allocator::get_default())
+{
+}
 
 inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
                                                   const Table* table, std::size_t column_ndx,
@@ -329,7 +331,9 @@ inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
                                                   ref_type ref):
     Column(ref, parent, ndx_in_parent, alloc),
     m_table(table), m_index(column_ndx),
-    m_subtable_map(Allocator::get_default()) {}
+    m_subtable_map(Allocator::get_default())
+{
+}
 
 inline void ColumnSubtableParent::update_child_ref(std::size_t subtable_ndx, ref_type new_ref)
 {
@@ -381,13 +385,17 @@ std::size_t* ColumnSubtableParent::record_subtable_path(std::size_t* begin,
 
 inline ColumnTable::ColumnTable(Allocator& alloc, const Table* table, std::size_t column_ndx,
                                 ref_type spec_ref):
-    ColumnSubtableParent(alloc, table, column_ndx), m_spec_ref(spec_ref) {}
+    ColumnSubtableParent(alloc, table, column_ndx), m_spec_ref(spec_ref)
+{
+}
 
 inline ColumnTable::ColumnTable(Allocator& alloc, const Table* table, std::size_t column_ndx,
                                 ArrayParent* parent, std::size_t ndx_in_parent,
                                 ref_type spec_ref, ref_type column_ref):
     ColumnSubtableParent(alloc, table, column_ndx, parent, ndx_in_parent, column_ref),
-    m_spec_ref(spec_ref) {}
+    m_spec_ref(spec_ref)
+{
+}
 
 inline void ColumnTable::add(const Table* subtable)
 {

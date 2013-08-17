@@ -21,9 +21,6 @@ const size_t init_subtab_path_buf_size = 2*init_subtab_path_buf_levels - 1;
 } // anonymous namespace
 
 
-namespace tightdb {
-
-
 Replication::Replication(): m_selected_table(0), m_selected_spec(0)
 {
     m_subtab_path_buf.set_size(init_subtab_path_buf_size); // Throws
@@ -847,6 +844,3 @@ void Replication::apply_transact_log(InputStream& transact_log, Group& group)
     applier.apply(); // Throws
 }
 #endif
-
-
-} // namespace tightdb

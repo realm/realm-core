@@ -98,7 +98,13 @@ private:
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT;
 
-    bool update_from_parent() TIGHTDB_NOEXCEPT;
+    /// Called in the context of Group::commit() to ensure that
+    /// attached table accessors stay valid across a commit. Please
+    /// note that this works only for non-transactional commits. Table
+    /// accessors obtained during a transaction are always detached
+    /// when the transaction ends.
+    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
+
     void set_parent(ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
 
     void set_column_type(std::size_t column_ndx, ColumnType type);
