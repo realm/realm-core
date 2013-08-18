@@ -542,18 +542,22 @@ void Group::to_string(ostream& out) const
     size_t count = size();
     for (size_t i = 0; i < count; ++i) {
         StringData name = get_table_name(i);
-        if (name_width < name.size()) name_width = name.size();
+        if (name_width < name.size()) {
+            name_width = name.size();
+        }
 
         ConstTableRef table = get_table(name);
         size_t row_count = table->size();
-        if (rows_width < row_count) rows_width = row_count; // FIXME: should be the number of digits in row_count: floor(log10(row_count+1))
+        if (rows_width < row_count) { // FIXME: should be the number of digits in row_count: floor(log10(row_count+1))
+            rows_width = row_count;
+        }
     }
 
 
     // Print header
-    out << std::setw(index_width+1) << std::left << " ";
-    out << std::setw(name_width+1)  << std::left << "tables";
-    out << std::setw(rows_width)    << std::left << "rows"    << endl;
+    out << setw(index_width+1) << left << " ";
+    out << setw(name_width+1)  << left << "tables";
+    out << setw(rows_width)    << left << "rows"    << endl;
 
     // Print tables
     for (size_t i = 0; i < count; ++i) {
@@ -561,9 +565,9 @@ void Group::to_string(ostream& out) const
         ConstTableRef table = get_table(name);
         size_t row_count = table->size();
 
-        out << std::setw(index_width) << std::right << i           << " ";
-        out << std::setw(name_width)  << std::left  << name.data() << " ";
-        out << std::setw(rows_width)  << std::left  << row_count   << endl;
+        out << setw(index_width) << right << i           << " ";
+        out << setw(name_width)  << left  << name.data() << " ";
+        out << setw(rows_width)  << left  << row_count   << endl;
     }
 }
 
