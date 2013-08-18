@@ -1,6 +1,7 @@
 // Tightdb daemon (tightdbd) responsible for async commits
 
 #include <tightdb/group_shared.hpp>
+#include <unistd.h>
 
 using namespace tightdb;
 

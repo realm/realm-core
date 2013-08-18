@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
 #include <tightdb/terminate.hpp>
 #include <tightdb/safe_int_ops.hpp>
@@ -112,7 +113,7 @@ void spawn_daemon(const string& file)
         // child process ends here
 
     } else if (pid > 0) { // parent process, fork succeeded:
-
+        
         // use childs exit code to catch and report any errors:
         int status;
         int pid_changed = waitpid(pid, &status, 0);
@@ -314,10 +315,10 @@ retry:
             // In async mode we need to wait for the commit process to get ready
             // so we wait for first read lock being made by async_commit process
             SharedInfo* const info = m_file_map.get_addr();
-            int maxwait = 500;
+            int maxwait = 10000;
             while (maxwait--) {
                 if (info->put_pos != 0) return;
-                usleep(2);
+                usleep(10);
             }
             throw runtime_error("Failed to observe async commit starting");
         }
