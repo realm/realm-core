@@ -103,16 +103,16 @@ protected:
 
 private:
     struct SubtableMap {
-        SubtableMap(Allocator& alloc): m_indices(alloc), m_wrappers(alloc) {}
+        SubtableMap(Allocator& alloc): m_indexes(alloc), m_wrappers(alloc) {}
         ~SubtableMap();
-        bool empty() const TIGHTDB_NOEXCEPT { return !m_indices.IsValid() || m_indices.is_empty(); }
+        bool empty() const TIGHTDB_NOEXCEPT { return !m_indexes.is_attached() || m_indexes.is_empty(); }
         Table* find(std::size_t subtable_ndx) const;
         void insert(std::size_t subtable_ndx, Table* wrapper);
         void remove(std::size_t subtable_ndx);
         void update_from_parents() TIGHTDB_NOEXCEPT;
         void invalidate_subtables();
     private:
-        Array m_indices;
+        Array m_indexes;
         Array m_wrappers;
     };
 
@@ -153,7 +153,7 @@ public:
     /// an instance of BasicTableRef.
     Table* get_subtable_ptr(std::size_t subtable_ndx) const
     {
-        return ColumnSubtableParent::get_subtable_ptr(subtable_ndx, m_ref_specSet);
+        return ColumnSubtableParent::get_subtable_ptr(subtable_ndx, m_spec_ref);
     }
 
     // When passing a table to add() or insert() it is assumed that
@@ -187,9 +187,7 @@ public:
 #endif
 
 private:
-    const ref_type m_ref_specSet;
-
-    bool subtables_have_shared_spec() TIGHTDB_OVERRIDE { return true; }
+    const ref_type m_spec_ref;
 
     void destroy_subtable(std::size_t ndx);
 
@@ -258,45 +256,45 @@ inline TableRef ColumnSubtableParent::get_subtable(std::size_t subtable_ndx) con
 
 inline ColumnSubtableParent::SubtableMap::~SubtableMap()
 {
-    if (m_indices.IsValid()) {
-        TIGHTDB_ASSERT(m_indices.is_empty());
-        m_indices.destroy();
+    if (m_indexes.is_attached()) {
+        TIGHTDB_ASSERT(m_indexes.is_empty());
+        m_indexes.destroy();
         m_wrappers.destroy();
     }
 }
 
 inline Table* ColumnSubtableParent::SubtableMap::find(std::size_t subtable_ndx) const
 {
-    if (!m_indices.IsValid()) return 0;
-    std::size_t pos = m_indices.find_first(subtable_ndx);
+    if (!m_indexes.is_attached()) return 0;
+    std::size_t pos = m_indexes.find_first(subtable_ndx);
     return pos != std::size_t(-1) ? reinterpret_cast<Table*>(m_wrappers.get(pos)) : 0;
 }
 
 inline void ColumnSubtableParent::SubtableMap::insert(std::size_t subtable_ndx, Table* wrapper)
 {
-    if (!m_indices.IsValid()) {
-        m_indices.set_type(Array::type_Normal);
-        m_wrappers.set_type(Array::type_Normal);
+    if (!m_indexes.is_attached()) {
+        m_indexes.create(Array::type_Normal);
+        m_wrappers.create(Array::type_Normal);
     }
-    m_indices.add(subtable_ndx);
+    m_indexes.add(subtable_ndx);
     m_wrappers.add(reinterpret_cast<unsigned long>(wrapper));
 }
 
 inline void ColumnSubtableParent::SubtableMap::remove(std::size_t subtable_ndx)
 {
-    TIGHTDB_ASSERT(m_indices.IsValid());
-    std::size_t pos = m_indices.find_first(subtable_ndx);
+    TIGHTDB_ASSERT(m_indexes.is_attached());
+    std::size_t pos = m_indexes.find_first(subtable_ndx);
     TIGHTDB_ASSERT(pos != std::size_t(-1));
     // FIXME: It is a problem that Array as our most low-level array
     // construct has too many features to deliver a erase() method
     // that cannot be guaranteed to never throw.
-    m_indices.erase(pos);
+    m_indexes.erase(pos);
     m_wrappers.erase(pos);
 }
 
 inline void ColumnSubtableParent::SubtableMap::update_from_parents() TIGHTDB_NOEXCEPT
 {
-    if (!m_indices.IsValid()) return;
+    if (!m_indexes.is_attached()) return;
 
     std::size_t n = m_wrappers.size();
     for (std::size_t i = 0; i < n; ++i) {
@@ -307,7 +305,7 @@ inline void ColumnSubtableParent::SubtableMap::update_from_parents() TIGHTDB_NOE
 
 inline void ColumnSubtableParent::SubtableMap::invalidate_subtables()
 {
-    if (!m_indices.IsValid()) return;
+    if (!m_indexes.is_attached()) return;
 
     std::size_t n = m_wrappers.size();
     for (std::size_t i=0; i<n; ++i) {
@@ -315,7 +313,7 @@ inline void ColumnSubtableParent::SubtableMap::invalidate_subtables()
         t->invalidate();
     }
 
-    m_indices.clear(); // FIXME: Can we rely on Array::clear() never failing????
+    m_indexes.clear(); // FIXME: Can we rely on Array::clear() never failing????
     m_wrappers.clear();
 }
 
@@ -383,13 +381,13 @@ std::size_t* ColumnSubtableParent::record_subtable_path(std::size_t* begin,
 
 inline ColumnTable::ColumnTable(Allocator& alloc, const Table* table, std::size_t column_ndx,
                                 ref_type spec_ref):
-    ColumnSubtableParent(alloc, table, column_ndx), m_ref_specSet(spec_ref) {}
+    ColumnSubtableParent(alloc, table, column_ndx), m_spec_ref(spec_ref) {}
 
 inline ColumnTable::ColumnTable(Allocator& alloc, const Table* table, std::size_t column_ndx,
                                 ArrayParent* parent, std::size_t ndx_in_parent,
                                 ref_type spec_ref, ref_type column_ref):
     ColumnSubtableParent(alloc, table, column_ndx, parent, ndx_in_parent, column_ref),
-    m_ref_specSet(spec_ref) {}
+    m_spec_ref(spec_ref) {}
 
 inline void ColumnTable::add(const Table* subtable)
 {

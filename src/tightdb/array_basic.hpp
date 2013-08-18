@@ -65,6 +65,13 @@ public:
     std::size_t lower_bound(T value) const TIGHTDB_NOEXCEPT;
     std::size_t upper_bound(T value) const TIGHTDB_NOEXCEPT;
 
+    /// Create a new empty string array and attach to it. This does
+    /// not modify the parent reference information.
+    ///
+    /// Note that the caller assumes ownership of the allocated
+    /// underlying node. It is not owned by the accessor.
+    void create();
+
 private:
     std::size_t find(T target, std::size_t begin, std::size_t end) const;
 
@@ -73,7 +80,7 @@ private:
     virtual WidthType GetWidthType() const { return wtype_Multiply; }
 
     template<bool find_max> bool minmax(T& result, std::size_t begin, std::size_t end) const;
-    static ref_type create_empty_basic_array(Allocator&);
+    static ref_type create_empty_array(Allocator&);
 };
 
 

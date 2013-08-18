@@ -46,9 +46,11 @@ public:
         /// Open in read-only mode. Fail if the file does not already
         /// exist.
         mode_ReadOnly,
+
         /// Open in read/write mode. Create the file if it does not
         /// already exist.
         mode_ReadWrite,
+
         /// Open in read/write mode. Fail if the file does not already
         /// exist.
         mode_ReadWriteNoCreate
@@ -129,6 +131,9 @@ public:
     /// them are opened in read-only mode, and there is no other party
     /// that modifies the file concurrently.
     ///
+    /// Do not call this function on a group instance that is managed
+    /// by a shared group. Doing so will result in undefined behavior.
+    ///
     /// \param file File system path to a TightDB database file.
     ///
     /// \param mode Specifying a mode that is not mode_ReadOnly
@@ -164,14 +169,17 @@ public:
     /// Calling open() on a Group instance that is already in the
     /// attached state has undefined behavior.
     ///
+    /// Do not call this function on a group instance that is managed
+    /// by a shared group. Doing so will result in undefined behavior.
+    ///
     /// \throw InvalidDatabase If the specified buffer does not appear
     /// to contain a valid database.
     void open(BinaryData, bool take_ownership = true);
 
     /// A group may be created in the unattached state, and then later
     /// attached to a file with a call to open(). Calling any method
-    /// other than open(), is_attached(), and ~Group() on an
-    /// unattached instance results in undefined behavior.
+    /// other than open(), and is_attached() on an unattached instance
+    /// results in undefined behavior.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
     /// Returns true if, and only if the number of tables in this
@@ -216,17 +224,19 @@ public:
     /// std::malloc().
     BinaryData write_to_mem() const;
 
-    // FIXME: What does this one do? Exactly how is it different from
-    // calling write()? There is no documentation to be found anywhere
-    // and it looks like it leaves the group in an invalid state. You
-    // should probably not use it.
-    // FIXME: Must throw an exception if the group is opened in
-    // read-only mode. Currently this is impossible because the
-    // information is not stored anywhere. A flag probably needs to be
-    // added to SlabAlloc.
-    // FIXME: It needs to be determined whether or not this method can
-    // leave the Group instance in an invalid state. This issue
-    // strongly affects how high-level language bindings can use it.
+    /// Commit changes to the attached file. This requires that the
+    /// attached file is opened in read/write mode.
+    ///
+    /// Do not call this function on a group instance that is managed
+    /// by a shared group. Doing so will result in undefined behavior.
+    ///
+    /// Table accesors will remain valid across the commit. Note that
+    /// this is not the case when working with proper transactions.
+    ///
+    /// FIXME: Must throw an exception if the group is opened in
+    /// read-only mode. Currently this is impossible because the
+    /// information is not stored anywhere. A flag probably needs to be
+    /// added to SlabAlloc.
     void commit();
 
     // Conversion
@@ -250,29 +260,36 @@ public:
     void enable_mem_diagnostics(bool enable = true) { m_alloc.enable_debug(enable); }
     void to_dot(std::ostream&) const;
     void to_dot() const; // For GDB
+    void to_dot(const char* file_path) const;
     void zero_free_space(std::size_t file_size, std::size_t readlock_version);
 #endif
 
-protected:
-    friend class GroupWriter;
-    friend class SharedGroup;
+private:
+    SlabAlloc m_alloc;
+    Array m_top;
+    Array m_tables;
+    ArrayString m_table_names;
+    Array m_free_positions;
+    Array m_free_lengths;
+    Array m_free_versions;
+    mutable Array m_cached_tables;
+    const bool m_is_shared; // FIXME: Currently used only by Verify() when compiling in debug mode
+    std::size_t m_readlock_version;
 
-    void create_from_file(const std::string& filename, OpenMode, bool do_init);
+    struct shared_tag {};
+    Group(shared_tag) TIGHTDB_NOEXCEPT;
 
+    // FIXME: Implement a proper copy constructor (fairly trivial).
+    Group(const Group&); // Disable copying
+
+    void init_array_parents();
     void invalidate();
-    bool in_initial_state() const;
     void init_shared();
-    std::size_t commit(std::size_t current_version, std::size_t readlock_version, bool persist);
-    void rollback();
-
-    SlabAlloc& get_allocator() { return m_alloc; }
-    Array& get_top_array() { return m_top; }
 
     // Recursively update all internal refs after commit
     void update_refs(ref_type top_ref);
 
-    void update_from_shared(ref_type top_ref, std::size_t len);
-    void reset_to_new();
+    void update_from_shared(ref_type new_top_ref, std::size_t new_file_size);
 
     void update_child_ref(std::size_t subtable_ndx, ref_type new_ref) TIGHTDB_OVERRIDE
     {
@@ -286,30 +303,17 @@ protected:
         return m_tables.get_as_ref(subtable_ndx);
     }
 
-    void create(); // FIXME: Could be private
-    void create_from_ref(ref_type top_ref);
-
     // May throw WriteError
     template<class S> std::size_t write_to_stream(S& out) const;
 
-    // Member variables
-    SlabAlloc m_alloc;
-    Array m_top;
-    Array m_tables;
-    ArrayString m_tableNames;
-    Array m_freePositions;
-    Array m_freeLengths;
-    Array m_freeVersions;
-    mutable Array m_cachedtables;
-    const bool m_is_shared;
-    std::size_t m_readlock_version;
+    /// Create a new underlying node structure and attach this
+    /// accessor instance to it
+    void create();
 
-private:
-    struct shared_tag {};
-    Group(shared_tag) TIGHTDB_NOEXCEPT;
-
-    // FIXME: Implement a proper copy constructor (fairly trivial).
-    Group(const Group&); // Disable copying
+    /// Attach this accessor instance to a preexisting underlying node
+    /// structure. This function also initializes the table accessor
+    /// cache.
+    void init_from_ref(ref_type top_ref);
 
     Table* get_table_ptr(StringData name);
     Table* get_table_ptr(StringData name, bool& was_created);
@@ -323,6 +327,8 @@ private:
 
     void clear_cache();
 
+    friend class GroupWriter;
+    friend class SharedGroup;
     friend class LangBindHelper;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -338,75 +344,84 @@ private:
 
 // Implementation
 
-// FIXME: Successfully constructed arrays are leaked if one array
-// constructor fails. The core problem here and in many other places
-// is that ~Array() does not deallocate memory. More generally, the
-// fact that the Array class violates the RAII idiom in multiple ways,
-// coupled with the fact that we still use it in ways that involves
-// ownership of the underlying memory, causes lots of problems with
-// robustness both here and in other places.
 inline Group::Group():
-    m_top(Array::type_HasRefs, 0, 0, m_alloc), m_tables(m_alloc), m_tableNames(0, 0, m_alloc),
-    m_freePositions(Array::type_Normal, 0, 0, m_alloc),
-    m_freeLengths(Array::type_Normal, 0, 0, m_alloc),
-    m_freeVersions(Array::type_Normal, 0, 0, m_alloc), m_is_shared(false)
+    m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
+    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
 {
-    // FIXME: Arrays are leaked when create() throws
-    create();
+    init_array_parents();
+
+    // FIXME: The try-catch is required because of the unfortunate
+    // fact that Array violates the RAII idiom by allocating memory in
+    // the constructor and not freeing it in the destructor. We must
+    // find a way to improve Array.
+    try {
+        create(); // Throws
+    }
+    catch (...) {
+        m_cached_tables.destroy();
+        throw;
+    }
 }
 
 inline Group::Group(const std::string& file, OpenMode mode):
-    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
-    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(false)
+    m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
+    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
 {
-    // FIXME: The try-cache is required because of the unfortunate
-    // fact that Array violates the RAII idiom while still being used
-    // to own memory. We must find a way to improve Array.
+    init_array_parents();
+
+    // FIXME: The try-catch is required because of the unfortunate
+    // fact that Array violates the RAII idiom by allocating memory in
+    // the constructor and not freeing it in the destructor. We must
+    // find a way to improve Array.
     try {
         open(file, mode); // Throws
     }
     catch (...) {
-        m_cachedtables.destroy();
+        m_cached_tables.destroy();
         throw;
     }
 }
 
 inline Group::Group(BinaryData buffer, bool take_ownership):
-    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
-    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(false)
+    m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
+    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
 {
-    // FIXME: The try-cache is required because of the unfortunate
-    // fact that Array violates the RAII idiom while still being used
-    // to own memory. We must find a way to improve Array.
+    init_array_parents();
+
+    // FIXME: The try-catch is required because of the unfortunate
+    // fact that Array violates the RAII idiom by allocating memory in
+    // the constructor and not freeing it in the destructor. We must
+    // find a way to improve Array.
     try {
         open(buffer, take_ownership); // Throws
     }
     catch (...) {
-        m_cachedtables.destroy();
+        m_cached_tables.destroy();
         throw;
     }
 }
 
 inline Group::Group(unattached_tag) TIGHTDB_NOEXCEPT:
-    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
-    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(false) {}
-
-inline Group::Group(shared_tag) TIGHTDB_NOEXCEPT:
-    m_top(m_alloc), m_tables(m_alloc), m_tableNames(m_alloc), m_freePositions(m_alloc),
-    m_freeLengths(m_alloc), m_freeVersions(m_alloc), m_is_shared(true) {}
-
-inline void Group::open(const std::string& file, OpenMode mode)
+    m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
+    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
 {
-    TIGHTDB_ASSERT(!is_attached());
-    create_from_file(file, mode, true);
+    init_array_parents();
 }
 
-inline void Group::open(BinaryData buffer, bool take_ownership)
+inline Group::Group(shared_tag) TIGHTDB_NOEXCEPT:
+    m_top(m_alloc), m_tables(m_alloc), m_table_names(m_alloc), m_free_positions(m_alloc),
+    m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(true)
 {
-    TIGHTDB_ASSERT(!is_attached());
-    TIGHTDB_ASSERT(buffer.data());
-    m_alloc.attach_buffer(const_cast<char*>(buffer.data()), buffer.size(), take_ownership);
-    create_from_ref(m_alloc.get_top_ref()); // FIXME: Throws and leaves the Group in peril
+    init_array_parents();
+}
+
+inline void Group::init_array_parents()
+{
+    m_table_names.set_parent(&m_top, 0);
+    m_tables.set_parent(&m_top, 1);
+    m_free_positions.set_parent(&m_top, 2);
+    m_free_lengths.set_parent(&m_top, 3);
+    m_free_versions.set_parent(&m_top, 4);
 }
 
 inline bool Group::is_attached() const TIGHTDB_NOEXCEPT
@@ -416,26 +431,21 @@ inline bool Group::is_attached() const TIGHTDB_NOEXCEPT
 
 inline bool Group::is_empty() const TIGHTDB_NOEXCEPT
 {
-    if (!m_top.IsValid()) return true;
-    return m_tableNames.is_empty();
-}
-
-inline bool Group::in_initial_state() const
-{
-    return !m_top.IsValid();
+    if (!m_top.is_attached()) return true;
+    return m_table_names.is_empty();
 }
 
 inline std::size_t Group::size() const
 {
-    if (!m_top.IsValid()) return 0;
-    return m_tableNames.size();
+    if (!m_top.is_attached()) return 0;
+    return m_table_names.size();
 }
 
 inline StringData Group::get_table_name(std::size_t table_ndx) const
 {
-    TIGHTDB_ASSERT(m_top.IsValid());
-    TIGHTDB_ASSERT(table_ndx < m_tableNames.size());
-    return m_tableNames.get(table_ndx);
+    TIGHTDB_ASSERT(m_top.is_attached());
+    TIGHTDB_ASSERT(table_ndx < m_table_names.size());
+    return m_table_names.get(table_ndx);
 }
 
 inline const Table* Group::get_table_ptr(std::size_t ndx) const
@@ -445,15 +455,15 @@ inline const Table* Group::get_table_ptr(std::size_t ndx) const
 
 inline bool Group::has_table(StringData name) const
 {
-    if (!m_top.IsValid()) return false;
-    std::size_t i = m_tableNames.find_first(name);
+    if (!m_top.is_attached()) return false;
+    std::size_t i = m_table_names.find_first(name);
     return i != std::size_t(-1);
 }
 
 template<class T> inline bool Group::has_table(StringData name) const
 {
-    if (!m_top.IsValid()) return false;
-    std::size_t i = m_tableNames.find_first(name);
+    if (!m_top.is_attached()) return false;
+    std::size_t i = m_table_names.find_first(name);
     if (i == std::size_t(-1)) return false;
     const Table* table = get_table_ptr(i);
     return T::matches_dynamic_spec(&table->get_spec());
@@ -461,8 +471,8 @@ template<class T> inline bool Group::has_table(StringData name) const
 
 inline Table* Group::get_table_ptr(StringData name)
 {
-    TIGHTDB_ASSERT(m_top.IsValid());
-    std::size_t ndx = m_tableNames.find_first(name);
+    TIGHTDB_ASSERT(m_top.is_attached());
+    std::size_t ndx = m_table_names.find_first(name);
     if (ndx != std::size_t(-1)) {
         // Get table from cache
         return get_table_ptr(ndx);
@@ -473,8 +483,8 @@ inline Table* Group::get_table_ptr(StringData name)
 
 inline Table* Group::get_table_ptr(StringData name, bool& was_created)
 {
-    TIGHTDB_ASSERT(m_top.IsValid());
-    std::size_t ndx = m_tableNames.find_first(name);
+    TIGHTDB_ASSERT(m_top.is_attached());
+    std::size_t ndx = m_table_names.find_first(name);
     if (ndx != std::size_t(-1)) {
         was_created = false;
         // Get table from cache
@@ -496,8 +506,8 @@ template<class T> inline T* Group::get_table_ptr(StringData name)
     TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
     TIGHTDB_ASSERT(!has_table(name) || has_table<T>(name));
 
-    TIGHTDB_ASSERT(m_top.IsValid());
-    std::size_t ndx = m_tableNames.find_first(name);
+    TIGHTDB_ASSERT(m_top.is_attached());
+    std::size_t ndx = m_table_names.find_first(name);
     if (ndx != std::size_t(-1)) {
         // Get table from cache
         return static_cast<T*>(get_table_ptr(ndx));
@@ -534,11 +544,6 @@ template<class T> inline typename T::ConstRef Group::get_table(StringData name) 
     return get_table_ptr<T>(name)->get_table_ref();
 }
 
-inline void Group::commit()
-{
-    commit(-1, -1, true);
-}
-
 template<class S> std::size_t Group::write_to_stream(S& out) const
 {
     // Space for file header
@@ -552,14 +557,14 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
     top.add(m_top.get(1));
 
     // Recursively write all arrays
-    const uint64_t topPos = top.Write(out); // FIXME: Why does this not return char*?
+    const uint64_t top_pos = top.write(out);
     const std::size_t byte_size = out.getpos();
 
     // Write top ref
     // (since we initially set the last bit in the file header to
     //  zero, it is the first ref block that is valid)
     out.seek(0);
-    out.write(reinterpret_cast<const char*>(&topPos), 8);
+    out.write(reinterpret_cast<const char*>(&top_pos), 8);
 
     // FIXME: To be 100% robust with respect to being able to detect
     // afterwards whether the file was completely written, we would
@@ -583,7 +588,7 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
 template<class S>
 void Group::to_json(S& out) const
 {
-    if (!m_top.IsValid()) {
+    if (!m_top.is_attached()) {
         out << "{}";
         return;
     }
@@ -591,7 +596,7 @@ void Group::to_json(S& out) const
     out << "{";
 
     for (std::size_t i = 0; i < m_tables.size(); ++i) {
-        StringData name = m_tableNames.get(i);
+        StringData name = m_table_names.get(i);
         const Table* table = get_table_ptr(i);
 
         if (i) out << ",";
@@ -606,14 +611,14 @@ void Group::to_json(S& out) const
 
 inline void Group::clear_cache()
 {
-    std::size_t count = m_cachedtables.size();
-    for (std::size_t i = 0; i < count; ++i) {
-        if (Table* const t = reinterpret_cast<Table*>(m_cachedtables.get(i))) {
+    std::size_t n = m_cached_tables.size();
+    for (std::size_t i = 0; i < n; ++i) {
+        if (Table* t = reinterpret_cast<Table*>(m_cached_tables.get(i))) {
             t->invalidate();
             t->unbind_ref();
         }
     }
-    m_cachedtables.clear();
+    m_cached_tables.clear();
 }
 
 
