@@ -589,7 +589,7 @@ CATEGORIES :
                  void set_string(size_t column_ndx, size_t row_ndx, StringData value)
                  void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value)
                  void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value)
-                 void set_subtable(siz_t column_ndx, size_t row_ndx, const Table*)
+                 void set_subtable(size_t column_ndx, size_t row_ndx, const Table*)
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
