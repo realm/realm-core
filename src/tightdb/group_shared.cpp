@@ -30,6 +30,7 @@ struct SharedGroup::ReadCount {
 };
 
 struct SharedGroup::SharedInfo {
+    uint16_t init_complete; // indicates lock file has valid content
     uint16_t version;
     uint16_t flags;
 
@@ -149,10 +150,6 @@ void spawn_daemon(const string& file)
 // to reinitialize a shared mutex if the first initializing process
 // craches and leaves the shared memory in an undefined state.
 
-// FIXME: Issues with current implementation:
-//
-// - Possible reinitialization due to temporary unlocking during downgrade of file lock
-
 void SharedGroup::open(const string& file, bool no_create_file,
                        DurabilityLevel dlevel, bool is_backend)
 {
@@ -160,53 +157,44 @@ void SharedGroup::open(const string& file, bool no_create_file,
 
     m_file_path = file + ".lock";
 
-retry:
     {
-        // Open shared coordination buffer
-        m_file.open(m_file_path, File::access_ReadWrite, File::create_Auto, 0);
-        File::CloseGuard fcg(m_file);
-
-        // FIXME: Handle lock file removal in case of failure below
-
         bool need_init = false;
         size_t len     = 0;
 
-        // If we can get an exclusive lock we know that the file is
-        // either new (empty) or a leftover from a previously
-        // crashed process (needing re-initialization)
-        if (m_file.try_lock_exclusive()) {
-            // There is a slight window between opening the file and getting the
-            // lock where another process could have deleted the file
-            if (m_file.is_removed()) {
-                m_file.close();
-                goto retry;
-            }
-            // Get size
-            if (int_cast_with_overflow_detect(m_file.get_size(), len))
-                throw runtime_error("Lock file too large");
+        // Open shared coordination buffer
+        try {
 
-            // Handle empty files (first user)
-            if (len == 0) {
-                // Create new file
-                len = sizeof (SharedInfo);
-                m_file.resize(len);
-            }
+            m_file.open(m_file_path, 
+                        File::access_ReadWrite, File::create_Must, 0);
+            len = sizeof (SharedInfo);
+            m_file.alloc(0,len);
             need_init = true;
-        }
-        else {
-            m_file.lock_shared();
 
-            // Get size
+        } catch (runtime_error e) {
+
+            // if this one throws, just propagate it:
+            m_file.open(m_file_path, 
+                        File::access_ReadWrite, File::create_Never, 0);
+        }
+
+        File::CloseGuard fcg(m_file);
+        int time_left = 100000;
+        while (1) {
+            time_left--;
+            // need to validate the size of the file before trying to map it
+            // possibly waiting a little for size to go nonzero, if another
+            // process is creating the file in parallel.
             if (int_cast_with_overflow_detect(m_file.get_size(), len))
                 throw runtime_error("Lock file too large");
-
-            // There is a slight window between opening the file and getting the
-            // lock where another process could have deleted the file
-            if (len == 0 || m_file.is_removed()) {
-                goto retry;
-            }
+            if (time_left <= 0)
+                throw runtime_error("Stale lock file");
+            // wait for file to at least contain the basic shared info block
+            // NB! it might be larger due to expansion of the ring buffer.
+            if (len < sizeof(SharedInfo))
+                usleep(10);
+            else
+                break;
         }
-
         // Map to memory
         m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
         File::UnmapGuard fug(m_file_map);
@@ -251,36 +239,25 @@ retry:
             info->capacity = 32-1;
             info->put_pos  = 0;
             info->get_pos  = 0;
-
+            info->init_complete = 1; // <- must be last in initialization
             // Set initial version so we can track if other instances
             // change the db
             m_version = 0;
-
             // In async mode we need a separate process to do the async commits
             // We start it up here during init so that it only get started once
             if (dlevel == durability_Async) {
                 spawn_daemon(file);
             }
-
-            // Downgrade lock to shared now that it is initialized,
-            // so other processes can share it as well
-            m_file.unlock(); // <- this is implicit in lock_shared, put here
-            //                     for exposition. Removing it has no effect.
-            // FIXME: downgrading of the lock is not guaranteed to be atomic
-            // a different process may obtain exclusive lock and proceed to 
-            // initialize the shared_info, including reinit of the mutexes.
-            // Reinit of initialized mutexes are UNDEFINED ... :-(
-            // Further: it could then proceed with its work, be done, and
-            // again get exclusive access. This time believing to be the sole
-            // client, it will destroy the mutexes (again undefined) and remove
-            // the .lock file. Any later guests at the party will now create
-            // a new .lock file and new semaphores - both the current process
-            // and the newcomers are free to do concurrent access to the
-            // database (there will now be two different sets of mutexes)
-            // this could potentially corrupt the database.
-            m_file.lock_shared();
         }
         else {
+            // wait for init complete:
+            int wait_count = 100000;
+            while (wait_count && info->init_complete == 0) {
+                wait_count--;
+                usleep(10);
+            }
+            if (info->init_complete == 0)
+                throw runtime_error("Lock file initialization incomplete");
             if (info->version != 0)
                 throw runtime_error("Unsupported version");
 
@@ -316,7 +293,9 @@ retry:
             SharedInfo* const info = m_file_map.get_addr();
             int maxwait = 500;
             while (maxwait--) {
-                if (info->put_pos != 0) return;
+                if (info->put_pos != 0) {
+                    return;
+                }
                 usleep(2);
             }
             throw runtime_error("Failed to observe async commit starting");
@@ -336,25 +315,9 @@ SharedGroup::~SharedGroup()
         delete repl;
 #endif
 
-    // If we can get an exclusive lock on the file we know that we are
-    // the only user (since all users take at least shared locks on
-    // the file.  So that means that we have to delete it when done
-    // (to avoid someone later opening a stale file with uinitialized
-    // mutexes)
-
-    // FIXME: This upgrading of the lock is not guaranteed to be atomic
-    m_file.unlock(); // <- for exposition only
-    // at this point a different process may gain exclusive access and
-    // proceed to remove the lock file, including destroying the mutexes.
-    // according to posix, destroying already destroyed mutexes cause
-    // UNDEFINED behavior.
-    if (!m_file.try_lock_exclusive()) return;
-
     SharedInfo* info = m_file_map.get_addr();
 
-    // In sync mode, cleanup will be handled by the async_commit process
-    // (but we might still be able to get exclusive lock, as it will
-    //  release it while doing its own try_lock_exclusive())
+    // In async mode, cleanup will be handled by the async_commit process
     if (info->flags == durability_Async) return;
 
     // If the db file is just backing for a transient data structure,
@@ -365,10 +328,12 @@ SharedGroup::~SharedGroup()
         remove(db_path.c_str());
     }
 
-    pthread_mutex_destroy(&info->readmutex);
-    pthread_mutex_destroy(&info->writemutex);
+    // FIXME: the following is not possible unless you detect that you are
+    // the last client
+//    pthread_mutex_destroy(&info->readmutex);
+//    pthread_mutex_destroy(&info->writemutex);
 
-    remove(m_file_path.c_str());
+//    remove(m_file_path.c_str());
 }
 
 
@@ -420,10 +385,10 @@ void SharedGroup::do_async_commits()
     size_t last_version = m_version;
     m_group.invalidate();
     while(true) {
-        // If we can get an exclusive lock, we know that we are
-        // the last process using the db so we can close down
-        // (all other processes using the db holds shared locks)
-        if (m_file.try_lock_exclusive()) {
+
+        // FIXME: no way yet to detect that we should shut down
+        if (m_file.is_removed()) {
+
             shutdown = true;
         }
 
@@ -447,7 +412,7 @@ void SharedGroup::do_async_commits()
             last_version = current_version;
         }
         else if (!shutdown) {
-            usleep(20);
+            usleep(100);
         }
 
         if (shutdown) {
@@ -864,8 +829,8 @@ void SharedGroup::zero_free_space()
     size_t current_version;
     size_t readlock_version;
     size_t file_size;
-    pthread_mutex_lock(&info->readmutex);
     {
+        ScopedMutexLock lock(&info->readmutex);
         current_version = info->current_version + 1;
         file_size = to_size_t(info->filesize);
 
@@ -876,7 +841,7 @@ void SharedGroup::zero_free_space()
             readlock_version = r.version;
         }
     }
-    pthread_mutex_unlock(&info->readmutex);
+    // pthread_mutex_unlock(&info->readmutex);
 
     m_group.zero_free_space(file_size, readlock_version);
 }

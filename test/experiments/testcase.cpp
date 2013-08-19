@@ -77,8 +77,10 @@ void* IncrementEntry(void* arg)
     } catch (runtime_error e) {
         printf("Thread exiting due to runtime exception\n");
         printf("what(): %s\n", e.what());
+        sleep(1);
         exit(1);
     }
+    printf("thread done\n");
     return 0;
 }
 
@@ -104,15 +106,16 @@ int main()
             wt.commit();
         }
     }
-
+/*
     // Wait for async_commit process to shutdown
     while (File::exists("asynctest.tightdb.lock")) {
         sleep(1);
     }
-
+*/
+    sleep(1);
     // Read the db again in normal mode to verify
     {
-        SharedGroup db("asynctest.tightdb");
+        SharedGroup db("asynctest.tightdb", false, SharedGroup::durability_Async);
 
         for (size_t n = 0; n < 100; ++n) {
             ReadTransaction rt(db);
@@ -169,11 +172,12 @@ int main()
         }
 
     }
+/*
     // Wait for async_commit process to shutdown
     while (File::exists("test_shared.tightdb.lock")) {
         sleep(1);
     }
-
+*/
     // Verify - once more, in sync mode - that the changes were made
     {
         printf("Reopening in sync mode and verifying\n");
