@@ -610,6 +610,12 @@ inline std::size_t Table::create_empty_table(Allocator& alloc)
     return top.GetRef();
 }
 
+#ifdef _MSC_VER
+#pragma warning(push)
+// Disable the Microsoft warning about passing "this" as a parameter to another constructor. Here it's safe.
+#pragma warning(disable: 4355)
+#endif
+
 inline Table::Table(Allocator& alloc):
     m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1), m_lookup_index(NULL)
 {
@@ -637,6 +643,11 @@ inline Table::Table(RefCountTag, Allocator& alloc, size_t spec_ref, size_t colum
 {
     init_from_ref(spec_ref, columns_ref, parent, ndx_in_parent);
 }
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
 
 inline TableRef Table::create(Allocator& alloc)
 {
