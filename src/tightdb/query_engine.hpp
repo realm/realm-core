@@ -235,7 +235,7 @@ private:
 
 class ParentNode {
 public:
-    ParentNode() : m_is_integer_node(false), m_table(NULL) {}
+    ParentNode(): m_is_integer_node(false), m_table(0) {}
 
     void gather_children(std::vector<ParentNode*>& v)
     {
@@ -245,7 +245,7 @@ public:
         v.push_back(this);
         p = p->child_criteria();
 
-        if (p != NULL)
+        if (p)
             p->gather_children(v);
 
         m_children = v;
@@ -256,7 +256,7 @@ public:
     }
 
     struct score_compare {
-        bool operator ()(ParentNode const* a, ParentNode const* b) const { return (a->cost() < b->cost()); }
+        bool operator ()(const ParentNode* a, const ParentNode* b) const { return a->cost() < b->cost(); }
     };
 
     double cost() const
@@ -465,6 +465,15 @@ protected:
     const Table* m_table;
     std::string error_code;
 
+    const ColumnBase& get_column_base(const Table& table, std::size_t ndx)
+    {
+        return table.get_column_base(ndx);
+    }
+
+    ColumnType get_real_column_type(const Table& table, std::size_t ndx)
+    {
+        return table.get_real_column_type(ndx);
+    }
 };
 
 
@@ -585,7 +594,7 @@ public:
     void init(const Table& table)
     {
         m_dD = 100.0;
-        m_condition_column = static_cast<const ColType*>(&table.get_column_base(m_condition_column_idx));
+        m_condition_column = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx));
         m_table = &table;
         m_leaf_end = 0;
         if (m_child)
@@ -848,8 +857,8 @@ public:
         m_matches = 0;
         m_end_s = 0;
         m_table = &table;
-        m_condition_column = &table.get_column_base(m_condition_column_idx);
-        m_column_type = table.get_real_column_type(m_condition_column_idx);
+        m_condition_column = &get_column_base(table, m_condition_column_idx);
+        m_column_type = get_real_column_type(table, m_condition_column_idx);
 
         if (m_child)
             m_child->init(table);
@@ -867,7 +876,7 @@ public:
                 t = static_cast<const ColumnStringEnum*>(m_condition_column)->get(s);
             }
             else {
-                // short or long 
+                // short or long
                 const AdaptiveStringColumn* asc = static_cast<const AdaptiveStringColumn*>(m_condition_column);
                 if (s >= m_end_s) {
                     // we exceeded current leaf's range
@@ -931,7 +940,7 @@ public:
     {
         m_dD = 100.0;
         m_table = &table;
-        m_condition_column.m_column = static_cast<const ColType*>(&table.get_column_base(m_condition_column_idx));
+        m_condition_column.m_column = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx));
         m_condition_column.m_leaf_end = 0;
 
         if (m_child)
@@ -981,8 +990,8 @@ public:
     {
         m_dD = 100.0;
         m_table = &table;
-        m_condition_column = static_cast<const ColumnBinary*>(&table.get_column_base(m_condition_column_idx));
-        m_column_type = table.get_real_column_type(m_condition_column_idx);
+        m_condition_column = static_cast<const ColumnBinary*>(&get_column_base(table, m_condition_column_idx));
+        m_column_type = get_real_column_type(table, m_condition_column_idx);
 
         if (m_child)
             m_child->init(table);
@@ -1064,8 +1073,8 @@ public:
         m_dD = 10.0;
         m_leaf_end = 0;
         m_table = &table;
-        m_condition_column = &table.get_column_base(m_condition_column_idx);
-        m_column_type = table.get_real_column_type(m_condition_column_idx);
+        m_condition_column = &get_column_base(table, m_condition_column_idx);
+        m_column_type = get_real_column_type(table, m_condition_column_idx);
 
         if (m_column_type == col_type_StringEnum) {
             m_dT = 1.0;
@@ -1330,10 +1339,10 @@ public:
         m_dD = 100.0;
         m_table = &table;
 
-        const ColType* c = static_cast<const ColType*>(&table.get_column_base(m_condition_column_idx1));
+        const ColType* c = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx1));
         m_getter1.init(c);
 
-        c = static_cast<const ColType*>(&table.get_column_base(m_condition_column_idx2));
+        c = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx2));
         m_getter2.init(c);
 
         if (m_child)

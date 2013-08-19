@@ -193,16 +193,14 @@ void Group::init_from_ref(ref_type top_ref)
     // at all, and files that are not shared does not need version
     // info for free space.
     if (top_size > 2) {
-        TIGHTDB_ASSERT(top_size == 4 || top_size == 5);
+        TIGHTDB_ASSERT(top_size >= 4);
         size_t fp_ref = m_top.get_as_ref(2);
         size_t fl_ref = m_top.get_as_ref(3);
         m_free_positions.init_from_ref(fp_ref);
         m_free_lengths.init_from_ref(fl_ref);
 
-        if (m_is_shared && top_size > 4) {
-            TIGHTDB_ASSERT(top_size == 5);
+        if (m_is_shared && top_size > 4)
             m_free_versions.init_from_ref(m_top.get_as_ref(4));
-        }
     }
 
     // Make room for pointers to cached tables
@@ -218,14 +216,17 @@ void Group::init_shared()
     if (m_free_versions.is_attached()) {
         // If free space tracking is enabled
         // we just have to reset it
-        m_free_versions.SetAllToZero();
+        m_free_versions.set_all_to_zero();
     }
     else {
         // Serialized files have no free space tracking
         // at all so we have to add the basic free lists
         if (m_top.size() == 2) {
-            // FIXME: Is there a risk that these are already
-            // allocated? That would cause a leak.
+            // FIXME: There is a risk that these are already
+            // allocated, and that would cause a leak. This could
+            // happen if an earlier commit attempt failed.
+            TIGHTDB_ASSERT(!m_free_positions.is_attached());
+            TIGHTDB_ASSERT(!m_free_lengths.is_attached());
             m_free_positions.create(Array::type_Normal);
             m_free_lengths.create(Array::type_Normal);
             m_top.add(m_free_positions.get_ref());
@@ -235,13 +236,14 @@ void Group::init_shared()
         // Files that have only been used in single thread
         // mode do not have version tracking for the free lists
         if (m_top.size() == 4) {
-            // FIXME: Is there a risk that this one is already
-            // allocated? That would cause a leak.
+            // FIXME: There is a risk that this one is already
+            // allocated, and that would cause a leak. This could
+            // happen if an earlier commit attempt failed.
+            TIGHTDB_ASSERT(!m_free_versions.is_attached());
             m_free_versions.create(Array::type_Normal);
             size_t n = m_free_positions.size();
-            for (size_t i = 0; i < n; ++i) {
+            for (size_t i = 0; i < n; ++i)
                 m_free_versions.add(0);
-            }
             m_top.add(m_free_versions.get_ref());
         }
     }
@@ -452,12 +454,12 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline)
 void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size)
 {
     TIGHTDB_ASSERT(new_top_ref < new_file_size);
+    TIGHTDB_ASSERT(!m_top.is_attached());
 
     // Update memory mapping if database file has grown
     TIGHTDB_ASSERT(new_file_size >= m_alloc.get_baseline());
-    if (new_file_size > m_alloc.get_baseline()) {
+    if (new_file_size > m_alloc.get_baseline())
         m_alloc.remap(new_file_size);
-    }
 
     // If our last look at the file was when it
     // was empty, we may have to re-create the group

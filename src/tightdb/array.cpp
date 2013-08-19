@@ -204,63 +204,27 @@ void Array::set_parent(ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCE
     m_ndx_in_parent = ndx_in_parent;
 }
 
-void Array::destroy()
+
+void Array::destroy_children()
 {
-    if (!m_data) return;
+    for (size_t i = 0; i < m_size; ++i) {
+        int64_t v = get(i);
 
-    if (m_hasRefs) {
-        for (size_t i = 0; i < m_size; ++i) {
-            int64_t v = get(i);
+        // Null-refs indicate empty sub-trees
+        if (v == 0)
+            continue;
 
-            // null-refs signify empty sub-trees
-            if (v == 0) continue;
+        // A ref is always 8-byte aligned, so the lowest bit
+        // cannot be set. If it is, it means that it should not be
+        // interpreted as a ref.
+        if (v % 2 != 0)
+            continue;
 
-            // all refs are 64bit aligned, so the lowest bits
-            // cannot be set. If they are it means that it should
-            // not be interpreted as a ref
-            if (v & 0x1) continue;
-
-            Array sub(to_ref(v), this, i, m_alloc);
-            sub.destroy();
-        }
+        Array sub(to_ref(v), this, i, m_alloc);
+        sub.destroy();
     }
-
-    char* header = get_header_from_data(m_data);
-    m_alloc.free_(m_ref, header);
-    m_data = 0;
 }
 
-void Array::clear()
-{
-    copy_on_write(); // Throws
-
-    // Make sure we don't have any dangling references
-    if (m_hasRefs) {
-        for (size_t i = 0; i < size(); ++i) {
-            int64_t v = get(i);
-
-            // null-refs signify empty sub-trees
-            if (v == 0) continue;
-
-            // all refs are 64bit aligned, so the lowest bits
-            // cannot be set. If they are it means that it should
-            // not be interpreted as a ref
-            if (v & 0x1) continue;
-
-            Array sub(to_ref(v), this, i, m_alloc);
-            sub.destroy();
-        }
-    }
-
-    // Truncate size to zero (but keep capacity)
-    m_size     = 0;
-    m_capacity = CalcItemCount(get_capacity_from_header(), 0);
-    set_width(0);
-
-    // Update header
-    set_header_size(0);
-    set_header_width(0);
-}
 
 void Array::erase(size_t ndx)
 {
@@ -440,7 +404,7 @@ void Array::ensure_minimum_width(int64_t value)
     }
 }
 
-void Array::SetAllToZero()
+void Array::set_all_to_zero()
 {
     copy_on_write(); // Throws
 

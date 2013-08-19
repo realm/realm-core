@@ -431,7 +431,10 @@ public:
     size_t IndexStringCount(StringData value, void* column, StringGetter get_func) const;
     FindRes IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const;
 
-    void SetAllToZero();
+    /// This one may change the represenation of the array, so be
+    /// carefull if you call it after ensure_minimum_width().
+    void set_all_to_zero();
+
     void Increment(int64_t value, std::size_t start=0, std::size_t end=std::size_t(-1));
     void IncrementIf(int64_t limit, int64_t value);
     void adjust(std::size_t start, int64_t diff);
@@ -503,7 +506,13 @@ public:
     Array GetSubArray(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT { return m_ref; }
+
+    /// Recursively destroy children (as if calling clear()), then
+    /// transition to the detached state (as if calling detach()),
+    /// then free the allocated memory. For an unattached accessor,
+    /// this function has no effect (idempotency).
     void destroy();
+
     static void destroy(ref_type, Allocator&);
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_alloc; }
@@ -816,6 +825,8 @@ protected:
     void update_child_ref(std::size_t child_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
     ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
+    void destroy_children();
+
 // FIXME: below should be moved to a specific IntegerArray class
 protected:
     // Getters and Setters for adaptive-packed arrays
@@ -1110,6 +1121,37 @@ inline bool Array::is_index_node(ref_type ref, const Allocator& alloc)
     return get_indexflag_from_header(alloc.translate(ref));
 }
 
+inline void Array::destroy()
+{
+    if (!is_attached())
+        return;
+
+    if (m_hasRefs)
+        destroy_children(); // Throws
+
+    char* header = get_header_from_data(m_data);
+    m_alloc.free_(m_ref, header);
+    m_data = 0;
+}
+
+inline void Array::clear()
+{
+    TIGHTDB_ASSERT(is_attached());
+
+    copy_on_write(); // Throws
+
+    if (m_hasRefs)
+        destroy_children(); // Throws
+
+    // Truncate size to zero (but keep capacity)
+    m_size = 0;
+    m_capacity = CalcItemCount(get_capacity_from_header(), 0);
+    set_width(0);
+
+    // Update header
+    set_header_size(0);
+    set_header_width(0);
+}
 
 inline void Array::destroy(ref_type ref, Allocator& alloc)
 {

@@ -563,11 +563,7 @@ private:
     friend class ColumnSubtableParent;
     friend class LangBindHelper;
     friend class TableViewBase;
-    template<class> friend class StringNode;
-    template<class> friend class BinaryNode;
-    template<class, class> friend class IntegerNode;
-    template<class, class> friend class BasicNode;
-    template<class, class> friend class TwoColumnsNode;
+    friend class ParentNode;
     template<class> friend class SequentialGetter;
 };
 

@@ -464,6 +464,9 @@ void SharedGroup::commit()
 // failed call to commit(). A failed call to commit() is any that
 // returns to the caller by throwing an exception. As it is right now,
 // rollback() does not handle all cases.
+//
+// FIXME: This function must be modified is such a way that it can be
+// guaranteed that it never throws. There are two problems to be delat with. Group::invalidate() calls Group::clear_cache()
 void SharedGroup::rollback()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
