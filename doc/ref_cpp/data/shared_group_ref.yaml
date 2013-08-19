@@ -48,7 +48,8 @@ CATEGORIES:
       NAMES    : SharedGroup
       SUMMARY  : &g_shared_group_constructor_summary
                  Create a shared group.
-      DESCR    : &g_shared_group_constructor_descr
+      DESCR    :
+      - TEXT   : &g_shared_group_constructor_descr
                  >
                  Open a shared group (will be created if it does not already exist).
 
@@ -57,19 +58,21 @@ CATEGORIES:
 
                  If your data is transient, and does not need to persist to disk (like for caching or
                  shared state between processes). You can open the shared group in mem-only mode. Then the
-                 file will just be used for identification and keeping temporary metadata; it will be
-                 removed again when there are no more processes using it.
+                 file will just be used for identification and backing; it will be removed when there
+                 are no more processes using it.
 
                  Note that a shared group can only be opened in the mode it was created in.
 
+      - TEXT   : &g_shared_group_constructor_descr_unattached
+                 >
                  A SharedGroup may also be constructed in an unattached
-                 state (2). See open() and is_attached() for more on
-                 this.
-      SIGNATURE: >
-                 SharedGroup(const std::string& file, bool no_create = false, DurabilityLevel dlevel = durability_Full);
-                 SharedGroup(unattached_tag);
+                 state (2). See {@link g_shared_group_open} and
+                 {@link g_shared_group_is_attached} for more on this.
+      ENUM_SIG :
+      - SIG    : SharedGroup(const std::string& path, bool no_create = false, DurabilityLevel dlevel = durability_Full);
+      - SIG    : SharedGroup(unattached_tag);
       PARAMS:
-      - NAME   : file
+      - NAME   : path
         TYPES  : const std::string&
         DESCR  : &g_shared_group_constructor_parm1_descr
                  Filesystem path of the TightDB database file to be opened.
@@ -87,13 +90,28 @@ CATEGORIES:
         DESCR  : &g_shared_group_constructor_return1_descr
                  A shared group.
       THROWS:
-      - EXCEPT : File::AccessError
-        DESCR  : &g_shared_group_constructor_throws_descr
-                 If the file could not be opened. If the reason
-                 corresponds to one of the exception types that are
-                 derived from File::AccessError, the derived exception
-                 type is thrown. Note that InvalidDatabase is among
-                 these derived exception types.
+      - EXCEPT : &cpp_permission_denied_except
+                 File::PermissionDenied
+        DESCR  : &g_permission_denied_descr
+                 >
+                 The user has insufficient permissions to perform the IO
+                 operation.
+      - EXCEPT : &cpp_not_found_except
+                 File::NotFound
+        DESCR  : &g_not_found_descr
+                 A part of the path was not found.
+      - EXCEPT : &cpp_invalid_database_except
+                 InvalidDatabase
+        DESCR  : &g_shared_group_invalid_database_descr
+                 The file does not appear to contain a valid TightDB database.
+      - EXCEPT : &cpp_access_error_except
+                 File::AccessError
+        DESCR  : &g_access_error_descr
+                 An IO error occurred.
+      - EXCEPT : &cpp_runtime_error_except
+                 std::runtime_error
+        DESCR  : &g_runtime_error_descr
+                 A serious error occurred.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_constructor
         DESCR  :

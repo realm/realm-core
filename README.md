@@ -213,3 +213,9 @@ package:
 
 This will produce a package whose name, and whose top-level directory
 is named according to the tag.
+
+`Pandoc` is required to build a distribution package.
+
+On Mac OSX, install Pandoc and XeLaTeX (aka MacTeX) via the following link:
+
+    http://www.texts.io/support
