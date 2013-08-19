@@ -50,8 +50,6 @@ public:
     /// written.
     std::size_t write(const char* data, std::size_t size);
 
-    void write_at(std::size_t pos, const char* data, std::size_t size);
-
 #ifdef TIGHTDB_DEBUG
     void dump();
 #endif
@@ -63,8 +61,7 @@ private:
     std::size_t     m_readlock_version;
     File::Map<char> m_file_map;
 
-    // Controlled update of physical medium
-    void sync(uint64_t top_pos);
+    void merge_free_space();
 
     /// Allocate a chunk of free space of the specified size. The
     /// specified size must be 8-byte aligned. Extend the file if
@@ -97,7 +94,10 @@ private:
     /// size, and `chunk_size` is the size of that chunk.
     std::pair<std::size_t, std::size_t> extend_free_space(std::size_t requested_size);
 
-    void merge_free_space();
+    void write_at(std::size_t pos, const char* data, std::size_t size);
+
+    // Controlled update of physical medium
+    void sync(uint64_t top_pos);
 };
 
 

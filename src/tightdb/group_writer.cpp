@@ -8,7 +8,6 @@ using namespace std;
 using namespace tightdb;
 
 
-// todo, test (int) cast
 GroupWriter::GroupWriter(Group& group) :
     m_group(group), m_alloc(group.m_alloc), m_current_version(0)
 {
@@ -28,11 +27,11 @@ size_t GroupWriter::commit(bool do_sync)
 {
     merge_free_space();
 
-    Array& top           = m_group.m_top;
-    Array& fpositions    = m_group.m_free_positions;
-    Array& flengths      = m_group.m_free_lengths;
-    Array& fversions     = m_group.m_free_versions;
-    const bool is_shared = m_group.m_is_shared;
+    Array& top        = m_group.m_top;
+    Array& fpositions = m_group.m_free_positions;
+    Array& flengths   = m_group.m_free_lengths;
+    Array& fversions  = m_group.m_free_versions;
+    bool is_shared = m_group.m_is_shared;
     TIGHTDB_ASSERT(fpositions.size() == flengths.size());
     TIGHTDB_ASSERT(!is_shared || fversions.size() == flengths.size());
 
@@ -96,24 +95,22 @@ size_t GroupWriter::commit(bool do_sync)
     // present in the non-transactionl case where there is no version
     // tracking on the free-space chunks.
     {
-        const size_t n = new_free_space.size();
-        if (n > 0) {
-            for (size_t i = 0; i < n; ++i) {
-                SlabAlloc::FreeSpace::ConstCursor r = new_free_space[i];
-                size_t pos  = to_size_t(r.ref);
-                size_t size = to_size_t(r.size);
-                // We always want to keep the list of free space in sorted order
-                // (by ascending position) to facilitate merge of adjacent
-                // segments. We can find the correct insert postion by binary
-                // search
-                size_t ndx = fpositions.lower_bound_int(pos);
-                fpositions.insert(ndx, pos);
-                flengths.insert(ndx, size);
-                if (is_shared)
-                    fversions.insert(ndx, m_current_version);
-                if (ndx <= reserve_ndx)
-                    ++reserve_ndx;
-            }
+        size_t n = new_free_space.size();
+        for (size_t i = 0; i < n; ++i) {
+            SlabAlloc::FreeSpace::ConstCursor r = new_free_space[i];
+            size_t pos  = to_size_t(r.ref);
+            size_t size = to_size_t(r.size);
+            // We always want to keep the list of free space in sorted
+            // order (by ascending position) to facilitate merge of
+            // adjacent segments. We can find the correct insert
+            // postion by binary search
+            size_t ndx = fpositions.lower_bound_int(pos);
+            fpositions.insert(ndx, pos);
+            flengths.insert(ndx, size);
+            if (is_shared)
+                fversions.insert(ndx, m_current_version);
+            if (ndx <= reserve_ndx)
+                ++reserve_ndx;
         }
     }
 
@@ -179,60 +176,6 @@ size_t GroupWriter::commit(bool do_sync)
     // Return top_pos so that it can be saved in lock file used
     // for coordination
     return top_pos;
-}
-
-
-size_t GroupWriter::write(const char* data, size_t size)
-{
-    // Get position of free space to write in (expanding file if needed)
-    size_t pos = get_free_space(size);
-    TIGHTDB_ASSERT((pos & 0x7) == 0); // Write position should always be 64bit aligned
-
-    // Write the block
-    char* dest = m_file_map.get_addr() + pos;
-    copy(data, data+size, dest);
-
-    // return the position it was written
-    return pos;
-}
-
-
-void GroupWriter::write_at(size_t pos, const char* data, size_t size)
-{
-    char* dest = m_file_map.get_addr() + pos;
-
-    char* mmap_end = m_file_map.get_addr() + m_file_map.get_size();
-    char* copy_end = dest + size;
-    TIGHTDB_ASSERT(copy_end <= mmap_end);
-    static_cast<void>(mmap_end);
-    static_cast<void>(copy_end);
-
-    copy(data, data+size, dest);
-}
-
-
-void GroupWriter::sync(uint64_t top_pos)
-{
-    // Write data
-    m_file_map.sync();
-
-    // File header is 24 bytes, composed of three 64bit
-    // blocks. The two first being top_refs (only one valid
-    // at a time) and the last being the info block.
-    char* file_header = m_file_map.get_addr();
-
-    // Least significant bit in last byte of info block indicates
-    // which top_ref block is valid
-    int current_valid_ref = file_header[16+7] & 0x1;
-    int new_valid_ref = current_valid_ref ^ 0x1;
-
-    // Update top ref pointer
-    uint64_t* top_refs = reinterpret_cast<uint64_t*>(file_header);
-    top_refs[new_valid_ref] = top_pos;
-    file_header[16+7] = char(new_valid_ref); // swap
-
-    // Write new header to disk
-    m_file_map.sync();
 }
 
 
@@ -315,18 +258,19 @@ size_t GroupWriter::get_free_space(size_t size)
 
 pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 {
-    Array& lengths   = m_group.m_free_lengths;
-    Array& versions  = m_group.m_free_versions;
+    Array& lengths  = m_group.m_free_lengths;
+    Array& versions = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
 
-    size_t end = lengths.size();
-
-    // Since we do a 'first fit' search, the top pieces are likely
-    // to get smaller and smaller. So if we are looking for a bigger piece
-    // we may find it faster by looking further down in the list.
+    // Since we do a first-fit search for small chunks, the top pieces
+    // are likely to get smaller and smaller. So when we are looking
+    // for bigger chunks we are likely to find them faster by skipping
+    // the first half of the list.
+    size_t end   = lengths.size();
     size_t begin = size < 1024 ? 0 : end / 2;
 
     // Do we have a free space we can reuse?
+  again:
     for (size_t i = begin; i != end; ++i) {
         size_t chunk_size = to_size_t(lengths.get(i));
         if (chunk_size >= size) {
@@ -341,6 +285,12 @@ pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
             // Match found!
             return make_pair(i, chunk_size);
         }
+    }
+
+    if (begin > 0) {
+        begin = 0;
+        end = begin;
+        goto again;
     }
 
     // No free space, so we have to extend the file.
@@ -426,6 +376,60 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     }
 
     return make_pair(chunk_ndx, chunk_size);
+}
+
+
+size_t GroupWriter::write(const char* data, size_t size)
+{
+    // Get position of free space to write in (expanding file if needed)
+    size_t pos = get_free_space(size);
+    TIGHTDB_ASSERT((pos & 0x7) == 0); // Write position should always be 64bit aligned
+
+    // Write the block
+    char* dest = m_file_map.get_addr() + pos;
+    copy(data, data+size, dest);
+
+    // return the position it was written
+    return pos;
+}
+
+
+void GroupWriter::write_at(size_t pos, const char* data, size_t size)
+{
+    char* dest = m_file_map.get_addr() + pos;
+
+    char* mmap_end = m_file_map.get_addr() + m_file_map.get_size();
+    char* copy_end = dest + size;
+    TIGHTDB_ASSERT(copy_end <= mmap_end);
+    static_cast<void>(mmap_end);
+    static_cast<void>(copy_end);
+
+    copy(data, data+size, dest);
+}
+
+
+void GroupWriter::sync(uint64_t top_pos)
+{
+    // Write data
+    m_file_map.sync();
+
+    // File header is 24 bytes, composed of three 64bit
+    // blocks. The two first being top_refs (only one valid
+    // at a time) and the last being the info block.
+    char* file_header = m_file_map.get_addr();
+
+    // Least significant bit in last byte of info block indicates
+    // which top_ref block is valid
+    int current_valid_ref = file_header[16+7] & 0x1;
+    int new_valid_ref = current_valid_ref ^ 0x1;
+
+    // Update top ref pointer
+    uint64_t* top_refs = reinterpret_cast<uint64_t*>(file_header);
+    top_refs[new_valid_ref] = top_pos;
+    file_header[16+7] = char(new_valid_ref); // swap
+
+    // Write new header to disk
+    m_file_map.sync();
 }
 
 
