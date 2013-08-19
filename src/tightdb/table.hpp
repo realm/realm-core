@@ -114,13 +114,13 @@ public:
     /// any attempt at accessing such a failed group.
     ///
     /// FIXME: The C++ documentation must state that if any modifying
-    /// operation on a group (incl. tables, subtables, and specs), or
-    /// on a free standing table (incl. subtables and specs), then any
-    /// further access to that group (except ~Group()) or freestanding
-    /// table (except ~Table()) has undefined behaviour and is
-    /// considered an error on behalf of the application. Note that
-    /// even Table::is_valid() is disallowed in this case.
-    bool is_valid() const TIGHTDB_NOEXCEPT { return m_columns.has_parent(); }
+    /// operation on a group (incl. tables, subtables, and specs) or
+    /// on a free standing table (incl. subtables and specs) fails,
+    /// then any further access to that group (except ~Group()) or
+    /// freestanding table (except ~Table()) has undefined behaviour
+    /// and is considered an error on behalf of the application. Note
+    /// that even Table::is_valid() is disallowed in this case.
+    bool is_valid() const TIGHTDB_NOEXCEPT;
 
     /// A shared spec is a column specification that in general
     /// applies to many tables. A table is not allowed to directly
@@ -590,6 +590,22 @@ protected:
 
 
 // Implementation:
+
+inline bool Table::is_valid() const TIGHTDB_NOEXCEPT
+{
+    // Note that it is not possible to link the state of attachment of
+    // a table to the state of attachment of m_top, because tables
+    // with shared spec do not have a 'top' array. Neither is it
+    // possible to link it to the state of attachment of m_columns,
+    // because subtables with shared spec start out in a degenerate
+    // form where they do not have a 'columns' array. For these
+    // reasons, it is neccessary to define the state of attachment of
+    // a table as follows: A table is attached if, and ony if m_column
+    // stores a non-null parent pointer. This works because even for
+    // degenerate subtables, m_columns is initialized with the correct
+    // parent pointer.
+    return m_columns.has_parent();
+}
 
 inline std::size_t Table::get_column_count() const TIGHTDB_NOEXCEPT
 {

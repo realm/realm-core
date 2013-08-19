@@ -1,6 +1,4 @@
 #include <limits>
-#include <algorithm>
-#include <vector>
 #include <iostream>
 #include <iomanip>
 
@@ -1107,17 +1105,6 @@ size_t Array::count(int64_t value) const
     return count;
 }
 
-size_t Array::GetByteSize(bool align) const
-{
-    size_t size = CalcByteLen(m_size, m_width);
-    if (align) {
-        size_t rest = (~size & 0x7) + 1;
-        if (rest < 8)
-            size += rest; // 64-bit blocks
-    }
-    return size;
-}
-
 size_t Array::CalcByteLen(size_t count, size_t width) const
 {
     // FIXME: This arithemtic could overflow. Consider using <tightdb/safe_int_ops.hpp>
@@ -1210,7 +1197,7 @@ void Array::copy_on_write()
 
     // Calculate size in bytes (plus a bit of matchcount room for expansion)
     size_t size = CalcByteLen(m_size, m_width);
-    size_t rest = (~size & 0x7)+1;
+    size_t rest = (~size & 0x7) + 1;
     if (rest < 8)
         size += rest; // 64bit blocks
     size_t new_size = size + 64;
@@ -1274,7 +1261,8 @@ void Array::alloc(size_t size, size_t width)
             if (capacity_bytes < needed_bytes) {
                 size_t rest = (~needed_bytes & 0x7) + 1;
                 capacity_bytes = needed_bytes;
-                if (rest < 8) capacity_bytes += rest; // 64bit align
+                if (rest < 8)
+                    capacity_bytes += rest; // 64bit align
             }
 
             // Allocate and initialize header

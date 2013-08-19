@@ -165,7 +165,7 @@ void Group::create()
     m_top.add(m_free_lengths.get_ref());
 
     // We may have been attached to a newly created file, that is, to
-    // a file consisting only of a default header and possible some
+    // a file consisting only of a default header and possibly some
     // free space. In that case, we must add as free space, the size
     // of the file minus its header.
     if (m_alloc.is_attached()) {
@@ -215,8 +215,6 @@ void Group::init_from_ref(ref_type top_ref)
 
 void Group::init_shared()
 {
-    // FIXME: Can this be done as part of update_from_shared()?
-
     if (m_free_versions.is_attached()) {
         // If free space tracking is enabled
         // we just have to reset it
@@ -360,6 +358,11 @@ void Group::commit()
     // information.
     if (m_free_positions.is_attached()) {
         TIGHTDB_ASSERT(m_top.size() == 4 || m_top.size() == 5);
+        if (m_top.size() > 4) {
+            // Delete free-list version information
+            Array::destroy(m_top.get_as_ref(4), m_top.get_alloc());
+            m_top.erase(4);
+        }
     }
     else {
         TIGHTDB_ASSERT(m_top.size() == 2);
@@ -379,7 +382,7 @@ void Group::commit()
     // mode we have to make sure that the group stays valid after
     // commit
 
-    // Mark all managed space as free
+    // Mark all managed space (beyond the atatched file) as free
     m_alloc.free_all();
 
     size_t old_baseline = m_alloc.get_baseline();
@@ -539,50 +542,46 @@ void Group::Verify() const
     if (m_free_positions.is_attached()) {
         TIGHTDB_ASSERT(m_free_lengths.is_attached());
 
-        size_t count_p = m_free_positions.size();
-        size_t count_l = m_free_lengths.size();
-        TIGHTDB_ASSERT(count_p == count_l);
+        size_t n = m_free_positions.size();
+        TIGHTDB_ASSERT(n == m_free_lengths.size());
 
-        if (m_free_versions.is_attached()) {
-            TIGHTDB_ASSERT(count_p == m_free_versions.size());
-        }
+        if (m_free_versions.is_attached())
+            TIGHTDB_ASSERT(n == m_free_versions.size());
 
-        if (count_p) {
-            // Check for alignment
-            for (size_t i = 0; i < count_p; ++i) {
-                size_t p = to_size_t(m_free_positions.get(i));
-                size_t l = to_size_t(m_free_lengths.get(i));
-                TIGHTDB_ASSERT((p & 0x7) == 0); // 64bit alignment
-                TIGHTDB_ASSERT((l & 0x7) == 0); // 64bit alignment
-            }
+        // FIXME: What we really need here is the "logical" size of
+        // the file and not the real size. The real size may have
+        // changed without the free space information having been
+        // adjusted accordingly. This can happen, for example, if
+        // commit() fails before writing the new top-ref, but after
+        // having extended the file size. We currently do not have a
+        // concept of a logical file size, but if provided, it would
+        // have to be stored as part of a database version such that
+        // it is updated atomically together with the rest of the
+        // contents of the version.
+        size_t file_size = m_alloc.is_attached() ? m_alloc.get_baseline() : 0;
 
-            size_t filelen = m_alloc.get_baseline();
+        size_t prev_end = 0;
+        for (size_t i = 0; i < n; ++i) {
+            size_t pos  = to_size_t(m_free_positions.get(i));
+            size_t size = to_size_t(m_free_lengths.get(i));
 
-            // Segments should be ordered and without overlap
-            for (size_t i = 0; i < count_p-1; ++i) {
-                size_t pos1 = to_size_t(m_free_positions.get(i));
-                size_t pos2 = to_size_t(m_free_positions.get(i+1));
-                TIGHTDB_ASSERT(pos1 < pos2);
+            TIGHTDB_ASSERT(pos < file_size);
+            TIGHTDB_ASSERT(size > 0);
+            TIGHTDB_ASSERT(pos + size <= file_size);
+            TIGHTDB_ASSERT(prev_end <= pos);
 
-                size_t len1 = to_size_t(m_free_lengths.get(i));
-                TIGHTDB_ASSERT(len1 != 0);
-                TIGHTDB_ASSERT(len1 < filelen);
+            TIGHTDB_ASSERT(pos  % 8 == 0); // 8-byte alignment
+            TIGHTDB_ASSERT(size % 8 == 0); // 8-byte alignment
 
-                size_t end = pos1 + len1;
-                TIGHTDB_ASSERT(end <= pos2);
-            }
-
-            size_t lastlen = to_size_t(m_free_lengths.back());
-            TIGHTDB_ASSERT(lastlen != 0 && lastlen <= filelen);
-
-            size_t end = to_size_t(m_free_positions.back() + lastlen);
-            TIGHTDB_ASSERT(end <= filelen);
+            prev_end = pos + size;
         }
     }
 
     // Verify tables
-    for (size_t i = 0; i < m_tables.size(); ++i) {
-        get_table_ptr(i)->Verify();
+    {
+        size_t n = m_tables.size();
+        for (size_t i = 0; i < n; ++i)
+            get_table_ptr(i)->Verify();
     }
 }
 
