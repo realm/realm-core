@@ -14,7 +14,7 @@ DESCR      : &g_dyn_query_intro_descr
              >
              The dynamic query class is used in conjunction with the dynamic table class.
              Query objects are used to build up queries. A query is tied to a
-             {@link class_dyn_table} and constructed from this class by it's 
+             {@link class_dyn_table} and constructed from this class by it's
              <code>where()</code> method.
 
              Conditions are added to a query through a
@@ -210,7 +210,7 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_lessThan
-        
+
   - g_dyn_query_lessThanOrEqual_integer:
   - g_dyn_query_lessThanOrEqual_float:
   - g_dyn_query_lessThanOrEqual_double:
@@ -333,7 +333,7 @@ CATEGORIES :
         CODE   : ex_cpp_dyn_query_endsWith
 
   - g_dyn_query_contains_string_2:
-      IGNORE   : ""  
+      IGNORE   : ""
   - g_dyn_query_contains_string:
   - g_dyn_query_contains_binary:
       NAMES    : [contains, contains]
@@ -360,17 +360,17 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_contains
-        
 
-- Combiners:
+
+- Combinators:
   METHODS:
   - g_dyn_query_group:
       NAME     : group
       DESCR    : &g_dyn_query_group_descr
                  >
-                 Group conditions ("left" parenthesis). Group of conditions can 
-                 be nested and they are conceptually a parenthesis. 
-                 
+                 Group conditions ("left" parenthesis). Group of conditions can
+                 be nested and they are conceptually a parenthesis.
+
                  You must end the grouping with {@link g_dyn_query_endGroup}.
       SUMMARY  : &g_dyn_query_group_summary
                  Start group ("left parenthesis").
@@ -383,7 +383,7 @@ CATEGORIES :
   - g_dyn_query_endGroup:
       NAME     : end_group
       DESCR    : &g_dyn_query_endGroup_descr
-                 Ends the Group conditions ("right" parenthesis) that was 
+                 Ends the Group conditions ("right" parenthesis) that was
                  started with {@link g_dyn_query_group}.
       SUMMARY  : &g_dyn_query_endGroup_summary
                  Stop group ("right parenthesis").
@@ -410,7 +410,7 @@ CATEGORIES :
       DESCR    : &g_dyn_query_subtable_descr
                  >
                  This method selects a subtable to query.
-                 
+
                  You must end the subtable query with {@link g_dyn_query_endSubtable}.
       SUMMARY  : &g_dyn_query_subtable_summary
                  Query a subtable.
@@ -436,8 +436,8 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_subtable
-        
-        
+
+
 - Actions:
   METHODS:
   - g_dyn_query_find_all_2:
@@ -472,12 +472,14 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_findall
-        
+
   - g_dyn_query_find_next:
       NAME     : find_next
       DESCR    : &g_dyn_query_find_next_descr
-                 Find next matching row.
-# TODO: describe further. Next form what?
+                 >
+                 Find next matching row that fullfil the query condition. To inialize the search,
+                 you can call the method with no parameters as this invocation will find the
+                 first matching row.
       SUMMARY  : &g_dyn_query_find_next_summary
                  Find next match.
       PARAMS:
@@ -523,7 +525,7 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_size
-        
+
   - g_dyn_query_remove:
       NAME     : remove
       DESCR    : &g_dyn_query_remove_descr
@@ -557,7 +559,7 @@ CATEGORIES :
       DESCR    : &g_dyn_query_sum_descr
                  |
                  This methods calculates the sum of the values in a specific column.
-                 
+
                  Note: <code>sum()</code> can overflow depending on the values stored. Nothing will indicate this.
                  Note: Adding many floats or doubles can accumulate representation imprecisions.
       SUMMARY  : &g_dyn_query_sum_summary
@@ -571,7 +573,7 @@ CATEGORIES :
       - NAME   : column_ndx
         DESCR  : &g_dyn_query_sum_parm1_desc
                  >
-                 Column index. The datatype of the column must match the function called. 
+                 Column index. The datatype of the column must match the function called.
                  E.g. <code>sum_float()</code> can only be used on columns which contains floats.
         TYPES  : size_t
       - NAME   : resultcount
@@ -687,7 +689,7 @@ CATEGORIES :
       DESCR    : &g_dyn_query_average_descr
                  |
                  The method calculates the average of a specific column.
-                 
+
                  Note: <code>average()</code> uses <code>sum()</code> which can overflow depending on the values stored. Nothing will indicate this.
                  Note: Averaging many floats or doubles can accumulate representation imprecisions.
       CONST    : true

@@ -68,19 +68,19 @@ CATEGORIES:
                  Column type. Following types are available:
                  <table>
                  <thead>
-                 <tr><th>Name</th>              <th>Desc</th>         <th>C++ type</th></tr>
+                 <tr><th>Name</th>              <th>Desc</th>         <th>C++ type</th>   <th>Default value</th></tr>
                  </thead>
                  <tbody>
-                 <tr><td>Int</td>               <td>Integer</td>        <td>(int64_t)</td></tr>
-                 <tr><td>Bool</td>              <td>Boolean</td>        <td>(bool)</td></tr>
-                 <tr><td>Float</td>             <td>Floating-point</td> <td>(float)</td></tr>
-                 <tr><td>Double</td>            <td>Floating-point</td> <td>(double)</td></tr>
-                 <tr><td>Date</td>              <td>UTC datetime</td>   <td>(Date)</td></tr>
+                 <tr><td>Int</td>               <td>Integer</td>        <td>(int64_t)</td>   <td>0</td></tr>
+                 <tr><td>Bool</td>              <td>Boolean</td>        <td>(bool)</td>      <td>false</td></tr>
+                 <tr><td>Float</td>             <td>Floating-point</td> <td>(float)</td>     <td>0.0</td></tr>
+                 <tr><td>Double</td>            <td>Floating-point</td> <td>(double)</td>    <td>0.0</td></tr>
+                 <tr><td>Date</td>              <td>UTC datetime</td>   <td>(Date)</td>      <td>0 - 1970-01-01 00:00:00</td></tr>
                  <tr><td>Enum&lt;T&gt;</td>     <td>Enum</td>           <td>(T as enum type)</td></tr>
-                 <tr><td>String</td>            <td>Text</td>           <td>(StringData)</td></tr>
-                 <tr><td>Binary</td>            <td>Arbitrary data</td> <td>(BinaryData)</td></tr>
-                 <tr><td>Subtable&lt;T&gt;</td> <td>Sub-tables</td>     <td>(T as table class)</td></tr>
-                 <tr><td>Mixed</td>             <td>Dynamic</td>        <td>(any of the above)</td></tr>
+                 <tr><td>String</td>            <td>Text</td>           <td>(StringData)</td>  <td>empty - ""</td></tr>
+                 <tr><td>Binary</td>            <td>Arbitrary data</td> <td>(BinaryData)</td>  <td>empty</td></tr>
+                 <tr><td>Subtable&lt;T&gt;</td> <td>Sub-tables</td>     <td>(T as table class)</td><td>empty - <code>NULL</code></td></tr>
+                 <tr><td>Mixed</td>             <td>Dynamic</td>        <td>(any of the above)</td><td>empty - <code>NULL</code></td></tr>
                  </tbody>
                  </table>
       EXAMPLES:
@@ -104,7 +104,7 @@ CATEGORIES:
       EXAMPLES:
       - CODE   :  ex_cpp_type_table_is_empty
         DESCR  :
-        
+
   - g_typed_table_size:
       NAME     : size
       DESCR    : &g_typed_table_size_descr
@@ -131,7 +131,7 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_clear
         DESCR  :
-        
+
   - g_typed_table_optimize:
       NAME     : optimize
       SUMMARY  : &g_typed_table_optimize_summary
@@ -151,10 +151,10 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_optimize
         DESCR  :
-        
+
   - g_typed_table_columns:
   - g_typed_table_columns_const:
-      NAMES     : [columns, columns]
+      NAMES     : [column, column]
       SIGNATURE: |
                  ColsAccessor      column()
                  ConstColsAccessor column() const
@@ -164,7 +164,7 @@ CATEGORIES:
         TYPES  : ColumnAccessor
         DESCR  : &g_typed_table_columns_return1_descr
                  Cursor that lets you access and do operations on columns.
-  
+
   - g_typed_table_operator==:
       NAME     : operator==
       SUMMARY  : &g_typed_table_operator_eq_summary
@@ -240,7 +240,7 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_operator_brackets
         DESCR  :
-        
+
   - g_typed_table_front:
   - g_typed_table_front:
       NAMES    : [front, front]
@@ -256,7 +256,7 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_front
         DESCR  :
-        
+
   - g_typed_table_back:
   - g_typed_table_back_const:
       NAMES    : [back, back]
@@ -272,7 +272,7 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_back
         DESCR  :
-        
+
   - g_typed_table_add:
       NAME     : add
       SIGNATURE: RowAccesor add(value, ...)
@@ -292,7 +292,7 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_add
         DESCR  :
-  
+
   - g_typed_table_add_empty_row:
       NAME     : add_empty_row
       SUMMARY  : &g_typed_table_add_empty_row_summary
@@ -318,6 +318,8 @@ CATEGORIES:
                  Insert a new row at the specified position.
       DESCR    : &g_typed_table_insert_descr
                  This method inserts new row at a given position.
+                 Rows with index greater or equal to position will be
+                 shifted downwards i.e. their index will be incremented.
                  The types of the parameters must match the
                  types of the columns in the table definition.
       PARAMS:
@@ -334,10 +336,14 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_insert
         DESCR  :
- 
+
   - g_typed_table_insert_empty_row:
       NAME     : insert_empty_row
       SUMMARY  : This method inserts empty rows at a given position.
+                 Rows with index greater or equal to position will be
+                 shifted downwards i.e. their index will be incremented.
+                 The values of the cells in the new row will be assigned default
+                 value of the type of the cell/column.
       DESCR    : Insert empty rows.
       SIGNATURE: void insert_empty_row(size_t row_ndx, size_t num_rows = 1)
       PARAMS:
@@ -366,7 +372,7 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_remove
         DESCR  :
- 
+
   - g_typed_table_remove_last_row:
       NAME     : remove_last
       SUMMARY  : &g_typed_table_remove_last_row_summary
@@ -402,7 +408,7 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_lookup
         DESCR  :
-        
+
   - g_typed_table_find_first_bool:
   - g_typed_table_find_first_int:
   - g_typed_table_find_first_float:
@@ -447,7 +453,7 @@ CATEGORIES:
   - g_typed_table_find_all_int_const:
   - g_typed_table_find_all_date_const:
   - g_typed_table_find_all_string_const:
-      NAMES    : [find_all, find_all, find_all, find_all, find_all, find_all, 
+      NAMES    : [find_all, find_all, find_all, find_all, find_all, find_all,
                   find_all, find_all, find_all, find_all, find_all, find_all]
       TITLE    : find_all_*
       SUMMARY  : &g_typed_table_find_all_xxx_summary
@@ -480,7 +486,7 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_find_all_xxx
         DESCR  :
-        
+
   - g_typed_table_get_sorted_view:
   - g_typed_table_get_sorted_view_const:
       NAMES    : [get_sorted_view, get_sorted_view]
@@ -503,7 +509,7 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_get_sorted_view
         DESCR  :
-        
+
   - g_typed_table_distinct:
   - g_typed_table_distinct_const:
       NAMES    : [distinct, distinct]
@@ -524,7 +530,7 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_distinct
         DESCR  :
-        
+
   - g_typed_table_where:
   - g_typed_table_where_const:
       NAMES    : [where, where]
@@ -541,4 +547,3 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_table_where
-
