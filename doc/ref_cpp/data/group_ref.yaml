@@ -2,7 +2,7 @@
 # C++ reference documentation for Group class
 #
 
-#UNDOCUMENTED: [commit, to_json, get_table_typed]
+#UNDOCUMENTED: [commit, get_table_typed]
 ID         : class_group
 TITLE      : Group
 SUMMARY    : &g_group_summary
@@ -61,7 +61,7 @@ CATEGORIES:
       - NAME   : file
         TYPES  : const std::string&
         DESCR  : &g_group_constructor_memory_parm1_descr
-                 Filesystem path of the TightDB database file to be opened.
+                 File system path of the TightDB database file to be opened.
       - NAME   : mode
         TYPES  : Group::OpenMode
         DESCR  : |
@@ -324,6 +324,23 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_tostring
+  - g_group_to_json:
+      NAME     : to_json
+      SUMMARY  : &g_group_to_json_summary
+                 Get a JSON representation of the group.
+      DESCR    : &g_group_to_json_descr
+                 This methods adds a JSON representation of information about the group to an
+                 output stream. The group is represented as an JSON object where the tables are
+                 elements/attributes.
+      CONST    : true
+      PARAMS:
+      - NAME   : out
+        TYPES  : std::ostream&
+        DESCR  : &g_group_to_json_parm1_descr
+                 The output stream.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_to_json
 
   - g_group_open_file:
   - g_group_open_memory:
