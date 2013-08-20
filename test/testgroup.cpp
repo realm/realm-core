@@ -891,6 +891,7 @@ TEST(Group_toJSON)
     g.to_json(ss);
     const std::string str = ss.str();
     CHECK(str.length() > 0);
+    CHECK_EQUAL("{\"test\":[{\"first\":\"jeff\",\"second\":1,\"third\":true,\"fourth\":2},{\"first\":\"jim\",\"second\":1,\"third\":true,\"fourth\":2}]}", str);
 }
 
 TEST(Group_toString)
