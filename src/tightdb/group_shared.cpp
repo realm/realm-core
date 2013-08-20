@@ -349,14 +349,18 @@ SharedGroup::~SharedGroup()
     // proceed to remove the lock file, including destroying the mutexes.
     // according to posix, destroying already destroyed mutexes cause
     // UNDEFINED behavior.
-    if (!m_file.try_lock_exclusive()) return;
+    if (!m_file.try_lock_exclusive())
+        return;
 
     SharedInfo* info = m_file_map.get_addr();
 
     // In sync mode, cleanup will be handled by the async_commit process
     // (but we might still be able to get exclusive lock, as it will
     //  release it while doing its own try_lock_exclusive())
-    if (info->flags == durability_Async) return;
+    if (info->flags == durability_Async) {
+        m_file.unlock();
+        return;
+    }
 
     // If the db file is just backing for a transient data structure,
     // we can delete it when done.
