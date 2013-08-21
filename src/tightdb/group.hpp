@@ -43,16 +43,11 @@ public:
     Group();
 
     enum OpenMode {
-        /// Open in read-only mode. Fail if the file does not already
-        /// exist.
+        /// Open in read-only mode. Fail if the file does not already exist.
         mode_ReadOnly,
-
-        /// Open in read/write mode. Create the file if it does not
-        /// already exist.
+        /// Open in read/write mode. Create the file if it doesn't exist.
         mode_ReadWrite,
-
-        /// Open in read/write mode. Fail if the file does not already
-        /// exist.
+        /// Open in read/write mode. Fail if the file does not already exist.
         mode_ReadWriteNoCreate
     };
 
