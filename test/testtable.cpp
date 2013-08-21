@@ -729,6 +729,25 @@ TEST(Table_Index_String)
     CHECK_EQUAL(2, c1);
 }
 
+TEST(Table_Index_String_Twice)
+{
+    TestTableEnum table;
+
+    table.add(Mon, "jeff");
+    table.add(Tue, "jim");
+    table.add(Wed, "jennifer");
+    table.add(Thu, "john");
+    table.add(Fri, "jimmy");
+    table.add(Sat, "jimbo");
+    table.add(Sun, "johnny");
+    table.add(Mon, "jennifer"); // duplicate
+
+    table.column().second.set_index();
+    CHECK_EQUAL(true, table.column().second.has_index());
+    table.column().second.set_index();
+    CHECK_EQUAL(true, table.column().second.has_index());
+}
+
 namespace {
 TIGHTDB_TABLE_2(LookupTable,
                 first,  String,
