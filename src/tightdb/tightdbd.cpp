@@ -7,7 +7,7 @@ using namespace tightdb;
 
 void exit_handler()
 {
-    fprintf(stderr, "Daemon exiting (exit_handler called)");
+    fprintf(stderr, "Daemon exiting (exit_handler called)\n");
 }
 
 int main(int argc, char* argv[]) 
