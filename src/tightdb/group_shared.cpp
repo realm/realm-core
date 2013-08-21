@@ -215,6 +215,7 @@ void SharedGroup::open(const string& file, bool no_create_file,
             pthread_mutexattr_t mattr;
             pthread_mutexattr_init(&mattr);
             // FIXME: Must verify availability of optional feature: #ifdef _POSIX_THREAD_PROCESS_SHARED
+            pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_ERRORCHECK);
             pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
             pthread_mutex_init(&info->readmutex, &mattr);
 #if _POSIX_THREADS >= 200809L
@@ -297,6 +298,7 @@ void SharedGroup::open(const string& file, bool no_create_file,
                 if (info->put_pos != 0) {
                     return;
                 }
+                usleep(10);
             }
             throw runtime_error("Failed to observe async commit starting");
         }
@@ -393,6 +395,7 @@ void SharedGroup::do_async_commits()
         }
 
         if (has_changed()) {
+
             // Get a read lock on the (current) version that we want
             // to commit to disk.
 #ifdef TIGHTDB_DEBUG
@@ -412,7 +415,7 @@ void SharedGroup::do_async_commits()
             last_version = current_version;
         }
         else if (!shutdown) {
-            usleep(100);
+            usleep(1000);
         }
 
         if (shutdown) {

@@ -80,20 +80,25 @@ void* IncrementEntry(void* arg)
         printf("what(): %s\n", e.what());
         sleep(1);
         exit(1);
+    } catch (...) {
+        printf("Thread exiting for unknown reason\n");
+        printf("\n");
     }
     printf("thread done\n");
+    sleep(1);
+    printf("thread returning 0\n");
     return 0;
 }
 
 } // anonymous namespace
 
-
-int main()
+void single_threaded()
 {
     // Clean up old state
     File::try_remove("asynctest.tightdb");
     File::try_remove("asynctest.tightdb.lock");
-
+    // wait for daemon to exit
+    sleep(1);
     printf("Single threaded client\n");
     // Do some changes in a async db
     {
@@ -107,16 +112,12 @@ int main()
             wt.commit();
         }
     }
-/*
-    // Wait for async_commit process to shutdown
-    while (File::exists("asynctest.tightdb.lock")) {
-        sleep(1);
-    }
-*/
+
+    File::try_remove("asynctest.tightdb.lock");
     sleep(1);
     // Read the db again in normal mode to verify
     {
-        SharedGroup db("asynctest.tightdb", false, SharedGroup::durability_Async);
+        SharedGroup db("asynctest.tightdb");
 
         for (size_t n = 0; n < 100; ++n) {
             ReadTransaction rt(db);
@@ -124,13 +125,16 @@ int main()
             CHECK(t1->size() == 100);
         }
     }
+}
 
+void multi_threaded() 
+{
     // Clean up old state
     File::try_remove("test_shared.tightdb");
     File::try_remove("test_shared.tightdb.lock");
-
+    sleep(1);
     printf("Multithreaded client\n");
-    const size_t thread_count = 10;
+    const size_t thread_count = 1;
 
     // Do some changes in a async db
     {
@@ -160,7 +164,6 @@ int main()
             CHECK_EQUAL(0, rc);
         }
         printf("Threads done, verifying\n");
-
         // Verify that the changes were made
         {
             ReadTransaction rt(sg);
@@ -173,12 +176,8 @@ int main()
         }
 
     }
-/*
-    // Wait for async_commit process to shutdown
-    while (File::exists("test_shared.tightdb.lock")) {
-        sleep(1);
-    }
-*/
+    File::try_remove("test_shared.tightdb.lock");
+    sleep(1);
     // Verify - once more, in sync mode - that the changes were made
     {
         printf("Reopening in sync mode and verifying\n");
@@ -193,4 +192,12 @@ int main()
     }
 
 
+}
+
+
+int main()
+{
+    // single_threaded();
+
+    multi_threaded();
 }
