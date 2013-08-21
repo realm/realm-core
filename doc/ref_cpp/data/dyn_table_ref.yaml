@@ -289,11 +289,14 @@ CATEGORIES :
       - NAME   : column_ndx
         TYPES  : size_t
         DESCR  : &g_dyn_table_get_column_name_param1_descr
-                 The column index (starting from 0), and it is not checked if the column index is out of range.
+                 >
+                 The column index (starting from 0), and it is not checked if the column
+                 index is out of range.
+
       RETURN:
         TYPES  : StringData
         DESCR  : &g_dyn_table_get_column_name_return_descr
-                 The column name.
+                 The column name. An empty string if index is out of range.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_column_name
         DESCR  :
@@ -658,7 +661,7 @@ CATEGORIES :
                  Add an index to a column.
       DESCR    : &g_dyn_table_set_index_descr
                  This method adds an index to a column, and queries will be faster. But the table
-                 will require more memory and inserts will be slower.
+                 will require more memory and inserts will be slower. This method is idempotent.
                  Currently only String columns can be indexed. Note, index cannot be removed.
       PARAMS:
       - NAME   : column_ndx

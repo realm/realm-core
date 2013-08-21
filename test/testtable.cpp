@@ -42,6 +42,7 @@ TEST(Table1)
     CHECK_EQUAL(type_Int, table.get_column_type(1));
     CHECK_EQUAL("first", table.get_column_name(0));
     CHECK_EQUAL("second", table.get_column_name(1));
+    CHECK_EQUAL("", table.get_column_name(2));
 
     // Test adding a single empty row
     // and filling it with values
@@ -727,6 +728,25 @@ TEST(Table_Index_String)
 
     const size_t c1 = table.column().second.count("jennifer");
     CHECK_EQUAL(2, c1);
+}
+
+TEST(Table_Index_String_Twice)
+{
+    TestTableEnum table;
+
+    table.add(Mon, "jeff");
+    table.add(Tue, "jim");
+    table.add(Wed, "jennifer");
+    table.add(Thu, "john");
+    table.add(Fri, "jimmy");
+    table.add(Sat, "jimbo");
+    table.add(Sun, "johnny");
+    table.add(Mon, "jennifer"); // duplicate
+
+    table.column().second.set_index();
+    CHECK_EQUAL(true, table.column().second.has_index());
+    table.column().second.set_index();
+    CHECK_EQUAL(true, table.column().second.has_index());
 }
 
 namespace {
