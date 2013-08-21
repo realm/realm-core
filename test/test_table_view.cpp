@@ -1,5 +1,7 @@
 #include <UnitTest++.h>
 #include <tightdb/table_macros.hpp>
+#include <string>
+#include <sstream>
 
 using namespace tightdb;
 
@@ -16,6 +18,27 @@ TIGHTDB_TABLE_2(TestTableDate,
                 second, Int)
 
 }
+
+TEST(TableViewJSON)
+{
+    Table table;
+    table.add_column(type_Int, "first");
+
+    size_t ndx = table.add_empty_row();
+    table.set_int(0, ndx, 1);
+    ndx = table.add_empty_row();
+    table.set_int(0, ndx, 2);
+    ndx = table.add_empty_row();
+    table.set_int(0, ndx, 3);
+
+    TableView v = table.where().find_all(1);
+    std::stringstream ss;
+    v.to_json(ss);
+    const std::string json = ss.str();
+    CHECK_EQUAL(true, json.length() > 0);
+    CHECK_EQUAL("[{\"first\":2},{\"first\":3}]", json);
+}
+
 
 TEST(TableViewDateMaxMin)
 {
