@@ -46,12 +46,15 @@ void* IncrementEntry(void* arg)
     {
         const size_t row_ndx = (size_t)arg;
 
+/*
         // Open shared db
         SharedGroup sg("test_shared.tightdb", 
                        false, SharedGroup::durability_Async);
         for (size_t i = 0; i < 100; ++i) {
+
             // Increment cell
             {
+
                 WriteTransaction wt(sg);
                 TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
                 t1[row_ndx].first += 1;
@@ -63,9 +66,9 @@ void* IncrementEntry(void* arg)
                 // rows. It is about 1 MiB per transaction.
                 wt.commit();
             }
-
             // Verify in new transaction so that we interleave
             // read and write transactions
+
             {
                 ReadTransaction rt(sg);
                 TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
@@ -74,7 +77,9 @@ void* IncrementEntry(void* arg)
                 const int64_t expected = i+1;
                 CHECK_EQUAL(expected, v);
             }
+
         }
+*/
     } catch (runtime_error e) {
         printf("Thread exiting due to runtime exception\n");
         printf("what(): %s\n", e.what());
@@ -134,10 +139,11 @@ void multi_threaded()
     File::try_remove("test_shared.tightdb.lock");
     sleep(1);
     printf("Multithreaded client\n");
-    const size_t thread_count = 10;
+    const size_t thread_count = 2;
 
     // Do some changes in a async db
     {
+/*
         SharedGroup sg("test_shared.tightdb", 
                        false, SharedGroup::durability_Async);
         // Create first table in group
@@ -149,6 +155,7 @@ void multi_threaded()
             }
             wt.commit();
         }
+*/
         printf("Spawning test threads\n");
         pthread_t threads[thread_count];
 
@@ -164,6 +171,7 @@ void multi_threaded()
             CHECK_EQUAL(0, rc);
         }
         printf("Threads done, verifying\n");
+/*
         // Verify that the changes were made
         {
             ReadTransaction rt(sg);
@@ -174,10 +182,11 @@ void multi_threaded()
                 CHECK_EQUAL(100, v);
             }
         }
-
+*/
     }
     sleep(1);
     File::try_remove("test_shared.tightdb.lock");
+/*
     sleep(1);
     // Verify - once more, in sync mode - that the changes were made
     {
@@ -192,7 +201,7 @@ void multi_threaded()
         }
     }
     File::try_remove("test_shared.tightdb.lock");
-
+*/
 
 }
 
