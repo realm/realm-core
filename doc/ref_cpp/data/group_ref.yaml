@@ -488,7 +488,7 @@ CATEGORIES:
       NAME     : to_json
       SUMMARY  : &g_group_to_json_summary
                  Get a JSON representation of the group.
-      PROTOTYPE: template<class S> void to_json(S& out) const
+      SIGNATURE: template<class S> void to_json(S& out) const
       DESCR    : &g_group_to_json_descr
                  This methods adds a JSON representation of information about the group to an
                  output stream. The group is represented as an JSON object where the tables are
