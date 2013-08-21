@@ -94,9 +94,9 @@ void spawn_daemon(const string& file)
         int i;
         for (i=m;i>=0;--i) close(i); 
         i=::open("/dev/null",O_RDWR);
-        int k = dup(i); static_cast<void>(k);
-        k = dup(i); static_cast<void>(k);
-
+        i=::open((file+".log").c_str(),O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
+        i = dup(i); static_cast<void>(i);
+        printf("Detaching\n");
         // detach from current session:
         setsid();
 
@@ -396,6 +396,7 @@ void SharedGroup::do_async_commits()
 
         if (has_changed()) {
 
+            printf("Syncing...");
             // Get a read lock on the (current) version that we want
             // to commit to disk.
 #ifdef TIGHTDB_DEBUG
@@ -413,9 +414,10 @@ void SharedGroup::do_async_commits()
             m_version = last_version;
             end_read();
             last_version = current_version;
+            printf("..and Done\n");
         }
         else if (!shutdown) {
-            usleep(1000);
+            usleep(100);
         }
 
         if (shutdown) {
@@ -424,6 +426,7 @@ void SharedGroup::do_async_commits()
             pthread_mutex_destroy(&info->readmutex);
             pthread_mutex_destroy(&info->writemutex);
             remove(m_file_path.c_str());
+            printf("Daemon exiting nicely\n");
             exit(EXIT_SUCCESS);
         }
     }
@@ -844,7 +847,6 @@ void SharedGroup::zero_free_space()
             readlock_version = r.version;
         }
     }
-    // pthread_mutex_unlock(&info->readmutex);
 
     m_group.zero_free_space(file_size, readlock_version);
 }

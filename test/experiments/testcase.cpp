@@ -134,7 +134,7 @@ void multi_threaded()
     File::try_remove("test_shared.tightdb.lock");
     sleep(1);
     printf("Multithreaded client\n");
-    const size_t thread_count = 1;
+    const size_t thread_count = 10;
 
     // Do some changes in a async db
     {
@@ -176,6 +176,7 @@ void multi_threaded()
         }
 
     }
+    sleep(1);
     File::try_remove("test_shared.tightdb.lock");
     sleep(1);
     // Verify - once more, in sync mode - that the changes were made
@@ -190,6 +191,7 @@ void multi_threaded()
             CHECK_EQUAL(100, v);
         }
     }
+    File::try_remove("test_shared.tightdb.lock");
 
 
 }
