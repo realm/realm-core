@@ -293,7 +293,7 @@ void SharedGroup::open(const string& file, bool no_create_file,
             // In async mode we need to wait for the commit process to get ready
             // so we wait for first read lock being made by async_commit process
             SharedInfo* const info = m_file_map.get_addr();
-            int maxwait = 10000;
+            int maxwait = 100000;
             while (maxwait--) {
                 if (info->put_pos != 0) {
                     return;
