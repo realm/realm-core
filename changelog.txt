@@ -15,13 +15,16 @@ Format:
 2013-08-18 (Kenneth Geisshirt)
 ! Group::to_string formatting was incorrect. See https://app.asana.com/0/1441391972580/5659532773181.
 
-
 2013-08-03 (Kristian Spangsege)
 + Table::find_sorted_int() replaced by Table::lower_bound_int() and Table::upper_bound_int() as these are standardized and provide more flexibility.
 + Addition of Table::lower_bound_bool() and Table::upper_bound_bool().
 + Addition of Table::lower_bound_float() and Table::upper_bound_float().
 + Addition of Table::lower_bound_double() and Table::upper_bound_double().
 + Addition of Table::lower_bound_string() and Table::upper_bound_string(). They rely on simple byte-wise lexicographical comparison. No Unicode or locale dependent collation is taken into account. Comparison occurs exactly as defined by std::lexicographical_compare in the C++ STL.
+
+
+2013-07-19 (Dennis Fantoni)
++ Added Table::set_subtable(size_t column_ndx, size_t row_ndx, const Table*)
 
 
 2013-06-25 (Kristian Spangsege)
