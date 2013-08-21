@@ -887,6 +887,22 @@ TEST(Group_toJSON)
     g.to_json(ss);
     const std::string str = ss.str();
     CHECK(str.length() > 0);
+    CHECK_EQUAL("{\"test\":[{\"first\":\"jeff\",\"second\":1,\"third\":true,\"fourth\":2},{\"first\":\"jim\",\"second\":1,\"third\":true,\"fourth\":2}]}", str);
+}
+
+TEST(Group_toString)
+{
+    Group g;
+    TestTableGroup::Ref table = g.get_table<TestTableGroup>("test");
+
+    table->add("jeff",     1, true, Wed);
+    table->add("jim",      1, true, Wed);
+    std::ostringstream ss;
+    ss.sync_with_stdio(false); // for performance
+    g.to_string(ss);
+    const std::string str = ss.str();
+    CHECK(str.length() > 0);
+    CHECK_EQUAL("     tables     rows  \n   0 test       2     \n", str.c_str());
 }
 
 TEST(Group_Index_String)

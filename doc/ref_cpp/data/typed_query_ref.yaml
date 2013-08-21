@@ -75,7 +75,7 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_equals
-        
+
   - g_typed_query_notEquals_bool:
   - g_typed_query_notEquals_int:
   - g_typed_query_notEquals_float:
@@ -85,7 +85,7 @@ CATEGORIES :
       IGNORE: ""
   - g_typed_query_notEquals_date:
   - g_typed_query_notEquals_binary:
-      NAMES    : [ not_equal, not_equal, not_equal, not_equal, 
+      NAMES    : [ not_equal, not_equal, not_equal, not_equal,
                    not_equal, not_equal, not_equal ]
       SIGNATURE: |
                  Query& not_equal(bool value);
@@ -112,7 +112,7 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_notEquals
-        
+
   - g_typed_query_greaterThan_int:
   - g_typed_query_greaterThan_float:
   - g_typed_query_greaterThan_double:
@@ -137,7 +137,7 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_greaterThan
-        
+
   - g_typed_query_greaterThanOrEqual_int:
   - g_typed_query_greaterThanOrEqual_float:
   - g_typed_query_greaterThanOrEqual_double:
@@ -162,7 +162,7 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_greaterThanOrEqual
-        
+
   - g_typed_query_lessThan_int:
   - g_typed_query_lessThan_float:
   - g_typed_query_lessThan_double:
@@ -187,7 +187,7 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_lessThan
-        
+
   - g_typed_query_lessThanOrEqual_int:
   - g_typed_query_lessThanOrEqual_float:
   - g_typed_query_lessThanOrEqual_double:
@@ -242,13 +242,13 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_between
-        
+
   - g_typed_query_startsWith_string_2:
       IGNORE: ""
   - g_typed_query_startsWith_string:
-      NAME     : begins_with 
+      NAME     : begins_with
   - g_typed_query_startsWith_binary:
-      NAME     : begins_with 
+      NAME     : begins_with
       SIGNATURE: |
                  Query& begins_with(StringData value, bool case_sensitive=true);
                  Query& begins_with(BinaryData value);
@@ -269,7 +269,7 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_startsWith
-        
+
   - g_typed_query_endsWith_string_2:
       IGNORE   : ""
   - g_typed_query_endsWith_string:
@@ -296,13 +296,13 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_endsWith
-        
+
   - g_typed_query_contains_string_2:
       IGNORE: ""
   - g_typed_query_contains_string:
-      NAME     : contains     
+      NAME     : contains
   - g_typed_query_contains_binary:
-      NAME     : contains     
+      NAME     : contains
       SIGNATURE: |
                  Query& contains(StringData value, bool case_sensitive=true);
                  Query& contains(BinaryData value);
@@ -323,9 +323,9 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_contains
-        
-        
-- Combiners:
+
+
+- Combinators:
   METHODS:
   - g_typed_query_group:
       NAME     : group
@@ -393,8 +393,8 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_subtable
-        
-        
+
+
 - Actions:
   METHODS:
   - g_typed_query_find_all_2:
@@ -427,7 +427,7 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_findall
-        
+
   - g_typed_query_find_next:
       NAME     : find_next
       DESCR    : &g_typed_query_find_next_descr
@@ -446,7 +446,7 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_find_next
-        
+
   - g_typed_query_sum_2:
       IGNORE: ""
   - g_typed_query_sum_float_2:
@@ -464,11 +464,12 @@ CATEGORIES :
       CONST    : true
       SIGNATURE: |
                  int64_t sum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
-                 double sum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
+                 double sum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
+                 double sum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
       PARAMS:
       - NAME   : resultcount
         DESCR  : &g_typed_query_number_of_rows_descr
-                 The number of rows to consider.
+                 The number of rows used in the calculation.
         TYPES  : size_t*
       - NAME   : start
         TYPES  : size_t
@@ -486,7 +487,7 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_sum
-        
+
   - g_typed_query_size:
       NAME     : count
       DESCR    : &g_typed_query_size_descr
@@ -511,7 +512,7 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_size
-  
+
   - g_typed_query_maximum_2:
       IGNORE   : ""
   - g_typed_query_maximum_float_2:
@@ -523,11 +524,9 @@ CATEGORIES :
   - g_typed_query_maximum:
       NAME     : maximum
   - g_typed_query_maximum_float:
-      NAME     : maximum
+      NAME     : maximum_float
   - g_typed_query_maximum_double:
-      NAME     : maximum
-  - g_typed_query_maximum_date:
-      NAME     : maximum
+      NAME     : maximum_double
       DESCR    : &g_typed_query_maximum_descr
                  This method finds the highest value.
       SUMMARY  : &g_typed_query_maximum_summary
@@ -535,9 +534,8 @@ CATEGORIES :
       CONST    : true
       SIGNATURE: |
                  int64_t maximum(size_t* resultcount, size_t start, size_t end, size_t limit) const;
-                 float   maximum(size_t* resultcount, size_t start, size_t end, size_t limit) const;
-                 double  maximum(size_t* resultcount, size_t start, size_t end, size_t limit) const;
-                 Date    maximum(size_t* resultcount, size_t start, size_t end, size_t limit) const;
+                 float   maximum_float(size_t* resultcount, size_t start, size_t end, size_t limit) const;
+                 double  maximum_double(size_t* resultcount, size_t start, size_t end, size_t limit) const;
       PARAMS:
       - NAME   : resultcount
         DESCR  : *g_typed_query_number_of_rows_descr
@@ -570,8 +568,7 @@ CATEGORIES :
   - g_typed_query_minimum:
   - g_typed_query_minimum_float:
   - g_typed_query_minimum_double:
-  - g_typed_query_minimum_date:
-      NAMES    : [minimum, minimum, minimum, minimum]
+      NAMES    : [minimum, minimum_float, minimum_double]
       DESCR    : &g_typed_query_minimum_descr
                  This method finds the lowest value.
       SUMMARY  : &g_typed_query_minimum_summary
@@ -579,9 +576,8 @@ CATEGORIES :
       CONST    : true
       SIGNATURE: |
                  int64_t minimum(size_t* resultcount, size_t start, size_t end, size_t limit) const;
-                 float   minimum(size_t* resultcount, size_t start, size_t end, size_t limit) const;
-                 double  minimum(size_t* resultcount, size_t start, size_t end, size_t limit) const;
-                 Date    minimum(size_t* resultcount, size_t start, size_t end, size_t limit) const;
+                 float   minimum_float(size_t* resultcount, size_t start, size_t end, size_t limit) const;
+                 double  minimum_double(size_t* resultcount, size_t start, size_t end, size_t limit) const;
       PARAMS:
       - NAME   : resultcount
         DESCR  : *g_typed_query_number_of_rows_descr
@@ -602,7 +598,7 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_manimum
-        
+
   - g_typed_query_average_2:
       IGNORE   : ""
   - g_typed_query_average_float_2:
@@ -639,7 +635,7 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_average
-        
+
   - g_typed_query_remove:
       NAME     : remove
       DESCR    : &g_typed_query_remove_descr

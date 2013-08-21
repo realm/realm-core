@@ -2,6 +2,7 @@
 #include <new>
 #include <algorithm>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 
 #include <tightdb/terminate.hpp>
@@ -494,24 +495,28 @@ bool Group::operator==(const Group& g) const
 void Group::to_string(ostream& out) const
 {
     // Calculate widths
-    size_t name_width = 6;
-    size_t rows_width = 4;
+    size_t index_width = 4;
+    size_t name_width = 10;
+    size_t rows_width = 6;
     size_t count = size();
     for (size_t i = 0; i < count; ++i) {
         StringData name = get_table_name(i);
-        if (name_width < name.size()) name_width = name.size();
+        if (name_width < name.size()) {
+            name_width = name.size();
+        }
 
         ConstTableRef table = get_table(name);
         size_t row_count = table->size();
-        if (rows_width < row_count) rows_width = row_count;
+        if (rows_width < row_count) { // FIXME: should be the number of digits in row_count: floor(log10(row_count+1))
+            rows_width = row_count;
+        }
     }
 
+
     // Print header
-    out << "   ";
-    out.width(name_width);
-    out << "tables" << "  ";
-    out.width(rows_width);
-    out << "rows\n";
+    out << setw(index_width+1) << left << " ";
+    out << setw(name_width+1)  << left << "tables";
+    out << setw(rows_width)    << left << "rows"    << endl;
 
     // Print tables
     for (size_t i = 0; i < count; ++i) {
@@ -519,14 +524,9 @@ void Group::to_string(ostream& out) const
         ConstTableRef table = get_table(name);
         size_t row_count = table->size();
 
-        out << i << "  ";
-        out.width(name_width);
-        out.setf(ostream::left, ostream::adjustfield);
-        out << name;
-        out << "  ";
-        out.width(rows_width);
-        out.unsetf(ostream::adjustfield);
-        out << row_count << endl;
+        out << setw(index_width) << right << i           << " ";
+        out << setw(name_width)  << left  << name.data() << " ";
+        out << setw(rows_width)  << left  << row_count   << endl;
     }
 }
 
