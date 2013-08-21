@@ -477,9 +477,9 @@ CATEGORIES :
       NAME     : find_next
       DESCR    : &g_dyn_query_find_next_descr
                  >
-                 Initially call the method with -1 or no parameter (defaults to -1).
-                 This will find the first row that fulfil the query condition. Use
-                 the return value (row number) or greater (but not less!) as parameter
+                 Initially call the method with -1 or no parameter.
+                 This will find the first row that fulfil the query condition.
+                 Use the return value (row number) or greater (but not less!) as parameter
                  for successive calls to iterate through matching row.
       SUMMARY  : &g_dyn_query_find_next_summary
                  Find next matching row.
@@ -487,7 +487,7 @@ CATEGORIES :
       - NAME   : lastmatch
         TYPES  : size_t
         DESCR  : &g_dyn_query_find_next_parm1_descr
-                 "Row to start search. Default: -1."
+                 "Row to start search"
       RETURN:
         TYPES  : size_t
         DESCR  : &g_dyn_query_find_next
