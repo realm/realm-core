@@ -289,11 +289,14 @@ CATEGORIES :
       - NAME   : column_ndx
         TYPES  : size_t
         DESCR  : &g_dyn_table_get_column_name_param1_descr
-                 The column index (starting from 0), and it is not checked if the column index is out of range.
+                 >
+                 The column index (starting from 0), and it is not checked if the column
+                 index is out of range.
+
       RETURN:
         TYPES  : StringData
         DESCR  : &g_dyn_table_get_column_name_return_descr
-                 The column name.
+                 The column name. An empty string if index is out of range.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_column_name
         DESCR  :
