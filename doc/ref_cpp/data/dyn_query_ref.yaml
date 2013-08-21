@@ -477,16 +477,17 @@ CATEGORIES :
       NAME     : find_next
       DESCR    : &g_dyn_query_find_next_descr
                  >
-                 Find next matching row that fullfil the query condition. To inialize the search,
-                 you can call the method with no parameters as this invocation will find the
-                 first matching row.
+                 Initially call the method with -1 or no parameter.
+                 This will find the first row that fulfil the query condition.
+                 Use the return value (row number) or greater (but not less!) as parameter
+                 for successive calls to iterate through matching row.
       SUMMARY  : &g_dyn_query_find_next_summary
-                 Find next match.
+                 Find next matching row.
       PARAMS:
       - NAME   : lastmatch
         TYPES  : size_t
         DESCR  : &g_dyn_query_find_next_parm1_descr
-                 "Row to stop search. Default: -1 (infinity)."
+                 "Row to start search"
       RETURN:
         TYPES  : size_t
         DESCR  : &g_dyn_query_find_next
