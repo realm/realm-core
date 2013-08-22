@@ -420,6 +420,25 @@ TEST(TableViewClear)
     CHECK_EQUAL(3, table[1].first);
 }
 
+//exposes a bug in stacked tableview:
+//view V1 selects a subset of rows from Table T1
+//View V2 selects rows from  view V1
+//Then, some rows in V2 can be found, that are not in V1
+TEST(TableViewStacked) {
+ 
+    Table t;
+    t.add_column(type_Int,"i1");
+    t.add_column(type_Int,"i2");
+    t.add_column(type_String,"S1");
+    t.add_empty_row(2);
+    t.set_int(0,0,1);    t.set_int(1,0,2); t.set_string(2,0,"A");    //   1 2   "A"
+    t.set_int(0,1,2);    t.set_int(1,1,2); t.set_string(2,1,"B");    //   2 2   "B"
+
+    TableView tv = t.find_all_int(0,2);
+    TableView tv2 = tv.find_all_int(1,2);
+    CHECK_EQUAL(1,tv2.size()); //evaluates tv2.size to 1 which is expected
+    CHECK_EQUAL("B",tv2.get_string(2,0)); //evalates get_string(2,0) to "A" which is not expected
+}
 
 TEST(TableViewClearNone)
 {

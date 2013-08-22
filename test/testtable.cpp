@@ -566,7 +566,7 @@ TEST(Table_test_json_simple)
         table.insert_int(0, i, i);
         table.insert_bool(1, i, (i % 2 == 0? true : false));
         table.insert_date(2, i, 0x7fffeeeeL);
-        table.insert_float(3, i, 3.14);
+        table.insert_float(3, i, 3.14f);
         table.insert_double(4, i, 2.71);
         table.insert_string(5, i, "helloooooo");
         const char bin[] = "123456789012345678901234567890nopq";
