@@ -64,8 +64,8 @@ CATEGORIES  :
       PARAMS:
       - NAME   : file
         TYPES  : const std::string&
-        DESCR  : &g_group_constructor_memory_parm1_descr
-                 File system path of the TightDB database file to be opened.
+        DESCR  : &g_open_filesystem_path_descr
+                 Filesystem path of the TightDB database file to be opened.
       - NAME   : mode
         TYPES  : Group::OpenMode
         DESCR  : |
@@ -200,10 +200,9 @@ CATEGORIES  :
                  void open(const std::string& file, OpenMode mode = mode_ReadOnly);
                  void open(BinaryData buffer, bool take_ownership = true);
       PARAMS:
-      - NAME   : file
+      - NAME   : path
         TYPES  : const std::string&
-        DESCR  : &g_group_open_memory_parm1_descr
-                 Filesystem path of the TightDB database file to be opened.
+        DESCR  : *g_open_filesystem_path_descr
       - NAME   : mode
         TYPES  : Group::OpenMode
         DESCR  : &g_group_open_memory_parm2_descr
@@ -437,10 +436,10 @@ CATEGORIES  :
                  behaviour.
       CONST    : true
       PARAMS:
-      - NAME   : file
+      - NAME   : path
         TYPES  : const std::string&
         DESCR  : &g_group_write_to_file_parm1_descr
-                 A filesystem path.
+                 A filesystem path to write to.
       THROWS:
       - EXCEPT : File::AccessError
         DESCR  : &g_group_write_to_file_throws_descr
