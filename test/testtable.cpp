@@ -42,7 +42,6 @@ TEST(Table1)
     CHECK_EQUAL(type_Int, table.get_column_type(1));
     CHECK_EQUAL("first", table.get_column_name(0));
     CHECK_EQUAL("second", table.get_column_name(1));
-    CHECK_EQUAL("", table.get_column_name(2));
 
     // Test adding a single empty row
     // and filling it with values
