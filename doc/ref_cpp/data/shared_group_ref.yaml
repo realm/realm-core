@@ -1,5 +1,5 @@
 #
-# C++ reference documentation for Shared Group class
+# C++ reference documentation for the SharedGroup class.
 #
 
 ID         : class_shared_group
@@ -8,7 +8,7 @@ SUMMARY    : &g_shared_group_summary
              Sharing groups
 DESCR      : &g_shared_group_descr
              >
-             Database files can be shared across running applications.
+             Database files can be shared between running applications.
 
              When two threads or processes want to access the same
              database file, they must each create their own
@@ -69,7 +69,9 @@ CATEGORIES:
                  state (2). See {@link g_shared_group_open} and
                  {@link g_shared_group_is_attached} for more on this.
       ENUM_SIG :
-      - SIG    : SharedGroup(const std::string& path, bool no_create = false, DurabilityLevel dlevel = durability_Full);
+      - SIG    : >
+                 SharedGroup(const std::string& path, bool no_create = false,
+                             DurabilityLevel dlevel = durability_Full);
       - SIG    : SharedGroup(unattached_tag);
       PARAMS:
       - NAME   : path
