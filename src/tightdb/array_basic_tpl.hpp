@@ -25,28 +25,12 @@
 namespace tightdb {
 
 template<class T>
-inline ref_type BasicArray<T>::create_empty_basic_array(Allocator& alloc)
-{
-    std::size_t capacity = Array::initial_capacity;
-    MemRef mem_ref = alloc.alloc(capacity); // Throws
-
-    bool is_leaf = true;
-    bool has_refs = false;
-    int width = sizeof (T);
-    std::size_t size = 0;
-    init_header(mem_ref.m_addr, is_leaf, has_refs, wtype_Multiply, width, size, capacity);
-
-    return mem_ref.m_ref;
-}
-
-template<class T>
 inline BasicArray<T>::BasicArray(ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
     Array(alloc)
 {
-    ref_type ref = create_empty_basic_array(alloc); // Throws
-    init_from_ref(ref);
+    create(); // Throws
     set_parent(parent, ndx_in_parent);
-    update_ref_in_parent();
+    update_parent(); // Throws
 }
 
 template<class T>
@@ -70,7 +54,33 @@ inline BasicArray<T>::BasicArray(ref_type ref, ArrayParent* parent, std::size_t 
 }
 
 template<class T>
-inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT: Array(no_prealloc_tag()) {}
+inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT: Array(no_prealloc_tag())
+{
+}
+
+
+template<class T>
+inline void BasicArray<T>::create()
+{
+    ref_type ref = create_empty_array(get_alloc()); // Throws
+    init_from_ref(ref);
+}
+
+
+template<class T>
+inline ref_type BasicArray<T>::create_empty_array(Allocator& alloc)
+{
+    std::size_t capacity = Array::initial_capacity;
+    MemRef mem_ref = alloc.alloc(capacity); // Throws
+
+    bool is_leaf = true;
+    bool has_refs = false;
+    int width = sizeof (T);
+    std::size_t size = 0;
+    init_header(mem_ref.m_addr, is_leaf, has_refs, wtype_Multiply, width, size, capacity);
+
+    return mem_ref.m_ref;
+}
 
 
 template<class T>

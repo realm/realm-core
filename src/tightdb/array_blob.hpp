@@ -49,6 +49,13 @@ public:
     /// slower.
     static const char* get(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT;
 
+    /// Create a new empty blob (binary) array and attach to it. This
+    /// does not modify the parent reference information.
+    ///
+    /// Note that the caller assumes ownership of the allocated
+    /// underlying node. It is not owned by the accessor.
+    void create();
+
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, const char* title = 0) const;
 #endif
@@ -65,24 +72,24 @@ private:
 
 // Implementation:
 
-inline ArrayBlob::ArrayBlob(ArrayParent* parent, std::size_t pndx, Allocator& alloc):
-    Array(type_Normal, parent, pndx, alloc)
+inline ArrayBlob::ArrayBlob(ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
+    Array(type_Normal, parent, ndx_in_parent, alloc)
 {
     // Manually set wtype as array constructor in initiatializer list
     // will not be able to call correct virtual function
     set_header_wtype(wtype_Ignore);
 }
 
-inline ArrayBlob::ArrayBlob(ref_type ref, ArrayParent* parent, std::size_t pndx,
+inline ArrayBlob::ArrayBlob(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
                             Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
 {
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
     init_from_ref(ref);
-    set_parent(parent, pndx);
+    set_parent(parent, ndx_in_parent);
 }
 
-// Creates new array (but invalid, call update_ref() to init)
+// Creates new array (but invalid, call init_from_ref() to init)
 inline ArrayBlob::ArrayBlob(Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc) {}
 
 inline const char* ArrayBlob::get(std::size_t pos) const TIGHTDB_NOEXCEPT
@@ -121,6 +128,12 @@ inline const char* ArrayBlob::get(const char* header, std::size_t pos) TIGHTDB_N
 {
     const char* data = get_data_from_header(header);
     return data + pos;
+}
+
+inline void ArrayBlob::create()
+{
+    ref_type ref = create_empty_array(type_Normal, wtype_Ignore, get_alloc()); // Throws
+    init_from_ref(ref);
 }
 
 inline std::size_t ArrayBlob::CalcByteLen(std::size_t count, std::size_t) const
