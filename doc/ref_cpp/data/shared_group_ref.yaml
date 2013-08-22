@@ -108,7 +108,7 @@ CATEGORIES:
       - EXCEPT : &cpp_access_error_except
                  File::AccessError
         DESCR  : &g_access_error_descr
-                 An IO error occurred.
+                 For some reason, we can't access the database.
       - EXCEPT : &cpp_runtime_error_except
                  std::runtime_error
         DESCR  : &g_runtime_error_descr
