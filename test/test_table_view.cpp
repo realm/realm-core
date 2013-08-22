@@ -1,5 +1,7 @@
 #include <UnitTest++.h>
 #include <tightdb/table_macros.hpp>
+#include <string>
+#include <sstream>
 
 using namespace tightdb;
 
@@ -7,11 +9,36 @@ namespace {
 TIGHTDB_TABLE_1(TestTableInt,
                 first, Int)
 
+TIGHTDB_TABLE_2(TestTableInt2,
+                first,  Int,
+                second, Int)
+
 TIGHTDB_TABLE_2(TestTableDate,
                 first, Date,
                 second, Int)
 
 }
+
+TEST(TableViewJSON)
+{
+    Table table;
+    table.add_column(type_Int, "first");
+
+    size_t ndx = table.add_empty_row();
+    table.set_int(0, ndx, 1);
+    ndx = table.add_empty_row();
+    table.set_int(0, ndx, 2);
+    ndx = table.add_empty_row();
+    table.set_int(0, ndx, 3);
+
+    TableView v = table.where().find_all(1);
+    std::stringstream ss;
+    v.to_json(ss);
+    const std::string json = ss.str();
+    CHECK_EQUAL(true, json.length() > 0);
+    CHECK_EQUAL("[{\"first\":2},{\"first\":3}]", json);
+}
+
 
 TEST(TableViewDateMaxMin)
 {
@@ -295,12 +322,14 @@ TEST(TableViewFindAll)
     table.add(0);
 
     TestTableInt::View v = table.column().first.find_all(0);
+    CHECK_EQUAL(3, v.size());
     v[0].first = 5;
     v[1].first = 4; // match
     v[2].first = 4; // match
 
     // todo, add creation to wrapper function in table.h
     TestTableInt::View v2 = v.column().first.find_all(4);
+    CHECK_EQUAL(2, v2.size());
     CHECK_EQUAL(1, v2.get_source_ndx(0));
     CHECK_EQUAL(2, v2.get_source_ndx(1));
 }
@@ -400,6 +429,28 @@ TEST(TableViewClearNone)
     CHECK_EQUAL(0, v.size());
 
     v.clear();
+}
+
+
+TEST(TableViewFindAllStacked)
+{
+    TestTableInt2 table;
+
+    table.add(0, 1);
+    table.add(0, 2);
+    table.add(0, 3);
+    table.add(1, 1);
+    table.add(1, 2);
+    table.add(1, 3);
+
+    TestTableInt2::View v = table.column().first.find_all(0);
+    CHECK_EQUAL(3, v.size());
+
+    TestTableInt2::View v2 = v.column().second.find_all(2);
+    CHECK_EQUAL(1, v2.size());
+    CHECK_EQUAL(0, v2[0].first);
+    CHECK_EQUAL(2, v2[0].second);
+    CHECK_EQUAL(1, v2.get_source_ndx(0));
 }
 
 

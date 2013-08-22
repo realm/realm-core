@@ -42,6 +42,7 @@ TEST(Table1)
     CHECK_EQUAL(type_Int, table.get_column_type(1));
     CHECK_EQUAL("first", table.get_column_name(0));
     CHECK_EQUAL("second", table.get_column_name(1));
+    CHECK_EQUAL("", table.get_column_name(2));
 
     // Test adding a single empty row
     // and filling it with values
@@ -555,7 +556,8 @@ TEST(Table_test_json_simple)
     s.add_column(type_Int,    "int");
     s.add_column(type_Bool,   "bool");
     s.add_column(type_Date,   "date");
-    // FIXME: Add float, double
+    s.add_column(type_Float,  "float");
+    s.add_column(type_Double, "double");
     s.add_column(type_String, "string");
     s.add_column(type_Binary, "binary");
     table.update_from_spec();
@@ -563,11 +565,13 @@ TEST(Table_test_json_simple)
     // Add some rows
     for (size_t i = 0; i < 1; ++i) {
         table.insert_int(0, i, i);
-        table.insert_bool(1, i, (i % 2 ? true : false));
+        table.insert_bool(1, i, (i % 2 == 0? true : false));
         table.insert_date(2, i, 0x7fffeeeeL);
-        table.insert_string(3, i, "helloooooo");
+        table.insert_float(3, i, 3.14);
+        table.insert_double(4, i, 2.71);
+        table.insert_string(5, i, "helloooooo");
         const char bin[] = "123456789012345678901234567890nopq";
-        table.insert_binary(4, i, BinaryData(bin, sizeof bin));
+        table.insert_binary(6, i, BinaryData(bin, sizeof bin));
         table.insert_done();
     }
 
@@ -575,7 +579,7 @@ TEST(Table_test_json_simple)
      table.to_json(ss);
      const string json = ss.str();
      CHECK_EQUAL(true, json.length() > 0);
-     //cerr << "JSON:" << json << "\n";
+     CHECK_EQUAL("[{\"int\":0,\"bool\":true,\"date\":\"2038-01-19 02:01:18\",\"float\":3.1400001e+00,\"double\":2.7100000000000000e+00,\"string\":\"helloooooo\",\"binary\":\"3132333435363738393031323334353637383930313233343536373839306e6f707100\"}]", json);
 }
 
 
@@ -724,6 +728,25 @@ TEST(Table_Index_String)
 
     const size_t c1 = table.column().second.count("jennifer");
     CHECK_EQUAL(2, c1);
+}
+
+TEST(Table_Index_String_Twice)
+{
+    TestTableEnum table;
+
+    table.add(Mon, "jeff");
+    table.add(Tue, "jim");
+    table.add(Wed, "jennifer");
+    table.add(Thu, "john");
+    table.add(Fri, "jimmy");
+    table.add(Sat, "jimbo");
+    table.add(Sun, "johnny");
+    table.add(Mon, "jennifer"); // duplicate
+
+    table.column().second.set_index();
+    CHECK_EQUAL(true, table.column().second.has_index());
+    table.column().second.set_index();
+    CHECK_EQUAL(true, table.column().second.has_index());
 }
 
 namespace {
