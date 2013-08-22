@@ -8,7 +8,7 @@ SUMMARY    : &g_shared_group_summary
              Sharing groups
 DESCR      : &g_shared_group_descr
              >
-             Database files can be shared across running applications.
+             Database files can be shared between running applications.
 
              When two threads or processes want to access the same
              database file, they must each create their own
