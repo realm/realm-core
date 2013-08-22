@@ -317,18 +317,16 @@ CATEGORIES  :
       - DESCR  :
         CODE   : ex_cpp_group_operator_equal
 
-# TODO below: split in two texts
-#      -TEXT    : &g_group_has_table_descr
-#      -TEXT    : >
-
 - Table:
   METHODS:
   - g_group_has_table:
       NAME     : has_table
       SUMMARY  : &g_group_has_table_summary
-                 Does group have a specific table?
-      DESCR    : >
+                 Does group have table?
+      DESCR    :
+      - TEXT   : &g_group_has_table_descr
                  The method checks whether this group contains the specified table.
+      - TEXT   : >
                  When no table class is specified, this function
                  returns <code>true</code> if the group contains a
                  table with the specified name. When a table class
