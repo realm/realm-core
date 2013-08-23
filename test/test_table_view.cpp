@@ -420,7 +420,7 @@ TEST(TableViewClear)
     CHECK_EQUAL(3, table[1].first);
 }
 
-/*
+
 //exposes a bug in stacked tableview:
 //view V1 selects a subset of rows from Table T1
 //View V2 selects rows from  view V1
@@ -440,7 +440,7 @@ TEST(TableViewStacked)
     CHECK_EQUAL(1,tv2.size()); //evaluates tv2.size to 1 which is expected
     CHECK_EQUAL("B",tv2.get_string(2,0)); //evalates get_string(2,0) to "A" which is not expected
 }
-*/
+
 
 TEST(TableViewClearNone)
 {
