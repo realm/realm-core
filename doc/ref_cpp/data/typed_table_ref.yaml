@@ -1,5 +1,5 @@
 #
-# C++ reference documentation for TypedTable class
+# C++ reference documentation for the Table (typed) class.
 #
 
 ID         : class_typed_table
@@ -521,8 +521,12 @@ CATEGORIES:
                  (first matching row for each unique value in column).
                  The rows are returned as a {@link class_typed_tableview} object.
       SIGNATURE: |
-                 TableView      distinct();
-                 ConstTableView distinct() const;
+                 TableView      distinct(std::size_t column_ndx);
+                 ConstTableView distinct(std::size_t column_ndx) const;
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : The column to use to find distinct rows.
       RETURN:
         TYPES  : TableView
         DESCR  : &g_typed_table_distinct_return1_descr
