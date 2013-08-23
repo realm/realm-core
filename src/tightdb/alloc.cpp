@@ -40,6 +40,8 @@ public:
     MemRef alloc(size_t size) TIGHTDB_OVERRIDE
     {
         char* addr = static_cast<char*>(malloc(size));
+        fill(addr, addr+size, 0); 
+
         if (TIGHTDB_LIKELY(addr))
             return MemRef(addr, reinterpret_cast<size_t>(addr));
         TIGHTDB_ASSERT(errno == ENOMEM);

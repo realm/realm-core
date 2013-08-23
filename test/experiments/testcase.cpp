@@ -50,7 +50,7 @@ void* IncrementEntry(void* arg)
         // Open shared db
         SharedGroup sg("test_shared.tightdb", 
                        false, SharedGroup::durability_Async );
-/*
+
         for (size_t i = 0; i < 100; ++i) {
 
             // Increment cell
@@ -80,7 +80,7 @@ void* IncrementEntry(void* arg)
             }
 
         }
-*/
+
     } catch (runtime_error e) {
         printf("Thread exiting due to runtime exception\n");
         printf("what(): %s\n", e.what());
@@ -139,11 +139,11 @@ void multi_threaded()
     File::try_remove("test_shared.tightdb.lock");
     sleep(1);
     printf("Multithreaded client\n");
-    const size_t thread_count = 2;
+    const size_t thread_count = 10;
 
     // Do some changes in a async db
     {
-/*
+
         SharedGroup sg("test_shared.tightdb", 
                        false, SharedGroup::durability_Async);
         // Create first table in group
@@ -155,7 +155,7 @@ void multi_threaded()
             }
             wt.commit();
         }
-*/
+
         printf("Spawning test threads\n");
         pthread_t threads[thread_count];
 
@@ -171,7 +171,7 @@ void multi_threaded()
             CHECK_EQUAL(0, rc);
         }
         printf("Threads done, verifying\n");
-/*
+
         // Verify that the changes were made
         {
             ReadTransaction rt(sg);
@@ -182,11 +182,10 @@ void multi_threaded()
                 CHECK_EQUAL(100, v);
             }
         }
-*/
+
     }
     sleep(1);
     File::try_remove("test_shared.tightdb.lock");
-/*
     sleep(1);
     // Verify - once more, in sync mode - that the changes were made
     {
@@ -200,15 +199,15 @@ void multi_threaded()
             CHECK_EQUAL(100, v);
         }
     }
+    sleep(1);
     File::try_remove("test_shared.tightdb.lock");
-*/
 
 }
 
 
 int main()
 {
-    // single_threaded();
+    single_threaded();
 
     multi_threaded();
 }
