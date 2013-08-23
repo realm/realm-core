@@ -51,7 +51,7 @@ class Array;
 class Query {
 public:
     Query(const Query& copy); // FIXME: Try to remove this
-    ~Query();
+    ~Query() TIGHTDB_NOEXCEPT;
 
     // Conditions: Query only rows contained in tv
     Query& tableview(const TableView& tv);
@@ -202,11 +202,6 @@ public:
 #endif
 
 protected:
-    friend class Table;
-    template <typename T> friend class BasicTable;
-    friend class XQueryAccessorInt;
-    friend class XQueryAccessorString;
-
     Query(Table& table);
     Query(const Table& table); // FIXME: This constructor should not exist. We need a ConstQuery class.
     void Create();
@@ -266,6 +261,11 @@ private:
     template <Action action, typename T, typename R, class ColClass>
         R aggregate(R (ColClass::*method)(size_t, size_t) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
+
+    friend class Table;
+    template <typename T> friend class BasicTable;
+    friend class XQueryAccessorInt;
+    friend class XQueryAccessorString;
 };
 
 

@@ -176,7 +176,8 @@ inline Table* LangBindHelper::get_table_ptr(Group* grp, StringData name)
 
 inline Table* LangBindHelper::get_table_ptr(Group* grp, StringData name, bool& was_created)
 {
-    Table* subtab = grp->get_table_ptr(name, was_created);
+    Group::SpecSetter spec_setter = 0; // Do not add any columns
+    Table* subtab = grp->get_table_ptr(name, spec_setter, was_created);
     subtab->bind_ref();
     return subtab;
 }

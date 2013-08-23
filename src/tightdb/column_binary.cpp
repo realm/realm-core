@@ -6,11 +6,9 @@ using namespace std;
 using namespace tightdb;
 
 
-namespace tightdb {
-
 ColumnBinary::ColumnBinary(Allocator& alloc)
 {
-    m_array = new ArrayBinary(NULL, 0, alloc);
+    m_array = new ArrayBinary(0, 0, alloc);
 }
 
 ColumnBinary::ColumnBinary(ref_type ref, ArrayParent* parent, size_t pndx, Allocator& alloc)
@@ -24,20 +22,14 @@ ColumnBinary::ColumnBinary(ref_type ref, ArrayParent* parent, size_t pndx, Alloc
     }
 }
 
-ColumnBinary::~ColumnBinary()
+ColumnBinary::~ColumnBinary() TIGHTDB_NOEXCEPT
 {
-    if (root_is_leaf())
+    if (root_is_leaf()) {
         delete static_cast<ArrayBinary*>(m_array);
-    else
+    }
+    else {
         delete m_array;
-}
-
-void ColumnBinary::destroy()
-{
-    if (root_is_leaf())
-        static_cast<ArrayBinary*>(m_array)->destroy();
-    else
-        m_array->destroy();
+    }
 }
 
 bool ColumnBinary::is_empty() const TIGHTDB_NOEXCEPT
@@ -217,5 +209,3 @@ void ColumnBinary::leaf_to_dot(ostream& out, const Array& array) const
 }
 
 #endif // TIGHTDB_DEBUG
-
-}
