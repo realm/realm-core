@@ -49,11 +49,12 @@ struct SharedGroup::SharedInfo {
     ReadCount readers[32]; // has to be power of two
 };
 
+
 namespace {
 
 class ScopedMutexLock {
 public:
-    ScopedMutexLock(pthread_mutex_t* mutex) TIGHTDB_NOEXCEPT : m_mutex(mutex)
+    ScopedMutexLock(pthread_mutex_t* mutex) TIGHTDB_NOEXCEPT: m_mutex(mutex)
     {
         int r = pthread_mutex_lock(m_mutex);
         TIGHTDB_ASSERT(r == 0);
@@ -151,7 +152,7 @@ void spawn_daemon(const string& file)
 // to reinitialize a shared mutex if the first initializing process
 // crashes and leaves the shared memory in an undefined state.
 
-void SharedGroup::open(const string& file, bool no_create_file,
+void SharedGroup::open(const string& path, bool no_create_file,
                        DurabilityLevel dlevel, bool is_backend)
 {
     TIGHTDB_ASSERT(!is_attached());
@@ -241,7 +242,7 @@ void SharedGroup::open(const string& file, bool no_create_file,
             // Set initial values
             info->version  = 0;
             info->flags    = dlevel; // durability level is fixed from creation
-            info->filesize = alloc.get_attached_size();
+            info->filesize = alloc.get_baseline();
             info->infosize = uint32_t(len);
             info->current_top = alloc.get_top_ref();
             info->current_version = 0;
@@ -255,7 +256,7 @@ void SharedGroup::open(const string& file, bool no_create_file,
             // In async mode we need a separate process to do the async commits
             // We start it up here during init so that it only get started once
             if (dlevel == durability_Async) {
-                spawn_daemon(file);
+                spawn_daemon(path);
             }
         }
         else {
@@ -311,12 +312,16 @@ void SharedGroup::open(const string& file, bool no_create_file,
 }
 
 
-SharedGroup::~SharedGroup()
+SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 {
     if (!is_attached())
         return;
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
+
+    // FIXME: Throws. Exception must not escape, as that would
+    // terminate the program.
+    m_group.m_alloc.free_all();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = m_group.get_replication())
@@ -332,7 +337,10 @@ SharedGroup::~SharedGroup()
     // we can delete it when done.
     if (info->flags == durability_MemOnly) {
         size_t path_len = m_file_path.size()-5; // remove ".lock"
-        string db_path = m_file_path.substr(0, path_len);
+        // FIXME: Find a way to avoid the possible exception from
+        // m_file_path.substr(). Currently, if it throws, the program
+        // will be terminated due to 'noexcept' on ~SharedGroup().
+        string db_path = m_file_path.substr(0, path_len); // Throws
         remove(db_path.c_str());
     }
 
@@ -410,10 +418,10 @@ void SharedGroup::do_async_commits()
 #endif
             begin_read();
             size_t current_version = m_version;
-            size_t current_top_ref = m_group.get_top_array().get_ref();
+            size_t current_top_ref = m_group.m_top.get_ref();
 
-            GroupWriter writer(m_group, true);
-            writer.DoCommit(current_top_ref);
+            GroupWriter writer(m_group);
+            writer.sync(current_top_ref);
 
             // Now we can release the version that was previously commited
             // to disk and just keep the lock on the latest version.
@@ -443,7 +451,6 @@ void SharedGroup::do_async_commits()
 const Group& SharedGroup::begin_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-    TIGHTDB_ASSERT(m_group.m_alloc.is_all_free());
 
     ref_type new_top_ref = 0;
     size_t new_file_size = 0;
@@ -463,7 +470,7 @@ const Group& SharedGroup::begin_read()
 
         // Update reader list
         if (ringbuf_is_empty()) {
-            ReadCount r2 = {info->current_version, 1};
+            ReadCount r2 = { info->current_version, 1 };
             ringbuf_put(r2);
         }
         else {
@@ -472,7 +479,7 @@ const Group& SharedGroup::begin_read()
                 ++r.count;
             }
             else {
-                ReadCount r2 = {info->current_version, 1};
+                ReadCount r2 = { info->current_version, 1 };
                 ringbuf_put(r2);
             }
         }
@@ -491,7 +498,7 @@ const Group& SharedGroup::begin_read()
 }
 
 
-void SharedGroup::end_read()
+void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
@@ -508,15 +515,14 @@ void SharedGroup::end_read()
 
         // Find entry for current version
         size_t ndx = ringbuf_find(uint32_t(m_version));
-        TIGHTDB_ASSERT(ndx != size_t(-1));
+        TIGHTDB_ASSERT(ndx != not_found);
         ReadCount& r = ringbuf_get(ndx);
 
         // Decrement count and remove as many entries as possible
         if (r.count == 1 && ringbuf_is_first(ndx)) {
             ringbuf_remove_first();
-            while (!ringbuf_is_empty() && ringbuf_get_first().count == 0) {
+            while (!ringbuf_is_empty() && ringbuf_get_first().count == 0)
                 ringbuf_remove_first();
-            }
         }
         else {
             TIGHTDB_ASSERT(r.count > 0);
@@ -536,7 +542,6 @@ void SharedGroup::end_read()
 Group& SharedGroup::begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-    TIGHTDB_ASSERT(m_group.m_alloc.is_all_free());
 
     SharedInfo* info = m_file_map.get_addr();
 
@@ -610,7 +615,12 @@ void SharedGroup::commit()
 // failed call to commit(). A failed call to commit() is any that
 // returns to the caller by throwing an exception. As it is right now,
 // rollback() does not handle all cases.
-void SharedGroup::rollback()
+//
+// FIXME: This function must be modified in such a way that it can be
+// guaranteed that it never throws. There are two problems to be dealt
+// with. Group::invalidate() calls Group::clear_cache() and
+// SlabAlloc::free_all().
+void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 

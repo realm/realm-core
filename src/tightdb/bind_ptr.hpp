@@ -44,10 +44,13 @@ namespace tightdb {
 /// for an example of that.
 ///
 /// A restricted notion of move semantics (as defined by C++11) is
-/// provided. Instead of calling <tt>std::move()</tt> one must call
-/// <tt>move()</tt> without the <tt>std</tt> qualifier. The
-/// effectiveness of this 'emulation' relies on 'return value
-/// optimization' being enabled in the compiler.
+/// provided. Instead of calling `std::move()` one must call `move()`
+/// without the `std::` qualifier. The effectiveness of this
+/// 'emulation' relies on 'return value optimization' being enabled in
+/// the compiler.
+///
+/// This smart pointer implementation assumes that the target object
+/// destructor never throws.
 template<class T> class bind_ptr {
 public:
 #ifdef TIGHTDB_HAVE_CXX11_CONSTEXPR
@@ -57,7 +60,7 @@ public:
 #endif
     explicit bind_ptr(T* p) TIGHTDB_NOEXCEPT { bind(p); }
     template<class U> explicit bind_ptr(U* p) TIGHTDB_NOEXCEPT { bind(p); }
-    ~bind_ptr() { unbind(); }
+    ~bind_ptr() TIGHTDB_NOEXCEPT { unbind(); }
 
 #ifdef TIGHTDB_HAVE_CXX11_RVALUE_REFERENCE
 
@@ -66,16 +69,16 @@ public:
     template<class U> bind_ptr(const bind_ptr<U>& p) TIGHTDB_NOEXCEPT { bind(p.m_ptr); }
 
     // Copy assign
-    bind_ptr& operator=(const bind_ptr& p) { bind_ptr(p).swap(*this); return *this; }
-    template<class U> bind_ptr& operator=(const bind_ptr<U>& p) { bind_ptr(p).swap(*this); return *this; }
+    bind_ptr& operator=(const bind_ptr& p) TIGHTDB_NOEXCEPT { bind_ptr(p).swap(*this); return *this; }
+    template<class U> bind_ptr& operator=(const bind_ptr<U>& p) TIGHTDB_NOEXCEPT { bind_ptr(p).swap(*this); return *this; }
 
     // Move construct
     bind_ptr(bind_ptr&& p) TIGHTDB_NOEXCEPT: m_ptr(p.release()) {}
     template<class U> bind_ptr(bind_ptr<U>&& p) TIGHTDB_NOEXCEPT: m_ptr(p.release()) {}
 
     // Move assign
-    bind_ptr& operator=(bind_ptr&& p) { bind_ptr(std::move(p)).swap(*this); return *this; }
-    template<class U> bind_ptr& operator=(bind_ptr<U>&& p) { bind_ptr(std::move(p)).swap(*this); return *this; }
+    bind_ptr& operator=(bind_ptr&& p) TIGHTDB_NOEXCEPT { bind_ptr(std::move(p)).swap(*this); return *this; }
+    template<class U> bind_ptr& operator=(bind_ptr<U>&& p) TIGHTDB_NOEXCEPT { bind_ptr(std::move(p)).swap(*this); return *this; }
 
 #else // !TIGHTDB_HAVE_CXX11_RVALUE_REFERENCE
 
@@ -84,8 +87,8 @@ public:
     template<class U> bind_ptr(bind_ptr<U> p) TIGHTDB_NOEXCEPT: m_ptr(p.release()) {}
 
     // Copy assign
-    bind_ptr& operator=(bind_ptr p) { p.swap(*this); return *this; }
-    template<class U> bind_ptr& operator=(bind_ptr<U> p) { bind_ptr(move(p)).swap(*this); return *this; }
+    bind_ptr& operator=(bind_ptr p) TIGHTDB_NOEXCEPT { p.swap(*this); return *this; }
+    template<class U> bind_ptr& operator=(bind_ptr<U> p) TIGHTDB_NOEXCEPT { bind_ptr(move(p)).swap(*this); return *this; }
 
 #endif // !TIGHTDB_HAVE_CXX11_RVALUE_REFERENCE
 
@@ -109,9 +112,9 @@ public:
 #endif
 
     T* get() const TIGHTDB_NOEXCEPT { return m_ptr; }
-    void reset() { bind_ptr().swap(*this); }
-    void reset(T* p) { bind_ptr(p).swap(*this); }
-    template<class U> void reset(U* p) { bind_ptr(p).swap(*this); }
+    void reset() TIGHTDB_NOEXCEPT { bind_ptr().swap(*this); }
+    void reset(T* p) TIGHTDB_NOEXCEPT { bind_ptr(p).swap(*this); }
+    template<class U> void reset(U* p) TIGHTDB_NOEXCEPT { bind_ptr(p).swap(*this); }
 
     void swap(bind_ptr& p) TIGHTDB_NOEXCEPT { std::swap(m_ptr, p.m_ptr); }
     friend void swap(bind_ptr& a, bind_ptr& b) TIGHTDB_NOEXCEPT { a.swap(b); }
@@ -128,7 +131,7 @@ private:
     T* m_ptr;
 
     void bind(T* p) TIGHTDB_NOEXCEPT { if (p) p->bind_ref(); m_ptr = p; }
-    void unbind() { if (m_ptr) m_ptr->unbind_ref(); }
+    void unbind() TIGHTDB_NOEXCEPT { if (m_ptr) m_ptr->unbind_ref(); }
 
     T* release() TIGHTDB_NOEXCEPT { T* const p = m_ptr; m_ptr = 0; return p; }
 
@@ -156,16 +159,17 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const b
 class RefCountBase {
 public:
     RefCountBase() TIGHTDB_NOEXCEPT: m_ref_count(0) {}
-    virtual ~RefCountBase() {}
+    virtual ~RefCountBase() TIGHTDB_NOEXCEPT {}
 
 private:
     mutable std::atomic<unsigned long> m_ref_count;
 
     // FIXME: Operators ++ and -- as used below use
-    // std::memory_order_seq_cst. I'm not sure whether it is the
-    // most effecient choice, that also guarantees safety.
+    // std::memory_order_seq_cst. I'm not sure whether this is the
+    // choice that leads to maximum efficiency, but at least it is
+    // safe.
     void bind_ref() const TIGHTDB_NOEXCEPT { ++m_ref_count; }
-    void unbind_ref() const { if (--m_ref_count == 0) delete this; }
+    void unbind_ref() const TIGHTDB_NOEXCEPT { if (--m_ref_count == 0) delete this; }
 
     template<class> friend class bind_ptr;
 };

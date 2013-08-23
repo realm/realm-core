@@ -21,10 +21,11 @@
 #define TIGHTDB_GROUP_WRITER_HPP
 
 #include <stdint.h> // unint8_t etc
-#include <cstdlib> // size_t
+#include <utility>
 
 #include <tightdb/file.hpp>
 #include <tightdb/alloc.hpp>
+
 
 namespace tightdb {
 
@@ -49,7 +50,8 @@ public:
     /// written.
     std::size_t write(const char* data, std::size_t size);
 
-    void write_at(std::size_t pos, const char* data, std::size_t size);
+    /// Controlled update of physical medium
+    void sync(uint64_t top_pos);
 
 #ifdef TIGHTDB_DEBUG
     void dump();
@@ -62,14 +64,40 @@ private:
     std::size_t     m_readlock_version;
     File::Map<char> m_file_map;
 
-    // Controlled update of physical medium
-    void sync(uint64_t top_pos);
+    void merge_free_space();
 
+    /// Allocate a chunk of free space of the specified size. The
+    /// specified size must be 8-byte aligned. Extend the file if
+    /// required. The returned chunk is removed from the amount of
+    /// remaing free space.
+    ///
+    /// \return The position within the database file of the allocated
+    /// chunk.
     std::size_t get_free_space(std::size_t size);
-    std::size_t reserve_free_space(std::size_t size);
-    void        add_free_space(std::size_t pos, std::size_t size, std::size_t version = 0);
-    void        merge_free_space();
-    std::size_t extend_free_space(std::size_t requested_size);
+
+    /// Find a block of free space that is at least as big as the
+    /// specified size. The specified size does not need to be 8-byte
+    /// aligned. Extend the file if required. The returned chunk is
+    /// not removed from the amount of remaing free space. This
+    /// function guarantees that it will add at most one entry to the
+    /// free-lists.
+    ///
+    /// \return A pair (`chunk_ndx`, `chunk_size`) where `chunk_ndx`
+    /// is the index of a chunk whose size is at least the requestd
+    /// size, and `chunk_size` is the size of that chunk.
+    std::pair<std::size_t, std::size_t> reserve_free_space(std::size_t size);
+
+    /// Extend the file to ensure that a chunk of free space of the
+    /// specified size is available. The specified size does not need
+    /// to be 8-byte aligned. This function guarantees that it will
+    /// add at most one entry to the free-lists.
+    ///
+    /// \return A pair (`chunk_ndx`, `chunk_size`) where `chunk_ndx`
+    /// is the index of a chunk whose size is at least the requestd
+    /// size, and `chunk_size` is the size of that chunk.
+    std::pair<std::size_t, std::size_t> extend_free_space(std::size_t requested_size);
+
+    void write_at(std::size_t pos, const char* data, std::size_t size);
 };
 
 

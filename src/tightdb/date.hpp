@@ -34,6 +34,8 @@ public:
     /// 1970.
     Date(std::time_t d) TIGHTDB_NOEXCEPT: m_time(d) {}
 
+    ~Date() TIGHTDB_NOEXCEPT {}
+
     /// Return the time as seconds since Jan 1 00:00:00 UTC 1970.
     std::time_t get_date() const TIGHTDB_NOEXCEPT { return m_time; }
 
