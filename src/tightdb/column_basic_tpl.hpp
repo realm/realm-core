@@ -65,30 +65,6 @@ void BasicColumn<T>::destroy()
         m_array->destroy();
 }
 
-
-template<class T>
-void BasicColumn<T>::update_ref(ref_type ref)
-{
-    TIGHTDB_ASSERT(!root_is_leaf_from_ref(ref, m_array->get_alloc())); // Can only be called when creating node
-
-    if (!root_is_leaf()) {
-        m_array->update_ref(ref);
-        return;
-    }
-
-    ArrayParent* parent = m_array->get_parent();
-    std::size_t pndx = m_array->get_ndx_in_parent();
-
-    // Replace the generic array with int array for node
-    Array* array = new Array(ref, parent, pndx, m_array->get_alloc());
-    delete m_array;
-    m_array = array;
-
-    // Update ref in parent
-    if (parent)
-        parent->update_child_ref(pndx, ref);
-}
-
 template<class T>
 bool BasicColumn<T>::is_empty() const TIGHTDB_NOEXCEPT
 {

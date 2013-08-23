@@ -104,21 +104,24 @@ void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, String
             StringIndex new_node(inner_node_tag(), m_array->get_alloc());
             new_node.NodeAddKey(nc.ref1);
             new_node.NodeAddKey(get_ref());
-            update_ref(new_node.get_ref());
+            m_array->init_from_ref(new_node.get_ref());
+            m_array->update_parent();
             return;
         }
         case NodeChange::insert_after: {
             StringIndex new_node(inner_node_tag(), m_array->get_alloc());
             new_node.NodeAddKey(get_ref());
             new_node.NodeAddKey(nc.ref1);
-            update_ref(new_node.get_ref());
+            m_array->init_from_ref(new_node.get_ref());
+            m_array->update_parent();
             return;
         }
         case NodeChange::split: {
             StringIndex new_node(inner_node_tag(), m_array->get_alloc());
             new_node.NodeAddKey(nc.ref1);
             new_node.NodeAddKey(nc.ref2);
-            update_ref(new_node.get_ref());
+            m_array->init_from_ref(new_node.get_ref());
+            m_array->update_parent();
             return;
         }
     }
@@ -506,16 +509,19 @@ void StringIndex::erase(size_t row_ndx, StringData value, bool is_last)
     while (!root_is_leaf()) {
         Array refs = m_array->GetSubArray(1);
         TIGHTDB_ASSERT(refs.size() != 0); // node cannot be empty
-        if (refs.size() > 1) break;
+        if (refs.size() > 1)
+            break;
 
         ref_type ref = refs.get_as_ref(0);
         refs.erase(0); // avoid deleting subtree
         m_array->destroy();
-        m_array->update_ref(ref);
+        m_array->init_from_ref(ref);
+        m_array->update_parent();
     }
 
     // If it is last item in column, we don't have to update refs
-    if (!is_last) UpdateRefs(row_ndx, -1);
+    if (!is_last)
+        UpdateRefs(row_ndx, -1);
 }
 
 void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
