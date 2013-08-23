@@ -35,6 +35,7 @@ public:
     BasicArray(ref_type, ArrayParent*, std::size_t ndx_in_parent,
                Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
     explicit BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT;
+    ~BasicArray() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     T get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add(T value);

@@ -8,15 +8,16 @@ using namespace std;
 using namespace tightdb;
 
 
-Spec::~Spec()
+Spec::~Spec() TIGHTDB_NOEXCEPT
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* repl = m_top.get_alloc().get_replication();
-    if (repl) repl->on_spec_destroyed(this);
+    if (repl)
+        repl->on_spec_destroyed(this);
 #endif
 }
 
-void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
+void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT
 {
     m_top.init_from_ref(ref);
     m_top.set_parent(parent, ndx_in_parent);
@@ -34,7 +35,7 @@ void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent
     }
 }
 
-void Spec::destroy()
+void Spec::destroy() TIGHTDB_NOEXCEPT
 {
     m_top.destroy();
 }

@@ -155,7 +155,7 @@ void Table::create_columns()
 }
 
 
-void Table::invalidate()
+void Table::invalidate() TIGHTDB_NOEXCEPT
 {
     // This prevents the destructor from deallocating the underlying
     // memory structure, and from attempting to notify the parent. It
@@ -165,15 +165,15 @@ void Table::invalidate()
     // Invalidate all subtables
     invalidate_subtables();
 
-    clear_cached_columns();
+    destroy_column_accessors();
 }
 
 
-void Table::invalidate_subtables()
+void Table::invalidate_subtables() TIGHTDB_NOEXCEPT
 {
     size_t n = m_cols.size();
     for (size_t i=0; i<n; ++i) {
-        ColumnBase* c = reinterpret_cast<ColumnBase*>(m_cols.get(i));
+        ColumnBase* c = reinterpret_cast<ColumnBase*>(uintptr_t(m_cols.get(i)));
         c->invalidate_subtables_virtual();
     }
 }
@@ -310,7 +310,7 @@ void Table::cache_columns()
     if (num_rows != size_t(-1)) m_size = num_rows;
 }
 
-void Table::clear_cached_columns()
+void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_cols.is_attached());
 
@@ -322,7 +322,7 @@ void Table::clear_cached_columns()
     m_cols.destroy();
 }
 
-Table::~Table()
+Table::~Table() TIGHTDB_NOEXCEPT
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().on_table_destroyed();
@@ -342,8 +342,8 @@ Table::~Table()
         TIGHTDB_ASSERT(parent);
         TIGHTDB_ASSERT(m_ref_count == 0);
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
-        static_cast<Parent*>(parent)->child_destroyed(m_columns.get_ndx_in_parent());
-        clear_cached_columns();
+        static_cast<Parent*>(parent)->child_accessor_destroyed(m_columns.get_ndx_in_parent());
+        destroy_column_accessors();
         return;
     }
 
@@ -353,8 +353,8 @@ Table::~Table()
         // counting, so we must let our parent know about our demise.
         TIGHTDB_ASSERT(m_ref_count == 0);
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
-        static_cast<Parent*>(parent)->child_destroyed(m_top.get_ndx_in_parent());
-        clear_cached_columns();
+        static_cast<Parent*>(parent)->child_accessor_destroyed(m_top.get_ndx_in_parent());
+        destroy_column_accessors();
         return;
     }
 
@@ -367,8 +367,12 @@ Table::~Table()
     // be zero, because that is what has caused the destructor to be
     // called. In the latter case, there can be no subtables to
     // invalidate, because they would have kept their parent alive.
-    if (0 < m_ref_count) invalidate();
-    else clear_cached_columns();
+    if (0 < m_ref_count) {
+        invalidate();
+    }
+    else {
+        destroy_column_accessors();
+    }
     m_top.destroy();
 }
 

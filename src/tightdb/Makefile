@@ -1,11 +1,11 @@
 GENERATED_SOURCES = table_macros.hpp
 
 INST_HEADERS = config.h meta.hpp assert.hpp exceptions.hpp terminate.hpp type_list.hpp tuple.hpp \
-bind.hpp safe_int_ops.hpp unique_ptr.hpp bind_ptr.hpp string_buffer.hpp file.hpp thread.hpp \
-utf8.hpp utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp data_type.hpp \
-column_type.hpp column_fwd.hpp spec.hpp date.hpp string_data.hpp binary_data.hpp mixed.hpp \
-table.hpp table_ref.hpp table_basic_fwd.hpp table_accessors.hpp table_basic.hpp table_view.hpp \
-table_view_basic.hpp table_macros.hpp group.hpp group_shared.hpp query.hpp \
+bind.hpp safe_int_ops.hpp unique_ptr.hpp bind_ptr.hpp buffer.hpp string_buffer.hpp file.hpp \
+thread.hpp utf8.hpp utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp \
+data_type.hpp column_type.hpp column_fwd.hpp spec.hpp date.hpp string_data.hpp binary_data.hpp \
+mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp table_accessors.hpp table_basic.hpp \
+table_view.hpp table_view_basic.hpp table_macros.hpp group.hpp group_shared.hpp query.hpp \
 query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h replication.hpp
 
 lib_LIBRARIES = libtightdb.a

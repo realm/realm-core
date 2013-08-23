@@ -85,7 +85,7 @@ public:
     /// dynamic lifetime, use Table::copy() instead.
     Table(const Table&, Allocator& = Allocator::get_default());
 
-    ~Table();
+    ~Table() TIGHTDB_NOEXCEPT;
 
     /// Construct a new freestanding top-level table with dynamic
     /// lifetime.
@@ -151,8 +151,8 @@ public:
     /// specifies a column, C2, of the spec of C1, and so forth.
     ///
     /// \sa Spec
-    Spec& get_spec();
-    const Spec& get_spec() const;
+    Spec& get_spec() TIGHTDB_NOEXCEPT;
+    const Spec& get_spec() const TIGHTDB_NOEXCEPT;
     void update_from_spec(); // Must not be called for a table with shared spec
     std::size_t add_column(DataType type, StringData name); // Add a column dynamically
     std::size_t add_subcolumn(const std::vector<std::size_t>& column_path, DataType type,
@@ -403,7 +403,23 @@ private:
     mutable std::size_t m_ref_count;
     mutable const StringIndex* m_lookup_index;
 
-    Table& operator=(const Table&); // Disable copying assignment
+    /// Disable copying assignment.
+    ///
+    /// It could easily be implemented by calling assign(), but the
+    /// non-checking nature of the low-level dynamically typed API
+    /// makes it too risky to offer this feature as an
+    /// operator.
+    ///
+    /// FIXME: assign() has not yet been implemented, but the
+    /// intention is that it will copy the rows of the argument table
+    /// into this table after clearing the original contents, and for
+    /// target tables without a shared spec, it would also copy the
+    /// spec. For target tables with shared spec, it would be an error
+    /// to pass an argument table with an incompatible spec, but
+    /// assign() would not check for spec compatibility. This would
+    /// make it ideal as a basis for implementing operator=() for
+    /// typed tables.
+    Table& operator=(const Table&);
 
     /// Used when the lifetime of a table is managed by reference
     /// counting. The lifetime of free-standing tables allocated on
@@ -431,7 +447,7 @@ private:
 
     void create_columns();
     void cache_columns();
-    void clear_cached_columns();
+    void destroy_column_accessors() TIGHTDB_NOEXCEPT;
 
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please
@@ -481,15 +497,15 @@ private:
     /// way. This generally happens when a modifying table operation
     /// fails, and also when one transaction is ended and a new one is
     /// started.
-    void invalidate();
+    void invalidate() TIGHTDB_NOEXCEPT;
 
-    /// Detach all cached subtable accessors.
-    void invalidate_subtables();
+    /// Detach all attached subtable accessors.
+    void invalidate_subtables() TIGHTDB_NOEXCEPT;
 
     void bind_ref() const TIGHTDB_NOEXCEPT { ++m_ref_count; }
-    void unbind_ref() const { if (--m_ref_count == 0) delete this; } // FIXME: Cannot be noexcept since ~Table() may throw
+    void unbind_ref() const TIGHTDB_NOEXCEPT { if (--m_ref_count == 0) delete this; }
 
-    struct UnbindGuard;
+    class UnbindGuard;
 
     ColumnType get_real_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
@@ -570,9 +586,12 @@ private:
 
 
 class Table::Parent: public ArrayParent {
+public:
+    ~Parent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+
 protected:
-    /// Must be called whenever a child Table is destroyed.
-    virtual void child_destroyed(std::size_t child_ndx) = 0;
+    /// Must be called whenever a child table accessor is destroyed.
+    virtual void child_accessor_destroyed(std::size_t child_ndx) TIGHTDB_NOEXCEPT = 0;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     virtual std::size_t* record_subtable_path(std::size_t* begin, std::size_t* end) TIGHTDB_NOEXCEPT;
@@ -657,23 +676,51 @@ inline bool Table::has_shared_spec() const
     return !m_top.is_attached();
 }
 
-inline Spec& Table::get_spec()
+inline Spec& Table::get_spec() TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(!has_shared_spec()); // you can only change specs on top-level tables
     return m_spec_set;
 }
 
-inline const Spec& Table::get_spec() const
+inline const Spec& Table::get_spec() const TIGHTDB_NOEXCEPT
 {
     return m_spec_set;
 }
 
-struct Table::UnbindGuard {
-    UnbindGuard(Table* t) TIGHTDB_NOEXCEPT: m_table(t) {}
-    ~UnbindGuard() { if (m_table) m_table->unbind_ref(); } // FIXME: Cannot be noexcept since ~Table() may throw
-    Table* operator->() const { return m_table; }
-    Table* get() const { return m_table; }
-    Table* release() TIGHTDB_NOEXCEPT { Table* t = m_table; m_table = 0; return t; }
+class Table::UnbindGuard {
+public:
+    UnbindGuard(Table* table) TIGHTDB_NOEXCEPT: m_table(table)
+    {
+    }
+
+    ~UnbindGuard() TIGHTDB_NOEXCEPT
+    {
+        if (m_table)
+            m_table->unbind_ref();
+    }
+
+    Table& operator*() const TIGHTDB_NOEXCEPT
+    {
+        return *m_table;
+    }
+
+    Table* operator->() const TIGHTDB_NOEXCEPT
+    {
+        return m_table;
+    }
+
+    Table* get() const TIGHTDB_NOEXCEPT
+    {
+        return m_table;
+    }
+
+    Table* release() TIGHTDB_NOEXCEPT
+    {
+        Table* table = m_table;
+        m_table = 0;
+        return table;
+    }
+
 private:
     Table* m_table;
 };
@@ -738,14 +785,14 @@ inline void Table::set_index(std::size_t column_ndx)
 inline TableRef Table::create(Allocator& alloc)
 {
     ref_type ref = create_empty_table(alloc); // Throws
-    Table* table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
+    Table* table = new Table(RefCountTag(), alloc, ref, 0, 0); // Throws
     return table->get_table_ref();
 }
 
 inline TableRef Table::copy(Allocator& alloc) const
 {
     ref_type ref = clone(alloc); // Throws
-    Table* table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
+    Table* table = new Table(RefCountTag(), alloc, ref, 0, 0); // Throws
     return table->get_table_ref();
 }
 

@@ -61,9 +61,9 @@ public:
 
     virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT { return false; }
 
-    virtual void destroy() = 0;
+    virtual void destroy() TIGHTDB_NOEXCEPT;
 
-    virtual ~ColumnBase() {};
+    virtual ~ColumnBase() TIGHTDB_NOEXCEPT {};
 
     // Indexing
     virtual bool has_index() const TIGHTDB_NOEXCEPT { return false; }
@@ -78,7 +78,7 @@ public:
     /// when the transaction ends.
     virtual void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
-    virtual void invalidate_subtables_virtual() {}
+    virtual void invalidate_subtables_virtual() TIGHTDB_NOEXCEPT {}
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
 
@@ -172,9 +172,7 @@ public:
     explicit Column(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                     Allocator& = Allocator::get_default()); // Throws
     Column(const Column&); // FIXME: Constness violation
-    ~Column();
-
-    void destroy() TIGHTDB_OVERRIDE;
+    ~Column() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     bool IsIntColumn() const TIGHTDB_NOEXCEPT { return true; }
 
@@ -269,6 +267,12 @@ private:
 
 // Implementation:
 
+inline void ColumnBase::destroy() TIGHTDB_NOEXCEPT
+{
+    if (m_array)
+        m_array->destroy();
+}
+
 template<class L, class T>
 std::size_t ColumnBase::lower_bound(const L& list, T value) const TIGHTDB_NOEXCEPT
 {
@@ -341,15 +345,9 @@ inline Column::Column(const Column& column): ColumnBase(column.m_array)
 
 inline Column::Column(Array* root): ColumnBase(root) {}
 
-inline Column::~Column()
+inline Column::~Column() TIGHTDB_NOEXCEPT
 {
     delete m_array;
-}
-
-inline void Column::destroy()
-{
-    if (m_array)
-        m_array->destroy();
 }
 
 inline int64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT

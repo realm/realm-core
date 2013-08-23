@@ -11,11 +11,12 @@ void ColumnSubtableParent::update_from_parent(size_t old_baseline) TIGHTDB_NOEXC
     m_subtable_map.update_from_parent(old_baseline);
 }
 
-void ColumnSubtableParent::child_destroyed(size_t subtable_ndx)
+void ColumnSubtableParent::child_accessor_destroyed(size_t subtable_ndx) TIGHTDB_NOEXCEPT
 {
     m_subtable_map.remove(subtable_ndx);
     // Note that this column instance may be destroyed upon return
-    // from Table::unbind_ref().
+    // from Table::unbind_ref(), i.e., a so-called suicide is
+    // possible.
     if (m_table && m_subtable_map.empty())
         m_table->unbind_ref();
 }

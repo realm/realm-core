@@ -53,28 +53,15 @@ AdaptiveStringColumn::AdaptiveStringColumn(ref_type ref, ArrayParent* parent, si
     }
 }
 
-AdaptiveStringColumn::~AdaptiveStringColumn()
+AdaptiveStringColumn::~AdaptiveStringColumn() TIGHTDB_NOEXCEPT
 {
     delete m_array;
-    if (m_index)
-        delete m_index;
+    delete m_index;
 }
 
-void AdaptiveStringColumn::destroy()
+void AdaptiveStringColumn::destroy() TIGHTDB_NOEXCEPT
 {
-    if (root_is_leaf()) {
-        bool long_strings = m_array->has_refs();
-        if (long_strings) {
-            static_cast<ArrayStringLong*>(m_array)->destroy();
-        }
-        else {
-            static_cast<ArrayString*>(m_array)->destroy();
-        }
-    }
-    else {
-        m_array->destroy();
-    }
-
+    ColumnBase::destroy();
     if (m_index)
         m_index->destroy();
 }

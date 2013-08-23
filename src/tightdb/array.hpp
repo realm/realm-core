@@ -182,7 +182,7 @@ public:
 class ArrayParent
 {
 public:
-    virtual ~ArrayParent() {}
+    virtual ~ArrayParent() TIGHTDB_NOEXCEPT {}
 
     // FIXME: Must be protected. Solve problem by having the Array constructor, that creates a new array, call it.
     virtual void update_child_ref(std::size_t child_ndx, ref_type new_ref) = 0;
@@ -315,7 +315,7 @@ public:
     struct no_prealloc_tag {};
     explicit Array(no_prealloc_tag) TIGHTDB_NOEXCEPT;
 
-    virtual ~Array() TIGHTDB_NOEXCEPT {}
+    ~Array() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     /// Create a new empty array of the specified type and attach to
     /// it. This does not modify the parent reference information.
@@ -361,7 +361,7 @@ public:
     /// ref to the new array.
     ref_type clone(Allocator&) const;
 
-    void move_assign(Array&); // Move semantics for assignment
+    void move_assign(Array&) TIGHTDB_NOEXCEPT; // Move semantics for assignment
 
     /// Construct an empty array of the specified type and return just
     /// the reference to the underlying memory.
@@ -407,6 +407,9 @@ public:
     /// Erase the element at the specified index, and move elements at
     /// succeeding indexes to the next lower index.
     ///
+    /// Is guaranteed not to throw if
+    /// get_alloc().is_read_only(get_ref()) returns false.
+    ///
     /// FIXME: Carefull with this one. It does not destroy/deallocate
     /// subarrays as clear() does. This difference is surprising and
     /// highly counterintuitive.
@@ -414,6 +417,9 @@ public:
 
     /// Erase every element in this array. Subarrays will be destroyed
     /// recursively, and space allocated for subarrays will be freed.
+    ///
+    /// Is guaranteed not to throw if
+    /// get_alloc().is_read_only(get_ref()) returns false.
     void clear();
 
     /// If neccessary, expand the representation so that it can store
@@ -511,9 +517,11 @@ public:
     /// transition to the detached state (as if calling detach()),
     /// then free the allocated memory. For an unattached accessor,
     /// this function has no effect (idempotency).
-    void destroy();
+    void destroy() TIGHTDB_NOEXCEPT;
 
-    static void destroy(ref_type, Allocator&);
+    static void destroy(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
+
+    class DestroyGuard;
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_alloc; }
 
@@ -697,7 +705,6 @@ public:
     static WidthType get_wtype_from_header(const char*) TIGHTDB_NOEXCEPT;
     static int get_width_from_header(const char*) TIGHTDB_NOEXCEPT;
     static std::size_t get_size_from_header(const char*) TIGHTDB_NOEXCEPT;
-    static std::size_t get_capacity_from_header(const char*) TIGHTDB_NOEXCEPT;
 
     static Type get_type_from_header(const char*) TIGHTDB_NOEXCEPT;
 
@@ -816,6 +823,8 @@ protected:
     /// Same as get_byte_size().
     static std::size_t get_byte_size_from_header(const char*) TIGHTDB_NOEXCEPT;
 
+    static std::size_t get_capacity_from_header(const char*) TIGHTDB_NOEXCEPT;
+
     /// Get the maximum number of bytes that can be written by a
     /// non-recursive invocation of write() on an array with the
     /// specified number of elements, that is, the maxumum value that
@@ -825,7 +834,7 @@ protected:
     void update_child_ref(std::size_t child_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
     ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void destroy_children();
+    void destroy_children() TIGHTDB_NOEXCEPT;
 
 // FIXME: below should be moved to a specific IntegerArray class
 protected:
@@ -1121,13 +1130,13 @@ inline bool Array::is_index_node(ref_type ref, const Allocator& alloc)
     return get_indexflag_from_header(alloc.translate(ref));
 }
 
-inline void Array::destroy()
+inline void Array::destroy() TIGHTDB_NOEXCEPT
 {
     if (!is_attached())
         return;
 
     if (m_hasRefs)
-        destroy_children(); // Throws
+        destroy_children();
 
     char* header = get_header_from_data(m_data);
     m_alloc.free_(m_ref, header);
@@ -1141,7 +1150,7 @@ inline void Array::clear()
     copy_on_write(); // Throws
 
     if (m_hasRefs)
-        destroy_children(); // Throws
+        destroy_children();
 
     // Truncate size to zero (but keep capacity)
     m_size = 0;
@@ -1153,12 +1162,42 @@ inline void Array::clear()
     set_header_width(0);
 }
 
-inline void Array::destroy(ref_type ref, Allocator& alloc)
+inline void Array::destroy(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
     Array array(alloc);
     array.init_from_ref(ref);
     array.destroy();
 }
+
+
+class Array::DestroyGuard {
+public:
+    DestroyGuard(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT: m_ref(ref), m_alloc(alloc)
+    {
+    }
+
+    ~DestroyGuard() TIGHTDB_NOEXCEPT
+    {
+        if (m_ref)
+            destroy(m_ref, m_alloc);
+    }
+
+    ref_type get() const TIGHTDB_NOEXCEPT
+    {
+        return m_ref;
+    }
+
+    ref_type release() TIGHTDB_NOEXCEPT
+    {
+        ref_type ref = m_ref;
+        m_ref = 0;
+        return ref;
+    }
+
+private:
+    ref_type m_ref;
+    Allocator& m_alloc;
+};
 
 
 
@@ -1506,9 +1545,10 @@ inline ref_type Array::clone(Allocator& clone_alloc) const
     return clone(header, m_alloc, clone_alloc); // Throws
 }
 
-inline void Array::move_assign(Array& a)
+inline void Array::move_assign(Array& a) TIGHTDB_NOEXCEPT
 {
-    // FIXME: Be carefull with the old parent info here. Should it be copied?
+    // FIXME: Be carefull with the old parent info here. Should it be
+    // copied?
 
     // FIXME: It will likely be a lot better for the optimizer if we
     // did a member-wise copy, rather than recreating the state from

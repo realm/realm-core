@@ -25,7 +25,7 @@ void GroupWriter::set_versions(size_t current, size_t read_lock)
 
 size_t GroupWriter::commit(bool do_sync)
 {
-    merge_free_space();
+    merge_free_space(); // Throws
 
     Array& top        = m_group.m_top;
     Array& fpositions = m_group.m_free_positions;
@@ -42,8 +42,8 @@ size_t GroupWriter::commit(bool do_sync)
     // during the current transaction (or since the last commit), as
     // that would lead to clobbering of the previous database version.
     bool recurse = true, persist = true;
-    size_t names_pos  = m_group.m_table_names.write(*this, recurse, persist);
-    size_t tables_pos = m_group.m_tables.write(*this, recurse, persist);
+    size_t names_pos  = m_group.m_table_names.write(*this, recurse, persist); // Throws
+    size_t tables_pos = m_group.m_tables.write(*this, recurse, persist); // Throws
 
     // We now have a bit of a chicken-and-egg problem. We need to
     // write the free-lists to the file, but the act of writing them
@@ -61,11 +61,11 @@ size_t GroupWriter::commit(bool do_sync)
     // themselves, we must ensure that the original arrays used by the
     // free-lists are counted as part of the space that was freed
     // during the current transaction.
-    fpositions.copy_on_write();
-    flengths.copy_on_write();
+    fpositions.copy_on_write(); // Throws
+    flengths.copy_on_write(); // Throws
     if (is_shared)
-        fversions.copy_on_write();
-    const SlabAlloc::FreeSpace& new_free_space = m_group.m_alloc.get_free_read_only();
+        fversions.copy_on_write(); // Throws
+    const SlabAlloc::FreeSpace& new_free_space = m_group.m_alloc.get_free_read_only(); // Throws
     max_free_list_size += new_free_space.size();
 
     // The final allocation of free space (i.e., the call to
@@ -83,7 +83,7 @@ size_t GroupWriter::commit(bool do_sync)
     // even if we end up using the maximum size possible, we still do
     // not end up with a zero size free-space chunk as we deduct the
     // actually used size from it.
-    pair<size_t, size_t> reserve = reserve_free_space(max_free_space_needed + 1);
+    pair<size_t, size_t> reserve = reserve_free_space(max_free_space_needed + 1); // Throws
     size_t reserve_ndx  = reserve.first;
     size_t reserve_size = reserve.second;
 
@@ -105,10 +105,10 @@ size_t GroupWriter::commit(bool do_sync)
             // adjacent segments. We can find the correct insert
             // postion by binary search
             size_t ndx = fpositions.lower_bound_int(pos);
-            fpositions.insert(ndx, pos);
-            flengths.insert(ndx, size);
+            fpositions.insert(ndx, pos); // Throws
+            flengths.insert(ndx, size); // Throws
             if (is_shared)
-                fversions.insert(ndx, m_current_version);
+                fversions.insert(ndx, m_current_version); // Throws
             if (ndx <= reserve_ndx)
                 ++reserve_ndx;
         }
@@ -120,7 +120,7 @@ size_t GroupWriter::commit(bool do_sync)
     // reserved chunk,) will not change the byte-size of those arrays.
     size_t reserve_pos = to_size_t(fpositions.get(reserve_ndx));
     TIGHTDB_ASSERT(reserve_size > max_free_space_needed);
-    fpositions.ensure_minimum_width(reserve_pos + max_free_space_needed);
+    fpositions.ensure_minimum_width(reserve_pos + max_free_space_needed); // Throws
 
     // Get final sizes of free-list arrays
     size_t free_positions_size = fpositions.get_byte_size();
@@ -134,12 +134,12 @@ size_t GroupWriter::commit(bool do_sync)
     size_t top_pos            = free_versions_pos  + free_versions_size;
 
     // Update top to point to the calculated positions
-    top.set(0, names_pos);
-    top.set(1, tables_pos);
-    top.set(2, free_positions_pos);
-    top.set(3, free_sizes_pos);
+    top.set(0, names_pos); // Throws
+    top.set(1, tables_pos); // Throws
+    top.set(2, free_positions_pos); // Throws
+    top.set(3, free_sizes_pos); // Throws
     if (is_shared)
-        top.set(4, free_versions_pos);
+        top.set(4, free_versions_pos); // Throws
 
     // Get final sizes
     size_t top_size = top.get_byte_size();
@@ -153,25 +153,25 @@ size_t GroupWriter::commit(bool do_sync)
     // larger value without reallocation.
     size_t rest = reserve_pos + reserve_size - end_pos;
     TIGHTDB_ASSERT(rest > 0);
-    fpositions.set(reserve_ndx, end_pos);
-    flengths.set(reserve_ndx, rest);
+    fpositions.set(reserve_ndx, end_pos); // Throws
+    flengths.set(reserve_ndx, rest); // Throws
 
     // The free-list now have their final form, so we can write them
     // to the file
-    write_at(free_positions_pos, fpositions.get_header(), free_positions_size);
-    write_at(free_sizes_pos, flengths.get_header(), free_sizes_size);
+    write_at(free_positions_pos, fpositions.get_header(), free_positions_size); // Throws
+    write_at(free_sizes_pos, flengths.get_header(), free_sizes_size); // Throws
     if (is_shared)
-        write_at(free_versions_pos, fversions.get_header(), free_versions_size);
+        write_at(free_versions_pos, fversions.get_header(), free_versions_size); // Throws
 
     // Write top
-    write_at(top_pos, top.get_header(), top_size);
+    write_at(top_pos, top.get_header(), top_size); // Throws
 
     // In swap-only mode, we just use the file as backing for the shared
     // memory. So we never actually flush the data to disk (the OS may do
     // so for swapping though). Note that this means that the file on disk
     // may very likely be in an invalid state.
     if (do_sync)
-        sync(top_pos);
+        sync(top_pos); // Throws
 
     // Return top_pos so that it can be saved in lock file used
     // for coordination

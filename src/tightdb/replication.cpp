@@ -147,7 +147,7 @@ private:
     const char* m_input_begin;
     const char* m_input_end;
     TableRef m_table;
-    Buffer<Spec*> m_subspecs;
+    util::Buffer<Spec*> m_subspecs;
     size_t m_num_subspecs;
     bool m_dirty_spec;
     StringBuffer m_string_buffer;
@@ -314,7 +314,7 @@ void Replication::TransactLogApplier::read_string(StringBuffer& buf)
 void Replication::TransactLogApplier::add_subspec(Spec* spec)
 {
     if (m_num_subspecs == m_subspecs.m_size) {
-        Buffer<Spec*> new_subspecs;
+        util::Buffer<Spec*> new_subspecs;
         size_t new_size = m_subspecs.m_size;
         if (new_size == 0) {
             new_size = 16; // FIXME: Use a small value (1) when compiling in debug mode

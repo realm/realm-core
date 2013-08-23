@@ -48,7 +48,7 @@ namespace {
 
 class ScopedMutexLock {
 public:
-    ScopedMutexLock(pthread_mutex_t* mutex) TIGHTDB_NOEXCEPT : m_mutex(mutex)
+    ScopedMutexLock(pthread_mutex_t* mutex) TIGHTDB_NOEXCEPT: m_mutex(mutex)
     {
         int r = pthread_mutex_lock(m_mutex);
         TIGHTDB_ASSERT(r == 0);
@@ -224,12 +224,16 @@ retry:
 }
 
 
-SharedGroup::~SharedGroup()
+SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 {
     if (!is_attached())
         return;
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
+
+    // FIXME: Throws. Exception must not escape, as that would
+    // terminate the program.
+    m_group.m_alloc.free_all();
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = m_group.get_replication())
@@ -244,7 +248,11 @@ SharedGroup::~SharedGroup()
 
     // FIXME: This upgrading of the lock is not guaranteed to be atomic
     m_file.unlock();
-    if (!m_file.try_lock_exclusive())
+
+    // FIXME: File::try_lock_exclusive() can throw. We cannot allow
+    // the exception to escape, because that would terminate the
+    // program (due to 'noexcept' on the destructor).
+    if (!m_file.try_lock_exclusive()) // Throws
         return;
 
     SharedInfo* info = m_file_map.get_addr();
@@ -253,7 +261,10 @@ SharedGroup::~SharedGroup()
     // we can delete it when done.
     if (info->flags == durability_MemOnly) {
         size_t path_len = m_file_path.size()-5; // remove ".lock"
-        string db_path = m_file_path.substr(0, path_len);
+        // FIXME: Find a way to avoid the possible exception from
+        // m_file_path.substr(). Currently, if it throws, the program
+        // will be terminated due to 'noexcept' on ~SharedGroup().
+        string db_path = m_file_path.substr(0, path_len); // Throws
         remove(db_path.c_str());
     }
 
@@ -301,7 +312,6 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 const Group& SharedGroup::begin_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-    TIGHTDB_ASSERT(m_group.m_alloc.is_all_free());
 
     ref_type new_top_ref = 0;
     size_t new_file_size = 0;
@@ -321,7 +331,7 @@ const Group& SharedGroup::begin_read()
 
         // Update reader list
         if (ringbuf_is_empty()) {
-            ReadCount r2 = {info->current_version, 1};
+            ReadCount r2 = { info->current_version, 1 };
             ringbuf_put(r2);
         }
         else {
@@ -330,7 +340,7 @@ const Group& SharedGroup::begin_read()
                 ++r.count;
             }
             else {
-                ReadCount r2 = {info->current_version, 1};
+                ReadCount r2 = { info->current_version, 1 };
                 ringbuf_put(r2);
             }
         }
@@ -349,7 +359,7 @@ const Group& SharedGroup::begin_read()
 }
 
 
-void SharedGroup::end_read()
+void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
@@ -366,15 +376,14 @@ void SharedGroup::end_read()
 
         // Find entry for current version
         size_t ndx = ringbuf_find(uint32_t(m_version));
-        TIGHTDB_ASSERT(ndx != size_t(-1));
+        TIGHTDB_ASSERT(ndx != not_found);
         ReadCount& r = ringbuf_get(ndx);
 
         // Decrement count and remove as many entries as possible
         if (r.count == 1 && ringbuf_is_first(ndx)) {
             ringbuf_remove_first();
-            while (!ringbuf_is_empty() && ringbuf_get_first().count == 0) {
+            while (!ringbuf_is_empty() && ringbuf_get_first().count == 0)
                 ringbuf_remove_first();
-            }
         }
         else {
             TIGHTDB_ASSERT(r.count > 0);
@@ -394,7 +403,6 @@ void SharedGroup::end_read()
 Group& SharedGroup::begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-    TIGHTDB_ASSERT(m_group.m_alloc.is_all_free());
 
     SharedInfo* info = m_file_map.get_addr();
 
@@ -465,9 +473,11 @@ void SharedGroup::commit()
 // returns to the caller by throwing an exception. As it is right now,
 // rollback() does not handle all cases.
 //
-// FIXME: This function must be modified is such a way that it can be
-// guaranteed that it never throws. There are two problems to be delat with. Group::invalidate() calls Group::clear_cache()
-void SharedGroup::rollback()
+// FIXME: This function must be modified in such a way that it can be
+// guaranteed that it never throws. There are two problems to be dealt
+// with. Group::invalidate() calls Group::clear_cache() and
+// SlabAlloc::free_all().
+void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 

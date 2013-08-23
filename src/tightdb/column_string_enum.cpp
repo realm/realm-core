@@ -20,19 +20,19 @@ ColumnStringEnum::ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* 
                                    size_t ndx_in_parent, Allocator& alloc):
     Column(values, parent, ndx_in_parent+1, alloc), // Throws
     m_keys(keys,   parent, ndx_in_parent,   alloc), // Throws
-    m_index(0) {}
-
-ColumnStringEnum::~ColumnStringEnum()
+    m_index(0)
 {
-    if (m_index)
-        delete m_index;
 }
 
-void ColumnStringEnum::destroy()
+ColumnStringEnum::~ColumnStringEnum() TIGHTDB_NOEXCEPT
+{
+    delete m_index;
+}
+
+void ColumnStringEnum::destroy() TIGHTDB_NOEXCEPT
 {
     m_keys.destroy();
     Column::destroy();
-
     if (m_index)
         m_index->destroy();
 }

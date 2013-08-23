@@ -33,8 +33,8 @@ public:
 
     ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* = 0,
                      std::size_t ndx_in_parent = 0, Allocator& = Allocator::get_default());
-    ~ColumnStringEnum();
-    void destroy() TIGHTDB_OVERRIDE;
+    ~ColumnStringEnum() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void destroy() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add(StringData value);

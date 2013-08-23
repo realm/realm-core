@@ -205,7 +205,7 @@ void Array::set_parent(ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCE
 }
 
 
-void Array::destroy_children()
+void Array::destroy_children() TIGHTDB_NOEXCEPT
 {
     for (size_t i = 0; i < m_size; ++i) {
         int64_t v = get(i);

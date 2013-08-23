@@ -4,7 +4,7 @@ using namespace std;
 using namespace tightdb;
 
 
-ColumnMixed::~ColumnMixed()
+ColumnMixed::~ColumnMixed() TIGHTDB_NOEXCEPT
 {
     delete m_types;
     delete m_refs;
@@ -12,11 +12,6 @@ ColumnMixed::~ColumnMixed()
     delete m_array;
 }
 
-void ColumnMixed::destroy()
-{
-    if (m_array != 0)
-        m_array->destroy();
-}
 
 void ColumnMixed::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {

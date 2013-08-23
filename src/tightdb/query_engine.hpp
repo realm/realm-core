@@ -164,30 +164,32 @@ template<> struct ColumnTypeTraitsSum<float, act_Sum> {
 };
 
 // Lets you access elements of an integer column in increasing order in a fast way where leafs are cached
-struct SequentialGetterBase { virtual ~SequentialGetterBase() {} };
+struct SequentialGetterBase {
+    virtual ~SequentialGetterBase() TIGHTDB_NOEXCEPT {}
+};
 
 template<class T>class SequentialGetter : public SequentialGetterBase {
 public:
     typedef typename ColumnTypeTraits<T>::column_type ColType;
     typedef typename ColumnTypeTraits<T>::array_type ArrayType;
 
-    SequentialGetter() : m_array((Array::no_prealloc_tag()))
-    {
-    }
+    SequentialGetter(): m_array((Array::no_prealloc_tag())) {}
 
-    SequentialGetter(const Table& table, size_t column_ndx) : m_array((Array::no_prealloc_tag()))
+    SequentialGetter(const Table& table, size_t column_ndx): m_array((Array::no_prealloc_tag()))
     {
         if (column_ndx != not_found)
             m_column = static_cast<const ColType*>(&table.get_column_base(column_ndx));
         m_leaf_end = 0;
     }
 
-    SequentialGetter(const ColType* column) : m_array((Array::no_prealloc_tag()))
+    SequentialGetter(const ColType* column): m_array((Array::no_prealloc_tag()))
     {
         init(column);
     }
 
-    void init (const ColType* column)
+    ~SequentialGetter() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+
+    void init(const ColType* column)
     {
         m_column = column;
         m_leaf_end = 0;
@@ -290,7 +292,7 @@ public:
     }
 
 
-    virtual ~ParentNode() {}
+    virtual ~ParentNode() TIGHTDB_NOEXCEPT {}
 
     virtual void init(const Table& table)
     {
@@ -480,6 +482,7 @@ protected:
 class ArrayNode: public ParentNode {
 public:
     ArrayNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.size()) {m_child = 0; m_dT = 0.0;}
+    ~ArrayNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     void init(const Table& table)
     {
@@ -517,6 +520,7 @@ class SubtableNode: public ParentNode {
 public:
     SubtableNode(size_t column): m_column(column) {m_child = 0; m_child2 = 0; m_dT = 100.0;}
     SubtableNode() {};
+    ~SubtableNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
     void init(const Table& table)
     {
         m_dD = 10.0;
@@ -579,6 +583,7 @@ public:
         m_probes = 0;
         m_matches = 0;
     }
+    ~IntegerNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     // Only purpose of this function is to let you quickly create a IntegerNode object and call aggregate_local() on it to aggregate
     // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
@@ -840,7 +845,7 @@ public:
         m_lcase = lower;
     }
 
-    ~StringNode()
+    ~StringNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         delete[] m_value.data();
         delete[] m_ucase;
@@ -924,6 +929,7 @@ public:
         m_child = 0;
         m_dT = 1.0;
     }
+    ~BasicNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     // Only purpose of this function is to let you quickly create a IntegerNode object and call aggregate_local() on it to aggregate
     // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
@@ -981,7 +987,7 @@ public:
         m_value = BinaryData(data, v.size());
     }
 
-    ~BinaryNode()
+    ~BinaryNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         delete[] m_value.data();
     }
@@ -1040,7 +1046,7 @@ public:
         m_index_matches = 0;
         m_index_matches_destroy = false;
     }
-    ~StringNode()
+    ~StringNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         deallocate();
         delete[] m_value.data();
@@ -1048,7 +1054,7 @@ public:
         m_index.destroy();
     }
 
-    void deallocate()
+    void deallocate() TIGHTDB_NOEXCEPT
     {
         // Must be called after each query execution too free temporary resources used by the execution. Run in
         // destructor, but also in Init because a user could define a query once and execute it multiple times.
@@ -1237,7 +1243,8 @@ public:
         return 0;
     }
 
-    OrNode(ParentNode* p1) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL; m_dT = 50.0;};
+    OrNode(ParentNode* p1) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL; m_dT = 50.0;}
+    ~OrNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     void init(const Table& table)
     {
@@ -1328,7 +1335,7 @@ public:
         m_child = 0;
     }
 
-    ~TwoColumnsNode()
+    ~TwoColumnsNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         delete[] m_value.data();
     }

@@ -203,12 +203,6 @@ void Group::init_from_ref(ref_type top_ref)
         if (m_is_shared && top_size > 4)
             m_free_versions.init_from_ref(m_top.get_as_ref(4));
     }
-
-    // Make room for pointers to cached tables
-    size_t n = m_tables.size();
-    for (size_t i = 0; i < n; ++i) {
-        m_cached_tables.add(0); // Throws
-    }
 }
 
 
@@ -251,24 +245,35 @@ void Group::init_shared()
 }
 
 
-Group::~Group()
+Group::~Group() TIGHTDB_NOEXCEPT
 {
-    if (m_top.is_attached()) {
-        clear_cache();
+    if (!m_top.is_attached())
+        return;
 
-        // Recursively deletes entire tree
-        m_top.destroy();
-    }
+    destroy_table_accessors();
 
-    m_cached_tables.destroy();
+    // Recursively deletes entire tree
+    m_top.destroy();
 }
 
 
-void Group::invalidate()
+void Group::destroy_table_accessors() TIGHTDB_NOEXCEPT
 {
-    // TODO: Should only invalidate object wrappers and never touch
-    // the underlying data (that may no longer be valid)
-    clear_cache();
+    typedef table_accessors::const_iterator iter;
+    iter end = m_table_accessors.end();
+    for (iter i = m_table_accessors.begin(); i != end; ++i) {
+        if (Table* t = *i) {
+            t->invalidate();
+            t->unbind_ref();
+        }
+    }
+}
+
+
+void Group::invalidate() TIGHTDB_NOEXCEPT
+{
+    destroy_table_accessors();
+    m_table_accessors.clear();
 
     m_top.detach();
     m_tables.detach();
@@ -276,52 +281,77 @@ void Group::invalidate()
     m_free_positions.detach();
     m_free_lengths.detach();
     m_free_versions.detach();
-
-    // Reads may allocate some temproary state that we have
-    // to clean up
-    m_alloc.free_all();
 }
 
 
-Table* Group::get_table_ptr(size_t ndx)
+Table* Group::get_table_by_ndx(size_t ndx)
 {
     TIGHTDB_ASSERT(m_top.is_attached());
     TIGHTDB_ASSERT(ndx < m_tables.size());
 
+    if (m_table_accessors.empty())
+        m_table_accessors.resize(m_tables.size()); // Throws
+
+    TIGHTDB_ASSERT(m_table_accessors.size() == m_tables.size());
+
     // Get table from cache if exists, else create
-    Table* table = reinterpret_cast<Table*>(m_cached_tables.get(ndx));
+    Table* table = m_table_accessors[ndx];
     if (!table) {
-        const size_t ref = m_tables.get_as_ref(ndx);
-        Table::UnbindGuard t(new Table(Table::RefCountTag(), m_alloc, ref, this, ndx)); // Throws
-        t->bind_ref(); // Increase reference count to 1
-        m_cached_tables.set(ndx, intptr_t(t.get())); // FIXME: intptr_t is not guaranteed to exists, even in C++11
-        // This group shares ownership of the table, so leave
-        // reference count at 1.
-        table = t.release();
+        ref_type ref = m_tables.get_as_ref(ndx);
+        table = new Table(Table::RefCountTag(), m_alloc, ref, this, ndx); // Throws
+        m_table_accessors[ndx] = table;
+        table->bind_ref(); // Increase reference count from 0 to 1
     }
     return table;
 }
 
 
-Table* Group::create_new_table(StringData name)
+Table* Group::create_new_table(StringData name, SpecSetter spec_setter)
 {
-    ref_type ref = Table::create_empty_table(m_alloc); // Throws
-    m_tables.add(ref);
-    m_table_names.add(name);
-    Table::UnbindGuard table(new Table(Table::RefCountTag(), m_alloc,
-                                       ref, this, m_tables.size()-1)); // Throws
-    table->bind_ref(); // Increase reference count to 1
-    m_cached_tables.add(intptr_t(table.get())); // FIXME: intptr_t is not guaranteed to exists, even in C++11
+    // FIXME: This function is exception safe under the assumption
+    // that m_tables.insert() and m_table_names.insert() are exception
+    // safe. Currently, Array::insert() is not exception safe, but it
+    // is expected that it will be in the future. Note that a function
+    // is considered exception safe if it produces no visible
+    // side-effects when it throws, at least not in any way that
+    // matters.
 
+    Array::DestroyGuard ref_dg(Table::create_empty_table(m_alloc), m_alloc); // Throws
+    Table::UnbindGuard table_ug(new Table(Table::RefCountTag(), m_alloc,
+                                          ref_dg.get(), 0, 0)); // Throws
+    table_ug->bind_ref(); // Increase reference count from 0 to 1
+    if (spec_setter)
+        (*spec_setter)(*table_ug); // Throws
+
+    size_t ndx = m_tables.size();
+    m_table_accessors.resize(ndx+1); // Throws
+
+    TIGHTDB_ASSERT(ndx == m_table_names.size());
+    m_tables.insert(ndx, ref_dg.get()); // Throws
+    try {
+        m_table_names.insert(ndx, name); // Throws
+        try {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    Replication* repl = m_alloc.get_replication();
-    if (repl)
-        repl->new_top_level_table(name); // Throws
+            if (Replication* repl = m_alloc.get_replication())
+                repl->new_top_level_table(name); // Throws
 #endif
 
-    // This group shares ownership of the table, so leave reference
-    // count at 1.
-    return table.release();
+            // The rest is guaranteed not to throw
+            Table* table = table_ug.release();
+            ref_dg.release();
+            table->m_top.set_parent(this, ndx);
+            m_table_accessors[ndx] = table;
+            return table;
+        }
+        catch (...) {
+            m_table_names.erase(ndx); // Guaranteed not to throw
+            throw;
+        }
+    }
+    catch (...) {
+        m_tables.erase(ndx); // Guaranteed not to throw
+        throw;
+    }
 }
 
 
@@ -360,7 +390,7 @@ void Group::commit()
     // created by Group::write() do not have free-space tracking
     // information.
     if (m_free_positions.is_attached()) {
-        TIGHTDB_ASSERT(m_top.size() == 4 || m_top.size() == 5);
+        TIGHTDB_ASSERT(m_top.size() >= 4);
         if (m_top.size() > 4) {
             // Delete free-list version information
             Array::destroy(m_top.get_as_ref(4), m_top.get_alloc());
@@ -416,7 +446,7 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline)
 
     // After Group::commit() we will always have free space tracking
     // info.
-    TIGHTDB_ASSERT(m_top.size() == 4 || m_top.size() == 5);
+    TIGHTDB_ASSERT(m_top.size() >= 4);
 
     // Array nodes that a part of the previous version of the database
     // will not be overwritte by Group::commit(). This is necessary
@@ -442,12 +472,11 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline)
 
     // Update all attached table accessors including those attached to
     // subtables.
-    size_t n = m_cached_tables.size();
-    for (size_t i = 0; i < n; ++i) {
-        Table* t = reinterpret_cast<Table*>(m_cached_tables.get(i));
-        if (t) {
-            t->update_from_parent(old_baseline);
-        }
+    typedef table_accessors::const_iterator iter;
+    iter end = m_table_accessors.end();
+    for (iter i = m_table_accessors.begin(); i != end; ++i) {
+        if (Table* table = *i)
+            table->update_from_parent(old_baseline);
     }
 }
 
@@ -456,6 +485,10 @@ void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size)
 {
     TIGHTDB_ASSERT(new_top_ref < new_file_size);
     TIGHTDB_ASSERT(!m_top.is_attached());
+
+    // Make all managed memory beyond the attached file available
+    // again.
+    m_alloc.free_all();
 
     // Update memory mapping if database file has grown
     TIGHTDB_ASSERT(new_file_size >= m_alloc.get_baseline());
@@ -470,10 +503,10 @@ void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size)
         m_free_versions.create(Array::type_Normal);
         m_top.add(m_free_versions.get_ref());
         m_free_versions.add(0);
-        return;
     }
-
-    init_from_ref(new_top_ref); // Throws
+    else {
+        init_from_ref(new_top_ref); // Throws
+    }
 }
 
 
@@ -483,8 +516,8 @@ bool Group::operator==(const Group& g) const
     if (n != g.size())
         return false;
     for (size_t i=0; i<n; ++i) {
-        const Table* t1 = get_table_ptr(i);
-        const Table* t2 = g.get_table_ptr(i);
+        const Table* t1 = get_table_by_ndx(i);
+        const Table* t2 = g.get_table_by_ndx(i);
         if (*t1 != *t2)
             return false;
     }
@@ -501,9 +534,8 @@ void Group::to_string(ostream& out) const
     size_t count = size();
     for (size_t i = 0; i < count; ++i) {
         StringData name = get_table_name(i);
-        if (name_width < name.size()) {
+        if (name_width < name.size())
             name_width = name.size();
-        }
 
         ConstTableRef table = get_table(name);
         size_t row_count = table->size();
@@ -583,7 +615,7 @@ void Group::Verify() const
     {
         size_t n = m_tables.size();
         for (size_t i = 0; i < n; ++i)
-            get_table_ptr(i)->Verify();
+            get_table_by_ndx(i)->Verify();
     }
 }
 
@@ -640,7 +672,7 @@ void Group::to_dot(ostream& out) const
 
     // Tables
     for (size_t i = 0; i < m_tables.size(); ++i) {
-        const Table* table = get_table_ptr(i);
+        const Table* table = get_table_by_ndx(i);
         StringData name = get_table_name(i);
         table->to_dot(out, name);
     }
