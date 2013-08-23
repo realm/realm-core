@@ -92,7 +92,7 @@ void spawn_daemon(const string& file)
 
         // close all descriptors:
         int i;
-        for (i=m;i>=0;--i) close(i); 
+        for (i=m-1;i>=0;--i) close(i); 
         i=::open("/dev/null",O_RDWR);
         i=::open((file+".log").c_str(),O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
         i = dup(i); static_cast<void>(i);
@@ -227,6 +227,7 @@ void SharedGroup::open(const string& file, bool no_create_file,
 #endif
             if (pthread_mutex_init(&info->writemutex, &mattr))
                 throw runtime_error("mutex_init failed");
+            printf("writemutex resident at %p\n", &info->writemutex);
             pthread_mutexattr_destroy(&mattr);
 
             SlabAlloc& alloc = m_group.get_allocator();
@@ -424,6 +425,7 @@ void SharedGroup::do_async_commits()
             // Being the backend process, we own the lock file, so we
             // have to clean up when we shut down.
             pthread_mutex_destroy(&info->readmutex);
+            printf("write-mutex resident at %p\n", &info->writemutex);
             pthread_mutex_destroy(&info->writemutex);
             remove(m_file_path.c_str());
             printf("Daemon exiting nicely\n");

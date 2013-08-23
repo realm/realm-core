@@ -1,0 +1,57 @@
+{
+   <insert_a_suppression_name_here>
+   drd:ConflictingAccess
+   fun:_ZN7tightdb5_impl6AddColIlLi0EE4execEPNS_4SpecEPKNS_10StringDataE
+   ...
+   obj:/usr/lib/valgrind/vgpreload_drd-amd64-linux.so
+   fun:start_thread
+   fun:clone
+}
+{
+   <insert_a_suppression_name_here>
+   drd:ConflictingAccess
+   fun:_ZN7tightdb5_impl6AddColIlLi1EE4execEPNS_4SpecEPKNS_10StringDataE
+   ...
+   obj:/usr/lib/valgrind/vgpreload_drd-amd64-linux.so
+   fun:start_thread
+   fun:clone
+}
+{
+   <insert_a_suppression_name_here>
+   drd:ConflictingAccess
+   fun:open
+   ...
+   obj:/usr/lib/valgrind/vgpreload_drd-amd64-linux.so
+   fun:start_thread
+   fun:clone
+}
+{
+   <insert_a_suppression_name_here>
+   drd:ConflictingAccess
+   fun:close
+   ...
+   obj:/usr/lib/valgrind/vgpreload_drd-amd64-linux.so
+   fun:start_thread
+   fun:clone
+}
+{
+   <insert_a_suppression_name_here>
+   drd:ConflictingAccess
+   fun:waitpid
+   fun:_Z12spawn_daemonRKSs
+   ...
+   obj:/usr/lib/valgrind/vgpreload_drd-amd64-linux.so
+   fun:start_thread
+   fun:clone
+}
+{
+   <insert_a_suppression_name_here>
+   drd:ConflictingAccess
+   fun:__reclaim_stacks
+   fun:fork
+   fun:_Z12spawn_daemonRKSs
+   ...
+   obj:/usr/lib/valgrind/vgpreload_drd-amd64-linux.so
+   fun:start_thread
+   fun:clone
+}

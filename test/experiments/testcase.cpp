@@ -46,10 +46,10 @@ void* IncrementEntry(void* arg)
     {
         const size_t row_ndx = (size_t)arg;
 
-/*
         // Open shared db
         SharedGroup sg("test_shared.tightdb", 
-                       false, SharedGroup::durability_Async);
+                       false, SharedGroup::durability_Async );
+/*
         for (size_t i = 0; i < 100; ++i) {
 
             // Increment cell
@@ -84,7 +84,6 @@ void* IncrementEntry(void* arg)
         printf("Thread exiting due to runtime exception\n");
         printf("what(): %s\n", e.what());
         sleep(1);
-        exit(1);
     } catch (...) {
         printf("Thread exiting for unknown reason\n");
         printf("\n");
