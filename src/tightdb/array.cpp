@@ -5,9 +5,9 @@
 #include <iomanip>
 
 #ifdef _MSC_VER
-    #include <intrin.h>
-    #include <win32/types.h>
-    #pragma warning (disable : 4127) // Condition is constant warning
+#  include <intrin.h>
+#  include <win32/types.h>
+#  pragma warning (disable : 4127) // Condition is constant warning
 #endif
 
 #include <tightdb/terminate.hpp>
@@ -146,16 +146,9 @@ void Array::CreateFromHeaderDirect(char* header, ref_type ref) TIGHTDB_NOEXCEPT
 
 void Array::set_type(Type type)
 {
-    // If we are reviving an invalidated array
-    // we need to reset state first
-    if (!m_data) {
-        m_ref = 0;
-        m_capacity = 0;
-        m_size = 0;
-        m_width = size_t(-1);
-    }
+    TIGHTDB_ASSERT(is_attached());
 
-    if (m_ref) copy_on_write(); // Throws
+    copy_on_write(); // Throws
 
     bool is_leaf = false, has_refs = false;
     switch (type) {
@@ -165,21 +158,14 @@ void Array::set_type(Type type)
     }
     m_isNode  = !is_leaf;
     m_hasRefs = has_refs;
-
-    if (!m_data) {
-        // Create array
-        alloc(0, 0);
-        set_width(0);
-    }
-    else {
-        // Update Header
-        set_header_isleaf(is_leaf);
-        set_header_hasrefs(has_refs);
-    }
+    set_header_isleaf(is_leaf);
+    set_header_hasrefs(has_refs);
 }
 
 bool Array::update_from_parent() TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(is_attached());
+
     if (!m_parent) return false;
 
     // After commit to disk, the array may have moved
@@ -190,15 +176,17 @@ bool Array::update_from_parent() TIGHTDB_NOEXCEPT
         init_from_ref(new_ref);
         return true;
     }
-    else {
-        // If the file has been remapped it might have
-        // moved to a new location
-        char* header = m_alloc.translate(m_ref);
-        char* data = get_data_from_header(header);
-        if (m_data != data) {
-            m_data = data;
-            return true;
-        }
+
+    // FIXME: This early-out option is wrong. Equal 'refs' does in no
+    // way guarantee that the array has not been modified.
+
+    // If the file has been remapped it might have
+    // moved to a new location
+    char* header = m_alloc.translate(m_ref);
+    char* data = get_data_from_header(header);
+    if (m_data != data) {
+        m_data = data;
+        return true;
     }
 
     return false; // not modified
@@ -1128,7 +1116,8 @@ size_t Array::GetByteSize(bool align) const
     size_t size = CalcByteLen(m_size, m_width);
     if (align) {
         size_t rest = (~size & 0x7) + 1;
-        if (rest < 8) size += rest; // 64bit blocks
+        if (rest < 8)
+            size += rest; // 64-bit blocks
     }
     return size;
 }
@@ -1220,12 +1209,14 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
 
 void Array::copy_on_write()
 {
-    if (!m_alloc.is_read_only(m_ref)) return;
+    if (!m_alloc.is_read_only(m_ref))
+        return;
 
     // Calculate size in bytes (plus a bit of matchcount room for expansion)
     size_t size = CalcByteLen(m_size, m_width);
     size_t rest = (~size & 0x7)+1;
-    if (rest < 8) size += rest; // 64bit blocks
+    if (rest < 8)
+        size += rest; // 64bit blocks
     size_t new_size = size + 64;
 
     // Create new copy of array
@@ -1245,7 +1236,7 @@ void Array::copy_on_write()
     // Update capacity in header
     set_header_capacity(new_size); // uses m_data to find header, so m_data must be initialized correctly first
 
-    update_ref_in_parent();
+    update_parent();
 
     // Mark original as deleted, so that the space can be reclaimed in
     // future commits, when no versions are using it anymore
@@ -1314,7 +1305,7 @@ void Array::alloc(size_t size, size_t width)
             m_capacity = CalcItemCount(capacity_bytes, width);
             // FIXME: Trouble when this one throws. We will then leave
             // this array instance in a corrupt state
-            update_ref_in_parent();
+            update_parent();
             return;
         }
 
@@ -1745,8 +1736,8 @@ ref_type Array::insert_btree_child(Array& offsets, Array& refs, size_t orig_chil
     // Split parent node
     Allocator& alloc = refs.get_alloc();
     Array new_refs(alloc), new_offsets(alloc);
-    new_refs.set_type(type_HasRefs);
-    new_offsets.set_type(type_Normal);
+    new_refs.create(type_HasRefs);
+    new_offsets.create(type_Normal);
     size_t new_split_offset, new_split_size;
     if (insert_ndx == TIGHTDB_MAX_LIST_SIZE) {
         new_split_offset = elem_ndx_offset + state.m_split_offset;
@@ -1775,7 +1766,7 @@ ref_type Array::insert_btree_child(Array& offsets, Array& refs, size_t orig_chil
     state.m_split_size   = new_split_size;
 
     Array new_node(alloc);
-    new_node.set_type(type_InnerColumnNode);
+    new_node.create(type_InnerColumnNode);
     new_node.add(new_offsets.get_ref());
     new_node.add(new_refs.get_ref());
     return new_node.get_ref();
@@ -1786,15 +1777,16 @@ ref_type Array::btree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& sta
 {
     size_t leaf_size = size();
     TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_LIST_SIZE);
-    if (leaf_size < ndx) ndx = leaf_size;
+    if (leaf_size < ndx)
+        ndx = leaf_size;
     if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_LIST_SIZE)) {
         insert(ndx, value);
         return 0; // Leaf was not split
     }
 
     // Split leaf node
-    Array new_leaf(get_alloc());
-    new_leaf.set_type(has_refs() ? type_HasRefs : type_Normal);
+    Array new_leaf(m_alloc);
+    new_leaf.create(has_refs() ? type_HasRefs : type_Normal);
     if (ndx == leaf_size) {
         new_leaf.add(value);
         state.m_split_offset = ndx;
@@ -1814,7 +1806,7 @@ ref_type Array::btree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& sta
 
 #ifdef TIGHTDB_DEBUG
 
-void Array::Print() const
+void Array::print() const
 {
     cout << hex << get_ref() << dec << ": (" << size() << ") ";
     for (size_t i = 0; i < size(); ++i) {
@@ -1826,14 +1818,15 @@ void Array::Print() const
 
 void Array::Verify() const
 {
-    TIGHTDB_ASSERT(!IsValid() || (m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 ||
-                                  m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64));
+    TIGHTDB_ASSERT(!is_attached() ||
+                   (m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 ||
+                    m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64));
 
     // Check that parent is set correctly
     if (!m_parent) return;
 
     ref_type ref_in_parent = m_parent->get_child_ref(m_ndx_in_parent);
-    TIGHTDB_ASSERT(ref_in_parent == (IsValid() ? m_ref : 0));
+    TIGHTDB_ASSERT(ref_in_parent == (is_attached() ? m_ref : 0));
 }
 
 void Array::to_dot(ostream& out, StringData title) const
@@ -1885,7 +1878,7 @@ void Array::to_dot(ostream& out, StringData title) const
     out << endl;
 }
 
-void Array::Stats(MemStats& stats) const
+void Array::stats(MemStats& stats) const
 {
     size_t capacity_bytes = get_capacity_from_header();
     size_t bytes_used     = CalcByteLen(m_size, m_width);
@@ -1900,7 +1893,7 @@ void Array::Stats(MemStats& stats) const
             if (v == 0 || v & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
 
             Array sub(to_ref(v), 0, 0, get_alloc());
-            sub.Stats(stats);
+            sub.stats(stats);
         }
     }
 }

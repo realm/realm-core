@@ -90,11 +90,6 @@ public:
 #endif
 
 private:
-    friend class Array;
-    friend class ColumnBase;
-
-    void update_ref(ref_type ref);
-
     void LeafSet(size_t ndx, T value);
     void LeafDelete(size_t ndx);
 
@@ -114,6 +109,9 @@ private:
 
     template <typename R, Action action, class cond>
     R aggregate(T target, size_t start, size_t end, size_t *matchcount = 0) const;
+
+    friend class Array;
+    friend class ColumnBase;
 };
 
 

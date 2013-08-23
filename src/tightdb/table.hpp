@@ -49,7 +49,7 @@ class StringIndex;
 /// that BasicTable<> is non-polymorphic, has no destructor, and adds
 /// no extra data members.
 ///
-/// FIXME: Table copying (from any group to any group) could be made
+/// FIXME: Table assignment (from any group to any group) could be made
 /// aliasing safe as follows: Start by cloning source table into
 /// target allocator. On success, assign, and then deallocate any
 /// previous structure at the target.
@@ -60,7 +60,7 @@ class StringIndex;
 /// efficient manner.
 ///
 /// FIXME: When compiling in debug mode, all public table methods
-/// should should TIGHTDB_ASSERT(is_valid()).
+/// should TIGHTDB_ASSERT(is_valid()).
 class Table {
 public:
     /// Construct a new freestanding top-level table with static
@@ -477,7 +477,7 @@ private:
     /// started.
     void invalidate();
 
-    /// Invalidate all subtables.
+    /// Detach all cached subtable accessors.
     void invalidate_subtables();
 
     void bind_ref() const TIGHTDB_NOEXCEPT { ++m_ref_count; }
@@ -569,9 +569,6 @@ private:
 
 class Table::Parent: public ArrayParent {
 protected:
-    // ColumnTable must override this method and return true.
-    virtual bool subtables_have_shared_spec() { return false; }
-
     /// Must be called whenever a child Table is destroyed.
     virtual void child_destroyed(std::size_t child_ndx) = 0;
 
@@ -639,16 +636,12 @@ const C& Table::get_column(std::size_t ndx) const TIGHTDB_NOEXCEPT
 
 inline bool Table::has_shared_spec() const
 {
-    const Array& top_array = m_top.IsValid() ? m_top : m_columns;
-    ArrayParent* parent = top_array.get_parent();
-    if (!parent) return false;
-    TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
-    return static_cast<Parent*>(parent)->subtables_have_shared_spec();
+    return !m_top.is_attached();
 }
 
 inline Spec& Table::get_spec()
 {
-    TIGHTDB_ASSERT(m_top.IsValid()); // you can only change specs on top-level tables
+    TIGHTDB_ASSERT(!has_shared_spec()); // you can only change specs on top-level tables
     return m_spec_set;
 }
 
@@ -674,6 +667,12 @@ inline ref_type Table::create_empty_table(Allocator& alloc)
     top.add(Array::create_empty_array(Array::type_HasRefs, alloc)); // Columns
     return top.get_ref();
 }
+
+#ifdef _MSC_VER
+#pragma warning(push)
+// Disable the Microsoft warning about passing "this" as a parameter to another constructor. Here it's safe.
+#pragma warning(disable: 4355)
+#endif
 
 inline Table::Table(Allocator& alloc):
     m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1),
@@ -706,6 +705,11 @@ inline Table::Table(RefCountTag, Allocator& alloc, ref_type spec_ref, ref_type c
 {
     init_from_ref(spec_ref, columns_ref, parent, ndx_in_parent);
 }
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
 
 inline void Table::set_index(std::size_t column_ndx)
 {

@@ -1,5 +1,5 @@
 #
-# C++ reference documentation for TableView class
+# C++ reference documentation for the TableView (dynamic) class.
 #
 
 ID         : class_dyn_tableview
@@ -74,7 +74,9 @@ CATEGORIES :
       NAME     : clear
       SUMMARY  : *g_dyn_table_clear_summary
       DESCR    : &g_dyn_view_clear_descr
-                 This method will remove all rows in a view.
+                 >
+                 This method will remove all rows in a view. This implies that
+                 the rows in the originating table will be removed.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_clear
         DESCR  :
@@ -450,8 +452,13 @@ CATEGORIES :
       NAMES    : [sum, sum_float, sum_double]
       SUMMARY  : &g_dyn_view_sum_summary
                  Calculates the sum.
-      DESCR    : &g_dyn_view_sum_descr
+      DESCR    :
+      - TEXT   : &g_dyn_view_sum_descr
                  Calculates the sum of a column.
+      - TEXT   : >
+                 As the sum of many <code>float</code>
+                 values can be greater than the maximum value of the type, a <code>double</code>
+                 is returned.
       CONST    : True
       SIGNATURE: |
                  int64_t sum(size_t column_ndx) const;
@@ -462,8 +469,9 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : *g_dyn_view_column_index_descr
       RETURN:
-        TYPES  : [int64_t, float, double]
-        DESCR  : The sum.
+        TYPES  : [int64_t, double, double]
+        DESCR  : >
+                 The sum of values of the cells.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_sum
         DESCR  :
@@ -530,6 +538,9 @@ CATEGORIES :
                  The JavaScript Object Notation (<a
                  href="http://json.org">JSON</a>) is useful for
                  web/mobile applications and serialization.
+
+                 A table (and subtables) will be formatted as a array of rows, and row will
+                 be formatted as an object.
       CONST    : true
       PARAMS:
       - NAME   : out
