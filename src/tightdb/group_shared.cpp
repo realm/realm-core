@@ -155,7 +155,7 @@ void spawn_daemon(const string& file)
 //
 // - Possible reinitialization due to temporary unlocking during downgrade of file lock
 
-void SharedGroup::open(const string& file, bool no_create_file,
+void SharedGroup::open(const string& path, bool no_create_file,
                        DurabilityLevel dlevel, bool is_backend)
 {
     TIGHTDB_ASSERT(!is_attached());
@@ -267,7 +267,7 @@ retry:
             // In async mode we need a separate process to do the async commits
             // We start it up here during init so that it only get started once
             if (dlevel == durability_Async) {
-                spawn_daemon(file);
+                spawn_daemon(path);
             }
 
             // Downgrade lock to shared now that it is initialized,
@@ -459,10 +459,10 @@ void SharedGroup::do_async_commits()
 #endif
             begin_read();
             size_t current_version = m_version;
-            size_t current_top_ref = m_group.get_top_array().get_ref();
+            size_t current_top_ref = m_group.m_top.get_ref();
 
-            GroupWriter writer(m_group, true);
-            writer.DoCommit(current_top_ref);
+            GroupWriter writer(m_group);
+            writer.sync(current_top_ref);
 
             // Now we can release the version that was previously commited
             // to disk and just keep the lock on the latest version.

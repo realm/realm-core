@@ -50,6 +50,9 @@ public:
     /// written.
     std::size_t write(const char* data, std::size_t size);
 
+    /// Controlled update of physical medium
+    void sync(uint64_t top_pos);
+
 #ifdef TIGHTDB_DEBUG
     void dump();
 #endif
@@ -95,9 +98,6 @@ private:
     std::pair<std::size_t, std::size_t> extend_free_space(std::size_t requested_size);
 
     void write_at(std::size_t pos, const char* data, std::size_t size);
-
-    // Controlled update of physical medium
-    void sync(uint64_t top_pos);
 };
 
 
