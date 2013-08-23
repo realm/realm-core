@@ -7,6 +7,8 @@
 #include <tightdb/column.hpp>
 #include <tightdb/utilities.hpp>
 #include <tightdb/query_engine.hpp>
+#include <assert.h>
+
 
 #define USE_VLD
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
@@ -66,10 +68,48 @@ int main(int argc, char* argv[])
 {
 
 
+    /*
+
+
+
+
+
+    */
+
 
     Table table;
     table.add_column(type_Int, "first1");
     table.add_column(type_Float, "second1");
+    table.add_column(type_Double, "third");
+
+    size_t match;
+
+    Columns<int64_t> first(0);
+    Columns<float> second(1);
+    Columns<double> third(2);
+
+    table.add_empty_row(2);
+
+
+    table.set_int(0, 0, 20);
+    table.set_float(1, 0, 19.9f);
+    table.set_double(2, 0, 3.0);
+
+    table.set_int(0, 1, 20);
+    table.set_float(1, 1, 20.1f);
+    table.set_double(2, 1, 4.0);
+   
+    /*
+    exp = first >= 20.0f;
+    match = table.where().expression(exp).find_next();
+    assert(match == 0);
+
+    */
+
+
+
+
+
 
 
     for (int i = 0; i < 10100; i++) {
@@ -85,9 +125,8 @@ int main(int argc, char* argv[])
 // new-generation syntax:
         cerr << "555555555555\n";
 
-        Columns<int64_t> first(0);
-        Columns<float> second(1);
 
+        /*
         Expression* eee = first > first;
 
 
@@ -101,6 +140,8 @@ int main(int argc, char* argv[])
         Expression* eee7 = first + second > first + int64_t(8);
         Expression* eee8 = second + 3 > first + int64_t(8);
        
+        Expression* eee9 = 8 == second;       
+
         size_t match2;
         
         match2 = table.where().expression(eee2).find_next();
@@ -109,13 +150,13 @@ int main(int argc, char* argv[])
 
         match2 = table.where().expression(eee4).find_next();
 
-
+        */
 
 
 // query expressions:
 
 //        float_column(1) + (int_column(0) + 20) > 50.0
-#if 1
+#if 0
     // Slow
     Subexpr* col = new Columns<int64_t>(0);
     Subexpr* colf = new Columns<float>(1);
@@ -135,16 +176,17 @@ int main(int argc, char* argv[])
     Value<int64_t>* cc1 = new Value<int64_t>(20);
     Value<float>* cc2 = new Value<float>(50.0);  
 
-    Operator<Plus<int64_t>, Columns<int64_t>, Value<int64_t>>* ck0 = new Operator<Plus<int64_t>, Columns<int64_t>, Value<int64_t>>(col, cc1);  
-    Subexpr* ck = new Operator<Plus<float>, Columns<float>, Operator<Plus<int64_t>, Columns<int64_t>, Value<int64_t>>>(colf, ck0);  
+    Operator<Plus<int64_t>, Columns<int64_t>, Value<int64_t> >* ck0 = new Operator<Plus<int64_t>, Columns<int64_t>, Value<int64_t> >(col, cc1);  
+    Subexpr* ck = new Operator<Plus<float>, Columns<float>, Operator<Plus<int64_t>, Columns<int64_t>, Value<int64_t> > >(colf, ck0);  
 
-    Expression *e = new Compare<Greater, float, Subexpr, Value<float>>(ck, cc2);
+    Expression *e = new Compare<Greater, float, Subexpr, Value<float> >(ck, cc2);
 #endif
+
 
   
     tightdb::TableView t1;
 
-    size_t match = 0;
+    match = 0;
 
 
         {
@@ -165,6 +207,8 @@ int main(int argc, char* argv[])
             }
             cerr << best << ", match = " <<  match << "\n";
         }
+
+//        delete e;
 
 
 

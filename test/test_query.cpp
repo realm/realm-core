@@ -80,6 +80,294 @@ TIGHTDB_TABLE_2(PeopleTable2,
 
 } // anonymous namespace
 
+TEST(QueryExpressions0)
+{
+/*
+    We have following variables to vary in the tests:
+
+    left        right
+    +           -           *           /
+    Subexpr    Column       Value    
+    >           <           ==          !=          >=          <=
+    float       int         double      int64_t
+
+    Many of them are combined and tested together in equality classes below
+*/
+
+    Table table;
+    table.add_column(type_Int, "first1");
+    table.add_column(type_Float, "second1");
+    table.add_column(type_Double, "third");
+
+    Expression* exp;
+    size_t match;
+
+    Columns<int64_t> first(0);
+    Columns<float> second(1);
+    Columns<double> third(2);
+
+    table.add_empty_row(2);
+
+    table.set_int(0, 0, 20);
+    table.set_float(1, 0, 19.9f);
+    table.set_double(2, 0, 3.0);
+
+    table.set_int(0, 1, 20);
+    table.set_float(1, 1, 20.1f);
+    table.set_double(2, 1, 4.0);
+   
+    // 20 must convert to float    
+    exp = second + 0.2f > 20;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 0);
+    delete exp;
+
+    exp = first >= 20.0f;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 0);
+    delete exp;
+
+    // 20.1f must remain float
+    exp = first >= 20.1f;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == not_found);
+    delete exp;
+
+    // first must convert to float
+    exp = second >= first;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    // 20 and 40 must convert to float
+    exp = second + 20 > 40;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    // first and 40 must convert to float
+    exp = second + first >= 40;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    // 20 must convert to float
+    exp = 0.2f + second > 20;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 0);
+    delete exp;
+    
+    // Compare, left = Subexpr, right = Value
+    exp = second + first >= 40;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = second + first > 40;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = first - second < 0;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = second - second == 0;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 0);
+    delete exp;
+
+    exp = first - second <= 0;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = first * first != 400;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == -1);
+    delete exp;    
+
+    // Compare, left = Column, right = Value
+    exp = second >= 20;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = second > 20;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = second < 20;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 0);
+    delete exp;
+
+    exp = second == 20.1f;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = second != 19.9f;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = second <= 21;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 0);
+    delete exp;
+
+    // Compare, left = Column, right = Value
+    exp = 20 <= second;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = 20 < second;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = 20 > second;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 0);
+    delete exp;
+
+    exp = 20.1f == second;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = 19.9f != second;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = 21 >= second;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 0);
+    delete exp;
+
+    // Compare, left = Subexpr, right = Value
+    exp = 40 <= second + first;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = 40 < second + first;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = 0 > first - second;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = 0 == second - second;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 0);
+    delete exp;
+
+    exp = 0 >= first - second;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = 400 != first * first;
+    match = table.where().expression(exp).find_next();
+    CHECK(match == -1);
+    delete exp;
+
+    // Col compare Col
+    exp = second > first; 
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = second >= first; 
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = second == first; 
+    match = table.where().expression(exp).find_next();
+    CHECK(match == not_found);
+    delete exp;
+
+    exp = second != second; 
+    match = table.where().expression(exp).find_next();
+    CHECK(match == not_found);
+    delete exp;
+
+    exp = first < second; 
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = first <= second; 
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    // Subexpr compare Subexpr
+    exp = second + 0 > first + 0; 
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = second + 0 >= first + 0; 
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = second + 0 == first + 0; 
+    match = table.where().expression(exp).find_next();
+    CHECK(match == not_found);
+    delete exp;
+
+    exp = second + 0 != second + 0; 
+    match = table.where().expression(exp).find_next();
+    CHECK(match == not_found);
+    delete exp;
+
+    exp = first + 0 < second + 0; 
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    exp = first + 0 <= second + 0; 
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 1);
+    delete exp;
+
+    // Conversions, again
+    table.clear();
+    table.add_empty_row(1);
+
+    table.set_int(0, 0, 20);
+    table.set_float(1, 0, 3.0);
+    table.set_double(2, 0, 3.0);
+
+    exp = 1 / second == 1 / second; 
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 0);
+    delete exp;
+
+    exp = 1 / third == 1 / third; 
+    match = table.where().expression(exp).find_next();
+    CHECK(match == 0);
+    delete exp;
+
+    // Compare operator must preserve precision of each side, hence no match
+    exp = 1 / second == 1 / third; 
+    match = table.where().expression(exp).find_next();
+    CHECK(match == not_found);
+    delete exp;
+}
+
 
 TEST(QueryExpressions1)
 {
@@ -110,6 +398,15 @@ TEST(QueryExpressions1)
         Expression *e = new Compare<Greater, float>(ck, cc2);
         size_t match = table.where().expression(e).find_next();
         CHECK_EQUAL(10000, match);
+
+        // you MUST delete objects the reverse order of allocation (query system only has primitive ownership tracking)
+        delete e;
+        delete ck;
+        delete ck0;
+        delete cc2;
+        delete cc1;
+        delete colf;
+        delete col;
     }
     
     {
@@ -123,9 +420,17 @@ TEST(QueryExpressions1)
         Subexpr* ck = new Operator<Plus<float>, Columns<float>, Operator<Plus<int64_t>, Columns<int64_t>, Value<int64_t> > >(colf, ck0);  
 
         Expression *e = new Compare<Greater, float, Subexpr, Value<float> >(ck, cc2);
-
         size_t match = table.where().expression(e).find_next();
         CHECK_EQUAL(10000, match);
+
+        // you MUST delete objects the reverse order of allocation (query system only has primitive ownership tracking)
+        delete e;
+        delete ck;
+        delete ck0;
+        delete cc2;
+        delete cc1;
+        delete colf;
+        delete col;
     }
 
  

@@ -323,7 +323,7 @@ void Array::set(size_t ndx, int64_t value)
     // Set the value
     (this->*m_setter)(ndx, value);
 }
-
+ 
 /*
 // Optimization for the common case of adding positive values to a local array
 // (happens a lot when returning results to TableViews)

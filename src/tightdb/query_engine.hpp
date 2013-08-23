@@ -1393,7 +1393,11 @@ protected:
 // For expressions like col1 / col2 + 123 > col4 * 100
 class ExpressionNode: public ParentNode {
 
-public:    
+public:
+    ~ExpressionNode()
+    {
+ //       delete m_compare;
+    }
 
     ExpressionNode(Expression* compare) 
     {
@@ -1416,9 +1420,6 @@ public:
     
     Expression* m_compare;
 };
-
-
-
 
 } // namespace tightdb
 
