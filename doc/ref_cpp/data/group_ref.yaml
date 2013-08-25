@@ -1,38 +1,40 @@
 #
-# C++ reference documentation for Group class
+# C++ reference documentation for the Group class.
 #
 
 #UNDOCUMENTED: [commit, get_table_typed]
 
-ID         : class_group
-TITLE      : Group
-SUMMARY    : &g_group_summary
-             Container for tables.
-DESCR      : &g_group_descr
-             >
-             In order to store tables on disk or transfer tables over network, they must be
-             serialized. The TightDB framework provides various methods including
-             <a href="http://www.json.org">JSON</a> for single tables.
+ID          : class_group
+TITLE       : Group
+SUMMARY     : &g_group_summary
+              Container for tables.
+DESCR       : &g_group_descr
+              >
+              In order to store tables on disk or transfer tables over network,
+              they must be serialized. The TightDB framework provides various
+              methods including <a href="http://www.json.org">JSON</a> for
+              single tables.
 
-             The Group is a container for tables and it allows the tables to be serialized to
-             disk and memory. The serialization format is highly optimized for TightDB tables,
-             which implies that the consumed resources are low.
+              The Group is a container for tables and it allows the tables to
+              be serialized to disk and memory. The serialization format is
+              highly optimized for TightDB tables, which implies that the
+              consumed resources are low.
 
-             A group can hold one or more tables. If a table is going to be serialized, you
-             must create the table using the group. It is not possible to dynamically add a table
-             to a group.
+              A group can hold one or more tables. If a table is going to be
+              serialized, you must create the table using the group. It is not
+              possible to dynamically add a table to a group.
 
-             Once a group has been serialized, it is possible to deserialize it using any supported
-             programming language, at any supported operating system and at any supported
-             hardware platform. This implies that the TightDB framework is true a polyglot
-             framework where you can share data between applications.
-SEE        :
-EXAMPLES:
-- DESCR    :
-  CODE     : ex_cpp_group_intro
-IGNORE     : []                   # List of method-ids to ignore
-CATEGORIES:
-
+              Once a group has been serialized, it is possible to deserialize
+              it using any supported programming language, on any supported
+              operating system, and on any supported hardware platform. This
+              implies that TightDB is truly a polyglot framework which you can
+              use to share data between applications.
+SEE         :
+EXAMPLES    :
+- DESCR     :
+  CODE      : ex_cpp_group_intro
+IGNORE      : []                   # List of method-ids to ignore
+CATEGORIES  :
 - Constructor:
   METHODS:
   - g_group_constructor_plain:
@@ -62,8 +64,8 @@ CATEGORIES:
       PARAMS:
       - NAME   : file
         TYPES  : const std::string&
-        DESCR  : &g_group_constructor_memory_parm1_descr
-                 File system path of the TightDB database file to be opened.
+        DESCR  : &g_open_filesystem_path_descr
+                 Filesystem path of the TightDB database file to be opened.
       - NAME   : mode
         TYPES  : Group::OpenMode
         DESCR  : |
@@ -198,10 +200,9 @@ CATEGORIES:
                  void open(const std::string& file, OpenMode mode = mode_ReadOnly);
                  void open(BinaryData buffer, bool take_ownership = true);
       PARAMS:
-      - NAME   : file
+      - NAME   : path
         TYPES  : const std::string&
-        DESCR  : &g_group_open_memory_parm1_descr
-                 Filesystem path of the TightDB database file to be opened.
+        DESCR  : *g_open_filesystem_path_descr
       - NAME   : mode
         TYPES  : Group::OpenMode
         DESCR  : &g_group_open_memory_parm2_descr
@@ -316,18 +317,16 @@ CATEGORIES:
       - DESCR  :
         CODE   : ex_cpp_group_operator_equal
 
-# TODO below: split in two texts
-#      -TEXT    : &g_group_has_table_descr
-#      -TEXT    : >
-
 - Table:
   METHODS:
   - g_group_has_table:
       NAME     : has_table
       SUMMARY  : &g_group_has_table_summary
-                 Does group have a specific table?
-      DESCR    : >
+                 Does group have table?
+      DESCR    :
+      - TEXT   : &g_group_has_table_descr
                  The method checks whether this group contains the specified table.
+      - TEXT   : >
                  When no table class is specified, this function
                  returns <code>true</code> if the group contains a
                  table with the specified name. When a table class
@@ -435,10 +434,10 @@ CATEGORIES:
                  behaviour.
       CONST    : true
       PARAMS:
-      - NAME   : file
+      - NAME   : path
         TYPES  : const std::string&
         DESCR  : &g_group_write_to_file_parm1_descr
-                 A filesystem path.
+                 A filesystem path to write to.
       THROWS:
       - EXCEPT : File::AccessError
         DESCR  : &g_group_write_to_file_throws_descr
