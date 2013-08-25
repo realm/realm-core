@@ -1,3 +1,5 @@
+*.tightdb
+*.tightdb.lock
 *.ncb
 *.suo
 *.vcproj.*.user
