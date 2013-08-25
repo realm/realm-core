@@ -11,7 +11,7 @@ using namespace tightdb;
 GroupWriter::GroupWriter(Group& group) :
     m_group(group), m_alloc(group.m_alloc), m_current_version(0)
 {
-    m_file_map.map(m_alloc.m_file, File::access_ReadWrite, m_alloc.get_baseline());
+    m_file_map.map(m_alloc.m_file, File::access_ReadWrite, m_alloc.get_baseline()); // Throws
 }
 
 
