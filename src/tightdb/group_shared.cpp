@@ -321,7 +321,7 @@ const Group& SharedGroup::begin_read()
         ScopedMutexLock lock(&info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size())) {
-            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
+            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize); // Throws
         }
 
         // Get the current top ref
@@ -332,7 +332,7 @@ const Group& SharedGroup::begin_read()
         // Update reader list
         if (ringbuf_is_empty()) {
             ReadCount r2 = { info->current_version, 1 };
-            ringbuf_put(r2);
+            ringbuf_put(r2); // Throws
         }
         else {
             ReadCount& r = ringbuf_get_last();
@@ -341,14 +341,14 @@ const Group& SharedGroup::begin_read()
             }
             else {
                 ReadCount r2 = { info->current_version, 1 };
-                ringbuf_put(r2);
+                ringbuf_put(r2); // Throws
             }
         }
     }
 
     // Make sure the group is up-to-date.
     // A zero ref means that the file has just been created.
-    m_group.update_from_shared(new_top_ref, new_file_size);
+    m_group.update_from_shared(new_top_ref, new_file_size); // Throws
 
 #ifdef TIGHTDB_DEBUG
     m_group.Verify();
@@ -563,10 +563,10 @@ void SharedGroup::ringbuf_put(const ReadCount& v)
     // Check if the ringbuf is full
     // (there should always be one empty entry)
     size_t size = ringbuf_size();
-    bool is_full = (size == (info->capacity));
+    bool is_full = size == info->capacity;
 
     if (TIGHTDB_UNLIKELY(is_full)) {
-        ringbuf_expand();
+        ringbuf_expand(); // Throws
         info = m_reader_map.get_addr();
     }
 
@@ -587,8 +587,8 @@ void SharedGroup::ringbuf_expand()
     size_t new_file_size = base_file_size + (sizeof (ReadCount) * new_entry_count);
 
     // Extend file
-    m_file.alloc(0, new_file_size);
-    m_reader_map.remap(m_file, File::access_ReadWrite, new_file_size);
+    m_file.alloc(0, new_file_size); // Throws
+    m_reader_map.remap(m_file, File::access_ReadWrite, new_file_size); // Throws
     info = m_reader_map.get_addr();
 
     // Move existing entries (if there is a split)
@@ -718,8 +718,9 @@ void SharedGroup::zero_free_space()
     size_t current_version;
     size_t readlock_version;
     size_t file_size;
-    pthread_mutex_lock(&info->readmutex);
+
     {
+        ScopedMutexLock lock(&info->readmutex);
         current_version = info->current_version + 1;
         file_size = to_size_t(info->filesize);
 
@@ -731,7 +732,6 @@ void SharedGroup::zero_free_space()
             readlock_version = r.version;
         }
     }
-    pthread_mutex_unlock(&info->readmutex);
 
     m_group.zero_free_space(file_size, readlock_version);
 }
@@ -762,7 +762,7 @@ void SharedGroup::low_level_commit(size_t new_version)
         ScopedMutexLock lock(&info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size())) {
-            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
+            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize); // Throws
         }
 
         if (ringbuf_is_empty()) {
@@ -783,18 +783,18 @@ void SharedGroup::low_level_commit(size_t new_version)
         // info->writemutex. This is true (not a data race) becasue
         // info->current_version is modified only while
         // info->writemutex is locked.
-        m_group.init_shared();
+        m_group.init_shared(); // Throws
     }
 
     // Do the actual commit
     TIGHTDB_ASSERT(m_group.m_top.is_attached());
     TIGHTDB_ASSERT(readlock_version <= new_version);
-    GroupWriter out(m_group);
+    GroupWriter out(m_group); // Throws
     m_group.m_readlock_version = readlock_version;
     out.set_versions(new_version, readlock_version);
     // Recursively write all changed arrays to end of file
     bool do_sync = info->flags == durability_Full;
-    ref_type new_top_ref = out.commit(do_sync);
+    ref_type new_top_ref = out.commit(do_sync); // Throws
     size_t new_file_size = out.get_file_size();
 
     // Update reader info
