@@ -37,6 +37,7 @@ public:
     const T& operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
 
     Buffer() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
+    Buffer(std::size_t size): m_ptr(new T[size]) {}
 
     void set_size(std::size_t);
 
@@ -57,7 +58,11 @@ private:
 
 // Implementation:
 
-template<class T> void Buffer<T>::set_size(std::size_t size)
+template<class T> inline Buffer<T>::Buffer(std::size_t size): m_data(new T[size]), m_size(size)
+{
+}
+
+template<class T> inline void Buffer<T>::set_size(std::size_t size)
 {
     m_data.reset(new T[size]);
     m_size = size;
