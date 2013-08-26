@@ -66,10 +66,10 @@ TIGHTDB_TABLE_2(TwoColTable,
     first,  Int,
     second, Float)
 
+
 int main(int argc, char* argv[])
 {
 
-    
     Table table;
     table.add_column(type_Int, "first1");
     table.add_column(type_Float, "second1");
@@ -82,6 +82,7 @@ int main(int argc, char* argv[])
     Expression *expression = first >= first / second + second / 1;
 
 
+//    Expression e = table.first >= 123 + table.second  table2.fdfd;
 
 //    Column<int64_t> first = table....
 //    Query q = first > 120;
@@ -95,11 +96,31 @@ int main(int argc, char* argv[])
 
 // TwoColTable::first first = two.column().first;
 
-    
+
+//    two.column().first.average();
+//    two.average(0);
+
+
+
     
 
 
-   size_t match;
+
+
+
+
+
+
+
+
+
+
+
+    
+    
+
+    
+    size_t match;
 
 
 
@@ -197,6 +218,11 @@ int main(int argc, char* argv[])
 
     Expression *e = new Compare<Greater, float, Subexpr, Value<float> >(ck, cc2);
 #endif
+
+
+
+
+
 
 
 

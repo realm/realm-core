@@ -61,7 +61,9 @@ which performs the final query search.
 Todo:    
     * Use query_engine.hpp for execution of simple queries that are supported there, because it's faster
     * Support unary operators like power and sqrt
-
+    * Consider using references instead of pointers everywhere, but this depends on if constness is OK which again depends
+      on usage, like if tables need to be bound after having built the query, and if it's a requirement that you must 
+      be able to append/modify/whatever already existing queries, etc. Wait for usage to decide
 */
 
 
@@ -320,22 +322,22 @@ public:
 
     // Compare, right side subexpression
     Expression* operator == (const Subexpr2<R>& right) { 
-        return new Compare<Equal, CommonType>(static_cast<Subexpr2<L>*>(this), (Subexpr2<R>*)&right); 
+        return new Compare<Equal, CommonType>(static_cast<Subexpr2<L>*>(this), &right); 
     }
     Expression* operator != (const Subexpr2<R>& right) { 
-        return new Compare<NotEqual, CommonType>(static_cast<Subexpr2<L>*>(this), (Subexpr2<R>*)&right); 
+        return new Compare<NotEqual, CommonType>(static_cast<Subexpr2<L>*>(this), &right); 
     }
     Expression* operator > (const Subexpr2<R>& right) { 
-        return new Compare<Greater, CommonType>(static_cast<Subexpr2<L>*>(this), (Subexpr2<R>*)&right); 
+        return new Compare<Greater, CommonType>(static_cast<Subexpr2<L>*>(this), &right); 
     }
     Expression* operator < (const Subexpr2<R>& right) { 
-        return new Compare<Less, CommonType>(static_cast<Subexpr2<L>*>(this), (Subexpr2<R>*)&right); 
+        return new Compare<Less, CommonType>(static_cast<Subexpr2<L>*>(this), &right); 
     }
     Expression* operator >= (const Subexpr2<R>& right) { 
-        return new Compare<GreaterEqual, CommonType>(static_cast<Subexpr2<L>*>(this), (Subexpr2<R>*)&right); 
+        return new Compare<GreaterEqual, CommonType>(static_cast<Subexpr2<L>*>(this), &right); 
     }
     Expression* operator <= (const Subexpr2<R>& right) { 
-        return new Compare<LessEqual, CommonType>(static_cast<Subexpr2<L>*>(this), (Subexpr2<R>*)&right); 
+        return new Compare<LessEqual, CommonType>(static_cast<Subexpr2<L>*>(this), &right); 
     }
 };
 
