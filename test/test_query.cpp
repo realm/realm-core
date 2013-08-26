@@ -1795,7 +1795,16 @@ TEST(TestQueryFindNext)
 
     CHECK_EQUAL(5, res1);
     CHECK_EQUAL(6, res2);
-    CHECK_EQUAL(size_t(-1), res3); // no more matches
+    CHECK_EQUAL(not_found, res3); // no more matches
+
+    // Do same searches with new query every time
+    const size_t res4 = ttt.where().second.equal("X").first.greater(4).find_next();
+    const size_t res5 = ttt.where().second.equal("X").first.greater(4).find_next(res1);
+    const size_t res6 = ttt.where().second.equal("X").first.greater(4).find_next(res2);
+
+    CHECK_EQUAL(5, res4);
+    CHECK_EQUAL(6, res5);
+    CHECK_EQUAL(not_found, res6); // no more matches
 }
 
 TEST(TestQueryFindAll1)
