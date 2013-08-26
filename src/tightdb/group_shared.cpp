@@ -368,6 +368,10 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
         SharedInfo* info = m_file_map.get_addr();
         ScopedMutexLock lock(&info->readmutex);
 
+        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size())) {
+            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
+        }
+
         // FIXME: m_version may well be a 64-bit integer so this cast
         // to uint32_t seems quite dangerous. Should the type of
         // m_version be changed to uint32_t? The problem with uint32_t
