@@ -460,15 +460,12 @@ payload:
         // new record by just testing for 0a/0d.
         size_t fields = payload.back().size();
 
-        while ((src[m_curpos] == Separator && payload.size() > 0  && payload[0].size() == payload[payload.size() - 1].size())    ||    (src[m_curpos] != Separator    && src[m_curpos] != 0 && ((src[m_curpos] != 0xd && src[m_curpos] != 0xa) || (fields < m_fields && m_fields != size_t(-1)) ))) {
+        while(src[m_curpos] != Separator && src[m_curpos] != 0 && ((src[m_curpos] != 0xd && src[m_curpos] != 0xa) || (fields < m_fields && m_fields != size_t(-1)) )) {
+            m_row += src[m_curpos] == 0xa;
             payload.back().back().push_back(src[m_curpos]);
             m_curpos++;
-        }
-        
+        }        
     }
-
-    if(payload.size() == 72)
-        int s = 213;
 
     if(src[m_curpos] == 0)
         goto end;
@@ -483,21 +480,25 @@ payload:
         m_row++;
         if(src[m_curpos] == 0xd || src[m_curpos] == 0xa)
             m_curpos++;
+
+        if(payload.size() >= 2) {
+            if(payload[payload.size() - 2].size() != payload[payload.size()- 1].size()) {
+                // We don't use n-versions of printf because windows needs some macro tweaking for it
+                char buf[500];
+                string s = payload[payload.size() - 1][0];
+                if(s.length() > 100)
+                    s = s.substr(0, 100);
+                sprintf(buf, "Wrong number of delimitors around line %lld (+|- 3) in csv file. First few characters of line: %s", static_cast<unsigned long long>(m_row - 1),  s.c_str());
+                throw runtime_error(buf);                 
+            }
+        }
+
         goto nextrecord;
     }
 
     goto nextfield;
 
 end:
-
-    if(payload.size() >= 2) {
-        for(size_t t = 1; t < payload.size(); t++)
-            if(payload[t - 1].size() != payload[t].size()) {
-                char buf[200];
-                sprintf(buf, "Two rows have different number of fields, around line %lld in csv file", static_cast<unsigned long long>(m_row));
-                throw runtime_error(buf); 
-            }
-    }
 
     return payload.size() - original_size;
 }
