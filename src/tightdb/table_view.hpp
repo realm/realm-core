@@ -476,7 +476,7 @@ R TableViewBase::find_all_integer(V* view, size_t column_ndx, int64_t value)
     R tv(*view->m_table);
     for (size_t i = 0; i < view->m_refs.size(); i++)
         if (view->get_int(column_ndx, i) == value)
-            tv.get_ref_column().add(i);
+            tv.get_ref_column().add(view->get_source_ndx(i));
     return move(tv);
 }
 
@@ -486,7 +486,7 @@ R TableViewBase::find_all_float(V* view, size_t column_ndx, float value)
     R tv(*view->m_table);
     for (size_t i = 0; i < view->m_refs.size(); i++)
         if (view->get_float(column_ndx, i) == value)
-            tv.get_ref_column().add(i);
+            tv.get_ref_column().add(view->get_source_ndx(i));
     return move(tv);
 }
 
@@ -496,7 +496,7 @@ R TableViewBase::find_all_double(V* view, size_t column_ndx, double value)
     R tv(*view->m_table);
     for (size_t i = 0; i < view->m_refs.size(); i++)
         if (view->get_double(column_ndx, i) == value)
-            tv.get_ref_column().add(i);
+            tv.get_ref_column().add(view->get_source_ndx(i));
     return move(tv);
 }
 
@@ -510,7 +510,7 @@ R TableViewBase::find_all_string(V* view, size_t column_ndx, StringData value)
     R tv(*view->m_table);
     for (size_t i = 0; i < view->m_refs.size(); i++) {
         if (view->get_string(column_ndx, i) == value)
-            tv.get_ref_column().add(i);
+            tv.get_ref_column().add(view->get_source_ndx(i));
     }
     return move(tv);
 }
