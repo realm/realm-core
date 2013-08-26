@@ -53,6 +53,12 @@ struct SharedGroup::SharedInfo {
 
 namespace {
 
+// rudimentary compare and swap, while we are waiting for c++11
+bool CompareAndSwap(uint32_t* ptr, uint32_t expected_val, uint32_t new_val)
+{
+    return __sync_bool_compare_and_swap(ptr,expected_val,new_val);
+}
+
 class ScopedMutexLock {
 public:
     ScopedMutexLock(pthread_mutex_t* mutex) TIGHTDB_NOEXCEPT: m_mutex(mutex)
@@ -287,11 +293,10 @@ void SharedGroup::open(const string& path, bool no_create_file,
             alloc.attach_file(path, is_shared, read_only, no_create); // Throws
 
             // increment client count. 1 is added for every live shared_group.
-            {
-                ScopedMutexLock lock(&info->readmutex);
-                if (info->client_count == 0)
-                    throw runtime_error("Encountered a stale lock file");
-                info->client_count++;
+            while (1) {
+                uint32_t count = info->client_count;
+                if (CompareAndSwap(&info->client_count, count, count+1))
+                    break;
             }
         }
 
@@ -344,11 +349,14 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     SharedInfo* info = m_file_map.get_addr();
 
     // decrement client count. 1 is added for every live shared_group.
-    {
-        ScopedMutexLock lock(&info->readmutex);
-        info->client_count--;
-        if (info->client_count != 0) return;
+    uint32_t count;
+    while (1) {
+        count = info->client_count;
+        if (CompareAndSwap(&info->client_count, count, count-1))
+            break;
     }
+    if (count > 1) return;
+    // coming here count must be <= 1, implying that client_count <= 0
 
     // If the db file is just backing for a transient data structure,
     // we can delete it when done.
@@ -358,15 +366,13 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
         // m_file_path.substr(). Currently, if it throws, the program
         // will be terminated due to 'noexcept' on ~SharedGroup().
         string db_path = m_file_path.substr(0, path_len); // Throws
-        remove(db_path.c_str());
+        File::remove(db_path.c_str());
     }
 
-    // FIXME: the following is not possible unless you detect that you are
-    // the last client - and it is not possible to do safely
-    // pthread_mutex_destroy(&info->readmutex);
-    // pthread_mutex_destroy(&info->writemutex);
+    pthread_mutex_destroy(&info->readmutex);
+    pthread_mutex_destroy(&info->writemutex);
 
-    remove(m_file_path.c_str());
+    File::remove(m_file_path.c_str());
 }
 
 
@@ -425,16 +431,23 @@ void SharedGroup::do_async_commits()
             shutdown = true;
             printf("Lock file removed, initiating shutdown\n");
         }
-        {
-            ScopedMutexLock lock(&info->readmutex);
-            if (info->client_count == 1) {
 
-                info->client_count = 0;
-                shutdown = true;
-                printf("Last client gone, initiating shutdown\n");
-            }
+        // detect if we're the last "client", and if so mark the
+        // lock file invalid. Any client coming along before we
+        // finish syncing will see the lock file, but detect that
+        // the daemon has abandoned it. It can then wait for the
+        // lock file to be removed. Currently, it just throws a runtime
+        // exception, though.
+        uint32_t count;
+        do {
+            count = info->client_count;
+            if (count > 1) break;
+        } while (! CompareAndSwap(&info->client_count, count, 0));
+        if (count == 0) {
+            shutdown = true;
+            printf("Last client gone, initiating shutdown\n");
         }
-                
+
         if (has_changed()) {
 
             printf("Syncing...");
@@ -464,9 +477,10 @@ void SharedGroup::do_async_commits()
         if (shutdown) {
             // Being the backend process, we own the lock file, so we
             // have to clean up when we shut down.
-            // pthread_mutex_destroy(&info->readmutex);
-            // pthread_mutex_destroy(&info->writemutex);
-            remove(m_file_path.c_str());
+            pthread_mutex_destroy(&info->readmutex);
+            pthread_mutex_destroy(&info->writemutex);
+            printf("Removing coordination file: %s\n", m_file_path.c_str());
+            File::remove(m_file_path);
             printf("Daemon exiting nicely\n");
             exit(EXIT_SUCCESS);
         }
