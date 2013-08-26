@@ -1,6 +1,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <stdexcept>
+#include <algorithm>
 
 #include <tightdb/alloc_slab.hpp>
 
@@ -40,19 +41,29 @@ public:
     MemRef alloc(size_t size) TIGHTDB_OVERRIDE
     {
         char* addr = static_cast<char*>(malloc(size));
-        if (TIGHTDB_LIKELY(addr))
-            return MemRef(addr, reinterpret_cast<size_t>(addr));
-        TIGHTDB_ASSERT(errno == ENOMEM);
-        throw bad_alloc();
+        if (TIGHTDB_UNLIKELY(!addr)) {
+            TIGHTDB_ASSERT(errno == ENOMEM);
+            throw bad_alloc();
+        }
+#ifdef TIGHTDB_ALLOC_SET_ZERO
+        fill(addr, addr+size, 0);
+#endif
+        return MemRef(addr, reinterpret_cast<size_t>(addr));
     }
 
-    MemRef realloc_(ref_type, const char* addr, size_t size) TIGHTDB_OVERRIDE
+    MemRef realloc_(ref_type, const char* addr, size_t old_size, size_t new_size) TIGHTDB_OVERRIDE
     {
-        char* new_addr = static_cast<char*>(realloc(const_cast<char*>(addr), size));
-        if (TIGHTDB_LIKELY(new_addr))
-            return MemRef(new_addr, reinterpret_cast<size_t>(new_addr));
-        TIGHTDB_ASSERT(errno == ENOMEM);
-        throw bad_alloc();
+        char* new_addr = static_cast<char*>(realloc(const_cast<char*>(addr), new_size));
+        if (TIGHTDB_UNLIKELY(!new_addr)) {
+            TIGHTDB_ASSERT(errno == ENOMEM);
+            throw bad_alloc();
+        }
+#ifdef TIGHTDB_ALLOC_SET_ZERO
+        fill(new_addr+old_size, new_addr+new_size, 0);
+#else
+        static_cast<void>(old_size);
+#endif
+        return MemRef(new_addr, reinterpret_cast<size_t>(new_addr));
     }
 
     void free_(ref_type, const char* addr) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE

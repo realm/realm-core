@@ -745,7 +745,7 @@ protected:
 
     void CreateFromHeaderDirect(char* header, ref_type = 0) TIGHTDB_NOEXCEPT;
 
-    virtual std::size_t CalcByteLen(std::size_t count, std::size_t width) const;
+    virtual std::size_t CalcByteLen(std::size_t count, std::size_t width) const; // Not 8-byte aligned
     virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const TIGHTDB_NOEXCEPT;
     virtual WidthType GetWidthType() const { return wtype_Bits; }
 
@@ -804,7 +804,10 @@ private:
     Allocator& m_alloc;
 
 protected:
+    /// The total size in bytes (including the header) of a new empty
+    /// array. Must be a multiple of 8 (i.e., 64-bit aligned).
     static const std::size_t initial_capacity = 128;
+
     static ref_type create_empty_array(Type, WidthType, Allocator&);
     static ref_type clone(const char* header, Allocator& alloc, Allocator& clone_alloc);
 
@@ -1395,7 +1398,15 @@ inline std::size_t Array::get_byte_size() const TIGHTDB_NOEXCEPT
     const char* header = get_header_from_data(m_data);
     switch (get_wtype_from_header(header)) {
         case wtype_Bits: {
-            std::size_t num_bits = (m_size * m_width); // FIXME: Prone to overflow
+            // FIXME: The following arithmetic could overflow, that
+            // is, even though both the total number of elements and
+            // the total number of bytes can be represented in
+            // uint_fast64_t, the total number of bits may not
+            // fit. Note that "num_bytes = width < 8 ? size / (8 /
+            // width) : size * (width / 8)" would be guaranteed to
+            // never overflow, but it potentially involves two slow
+            // divisions.
+            uint_fast64_t num_bits = uint_fast64_t(m_size) * m_width;
             num_bytes = num_bits / 8;
             if (num_bits & 0x7)
                 ++num_bytes;

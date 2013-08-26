@@ -312,7 +312,7 @@ void Array::insert(size_t ndx, int64_t value)
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
-    Getter old_getter = m_getter;    // Save old getter before potential width expansion
+    Getter old_getter = m_getter; // Save old getter before potential width expansion
 
     bool do_expand = value < m_lbound || value > m_ubound;
     if (do_expand) {
@@ -382,7 +382,8 @@ void Array::resize(size_t count)
 
 void Array::ensure_minimum_width(int64_t value)
 {
-    if (value >= m_lbound && value <= m_ubound) return;
+    if (value >= m_lbound && value <= m_ubound)
+        return;
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -391,7 +392,7 @@ void Array::ensure_minimum_width(int64_t value)
     size_t width = bit_width(value);
     TIGHTDB_ASSERT(width > m_width);
 
-    Getter old_getter = m_getter;    // Save old getter before width expansion
+    Getter old_getter = m_getter; // Save old getter before width expansion
     alloc(m_size, width); // Throws
     set_width(width);
 
@@ -1061,7 +1062,7 @@ size_t Array::count(int64_t value) const
         return count;
     }
 
-    // Sum remainding elements
+    // Check remaining elements
     for (; i < end; ++i)
         if (value == get(i))
             ++count;
@@ -1080,7 +1081,7 @@ size_t Array::CalcByteLen(size_t count, size_t width) const
 size_t Array::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
 {
     if (width == 0)
-        return numeric_limits<size_t>::max(); // zero width gives infinite space
+        return numeric_limits<size_t>::max(); // Zero width gives "infinite" space
 
     size_t bytes_data = bytes - header_size; // ignore 8 byte header
     size_t total_bits = bytes_data * 8;
@@ -1179,6 +1180,7 @@ void Array::copy_on_write()
     m_ref = mref.m_ref;
     m_data = get_data_from_header(new_begin);
     m_capacity = CalcItemCount(new_size, m_width);
+    TIGHTDB_ASSERT(m_capacity > 0);
 
     // Update capacity in header
     set_header_capacity(new_size); // uses m_data to find header, so m_data must be initialized correctly first
@@ -1211,15 +1213,20 @@ ref_type Array::create_empty_array(Type type, WidthType width_type, Allocator& a
 }
 
 
+// FIXME: It may be worth trying to combine this with copy_on_write()
+// to avoid two copies.
 void Array::alloc(size_t size, size_t width)
 {
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(m_capacity > 0);
     if (m_capacity < size || width != m_width) {
         size_t needed_bytes   = CalcByteLen(size, width);
-        size_t capacity_bytes = m_capacity ? get_capacity_from_header() : 0; // space currently available in bytes
+        size_t orig_capacity_bytes = get_capacity_from_header();
+        size_t capacity_bytes = orig_capacity_bytes;
 
         if (capacity_bytes < needed_bytes) {
             // Double to avoid too many reallocs (or initialize to initial size)
-            capacity_bytes = capacity_bytes ? capacity_bytes * 2 : initial_capacity;
+            capacity_bytes = capacity_bytes * 2; // FIXME: Highly prone to overflow on 32-bit systems
 
             // If doubling is not enough, expand enough to fit
             if (capacity_bytes < needed_bytes) {
@@ -1229,31 +1236,22 @@ void Array::alloc(size_t size, size_t width)
                     capacity_bytes += rest; // 64bit align
             }
 
-            // Allocate and initialize header
-            MemRef mem_ref;
-            char* header;
-            if (!m_data) {
-                mem_ref = m_alloc.alloc(capacity_bytes); // Throws
-                header = mem_ref.m_addr;
-                init_header(header, !m_isNode, m_hasRefs, GetWidthType(), int(width), size,
-                            capacity_bytes);
-            }
-            else {
-                header = get_header_from_data(m_data);
-                mem_ref = m_alloc.realloc_(m_ref, header, capacity_bytes); // Throws
-                header = mem_ref.m_addr;
-                set_header_width(int(width), header);
-                set_header_size(size, header);
-                set_header_capacity(capacity_bytes, header);
-            }
+            // Allocate and update header
+            char* header = get_header_from_data(m_data);
+            MemRef mem_ref = m_alloc.realloc_(m_ref, header, orig_capacity_bytes,
+                                              capacity_bytes); // Throws
+            header = mem_ref.m_addr;
+            set_header_width(int(width), header);
+            set_header_size(size, header);
+            set_header_capacity(capacity_bytes, header);
 
-            // Update wrapper objects
+            // Update this accessor and its ancestors
             m_ref      = mem_ref.m_ref;
             m_data     = get_data_from_header(header);
             m_capacity = CalcItemCount(capacity_bytes, width);
             // FIXME: Trouble when this one throws. We will then leave
             // this array instance in a corrupt state
-            update_parent();
+            update_parent(); // Throws
             return;
         }
 

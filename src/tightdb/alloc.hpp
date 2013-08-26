@@ -78,7 +78,8 @@ public:
     ///
     /// Note: The underscore has been added because the name `realloc`
     /// would conflict with a macro on the Windows platform.
-    virtual MemRef realloc_(ref_type ref, const char* addr, std::size_t size) = 0;
+    virtual MemRef realloc_(ref_type ref, const char* addr, std::size_t old_size,
+                            std::size_t new_size) = 0;
 
     /// Release the specified chunk of memory.
     ///

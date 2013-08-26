@@ -105,6 +105,9 @@ MemRef SlabAlloc::alloc(size_t size)
 #endif
 
                 char* addr = translate(ref);
+#ifdef TIGHTDB_ALLOC_SET_ZERO
+                fill(addr, addr+size, 0);
+#endif
                 return MemRef(addr, ref);
             }
         }
@@ -133,9 +136,9 @@ MemRef SlabAlloc::alloc(size_t size)
     // Add to slab table
     size_t new_ref_end = curr_ref_end + new_size;
     // FIXME: intptr_t is not guaranteed to exists, not even in C++11
-    uintptr_t addr = reinterpret_cast<uintptr_t>(slab);
+    uintptr_t slab_2 = reinterpret_cast<uintptr_t>(slab);
     // FIXME: Dangerous conversions to int64_t here (undefined behavior according to C++11)
-    m_slabs.add(int64_t(new_ref_end), int64_t(addr));
+    m_slabs.add(int64_t(new_ref_end), int64_t(slab_2));
 
     // Update free list
     size_t unused = new_size - size;
@@ -145,7 +148,7 @@ MemRef SlabAlloc::alloc(size_t size)
         m_free_space.add(int64_t(ref), int64_t(unused));
     }
 
-    char* addr_2 = slab;
+    char* addr = slab;
     size_t ref = curr_ref_end;
 
 #ifdef TIGHTDB_DEBUG
@@ -153,7 +156,11 @@ MemRef SlabAlloc::alloc(size_t size)
         cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
-    return MemRef(addr_2, ref);
+#ifdef TIGHTDB_ALLOC_SET_ZERO
+    fill(addr, addr+size, 0);
+#endif
+
+    return MemRef(addr, ref);
 }
 
 
@@ -233,33 +240,30 @@ void SlabAlloc::free_(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
 }
 
 
-MemRef SlabAlloc::realloc_(size_t ref, const char* addr, size_t size)
+MemRef SlabAlloc::realloc_(size_t ref, const char* addr, size_t old_size, size_t new_size)
 {
     TIGHTDB_ASSERT(translate(ref) == addr);
-    TIGHTDB_ASSERT(0 < size);
-    TIGHTDB_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
+    TIGHTDB_ASSERT(0 < new_size);
+    TIGHTDB_ASSERT((new_size & 0x7) == 0); // only allow sizes that are multiples of 8
 
     // FIXME: Check if we can extend current space. In that case,
-    // remember to check m_free_space_invalid.
+    // remember to check m_free_space_invalid. Also remember to fill
+    // with zero if TIGHTDB_ALLOC_SET_ZERO is defined.
 
     // Allocate new space
-    MemRef new_mem = alloc(size); // Throws
-
-    /*if (doCopy) {*/  //TODO: allow realloc without copying
-        // Get size of old segment
-    size_t old_size = Array::get_capacity_from_header(addr);
+    MemRef new_mem = alloc(new_size); // Throws
 
     // Copy existing segment
-    copy(addr, addr+old_size, new_mem.m_addr);
+    char* new_addr = new_mem.m_addr;
+    copy(addr, addr+old_size, new_addr);
 
     // Add old segment to freelist
-    free_(ref, addr); // FIXME: Unfortunately, this one can throw
-    //}
+    free_(ref, addr);
 
 #ifdef TIGHTDB_DEBUG
     if (m_debug_out) {
         cerr << "Realloc orig_ref: " << ref << " old_size: " << old_size << " "
-            "new_ref: " << new_mem.m_ref << " new_size: " << size << "\n";
+            "new_ref: " << new_mem.m_ref << " new_size: " << new_size << "\n";
     }
 #endif // TIGHTDB_DEBUG
 

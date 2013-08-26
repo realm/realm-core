@@ -131,7 +131,8 @@ public:
     bool remap(std::size_t file_size);
 
     MemRef alloc(std::size_t size) TIGHTDB_OVERRIDE;
-    MemRef realloc_(ref_type, const char*, std::size_t size) TIGHTDB_OVERRIDE;
+    MemRef realloc_(ref_type, const char*, std::size_t old_size,
+                    std::size_t new_size) TIGHTDB_OVERRIDE;
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
     void free_(ref_type, const char*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     char* translate(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
