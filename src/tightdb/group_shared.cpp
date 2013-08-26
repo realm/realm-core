@@ -35,6 +35,7 @@ struct SharedGroup::SharedInfo {
     uint16_t version;
     uint16_t flags;
 
+    uint32_t client_count;
     pthread_mutex_t readmutex;
     pthread_mutex_t writemutex;
     uint64_t filesize;
@@ -252,6 +253,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             info->capacity = 32 - 1;
             info->put_pos  = 0;
             info->get_pos  = 0;
+            info->client_count = 1;
             info->init_complete = 1; // <- must be last in initialization
             // Set initial version so we can track if other instances
             // change the db
@@ -283,6 +285,14 @@ void SharedGroup::open(const string& path, bool no_create_file,
             bool read_only = false;
             bool no_create = true;
             alloc.attach_file(path, is_shared, read_only, no_create); // Throws
+
+            // increment client count. 1 is added for every live shared_group.
+            {
+                ScopedMutexLock lock(&info->readmutex);
+                if (info->client_count == 0)
+                    throw runtime_error("Encountered a stale lock file");
+                info->client_count++;
+            }
         }
 
         fug_2.release(); // Do not unmap
@@ -333,8 +343,12 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 
     SharedInfo* info = m_file_map.get_addr();
 
-    // In async mode, cleanup will be handled by the async_commit process
-    if (info->flags == durability_Async) return;
+    // decrement client count. 1 is added for every live shared_group.
+    {
+        ScopedMutexLock lock(&info->readmutex);
+        info->client_count--;
+        if (info->client_count != 0) return;
+    }
 
     // If the db file is just backing for a transient data structure,
     // we can delete it when done.
@@ -348,11 +362,11 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     }
 
     // FIXME: the following is not possible unless you detect that you are
-    // the last client
-//    pthread_mutex_destroy(&info->readmutex);
-//    pthread_mutex_destroy(&info->writemutex);
+    // the last client - and it is not possible to do safely
+    // pthread_mutex_destroy(&info->readmutex);
+    // pthread_mutex_destroy(&info->writemutex);
 
-//    remove(m_file_path.c_str());
+    remove(m_file_path.c_str());
 }
 
 
@@ -409,8 +423,18 @@ void SharedGroup::do_async_commits()
         if (m_file.is_removed()) {
 
             shutdown = true;
+            printf("Lock file removed, initiating shutdown\n");
         }
+        {
+            ScopedMutexLock lock(&info->readmutex);
+            if (info->client_count == 1) {
 
+                info->client_count = 0;
+                shutdown = true;
+                printf("Last client gone, initiating shutdown\n");
+            }
+        }
+                
         if (has_changed()) {
 
             printf("Syncing...");
@@ -440,8 +464,8 @@ void SharedGroup::do_async_commits()
         if (shutdown) {
             // Being the backend process, we own the lock file, so we
             // have to clean up when we shut down.
-            pthread_mutex_destroy(&info->readmutex);
-            pthread_mutex_destroy(&info->writemutex);
+            // pthread_mutex_destroy(&info->readmutex);
+            // pthread_mutex_destroy(&info->writemutex);
             remove(m_file_path.c_str());
             printf("Daemon exiting nicely\n");
             exit(EXIT_SUCCESS);

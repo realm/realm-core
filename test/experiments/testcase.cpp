@@ -89,9 +89,6 @@ void* IncrementEntry(void* arg)
         printf("Thread exiting for unknown reason\n");
         printf("\n");
     }
-    printf("thread done\n");
-    sleep(1);
-    printf("thread returning 0\n");
     return 0;
 }
 
@@ -118,8 +115,10 @@ void single_threaded()
         }
     }
 
-    File::try_remove("asynctest.tightdb.lock");
-    sleep(1);
+    // Wait for async_commit process to shutdown
+    while (File::exists("asynctest.tightdb.lock")) {
+        sleep(1);
+    }
     // Read the db again in normal mode to verify
     {
         SharedGroup db("asynctest.tightdb");
@@ -130,8 +129,6 @@ void single_threaded()
             CHECK(t1->size() == 100);
         }
     }
-    File::try_remove("asynctest.tightdb.lock");
-    sleep(1);
 }
 
 void multi_threaded() 
@@ -186,9 +183,10 @@ void multi_threaded()
         }
 
     }
-    sleep(1);
-    File::try_remove("test_shared.tightdb.lock");
-    sleep(1);
+    // Wait for async_commit process to shutdown
+    while (File::exists("test_shared.tightdb.lock")) {
+        sleep(1);
+    }
     // Verify - once more, in sync mode - that the changes were made
     {
         printf("Reopening in sync mode and verifying\n");
@@ -201,9 +199,6 @@ void multi_threaded()
             CHECK_EQUAL(100, v);
         }
     }
-    sleep(1);
-    File::try_remove("test_shared.tightdb.lock");
-
 }
 
 
