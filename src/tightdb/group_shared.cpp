@@ -106,7 +106,11 @@ void spawn_daemon(const string& file)
         // single threaded context. This is ensured by the fork above.
         const char* exe = getenv("TIGHTDBD_PATH");
         if (exe == NULL)
+#ifdef TIGTHDB_DEBUG
             exe = "/usr/local/bin/tightdbd";
+#else
+            exe = "/usr/local/bin/tightdbd-dbg";
+#endif
         execl(exe, exe, file.c_str(), (char*) NULL);
 
         // if we continue here, exec has failed so return error
@@ -235,7 +239,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
 #endif
             if (pthread_mutex_init(&info->writemutex, &mattr))
                 throw runtime_error("mutex_init failed");
-            printf("writemutex resident at %p\n", &info->writemutex);
             pthread_mutexattr_destroy(&mattr);
 
 
@@ -438,7 +441,6 @@ void SharedGroup::do_async_commits()
             // Being the backend process, we own the lock file, so we
             // have to clean up when we shut down.
             pthread_mutex_destroy(&info->readmutex);
-            printf("write-mutex resident at %p\n", &info->writemutex);
             pthread_mutex_destroy(&info->writemutex);
             remove(m_file_path.c_str());
             printf("Daemon exiting nicely\n");
