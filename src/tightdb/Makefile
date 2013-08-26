@@ -1,4 +1,6 @@
-GENERATED_SOURCES = table_macros.hpp
+lib_LIBRARIES = libtightdb.a
+DEV_PROGRAMS = tightdb-config
+bin_PROGRAMS = tightdb-import
 
 INST_HEADERS = config.h meta.hpp assert.hpp exceptions.hpp terminate.hpp type_list.hpp tuple.hpp \
 bind.hpp safe_int_ops.hpp unique_ptr.hpp bind_ptr.hpp string_buffer.hpp file.hpp thread.hpp \
@@ -7,9 +9,6 @@ column_type.hpp column_fwd.hpp spec.hpp date.hpp string_data.hpp binary_data.hpp
 table.hpp table_ref.hpp table_basic_fwd.hpp table_accessors.hpp table_basic.hpp table_view.hpp \
 table_view_basic.hpp table_macros.hpp group.hpp group_shared.hpp query.hpp \
 query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h replication.hpp importer.hpp
-
-lib_LIBRARIES = libtightdb.a
-DEV_PROGRAMS = tightdb-config
 
 libtightdb_a_SOURCES = terminate.cpp string_buffer.cpp file.cpp thread.cpp utf8.cpp \
 utilities.cpp alloc.cpp alloc_slab.cpp array.cpp array_string.cpp array_string_long.cpp \
@@ -43,6 +42,11 @@ endif
 libtightdb_a_VERSION = 3:0:0
 
 tightdb_config_SOURCES = config.cpp
+
+tightdb_import_SOURCES = importer_tool.cpp
+tightdb_import_LIBS    = libtightdb.a
+
+GENERATED_SOURCES = table_macros.hpp
 
 include ../../generic.mk
 

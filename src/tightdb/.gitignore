@@ -23,7 +23,13 @@
 
 /tightdb-config
 /tightdb-config-dbg
-/tightdb-config-cov
+
+/tightdb-import
+/tightdb-import-noinst
+/tightdb-import-dbg
+/tightdb-import-dbg-noinst
+/tightdb-import-cov
+/tightdb-import-cov-noinst
 
 # iPhone
 /libtightdb-iPhoneOS.a
