@@ -62,31 +62,46 @@ struct CustomTestReporter: TestReporter {
 } // anonymous namespace
 
 
-
+TIGHTDB_TABLE_2(TwoColTable,
+    first,  Int,
+    second, Float)
 
 int main(int argc, char* argv[])
 {
 
-
-    /*
-
-
-
-
-
-    */
-
-
+    
     Table table;
     table.add_column(type_Int, "first1");
     table.add_column(type_Float, "second1");
     table.add_column(type_Double, "third");
 
-    size_t match;
-
     Columns<int64_t> first(0);
     Columns<float> second(1);
     Columns<double> third(2);
+
+    Expression *expression = first >= first / second + second / 1;
+
+
+
+//    Column<int64_t> first = table....
+//    Query q = first > 120;
+//    TwoColTable
+
+    TwoColTable two;
+    two.column().first;  
+    two.column().first.minimum();
+
+//    Columns<int64_t> first2(    two.column().first    );
+
+// TwoColTable::first first = two.column().first;
+
+    
+    
+
+
+   size_t match;
+
+
 
     table.add_empty_row(2);
 
@@ -98,7 +113,9 @@ int main(int argc, char* argv[])
     table.set_int(0, 1, 20);
     table.set_float(1, 1, 20.1f);
     table.set_double(2, 1, 4.0);
-   
+
+
+
     /*
     exp = first >= 20.0f;
     match = table.where().expression(exp).find_next();
@@ -107,8 +124,7 @@ int main(int argc, char* argv[])
     */
 
 
-
-
+//    ColumnDouble& cd =
 
 
 
@@ -183,7 +199,7 @@ int main(int argc, char* argv[])
 #endif
 
 
-  
+
     tightdb::TableView t1;
 
     match = 0;

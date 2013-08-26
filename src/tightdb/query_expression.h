@@ -23,7 +23,7 @@ This file lets you write queries in C++ syntax like: Expression* e = (first + 1 
 
 Type conversion/promotion semantics is the same as in the C++ expressions, e.g float + int > double == float + 
 (float)int > double. Grammar and classes:
-
+-----------------------------------------------------------------------------------------------------------------------
     Expression:         Subexpr2<T>  Compare<Cond, T>  Subexpr2<T>
 
     Subexpr2<T>:        Value<T>
@@ -38,6 +38,7 @@ Type conversion/promotion semantics is the same as in the C++ expressions, e.g f
 
     T:                  int, int64_t, float, double
 
+-----------------------------------------------------------------------------------------------------------------------
 The Value<T> type can contain values and is used for both user-specified constants and internal intermediate results.
 
 All Subexpr2<T> subclasses (Value, Columns and Operator) contain the method:
@@ -55,6 +56,12 @@ The Compare class contains the method:
     size_t compare(size_t start, size_t end)
 
 which performs the final query search. 
+-----------------------------------------------------------------------------------------------------------------------
+
+Todo:    
+    * Use query_engine.hpp for execution of simple queries that are supported there, because it's faster
+    * Support unary operators like power and sqrt
+
 */
 
 
