@@ -130,6 +130,8 @@ void single_threaded()
             CHECK(t1->size() == 100);
         }
     }
+    File::try_remove("asynctest.tightdb.lock");
+    sleep(1);
 }
 
 void multi_threaded() 
