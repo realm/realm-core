@@ -555,7 +555,8 @@ TEST(Table_test_json_simple)
     s.add_column(type_Int,    "int");
     s.add_column(type_Bool,   "bool");
     s.add_column(type_Date,   "date");
-    // FIXME: Add float, double
+    s.add_column(type_Float,  "float");
+    s.add_column(type_Double, "double");
     s.add_column(type_String, "string");
     s.add_column(type_Binary, "binary");
     table.update_from_spec();
@@ -563,11 +564,13 @@ TEST(Table_test_json_simple)
     // Add some rows
     for (size_t i = 0; i < 1; ++i) {
         table.insert_int(0, i, i);
-        table.insert_bool(1, i, (i % 2 ? true : false));
+        table.insert_bool(1, i, (i % 2 == 0? true : false));
         table.insert_date(2, i, 0x7fffeeeeL);
-        table.insert_string(3, i, "helloooooo");
+        table.insert_float(3, i, 3.14f);
+        table.insert_double(4, i, 2.71);
+        table.insert_string(5, i, "helloooooo");
         const char bin[] = "123456789012345678901234567890nopq";
-        table.insert_binary(4, i, BinaryData(bin, sizeof bin));
+        table.insert_binary(6, i, BinaryData(bin, sizeof bin));
         table.insert_done();
     }
 
@@ -575,7 +578,7 @@ TEST(Table_test_json_simple)
      table.to_json(ss);
      const string json = ss.str();
      CHECK_EQUAL(true, json.length() > 0);
-     //cerr << "JSON:" << json << "\n";
+     CHECK_EQUAL("[{\"int\":0,\"bool\":true,\"date\":\"2038-01-19 02:01:18\",\"float\":3.1400001e+00,\"double\":2.7100000000000000e+00,\"string\":\"helloooooo\",\"binary\":\"3132333435363738393031323334353637383930313233343536373839306e6f707100\"}]", json);
 }
 
 
@@ -726,6 +729,25 @@ TEST(Table_Index_String)
     CHECK_EQUAL(2, c1);
 }
 
+TEST(Table_Index_String_Twice)
+{
+    TestTableEnum table;
+
+    table.add(Mon, "jeff");
+    table.add(Tue, "jim");
+    table.add(Wed, "jennifer");
+    table.add(Thu, "john");
+    table.add(Fri, "jimmy");
+    table.add(Sat, "jimbo");
+    table.add(Sun, "johnny");
+    table.add(Mon, "jennifer"); // duplicate
+
+    table.column().second.set_index();
+    CHECK_EQUAL(true, table.column().second.has_index());
+    table.column().second.set_index();
+    CHECK_EQUAL(true, table.column().second.has_index());
+}
+
 namespace {
 TIGHTDB_TABLE_2(LookupTable,
                 first,  String,
@@ -784,6 +806,39 @@ TEST(Table_Lookup)
     CHECK_EQUAL(6, b6);
     CHECK_EQUAL(not_found, b7);
 }
+
+namespace {
+TIGHTDB_TABLE_1(TestSubtableLookup2,
+                str, String)
+TIGHTDB_TABLE_1(TestSubtableLookup1,
+                subtab, Subtable<TestSubtableLookup2>)
+} // anonymous namespace
+
+
+/*
+TEST(Table_SubtableLookup)
+{
+    TestSubtableLookup1 t;
+    t.add();
+    t.add();
+    {
+        TestSubtableLookup2::Ref r0 = t[0].subtab;
+        r0->add("foo");
+        r0->add("bar");
+        size_t i1 = r0->lookup("bar");
+        CHECK_EQUAL(1, i1);
+        size_t i2 = r0->lookup("foobar");
+        CHECK_EQUAL(not_found, i2);
+    }
+
+    {
+        TestSubtableLookup2::Ref r1 = t[1].subtab;
+        size_t i3 = r1->lookup("bar");
+        CHECK_EQUAL(not_found, i3);
+    }
+}
+*/
+
 
 TEST(Table_Distinct)
 {
@@ -2001,7 +2056,7 @@ TEST(Table_SetSubTableByExample)
     table->insert_subtable(2, 0);
     table->insert_done();
 
-    // create a freestanding table to be used as a source by set_subtable 
+    // create a freestanding table to be used as a source by set_subtable
 
     Table  sub = Table();
     sub.add_column(type_Int,"sub_first");
@@ -2254,10 +2309,25 @@ TEST(Table_LanguageBindings)
 
 TEST(Table_MultipleColumn)
 {
-
     Table table;
     table.add_column(type_Int, "first");
     table.add_column(type_Int, "first");
     CHECK_EQUAL(table.get_column_count(), 2);
     CHECK_EQUAL(table.get_column_index("first"), 0);
+}
+
+
+TEST(Table_FormerLeakCase)
+{
+    Table sub;
+    sub.add_column(type_Int, "a");
+
+    Table root;
+    Spec& s = root.get_spec();
+    Spec subs = s.add_subtable_column("b");
+    subs.add_column(type_Int, "a");
+    root.update_from_spec();
+    root.add_empty_row(1);
+    root.set_subtable(0, 0, &sub);
+    root.set_subtable(0, 0, 0);
 }

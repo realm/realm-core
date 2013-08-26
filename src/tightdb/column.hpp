@@ -59,8 +59,6 @@ public:
     // column types such as AdaptiveStringColumn.
     void resize(std::size_t size) { m_array->resize(size); }
 
-    virtual void SetHasRefs() {};
-
     virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT { return false; }
 
     virtual void destroy() = 0;
@@ -174,8 +172,6 @@ public:
 
     bool IsIntColumn() const TIGHTDB_NOEXCEPT { return true; }
 
-    void SetHasRefs();
-
     std::size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
 
@@ -198,7 +194,11 @@ public:
 
     void sort(std::size_t start, std::size_t end);
     void ReferenceSort(std::size_t start, std::size_t end, Column& ref);
+
+    // FIXME: Be careful, clear() currently forgets if the leaf type
+    // is Array::type_HasRefs.
     void clear() TIGHTDB_OVERRIDE;
+
     void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
 
@@ -226,15 +226,14 @@ public:
 
     // Debug
 #ifdef TIGHTDB_DEBUG
-    void Print() const;
+    void print() const;
     virtual void Verify() const TIGHTDB_OVERRIDE;
-    MemStats Stats() const;
+    MemStats stats() const;
 #endif
 
 protected:
     Column(Array* root);
     void create();
-    void update_ref(ref_type ref);
 
     // Node functions
     void LeafSet(std::size_t ndx, int64_t value) { m_array->set(ndx, value); }
@@ -339,11 +338,6 @@ inline Column::Column(Array* root): ColumnBase(root) {}
 inline Column::~Column()
 {
     delete m_array;
-}
-
-inline void Column::update_ref(ref_type ref)
-{
-    m_array->update_ref(ref);
 }
 
 inline void Column::destroy()

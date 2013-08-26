@@ -115,7 +115,7 @@ public:
     void insert_subtable(std::size_t ndx, const Table*);
 
     void add() TIGHTDB_OVERRIDE { insert_int(size(), 0); }
-    void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert_int(ndx, 0); invalidate_subtables(); }
+    void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert_int(ndx, 0); }
     void clear() TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
