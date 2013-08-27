@@ -54,9 +54,13 @@ struct SharedGroup::SharedInfo {
 namespace {
 
 // rudimentary compare and swap, while we are waiting for c++11
-bool CompareAndSwap(uint32_t* ptr, uint32_t expected_val, uint32_t new_val)
+bool compare_and_swap(uint32_t* ptr, uint32_t expected_val, uint32_t new_val)
 {
+#ifdef TIGHTDB_HAVE_GCC_GE_4_6
     return __sync_bool_compare_and_swap(ptr,expected_val,new_val);
+#else
+#  error "CAS is unimplemented on this platform"
+#endif
 }
 
 class ScopedMutexLock {
@@ -292,10 +296,18 @@ void SharedGroup::open(const string& path, bool no_create_file,
             bool no_create = true;
             alloc.attach_file(path, is_shared, read_only, no_create); // Throws
 
-            // increment client count. 1 is added for every live shared_group.
+            // increment client count. 1 is added for every live shared_group
+            // We need to handle a count value of 0 specially, as it indicates
+            // that the daemon is already shutting down. This can happen if
+            // another client drops through and triggers shutdown before this
+            // one comes here.
             while (1) {
                 uint32_t count = info->client_count;
-                if (CompareAndSwap(&info->client_count, count, count+1))
+                if (count == 0) {
+                    // FIXME: this one should restart the entire procedure
+                    throw runtime_error("Daemon shutting down");
+                }
+                if (compare_and_swap(&info->client_count, count, count+1))
                     break;
             }
         }
@@ -352,11 +364,12 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     uint32_t count;
     while (1) {
         count = info->client_count;
-        if (CompareAndSwap(&info->client_count, count, count-1))
+        if (compare_and_swap(&info->client_count, count, count-1))
             break;
     }
     if (count > 1) return;
     // coming here count must be <= 1, implying that client_count <= 0
+    // implying that we are the last client and responsible for cleaning up
 
     // If the db file is just backing for a transient data structure,
     // we can delete it when done.
@@ -436,13 +449,13 @@ void SharedGroup::do_async_commits()
         // lock file invalid. Any client coming along before we
         // finish syncing will see the lock file, but detect that
         // the daemon has abandoned it. It can then wait for the
-        // lock file to be removed. Currently, it just throws a runtime
-        // exception, though.
+        // lock file to be removed (with a timeout). 
+        // Currently, it just throws a runtim exception, though.
         uint32_t count;
         do {
             count = info->client_count;
             if (count > 1) break;
-        } while (! CompareAndSwap(&info->client_count, count, 0));
+        } while (! compare_and_swap(&info->client_count, count, 0));
         if (count == 0) {
             shutdown = true;
             printf("Last client gone, initiating shutdown\n");
