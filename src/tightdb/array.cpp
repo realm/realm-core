@@ -1978,6 +1978,41 @@ find_child(const char* offsets_header, size_t elem_ndx) TIGHTDB_NOEXCEPT
 
 
 template<int width>
+inline pair<ref_type, size_t> find_btree_child(const char* data, size_t ndx,
+                                               const Allocator& alloc) TIGHTDB_NOEXCEPT
+{
+    ref_type child_ref;
+    size_t elem_ndx_offset;
+    int64_t value = get_direct<width>(data, 0);
+    if (value % 2 == 1) {
+        // Case 1/2: No offsets array
+        size_t elems_per_child = to_size_t(value);
+        size_t child_ndx = ndx / elems_per_child;
+        elem_ndx_offset  = ndx % elems_per_child;
+        // FIXME: It may be worth considering not to store the total
+        // number of elements in each node. This would also speed up a
+        // tight sequence of append-to-column.
+        child_ref = to_ref(get_direct<width>(data, 2+child_ndx));
+    }
+    else {
+        // Case 2/2: Offsets array
+        ref_type offsets_ref = to_ref(value);
+        ref_type refs_ref = to_ref(get_direct<width>(data, 1));
+        char* header = alloc.translate(offsets_ref);
+        int width_2 = Array::get_width_from_header(header);
+        pair<size_t, size_t> p;
+        TIGHTDB_TEMPEX(p = find_child, width_2, (header, ndx));
+        size_t child_ndx = p.first;
+        elem_ndx_offset = p.second;
+        header = alloc.translate(refs_ref);
+        width_2 = Array::get_width_from_header(header);
+        child_ref = to_ref(get_direct(Array::get_data_from_header(header), width_2, child_ndx));
+    }
+    return make_pair(child_ref, elem_ndx_offset);
+}
+
+
+template<int width>
 inline pair<size_t, size_t> get_two_as_size(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 {
     const char* data = Array::get_data_from_header(header);
@@ -2694,30 +2729,23 @@ top:
 pair<MemRef, size_t> Array::find_btree_leaf(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(!is_leaf());
-    ref_type offsets_ref = get_as_ref(0);
-    ref_type refs_ref    = get_as_ref(1);
+
+    size_t ndx_2 = ndx;
+    int width = m_width;
+    const char* data = m_data;
+
     for (;;) {
-        char* header = m_alloc.translate(offsets_ref);
-        int width = get_width_from_header(header);
-        pair<size_t, size_t> p;
-        TIGHTDB_TEMPEX(p = find_child, width, (header, ndx));
-        size_t child_ndx       = p.first;
+        pair<ref_type, size_t> p;
+        TIGHTDB_TEMPEX(p = find_btree_child, width, (data, ndx_2, m_alloc));
+        ref_type child_ref     = p.first;
         size_t elem_ndx_offset = p.second;
-        ndx -= elem_ndx_offset; // local index
-
-        header = m_alloc.translate(refs_ref);
-        width = get_width_from_header(header);
-        ref_type child_ref = to_ref(get_direct(get_data_from_header(header), width, child_ndx));
-
-        header = m_alloc.translate(child_ref);
+        ndx_2 -= elem_ndx_offset; // local index
+        char* header = m_alloc.translate(child_ref);
         bool child_is_leaf = get_isleaf_from_header(header);
         if (child_is_leaf)
-            return make_pair(MemRef(header, child_ref), ndx);
-
+            return make_pair(MemRef(header, child_ref), ndx_2);
         width = get_width_from_header(header);
-        TIGHTDB_TEMPEX(p = ::get_two_as_size, width, (header, 0));
-        offsets_ref = p.first;
-        refs_ref    = p.second;
+        data = get_data_from_header(header);
     }
 }
 
