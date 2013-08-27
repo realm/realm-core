@@ -383,6 +383,10 @@ TEST(Shared_Writes)
 
 TEST(Shared_ManyReaders)
 {
+    // This test was written primarily to expose a former bug in
+    // SharedGroup::end_read(), where the lock-file was not remapped
+    // after ring-buffer expansion.
+
     const int chunk_1_size = 251;
     char chunk_1[chunk_1_size];
     for (int i = 0; i < chunk_1_size; ++i)
@@ -461,7 +465,7 @@ TEST(Shared_ManyReaders)
             }
         }
 
-        // Check isolation between changes
+        // Check isolation between read transactions
         for (int i = 0; i < 2*N; ++i) {
             ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
             CHECK_EQUAL(1, test_1->size());
@@ -476,7 +480,7 @@ TEST(Shared_ManyReaders)
                 CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
         }
 
-        // End the first half of the read transaction during further
+        // End the first half of the read transactions during further
         // changes
         for (int i = N-1; i >= 0; --i) {
             {
@@ -501,7 +505,7 @@ TEST(Shared_ManyReaders)
             read_transactions[i].reset();
         }
 
-        // Initiate 6*N extra read transactions with further progressive changes
+        // Initiate 6*N extra read transactionss with further progressive changes
         for (int i = 2*N; i < 8*N; ++i) {
             read_transactions[i].reset(new ReadTransaction(*shared_groups[i]));
             {
@@ -538,7 +542,7 @@ TEST(Shared_ManyReaders)
             }
         }
 
-        // End all remaining read transaction during further changes
+        // End all remaining read transactions during further changes
         for (int i = 1*N; i < 8*N; ++i) {
             {
                 WriteTransaction wt(root_sg);
