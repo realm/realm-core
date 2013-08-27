@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iostream>
 #include <unistd.h>
+#include <wait.h>
 
 #include <tightdb/column.hpp>
 #include <tightdb.hpp>
@@ -41,6 +42,8 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 namespace  {
 
+#define INCREMENTS 10
+
 void* IncrementEntry(void* arg)
 {
     try 
@@ -51,7 +54,7 @@ void* IncrementEntry(void* arg)
         SharedGroup sg("test_shared.tightdb", 
                        false, SharedGroup::durability_Async );
 
-        for (size_t i = 0; i < 100; ++i) {
+        for (size_t i = 0; i < INCREMENTS; ++i) {
 
             // Increment cell
             {
@@ -84,7 +87,6 @@ void* IncrementEntry(void* arg)
     } catch (runtime_error e) {
         printf("Thread exiting due to runtime exception\n");
         printf("what(): %s\n", e.what());
-        sleep(1);
     } catch (...) {
         printf("Thread exiting for unknown reason\n");
         printf("\n");
@@ -96,11 +98,6 @@ void* IncrementEntry(void* arg)
 
 void single_threaded()
 {
-    // Clean up old state
-    File::try_remove("asynctest.tightdb");
-    File::try_remove("asynctest.tightdb.lock");
-    // wait for daemon to exit
-    sleep(1);
     printf("Single threaded client\n");
     // Do some changes in a async db
     {
@@ -117,7 +114,7 @@ void single_threaded()
 
     // Wait for async_commit process to shutdown
     while (File::exists("asynctest.tightdb.lock")) {
-        sleep(1);
+        usleep(100);
     }
     // Read the db again in normal mode to verify
     {
@@ -131,36 +128,64 @@ void single_threaded()
     }
 }
 
-void multi_threaded() 
+void make_table(size_t rows) 
 {
-    // Clean up old state
     File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock");
-    sleep(1);
+    File::try_remove("test_alone.tightdb");
+    // Create first table in group
+#if 1
+    {
+        SharedGroup sg("test_shared.tightdb");
+        WriteTransaction wt(sg);
+        TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+        for (size_t i = 0; i < rows; ++i) {
+            t1->add(0, 2, false, "test");
+        }
+        wt.commit();
+    }
+#if 0
+#else
+    {
+        SharedGroup sg("test_shared.tightdb", 
+                       false, SharedGroup::durability_Async);
+        WriteTransaction wt(sg);
+        TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+        for (size_t i = 0; i < rows; ++i) {
+            t1->add(0, 2, false, "test");
+        }
+        wt.commit();
+    }
+#endif
+    // Wait for async_commit process to shutdown
+    while (File::exists("test_shared.tightdb.lock")) {
+        usleep(100);
+    }
+#else
+    {
+        Group g("test_alone.tightdb", Group::mode_ReadWrite);
+        TestTableShared::Ref t1 = g.get_table<TestTableShared>("test");
+        for (size_t i = 0; i < rows; ++i) {
+            t1->add(0, 2, false, "test");
+        }
+        printf("Writing db\n");
+        g.commit();
+    }
+#endif
+}
+
+void multi_threaded(size_t thread_count, size_t base) 
+{
     printf("Multithreaded client\n");
-    const size_t thread_count = 10;
 
     // Do some changes in a async db
     {
 
-        SharedGroup sg("test_shared.tightdb", 
-                       false, SharedGroup::durability_Async);
-        // Create first table in group
-        {
-            WriteTransaction wt(sg);
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            for (size_t i = 0; i < thread_count; ++i) {
-                t1->add(0, 2, false, "test");
-            }
-            wt.commit();
-        }
-
         printf("Spawning test threads\n");
-        pthread_t threads[thread_count];
+        pthread_t* threads = new pthread_t[thread_count];
 
         // Create all threads
         for (size_t i = 0; i < thread_count; ++i) {
-            const int rc = pthread_create(&threads[i], NULL, IncrementEntry, (void*)i);
+            const int rc = pthread_create(&threads[i], NULL, IncrementEntry, (void*)(i+base));
             CHECK_EQUAL(0, rc);
         }
 
@@ -169,42 +194,81 @@ void multi_threaded()
             const int rc = pthread_join(threads[i], NULL);
             CHECK_EQUAL(0, rc);
         }
+
+        delete[] threads;
         printf("Threads done, verifying\n");
 
         // Verify that the changes were made
         {
+            SharedGroup sg("test_shared.tightdb", 
+                           false, SharedGroup::durability_Async);
             ReadTransaction rt(sg);
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
             for (size_t i = 0; i < thread_count; ++i) {
-                const int64_t v = t[i].first;
-                CHECK_EQUAL(100, v);
+                const int64_t v = t[i+base].first;
+                CHECK_EQUAL(INCREMENTS, v);
             }
         }
-
     }
+}
+
+void validate_and_clear(size_t rows, int result)
+{
     // Wait for async_commit process to shutdown
     while (File::exists("test_shared.tightdb.lock")) {
-        sleep(1);
+        usleep(100);
     }
     // Verify - once more, in sync mode - that the changes were made
     {
         printf("Reopening in sync mode and verifying\n");
         SharedGroup sg("test_shared.tightdb");
-        ReadTransaction rt(sg);
-        TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
+        WriteTransaction wt(sg);
+        TestTableShared::Ref t = wt.get_table<TestTableShared>("test");
         
-        for (size_t i = 0; i < thread_count; ++i) {
+        for (size_t i = 0; i < rows; ++i) {
             const int64_t v = t[i].first;
-            CHECK_EQUAL(100, v);
+            t[i].first = 0;
+            CHECK_EQUAL(result, v);
         }
+        wt.commit();
     }
 }
 
+void multi_process(int numprocs, size_t numthreads) 
+{
+    for (int i=0; i<numprocs; i++) {
+        if (fork()==0) {
+            fprintf(stderr, "Forked!\n");
+            multi_threaded(numthreads, i*numthreads);
+            exit(0);
+        }
+    }
+    int status = 0;
+    for (int i=0; i<numprocs; i++) wait(&status);
+    fprintf(stderr,"Joined\n");
+}
 
 int main()
 {
+    // wait for any daemon hanging around to exit
+    File::try_remove("test_shared.tightdb.lock");
+    File::try_remove("asynctest.tightdb.lock");
+    usleep(100);
+    // Clean up old state
+    File::try_remove("asynctest.tightdb");
+
     single_threaded();
 
-    multi_threaded();
+    make_table(1);
+/*
+    multi_threaded(10,0);
+    validate_and_clear(10, INCREMENTS);
+
+    for (int k=1; k<10; k++) {
+        fprintf(stderr,"Spawning processes\n");
+        multi_process(10,10);
+        validate_and_clear(100,INCREMENTS);
+    }
+*/
 }
