@@ -79,8 +79,6 @@ int main(int argc, char* argv[])
     Columns<float> second(1);
     Columns<double> third(2);
 
-    Expression *expression = first >= first / second + second / 1;
-
 
 //    Expression e = table.first >= 123 + table.second  table2.fdfd;
 
@@ -137,17 +135,6 @@ int main(int argc, char* argv[])
 
 
 
-    /*
-    exp = first >= 20.0f;
-    match = table.where().expression(exp).find_next();
-    assert(match == 0);
-
-    */
-
-
-//    ColumnDouble& cd =
-
-
 
     for (int i = 0; i < 10100; i++) {
         table.add_empty_row();
@@ -193,7 +180,7 @@ int main(int argc, char* argv[])
 // query expressions:
 
 //        float_column(1) + (int_column(0) + 20) > 50.0
-#if 0
+#if 1
     // Slow
     Subexpr* col = new Columns<int64_t>(0);
     Subexpr* colf = new Columns<float>(1);
@@ -201,10 +188,10 @@ int main(int argc, char* argv[])
     Subexpr* cc1 = new Value<int64_t>(20);
     Subexpr* cc2 = new Value<float>(50.0);  
 
-    Subexpr* ck0 = new Operator<Plus<int64_t> >(col, cc1);  
-    Subexpr* ck = new Operator<Plus<float> >(colf, ck0);  
+    Subexpr* ck0 = new Operator<Plus<int64_t> >(*col, *cc1);  
+    Subexpr* ck = new Operator<Plus<float> >(*colf, *ck0);  
 
-    Expression *e = new Compare<Greater, float>(ck, cc2);
+    Expression *e = new Compare<Greater, float>(*ck, *cc2);
 #else
     // Fast
     Columns<int64_t>* col = new Columns<int64_t>(0);
@@ -218,12 +205,6 @@ int main(int argc, char* argv[])
 
     Expression *e = new Compare<Greater, float, Subexpr, Value<float> >(ck, cc2);
 #endif
-
-
-
-
-
-
 
 
     tightdb::TableView t1;
@@ -251,8 +232,6 @@ int main(int argc, char* argv[])
         }
 
 //        delete e;
-
-
 
         /*
 
