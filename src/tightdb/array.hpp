@@ -1628,7 +1628,7 @@ ref_type Array::btree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& state
         // the first subtree, or it can be prepended to the second
         // one. We currently always append to the first subtree. It is
         // essentially a matter of using the lower vs. the upper bound
-        // when searching in in the offsets array.
+        // when searching through the offsets array.
         child_ndx = offsets.lower_bound_int(elem_ndx);
         TIGHTDB_ASSERT(child_ndx < refs.size());
         std::size_t elem_ndx_offset = child_ndx == 0 ? 0 : to_size_t(offsets.get(child_ndx-1));

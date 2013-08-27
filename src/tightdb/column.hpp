@@ -375,7 +375,8 @@ inline void Column::add(int64_t value)
 inline void Column::insert(std::size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx <= size());
-    if (size() <= ndx) ndx = npos;
+    if (size() <= ndx)
+        ndx = npos;
     do_insert(ndx, value);
 }
 
