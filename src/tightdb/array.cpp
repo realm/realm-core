@@ -1981,33 +1981,29 @@ template<int width>
 inline pair<ref_type, size_t> find_btree_child(const char* data, size_t ndx,
                                                const Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    ref_type child_ref;
+    size_t child_ref_ndx;
     size_t elem_ndx_offset;
-    int64_t value = get_direct<width>(data, 0);
-    if (value % 2 == 1) {
-        // Case 1/2: No offsets array
-        size_t elems_per_child = to_size_t(value);
-        size_t child_ndx = ndx / elems_per_child;
-        elem_ndx_offset  = ndx % elems_per_child;
+    int64_t first_value = get_direct<width>(data, 0);
+    if (first_value % 2 == 1) {
+        // Case 1/2: No offsets array (collapsed)
+        size_t elems_per_child = to_size_t(first_value);
+        child_ref_ndx   = 2 + ndx / elems_per_child;
+        elem_ndx_offset =     ndx % elems_per_child;
         // FIXME: It may be worth considering not to store the total
-        // number of elements in each node. This would also speed up a
-        // tight sequence of append-to-column.
-        child_ref = to_ref(get_direct<width>(data, 2+child_ndx));
+        // number of elements in each collapsed node. This would also
+        // speed up a tight sequence of append-to-column.
     }
     else {
-        // Case 2/2: Offsets array
-        ref_type offsets_ref = to_ref(value);
-        ref_type refs_ref = to_ref(get_direct<width>(data, 1));
+        // Case 2/2: Offsets array (non-collapsed)
+        ref_type offsets_ref = to_ref(first_value);
         char* header = alloc.translate(offsets_ref);
         int width_2 = Array::get_width_from_header(header);
         pair<size_t, size_t> p;
         TIGHTDB_TEMPEX(p = find_child, width_2, (header, ndx));
-        size_t child_ndx = p.first;
-        elem_ndx_offset = p.second;
-        header = alloc.translate(refs_ref);
-        width_2 = Array::get_width_from_header(header);
-        child_ref = to_ref(get_direct(Array::get_data_from_header(header), width_2, child_ndx));
+        child_ref_ndx   = 1 + p.first;
+        elem_ndx_offset =     p.second;
     }
+    ref_type child_ref = to_ref(get_direct<width>(data, child_ref_ndx));
     return make_pair(child_ref, elem_ndx_offset);
 }
 
