@@ -2,8 +2,8 @@
 echo Tightdb core c++ binding Windows Release.
 Echo alpha 0.02
 echo ----------------------------------------------------------
-Echo Currently this batch file will create a release version of
-echo the already built source in the directory where the batch 
+Echo Currently this cmd file will create a release version of
+echo the already built source in the directory where the cmd
 echo file resides. The release version will be placed in 
 echo (git checkout directory)\release\VS2012\files
 echo the directory is created if it does not exist.
@@ -67,3 +67,4 @@ cd %location%release\vs2012\files%location%7z.exe a -tzip -r %location%\release\
 :0.02 language rewritten for clarity
 :0.02 7zip now called so that it makes a .zip file instead of a 7z file
 :0.02 file renamed to winrelease.bat from build.bat
+:0.03 file renamed to winrelease.cmd from winrelease.bat

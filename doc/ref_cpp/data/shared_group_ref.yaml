@@ -1,5 +1,5 @@
 #
-# C++ reference documentation for Shared Group class
+# C++ reference documentation for the SharedGroup class.
 #
 
 ID         : class_shared_group
@@ -8,7 +8,7 @@ SUMMARY    : &g_shared_group_summary
              Sharing groups
 DESCR      : &g_shared_group_descr
              >
-             Database files can be shared across running applications.
+             Database files can be shared between running applications.
 
              When two threads or processes want to access the same
              database file, they must each create their own
@@ -29,7 +29,7 @@ DESCR      : &g_shared_group_descr
              Processes that share a database file must reside on
              the same host.
 
-             Moreover, the class also provide a transactional
+             Moreover, the class also provides a transactional
              interface to TightDB. Transactions are divided into
              read and write transactions. While read transactions
              do not modify the table and thereby the group, write
@@ -69,13 +69,14 @@ CATEGORIES:
                  state (2). See {@link g_shared_group_open} and
                  {@link g_shared_group_is_attached} for more on this.
       ENUM_SIG :
-      - SIG    : SharedGroup(const std::string& path, bool no_create = false, DurabilityLevel dlevel = durability_Full);
+      - SIG    : >
+                 SharedGroup(const std::string& path, bool no_create = false,
+                             DurabilityLevel dlevel = durability_Full);
       - SIG    : SharedGroup(unattached_tag);
       PARAMS:
       - NAME   : path
         TYPES  : const std::string&
-        DESCR  : &g_shared_group_constructor_parm1_descr
-                 Filesystem path of the TightDB database file to be opened.
+        DESCR  : *g_open_filesystem_path_descr
       - NAME   : no_create
         TYPES  : bool
         DESCR  : &g_shared_group_constructor_parm2_descr
@@ -107,11 +108,11 @@ CATEGORIES:
       - EXCEPT : &cpp_access_error_except
                  File::AccessError
         DESCR  : &g_access_error_descr
-                 Some other IO error occurred.
+                 For some reason, we can't access the database.
       - EXCEPT : &cpp_runtime_error_except
                  std::runtime_error
         DESCR  : &g_runtime_error_descr
-                 Some other error occurred.
+                 A serious error occurred.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_constructor
         DESCR  :
@@ -121,6 +122,8 @@ CATEGORIES:
       NAMES    : open
       SUMMARY  : &g_shared_group_open_summary
                  Is this SharedGroup instance in its attached state?
+      SIGNATURE: >
+                 open(const std::string& file, bool no_create = false, DurabilityLevel dlevel = durability_Full);
       DESCR    : &g_shared_group_open_descr
                  Attach this SharedGroup instance to the specified
                  database file.
@@ -145,10 +148,9 @@ CATEGORIES:
                  Calling open() on a SharedGroup instance that is
                  already in the attached state has undefined behavior.
       PARAMS:
-      - NAME   : file
+      - NAME   : path
         TYPES  : const std::string&
-        DESCR  : &g_shared_group_open_parm1_descr
-                 Filesystem path of the TightDB database file to be opened.
+        DESCR  : *g_open_filesystem_path_descr
       - NAME   : no_create
         TYPES  : bool
         DESCR  : &g_shared_group_open_parm2_descr
@@ -283,7 +285,7 @@ CATEGORIES:
                  Initiate reading from a shared group.
       DESCR    : &g_shared_group_begin_read_descr
                  >
-                 Begin reading from a shared group. During the read transaction, 
+                 Begin reading from a shared group. During the read transaction,
                  you have a fully consistent immutable view of the group.
       CONST    : True
       RETURN:
@@ -301,4 +303,3 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_end_read
         DESCR  :
-

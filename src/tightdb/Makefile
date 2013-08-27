@@ -9,7 +9,7 @@ table_view_basic.hpp table_macros.hpp group.hpp group_shared.hpp query.hpp \
 query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h replication.hpp
 
 lib_LIBRARIES = libtightdb.a
-bin_PROGRAMS  = tightdb-config
+DEV_PROGRAMS = tightdb-config
 
 libtightdb_a_SOURCES = terminate.cpp string_buffer.cpp file.cpp thread.cpp utf8.cpp \
 utilities.cpp alloc.cpp alloc_slab.cpp array.cpp array_string.cpp array_string_long.cpp \
