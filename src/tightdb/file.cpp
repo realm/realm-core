@@ -182,6 +182,9 @@ string make_temp_dir()
 }
 
 
+} // namespace tightdb
+
+
 void File::open(const string& path, AccessMode a, CreateMode c, int flags)
 {
     TIGHTDB_ASSERT(!is_attached());
@@ -886,6 +889,3 @@ bool File::is_removed() const
 
 #endif
 }
-
-
-} // namespace tightdb

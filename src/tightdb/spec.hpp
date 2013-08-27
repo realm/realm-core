@@ -32,7 +32,7 @@ class Table;
 class Spec {
 public:
     Spec(const Spec&);
-    ~Spec();
+    ~Spec() TIGHTDB_NOEXCEPT;
 
     std::size_t add_column(DataType type, StringData name, ColumnType attr = col_attr_None);
     std::size_t add_subcolumn(const std::vector<std::size_t>& column_path, DataType type,
@@ -93,19 +93,22 @@ private:
     Spec(const Table*, Allocator&, ArrayParent*, std::size_t ndx_in_parent);
     Spec(const Table*, Allocator&, ref_type, ArrayParent*, std::size_t ndx_in_parent);
 
-    void init_from_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent);
-    void destroy();
+    void init_from_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
+    void destroy() TIGHTDB_NOEXCEPT;
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT;
 
-    bool update_from_parent() TIGHTDB_NOEXCEPT;
+    /// Called in the context of Group::commit() to ensure that
+    /// attached table accessors stay valid across a commit. Please
+    /// note that this works only for non-transactional commits. Table
+    /// accessors obtained during a transaction are always detached
+    /// when the transaction ends.
+    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
+
     void set_parent(ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
 
     void set_column_type(std::size_t column_ndx, ColumnType type);
     void set_column_attr(std::size_t column_ndx, ColumnType attr);
-
-    // Serialization
-    template<class S> std::size_t write(S& out, std::size_t& pos) const;
 
     std::size_t get_column_type_pos(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_subspec_ndx(std::size_t column_ndx) const;

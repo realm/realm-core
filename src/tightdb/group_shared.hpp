@@ -53,7 +53,7 @@ public:
     /// state has undefined behavior.
     SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT;
 
-    ~SharedGroup();
+    ~SharedGroup() TIGHTDB_NOEXCEPT;
 
     /// Attach this SharedGroup instance to the specified database
     /// file.
@@ -110,12 +110,12 @@ public:
 
     // Read transactions
     const Group& begin_read();
-    void end_read();
+    void end_read() TIGHTDB_NOEXCEPT;
 
     // Write transactions
     Group& begin_write();
     void commit();
-    void rollback();
+    void rollback() TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
     void test_ringbuf();
@@ -201,9 +201,14 @@ public:
         m_shared_group.begin_read();
     }
 
-    ~ReadTransaction()
+    ~ReadTransaction() TIGHTDB_NOEXCEPT
     {
         m_shared_group.end_read();
+    }
+
+    bool has_table(StringData name) const
+    {
+        return get_group().has_table(name);
     }
 
     ConstTableRef get_table(StringData name) const
@@ -216,7 +221,7 @@ public:
         return get_group().get_table<T>(name);
     }
 
-    const Group& get_group() const
+    const Group& get_group() const TIGHTDB_NOEXCEPT
     {
         return m_shared_group.m_group;
     }
@@ -233,9 +238,10 @@ public:
         m_shared_group->begin_write();
     }
 
-    ~WriteTransaction()
+    ~WriteTransaction() TIGHTDB_NOEXCEPT
     {
-        if (m_shared_group) m_shared_group->rollback();
+        if (m_shared_group)
+            m_shared_group->rollback();
     }
 
     TableRef get_table(StringData name) const
@@ -248,7 +254,7 @@ public:
         return get_group().get_table<T>(name);
     }
 
-    Group& get_group() const
+    Group& get_group() const TIGHTDB_NOEXCEPT
     {
         TIGHTDB_ASSERT(m_shared_group);
         return m_shared_group->m_group;
@@ -279,7 +285,9 @@ inline SharedGroup::SharedGroup(const std::string& file, bool no_create, Durabil
 
 
 inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()) {}
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
+{
+}
 
 
 #ifdef TIGHTDB_ENABLE_REPLICATION

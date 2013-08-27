@@ -67,12 +67,12 @@ inline Table* ColumnMixed::get_subtable_ptr(std::size_t row_idx) const
     return m_refs->get_subtable_ptr(row_idx);
 }
 
-inline void ColumnMixed::invalidate_subtables()
+inline void ColumnMixed::invalidate_subtables() TIGHTDB_NOEXCEPT
 {
     m_refs->invalidate_subtables();
 }
 
-inline void ColumnMixed::invalidate_subtables_virtual()
+inline void ColumnMixed::invalidate_subtables_virtual() TIGHTDB_NOEXCEPT
 {
     invalidate_subtables();
 }

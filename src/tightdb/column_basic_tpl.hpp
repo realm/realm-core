@@ -41,28 +41,23 @@ template<class T>
 BasicColumn<T>::BasicColumn(ref_type ref, ArrayParent* parent, std::size_t pndx, Allocator& alloc)
 {
     bool root_is_leaf = root_is_leaf_from_ref(ref, alloc);
-    if (root_is_leaf)
+    if (root_is_leaf) {
         m_array = new BasicArray<T>(ref, parent, pndx, alloc);
-    else
+    }
+    else {
         m_array = new Array(ref, parent, pndx, alloc);
+    }
 }
 
 template<class T>
-BasicColumn<T>::~BasicColumn()
+BasicColumn<T>::~BasicColumn() TIGHTDB_NOEXCEPT
 {
-    if (root_is_leaf())
+    if (root_is_leaf()) {
         delete static_cast<BasicArray<T>*>(m_array);
-    else
+    }
+    else {
         delete m_array;
-}
-
-template<class T>
-void BasicColumn<T>::destroy()
-{
-    if (root_is_leaf())
-        static_cast<BasicArray<T>*>(m_array)->destroy();
-    else
-        m_array->destroy();
+    }
 }
 
 template<class T>

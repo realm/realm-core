@@ -39,7 +39,7 @@ namespace tightdb {
 class Thread {
 public:
     Thread();
-    ~Thread();
+    ~Thread() TIGHTDB_NOEXCEPT;
 
     template<class F> explicit Thread(F func);
 
@@ -169,7 +169,7 @@ template<class F> inline void Thread::start(F func)
     m_joinable = true;
 }
 
-inline Thread::~Thread()
+inline Thread::~Thread() TIGHTDB_NOEXCEPT
 {
     if (m_joinable) {
         std::terminate();

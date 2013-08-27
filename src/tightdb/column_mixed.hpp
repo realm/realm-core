@@ -66,10 +66,9 @@ public:
     ColumnMixed(Allocator&, const Table* table, std::size_t column_ndx,
                 ArrayParent*, std::size_t ndx_in_parent, ref_type);
 
-    ~ColumnMixed();
-    void destroy() TIGHTDB_OVERRIDE;
+    ~ColumnMixed() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void update_from_parent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     DataType get_type(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_types->size(); }
@@ -124,10 +123,9 @@ public:
     /// Compare two mixed columns for equality.
     bool compare_mixed(const ColumnMixed&) const;
 
-    void invalidate_subtables();
+    void invalidate_subtables() TIGHTDB_NOEXCEPT;
 
-    // Overriding virtual method.
-    void invalidate_subtables_virtual();
+    void invalidate_subtables_virtual() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     static ref_type create(std::size_t num_default_values, Allocator&);
 
@@ -193,6 +191,7 @@ public:
     RefsColumn(Allocator& alloc, const Table* table, std::size_t column_ndx,
                ArrayParent* parent, std::size_t ndx_in_parent, ref_type ref):
         ColumnSubtableParent(alloc, table, column_ndx, parent, ndx_in_parent, ref) {}
+    ~RefsColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
     using ColumnSubtableParent::get_subtable_ptr;
     using ColumnSubtableParent::get_subtable;
 };
