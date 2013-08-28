@@ -212,7 +212,7 @@ protected:
 /// referenced array node. This 'reverse' reference is not explicitely
 /// present in the underlying node hierarchy, but it is needed when
 /// modifying an array. A modification may lead to relocation of the
-/// undeerlying array node, and the parent must be updated
+/// underlying array node, and the parent must be updated
 /// accordingly. Since this applies recursivly all the way to the root
 /// node, it is essential that the entire chain of parent accessors is
 /// constructed and propperly maintained when a particular array is

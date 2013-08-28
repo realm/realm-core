@@ -186,16 +186,47 @@ public:
     std::size_t size() const;
 
     StringData get_table_name(std::size_t table_ndx) const;
+
+    /// Check whether this group has a table with the specified name.
     bool has_table(StringData name) const;
 
     /// Check whether this group has a table with the specified name
-    /// and type.
+    /// and a dynamic type that matches the specified static type.
+    ///
+    /// \tparam T An instance of the BasicTable<> class template.
     template<class T> bool has_table(StringData name) const;
 
+    //@{
+    /// Get the table with the specified name from this group.
+    ///
+    /// The non-const versions of this function will create a table
+    /// with the specified name if one does not already exist. The
+    /// const versions will not.
+    ///
+    /// It is an error to call one of the const-qualified versions for
+    /// a table that does not already exist. Doing so will result in
+    /// undefined behavior.
+    ///
+    /// The non-template versions will return dynamically typed table
+    /// accessors, while the template versions will return statically
+    /// typed accessors.
+    ///
+    /// It is an error to call one of the templated versions for a
+    /// table whose dynamic type does not match the specified static
+    /// type. Doing so will result in undefined behavior.
+    ///
+    /// New tables created by the non-const non-template version will
+    /// have no columns initially. New tables created by the non-const
+    /// template version will have a dynamic type (set of columns)
+    /// that matches the specifed static type.
+    ///
+    /// \tparam T An instance of the BasicTable<> class template.
     TableRef      get_table(StringData name);
     ConstTableRef get_table(StringData name) const;
     template<class T> typename T::Ref      get_table(StringData name);
     template<class T> typename T::ConstRef get_table(StringData name) const;
+    //@}
+
 
     // Serialization
 
@@ -483,7 +514,7 @@ template<class T> inline const T* Group::get_table_ptr(StringData name) const
 {
     TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
     const Table* table = get_table_ptr(name); // Throws
-    TIGHTDB_ASSERT(table || T::matches_dynamic_spec(&table->get_spec()));
+    TIGHTDB_ASSERT(!table || T::matches_dynamic_spec(&table->get_spec()));
     return static_cast<const T*>(table);
 }
 
@@ -494,6 +525,7 @@ inline TableRef Group::get_table(StringData name)
 
 inline ConstTableRef Group::get_table(StringData name) const
 {
+    TIGHTDB_ASSERT(has_table(name));
     return get_table_ptr(name)->get_table_ref();
 }
 
@@ -504,6 +536,7 @@ template<class T> inline typename T::Ref Group::get_table(StringData name)
 
 template<class T> inline typename T::ConstRef Group::get_table(StringData name) const
 {
+    TIGHTDB_ASSERT(has_table<T>(name));
     return get_table_ptr<T>(name)->get_table_ref();
 }
 
