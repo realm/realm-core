@@ -1,6 +1,4 @@
 #include <limits>
-#include <algorithm>
-#include <vector>
 #include <iostream>
 #include <iomanip>
 
@@ -18,36 +16,6 @@
 #include <tightdb/index_string.hpp>
 #include <tightdb/utilities.hpp>
 
-using namespace std;
-
-namespace {
-
-/// Takes a 64-bit value and returns the minimum number of bits needed
-/// to fit the value. For alignment this is rounded up to nearest
-/// log2. Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
-size_t bit_width(int64_t v)
-{
-    // FIXME: Assuming there is a 64-bit CPU reverse bitscan
-    // instruction and it is fast, then this function could be
-    // implemented simply as (v<2 ? v :
-    // 2<<rev_bitscan(rev_bitscan(v))).
-
-    if ((uint64_t(v) >> 4) == 0) {
-        static const int8_t bits[] = {0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
-        return bits[int8_t(v)];
-    }
-
-    // First flip all bits if bit 63 is set (will now always be zero)
-    if (v < 0) v = ~v;
-
-    // Then check if bits 15-31 used (32b), 7-31 used (16b), else (8b)
-    return uint64_t(v) >> 31 ? 64 : uint64_t(v) >> 15 ? 32 : uint64_t(v) >> 7 ? 16 : 8;
-}
-
-} // anonymous namespace
-
-
-namespace tightdb {
 
 // Header format (8 bytes):
 //
@@ -79,6 +47,37 @@ namespace tightdb {
 //
 // 'capacity' is the total number of bytes allocated for this array
 // including the header.
+
+
+using namespace std;
+using namespace tightdb;
+
+namespace {
+
+/// Takes a 64-bit value and returns the minimum number of bits needed
+/// to fit the value. For alignment this is rounded up to nearest
+/// log2. Posssible results {0, 1, 2, 4, 8, 16, 32, 64}
+size_t bit_width(int64_t v)
+{
+    // FIXME: Assuming there is a 64-bit CPU reverse bitscan
+    // instruction and it is fast, then this function could be
+    // implemented simply as (v<2 ? v :
+    // 2<<rev_bitscan(rev_bitscan(v))).
+
+    if ((uint64_t(v) >> 4) == 0) {
+        static const int8_t bits[] = {0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
+        return bits[int8_t(v)];
+    }
+
+    // First flip all bits if bit 63 is set (will now always be zero)
+    if (v < 0) v = ~v;
+
+    // Then check if bits 15-31 used (32b), 7-31 used (16b), else (8b)
+    return uint64_t(v) >> 31 ? 64 : uint64_t(v) >> 15 ? 32 : uint64_t(v) >> 7 ? 16 : 8;
+}
+
+} // anonymous namespace
+
 
 void Array::init_from_ref(ref_type ref) TIGHTDB_NOEXCEPT
 {
@@ -162,34 +161,24 @@ void Array::set_type(Type type)
     set_header_hasrefs(has_refs);
 }
 
-bool Array::update_from_parent() TIGHTDB_NOEXCEPT
+bool Array::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(m_parent);
 
-    if (!m_parent) return false;
+    // Array nodes that a part of the previous version of the database
+    // will not be overwritte by Group::commit(). This is necessary
+    // for robustness in the face of abrupt termination of the
+    // process. It also means that we can be sure that an array
+    // remains unchanged across a commit if the new ref is equal to
+    // the old ref and the ref is below the previous basline.
 
-    // After commit to disk, the array may have moved
-    // so get ref from parent and see if it has changed
     ref_type new_ref = m_parent->get_child_ref(m_ndx_in_parent);
+    if (new_ref == m_ref && new_ref < old_baseline)
+        return false; // Has not changed
 
-    if (new_ref != m_ref) {
-        init_from_ref(new_ref);
-        return true;
-    }
-
-    // FIXME: This early-out option is wrong. Equal 'refs' does in no
-    // way guarantee that the array has not been modified.
-
-    // If the file has been remapped it might have
-    // moved to a new location
-    char* header = m_alloc.translate(m_ref);
-    char* data = get_data_from_header(header);
-    if (m_data != data) {
-        m_data = data;
-        return true;
-    }
-
-    return false; // not modified
+    init_from_ref(new_ref);
+    return true; // Has changed
 }
 
 // Allocates space for 'count' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
@@ -215,63 +204,27 @@ void Array::set_parent(ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCE
     m_ndx_in_parent = ndx_in_parent;
 }
 
-void Array::destroy()
+
+void Array::destroy_children() TIGHTDB_NOEXCEPT
 {
-    if (!m_data) return;
+    for (size_t i = 0; i < m_size; ++i) {
+        int64_t v = get(i);
 
-    if (m_hasRefs) {
-        for (size_t i = 0; i < m_size; ++i) {
-            int64_t v = get(i);
+        // Null-refs indicate empty sub-trees
+        if (v == 0)
+            continue;
 
-            // null-refs signify empty sub-trees
-            if (v == 0) continue;
+        // A ref is always 8-byte aligned, so the lowest bit
+        // cannot be set. If it is, it means that it should not be
+        // interpreted as a ref.
+        if (v % 2 != 0)
+            continue;
 
-            // all refs are 64bit aligned, so the lowest bits
-            // cannot be set. If they are it means that it should
-            // not be interpreted as a ref
-            if (v & 0x1) continue;
-
-            Array sub(to_ref(v), this, i, m_alloc);
-            sub.destroy();
-        }
+        Array sub(to_ref(v), this, i, m_alloc);
+        sub.destroy();
     }
-
-    char* header = get_header_from_data(m_data);
-    m_alloc.free_(m_ref, header);
-    m_data = 0;
 }
 
-void Array::clear()
-{
-    copy_on_write(); // Throws
-
-    // Make sure we don't have any dangling references
-    if (m_hasRefs) {
-        for (size_t i = 0; i < size(); ++i) {
-            int64_t v = get(i);
-
-            // null-refs signify empty sub-trees
-            if (v == 0) continue;
-
-            // all refs are 64bit aligned, so the lowest bits
-            // cannot be set. If they are it means that it should
-            // not be interpreted as a ref
-            if (v & 0x1) continue;
-
-            Array sub(to_ref(v), this, i, m_alloc);
-            sub.destroy();
-        }
-    }
-
-    // Truncate size to zero (but keep capacity)
-    m_size     = 0;
-    m_capacity = CalcItemCount(get_capacity_from_header(), 0);
-    set_width(0);
-
-    // Update header
-    set_header_size(0);
-    set_header_width(0);
-}
 
 void Array::erase(size_t ndx)
 {
@@ -359,7 +312,7 @@ void Array::insert(size_t ndx, int64_t value)
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
-    Getter old_getter = m_getter;    // Save old getter before potential width expansion
+    Getter old_getter = m_getter; // Save old getter before potential width expansion
 
     bool do_expand = value < m_lbound || value > m_ubound;
     if (do_expand) {
@@ -429,7 +382,8 @@ void Array::resize(size_t count)
 
 void Array::ensure_minimum_width(int64_t value)
 {
-    if (value >= m_lbound && value <= m_ubound) return;
+    if (value >= m_lbound && value <= m_ubound)
+        return;
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -438,7 +392,7 @@ void Array::ensure_minimum_width(int64_t value)
     size_t width = bit_width(value);
     TIGHTDB_ASSERT(width > m_width);
 
-    Getter old_getter = m_getter;    // Save old getter before width expansion
+    Getter old_getter = m_getter; // Save old getter before width expansion
     alloc(m_size, width); // Throws
     set_width(width);
 
@@ -451,7 +405,7 @@ void Array::ensure_minimum_width(int64_t value)
     }
 }
 
-void Array::SetAllToZero()
+void Array::set_all_to_zero()
 {
     copy_on_write(); // Throws
 
@@ -618,6 +572,8 @@ size_t Array::FirstSetBit64(int64_t v) const
 }
 
 
+namespace {
+
 template<size_t width> inline int64_t LowerBits()
 {
     if (width == 1)
@@ -691,6 +647,9 @@ template<bool eq, size_t width> size_t FindZero(uint64_t v)
 
     return start;
 }
+
+} // anonymous namesapce
+
 
 template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t start, size_t end) const
 {
@@ -1103,23 +1062,12 @@ size_t Array::count(int64_t value) const
         return count;
     }
 
-    // Sum remainding elements
+    // Check remaining elements
     for (; i < end; ++i)
         if (value == get(i))
             ++count;
 
     return count;
-}
-
-size_t Array::GetByteSize(bool align) const
-{
-    size_t size = CalcByteLen(m_size, m_width);
-    if (align) {
-        size_t rest = (~size & 0x7) + 1;
-        if (rest < 8)
-            size += rest; // 64-bit blocks
-    }
-    return size;
 }
 
 size_t Array::CalcByteLen(size_t count, size_t width) const
@@ -1133,7 +1081,7 @@ size_t Array::CalcByteLen(size_t count, size_t width) const
 size_t Array::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
 {
     if (width == 0)
-        return numeric_limits<size_t>::max(); // zero width gives infinite space
+        return numeric_limits<size_t>::max(); // Zero width gives "infinite" space
 
     size_t bytes_data = bytes - header_size; // ignore 8 byte header
     size_t total_bits = bytes_data * 8;
@@ -1214,7 +1162,7 @@ void Array::copy_on_write()
 
     // Calculate size in bytes (plus a bit of matchcount room for expansion)
     size_t size = CalcByteLen(m_size, m_width);
-    size_t rest = (~size & 0x7)+1;
+    size_t rest = (~size & 0x7) + 1;
     if (rest < 8)
         size += rest; // 64bit blocks
     size_t new_size = size + 64;
@@ -1232,6 +1180,7 @@ void Array::copy_on_write()
     m_ref = mref.m_ref;
     m_data = get_data_from_header(new_begin);
     m_capacity = CalcItemCount(new_size, m_width);
+    TIGHTDB_ASSERT(m_capacity > 0);
 
     // Update capacity in header
     set_header_capacity(new_size); // uses m_data to find header, so m_data must be initialized correctly first
@@ -1264,48 +1213,45 @@ ref_type Array::create_empty_array(Type type, WidthType width_type, Allocator& a
 }
 
 
+// FIXME: It may be worth trying to combine this with copy_on_write()
+// to avoid two copies.
 void Array::alloc(size_t size, size_t width)
 {
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(m_capacity > 0);
     if (m_capacity < size || width != m_width) {
         size_t needed_bytes   = CalcByteLen(size, width);
-        size_t capacity_bytes = m_capacity ? get_capacity_from_header() : 0; // space currently available in bytes
+        size_t orig_capacity_bytes = get_capacity_from_header();
+        size_t capacity_bytes = orig_capacity_bytes;
 
         if (capacity_bytes < needed_bytes) {
             // Double to avoid too many reallocs (or initialize to initial size)
-            capacity_bytes = capacity_bytes ? capacity_bytes * 2 : initial_capacity;
+            capacity_bytes = capacity_bytes * 2; // FIXME: Highly prone to overflow on 32-bit systems
 
             // If doubling is not enough, expand enough to fit
             if (capacity_bytes < needed_bytes) {
                 size_t rest = (~needed_bytes & 0x7) + 1;
                 capacity_bytes = needed_bytes;
-                if (rest < 8) capacity_bytes += rest; // 64bit align
+                if (rest < 8)
+                    capacity_bytes += rest; // 64bit align
             }
 
-            // Allocate and initialize header
-            MemRef mem_ref;
-            char* header;
-            if (!m_data) {
-                mem_ref = m_alloc.alloc(capacity_bytes); // Throws
-                header = mem_ref.m_addr;
-                init_header(header, !m_isNode, m_hasRefs, GetWidthType(), int(width), size,
-                            capacity_bytes);
-            }
-            else {
-                header = get_header_from_data(m_data);
-                mem_ref = m_alloc.realloc_(m_ref, header, capacity_bytes); // Throws
-                header = mem_ref.m_addr;
-                set_header_width(int(width), header);
-                set_header_size(size, header);
-                set_header_capacity(capacity_bytes, header);
-            }
+            // Allocate and update header
+            char* header = get_header_from_data(m_data);
+            MemRef mem_ref = m_alloc.realloc_(m_ref, header, orig_capacity_bytes,
+                                              capacity_bytes); // Throws
+            header = mem_ref.m_addr;
+            set_header_width(int(width), header);
+            set_header_size(size, header);
+            set_header_capacity(capacity_bytes, header);
 
-            // Update wrapper objects
+            // Update this accessor and its ancestors
             m_ref      = mem_ref.m_ref;
             m_data     = get_data_from_header(header);
             m_capacity = CalcItemCount(capacity_bytes, width);
             // FIXME: Trouble when this one throws. We will then leave
             // this array instance in a corrupt state
-            update_parent();
+            update_parent(); // Throws
             return;
         }
 
@@ -1900,8 +1846,6 @@ void Array::stats(MemStats& stats) const
 
 #endif // TIGHTDB_DEBUG
 
-} // namespace tightdb
-
 
 namespace {
 
@@ -1976,8 +1920,6 @@ inline int64_t get_direct(const char* data, size_t width, size_t ndx) TIGHTDB_NO
 template<int width>
 inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
-    using namespace tightdb;
-
     size_t i = 0;
     size_t size_2 = size;
     while (0 < size_2) {
@@ -1999,8 +1941,6 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_
 template<int width>
 inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
-    using namespace tightdb;
-
     size_t i = 0;
     size_t size_2 = size;
     while (0 < size_2) {
@@ -2028,7 +1968,6 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_
 template<int width> inline pair<size_t, size_t>
 find_child(const char* offsets_header, size_t elem_ndx) TIGHTDB_NOEXCEPT
 {
-    using namespace tightdb;
     const char* offsets_data = Array::get_data_from_header(offsets_header);
     size_t offsets_size = Array::get_size_from_header(offsets_header);
     size_t child_ndx = upper_bound<width>(offsets_data, offsets_size, elem_ndx);
@@ -2041,16 +1980,14 @@ find_child(const char* offsets_header, size_t elem_ndx) TIGHTDB_NOEXCEPT
 template<int width>
 inline pair<size_t, size_t> get_two_as_size(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 {
-    const char* data = tightdb::Array::get_data_from_header(header);
-    return make_pair(tightdb::to_size_t(get_direct<width>(data, ndx+0)),
-                     tightdb::to_size_t(get_direct<width>(data, ndx+1)));
+    const char* data = Array::get_data_from_header(header);
+    return make_pair(to_size_t(get_direct<width>(data, ndx+0)),
+                     to_size_t(get_direct<width>(data, ndx+1)));
 }
 
 
 } // anonymous namespace
 
-
-namespace tightdb {
 
 
 size_t Array::lower_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
@@ -2077,6 +2014,7 @@ void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t star
 
     return;
 }
+
 
 bool Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state) const
 {
@@ -2191,6 +2129,7 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
     return find_first<Equal>(value, start, end);
 }
 
+
 // Get containing array block direct through column b-tree without instatiating any Arrays. Calling with
 // use_retval = true will return itself if leaf and avoid unneccesary header initialization.
 const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off,
@@ -2210,49 +2149,50 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off,
     return &arr;
 }
 
+
 // Find value direct through column b-tree without instatiating any Arrays.
 size_t Array::ColumnFind(int64_t target, ref_type ref, Array& cache) const
 {
     char* header = m_alloc.translate(ref);
     bool is_leaf = get_isleaf_from_header(header);
 
-    if (!is_leaf) {
-        const char* data = get_data_from_header(header);
-        size_t width = get_width_from_header(header);
-
-        // Get subnode table
-        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
-        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
-
-        const char* offsets_header = m_alloc.translate(offsets_ref);
-        const char* offsets_data = get_data_from_header(offsets_header);
-        size_t offsets_width  = get_width_from_header(offsets_header);
-        size_t offsets_size = get_size_from_header(offsets_header);
-
-        const char* refs_header = m_alloc.translate(refs_ref);
-        const char* refs_data = get_data_from_header(refs_header);
-        size_t refs_width  = get_width_from_header(refs_header);
-
-        // Iterate over nodes until we find a match
-        size_t offset = 0;
-        for (size_t i = 0; i < offsets_size; ++i) {
-            ref_type ref = to_ref(get_direct(refs_data, refs_width, i));
-            size_t result = ColumnFind(target, ref, cache);
-            if (result != not_found)
-                return offset + result;
-
-            size_t off = to_size_t(get_direct(offsets_data, offsets_width, i));
-            offset = off;
-        }
-
-        // if we get to here there is no match
-        return not_found;
-    }
-    else {
+    if (is_leaf) {
         cache.CreateFromHeaderDirect(header);
         return cache.find_first(target, 0, -1);
     }
+
+    const char* data = get_data_from_header(header);
+    size_t width = get_width_from_header(header);
+
+    // Get subnode table
+    ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+    ref_type refs_ref    = to_ref(get_direct(data, width, 1));
+
+    const char* offsets_header = m_alloc.translate(offsets_ref);
+    const char* offsets_data = get_data_from_header(offsets_header);
+    size_t offsets_width  = get_width_from_header(offsets_header);
+    size_t offsets_size = get_size_from_header(offsets_header);
+
+    const char* refs_header = m_alloc.translate(refs_ref);
+    const char* refs_data = get_data_from_header(refs_header);
+    size_t refs_width  = get_width_from_header(refs_header);
+
+    // Iterate over nodes until we find a match
+    size_t offset = 0;
+    for (size_t i = 0; i < offsets_size; ++i) {
+        ref_type ref = to_ref(get_direct(refs_data, refs_width, i));
+        size_t result = ColumnFind(target, ref, cache);
+        if (result != not_found)
+            return offset + result;
+
+        size_t off = to_size_t(get_direct(offsets_data, offsets_width, i));
+        offset = off;
+    }
+
+    // if we get to here there is no match
+    return not_found;
 }
+
 
 size_t Array::IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const
 {
@@ -2299,62 +2239,73 @@ top:
 
         key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
 
-        if (stored_key == key) {
-            // Literal row index
-            if (ref & 1) {
-                size_t row_ref = size_t(uint64_t(ref) >> 1);
+        if (stored_key != key)
+            return not_found;
 
-                // If the last byte in the stored key is zero, we know that we have
-                // compared against the entire (target) string
-                if (!(stored_key << 24)) return row_ref;
+        // Literal row index
+        if (ref & 1) {
+            size_t row_ref = size_t(uint64_t(ref) >> 1);
 
-                StringData str = (*get_func)(column, row_ref);
-                if (str == value) return row_ref;
-                else return not_found;
-            }
+            // If the last byte in the stored key is zero, we know that we have
+            // compared against the entire (target) string
+            if (!(stored_key << 24))
+                return row_ref;
 
-            const char* sub_header = m_alloc.translate(to_ref(ref));
-            const bool sub_isindex = get_indexflag_from_header(sub_header);
-
-            // List of matching row indexes
-            if (!sub_isindex) {
-                const char* sub_data = get_data_from_header(sub_header);
-                const size_t sub_width  = get_width_from_header(sub_header);
-                const bool sub_isleaf = get_isleaf_from_header(sub_header);
-
-                // In most cases the row list will just be an array but there
-                // might be so many matches that it has branched into a column
-                size_t row_ref;
-                if (sub_isleaf)
-                    row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
-                else {
-                    Array sub(to_ref(ref), 0, 0, m_alloc);
-                    pair<MemRef, size_t> p = sub.find_btree_leaf(0);
-                    const char* leaf_header = p.first.m_addr;
-                    row_ref = to_size_t(get(leaf_header, 0));
-                }
-
-                // If the last byte in the stored key is zero, we know that we have
-                // compared against the entire (target) string
-                if (!(stored_key << 24)) return row_ref;
-
-                StringData str = (*get_func)(column, row_ref);
-                if (str == value) return row_ref;
-                else return not_found;
-            }
-
-            // Recurse into sub-index;
-            header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
-            data    = get_data_from_header(header);
-            width   = get_width_from_header(header);
-            is_leaf = get_isleaf_from_header(header);
-            if (value_2.size() <= 4) value_2 = StringData();
-            else value_2 = value_2.substr(4);
-            goto top;
+            StringData str = (*get_func)(column, row_ref);
+            if (str == value)
+                return row_ref;
+            return not_found;
         }
-        else return not_found;
+
+        const char* sub_header = m_alloc.translate(to_ref(ref));
+        const bool sub_isindex = get_indexflag_from_header(sub_header);
+
+        // List of matching row indexes
+        if (!sub_isindex) {
+            const char* sub_data = get_data_from_header(sub_header);
+            const size_t sub_width  = get_width_from_header(sub_header);
+            const bool sub_isleaf = get_isleaf_from_header(sub_header);
+
+            // In most cases the row list will just be an array but
+            // there might be so many matches that it has branched
+            // into a column
+            size_t row_ref;
+            if (sub_isleaf)
+                row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
+            else {
+                Array sub(to_ref(ref), 0, 0, m_alloc);
+                pair<MemRef, size_t> p = sub.find_btree_leaf(0);
+                const char* leaf_header = p.first.m_addr;
+                row_ref = to_size_t(get(leaf_header, 0));
+            }
+
+            // If the last byte in the stored key is zero, we know
+            // that we have compared against the entire (target)
+            // string
+            if (!(stored_key << 24))
+                return row_ref;
+
+            StringData str = (*get_func)(column, row_ref);
+            if (str == value)
+                return row_ref;
+            return not_found;
+        }
+
+        // Recurse into sub-index;
+        header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
+        data    = get_data_from_header(header);
+        width   = get_width_from_header(header);
+        is_leaf = get_isleaf_from_header(header);
+        if (value_2.size() <= 4) {
+            value_2 = StringData();
+        }
+        else {
+            value_2 = value_2.substr(4);
+        }
+        goto top;
     }
 }
+
 
 void Array::IndexStringFindAll(Array& result, StringData value, void* column, StringGetter get_func) const
 {
@@ -2382,7 +2333,8 @@ top:
         size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
 
         // If key is outside range, we know there can be no match
-        if (pos == offsets_size) return; // not_found
+        if (pos == offsets_size)
+            return; // not_found
 
         // Get entry under key
         const char* refs_header = m_alloc.translate(refs_ref);
@@ -2401,91 +2353,94 @@ top:
 
         key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
 
-        if (stored_key == key) {
-            // Literal row index
-            if (ref & 1) {
-                size_t row_ref = size_t(uint64_t(ref) >> 1);
+        if (stored_key != key)
+            return; // not_found
 
-                // If the last byte in the stored key is zero, we know that we have
-                // compared against the entire (target) string
-                if (!(stored_key << 24)) {
-                    result.add(row_ref);
-                    return;
-                }
+        // Literal row index
+        if (ref & 1) {
+            size_t row_ref = size_t(uint64_t(ref) >> 1);
 
-                StringData str = (*get_func)(column, row_ref);
-                if (str == value) {
-                    result.add(row_ref);
-                    return;
-                }
-                else return; // not_found
-            }
-
-            const char* sub_header = m_alloc.translate(to_ref(ref));
-            const bool sub_isindex = get_indexflag_from_header(sub_header);
-
-            // List of matching row indexes
-            if (!sub_isindex) {
-                const bool sub_isleaf = get_isleaf_from_header(sub_header);
-
-                // In most cases the row list will just be an array but there
-                // might be so many matches that it has branched into a column
-                if (sub_isleaf) {
-                    const size_t sub_width = get_width_from_header(sub_header);
-                    const char* sub_data = get_data_from_header(sub_header);
-                    const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
-
-                    // If the last byte in the stored key is not zero, we have
-                    // not yet compared against the entire (target) string
-                    if ((stored_key << 24)) {
-                        StringData str = (*get_func)(column, first_row_ref);
-                        if (str != value)
-                            return; // not_found
-                    }
-
-                    // Copy all matches into result array
-                    const size_t sub_size  = get_size_from_header(sub_header);
-
-                    for (size_t i = 0; i < sub_size; ++i) {
-                        size_t row_ref = to_size_t(get_direct(sub_data, sub_width, i));
-                        result.add(row_ref);
-                    }
-                }
-                else {
-                    const Column sub(to_ref(ref), 0, 0, m_alloc);
-                    const size_t first_row_ref = to_size_t(sub.get(0));
-
-                    // If the last byte in the stored key is not zero, we have
-                    // not yet compared against the entire (target) string
-                    if ((stored_key << 24)) {
-                        StringData str = (*get_func)(column, first_row_ref);
-                        if (str != value)
-                            return; // not_found
-                    }
-
-                    // Copy all matches into result array
-                    const size_t sub_size  = sub.size();
-
-                    for (size_t i = 0; i < sub_size; ++i) {
-                        size_t row_ref = to_size_t(sub.get(i));
-                        result.add(row_ref);
-                    }
-                }
+            // If the last byte in the stored key is zero, we know that we have
+            // compared against the entire (target) string
+            if (!(stored_key << 24)) {
+                result.add(row_ref);
                 return;
             }
 
-            // Recurse into sub-index;
-            header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
-            data    = get_data_from_header(header);
-            width   = get_width_from_header(header);
-            is_leaf = get_isleaf_from_header(header);
-            if (value_2.size() <= 4) value_2 = StringData();
-            else value_2 = value_2.substr(4);
-            goto top;
+            StringData str = (*get_func)(column, row_ref);
+            if (str == value)
+                result.add(row_ref);
+            return; // not_found
         }
-        else return; // not_found
+
+        const char* sub_header = m_alloc.translate(to_ref(ref));
+        const bool sub_isindex = get_indexflag_from_header(sub_header);
+
+        // List of matching row indexes
+        if (!sub_isindex) {
+            const bool sub_isleaf = get_isleaf_from_header(sub_header);
+
+            // In most cases the row list will just be an array but there
+            // might be so many matches that it has branched into a column
+            if (sub_isleaf) {
+                const size_t sub_width = get_width_from_header(sub_header);
+                const char* sub_data = get_data_from_header(sub_header);
+                const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
+
+                // If the last byte in the stored key is not zero, we have
+                // not yet compared against the entire (target) string
+                if ((stored_key << 24)) {
+                    StringData str = (*get_func)(column, first_row_ref);
+                    if (str != value)
+                        return; // not_found
+                }
+
+                // Copy all matches into result array
+                const size_t sub_size  = get_size_from_header(sub_header);
+
+                for (size_t i = 0; i < sub_size; ++i) {
+                    size_t row_ref = to_size_t(get_direct(sub_data, sub_width, i));
+                    result.add(row_ref);
+                }
+            }
+            else {
+                const Column sub(to_ref(ref), 0, 0, m_alloc);
+                const size_t first_row_ref = to_size_t(sub.get(0));
+
+                // If the last byte in the stored key is not zero, we have
+                // not yet compared against the entire (target) string
+                if ((stored_key << 24)) {
+                    StringData str = (*get_func)(column, first_row_ref);
+                    if (str != value)
+                        return; // not_found
+                }
+
+                // Copy all matches into result array
+                const size_t sub_size  = sub.size();
+
+                for (size_t i = 0; i < sub_size; ++i) {
+                    size_t row_ref = to_size_t(sub.get(i));
+                    result.add(row_ref);
+                }
+            }
+            return;
+        }
+
+        // Recurse into sub-index;
+        header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
+        data    = get_data_from_header(header);
+        width   = get_width_from_header(header);
+        is_leaf = get_isleaf_from_header(header);
+        if (value_2.size() <= 4) {
+            value_2 = StringData();
+        }
+        else {
+            value_2 = value_2.substr(4);
+        }
+        goto top;
     }
 }
+
 
 FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const
 {
@@ -2513,7 +2468,8 @@ top:
         size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
 
         // If key is outside range, we know there can be no match
-        if (pos == offsets_size) return FindRes_not_found;
+        if (pos == offsets_size)
+            return FindRes_not_found;
 
         // Get entry under key
         const char* refs_header = m_alloc.translate(refs_ref);
@@ -2532,78 +2488,83 @@ top:
 
         key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
 
-        if (stored_key == key) {
-            // Literal row index
-            if (ref & 1) {
-                size_t row_ref = size_t(uint64_t(ref) >> 1);
+        if (stored_key != key)
+            return FindRes_not_found; // not_found
 
-                // If the last byte in the stored key is zero, we know that we have
-                // compared against the entire (target) string
-                if (!(stored_key << 24)) {
-                    res_ref = row_ref;
-                    return FindRes_single; // found single
-                }
+        // Literal row index
+        if (ref & 1) {
+            size_t row_ref = size_t(uint64_t(ref) >> 1);
 
-                StringData str = (*get_func)(column, row_ref);
-                if (str == value) {
-                    res_ref = row_ref;
-                    return FindRes_single; // found single
-                }
-                return FindRes_not_found; // not_found
+            // If the last byte in the stored key is zero, we know that we have
+            // compared against the entire (target) string
+            if (!(stored_key << 24)) {
+                res_ref = row_ref;
+                return FindRes_single; // found single
             }
 
-            const char* sub_header  = m_alloc.translate(to_ref(ref));
-            const bool  sub_isindex = get_indexflag_from_header(sub_header);
-
-            // List of matching row indexes
-            if (!sub_isindex) {
-                const bool sub_isleaf = get_isleaf_from_header(sub_header);
-
-                // In most cases the row list will just be an array but there
-                // might be so many matches that it has branched into a column
-                if (sub_isleaf) {
-                    const size_t sub_width = get_width_from_header(sub_header);
-                    const char*  sub_data  = get_data_from_header(sub_header);
-                    const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
-
-                    // If the last byte in the stored key is not zero, we have
-                    // not yet compared against the entire (target) string
-                    if ((stored_key << 24)) {
-                        StringData str = (*get_func)(column, first_row_ref);
-                        if (str != value)
-                            return FindRes_not_found; // not_found
-                    }
-                }
-                else {
-                    const Column sub(to_ref(ref), 0, 0, m_alloc);
-                    const size_t first_row_ref = to_size_t(sub.get(0));
-
-                    // If the last byte in the stored key is not zero, we have
-                    // not yet compared against the entire (target) string
-                    if ((stored_key << 24)) {
-                        StringData str = (*get_func)(column, first_row_ref);
-                        if (str != value)
-                            return FindRes_not_found; // not_found
-                    }
-                }
-
-                // Return a reference to the result column
-                res_ref = to_ref(ref);
-                return FindRes_column; // column of matches
+            StringData str = (*get_func)(column, row_ref);
+            if (str == value) {
+                res_ref = row_ref;
+                return FindRes_single; // found single
             }
-
-            // Recurse into sub-index;
-            header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
-            data    = get_data_from_header(header);
-            width   = get_width_from_header(header);
-            is_leaf = get_isleaf_from_header(header);
-            if (value_2.size() <= 4) value_2 = StringData();
-            else value_2 = value_2.substr(4);
-            goto top;
+            return FindRes_not_found; // not_found
         }
-        else return FindRes_not_found; // not_found
+
+        const char* sub_header  = m_alloc.translate(to_ref(ref));
+        const bool  sub_isindex = get_indexflag_from_header(sub_header);
+
+        // List of matching row indexes
+        if (!sub_isindex) {
+            const bool sub_isleaf = get_isleaf_from_header(sub_header);
+
+            // In most cases the row list will just be an array but there
+            // might be so many matches that it has branched into a column
+            if (sub_isleaf) {
+                const size_t sub_width = get_width_from_header(sub_header);
+                const char*  sub_data  = get_data_from_header(sub_header);
+                const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
+
+                // If the last byte in the stored key is not zero, we have
+                // not yet compared against the entire (target) string
+                if ((stored_key << 24)) {
+                    StringData str = (*get_func)(column, first_row_ref);
+                    if (str != value)
+                        return FindRes_not_found; // not_found
+                }
+            }
+            else {
+                const Column sub(to_ref(ref), 0, 0, m_alloc);
+                const size_t first_row_ref = to_size_t(sub.get(0));
+
+                // If the last byte in the stored key is not zero, we have
+                // not yet compared against the entire (target) string
+                if ((stored_key << 24)) {
+                    StringData str = (*get_func)(column, first_row_ref);
+                    if (str != value)
+                        return FindRes_not_found; // not_found
+                }
+            }
+
+            // Return a reference to the result column
+            res_ref = to_ref(ref);
+            return FindRes_column; // column of matches
+        }
+
+        // Recurse into sub-index;
+        header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
+        data    = get_data_from_header(header);
+        width   = get_width_from_header(header);
+        is_leaf = get_isleaf_from_header(header);
+        if (value_2.size() <= 4) {
+            value_2 = StringData();
+        }
+        else {
+            value_2 = value_2.substr(4);
+        }
+        goto top;
     }
 }
+
 
 size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_func) const
 
@@ -2632,7 +2593,8 @@ top:
         size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
 
         // If key is outside range, we know there can be no match
-        if (pos == offsets_size) return 0;
+        if (pos == offsets_size)
+            return 0;
 
         // Get entry under key
         const char* refs_header = m_alloc.translate(refs_ref);
@@ -2651,68 +2613,80 @@ top:
 
         key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
 
-        if (stored_key == key) {
-            // Literal row index
-            if (ref & 1) {
-                const size_t row_ref = size_t((uint64_t(ref) >> 1));
+        if (stored_key != key)
+            return 0;
 
-                // If the last byte in the stored key is zero, we know that we have
-                // compared against the entire (target) string
-                if (!(stored_key << 24)) return 1;
+        // Literal row index
+        if (ref & 1) {
+            const size_t row_ref = size_t((uint64_t(ref) >> 1));
 
-                StringData str = (*get_func)(column, row_ref);
-                if (str == value) return 1;
-                else return 0;
-            }
+            // If the last byte in the stored key is zero, we know that we have
+            // compared against the entire (target) string
+            if (!(stored_key << 24))
+                return 1;
 
-            const char* sub_header = m_alloc.translate(to_ref(ref));
-            const bool sub_isindex = get_indexflag_from_header(sub_header);
-
-            // List of matching row indexes
-            if (!sub_isindex) {
-                const bool sub_isleaf = get_isleaf_from_header(sub_header);
-                size_t sub_count;
-                size_t row_ref;
-
-                // In most cases the row list will just be an array but there
-                // might be so many matches that it has branched into a column
-                if (sub_isleaf) {
-                    sub_count  = get_size_from_header(sub_header);
-
-                    // If the last byte in the stored key is zero, we know that we have
-                    // compared against the entire (target) string
-                    if (!(stored_key << 24)) return sub_count;
-
-                    const char* sub_data = get_data_from_header(sub_header);
-                    const size_t sub_width  = get_width_from_header(sub_header);
-                    row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
-                }
-                else {
-                    const Column sub(to_ref(ref), 0, 0, m_alloc);
-                    sub_count = sub.size();
-
-                    // If the last byte in the stored key is zero, we know that we have
-                    // compared against the entire (target) string
-                    if (!(stored_key << 24)) return sub_count;
-
-                    row_ref = to_size_t(sub.get(0));
-                }
-
-                StringData str = (*get_func)(column, row_ref);
-                if (str == value) return sub_count;
-                else return 0;
-            }
-
-            // Recurse into sub-index;
-            header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
-            data    = get_data_from_header(header);
-            width   = get_width_from_header(header);
-            is_leaf = get_isleaf_from_header(header);
-            if (value_2.size() <= 4) value_2 = StringData();
-            else value_2 = value_2.substr(4);
-            goto top;
+            StringData str = (*get_func)(column, row_ref);
+            if (str == value)
+                return 1;
+            return 0;
         }
-        else return 0;
+
+        const char* sub_header = m_alloc.translate(to_ref(ref));
+        const bool sub_isindex = get_indexflag_from_header(sub_header);
+
+        // List of matching row indexes
+        if (!sub_isindex) {
+            const bool sub_isleaf = get_isleaf_from_header(sub_header);
+            size_t sub_count;
+            size_t row_ref;
+
+            // In most cases the row list will just be an array but
+            // there might be so many matches that it has branched
+            // into a column
+            if (sub_isleaf) {
+                sub_count  = get_size_from_header(sub_header);
+
+                // If the last byte in the stored key is zero, we know
+                // that we have compared against the entire (target)
+                // string
+                if (!(stored_key << 24))
+                    return sub_count;
+
+                const char* sub_data = get_data_from_header(sub_header);
+                const size_t sub_width  = get_width_from_header(sub_header);
+                row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
+            }
+            else {
+                const Column sub(to_ref(ref), 0, 0, m_alloc);
+                sub_count = sub.size();
+
+                // If the last byte in the stored key is zero, we know
+                // that we have compared against the entire (target)
+                // string
+                if (!(stored_key << 24))
+                    return sub_count;
+
+                row_ref = to_size_t(sub.get(0));
+            }
+
+            StringData str = (*get_func)(column, row_ref);
+            if (str == value)
+                return sub_count;
+            return 0;
+        }
+
+        // Recurse into sub-index;
+        header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
+        data    = get_data_from_header(header);
+        width   = get_width_from_header(header);
+        is_leaf = get_isleaf_from_header(header);
+        if (value_2.size() <= 4) {
+            value_2 = StringData();
+        }
+        else {
+            value_2 = value_2.substr(4);
+        }
+        goto top;
     }
 }
 
@@ -2737,7 +2711,8 @@ pair<MemRef, size_t> Array::find_btree_leaf(size_t ndx) const TIGHTDB_NOEXCEPT
 
         header = m_alloc.translate(child_ref);
         bool child_is_leaf = get_isleaf_from_header(header);
-        if (child_is_leaf) return make_pair(MemRef(header, child_ref), ndx);
+        if (child_is_leaf)
+            return make_pair(MemRef(header, child_ref), ndx);
 
         width = get_width_from_header(header);
         TIGHTDB_TEMPEX(p = ::get_two_as_size, width, (header, 0));
@@ -2746,12 +2721,14 @@ pair<MemRef, size_t> Array::find_btree_leaf(size_t ndx) const TIGHTDB_NOEXCEPT
     }
 }
 
+
 int64_t Array::get(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);
     return get_direct(data, width, ndx);
 }
+
 
 pair<size_t, size_t> Array::get_size_pair(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 {
@@ -2760,6 +2737,3 @@ pair<size_t, size_t> Array::get_size_pair(const char* header, size_t ndx) TIGHTD
     TIGHTDB_TEMPEX(p = ::get_two_as_size, width, (header, ndx));
     return p;
 }
-
-
-} //namespace tightdb

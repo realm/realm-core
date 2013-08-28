@@ -185,12 +185,10 @@
 		4142C98A1623478700B3B902 /* file.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3640797E15AD6687009A3A82 /* file.hpp */; };
 		520588CA16C1DA9D009DA6D8 /* data_type.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 520588C916C1DA9D009DA6D8 /* data_type.hpp */; };
 		52113CDE16C27EF800C301FB /* lang_bind_helper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */; };
+		525AAC8517CD6C9B00267037 /* thread.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52C3965616BC6704003619FF /* thread.cpp */; };
 		52C3965716BC6704003619FF /* thread.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52C3965616BC6704003619FF /* thread.cpp */; };
-		52D6E064175BDBDD00B423E5 /* Makefile in Sources */ = {isa = PBXBuildFile; fileRef = 52D6E058175BDBDD00B423E5 /* Makefile */; };
-		52D6E065175BDBDD00B423E5 /* mem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52D6E059175BDBDD00B423E5 /* mem.cpp */; };
 		52D6E067175BDBDD00B423E5 /* mem.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 52D6E05B175BDBDD00B423E5 /* mem.hpp */; };
 		52D6E069175BDBDD00B423E5 /* number_names.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 52D6E05D175BDBDD00B423E5 /* number_names.hpp */; };
-		52D6E06B175BDBDD00B423E5 /* timer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52D6E060175BDBDD00B423E5 /* timer.cpp */; };
 		52D6E06D175BDBDD00B423E5 /* timer.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 52D6E062175BDBDD00B423E5 /* timer.hpp */; };
 		52D6E06F175BDC5D00B423E5 /* mem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52D6E059175BDBDD00B423E5 /* mem.cpp */; };
 		52D6E070175BDC6500B423E5 /* timer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52D6E060175BDBDD00B423E5 /* timer.cpp */; };
@@ -1043,6 +1041,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				525AAC8517CD6C9B00267037 /* thread.cpp in Sources */,
 				365CCE34157CC37D00172BF8 /* alloc_slab.cpp in Sources */,
 				365CCE37157CC37D00172BF8 /* array_binary.cpp in Sources */,
 				365CCE39157CC37D00172BF8 /* array_blob.cpp in Sources */,
@@ -1070,9 +1069,6 @@
 				36A1DC9316C3F34B0086A836 /* lang_bind_helper.cpp in Sources */,
 				36A1DC9716C3F3C50086A836 /* terminate.cpp in Sources */,
 				36A1DCA216C3F43D0086A836 /* string_buffer.cpp in Sources */,
-				52D6E064175BDBDD00B423E5 /* Makefile in Sources */,
-				52D6E065175BDBDD00B423E5 /* mem.cpp in Sources */,
-				52D6E06B175BDBDD00B423E5 /* timer.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1311,6 +1307,7 @@
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
@@ -1348,6 +1345,8 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_INLINES_ARE_PRIVATE_EXTERN = NO;
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
 				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
@@ -1415,6 +1414,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
+				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
 				GCC_VERSION = com.apple.compilers.llvm.clang.1_0;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;

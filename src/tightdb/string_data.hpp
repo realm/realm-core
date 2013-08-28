@@ -65,6 +65,7 @@ public:
 
     /// Initialize from a zero terminated C style string.
     StringData(const char* c_str) TIGHTDB_NOEXCEPT;
+    ~StringData() TIGHTDB_NOEXCEPT {}
 
     char operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
 
