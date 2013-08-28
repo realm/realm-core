@@ -117,7 +117,7 @@ void spawn_daemon(const string& file)
         // single threaded context. This is ensured by the fork above.
         const char* exe = getenv("TIGHTDBD_PATH");
         if (exe == NULL)
-#ifdef TIGTHDB_DEBUG
+#ifndef TIGTHDB_DEBUG
             exe = "/usr/local/bin/tightdbd";
 #else
             exe = "/usr/local/bin/tightdbd-dbg";
