@@ -860,57 +860,68 @@ inline void Table::set_into_mixed(Table* parent, std::size_t col_ndx, std::size_
 struct Table::LocalTransactLog {
     template<class T> void set_value(std::size_t column_ndx, std::size_t row_ndx, const T& value)
     {
-        if (m_repl) m_repl->set_value(m_table, column_ndx, row_ndx, value); // Throws
+        if (m_repl)
+            m_repl->set_value(m_table, column_ndx, row_ndx, value); // Throws
     }
 
     template<class T> void insert_value(std::size_t column_ndx, std::size_t row_ndx, const T& value)
     {
-        if (m_repl) m_repl->insert_value(m_table, column_ndx, row_ndx, value); // Throws
+        if (m_repl)
+            m_repl->insert_value(m_table, column_ndx, row_ndx, value); // Throws
     }
 
     void row_insert_complete()
     {
-        if (m_repl) m_repl->row_insert_complete(m_table); // Throws
+        if (m_repl)
+            m_repl->row_insert_complete(m_table); // Throws
     }
 
     void insert_empty_rows(std::size_t row_ndx, std::size_t num_rows)
     {
-        if (m_repl) m_repl->insert_empty_rows(m_table, row_ndx, num_rows); // Throws
+        if (m_repl)
+            m_repl->insert_empty_rows(m_table, row_ndx, num_rows); // Throws
     }
 
     void remove_row(std::size_t row_ndx)
     {
-        if (m_repl) m_repl->remove_row(m_table, row_ndx); // Throws
+        if (m_repl)
+            m_repl->remove_row(m_table, row_ndx); // Throws
     }
 
     void add_int_to_column(std::size_t column_ndx, int64_t value)
     {
-        if (m_repl) m_repl->add_int_to_column(m_table, column_ndx, value); // Throws
+        if (m_repl)
+            m_repl->add_int_to_column(m_table, column_ndx, value); // Throws
     }
 
     void add_index_to_column(std::size_t column_ndx)
     {
-        if (m_repl) m_repl->add_index_to_column(m_table, column_ndx); // Throws
+        if (m_repl)
+            m_repl->add_index_to_column(m_table, column_ndx); // Throws
     }
 
     void clear_table()
     {
-        if (m_repl) m_repl->clear_table(m_table); // Throws
+        if (m_repl)
+            m_repl->clear_table(m_table); // Throws
     }
 
     void optimize_table()
     {
-        if (m_repl) m_repl->optimize_table(m_table); // Throws
+        if (m_repl)
+            m_repl->optimize_table(m_table); // Throws
     }
 
     void add_column(DataType type, StringData name)
     {
-        if (m_repl) m_repl->add_column(m_table, &m_table->m_spec_set, type, name); // Throws
+        if (m_repl)
+            m_repl->add_column(m_table, &m_table->m_spec_set, type, name); // Throws
     }
 
     void on_table_destroyed() TIGHTDB_NOEXCEPT
     {
-        if (m_repl) m_repl->on_table_destroyed(m_table);
+        if (m_repl)
+            m_repl->on_table_destroyed(m_table);
     }
 
 private:
