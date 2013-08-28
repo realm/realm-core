@@ -134,6 +134,7 @@ void make_table(size_t rows)
     File::try_remove("test_alone.tightdb");
     // Create first table in group
 #if 1
+#if 1
     {
         SharedGroup sg("test_shared.tightdb");
         WriteTransaction wt(sg);
@@ -143,7 +144,6 @@ void make_table(size_t rows)
         }
         wt.commit();
     }
-#if 0
 #else
     {
         SharedGroup sg("test_shared.tightdb", 
@@ -258,9 +258,9 @@ int main()
     // Clean up old state
     File::try_remove("asynctest.tightdb");
 
-    single_threaded();
+//    single_threaded();
 
-    make_table(1);
+    make_table(1ULL);
 /*
     multi_threaded(10,0);
     validate_and_clear(10, INCREMENTS);
