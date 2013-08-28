@@ -26,6 +26,8 @@
 #include <tightdb/mixed.hpp>
 #include <tightdb/table.hpp>
 
+#include <tightdb/query_engine.hpp>
+
 namespace tightdb {
 
 
@@ -206,7 +208,6 @@ public:
     {
         Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value);
     }
-
     operator int64_t() const TIGHTDB_NOEXCEPT { return get(); }
     const FieldAccessor& operator=(int64_t value) const { set(value); return *this; }
 
@@ -814,12 +815,17 @@ protected:
 /// Column accessor specialization for integers.
 template<class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, int64_t>:
-    public ColumnAccessorBase<Taboid, col_idx, int64_t> {
+    public ColumnAccessorBase<Taboid, col_idx, int64_t>, public Columns<int64_t> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, int64_t> Base;
 
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
+
+    // todo: very quick/dirty hack to get a non-temporary column from ColumnAccessor. Fix
+    const Subexpr& get_qexp_column() const {
+        return *new Columns<int64_t>(col_idx, true);
+    }
 
     std::size_t find_first(int64_t value) const
     {
@@ -882,12 +888,17 @@ public:
 /// Column accessor specialization for float
 template<class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, float>:
-    public ColumnAccessorBase<Taboid, col_idx, float> {
+    public ColumnAccessorBase<Taboid, col_idx, float>, public Columns<float> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, float> Base;
 
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
+
+    // todo: very quick/dirty hack to get a non-temporary column from ColumnAccessor. Fix
+    const Subexpr& get_qexp_column() const {
+        return *new Columns<float>(col_idx, true);
+    }
 
     std::size_t find_first(float value) const
     {
@@ -935,12 +946,17 @@ public:
 /// Column accessor specialization for double
 template<class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, double>:
-    public ColumnAccessorBase<Taboid, col_idx, double> {
+    public ColumnAccessorBase<Taboid, col_idx, double>, public Columns<double> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, double> Base;
 
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
+
+    // todo: very quick/dirty hack to get a non-temporary column from ColumnAccessor. Fix
+    const Subexpr& get_qexp_column() const {
+        return *new Columns<double>(col_idx, true);
+    }
 
     std::size_t find_first(double value) const
     {

@@ -61,9 +61,8 @@ which performs the final query search.
 Todo:    
     * Use query_engine.hpp for execution of simple queries that are supported there, because it's faster
     * Support unary operators like power and sqrt
-    * Consider using references instead of pointers everywhere, but this depends on if constness is OK which again depends
-      on usage, like if tables need to be bound after having built the query, and if it's a requirement that you must 
-      be able to append/modify/whatever already existing queries, etc. Wait for usage to decide
+    * The name Columns for query-expression-columns can be confusing
+
 */
 
 
@@ -146,6 +145,10 @@ class Subexpr
 {
 public:
     virtual ~Subexpr() { }
+
+    virtual const Subexpr& get_qexp_column() const {
+        return *this;
+    }
 
     // Values need no table attached and have no children to call set_table() on either, so do nothing
     virtual void set_table(const Table*) { }    
@@ -268,6 +271,8 @@ public:
 //
 // For L = R = {int, int64_t, float, double}:  
 
+class ColumnAccessorBase;
+
 template <class L, class R> class Overloads
 {
     typedef typename Common<L, R>::type CommonType;
@@ -291,7 +296,7 @@ public:
     Operator<Plus<CommonType> >& operator + (const Subexpr2<R>& right) { 
         return *new Operator<Plus<CommonType> > (static_cast<Subexpr2<L>&>(*this), right, true); 
     }
-
+        
     Operator<Minus<CommonType> >& operator - (const Subexpr2<R>& right) { 
         return *new Operator<Minus<CommonType> > (static_cast<Subexpr2<L>&>(*this), right, true); 
     }
@@ -490,14 +495,18 @@ template <class R> Operator<Div<typename Common<R, int64_t>::type> >& operator /
 
 template <class T> class Columns : public Subexpr2<T>
 {
-protected:
+public:
     explicit Columns(size_t column, bool auto_delete)
     {
         Subexpr::m_auto_delete = auto_delete;
         m_column = column;
     }
 
-public:
+    explicit Columns()
+    {
+        Subexpr::m_auto_delete = false;
+    }
+
     explicit Columns(size_t column)
     {
         Subexpr::m_auto_delete = false;
@@ -534,17 +543,24 @@ private:
     size_t m_column;
 };
 
-
 template <class oper, class TLeft, class TRight> class Operator : public Subexpr2<typename oper::type>
 {
 public:
-    Operator(TLeft& left, const TRight& right) : m_left(left), m_right(const_cast<TRight&>(right)) {
+    // todo: get_qexp_column was a very quick/dirty hack to get a non-temporary column from ColumnAccessor. Todo, fix
+    Operator(TLeft& left, const TRight& right) : 
+    m_left(const_cast<TLeft&>(left.get_qexp_column())), 
+    m_right(const_cast<TRight&>(right.get_qexp_column()))
+    {
         Subexpr::m_auto_delete = false;
-    };
+    }
 
-    Operator(TLeft& left, const TRight& right, bool auto_delete) : m_left(left), m_right(const_cast<TRight&>(right)) {
+    // todo, make protected
+    Operator(TLeft& left, const TRight& right, bool auto_delete) :
+    m_left(const_cast<TLeft&>(left.get_qexp_column())),
+    m_right(const_cast<TRight&>(right.get_qexp_column()))
+    {
         Subexpr::m_auto_delete = auto_delete;
-    };
+    }
 
     ~Operator() 
     {
@@ -599,7 +615,6 @@ private:
     TRight& m_right;
 };
 
-
 template <class TCond, class T, class TLeft, class TRight> class Compare : public Expression
 {
 public:
@@ -612,8 +627,12 @@ public:
             delete &m_right;
     }
 
-    Compare(TLeft& left, const TRight& right) : m_left(left), m_right(const_cast<TRight&>(right))
+    // todo: get_qexp_column was a very quick/dirty hack to get a non-temporary column from ColumnAccessor. Todo, fix
+    Compare(TLeft& left, const TRight& right) : 
+    m_left(const_cast<TLeft&>(left.get_qexp_column())), 
+    m_right(const_cast<TRight&>(right.get_qexp_column()))
     {
+
     }
 
     void set_table(const Table* table) 

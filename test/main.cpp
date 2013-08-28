@@ -69,24 +69,32 @@ TIGHTDB_TABLE_2(TwoColTable,
 
 int main(int argc, char* argv[])
 {
+    TwoColTable two;
+
+
+
+    //e5->compare(0, 2);
+
+
+   
+
+
+
+
+
 
     Table table;
     table.add_column(type_Int, "first1");
     table.add_column(type_Float, "second1");
     table.add_column(type_Double, "third");
 
+
     Columns<int64_t> first(0);
     Columns<float> second(1);
     Columns<double> third(2);
 
 
-//    Expression e = table.first >= 123 + table.second  table2.fdfd;
 
-//    Column<int64_t> first = table....
-//    Query q = first > 120;
-//    TwoColTable
-
-    TwoColTable two;
     two.column().first;  
     two.column().first.minimum();
 
@@ -99,23 +107,7 @@ int main(int argc, char* argv[])
 //    two.average(0);
 
 
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    
+        
 
     
     size_t match;
@@ -132,6 +124,32 @@ int main(int argc, char* argv[])
     table.set_int(0, 1, 20);
     table.set_float(1, 1, 20.1f);
     table.set_double(2, 1, 4.0);
+
+
+
+
+
+
+
+
+
+
+    Expression* e5 = two.column().second + two.column().first > 77;    
+
+    match = table.where().expression(e5).find_next();
+
+
+    match = match;
+
+
+
+
+
+
+
+
+
+
 
 
 
