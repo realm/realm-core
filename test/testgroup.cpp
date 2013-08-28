@@ -844,35 +844,35 @@ TEST(Group_InvalidateTables)
     {
         Group group;
         table = group.get_table<TestTableGroup2>("foo");
-        CHECK(table->is_valid());
+        CHECK(table->is_attached());
         table->add(Mixed::subtable_tag(), 0, 0);
-        CHECK(table->is_valid());
+        CHECK(table->is_attached());
         subtable1 = table[0].first.get_subtable();
-        CHECK(table->is_valid());
+        CHECK(table->is_attached());
         CHECK(subtable1);
-        CHECK(subtable1->is_valid());
+        CHECK(subtable1->is_attached());
         subtable2 = table[0].second;
-        CHECK(table->is_valid());
-        CHECK(subtable1->is_valid());
+        CHECK(table->is_attached());
+        CHECK(subtable1->is_attached());
         CHECK(subtable2);
-        CHECK(subtable2->is_valid());
+        CHECK(subtable2->is_attached());
         subtable3 = table[0].third;
-        CHECK(table->is_valid());
-        CHECK(subtable1->is_valid());
-        CHECK(subtable2->is_valid());
+        CHECK(table->is_attached());
+        CHECK(subtable1->is_attached());
+        CHECK(subtable2->is_attached());
         CHECK(subtable3);
-        CHECK(subtable3->is_valid());
+        CHECK(subtable3->is_attached());
         subtable3->add("alpha", 79542, true,  Wed);
         subtable3->add("beta",     97, false, Mon);
-        CHECK(table->is_valid());
-        CHECK(subtable1->is_valid());
-        CHECK(subtable2->is_valid());
-        CHECK(subtable3->is_valid());
+        CHECK(table->is_attached());
+        CHECK(subtable1->is_attached());
+        CHECK(subtable2->is_attached());
+        CHECK(subtable3->is_attached());
     }
-    CHECK(!table->is_valid());
-    CHECK(!subtable1->is_valid());
-    CHECK(!subtable2->is_valid());
-    CHECK(!subtable3->is_valid());
+    CHECK(!table->is_attached());
+    CHECK(!subtable1->is_attached());
+    CHECK(!subtable2->is_attached());
+    CHECK(!subtable3->is_attached());
 }
 
 TEST(Group_toJSON)

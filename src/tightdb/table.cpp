@@ -155,26 +155,26 @@ void Table::create_columns()
 }
 
 
-void Table::invalidate() TIGHTDB_NOEXCEPT
+void Table::detach() TIGHTDB_NOEXCEPT
 {
     // This prevents the destructor from deallocating the underlying
     // memory structure, and from attempting to notify the parent. It
-    // also causes is_valid() to return false.
+    // also causes is_attached() to return false.
     m_columns.set_parent(0,0);
 
-    // Invalidate all subtables
-    invalidate_subtables();
+    // Detach all offspring accessors
+    detach_subtable_accessors();
 
     destroy_column_accessors();
 }
 
 
-void Table::invalidate_subtables() TIGHTDB_NOEXCEPT
+void Table::detach_subtable_accessors() TIGHTDB_NOEXCEPT
 {
     size_t n = m_cols.size();
     for (size_t i=0; i<n; ++i) {
         ColumnBase* c = reinterpret_cast<ColumnBase*>(uintptr_t(m_cols.get(i)));
-        c->invalidate_subtables_virtual();
+        c->detach_subtable_accessors_virtual();
     }
 }
 
@@ -328,8 +328,8 @@ Table::~Table() TIGHTDB_NOEXCEPT
     transact_log().on_table_destroyed();
 #endif
 
-    if (!is_valid()) {
-        // This table has been invalidated.
+    if (!is_attached()) {
+        // This table has been detached.
         TIGHTDB_ASSERT(m_ref_count == 0);
         return;
     }
@@ -366,9 +366,10 @@ Table::~Table() TIGHTDB_NOEXCEPT
     // LangBindHelper::new_table(), and then the reference count must
     // be zero, because that is what has caused the destructor to be
     // called. In the latter case, there can be no subtables to
-    // invalidate, because they would have kept their parent alive.
+    // detach, because attached ones would have kept their parent
+    // alive.
     if (0 < m_ref_count) {
-        invalidate();
+        detach();
     }
     else {
         destroy_column_accessors();
@@ -379,7 +380,7 @@ Table::~Table() TIGHTDB_NOEXCEPT
 size_t Table::add_column(DataType type, StringData name)
 {
     TIGHTDB_ASSERT(!has_shared_spec());
-    invalidate_subtables();
+    detach_subtable_accessors();
 
     // Update spec
     m_spec_set.add_column(type, name);
@@ -398,7 +399,7 @@ size_t Table::add_subcolumn(const vector<size_t>& column_path, DataType type, St
 {
     TIGHTDB_ASSERT(!column_path.empty());
     TIGHTDB_ASSERT(!has_shared_spec());
-    invalidate_subtables();
+    detach_subtable_accessors();
 
     // Update spec
     size_t column_ndx = m_spec_set.add_subcolumn(column_path, type, name);
@@ -524,7 +525,7 @@ void Table::do_add_subcolumn(const vector<size_t>& column_path, size_t column_pa
 void Table::remove_column(size_t column_ndx)
 {
     TIGHTDB_ASSERT(!has_shared_spec());
-    invalidate_subtables();
+    detach_subtable_accessors();
 
     Spec::ColumnInfo info;
     m_spec_set.get_column_info(column_ndx, info);
@@ -551,7 +552,7 @@ void Table::remove_subcolumn(const vector<size_t>& column_path)
 {
     TIGHTDB_ASSERT(2 <= column_path.size());
     TIGHTDB_ASSERT(!has_shared_spec());
-    invalidate_subtables();
+    detach_subtable_accessors();
 
     Spec::ColumnInfo info;
     m_spec_set.get_subcolumn_info(column_path, 0, info);
@@ -613,7 +614,7 @@ void Table::do_remove_subcolumn(const vector<size_t>& column_path, size_t column
 void Table::rename_column(size_t column_ndx, StringData name)
 {
     TIGHTDB_ASSERT(!has_shared_spec());
-    invalidate_subtables();
+    detach_subtable_accessors();
     m_spec_set.rename_column(column_ndx, name);
 }
 
@@ -621,7 +622,7 @@ void Table::rename_subcolumn(const vector<size_t>& column_path, StringData name)
 {
     TIGHTDB_ASSERT(2 <= column_path.size());
     TIGHTDB_ASSERT(!has_shared_spec());
-    invalidate_subtables();
+    detach_subtable_accessors();
     m_spec_set.rename_column(column_path, name);
 }
 
@@ -1660,21 +1661,25 @@ size_t Table::lookup(StringData value) const
         ColumnType type = get_real_column_type(0);
         if (type == col_type_String) {
             const AdaptiveStringColumn& column = get_column_string(0);
-            if (!column.has_index())
+            if (!column.has_index()) {
                 return column.find_first(value);
+            }
             else {
                 m_lookup_index = &column.get_index();
             }
         }
         else if (type == col_type_StringEnum) {
             const ColumnStringEnum& column = get_column_string_enum(0);
-            if (!column.has_index())
+            if (!column.has_index()) {
                 return column.find_first(value);
+            }
             else {
                 m_lookup_index = &column.get_index();
             }
         }
-        else return not_found; // invalid column type
+        else {
+            return not_found; // invalid column type
+        }
     }
 
     // Do lookup directly on cached index
@@ -2122,7 +2127,7 @@ void Table::adjust_column_ndx_in_parent(size_t column_ndx_begin, int diff) TIGHT
 
 void Table::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_valid());
+    TIGHTDB_ASSERT(is_attached());
 
     // There is no top for sub-tables sharing spec
     if (m_top.is_attached()) {
@@ -2149,7 +2154,7 @@ void Table::update_from_spec()
     TIGHTDB_ASSERT(!has_shared_spec());
     TIGHTDB_ASSERT(m_columns.is_empty() && m_cols.is_empty()); // only on initial creation
 
-    invalidate_subtables();
+    detach_subtable_accessors();
 
     create_columns();
 }

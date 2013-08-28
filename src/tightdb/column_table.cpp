@@ -49,7 +49,7 @@ void ColumnTable::insert(size_t ndx)
 void ColumnTable::insert(size_t ndx, const Table* subtable)
 {
     TIGHTDB_ASSERT(ndx <= size());
-    invalidate_subtables(); // FIXME: Rename to detach_subtable_accessors().
+    detach_subtable_accessors();
 
     ref_type columns_ref = 0;
     if (subtable)
@@ -61,7 +61,7 @@ void ColumnTable::insert(size_t ndx, const Table* subtable)
 void ColumnTable::set(size_t ndx, const Table* subtable)
 {
     TIGHTDB_ASSERT(ndx < size());
-    invalidate_subtables(); // FIXME: Rename to detach_subtable_accessors().
+    detach_subtable_accessors();
     destroy_subtable(ndx);
 
     ref_type columns_ref = 0;
@@ -86,14 +86,14 @@ void ColumnTable::fill(size_t n)
 void ColumnTable::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < size());
-    invalidate_subtables(); // FIXME: Rename to detach_subtable_accessors().
+    detach_subtable_accessors();
     destroy_subtable(ndx);
     Column::erase(ndx);
 }
 
 void ColumnTable::clear()
 {
-    invalidate_subtables();
+    detach_subtable_accessors();
     Column::clear();
     // FIXME: This one is needed because Column::clear() forgets about
     // the leaf type. A better solution should probably be found.
@@ -103,7 +103,7 @@ void ColumnTable::clear()
 void ColumnTable::move_last_over(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx+1 < size());
-    invalidate_subtables(); // FIXME: Rename to detach_subtable_accessors().
+    detach_subtable_accessors();
     destroy_subtable(ndx);
 
     size_t ndx_last = size()-1;

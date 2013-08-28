@@ -359,7 +359,7 @@ private:
     const Table* get_table_by_ndx(std::size_t ndx) const;
     Table* create_new_table(StringData name, SpecSetter);
 
-    void destroy_table_accessors() TIGHTDB_NOEXCEPT;
+    void detach_table_accessors() TIGHTDB_NOEXCEPT;
 
     friend class GroupWriter;
     friend class SharedGroup;

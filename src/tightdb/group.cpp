@@ -250,20 +250,20 @@ Group::~Group() TIGHTDB_NOEXCEPT
     if (!m_top.is_attached())
         return;
 
-    destroy_table_accessors();
+    detach_table_accessors();
 
     // Recursively deletes entire tree
     m_top.destroy();
 }
 
 
-void Group::destroy_table_accessors() TIGHTDB_NOEXCEPT
+void Group::detach_table_accessors() TIGHTDB_NOEXCEPT
 {
     typedef table_accessors::const_iterator iter;
     iter end = m_table_accessors.end();
     for (iter i = m_table_accessors.begin(); i != end; ++i) {
         if (Table* t = *i) {
-            t->invalidate();
+            t->detach();
             t->unbind_ref();
         }
     }
@@ -272,7 +272,7 @@ void Group::destroy_table_accessors() TIGHTDB_NOEXCEPT
 
 void Group::invalidate() TIGHTDB_NOEXCEPT
 {
-    destroy_table_accessors();
+    detach_table_accessors();
     m_table_accessors.clear();
 
     m_top.detach();
