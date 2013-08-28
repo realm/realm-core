@@ -86,13 +86,12 @@ public:
 #endif
 };
 
-DefaultAllocator default_alloc;
-
 } // anonymous namespace
 
 
 
 Allocator& Allocator::get_default() TIGHTDB_NOEXCEPT
 {
+    static DefaultAllocator default_alloc;
     return default_alloc;
 }
