@@ -1,3 +1,4 @@
+#include <exception>
 #include <algorithm>
 #include <iostream>
 
@@ -10,7 +11,17 @@ using namespace std;
 using namespace tightdb;
 
 
-namespace tightdb {
+namespace {
+
+class InvalidFreeSpace: std::exception {
+public:
+    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+    {
+        return "Free space tracking was lost due to out-of-memory";
+    }
+};
+
+} // anonymous namespace
 
 const char SlabAlloc::default_header[24] = {
     0,   0,   0,   0,   0,   0,   0,   0,
@@ -19,27 +30,31 @@ const char SlabAlloc::default_header[24] = {
 };
 
 
-SlabAlloc::~SlabAlloc()
+SlabAlloc::~SlabAlloc() TIGHTDB_NOEXCEPT
 {
 #ifdef TIGHTDB_DEBUG
-    if (!is_all_free()) {
+    if (!m_free_space_invalid && !is_all_free()) {
         m_slabs.print();
         m_free_space.print();
         TIGHTDB_TERMINATE("SlabAlloc detected a leak");
     }
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Release all allocated memory
-    for (size_t i = 0; i < m_slabs.size(); ++i) {
+    for (size_t i = 0; i < m_slabs.size(); ++i)
         delete[] reinterpret_cast<char*>(m_slabs[i].addr.get());
-    }
 
     // Release memory
     if (m_data) {
         switch (m_free_mode) {
-            case free_Noop:                                     break;
-            case free_Unalloc: ::free(m_data);                  break;
-            case free_Unmap:   File::unmap(m_data, m_baseline); break;
+            case free_Noop:
+                break;
+            case free_Unalloc:
+                ::free(m_data);
+                break;
+            case free_Unmap:
+                File::unmap(m_data, m_baseline);
+                break;
         }
     }
 }
@@ -47,8 +62,24 @@ SlabAlloc::~SlabAlloc()
 
 MemRef SlabAlloc::alloc(size_t size)
 {
+    // FIXME: The table operations that modify the free lists below
+    // are not yet exception safe, that is, if one of them fails
+    // (presumably due to std::bad_alloc being thrown) they may leave
+    // the underlying node structure of the tables in a state that is
+    // so corrupt that it can lead to memory leaks and even general
+    // memory corruption. This must be fixed. Note that corruption may
+    // be accetable, but we must be able to guarantee that corruption
+    // never gets so bad that destruction of the tables fail.
+
     TIGHTDB_ASSERT(0 < size);
     TIGHTDB_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
+
+    // FIXME: Ideally, instead of just marking the free space as
+    // invalid in free_(), we shuld at least make a best effort to
+    // keep a record of what was freed and then attempt to rebuild the
+    // free lists here when they have become invalid.
+    if (m_free_space_invalid)
+        throw InvalidFreeSpace();
 
     // Do we have a free space we can reuse?
     {
@@ -69,12 +100,14 @@ MemRef SlabAlloc::alloc(size_t size)
                 }
 
 #ifdef TIGHTDB_DEBUG
-                if (m_debug_out) {
+                if (m_debug_out)
                     cerr << "Alloc ref: " << ref << " size: " << size << "\n";
-                }
 #endif
 
                 char* addr = translate(ref);
+#ifdef TIGHTDB_ALLOC_SET_ZERO
+                fill(addr, addr+size, 0);
+#endif
                 return MemRef(addr, ref);
             }
         }
@@ -103,9 +136,9 @@ MemRef SlabAlloc::alloc(size_t size)
     // Add to slab table
     size_t new_ref_end = curr_ref_end + new_size;
     // FIXME: intptr_t is not guaranteed to exists, not even in C++11
-    uintptr_t addr = reinterpret_cast<uintptr_t>(slab);
+    uintptr_t slab_2 = reinterpret_cast<uintptr_t>(slab);
     // FIXME: Dangerous conversions to int64_t here (undefined behavior according to C++11)
-    m_slabs.add(int64_t(new_ref_end), int64_t(addr));
+    m_slabs.add(int64_t(new_ref_end), int64_t(slab_2));
 
     // Update free list
     size_t unused = new_size - size;
@@ -115,25 +148,26 @@ MemRef SlabAlloc::alloc(size_t size)
         m_free_space.add(int64_t(ref), int64_t(unused));
     }
 
-    char* addr_2 = slab;
+    char* addr = slab;
     size_t ref = curr_ref_end;
 
 #ifdef TIGHTDB_DEBUG
-    if (m_debug_out) {
+    if (m_debug_out)
         cerr << "Alloc ref: " << ref << " size: " << size << "\n";
-    }
 #endif
 
-    return MemRef(addr_2, ref);
+#ifdef TIGHTDB_ALLOC_SET_ZERO
+    fill(addr, addr+size, 0);
+#endif
+
+    return MemRef(addr, ref);
 }
 
 
-// FIXME: We need to come up with a way to make free() a method that
-// never throws. This is essential for exception safety in large parts
-// of the TightDB API.
-void SlabAlloc::free_(ref_type ref, const char* addr)
+void SlabAlloc::free_(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(translate(ref) == addr);
+
     // Free space in read only segment is tracked separately
     bool read_only = is_read_only(ref);
     FreeSpace& free_space = read_only ? m_free_read_only : m_free_space;
@@ -142,79 +176,94 @@ void SlabAlloc::free_(ref_type ref, const char* addr)
     size_t size = read_only ? Array::get_byte_size_from_header(addr) :
         Array::get_capacity_from_header(addr);
     size_t ref_end = ref + size;
-    size_t merged_with = npos;
 
 #ifdef TIGHTDB_DEBUG
-    if (m_debug_out) {
+    if (m_debug_out)
         cerr << "Free ref: " << ref << " size: " << size << "\n";
-    }
-#endif // TIGHTDB_DEBUG
+#endif
 
-    // Check if we can merge with start of free block
-    {
-        size_t n = free_space.column().ref.find_first(ref_end);
-        if (n != not_found) {
-            // No consolidation over slab borders
-            if (m_slabs.column().ref_end.find_first(ref_end) == not_found) {
-                free_space[n].ref = ref;
-                free_space[n].size += size;
-                merged_with = n;
+    if (m_free_space_invalid)
+        return;
+
+    try {
+        // FIXME: The table operations that modify the free lists
+        // below are not yet exception safe, that is, if one of them
+        // fails (presumably due to std::bad_alloc being thrown) they
+        // may leave the underlying node structure of the tables in a
+        // state that is so corrupt that it can lead to memory leaks
+        // and even general memory corruption. This must be
+        // fixed. Note that corruption may be accetable, but we must
+        // be able to guarantee that corruption never gets so bad that
+        // destruction of the tables fail.
+
+        // Check if we can merge with start of free block
+        size_t merged_with = npos;
+        {
+            size_t n = free_space.column().ref.find_first(ref_end);
+            if (n != not_found) {
+                // No consolidation over slab borders
+                if (m_slabs.column().ref_end.find_first(ref_end) == not_found) {
+                    free_space[n].ref = ref; // Throws
+                    free_space[n].size += size; // Throws
+                    merged_with = n;
+                }
             }
         }
-    }
 
-    // Check if we can merge with end of free block
-    if (m_slabs.column().ref_end.find_first(ref) == not_found) { // avoid slab borders
-        size_t n = free_space.size();
-        for (size_t i = 0; i < n; ++i) {
-            FreeSpace::Cursor c = free_space[i];
-
-            ref_type end = to_ref(c.ref + c.size);
-            if (ref == end) {
-                if (merged_with != npos) {
-                    c.size += free_space[merged_with].size;
-                    free_space.remove(merged_with);
+        // Check if we can merge with end of free block
+        if (m_slabs.column().ref_end.find_first(ref) == not_found) { // avoid slab borders
+            size_t n = free_space.size();
+            for (size_t i = 0; i < n; ++i) {
+                FreeSpace::Cursor c = free_space[i];
+                ref_type end = to_ref(c.ref + c.size);
+                if (ref == end) {
+                    if (merged_with != npos) {
+                        size_t s = to_size_t(free_space[merged_with].size);
+                        c.size += s; // Throws
+                        free_space.remove(merged_with); // Throws
+                    }
+                    else {
+                        c.size += size; // Throws
+                    }
+                    return;
                 }
-                else {
-                    c.size += size;
-                }
-                return;
             }
         }
-    }
 
-    // Else just add to freelist
-    if (merged_with == npos)
-        free_space.add(ref, size); // Throws
+        // Else just add to freelist
+        if (merged_with == npos)
+            free_space.add(ref, size); // Throws
+    }
+    catch (...) {
+        m_free_space_invalid = true;
+    }
 }
 
 
-MemRef SlabAlloc::realloc_(size_t ref, const char* addr, size_t size)
+MemRef SlabAlloc::realloc_(size_t ref, const char* addr, size_t old_size, size_t new_size)
 {
     TIGHTDB_ASSERT(translate(ref) == addr);
-    TIGHTDB_ASSERT(0 < size);
-    TIGHTDB_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
+    TIGHTDB_ASSERT(0 < new_size);
+    TIGHTDB_ASSERT((new_size & 0x7) == 0); // only allow sizes that are multiples of 8
 
-    //TODO: Check if we can extend current space
+    // FIXME: Check if we can extend current space. In that case,
+    // remember to check m_free_space_invalid. Also remember to fill
+    // with zero if TIGHTDB_ALLOC_SET_ZERO is defined.
 
     // Allocate new space
-    MemRef new_mem = alloc(size); // Throws
-
-    /*if (doCopy) {*/  //TODO: allow realloc without copying
-        // Get size of old segment
-    size_t old_size = Array::get_capacity_from_header(addr);
+    MemRef new_mem = alloc(new_size); // Throws
 
     // Copy existing segment
-    copy(addr, addr+old_size, new_mem.m_addr);
+    char* new_addr = new_mem.m_addr;
+    copy(addr, addr+old_size, new_addr);
 
     // Add old segment to freelist
-    free_(ref, addr); // FIXME: Unfortunately, this one can throw
-    //}
+    free_(ref, addr);
 
 #ifdef TIGHTDB_DEBUG
     if (m_debug_out) {
         cerr << "Realloc orig_ref: " << ref << " old_size: " << old_size << " "
-            "new_ref: " << new_mem.m_ref << " new_size: " << size << "\n";
+            "new_ref: " << new_mem.m_ref << " new_size: " << new_size << "\n";
     }
 #endif // TIGHTDB_DEBUG
 
@@ -224,15 +273,15 @@ MemRef SlabAlloc::realloc_(size_t ref, const char* addr, size_t size)
 
 char* SlabAlloc::translate(ref_type ref) const TIGHTDB_NOEXCEPT
 {
-    if (ref < m_baseline) return m_data + ref;
-    else {
-        size_t ndx = m_slabs.column().ref_end.upper_bound(ref);
-        TIGHTDB_ASSERT(ndx != m_slabs.size());
+    if (ref < m_baseline)
+        return m_data + ref;
 
-        size_t offset = ndx == 0 ? m_baseline : to_size_t(m_slabs[ndx-1].ref_end);
-        intptr_t addr = intptr_t(m_slabs[ndx].addr.get());
-        return reinterpret_cast<char*>(addr) + (ref - offset);
-    }
+    size_t ndx = m_slabs.column().ref_end.upper_bound(ref);
+    TIGHTDB_ASSERT(ndx != m_slabs.size());
+
+    size_t offset = ndx == 0 ? m_baseline : to_size_t(m_slabs[ndx-1].ref_end);
+    intptr_t addr = intptr_t(m_slabs[ndx].addr.get());
+    return reinterpret_cast<char*>(addr) + (ref - offset);
 }
 
 
@@ -315,7 +364,8 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
 void SlabAlloc::attach_buffer(char* data, size_t size, bool take_ownership)
 {
     // Verify the data structures
-    if (!validate_buffer(data, size)) throw InvalidDatabase();
+    if (!validate_buffer(data, size))
+        throw InvalidDatabase();
 
     m_data      = data;
     m_baseline  = size;
@@ -389,6 +439,13 @@ size_t SlabAlloc::get_total_size() const
 
 void SlabAlloc::free_all()
 {
+    // FIXME: Currently, it is not safe to call
+    // m_free_read_only.clear() and m_free_space.clear() after a
+    // failure to update them in free() (m_free_space_valid =
+    // true). It is expected that this problem will be fixed by
+    // changes that will make the public API completely exception
+    // safe.
+
     // Free all scratch space (done after all data has
     // been commited to persistent space)
     m_free_read_only.clear();
@@ -407,10 +464,12 @@ void SlabAlloc::free_all()
     }
 
     TIGHTDB_ASSERT(is_all_free());
+
+    m_free_space_invalid = false;
 }
 
 
-void SlabAlloc::remap(size_t file_size)
+bool SlabAlloc::remap(size_t file_size)
 {
     TIGHTDB_ASSERT(m_free_read_only.is_empty());
     TIGHTDB_ASSERT(m_slabs.size() == m_free_space.size());
@@ -420,6 +479,8 @@ void SlabAlloc::remap(size_t file_size)
 
     void* addr =
         m_file.remap(m_data, m_baseline, File::access_ReadOnly, file_size);
+
+    bool addr_changed = addr != m_data;
 
     m_data = static_cast<char*>(addr);
     m_baseline = file_size;
@@ -434,6 +495,15 @@ void SlabAlloc::remap(size_t file_size)
 
         m_slabs[i].ref_end = new_offset;
     }
+
+    return addr_changed;
+}
+
+const SlabAlloc::FreeSpace& SlabAlloc::get_free_read_only() const
+{
+    if (m_free_space_invalid)
+        throw InvalidFreeSpace();
+    return m_free_read_only;
 }
 
 
@@ -487,9 +557,8 @@ void SlabAlloc::print() const
         size_t(m_slabs[m_slabs.size()-1].ref_end - m_baseline);
 
     size_t free = 0;
-    for (size_t i = 0; i < m_free_space.size(); ++i) {
+    for (size_t i = 0; i < m_free_space.size(); ++i)
         free += to_ref(m_free_space[i].size);
-    }
 
     size_t allocated = allocated_for_slabs - free;
     cout << "Attached: " << (m_data ? m_baseline : 0) << " Allocated: " << allocated << "\n";
@@ -545,5 +614,3 @@ void SlabAlloc::print() const
 }
 
 #endif // TIGHTDB_DEBUG
-
-} //namespace tightdb

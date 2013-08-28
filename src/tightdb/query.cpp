@@ -52,7 +52,7 @@ Query::Query(const Query& copy)
     do_delete = true;
 }
 
-Query::~Query()
+Query::~Query() TIGHTDB_NOEXCEPT
 {
 #if TIGHTDB_MULTITHREAD_QUERY
     for (size_t i = 0; i < m_threadcount; i++)

@@ -22,6 +22,7 @@
 #define TIGHTDB_GROUP_HPP
 
 #include <string>
+#include <vector>
 
 #include <tightdb/exceptions.hpp>
 #include <tightdb/table.hpp>
@@ -70,7 +71,7 @@ public:
     /// behavior.
     Group(unattached_tag) TIGHTDB_NOEXCEPT;
 
-    ~Group();
+    ~Group() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     /// Attach this Group instance to the specified database file.
     ///
@@ -185,16 +186,47 @@ public:
     std::size_t size() const;
 
     StringData get_table_name(std::size_t table_ndx) const;
+
+    /// Check whether this group has a table with the specified name.
     bool has_table(StringData name) const;
 
     /// Check whether this group has a table with the specified name
-    /// and type.
+    /// and a dynamic type that matches the specified static type.
+    ///
+    /// \tparam T An instance of the BasicTable<> class template.
     template<class T> bool has_table(StringData name) const;
 
+    //@{
+    /// Get the table with the specified name from this group.
+    ///
+    /// The non-const versions of this function will create a table
+    /// with the specified name if one does not already exist. The
+    /// const versions will not.
+    ///
+    /// It is an error to call one of the const-qualified versions for
+    /// a table that does not already exist. Doing so will result in
+    /// undefined behavior.
+    ///
+    /// The non-template versions will return dynamically typed table
+    /// accessors, while the template versions will return statically
+    /// typed accessors.
+    ///
+    /// It is an error to call one of the templated versions for a
+    /// table whose dynamic type does not match the specified static
+    /// type. Doing so will result in undefined behavior.
+    ///
+    /// New tables created by the non-const non-template version will
+    /// have no columns initially. New tables created by the non-const
+    /// template version will have a dynamic type (set of columns)
+    /// that matches the specifed static type.
+    ///
+    /// \tparam T An instance of the BasicTable<> class template.
     TableRef      get_table(StringData name);
     ConstTableRef get_table(StringData name) const;
     template<class T> typename T::Ref      get_table(StringData name);
     template<class T> typename T::ConstRef get_table(StringData name) const;
+    //@}
+
 
     // Serialization
 
@@ -222,16 +254,14 @@ public:
     /// Commit changes to the attached file. This requires that the
     /// attached file is opened in read/write mode.
     ///
-    /// Do not call this function on a group instance that is managed
-    /// by a shared group. Doing so will result in undefined behavior.
+    /// Calling this function on an unattached group, a free-standing
+    /// group, a group whose attached file is opened in read-only
+    /// mode, a group that is attached to a memory buffer, or a group
+    /// that is managed by a shared group, is an error and will result
+    /// in undefined behavior.
     ///
     /// Table accesors will remain valid across the commit. Note that
     /// this is not the case when working with proper transactions.
-    ///
-    /// FIXME: Must throw an exception if the group is opened in
-    /// read-only mode. Currently this is impossible because the
-    /// information is not stored anywhere. A flag probably needs to be
-    /// added to SlabAlloc.
     void commit();
 
     // Conversion
@@ -267,8 +297,9 @@ private:
     Array m_free_positions;
     Array m_free_lengths;
     Array m_free_versions;
-    mutable Array m_cached_tables;
-    const bool m_is_shared; // FIXME: Currently used only by Verify() when compiling in debug mode
+    typedef std::vector<Table*> table_accessors;
+    mutable table_accessors m_table_accessors;
+    const bool m_is_shared;
     std::size_t m_readlock_version;
 
     struct shared_tag {};
@@ -278,11 +309,17 @@ private:
     Group(const Group&); // Disable copying
 
     void init_array_parents();
-    void invalidate();
+    void invalidate() TIGHTDB_NOEXCEPT;
     void init_shared();
 
-    // Recursively update all internal refs after commit
-    void update_refs(ref_type top_ref);
+    /// Recursively update refs stored in all cached array
+    /// accessors. This includes cached array accessors in any
+    /// currently attached table accessors. This ensures that the
+    /// group instance itself, as well as any attached table accessor
+    /// that exists across Group::commit() will remain valid. This
+    /// function is not appropriate for use in conjunction with
+    /// commits via shared group.
+    void update_refs(ref_type top_ref, std::size_t old_baseline);
 
     void update_from_shared(ref_type new_top_ref, std::size_t new_file_size);
 
@@ -291,7 +328,7 @@ private:
         m_tables.set(subtable_ndx, new_ref);
     }
 
-    void child_destroyed(std::size_t) TIGHTDB_OVERRIDE {} // Ignore
+    void child_accessor_destroyed(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {} // Ignore
 
     ref_type get_child_ref(std::size_t subtable_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
@@ -310,17 +347,19 @@ private:
     /// cache.
     void init_from_ref(ref_type top_ref);
 
+    typedef void (*SpecSetter)(Table&);
+    Table* get_table_ptr(StringData name, SpecSetter, bool& was_created);
+
     Table* get_table_ptr(StringData name);
-    Table* get_table_ptr(StringData name, bool& was_created);
     const Table* get_table_ptr(StringData name) const;
     template<class T> T* get_table_ptr(StringData name);
     template<class T> const T* get_table_ptr(StringData name) const;
 
-    Table* get_table_ptr(std::size_t ndx);
-    const Table* get_table_ptr(std::size_t ndx) const;
-    Table* create_new_table(StringData name);
+    Table* get_table_by_ndx(std::size_t ndx);
+    const Table* get_table_by_ndx(std::size_t ndx) const;
+    Table* create_new_table(StringData name, SpecSetter);
 
-    void clear_cache();
+    void destroy_table_accessors() TIGHTDB_NOEXCEPT;
 
     friend class GroupWriter;
     friend class SharedGroup;
@@ -344,18 +383,7 @@ inline Group::Group():
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
 {
     init_array_parents();
-
-    // FIXME: The try-catch is required because of the unfortunate
-    // fact that Array violates the RAII idiom by allocating memory in
-    // the constructor and not freeing it in the destructor. We must
-    // find a way to improve Array.
-    try {
-        create(); // Throws
-    }
-    catch (...) {
-        m_cached_tables.destroy();
-        throw;
-    }
+    create(); // Throws
 }
 
 inline Group::Group(const std::string& file, OpenMode mode):
@@ -363,18 +391,7 @@ inline Group::Group(const std::string& file, OpenMode mode):
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
 {
     init_array_parents();
-
-    // FIXME: The try-catch is required because of the unfortunate
-    // fact that Array violates the RAII idiom by allocating memory in
-    // the constructor and not freeing it in the destructor. We must
-    // find a way to improve Array.
-    try {
-        open(file, mode); // Throws
-    }
-    catch (...) {
-        m_cached_tables.destroy();
-        throw;
-    }
+    open(file, mode); // Throws
 }
 
 inline Group::Group(BinaryData buffer, bool take_ownership):
@@ -382,18 +399,7 @@ inline Group::Group(BinaryData buffer, bool take_ownership):
     m_free_lengths(m_alloc), m_free_versions(m_alloc), m_is_shared(false)
 {
     init_array_parents();
-
-    // FIXME: The try-catch is required because of the unfortunate
-    // fact that Array violates the RAII idiom by allocating memory in
-    // the constructor and not freeing it in the destructor. We must
-    // find a way to improve Array.
-    try {
-        open(buffer, take_ownership); // Throws
-    }
-    catch (...) {
-        m_cached_tables.destroy();
-        throw;
-    }
+    open(buffer, take_ownership); // Throws
 }
 
 inline Group::Group(unattached_tag) TIGHTDB_NOEXCEPT:
@@ -443,80 +449,73 @@ inline StringData Group::get_table_name(std::size_t table_ndx) const
     return m_table_names.get(table_ndx);
 }
 
-inline const Table* Group::get_table_ptr(std::size_t ndx) const
-{
-    return const_cast<Group*>(this)->get_table_ptr(ndx);
-}
-
 inline bool Group::has_table(StringData name) const
 {
-    if (!m_top.is_attached()) return false;
+    if (!m_top.is_attached())
+        return false;
     std::size_t i = m_table_names.find_first(name);
-    return i != std::size_t(-1);
+    return i != not_found;
 }
 
 template<class T> inline bool Group::has_table(StringData name) const
 {
-    if (!m_top.is_attached()) return false;
-    std::size_t i = m_table_names.find_first(name);
-    if (i == std::size_t(-1)) return false;
-    const Table* table = get_table_ptr(i);
+    if (!m_top.is_attached())
+        return false;
+    std::size_t ndx = m_table_names.find_first(name);
+    if (ndx == not_found)
+        return false;
+    const Table* table = get_table_by_ndx(ndx);
     return T::matches_dynamic_spec(&table->get_spec());
+}
+
+inline Table* Group::get_table_ptr(StringData name, SpecSetter spec_setter, bool& was_created)
+{
+    TIGHTDB_ASSERT(m_top.is_attached());
+    std::size_t ndx = m_table_names.find_first(name);
+
+    if (ndx != not_found) {
+        Table* table = get_table_by_ndx(ndx); // Throws
+        was_created = false;
+        return table;
+    }
+
+    Table* table = create_new_table(name, spec_setter); // Throws
+    was_created = true;
+    return table;
 }
 
 inline Table* Group::get_table_ptr(StringData name)
 {
-    TIGHTDB_ASSERT(m_top.is_attached());
-    std::size_t ndx = m_table_names.find_first(name);
-    if (ndx != std::size_t(-1)) {
-        // Get table from cache
-        return get_table_ptr(ndx);
-    }
-
-    return create_new_table(name);
-}
-
-inline Table* Group::get_table_ptr(StringData name, bool& was_created)
-{
-    TIGHTDB_ASSERT(m_top.is_attached());
-    std::size_t ndx = m_table_names.find_first(name);
-    if (ndx != std::size_t(-1)) {
-        was_created = false;
-        // Get table from cache
-        return get_table_ptr(ndx);
-    }
-
-    was_created = true;
-    return create_new_table(name);
+    SpecSetter spec_setter = 0; // Do not add any columns
+    bool was_created; // Dummy
+    return get_table_ptr(name, spec_setter, was_created);
 }
 
 inline const Table* Group::get_table_ptr(StringData name) const
 {
-    TIGHTDB_ASSERT(has_table(name));
-    return const_cast<Group*>(this)->get_table_ptr(name);
+    TIGHTDB_ASSERT(m_top.is_attached());
+    std::size_t ndx = m_table_names.find_first(name);
+    if (ndx == not_found)
+        return 0;
+    return get_table_by_ndx(ndx); // Throws
 }
 
 template<class T> inline T* Group::get_table_ptr(StringData name)
 {
     TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
-    TIGHTDB_ASSERT(!has_table(name) || has_table<T>(name));
-
-    TIGHTDB_ASSERT(m_top.is_attached());
-    std::size_t ndx = m_table_names.find_first(name);
-    if (ndx != std::size_t(-1)) {
-        // Get table from cache
-        return static_cast<T*>(get_table_ptr(ndx));
-    }
-
-    T* table = static_cast<T*>(create_new_table(name));
-    table->set_dynamic_spec(); // FIXME: May fail
-    return table;
+    SpecSetter spec_setter = &T::set_dynamic_spec;
+    bool was_created; // Dummy
+    Table* table = get_table_ptr(name, spec_setter, was_created);
+    TIGHTDB_ASSERT(T::matches_dynamic_spec(&table->get_spec()));
+    return static_cast<T*>(table);
 }
 
 template<class T> inline const T* Group::get_table_ptr(StringData name) const
 {
-    TIGHTDB_ASSERT(has_table(name));
-    return const_cast<Group*>(this)->get_table_ptr<T>(name);
+    TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
+    const Table* table = get_table_ptr(name); // Throws
+    TIGHTDB_ASSERT(!table || T::matches_dynamic_spec(&table->get_spec()));
+    return static_cast<const T*>(table);
 }
 
 inline TableRef Group::get_table(StringData name)
@@ -526,6 +525,7 @@ inline TableRef Group::get_table(StringData name)
 
 inline ConstTableRef Group::get_table(StringData name) const
 {
+    TIGHTDB_ASSERT(has_table(name));
     return get_table_ptr(name)->get_table_ref();
 }
 
@@ -536,7 +536,13 @@ template<class T> inline typename T::Ref Group::get_table(StringData name)
 
 template<class T> inline typename T::ConstRef Group::get_table(StringData name) const
 {
+    TIGHTDB_ASSERT(has_table<T>(name));
     return get_table_ptr<T>(name)->get_table_ref();
+}
+
+inline const Table* Group::get_table_by_ndx(size_t ndx) const
+{
+    return const_cast<Group*>(this)->get_table_by_ndx(ndx);
 }
 
 template<class S> std::size_t Group::write_to_stream(S& out) const
@@ -592,7 +598,7 @@ void Group::to_json(S& out) const
 
     for (std::size_t i = 0; i < m_tables.size(); ++i) {
         StringData name = m_table_names.get(i);
-        const Table* table = get_table_ptr(i);
+        const Table* table = get_table_by_ndx(i);
 
         if (i) out << ",";
         out << "\"" << name << "\"";
@@ -601,19 +607,6 @@ void Group::to_json(S& out) const
     }
 
     out << "}";
-}
-
-
-inline void Group::clear_cache()
-{
-    std::size_t n = m_cached_tables.size();
-    for (std::size_t i = 0; i < n; ++i) {
-        if (Table* t = reinterpret_cast<Table*>(m_cached_tables.get(i))) {
-            t->invalidate();
-            t->unbind_ref();
-        }
-    }
-    m_cached_tables.clear();
 }
 
 
