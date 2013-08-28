@@ -59,7 +59,7 @@ public:
     /// Construct a slab allocator in the unattached state.
     SlabAlloc();
 
-    ~SlabAlloc();
+    ~SlabAlloc() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     /// Attach this allocator to the specified file.
     ///
@@ -109,7 +109,7 @@ public:
     /// This function may be called only for an attached
     /// allocator. The effect of calling it on an unattached allocator
     /// is undefined.
-    std::size_t get_attached_size() const TIGHTDB_NOEXCEPT;
+    std::size_t get_baseline() const TIGHTDB_NOEXCEPT;
 
     /// Get the total amount of managed memory (allocated and
     /// unallocated).
@@ -124,13 +124,18 @@ public:
 
     /// Remap the attached file such that a prefix of the specified
     /// size becomes available in memory. If sucessfull,
-    /// get_attached_size() will return the specified new file size.
-    void remap(std::size_t file_size);
+    /// get_baseline() will return the specified new file size.
+    ///
+    /// \return True if, and only if the memory address of the first
+    /// mapped byte has changed.
+    bool remap(std::size_t file_size);
 
     MemRef alloc(std::size_t size) TIGHTDB_OVERRIDE;
-    MemRef realloc_(ref_type, const char*, std::size_t size) TIGHTDB_OVERRIDE;
-    void   free_(ref_type, const char*) TIGHTDB_OVERRIDE; // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
-    char*  translate(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    MemRef realloc_(ref_type, const char*, std::size_t old_size,
+                    std::size_t new_size) TIGHTDB_OVERRIDE;
+    // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
+    void free_(ref_type, const char*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    char* translate(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_read_only(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
@@ -153,19 +158,31 @@ private:
 
     static const char default_header[24];
 
-    File        m_file;
-    char*       m_data;
-    FreeMode    m_free_mode;
+    File m_file;
+    char* m_data;
+    FreeMode m_free_mode;
+
+    /// When set to true, the free lists are no longer
+    /// up-to-date. This happens if free_() fails, presumably due to
+    /// std::bad_alloc being thrown during updating of the free space
+    /// list. In this this case, alloc(), realloc(), and
+    /// get_free_read_only() must throw. This member is deliberately
+    /// placed after m_free_mode in the hope that it leads to less
+    /// padding between members due to alignment requirements.
+    bool m_free_space_invalid;
+
     std::size_t m_baseline; // Also size of memory mapped portion of database file
-    Slabs       m_slabs;
-    FreeSpace   m_free_space;
-    FreeSpace   m_free_read_only;
+    Slabs m_slabs;
+    FreeSpace m_free_space;
+    FreeSpace m_free_read_only;
 
 #ifdef TIGHTDB_DEBUG
-    bool        m_debug_out;
+    bool m_debug_out;
 #endif
 
-    const FreeSpace& get_free_read_only() const { return m_free_read_only; }
+    /// Throws if free-lists are no longer valid.
+    const FreeSpace& get_free_read_only() const;
+
     bool validate_buffer(const char* data, std::size_t len) const;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -187,6 +204,8 @@ inline SlabAlloc::SlabAlloc()
     // Mark as unattached
     m_data = 0;
 
+    m_free_space_invalid = false;
+
     // We cannot initialize m_baseline to zero, because that would
     // cause the first invocation of alloc() to return a 'ref' equal
     // to zero, and zero is by definition not a valid ref. Since all
@@ -204,7 +223,7 @@ inline bool SlabAlloc::is_attached() const  TIGHTDB_NOEXCEPT
     return m_data != 0;
 }
 
-inline std::size_t SlabAlloc::get_attached_size() const TIGHTDB_NOEXCEPT
+inline std::size_t SlabAlloc::get_baseline() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
     return m_baseline;

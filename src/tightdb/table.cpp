@@ -19,15 +19,7 @@
 #include <tightdb/index_string.hpp>
 
 using namespace std;
-
-
-namespace tightdb {
-
-struct FakeParent: Table::Parent {
-    void update_child_ref(size_t, ref_type) TIGHTDB_OVERRIDE {} // Ignore
-    void child_destroyed(size_t) TIGHTDB_OVERRIDE {} // Ignore
-    ref_type get_child_ref(size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return 0; }
-};
+using namespace tightdb;
 
 
 // -- Table ---------------------------------------------------------------------------------
@@ -163,7 +155,7 @@ void Table::create_columns()
 }
 
 
-void Table::invalidate()
+void Table::invalidate() TIGHTDB_NOEXCEPT
 {
     // This prevents the destructor from deallocating the underlying
     // memory structure, and from attempting to notify the parent. It
@@ -173,15 +165,15 @@ void Table::invalidate()
     // Invalidate all subtables
     invalidate_subtables();
 
-    clear_cached_columns();
+    destroy_column_accessors();
 }
 
 
-void Table::invalidate_subtables()
+void Table::invalidate_subtables() TIGHTDB_NOEXCEPT
 {
     size_t n = m_cols.size();
     for (size_t i=0; i<n; ++i) {
-        ColumnBase* c = reinterpret_cast<ColumnBase*>(m_cols.get(i));
+        ColumnBase* c = reinterpret_cast<ColumnBase*>(uintptr_t(m_cols.get(i)));
         c->invalidate_subtables_virtual();
     }
 }
@@ -318,7 +310,7 @@ void Table::cache_columns()
     if (num_rows != size_t(-1)) m_size = num_rows;
 }
 
-void Table::clear_cached_columns()
+void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_cols.is_attached());
 
@@ -330,7 +322,7 @@ void Table::clear_cached_columns()
     m_cols.destroy();
 }
 
-Table::~Table()
+Table::~Table() TIGHTDB_NOEXCEPT
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().on_table_destroyed();
@@ -350,8 +342,8 @@ Table::~Table()
         TIGHTDB_ASSERT(parent);
         TIGHTDB_ASSERT(m_ref_count == 0);
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
-        static_cast<Parent*>(parent)->child_destroyed(m_columns.get_ndx_in_parent());
-        clear_cached_columns();
+        static_cast<Parent*>(parent)->child_accessor_destroyed(m_columns.get_ndx_in_parent());
+        destroy_column_accessors();
         return;
     }
 
@@ -361,8 +353,8 @@ Table::~Table()
         // counting, so we must let our parent know about our demise.
         TIGHTDB_ASSERT(m_ref_count == 0);
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
-        static_cast<Parent*>(parent)->child_destroyed(m_top.get_ndx_in_parent());
-        clear_cached_columns();
+        static_cast<Parent*>(parent)->child_accessor_destroyed(m_top.get_ndx_in_parent());
+        destroy_column_accessors();
         return;
     }
 
@@ -375,8 +367,12 @@ Table::~Table()
     // be zero, because that is what has caused the destructor to be
     // called. In the latter case, there can be no subtables to
     // invalidate, because they would have kept their parent alive.
-    if (0 < m_ref_count) invalidate();
-    else clear_cached_columns();
+    if (0 < m_ref_count) {
+        invalidate();
+    }
+    else {
+        destroy_column_accessors();
+    }
     m_top.destroy();
 }
 
@@ -798,30 +794,85 @@ ref_type Table::clone(Allocator& alloc) const
 
 // TODO: get rid of the Column* template parameter
 
-Column& Table::get_column(size_t ndx)                              { return get_column<Column, col_type_Int>(ndx); }
-const Column& Table::get_column(size_t ndx) const TIGHTDB_NOEXCEPT { return get_column<Column, col_type_Int>(ndx); }
+Column& Table::get_column(size_t ndx)
+{
+    return get_column<Column, col_type_Int>(ndx);
+}
 
-AdaptiveStringColumn& Table::get_column_string(size_t ndx)                              { return get_column<AdaptiveStringColumn, col_type_String>(ndx); }
-const AdaptiveStringColumn& Table::get_column_string(size_t ndx) const TIGHTDB_NOEXCEPT { return get_column<AdaptiveStringColumn, col_type_String>(ndx); }
+const Column& Table::get_column(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<Column, col_type_Int>(ndx);
+}
 
-ColumnStringEnum& Table::get_column_string_enum(size_t ndx)                              { return get_column<ColumnStringEnum, col_type_StringEnum>(ndx); }
-const ColumnStringEnum& Table::get_column_string_enum(size_t ndx) const TIGHTDB_NOEXCEPT { return get_column<ColumnStringEnum, col_type_StringEnum>(ndx); }
+AdaptiveStringColumn& Table::get_column_string(size_t ndx)
+{
+    return get_column<AdaptiveStringColumn, col_type_String>(ndx);
+}
 
-ColumnFloat& Table::get_column_float(size_t ndx)                                { return get_column<ColumnFloat, col_type_Float>(ndx); }
-const ColumnFloat& Table::get_column_float(size_t ndx) const   TIGHTDB_NOEXCEPT { return get_column<ColumnFloat, col_type_Float>(ndx); }
+const AdaptiveStringColumn& Table::get_column_string(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<AdaptiveStringColumn, col_type_String>(ndx);
+}
 
-ColumnDouble& Table::get_column_double(size_t ndx)                              { return get_column<ColumnDouble, col_type_Double>(ndx); }
-const ColumnDouble& Table::get_column_double(size_t ndx) const TIGHTDB_NOEXCEPT { return get_column<ColumnDouble, col_type_Double>(ndx); }
+ColumnStringEnum& Table::get_column_string_enum(size_t ndx)
+{
+    return get_column<ColumnStringEnum, col_type_StringEnum>(ndx);
+}
 
-ColumnBinary& Table::get_column_binary(size_t ndx)                              { return get_column<ColumnBinary, col_type_Binary>(ndx); }
-const ColumnBinary& Table::get_column_binary(size_t ndx) const TIGHTDB_NOEXCEPT { return get_column<ColumnBinary, col_type_Binary>(ndx); }
+const ColumnStringEnum& Table::get_column_string_enum(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnStringEnum, col_type_StringEnum>(ndx);
+}
 
-ColumnTable &Table::get_column_table(size_t ndx)                                { return get_column<ColumnTable, col_type_Table>(ndx); }
-const ColumnTable &Table::get_column_table(size_t ndx) const   TIGHTDB_NOEXCEPT { return get_column<ColumnTable, col_type_Table>(ndx); }
+ColumnFloat& Table::get_column_float(size_t ndx)
+{
+    return get_column<ColumnFloat, col_type_Float>(ndx);
+}
 
-ColumnMixed& Table::get_column_mixed(size_t ndx)                                { return get_column<ColumnMixed, col_type_Mixed>(ndx); }
-const ColumnMixed& Table::get_column_mixed(size_t ndx) const   TIGHTDB_NOEXCEPT { return get_column<ColumnMixed, col_type_Mixed>(ndx); }
+const ColumnFloat& Table::get_column_float(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnFloat, col_type_Float>(ndx);
+}
 
+ColumnDouble& Table::get_column_double(size_t ndx)
+{
+    return get_column<ColumnDouble, col_type_Double>(ndx);
+}
+
+const ColumnDouble& Table::get_column_double(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnDouble, col_type_Double>(ndx);
+}
+
+ColumnBinary& Table::get_column_binary(size_t ndx)
+{
+    return get_column<ColumnBinary, col_type_Binary>(ndx);
+}
+
+const ColumnBinary& Table::get_column_binary(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnBinary, col_type_Binary>(ndx);
+}
+
+ColumnTable &Table::get_column_table(size_t ndx)
+{
+    return get_column<ColumnTable, col_type_Table>(ndx);
+}
+
+const ColumnTable &Table::get_column_table(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnTable, col_type_Table>(ndx);
+}
+
+ColumnMixed& Table::get_column_mixed(size_t ndx)
+{
+    return get_column<ColumnMixed, col_type_Mixed>(ndx);
+}
+
+const ColumnMixed& Table::get_column_mixed(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnMixed, col_type_Mixed>(ndx);
+}
 
 
 size_t Table::add_empty_row(size_t num_rows)
@@ -2010,7 +2061,8 @@ void Table::optimize()
     // enumeration column. Since this involves changing the spec of
     // the table, it is not something we can do for a subtable with
     // shared spec.
-    if (has_shared_spec()) return;
+    if (has_shared_spec())
+        return;
 
     Allocator& alloc = m_columns.get_alloc();
 
@@ -2022,7 +2074,8 @@ void Table::optimize()
 
             ref_type keys_ref, values_ref;
             bool res = column->auto_enumerate(keys_ref, values_ref);
-            if (!res) continue;
+            if (!res)
+                continue;
 
             // Add to spec and column refs
             m_spec_set.set_column_type(i, col_type_StringEnum);
@@ -2038,7 +2091,8 @@ void Table::optimize()
             adjust_column_ndx_in_parent(i+1, 1);
 
             // Replace cached column
-            ColumnStringEnum* e = new ColumnStringEnum(keys_ref, values_ref, &m_columns, column_ref_ndx, alloc);
+            ColumnStringEnum* e =
+                new ColumnStringEnum(keys_ref, values_ref, &m_columns, column_ref_ndx, alloc);
             m_cols.set(i, intptr_t(e));
 
             // Inherit any existing index
@@ -2066,30 +2120,26 @@ void Table::adjust_column_ndx_in_parent(size_t column_ndx_begin, int diff) TIGHT
     }
 }
 
-void Table::update_from_parent() TIGHTDB_NOEXCEPT
+void Table::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(is_valid());
+
     // There is no top for sub-tables sharing spec
     if (m_top.is_attached()) {
-        if (!m_top.update_from_parent()) return;
+        if (!m_top.update_from_parent(old_baseline))
+            return;
     }
 
-    m_spec_set.update_from_parent();
-    if (!m_columns.update_from_parent()) return;
+    m_spec_set.update_from_parent(old_baseline);
 
-    // Update cached columns
-    size_t column_count = get_column_count();
-    for (size_t i = 0; i < column_count; ++i) {
-        ColumnBase* column = reinterpret_cast<ColumnBase*>(m_cols.get(i));
-        column->update_from_parent();
-    }
+    if (!m_columns.update_from_parent(old_baseline))
+        return;
 
-    // Size may have changed
-    if (column_count == 0) {
-        m_size = 0;
-    }
-    else {
-        const ColumnBase* column = reinterpret_cast<ColumnBase*>(m_cols.get(0));
-        m_size = column->size();
+    // Update column accessors
+    size_t n = m_cols.size();
+    for (size_t i = 0; i < n; ++i) {
+        ColumnBase* column = reinterpret_cast<ColumnBase*>(uintptr_t(m_cols.get(i)));
+        column->update_from_parent(old_baseline);
     }
 }
 
@@ -2121,6 +2171,7 @@ void Table::to_json(ostream& out) const
 
     out << "]";
 }
+
 
 namespace {
 
@@ -2154,6 +2205,7 @@ template<class T> void out_floats(ostream& out, T value)
 }
 
 } // anonymous namespace
+
 
 void Table::to_json_row(size_t row_ndx, ostream& out) const
 {
@@ -2240,6 +2292,7 @@ void Table::to_json_row(size_t row_ndx, ostream& out) const
 
 
 namespace {
+
 size_t chars_in_int(int64_t v)
 {
     size_t count = 0;
@@ -2247,7 +2300,9 @@ size_t chars_in_int(int64_t v)
         ++count;
     return count+1;
 }
-}
+
+} // anonymous namespace
+
 
 void Table::to_string(ostream& out, size_t limit) const
 {
@@ -2398,6 +2453,7 @@ void Table::to_string_header(ostream& out, vector<size_t>& widths) const
     out << "\n";
 }
 
+
 namespace {
 
 inline void out_string(ostream& out, const string text, const size_t max_len)
@@ -2417,7 +2473,8 @@ inline void out_table(ostream& out, const size_t len)
     out << "[" << len << "]";
 }
 
-}
+} // anonymous namespace
+
 
 void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& widths) const
 {
@@ -2502,7 +2559,6 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
     }
     out << "\n";
 }
-
 
 
 bool Table::compare_rows(const Table& t) const
@@ -2836,5 +2892,3 @@ MemStats Table::stats() const
 
 
 #endif // TIGHTDB_DEBUG
-
-} // namespace tightdb

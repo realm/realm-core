@@ -6,8 +6,7 @@
 #include <tightdb/array_blob.hpp>
 
 using namespace std;
-
-namespace tightdb {
+using namespace tightdb;
 
 
 ArrayBinary::ArrayBinary(ArrayParent* parent, size_t pndx, Allocator& alloc):
@@ -180,5 +179,3 @@ void ArrayBinary::to_dot(ostream& out, const char* title) const
 }
 
 #endif // TIGHTDB_DEBUG
-
-}
