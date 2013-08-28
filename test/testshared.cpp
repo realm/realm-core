@@ -380,6 +380,232 @@ TEST(Shared_Writes)
 #endif
 }
 
+
+TEST(Shared_ManyReaders)
+{
+    // This test was written primarily to expose a former bug in
+    // SharedGroup::end_read(), where the lock-file was not remapped
+    // after ring-buffer expansion.
+
+    const int chunk_1_size = 251;
+    char chunk_1[chunk_1_size];
+    for (int i = 0; i < chunk_1_size; ++i)
+        chunk_1[i] = (i + 3) % 251;
+    const int chunk_2_size = 123;
+    char chunk_2[chunk_2_size];
+    for (int i = 0; i < chunk_2_size; ++i)
+        chunk_2[i] = (i + 11) % 241;
+
+    int rounds[] = { 3, 5, 11, 17, 23, 27, 31, 47, 59 };
+    const int num_rounds = sizeof rounds / sizeof *rounds;
+
+    const int max_N = 64;
+    CHECK(max_N >= rounds[num_rounds-1]);
+    UniquePtr<SharedGroup> shared_groups[8 * max_N];
+    UniquePtr<ReadTransaction> read_transactions[8 * max_N];
+
+    for (int round = 0; round < num_rounds; ++round) {
+        int N = rounds[round];
+
+        File::try_remove("test.tightdb");
+        File::try_remove("test.tightdb.lock");
+
+        SharedGroup root_sg("test.tightdb", false, SharedGroup::durability_MemOnly);
+
+        // Add two tables
+        {
+            WriteTransaction wt(root_sg);
+            TableRef test_1 = wt.get_table("test_1");
+            test_1->add_column(type_Int, "i");
+            test_1->insert_int(0,0,0);
+            test_1->insert_done();
+            TableRef test_2 = wt.get_table("test_2");
+            test_2->add_column(type_Binary, "b");
+            wt.commit();
+        }
+
+
+        // Create 8*N shared group accessors
+        for (int i = 0; i < 8*N; ++i)
+            shared_groups[i].reset(new SharedGroup("test.tightdb", false, SharedGroup::durability_MemOnly));
+
+        // Initiate 2*N read transactions with progressive changes
+        for (int i = 0; i < 2*N; ++i) {
+            read_transactions[i].reset(new ReadTransaction(*shared_groups[i]));
+            {
+                ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
+                CHECK_EQUAL(1u, test_1->size());
+                CHECK_EQUAL(i, test_1->get_int(0,0));
+                ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
+                int n_1 = i *  1;
+                int n_2 = i * 18;
+                CHECK_EQUAL(n_1+n_2, test_2->size());
+                for (int j = 0; j < n_1; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
+                for (int j = n_1; j < n_1+n_2; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+            }
+            {
+                WriteTransaction wt(root_sg);
+                TableRef test_1 = wt.get_table("test_1");
+                test_1->add_int(0,1);
+                TableRef test_2 = wt.get_table("test_2");
+                test_2->insert_binary(0, 0, BinaryData(chunk_1));
+                test_2->insert_done();
+                wt.commit();
+            }
+            {
+                WriteTransaction wt(root_sg);
+                TableRef test_2 = wt.get_table("test_2");
+                for (int j = 0; j < 18; ++j) {
+                    test_2->insert_binary(0, test_2->size(), BinaryData(chunk_2));
+                    test_2->insert_done();
+                }
+                wt.commit();
+            }
+        }
+
+        // Check isolation between read transactions
+        for (int i = 0; i < 2*N; ++i) {
+            ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
+            CHECK_EQUAL(1, test_1->size());
+            CHECK_EQUAL(i, test_1->get_int(0,0));
+            ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
+            int n_1 = i *  1;
+            int n_2 = i * 18;
+            CHECK_EQUAL(n_1+n_2, test_2->size());
+            for (int j = 0; j < n_1; ++j)
+                CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
+            for (int j = n_1; j < n_1+n_2; ++j)
+                CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+        }
+
+        // End the first half of the read transactions during further
+        // changes
+        for (int i = N-1; i >= 0; --i) {
+            {
+                WriteTransaction wt(root_sg);
+                TableRef test_1 = wt.get_table("test_1");
+                test_1->add_int(0,2);
+                wt.commit();
+            }
+            {
+                ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
+                CHECK_EQUAL(1, test_1->size());
+                CHECK_EQUAL(i, test_1->get_int(0,0));
+                ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
+                int n_1 = i *  1;
+                int n_2 = i * 18;
+                CHECK_EQUAL(n_1+n_2, test_2->size());
+                for (int j = 0; j < n_1; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
+                for (int j = n_1; j < n_1+n_2; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+            }
+            read_transactions[i].reset();
+        }
+
+        // Initiate 6*N extra read transactionss with further progressive changes
+        for (int i = 2*N; i < 8*N; ++i) {
+            read_transactions[i].reset(new ReadTransaction(*shared_groups[i]));
+            {
+                ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
+                CHECK_EQUAL(1u, test_1->size());
+                int i_2 = 2*N + i;
+                CHECK_EQUAL(i_2, test_1->get_int(0,0));
+                ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
+                int n_1 = i *  1;
+                int n_2 = i * 18;
+                CHECK_EQUAL(n_1+n_2, test_2->size());
+                for (int j = 0; j < n_1; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
+                for (int j = n_1; j < n_1+n_2; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+            }
+            {
+                WriteTransaction wt(root_sg);
+                TableRef test_1 = wt.get_table("test_1");
+                test_1->add_int(0,1);
+                TableRef test_2 = wt.get_table("test_2");
+                test_2->insert_binary(0, 0, BinaryData(chunk_1));
+                test_2->insert_done();
+                wt.commit();
+            }
+            {
+                WriteTransaction wt(root_sg);
+                TableRef test_2 = wt.get_table("test_2");
+                for (int j = 0; j < 18; ++j) {
+                    test_2->insert_binary(0, test_2->size(), BinaryData(chunk_2));
+                    test_2->insert_done();
+                }
+                wt.commit();
+            }
+        }
+
+        // End all remaining read transactions during further changes
+        for (int i = 1*N; i < 8*N; ++i) {
+            {
+                WriteTransaction wt(root_sg);
+                TableRef test_1 = wt.get_table("test_1");
+                test_1->add_int(0,2);
+                wt.commit();
+            }
+            {
+                ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
+                CHECK_EQUAL(1, test_1->size());
+                int i_2 = i<2*N ? i : 2*N + i;
+                CHECK_EQUAL(i_2, test_1->get_int(0,0));
+                ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
+                int n_1 = i *  1;
+                int n_2 = i * 18;
+                CHECK_EQUAL(n_1+n_2, test_2->size());
+                for (int j = 0; j < n_1; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
+                for (int j = n_1; j < n_1+n_2; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+            }
+            read_transactions[i].reset();
+        }
+
+        // Check final state via each shared group, then destroy it
+        for (int i=0; i<8*N; ++i) {
+            {
+                ReadTransaction rt(*shared_groups[i]);
+                ConstTableRef test_1 = rt.get_table("test_1");
+                CHECK_EQUAL(1, test_1->size());
+                CHECK_EQUAL(3*8*N, test_1->get_int(0,0));
+                ConstTableRef test_2 = rt.get_table("test_2");
+                int n_1 = 8*N *  1;
+                int n_2 = 8*N * 18;
+                CHECK_EQUAL(n_1+n_2, test_2->size());
+                for (int j = 0; j < n_1; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
+                for (int j = n_1; j < n_1+n_2; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+            }
+            shared_groups[i].reset();
+        }
+
+        // Check final state via new shared group
+        {
+            SharedGroup sg("test.tightdb", false, SharedGroup::durability_MemOnly);
+            ReadTransaction rt(sg);
+            ConstTableRef test_1 = rt.get_table("test_1");
+            CHECK_EQUAL(1, test_1->size());
+            CHECK_EQUAL(3*8*N, test_1->get_int(0,0));
+            ConstTableRef test_2 = rt.get_table("test_2");
+            int n_1 = 8*N *  1;
+            int n_2 = 8*N * 18;
+            CHECK_EQUAL(n_1+n_2, test_2->size());
+            for (int j = 0; j < n_1; ++j)
+                CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
+            for (int j = n_1; j < n_1+n_2; ++j)
+                CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+        }
+    }
+}
+
+
 namespace {
 
 TIGHTDB_TABLE_1(MyTable_SpecialOrder, first,  Int)
