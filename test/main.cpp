@@ -62,230 +62,68 @@ struct CustomTestReporter: TestReporter {
 } // anonymous namespace
 
 
-TIGHTDB_TABLE_2(TwoColTable,
+TIGHTDB_TABLE_3(ThreeColTable,
     first,  Int,
-    second, Float)
+    second, Float,
+    third, Double)
+
 
 
 int main(int argc, char* argv[])
 {
-    TwoColTable two;
+    size_t match, match1, match2;
 
+    // UNTYPED table with 2 rows and 3 cols
+    Table untyped;
+    untyped.add_column(type_Int, "firs1");
+    untyped.add_column(type_Float, "second");
+    untyped.add_column(type_Double, "third");
+    untyped.add_empty_row(2);
+    untyped.set_int(0, 0, 20);
+    untyped.set_float(1, 0, 19.9f);
+    untyped.set_double(2, 0, 3.0);
+    untyped.set_int(0, 1, 20);
+    untyped.set_float(1, 1, 20.1f);
+    untyped.set_double(2, 1, 4.0);
 
 
-    //e5->compare(0, 2);
+    // TYPED table with same data contents as above untyped
+    ThreeColTable typed;
+    typed.add(20, 19.9f, 3.0);
+    typed.add(20, 20.1f, 4.0);
 
 
-   
+    // typed table
+    Query* e5 = typed.column().second + typed.column().first > 40;   
+    match = e5->find_next();
+    assert(match == 1);
 
+    ThreeColTable::Query q45 = typed.where().expression(static_cast<Expression*>(e5));
+    match = q45.find_next();
+    assert(match == 1);
 
+    delete static_cast<Expression*>(e5);
 
 
+    // untyped table 
+    Subexpr* first = new Columns<int64_t>(0);
+    Subexpr* second = new Columns<float>(1);
+    Subexpr* third = new Columns<double>(1);
+    Subexpr* constant = new Value<int64_t>(40);    
+    Subexpr* plus = new Operator<Plus<float> >(*first, *second);  
+    Expression *e = new Compare<Greater, float>(*plus, *constant);
 
+    match = untyped.where().expression(e).find_next();
+    assert(match == 1);    
 
-    Table table;
-    table.add_column(type_Int, "first1");
-    table.add_column(type_Float, "second1");
-    table.add_column(type_Double, "third");
 
 
-    Columns<int64_t> first(0);
-    Columns<float> second(1);
-    Columns<double> third(2);
-
-
-
-    two.column().first;  
-    two.column().first.minimum();
-
-//    Columns<int64_t> first2(    two.column().first    );
-
-// TwoColTable::first first = two.column().first;
-
-
-//    two.column().first.average();
-//    two.average(0);
-
-
-        
-
-    
-    size_t match;
-
-
-
-    table.add_empty_row(2);
-
-
-    table.set_int(0, 0, 20);
-    table.set_float(1, 0, 19.9f);
-    table.set_double(2, 0, 3.0);
-
-    table.set_int(0, 1, 20);
-    table.set_float(1, 1, 20.1f);
-    table.set_double(2, 1, 4.0);
-
-
-
-
-
-
-
-
-
-
-    Expression* e5 = two.column().second + two.column().first > 77;    
-
-    match = table.where().expression(e5).find_next();
-
-
-    match = match;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    for (int i = 0; i < 10100; i++) {
-        table.add_empty_row();
-        table.set_int(0, i,  rand() % 10 );
-        table.set_float(1, i, float(rand() % 10));
-    }
-
-    table.set_int(0, 10003, 20);
-    table.set_float(1, 10003, 20.0);
-
-
-// new-generation syntax:
-        cerr << "555555555555\n";
-
-
-        /*
-        Expression* eee = first > first;
-
-
-
-        Expression* eee1 = first + second > 8.9 + first;
-        Expression* eee2 = first + second > first + 8;
-        Expression* eee3 = first + second > 10;
-        Expression* eee4 = second > 8;       
-        Expression* eee5 = second > 8.1;
-        Expression* eee6 = 8.1 > second;
-        Expression* eee7 = first + second > first + int64_t(8);
-        Expression* eee8 = second + 3 > first + int64_t(8);
-       
-        Expression* eee9 = 8 == second;       
-
-        size_t match2;
-        
-        match2 = table.where().expression(eee2).find_next();
-
-        match2 = table.where().expression(eee3).find_next();
-
-        match2 = table.where().expression(eee4).find_next();
-
-        */
-
-
-// query expressions:
-
-//        float_column(1) + (int_column(0) + 20) > 50.0
-#if 1
-    // Slow
-    Subexpr* col = new Columns<int64_t>(0);
-    Subexpr* colf = new Columns<float>(1);
-
-    Subexpr* cc1 = new Value<int64_t>(20);
-    Subexpr* cc2 = new Value<float>(50.0);  
-
-    Subexpr* ck0 = new Operator<Plus<int64_t> >(*col, *cc1);  
-    Subexpr* ck = new Operator<Plus<float> >(*colf, *ck0);  
-
-    Expression *e = new Compare<Greater, float>(*ck, *cc2);
-#else
-    // Fast
-    Columns<int64_t>* col = new Columns<int64_t>(0);
-    Columns<float>* colf = new Columns<float>(1);
-
-    Value<int64_t>* cc1 = new Value<int64_t>(20);
-    Value<float>* cc2 = new Value<float>(50.0);  
-
-    Operator<Plus<int64_t>, Columns<int64_t>, Value<int64_t> >* ck0 = new Operator<Plus<int64_t>, Columns<int64_t>, Value<int64_t> >(col, cc1);  
-    Subexpr* ck = new Operator<Plus<float>, Columns<float>, Operator<Plus<int64_t>, Columns<int64_t>, Value<int64_t> > >(colf, ck0);  
-
-    Expression *e = new Compare<Greater, float, Subexpr, Value<float> >(ck, cc2);
-#endif
-
-
-    tightdb::TableView t1;
-
-    match = 0;
-
-
-        {
-            int best = -1;
-            for(int y = 0; y < 20; y++)
-            {
-                UnitTest::Timer timer;
-                timer.Start();
-                for(int i = 0; i < 10; i++) {
-                    match = table.where().expression(e).find_next();
-
-                }
-                
-                int t = timer.GetTimeInMs() ;
-                if (t < best)
-                    best = t;
-
-            }
-            cerr << best << ", match = " <<  match << "\n";
-        }
-
-//        delete e;
-
-        /*
-
-
-        {
-        // Static implementation, to compare speed of our dynamic methods above
-            volatile size_t m;
-            unsigned int best = -1;
-            for(int y = 0; y < 1; y++)
-            {
-                UnitTest::Timer timer;
-                timer.Start();
-                for(int i = 0; i < 100000; i++) {
-                    for(size_t t = 0; t < 1010; t += 8) {
-                        if(a.get(t) + 20 == 50 || a.get(t + 1) + 20 == 50 || a.get(t + 2) + 20 == 50 || a.get(t + 3) + 20 == 50 ||
-                           a.get(t + 4) + 20 == 50 || a.get(t + 5) + 20 == 50 || a.get(t + 6) + 20 == 50 || a.get(t + 7) + 20 == 50) {
-                            m = t;
-                            break;
-                        }
-                    }
-                }
-                int t = timer.GetTimeInMs() ;
-                if (t < best)
-                    best = t;
-
-            }
-            cerr << best << "  " << m << "\n";
-        }
-        */
-
-         CustomTestReporter reporter;
+    CustomTestReporter reporter;
     TestRunner runner(reporter);
     const int res = runner.RunTestsIf(Test::GetTestList(), 0, True(), 0);
 
 
-        return 0;
+    return 0;
 }
  
 

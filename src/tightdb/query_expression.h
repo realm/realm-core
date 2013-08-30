@@ -120,14 +120,16 @@ template<class T1, class T2, bool b> struct Common<T1, T2, true , false, b> {
 };
 
 
-class Expression
+class Expression : public Query
 {
 public:
+    Expression() {
+
+    }
+
     virtual size_t compare(size_t start, size_t end) = 0;
     virtual void set_table(const Table* table) = 0;
-    virtual ~Expression() { 
-    
-    }
+    virtual ~Expression() { }
 };
 
 class ValueBase 
@@ -152,6 +154,7 @@ public:
 
     // Values need no table attached and have no children to call set_table() on either, so do nothing
     virtual void set_table(const Table*) { }    
+    virtual Table* get_table() { return NULL; }
 
     TIGHTDB_FORCEINLINE virtual void evaluate(size_t, ValueBase&) { TIGHTDB_ASSERT(false); }
 
@@ -496,18 +499,25 @@ template <class R> Operator<Div<typename Common<R, int64_t>::type> >& operator /
 template <class T> class Columns : public Subexpr2<T>
 {
 public:
-    explicit Columns(size_t column, bool auto_delete)
+    explicit Columns(size_t column, bool auto_delete) : m_table2(NULL)
     {
         Subexpr::m_auto_delete = auto_delete;
         m_column = column;
     }
 
-    explicit Columns()
+    explicit Columns(size_t column, Table* table, bool auto_delete) : m_table2(NULL)
+    {
+        m_column = column;
+        Subexpr::m_auto_delete = auto_delete;
+        set_table(table);
+    }
+
+    explicit Columns() : m_table2(NULL)
     {
         Subexpr::m_auto_delete = false;
     }
 
-    explicit Columns(size_t column)
+    explicit Columns(size_t column) : m_table2(NULL)
     {
         Subexpr::m_auto_delete = false;
         m_column = column;
@@ -515,11 +525,16 @@ public:
 
     virtual void set_table(const Table* table) 
     {
-        m_table = table;
+        m_table2 = table;
         typedef typename ColumnTypeTraits<T>::column_type ColType;
         ColType* c;
         c = (ColType*)&table->GetColumnBase(m_column);
         sg.init(c);
+    }
+
+    virtual Table* get_table() 
+    {
+        return (Table*) m_table2;
     }
 
     TIGHTDB_FORCEINLINE void evaluate(size_t i, ValueBase& destination) {
@@ -536,7 +551,7 @@ public:
         destination.import(v);
     }
 
-    const Table* m_table;
+    const Table* m_table2;
 
 private:
     SequentialGetter<T> sg;
@@ -575,6 +590,13 @@ public:
     {
         m_left.set_table(table);
         m_right.set_table(table);
+    }
+
+    Table* get_table()
+    {
+        Table* l = m_left.get_table();
+        Table* r = m_right.get_table();
+        return l ? l : r;
     }
 
     TIGHTDB_FORCEINLINE void evaluate(size_t i, ValueBase& destination) {
@@ -632,13 +654,23 @@ public:
     m_left(const_cast<TLeft&>(left.get_qexp_column())), 
     m_right(const_cast<TRight&>(right.get_qexp_column()))
     {
-
+        Query::expression(this);
+        Table* t = get_table();
+        if(t)
+            m_table = t->get_table_ref(); // todo, review, Lasse
     }
 
     void set_table(const Table* table) 
     {
         m_left.set_table(table);
         m_right.set_table(table);
+    }
+
+    Table* get_table()
+    {
+        Table* l = m_left.get_table();
+        Table* r = m_right.get_table();
+        return l ? l : r;
     }
 
     size_t compare(size_t start, size_t end) {

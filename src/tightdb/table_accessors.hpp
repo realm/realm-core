@@ -823,8 +823,11 @@ public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
 
     // todo: very quick/dirty hack to get a non-temporary column from ColumnAccessor. Fix
+    // todo, review get_impl()
+    // C cast to accept TableView (not supported yet), just to make it compile. Todo, beautify
+    // or support TableView
     const Subexpr& get_qexp_column() const {
-        return *new Columns<int64_t>(col_idx, true);
+        return *new Columns<int64_t>(col_idx, (Table*)m_table->get_impl(), true);
     }
 
     std::size_t find_first(int64_t value) const
@@ -897,7 +900,7 @@ public:
 
     // todo: very quick/dirty hack to get a non-temporary column from ColumnAccessor. Fix
     const Subexpr& get_qexp_column() const {
-        return *new Columns<float>(col_idx, true);
+        return *new Columns<float>(col_idx, (Table*)m_table->get_impl(), true);
     }
 
     std::size_t find_first(float value) const
@@ -955,7 +958,7 @@ public:
 
     // todo: very quick/dirty hack to get a non-temporary column from ColumnAccessor. Fix
     const Subexpr& get_qexp_column() const {
-        return *new Columns<double>(col_idx, true);
+        return *new Columns<double>(col_idx, (Table*)m_table->get_impl(), true);
     }
 
     std::size_t find_first(double value) const

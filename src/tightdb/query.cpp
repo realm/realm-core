@@ -14,6 +14,12 @@ namespace {
 const size_t thread_chunk_size = 1000;
 }
 
+Query::Query() 
+{
+    Create();
+//    expression(static_cast<Expression*>(this));
+};
+
 Query::Query(Table& table) : m_table(table.get_table_ref())
 {
     Create();

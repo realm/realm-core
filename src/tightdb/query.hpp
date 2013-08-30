@@ -50,6 +50,7 @@ class Expression;
 
 class Query {
 public:
+    Query();
     Query(const Query& copy); // FIXME: Try to remove this
     ~Query();
 
