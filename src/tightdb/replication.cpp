@@ -51,11 +51,11 @@ void Replication::select_table(const Table* table)
     size_t* begin;
     size_t* end;
     for (;;) {
-        begin = m_subtab_path_buf.m_data.get();
-        end = table->record_subtable_path(begin, begin+m_subtab_path_buf.m_size);
+        begin = m_subtab_path_buf.data();
+        end = table->record_subtable_path(begin, begin+m_subtab_path_buf.size());
         if (end)
             break;
-        size_t new_size = m_subtab_path_buf.m_size;
+        size_t new_size = m_subtab_path_buf.size();
         if (int_multiply_with_overflow_detect(new_size, 2))
             throw runtime_error("To many subtable nesting levels");
         m_subtab_path_buf.set_size(new_size); // Throws
@@ -90,10 +90,11 @@ void Replication::select_spec(const Table* table, const Spec* spec)
     size_t* begin;
     size_t* end;
     for (;;) {
-        begin = m_subtab_path_buf.m_data.get();
-        end = table->record_subspec_path(spec, begin, begin+m_subtab_path_buf.m_size);
-        if (end) break;
-        size_t new_size = m_subtab_path_buf.m_size;
+        begin = m_subtab_path_buf.data();
+        end = table->record_subspec_path(spec, begin, begin+m_subtab_path_buf.size());
+        if (end)
+            break;
+        size_t new_size = m_subtab_path_buf.size();
         if (int_multiply_with_overflow_detect(new_size, 2))
             throw runtime_error("To many subspec nesting levels");
         m_subtab_path_buf.set_size(new_size); // Throws
@@ -134,7 +135,12 @@ struct Replication::TransactLogApplier {
     }
 
 #ifdef TIGHTDB_DEBUG
-    void set_apply_log(ostream* log) { m_log = log; if (m_log) *m_log << boolalpha; }
+    void set_apply_log(ostream* log)
+    {
+        m_log = log;
+        if (m_log)
+            *m_log << boolalpha;
+    }
 #endif
 
     void apply();
@@ -201,7 +207,8 @@ private:
         TIGHTDB_ASSERT(m_table);
         m_table->update_from_spec();
 #ifdef TIGHTDB_DEBUG
-        if (m_log) *m_log << "table->update_from_spec()\n";
+        if (m_log)
+            *m_log << "table->update_from_spec()\n";
 #endif
         m_dirty_spec = false;
     }
@@ -313,9 +320,9 @@ void Replication::TransactLogApplier::read_string(StringBuffer& buf)
 
 void Replication::TransactLogApplier::add_subspec(Spec* spec)
 {
-    if (m_num_subspecs == m_subspecs.m_size) {
+    if (m_num_subspecs == m_subspecs.size()) {
         util::Buffer<Spec*> new_subspecs;
-        size_t new_size = m_subspecs.m_size;
+        size_t new_size = m_subspecs.size();
         if (new_size == 0) {
             new_size = 16; // FIXME: Use a small value (1) when compiling in debug mode
         }
@@ -324,8 +331,8 @@ void Replication::TransactLogApplier::add_subspec(Spec* spec)
                 throw runtime_error("To many subspec nesting levels");
         }
         new_subspecs.set_size(new_size); // Throws
-        copy(m_subspecs.m_data.get(), m_subspecs.m_data.get()+m_num_subspecs,
-             new_subspecs.m_data.get());
+        copy(m_subspecs.data(), m_subspecs.data()+m_num_subspecs,
+             new_subspecs.data());
         swap(m_subspecs, new_subspecs);
     }
     m_subspecs[m_num_subspecs++] = spec;
@@ -672,7 +679,8 @@ void Replication::TransactLogApplier::apply()
                 int64_t value = read_int<int64_t>(); // Throws
                 m_table->add_int(column_ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
-                if (m_log) *m_log << "table->add_int("<<column_ndx<<", "<<value<<")\n";
+                if (m_log)
+                    *m_log << "table->add_int("<<column_ndx<<", "<<value<<")\n";
 #endif
                 break;
             }
@@ -684,7 +692,7 @@ void Replication::TransactLogApplier::apply()
                 size_t ndx = read_int<size_t>(); // Throws
                 if (m_group.size() <= ndx)
                     goto bad_transact_log;
-                m_table = m_group.get_table_ptr(ndx)->get_table_ref();
+                m_table = m_group.get_table_by_ndx(ndx)->get_table_ref();
 #ifdef TIGHTDB_DEBUG
                 if (m_log)
                     *m_log << "table = group->get_table_by_ndx("<<ndx<<")\n";
@@ -731,7 +739,8 @@ void Replication::TransactLogApplier::apply()
             }
 
             case 'x': { // Add index to column
-                if (m_dirty_spec) finalize_spec();
+                if (m_dirty_spec)
+                    finalize_spec();
                 int column_ndx = read_int<int>(); // Throws
                 if (!m_table)
                     goto bad_transact_log;

@@ -29,14 +29,42 @@ const char SlabAlloc::default_header[24] = {
     'T', '-', 'D', 'B', 0,   0,   0,   0
 };
 
+void SlabAlloc::detach() TIGHTDB_NOEXCEPT
+{
+    switch (m_attach_mode) {
+        case attach_None:
+        case attach_UsersBuffer:
+            goto found;
+        case attach_OwnedBuffer:
+            ::free(m_data);
+            goto found;
+        case attach_SharedFile:
+        case attach_UnsharedFile:
+            File::unmap(m_data, m_baseline);
+            m_file.close();
+            goto found;
+    }
+    TIGHTDB_ASSERT(false);
+  found:
+    m_attach_mode = attach_None;
+}
+
 
 SlabAlloc::~SlabAlloc() TIGHTDB_NOEXCEPT
 {
 #ifdef TIGHTDB_DEBUG
-    if (!m_free_space_invalid && !is_all_free()) {
-        m_slabs.print();
-        m_free_space.print();
-        TIGHTDB_TERMINATE("SlabAlloc detected a leak");
+    if (is_attached()) {
+        // A shared group does not guarantee that all space is free
+        if (m_attach_mode != attach_SharedFile) {
+            // No point inchecking if free space info is invalid
+            if (!m_free_space_invalid) {
+                if (!is_all_free()) {
+                    m_slabs.print();
+                    m_free_space.print();
+                    TIGHTDB_TERMINATE("SlabAlloc detected a leak");
+                }
+            }
+        }
     }
 #endif
 
@@ -44,24 +72,17 @@ SlabAlloc::~SlabAlloc() TIGHTDB_NOEXCEPT
     for (size_t i = 0; i < m_slabs.size(); ++i)
         delete[] reinterpret_cast<char*>(m_slabs[i].addr.get());
 
-    // Release memory
-    if (m_data) {
-        switch (m_free_mode) {
-            case free_Noop:
-                break;
-            case free_Unalloc:
-                ::free(m_data);
-                break;
-            case free_Unmap:
-                File::unmap(m_data, m_baseline);
-                break;
-        }
-    }
+    if (is_attached())
+        detach();
 }
 
 
 MemRef SlabAlloc::alloc(size_t size)
 {
+    TIGHTDB_ASSERT(0 < size);
+    TIGHTDB_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
+    TIGHTDB_ASSERT(is_attached());
+
     // FIXME: The table operations that modify the free lists below
     // are not yet exception safe, that is, if one of them fails
     // (presumably due to std::bad_alloc being thrown) they may leave
@@ -70,9 +91,6 @@ MemRef SlabAlloc::alloc(size_t size)
     // memory corruption. This must be fixed. Note that corruption may
     // be accetable, but we must be able to guarantee that corruption
     // never gets so bad that destruction of the tables fail.
-
-    TIGHTDB_ASSERT(0 < size);
-    TIGHTDB_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
 
     // FIXME: Ideally, instead of just marking the free space as
     // invalid in free_(), we shuld at least make a best effort to
@@ -273,6 +291,8 @@ MemRef SlabAlloc::realloc_(size_t ref, const char* addr, size_t old_size, size_t
 
 char* SlabAlloc::translate(ref_type ref) const TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(is_attached());
+
     if (ref < m_baseline)
         return m_data + ref;
 
@@ -287,12 +307,15 @@ char* SlabAlloc::translate(ref_type ref) const TIGHTDB_NOEXCEPT
 
 bool SlabAlloc::is_read_only(ref_type ref) const TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(is_attached());
     return ref < m_baseline;
 }
 
 
 void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create)
 {
+    TIGHTDB_ASSERT(!is_attached());
+
     // When 'read_only' is true, this function will throw
     // InvalidDatabase if the file exists already but is empty. This
     // can happen if another process is currently creating it. Note
@@ -304,7 +327,7 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
 
     File::AccessMode access = read_only ? File::access_ReadOnly : File::access_ReadWrite;
     File::CreateMode create = read_only || no_create ? File::create_Never : File::create_Auto;
-    m_file.open(path.c_str(), access, create, 0);
+    m_file.open(path.c_str(), access, create, 0); // Throws
     File::CloseGuard fcg(m_file);
 
     size_t initial_size = 1024 * 1024;
@@ -334,23 +357,23 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
         if (read_only)
             goto invalid_database;
 
-        m_file.write(default_header);
+        m_file.write(default_header); // Throws
 
         // Pre-alloc initial space
-        m_file.alloc(0, initial_size);
+        m_file.alloc(0, initial_size); // Throws
         size = initial_size;
     }
 
     {
-        File::Map<char> map(m_file, File::access_ReadOnly, size);
+        File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
 
         // Verify the data structures
         if (!validate_buffer(map.get_addr(), size))
             goto invalid_database;
 
-        m_data      = map.release();
-        m_baseline  = size;
-        m_free_mode = free_Unmap;
+        m_data        = map.release();
+        m_baseline    = size;
+        m_attach_mode = is_shared ? attach_SharedFile : attach_UnsharedFile;
     }
 
     fcg.release(); // Do not close
@@ -361,15 +384,33 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
 }
 
 
-void SlabAlloc::attach_buffer(char* data, size_t size, bool take_ownership)
+void SlabAlloc::attach_buffer(char* data, size_t size)
 {
+    TIGHTDB_ASSERT(!is_attached());
+
     // Verify the data structures
     if (!validate_buffer(data, size))
         throw InvalidDatabase();
 
-    m_data      = data;
-    m_baseline  = size;
-    m_free_mode = take_ownership ? free_Unalloc : free_Noop;
+    m_data        = data;
+    m_baseline    = size;
+    m_attach_mode = attach_UsersBuffer;
+}
+
+
+void SlabAlloc::attach_empty()
+{
+    TIGHTDB_ASSERT(!is_attached());
+
+    m_attach_mode = attach_OwnedBuffer;
+    m_data = 0; // Empty buffer
+
+    // We cannot initialize m_baseline to zero, because that would
+    // cause the first invocation of alloc() to return a 'ref' equal
+    // to zero, and zero is by definition not a valid ref. Since all
+    // 'refs' must be a multiple of 8, it is appropriate to use a
+    // value of 8.
+    m_baseline = 8;
 }
 
 
@@ -437,7 +478,7 @@ size_t SlabAlloc::get_total_size() const
 }
 
 
-void SlabAlloc::free_all()
+void SlabAlloc::reset_free_space_tracking()
 {
     // FIXME: Currently, it is not safe to call
     // m_free_read_only.clear() and m_free_space.clear() after a
@@ -448,19 +489,25 @@ void SlabAlloc::free_all()
 
     // Free all scratch space (done after all data has
     // been commited to persistent space)
-    m_free_read_only.clear();
-    m_free_space.clear();
+    try {
+        m_free_read_only.clear(); // Throws
+        m_free_space.clear(); // Throws
 
-    // Rebuild free list to include all slabs
-    size_t ref = m_baseline;
-    size_t n = m_slabs.size();
-    for (size_t i = 0; i < n; ++i) {
-        Slabs::Cursor c = m_slabs[i];
-        size_t size = to_size_t(c.ref_end - ref);
+        // Rebuild free list to include all slabs
+        size_t ref = m_baseline;
+        size_t n = m_slabs.size();
+        for (size_t i = 0; i < n; ++i) {
+            Slabs::Cursor c = m_slabs[i];
+            size_t size = to_size_t(c.ref_end - ref);
 
-        m_free_space.add(ref, size);
+            m_free_space.add(ref, size); // Throws
 
-        ref = to_size_t(c.ref_end);
+            ref = to_size_t(c.ref_end);
+        }
+    }
+    catch (...) {
+        m_free_space_invalid = true;
+        throw;
     }
 
     TIGHTDB_ASSERT(is_all_free());
@@ -471,11 +518,19 @@ void SlabAlloc::free_all()
 
 bool SlabAlloc::remap(size_t file_size)
 {
+    TIGHTDB_ASSERT(file_size % 8 == 0); // 8-byte alignment required
+    TIGHTDB_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
     TIGHTDB_ASSERT(m_free_read_only.is_empty());
     TIGHTDB_ASSERT(m_slabs.size() == m_free_space.size());
-
     TIGHTDB_ASSERT(m_baseline <= file_size);
-    TIGHTDB_ASSERT((file_size & 0x7) == 0); // 64bit alignment
+
+    // FIXME: We only need to call remap() in cases where free space
+    // tracking needs to be reset anyway, so instead of adjusting the
+    // free space information below, it would be more efficient to
+    // start by erasing the free space information, then remap, then
+    // rebuild the free space information. This way, Group::commit()
+    // and Group::update_from_shared() no longer have to call
+    // SlabAlloc::reset_free_space_tracking().
 
     void* addr =
         m_file.remap(m_data, m_baseline, File::access_ReadOnly, file_size);

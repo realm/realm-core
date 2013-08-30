@@ -39,8 +39,16 @@ public:
 
     void set_versions(std::size_t current, std::size_t read_lock);
 
-    /// Returns the new top ref.
-    ref_type commit(bool do_sync);
+    /// Write all changed array nodes into free space.
+    ///
+    /// Returns the new top ref. When in full durability mode, call
+    /// commit() with the returned top ref.
+    ref_type write_group();
+
+    /// Flush changes to physical medium, then write the new top ref
+    /// to the file header, then flush again. Pass the top ref
+    /// returned by write_group().
+    void commit(ref_type new_top_ref);
 
     std::size_t get_file_size() const TIGHTDB_NOEXCEPT;
 
@@ -95,9 +103,6 @@ private:
     std::pair<std::size_t, std::size_t> extend_free_space(std::size_t requested_size);
 
     void write_at(std::size_t pos, const char* data, std::size_t size);
-
-    // Controlled update of physical medium
-    void sync(uint64_t top_pos);
 };
 
 

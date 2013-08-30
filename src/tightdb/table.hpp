@@ -60,7 +60,7 @@ class StringIndex;
 /// efficient manner.
 ///
 /// FIXME: When compiling in debug mode, all public table methods
-/// should TIGHTDB_ASSERT(is_valid()).
+/// should TIGHTDB_ASSERT(is_attached()).
 class Table {
 public:
     /// Construct a new freestanding top-level table with static
@@ -95,18 +95,20 @@ public:
     /// top-level table with dynamic lifetime.
     TableRef copy(Allocator& = Allocator::get_default()) const;
 
-    /// An invalid table must not be accessed in any way except by
-    /// calling is_valid(). A table that is obtained from a Group
-    /// becomes invalid if its group is destroyed. This is also true
-    /// for any subtable that is obtained indirectly from a group. A
-    /// subtable will generally become invalid if its parent table is
-    /// modified. Calling a const member function on a parent table,
-    /// will never invalidate its subtables. A free standing table
-    /// will never become invalid. A subtable of a freestanding table
-    /// may become invalid.
+    /// A table accessor that is no longer attached must not be
+    /// accessed in any way except by calling is_attached(). A table
+    /// accessor that is obtained from a Group becomes detached if its
+    /// group accessor is destroyed. This is also true for any
+    /// subtable accessor that is obtained indirectly from a group. A
+    /// subtable accessor will generally become detached if its parent
+    /// table is modified. Calling a const member function on a parent
+    /// table accessor, will never detach its subtable accessors,
+    /// though. An accessor for a freestanding table will never become
+    /// detached. An accessor for a subtable of a freestanding table
+    /// may become detached.
     ///
     /// FIXME: High level language bindings will probably want to be
-    /// able to explicitely invalidate a group and all tables of that
+    /// able to explicitely detach a group and all tables of that
     /// group if any modifying operation fails (e.g. memory allocation
     /// failure) (and something similar for freestanding tables) since
     /// that leaves the group in state where any further access is
@@ -119,8 +121,8 @@ public:
     /// then any further access to that group (except ~Group()) or
     /// freestanding table (except ~Table()) has undefined behaviour
     /// and is considered an error on behalf of the application. Note
-    /// that even Table::is_valid() is disallowed in this case.
-    bool is_valid() const TIGHTDB_NOEXCEPT;
+    /// that even Table::is_attached() is disallowed in this case.
+    bool is_attached() const TIGHTDB_NOEXCEPT;
 
     /// A shared spec is a column specification that in general
     /// applies to many tables. A table is not allowed to directly
@@ -140,8 +142,8 @@ public:
     ///
     /// With the exception of get_spec() (with and without const
     /// qualification,) and has_index(), all of these methods will
-    /// invalidate all subtable accessors (instances of Table) having
-    /// this table as direct or indirect ancestor.
+    /// detach all subtable accessors (instances of Table) having this
+    /// table as direct or indirect ancestor.
     ///
     /// \param column_path A list of column indexes. For
     /// add_subcolumn() this list must contain at least one
@@ -395,7 +397,7 @@ private:
     // On-disk format
     Array m_top;
     Array m_columns;
-    Spec m_spec_set;
+    Spec m_spec;
 
     // Column accessor instances
     Array m_cols;
@@ -426,11 +428,11 @@ private:
     /// the stack by the application is not managed by reference
     /// counting, so that is a case where this tag must not be
     /// specified.
-    class RefCountTag {};
+    class ref_count_tag {};
 
     /// Construct a wrapper for a table with independent spec, and
     /// whose lifetime is managed by reference counting.
-    Table(RefCountTag, Allocator&, ref_type top_ref, Parent*, std::size_t ndx_in_parent);
+    Table(ref_count_tag, Allocator&, ref_type top_ref, Parent*, std::size_t ndx_in_parent);
 
     /// Construct a wrapper for a table with shared spec, and whose
     /// lifetime is managed by reference counting.
@@ -438,7 +440,7 @@ private:
     /// It is possible to construct a 'null' table by passing zero for
     /// \a columns_ref, in this case the columns will be created on
     /// demand.
-    Table(RefCountTag, Allocator&, ref_type spec_ref, ref_type columns_ref,
+    Table(ref_count_tag, Allocator&, ref_type spec_ref, ref_type columns_ref,
           Parent*, std::size_t ndx_in_parent);
 
     void init_from_ref(ref_type top_ref, ArrayParent*, std::size_t ndx_in_parent);
@@ -483,24 +485,24 @@ private:
 
     void set_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
 
-    /// Put this table wrapper into the invalid state, which detaches
-    /// it from the underlying structure of arrays. Also do this
+    /// Put this table accessor into the detached state. This detaches
+    /// it from the underlying structure of array nodes. Also do this
     /// recursively for subtables. When this function returns,
-    /// is_valid() will return false.
+    /// is_attached() will return false.
     ///
     /// This function may be called for a table accessor that is
-    /// already in the invalid state (idempotency).
+    /// already in the detached state (idempotency).
     ///
     /// It is also valid to call this function for a table accessor
-    /// that has not yet been marked as invalid, but whose underlying
-    /// structure of arrays have changed in an unpredictable/unknown
-    /// way. This generally happens when a modifying table operation
-    /// fails, and also when one transaction is ended and a new one is
-    /// started.
-    void invalidate() TIGHTDB_NOEXCEPT;
+    /// that has not yet been detached, but whose underlying structure
+    /// of arrays have changed in an unpredictable/unknown way. This
+    /// kind of change generally happens when a modifying table
+    /// operation fails, and also when one transaction is ended and a
+    /// new one is started.
+    void detach() TIGHTDB_NOEXCEPT;
 
     /// Detach all attached subtable accessors.
-    void invalidate_subtables() TIGHTDB_NOEXCEPT;
+    void detach_subtable_accessors() TIGHTDB_NOEXCEPT;
 
     void bind_ref() const TIGHTDB_NOEXCEPT { ++m_ref_count; }
     void unbind_ref() const TIGHTDB_NOEXCEPT { if (--m_ref_count == 0) delete this; }
@@ -606,7 +608,7 @@ protected:
 
 // Implementation:
 
-inline bool Table::is_valid() const TIGHTDB_NOEXCEPT
+inline bool Table::is_attached() const TIGHTDB_NOEXCEPT
 {
     // Note that it is not possible to link the state of attachment of
     // a table to the state of attachment of m_top, because tables
@@ -624,30 +626,30 @@ inline bool Table::is_valid() const TIGHTDB_NOEXCEPT
 
 inline std::size_t Table::get_column_count() const TIGHTDB_NOEXCEPT
 {
-    return m_spec_set.get_column_count();
+    return m_spec.get_column_count();
 }
 
 inline StringData Table::get_column_name(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
-    return m_spec_set.get_column_name(ndx);
+    return m_spec.get_column_name(ndx);
 }
 
 inline std::size_t Table::get_column_index(StringData name) const
 {
-    return m_spec_set.get_column_index(name);
+    return m_spec.get_column_index(name);
 }
 
 inline ColumnType Table::get_real_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
-    return m_spec_set.get_real_column_type(ndx);
+    return m_spec.get_real_column_type(ndx);
 }
 
 inline DataType Table::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
-    return m_spec_set.get_column_type(ndx);
+    return m_spec.get_column_type(ndx);
 }
 
 template <class C, ColumnType coltype>
@@ -679,12 +681,12 @@ inline bool Table::has_shared_spec() const
 inline Spec& Table::get_spec() TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(!has_shared_spec()); // you can only change specs on top-level tables
-    return m_spec_set;
+    return m_spec;
 }
 
 inline const Spec& Table::get_spec() const TIGHTDB_NOEXCEPT
 {
-    return m_spec_set;
+    return m_spec;
 }
 
 class Table::UnbindGuard {
@@ -740,7 +742,7 @@ inline ref_type Table::create_empty_table(Allocator& alloc)
 #endif
 
 inline Table::Table(Allocator& alloc):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1),
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec(this, alloc), m_ref_count(1),
     m_lookup_index(0)
 {
     ref_type ref = create_empty_table(alloc); // Throws
@@ -748,24 +750,24 @@ inline Table::Table(Allocator& alloc):
 }
 
 inline Table::Table(const Table& t, Allocator& alloc):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1),
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec(this, alloc), m_ref_count(1),
     m_lookup_index(0)
 {
     ref_type ref = t.clone(alloc); // Throws
     init_from_ref(ref, 0, 0);
 }
 
-inline Table::Table(RefCountTag, Allocator& alloc, ref_type top_ref,
+inline Table::Table(ref_count_tag, Allocator& alloc, ref_type top_ref,
                     Parent* parent, std::size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0),
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec(this, alloc), m_ref_count(0),
     m_lookup_index(0)
 {
     init_from_ref(top_ref, parent, ndx_in_parent);
 }
 
-inline Table::Table(RefCountTag, Allocator& alloc, ref_type spec_ref, ref_type columns_ref,
+inline Table::Table(ref_count_tag, Allocator& alloc, ref_type spec_ref, ref_type columns_ref,
                     Parent* parent, std::size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0),
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec(this, alloc), m_ref_count(0),
     m_lookup_index(0)
 {
     init_from_ref(spec_ref, columns_ref, parent, ndx_in_parent);
@@ -778,21 +780,21 @@ inline Table::Table(RefCountTag, Allocator& alloc, ref_type spec_ref, ref_type c
 
 inline void Table::set_index(std::size_t column_ndx)
 {
-    invalidate_subtables();
+    detach_subtable_accessors();
     set_index(column_ndx, true);
 }
 
 inline TableRef Table::create(Allocator& alloc)
 {
     ref_type ref = create_empty_table(alloc); // Throws
-    Table* table = new Table(RefCountTag(), alloc, ref, 0, 0); // Throws
+    Table* table = new Table(ref_count_tag(), alloc, ref, 0, 0); // Throws
     return table->get_table_ref();
 }
 
 inline TableRef Table::copy(Allocator& alloc) const
 {
     ref_type ref = clone(alloc); // Throws
-    Table* table = new Table(RefCountTag(), alloc, ref, 0, 0); // Throws
+    Table* table = new Table(ref_count_tag(), alloc, ref, 0, 0); // Throws
     return table->get_table_ref();
 }
 
@@ -836,12 +838,12 @@ inline ConstTableRef Table::get_subtable(std::size_t column_ndx, std::size_t row
 
 inline bool Table::operator==(const Table& t) const
 {
-    return m_spec_set == t.m_spec_set && compare_rows(t);
+    return m_spec == t.m_spec && compare_rows(t);
 }
 
 inline bool Table::operator!=(const Table& t) const
 {
-    return m_spec_set != t.m_spec_set || !compare_rows(t);
+    return m_spec != t.m_spec || !compare_rows(t);
 }
 
 inline void Table::insert_into(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const
@@ -915,7 +917,7 @@ struct Table::LocalTransactLog {
     void add_column(DataType type, StringData name)
     {
         if (m_repl)
-            m_repl->add_column(m_table, &m_table->m_spec_set, type, name); // Throws
+            m_repl->add_column(m_table, &m_table->m_spec, type, name); // Throws
     }
 
     void on_table_destroyed() TIGHTDB_NOEXCEPT
@@ -939,9 +941,9 @@ inline Table::LocalTransactLog Table::transact_log() TIGHTDB_NOEXCEPT
 inline std::size_t* Table::record_subspec_path(const Spec* spec, std::size_t* begin,
                                                std::size_t* end) const TIGHTDB_NOEXCEPT
 {
-    if (spec != &m_spec_set) {
-        TIGHTDB_ASSERT(m_spec_set.m_subSpecs.IsValid());
-        return spec->record_subspec_path(&m_spec_set.m_subSpecs, begin, end);
+    if (spec != &m_spec) {
+        TIGHTDB_ASSERT(m_spec.m_subspecs.is_attached());
+        return spec->record_subspec_path(&m_spec.m_subspecs, begin, end);
     }
     return begin;
 }
@@ -949,7 +951,7 @@ inline std::size_t* Table::record_subspec_path(const Spec* spec, std::size_t* be
 inline std::size_t* Table::record_subtable_path(std::size_t* begin,
                                                 std::size_t* end) const TIGHTDB_NOEXCEPT
 {
-    const Array& real_top = m_top.IsValid() ? m_top : m_columns;
+    const Array& real_top = m_top.is_attached() ? m_top : m_columns;
     std::size_t index_in_parent = real_top.get_ndx_in_parent();
     TIGHTDB_ASSERT(begin < end);
     *begin++ = index_in_parent;

@@ -33,7 +33,7 @@ class ColumnSubtableParent: public Column, public Table::Parent {
 public:
     void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void invalidate_subtables() TIGHTDB_NOEXCEPT;
+    void detach_subtable_accessors() TIGHTDB_NOEXCEPT;
 
     ~ColumnSubtableParent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
@@ -113,7 +113,7 @@ private:
         void add(std::size_t subtable_ndx, Table*);
         void remove(std::size_t subtable_ndx) TIGHTDB_NOEXCEPT;
         void update_from_parent(std::size_t old_baseline) const TIGHTDB_NOEXCEPT;
-        void invalidate_subtables() TIGHTDB_NOEXCEPT;
+        void detach_accessors() TIGHTDB_NOEXCEPT;
     private:
         struct entry {
             std::size_t m_subtable_ndx;
@@ -187,7 +187,7 @@ public:
     /// Compare two subtable columns for equality.
     bool compare_table(const ColumnTable&) const;
 
-    void invalidate_subtables_virtual() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void detach_subtable_accessors_virtual() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     static ref_type create(std::size_t size, Allocator&);
 
@@ -219,7 +219,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) c
     if (!subtable) {
         ref_type top_ref = get_as_ref(subtable_ndx);
         Allocator& alloc = get_alloc();
-        subtable = new Table(Table::RefCountTag(), alloc, top_ref,
+        subtable = new Table(Table::ref_count_tag(), alloc, top_ref,
                              const_cast<ColumnSubtableParent*>(this), subtable_ndx);
         bool was_empty = m_subtable_map.empty();
         m_subtable_map.add(subtable_ndx, subtable);
@@ -238,7 +238,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx,
     if (!subtable) {
         ref_type columns_ref = get_as_ref(subtable_ndx);
         Allocator& alloc = get_alloc();
-        subtable = new Table(Table::RefCountTag(), alloc, spec_ref, columns_ref,
+        subtable = new Table(Table::ref_count_tag(), alloc, spec_ref, columns_ref,
                              const_cast<ColumnSubtableParent*>(this), subtable_ndx);
         bool was_empty = m_subtable_map.empty();
         m_subtable_map.add(subtable_ndx, subtable);
@@ -299,12 +299,12 @@ update_from_parent(std::size_t old_baseline) const TIGHTDB_NOEXCEPT
         i->m_table->update_from_parent(old_baseline);
 }
 
-inline void ColumnSubtableParent::SubtableMap::invalidate_subtables() TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::SubtableMap::detach_accessors() TIGHTDB_NOEXCEPT
 {
     typedef entries::const_iterator iter;
     iter end = m_entries.end();
     for (iter i = m_entries.begin(); i != end; ++i)
-        i->m_table->invalidate();
+        i->m_table->detach();
     m_entries.clear();
 }
 
@@ -334,10 +334,10 @@ inline ref_type ColumnSubtableParent::get_child_ref(std::size_t subtable_ndx) co
     return get_as_ref(subtable_ndx);
 }
 
-inline void ColumnSubtableParent::invalidate_subtables() TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::detach_subtable_accessors() TIGHTDB_NOEXCEPT
 {
     bool was_empty = m_subtable_map.empty();
-    m_subtable_map.invalidate_subtables();
+    m_subtable_map.detach_accessors();
     if (!was_empty && m_table)
         m_table->unbind_ref();
 }
@@ -360,8 +360,8 @@ inline ref_type ColumnSubtableParent::create(std::size_t size, Allocator& alloc)
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-std::size_t* ColumnSubtableParent::record_subtable_path(std::size_t* begin,
-                                                        std::size_t* end) TIGHTDB_NOEXCEPT
+inline std::size_t* ColumnSubtableParent::record_subtable_path(std::size_t* begin,
+                                                               std::size_t* end) TIGHTDB_NOEXCEPT
 {
     if (end == begin)
         return 0; // Error, not enough space in buffer
@@ -392,9 +392,9 @@ inline void ColumnTable::add(const Table* subtable)
     insert(size(), subtable);
 }
 
-inline void ColumnTable::invalidate_subtables_virtual() TIGHTDB_NOEXCEPT
+inline void ColumnTable::detach_subtable_accessors_virtual() TIGHTDB_NOEXCEPT
 {
-    invalidate_subtables();
+    detach_subtable_accessors();
 }
 
 inline ref_type ColumnTable::create(std::size_t size, Allocator& alloc)
