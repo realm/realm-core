@@ -1,4 +1,4 @@
-PASSIVE_SUBDIRS = util test-tightdb test-sqlite3 test-stl performance benchmark-insert-add experiments
+PASSIVE_SUBDIRS = util test-tightdb test-sqlite3 test-stl performance benchmark-insert-add experiments benchmark-prealloc
 
 test_tightdb_DEPS = util
 test_sqlite3_DEPS = util
@@ -56,3 +56,7 @@ testcase:
 	@$(MAKE) -C experiments test
 testcase-debug:
 	@$(MAKE) -C experiments test-debug
+
+.PHONY: benchmark-prealloc
+benchmark-prealloc:
+	@$(MAKE) -C benchmark-prealloc test

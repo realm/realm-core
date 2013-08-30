@@ -8,6 +8,9 @@ include generic.mk
 benchmark: minimal
 	@$(MAKE) -C test benchmark
 
+benchmark-prealloc: minimal
+	@$(MAKE) -C test benchmark-prealloc
+
 # Run the performance matrix benchmarking program
 .PHONY: performance
 performance: minimal
