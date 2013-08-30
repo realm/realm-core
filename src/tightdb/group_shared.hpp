@@ -105,19 +105,6 @@ public:
     /// an unattached instance results in undefined behavior.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
-    /// Reserve disk space now to avoid fragmentation, and the
-    /// performance penalty caused by it.
-    ///
-    /// A call to this method will make the database file at least as
-    /// big as the specified size. If the database file is already
-    /// that big, or bigger, this method will not affect the size of
-    /// the database, but it may still cause previously unallocated
-    /// disk space to be allocated.
-    ///
-    /// On systems that do not support preallocation of disk-space,
-    /// this method might have no effect at all.
-    void reserve(std::size_t);
-
     // Has db been modified since last transaction?
     bool has_changed() const TIGHTDB_NOEXCEPT;
 
@@ -341,12 +328,6 @@ inline void SharedGroup::clear_interrupt_transact()
 inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 {
     return m_file_map.is_attached();
-}
-
-
-inline void SharedGroup::reserve(std::size_t size)
-{
-    m_group.m_alloc.reserve(size);
 }
 
 

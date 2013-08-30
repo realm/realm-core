@@ -128,20 +128,6 @@ public:
     /// attach_empty().
     bool nonempty_attachment() const TIGHTDB_NOEXCEPT;
 
-    /// If a file is attached, reserve disk space now to avoid
-    /// fragmentation, and the performance penalty caused by it.
-    ///
-    /// A call to this method will make the file at least as big as
-    /// the specified size. If the file is already that big, or
-    /// bigger, this method will not affect the size, but it may still
-    /// cause previously unallocated disk space to be allocated.
-    ///
-    /// On systems that do not support preallocation of disk-space,
-    /// this method might have no effect at all.
-    ///
-    /// When a memory buffer is attached, this method has no effect.
-    void reserve(std::size_t);
-
     /// Get the 'ref' corresponding to the current root node.
     ///
     /// It is an error to call this function on a detached allocator,
@@ -299,11 +285,6 @@ inline std::size_t SlabAlloc::get_baseline() const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_data);
     return m_baseline;
-}
-
-inline void SlabAlloc::reserve(std::size_t size)
-{
-    m_file.prealloc_if_supported(0, size);
 }
 
 inline SlabAlloc::DetachGuard::~DetachGuard() TIGHTDB_NOEXCEPT
