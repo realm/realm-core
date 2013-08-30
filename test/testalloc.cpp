@@ -24,6 +24,8 @@ TEST(Alloc1)
     SlabAlloc alloc;
     CHECK(!alloc.is_attached());
     alloc.attach_empty();
+    CHECK(alloc.is_attached());
+    CHECK(!alloc.nonempty_attachment());
 
     MemRef mr1 = alloc.alloc(8);
     MemRef mr2 = alloc.alloc(16);
@@ -63,6 +65,7 @@ TEST(Alloc_AttachFile)
     bool no_create = false;
     alloc.attach_file("test.tightdb", is_shared, read_only, no_create);
     CHECK(alloc.is_attached());
+    CHECK(alloc.nonempty_attachment());
     alloc.detach();
     CHECK(!alloc.is_attached());
     alloc.attach_file("test.tightdb", is_shared, read_only, no_create);
@@ -140,6 +143,7 @@ TEST(Alloc_AttachBuffer)
 
     alloc.attach_buffer(buffer.get(), buffer_size);
     CHECK(alloc.is_attached());
+    CHECK(alloc.nonempty_attachment());
     alloc.detach();
     CHECK(!alloc.is_attached());
     alloc.attach_buffer(buffer.get(), buffer_size);
