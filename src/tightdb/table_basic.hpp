@@ -64,7 +64,7 @@ public:
     typedef BasicTableView<BasicTable> View;
     typedef BasicTableView<const BasicTable> ConstView;
 
-    using Table::is_valid;
+    using Table::is_attached;
     using Table::has_shared_spec;
     using Table::is_empty;
     using Table::size;

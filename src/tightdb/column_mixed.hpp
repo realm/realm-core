@@ -123,9 +123,9 @@ public:
     /// Compare two mixed columns for equality.
     bool compare_mixed(const ColumnMixed&) const;
 
-    void invalidate_subtables() TIGHTDB_NOEXCEPT;
+    void detach_subtable_accessors() TIGHTDB_NOEXCEPT;
 
-    void invalidate_subtables_virtual() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void detach_subtable_accessors_virtual() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     static ref_type create(std::size_t num_default_values, Allocator&);
 

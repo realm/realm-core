@@ -78,7 +78,7 @@ public:
     /// when the transaction ends.
     virtual void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
-    virtual void invalidate_subtables_virtual() TIGHTDB_NOEXCEPT {}
+    virtual void detach_subtable_accessors_virtual() TIGHTDB_NOEXCEPT {}
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
 
@@ -338,9 +338,9 @@ inline Column::Column(ref_type ref, ArrayParent* parent, std::size_t ndx_in_pare
 
 inline Column::Column(const Column& column): ColumnBase(column.m_array)
 {
-    // we now own array
     // FIXME: Unfortunate hidden constness violation here
-    column.m_array = 0;       // so invalidate source
+    // we now own array
+    column.m_array = 0;       // so detach source
 }
 
 inline Column::Column(Array* root): ColumnBase(root) {}

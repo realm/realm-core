@@ -32,16 +32,21 @@ namespace util {
 
 template<class T> class Buffer {
 public:
-    T& operator[](std::size_t i) TIGHTDB_NOEXCEPT { return m_data[i]; }
+    Buffer() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
+    Buffer(std::size_t size);
 
+    T& operator[](std::size_t i) TIGHTDB_NOEXCEPT { return m_data[i]; }
     const T& operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
 
-    Buffer() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
-    Buffer(std::size_t size): m_ptr(new T[size]) {}
+    T* data() TIGHTDB_NOEXCEPT { return m_data.get(); }
+    const T* data() const TIGHTDB_NOEXCEPT { return m_data.get(); }
+    std::size_t size() const TIGHTDB_NOEXCEPT { return m_size; }
 
     void set_size(std::size_t);
 
-    friend void swap(Buffer&a, Buffer&b)
+    T* release() TIGHTDB_NOEXCEPT;
+
+    friend void swap(Buffer&a, Buffer&b) TIGHTDB_NOEXCEPT
     {
         using std::swap;
         swap(a.m_data, b.m_data);
@@ -66,6 +71,12 @@ template<class T> inline void Buffer<T>::set_size(std::size_t size)
 {
     m_data.reset(new T[size]);
     m_size = size;
+}
+
+template<class T> inline T* Buffer<T>::release() TIGHTDB_NOEXCEPT
+{
+    m_size = 0;
+    return m_data.release();
 }
 
 
