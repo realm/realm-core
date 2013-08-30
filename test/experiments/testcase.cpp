@@ -134,7 +134,33 @@ void make_table(size_t rows)
     File::try_remove("test_alone.tightdb");
     // Create first table in group
 #if 1
-#if 1
+#if 0
+    {
+        SharedGroup sgr("test_shared.tightdb");
+        SharedGroup sgw("test_shared.tightdb");
+        {
+            ReadTransaction rt0(sgr);
+            WriteTransaction wt0(sgw);
+            wt0.commit();
+        }
+        ReadTransaction rt(sgr);
+        {
+        }
+        WriteTransaction wt(sgw);
+        TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+        for (size_t i = 0; i < rows; ++i) {
+            t1->add(0, 2, false, "test");
+        }
+        wt.commit();
+        WriteTransaction wt2(sgw);
+        TestTableShared::Ref t2 = wt2.get_table<TestTableShared>("test");
+        for (size_t i = 0; i < rows; ++i) {
+            t2->add(0, 2, false, "test");
+        }
+        wt2.commit();
+    }
+#else
+#if 0
     {
         SharedGroup sg("test_shared.tightdb");
         WriteTransaction wt(sg);
@@ -155,6 +181,7 @@ void make_table(size_t rows)
         }
         wt.commit();
     }
+#endif
 #endif
     // Wait for async_commit process to shutdown
     while (File::exists("test_shared.tightdb.lock")) {
@@ -258,10 +285,10 @@ int main()
     // Clean up old state
     File::try_remove("asynctest.tightdb");
 
-//    single_threaded();
+    single_threaded();
 
-    make_table(1ULL);
-/*
+    make_table(100);
+
     multi_threaded(10,0);
     validate_and_clear(10, INCREMENTS);
 
@@ -270,5 +297,5 @@ int main()
         multi_process(10,10);
         validate_and_clear(100,INCREMENTS);
     }
-*/
+
 }

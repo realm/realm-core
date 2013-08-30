@@ -259,7 +259,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             info->filesize = alloc.get_baseline();
             info->infosize = uint32_t(len);
             info->current_top = alloc.get_top_ref();
-            info->current_version = 0;
+            info->current_version = 1;
             info->capacity = 32 - 1;
             info->put_pos  = 0;
             info->get_pos  = 0;
@@ -267,7 +267,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             info->init_complete = 1; // <- must be last in initialization
             // Set initial version so we can track if other instances
             // change the db
-            m_version = 0;
+            m_version = info->current_version;
             // In async mode we need a separate process to do the async commits
             // We start it up here during init so that it only get started once
             if (dlevel == durability_Async) {
@@ -655,6 +655,18 @@ void SharedGroup::commit()
 #else
         new_version = info->current_version + 1; // FIXME: Eventual overflow
 #endif
+        // Reset version tracking in group if we are
+        // starting from a new lock file
+        if (new_version == 2) {
+            // FIXME: Why is this not dealt with in begin_write()? Note
+            // that we can read the value of info->current_version without
+            // a lock on info->readmutex as long as we have a lock on
+            // info->writemutex. This is true (not a data race) becasue
+            // info->current_version is modified only while
+            // info->writemutex is locked.
+            m_group.init_shared();
+        }
+
         low_level_commit(new_version); // Throws
     }
 
@@ -956,7 +968,7 @@ size_t SharedGroup::get_current_version() TIGHTDB_NOEXCEPT
 void SharedGroup::low_level_commit(size_t new_version)
 {
     SharedInfo* info = m_file_map.get_addr();
-
+//    fprintf(stderr,"low_level_commit(%d)\n", new_version);
     size_t readlock_version;
     {
         ScopedMutexLock lock(&info->readmutex);
@@ -974,18 +986,6 @@ void SharedGroup::low_level_commit(size_t new_version)
         }
     }
 
-    // Reset version tracking in group if we are
-    // starting from a new lock file
-    if (new_version == 1) {
-        // FIXME: Why is this not dealt with in begin_write()? Note
-        // that we can read the value of info->current_version without
-        // a lock on info->readmutex as long as we have a lock on
-        // info->writemutex. This is true (not a data race) becasue
-        // info->current_version is modified only while
-        // info->writemutex is locked.
-        m_group.init_shared();
-    }
-
     // Do the actual commit
     TIGHTDB_ASSERT(m_group.m_top.is_attached());
     TIGHTDB_ASSERT(readlock_version <= new_version);
@@ -1001,6 +1001,8 @@ void SharedGroup::low_level_commit(size_t new_version)
     {
         ScopedMutexLock lock(&info->readmutex);
         info->current_top = new_top_ref;
+//        fprintf(stderr, "group_shared::low_level_commit   filesize <- %ul\n",
+//                new_file_size);
         info->filesize    = new_file_size;
         // FIXME: Due to lack of adequate synchronization, the
         // following modification of 'info->current_version'
