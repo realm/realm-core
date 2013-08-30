@@ -231,10 +231,6 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
-    // FIXME: Throws. Exception must not escape, as that would
-    // terminate the program.
-    m_group.m_alloc.free_all();
-
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = m_group.get_replication())
         delete repl;
@@ -320,9 +316,8 @@ const Group& SharedGroup::begin_read()
         SharedInfo* info = m_file_map.get_addr();
         ScopedMutexLock lock(&info->readmutex);
 
-        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size())) {
+        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize); // Throws
-        }
 
         // Get the current top ref
         new_top_ref   = to_size_t(info->current_top);
@@ -346,13 +341,22 @@ const Group& SharedGroup::begin_read()
         }
     }
 
+#ifdef TIGHTDB_DEBUG
+    m_transact_stage = transact_Reading;
+#endif
+
     // Make sure the group is up-to-date.
     // A zero ref means that the file has just been created.
-    m_group.update_from_shared(new_top_ref, new_file_size); // Throws
+    try {
+        m_group.update_from_shared(new_top_ref, new_file_size); // Throws
+    }
+    catch (...) {
+        end_read();
+        throw;
+    }
 
 #ifdef TIGHTDB_DEBUG
     m_group.Verify();
-    m_transact_stage = transact_Reading;
 #endif
 
     return m_group;
@@ -368,9 +372,8 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
         SharedInfo* info = m_file_map.get_addr();
         ScopedMutexLock lock(&info->readmutex);
 
-        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size())) {
+        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
-        }
 
         // FIXME: m_version may well be a 64-bit integer so this cast
         // to uint32_t seems quite dangerous. Should the type of
@@ -396,7 +399,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     }
 
     // The read may have allocated some temporary state
-    m_group.invalidate();
+    m_group.detach();
 
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
@@ -421,16 +424,23 @@ Group& SharedGroup::begin_write()
 
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
-    m_group.update_from_shared(new_top_ref, new_file_size);
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication())
-        repl->begin_write_transact(*this); // Throws
-#endif
+    m_group.update_from_shared(new_top_ref, new_file_size); // Throws
 
 #ifdef TIGHTDB_DEBUG
     m_group.Verify();
     m_transact_stage = transact_Writing;
+#endif
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = m_group.get_replication()) {
+        try {
+            repl->begin_write_transact(*this); // Throws
+        }
+        catch (...) {
+            rollback();
+            throw;
+        }
+    }
 #endif
 
     return m_group;
@@ -442,6 +452,14 @@ void SharedGroup::commit()
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
     SharedInfo* info = m_file_map.get_addr();
+
+    // FIXME: ExceptionSafety: Corruption has happened if
+    // low_level_commit() throws, because we have already told the
+    // replication manager to commit. It is not yet clear how this
+    // conflict should be solved. The solution is probably to catch
+    // the exception from low_level_commit() and when caught, mark the
+    // local database as not-up-to-date. The exception should not be
+    // rethrown, because the commit was effectively successful.
 
     {
         size_t new_version;
@@ -464,7 +482,7 @@ void SharedGroup::commit()
     // Release write lock
     pthread_mutex_unlock(&info->writemutex);
 
-    m_group.invalidate();
+    m_group.detach();
 
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
@@ -476,11 +494,6 @@ void SharedGroup::commit()
 // failed call to commit(). A failed call to commit() is any that
 // returns to the caller by throwing an exception. As it is right now,
 // rollback() does not handle all cases.
-//
-// FIXME: This function must be modified in such a way that it can be
-// guaranteed that it never throws. There are two problems to be dealt
-// with. Group::invalidate() calls Group::clear_cache() and
-// SlabAlloc::free_all().
 void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
@@ -496,7 +509,7 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
     pthread_mutex_unlock(&info->writemutex);
 
     // Clear all changes made during transaction
-    m_group.invalidate();
+    m_group.detach();
 
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
@@ -797,8 +810,14 @@ void SharedGroup::low_level_commit(size_t new_version)
     m_group.m_readlock_version = readlock_version;
     out.set_versions(new_version, readlock_version);
     // Recursively write all changed arrays to end of file
-    bool do_sync = info->flags == durability_Full;
-    ref_type new_top_ref = out.commit(do_sync); // Throws
+    ref_type new_top_ref = out.write_group(); // Throws
+    // In durability_Full mode, we just use the file as backing for
+    // the shared memory. So we never actually flush the data to disk
+    // (the OS may do so opportinisticly, or when swapping). So in
+    // this mode the file on disk may very likely be in an invalid
+    // state.
+    if (info->flags == durability_Full)
+        out.commit(new_top_ref); // Throws
     size_t new_file_size = out.get_file_size();
 
     // Update reader info

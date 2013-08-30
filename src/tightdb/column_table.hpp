@@ -219,7 +219,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) c
     if (!subtable) {
         ref_type top_ref = get_as_ref(subtable_ndx);
         Allocator& alloc = get_alloc();
-        subtable = new Table(Table::RefCountTag(), alloc, top_ref,
+        subtable = new Table(Table::ref_count_tag(), alloc, top_ref,
                              const_cast<ColumnSubtableParent*>(this), subtable_ndx);
         bool was_empty = m_subtable_map.empty();
         m_subtable_map.add(subtable_ndx, subtable);
@@ -238,7 +238,7 @@ inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx,
     if (!subtable) {
         ref_type columns_ref = get_as_ref(subtable_ndx);
         Allocator& alloc = get_alloc();
-        subtable = new Table(Table::RefCountTag(), alloc, spec_ref, columns_ref,
+        subtable = new Table(Table::ref_count_tag(), alloc, spec_ref, columns_ref,
                              const_cast<ColumnSubtableParent*>(this), subtable_ndx);
         bool was_empty = m_subtable_map.empty();
         m_subtable_map.add(subtable_ndx, subtable);
@@ -360,8 +360,8 @@ inline ref_type ColumnSubtableParent::create(std::size_t size, Allocator& alloc)
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-std::size_t* ColumnSubtableParent::record_subtable_path(std::size_t* begin,
-                                                        std::size_t* end) TIGHTDB_NOEXCEPT
+inline std::size_t* ColumnSubtableParent::record_subtable_path(std::size_t* begin,
+                                                               std::size_t* end) TIGHTDB_NOEXCEPT
 {
     if (end == begin)
         return 0; // Error, not enough space in buffer

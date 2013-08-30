@@ -1116,6 +1116,7 @@ TEST(Table_OptimizeCompare)
 TEST(Table_SlabAlloc)
 {
     SlabAlloc alloc;
+    alloc.attach_empty();
     TestTable table(alloc);
 
     table.add(0, 10, true, Wed);

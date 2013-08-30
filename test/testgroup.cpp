@@ -21,18 +21,24 @@ TIGHTDB_TABLE_4(TestTableGroup,
 
 } // Anonymous namespace
 
+TEST(Group_Unattached)
+{
+    Group g((Group::unattached_tag()));
+    CHECK(!g.is_attached());
+}
+
 TEST(Group_Size)
 {
     Group g;
-
-    CHECK_EQUAL(true, g.is_empty());
+    CHECK(g.is_attached());
+    CHECK(g.is_empty());
 
     TableRef t = g.get_table("a");
-    CHECK_EQUAL(false, g.is_empty());
+    CHECK(!g.is_empty());
     CHECK_EQUAL(1, g.size());
 
     TableRef t1 = g.get_table("b");
-    CHECK_EQUAL(false, g.is_empty());
+    CHECK(!g.is_empty());
     CHECK_EQUAL(2, g.size());
 }
 
@@ -290,17 +296,15 @@ TEST(Group_Serialize_Mem)
 
 TEST(Group_Close)
 {
-    Group* to_mem = new Group();
-    TestTableGroup::Ref table = to_mem->get_table<TestTableGroup>("test");
+    Group to_mem;
+    TestTableGroup::Ref table = to_mem.get_table<TestTableGroup>("test");
     table->add("",  1, true, Wed);
     table->add("",  2, true, Wed);
 
     // Serialize to memory (we now own the buffer)
-    BinaryData buffer = to_mem->write_to_mem();
+    BinaryData buffer = to_mem.write_to_mem();
 
-    Group* from_mem = new Group(buffer);
-    delete to_mem;
-    delete from_mem;
+    Group from_mem(buffer);
 }
 
 TEST(Group_Serialize_Optimized)

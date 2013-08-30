@@ -397,7 +397,7 @@ private:
     // On-disk format
     Array m_top;
     Array m_columns;
-    Spec m_spec_set;
+    Spec m_spec;
 
     // Column accessor instances
     Array m_cols;
@@ -428,11 +428,11 @@ private:
     /// the stack by the application is not managed by reference
     /// counting, so that is a case where this tag must not be
     /// specified.
-    class RefCountTag {};
+    class ref_count_tag {};
 
     /// Construct a wrapper for a table with independent spec, and
     /// whose lifetime is managed by reference counting.
-    Table(RefCountTag, Allocator&, ref_type top_ref, Parent*, std::size_t ndx_in_parent);
+    Table(ref_count_tag, Allocator&, ref_type top_ref, Parent*, std::size_t ndx_in_parent);
 
     /// Construct a wrapper for a table with shared spec, and whose
     /// lifetime is managed by reference counting.
@@ -440,7 +440,7 @@ private:
     /// It is possible to construct a 'null' table by passing zero for
     /// \a columns_ref, in this case the columns will be created on
     /// demand.
-    Table(RefCountTag, Allocator&, ref_type spec_ref, ref_type columns_ref,
+    Table(ref_count_tag, Allocator&, ref_type spec_ref, ref_type columns_ref,
           Parent*, std::size_t ndx_in_parent);
 
     void init_from_ref(ref_type top_ref, ArrayParent*, std::size_t ndx_in_parent);
@@ -626,30 +626,30 @@ inline bool Table::is_attached() const TIGHTDB_NOEXCEPT
 
 inline std::size_t Table::get_column_count() const TIGHTDB_NOEXCEPT
 {
-    return m_spec_set.get_column_count();
+    return m_spec.get_column_count();
 }
 
 inline StringData Table::get_column_name(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
-    return m_spec_set.get_column_name(ndx);
+    return m_spec.get_column_name(ndx);
 }
 
 inline std::size_t Table::get_column_index(StringData name) const
 {
-    return m_spec_set.get_column_index(name);
+    return m_spec.get_column_index(name);
 }
 
 inline ColumnType Table::get_real_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
-    return m_spec_set.get_real_column_type(ndx);
+    return m_spec.get_real_column_type(ndx);
 }
 
 inline DataType Table::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
-    return m_spec_set.get_column_type(ndx);
+    return m_spec.get_column_type(ndx);
 }
 
 template <class C, ColumnType coltype>
@@ -681,12 +681,12 @@ inline bool Table::has_shared_spec() const
 inline Spec& Table::get_spec() TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(!has_shared_spec()); // you can only change specs on top-level tables
-    return m_spec_set;
+    return m_spec;
 }
 
 inline const Spec& Table::get_spec() const TIGHTDB_NOEXCEPT
 {
-    return m_spec_set;
+    return m_spec;
 }
 
 class Table::UnbindGuard {
@@ -742,7 +742,7 @@ inline ref_type Table::create_empty_table(Allocator& alloc)
 #endif
 
 inline Table::Table(Allocator& alloc):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1),
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec(this, alloc), m_ref_count(1),
     m_lookup_index(0)
 {
     ref_type ref = create_empty_table(alloc); // Throws
@@ -750,24 +750,24 @@ inline Table::Table(Allocator& alloc):
 }
 
 inline Table::Table(const Table& t, Allocator& alloc):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(1),
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec(this, alloc), m_ref_count(1),
     m_lookup_index(0)
 {
     ref_type ref = t.clone(alloc); // Throws
     init_from_ref(ref, 0, 0);
 }
 
-inline Table::Table(RefCountTag, Allocator& alloc, ref_type top_ref,
+inline Table::Table(ref_count_tag, Allocator& alloc, ref_type top_ref,
                     Parent* parent, std::size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0),
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec(this, alloc), m_ref_count(0),
     m_lookup_index(0)
 {
     init_from_ref(top_ref, parent, ndx_in_parent);
 }
 
-inline Table::Table(RefCountTag, Allocator& alloc, ref_type spec_ref, ref_type columns_ref,
+inline Table::Table(ref_count_tag, Allocator& alloc, ref_type spec_ref, ref_type columns_ref,
                     Parent* parent, std::size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec_set(this, alloc), m_ref_count(0),
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec(this, alloc), m_ref_count(0),
     m_lookup_index(0)
 {
     init_from_ref(spec_ref, columns_ref, parent, ndx_in_parent);
@@ -787,14 +787,14 @@ inline void Table::set_index(std::size_t column_ndx)
 inline TableRef Table::create(Allocator& alloc)
 {
     ref_type ref = create_empty_table(alloc); // Throws
-    Table* table = new Table(RefCountTag(), alloc, ref, 0, 0); // Throws
+    Table* table = new Table(ref_count_tag(), alloc, ref, 0, 0); // Throws
     return table->get_table_ref();
 }
 
 inline TableRef Table::copy(Allocator& alloc) const
 {
     ref_type ref = clone(alloc); // Throws
-    Table* table = new Table(RefCountTag(), alloc, ref, 0, 0); // Throws
+    Table* table = new Table(ref_count_tag(), alloc, ref, 0, 0); // Throws
     return table->get_table_ref();
 }
 
@@ -838,12 +838,12 @@ inline ConstTableRef Table::get_subtable(std::size_t column_ndx, std::size_t row
 
 inline bool Table::operator==(const Table& t) const
 {
-    return m_spec_set == t.m_spec_set && compare_rows(t);
+    return m_spec == t.m_spec && compare_rows(t);
 }
 
 inline bool Table::operator!=(const Table& t) const
 {
-    return m_spec_set != t.m_spec_set || !compare_rows(t);
+    return m_spec != t.m_spec || !compare_rows(t);
 }
 
 inline void Table::insert_into(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const
@@ -917,7 +917,7 @@ struct Table::LocalTransactLog {
     void add_column(DataType type, StringData name)
     {
         if (m_repl)
-            m_repl->add_column(m_table, &m_table->m_spec_set, type, name); // Throws
+            m_repl->add_column(m_table, &m_table->m_spec, type, name); // Throws
     }
 
     void on_table_destroyed() TIGHTDB_NOEXCEPT
@@ -941,9 +941,9 @@ inline Table::LocalTransactLog Table::transact_log() TIGHTDB_NOEXCEPT
 inline std::size_t* Table::record_subspec_path(const Spec* spec, std::size_t* begin,
                                                std::size_t* end) const TIGHTDB_NOEXCEPT
 {
-    if (spec != &m_spec_set) {
-        TIGHTDB_ASSERT(m_spec_set.m_subSpecs.is_attached());
-        return spec->record_subspec_path(&m_spec_set.m_subSpecs, begin, end);
+    if (spec != &m_spec) {
+        TIGHTDB_ASSERT(m_spec.m_subspecs.is_attached());
+        return spec->record_subspec_path(&m_spec.m_subspecs, begin, end);
     }
     return begin;
 }

@@ -35,13 +35,13 @@ void Table::init_from_ref(ref_type top_ref, ArrayParent* parent, size_t ndx_in_p
     ref_type columns_ref = m_top.get_as_ref(1);
 
     init_from_ref(spec_ref, columns_ref, &m_top, 1);
-    m_spec_set.set_parent(&m_top, 0);
+    m_spec.set_parent(&m_top, 0);
 }
 
 void Table::init_from_ref(ref_type spec_ref, ref_type columns_ref,
                           ArrayParent* parent, size_t ndx_in_parent)
 {
-    m_spec_set.init_from_ref(spec_ref, 0, 0);
+    m_spec.init_from_ref(spec_ref, 0, 0);
 
     // A table instatiated with a zero-ref is just an empty table
     // but it will have to create itself on first modification
@@ -68,9 +68,9 @@ void Table::create_columns()
     Allocator& alloc = m_columns.get_alloc();
 
     // Add the newly defined columns
-    size_t n = m_spec_set.get_type_attr_count();
+    size_t n = m_spec.get_type_attr_count();
     for (size_t i=0; i<n; ++i) {
-        ColumnType type = m_spec_set.get_type_attr(i);
+        ColumnType type = m_spec.get_type_attr(i);
         size_t ref_pos =  m_columns.size();
         ColumnBase* new_col = 0;
 
@@ -114,7 +114,7 @@ void Table::create_columns()
             }
             case type_Table: {
                 size_t column_ndx = m_cols.size();
-                ref_type subspec_ref = m_spec_set.get_subspec_ref(subtable_count);
+                ref_type subspec_ref = m_spec.get_subspec_ref(subtable_count);
                 ColumnTable* c = new ColumnTable(alloc, this, column_ndx, subspec_ref);
                 m_columns.add(c->get_ref());
                 c->set_parent(&m_columns, ref_pos);
@@ -197,9 +197,9 @@ void Table::cache_columns()
     size_t subtable_count = 0;
 
     // Cache columns
-    size_t num_entries_in_spec = m_spec_set.get_type_attr_count();
+    size_t num_entries_in_spec = m_spec.get_type_attr_count();
     for (size_t i = 0; i < num_entries_in_spec; ++i) {
-        ColumnType type = m_spec_set.get_type_attr(i);
+        ColumnType type = m_spec.get_type_attr(i);
         ref_type ref = m_columns.get_as_ref(ndx_in_parent);
 
         ColumnBase* new_col = 0;
@@ -249,7 +249,7 @@ void Table::cache_columns()
             }
             case type_Table: {
                 size_t column_ndx = m_cols.size();
-                ref_type spec_ref = m_spec_set.get_subspec_ref(subtable_count);
+                ref_type spec_ref = m_spec.get_subspec_ref(subtable_count);
                 ColumnTable* c = new ColumnTable(alloc, this, column_ndx, &m_columns, ndx_in_parent,
                                                  spec_ref, ref);
                 colsize = c->size();
@@ -383,7 +383,7 @@ size_t Table::add_column(DataType type, StringData name)
     detach_subtable_accessors();
 
     // Update spec
-    m_spec_set.add_column(type, name);
+    m_spec.add_column(type, name);
 
     // Create column and add cached instance
     size_t column_ndx = do_add_column(type);
@@ -402,7 +402,7 @@ size_t Table::add_subcolumn(const vector<size_t>& column_path, DataType type, St
     detach_subtable_accessors();
 
     // Update spec
-    size_t column_ndx = m_spec_set.add_subcolumn(column_path, type, name);
+    size_t column_ndx = m_spec.add_subcolumn(column_path, type, name);
 
     // Update existing tables
     do_add_subcolumn(column_path, 0, type);
@@ -467,7 +467,7 @@ size_t Table::do_add_column(DataType type)
             break;
         }
         case type_Table: {
-            ref_type spec_ref = m_spec_set.get_subspec_ref(m_spec_set.get_num_subspecs()-1);
+            ref_type spec_ref = m_spec.get_subspec_ref(m_spec.get_num_subspecs()-1);
             ColumnTable* c = new ColumnTable(alloc, this, column_ndx, spec_ref);
             m_columns.add(c->get_ref());
             c->set_parent(&m_columns, m_columns.size()-1);
@@ -528,10 +528,10 @@ void Table::remove_column(size_t column_ndx)
     detach_subtable_accessors();
 
     Spec::ColumnInfo info;
-    m_spec_set.get_column_info(column_ndx, info);
+    m_spec.get_column_info(column_ndx, info);
 
     // Update Spec
-    m_spec_set.remove_column(column_ndx);
+    m_spec.remove_column(column_ndx);
 
     // Remove the column from this table
     do_remove_column(m_columns, info);
@@ -555,10 +555,10 @@ void Table::remove_subcolumn(const vector<size_t>& column_path)
     detach_subtable_accessors();
 
     Spec::ColumnInfo info;
-    m_spec_set.get_subcolumn_info(column_path, 0, info);
+    m_spec.get_subcolumn_info(column_path, 0, info);
 
     // Update Spec
-    m_spec_set.remove_column(column_path);
+    m_spec.remove_column(column_path);
 
     // Remove the column from all tables using the affected subspec
     do_remove_subcolumn(column_path, 0, info);
@@ -615,7 +615,7 @@ void Table::rename_column(size_t column_ndx, StringData name)
 {
     TIGHTDB_ASSERT(!has_shared_spec());
     detach_subtable_accessors();
-    m_spec_set.rename_column(column_ndx, name);
+    m_spec.rename_column(column_ndx, name);
 }
 
 void Table::rename_subcolumn(const vector<size_t>& column_path, StringData name)
@@ -623,7 +623,7 @@ void Table::rename_subcolumn(const vector<size_t>& column_path, StringData name)
     TIGHTDB_ASSERT(2 <= column_path.size());
     TIGHTDB_ASSERT(!has_shared_spec());
     detach_subtable_accessors();
-    m_spec_set.rename_column(column_path, name);
+    m_spec.rename_column(column_path, name);
 }
 
 
@@ -642,7 +642,7 @@ void Table::set_index(size_t column_ndx, bool update_spec)
 
     ColumnType ct = get_real_column_type(column_ndx);
     Spec::ColumnInfo info;
-    m_spec_set.get_column_info(column_ndx, info);
+    m_spec.get_column_info(column_ndx, info);
     size_t column_pos = info.m_column_ref_ndx;
     ref_type index_ref = 0;
 
@@ -673,7 +673,7 @@ void Table::set_index(size_t column_ndx, bool update_spec)
 
     // Update spec
     if (update_spec)
-        m_spec_set.set_column_attr(column_ndx, col_attr_Indexed);
+        m_spec.set_column_attr(column_ndx, col_attr_Indexed);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().add_index_to_column(column_ndx); // Throws
@@ -786,7 +786,7 @@ ref_type Table::clone(Allocator& alloc) const
         return m_top.clone(alloc); // Throws
 
     Array new_top(Array::type_HasRefs, 0, 0, alloc); // Throws
-    new_top.add(m_spec_set.m_top.clone(alloc)); // Throws
+    new_top.add(m_spec.m_top.clone(alloc)); // Throws
     new_top.add(m_columns.clone(alloc)); // Throws
     return new_top.get_ref();
 }
@@ -2083,9 +2083,9 @@ void Table::optimize()
                 continue;
 
             // Add to spec and column refs
-            m_spec_set.set_column_type(i, col_type_StringEnum);
+            m_spec.set_column_type(i, col_type_StringEnum);
             Spec::ColumnInfo info;
-            m_spec_set.get_column_info(i, info);
+            m_spec.get_column_info(i, info);
             size_t column_ref_ndx = info.m_column_ref_ndx;
             m_columns.set(column_ref_ndx, keys_ref);
             m_columns.insert(column_ref_ndx+1, values_ref);
@@ -2135,7 +2135,7 @@ void Table::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
             return;
     }
 
-    m_spec_set.update_from_parent(old_baseline);
+    m_spec.update_from_parent(old_baseline);
 
     if (!m_columns.update_from_parent(old_baseline))
         return;
@@ -2769,7 +2769,7 @@ void Table::Verify() const
         }
     }
 
-    m_spec_set.Verify();
+    m_spec.Verify();
 
     Allocator& alloc = m_columns.get_alloc();
     alloc.Verify();
@@ -2822,7 +2822,7 @@ void Table::print() const
     cout << "Table: len(" << m_size << ")\n    ";
     size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
-        StringData name = m_spec_set.get_column_name(i);
+        StringData name = m_spec.get_column_name(i);
         cout << left << setw(10) << name << right << " ";
     }
 
