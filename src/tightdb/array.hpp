@@ -41,6 +41,7 @@ Searching: The main finding function is:
 #include <cmath>
 #include <cstdlib> // std::size_t
 #include <cstring> // memmove
+#include <algorithm>
 #include <utility>
 #include <vector>
 #include <ostream>
@@ -181,7 +182,7 @@ public:
 class ArrayParent
 {
 public:
-    virtual ~ArrayParent() {}
+    virtual ~ArrayParent() TIGHTDB_NOEXCEPT {}
 
     // FIXME: Must be protected. Solve problem by having the Array constructor, that creates a new array, call it.
     virtual void update_child_ref(std::size_t child_ndx, ref_type new_ref) = 0;
@@ -211,7 +212,7 @@ protected:
 /// referenced array node. This 'reverse' reference is not explicitely
 /// present in the underlying node hierarchy, but it is needed when
 /// modifying an array. A modification may lead to relocation of the
-/// undeerlying array node, and the parent must be updated
+/// underlying array node, and the parent must be updated
 /// accordingly. Since this applies recursivly all the way to the root
 /// node, it is essential that the entire chain of parent accessors is
 /// constructed and propperly maintained when a particular array is
@@ -254,7 +255,19 @@ public:
 
     enum Type {
         type_Normal,
-        type_InnerColumnNode, ///< Inner node of B+-tree
+
+        /// This array is the root of an innner node of a B+-tree as
+        /// used in table columns.
+        type_InnerColumnNode,
+
+        /// This array may contain refs to subarrays. A element value
+        /// whose least significant bit is zero, is a ref pointing to
+        /// a subarray. An element value whose least significant bit
+        /// is one, is just a value. Is is the responsibility of the
+        /// application to ensure that non-ref values have their least
+        /// significant bit set. This will generally be done by
+        /// shifting the desired vlue to the left by one bit position,
+        /// and then setting the vacated bit to one.
         type_HasRefs
     };
 
@@ -302,7 +315,7 @@ public:
     struct no_prealloc_tag {};
     explicit Array(no_prealloc_tag) TIGHTDB_NOEXCEPT;
 
-    virtual ~Array() TIGHTDB_NOEXCEPT {}
+    ~Array() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     /// Create a new empty array of the specified type and attach to
     /// it. This does not modify the parent reference information.
@@ -326,17 +339,16 @@ public:
     /// does nothing.
     void update_parent();
 
-    /// When there is a chance that this array node has been modified
-    /// and possibly relocated, this function will update the accessor
-    /// such that it becomes valid again. Of course, this is allowed
-    /// only when the parent continues to exist and it continues to
-    /// have some child at the same index as the child that this
-    /// accessosr was originally attached to. Even then, one must be
-    /// carefull, because the new child at that index, may be a
-    /// completely different one in a logical sense.
+    /// Called in the context of Group::commit() to ensure that
+    /// attached accessors stay valid across a commit. Please note
+    /// that this works only for non-transactional commits. Accessors
+    /// obtained during a transaction are always detached when the
+    /// transaction ends.
     ///
-    /// FIXME: What is the point of this one? When can it ever be used safely?
-    bool update_from_parent() TIGHTDB_NOEXCEPT;
+    /// Returns true if, and only if the array has changed. If the
+    /// array has not cahnged, then its children are guaranteed to
+    /// also not have changed.
+    bool update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
     /// Change the type of an already attached array node.
     ///
@@ -349,7 +361,7 @@ public:
     /// ref to the new array.
     ref_type clone(Allocator&) const;
 
-    void move_assign(Array&); // Move semantics for assignment
+    void move_assign(Array&) TIGHTDB_NOEXCEPT; // Move semantics for assignment
 
     /// Construct an empty array of the specified type and return just
     /// the reference to the underlying memory.
@@ -376,8 +388,8 @@ public:
     /// effect if the accessor is currently unattached (idempotency).
     void detach() TIGHTDB_NOEXCEPT { m_data = 0; }
 
-    std::size_t size() const TIGHTDB_NOEXCEPT { return m_size; }
-    bool is_empty() const TIGHTDB_NOEXCEPT { return m_size == 0; }
+    std::size_t size() const TIGHTDB_NOEXCEPT;
+    bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
 
     void insert(std::size_t ndx, int64_t value);
     void add(int64_t value);
@@ -391,7 +403,23 @@ public:
 
     int64_t operator[](std::size_t ndx) const TIGHTDB_NOEXCEPT { return get(ndx); }
     int64_t back() const TIGHTDB_NOEXCEPT;
+
+    /// Erase the element at the specified index, and move elements at
+    /// succeeding indexes to the next lower index.
+    ///
+    /// Is guaranteed not to throw if
+    /// get_alloc().is_read_only(get_ref()) returns false.
+    ///
+    /// FIXME: Carefull with this one. It does not destroy/deallocate
+    /// subarrays as clear() does. This difference is surprising and
+    /// highly counterintuitive.
     void erase(std::size_t ndx);
+
+    /// Erase every element in this array. Subarrays will be destroyed
+    /// recursively, and space allocated for subarrays will be freed.
+    ///
+    /// Is guaranteed not to throw if
+    /// get_alloc().is_read_only(get_ref()) returns false.
     void clear();
 
     /// If neccessary, expand the representation so that it can store
@@ -409,7 +437,10 @@ public:
     size_t IndexStringCount(StringData value, void* column, StringGetter get_func) const;
     FindRes IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void* column, StringGetter get_func) const;
 
-    void SetAllToZero();
+    /// This one may change the represenation of the array, so be
+    /// carefull if you call it after ensure_minimum_width().
+    void set_all_to_zero();
+
     void Increment(int64_t value, std::size_t start=0, std::size_t end=std::size_t(-1));
     void IncrementIf(int64_t limit, int64_t value);
     void adjust(std::size_t start, int64_t diff);
@@ -481,8 +512,16 @@ public:
     Array GetSubArray(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT { return m_ref; }
-    void destroy();
-    static void destroy(ref_type, Allocator&);
+
+    /// Recursively destroy children (as if calling clear()), then
+    /// transition to the detached state (as if calling detach()),
+    /// then free the allocated memory. For an unattached accessor,
+    /// this function has no effect (idempotency).
+    void destroy() TIGHTDB_NOEXCEPT;
+
+    static void destroy(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
+
+    class DestroyGuard;
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_alloc; }
 
@@ -490,10 +529,12 @@ public:
 
     /// Returns the position in the target where the first byte of
     /// this array was written.
+    ///
+    /// The number of bytes that will be written by a non-recursive
+    /// invocation of this function is exactly the number returned by
+    /// get_byte_size().
     template<class S> std::size_t write(S& target, bool recurse = true, bool persist = false) const;
 
-    template<class S> void write_at(std::size_t pos, S& out) const;
-    std::size_t GetByteSize(bool align = false) const;
     std::vector<int64_t> ToVector() const;
 
     /// Compare two arrays for equality.
@@ -664,15 +705,8 @@ public:
     static WidthType get_wtype_from_header(const char*) TIGHTDB_NOEXCEPT;
     static int get_width_from_header(const char*) TIGHTDB_NOEXCEPT;
     static std::size_t get_size_from_header(const char*) TIGHTDB_NOEXCEPT;
-    static std::size_t get_capacity_from_header(const char*) TIGHTDB_NOEXCEPT;
 
     static Type get_type_from_header(const char*) TIGHTDB_NOEXCEPT;
-
-    /// Get the number of bytes currently in use by the specified
-    /// array. This includes the array header, but it does not include
-    /// allocated bytes corresponding to excess capacity. The result
-    /// is guaranteed to be a multiple of 8 (i.e., 64-bit aligned).
-    static std::size_t get_byte_size_from_header(const char*) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
     void print() const;
@@ -711,7 +745,7 @@ protected:
 
     void CreateFromHeaderDirect(char* header, ref_type = 0) TIGHTDB_NOEXCEPT;
 
-    virtual std::size_t CalcByteLen(std::size_t count, std::size_t width) const;
+    virtual std::size_t CalcByteLen(std::size_t count, std::size_t width) const; // Not 8-byte aligned
     virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const TIGHTDB_NOEXCEPT;
     virtual WidthType GetWidthType() const { return wtype_Bits; }
 
@@ -770,12 +804,40 @@ private:
     Allocator& m_alloc;
 
 protected:
+    /// The total size in bytes (including the header) of a new empty
+    /// array. Must be a multiple of 8 (i.e., 64-bit aligned).
     static const std::size_t initial_capacity = 128;
+
     static ref_type create_empty_array(Type, WidthType, Allocator&);
     static ref_type clone(const char* header, Allocator& alloc, Allocator& clone_alloc);
 
+    /// Get the address of the header of this array.
+    char* get_header() TIGHTDB_NOEXCEPT;
+
+    /// Get the number of bytes currently in use by this array. This
+    /// includes the array header, but it does not include allocated
+    /// bytes corresponding to excess capacity. The result is
+    /// guaranteed to be a multiple of 8 (i.e., 64-bit aligned).
+    ///
+    /// This number is exactly the number of bytes that will be
+    /// written by a non-recursive invocation of write().
+    std::size_t get_byte_size() const TIGHTDB_NOEXCEPT;
+
+    /// Same as get_byte_size().
+    static std::size_t get_byte_size_from_header(const char*) TIGHTDB_NOEXCEPT;
+
+    static std::size_t get_capacity_from_header(const char*) TIGHTDB_NOEXCEPT;
+
+    /// Get the maximum number of bytes that can be written by a
+    /// non-recursive invocation of write() on an array with the
+    /// specified number of elements, that is, the maxumum value that
+    /// can be returned by get_byte_size().
+    static std::size_t get_max_byte_size(std::size_t num_elems) TIGHTDB_NOEXCEPT;
+
     void update_child_ref(std::size_t child_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
     ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    void destroy_children() TIGHTDB_NOEXCEPT;
 
 // FIXME: below should be moved to a specific IntegerArray class
 protected:
@@ -792,6 +854,7 @@ protected:
     int64_t m_lbound;       // min number that can be stored with current m_width
     int64_t m_ubound;       // max number that can be stored with current m_width
 
+    friend class SlabAlloc;
     friend class GroupWriter;
     friend class AdaptiveStringColumn;
 };
@@ -1007,14 +1070,23 @@ inline void Array::create(Type type)
 }
 
 
+inline std::size_t Array::size() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    return m_size;
+}
+
+
 inline int64_t Array::back() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_size);
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(m_size > 0);
     return get(m_size - 1);
 }
 
 inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(ndx < m_size);
     return (this->*m_getter)(ndx);
 
@@ -1037,6 +1109,7 @@ inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 
 inline ref_type Array::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
+    TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_hasRefs);
     int64_t v = get(ndx);
     return to_ref(v);
@@ -1060,13 +1133,74 @@ inline bool Array::is_index_node(ref_type ref, const Allocator& alloc)
     return get_indexflag_from_header(alloc.translate(ref));
 }
 
+inline void Array::destroy() TIGHTDB_NOEXCEPT
+{
+    if (!is_attached())
+        return;
 
-inline void Array::destroy(ref_type ref, Allocator& alloc)
+    if (m_hasRefs)
+        destroy_children();
+
+    char* header = get_header_from_data(m_data);
+    m_alloc.free_(m_ref, header);
+    m_data = 0;
+}
+
+inline void Array::clear()
+{
+    TIGHTDB_ASSERT(is_attached());
+
+    copy_on_write(); // Throws
+
+    if (m_hasRefs)
+        destroy_children();
+
+    // Truncate size to zero (but keep capacity)
+    m_size = 0;
+    m_capacity = CalcItemCount(get_capacity_from_header(), 0);
+    set_width(0);
+
+    // Update header
+    set_header_size(0);
+    set_header_width(0);
+}
+
+inline void Array::destroy(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
     Array array(alloc);
     array.init_from_ref(ref);
     array.destroy();
 }
+
+
+class Array::DestroyGuard {
+public:
+    DestroyGuard(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT: m_ref(ref), m_alloc(alloc)
+    {
+    }
+
+    ~DestroyGuard() TIGHTDB_NOEXCEPT
+    {
+        if (m_ref)
+            destroy(m_ref, m_alloc);
+    }
+
+    ref_type get() const TIGHTDB_NOEXCEPT
+    {
+        return m_ref;
+    }
+
+    ref_type release() TIGHTDB_NOEXCEPT
+    {
+        ref_type ref = m_ref;
+        m_ref = 0;
+        return ref;
+    }
+
+private:
+    ref_type m_ref;
+    Allocator& m_alloc;
+};
 
 
 
@@ -1252,38 +1386,91 @@ inline Array::Type Array::get_type_from_header(const char* header) TIGHTDB_NOEXC
 }
 
 
+inline char* Array::get_header() TIGHTDB_NOEXCEPT
+{
+    return get_header_from_data(m_data);
+}
+
+
+inline std::size_t Array::get_byte_size() const TIGHTDB_NOEXCEPT
+{
+    std::size_t num_bytes = 0;
+    const char* header = get_header_from_data(m_data);
+    switch (get_wtype_from_header(header)) {
+        case wtype_Bits: {
+            // FIXME: The following arithmetic could overflow, that
+            // is, even though both the total number of elements and
+            // the total number of bytes can be represented in
+            // uint_fast64_t, the total number of bits may not
+            // fit. Note that "num_bytes = width < 8 ? size / (8 /
+            // width) : size * (width / 8)" would be guaranteed to
+            // never overflow, but it potentially involves two slow
+            // divisions.
+            uint_fast64_t num_bits = uint_fast64_t(m_size) * m_width;
+            num_bytes = num_bits / 8;
+            if (num_bits & 0x7)
+                ++num_bytes;
+            goto found;
+        }
+        case wtype_Multiply: {
+            num_bytes = m_size * m_width;
+            goto found;
+        }
+        case wtype_Ignore:
+            num_bytes = m_size;
+            goto found;
+    }
+    TIGHTDB_ASSERT(false);
+
+  found:
+    // Ensure 8-byte alignment
+    std::size_t rest = (~num_bytes & 0x7) + 1;
+    if (rest < 8)
+        num_bytes += rest;
+
+    num_bytes += header_size;
+
+    TIGHTDB_ASSERT(num_bytes <= get_capacity_from_header(header));
+
+    return num_bytes;
+}
+
+
 inline std::size_t Array::get_byte_size_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    // Calculate full size of array in bytes, including padding
-    // for 64bit alignment (that may be composed of random bits)
+    std::size_t num_bytes = 0;
     std::size_t size = get_size_from_header(header);
-
-    // Adjust size to number of bytes
     switch (get_wtype_from_header(header)) {
         case wtype_Bits: {
             int width = get_width_from_header(header);
-            std::size_t bits = (size * width);
-            size = bits / 8;
-            if (bits & 0x7) ++size;
-            break;
+            std::size_t num_bits = (size * width); // FIXME: Prone to overflow
+            num_bytes = num_bits / 8;
+            if (num_bits & 0x7)
+                ++num_bytes;
+            goto found;
         }
         case wtype_Multiply: {
             int width = get_width_from_header(header);
-            size *= width;
-            break;
+            num_bytes = size * width;
+            goto found;
         }
         case wtype_Ignore:
-            break;
+            num_bytes = size;
+            goto found;
     }
+    TIGHTDB_ASSERT(false);
 
-    // Add bytes used for padding
-    const std::size_t rest = (~size & 0x7) + 1;
-    if (rest < 8) size += rest; // 64bit blocks
-    size += get_data_from_header(header) - header; // include header in total
+  found:
+    // Ensure 8-byte alignment
+    std::size_t rest = (~num_bytes & 0x7) + 1;
+    if (rest < 8)
+        num_bytes += rest;
 
-    TIGHTDB_ASSERT(size <= get_capacity_from_header(header));
+    num_bytes += header_size;
 
-    return size;
+    TIGHTDB_ASSERT(num_bytes <= get_capacity_from_header(header));
+
+    return num_bytes;
 }
 
 
@@ -1292,9 +1479,8 @@ inline void Array::init_header(char* header, bool is_leaf, bool has_refs, WidthT
 {
     // Note: Since the header layout contains unallocated bit and/or
     // bytes, it is important that we put the entire header into a
-    // well defined state initially. Note also: The C++11 standard
-    // does not guarantee that int64_t is available on all platforms.
-    *reinterpret_cast<int64_t*>(header) = 0;
+    // well defined state initially.
+    std::fill(header, header + header_size, 0);
     set_header_isleaf(is_leaf, header);
     set_header_hasrefs(has_refs, header);
     set_header_wtype(width_type, header);
@@ -1357,23 +1543,11 @@ template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) c
 
     // Write array
     const char* header = get_header_from_data(m_data);
-    std::size_t size = get_byte_size_from_header(header);
+    std::size_t size = get_byte_size();
     std::size_t array_pos = out.write(header, size);
     TIGHTDB_ASSERT((array_pos & 0x7) == 0); /// 64-bit alignment
 
     return array_pos;
-}
-
-template<class S> void Array::write_at(std::size_t pos, S& out) const
-{
-    TIGHTDB_ASSERT(is_attached());
-
-    // TODO: replace capacity with checksum
-
-    // Write array
-    const char* header = get_header_from_data(m_data);
-    std::size_t size = get_byte_size_from_header(header);
-    out.write_at(pos, header, size);
 }
 
 inline ref_type Array::clone(Allocator& clone_alloc) const
@@ -1382,9 +1556,10 @@ inline ref_type Array::clone(Allocator& clone_alloc) const
     return clone(header, m_alloc, clone_alloc); // Throws
 }
 
-inline void Array::move_assign(Array& a)
+inline void Array::move_assign(Array& a) TIGHTDB_NOEXCEPT
 {
-    // FIXME: Be carefull with the old parent info here. Should it be copied?
+    // FIXME: Be carefull with the old parent info here. Should it be
+    // copied?
 
     // FIXME: It will likely be a lot better for the optimizer if we
     // did a member-wise copy, rather than recreating the state from
@@ -1399,6 +1574,12 @@ inline void Array::move_assign(Array& a)
 inline ref_type Array::create_empty_array(Type type, Allocator& alloc)
 {
     return create_empty_array(type, wtype_Bits, alloc); // Throws
+}
+
+inline std::size_t Array::get_max_byte_size(std::size_t num_elems) TIGHTDB_NOEXCEPT
+{
+    int max_bytes_per_elem = 8;
+    return header_size + num_elems * max_bytes_per_elem; // FIXME: Prone to overflow
 }
 
 inline void Array::update_parent()
@@ -1447,7 +1628,7 @@ ref_type Array::btree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& state
         // the first subtree, or it can be prepended to the second
         // one. We currently always append to the first subtree. It is
         // essentially a matter of using the lower vs. the upper bound
-        // when searching in in the offsets array.
+        // when searching through the offsets array.
         child_ndx = offsets.lower_bound_int(elem_ndx);
         TIGHTDB_ASSERT(child_ndx < refs.size());
         std::size_t elem_ndx_offset = child_ndx == 0 ? 0 : to_size_t(offsets.get(child_ndx-1));

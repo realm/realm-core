@@ -50,7 +50,7 @@ struct SpecBase {
     template<class E> class Enum {
     public:
         typedef E enum_type;
-        Enum(E v) : m_value(v) {};
+        Enum(E v): m_value(v) {}
         operator E() const { return m_value; }
     private:
         E m_value;
@@ -59,7 +59,7 @@ struct SpecBase {
     template<class T> class Subtable {
     public:
         typedef T table_type;
-        Subtable(T* t) : m_table(t) {};
+        Subtable(T* t): m_table(t) {}
         operator T*() const { return m_table; }
     private:
         T* m_table;
@@ -93,7 +93,7 @@ struct SpecBase {
 
     /// FIXME: Currently we do not support absence of dynamic column
     /// names.
-    static const StringData* dyn_col_names() { return 0; }
+    static void dyn_col_names(StringData*) TIGHTDB_NOEXCEPT {}
 
     /// This is the fallback class that is used when no convenience
     /// methods are specified in the users Spec class.
@@ -118,16 +118,16 @@ struct SpecBase {
     ///
     /// \endcode
     ///
-    /// FIXME: Note: Users ConvenienceMethods may not contain any
-    /// virtual methods, nor may it contain any data memebers. We
-    /// might want to check this by
-    /// TIGHTDB_STATIC_ASSERT(sizeof(Derivative of ConvenienceMethods)
-    /// == 1)), however, this would not be guaranteed by the standard,
-    /// since even an empty class may add to the size of the derived
-    /// class. Fortunately, as long as ConvenienceMethods is derived
-    /// from, by BasicTable, after deriving from Table, this cannot
-    /// become a problem, nor would it lead to a violation of the
-    /// strict aliasing rule of C++03 or C++11.
+    /// FIXME: ConvenienceMethods may not contain any virtual methods,
+    /// nor may it contain any data memebers. We might want to check
+    /// this by TIGHTDB_STATIC_ASSERT(sizeof(Derivative of
+    /// ConvenienceMethods) == 1)), however, this would not be
+    /// guaranteed by the standard, since even an empty class may add
+    /// to the size of the derived class. Fortunately, as long as
+    /// ConvenienceMethods is derived from, by BasicTable, after
+    /// deriving from Table, this cannot become a problem, nor would
+    /// it lead to a violation of the strict aliasing rule of C++03 or
+    /// C++11.
     struct ConvenienceMethods {};
 };
 
@@ -729,7 +729,7 @@ public:
     template<class T> BasicTableRef<T> set_subtable() const
     {
         BasicTableRef<T> t = unchecked_cast<T>(set_subtable());
-        t->set_dynamic_spec();
+        T::set_dynamic_spec(*t);
         return move(t);
     }
 

@@ -5,18 +5,19 @@
 #endif
 
 using namespace std;
+using namespace tightdb;
 
-namespace tightdb {
 
-Spec::~Spec()
+Spec::~Spec() TIGHTDB_NOEXCEPT
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* repl = m_top.get_alloc().get_replication();
-    if (repl) repl->on_spec_destroyed(this);
+    if (repl)
+        repl->on_spec_destroyed(this);
 #endif
 }
 
-void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
+void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT
 {
     m_top.init_from_ref(ref);
     m_top.set_parent(parent, ndx_in_parent);
@@ -34,7 +35,7 @@ void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent
     }
 }
 
-void Spec::destroy()
+void Spec::destroy() TIGHTDB_NOEXCEPT
 {
     m_top.destroy();
 }
@@ -44,22 +45,23 @@ ref_type Spec::get_ref() const TIGHTDB_NOEXCEPT
     return m_top.get_ref();
 }
 
-void Spec::set_parent(ArrayParent* parent, size_t pndx) TIGHTDB_NOEXCEPT
+void Spec::set_parent(ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT
 {
-    m_top.set_parent(parent, pndx);
+    m_top.set_parent(parent, ndx_in_parent);
 }
 
-bool Spec::update_from_parent() TIGHTDB_NOEXCEPT
+void Spec::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
-    if (m_top.update_from_parent()) {
-        m_spec.update_from_parent();
-        m_names.update_from_parent();
-        if (m_top.size() == 3) {
-            m_subspecs.update_from_parent();
-        }
-        return true;
+    if (!m_top.update_from_parent(old_baseline))
+        return;
+
+    m_spec.update_from_parent(old_baseline);
+    m_names.update_from_parent(old_baseline);
+
+    if (m_top.size() > 2) {
+        TIGHTDB_ASSERT(m_top.size() == 3);
+        m_subspecs.update_from_parent(old_baseline);
     }
-    return false;
 }
 
 size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
@@ -530,6 +532,3 @@ void Spec::to_dot(ostream& out, StringData) const
 }
 
 #endif // TIGHTDB_DEBUG
-
-
-} //namespace tightdb
