@@ -5,29 +5,19 @@
 #include <iostream>
 #include <iomanip>
 
-#include <pthread.h>
-
 #include <UnitTest++.h>
 
-#include <tightdb/file.hpp>
 #include <tightdb/group_shared.hpp>
+#include <tightdb/file.hpp>
+#include <tightdb/thread.hpp>
+#include <tightdb/bind.hpp>
+
 #include "testsettings.hpp"
 
 using namespace std;
 using namespace tightdb;
 
 namespace {
-
-template<class T> struct mem_buf {
-    mem_buf(std::size_t size): m_ptr(new T[size]) {}
-    ~mem_buf() { delete[] m_ptr; }
-    T* get()             { return m_ptr; }
-    const T* get() const { return m_ptr; }
-    T& operator[](std::size_t i)             { return m_ptr[i]; }
-    const T& operator[](std::size_t i) const { return m_ptr[i]; }
-private:
-    T* m_ptr;
-};
 
 
 enum MyEnum { moja, mbili, tatu, nne, tano, sita, saba, nane, tisa, kumi,
@@ -182,8 +172,8 @@ void round(SharedGroup& db, int index)
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MySubtable::Ref subtable = table[0].eta;
         MySubsubtable::Ref subsubtable = subtable[0].bar;
-        const size_t size = ((512 + index%1024) * 1024) % max_blob_size;
-        mem_buf<char> data(size);
+        size_t size = ((512 + index%1024) * 1024) % max_blob_size;
+        UniquePtr<char[]> data(new char[size]);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index) * 677 % 256);
         subsubtable[index].binary = BinaryData(data.get(), size);
@@ -201,8 +191,8 @@ void round(SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #11
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        const size_t size = ((512 + (333 + 677*index) % 1024) * 1024) % max_blob_size;
-        mem_buf<char> data(size);
+        size_t size = ((512 + (333 + 677*index) % 1024) * 1024) % max_blob_size;
+        UniquePtr<char[]> data(new char[size]);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index+73) * 677 % 256);
         table[index%2].zeta = BinaryData(data.get(), size);
@@ -225,8 +215,8 @@ void round(SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #13
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        const size_t size = (512 + (333 + 677*index) % 1024) * 327;
-        mem_buf<char> data(size);
+        size_t size = (512 + (333 + 677*index) % 1024) * 327;
+        UniquePtr<char[]> data(new char[size]);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index+73) * 677 % 256);
         table[(index+1)%2].zeta = BinaryData(data.get(), size);
@@ -246,10 +236,10 @@ void round(SharedGroup& db, int index)
             subtable->add();
             subtable->add();
         }
-        const int n = 1 + 13 / (1+index);
+        int n = 1 + 13 / (1+index);
         for (int i=0; i<n; ++i) {
-            const BinaryData bin(0,0);
-            const Mixed mix = int64_t(i);
+            BinaryData bin(0,0);
+            Mixed mix = int64_t(i);
             subtable->add(0, false, moja,  time_t(), "alpha",   bin, 0, mix);
             subtable->add(1, false, mbili, time_t(), "beta",    bin, 0, mix);
             subtable->add(2, false, tatu,  time_t(), "gamma",   bin, 0, mix);
@@ -284,11 +274,11 @@ void round(SharedGroup& db, int index)
         else {
             subsubtable = subtable[0].theta.set_subtable<MyTable>();
         }
-        const size_t size = (17 + 233*index) % 523;
-        mem_buf<char> data(size);
+        size_t size = (17 + 233*index) % 523;
+        UniquePtr<char[]> data(new char[size]);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index+79) * 677 % 256);
-        const BinaryData bin(data.get(), size);
+        BinaryData bin(data.get(), size);
         subsubtable->add(0, false, nne,  0, "", bin, 0, Mixed(int64_t(index*13)));
         subsubtable->add(1, false, tano, 0, "", bin, 0, Mixed(index%2==0?false:true));
         subsubtable->add(2, false, sita, 0, "", bin, 0, Mixed(Date(index*13)));
@@ -309,7 +299,7 @@ void round(SharedGroup& db, int index)
         else {
             subsubtable = subtable[1].theta.set_subtable<MySubtable>();
         }
-        const int num = 8;
+        int num = 8;
         for (int i=0; i<num; ++i) {
             subsubtable->add(i, 0);
         }
@@ -319,7 +309,7 @@ void round(SharedGroup& db, int index)
         }
         for (int i=0; i<3; ++i) {
             for (int j=0; j<num; j+=2) {
-                const BinaryData bin(0,0);
+                BinaryData bin(0,0);
                 subsubsubtables[j]->add((i-j)*index-19, bin);
             }
         }
@@ -347,7 +337,7 @@ void round(SharedGroup& db, int index)
         else {
             subsubtable = subtable[2].theta.set_subtable<MySubsubtable>();
         }
-        const int num = 9;
+        int num = 9;
         for (int i=0; i<num; ++i) {
             subsubtable->add(i, BinaryData(0,0));
         }
@@ -369,7 +359,7 @@ void round(SharedGroup& db, int index)
             // FIXME: Reenable this when it works!!!
 //            subsubtable->column().value.set_index();
         }
-        const int num = 9;
+        int num = 9;
         for (int i=0; i<num; ++i) {
             subsubtable->add(i, BinaryData(0,0));
         }
@@ -387,48 +377,60 @@ void thread(int index, string database_path)
 }
 
 
-struct ThreadWrapper {
-    void run(int index, string database_path)
+class ThreadWrapper {
+public:
+    template<class F> void start(const F& func)
     {
-        m_index         = index;
-        m_database_path = database_path;
-        m_error         = false;
-        const int rc = pthread_create(&m_pthread, 0, &ThreadWrapper::run, this);
-        if (rc != 0) throw runtime_error("pthread_create() failed");
+        m_except = false;
+        m_thread.start(util::bind(&Runner<F>::run, func, this));
     }
 
-    // Returns 'true' on error
+    /// Returns 'true' if thread has thrown an exception. In that case
+    /// the exception message will also be writte to std::cerr.
     bool join()
     {
-        const int rc = pthread_join(m_pthread, 0);
-        if (rc != 0) throw runtime_error("pthread_join() failed");
-        return m_error;
+        string except_msg;
+        if (join(except_msg)) {
+            cerr << "Exception thrown in thread: "<<except_msg<<"\n";
+            return true;
+        }
+        return false;
+    }
+
+    /// Returns 'true' if thread has thrown an exception. In that
+    /// case the exception message will have been assigned to \a
+    /// except_msg.
+    bool join(string& except_msg)
+    {
+        m_thread.join();
+        if (m_except) {
+            except_msg = m_except_msg;
+            return true;
+        }
+        return false;
     }
 
 private:
-    pthread_t m_pthread;
-    int m_index;
-    string m_database_path;
-    bool m_error;
+    Thread m_thread;
+    bool m_except;
+    string m_except_msg;
 
-    static void* run(void* arg)
-    {
-        ThreadWrapper& e = *static_cast<ThreadWrapper*>(arg);
-        try {
-            thread(e.m_index, e.m_database_path);
+    template<class F> struct Runner {
+        static void run(F func, ThreadWrapper* tw)
+        {
+            try {
+                func();
+            }
+            catch (exception& e) {
+                tw->m_except = true;
+                tw->m_except_msg = e.what();
+            }
+            catch (...) {
+                tw->m_except = true;
+                tw->m_except_msg = "Unknown error";
+            }
         }
-        catch (exception& ex) {
-            e.m_error = true;
-            cerr << "Exception thrown in thread "<<e.m_index<<": "<<ex.what()<<"\n";
-        }
-
-        catch (...) {
-            e.m_error = true;
-            cerr << "Unknown exception thrown in thread "<<e.m_index<<"\n";
-        }
-
-        return 0;
-    }
+    };
 };
 
 } // anonymous namespace
@@ -446,12 +448,18 @@ TEST(Transactions)
 
         // Start threads
         for (int i=0; i<num_threads; ++i) {
-            threads[i].run(i, database_path);
+            threads[i].start(util::bind(&thread, i, database_path));
         }
 
         // Wait for threads to finish
         for (int i=0; i<num_threads; ++i) {
-            CHECK(!threads[i].join());
+            bool thread_has_thrown = false;
+            string except_msg;
+            if (threads[i].join(except_msg)) {
+                cerr << "Exception thrown in thread "<<i<<": "<<except_msg<<"\n";
+                thread_has_thrown = true;
+            }
+            CHECK(!thread_has_thrown);
         }
     }
 
@@ -494,8 +502,8 @@ TEST(Transactions)
         MySubsubtable::ConstRef subsubtable = subtable[0].bar;
         for (int i=0; i<num_threads; ++i) {
             CHECK_EQUAL(1000+i, subsubtable[i].value);
-            const size_t size = ((512 + i%1024) * 1024) % max_blob_size;
-            mem_buf<char> data(size);
+            size_t size = ((512 + i%1024) * 1024) % max_blob_size;
+            UniquePtr<char[]> data(new char[size]);
             for (size_t j=0; j<size; ++j)
                 data[j] = static_cast<unsigned char>((j+i) * 677 % 256);
             CHECK_EQUAL(BinaryData(data.get(), size), subsubtable[i].binary);

@@ -1,5 +1,5 @@
 #
-# C++ reference documentation for TableView class
+# C++ reference documentation for the TableView (typed) class.
 #
 
 ID         : class_typed_tableview
@@ -47,7 +47,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_size
         DESCR  :
-        
+
   - g_typed_view_is_empty:
       NAME     : is_empty
       SUMMARY  : &g_typed_view_is_empty_summary
@@ -61,18 +61,20 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_is_empty
         DESCR  :
-        
+
 - View:
   METHODS:
   - g_typed_view_clear:
       NAME     : clear
       SUMMARY  : *g_typed_table_clear_summary
       DESCR    : &g_typed_view_clear_descr
-                 This method will remove all rows in a view.
+                 >
+                 This method will remove all rows in a view. This implies that
+                 the rows in the originating table will be removed.
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_clear
         DESCR  :
-        
+
 - Rows:
   METHODS:
   - g_typed_view_get_source_ndx:
@@ -160,7 +162,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_get_xxx
         DESCR  :
-        
+
   - g_typed_view_set_bool:
   - g_typed_view_set_int:
   - g_typed_view_set_float:
@@ -197,7 +199,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_set_xxx
         DESCR  :
-        
+
 - Sub-tables:
   METHODS:
   - g_typed_view_get_subtable_size:
@@ -230,8 +232,8 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_clear_subtable
         DESCR  :
-        
-        
+
+
 - Searching:
   METHODS:
   - g_typed_view_find_first_bool:
@@ -264,7 +266,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_find_first_xxx
         DESCR  :
-        
+
   - g_typed_view_find_all_bool:
   - g_typed_view_find_all_int:
   - g_typed_view_find_all_date:
@@ -277,7 +279,7 @@ CATEGORIES :
   - g_typed_view_find_all_double_double:
   - g_typed_view_find_all_date_const:
   - g_typed_view_find_all_string_const:
-      NAMES    : [find_all, find_all, find_all, find_all, find_all, find_all, 
+      NAMES    : [find_all, find_all, find_all, find_all, find_all, find_all,
                   find_all, find_all, find_all, find_all, find_all, find_all]
       TITLE    : find_all_*
       SUMMARY  : Find all matching rows.
@@ -311,7 +313,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_find_all_xxx
         DESCR  :
-        
+
   - g_typed_view_sort:
       NAME     : sort
       SUMMARY  : &g_typed_view_get_sorted_view_summary
@@ -404,7 +406,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_average
         DESCR  :
-        
+
 - Dump:
   METHODS:
   - g_typed_view_to_json:

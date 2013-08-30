@@ -269,8 +269,8 @@ public:
     enum {
         /// If possible, disable opportunistic flushing of dirted
         /// pages of a memory mapped file to physical medium. On some
-        /// systems this cannot be disable. On other systems it is the
-        /// default behavior. En explicit call to sync_map() will
+        /// systems this cannot be disabled. On other systems it is
+        /// the default behavior. An explicit call to sync_map() will
         /// flush the buffers regardless of whether this flag is
         /// specified or not.
         map_NoSync = 1
