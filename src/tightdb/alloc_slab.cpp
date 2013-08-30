@@ -360,7 +360,7 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
         m_file.write(default_header); // Throws
 
         // Pre-alloc initial space
-        m_file.alloc(0, initial_size); // Throws
+        m_file.prealloc(0, initial_size); // Throws
         size = initial_size;
     }
 

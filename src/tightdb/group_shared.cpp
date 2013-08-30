@@ -465,7 +465,7 @@ void SharedGroup::commit()
         size_t new_version;
 #ifdef TIGHTDB_ENABLE_REPLICATION
         // It is essential that if Replicatin::commit_write_transact()
-        // fails, then the transaction is not completed. A following call
+        // fails, then the transaction is not completed. A subsequent call
         // to rollback() must roll it back.
         if (Replication* repl = m_group.get_replication()) {
             new_version = repl->commit_write_transact(*this); // Throws
@@ -604,7 +604,7 @@ void SharedGroup::ringbuf_expand()
     size_t new_file_size = base_file_size + (sizeof (ReadCount) * new_entry_count);
 
     // Extend file
-    m_file.alloc(0, new_file_size); // Throws
+    m_file.prealloc(0, new_file_size); // Throws
     m_reader_map.remap(m_file, File::access_ReadWrite, new_file_size); // Throws
     info = m_reader_map.get_addr();
 
