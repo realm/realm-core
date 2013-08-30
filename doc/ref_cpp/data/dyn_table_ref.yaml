@@ -85,21 +85,33 @@ CATEGORIES :
       - CODE   : ex_cpp_dyn_table_is_empty
         DESCR  :
 
-# TODO: describe what to use it for...
-  - g_dyn_table_is_valid:
-      NAME     : is_valid
-      SUMMARY  : &g_dyn_table_is_valid_summary
-                 Is table valid/consistent?
-      DESCR    : &g_dyn_table_is_valid_descr
-                 This method will perform a number of consistency checks on a table and its
-                 columns.
+  - g_dyn_table_is_attached:
+      NAME     : is_attached
+      SUMMARY  : &g_dyn_table_is_attached_summary
+                 Check whether this table accessor is still in the
+                 attached state.
+      DESCR    : &g_dyn_table_is_attached_descr
+                 A table accessor that is no longer attached must not
+                 be accessed in any way except by calling
+                 is_attached(). A table accessor that is obtained from
+                 a Group becomes detached if its group accessor is
+                 destroyed. This is also true for any subtable
+                 accessor that is obtained indirectly from a group. A
+                 subtable accessor will generally become detached if
+                 its parent table is modified. Calling a const member
+                 function on a parent table accessor, will never
+                 detach its subtable accessors, though. An accessor
+                 for a freestanding table will never become
+                 detached. An accessor for a subtable of a
+                 freestanding table may become detached.
       CONST    : true
       RETURN:
         TYPES  : bool
-        DESCR  : &g_dyn_table_is_valid_return_descr
-                 <code>true</code> if table is valid, <code>false</code> otherwise.
+        DESCR  : &g_dyn_table_is_attached_return_descr
+                 <code>true</code> if, and only if this table accessor
+                 is still in the attached state.
       EXAMPLES:
-      - CODE   : ex_cpp_dyn_table_is_valid
+      - CODE   : ex_cpp_dyn_table_is_attached
         DESCR  :
 
 

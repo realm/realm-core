@@ -13,13 +13,16 @@ Format:
 ==================
 
 
+2013-08-28 (Kristian Spangsege)
++ Table::is_valid() renamed to Table::is_attached(). The notion of accessor attachment describes much better what is going on than the notion of validity.
+
+
 2013-08-23 (Kristian Spangsege)
 + Stop throwing from destructors (all), and from SharedGroup::rollback() and SharedGRoup::end_read().
 + General stability and eror checking improvements.
 ! Fixed many bugs relating to Group::commit().
 ! Fixed some bugs relating to SharedGroup::commit().
 ! Fixed bug in TableViewBase::sort().
-
 
 
 2013-08-18 (Kenneth Geisshirt)

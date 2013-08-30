@@ -119,7 +119,7 @@ inline Table* LangBindHelper::new_table()
 {
     Allocator& alloc = Allocator::get_default();
     std::size_t ref = Table::create_empty_table(alloc); // Throws
-    Table* const table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
+    Table* const table = new Table(Table::ref_count_tag(), alloc, ref, 0, 0); // Throws
     table->bind_ref();
     return table;
 }
@@ -128,7 +128,7 @@ inline Table* LangBindHelper::copy_table(const Table& t)
 {
     Allocator& alloc = Allocator::get_default();
     std::size_t ref = t.clone(alloc); // Throws
-    Table* const table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
+    Table* const table = new Table(Table::ref_count_tag(), alloc, ref, 0, 0); // Throws
     table->bind_ref();
     return table;
 }
@@ -220,7 +220,7 @@ inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_nd
 
 inline Spec& LangBindHelper::get_spec(Table& t) TIGHTDB_NOEXCEPT
 {
-    return t.m_spec_set;
+    return t.m_spec;
 }
 
 

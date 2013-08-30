@@ -21,18 +21,24 @@ TIGHTDB_TABLE_4(TestTableGroup,
 
 } // Anonymous namespace
 
+TEST(Group_Unattached)
+{
+    Group g((Group::unattached_tag()));
+    CHECK(!g.is_attached());
+}
+
 TEST(Group_Size)
 {
     Group g;
-
-    CHECK_EQUAL(true, g.is_empty());
+    CHECK(g.is_attached());
+    CHECK(g.is_empty());
 
     TableRef t = g.get_table("a");
-    CHECK_EQUAL(false, g.is_empty());
+    CHECK(!g.is_empty());
     CHECK_EQUAL(1, g.size());
 
     TableRef t1 = g.get_table("b");
-    CHECK_EQUAL(false, g.is_empty());
+    CHECK(!g.is_empty());
     CHECK_EQUAL(2, g.size());
 }
 
@@ -290,17 +296,15 @@ TEST(Group_Serialize_Mem)
 
 TEST(Group_Close)
 {
-    Group* to_mem = new Group();
-    TestTableGroup::Ref table = to_mem->get_table<TestTableGroup>("test");
+    Group to_mem;
+    TestTableGroup::Ref table = to_mem.get_table<TestTableGroup>("test");
     table->add("",  1, true, Wed);
     table->add("",  2, true, Wed);
 
     // Serialize to memory (we now own the buffer)
-    BinaryData buffer = to_mem->write_to_mem();
+    BinaryData buffer = to_mem.write_to_mem();
 
-    Group* from_mem = new Group(buffer);
-    delete to_mem;
-    delete from_mem;
+    Group from_mem(buffer);
 }
 
 TEST(Group_Serialize_Optimized)
@@ -844,35 +848,35 @@ TEST(Group_InvalidateTables)
     {
         Group group;
         table = group.get_table<TestTableGroup2>("foo");
-        CHECK(table->is_valid());
+        CHECK(table->is_attached());
         table->add(Mixed::subtable_tag(), 0, 0);
-        CHECK(table->is_valid());
+        CHECK(table->is_attached());
         subtable1 = table[0].first.get_subtable();
-        CHECK(table->is_valid());
+        CHECK(table->is_attached());
         CHECK(subtable1);
-        CHECK(subtable1->is_valid());
+        CHECK(subtable1->is_attached());
         subtable2 = table[0].second;
-        CHECK(table->is_valid());
-        CHECK(subtable1->is_valid());
+        CHECK(table->is_attached());
+        CHECK(subtable1->is_attached());
         CHECK(subtable2);
-        CHECK(subtable2->is_valid());
+        CHECK(subtable2->is_attached());
         subtable3 = table[0].third;
-        CHECK(table->is_valid());
-        CHECK(subtable1->is_valid());
-        CHECK(subtable2->is_valid());
+        CHECK(table->is_attached());
+        CHECK(subtable1->is_attached());
+        CHECK(subtable2->is_attached());
         CHECK(subtable3);
-        CHECK(subtable3->is_valid());
+        CHECK(subtable3->is_attached());
         subtable3->add("alpha", 79542, true,  Wed);
         subtable3->add("beta",     97, false, Mon);
-        CHECK(table->is_valid());
-        CHECK(subtable1->is_valid());
-        CHECK(subtable2->is_valid());
-        CHECK(subtable3->is_valid());
+        CHECK(table->is_attached());
+        CHECK(subtable1->is_attached());
+        CHECK(subtable2->is_attached());
+        CHECK(subtable3->is_attached());
     }
-    CHECK(!table->is_valid());
-    CHECK(!subtable1->is_valid());
-    CHECK(!subtable2->is_valid());
-    CHECK(!subtable3->is_valid());
+    CHECK(!table->is_attached());
+    CHECK(!subtable1->is_attached());
+    CHECK(!subtable2->is_attached());
+    CHECK(!subtable3->is_attached());
 }
 
 TEST(Group_toJSON)
