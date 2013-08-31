@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include <pthread.h>
 
 #include <tightdb/terminate.hpp>
@@ -20,6 +22,7 @@
 using namespace std;
 using namespace tightdb;
 
+
 struct SharedGroup::ReadCount {
     uint32_t version;
     uint32_t count;
@@ -37,10 +40,12 @@ struct SharedGroup::SharedInfo {
     volatile uint32_t current_version;
 
     uint32_t infosize;
-    uint32_t capacity; // -1 so it can also be used as mask
+    uint32_t capacity_mask; // Must be on the form 2**n - 1
     uint32_t put_pos;
     uint32_t get_pos;
-    ReadCount readers[32]; // has to be power of two
+
+    static const int init_readers_size = 32; // Must be a power of two
+    ReadCount readers[init_readers_size];
 };
 
 
@@ -182,9 +187,9 @@ retry:
             info->infosize = uint32_t(len);
             info->current_top = alloc.get_top_ref();
             info->current_version = 0;
-            info->capacity = 32 - 1;
-            info->put_pos  = 0;
-            info->get_pos  = 0;
+            info->capacity_mask = SharedInfo::init_readers_size - 1;
+            info->put_pos = 0;
+            info->get_pos = 0;
 
             // Set initial version so we can track if other instances
             // change the db
@@ -526,14 +531,14 @@ bool SharedGroup::ringbuf_is_empty() const TIGHTDB_NOEXCEPT
 size_t SharedGroup::ringbuf_size() const TIGHTDB_NOEXCEPT
 {
     SharedInfo* info = m_reader_map.get_addr();
-    return (info->put_pos - info->get_pos) & info->capacity;
+    return (info->put_pos - info->get_pos) & info->capacity_mask;
 }
 
 
 size_t SharedGroup::ringbuf_capacity() const TIGHTDB_NOEXCEPT
 {
     SharedInfo* info = m_reader_map.get_addr();
-    return info->capacity+1;
+    return info->capacity_mask;
 }
 
 
@@ -561,7 +566,7 @@ SharedGroup::ReadCount& SharedGroup::ringbuf_get_first() TIGHTDB_NOEXCEPT
 SharedGroup::ReadCount& SharedGroup::ringbuf_get_last() TIGHTDB_NOEXCEPT
 {
     SharedInfo* info = m_reader_map.get_addr();
-    uint32_t lastPos = (info->put_pos - 1) & info->capacity;
+    uint32_t lastPos = (info->put_pos - 1) & info->capacity_mask;
     return info->readers[lastPos];
 }
 
@@ -569,7 +574,7 @@ SharedGroup::ReadCount& SharedGroup::ringbuf_get_last() TIGHTDB_NOEXCEPT
 void SharedGroup::ringbuf_remove_first() TIGHTDB_NOEXCEPT
 {
     SharedInfo* info = m_reader_map.get_addr();
-    info->get_pos = (info->get_pos + 1) & info->capacity;
+    info->get_pos = (info->get_pos + 1) & info->capacity_mask;
 }
 
 
@@ -580,7 +585,7 @@ void SharedGroup::ringbuf_put(const ReadCount& v)
     // Check if the ringbuf is full
     // (there should always be one empty entry)
     size_t size = ringbuf_size();
-    bool is_full = size == info->capacity;
+    bool is_full = size == info->capacity_mask;
 
     if (TIGHTDB_UNLIKELY(is_full)) {
         ringbuf_expand(); // Throws
@@ -588,45 +593,55 @@ void SharedGroup::ringbuf_put(const ReadCount& v)
     }
 
     info->readers[info->put_pos] = v;
-    info->put_pos = (info->put_pos + 1) & info->capacity;
+    info->put_pos = (info->put_pos + 1) & info->capacity_mask;
 }
 
 
 void SharedGroup::ringbuf_expand()
 {
     SharedInfo* info = m_reader_map.get_addr();
+    size_t old_buffer_size = info->capacity_mask + 1; // FIXME: Why size_t and not uint32 as capacity?
+    size_t base_file_size = sizeof (SharedInfo) - sizeof (ReadCount[SharedInfo::init_readers_size]);
 
-    // Calculate size of file with more entries
-    size_t current_entry_count = info->capacity + 1;  // FIXME: Why size_t and not uint32 as capacity?
-    size_t excount = current_entry_count; // Always double so we can mask for index
-    size_t new_entry_count = current_entry_count + excount;
-    size_t base_file_size = sizeof (SharedInfo) - sizeof (ReadCount[32]);
-    size_t new_file_size = base_file_size + (sizeof (ReadCount) * new_entry_count);
+    // Be sure that the new file size, after doubling the size of the
+    // ring buffer, can be stored in a size_t. This also guarantees
+    // that there is no arithmetic overflow in the calculation of the
+    // new file size. We must always double the size of the ring
+    // buffer, such that we can continue to use the capacity as a bit
+    // mask. Note that the capacity of the ring buffer is one less
+    // than the size of the containing linear buffer.
+    //
+    // FIXME: It is no good that we convert back and forth between
+    // uint32_t and size_t, because that defetas the purpose of this
+    // check.
+    if (old_buffer_size > (numeric_limits<size_t>::max() -
+                           base_file_size) / (2 * sizeof (ReadCount)))
+        throw runtime_error("Overflow in size of 'readers' buffer");
+    size_t new_buffer_size = 2 * old_buffer_size;
+    size_t new_file_size = base_file_size + (sizeof (ReadCount) * new_buffer_size);
 
-    // Extend file
+    // Extend lock file
     m_file.prealloc(0, new_file_size); // Throws
     m_reader_map.remap(m_file, File::access_ReadWrite, new_file_size); // Throws
     info = m_reader_map.get_addr();
 
-    // Move existing entries (if there is a split)
+    // If the contents of the ring buffer crosses the end of the
+    // containing linear buffer (continuing at the beginning) then the
+    // section whose end coincided with the old end of the linear
+    // buffer, must be moved forward such that its end becomes
+    // coincident with the end of the expanded linear buffer.
     if (info->put_pos < info->get_pos) {
-        const ReadCount* low_start = &info->readers[info->get_pos];
-        const ReadCount* low_end   = &info->readers[current_entry_count];
-        bool has_overlap = (current_entry_count - info->get_pos) > excount;
-        if (has_overlap) {
-            ReadCount* new_end = &info->readers[new_entry_count];
-            copy_backward(low_start, low_end, new_end);
-        }
-        else {
-            ReadCount* new_start = &info->readers[info->get_pos + excount];
-            copy(low_start, low_end, new_start);
-        }
-        // FIXME: warning for adding size_t to uint32!
-        info->get_pos += excount;
+        // Since we always double the size of the linear buffer, there
+        // is never any risk of aliasing/clobbering during copying.
+        ReadCount* begin = info->readers + info->get_pos;
+        ReadCount* end   = info->readers + old_buffer_size;
+        ReadCount* new_begin = begin + old_buffer_size;
+        copy(begin, end, new_begin);
+        info->get_pos += uint32_t(old_buffer_size);
     }
 
     info->infosize = uint32_t(new_file_size); // notify other processes of expansion
-    info->capacity = uint32_t(new_entry_count) - 1;
+    info->capacity_mask = uint32_t(new_buffer_size) - 1;
 }
 
 
@@ -639,7 +654,7 @@ size_t SharedGroup::ringbuf_find(uint32_t version) const TIGHTDB_NOEXCEPT
         if (r.version == version)
             return pos;
 
-        pos = (pos + 1) & info->capacity;
+        pos = (pos + 1) & info->capacity_mask;
     }
 
     return not_found;
@@ -660,7 +675,7 @@ void SharedGroup::test_ringbuf()
     TIGHTDB_ASSERT(ringbuf_is_empty());
 
     // Fill buffer (within capacity)
-    size_t capacity = ringbuf_capacity()-1;
+    size_t capacity = ringbuf_capacity();
     for (size_t i = 0; i < capacity; ++i) {
         ReadCount r = { 1, uint32_t(i) };
         ringbuf_put(r);
@@ -697,7 +712,7 @@ void SharedGroup::test_ringbuf()
     TIGHTDB_ASSERT(ringbuf_is_empty());
 
     // Fill buffer above capacity (forcing it to expand)
-    size_t capacity_plus = ringbuf_capacity() + 16;
+    size_t capacity_plus = ringbuf_capacity() + (1+16);
     for (size_t i = 0; i < capacity_plus; ++i) {
         ReadCount r = { 1, uint32_t(i) };
         ringbuf_put(r);
@@ -711,7 +726,7 @@ void SharedGroup::test_ringbuf()
     TIGHTDB_ASSERT(ringbuf_is_empty());
 
     // Fill buffer above capacity again (forcing it to expand with overlap)
-    capacity_plus = ringbuf_capacity() + 16;
+    capacity_plus = ringbuf_capacity() + (1+16);
     for (size_t i = 0; i < capacity_plus; ++i) {
         ReadCount r = { 1, uint32_t(i) };
         ringbuf_put(r);
