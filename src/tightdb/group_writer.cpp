@@ -377,15 +377,6 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // mutation access.
     m_alloc.m_file.prealloc(0, new_file_size);
 
-    // FIXME: It is not clear what this call to sync() achieves. In
-    // fact, is seems like it acheives nothing at all, because only if
-    // the new top 'ref' is successfully instated will we need to see
-    // a bigger file on disk. On the other hand, if it does acheive
-    // something, what exactly is that? On the other hand, if it relly
-    // must stay, it should at least be skipped when
-    // SharedGroup::durability_MemOnly is selected.
-    m_alloc.m_file.sync();
-
     m_file_map.remap(m_alloc.m_file, File::access_ReadWrite, new_file_size);
 
     size_t chunk_ndx  = positions.size();
