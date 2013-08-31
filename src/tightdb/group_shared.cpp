@@ -612,7 +612,7 @@ void SharedGroup::ringbuf_expand()
     // than the size of the containing linear buffer.
     //
     // FIXME: It is no good that we convert back and forth between
-    // uint32_t and size_t, because that defetas the purpose of this
+    // uint32_t and size_t, because that defeats the purpose of this
     // check.
     if (old_buffer_size > (numeric_limits<size_t>::max() -
                            base_file_size) / (2 * sizeof (ReadCount)))
