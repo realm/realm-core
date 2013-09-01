@@ -98,6 +98,18 @@ TEST(Thread_MutexLock)
 }
 
 
+TEST(Thread_ProcessSharedMutex)
+{
+    Mutex mutex((Mutex::process_shared_tag()));
+    {
+        Mutex::Lock lock(mutex);
+    }
+    {
+        Mutex::Lock lock(mutex);
+    }
+}
+
+
 TEST(Thread_CriticalSection)
 {
     Shared shared;
