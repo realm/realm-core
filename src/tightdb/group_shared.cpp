@@ -269,6 +269,13 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
     // On top of that, if a customer chooses to run a data race
     // detector on their application, our data race migh show up, and
     // that may rightfully cause alarm.
+    //
+    // See also
+    // http://stackoverflow.com/questions/12878344/volatile-in-c11
+    //
+    // Please note that the definition of a data race inf C++11 also
+    // effectively applies to C++03. In this regard C++11 is just a
+    // standardization of the existing paradigm.
 
     // Have we changed since last transaction?
     // Visibility of changes can be delayed when using has_changed() because m_info->current_version is tested
