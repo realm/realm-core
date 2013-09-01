@@ -1,3 +1,5 @@
+#include <queue>
+
 #include <UnitTest++.h>
 
 #include <tightdb/thread.hpp>
@@ -59,7 +61,76 @@ struct Robust {
     }
 };
 
+
+class QueueMonitor {
+public:
+    QueueMonitor(): m_closed(false) {}
+
+    bool get(int& value)
+    {
+        Mutex::Lock lock(m_mutex);
+        for (;;) {
+            if (!m_queue.empty())
+                break;
+            if (m_closed)
+                return false;
+            m_nonempty_or_closed.wait(lock); // Wait for producer
+        }
+        bool was_full = m_queue.size() == max_queue_size;
+        value = m_queue.front();
+        m_queue.pop();
+        if (was_full)
+            m_nonfull.notify_all(); // Resume a waiting producer
+        return true;
+    }
+
+    void put(int value)
+    {
+        Mutex::Lock lock(m_mutex);
+        while (m_queue.size() == max_queue_size)
+            m_nonfull.wait(lock); // Wait for consumer
+        bool was_empty = m_queue.empty();
+        m_queue.push(value);
+        if (was_empty)
+            m_nonempty_or_closed.notify_all(); // Resume a waiting consumer
+    }
+
+    void close()
+    {
+        Mutex::Lock lock(m_mutex);
+        m_closed = true;
+        m_nonempty_or_closed.notify_all(); // Resume all waiting consumers
+    }
+
+private:
+    Mutex m_mutex;
+    CondVar m_nonempty_or_closed, m_nonfull;
+    queue<int> m_queue;
+    bool m_closed;
+
+    static const unsigned max_queue_size = 8;
+};
+
+void producer_thread(QueueMonitor* queue, int value)
+{
+    for (int i=0; i<1000; ++i) {
+        queue->put(value);
+    }
+}
+
+void consumer_thread(QueueMonitor* queue, int* consumed_counts)
+{
+    for (;;) {
+        int value = 0;
+        bool closed = !queue->get(value);
+        if (closed)
+            return;
+        ++consumed_counts[value];
+    }
+}
+
 } // anonymous namespace
+
 
 
 TEST(Thread_Join)
@@ -271,6 +342,33 @@ TEST(Thread_DeathDuringRecovery)
     robust.m_mutex.lock(util::bind(&Robust::recover, &robust));
     CHECK(!robust.m_recover_called);
     robust.m_mutex.unlock();
+}
+
+
+TEST(Thread_CondVar)
+{
+    QueueMonitor queue;
+    const int num_producers = 2; // 32;
+    const int num_consumers = 2; // 32;
+    Thread producers[num_producers], consumers[num_consumers];
+    int consumed_counts[num_consumers][num_producers];
+
+    for (int i = 0; i < num_producers; ++i)
+        producers[i].start(util::bind(&producer_thread, &queue, i));
+    for (int i = 0; i < num_consumers; ++i)
+        consumers[i].start(util::bind(&consumer_thread, &queue, &consumed_counts[i][0]));
+    for (int i = 0; i < num_producers; ++i)
+        producers[i].join();
+    queue.close(); // Stop consumers when queue is empty
+    for (int i = 0; i < num_consumers; ++i)
+        consumers[i].join();
+
+    for (int i = 0; i < num_producers; ++i) {
+        int n = 0;
+        for (int j = 0; j < num_consumers; ++j)
+            n += consumed_counts[j][i];
+        CHECK_EQUAL(1000, n);
+    }
 }
 
 #endif // _WIN32
