@@ -96,8 +96,6 @@ TEST(Thread_Start)
 // robust mutexes.
 // Lasse, could you take a look at it?
 
-#ifndef _WIN32
-
 TEST(Thread_MutexLock)
 {
     Mutex mutex;
@@ -272,5 +270,3 @@ TEST(Thread_DeathDuringRecovery)
     CHECK(!robust.m_recover_called);
     robust.m_mutex.unlock();
 }
-
-#endif // _WIN32
