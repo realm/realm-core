@@ -23,9 +23,136 @@ TIGHTDB_TABLE_4(TestTableGroup,
 
 TEST(Group_Unattached)
 {
-    Group g((Group::unattached_tag()));
-    CHECK(!g.is_attached());
+    Group group((Group::unattached_tag()));
+    CHECK(!group.is_attached());
 }
+
+
+TEST(Group_OpenFile)
+{
+    File::try_remove("test.tightdb");
+
+    {
+        Group group((Group::unattached_tag()));
+        group.open("test.tightdb", Group::mode_ReadWrite);
+        CHECK(group.is_attached());
+    }
+
+    {
+        Group group((Group::unattached_tag()));
+        group.open("test.tightdb", Group::mode_ReadWriteNoCreate);
+        CHECK(group.is_attached());
+    }
+
+    {
+        Group group((Group::unattached_tag()));
+        group.open("test.tightdb", Group::mode_ReadOnly);
+        CHECK(group.is_attached());
+    }
+
+    File::remove("test.tightdb");
+}
+
+
+TEST(Group_BadFile)
+{
+    File::try_remove("test.tightdb");
+    File::try_remove("test2.tightdb");
+
+    {
+        File file("test.tightdb", File::mode_Append);
+        file.write("foo");
+    }
+
+    {
+        Group group((Group::unattached_tag()));
+        CHECK_THROW(group.open("test.tightdb", Group::mode_ReadOnly), InvalidDatabase);
+        CHECK(!group.is_attached());
+        CHECK_THROW(group.open("test.tightdb", Group::mode_ReadOnly), InvalidDatabase); // Again
+        CHECK(!group.is_attached());
+        CHECK_THROW(group.open("test.tightdb", Group::mode_ReadWrite), InvalidDatabase);
+        CHECK(!group.is_attached());
+        CHECK_THROW(group.open("test.tightdb", Group::mode_ReadWriteNoCreate), InvalidDatabase);
+        CHECK(!group.is_attached());
+        group.open("test2.tightdb", Group::mode_ReadWrite); // This one must work
+        CHECK(group.is_attached());
+    }
+
+    File::remove("test.tightdb");
+    File::remove("test2.tightdb");
+}
+
+
+TEST(Group_OpenBuffer)
+{
+    // Produce a valid buffer
+    UniquePtr<char[]> buffer;
+    size_t buffer_size;
+    {
+        File::try_remove("test.tightdb");
+        {
+            Group group;
+            group.write("test.tightdb");
+        }
+        {
+            File file("test.tightdb");
+            buffer_size = size_t(file.get_size());
+            buffer.reset(static_cast<char*>(malloc(buffer_size)));
+            CHECK(bool(buffer));
+            file.read(buffer.get(), buffer_size);
+        }
+        File::remove("test.tightdb");
+    }
+
+
+    // Keep ownership of buffer
+    {
+        Group group((Group::unattached_tag()));
+        bool take_ownership = false;
+        group.open(BinaryData(buffer.get(), buffer_size), take_ownership);
+        CHECK(group.is_attached());
+    }
+
+    // Pass ownership of buffer
+    {
+        Group group((Group::unattached_tag()));
+        bool take_ownership = true;
+        group.open(BinaryData(buffer.get(), buffer_size), take_ownership);
+        CHECK(group.is_attached());
+        buffer.release();
+    }
+}
+
+
+TEST(Group_BadBuffer)
+{
+    File::try_remove("test.tightdb");
+
+    // Produce an invalid buffer
+    char buffer[32];
+    for (size_t i=0; i<sizeof buffer; ++i)
+        buffer[i] = char((i+192)%128);
+
+    {
+        Group group((Group::unattached_tag()));
+        bool take_ownership = false;
+        CHECK_THROW(group.open(BinaryData(buffer), take_ownership), InvalidDatabase);
+        CHECK(!group.is_attached());
+        // Check that ownership is not passed on failure during
+        // open. If it was, we would get a bad delete on stack
+        // allocated memory wich would at least be caught by Valgrind.
+        take_ownership = true;
+        CHECK_THROW(group.open(BinaryData(buffer), take_ownership), InvalidDatabase);
+        CHECK(!group.is_attached());
+        // Check that the group is still able to attach to a file,
+        // even after failures.
+        group.open("test.tightdb", Group::mode_ReadWrite);
+        CHECK(group.is_attached());
+    }
+
+    File::remove("test.tightdb");
+}
+
 
 TEST(Group_Size)
 {
@@ -52,6 +179,23 @@ TEST(Group_GetTable)
     TestTableGroup::Ref t3 = g.get_table<TestTableGroup>("beta");
     TestTableGroup::ConstRef t4 = cg.get_table<TestTableGroup>("beta");
     CHECK_EQUAL(t3, t4);
+}
+
+TEST(Group_TableAccessorLeftBehind)
+{
+    TableRef table;
+    TableRef subtable;
+    {
+        Group group;
+        table = group.get_table("test");
+        CHECK(table->is_attached());
+        table->add_column(type_Table, "sub");
+        table->add_empty_row();
+        subtable = table->get_subtable(0,0);
+        CHECK(subtable->is_attached());
+    }
+    CHECK(!table->is_attached());
+    CHECK(!subtable->is_attached());
 }
 
 TEST(Group_Invalid1)
