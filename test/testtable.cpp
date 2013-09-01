@@ -420,7 +420,7 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
         }
 
         // Add sub-tables to table column
-        for (size_t j=0; j<sub_rows; j++) {
+        for (size_t j=0; j<sub_rows+i; j++) {
             TableRef subtable = table.get_subtable(10, i);
             int64_t val = -123+i*j*1234*sign;
             subtable->insert_int(0, j, val);
@@ -484,7 +484,7 @@ TEST(Table_Move_All_Types)
 TEST(Table_test_to_string)
 {
     Table table;
-    setup_multi_table(table, 15, 2);
+    setup_multi_table(table, 15, 6);
 
     stringstream ss;
     table.to_string(ss);
@@ -578,7 +578,12 @@ TEST(Table_test_json_simple)
      table.to_json(ss);
      const string json = ss.str();
      CHECK_EQUAL(true, json.length() > 0);
+#if _MSC_VER
+     // On Windows floats in scientific notation contains 3 "0", as opposed to 2 on Linux
+     CHECK_EQUAL("[{\"int\":0,\"bool\":true,\"date\":\"2038-01-19 02:01:18\",\"float\":3.1400001e+000,\"double\":2.7100000000000000e+000,\"string\":\"helloooooo\",\"binary\":\"3132333435363738393031323334353637383930313233343536373839306e6f707100\"}]", json);
+#else
      CHECK_EQUAL("[{\"int\":0,\"bool\":true,\"date\":\"2038-01-19 02:01:18\",\"float\":3.1400001e+00,\"double\":2.7100000000000000e+00,\"string\":\"helloooooo\",\"binary\":\"3132333435363738393031323334353637383930313233343536373839306e6f707100\"}]", json);
+#endif
 }
 
 
