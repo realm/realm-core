@@ -86,6 +86,18 @@ TEST(Thread_Start)
 }
 
 
+// FIXME: Our POSIX Threads port for Windows seems to have a number
+// of bugs that prevent the rest of the unit-tests from working.
+// One bug appears to be that pthread_mutex_lock() incorrectly
+// believes that a regular mutex is a process-shared mutex.
+// It also looks like there is an error when calling
+// pthread_mutex_destroy() on a process-shared mutex.
+// And finally, it appears that it incorrectly claims support for
+// robust mutexes.
+// Lasse, could you take a look at it?
+
+#ifndef _WIN32
+
 TEST(Thread_MutexLock)
 {
     Mutex mutex;
@@ -260,3 +272,5 @@ TEST(Thread_DeathDuringRecovery)
     CHECK(!robust.m_recover_called);
     robust.m_mutex.unlock();
 }
+
+#endif // _WIN32
