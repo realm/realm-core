@@ -3,8 +3,8 @@
 #include <tightdb/array_blob.hpp>
 
 using namespace std;
+using namespace tightdb;
 
-namespace tightdb {
 
 void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size, bool add_zero_term)
 {
@@ -81,5 +81,3 @@ void ArrayBlob::to_dot(ostream& out, const char* title) const
 }
 
 #endif // TIGHTDB_DEBUG
-
-}
