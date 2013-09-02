@@ -1,36 +1,40 @@
 #
-# C++ reference documentation for Group class
+# C++ reference documentation for the Group class.
 #
 
-#UNDOCUMENTED: [commit, to_json, get_table_typed]
-ID         : class_group
-TITLE      : Group
-SUMMARY    : &g_group_summary
-             Container for tables.
-DESCR      : &g_group_descr
-             >
-             In order to store tables on disk or transfer tables over network, they must be
-             serialized. The TightDB framework provides various methods including
-             <a href="http://www.json.org">JSON</a> for single tables.
+#UNDOCUMENTED: [commit, get_table_typed]
 
-             The Group is a container for tables and it allows the tables to be serialized to
-             disk and memory. The serialization format is highly optimized for TightDB tables,
-             which implies that the consumed resources are low.
+ID          : class_group
+TITLE       : Group
+SUMMARY     : &g_group_summary
+              Container for tables.
+DESCR       : &g_group_descr
+              >
+              In order to store tables on disk or transfer tables over network,
+              they must be serialized. The TightDB framework provides various
+              methods including <a href="http://www.json.org">JSON</a> for
+              single tables.
 
-             A group can hold one or more tables. If a table is going to be serialized, you
-             must create the table using the group. It is not possible to dynamically add a table
-             to a group.
+              The Group is a container for tables and it allows the tables to
+              be serialized to disk and memory. The serialization format is
+              highly optimized for TightDB tables, which implies that the
+              consumed resources are low.
 
-             Once a group has been serialized, it is possible to deserialize it using any supported
-             programming language, at any supported operating system and at any supported
-             hardware platform. This implies that the TightDB framework is true a polyglot
-             framework where you can share data between applications.
-SEE        :
-EXAMPLES:
-- DESCR    :
-  CODE     : ex_cpp_group_intro
-IGNORE     : []                   # List of method-ids to ignore
-CATEGORIES:
+              A group can hold one or more tables. If a table is going to be
+              serialized, you must create the table using the group. It is not
+              possible to dynamically add a table to a group.
+
+              Once a group has been serialized, it is possible to deserialize
+              it using any supported programming language, on any supported
+              operating system, and on any supported hardware platform. This
+              implies that TightDB is truly a polyglot framework which you can
+              use to share data between applications.
+SEE         :
+EXAMPLES    :
+- DESCR     :
+  CODE      : ex_cpp_group_intro
+IGNORE      : []                   # List of method-ids to ignore
+CATEGORIES  :
 - Constructor:
   METHODS:
   - g_group_constructor_plain:
@@ -60,7 +64,7 @@ CATEGORIES:
       PARAMS:
       - NAME   : file
         TYPES  : const std::string&
-        DESCR  : &g_group_constructor_memory_parm1_descr
+        DESCR  : &g_open_filesystem_path_descr
                  Filesystem path of the TightDB database file to be opened.
       - NAME   : mode
         TYPES  : Group::OpenMode
@@ -91,245 +95,32 @@ CATEGORIES:
         CODE   : ex_cpp_group_constructor_file
       - DESCR  :
         CODE   : ex_cpp_group_constructor_memory
-- Operators:
-  METHODS:
-  - g_group_operator_equal:
-      NAME     : operator==
-      SUMMARY  : Compare two groups.
-      DESCR    : &g_group_operator_equal_descr
-                 >
-                 Compare two groups for equality. Two groups are equal if, and
-                 only if, they contain the same tables in the same order, that
-                 is, for each table T at index I in one of the groups, there is
-                 a table at index I in the other group that is equal to T.
-      CONST    : true
-      PARAMS:
-      - TYPES  : const Group&
-        NAME   : g
-        DESCR  : The group to compare with.
-      RETURN:
-        TYPES  : bool
-        DESCR  : <code>true</code> if the two groups are equal, <code>false</code> otherwise.
-      EXAMPLES:
-      - DESCR  :
-        CODE   : ex_cpp_group_operator_equal
-  - g_group_operator_not_equal:
-      NAME     : operator!=
-      SUMMARY  : Compare two groups.
-      DESCR    : *g_group_operator_equal_descr
-      CONST    : true
-      PARAMS:
-      - TYPES  : const Group&
-        NAME   : g
-        DESCR  : The group to compare with.
-      RETURN:
-        TYPES  : bool
-        DESCR  : <code>true</code> if the two groups are not equal, <code>false</code> otherwise.
-      EXAMPLES:
-      - DESCR  :
-        CODE   : ex_cpp_group_operator_equal
-
-- Table:
-  METHODS:
-  - g_group_size:
-      NAME     : size
-      SUMMARY  : &g_group_table_count_summary
-                 The number of tables in the group.
-      DESCR    : &g_group_table_count_descr
-                 >
-                 A group can be a container for many tables, and this method counts
-                 the number of tables currently stored in the group.
-      CONST    : true
-      RETURN:
-        TYPES  : size_t
-        DESCR  : &g_group_size_return1_descr
-                 The number of tables.
-      EXAMPLES:
-      - DESCR  :
-        CODE   : ex_cpp_group_traverse
-  - g_group_get_table:
-      NAME     : get_table
-      SUMMARY  : &g_group_get_table_summary
-                 Get a table.
-      DESCR    : &g_group_get_table_descr
-                 >
-                 This method will find and return a named table.
-
-                 When no table class is specified, this function
-                 returns a dynamically typed table accessor. When a
-                 table class (<code>MyTable</code>) is specified as a
-                 template parameter, you get a statically typed table
-                 accessor.
-
-                 It is an error to specify unmatching table class for
-                 an existing table in the group. Doing so will
-                 result in undefined behaviour. For this reason you
-                 should generally never call
-                 <code>get_table<MyTable>()</code>
-                 without first checking the type of the table with a
-                 call to <code>has_table<MyTable>()</code>.
-
-                 If no table exists with the specified name, a new
-                 empty table will be created.
-      SIGNATURE: |
-                 TableRef          get_table(StringData name);
-                 ConstTableRef     get_table(StringData name) const;
-                 MyTable::Ref      get_table<MyTable>(StringData name);
-                 MyTable::ConstRef get_table<MyTable>(StringData name) const;
-      PARAMS:
-      - NAME   : name
-        TYPES  : StringData
-        DESCR  : &g_group_get_table_parm1_descr
-                 >
-                 Name of the table you wish to retrieve.
-      - NAME   : tableclass
-        TYPES  : class definition
-        DESCR  : &g_group_get_table_parm2_descr
-                 Typed table class.
-      RETURN:
-        TYPES  : [TableRef, ConstTableRef]
-        DESCR  : &g_group_get_table_return1_descr
-                 A table reference object.
-      EXAMPLES:
-      -  DESCR :
-         CODE  : ex_cpp_group_traverse
-      -  DESCR :
-         CODE  : ex_cpp_group_optional_table
-      SEE      : "{@link g_group_has_table}"
-  - g_group_has_table:
-      NAME     : has_table
-      SUMMARY  : &g_group_has_table_summary
-                 Does group have table?
-      DESCR    : &g_group_has_table_descr
-                 >
-                 The method checks whether this group contains
-                 the specified table.
-
-                 When no table class is specified, this function
-                 returns <code>true</code> if the group contains a
-                 table with the
-                 specified name. When a table class
-                 (<code>MyTable</code>) is specified as a template
-                 parameter, it returns true if the group contains a
-                 table with the specified name, and the type of that
-                 table is compatible with the specified type. See
-                 {@link concepts_table_type_compatibility} for details.
-      CONST    : true
-      PARAMS:
-      - NAME   : name
-        TYPES  : StringData
-        DESCR  : &g_group_has_table_parm1_descr
-                 Name of the table you wish to look for.
-      RETURN:
-        TYPES  : bool
-        DESCR  : <code>true</code> if the table exits, otherwise <code>false</code>.
-      EXAMPLES:
-      - DESCR  :
-        CODE   : ex_cpp_group_optional_table
-  - g_group_get_table_name:
-      NAME     : get_table_name
-      DESCR    : &g_group_get_table_name_descr
-                 This method will find the name of a table stored in the group.
-      SUMMARY  : &g_group_get_table_name_summary
-                 Get the name of a table.
-      CONST    : true
-      PARAMS:
-      - NAME   : table_ndx
-        TYPES  : size_t
-        DESCR  : &g_group_get_table_name_parm1_descr
-                 Table index.
-      RETURN:
-        TYPES  : StringData
-        DESCR  : &g_group_get_table_name_return1_descr
-                 The table name.
-      EXAMPLES:
-      - DESCR  :
-        CODE   : ex_cpp_group_traverse
-- IO:
-  METHODS:
-  - g_group_write_to_file:
-      NAME     : write
-      SUMMARY  : &g_group_write_to_file_summary
-                 Write this group of tables to a new file.
-      DESCR    : &g_group_write_to_file_descr
-                 This method will write the group to persistent storage (disk). Metadata and tables
-                 will be stored, and can be retrieved at later times.
-
-                 It is an error to specify a file that already exists.
-                 This is to protect against overwriting a database file
-                 that is currently open, which would cause undefined
-                 behaviour.
-      CONST    : true
-      PARAMS:
-      - NAME   : file
-        TYPES  : const std::string&
-        DESCR  : &g_group_write_to_file_parm1_descr
-                 A filesystem path.
-      THROWS:
-      - EXCEPT : File::AccessError
-        DESCR  : &g_group_write_to_file_throws_descr
-                 If the file could not be opened. If the reason
-                 corresponds to one of the exception types that are
-                 derived from File::AccessError, the derived exception
-                 type is thrown. In particular, File::Exists will be
-                 thrown if the file exists already.
-      EXAMPLES:
-      - DESCR  :
-        CODE   : ex_cpp_group_write_to_file
-  - g_group_write_to_mem:
-      NAME     : write_to_mem
-      SUMMARY  : &g_group_write_to_mem_summary
-                 Write a group to an in-memory buffer.
-      DESCR    : &g_group_write_to_mem_descr
-                 This method will write the group to an in-memory buffer. This may be useful if you
-                 want to transfer a group over a TCP connection. The returned buffer will have been
-                 allocated using std::malloc(). The ownership of the buffer is passed to the caller.
-      CONST    : true
-      RETURN:
-        DESCR  : &g_group_write_to_mem_return1_descr
-                 The allocated buffer. You will have to call std::free() when you are done with it.
-        TYPES  : BinaryData
-      EXAMPLES:
-      - DESCR  :
-        CODE   : ex_cpp_group_write_to_mem
 
 - Group:
   METHODS:
-  - g_group_is_empty:
-      NAME     : is_empty
-      SUMMARY  : &g_group_is_empty_summary
-                 Is group empty?
-      DESCR    : &g_group_is_empty_descr
-                 This method checks if group is empty that is, does it have zero tables.
+  - g_group_is_attached:
+      NAME     : is_attached
+      SUMMARY  : &g_group_is_attached_summary
+                 Is this Group instance in its attached state?
+      DESCR    : &g_group_is_attached_descr
+                 A group may be created in the unattached state, and
+                 then later attached to a file or a memory buffer with
+                 a call to one of the open() methods. Calling any
+                 method other than open(), is_attached(), and ~Group()
+                 on an unattached instance results in undefined
+                 behavior.
       CONST    : true
       RETURN:
         TYPES  : bool
-        DESCR  : <code>true</code> if group is empty, <code>false</code> otherwise.
+        DESCR  : <code>true</code> if attached, <code>false</code> otherwise.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_group_is_empty
-  - g_group_tostring:
-      NAME     : to_string
-      SUMMARY  : &g_group_to_string_summary
-                 Get a string representation of the group.
-      DESCR    : &g_group_to_string_descr
-                 This methods adds a string representation of information about the group to an
-                 output stream.
-      CONST    : true
-      PARAMS:
-      - NAME   : out
-        TYPES  : std::ostream&
-        DESCR  : &g_group_tostring_parm1_descr
-                 The output stream.
-      EXAMPLES:
-      - DESCR  :
-        CODE   : ex_cpp_group_tostring
+        CODE   : ex_cpp_group_is_attached
 
   - g_group_open_file:
   - g_group_open_memory:
       NAMES    : [open, open]
-      DESCR    : &g_group_open_descr
-                 >
+      DESCR    : >
                  Attach this Group instance to a file or an externally
                  supplied memory buffer.
 
@@ -400,7 +191,33 @@ CATEGORIES:
                  specifying a file except that in this case the
                  database is assumed to be stored in that buffer.
 
-                 If <tt>take_ownership</tt> is <tt>true</tt>, you will
+                 Calling open() on a Group instance that is already in
+                 the attached state has undefined behavior.
+
+      SUMMARY  : &g_group_open_summary
+                 Attach to a file or a memory buffer.
+      SIGNATURE: |
+                 void open(const std::string& file, OpenMode mode = mode_ReadOnly);
+                 void open(BinaryData buffer, bool take_ownership = true);
+      PARAMS:
+      - NAME   : path
+        TYPES  : const std::string&
+        DESCR  : *g_open_filesystem_path_descr
+      - NAME   : mode
+        TYPES  : Group::OpenMode
+        DESCR  : &g_group_open_memory_parm2_descr
+                 Specifying mode_ReadWrite or mode_WriteNoCreate requires
+                 that the specified file can be opened in read/write
+                 mode. In general there is no reason to open a group
+                 in read/write mode unless you want to be able to call
+                 Group::commit().
+      - NAME   : buffer
+        TYPES  : BinaryData
+        DESCR  : &g_group_open_memory_parm3_descr
+                 In-memory binary encoded representation of a group.
+      - NAME   : take_ownership
+        TYPES  : bool
+        DESCR  : If <tt>take_ownership</tt> is <tt>true</tt>, you will
                  pass the ownership of the specified buffer to the
                  Group instance. In this case the buffer will
                  eventually be freed using std::free(), so the buffer
@@ -412,32 +229,6 @@ CATEGORIES:
                  the memory buffer alive during the lifetime of the
                  group, and in case the buffer needs to be deallocated
                  afterwards, that is your responsibility too.
-
-                 Calling open() on a Group instance that is already in
-                 the attached state has undefined behavior.
-
-      SUMMARY  : &g_group_open_summary
-                 Attach to a file or a memory buffer.
-      SIGNATURE: |
-                 void open(const std::string& file, OpenMode mode = mode_ReadOnly);
-                 void open(BinaryData buffer, bool take_ownership = true);
-      PARAMS:
-      - NAME   : file
-        TYPES  : const std::string&
-        DESCR  : &g_group_open_memory_parm1_descr
-                 Filesystem path of the TightDB database file to be opened.
-      - NAME   : mode
-        TYPES  : Group::OpenMode
-        DESCR  : &g_group_open_memory_parm2_descr
-                 Specifying a mode that is not mode_ReadOnly requires
-                 that the specified file can be opened in read/write
-                 mode. In general there is no reason to open a group
-                 in read/write mode unless you want to be able to call
-                 Group::commit().
-      - NAME   : buffer
-        TYPES  : BinaryData
-        DESCR  : &g_group_open_memory_parm3_descr
-                 In-memory binary encoded representation of a group.
       THROWS:
       - EXCEPT : File::AccessError
         DESCR  : &g_group_open_memory_throws_descr
@@ -452,21 +243,260 @@ CATEGORIES:
       - DESCR  :
         CODE   : ex_cpp_group_open_memory
 
-  - g_group_is_attached:
-      NAME     : is_attached
-      SUMMARY  : &g_group_is_attached_summary
-                 Is this Group instance in its attached state?
-      DESCR    : &g_group_is_attached_descr
-                 A group may be created in the unattached state, and
-                 then later attached to a file or a memory buffer with
-                 a call to one of the open() methods. Calling any
-                 method other than open(), is_attached(), and ~Group()
-                 on an unattached instance results in undefined
-                 behavior.
+  - g_group_commit:
+      TODO     : very soon
+
+  - g_group_size:
+      NAME     : size
+      SUMMARY  : &g_group_table_count_summary
+                 The number of tables in the group.
+      DESCR    : &g_group_table_count_descr
+                 >
+                 A group can be a container for many tables, and this method counts
+                 the number of tables currently stored in the group.
+      CONST    : true
+      RETURN:
+        TYPES  : size_t
+        DESCR  : &g_group_size_return1_descr
+                 The number of tables.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_traverse
+
+  - g_group_is_empty:
+      NAME     : is_empty
+      SUMMARY  : &g_group_is_empty_summary
+                 Is group empty?
+      DESCR    : &g_group_is_empty_descr
+                 This method checks if group is empty. That is, does it have zero tables.
       CONST    : true
       RETURN:
         TYPES  : bool
-        DESCR  : <code>true</code> if attached, <code>false</code> otherwise.
+        DESCR  : &g_group_is_empty_return_descr
+                 <code>true</code> if group is empty, <code>false</code> otherwise.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_group_is_attached
+        CODE   : ex_cpp_group_is_empty
+
+  - g_group_operator_equal:
+      NAME     : operator==
+      SUMMARY  : &g_group_operator_equal_summary
+                 Compare two groups.
+      DESCR    : &g_group_operator_equal_descr
+                 >
+                 Compare two groups for equality. Two groups are equal if 
+                 they contain the same tables in the same order. That
+                 is, for each table T at index I in one of the groups, there is
+                 a table at index I in the other group that is equal to T.
+      CONST    : true
+      PARAMS:
+      - TYPES  : const Group&
+        NAME   : g
+        DESCR  : The group to compare with.
+      RETURN:
+        TYPES  : bool
+        DESCR  : &g_group_operator_equal_return_descr
+                 <code>true</code> if the two groups are equal, <code>false</code> otherwise.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_operator_equal
+
+  - g_group_operator_not_equal:
+      NAME     : operator!=
+      SUMMARY  : Compare two groups.
+      DESCR    : *g_group_operator_equal_descr
+      CONST    : true
+      PARAMS:
+      - TYPES  : const Group&
+        NAME   : g
+        DESCR  : The group to compare with.
+      RETURN:
+        TYPES  : bool
+        DESCR  : <code>true</code> if the two groups are not equal, <code>false</code> otherwise.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_operator_equal
+
+- Table:
+  METHODS:
+  - g_group_has_table:
+      NAME     : has_table
+      SUMMARY  : &g_group_has_table_summary
+                 Does group have table?
+      DESCR    :
+      - TEXT   : &g_group_has_table_descr
+                 The method checks whether this group contains the specified table.
+      - TEXT   : >
+                 When no table class is specified, this function
+                 returns <code>true</code> if the group contains a
+                 table with the specified name. When a table class
+                 (<code>MyTable</code>) is specified as a template
+                 parameter, it returns true if the group contains a
+                 table with the specified name, and the type of that
+                 table is compatible with the specified type. 
+                 See {@link concepts_table_type_compatibility} for details.
+      CONST    : true
+      PARAMS:
+      - NAME   : name
+        TYPES  : StringData
+        DESCR  : &g_group_has_table_parm1_descr
+                 Name of the table you wish to look for.
+      RETURN:
+        TYPES  : bool
+        DESCR  : &g_group_has_table_return1_descr
+                 <code>true</code> if the table exits, otherwise <code>false</code>.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_optional_table
+
+  - g_group_get_table:
+      NAME     : get_table
+      SUMMARY  : &g_group_get_table_summary
+                 Get a table.
+      DESCR    : &g_group_get_table_descr
+                 >
+                 This method will find and return a named table.
+
+                 When no table class is specified, this function
+                 returns a dynamically typed table accessor. When a
+                 table class (<code>MyTable</code>) is specified as a
+                 template parameter, you get a statically typed table
+                 accessor.
+
+                 It is an error to specify unmatching table class for
+                 an existing table in the group. Doing so will
+                 result in undefined behaviour. For this reason you
+                 should generally never call
+                 <code>get_table<MyTable>()</code>
+                 without first checking the type of the table with a
+                 call to <code>has_table<MyTable>()</code>.
+
+                 If no table exists with the specified name, a new
+                 empty table will be created.
+      SIGNATURE: |
+                 TableRef          get_table(StringData name);
+                 ConstTableRef     get_table(StringData name) const;
+                 MyTable::Ref      get_table<MyTable>(StringData name);
+                 MyTable::ConstRef get_table<MyTable>(StringData name) const;
+      PARAMS:
+      - NAME   : name
+        TYPES  : StringData
+        DESCR  : &g_group_get_table_parm1_descr
+                 Name of the table you wish to retrieve.
+      - NAME   : tableclass
+        TYPES  : class definition
+        DESCR  : &g_group_get_table_parm2_descr
+                 Typed table class.
+      RETURN:
+        TYPES  : [TableRef, ConstTableRef]
+        DESCR  : &g_group_get_table_return1_descr
+                 A table reference object.
+      EXAMPLES:
+      -  DESCR :
+         CODE  : ex_cpp_group_traverse
+      -  DESCR :
+         CODE  : ex_cpp_group_optional_table
+      SEE      : "{@link g_group_has_table}"
+
+  - g_group_get_table_name:
+      NAME     : get_table_name
+      DESCR    : &g_group_get_table_name_descr
+                 This method will find the name of a table stored in the group.
+      SUMMARY  : &g_group_get_table_name_summary
+                 Get the name of a table.
+      CONST    : true
+      PARAMS:
+      - NAME   : table_ndx
+        TYPES  : size_t
+        DESCR  : &g_group_get_table_name_parm1_descr
+                 Table index.
+      RETURN:
+        TYPES  : StringData
+        DESCR  : &g_group_get_table_name_return1_descr
+                 The table name.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_traverse
+
+- Serialization:
+  METHODS:
+  - g_group_write_to_file:
+      NAME     : write
+      SUMMARY  : &g_group_write_to_file_summary
+                 Write this group of tables to a new file.
+      DESCR    : &g_group_write_to_file_descr
+                 This method will write the group to persistent storage (disk). Metadata and tables
+                 will be stored, and can be retrieved at later times.
+
+                 It is an error to specify a file that already exists.
+                 This is to protect against overwriting a database file
+                 that is currently open, which would cause undefined
+                 behaviour.
+      CONST    : true
+      PARAMS:
+      - NAME   : path
+        TYPES  : const std::string&
+        DESCR  : &g_group_write_to_file_parm1_descr
+                 A filesystem path to write to.
+      THROWS:
+      - EXCEPT : File::AccessError
+        DESCR  : &g_group_write_to_file_throws_descr
+                 If the file could not be opened. If the reason
+                 corresponds to one of the exception types that are
+                 derived from File::AccessError, the derived exception
+                 type is thrown. In particular, File::Exists will be
+                 thrown if the file exists already.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_write_to_file
+
+  - g_group_write_to_mem:
+      NAME     : write_to_mem
+      SUMMARY  : &g_group_write_to_mem_summary
+                 Write a group to an in-memory buffer.
+      DESCR    : &g_group_write_to_mem_descr
+                 This method will write the group to an in-memory buffer. This may be useful if you
+                 want to transfer a group over a network connection. The returned buffer will have been
+                 allocated using std::malloc(). The ownership of the buffer is passed to the caller.
+      CONST    : true
+      RETURN:
+        DESCR  : The allocated buffer. You will have to call std::free() when you are done with it.
+        TYPES  : BinaryData
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_write_to_mem
+
+  - g_group_tostring:
+      NAME     : to_string
+      SUMMARY  : &g_group_to_string_summary
+                 Get a string representation of the group.
+      DESCR    : &g_group_to_string_descr
+                 This methods adds a string representation of information about the group to an
+                 output stream.
+      CONST    : true
+      PARAMS:
+      - NAME   : out
+        TYPES  : std::ostream&
+        DESCR  : &g_group_tostring_parm1_descr
+                 The output stream.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_tostring
+
+  - g_group_to_json:
+      NAME     : to_json
+      SUMMARY  : &g_group_to_json_summary
+                 Get a JSON representation of the group.
+      SIGNATURE: template<class S> void to_json(S& out) const
+      DESCR    : &g_group_to_json_descr
+                 This methods adds a JSON representation of information about the group to an
+                 output stream. The group is represented as an JSON object where the tables are
+                 elements/attributes.
+      CONST    : true
+      PARAMS:
+      - NAME   : out
+        TYPES  : S&
+        DESCR  : Stream template class to use for outputting the result.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_to_json

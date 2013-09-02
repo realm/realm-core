@@ -1,24 +1,15 @@
-#include <pthread.h>
+#include <algorithm>
 
-#include <tightdb/terminate.hpp>
 #include <tightdb/safe_int_ops.hpp>
+#include <tightdb/terminate.hpp>
+#include <tightdb/thread.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group_shared.hpp>
 
-// FIXME: We should not include files from the test directory here. A
-// solution would probably be to move the definition of
-// TIGHTDB_PTHREADS_TEST to <config.h> and move <pthread_test.hpp>
-// into the "src/tightdb" directory.
-
-// Wrap pthread function calls with the pthread bug finding tool (program execution will be slower).
-// Works both in debug and release mode. Define the flag in testsettings.h
-#include "../test/testsettings.hpp"
-#ifdef TIGHTDB_PTHREADS_TEST
-#  include "../test/pthread_test.hpp"
-#endif
 
 using namespace std;
 using namespace tightdb;
+
 
 struct SharedGroup::ReadCount {
     uint32_t version;
@@ -29,60 +20,69 @@ struct SharedGroup::SharedInfo {
     uint16_t version;
     uint16_t flags;
 
-    pthread_mutex_t readmutex;
-    pthread_mutex_t writemutex;
+    Mutex readmutex;
+    RobustMutex writemutex;
     uint64_t filesize;
 
     uint64_t current_top;
     volatile uint32_t current_version;
 
     uint32_t infosize;
-    uint32_t capacity; // -1 so it can also be used as mask
+    uint32_t capacity_mask; // Must be on the form 2**n - 1
     uint32_t put_pos;
     uint32_t get_pos;
-    ReadCount readers[32]; // has to be power of two
+
+    static const int init_readers_size = 32; // Must be a power of two
+    ReadCount readers[init_readers_size];
+
+    SharedInfo(const SlabAlloc&, size_t file_size, DurabilityLevel);
+    ~SharedInfo() TIGHTDB_NOEXCEPT {}
 };
+
+SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
+                                    DurabilityLevel dlevel):
+    readmutex(Mutex::process_shared_tag()), // Throws
+    writemutex() // Throws
+{
+    version  = 0;
+    flags    = dlevel; // durability level is fixed from creation
+    filesize = alloc.get_baseline();
+    infosize = uint32_t(file_size);
+    current_top     = alloc.get_top_ref();
+    current_version = 0;
+    capacity_mask   = init_readers_size - 1;
+    put_pos = 0;
+    get_pos = 0;
+}
+
 
 namespace {
 
-class ScopedMutexLock {
-public:
-    ScopedMutexLock(pthread_mutex_t* mutex) TIGHTDB_NOEXCEPT : m_mutex(mutex)
-    {
-        int r = pthread_mutex_lock(m_mutex);
-        TIGHTDB_ASSERT(r == 0);
-        static_cast<void>(r);
-    }
-
-    ~ScopedMutexLock() TIGHTDB_NOEXCEPT
-    {
-        int r = pthread_mutex_unlock(m_mutex);
-        TIGHTDB_ASSERT(r == 0);
-        static_cast<void>(r);
-    }
-
-private:
-    pthread_mutex_t* m_mutex;
-};
+void recover_from_dead_write_transact()
+{
+    // Nothing needs to be done
+}
 
 } // anonymous namespace
 
 
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
 //
-// According to the 'process sharing example' in the POSIX man page
+// According to the 'process-sharing example' in the POSIX man page
 // for pthread_mutexattr_init() other processes may continue to use a
-// shared mutex after exit of the process that initialized it. Also,
-// the example does not contain any call to pthread_mutex_destroy(),
-// so apparently a shared mutex need not be destroyed at all, nor can
-// it be that a shared mutex is associated with any resources that are
-// local to the initializing process.
+// process-shared mutex after exit of the process that initialized
+// it. Also, the example does not contain any call to
+// pthread_mutex_destroy(), so apparently a process-shared mutex need
+// not be destroyed at all, nor can it be that a process-shared mutex
+// is associated with any resources that are local to the initializing
+// process, because that would imply a leak.
 //
 // While it is not explicitely guaranteed in the man page, we shall
-// assume that is is valid to initialize a shared mutex twice without
-// an intervending call to pthread_mutex_destroy(). We need to be able
-// to reinitialize a shared mutex if the first initializing process
-// crashes and leaves the shared memory in an undefined state.
+// assume that is is valid to initialize a process-shared mutex twice
+// without an intervending call to pthread_mutex_destroy(). We need to
+// be able to reinitialize a process-shared mutex if the first
+// initializing process crashes and leaves the shared memory in an
+// undefined state.
 
 // FIXME: Issues with current implementation:
 //
@@ -104,7 +104,7 @@ retry:
         // FIXME: Handle lock file removal in case of failure below
 
         bool need_init = false;
-        size_t len     = 0;
+        size_t file_size = 0;
 
         // If we can get an exclusive lock we know that the file is
         // either new (empty) or a leftover from a previously
@@ -116,14 +116,14 @@ retry:
                 goto retry;
             }
             // Get size
-            if (int_cast_with_overflow_detect(m_file.get_size(), len))
+            if (int_cast_with_overflow_detect(m_file.get_size(), file_size))
                 throw runtime_error("Lock file too large");
 
             // Handle empty files (first user)
-            if (len == 0) {
+            if (file_size == 0) {
                 // Create new file
-                len = sizeof (SharedInfo);
-                m_file.resize(len);
+                file_size = sizeof (SharedInfo);
+                m_file.resize(file_size);
             }
             need_init = true;
         }
@@ -131,14 +131,13 @@ retry:
             m_file.lock_shared();
 
             // Get size
-            if (int_cast_with_overflow_detect(m_file.get_size(), len))
+            if (int_cast_with_overflow_detect(m_file.get_size(), file_size))
                 throw runtime_error("Lock file too large");
 
             // There is a slight window between opening the file and getting the
             // lock where another process could have deleted the file
-            if (len == 0 || m_file.is_removed()) {
+            if (file_size == 0 || m_file.is_removed())
                 goto retry;
-            }
         }
 
         // Map to memory
@@ -163,27 +162,8 @@ retry:
             bool read_only = false;
             alloc.attach_file(path, is_shared, read_only, no_create_file); // Throws
 
-            // Initialize mutexes so that they can be shared between processes
-            pthread_mutexattr_t mattr;
-            pthread_mutexattr_init(&mattr);
-            // FIXME: Must verify availability of optional feature: #ifdef _POSIX_THREAD_PROCESS_SHARED
-            pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
-            // FIXME: Should also do pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST). Check for availability with: #if _POSIX_THREADS >= 200809L
-            pthread_mutex_init(&info->readmutex, &mattr);
-            pthread_mutex_init(&info->writemutex, &mattr);
-            pthread_mutexattr_destroy(&mattr);
-
-
-            // Set initial values
-            info->version  = 0;
-            info->flags    = dlevel; // durability level is fixed from creation
-            info->filesize = alloc.get_attached_size();
-            info->infosize = uint32_t(len);
-            info->current_top = alloc.get_top_ref();
-            info->current_version = 0;
-            info->capacity = 32 - 1;
-            info->put_pos  = 0;
-            info->get_pos  = 0;
+            // Call SharedInfo::SharedInfo() (placement new)
+            new (info) SharedInfo(alloc, file_size, dlevel); // Throws
 
             // Set initial version so we can track if other instances
             // change the db
@@ -223,7 +203,7 @@ retry:
 }
 
 
-SharedGroup::~SharedGroup()
+SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 {
     if (!is_attached())
         return;
@@ -243,7 +223,11 @@ SharedGroup::~SharedGroup()
 
     // FIXME: This upgrading of the lock is not guaranteed to be atomic
     m_file.unlock();
-    if (!m_file.try_lock_exclusive())
+
+    // FIXME: File::try_lock_exclusive() can throw. We cannot allow
+    // the exception to escape, because that would terminate the
+    // program (due to 'noexcept' on the destructor).
+    if (!m_file.try_lock_exclusive()) // Throws
         return;
 
     SharedInfo* info = m_file_map.get_addr();
@@ -252,12 +236,14 @@ SharedGroup::~SharedGroup()
     // we can delete it when done.
     if (info->flags == durability_MemOnly) {
         size_t path_len = m_file_path.size()-5; // remove ".lock"
-        string db_path = m_file_path.substr(0, path_len);
+        // FIXME: Find a way to avoid the possible exception from
+        // m_file_path.substr(). Currently, if it throws, the program
+        // will be terminated due to 'noexcept' on ~SharedGroup().
+        string db_path = m_file_path.substr(0, path_len); // Throws
         remove(db_path.c_str());
     }
 
-    pthread_mutex_destroy(&info->readmutex);
-    pthread_mutex_destroy(&info->writemutex);
+    info->~SharedInfo(); // Call destructor
 
     remove(m_file_path.c_str());
 }
@@ -283,6 +269,13 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
     // On top of that, if a customer chooses to run a data race
     // detector on their application, our data race migh show up, and
     // that may rightfully cause alarm.
+    //
+    // See also
+    // http://stackoverflow.com/questions/12878344/volatile-in-c11
+    //
+    // Please note that the definition of a data race inf C++11 also
+    // effectively applies to C++03. In this regard C++11 is just a
+    // standardization of the existing paradigm.
 
     // Have we changed since last transaction?
     // Visibility of changes can be delayed when using has_changed() because m_info->current_version is tested
@@ -300,18 +293,16 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 const Group& SharedGroup::begin_read()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-    TIGHTDB_ASSERT(m_group.m_alloc.is_all_free());
 
     ref_type new_top_ref = 0;
     size_t new_file_size = 0;
 
     {
         SharedInfo* info = m_file_map.get_addr();
-        ScopedMutexLock lock(&info->readmutex);
+        Mutex::Lock lock(info->readmutex);
 
-        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size())) {
-            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
-        }
+        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
+            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize); // Throws
 
         // Get the current top ref
         new_top_ref   = to_size_t(info->current_top);
@@ -320,8 +311,8 @@ const Group& SharedGroup::begin_read()
 
         // Update reader list
         if (ringbuf_is_empty()) {
-            ReadCount r2 = {info->current_version, 1};
-            ringbuf_put(r2);
+            ReadCount r2 = { info->current_version, 1 };
+            ringbuf_put(r2); // Throws
         }
         else {
             ReadCount& r = ringbuf_get_last();
@@ -329,33 +320,45 @@ const Group& SharedGroup::begin_read()
                 ++r.count;
             }
             else {
-                ReadCount r2 = {info->current_version, 1};
-                ringbuf_put(r2);
+                ReadCount r2 = { info->current_version, 1 };
+                ringbuf_put(r2); // Throws
             }
         }
     }
 
+#ifdef TIGHTDB_DEBUG
+    m_transact_stage = transact_Reading;
+#endif
+
     // Make sure the group is up-to-date.
     // A zero ref means that the file has just been created.
-    m_group.update_from_shared(new_top_ref, new_file_size);
+    try {
+        m_group.update_from_shared(new_top_ref, new_file_size); // Throws
+    }
+    catch (...) {
+        end_read();
+        throw;
+    }
 
 #ifdef TIGHTDB_DEBUG
     m_group.Verify();
-    m_transact_stage = transact_Reading;
 #endif
 
     return m_group;
 }
 
 
-void SharedGroup::end_read()
+void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
     {
         SharedInfo* info = m_file_map.get_addr();
-        ScopedMutexLock lock(&info->readmutex);
+        Mutex::Lock lock(info->readmutex);
+
+        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
+            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
 
         // FIXME: m_version may well be a 64-bit integer so this cast
         // to uint32_t seems quite dangerous. Should the type of
@@ -365,15 +368,14 @@ void SharedGroup::end_read()
 
         // Find entry for current version
         size_t ndx = ringbuf_find(uint32_t(m_version));
-        TIGHTDB_ASSERT(ndx != size_t(-1));
+        TIGHTDB_ASSERT(ndx != not_found);
         ReadCount& r = ringbuf_get(ndx);
 
         // Decrement count and remove as many entries as possible
         if (r.count == 1 && ringbuf_is_first(ndx)) {
             ringbuf_remove_first();
-            while (!ringbuf_is_empty() && ringbuf_get_first().count == 0) {
+            while (!ringbuf_is_empty() && ringbuf_get_first().count == 0)
                 ringbuf_remove_first();
-            }
         }
         else {
             TIGHTDB_ASSERT(r.count > 0);
@@ -382,7 +384,7 @@ void SharedGroup::end_read()
     }
 
     // The read may have allocated some temporary state
-    m_group.invalidate();
+    m_group.detach();
 
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
@@ -393,14 +395,12 @@ void SharedGroup::end_read()
 Group& SharedGroup::begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-    TIGHTDB_ASSERT(m_group.m_alloc.is_all_free());
 
     SharedInfo* info = m_file_map.get_addr();
 
     // Get write lock
-    // Note that this will not get released until we call
-    // end_write().
-    pthread_mutex_lock(&info->writemutex);
+    // Note that this will not get released until we call end_write().
+    info->writemutex.lock(&recover_from_dead_write_transact); // Throws
 
     // Get the current top ref
     ref_type new_top_ref = to_size_t(info->current_top);
@@ -408,16 +408,23 @@ Group& SharedGroup::begin_write()
 
     // Make sure the group is up-to-date
     // zero ref means that the file has just been created
-    m_group.update_from_shared(new_top_ref, new_file_size);
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication())
-        repl->begin_write_transact(*this); // Throws
-#endif
+    m_group.update_from_shared(new_top_ref, new_file_size); // Throws
 
 #ifdef TIGHTDB_DEBUG
     m_group.Verify();
     m_transact_stage = transact_Writing;
+#endif
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = m_group.get_replication()) {
+        try {
+            repl->begin_write_transact(*this); // Throws
+        }
+        catch (...) {
+            rollback();
+            throw;
+        }
+    }
 #endif
 
     return m_group;
@@ -430,11 +437,19 @@ void SharedGroup::commit()
 
     SharedInfo* info = m_file_map.get_addr();
 
+    // FIXME: ExceptionSafety: Corruption has happened if
+    // low_level_commit() throws, because we have already told the
+    // replication manager to commit. It is not yet clear how this
+    // conflict should be solved. The solution is probably to catch
+    // the exception from low_level_commit() and when caught, mark the
+    // local database as not-up-to-date. The exception should not be
+    // rethrown, because the commit was effectively successful.
+
     {
         size_t new_version;
 #ifdef TIGHTDB_ENABLE_REPLICATION
         // It is essential that if Replicatin::commit_write_transact()
-        // fails, then the transaction is not completed. A following call
+        // fails, then the transaction is not completed. A subsequent call
         // to rollback() must roll it back.
         if (Replication* repl = m_group.get_replication()) {
             new_version = repl->commit_write_transact(*this); // Throws
@@ -449,9 +464,9 @@ void SharedGroup::commit()
     }
 
     // Release write lock
-    pthread_mutex_unlock(&info->writemutex);
+    info->writemutex.unlock();
 
-    m_group.invalidate();
+    m_group.detach();
 
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
@@ -463,7 +478,7 @@ void SharedGroup::commit()
 // failed call to commit(). A failed call to commit() is any that
 // returns to the caller by throwing an exception. As it is right now,
 // rollback() does not handle all cases.
-void SharedGroup::rollback()
+void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
@@ -475,10 +490,10 @@ void SharedGroup::rollback()
     SharedInfo* info = m_file_map.get_addr();
 
     // Release write lock
-    pthread_mutex_unlock(&info->writemutex);
+    info->writemutex.unlock();
 
     // Clear all changes made during transaction
-    m_group.invalidate();
+    m_group.detach();
 
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
@@ -495,14 +510,14 @@ bool SharedGroup::ringbuf_is_empty() const TIGHTDB_NOEXCEPT
 size_t SharedGroup::ringbuf_size() const TIGHTDB_NOEXCEPT
 {
     SharedInfo* info = m_reader_map.get_addr();
-    return (info->put_pos - info->get_pos) & info->capacity;
+    return (info->put_pos - info->get_pos) & info->capacity_mask;
 }
 
 
 size_t SharedGroup::ringbuf_capacity() const TIGHTDB_NOEXCEPT
 {
     SharedInfo* info = m_reader_map.get_addr();
-    return info->capacity+1;
+    return info->capacity_mask;
 }
 
 
@@ -530,7 +545,7 @@ SharedGroup::ReadCount& SharedGroup::ringbuf_get_first() TIGHTDB_NOEXCEPT
 SharedGroup::ReadCount& SharedGroup::ringbuf_get_last() TIGHTDB_NOEXCEPT
 {
     SharedInfo* info = m_reader_map.get_addr();
-    uint32_t lastPos = (info->put_pos - 1) & info->capacity;
+    uint32_t lastPos = (info->put_pos - 1) & info->capacity_mask;
     return info->readers[lastPos];
 }
 
@@ -538,7 +553,7 @@ SharedGroup::ReadCount& SharedGroup::ringbuf_get_last() TIGHTDB_NOEXCEPT
 void SharedGroup::ringbuf_remove_first() TIGHTDB_NOEXCEPT
 {
     SharedInfo* info = m_reader_map.get_addr();
-    info->get_pos = (info->get_pos + 1) & info->capacity;
+    info->get_pos = (info->get_pos + 1) & info->capacity_mask;
 }
 
 
@@ -549,53 +564,63 @@ void SharedGroup::ringbuf_put(const ReadCount& v)
     // Check if the ringbuf is full
     // (there should always be one empty entry)
     size_t size = ringbuf_size();
-    bool is_full = (size == (info->capacity));
+    bool is_full = size == info->capacity_mask;
 
     if (TIGHTDB_UNLIKELY(is_full)) {
-        ringbuf_expand();
+        ringbuf_expand(); // Throws
         info = m_reader_map.get_addr();
     }
 
     info->readers[info->put_pos] = v;
-    info->put_pos = (info->put_pos + 1) & info->capacity;
+    info->put_pos = (info->put_pos + 1) & info->capacity_mask;
 }
 
 
 void SharedGroup::ringbuf_expand()
 {
     SharedInfo* info = m_reader_map.get_addr();
+    size_t old_buffer_size = info->capacity_mask + 1; // FIXME: Why size_t and not uint32 as capacity?
+    size_t base_file_size = sizeof (SharedInfo) - sizeof (ReadCount[SharedInfo::init_readers_size]);
 
-    // Calculate size of file with more entries
-    size_t current_entry_count = info->capacity + 1;  // FIXME: Why size_t and not uint32 as capacity?
-    size_t excount = current_entry_count; // Always double so we can mask for index
-    size_t new_entry_count = current_entry_count + excount;
-    size_t base_file_size = sizeof (SharedInfo) - sizeof (ReadCount[32]);
-    size_t new_file_size = base_file_size + (sizeof (ReadCount) * new_entry_count);
+    // Be sure that the new file size, after doubling the size of the
+    // ring buffer, can be stored in a size_t. This also guarantees
+    // that there is no arithmetic overflow in the calculation of the
+    // new file size. We must always double the size of the ring
+    // buffer, such that we can continue to use the capacity as a bit
+    // mask. Note that the capacity of the ring buffer is one less
+    // than the size of the containing linear buffer.
+    //
+    // FIXME: It is no good that we convert back and forth between
+    // uint32_t and size_t, because that defeats the purpose of this
+    // check.
+    if (old_buffer_size > (numeric_limits<size_t>::max() -
+                           base_file_size) / (2 * sizeof (ReadCount)))
+        throw runtime_error("Overflow in size of 'readers' buffer");
+    size_t new_buffer_size = 2 * old_buffer_size;
+    size_t new_file_size = base_file_size + (sizeof (ReadCount) * new_buffer_size);
 
-    // Extend file
-    m_file.alloc(0, new_file_size);
-    m_reader_map.remap(m_file, File::access_ReadWrite, new_file_size);
+    // Extend lock file
+    m_file.prealloc(0, new_file_size); // Throws
+    m_reader_map.remap(m_file, File::access_ReadWrite, new_file_size); // Throws
     info = m_reader_map.get_addr();
 
-    // Move existing entries (if there is a split)
+    // If the contents of the ring buffer crosses the end of the
+    // containing linear buffer (continuing at the beginning) then the
+    // section whose end coincided with the old end of the linear
+    // buffer, must be moved forward such that its end becomes
+    // coincident with the end of the expanded linear buffer.
     if (info->put_pos < info->get_pos) {
-        const ReadCount* low_start = &info->readers[info->get_pos];
-        const ReadCount* low_end   = &info->readers[current_entry_count];
-        bool has_overlap = (current_entry_count - info->get_pos) > excount;
-        if (has_overlap) {
-            ReadCount* new_end = &info->readers[new_entry_count];
-            copy_backward(low_start, low_end, new_end);
-        }
-        else {
-            ReadCount* new_start = &info->readers[info->get_pos + excount];
-            copy(low_start, low_end, new_start);
-        }
-        // FIXME: warning for adding size_t to uint32!
-        info->get_pos += excount;
+        // Since we always double the size of the linear buffer, there
+        // is never any risk of aliasing/clobbering during copying.
+        ReadCount* begin = info->readers + info->get_pos;
+        ReadCount* end   = info->readers + old_buffer_size;
+        ReadCount* new_begin = begin + old_buffer_size;
+        copy(begin, end, new_begin);
+        info->get_pos += uint32_t(old_buffer_size);
     }
 
     info->infosize = uint32_t(new_file_size); // notify other processes of expansion
-    info->capacity = uint32_t(new_entry_count) - 1;
+    info->capacity_mask = uint32_t(new_buffer_size) - 1;
 }
 
 
@@ -608,7 +633,7 @@ size_t SharedGroup::ringbuf_find(uint32_t version) const TIGHTDB_NOEXCEPT
         if (r.version == version)
             return pos;
 
-        pos = (pos + 1) & info->capacity;
+        pos = (pos + 1) & info->capacity_mask;
     }
 
     return not_found;
@@ -629,7 +654,7 @@ void SharedGroup::test_ringbuf()
     TIGHTDB_ASSERT(ringbuf_is_empty());
 
     // Fill buffer (within capacity)
-    size_t capacity = ringbuf_capacity()-1;
+    size_t capacity = ringbuf_capacity();
     for (size_t i = 0; i < capacity; ++i) {
         ReadCount r = { 1, uint32_t(i) };
         ringbuf_put(r);
@@ -666,7 +691,7 @@ void SharedGroup::test_ringbuf()
     TIGHTDB_ASSERT(ringbuf_is_empty());
 
     // Fill buffer above capacity (forcing it to expand)
-    size_t capacity_plus = ringbuf_capacity() + 16;
+    size_t capacity_plus = ringbuf_capacity() + (1+16);
     for (size_t i = 0; i < capacity_plus; ++i) {
         ReadCount r = { 1, uint32_t(i) };
         ringbuf_put(r);
@@ -680,7 +705,7 @@ void SharedGroup::test_ringbuf()
     TIGHTDB_ASSERT(ringbuf_is_empty());
 
     // Fill buffer above capacity again (forcing it to expand with overlap)
-    capacity_plus = ringbuf_capacity() + 16;
+    capacity_plus = ringbuf_capacity() + (1+16);
     for (size_t i = 0; i < capacity_plus; ++i) {
         ReadCount r = { 1, uint32_t(i) };
         ringbuf_put(r);
@@ -704,8 +729,9 @@ void SharedGroup::zero_free_space()
     size_t current_version;
     size_t readlock_version;
     size_t file_size;
-    pthread_mutex_lock(&info->readmutex);
+
     {
+        Mutex::Lock lock(info->readmutex);
         current_version = info->current_version + 1;
         file_size = to_size_t(info->filesize);
 
@@ -717,7 +743,6 @@ void SharedGroup::zero_free_space()
             readlock_version = r.version;
         }
     }
-    pthread_mutex_unlock(&info->readmutex);
 
     m_group.zero_free_space(file_size, readlock_version);
 }
@@ -745,11 +770,10 @@ void SharedGroup::low_level_commit(size_t new_version)
 
     size_t readlock_version;
     {
-        ScopedMutexLock lock(&info->readmutex);
+        Mutex::Lock lock(info->readmutex);
 
-        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size())) {
-            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
-        }
+        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
+            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize); // Throws
 
         if (ringbuf_is_empty()) {
             readlock_version = new_version;
@@ -769,23 +793,29 @@ void SharedGroup::low_level_commit(size_t new_version)
         // info->writemutex. This is true (not a data race) becasue
         // info->current_version is modified only while
         // info->writemutex is locked.
-        m_group.init_shared();
+        m_group.init_shared(); // Throws
     }
 
     // Do the actual commit
     TIGHTDB_ASSERT(m_group.m_top.is_attached());
     TIGHTDB_ASSERT(readlock_version <= new_version);
-    GroupWriter out(m_group);
+    GroupWriter out(m_group); // Throws
     m_group.m_readlock_version = readlock_version;
     out.set_versions(new_version, readlock_version);
     // Recursively write all changed arrays to end of file
-    bool do_sync = info->flags == durability_Full;
-    ref_type new_top_ref = out.commit(do_sync);
+    ref_type new_top_ref = out.write_group(); // Throws
+    // In durability_Full mode, we just use the file as backing for
+    // the shared memory. So we never actually flush the data to disk
+    // (the OS may do so opportinisticly, or when swapping). So in
+    // this mode the file on disk may very likely be in an invalid
+    // state.
+    if (info->flags == durability_Full)
+        out.commit(new_top_ref); // Throws
     size_t new_file_size = out.get_file_size();
 
     // Update reader info
     {
-        ScopedMutexLock lock(&info->readmutex);
+        Mutex::Lock lock(info->readmutex);
         info->current_top = new_top_ref;
         info->filesize    = new_file_size;
         // FIXME: Due to lack of adequate synchronization, the

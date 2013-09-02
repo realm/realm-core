@@ -44,14 +44,22 @@ void cpuid_init()
 }
 
 
+// FIXME: Move all these rounding functions to the header file to
+// allow inlining.
 void* round_up(void* p, size_t align)
 {
+    // FIXME: The C++ standard does not guarantee that a pointer can
+    // be stored in size_t. Use uintptr_t instead. The problem with
+    // uintptr_t, is that is is not part of C++03.
     size_t r = size_t(p) % align == 0 ? 0 : align - size_t(p) % align;
     return static_cast<char *>(p) + r;
 }
 
 void* round_down(void* p, size_t align)
 {
+    // FIXME: The C++ standard does not guarantee that a pointer can
+    // be stored in size_t. Use uintptr_t instead. The problem with
+    // uintptr_t, is that is is not part of C++03.
     size_t r = size_t(p);
     return reinterpret_cast<void *>(r & ~(align - 1));
 }

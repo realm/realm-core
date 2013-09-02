@@ -64,7 +64,7 @@ public:
     typedef BasicTableView<BasicTable> View;
     typedef BasicTableView<const BasicTable> ConstView;
 
-    using Table::is_valid;
+    using Table::is_attached;
     using Table::has_shared_spec;
     using Table::is_empty;
     using Table::size;
@@ -76,15 +76,20 @@ public:
     using Table::add_empty_row;
     using Table::insert_empty_row;
 
-    BasicTable(Allocator& alloc = Allocator::get_default()): Table(alloc) { set_dynamic_spec(); }
+    BasicTable(Allocator& alloc = Allocator::get_default()): Table(alloc)
+    {
+        set_dynamic_spec(*this);
+    }
 
     BasicTable(const BasicTable& t, Allocator& alloc = Allocator::get_default()): Table(t, alloc) {}
+
+    ~BasicTable() TIGHTDB_NOEXCEPT {}
 
     static Ref create(Allocator& = Allocator::get_default());
 
     Ref copy(Allocator& = Allocator::get_default()) const;
 
-    static int get_column_count() { return TypeCount<typename Spec::Columns>::value; }
+    static int get_column_count() TIGHTDB_NOEXCEPT { return TypeCount<typename Spec::Columns>::value; }
 
     Ref get_table_ref() { return Ref(this); }
 
@@ -225,13 +230,13 @@ public:
     /// where it is desirable to be able to cast to a table type with
     /// different column names. Similar changes are needed in the Java
     /// and Objective-C language bindings.
-    template<class T> friend bool is_a(const Table&);
+    template<class T> friend bool is_a(const Table&) TIGHTDB_NOEXCEPT;
 
     //@{
     /// These functions return null if the specified table is not
     /// compatible with the specified table type.
-    template<class T> friend BasicTableRef<T> checked_cast(TableRef);
-    template<class T> friend BasicTableRef<const T> checked_cast(ConstTableRef);
+    template<class T> friend BasicTableRef<T> checked_cast(TableRef) TIGHTDB_NOEXCEPT;
+    template<class T> friend BasicTableRef<const T> checked_cast(ConstTableRef) TIGHTDB_NOEXCEPT;
     //@}
 
 #ifdef TIGHTDB_DEBUG
@@ -259,17 +264,23 @@ private:
         return static_cast<const Subtab*>(Table::get_subtable_ptr(col_idx, row_idx));
     }
 
-    void set_dynamic_spec()
+    static void set_dynamic_spec(Table& table)
     {
-        tightdb::Spec& spec = get_spec();
-        ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&spec, Spec::dyn_col_names());
-        update_from_spec();
+        tightdb::Spec& spec = table.get_spec();
+        const int num_cols = TypeCount<typename Spec::Columns>::value;
+        StringData dyn_col_names[num_cols];
+        Spec::dyn_col_names(dyn_col_names);
+        ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&spec, dyn_col_names);
+        table.update_from_spec();
     }
 
-    static bool matches_dynamic_spec(const tightdb::Spec* spec)
+    static bool matches_dynamic_spec(const tightdb::Spec* spec) TIGHTDB_NOEXCEPT
     {
+        const int num_cols = TypeCount<typename Spec::Columns>::value;
+        StringData dyn_col_names[num_cols];
+        Spec::dyn_col_names(dyn_col_names);
         return !HasType<typename Spec::Columns,
-                        _impl::DiffColType>::exec(spec, Spec::dyn_col_names());
+                        _impl::DiffColType>::exec(spec, dyn_col_names);
     }
 
     // This one allows a BasicTable to know that BasicTables with
@@ -307,19 +318,18 @@ private:
 #endif
 
 template<class Spec> class BasicTable<Spec>::Query:
-    public Spec::template ColNames<QueryCol, Query*> {
+        public Spec::template ColNames<QueryCol, Query*> {
 public:
-    template<class, int, class> friend class _impl::QueryColumnBase;
-    template<class, int, class> friend class _impl::QueryColumn;
-
     Query(const Query&q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
+    ~Query() TIGHTDB_NOEXCEPT {}
 
     Query& tableview(const Array& arr) { m_impl.tableview(arr); return *this; }
 
 // Query& Query::tableview(const TableView& tv)
 // Query& Query::tableview(const Array &arr)
 
-    Query& tableview(const typename BasicTable<Spec>::View& v) {
+    Query& tableview(const typename BasicTable<Spec>::View& v)
+    {
         m_impl.tableview(*v.get_impl());
         return *this;
     }
@@ -333,33 +343,34 @@ public:
 
     Query& Or() { m_impl.Or(); return *this; }
 
-    std::size_t find_next(std::size_t lastmatch=std::size_t(-1))
+    std::size_t find_next(std::size_t lastmatch = std::size_t(-1))
     {
         return m_impl.find_next(lastmatch);
     }
 
-    typename BasicTable<Spec>::View find_all(std::size_t start=0,
-                                             std::size_t end=std::size_t(-1),
-                                             std::size_t limit=std::size_t(-1))
+    typename BasicTable<Spec>::View find_all(std::size_t start = 0,
+                                             std::size_t end   = std::size_t(-1),
+                                             std::size_t limit = std::size_t(-1))
     {
         return m_impl.find_all(start, end, limit);
     }
 
-    typename BasicTable<Spec>::ConstView find_all(std::size_t start=0,
-                                                  std::size_t end=std::size_t(-1),
-                                                  std::size_t limit=std::size_t(-1)) const
+    typename BasicTable<Spec>::ConstView find_all(std::size_t start = 0,
+                                                  std::size_t end   = std::size_t(-1),
+                                                  std::size_t limit = std::size_t(-1)) const
     {
         return m_impl.find_all(start, end, limit);
     }
 
-    std::size_t count(std::size_t start=0,
-                      std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
+    std::size_t count(std::size_t start = 0,
+                      std::size_t end   = std::size_t(-1),
+                      std::size_t limit = std::size_t(-1)) const
     {
         return m_impl.count(start, end, limit);
     }
 
     std::size_t remove(std::size_t start = 0,
-                       std::size_t end = std::size_t(-1),
+                       std::size_t end   = std::size_t(-1),
                        std::size_t limit = std::size_t(-1))
     {
         return m_impl.remove(start, end, limit);
@@ -370,12 +381,15 @@ public:
 #endif
 
 protected:
-    friend class BasicTable;
-
-    Query(const BasicTable<Spec>& table): Spec::template ColNames<QueryCol, Query*>(this), m_impl(table) {}
+    Query(const BasicTable<Spec>& table):
+        Spec::template ColNames<QueryCol, Query*>(this), m_impl(table) {}
 
 private:
     tightdb::Query m_impl;
+
+    friend class BasicTable;
+    template<class, int, class> friend class _impl::QueryColumnBase;
+    template<class, int, class> friend class _impl::QueryColumn;
 };
 
 #ifdef _MSC_VER
@@ -435,8 +449,10 @@ namespace _impl
             TIGHTDB_ASSERT(col_idx == spec->get_column_count());
             typedef typename Subtab::Columns Subcolumns;
             Spec subspec = spec->add_subtable_column(col_names[col_idx]);
-            const StringData* const subcol_names = Subtab::spec_type::dyn_col_names();
-            ForEachType<Subcolumns, _impl::AddCol>::exec(&subspec, subcol_names);
+            const int num_cols = TypeCount<typename Subtab::spec_type::Columns>::value;
+            StringData dyn_col_names[num_cols];
+            Subtab::spec_type::dyn_col_names(dyn_col_names);
+            ForEachType<Subcolumns, _impl::AddCol>::exec(&subspec, dyn_col_names);
         }
     };
 
@@ -632,9 +648,9 @@ namespace _impl
 template<class Spec>
 inline typename BasicTable<Spec>::Ref BasicTable<Spec>::create(Allocator& alloc)
 {
-    TableRef ref = Table::create(alloc);
-    static_cast<BasicTable&>(*ref)->set_dynamic_spec();
-    return unchecked_cast<BasicTable<Spec> >(move(ref));
+    TableRef table = Table::create(alloc);
+    set_dynamic_spec(*table);
+    return unchecked_cast<BasicTable<Spec> >(move(table));
 }
 
 
@@ -645,22 +661,24 @@ inline typename BasicTable<Spec>::Ref BasicTable<Spec>::copy(Allocator& alloc) c
 }
 
 
-template<class T> inline bool is_a(const Table& t)
+template<class T> inline bool is_a(const Table& t) TIGHTDB_NOEXCEPT
 {
     return T::matches_dynamic_spec(&t.get_spec());
 }
 
 
-template<class T> inline BasicTableRef<T> checked_cast(TableRef t)
+template<class T> inline BasicTableRef<T> checked_cast(TableRef t) TIGHTDB_NOEXCEPT
 {
-    if (!is_a<T>(*t)) return BasicTableRef<T>(); // Null
+    if (!is_a<T>(*t))
+        return BasicTableRef<T>(); // Null
     return unchecked_cast<T>(t);
 }
 
 
-template<class T> inline BasicTableRef<const T> checked_cast(ConstTableRef t)
+template<class T> inline BasicTableRef<const T> checked_cast(ConstTableRef t) TIGHTDB_NOEXCEPT
 {
-    if (!is_a<T>(*t)) return BasicTableRef<const T>(); // Null
+    if (!is_a<T>(*t))
+        return BasicTableRef<const T>(); // Null
     return unchecked_cast<T>(t);
 }
 

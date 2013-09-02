@@ -187,21 +187,39 @@ public:
     /// file that is opened in read-only mode, is an error.
     void resize(SizeType);
 
-    /// Allocate space on the target device for the specified region
-    /// of the file. If the region extends beyond the current end of
-    /// the file, the file size is increased as necessary. Calling
-    /// this method will generally affect the read/write offset
-    /// associated with this File instance.
+    /// The same as prealloc_if_supported() but when the operation is
+    /// not supported by the system, this method will still increase
+    /// the file size when the specified region extends beyond the
+    /// current end of the file. This allows you to both extend and
+    /// allocate in one operation.
+    ///
+    /// The downside is that this method is not guaranteed to have
+    /// atomic behaviour on all systems, that is, two processes, or
+    /// two threads should never call this method concurrently for the
+    /// same underlying file even though they access the file through
+    /// distinct File instances.
+    ///
+    /// \sa prealloc_if_supported()
+    void prealloc(SizeType offset, std::size_t size);
+
+    /// When supported by the system, allocate space on the target
+    /// device for the specified region of the file. If the region
+    /// extends beyond the current end of the file, the file size is
+    /// increased as necessary.
+    ///
+    /// On systems that do not support this operation, this method has
+    /// no effect.
     ///
     /// Calling this method on an instance that is not attached to an
     /// open file has undefined behavior. Calling this method on a
     /// file that is opened in read-only mode, is an error.
     ///
-    /// This method may not have atomic behaviour on all systems, that
-    /// is, two processes, or two threads should never call this
-    /// method concurrently for the same underlying file even though
-    /// they access the file through distinct File instances.
-    void alloc(SizeType offset, std::size_t size);
+    /// This method is guaranteed to have atomic behaviour, that is,
+    /// there is never any risk of the file size being reduced due to
+    /// concurrent invocations.
+    ///
+    /// \sa prealloc()
+    void prealloc_if_supported(SizeType offset, std::size_t size);
 
     /// Reposition the read/write offset of this File
     /// instance. Distinct File instances have separate independent
@@ -251,8 +269,8 @@ public:
     enum {
         /// If possible, disable opportunistic flushing of dirted
         /// pages of a memory mapped file to physical medium. On some
-        /// systems this cannot be disable. On other systems it is the
-        /// default behavior. En explicit call to sync_map() will
+        /// systems this cannot be disabled. On other systems it is
+        /// the default behavior. An explicit call to sync_map() will
         /// flush the buffers regardless of whether this flag is
         /// specified or not.
         map_NoSync = 1
