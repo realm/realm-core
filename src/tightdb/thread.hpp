@@ -93,6 +93,9 @@ public:
 protected:
     pthread_mutex_t m_impl;
 
+    struct no_init_tag {};
+    Mutex(no_init_tag) {}
+
     void init_as_regular();
     void init_as_process_shared(bool robust_if_available);
 
@@ -210,8 +213,15 @@ public:
     /// system resources to be leaked.
     CondVar(process_shared_tag);
 
+    /// Wait for another thread to call notify() or notify_all().
     void wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT;
 
+    /// If any threads are wating for this condition, wake up at least
+    /// one.
+    void notify() TIGHTDB_NOEXCEPT;
+
+    /// Wake up every thread that is currently wating on this
+    /// condition.
     void notify_all() TIGHTDB_NOEXCEPT;
 
 private:
@@ -333,7 +343,7 @@ inline Mutex::Lock::~Lock() TIGHTDB_NOEXCEPT
 }
 
 
-inline RobustMutex::RobustMutex()
+inline RobustMutex::RobustMutex(): Mutex(no_init_tag())
 {
     bool robust_if_available = true;
     init_as_process_shared(robust_if_available);
@@ -391,6 +401,13 @@ inline void CondVar::wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT
     int r = pthread_cond_wait(&m_impl, &l.m_mutex.m_impl);
     if (TIGHTDB_UNLIKELY(r != 0))
         TIGHTDB_TERMINATE("pthread_cond_wait() failed");
+}
+
+inline void CondVar::notify() TIGHTDB_NOEXCEPT
+{
+    int r = pthread_cond_signal(&m_impl);
+    TIGHTDB_ASSERT(r == 0);
+    static_cast<void>(r);
 }
 
 inline void CondVar::notify_all() TIGHTDB_NOEXCEPT

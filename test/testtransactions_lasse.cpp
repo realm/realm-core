@@ -1,15 +1,13 @@
-#include <cstdarg>
-#include <cstring>
+#include <cstdlib>
 #include <iostream>
-
-#include <sys/stat.h>
-#include <pthread.h>
 
 #ifdef _WIN32
 #  define NOMINMAX
-#  include <windows.h>
+#  include <windows.h> // Sleep()
+#  include <pthread.h> // pthread_win32_process_attach_np()
 #else
-#  include <unistd.h>
+#  include <sched.h>  // sched_yield()
+#  include <unistd.h> // usleep()
 #endif
 
 #include <UnitTest++.h>
@@ -18,15 +16,28 @@
 #include <tightdb/file.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/utilities.hpp>
-#include <tightdb/thread.hpp>
 #include <tightdb/bind.hpp>
 
+#include "util/thread_wrapper.hpp"
+
 #include "testsettings.hpp"
+
 
 using namespace std;
 using namespace tightdb;
 
+
 // The tests in this file are run if you #define STRESSTEST1 and/or #define STRESSTEST2. Please define them in testsettings.hpp
+
+
+namespace {
+
+inline void yield()
+{
+#ifndef _WIN32
+    sched_yield();
+#endif
+}
 
 unsigned int fastrand()
 {
@@ -59,7 +70,7 @@ TIGHTDB_FORCEINLINE void randsleep(void)
     }
     else if (r <= 252) {
         // Release current time slice but get next available
-        sched_yield();
+        yield();
     }
     else if (r <= 254) {
         // Release current time slice and get time slice according to normal scheduling
@@ -79,11 +90,9 @@ TIGHTDB_FORCEINLINE void randsleep(void)
     }
 }
 
-void deletefile(const char* file)
-{
-    File::try_remove(file);
-    CHECK(!File::exists(file));
-}
+} // anonymous namespace
+
+
 
 #ifdef STRESSTEST1
 
@@ -93,61 +102,57 @@ void deletefile(const char* file)
 // *
 // *************************************************************************************
 
-const size_t ITER1 =    2000;
-const size_t READERS1 =   20;
-const size_t WRITERS1 =   20;
+namespace {
 
-void* write_thread(void* arg)
+const int ITER1 =    2000;
+const int READERS1 =   20;
+const int WRITERS1 =   20;
+
+void write_thread(int thread_ndx)
 {
-    int64_t w = int64_t(arg);
-    int id = w;
-    (void)id;
+    int_least64_t w = thread_ndx;
     SharedGroup sg("database.tightdb");
 
-    for (size_t t = 0; t < ITER1; ++t) {
+    for (int i = 0; i < ITER1; ++i) {
         {
             WriteTransaction wt(sg);
             TableRef table = wt.get_table("table");
             table->set_int(0, 0, w);
             randsleep();
             int64_t r = table->get_int(0, 0);
-            CHECK_EQUAL(r, w);
+            CHECK_EQUAL(r, w); // FIXME: Is UnitTest++ thread-safe to this extent?
             wt.commit();
         }
 
         // All writes by all threads must be unique so that it can be detected if they're spurious
         w += 1000;
     }
-    return 0;
 }
 
-void* read_thread(void* arg)
+void read_thread()
 {
-    (void)arg;
-    int64_t r1;
-    int64_t r2;
-
     SharedGroup sg("database.tightdb");
-    for (size_t t = 0; t < ITER1; ++t) {
+    for (size_t i = 0; i < ITER1; ++i) {
         ReadTransaction rt(sg);
-        r1 = rt.get_table("table")->get_int(0, 0);
+        int64_t r1 = rt.get_table("table")->get_int(0, 0);
         randsleep();
-        r2 = rt.get_table("table")->get_int(0, 0);
-        CHECK_EQUAL(r1, r2);
+        int64_t r2 = rt.get_table("table")->get_int(0, 0);
+        CHECK_EQUAL(r1, r2); // FIXME: Is UnitTest++ thread-safe to this extent?
     }
-
-    return 0;
 }
+
+} // anonymous namespace
+
 
 TEST(Transactions_Stress1)
 {
-    pthread_t read_threads[READERS1];
-    pthread_t write_threads[WRITERS1];
+    test_util::ThreadWrapper read_threads[READERS1];
+    test_util::ThreadWrapper write_threads[WRITERS1];
 
     srand(123);
 
-    deletefile("database.tightdb");
-    deletefile("database.tightdb.lock");
+    File::try_remove("database.tightdb");
+    File::try_remove("database.tightdb.lock");
 
     SharedGroup sg("database.tightdb");
 
@@ -166,20 +171,26 @@ TEST(Transactions_Stress1)
         pthread_win32_process_attach_np ();
     #endif
 
-    for (size_t t = 0; t < READERS1; t++)
-        pthread_create(&read_threads[t], NULL, read_thread, (void*)t);
+    for (int i = 0; i < READERS1; ++i)
+        read_threads[i].start(&read_thread);
 
-    for (size_t t = 0; t < WRITERS1; t++)
-        pthread_create(&write_threads[t], NULL, write_thread, (void*)t);
+    for (int i = 0; i < WRITERS1; ++i)
+        write_threads[i].start(util::bind(write_thread, i));
 
-    for (size_t t = 0; t < READERS1; t++)
-        pthread_join(read_threads[t], NULL);
+    for (int i = 0; i < READERS1; ++i) {
+        bool reader_has_thrown = read_threads[i].join();
+        CHECK(!reader_has_thrown);
+    }
 
-    for (size_t t = 0; t < WRITERS1; t++)
-        pthread_join(write_threads[t], NULL);
+    for (int i = 0; i < WRITERS1; ++i) {
+        bool writer_has_thrown = write_threads[i].join();
+        CHECK(!writer_has_thrown);
+    }
+
+    File::try_remove("database.tightdb");
 }
 
-#endif
+#endif // STRESSTEST1
 
 
 
@@ -197,35 +208,27 @@ const int      THREADS2 = 30;
 const int      ITER2    = 2000;
 const unsigned GROUPS2  = 30;
 
-void create_groups(int thread_ndx)
+void create_groups()
 {
-    try {
-        std::vector<SharedGroup*> groups;
+    std::vector<SharedGroup*> groups;
 
-        for (int i = 0; i < ITER2; ++i) {
-            // Repeatedly create a group or destroy a group or do nothing
-            int action = rand() % 2;
+    for (int i = 0; i < ITER2; ++i) {
+        // Repeatedly create a group or destroy a group or do nothing
+        int action = rand() % 2;
 
-            if (action == 0 && groups.size() < GROUPS2) {
-                groups.push_back(new SharedGroup("database.tightdb"));
-            }
-            else if (action == 1 && groups.size() > 0) {
-                size_t g = rand() % groups.size();
-                delete groups[g];
-                groups.erase(groups.begin() + g);
-            }
+        if (action == 0 && groups.size() < GROUPS2) {
+            groups.push_back(new SharedGroup("database.tightdb"));
         }
+        else if (action == 1 && groups.size() > 0) {
+            size_t g = rand() % groups.size();
+            delete groups[g];
+            groups.erase(groups.begin() + g);
+        }
+    }
 
-        // Delete any remaining group to avoid memory and lock file leaks
-        for (size_t i=0; i<groups.size(); ++i)
-            delete groups[i];
-    }
-    catch (exception& e) {
-        cerr << "Thread " << thread_ndx << " failed: " << e.what() << "\n";
-    }
-    catch (...) {
-        cerr << "Thread " << thread_ndx << " failed (unknown excpetion)\n";
-    }
+    // Delete any remaining group to avoid memory and lock file leaks
+    for (size_t i = 0; i < groups.size(); ++i)
+        delete groups[i];
 }
 
 } // anonymous namespace
@@ -233,18 +236,23 @@ void create_groups(int thread_ndx)
 TEST(Transactions_Stress2)
 {
     srand(123);
-    Thread threads[THREADS2];
+    test_util::ThreadWrapper threads[THREADS2];
 
-    deletefile("database.tightdb");
-    deletefile("database.tightdb.lock");
-
-    for (int i = 0; i < THREADS2; ++i)
-        threads[i].start(util::bind(create_groups, i));
+    File::try_remove("database.tightdb");
+    File::try_remove("database.tightdb.lock");
 
     for (int i = 0; i < THREADS2; ++i)
-        threads[i].join();
+        threads[i].start(&create_groups);
+
+    for (int i = 0; i < THREADS2; ++i) {
+        bool thread_has_thrown = threads[i].join();
+        CHECK(!thread_has_thrown);
+    }
+
+    File::try_remove("database.tightdb");
 }
-#endif
+
+#endif // STRESSTEST2
 
 
 
@@ -256,20 +264,19 @@ TEST(Transactions_Stress2)
 // *
 // *************************************************************************************
 
-const size_t ITER3 =     20;
-const size_t WRITERS3 =   4;
-const size_t READERS3 =   4;
-const size_t ROWS3 = 1*1000*1000 + 1000; // + 1000 to add extra depth level if TIGHTDB_MAX_LIST_SIZE = 1000
-bool terminate3 = false;
+namespace {
 
-void* write_thread3(void* arg)
+const int ITER3 =     20;
+const int WRITERS3 =   4;
+const int READERS3 =   4;
+const size_t ROWS3 = 1*1000*1000 + 1000; // + 1000 to add extra depth level if TIGHTDB_MAX_LIST_SIZE = 1000
+volatile bool terminate3 = false;
+
+void write_thread3()
 {
-    int64_t w = int64_t(arg);
-    int id = w;
-    (void)id;
     SharedGroup sg("database.tightdb");
 
-    for (size_t t = 0; t < ITER3; ++t) {
+    for (int i = 0; i < ITER3; ++i) {
         WriteTransaction wt(sg);
         TableRef table = wt.get_table("table");
         size_t s = table->size();
@@ -291,37 +298,33 @@ void* write_thread3(void* arg)
 
         wt.commit();
     }
-    return 0;
-
 }
 
-void* read_thread3(void* arg)
+void read_thread3()
 {
-    (void)arg;
-    int64_t r1;
-    int64_t r2;
-
     SharedGroup sg("database.tightdb");
-    while (!terminate3) {
+    while (!terminate3) { // FIXME: Oops - this 'read' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
         ReadTransaction rt(sg);
-        r1 = rt.get_table("table")->get_int(0, 0);
+        // FIXME: There is no guarantee that "table" has at least one row at this point
+        int64_t r1 = rt.get_table("table")->get_int(0,0);
         randsleep();
-        r2 = rt.get_table("table")->get_int(0, 0);
+        int64_t r2 = rt.get_table("table")->get_int(0,0);
         CHECK_EQUAL(r1, r2);
     }
-
-    return 0;
 }
+
+} // anonymous namespace
+
 
 TEST(Transactions_Stress3)
 {
-    pthread_t write_threads3[WRITERS3];
-    pthread_t read_threads3[READERS3];
+    test_util::ThreadWrapper write_threads[WRITERS3];
+    test_util::ThreadWrapper read_threads[READERS3];
 
     srand(123);
 
-    deletefile("database.tightdb");
-    deletefile("database.tightdb.lock");
+    File::try_remove("database.tightdb");
+    File::try_remove("database.tightdb.lock");
 
     SharedGroup sg("database.tightdb");
 
@@ -338,20 +341,30 @@ TEST(Transactions_Stress3)
         pthread_win32_process_attach_np ();
     #endif
 
-    for (size_t t = 0; t < WRITERS3; t++)
-        pthread_create(&write_threads3[t], NULL, write_thread3, (void*)t);
+    for (int i = 0; i < WRITERS3; ++i)
+        write_threads[i].start(&write_thread3);
 
-    for (size_t t = 0; t < READERS3; t++)
-        pthread_create(&read_threads3[t], NULL, read_thread3, (void*)t);
+    for (int i = 0; i < READERS3; ++i)
+        read_threads[i].start(&read_thread3);
 
-    for (size_t t = 0; t < WRITERS3; t++)
-        pthread_join(write_threads3[t], NULL);
+    for (int i = 0; i < WRITERS3; ++i) {
+        bool writer_has_thrown = write_threads[i].join();
+        CHECK(!writer_has_thrown);
+    }
 
     // Terminate reader threads cleanly
-    terminate3 = true;
-    for (size_t t = 0; t < READERS3; t++)
-        pthread_join(read_threads3[t], NULL);
+    terminate3 = true; // FIXME: Oops - this 'write' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
+    for (int i = 0; i < READERS3; ++i) {
+        bool reader_has_thrown = read_threads[i].join();
+        CHECK(!reader_has_thrown);
+    }
+
+    File::try_remove("database.tightdb");
 }
+
+#endif // STRESSTEST3
+
+
 
 
 #ifdef STRESSTEST4
@@ -363,19 +376,19 @@ TEST(Transactions_Stress3)
 // *
 // *************************************************************************************
 
-const size_t ITER4 =    2000;
-const size_t READERS4 =   20;
-const size_t WRITERS4 =   20;
-bool terminate4 = false;
+namespace {
 
-void* write_thread4(void* arg)
+const int ITER4 =    2000;
+const int READERS4 =   20;
+const int WRITERS4 =   20;
+volatile bool terminate4 = false;
+
+void write_thread4(int thread_ndx)
 {
-    int64_t w = int64_t(arg);
-    int id = w;
-    (void)id;
+    int_least64_t w = thread_ndx;
     SharedGroup sg("database.tightdb");
 
-    for (size_t t = 0; t < ITER4; ++t) {
+    for (int i = 0; i < ITER4; ++i) {
         {
             WriteTransaction wt(sg);
             TableRef table = wt.get_table("table");
@@ -389,36 +402,32 @@ void* write_thread4(void* arg)
         // All writes by all threads must be unique so that it can be detected if they're spurious
         w += 1000;
     }
-    return 0;
 }
 
-void* read_thread4(void* arg)
+void read_thread4()
 {
-    (void)arg;
-    int64_t r1;
-    int64_t r2;
-
     SharedGroup sg("database.tightdb");
-    while (!terminate4) {
+    while (!terminate4) { // FIXME: Oops - this 'read' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
         ReadTransaction rt(sg);
-        r1 = rt.get_table("table")->get_int(0, 0);
+        int64_t r1 = rt.get_table("table")->get_int(0, 0);
         randsleep();
-        r2 = rt.get_table("table")->get_int(0, 0);
+        int64_t r2 = rt.get_table("table")->get_int(0, 0);
         CHECK_EQUAL(r1, r2);
     }
-
-    return 0;
 }
+
+} // anonymous namespace
+
 
 TEST(Transactions_Stress4)
 {
-    pthread_t read_threads[READERS4];
-    pthread_t write_threads[WRITERS4];
+    test_util::ThreadWrapper read_threads[READERS4];
+    test_util::ThreadWrapper write_threads[WRITERS4];
 
     srand(123);
 
-    deletefile("database.tightdb");
-    deletefile("database.tightdb.lock");
+    File::try_remove("database.tightdb");
+    File::try_remove("database.tightdb.lock");
 
     SharedGroup sg("database.tightdb");
 
@@ -437,20 +446,24 @@ TEST(Transactions_Stress4)
         pthread_win32_process_attach_np ();
     #endif
 
-    for (size_t t = 0; t < READERS4; t++)
-        pthread_create(&read_threads[t], NULL, read_thread4, (void*)t);
+    for (int i = 0; i < READERS4; ++i)
+        read_threads[i].start(&read_thread4);
 
-    for (size_t t = 0; t < WRITERS4; t++)
-        pthread_create(&write_threads[t], NULL, write_thread4, (void*)t);
+    for (int i = 0; i < WRITERS4; ++i)
+        write_threads[i].start(util::bind(write_thread4, i));
 
-    for (size_t t = 0; t < WRITERS4; t++)
-        pthread_join(write_threads[t], NULL);
+    for (int i = 0; i < WRITERS4; ++i) {
+        bool writer_has_thrown = write_threads[i].join();
+        CHECK(!writer_has_thrown);
+    }
 
-    terminate4 = true;
-    for (size_t t = 0; t < READERS4; t++)
-        pthread_join(read_threads[t], NULL);
+    terminate4 = true; // FIXME: Oops - this 'write' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
+    for (int i = 0; i < READERS4; ++i) {
+        bool reader_has_thrown = read_threads[i].join();
+        CHECK(!reader_has_thrown);
+    }
+
+    File::try_remove("database.tightdb");
 }
 
-#endif
-
-#endif
+#endif // STRESSTEST4
