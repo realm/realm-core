@@ -1,9 +1,13 @@
+#include <algorithm>
 #include <queue>
 
 #include <UnitTest++.h>
 
 #include <tightdb/thread.hpp>
 #include <tightdb/bind.hpp>
+
+#include "testsettings.hpp"
+
 
 using namespace std;
 using namespace tightdb;
@@ -206,6 +210,8 @@ TEST(Thread_CriticalSection)
 }
 
 
+#ifdef TEST_ROBUSTNESS
+
 TEST(Thread_RobustMutex)
 {
     // Abort if robust mutexes are not supported on the current
@@ -344,6 +350,8 @@ TEST(Thread_DeathDuringRecovery)
     robust.m_mutex.unlock();
 }
 
+#endif // TEST_ROBUSTNESS
+
 
 TEST(Thread_CondVar)
 {
@@ -352,6 +360,7 @@ TEST(Thread_CondVar)
     const int num_consumers = 2; // 32;
     Thread producers[num_producers], consumers[num_consumers];
     int consumed_counts[num_consumers][num_producers];
+    fill(&consumed_counts[0][0], &consumed_counts[num_consumers][num_producers], 0);
 
     for (int i = 0; i < num_producers; ++i)
         producers[i].start(util::bind(&producer_thread, &queue, i));

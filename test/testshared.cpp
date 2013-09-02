@@ -6,6 +6,8 @@
 #include <tightdb/bind.hpp>
 #include <tightdb/terminate.hpp>
 
+#include "testsettings.hpp"
+
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
 #  include <unistd.h>
@@ -750,7 +752,7 @@ TEST(Shared_WriterThreads)
 }
 
 
-#ifdef ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
+#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 
 TEST(Shared_RobustAgainstDeathDuringWrite)
 {
@@ -785,7 +787,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             bool child_exited_normaly = WIFEXITED(stat_loc);
             CHECK(child_exited_normaly);
             int child_exit_status = WEXITSTATUS(stat_loc);
-            CHECK(child_exit_status == 0);
+            CHECK_EQUAL(0, child_exit_status);
         }
 
         // Check that we can continue without dead-locking
@@ -815,7 +817,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
     File::remove("test.tightdb");
 }
 
-#endif // ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
+#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 
 
 TEST(Shared_FormerErrorCase1)
@@ -1035,6 +1037,7 @@ TEST(Shared_SpaceOveruse)
         }
     }
 }
+
 
 TEST(Shared_Notifications)
 {
