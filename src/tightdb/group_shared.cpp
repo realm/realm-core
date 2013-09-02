@@ -32,10 +32,9 @@ struct SharedGroup::ReadCount {
 
 struct SharedGroup::SharedInfo {
     uint16_t init_complete; // indicates lock file has valid content
+    uint16_t shutdown_started; // indicates that shutdown is in progress
     uint16_t version;
     uint16_t flags;
-
-    uint32_t client_count;
     pthread_mutex_t readmutex;
     pthread_mutex_t writemutex;
     uint64_t filesize;
@@ -53,15 +52,6 @@ struct SharedGroup::SharedInfo {
 
 namespace {
 
-// rudimentary compare and swap, while we are waiting for c++11
-bool compare_and_swap(uint32_t* ptr, uint32_t expected_val, uint32_t new_val)
-{
-#ifdef TIGHTDB_HAVE_GCC_GE_4_6
-    return __sync_bool_compare_and_swap(ptr,expected_val,new_val);
-#else
-#  error "CAS is unimplemented on this platform"
-#endif
-}
 
 class ScopedMutexLock {
 public:
@@ -194,6 +184,11 @@ void SharedGroup::open(const string& path, bool no_create_file,
                         File::access_ReadWrite, File::create_Never, 0);
         }
 
+        // file locks are used solely to detect if/when all clients
+        // are done accessing the database. We grab them here and hold
+        // them until the destructor is called, where we try to promote
+        // them to exclusive to detect if we can shutdown.
+        m_file.lock_shared();
         File::CloseGuard fcg(m_file);
         int time_left = 100000;
         while (1) {
@@ -263,7 +258,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             info->capacity = 32 - 1;
             info->put_pos  = 0;
             info->get_pos  = 0;
-            info->client_count = 1;
+            info->shutdown_started = 0;
             info->init_complete = 1; // <- must be last in initialization
             // Set initial version so we can track if other instances
             // change the db
@@ -296,19 +291,9 @@ void SharedGroup::open(const string& path, bool no_create_file,
             bool no_create = true;
             alloc.attach_file(path, is_shared, read_only, no_create); // Throws
 
-            // increment client count. 1 is added for every live shared_group
-            // We need to handle a count value of 0 specially, as it indicates
-            // that the daemon is already shutting down. This can happen if
-            // another client drops through and triggers shutdown before this
-            // one comes here.
-            while (1) {
-                uint32_t count = info->client_count;
-                if (count == 0) {
+            if (info->shutdown_started) {
                     // FIXME: this one should restart the entire procedure
                     throw runtime_error("Daemon shutting down");
-                }
-                if (compare_and_swap(&info->client_count, count, count+1))
-                    break;
             }
         }
 
@@ -359,17 +344,21 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 #endif
 
     SharedInfo* info = m_file_map.get_addr();
-
-    // decrement client count. 1 is added for every live shared_group.
-    uint32_t count;
-    while (1) {
-        count = info->client_count;
-        if (compare_and_swap(&info->client_count, count, count-1))
-            break;
+    if (info->flags == durability_Async) {
+        m_file.unlock();
+        return;
     }
-    if (count > 1) return;
-    // coming here count must be <= 1, implying that client_count <= 0
-    // implying that we are the last client and responsible for cleaning up
+
+    if (!m_file.try_lock_exclusive()) {
+        m_file.unlock();
+        return;
+    }
+
+    if (info->shutdown_started) {
+        m_file.unlock();
+        return;
+    }
+    info->shutdown_started = 1;
 
     // If the db file is just backing for a transient data structure,
     // we can delete it when done.
@@ -451,15 +440,15 @@ void SharedGroup::do_async_commits()
         // the daemon has abandoned it. It can then wait for the
         // lock file to be removed (with a timeout). 
         // Currently, it just throws a runtim exception, though.
-        uint32_t count;
-        do {
-            count = info->client_count;
-            if (count > 1) break;
-        } while (! compare_and_swap(&info->client_count, count, 0));
-        if (count == 0) {
+        if (m_file.try_lock_exclusive()) {
+            info->shutdown_started = 1;
             shutdown = true;
-            printf("Last client gone, initiating shutdown\n");
         }
+        // if try_lock_exclusive fails, we loose our read lock, so
+        // reacquire it! At the moment this is not used for anything,
+        // because ONLY the daemon ever asks for an exclusive lock
+        // when async commits are used.
+        m_file.lock_shared();
 
         if (has_changed()) {
 
