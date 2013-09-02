@@ -30,7 +30,8 @@
 #define TIGHTDB_MULTITHREAD_QUERY 0
 
 #if TIGHTDB_MULTITHREAD_QUERY
-// FIXME: If at all possible, we should hide the use of pthreads in the cpp-file
+// FIXME: Use our C++ thread abstraction API since it provides a much
+// higher level of encapsulation and safety.
 #include <pthread.h>
 #endif
 
