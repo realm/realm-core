@@ -305,11 +305,12 @@ void read_thread3()
     SharedGroup sg("database.tightdb");
     while (!terminate3) { // FIXME: Oops - this 'read' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
         ReadTransaction rt(sg);
-        // FIXME: There is no guarantee that "table" has at least one row at this point
-        int64_t r1 = rt.get_table("table")->get_int(0,0);
-        randsleep();
-        int64_t r2 = rt.get_table("table")->get_int(0,0);
-        CHECK_EQUAL(r1, r2);
+        if(rt.get_table("table")->size() > 0) {
+            int64_t r1 = rt.get_table("table")->get_int(0,0);
+            randsleep();
+            int64_t r2 = rt.get_table("table")->get_int(0,0);
+            CHECK_EQUAL(r1, r2);
+        }
     }
 }
 
