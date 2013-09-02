@@ -1407,7 +1407,7 @@ inline std::size_t Array::get_byte_size() const TIGHTDB_NOEXCEPT
             // never overflow, but it potentially involves two slow
             // divisions.
             uint_fast64_t num_bits = uint_fast64_t(m_size) * m_width;
-            num_bytes = num_bits / 8;
+            num_bytes = std::size_t(num_bits / 8);
             if (num_bits & 0x7)
                 ++num_bytes;
             goto found;
