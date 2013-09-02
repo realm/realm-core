@@ -18,7 +18,7 @@
 // Transaction stress tests in testtransactions_lasse.cpp that take a long time to run
 //#define STRESSTEST1
 //#define STRESSTEST2
-#define STRESSTEST3
+//#define STRESSTEST3
 //#define STRESSTEST4
 
 // Bypass an overflow bug in BinaryData. Todo/fixme
