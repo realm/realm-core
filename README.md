@@ -216,6 +216,11 @@ is named according to the tag.
 
 `Pandoc` is required to build a distribution package.
 
+On Ubuntu, install Pandoc and XeLaTeX with the following commands:
+
+    sudo apt-get install texlive-latex-base
+    sudo apt-get install pandoc 
+
 On Mac OSX, install Pandoc and XeLaTeX (aka MacTeX) via the following link:
 
     http://www.texts.io/support

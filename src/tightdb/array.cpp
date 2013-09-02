@@ -70,7 +70,8 @@ size_t bit_width(int64_t v)
     }
 
     // First flip all bits if bit 63 is set (will now always be zero)
-    if (v < 0) v = ~v;
+    if (v < 0)
+        v = ~v;
 
     // Then check if bits 15-31 used (32b), 7-31 used (16b), else (8b)
     return uint64_t(v) >> 31 ? 64 : uint64_t(v) >> 15 ? 32 : uint64_t(v) >> 7 ? 16 : 8;
@@ -151,9 +152,15 @@ void Array::set_type(Type type)
 
     bool is_leaf = false, has_refs = false;
     switch (type) {
-        case type_Normal:          is_leaf  = true;           break;
-        case type_InnerColumnNode: has_refs = true;           break;
-        case type_HasRefs:         has_refs = is_leaf = true; break;
+        case type_Normal:
+            is_leaf = true;
+            break;
+        case type_InnerColumnNode:
+            has_refs = true;
+            break;
+        case type_HasRefs:
+            has_refs = is_leaf = true;
+            break;
     }
     m_isNode  = !is_leaf;
     m_hasRefs = has_refs;
@@ -418,7 +425,8 @@ void Array::set_all_to_zero()
 
 void Array::Increment(int64_t value, size_t start, size_t end)
 {
-    if (end == size_t(-1)) end = m_size;
+    if (end == size_t(-1))
+        end = m_size;
     TIGHTDB_ASSERT(start < m_size);
     TIGHTDB_ASSERT(end >= start && end <= m_size);
 
@@ -469,15 +477,29 @@ size_t Array::FindGTE(int64_t target, size_t start) const
 
     size_t ret;
 
-    if (start >= m_size) {ret = not_found; goto exit;}
+    if (start >= m_size) {
+        ret = not_found;
+        goto exit;
+    }
 
     if (start + 2 < m_size) {
-        if (get(start) >= target) {ret = start; goto exit;} else ++start;
-        if (get(start) >= target) {ret = start; goto exit;} else ++start;
+        if (get(start) >= target) {
+            ret = start;
+            goto exit;
+        }
+        ++start;
+        if (get(start) >= target) {
+            ret = start;
+            goto exit;
+        }
+        ++start;
     }
 
     // Todo, use templated get<width> from this point for performance
-    if (target > get(m_size - 1)) {ret = not_found; goto exit;}
+    if (target > get(m_size - 1)) {
+        ret = not_found;
+        goto exit;
+    }
 
     size_t add;
     add = 1;
@@ -739,7 +761,8 @@ int64_t Array::sum(size_t start, size_t end) const
 
 template<size_t w> int64_t Array::sum(size_t start, size_t end) const
 {
-    if (end == size_t(-1)) end = m_size;
+    if (end == size_t(-1))
+        end = m_size;
     TIGHTDB_ASSERT(start < m_size && end <= m_size && start < end);
 
     if (w == 0)
@@ -915,16 +938,19 @@ size_t Array::count(int64_t value) const
     const uint64_t h01 = 0x0101010101010101ULL;
 
     if (m_width == 0) {
-        if (value == 0) return m_size;
-        else return 0;
+        if (value == 0)
+            return m_size;
+        return 0;
     }
-    else if (m_width == 1) {
-        if (uint64_t(value) > 1) return 0;
+    if (m_width == 1) {
+        if (uint64_t(value) > 1)
+            return 0;
 
         const size_t chunkvals = 64;
         for (; i + chunkvals <= end; i += chunkvals) {
             uint64_t a = next[i / chunkvals];
-            if (value == 0) a = ~a; // reverse
+            if (value == 0)
+                a = ~a; // reverse
 
             a -= (a >> 1) & m1;
             a = (a & m2) + ((a >> 2) & m2);
@@ -938,7 +964,8 @@ size_t Array::count(int64_t value) const
         }
     }
     else if (m_width == 2) {
-        if (uint64_t(value) > 3) return 0;
+        if (uint64_t(value) > 3)
+            return 0;
 
         const uint64_t v = ~0ULL/0x3 * value;
 
@@ -963,7 +990,8 @@ size_t Array::count(int64_t value) const
         }
     }
     else if (m_width == 4) {
-        if (uint64_t(value) > 15) return 0;
+        if (uint64_t(value) > 15)
+            return 0;
 
         const uint64_t v  = ~0ULL/0xF * value;
         const uint64_t m  = ~0ULL/0xF * 0x1;
@@ -989,7 +1017,8 @@ size_t Array::count(int64_t value) const
         }
     }
     else if (m_width == 8) {
-        if (value > 0x7FLL || value < -0x80LL) return 0; // by casting?
+        if (value > 0x7FLL || value < -0x80LL)
+            return 0; // by casting?
 
         const uint64_t v  = ~0ULL/0xFF * value;
         const uint64_t m  = ~0ULL/0xFF * 0x1;
@@ -1016,7 +1045,8 @@ size_t Array::count(int64_t value) const
         }
     }
     else if (m_width == 16) {
-        if (value > 0x7FFFLL || value < -0x8000LL) return 0; // by casting?
+        if (value > 0x7FFFLL || value < -0x8000LL)
+            return 0; // by casting?
 
         const uint64_t v  = ~0ULL/0xFFFF * value;
         const uint64_t m  = ~0ULL/0xFFFF * 0x1;
@@ -1197,9 +1227,15 @@ ref_type Array::create_empty_array(Type type, WidthType width_type, Allocator& a
 {
     bool is_leaf = false, has_refs = false;
     switch (type) {
-        case type_Normal:          is_leaf = true;            break;
-        case type_InnerColumnNode: has_refs = true;           break;
-        case type_HasRefs:         has_refs = is_leaf = true; break;
+        case type_Normal:
+            is_leaf = true;
+            break;
+        case type_InnerColumnNode:
+            has_refs = true;
+            break;
+        case type_HasRefs:
+            has_refs = is_leaf = true;
+            break;
     }
 
     size_t capacity = initial_capacity;
@@ -1600,8 +1636,10 @@ template<size_t w> void Array::ReferenceQuickSort(size_t lo, size_t hi, Array& r
     while (i <= j);
 
     //  recursion
-    if (int(lo) < j) ReferenceQuickSort<w>(lo, j, ref);
-    if (i < int(hi)) ReferenceQuickSort<w>(i, hi, ref);
+    if (int(lo) < j)
+        ReferenceQuickSort<w>(lo, j, ref);
+    if (i < int(hi))
+        ReferenceQuickSort<w>(i, hi, ref);
 }
 
 
@@ -1635,8 +1673,10 @@ template<size_t w> void Array::QuickSort(size_t lo, size_t hi)
     while (i <= j);
 
     //  recursion
-    if (int(lo) < j) QuickSort(lo, j);
-    if (i < int(hi)) QuickSort(i, hi);
+    if (int(lo) < j)
+        QuickSort(lo, j);
+    if (i < int(hi))
+        QuickSort(i, hi);
 }
 
 vector<int64_t> Array::ToVector() const
@@ -1650,10 +1690,12 @@ vector<int64_t> Array::ToVector() const
 
 bool Array::compare_int(const Array& a) const
 {
-    if (a.size() != size()) return false;
+    if (a.size() != size())
+        return false;
 
     for (size_t i = 0; i < size(); ++i) {
-        if (get(i) != a.get(i)) return false;
+        if (get(i) != a.get(i))
+            return false;
     }
 
     return true;
@@ -1756,7 +1798,8 @@ void Array::print() const
 {
     cout << hex << get_ref() << dec << ": (" << size() << ") ";
     for (size_t i = 0; i < size(); ++i) {
-        if (i) cout << ", ";
+        if (i)
+            cout << ", ";
         cout << get(i);
     }
     cout << "\n";
@@ -1769,7 +1812,8 @@ void Array::Verify() const
                     m_width == 8 || m_width == 16 || m_width == 32 || m_width == 64));
 
     // Check that parent is set correctly
-    if (!m_parent) return;
+    if (!m_parent)
+        return;
 
     ref_type ref_in_parent = m_parent->get_child_ref(m_ndx_in_parent);
     TIGHTDB_ASSERT(ref_in_parent == (is_attached() ? m_ref : 0));
@@ -1791,8 +1835,10 @@ void Array::to_dot(ostream& out, StringData title) const
     // Header
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
     out << "0x" << hex << ref << dec << "<BR/>";
-    if (m_isNode) out << "IsNode<BR/>";
-    if (m_hasRefs) out << "HasRefs<BR/>";
+    if (m_isNode)
+        out << "IsNode<BR/>";
+    if (m_hasRefs)
+        out << "HasRefs<BR/>";
     out << "</FONT></TD>" << endl;
 
     // Values
@@ -1800,21 +1846,28 @@ void Array::to_dot(ostream& out, StringData title) const
         int64_t v =  get(i);
         if (m_hasRefs) {
             // zero-refs and refs that are not 64-aligned do not point to sub-trees
-            if (v == 0) out << "<TD>none";
-            else if (v & 0x1) out << "<TD BGCOLOR=\"grey90\">" << (uint64_t(v) >> 1);
-            else out << "<TD PORT=\"" << i << "\">";
+            if (v == 0)
+                out << "<TD>none";
+            else if (v & 0x1)
+                out << "<TD BGCOLOR=\"grey90\">" << (uint64_t(v) >> 1);
+            else
+                out << "<TD PORT=\"" << i << "\">";
         }
-        else out << "<TD>" << v;
+        else {
+            out << "<TD>" << v;
+        }
         out << "</TD>" << endl;
     }
 
     out << "</TR></TABLE>>];" << endl;
-    if (0 < title.size()) out << "}" << endl;
+    if (0 < title.size())
+        out << "}" << endl;
 
     if (m_hasRefs) {
         for (size_t i = 0; i < m_size; ++i) {
             int64_t target = get(i);
-            if (target == 0 || target & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
+            if (target == 0 || target & 0x1)
+                continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
 
             out << "n" << hex << ref << dec << ":" << i;
             out << " -> n" << hex << target << dec << endl;
@@ -1836,7 +1889,8 @@ void Array::stats(MemStats& stats) const
     if (m_hasRefs) {
         for (size_t i = 0; i < m_size; ++i) {
             int64_t v = get(i);
-            if (v == 0 || v & 0x1) continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
+            if (v == 0 || v & 0x1)
+                continue; // zero-refs and refs that are not 64-aligned do not point to sub-trees
 
             Array sub(to_ref(v), 0, 0, get_alloc());
             sub.stats(stats);
@@ -2034,7 +2088,8 @@ size_t Array::upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
 
 void Array::find_all(Array& result, int64_t value, size_t colOffset, size_t start, size_t end) const
 {
-    if (end == size_t(-1)) end = m_size;
+    if (end == size_t(-1))
+        end = m_size;
     TIGHTDB_ASSERT(start < m_size && end <= m_size && start < end);
 
     QueryState<int64_t> state;
@@ -2251,7 +2306,8 @@ top:
         size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
 
         // If key is outside range, we know there can be no match
-        if (pos == offsets_size) return not_found;
+        if (pos == offsets_size)
+            return not_found;
 
         // Get entry under key
         const char* refs_header = m_alloc.translate(refs_ref);

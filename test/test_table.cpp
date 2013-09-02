@@ -1116,6 +1116,7 @@ TEST(Table_OptimizeCompare)
 TEST(Table_SlabAlloc)
 {
     SlabAlloc alloc;
+    alloc.attach_empty();
     TestTable table(alloc);
 
     table.add(0, 10, true, Wed);
@@ -2163,28 +2164,28 @@ TEST(Table_SubtableWithParentChange)
     table.add();
     MyTable2::Ref subtab = table[1].subtab;
     subtab->add(7, 0);
-    CHECK(table.is_valid());
-    CHECK(subtab->is_valid());
+    CHECK(table.is_attached());
+    CHECK(subtab->is_attached());
     CHECK_EQUAL(subtab, MyTable2::Ref(table[1].subtab));
     CHECK_EQUAL(table[1].subtab[0].val, 7);
     CHECK_EQUAL(subtab[0].val, 7);
-    CHECK(subtab->is_valid());
+    CHECK(subtab->is_attached());
 #ifdef TIGHTDB_DEBUG
     table.Verify();
     subtab->Verify();
 #endif
-    CHECK(table.is_valid());
-    CHECK(subtab->is_valid());
+    CHECK(table.is_attached());
+    CHECK(subtab->is_attached());
     table.insert(0, 0);
-    CHECK(table.is_valid());
-    CHECK(!subtab->is_valid());
+    CHECK(table.is_attached());
+    CHECK(!subtab->is_attached());
     subtab = table[2].subtab;
-    CHECK(subtab->is_valid());
+    CHECK(subtab->is_attached());
     table.remove(1);
-    CHECK(!subtab->is_valid());
+    CHECK(!subtab->is_attached());
     subtab = table[1].subtab;
-    CHECK(table.is_valid());
-    CHECK(subtab->is_valid());
+    CHECK(table.is_attached());
+    CHECK(subtab->is_attached());
 }
 
 TEST(Table_HasSharedSpec)
@@ -2290,7 +2291,7 @@ TEST(Table_Aggregates2)
 TEST(Table_LanguageBindings)
 {
    Table* table = LangBindHelper::new_table();
-   CHECK(table->is_valid());
+   CHECK(table->is_attached());
 
    table->add_column(type_Int, "i");
    table->insert_int(0, 0, 10);
@@ -2299,7 +2300,7 @@ TEST(Table_LanguageBindings)
    table->insert_done();
 
    Table* table2 = LangBindHelper::copy_table(*table);
-   CHECK(table2->is_valid());
+   CHECK(table2->is_attached());
 
    CHECK(*table == *table2);
 

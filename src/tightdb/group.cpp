@@ -31,7 +31,8 @@ public:
     MemoryOStream(size_t buffer_size): m_pos(0)
     {
         m_buffer = static_cast<char*>(malloc(buffer_size));
-        if (!m_buffer) throw bad_alloc();
+        if (!m_buffer)
+            throw bad_alloc();
     }
 
     ~MemoryOStream()
@@ -119,20 +120,20 @@ void Group::open(const string& file_path, OpenMode mode)
     bool is_shared = false;
     bool read_only = mode == mode_ReadOnly;
     bool no_create = mode == mode_ReadWriteNoCreate;
-    m_alloc.attach_file(file_path, is_shared, read_only, no_create);
+    m_alloc.attach_file(file_path, is_shared, read_only, no_create); // Throws
+    SlabAlloc::DetachGuard dg(m_alloc);
+    m_alloc.reset_free_space_tracking(); // Throws
     ref_type top_ref = m_alloc.get_top_ref();
-    // FIXME: Must detach file from allocator if the following
-    // throws. Unfortunatly we may already have created a file. If we
-    // cannot avoid that, we must document the fact that a failed open
-    // may still have the effect of creating the file.
     if (top_ref == 0) {
         // Attaching to a newly created file
-        create(); // Throws
+        bool add_free_versions = false;
+        create(add_free_versions); // Throws
     }
     else {
         // Attaching to a pre-existing database
-        init_from_ref(top_ref); // Throws
+        init_from_ref(top_ref);
     }
+    dg.release(); // Do not detach allocator from file
 }
 
 
@@ -140,46 +141,70 @@ void Group::open(BinaryData buffer, bool take_ownership)
 {
     TIGHTDB_ASSERT(!is_attached());
     TIGHTDB_ASSERT(buffer.data());
-    m_alloc.attach_buffer(const_cast<char*>(buffer.data()), buffer.size(), take_ownership);
+    m_alloc.attach_buffer(const_cast<char*>(buffer.data()), buffer.size()); // Throws
+    SlabAlloc::DetachGuard dg(m_alloc);
+    m_alloc.reset_free_space_tracking(); // Throws
     ref_type top_ref = m_alloc.get_top_ref();
-    // FIXME: Must detach allocator if the following fails.
     if (top_ref == 0) {
-        create(); // Throws
+        bool add_free_versions = false;
+        create(add_free_versions); // Throws
     }
     else {
-        init_from_ref(top_ref); // Throws
+        init_from_ref(top_ref);
     }
+    dg.release(); // Do not detach allocator from file
+    if (take_ownership)
+        m_alloc.own_buffer();
 }
 
 
-void Group::create()
+void Group::create(bool add_free_versions)
 {
-    m_top.create(Array::type_HasRefs);
-    m_tables.create(Array::type_HasRefs);
-    m_table_names.create();
-    m_free_positions.create(Array::type_Normal);
-    m_free_lengths.create(Array::type_Normal);
+    TIGHTDB_ASSERT(!is_attached());
 
-    m_top.add(m_table_names.get_ref());
-    m_top.add(m_tables.get_ref());
-    m_top.add(m_free_positions.get_ref());
-    m_top.add(m_free_lengths.get_ref());
+    try {
+        m_top.create(Array::type_HasRefs); // Throws
+        m_tables.create(Array::type_HasRefs); // Throws
+        m_table_names.create(); // Throws
+        m_free_positions.create(Array::type_Normal); // Throws
+        m_free_lengths.create(Array::type_Normal); // Throws
 
-    // We may have been attached to a newly created file, that is, to
-    // a file consisting only of a default header and possibly some
-    // free space. In that case, we must add as free space, the size
-    // of the file minus its header.
-    if (m_alloc.is_attached()) {
-        size_t free = m_alloc.get_baseline() - sizeof SlabAlloc::default_header;
-        if (free > 0) {
-            m_free_positions.add(sizeof SlabAlloc::default_header);
-            m_free_lengths.add(free);
+        m_top.add(m_table_names.get_ref()); // Throws
+        m_top.add(m_tables.get_ref()); // Throws
+        m_top.add(m_free_positions.get_ref()); // Throws
+        m_top.add(m_free_lengths.get_ref()); // Throws
+
+        // We may have been attached to a newly created file, that is,
+        // to a file consisting only of a default header and possibly
+        // some free space. In that case, we must add as free space,
+        // the size of the file minus its header.
+        if (m_alloc.nonempty_attachment()) {
+            size_t free = m_alloc.get_baseline() - sizeof SlabAlloc::default_header;
+            if (free > 0) {
+                m_free_positions.add(sizeof SlabAlloc::default_header); // Throws
+                m_free_lengths.add(free); // Throws
+            }
+        }
+
+        if (add_free_versions) {
+            m_free_versions.create(Array::type_Normal); // Throws
+            m_top.add(m_free_versions.get_ref()); // Throws
+            m_free_versions.add(0); // Throws
         }
     }
+    catch (...) {
+        m_free_versions.destroy();
+        m_free_lengths.destroy();
+        m_free_positions.destroy();
+        m_table_names.destroy();
+        m_tables.destroy();
+        m_top.destroy();
+        throw;
+    }
 }
 
 
-void Group::init_from_ref(ref_type top_ref)
+void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 {
     m_top.init_from_ref(top_ref);
     size_t top_size = m_top.size();
@@ -247,32 +272,32 @@ void Group::init_shared()
 
 Group::~Group() TIGHTDB_NOEXCEPT
 {
-    if (!m_top.is_attached())
+    if (!is_attached())
         return;
 
-    destroy_table_accessors();
+    detach_table_accessors();
 
     // Recursively deletes entire tree
     m_top.destroy();
 }
 
 
-void Group::destroy_table_accessors() TIGHTDB_NOEXCEPT
+void Group::detach_table_accessors() TIGHTDB_NOEXCEPT
 {
     typedef table_accessors::const_iterator iter;
     iter end = m_table_accessors.end();
     for (iter i = m_table_accessors.begin(); i != end; ++i) {
         if (Table* t = *i) {
-            t->invalidate();
+            t->detach();
             t->unbind_ref();
         }
     }
 }
 
 
-void Group::invalidate() TIGHTDB_NOEXCEPT
+void Group::detach() TIGHTDB_NOEXCEPT
 {
-    destroy_table_accessors();
+    detach_table_accessors();
     m_table_accessors.clear();
 
     m_top.detach();
@@ -286,7 +311,7 @@ void Group::invalidate() TIGHTDB_NOEXCEPT
 
 Table* Group::get_table_by_ndx(size_t ndx)
 {
-    TIGHTDB_ASSERT(m_top.is_attached());
+    TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(ndx < m_tables.size());
 
     if (m_table_accessors.empty())
@@ -298,7 +323,7 @@ Table* Group::get_table_by_ndx(size_t ndx)
     Table* table = m_table_accessors[ndx];
     if (!table) {
         ref_type ref = m_tables.get_as_ref(ndx);
-        table = new Table(Table::RefCountTag(), m_alloc, ref, this, ndx); // Throws
+        table = new Table(Table::ref_count_tag(), m_alloc, ref, this, ndx); // Throws
         m_table_accessors[ndx] = table;
         table->bind_ref(); // Increase reference count from 0 to 1
     }
@@ -306,7 +331,7 @@ Table* Group::get_table_by_ndx(size_t ndx)
 }
 
 
-Table* Group::create_new_table(StringData name, SpecSetter spec_setter)
+ref_type Group::create_new_table(StringData name)
 {
     // FIXME: This function is exception safe under the assumption
     // that m_tables.insert() and m_table_names.insert() are exception
@@ -317,7 +342,44 @@ Table* Group::create_new_table(StringData name, SpecSetter spec_setter)
     // matters.
 
     Array::DestroyGuard ref_dg(Table::create_empty_table(m_alloc), m_alloc); // Throws
-    Table::UnbindGuard table_ug(new Table(Table::RefCountTag(), m_alloc,
+    size_t ndx = m_tables.size();
+    TIGHTDB_ASSERT(ndx == m_table_names.size());
+    m_tables.insert(ndx, ref_dg.get()); // Throws
+    try {
+        m_table_names.insert(ndx, name); // Throws
+        try {
+#ifdef TIGHTDB_ENABLE_REPLICATION
+            if (Replication* repl = m_alloc.get_replication())
+                repl->new_top_level_table(name); // Throws
+#endif
+
+            // The rest is guaranteed not to throw
+            return ref_dg.release();
+        }
+        catch (...) {
+            m_table_names.erase(ndx); // Guaranteed not to throw
+            throw;
+        }
+    }
+    catch (...) {
+        m_tables.erase(ndx); // Guaranteed not to throw
+        throw;
+    }
+}
+
+
+Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_setter)
+{
+    // FIXME: This function is exception safe under the assumption
+    // that m_tables.insert() and m_table_names.insert() are exception
+    // safe. Currently, Array::insert() is not exception safe, but it
+    // is expected that it will be in the future. Note that a function
+    // is considered exception safe if it produces no visible
+    // side-effects when it throws, at least not in any way that
+    // matters.
+
+    Array::DestroyGuard ref_dg(Table::create_empty_table(m_alloc), m_alloc); // Throws
+    Table::UnbindGuard table_ug(new Table(Table::ref_count_tag(), m_alloc,
                                           ref_dg.get(), 0, 0)); // Throws
     table_ug->bind_ref(); // Increase reference count from 0 to 1
     if (spec_setter)
@@ -357,7 +419,7 @@ Table* Group::create_new_table(StringData name, SpecSetter spec_setter)
 
 void Group::write(const string& path) const
 {
-    TIGHTDB_ASSERT(m_top.is_attached());
+    TIGHTDB_ASSERT(is_attached());
 
     FileOStream out(path);
     write_to_stream(out);
@@ -366,9 +428,12 @@ void Group::write(const string& path) const
 
 BinaryData Group::write_to_mem() const
 {
-    TIGHTDB_ASSERT(m_top.is_attached());
+    TIGHTDB_ASSERT(is_attached());
 
     // Get max possible size of buffer
+    //
+    // FIXME: This size could potentially be vastly bigger that what
+    // is actually needed.
     size_t max_size = m_alloc.get_total_size();
 
     MemoryOStream out(max_size);
@@ -382,13 +447,12 @@ BinaryData Group::write_to_mem() const
 void Group::commit()
 {
     TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(m_top.is_attached());
 
-    // GroupWriter::commit() needs free-space tracking information, so
-    // if the attached database does not contain it, we must add it
-    // now. Empty (newly created) database files and database files
-    // created by Group::write() do not have free-space tracking
-    // information.
+    // GroupWriter::write_group() needs free-space tracking
+    // information, so if the attached database does not contain it,
+    // we must add it now. Empty (newly created) database files and
+    // database files created by Group::write() do not have free-space
+    // tracking information.
     if (m_free_positions.is_attached()) {
         TIGHTDB_ASSERT(m_top.size() >= 4);
         if (m_top.size() > 4) {
@@ -405,18 +469,22 @@ void Group::commit()
         m_top.add(m_free_lengths.get_ref());
     }
 
-    GroupWriter out(*this);
+    GroupWriter out(*this); // Throws
 
-    // Recursively write all changed arrays to the database file
-    bool do_sync = true;
-    ref_type top_ref = out.commit(do_sync);
+    // Recursively write all changed arrays to the database file. We
+    // postpone the commit until we are sure that no exceptions can be
+    // thrown.
+    ref_type top_ref = out.write_group(); // Throws
 
     // Since the group is persisiting in single-thread (un-shared)
     // mode we have to make sure that the group stays valid after
     // commit
 
     // Mark all managed space (beyond the atatched file) as free
-    m_alloc.free_all();
+    //
+    // FIXME: Perform this as part of m_alloc.remap(), but that
+    // requires that we always call remap().
+    m_alloc.reset_free_space_tracking(); // Throws
 
     size_t old_baseline = m_alloc.get_baseline();
 
@@ -424,12 +492,14 @@ void Group::commit()
     size_t new_file_size = out.get_file_size();
     TIGHTDB_ASSERT(new_file_size >= m_alloc.get_baseline());
     if (new_file_size > m_alloc.get_baseline()) {
-        if (m_alloc.remap(new_file_size)) {
+        if (m_alloc.remap(new_file_size)) { // Throws
             // The file was mapped to a new address, so all array
             // accessors must be updated.
             old_baseline = 0;
         }
     }
+
+    out.commit(top_ref); // Throws
 
     // Recusively update refs in all active tables (columns, arrays..)
     update_refs(top_ref, old_baseline);
@@ -440,7 +510,7 @@ void Group::commit()
 }
 
 
-void Group::update_refs(ref_type top_ref, size_t old_baseline)
+void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(!m_free_versions.is_attached());
 
@@ -484,28 +554,28 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline)
 void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size)
 {
     TIGHTDB_ASSERT(new_top_ref < new_file_size);
-    TIGHTDB_ASSERT(!m_top.is_attached());
+    TIGHTDB_ASSERT(!is_attached());
 
     // Make all managed memory beyond the attached file available
     // again.
-    m_alloc.free_all();
+    //
+    // FIXME: Perform this as part of m_alloc.remap(), but that
+    // requires that we always call remap().
+    m_alloc.reset_free_space_tracking(); // Throws
 
     // Update memory mapping if database file has grown
     TIGHTDB_ASSERT(new_file_size >= m_alloc.get_baseline());
     if (new_file_size > m_alloc.get_baseline())
-        m_alloc.remap(new_file_size);
+        m_alloc.remap(new_file_size); // Throws
 
     // If our last look at the file was when it
     // was empty, we may have to re-create the group
     if (new_top_ref == 0) {
-        create(); // Throws
-
-        m_free_versions.create(Array::type_Normal);
-        m_top.add(m_free_versions.get_ref());
-        m_free_versions.add(0);
+        bool add_free_versions = true;
+        create(add_free_versions); // Throws
     }
     else {
-        init_from_ref(new_top_ref); // Throws
+        init_from_ref(new_top_ref);
     }
 }
 
@@ -567,10 +637,7 @@ void Group::to_string(ostream& out) const
 
 void Group::Verify() const
 {
-    TIGHTDB_ASSERT(m_top.is_attached() || !is_attached());
-
-    if (!m_top.is_attached())
-        return;
+    TIGHTDB_ASSERT(is_attached());
 
     // Verify free lists
     if (m_free_positions.is_attached()) {
@@ -592,7 +659,7 @@ void Group::Verify() const
         // have to be stored as part of a database version such that
         // it is updated atomically together with the rest of the
         // contents of the version.
-        size_t file_size = m_alloc.is_attached() ? m_alloc.get_baseline() : 0;
+        size_t file_size = m_alloc.nonempty_attachment() ? m_alloc.get_baseline() : 0;
 
         size_t prev_end = 0;
         for (size_t i = 0; i < n; ++i) {
