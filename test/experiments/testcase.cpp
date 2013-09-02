@@ -42,7 +42,7 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 namespace  {
 
-#define INCREMENTS 10
+#define INCREMENTS 100
 
 void* IncrementEntry(void* arg)
 {
@@ -202,12 +202,9 @@ void make_table(size_t rows)
 
 void multi_threaded(size_t thread_count, size_t base) 
 {
-    printf("Multithreaded client\n");
-
     // Do some changes in a async db
     {
 
-        printf("Spawning test threads\n");
         pthread_t* threads = new pthread_t[thread_count];
 
         // Create all threads
@@ -223,7 +220,6 @@ void multi_threaded(size_t thread_count, size_t base)
         }
 
         delete[] threads;
-        printf("Threads done, verifying\n");
 
         // Verify that the changes were made
         {
@@ -264,16 +260,15 @@ void validate_and_clear(size_t rows, int result)
 
 void multi_process(int numprocs, size_t numthreads) 
 {
+    printf("Multiprocess + multithreading client\n");
     for (int i=0; i<numprocs; i++) {
         if (fork()==0) {
-            fprintf(stderr, "Forked!\n");
             multi_threaded(numthreads, i*numthreads);
             exit(0);
         }
     }
     int status = 0;
     for (int i=0; i<numprocs; i++) wait(&status);
-    fprintf(stderr,"Joined\n");
 }
 
 int main()
@@ -293,7 +288,6 @@ int main()
     validate_and_clear(10, INCREMENTS);
 
     for (int k=1; k<10; k++) {
-        fprintf(stderr,"Spawning processes\n");
         multi_process(10,10);
         validate_and_clear(100,INCREMENTS);
     }
