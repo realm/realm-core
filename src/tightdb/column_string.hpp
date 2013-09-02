@@ -37,9 +37,9 @@ public:
     explicit AdaptiveStringColumn(Allocator& = Allocator::get_default());
     explicit AdaptiveStringColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                                   Allocator& = Allocator::get_default());
-    ~AdaptiveStringColumn();
+    ~AdaptiveStringColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void destroy() TIGHTDB_OVERRIDE;
+    void destroy() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     std::size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;

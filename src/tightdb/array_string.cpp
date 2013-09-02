@@ -8,6 +8,8 @@
 #include <tightdb/array_string.hpp>
 
 using namespace std;
+using namespace tightdb;
+
 
 namespace {
 
@@ -19,7 +21,8 @@ const int max_width = 64;
 // Thus, 0 < size < 256 implies that size < round_up(size).
 size_t round_up(size_t size)
 {
-    if (size < 2) return size << 2;
+    if (size < 2)
+        return size << 2;
     size |= size >> 1;
     size |= size >> 2;
     size |= size >> 4;
@@ -28,9 +31,6 @@ size_t round_up(size_t size)
 }
 
 } // anonymous namespace
-
-
-namespace tightdb {
 
 
 void ArrayString::set(size_t ndx, StringData value)
@@ -374,10 +374,12 @@ void ArrayString::find_all(Array& result, StringData value, size_t add_offset,
 
 bool ArrayString::compare_string(const ArrayString& c) const
 {
-    if (c.size() != size()) return false;
+    if (c.size() != size())
+        return false;
 
     for (size_t i = 0; i < size(); ++i) {
-        if (get(i) != c.get(i)) return false;
+        if (get(i) != c.get(i))
+            return false;
     }
 
     return true;
@@ -438,7 +440,7 @@ void ArrayString::foreach(const Array* a, ForEachOp<StringData>* op) TIGHTDB_NOE
 
 #ifdef TIGHTDB_DEBUG
 
-void ArrayString::StringStats() const
+void ArrayString::string_stats() const
 {
     size_t total = 0;
     size_t longest = 0;
@@ -508,5 +510,3 @@ void ArrayString::to_dot(ostream& out, StringData title) const
 }
 
 #endif // TIGHTDB_DEBUG
-
-}

@@ -405,7 +405,7 @@ EOF
     "install-shared")
         require_config || exit 1
         install_prefix="$(get_config_param "install-prefix")" || exit 1
-        make install DESTDIR="$DESTDIR" prefix="$install_prefix" INSTALL_FILTER=shared-libs || exit 1
+        make install DESTDIR="$DESTDIR" prefix="$install_prefix" INSTALL_FILTER=shared-libs,progs || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
@@ -416,7 +416,7 @@ EOF
     "install-devel")
         require_config || exit 1
         install_prefix="$(get_config_param "install-prefix")" || exit 1
-        make install DESTDIR="$DESTDIR" prefix="$install_prefix" INSTALL_FILTER=static-libs,progs,headers || exit 1
+        make install DESTDIR="$DESTDIR" prefix="$install_prefix" INSTALL_FILTER=static-libs,dev-progs,headers || exit 1
         echo "Done installing"
         exit 0
         ;;
@@ -435,7 +435,7 @@ EOF
     "uninstall-shared")
         require_config || exit 1
         install_prefix="$(get_config_param "install-prefix")" || exit 1
-        make uninstall prefix="$install_prefix" INSTALL_FILTER=shared-libs || exit 1
+        make uninstall prefix="$install_prefix" INSTALL_FILTER=shared-libs,progs || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
@@ -446,7 +446,7 @@ EOF
     "uninstall-devel")
         require_config || exit 1
         install_prefix="$(get_config_param "install-prefix")" || exit 1
-        make uninstall prefix="$install_prefix" INSTALL_FILTER=static-libs,progs,extra || exit 1
+        make uninstall prefix="$install_prefix" INSTALL_FILTER=static-libs,dev-progs,extra || exit 1
         echo "Done uninstalling"
         exit 0
         ;;

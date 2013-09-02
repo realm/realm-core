@@ -37,6 +37,7 @@ public:
     ArrayString(ref_type, ArrayParent*, std::size_t ndx_in_parent,
                 Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
     explicit ArrayString(Allocator&) TIGHTDB_NOEXCEPT;
+    ~ArrayString() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add();
@@ -76,7 +77,7 @@ public:
     static void foreach(const Array*, ForEachOp<StringData>*) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
-    void StringStats() const;
+    void string_stats() const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 

@@ -10,10 +10,10 @@
 #include <tightdb/query_engine.hpp>
 
 using namespace std;
+using namespace tightdb;
+
 
 namespace {
-
-using namespace tightdb;
 
 Column get_column_from_ref(Array& parent, size_t ndx)
 {
@@ -231,10 +231,18 @@ bool callme_arrays(Array* a, size_t start, size_t end, size_t caller_offset, voi
     return true;
 }
 
+} // anonymous namespace
+
+
+void ColumnBase::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
+{
+    m_array->adjust_ndx_in_parent(diff);
 }
 
-
-namespace tightdb {
+void ColumnBase::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
+{
+    m_array->update_from_parent(old_baseline);
+}
 
 size_t ColumnBase::get_size_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
@@ -483,7 +491,9 @@ void Column::Increment64(int64_t value, size_t start, size_t end)
 
 void Column::IncrementIf(int64_t limit, int64_t value)
 {
-    if (root_is_leaf()) m_array->IncrementIf(limit, value);
+    if (root_is_leaf()) {
+        m_array->IncrementIf(limit, value);
+    }
     else {
         Array refs = NodeGetRefs();
         size_t count = refs.size();
@@ -504,9 +514,8 @@ size_t Column::find_first(int64_t value, size_t start, size_t end) const
         size_t ref = m_array->get_ref();
         return m_array->ColumnFind(value, ref, cache);
     }
-    else {
-        return TreeFind<int64_t, Column, Equal>(value, start, end);
-    }
+
+    return TreeFind<int64_t, Column, Equal>(value, start, end);
 }
 
 void Column::find_all(Array& result, int64_t value, size_t caller_offset, size_t start, size_t end) const
@@ -642,7 +651,8 @@ void ColumnBase::to_dot(ostream& out, StringData title) const
 
     out << "subgraph cluster_column" << ref << " {" << endl;
     out << " label = \"Column";
-    if (0 < title.size()) out << "\\n'" << title << "'";
+    if (0 < title.size())
+        out << "\\n'" << title << "'";
     out << "\";" << endl;
 
     array_to_dot(out, *m_array);
@@ -692,5 +702,3 @@ MemStats Column::stats() const
 }
 
 #endif // TIGHTDB_DEBUG
-
-}

@@ -61,18 +61,24 @@ public:
 
     virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT { return false; }
 
-    virtual void destroy() = 0;
+    virtual void destroy() TIGHTDB_NOEXCEPT;
 
-    virtual ~ColumnBase() {};
+    virtual ~ColumnBase() TIGHTDB_NOEXCEPT {};
 
     // Indexing
     virtual bool has_index() const TIGHTDB_NOEXCEPT { return false; }
     virtual void set_index_ref(ref_type, ArrayParent*, std::size_t) {}
 
-    virtual void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT { m_array->adjust_ndx_in_parent(diff); }
-    virtual void update_from_parent() TIGHTDB_NOEXCEPT { m_array->update_from_parent(); }
+    virtual void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT;
 
-    virtual void invalidate_subtables_virtual() {}
+    /// Called in the context of Group::commit() to ensure that
+    /// attached table accessors stay valid across a commit. Please
+    /// note that this works only for non-transactional commits. Table
+    /// accessors obtained during a transaction are always detached
+    /// when the transaction ends.
+    virtual void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
+
+    virtual void detach_subtable_accessors_virtual() TIGHTDB_NOEXCEPT {}
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
 
@@ -166,9 +172,7 @@ public:
     explicit Column(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                     Allocator& = Allocator::get_default()); // Throws
     Column(const Column&); // FIXME: Constness violation
-    ~Column();
-
-    void destroy() TIGHTDB_OVERRIDE;
+    ~Column() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     bool IsIntColumn() const TIGHTDB_NOEXCEPT { return true; }
 
@@ -267,6 +271,12 @@ private:
 
 // Implementation:
 
+inline void ColumnBase::destroy() TIGHTDB_NOEXCEPT
+{
+    if (m_array)
+        m_array->destroy();
+}
+
 template<class L, class T>
 std::size_t ColumnBase::lower_bound(const L& list, T value) const TIGHTDB_NOEXCEPT
 {
@@ -332,22 +342,16 @@ inline Column::Column(ref_type ref, ArrayParent* parent, std::size_t ndx_in_pare
 
 inline Column::Column(const Column& column): ColumnBase(column.m_array)
 {
-    // we now own array
     // FIXME: Unfortunate hidden constness violation here
-    column.m_array = 0;       // so invalidate source
+    // we now own array
+    column.m_array = 0;       // so detach source
 }
 
 inline Column::Column(Array* root): ColumnBase(root) {}
 
-inline Column::~Column()
+inline Column::~Column() TIGHTDB_NOEXCEPT
 {
     delete m_array;
-}
-
-inline void Column::destroy()
-{
-    if (m_array)
-        m_array->destroy();
 }
 
 inline int64_t Column::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
@@ -375,7 +379,8 @@ inline void Column::add(int64_t value)
 inline void Column::insert(std::size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx <= size());
-    if (size() <= ndx) ndx = npos;
+    if (size() <= ndx)
+        ndx = npos;
     do_insert(ndx, value);
 }
 

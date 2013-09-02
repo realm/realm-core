@@ -45,9 +45,7 @@ public:
     explicit BasicColumn(Allocator& = Allocator::get_default());
     explicit BasicColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                          Allocator& = Allocator::get_default());
-    ~BasicColumn();
-
-    void destroy() TIGHTDB_OVERRIDE;
+    ~BasicColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;

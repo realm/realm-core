@@ -7,8 +7,8 @@
 #include <tightdb/column.hpp>
 
 using namespace std;
+using namespace tightdb;
 
-namespace tightdb {
 
 ArrayStringLong::ArrayStringLong(ArrayParent* parent, size_t pndx, Allocator& alloc):
     Array(type_HasRefs, parent, pndx, alloc),
@@ -260,5 +260,3 @@ void ArrayStringLong::to_dot(ostream& out, StringData title) const
 }
 
 #endif // TIGHTDB_DEBUG
-
-}

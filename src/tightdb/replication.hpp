@@ -31,7 +31,7 @@
 
 #include <tightdb/meta.hpp>
 #include <tightdb/tuple.hpp>
-#include <tightdb/unique_ptr.hpp>
+#include <tightdb/buffer.hpp>
 #include <tightdb/file.hpp>
 #include <tightdb/mixed.hpp>
 
@@ -211,7 +211,7 @@ public:
     static void apply_transact_log(InputStream& transact_log, Group& target);
 #endif
 
-    virtual ~Replication() {}
+    virtual ~Replication() TIGHTDB_NOEXCEPT {}
 
 protected:
     // These two delimit a contiguous region of free space in a
@@ -271,21 +271,7 @@ protected:
 private:
     struct TransactLogApplier;
 
-    template<class T> struct Buffer {
-        UniquePtr<T[]> m_data;
-        std::size_t m_size;
-        T& operator[](std::size_t i) TIGHTDB_NOEXCEPT { return m_data[i]; }
-        const T& operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
-        Buffer() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
-        void set_size(std::size_t);
-        friend void swap(Buffer&a, Buffer&b)
-        {
-            using std::swap;
-            swap(a.m_data, b.m_data);
-            swap(a.m_size, b.m_size);
-        }
-    };
-    Buffer<std::size_t> m_subtab_path_buf;
+    util::Buffer<std::size_t> m_subtab_path_buf;
 
     const Table* m_selected_table;
     const Spec*  m_selected_spec;
@@ -744,13 +730,6 @@ inline void Replication::on_table_destroyed(const Table* t) TIGHTDB_NOEXCEPT
 inline void Replication::on_spec_destroyed(const Spec* s) TIGHTDB_NOEXCEPT
 {
     if (m_selected_spec == s) m_selected_spec = 0;
-}
-
-
-template<class T> void Replication::Buffer<T>::set_size(std::size_t size)
-{
-    m_data.reset(new T[size]);
-    m_size = size;
 }
 
 
