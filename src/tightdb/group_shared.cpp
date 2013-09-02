@@ -1,23 +1,11 @@
 #include <algorithm>
 
-#include <pthread.h>
-
-#include <tightdb/terminate.hpp>
 #include <tightdb/safe_int_ops.hpp>
+#include <tightdb/terminate.hpp>
+#include <tightdb/thread.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group_shared.hpp>
 
-// FIXME: We should not include files from the test directory here. A
-// solution would probably be to move the definition of
-// TIGHTDB_PTHREADS_TEST to <config.h> and move <pthread_test.hpp>
-// into the "src/tightdb" directory.
-
-// Wrap pthread function calls with the pthread bug finding tool (program execution will be slower).
-// Works both in debug and release mode. Define the flag in testsettings.h
-#include "../test/testsettings.hpp"
-#ifdef TIGHTDB_PTHREADS_TEST
-#  include "../test/pthread_test.hpp"
-#endif
 
 using namespace std;
 using namespace tightdb;
@@ -32,8 +20,8 @@ struct SharedGroup::SharedInfo {
     uint16_t version;
     uint16_t flags;
 
-    pthread_mutex_t readmutex;
-    pthread_mutex_t writemutex;
+    Mutex readmutex;
+    RobustMutex writemutex;
     uint64_t filesize;
 
     uint64_t current_top;
@@ -46,49 +34,55 @@ struct SharedGroup::SharedInfo {
 
     static const int init_readers_size = 32; // Must be a power of two
     ReadCount readers[init_readers_size];
+
+    SharedInfo(const SlabAlloc&, size_t file_size, DurabilityLevel);
+    ~SharedInfo() TIGHTDB_NOEXCEPT {}
 };
+
+SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
+                                    DurabilityLevel dlevel):
+    readmutex(Mutex::process_shared_tag()), // Throws
+    writemutex() // Throws
+{
+    version  = 0;
+    flags    = dlevel; // durability level is fixed from creation
+    filesize = alloc.get_baseline();
+    infosize = uint32_t(file_size);
+    current_top     = alloc.get_top_ref();
+    current_version = 0;
+    capacity_mask   = init_readers_size - 1;
+    put_pos = 0;
+    get_pos = 0;
+}
 
 
 namespace {
 
-class ScopedMutexLock {
-public:
-    ScopedMutexLock(pthread_mutex_t* mutex) TIGHTDB_NOEXCEPT: m_mutex(mutex)
-    {
-        int r = pthread_mutex_lock(m_mutex);
-        TIGHTDB_ASSERT(r == 0);
-        static_cast<void>(r);
-    }
-
-    ~ScopedMutexLock() TIGHTDB_NOEXCEPT
-    {
-        int r = pthread_mutex_unlock(m_mutex);
-        TIGHTDB_ASSERT(r == 0);
-        static_cast<void>(r);
-    }
-
-private:
-    pthread_mutex_t* m_mutex;
-};
+void recover_from_dead_write_transact()
+{
+    // Nothing needs to be done
+}
 
 } // anonymous namespace
 
 
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
 //
-// According to the 'process sharing example' in the POSIX man page
+// According to the 'process-sharing example' in the POSIX man page
 // for pthread_mutexattr_init() other processes may continue to use a
-// shared mutex after exit of the process that initialized it. Also,
-// the example does not contain any call to pthread_mutex_destroy(),
-// so apparently a shared mutex need not be destroyed at all, nor can
-// it be that a shared mutex is associated with any resources that are
-// local to the initializing process.
+// process-shared mutex after exit of the process that initialized
+// it. Also, the example does not contain any call to
+// pthread_mutex_destroy(), so apparently a process-shared mutex need
+// not be destroyed at all, nor can it be that a process-shared mutex
+// is associated with any resources that are local to the initializing
+// process, because that would imply a leak.
 //
 // While it is not explicitely guaranteed in the man page, we shall
-// assume that is is valid to initialize a shared mutex twice without
-// an intervending call to pthread_mutex_destroy(). We need to be able
-// to reinitialize a shared mutex if the first initializing process
-// crashes and leaves the shared memory in an undefined state.
+// assume that is is valid to initialize a process-shared mutex twice
+// without an intervending call to pthread_mutex_destroy(). We need to
+// be able to reinitialize a process-shared mutex if the first
+// initializing process crashes and leaves the shared memory in an
+// undefined state.
 
 // FIXME: Issues with current implementation:
 //
@@ -110,7 +104,7 @@ retry:
         // FIXME: Handle lock file removal in case of failure below
 
         bool need_init = false;
-        size_t len     = 0;
+        size_t file_size = 0;
 
         // If we can get an exclusive lock we know that the file is
         // either new (empty) or a leftover from a previously
@@ -122,14 +116,14 @@ retry:
                 goto retry;
             }
             // Get size
-            if (int_cast_with_overflow_detect(m_file.get_size(), len))
+            if (int_cast_with_overflow_detect(m_file.get_size(), file_size))
                 throw runtime_error("Lock file too large");
 
             // Handle empty files (first user)
-            if (len == 0) {
+            if (file_size == 0) {
                 // Create new file
-                len = sizeof (SharedInfo);
-                m_file.resize(len);
+                file_size = sizeof (SharedInfo);
+                m_file.resize(file_size);
             }
             need_init = true;
         }
@@ -137,14 +131,13 @@ retry:
             m_file.lock_shared();
 
             // Get size
-            if (int_cast_with_overflow_detect(m_file.get_size(), len))
+            if (int_cast_with_overflow_detect(m_file.get_size(), file_size))
                 throw runtime_error("Lock file too large");
 
             // There is a slight window between opening the file and getting the
             // lock where another process could have deleted the file
-            if (len == 0 || m_file.is_removed()) {
+            if (file_size == 0 || m_file.is_removed())
                 goto retry;
-            }
         }
 
         // Map to memory
@@ -169,27 +162,8 @@ retry:
             bool read_only = false;
             alloc.attach_file(path, is_shared, read_only, no_create_file); // Throws
 
-            // Initialize mutexes so that they can be shared between processes
-            pthread_mutexattr_t mattr;
-            pthread_mutexattr_init(&mattr);
-            // FIXME: Must verify availability of optional feature: #ifdef _POSIX_THREAD_PROCESS_SHARED
-            pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
-            // FIXME: Should also do pthread_mutexattr_setrobust(&attr, PTHREAD_MUTEX_ROBUST). Check for availability with: #if _POSIX_THREADS >= 200809L
-            pthread_mutex_init(&info->readmutex, &mattr);
-            pthread_mutex_init(&info->writemutex, &mattr);
-            pthread_mutexattr_destroy(&mattr);
-
-
-            // Set initial values
-            info->version  = 0;
-            info->flags    = dlevel; // durability level is fixed from creation
-            info->filesize = alloc.get_baseline();
-            info->infosize = uint32_t(len);
-            info->current_top = alloc.get_top_ref();
-            info->current_version = 0;
-            info->capacity_mask = SharedInfo::init_readers_size - 1;
-            info->put_pos = 0;
-            info->get_pos = 0;
+            // Call SharedInfo::SharedInfo() (placement new)
+            new (info) SharedInfo(alloc, file_size, dlevel); // Throws
 
             // Set initial version so we can track if other instances
             // change the db
@@ -269,8 +243,7 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
         remove(db_path.c_str());
     }
 
-    pthread_mutex_destroy(&info->readmutex);
-    pthread_mutex_destroy(&info->writemutex);
+    info->~SharedInfo(); // Call destructor
 
     remove(m_file_path.c_str());
 }
@@ -296,6 +269,13 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
     // On top of that, if a customer chooses to run a data race
     // detector on their application, our data race migh show up, and
     // that may rightfully cause alarm.
+    //
+    // See also
+    // http://stackoverflow.com/questions/12878344/volatile-in-c11
+    //
+    // Please note that the definition of a data race inf C++11 also
+    // effectively applies to C++03. In this regard C++11 is just a
+    // standardization of the existing paradigm.
 
     // Have we changed since last transaction?
     // Visibility of changes can be delayed when using has_changed() because m_info->current_version is tested
@@ -319,7 +299,7 @@ const Group& SharedGroup::begin_read()
 
     {
         SharedInfo* info = m_file_map.get_addr();
-        ScopedMutexLock lock(&info->readmutex);
+        Mutex::Lock lock(info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize); // Throws
@@ -375,7 +355,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 
     {
         SharedInfo* info = m_file_map.get_addr();
-        ScopedMutexLock lock(&info->readmutex);
+        Mutex::Lock lock(info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
@@ -419,9 +399,8 @@ Group& SharedGroup::begin_write()
     SharedInfo* info = m_file_map.get_addr();
 
     // Get write lock
-    // Note that this will not get released until we call
-    // end_write().
-    pthread_mutex_lock(&info->writemutex);
+    // Note that this will not get released until we call end_write().
+    info->writemutex.lock(&recover_from_dead_write_transact); // Throws
 
     // Get the current top ref
     ref_type new_top_ref = to_size_t(info->current_top);
@@ -485,7 +464,7 @@ void SharedGroup::commit()
     }
 
     // Release write lock
-    pthread_mutex_unlock(&info->writemutex);
+    info->writemutex.unlock();
 
     m_group.detach();
 
@@ -511,7 +490,7 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
     SharedInfo* info = m_file_map.get_addr();
 
     // Release write lock
-    pthread_mutex_unlock(&info->writemutex);
+    info->writemutex.unlock();
 
     // Clear all changes made during transaction
     m_group.detach();
@@ -752,7 +731,7 @@ void SharedGroup::zero_free_space()
     size_t file_size;
 
     {
-        ScopedMutexLock lock(&info->readmutex);
+        Mutex::Lock lock(info->readmutex);
         current_version = info->current_version + 1;
         file_size = to_size_t(info->filesize);
 
@@ -791,11 +770,10 @@ void SharedGroup::low_level_commit(size_t new_version)
 
     size_t readlock_version;
     {
-        ScopedMutexLock lock(&info->readmutex);
+        Mutex::Lock lock(info->readmutex);
 
-        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size())) {
+        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize); // Throws
-        }
 
         if (ringbuf_is_empty()) {
             readlock_version = new_version;
@@ -837,7 +815,7 @@ void SharedGroup::low_level_commit(size_t new_version)
 
     // Update reader info
     {
-        ScopedMutexLock lock(&info->readmutex);
+        Mutex::Lock lock(info->readmutex);
         info->current_top = new_top_ref;
         info->filesize    = new_file_size;
         // FIXME: Due to lack of adequate synchronization, the

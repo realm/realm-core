@@ -9,8 +9,9 @@
 
 #include <tightdb/group_shared.hpp>
 #include <tightdb/file.hpp>
-#include <tightdb/thread.hpp>
 #include <tightdb/bind.hpp>
+
+#include "util/thread_wrapper.hpp"
 
 #include "testsettings.hpp"
 
@@ -376,63 +377,6 @@ void thread(int index, string database_path)
     }
 }
 
-
-class ThreadWrapper {
-public:
-    template<class F> void start(const F& func)
-    {
-        m_except = false;
-        m_thread.start(util::bind(&Runner<F>::run, func, this));
-    }
-
-    /// Returns 'true' if thread has thrown an exception. In that case
-    /// the exception message will also be writte to std::cerr.
-    bool join()
-    {
-        string except_msg;
-        if (join(except_msg)) {
-            cerr << "Exception thrown in thread: "<<except_msg<<"\n";
-            return true;
-        }
-        return false;
-    }
-
-    /// Returns 'true' if thread has thrown an exception. In that
-    /// case the exception message will have been assigned to \a
-    /// except_msg.
-    bool join(string& except_msg)
-    {
-        m_thread.join();
-        if (m_except) {
-            except_msg = m_except_msg;
-            return true;
-        }
-        return false;
-    }
-
-private:
-    Thread m_thread;
-    bool m_except;
-    string m_except_msg;
-
-    template<class F> struct Runner {
-        static void run(F func, ThreadWrapper* tw)
-        {
-            try {
-                func();
-            }
-            catch (exception& e) {
-                tw->m_except = true;
-                tw->m_except_msg = e.what();
-            }
-            catch (...) {
-                tw->m_except = true;
-                tw->m_except_msg = "Unknown error";
-            }
-        }
-    };
-};
-
 } // anonymous namespace
 
 
@@ -444,7 +388,7 @@ TEST(Transactions)
 
     // Run N rounds in each thread
     {
-        ThreadWrapper threads[num_threads];
+        test_util::ThreadWrapper threads[num_threads];
 
         // Start threads
         for (int i=0; i<num_threads; ++i) {

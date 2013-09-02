@@ -8,6 +8,9 @@
     //#define TEST_DURATION 3
 #endif
 
+// Robustness tests are not enable by default, because they interfere badly with Valgrind.
+// #define TEST_ROBUSTNESS
+
 // Wrap pthread function calls with the pthread bug finding tool (program execution will be slower) by
 // #including pthread_test.h. Works both in debug and release mode.
 //#define TIGHTDB_PTHREADS_TEST
