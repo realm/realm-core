@@ -40,7 +40,7 @@ struct SharedGroup::SharedInfo {
     uint64_t filesize;
 
     uint64_t current_top;
-    volatile uint32_t current_version;
+    uint32_t current_version;
 
     uint32_t infosize;
     uint32_t capacity; // -1 so it can also be used as mask
@@ -312,13 +312,20 @@ void SharedGroup::open(const string& path, bool no_create_file,
         }
         else {
             // In async mode we need to wait for the commit process to get ready
-            // so we wait for first read lock being made by async_commit process
+            // so we wait for first begin_read being made by async_commit process
             SharedInfo* const info = m_file_map.get_addr();
             int maxwait = 100000;
             while (maxwait--) {
+                // FIXME: using put_pos is not nice. Look for a better way
                 if (info->put_pos != 0) {
+                    // NOTE: access to info following the return is separeted
+                    // from the above check by synchronization primitives. Were
+                    // that not the case, a read barrier would be needed here.
                     return;
                 }
+                // this function call prevents access to put_pos from beeing
+                // optimized into a register - if removed, a read barrier is
+                // required instead to prevent optimization.
                 usleep(10);
             }
             throw runtime_error("Failed to observe async commit starting");
@@ -380,33 +387,14 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 
 bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 {
-    // FIXME: Due to lack of adequate synchronization, the following
-    // read of 'info->current_version' effectively participates in a
-    // "data race". See also SharedGroup::low_level_commit(). First of
-    // all, portable C++ code must always operate under the assumption
-    // that a data race is an error. The point is that the memory
-    // model defined by, and assumed by the C++ standard does not
-    // allow for data races at all. The purpose is to give harware
-    // designers more freedom to optimize their hardware. This also
-    // means that even if your 'data race' works for you today, it may
-    // malfunction and cause havoc on the next revision of that
-    // platform. According to Hans Boehm (one of the major
-    // contributors to the design of the C++ memory model) we should
-    // think of a data race as something so grave that it could cause
-    // you computer to burst into flames (see
-    // http://channel9.msdn.com/Events/GoingNative/GoingNative-2012/Threads-and-Shared-Variables-in-C-11)
-    // On top of that, if a customer chooses to run a data race
-    // detector on their application, our data race migh show up, and
-    // that may rightfully cause alarm.
-
-    // Have we changed since last transaction?
-    // Visibility of changes can be delayed when using has_changed() because m_info->current_version is tested
-    // outside mutexes. However, the delay is finite on architectures that have hardware cache coherency (ARM, x64, x86,
-    // POWER, UltraSPARC, etc) because it guarantees write propagation (writes to m_info->current_version occur on
-    // system bus and make cache controllers invalidate caches of reader). Some excotic architectures may need
-    // explicit synchronization which isn't implemented yet.
     TIGHTDB_SYNC_IF_NO_CACHE_COHERENCE
     const SharedInfo* info = m_file_map.get_addr();
+    // this variable is changed under lock (the readmutex), but
+    // inspected here without taking a lock. This is intentional.
+    // Callers of has_changed MUST lock the readmutex before
+    // accessing any parts of the info structure, OR it may see
+    // an inconsistent view of memory on systems with weak memory
+    // consistency.
     bool changed = m_version != info->current_version;
     return changed;
 }
@@ -415,6 +403,10 @@ void SharedGroup::do_async_commits()
 {
     bool shutdown = false;
     SharedInfo* info = m_file_map.get_addr();
+    // NO client are allowed to proceed and update current_version
+    // until they see the memory changes triggered by begin_read,
+    // which will update the info->put_pos field. As we haven't called
+    // begin read yet, it is safe to assert the following:
     TIGHTDB_ASSERT(info->current_version == 0);
 
     // We always want to keep a read lock on the last version
@@ -427,9 +419,10 @@ void SharedGroup::do_async_commits()
     m_group.invalidate();
     while(true) {
 
-        // FIXME: no way yet to detect that we should shut down
-        if (m_file.is_removed()) {
+        if (m_file.is_removed()) { // operator removed the lock file. take a hint!
 
+            info->shutdown_started = 1;
+            // FIXME: barrier?
             shutdown = true;
             printf("Lock file removed, initiating shutdown\n");
         }
@@ -442,6 +435,7 @@ void SharedGroup::do_async_commits()
         // Currently, it just throws a runtim exception, though.
         if (m_file.try_lock_exclusive()) {
             info->shutdown_started = 1;
+            // FIXME: barrier?
             shutdown = true;
         }
         // if try_lock_exclusive fails, we loose our read lock, so
@@ -450,6 +444,12 @@ void SharedGroup::do_async_commits()
         // when async commits are used.
         m_file.lock_shared();
 
+        // the existence of function calls above protects us against
+        // the compiler "registerizing" info->current_version, which
+        // must be refetched from cache by has_changed(). The call to
+        // begin_read below BOTH has a memory barrier ensuring a consistent
+        // memory view AND ensures exclusive access to the relevant part
+        // of the info structure.
         if (has_changed()) {
 
             printf("Syncing...");
@@ -993,10 +993,12 @@ void SharedGroup::low_level_commit(size_t new_version)
 //        fprintf(stderr, "group_shared::low_level_commit   filesize <- %ul\n",
 //                new_file_size);
         info->filesize    = new_file_size;
-        // FIXME: Due to lack of adequate synchronization, the
-        // following modification of 'info->current_version'
-        // effectively participates in a "data race". Please see the
-        // 'FIXME' in SharedGroup::has_changed() for more info.
+        // The following assignment may be observed by other threads 
+        // without taking a lock, by calling the has_changed() function. 
+        // On architectures with weak memory consistency, an observer might 
+        // see this change *before* the corresponding updates to current_top
+        // and filesize. To avoid this race, any observer reacting to has_changed()
+        // must obtain a lock on the readmutex before accessing these variables.
         info->current_version = new_version;//FIXME src\tightdb\group_shared.cpp(772): warning C4267: '=' : conversion from 'size_t' to 'volatile uint32_t', possible loss of data
     }
 
