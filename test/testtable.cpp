@@ -489,17 +489,13 @@ TEST(Table_test_to_string)
     stringstream ss;
     table.to_string(ss);
     const string result = ss.str();
-
-#if _MSC_VER
-    const char* filename = "expect_string-win.txt";
-#else
     const char* filename = "expect_string.txt";
-#endif
+
 #if GENERATE   // enable to generate testfile - check it manually
-    ofstream testFile(filename, ios::out | ios::binary);
+    ofstream testFile(filename, ios::out);
     testFile << result;
 #else
-    ifstream testFile(filename, ios::in | ios::binary);
+    ifstream testFile(filename, ios::in);
     CHECK(!testFile.fail());
     string expected;
     expected.assign( istreambuf_iterator<char>(testFile),
@@ -521,11 +517,7 @@ TEST(Table_test_json_all_data)
     stringstream ss;
     table.to_json(ss);
     const string json = ss.str();
-#if _MSC_VER
-    const char* filename = "expect_json-win.json";
-#else
     const char* filename = "expect_json.json";
-#endif
 #if GENERATE
         // Generate the testdata to compare. After doing this,
         // verify that the output is correct with a json validator:
