@@ -13,9 +13,6 @@
     <ClCompile Include="test\test_array_string_long.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\test_column.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
     <ClCompile Include="test\test_column_binary.cpp">
       <Filter>test</Filter>
     </ClCompile>
@@ -53,9 +50,6 @@
       <Filter>test\large_tests</Filter>
     </ClCompile>
     <ClCompile Include="test\large_tests\verified_string.cpp">
-      <Filter>test\large_tests</Filter>
-    </ClCompile>
-    <ClCompile Include="test\large_tests\test_column.cpp">
       <Filter>test\large_tests</Filter>
     </ClCompile>
     <ClCompile Include="src\tightdb\column.cpp">
@@ -170,6 +164,24 @@
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="test\test_thread.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_column.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\large_tests\test_column_large.cpp">
+      <Filter>test\large_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_utf8.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_column_basic.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_string_data.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_lang_bind_helper.cpp">
       <Filter>test</Filter>
     </ClCompile>
   </ItemGroup>
