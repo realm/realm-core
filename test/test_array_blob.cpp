@@ -3,6 +3,16 @@
 
 using namespace tightdb;
 
+TEST(ArrayBlob_AddEmpty)
+{
+    ArrayBlob blob;
+
+    blob.add("", 0);
+
+    // Cleanup
+    blob.destroy();
+}
+
 TEST(ArrayBlob)
 {
     ArrayBlob blob;

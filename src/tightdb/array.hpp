@@ -503,6 +503,9 @@ public:
     /// Returns true if type is either type_HasRefs or type_InnerColumnNode
     bool has_refs() const TIGHTDB_NOEXCEPT { return m_hasRefs; }
 
+    // Columns and indexes can use the context bit to diffentiate leaf types
+    bool context_bit() const TIGHTDB_NOEXCEPT { return get_indexflag_from_header(); }
+    void set_context_bit(bool value) { set_header_indexflag(value); }
     bool is_index_node() const  TIGHTDB_NOEXCEPT { return get_indexflag_from_header(); }
     void set_is_index_node(bool value) { set_header_indexflag(value); }
 
