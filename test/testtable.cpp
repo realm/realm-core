@@ -6,6 +6,7 @@
 
 #include <UnitTest++.h>
 #include "testsettings.hpp"
+#include "test_utilities.hpp"
 #include <tightdb/table_macros.hpp>
 #include <tightdb/lang_bind_helper.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -478,6 +479,7 @@ TEST(Table_Move_All_Types)
     }
 }
 
+
 // enable to generate testfiles for to_string and json below
 #define GENERATE 0
 
@@ -489,19 +491,24 @@ TEST(Table_test_to_string)
     stringstream ss;
     table.to_string(ss);
     const string result = ss.str();
+#if _MSC_VER
+    const char* filename = "expect_string-win.txt";
+#else
     const char* filename = "expect_string.txt";
-
+#endif
 #if GENERATE   // enable to generate testfile - check it manually
     ofstream testFile(filename, ios::out);
     testFile << result;
+    cerr << "to_string() test:\n" << result << endl;
 #else
     ifstream testFile(filename, ios::in);
     CHECK(!testFile.fail());
     string expected;
     expected.assign( istreambuf_iterator<char>(testFile),
                      istreambuf_iterator<char>() );
-    CHECK_EQUAL(true, result == expected);
-    if (result != expected) {
+    bool test_ok = equal_without_cr(result, expected);
+    CHECK_EQUAL(true, test_ok);
+    if (!test_ok) {
         ofstream testFile("expect_string.error.txt", ios::out | ios::binary);
         testFile << result;
         cerr << "\n error result in 'expect_string.error.txt'\n";
@@ -517,7 +524,11 @@ TEST(Table_test_json_all_data)
     stringstream ss;
     table.to_json(ss);
     const string json = ss.str();
+#if _MSC_VER
+    const char* filename = "expect_json-win.json";
+#else
     const char* filename = "expect_json.json";
+#endif
 #if GENERATE
         // Generate the testdata to compare. After doing this,
         // verify that the output is correct with a json validator:

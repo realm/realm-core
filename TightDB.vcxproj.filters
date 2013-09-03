@@ -169,6 +169,9 @@
     <ClCompile Include="test\test_file.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="test\test_utilities.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">
@@ -356,6 +359,9 @@
     </ClInclude>
     <ClInclude Include="test\pthread_test.hpp">
       <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="test\test_utilities.hpp">
+      <Filter>test</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
