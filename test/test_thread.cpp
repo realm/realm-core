@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <queue>
+#include <memory.h>
 
 #include <UnitTest++.h>
 
@@ -20,18 +21,31 @@ void increment(int* i)
     ++*i;
 }
 
-
 struct Shared {
     Mutex m_mutex;
     int m_value;
 
-    void increment_1000_times()
+    // 10000 takes less than 0.1 sec
+    void increment_10000_times()
     {
-        for (int i=0; i<1000; ++i) {
+        for (int i=0; i<10000; ++i) {
             Mutex::Lock lock(m_mutex);
             ++m_value;
         }
     }
+
+    void increment_10000_times2()
+    {
+        for (int i=0; i<10000; ++i) {
+            Mutex::Lock lock(m_mutex);
+            // Create a time window where thread interference can take place. Problem with ++m_value is that it 
+            // could assemble into 'inc [addr]' which has very tiny gap
+            double f = m_value;
+            f += 1.;
+            m_value = int(f);
+        }
+    }
+
 };
 
 
@@ -171,8 +185,6 @@ TEST(Thread_Start)
 // robust mutexes.
 // Lasse, could you take a look at it?
 
-#ifndef _WIN32
-
 TEST(Thread_MutexLock)
 {
     Mutex mutex;
@@ -203,14 +215,25 @@ TEST(Thread_CriticalSection)
     shared.m_value = 0;
     Thread threads[10];
     for (int i = 0; i < 10; ++i)
-        threads[i].start(util::bind(&Shared::increment_1000_times, &shared));
+        threads[i].start(util::bind(&Shared::increment_10000_times, &shared));
     for (int i = 0; i < 10; ++i)
         threads[i].join();
-    CHECK_EQUAL(10000, shared.m_value);
+    CHECK_EQUAL(100000, shared.m_value);
 }
 
 
-#ifdef TEST_ROBUSTNESS
+TEST(Thread_CriticalSection2)
+{
+    Shared shared;
+    shared.m_value = 0;
+    Thread threads[10];
+    for (int i = 0; i < 10; ++i)
+        threads[i].start(util::bind(&Shared::increment_10000_times2, &shared));
+    for (int i = 0; i < 10; ++i)
+        threads[i].join();
+    CHECK_EQUAL(100000, shared.m_value);
+}
+
 
 TEST(Thread_RobustMutex)
 {
@@ -350,17 +373,15 @@ TEST(Thread_DeathDuringRecovery)
     robust.m_mutex.unlock();
 }
 
-#endif // TEST_ROBUSTNESS
-
 
 TEST(Thread_CondVar)
 {
     QueueMonitor queue;
-    const int num_producers = 2; // 32;
-    const int num_consumers = 2; // 32;
+    const int num_producers = 32; // 32;
+    const int num_consumers = 32; // 32;
     Thread producers[num_producers], consumers[num_consumers];
     int consumed_counts[num_consumers][num_producers];
-    fill(&consumed_counts[0][0], &consumed_counts[num_consumers][num_producers], 0);
+    memset(consumed_counts, 0, sizeof(consumed_counts));
 
     for (int i = 0; i < num_producers; ++i)
         producers[i].start(util::bind(&producer_thread, &queue, i));
@@ -379,5 +400,3 @@ TEST(Thread_CondVar)
         CHECK_EQUAL(1000, n);
     }
 }
-
-#endif // _WIN32

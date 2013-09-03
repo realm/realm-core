@@ -8,12 +8,15 @@
 #endif
 
 #ifdef _POSIX_THREAD_PROCESS_SHARED
-#  define TIGHTDB_HAVE_PTHREAD_PROCESS_SHARED
-#  if _POSIX_THREADS >= 200809L
-#    define TIGHTDB_HAVE_ROBUST_PTHREAD_MUTEX
+#  if _POSIX_THREAD_PROCESS_SHARED != -1            // can apparently also be -1
+#    define TIGHTDB_HAVE_PTHREAD_PROCESS_SHARED
+#    if !defined(_MSC_VER)                          // robust not supported by our windows pthreads port
+#      if _POSIX_THREADS >= 200809L
+#        define TIGHTDB_HAVE_ROBUST_PTHREAD_MUTEX
+#      endif
+#    endif
 #  endif
 #endif
-
 
 using namespace std;
 using namespace tightdb;
