@@ -2,7 +2,6 @@
 *.tightdb.lock
 *.ncb
 *.suo
-*.vcproj.*.user
 *.swp
 *~
 cscope.*
@@ -12,13 +11,16 @@ tags
 /gcovr.xml
 /tmp
 
+# Ignore all user files except one which includes execution path for test
+*.user
+!tighdb.vcxproj.user
+
 #ignore thumbnails created by windows
 Thumbs.db
 #Ignore files build by Visual Studio
 *.obj
 *.exe
 *.pdb
-*.user
 *.aps
 *.pch
 *.vspscc
