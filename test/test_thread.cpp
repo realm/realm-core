@@ -1,6 +1,6 @@
+#include <cstring>
 #include <algorithm>
 #include <queue>
-#include <memory.h>
 
 #include <UnitTest++.h>
 
@@ -38,7 +38,7 @@ struct Shared {
     {
         for (int i=0; i<10000; ++i) {
             Mutex::Lock lock(m_mutex);
-            // Create a time window where thread interference can take place. Problem with ++m_value is that it 
+            // Create a time window where thread interference can take place. Problem with ++m_value is that it
             // could assemble into 'inc [addr]' which has very tiny gap
             double f = m_value;
             f += 1.;
@@ -175,16 +175,6 @@ TEST(Thread_Start)
 }
 
 
-// FIXME: Our POSIX Threads port for Windows seems to have a number
-// of bugs that prevent the rest of the unit-tests from working.
-// One bug appears to be that pthread_mutex_lock() incorrectly
-// believes that a regular mutex is a process-shared mutex.
-// It also looks like there is an error when calling
-// pthread_mutex_destroy() on a process-shared mutex.
-// And finally, it appears that it incorrectly claims support for
-// robust mutexes.
-// Lasse, could you take a look at it?
-
 TEST(Thread_MutexLock)
 {
     Mutex mutex;
@@ -234,6 +224,8 @@ TEST(Thread_CriticalSection2)
     CHECK_EQUAL(100000, shared.m_value);
 }
 
+
+#ifdef TEST_ROBUSTNESS
 
 TEST(Thread_RobustMutex)
 {
@@ -373,15 +365,17 @@ TEST(Thread_DeathDuringRecovery)
     robust.m_mutex.unlock();
 }
 
+#endif // TEST_ROBUSTNESS
+
 
 TEST(Thread_CondVar)
 {
     QueueMonitor queue;
-    const int num_producers = 32; // 32;
-    const int num_consumers = 32; // 32;
+    const int num_producers = 32;
+    const int num_consumers = 32;
     Thread producers[num_producers], consumers[num_consumers];
     int consumed_counts[num_consumers][num_producers];
-    memset(consumed_counts, 0, sizeof(consumed_counts));
+    memset(consumed_counts, 0, sizeof consumed_counts);
 
     for (int i = 0; i < num_producers; ++i)
         producers[i].start(util::bind(&producer_thread, &queue, i));
