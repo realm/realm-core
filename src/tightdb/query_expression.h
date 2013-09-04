@@ -161,6 +161,10 @@ public:
     bool m_auto_delete;
 };
 
+class ColumnsBase {
+
+};
+
 template <class T> class Columns;
 template <class T> class Value;
 template <class T> class Subexpr2;
@@ -496,7 +500,7 @@ template <class R> Operator<Div<typename Common<R, int64_t>::type> >& operator /
 }
 
 
-template <class T> class Columns : public Subexpr2<T>
+template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
     explicit Columns(size_t column, bool auto_delete) : m_table2(NULL)

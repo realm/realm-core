@@ -18,6 +18,8 @@
 #include <tightdb/column_mixed.hpp>
 #include <tightdb/index_string.hpp>
 
+#include "query_engine.hpp"
+
 using namespace std;
 
 
@@ -31,6 +33,7 @@ struct FakeParent: Table::Parent {
 
 
 // -- Table ---------------------------------------------------------------------------------
+
 
 void Table::init_from_ref(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent)
 {

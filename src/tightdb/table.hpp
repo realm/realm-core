@@ -28,6 +28,8 @@
 #include <tightdb/mixed.hpp>
 #include <tightdb/query.hpp>
 
+//#include "query_expression.h"
+
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
@@ -39,6 +41,7 @@ class TableView;
 class ConstTableView;
 class StringIndex;
 
+template <class T> class Columns;
 
 /// The Table class is non-polymorphic, that is, it has no virtual
 /// functions. This is important because it ensures that there is no
@@ -165,6 +168,11 @@ public:
     bool has_index(std::size_t column_ndx) const;
     void set_index(std::size_t column_ndx);
     //@}
+
+    template <class T> Columns<T>& columns(size_t column)
+    {
+        return *new Columns<T>(column, this, true);
+    }
 
 
     // Table size and deletion

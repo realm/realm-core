@@ -71,7 +71,7 @@ TIGHTDB_TABLE_3(ThreeColTable,
 
 int main(int argc, char* argv[])
 {
-    size_t match, match1, match2;
+    size_t match;
 
     // UNTYPED table with 2 rows and 3 cols
     Table untyped;
@@ -93,6 +93,32 @@ int main(int argc, char* argv[])
     typed.add(20, 20.1f, 4.0);
 
 
+    // untyped table
+
+    Columns<int64_t> &c1 = untyped.columns<int64_t>(0);
+    Columns<float> &c2 = untyped.columns<float>(1);
+    Expression *e2 = new Compare<Greater, float>(c2, c1);
+    match = untyped.where().expression(e2).find_next();
+    assert(match == 1);    
+
+    match = (untyped.columns<int64_t>(0) < untyped.columns<float>(1))->find_next();
+    assert(match == 1);    
+
+
+    // untyped table 
+    Subexpr* first = new Columns<int64_t>(0);
+    Subexpr* second = new Columns<float>(1);
+    Subexpr* third = new Columns<double>(2);
+    Subexpr* constant = new Value<int64_t>(40);    
+    Subexpr* plus = new Operator<Plus<float> >(*first, *second);  
+    Expression *e = new Compare<Greater, float>(*plus, *constant);
+
+    match = untyped.where().expression(e).find_next();
+    assert(match == 1);    
+
+
+
+
     // typed table
     Query* e5 = typed.column().second + typed.column().first > 40;   
     match = e5->find_next();
@@ -103,18 +129,6 @@ int main(int argc, char* argv[])
     assert(match == 1);
 
     delete static_cast<Expression*>(e5);
-
-
-    // untyped table 
-    Subexpr* first = new Columns<int64_t>(0);
-    Subexpr* second = new Columns<float>(1);
-    Subexpr* third = new Columns<double>(1);
-    Subexpr* constant = new Value<int64_t>(40);    
-    Subexpr* plus = new Operator<Plus<float> >(*first, *second);  
-    Expression *e = new Compare<Greater, float>(*plus, *constant);
-
-    match = untyped.where().expression(e).find_next();
-    assert(match == 1);    
 
 
 
