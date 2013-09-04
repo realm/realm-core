@@ -97,7 +97,6 @@ int main(int argc, char* argv[])
     match = q1.find_next();
     assert(match == 1);   
 
-
     match = (typed.column().first + typed.column().second > 40).find_next();
     assert(match == 1);   
 
@@ -143,9 +142,20 @@ int main(int argc, char* argv[])
     Subexpr* plus = new Operator<Plus<float> >(*first, *second);  
     Expression *e = new Compare<Greater, float>(*plus, *constant);
 
+    // Bind table and do search
     match = untyped.where().expression(e).find_next();
+    assert(match == 1);    
 
-    
+    // you MUST delete these in reversed order of creation
+    delete e;
+    delete plus;
+    delete constant;
+    delete third;
+    delete second;
+    delete first;
+
+
+
     /*
     ThreeColTable::Query q45 = typed.where().expression(static_cast<Expression*>(&e5));
     match = q45.find_next();
