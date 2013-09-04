@@ -18,6 +18,7 @@
 
 
 // Header format (8 bytes):
+// ------------------------
 //
 // |--------|--------|--------|--------|--------|--------|--------|--------|
 // |12344555|           size           |         capacity         |reserved|
@@ -47,6 +48,43 @@
 //
 // 'capacity' is the total number of bytes allocated for this array
 // including the header.
+//
+//
+// Inner node of B+-tree:
+// ----------------------
+//
+// An inner node of a B+-tree is has one of two forms: The 'compact'
+// form which uses a single array node, or the 'general' form which
+// uses two. The compact form is used by default but is converted to
+// the general form when the corresponding subtree is modified in
+// certain ways. There are two kinds of modification that require
+// conversion to the general form:
+//
+//  - Insertion of an element into the corresponding subtree, except
+//    when insertion occurs after the last element in the subtree
+//    (append).
+//
+//  - Removal of an element from the corresponding subtree, except
+//    when the removed element is the last element in the subtree.
+//
+// Compact form:
+//
+//   --> | N_c | r_1 | r_2 | ... | r_N | N_t |
+//
+// General form:
+//
+//   --> |  .  | r_1 | r_2 | ... | r_N | N_t |  (main array node)
+//          |
+//           --> | o_1 | o_2 | ... | o_M |  (offsets array node)
+//
+// Here,
+//   `r_i` is the i'th child ref,
+//   `o_i` is the number of elements in the i'th child plus the number
+//         of elements in preceeding children,
+//   `N`   is the number of children,
+//   'M'   is one less than the number of children,
+//   `N_c` is the fixed number of elements per child, and
+//   `N_t` is the total number of elements in the subtree.
 
 
 using namespace std;
@@ -2035,29 +2073,29 @@ template<int width>
 inline pair<ref_type, size_t> find_btree_child(const char* data, size_t ndx,
                                                const Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    size_t child_ref_ndx;
+    size_t child_ndx;
     size_t elem_ndx_offset;
     int64_t first_value = get_direct<width>(data, 0);
     if (first_value % 2 == 1) {
-        // Case 1/2: No offsets array (collapsed)
+        // Case 1/2: No offsets array (compact form)
         size_t elems_per_child = to_size_t(first_value);
-        child_ref_ndx   = 2 + ndx / elems_per_child;
-        elem_ndx_offset =     ndx % elems_per_child;
+        child_ndx       = ndx / elems_per_child;
+        elem_ndx_offset = ndx % elems_per_child;
         // FIXME: It may be worth considering not to store the total
         // number of elements in each collapsed node. This would also
         // speed up a tight sequence of append-to-column.
     }
     else {
-        // Case 2/2: Offsets array (non-collapsed)
+        // Case 2/2: Offsets array (general form)
         ref_type offsets_ref = to_ref(first_value);
-        char* header = alloc.translate(offsets_ref);
-        int width_2 = Array::get_width_from_header(header);
+        char* offsets_header = alloc.translate(offsets_ref);
+        int offsets_width = Array::get_width_from_header(offsets_header);
         pair<size_t, size_t> p;
-        TIGHTDB_TEMPEX(p = find_child, width_2, (header, ndx));
-        child_ref_ndx   = 1 + p.first;
-        elem_ndx_offset =     p.second;
+        TIGHTDB_TEMPEX(p = find_child, offsets_width, (offsets_header, ndx));
+        child_ndx       = p.first;
+        elem_ndx_offset = p.second;
     }
-    ref_type child_ref = to_ref(get_direct<width>(data, child_ref_ndx));
+    ref_type child_ref = to_ref(get_direct<width>(data, 1 + child_ndx));
     return make_pair(child_ref, elem_ndx_offset);
 }
 
