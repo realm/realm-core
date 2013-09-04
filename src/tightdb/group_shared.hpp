@@ -308,12 +308,12 @@ inline void SharedGroup::open(Replication::Provider& repl_provider)
     // We receive ownership of the Replication instance. Note that
     // even though we store the pointer in the Group instance, it is
     // still ~SharedGroup() that is responsible for deleting it.
-    Replication* repl = repl_provider.new_instance();
-    m_group.set_replication(repl);
+    Replication* repl = repl_provider.new_instance(); // Throws
     std::string file       = repl->get_database_path();
     bool no_create         = false;
     DurabilityLevel dlevel = durability_Full;
-    open(file, no_create, dlevel);
+    open(file, no_create, dlevel); // Throws
+    m_group.set_replication(repl);
 }
 
 inline void SharedGroup::interrupt_transact()

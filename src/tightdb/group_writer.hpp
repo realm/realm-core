@@ -39,8 +39,16 @@ public:
 
     void set_versions(std::size_t current, std::size_t read_lock);
 
-    /// Returns the new top ref.
-    ref_type commit(bool do_sync);
+    /// Write all changed array nodes into free space.
+    ///
+    /// Returns the new top ref. When in full durability mode, call
+    /// commit() with the returned top ref.
+    ref_type write_group();
+
+    /// Flush changes to physical medium, then write the new top ref
+    /// to the file header, then flush again. Pass the top ref
+    /// returned by write_group().
+    void commit(ref_type new_top_ref);
 
     std::size_t get_file_size() const TIGHTDB_NOEXCEPT;
 
@@ -49,9 +57,6 @@ public:
     /// Returns the position in the file where the first byte was
     /// written.
     std::size_t write(const char* data, std::size_t size);
-
-    /// Controlled update of physical medium
-    void sync(uint64_t top_pos);
 
 #ifdef TIGHTDB_DEBUG
     void dump();

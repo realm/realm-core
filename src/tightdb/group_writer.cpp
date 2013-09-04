@@ -1,5 +1,6 @@
 #include <algorithm>
 
+#include <tightdb/safe_int_ops.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -11,7 +12,7 @@ using namespace tightdb;
 GroupWriter::GroupWriter(Group& group) :
     m_group(group), m_alloc(group.m_alloc), m_current_version(0)
 {
-    m_file_map.map(m_alloc.m_file, File::access_ReadWrite, m_alloc.get_baseline());
+    m_file_map.map(m_alloc.m_file, File::access_ReadWrite, m_alloc.get_baseline()); // Throws
 }
 
 
@@ -23,7 +24,7 @@ void GroupWriter::set_versions(size_t current, size_t read_lock)
 }
 
 
-size_t GroupWriter::commit(bool do_sync)
+size_t GroupWriter::write_group()
 {
     merge_free_space(); // Throws
 
@@ -109,6 +110,7 @@ size_t GroupWriter::commit(bool do_sync)
             flengths.insert(ndx, size); // Throws
             if (is_shared)
                 fversions.insert(ndx, m_current_version); // Throws
+            // Adjust reserve_ndx to keep in valid
             if (ndx <= reserve_ndx)
                 ++reserve_ndx;
         }
@@ -165,13 +167,6 @@ size_t GroupWriter::commit(bool do_sync)
 
     // Write top
     write_at(top_pos, top.get_header(), top_size); // Throws
-
-    // In swap-only mode, we just use the file as backing for the shared
-    // memory. So we never actually flush the data to disk (the OS may do
-    // so for swapping though). Note that this means that the file on disk
-    // may very likely be in an invalid state.
-    if (do_sync)
-        sync(top_pos); // Throws
 
     // Return top_pos so that it can be saved in lock file used
     // for coordination
@@ -308,12 +303,12 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     // FIXME: What we really need here is the "logical" size of the
     // file and not the real size. The real size may have changed
     // without the free space information having been adjusted
-    // accordingly. This can happen, for example, if commit() fails
-    // before writing the new top-ref, but after having extended the
-    // file size. We currently do not have a concept of a logical file
-    // size, but if provided, it would have to be stored as part of a
-    // database version such that it is updated atomically together
-    // with the rest of the contents of the version.
+    // accordingly. This can happen, for example, if write_group()
+    // fails before writing the new top-ref, but after having extended
+    // the file size. We currently do not have a concept of a logical
+    // file size, but if provided, it would have to be stored as part
+    // of a database version such that it is updated atomically
+    // together with the rest of the contents of the version.
     size_t file_size = m_file_map.get_size();
 
     bool extend_last_chunk = false;
@@ -338,24 +333,49 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
         }
     }
 
-    // we always expand megabytes at a time, both for
-    // performance and to avoid excess fragmentation
-    const size_t megabyte = 1024 * 1024;
-    const size_t needed_size = file_size + requested_size;
-    const size_t rest = needed_size % megabyte;
-    const size_t new_file_size = rest > 0 ? (needed_size + (megabyte - rest)) : needed_size;
+    size_t min_file_size = file_size;
+    if (int_add_with_overflow_detect(min_file_size, requested_size)) {
+        throw runtime_error("File size overflow");
+    }
 
-    // Extend the file
-    m_alloc.m_file.alloc(0, new_file_size); // Throws
+    // We double the size until we reach 'stop_doubling_size'. From
+    // then on we increment the size in steps of
+    // 'stop_doubling_size'. This is to achieve a reasonable
+    // compromise between minimizing fragmentation (maximizing
+    // performance) and minimizing over-allocation.
+    size_t stop_doubling_size = 128 * (1024*1024L); // = 128 MiB
+    TIGHTDB_ASSERT(stop_doubling_size % 8 == 0);
 
-    // FIXME: It is not clear what this call to sync() achieves. In
-    // fact, is seems like it acheives nothing at all, because only if
-    // the new top 'ref' is successfully instated will we need to see
-    // a bigger file on disk. On the other hand, if it does acheive
-    // something, what exactly is that? On the other hand, if it relly
-    // must stay, it should at least be skipped when
-    // SharedGroup::durability_MemOnly is selected.
-    m_alloc.m_file.sync();
+    size_t new_file_size = file_size;
+    while (new_file_size < min_file_size) {
+        if (new_file_size < stop_doubling_size) {
+            // The file contains at least a header, so the size can never
+            // be zero. We need this to ensure that the number of
+            // iterations will be finite.
+            TIGHTDB_ASSERT(new_file_size != 0);
+            // Be sure that the doubling does not overflow
+            TIGHTDB_ASSERT(stop_doubling_size <= numeric_limits<size_t>::max() / 2);
+            new_file_size *= 2;
+        }
+        else {
+            if (int_add_with_overflow_detect(new_file_size, stop_doubling_size)) {
+                new_file_size = numeric_limits<size_t>::max();
+                new_file_size &= ~size_t(0x7); // 8-byte alignment
+            }
+        }
+    }
+
+    // The size must be a multiple of 8. This is guaranteed as long as
+    // the initial size is a multiple of 8.
+    TIGHTDB_ASSERT(new_file_size % 8 == 0);
+
+    // Note: File::prealloc() may misbehave under race conditions (see
+    // documentation of File::prealloc()). Fortunately, no race
+    // conditions can occur, because in transactional mode we hold a
+    // write lock at this time, and in non-transactional mode it is
+    // the responsibility of the user to ensure non-concurrent
+    // mutation access.
+    m_alloc.m_file.prealloc(0, new_file_size);
 
     m_file_map.remap(m_alloc.m_file, File::access_ReadWrite, new_file_size);
 
@@ -408,12 +428,12 @@ void GroupWriter::write_at(size_t pos, const char* data, size_t size)
 }
 
 
-void GroupWriter::sync(uint64_t top_pos)
+void GroupWriter::commit(ref_type new_top_ref)
 {
     // Write data
-    m_file_map.sync();
+    m_file_map.sync(); // Throws
 
-    // File header is 24 bytes, composed of three 64bit
+    // File header is 24 bytes, composed of three 64-bit
     // blocks. The two first being top_refs (only one valid
     // at a time) and the last being the info block.
     char* file_header = m_file_map.get_addr();
@@ -423,13 +443,16 @@ void GroupWriter::sync(uint64_t top_pos)
     int current_valid_ref = file_header[16+7] & 0x1;
     int new_valid_ref = current_valid_ref ^ 0x1;
 
+    // FIXME: What rule guarantees that the new top ref is written to
+    // physical medium before the swapping bit?
+
     // Update top ref pointer
     uint64_t* top_refs = reinterpret_cast<uint64_t*>(file_header);
-    top_refs[new_valid_ref] = top_pos;
+    top_refs[new_valid_ref] = new_top_ref;
     file_header[16+7] = char(new_valid_ref); // swap
 
     // Write new header to disk
-    m_file_map.sync();
+    m_file_map.sync(); // Throws
 }
 
 

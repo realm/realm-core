@@ -6,6 +6,16 @@
 #include <tightdb/file.hpp>
 #include <tightdb/thread.hpp>
 #include <tightdb/bind.hpp>
+#include <tightdb/terminate.hpp>
+
+#include "testsettings.hpp"
+
+// Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
+#ifndef _WIN32
+#  include <unistd.h>
+#  include <sys/wait.h>
+#  define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
+#endif
 
 using namespace std;
 using namespace tightdb;
@@ -382,6 +392,237 @@ TEST(Shared_Writes)
 #endif
 }
 
+
+TEST(Shared_ManyReaders)
+{
+    // This test was written primarily to expose a former bug in
+    // SharedGroup::end_read(), where the lock-file was not remapped
+    // after ring-buffer expansion.
+
+    const int chunk_1_size = 251;
+    char chunk_1[chunk_1_size];
+    for (int i = 0; i < chunk_1_size; ++i)
+        chunk_1[i] = (i + 3) % 251;
+    const int chunk_2_size = 123;
+    char chunk_2[chunk_2_size];
+    for (int i = 0; i < chunk_2_size; ++i)
+        chunk_2[i] = (i + 11) % 241;
+
+#if TEST_DURATION < 1
+    // Mac OS X 10.8 cannot handle more than 15 due to its default ulimit settings.
+    int rounds[] = { 3, 5, 7, 9, 11, 13, 15 };
+#else
+    int rounds[] = { 3, 5, 11, 17, 23, 27, 31, 47, 59 };
+#endif
+    const int num_rounds = sizeof rounds / sizeof *rounds;
+
+    const int max_N = 64;
+    CHECK(max_N >= rounds[num_rounds-1]);
+    UniquePtr<SharedGroup> shared_groups[8 * max_N];
+    UniquePtr<ReadTransaction> read_transactions[8 * max_N];
+
+    for (int round = 0; round < num_rounds; ++round) {
+        int N = rounds[round];
+
+        File::try_remove("test.tightdb");
+        File::try_remove("test.tightdb.lock");
+
+        SharedGroup root_sg("test.tightdb", false, SharedGroup::durability_MemOnly);
+
+        // Add two tables
+        {
+            WriteTransaction wt(root_sg);
+            TableRef test_1 = wt.get_table("test_1");
+            test_1->add_column(type_Int, "i");
+            test_1->insert_int(0,0,0);
+            test_1->insert_done();
+            TableRef test_2 = wt.get_table("test_2");
+            test_2->add_column(type_Binary, "b");
+            wt.commit();
+        }
+
+
+        // Create 8*N shared group accessors
+        for (int i = 0; i < 8*N; ++i)
+            shared_groups[i].reset(new SharedGroup("test.tightdb", false, SharedGroup::durability_MemOnly));
+
+        // Initiate 2*N read transactions with progressive changes
+        for (int i = 0; i < 2*N; ++i) {
+            read_transactions[i].reset(new ReadTransaction(*shared_groups[i]));
+            {
+                ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
+                CHECK_EQUAL(1u, test_1->size());
+                CHECK_EQUAL(i, test_1->get_int(0,0));
+                ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
+                int n_1 = i *  1;
+                int n_2 = i * 18;
+                CHECK_EQUAL(n_1+n_2, test_2->size());
+                for (int j = 0; j < n_1; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
+                for (int j = n_1; j < n_1+n_2; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+            }
+            {
+                WriteTransaction wt(root_sg);
+                TableRef test_1 = wt.get_table("test_1");
+                test_1->add_int(0,1);
+                TableRef test_2 = wt.get_table("test_2");
+                test_2->insert_binary(0, 0, BinaryData(chunk_1));
+                test_2->insert_done();
+                wt.commit();
+            }
+            {
+                WriteTransaction wt(root_sg);
+                TableRef test_2 = wt.get_table("test_2");
+                for (int j = 0; j < 18; ++j) {
+                    test_2->insert_binary(0, test_2->size(), BinaryData(chunk_2));
+                    test_2->insert_done();
+                }
+                wt.commit();
+            }
+        }
+
+        // Check isolation between read transactions
+        for (int i = 0; i < 2*N; ++i) {
+            ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
+            CHECK_EQUAL(1, test_1->size());
+            CHECK_EQUAL(i, test_1->get_int(0,0));
+            ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
+            int n_1 = i *  1;
+            int n_2 = i * 18;
+            CHECK_EQUAL(n_1+n_2, test_2->size());
+            for (int j = 0; j < n_1; ++j)
+                CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
+            for (int j = n_1; j < n_1+n_2; ++j)
+                CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+        }
+
+        // End the first half of the read transactions during further
+        // changes
+        for (int i = N-1; i >= 0; --i) {
+            {
+                WriteTransaction wt(root_sg);
+                TableRef test_1 = wt.get_table("test_1");
+                test_1->add_int(0,2);
+                wt.commit();
+            }
+            {
+                ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
+                CHECK_EQUAL(1, test_1->size());
+                CHECK_EQUAL(i, test_1->get_int(0,0));
+                ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
+                int n_1 = i *  1;
+                int n_2 = i * 18;
+                CHECK_EQUAL(n_1+n_2, test_2->size());
+                for (int j = 0; j < n_1; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
+                for (int j = n_1; j < n_1+n_2; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+            }
+            read_transactions[i].reset();
+        }
+
+        // Initiate 6*N extra read transactionss with further progressive changes
+        for (int i = 2*N; i < 8*N; ++i) {
+            read_transactions[i].reset(new ReadTransaction(*shared_groups[i]));
+            {
+                ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
+                CHECK_EQUAL(1u, test_1->size());
+                int i_2 = 2*N + i;
+                CHECK_EQUAL(i_2, test_1->get_int(0,0));
+                ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
+                int n_1 = i *  1;
+                int n_2 = i * 18;
+                CHECK_EQUAL(n_1+n_2, test_2->size());
+                for (int j = 0; j < n_1; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
+                for (int j = n_1; j < n_1+n_2; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+            }
+            {
+                WriteTransaction wt(root_sg);
+                TableRef test_1 = wt.get_table("test_1");
+                test_1->add_int(0,1);
+                TableRef test_2 = wt.get_table("test_2");
+                test_2->insert_binary(0, 0, BinaryData(chunk_1));
+                test_2->insert_done();
+                wt.commit();
+            }
+            {
+                WriteTransaction wt(root_sg);
+                TableRef test_2 = wt.get_table("test_2");
+                for (int j = 0; j < 18; ++j) {
+                    test_2->insert_binary(0, test_2->size(), BinaryData(chunk_2));
+                    test_2->insert_done();
+                }
+                wt.commit();
+            }
+        }
+
+        // End all remaining read transactions during further changes
+        for (int i = 1*N; i < 8*N; ++i) {
+            {
+                WriteTransaction wt(root_sg);
+                TableRef test_1 = wt.get_table("test_1");
+                test_1->add_int(0,2);
+                wt.commit();
+            }
+            {
+                ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
+                CHECK_EQUAL(1, test_1->size());
+                int i_2 = i<2*N ? i : 2*N + i;
+                CHECK_EQUAL(i_2, test_1->get_int(0,0));
+                ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
+                int n_1 = i *  1;
+                int n_2 = i * 18;
+                CHECK_EQUAL(n_1+n_2, test_2->size());
+                for (int j = 0; j < n_1; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
+                for (int j = n_1; j < n_1+n_2; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+            }
+            read_transactions[i].reset();
+        }
+
+        // Check final state via each shared group, then destroy it
+        for (int i=0; i<8*N; ++i) {
+            {
+                ReadTransaction rt(*shared_groups[i]);
+                ConstTableRef test_1 = rt.get_table("test_1");
+                CHECK_EQUAL(1, test_1->size());
+                CHECK_EQUAL(3*8*N, test_1->get_int(0,0));
+                ConstTableRef test_2 = rt.get_table("test_2");
+                int n_1 = 8*N *  1;
+                int n_2 = 8*N * 18;
+                CHECK_EQUAL(n_1+n_2, test_2->size());
+                for (int j = 0; j < n_1; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
+                for (int j = n_1; j < n_1+n_2; ++j)
+                    CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+            }
+            shared_groups[i].reset();
+        }
+
+        // Check final state via new shared group
+        {
+            SharedGroup sg("test.tightdb", false, SharedGroup::durability_MemOnly);
+            ReadTransaction rt(sg);
+            ConstTableRef test_1 = rt.get_table("test_1");
+            CHECK_EQUAL(1, test_1->size());
+            CHECK_EQUAL(3*8*N, test_1->get_int(0,0));
+            ConstTableRef test_2 = rt.get_table("test_2");
+            int n_1 = 8*N *  1;
+            int n_2 = 8*N * 18;
+            CHECK_EQUAL(n_1+n_2, test_2->size());
+            for (int j = 0; j < n_1; ++j)
+                CHECK_EQUAL(BinaryData(chunk_1), test_2->get_binary(0,j));
+            for (int j = n_1; j < n_1+n_2; ++j)
+                CHECK_EQUAL(BinaryData(chunk_2), test_2->get_binary(0,j));
+        }
+    }
+}
+
+
 namespace {
 
 TIGHTDB_TABLE_1(MyTable_SpecialOrder, first,  Int)
@@ -516,6 +757,74 @@ TEST(Shared_WriterThreads)
     CHECK(!File::exists("test_shared.tightdb.lock"));
 #endif
 }
+
+
+#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
+
+TEST(Shared_RobustAgainstDeathDuringWrite)
+{
+    // Abort if robust mutexes are not supported on the current
+    // platform. Otherwise we would probably get into a dead-lock.
+    if (!RobustMutex::is_robust_on_this_platform())
+        return;
+
+    // This test can only be conducted by spawning independent
+    // processes which can then be terminated individually.
+
+    File::try_remove("test.tightdb");
+
+    for (int i = 0; i < 10; ++i) {
+        pid_t pid = fork();
+        if (pid == pid_t(-1))
+            TIGHTDB_TERMINATE("fork() failed");
+        if (pid == 0) {
+            // Child
+            SharedGroup sg("test.tightdb");
+            WriteTransaction wt(sg);
+            TableRef table = wt.get_table("alpha");
+            _exit(0); // Die with an active write transaction
+        }
+        else {
+            // Parent
+            int stat_loc = 0;
+            int options = 0;
+            pid = waitpid(pid, &stat_loc, options);
+            if (pid == pid_t(-1))
+                TIGHTDB_TERMINATE("waitpid() failed");
+            bool child_exited_normaly = WIFEXITED(stat_loc);
+            CHECK(child_exited_normaly);
+            int child_exit_status = WEXITSTATUS(stat_loc);
+            CHECK_EQUAL(0, child_exit_status);
+        }
+
+        // Check that we can continue without dead-locking
+        {
+            SharedGroup sg("test.tightdb");
+            WriteTransaction wt(sg);
+            TableRef table = wt.get_table("beta");
+            if (table->is_empty()) {
+                table->add_column(type_Int, "i");
+                table->insert_int(0,0,0);
+                table->insert_done();
+            }
+            table->add_int(0,1);
+            wt.commit();
+        }
+    }
+
+    {
+        SharedGroup sg("test.tightdb");
+        ReadTransaction rt(sg);
+        CHECK(!rt.has_table("alpha"));
+        CHECK(rt.has_table("beta"));
+        ConstTableRef table = rt.get_table("beta");
+        CHECK_EQUAL(10, table->get_int(0,0));
+    }
+
+    File::remove("test.tightdb");
+}
+
+#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 
 
 TEST(Shared_FormerErrorCase1)
@@ -736,6 +1045,7 @@ TEST(Shared_SpaceOveruse)
     }
 }
 
+
 TEST(Shared_Notifications)
 {
     // Delete old files if there
@@ -822,9 +1132,9 @@ TEST(Shared_FromSerialized)
 
 TEST(StringIndex_Bug1)
 {
-    File::try_remove("x.tightdb");
-    File::try_remove("x.tightdb.lock");
-    SharedGroup sg("x.tightdb");
+    File::try_remove("test.tightdb");
+    File::try_remove("test.tightdb.lock");
+    SharedGroup sg("test.tightdb");
 
     {
         WriteTransaction wt(sg);
@@ -842,12 +1152,12 @@ TEST(StringIndex_Bug1)
 
 
 namespace {
-void randstr(char* res, size_t len) {
+void rand_str(char* res, size_t len) {
     for (size_t i = 0; i < len; ++i) {
         res[i] = 'a' + rand() % 10;
     }
 }
-}
+} // anonymous namespace
 
 TEST(StringIndex_Bug2)
 {
@@ -890,7 +1200,7 @@ TEST(StringIndex_Bug2)
             TableRef table = group.get_table("users");
             table->add_empty_row();
             char txt[100];
-            randstr(txt, 8);
+            rand_str(txt, 8);
             txt[8] = 0;
             //cerr << "+" << txt << endl;
             table->set_string(0, table->size() - 1, txt);
@@ -941,42 +1251,42 @@ TEST(Shared_Async)
 
 TEST(Shared_MixedWithNonShared)
 {
-    File::try_remove("/tmp/x.tightdb");
+    File::try_remove("test.tightdb");
     {
         // Create empty file without free-space tracking
         Group g;
-        g.write("/tmp/x.tightdb");
+        g.write("test.tightdb");
     }
     {
         // See if we can modify with non-shared group
-        Group g("/tmp/x.tightdb", Group::mode_ReadWrite);
+        Group g("test.tightdb", Group::mode_ReadWrite);
         g.get_table("foo"); // Add table "foo"
         g.commit();
     }
 
-    File::try_remove("/tmp/x.tightdb");
+    File::try_remove("test.tightdb");
     {
         // Create non-empty file without free-space tracking
         Group g;
         g.get_table("x");
-        g.write("/tmp/x.tightdb");
+        g.write("test.tightdb");
     }
     {
         // See if we can modify with non-shared group
-        Group g("/tmp/x.tightdb", Group::mode_ReadWrite);
+        Group g("test.tightdb", Group::mode_ReadWrite);
         g.get_table("foo"); // Add table "foo"
         g.commit();
     }
 
-    File::try_remove("/tmp/x.tightdb");
+    File::try_remove("test.tightdb");
     {
         // Create empty file without free-space tracking
         Group g;
-        g.write("/tmp/x.tightdb");
+        g.write("test.tightdb");
     }
     {
         // See if we can read and modify with shared group
-        SharedGroup sg("/tmp/x.tightdb");
+        SharedGroup sg("test.tightdb");
         {
             ReadTransaction rt(sg);
             CHECK(!rt.has_table("foo"));
@@ -988,16 +1298,16 @@ TEST(Shared_MixedWithNonShared)
         }
     }
 
-    File::try_remove("/tmp/x.tightdb");
+    File::try_remove("test.tightdb");
     {
         // Create non-empty file without free-space tracking
         Group g;
         g.get_table("x");
-        g.write("/tmp/x.tightdb");
+        g.write("test.tightdb");
     }
     {
         // See if we can read and modify with shared group
-        SharedGroup sg("/tmp/x.tightdb");
+        SharedGroup sg("test.tightdb");
         {
             ReadTransaction rt(sg);
             CHECK(!rt.has_table("foo"));
@@ -1009,7 +1319,7 @@ TEST(Shared_MixedWithNonShared)
         }
     }
     {
-        SharedGroup sg("/tmp/x.tightdb");
+        SharedGroup sg("test.tightdb");
         {
             ReadTransaction rt(sg);
             CHECK(rt.has_table("foo"));
@@ -1017,18 +1327,18 @@ TEST(Shared_MixedWithNonShared)
     }
     {
         // Access using non-shared group
-        Group g("/tmp/x.tightdb", Group::mode_ReadWrite);
+        Group g("test.tightdb", Group::mode_ReadWrite);
         g.commit();
     }
     {
         // Modify using non-shared group
-        Group g("/tmp/x.tightdb", Group::mode_ReadWrite);
+        Group g("test.tightdb", Group::mode_ReadWrite);
         g.get_table("bar"); // Add table "bar"
         g.commit();
     }
     {
         // See if we can still acces using shared group
-        SharedGroup sg("/tmp/x.tightdb");
+        SharedGroup sg("test.tightdb");
         {
             ReadTransaction rt(sg);
             CHECK(rt.has_table("foo"));
@@ -1042,11 +1352,11 @@ TEST(Shared_MixedWithNonShared)
         }
     }
     {
-        SharedGroup sg("/tmp/x.tightdb");
+        SharedGroup sg("test.tightdb");
         {
             ReadTransaction rt(sg);
             CHECK(rt.has_table("baz"));
         }
     }
-    File::remove("/tmp/x.tightdb");
+    File::remove("test.tightdb");
 }
