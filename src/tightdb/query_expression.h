@@ -129,7 +129,10 @@ public:
 
     virtual size_t compare(size_t start, size_t end) = 0;
     virtual void set_table(const Table* table) = 0;
-    virtual ~Expression() { }
+    virtual ~Expression() {
+    
+    
+    }
 };
 
 class ValueBase 
@@ -146,7 +149,9 @@ public:
 class Subexpr
 {
 public:
-    virtual ~Subexpr() { }
+    virtual ~Subexpr() {
+    
+    }
 
     virtual const Subexpr& get_qexp_column() const {
         return *this;
@@ -315,43 +320,43 @@ public:
     }
 
     // Compare, right side constant
-    Expression* operator > (R right) {
-        return new Compare<Greater, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true));
+    Query operator > (R right) {
+        return *new Compare<Greater, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true));
     }
-    Expression* operator < (R right) {
-        return new Compare<Less, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true));
+    Query operator < (R right) {
+        return *new Compare<Less, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true));
     }
-    Expression* operator >= (R right) {
-        return new Compare<GreaterEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true));
+    Query operator >= (R right) {
+        return *new Compare<GreaterEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true));
     }
-    Expression* operator <= (R right) {
-        return new Compare<LessEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true));
+    Query operator <= (R right) {
+        return *new Compare<LessEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true));
     }
-    Expression* operator == (R right) {
-        return new Compare<Equal, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true));
+    Query operator == (R right) {
+        return *new Compare<Equal, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true));
     }
-    Expression* operator != (R right) {
-        return new Compare<NotEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true));
+    Query operator != (R right) {
+        return *new Compare<NotEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true));
     }
 
     // Compare, right side subexpression
-    Expression* operator == (const Subexpr2<R>& right) { 
-        return new Compare<Equal, CommonType>(static_cast<Subexpr2<L>&>(*this), right); 
+    Query operator == (const Subexpr2<R>& right) { 
+        return *new Compare<Equal, CommonType>(static_cast<Subexpr2<L>&>(*this), right); 
     }
-    Expression* operator != (const Subexpr2<R>& right) { 
-        return new Compare<NotEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), right); 
+    Query operator != (const Subexpr2<R>& right) { 
+        return *new Compare<NotEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), right); 
     }
-    Expression* operator > (const Subexpr2<R>& right) { 
-        return new Compare<Greater, CommonType>(static_cast<Subexpr2<L>&>(*this), right); 
+    Query operator > (const Subexpr2<R>& right) { 
+        return *new Compare<Greater, CommonType>(static_cast<Subexpr2<L>&>(*this), right); 
     }
-    Expression* operator < (const Subexpr2<R>& right) { 
-        return new Compare<Less, CommonType>(static_cast<Subexpr2<L>&>(*this), right); 
+    Query operator < (const Subexpr2<R>& right) { 
+        return *new Compare<Less, CommonType>(static_cast<Subexpr2<L>&>(*this), right); 
     }
-    Expression* operator >= (const Subexpr2<R>& right) { 
-        return new Compare<GreaterEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), right); 
+    Query operator >= (const Subexpr2<R>& right) { 
+        return *new Compare<GreaterEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), right); 
     }
-    Expression* operator <= (const Subexpr2<R>& right) { 
-        return new Compare<LessEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), right); 
+    Query operator <= (const Subexpr2<R>& right) { 
+        return *new Compare<LessEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), right); 
     }
 };
 
@@ -360,7 +365,9 @@ template <class T> class Subexpr2 : public Subexpr, public Overloads<T, int>, pu
                                     public Overloads<T, double>, public Overloads<T, int64_t> 
 {
 public:
-    virtual ~Subexpr2() {};
+    virtual ~Subexpr2() {
+    
+    };
 
     #define TDB_U2(t, o) using Overloads<T, t>::operator o;
     #define TDB_U(o) TDB_U2(int, o) TDB_U2(float, o) TDB_U2(double, o) TDB_U2(int64_t, o)
@@ -376,77 +383,77 @@ public:
 // For L = R = {int, int64_t, float, double}:
 
 // Compare
-template <class R> Expression* operator > (double left, const Subexpr2<R>& right) { 
-    return new Compare<Greater, typename Common<R, double>::type>(*new Value<double>(left, true), right); 
+template <class R> Query operator > (double left, const Subexpr2<R>& right) { 
+    return *new Compare<Greater, typename Common<R, double>::type>(*new Value<double>(left, true), right); 
 }
-template <class R> Expression* operator > (float left, const Subexpr2<R>& right) {
-    return new Compare<Greater, typename Common<R, float>::type>(*new Value<float>(left, true), right);
+template <class R> Query operator > (float left, const Subexpr2<R>& right) {
+    return *new Compare<Greater, typename Common<R, float>::type>(*new Value<float>(left, true), right);
 }
-template <class R> Expression* operator > (int left, const Subexpr2<R>& right) {
-    return new Compare<Greater, typename Common<R, int>::type>(*new Value<int>(left, true), right);
+template <class R> Query operator > (int left, const Subexpr2<R>& right) {
+    return *new Compare<Greater, typename Common<R, int>::type>(*new Value<int>(left, true), right);
 }
-template <class R> Expression* operator > (int64_t left, const Subexpr2<R>& right) {
-    return new Compare<Greater, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right); 
+template <class R> Query operator > (int64_t left, const Subexpr2<R>& right) {
+    return *new Compare<Greater, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right); 
 }
-template <class R> Expression* operator < (double left, const Subexpr2<R>& right) {
-    return new Compare<Less, typename Common<R, double>::type>(*new Value<double>(left, true), right); 
+template <class R> Query operator < (double left, const Subexpr2<R>& right) {
+    return *new Compare<Less, typename Common<R, double>::type>(*new Value<double>(left, true), right); 
 }
-template <class R> Expression* operator < (float left, const Subexpr2<R>& right) { 
-    return new Compare<Less, typename Common<R, float>::type>(*new Value<float>(left, true), right); 
+template <class R> Query operator < (float left, const Subexpr2<R>& right) { 
+    return *new Compare<Less, typename Common<R, float>::type>(*new Value<float>(left, true), right); 
 }
-template <class R> Expression* operator < (int left, const Subexpr2<R>& right) {
-    return new Compare<Less, typename Common<R, int>::type>(*new Value<int>(left, true), right);
+template <class R> Query operator < (int left, const Subexpr2<R>& right) {
+    return *new Compare<Less, typename Common<R, int>::type>(*new Value<int>(left, true), right);
 }
-template <class R> Expression* operator < (int64_t left, const Subexpr2<R>& right) {
-    return new Compare<Less, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right); 
+template <class R> Query operator < (int64_t left, const Subexpr2<R>& right) {
+    return *new Compare<Less, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right); 
 }
-template <class R> Expression* operator == (double left, const Subexpr2<R>& right) { 
-    return new Compare<Equal, typename Common<R, double>::type>(*new Value<double>(left, true), right);
+template <class R> Query operator == (double left, const Subexpr2<R>& right) { 
+    return *new Compare<Equal, typename Common<R, double>::type>(*new Value<double>(left, true), right);
 }
-template <class R> Expression* operator == (float left, const Subexpr2<R>& right) {
-    return new Compare<Equal, typename Common<R, float>::type>(*new Value<float>(left, true), right); 
+template <class R> Query operator == (float left, const Subexpr2<R>& right) {
+    return *new Compare<Equal, typename Common<R, float>::type>(*new Value<float>(left, true), right); 
 }
-template <class R> Expression* operator == (int left, const Subexpr2<R>& right) {
-    return new Compare<Equal, typename Common<R, int>::type>(*new Value<int>(left, true), right); 
+template <class R> Query operator == (int left, const Subexpr2<R>& right) {
+    return *new Compare<Equal, typename Common<R, int>::type>(*new Value<int>(left, true), right); 
 }
-template <class R> Expression* operator == (int64_t left, const Subexpr2<R>& right) { 
-    return new Compare<Equal, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right); 
+template <class R> Query operator == (int64_t left, const Subexpr2<R>& right) { 
+    return *new Compare<Equal, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right); 
 }
-template <class R> Expression* operator >= (double left, const Subexpr2<R>& right) {
-    return new Compare<GreaterEqual, typename Common<R, double>::type>(*new Value<double>(left, true), right);
+template <class R> Query operator >= (double left, const Subexpr2<R>& right) {
+    return *new Compare<GreaterEqual, typename Common<R, double>::type>(*new Value<double>(left, true), right);
 }
-template <class R> Expression* operator >= (float left, const Subexpr2<R>& right) {
-    return new Compare<GreaterEqual, typename Common<R, float>::type>(*new Value<float>(left, true), right);
+template <class R> Query operator >= (float left, const Subexpr2<R>& right) {
+    return *new Compare<GreaterEqual, typename Common<R, float>::type>(*new Value<float>(left, true), right);
 }
-template <class R> Expression* operator >= (int left, const Subexpr2<R>& right) {
-    return new Compare<GreaterEqual, typename Common<R, int>::type>(*new Value<int>(left, true), right);
+template <class R> Query operator >= (int left, const Subexpr2<R>& right) {
+    return *new Compare<GreaterEqual, typename Common<R, int>::type>(*new Value<int>(left, true), right);
 }
-template <class R> Expression* operator >= (int64_t left, const Subexpr2<R>& right) {
-    return new Compare<GreaterEqual, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right); 
+template <class R> Query operator >= (int64_t left, const Subexpr2<R>& right) {
+    return *new Compare<GreaterEqual, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right); 
 }
-template <class R> Expression* operator <= (double left, const Subexpr2<R>& right) {
-    return new Compare<LessEqual, typename Common<R, double>::type>(*new Value<double>(left, true), right); 
+template <class R> Query operator <= (double left, const Subexpr2<R>& right) {
+    return *new Compare<LessEqual, typename Common<R, double>::type>(*new Value<double>(left, true), right); 
 }
-template <class R> Expression* operator <= (float left, const Subexpr2<R>& right) {
-    return new Compare<LessEqual, typename Common<R, float>::type>(*new Value<float>(left, true), right); 
+template <class R> Query operator <= (float left, const Subexpr2<R>& right) {
+    return *new Compare<LessEqual, typename Common<R, float>::type>(*new Value<float>(left, true), right); 
 }
-template <class R> Expression* operator <= (int left, const Subexpr2<R>& right) {
-    return new Compare<LessEqual, typename Common<R, int>::type>(*new Value<int>(left, true), right); 
+template <class R> Query operator <= (int left, const Subexpr2<R>& right) {
+    return *new Compare<LessEqual, typename Common<R, int>::type>(*new Value<int>(left, true), right); 
 }
-template <class R> Expression* operator <= (int64_t left, const Subexpr2<R>& right) { 
-    return new Compare<LessEqual, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right);
+template <class R> Query operator <= (int64_t left, const Subexpr2<R>& right) { 
+    return *new Compare<LessEqual, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right);
 }
-template <class R> Expression* operator != (double left, const Subexpr2<R>& right) {
-    return new Compare<NotEqual, typename Common<R, double>::type>(*new Value<double>(left, true), right); 
+template <class R> Query operator != (double left, const Subexpr2<R>& right) {
+    return *new Compare<NotEqual, typename Common<R, double>::type>(*new Value<double>(left, true), right); 
 }
-template <class R> Expression* operator != (float left, const Subexpr2<R>& right) {
-    return new Compare<NotEqual, typename Common<R, float>::type>(*new Value<float>(left, true), right); 
+template <class R> Query operator != (float left, const Subexpr2<R>& right) {
+    return *new Compare<NotEqual, typename Common<R, float>::type>(*new Value<float>(left, true), right); 
 }
-template <class R> Expression* operator != (int left, const Subexpr2<R>& right) {
-    return new Compare<NotEqual, typename Common<R, int>::type>(*new Value<int>(left, true), right); 
+template <class R> Query operator != (int left, const Subexpr2<R>& right) {
+    return *new Compare<NotEqual, typename Common<R, int>::type>(*new Value<int>(left, true), right); 
 }
-template <class R> Expression* operator != (int64_t left, const Subexpr2<R>& right) { 
-    return new Compare<NotEqual, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right);
+template <class R> Query operator != (int64_t left, const Subexpr2<R>& right) { 
+    return *new Compare<NotEqual, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right);
 }
 
 // Arithmetic
@@ -503,25 +510,39 @@ template <class R> Operator<Div<typename Common<R, int64_t>::type> >& operator /
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
-    explicit Columns(size_t column, bool auto_delete) : m_table2(NULL)
+    /*
+    Columns(const Columns& other)
+    {
+        sg = other.sg;
+        m_column = other.m_column;
+        m_table2 = other.m_table2;
+    }    
+    */
+    ~Columns()
+    {
+        delete sg;
+        sg = NULL;
+    }
+
+    explicit Columns(size_t column, bool auto_delete) : m_table2(NULL), sg(NULL)
     {
         Subexpr::m_auto_delete = auto_delete;
         m_column = column;
     }
 
-    explicit Columns(size_t column, Table* table, bool auto_delete) : m_table2(NULL)
+    explicit Columns(size_t column, Table* table, bool auto_delete) : m_table2(NULL), sg(NULL)
     {
         m_column = column;
         Subexpr::m_auto_delete = auto_delete;
         set_table(table);
     }
 
-    explicit Columns() : m_table2(NULL)
+    explicit Columns() : m_table2(NULL), sg(NULL)
     {
         Subexpr::m_auto_delete = false;
     }
 
-    explicit Columns(size_t column) : m_table2(NULL)
+    explicit Columns(size_t column) : m_table2(NULL), sg(NULL)
     {
         Subexpr::m_auto_delete = false;
         m_column = column;
@@ -533,7 +554,9 @@ public:
         typedef typename ColumnTypeTraits<T>::column_type ColType;
         ColType* c;
         c = (ColType*)&table->GetColumnBase(m_column);
-        sg.init(c);
+        if(sg == NULL)
+            sg = new SequentialGetter<T>();
+        sg->init(c);
     }
 
     virtual Table* get_table() 
@@ -543,23 +566,22 @@ public:
 
     TIGHTDB_FORCEINLINE void evaluate(size_t i, ValueBase& destination) {
         Value<T> v;            
-        sg.cache_next(i);
+        sg->cache_next(i);
         if(SameType<T, int64_t>::value) {
             // int64_t leafs have a get_chunk optimization that returns an 8 int64_t values at once
-            sg.m_array_ptr->get_chunk(i - sg.m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
+            sg->m_array_ptr->get_chunk(i - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
         }
         else {
-            for(size_t t = 0; t < ValueBase::elements && i + t < sg.m_leaf_end; t++)
-                v.m_v[t] = sg.get_next(i + t);
+            for(size_t t = 0; t < ValueBase::elements && i + t < sg->m_leaf_end; t++)
+                v.m_v[t] = sg->get_next(i + t);
         }
         destination.import(v);
     }
 
     const Table* m_table2;
-
-private:
-    SequentialGetter<T> sg;
     size_t m_column;
+//private:
+    SequentialGetter<T>* sg;
 };
 
 template <class oper, class TLeft, class TRight> class Operator : public Subexpr2<typename oper::type>
@@ -588,6 +610,7 @@ public:
 
         if(m_right.m_auto_delete)
             delete &m_right;
+
     }
 
     void set_table(const Table* table)
@@ -651,6 +674,7 @@ public:
 
         if(m_right.m_auto_delete)
             delete &m_right;
+            
     }
 
     // todo: get_qexp_column was a very quick/dirty hack to get a non-temporary column from ColumnAccessor. Todo, fix

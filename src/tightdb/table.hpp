@@ -169,9 +169,9 @@ public:
     void set_index(std::size_t column_ndx);
     //@}
 
-    template <class T> Columns<T>& columns(size_t column)
+    template <class T> Columns<T> columns(size_t column)
     {
-        return *new Columns<T>(column, this, true);
+        return Columns<T>(column, this, false);
     }
 
 

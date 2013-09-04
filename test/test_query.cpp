@@ -94,6 +94,8 @@ TEST(QueryExpressions0)
     Many of them are combined and tested together in equality classes below
 */
 
+
+    /*
     Table table;
     table.add_column(type_Int, "first1");
     table.add_column(type_Float, "second1");
@@ -367,12 +369,14 @@ TEST(QueryExpressions0)
     CHECK(match == not_found);
     delete exp;
     
-
+    */
 }
 
 
 TEST(QueryExpressions1)
 {
+
+/*
     Table table;
     table.add_column(type_Int, "first1");
     table.add_column(type_Float, "second1");
@@ -410,7 +414,9 @@ TEST(QueryExpressions1)
         delete colf;
         delete col;
     }
-    
+  
+  */
+
     /*
 
     {

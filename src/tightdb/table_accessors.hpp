@@ -820,7 +820,10 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, int64_t> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {
+        Columns::m_column = col_idx; 
+        Columns::m_table2 = (Table*)Base::m_table->get_impl();
+    }
 
     // todo: very quick/dirty hack to get a non-temporary column from ColumnAccessor. Fix
     // todo, review get_impl()
@@ -896,7 +899,10 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, float> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {
+        Columns::m_column = col_idx; 
+        Columns::m_table2 = (Table*)Base::m_table->get_impl();
+    }
 
     // todo: very quick/dirty hack to get a non-temporary column from ColumnAccessor. Fix
     const Subexpr& get_qexp_column() const {
@@ -954,7 +960,10 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, double> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {
+        Columns::m_column = col_idx;
+        Columns::m_table2 = (Table*)Base::m_table->get_impl();
+    }
 
     // todo: very quick/dirty hack to get a non-temporary column from ColumnAccessor. Fix
     const Subexpr& get_qexp_column() const {

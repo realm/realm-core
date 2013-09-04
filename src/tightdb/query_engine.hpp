@@ -290,7 +290,9 @@ public:
     }
 
 
-    virtual ~ParentNode() {}
+    virtual ~ParentNode() {
+    
+    }
 
     virtual void init(const Table& table)
     {
@@ -1396,7 +1398,7 @@ class ExpressionNode: public ParentNode {
 public:
     ~ExpressionNode()
     {
- //       delete m_compare;
+        delete m_compare;
     }
 
     ExpressionNode(Expression* compare) 

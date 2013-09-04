@@ -68,12 +68,11 @@ TIGHTDB_TABLE_3(ThreeColTable,
     third, Double)
 
 
-
 int main(int argc, char* argv[])
 {
     size_t match;
 
-    // UNTYPED table with 2 rows and 3 cols
+    // Setup untyped table
     Table untyped;
     untyped.add_column(type_Int, "firs1");
     untyped.add_column(type_Float, "second");
@@ -87,25 +86,56 @@ int main(int argc, char* argv[])
     untyped.set_double(2, 1, 4.0);
 
 
-    // TYPED table with same data contents as above untyped
+    // Setup typed table, same contents as untyped
     ThreeColTable typed;
     typed.add(20, 19.9f, 3.0);
     typed.add(20, 20.1f, 4.0);
 
 
-    // untyped table
+    // Typed, direct column addressing
+    Query q1 = typed.column().second + typed.column().first > 40;
+    match = q1.find_next();
+    assert(match == 1);   
 
-    Columns<int64_t> &c1 = untyped.columns<int64_t>(0);
-    Columns<float> &c2 = untyped.columns<float>(1);
-    Expression *e2 = new Compare<Greater, float>(c2, c1);
-    match = untyped.where().expression(e2).find_next();
+
+    match = (typed.column().first + typed.column().second > 40).find_next();
+    assert(match == 1);   
+
+
+    // Typed, column objects
+    Columns<int64_t> t0 = typed.column().first;
+    Columns<float> t1 = typed.column().second;
+
+    match = (t0 + t1 > 40).find_next();
+    assert(match == 1);
+
+
+    // Untyped, direct column addressing
+//    Query q2 = untyped.columns<int64_t>(0) > 20;
+//    match = q2.find_next();
+//    assert(match == 1);    
+
+    match = (untyped.columns<int64_t>(0) + untyped.columns<float>(1) > 40).find_next();
     assert(match == 1);    
 
-    match = (untyped.columns<int64_t>(0) < untyped.columns<float>(1))->find_next();
+    match = (untyped.columns<int64_t>(0) + untyped.columns<float>(1) < 40).find_next();
+    assert(match == 0);    
+
+    match = (untyped.columns<float>(1) <= untyped.columns<int64_t>(0)).find_next();
+    assert(match == 0);    
+
+    match = (untyped.columns<int64_t>(0) + untyped.columns<float>(1) >= untyped.columns<int64_t>(0) + untyped.columns<float>(1)).find_next();
+    assert(match == 0);    
+
+    // Untyped, column objects
+    Columns<int64_t> u0 = untyped.columns<int64_t>(0);
+    Columns<float> u1 = untyped.columns<float>(1);
+
+    match = (u0 + u1 > 40).find_next();
     assert(match == 1);    
+    
 
-
-    // untyped table 
+    // Flexible language binding style
     Subexpr* first = new Columns<int64_t>(0);
     Subexpr* second = new Columns<float>(1);
     Subexpr* third = new Columns<double>(2);
@@ -114,21 +144,50 @@ int main(int argc, char* argv[])
     Expression *e = new Compare<Greater, float>(*plus, *constant);
 
     match = untyped.where().expression(e).find_next();
+
+    
+    /*
+    ThreeColTable::Query q45 = typed.where().expression(static_cast<Expression*>(&e5));
+    match = q45.find_next();
+    assert(match == 1);
+    */
+//    delete static_cast<Expression*>(e5);
+
+
+    // untyped table
+
+  //  Columns<int64_t> c1 = untyped.columns<int64_t>(0);
+ //   Columns<float> c2 = untyped.columns<float>(1);
+
+    
+
+    //  Compare<Greater, float> q2 = Compare<Greater, float>(c2, c1);
+ //   match = untyped.where().expression(q2).find_next();
+ //   assert(match == 1);    
+
+    /*
+
+    // untyped table 
+    Subexpr* first = new Columns<int64_t>(0);
+    Subexpr* second = new Columns<float>(1);
+    Subexpr* third = new Columns<double>(2);
+    Subexpr* constant = new Value<int64_t>(40);    
+    Subexpr* plus = new Operator<Plus<float> >(*first, *second);  
+    Expression *e = new Compare<Greater, float>(*plus, *constant);
+*/
+
+
+
+
+
+//    match = untyped.where().expression(e).find_next();
+    /*
     assert(match == 1);    
 
 
 
 
-    // typed table
-    Query* e5 = typed.column().second + typed.column().first > 40;   
-    match = e5->find_next();
-    assert(match == 1);
 
-    ThreeColTable::Query q45 = typed.where().expression(static_cast<Expression*>(e5));
-    match = q45.find_next();
-    assert(match == 1);
-
-    delete static_cast<Expression*>(e5);
 
 
 
@@ -136,7 +195,7 @@ int main(int argc, char* argv[])
     TestRunner runner(reporter);
     const int res = runner.RunTestsIf(Test::GetTestList(), 0, True(), 0);
 
-
+    */
     return 0;
 }
  
