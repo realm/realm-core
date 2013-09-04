@@ -1307,6 +1307,7 @@ void* IncrementEntry(void* arg)
 void make_table(size_t rows) 
 {
     File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.log");
     File::try_remove("test_alone.tightdb");
     // Create first table in group
 #if 1

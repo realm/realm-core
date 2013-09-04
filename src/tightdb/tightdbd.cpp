@@ -2,13 +2,10 @@
 
 #include <tightdb/group_shared.hpp>
 #include <unistd.h>
+#include <iostream>
 
 using namespace tightdb;
-
-void exit_handler()
-{
-    fprintf(stderr, "Daemon exiting (exit_handler called)\n");
-}
+using namespace std;
 
 int main(int argc, char* argv[]) 
 {
@@ -26,15 +23,14 @@ int main(int argc, char* argv[])
     int pid = fork();
     if (pid == 0) { // in daemon process:
 
-        atexit(exit_handler);
-        fprintf(stderr, "Daemon starting\n");
+        cerr << "Daemon starting" << endl;
         try {
             SharedGroup::unattached_tag tag;
             SharedGroup async_committer(tag);
             char* file = argv[1];
             async_committer.open(file, true, SharedGroup::durability_Async, true);
         } catch (...) {
-            fprintf(stderr, "Daemon threw an exception");
+            cerr << "Daemon threw an exception" << endl;
         }
 
     } else if (pid > 0) { // in parent, fork was ok, so return succes

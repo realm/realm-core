@@ -98,7 +98,7 @@ void spawn_daemon(const string& file)
         i=::open("/dev/null",O_RDWR);
         i=::open((file+".log").c_str(),O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
         i = dup(i); static_cast<void>(i);
-        printf("Detaching\n");
+        cerr << "Detaching" << endl;
         // detach from current session:
         setsid();
 
@@ -394,7 +394,7 @@ void SharedGroup::do_async_commits()
             info->shutdown_started = 1;
             // FIXME: barrier?
             shutdown = true;
-            printf("Lock file removed, initiating shutdown\n");
+            cerr << "Lock file removed, initiating shutdown" << endl;
         }
 
         // detect if we're the last "client", and if so mark the
@@ -422,13 +422,14 @@ void SharedGroup::do_async_commits()
         // of the info structure.
         if (has_changed()) {
 
-            printf("Syncing...");
+            cerr << "Syncing...";
             // Get a read lock on the (current) version that we want
             // to commit to disk.
 #ifdef TIGHTDB_DEBUG
             m_transact_stage = transact_Ready;
 #endif
             begin_read();
+            cerr << "(version " << m_version << ")...";
             size_t current_version = m_version;
             size_t current_top_ref = m_group.m_top.get_ref();
 
@@ -440,7 +441,7 @@ void SharedGroup::do_async_commits()
             m_version = last_version;
             end_read();
             last_version = current_version;
-            printf("..and Done\n");
+            cerr << "..and Done" << endl;
         }
         else if (!shutdown) {
             usleep(100);
@@ -450,9 +451,9 @@ void SharedGroup::do_async_commits()
             // Being the backend process, we own the lock file, so we
             // have to clean up when we shut down.
             info->~SharedInfo(); // Call destructor
-            printf("Removing coordination file: %s\n", m_file_path.c_str());
+            cerr << "Removing coordination file" << endl;
             File::remove(m_file_path);
-            printf("Daemon exiting nicely\n");
+            cerr << "Daemon exiting nicely";
             exit(EXIT_SUCCESS);
         }
     }
@@ -954,7 +955,6 @@ size_t SharedGroup::get_current_version() TIGHTDB_NOEXCEPT
 void SharedGroup::low_level_commit(size_t new_version)
 {
     SharedInfo* info = m_file_map.get_addr();
-//    fprintf(stderr,"low_level_commit(%d)\n", new_version);
     size_t readlock_version;
     {
         Mutex::Lock lock(info->readmutex);
@@ -992,8 +992,6 @@ void SharedGroup::low_level_commit(size_t new_version)
     {
         Mutex::Lock lock(info->readmutex);
         info->current_top = new_top_ref;
-//        fprintf(stderr, "group_shared::low_level_commit   filesize <- %ul\n",
-//                new_file_size);
         info->filesize    = new_file_size;
         // The following assignment may be observed by other threads 
         // without taking a lock, by calling the has_changed() function. 
