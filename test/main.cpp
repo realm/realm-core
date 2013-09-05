@@ -92,13 +92,42 @@ int main(int argc, char* argv[])
     typed.add(20, 20.1f, 4.0);
 
 
+
+
+    // Untyped, direct column addressing
+    Value<int64_t> uv1(1);
+
+    Columns<float> uc1 = untyped.columns<float>(1);
+    
+    Query q2 = untyped.columns<float>(1) >= uv1;
+    match = q2.find_next();
+    assert(match == 0);
+
+    Query q3 = untyped.columns<float>(1) + untyped.columns<int64_t>(0) > 10 + untyped.columns<int64_t>(0);
+    match = q3.find_next();
+
+    match = q2.find_next();
+    assert(match == 0);    
+
+
+
+
+
+
+
     // Typed, direct column addressing
     Query q1 = typed.column().second + typed.column().first > 40;
     match = q1.find_next();
     assert(match == 1);   
 
+
     match = (typed.column().first + typed.column().second > 40).find_next();
     assert(match == 1);   
+
+
+    Query tq1 = typed.column().first + typed.column().second >= typed.column().first + typed.column().second;
+    match = tq1.find_next();
+    assert(match == 0);   
 
 
     // Typed, column objects
@@ -109,10 +138,9 @@ int main(int argc, char* argv[])
     assert(match == 1);
 
 
-    // Untyped, direct column addressing
-//    Query q2 = untyped.columns<int64_t>(0) > 20;
-//    match = q2.find_next();
-//    assert(match == 1);    
+
+
+
 
     match = (untyped.columns<int64_t>(0) + untyped.columns<float>(1) > 40).find_next();
     assert(match == 1);    

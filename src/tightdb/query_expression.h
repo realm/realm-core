@@ -512,14 +512,7 @@ template <class R> Operator<Div<typename Common<R, int64_t>::type> >& operator /
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
-    /*
-    Columns(const Columns& other)
-    {
-        sg = other.sg;
-        m_column = other.m_column;
-        m_table2 = other.m_table2;
-    }    
-    */
+
     ~Columns()
     {
         delete sg;
