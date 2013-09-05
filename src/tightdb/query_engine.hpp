@@ -1398,8 +1398,8 @@ class ExpressionNode: public ParentNode {
 public:
     ~ExpressionNode()
     {
-        if(m_compare->m_auto_delete)
-            delete m_compare;
+     //   if(m_compare)
+     //       delete m_compare, m_compare = NULL;
     }
 
     ExpressionNode(Expression* compare) 

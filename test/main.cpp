@@ -97,8 +97,8 @@ int main(int argc, char* argv[])
     Query q5 = 20 < untyped.columns<float>(1);
 
 
-    match = q4.expression(  q5.get_expression()  ).find_next();
-    assert(match == 1);
+//    match = q4.expression(  q5.get_expression()  ).find_next();
+ //   assert(match == 1);
 
 
     // Untyped, direct column addressing
@@ -170,7 +170,7 @@ int main(int argc, char* argv[])
     match = (u0 + u1 > 40).find_next();
     assert(match == 1);    
     
-
+    
     // Flexible language binding style
     Subexpr* first = new Columns<int64_t>(0);
     Subexpr* second = new Columns<float>(1);
@@ -200,7 +200,7 @@ int main(int argc, char* argv[])
 
 
 
-
+    
 
 
     // you MUST delete these in reversed order of creation
@@ -211,53 +211,22 @@ int main(int argc, char* argv[])
     delete second;
     delete first;
 
-
-
-    /*
-    ThreeColTable::Query q45 = typed.where().expression(static_cast<Expression*>(&e5));
-    match = q45.find_next();
-    assert(match == 1);
-    */
-//    delete static_cast<Expression*>(e5);
-
-
-    // untyped table
-
-  //  Columns<int64_t> c1 = untyped.columns<int64_t>(0);
- //   Columns<float> c2 = untyped.columns<float>(1);
+    
+    delete e2;
+    delete plus2;
+    delete constant2;
+    delete third2;
+    delete second2;
+    delete first2;
 
     
 
-    //  Compare<Greater, float> q2 = Compare<Greater, float>(c2, c1);
- //   match = untyped.where().expression(q2).find_next();
- //   assert(match == 1);    
-
-    /*
-
-    // untyped table 
-    Subexpr* first = new Columns<int64_t>(0);
-    Subexpr* second = new Columns<float>(1);
-    Subexpr* third = new Columns<double>(2);
-    Subexpr* constant = new Value<int64_t>(40);    
-    Subexpr* plus = new Operator<Plus<float> >(*first, *second);  
-    Expression *e = new Compare<Greater, float>(*plus, *constant);
-*/
 
 
 
 
 
-//    match = untyped.where().expression(e).find_next();
-    /*
-    assert(match == 1);    
-
-
-
-
-
-
-
-
+/*
     CustomTestReporter reporter;
     TestRunner runner(reporter);
     const int res = runner.RunTestsIf(Test::GetTestList(), 0, True(), 0);

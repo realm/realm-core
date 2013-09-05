@@ -515,8 +515,8 @@ public:
 
     ~Columns()
     {
-        delete sg;
-        sg = NULL;
+   //     delete sg;
+   //     sg = NULL;
     }
 
     explicit Columns(size_t column, bool auto_delete) : m_table2(NULL), sg(NULL)
@@ -600,12 +600,13 @@ public:
 
     ~Operator() 
     {
+        /*
         if(m_left.m_auto_delete)
             delete &m_left;
 
         if(m_right.m_auto_delete)
             delete &m_right;
-
+            */
     }
 
     void set_table(const Table* table)
@@ -664,12 +665,12 @@ template <class TCond, class T, class TLeft, class TRight> class Compare : publi
 public:
     ~Compare()
     {
-        if(m_left.m_auto_delete)
+/*        if(m_left.m_auto_delete)
             delete &m_left;
 
         if(m_right.m_auto_delete)
             delete &m_right;
-            
+  */          
     }
 
     // todo: get_qexp_column was a very quick/dirty hack to get a non-temporary column from ColumnAccessor. Todo, fix
