@@ -180,8 +180,28 @@ int main(int argc, char* argv[])
     Expression *e = new Compare<Greater, float>(*plus, *constant);
 
     // Bind table and do search
+
     match = untyped.where().expression(e).find_next();
     assert(match == 1);    
+
+
+
+
+    Subexpr* first2 = new Columns<int64_t>(0);
+    Subexpr* second2 = new Columns<float>(1);
+    Subexpr* third2 = new Columns<double>(2);
+    Subexpr* constant2 = new Value<int64_t>(40);    
+    Subexpr* plus2 = new Operator<Plus<float> >(*first, *second);  
+    Expression *e2 = new Compare<Greater, float>(*plus, *constant);
+
+    match = untyped.where().expression(e).expression(e2).find_next();
+    assert(match == 1);    
+
+
+
+
+
+
 
     // you MUST delete these in reversed order of creation
     delete e;
