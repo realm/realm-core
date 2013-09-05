@@ -2,25 +2,31 @@
 
 #include <tightdb/exceptions.hpp>
 #include <tightdb/thread.hpp>
+#include <features.h>
 
 #if !defined _WIN32
 #  include <unistd.h>
 #endif
 
-// FIXME: Unfortunately Older Ubuntu releases such as 10.04 reports
+// Unfortunately Older Ubuntu releases such as 10.04 reports
 // support for robust mutexes by setting _POSIX_THREADS = 200809L and
 // _POSIX_THREAD_PROCESS_SHARED = 200809L even though they do not
 // provide pthread_mutex_consistent(). See also
 // http://www.gnu.org/software/gnulib/manual/gnulib.html#pthread_005fmutex_005fconsistent.
-// Currently this prevents us from building a TightDB distribution on
-// Ubuntu 10.04, so something has to be done.
+// Support was added to glibc 2.12, so we disable for earlier versions of glibs
 
 #ifdef _POSIX_THREAD_PROCESS_SHARED
 #  if _POSIX_THREAD_PROCESS_SHARED != -1 // can apparently also be -1
 #    define TIGHTDB_HAVE_PTHREAD_PROCESS_SHARED
 #    if !defined _WIN32 // robust not supported by our windows pthreads port
 #      if _POSIX_THREADS >= 200809L
-#        define TIGHTDB_HAVE_ROBUST_PTHREAD_MUTEX
+#        ifdef __GNU_LIBRARY__
+#          if (__GLIBC__ >= 2)  && (__GLIBC_MINOR__ >= 12)
+#            define TIGHTDB_HAVE_ROBUST_PTHREAD_MUTEX
+#          endif
+#        else
+#          define TIGHTDB_HAVE_ROBUST_PTHREAD_MUTEX
+#        endif
 #      endif
 #    endif
 #  endif
