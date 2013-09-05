@@ -6,7 +6,7 @@
 
 #include <UnitTest++.h>
 #include "testsettings.hpp"
-#include "test_utilities.hpp"
+#include "util/test_utilities.hpp"
 #include <tightdb/table_macros.hpp>
 #include <tightdb/lang_bind_helper.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -506,7 +506,7 @@ TEST(Table_test_to_string)
     string expected;
     expected.assign( istreambuf_iterator<char>(testFile),
                      istreambuf_iterator<char>() );
-    bool test_ok = equal_without_cr(result, expected);
+    bool test_ok = test_util::equal_without_cr(result, expected);
     CHECK_EQUAL(true, test_ok);
     if (!test_ok) {
         ofstream testFile("expect_string.error.txt", ios::out | ios::binary);

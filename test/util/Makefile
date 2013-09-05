@@ -1,6 +1,6 @@
 NOINST_LIBRARIES = test-util
 
-test_util_SOURCES = mem.cpp timer.cpp
+test_util_SOURCES = mem.cpp timer.cpp test_utilities
 
 ifeq ($(shell uname),Linux)
 

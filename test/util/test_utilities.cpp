@@ -4,6 +4,9 @@
 
 using namespace std;
 
+namespace tightdb {
+namespace test_util {
+
 void replace_all(string& str, const string& from, const string& to) {
     if (from.empty())
         return;
@@ -21,4 +24,7 @@ bool equal_without_cr(string s1, string s2)
     replace_all(s1, "\r", "");
     replace_all(s2, "\r", "");
     return (s1 == s2);
+}
+
+}
 }
