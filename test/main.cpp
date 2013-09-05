@@ -93,6 +93,13 @@ int main(int argc, char* argv[])
 
 
 
+    Query q4 = untyped.columns<float>(1) + untyped.columns<int64_t>(0) > 40;
+    Query q5 = 20 < untyped.columns<float>(1);
+
+
+    match = q4.expression(  q5.get_expression()  ).find_next();
+    assert(match == 1);
+
 
     // Untyped, direct column addressing
     Value<int64_t> uv1(1);
@@ -103,13 +110,15 @@ int main(int argc, char* argv[])
     match = q2.find_next();
     assert(match == 0);
 
+
+
+
+
     Query q3 = untyped.columns<float>(1) + untyped.columns<int64_t>(0) > 10 + untyped.columns<int64_t>(0);
     match = q3.find_next();
 
     match = q2.find_next();
     assert(match == 0);    
-
-
 
 
 

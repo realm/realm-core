@@ -73,6 +73,10 @@ Query::~Query()
     }
 }
 
+Expression* Query::get_expression() {
+    return (static_cast<ExpressionNode*>(first[first.size()-1]))->m_compare;
+}
+
 Query& Query::expression(Expression* compare)
 {
     ParentNode* const p = new ExpressionNode(compare);

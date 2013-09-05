@@ -55,6 +55,7 @@ public:
     ~Query();
 
     Query& expression(Expression* compare);
+    Expression* get_expression();
 
     // Conditions: Query only rows contained in tv
     Query& tableview(const TableView& tv);
@@ -241,6 +242,7 @@ protected:
     pthread_t threads[max_threads];
 #endif
 
+public:
     TableRef m_table;
     std::vector<ParentNode*> first;
     std::vector<ParentNode**> update;
