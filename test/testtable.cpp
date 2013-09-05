@@ -6,7 +6,7 @@
 
 #include <UnitTest++.h>
 #include "testsettings.hpp"
-#include "util/test_utilities.hpp"
+#include "test_utilities.hpp"
 #include <tightdb/table_macros.hpp>
 #include <tightdb/lang_bind_helper.hpp>
 #include <tightdb/alloc_slab.hpp>
