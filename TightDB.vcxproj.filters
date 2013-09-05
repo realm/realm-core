@@ -169,7 +169,7 @@
     <ClCompile Include="test\test_file.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\util\test_utilities.cpp">
+    <ClCompile Include="test\test_utilities.cpp">
       <Filter>test\util</Filter>
     </ClCompile>
   </ItemGroup>
@@ -360,7 +360,7 @@
     <ClInclude Include="test\pthread_test.hpp">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="test\util\test_utilities.hpp">
+    <ClInclude Include="test\test_utilities.hpp">
       <Filter>test\util</Filter>
     </ClInclude>
   </ItemGroup>
