@@ -15,7 +15,7 @@ namespace {
 
 class InvalidFreeSpace: std::exception {
 public:
-    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW
+    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
     {
         return "Free space tracking was lost due to out-of-memory";
     }

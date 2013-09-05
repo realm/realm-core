@@ -4,6 +4,16 @@
 #include <tightdb/file.hpp>
 #include <tightdb/thread.hpp>
 #include <tightdb/bind.hpp>
+#include <tightdb/terminate.hpp>
+
+#include "testsettings.hpp"
+
+// Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
+#ifndef _WIN32
+#  include <unistd.h>
+#  include <sys/wait.h>
+#  define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
+#endif
 
 using namespace std;
 using namespace tightdb;
@@ -396,7 +406,12 @@ TEST(Shared_ManyReaders)
     for (int i = 0; i < chunk_2_size; ++i)
         chunk_2[i] = (i + 11) % 241;
 
+#if TEST_DURATION < 1
+    // Mac OS X 10.8 cannot handle more than 15 due to its default ulimit settings.
+    int rounds[] = { 3, 5, 7, 9, 11, 13, 15 };
+#else
     int rounds[] = { 3, 5, 11, 17, 23, 27, 31, 47, 59 };
+#endif
     const int num_rounds = sizeof rounds / sizeof *rounds;
 
     const int max_N = 64;
@@ -742,6 +757,74 @@ TEST(Shared_WriterThreads)
 }
 
 
+#if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
+
+TEST(Shared_RobustAgainstDeathDuringWrite)
+{
+    // Abort if robust mutexes are not supported on the current
+    // platform. Otherwise we would probably get into a dead-lock.
+    if (!RobustMutex::is_robust_on_this_platform())
+        return;
+
+    // This test can only be conducted by spawning independent
+    // processes which can then be terminated individually.
+
+    File::try_remove("test.tightdb");
+
+    for (int i = 0; i < 10; ++i) {
+        pid_t pid = fork();
+        if (pid == pid_t(-1))
+            TIGHTDB_TERMINATE("fork() failed");
+        if (pid == 0) {
+            // Child
+            SharedGroup sg("test.tightdb");
+            WriteTransaction wt(sg);
+            TableRef table = wt.get_table("alpha");
+            _exit(0); // Die with an active write transaction
+        }
+        else {
+            // Parent
+            int stat_loc = 0;
+            int options = 0;
+            pid = waitpid(pid, &stat_loc, options);
+            if (pid == pid_t(-1))
+                TIGHTDB_TERMINATE("waitpid() failed");
+            bool child_exited_normaly = WIFEXITED(stat_loc);
+            CHECK(child_exited_normaly);
+            int child_exit_status = WEXITSTATUS(stat_loc);
+            CHECK_EQUAL(0, child_exit_status);
+        }
+
+        // Check that we can continue without dead-locking
+        {
+            SharedGroup sg("test.tightdb");
+            WriteTransaction wt(sg);
+            TableRef table = wt.get_table("beta");
+            if (table->is_empty()) {
+                table->add_column(type_Int, "i");
+                table->insert_int(0,0,0);
+                table->insert_done();
+            }
+            table->add_int(0,1);
+            wt.commit();
+        }
+    }
+
+    {
+        SharedGroup sg("test.tightdb");
+        ReadTransaction rt(sg);
+        CHECK(!rt.has_table("alpha"));
+        CHECK(rt.has_table("beta"));
+        ConstTableRef table = rt.get_table("beta");
+        CHECK_EQUAL(10, table->get_int(0,0));
+    }
+
+    File::remove("test.tightdb");
+}
+
+#endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
+
+
 TEST(Shared_FormerErrorCase1)
 {
     File::try_remove("test_shared.tightdb");
@@ -960,6 +1043,7 @@ TEST(Shared_SpaceOveruse)
     }
 }
 
+
 TEST(Shared_Notifications)
 {
     // Delete old files if there
@@ -1066,12 +1150,12 @@ TEST(StringIndex_Bug1)
 
 
 namespace {
-void randstr(char* res, size_t len) {
+void rand_str(char* res, size_t len) {
     for (size_t i = 0; i < len; ++i) {
         res[i] = 'a' + rand() % 10;
     }
 }
-}
+} // anonymous namespace
 
 TEST(StringIndex_Bug2)
 {
@@ -1114,7 +1198,7 @@ TEST(StringIndex_Bug2)
             TableRef table = group.get_table("users");
             table->add_empty_row();
             char txt[100];
-            randstr(txt, 8);
+            rand_str(txt, 8);
             txt[8] = 0;
             //cerr << "+" << txt << endl;
             table->set_string(0, table->size() - 1, txt);
