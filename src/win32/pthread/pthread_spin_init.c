@@ -69,7 +69,7 @@ pthread_spin_init (pthread_spinlock_t * lock, int pshared)
 	   * Not implemented yet.
 	   */
 
-#error ERROR [__FILE__, line __LINE__]: Process shared spin locks are not supported yet.
+//#error ERROR [__FILE__, line __LINE__]: Process shared spin locks are not supported yet.
 
 #else
 
