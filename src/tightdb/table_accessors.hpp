@@ -829,7 +829,7 @@ public:
     // todo, review get_impl()
     // C cast to accept TableView (not supported yet), just to make it compile. Todo, beautify
     // or support TableView
-    const Subexpr& get_qexp_column() const {
+    Subexpr& clone() {
         return *new Columns<int64_t>(col_idx, (Table*)Base::m_table->get_impl(), true);
     }
 
@@ -905,7 +905,7 @@ public:
     }
 
     // todo: very quick/dirty hack to get a non-temporary column from ColumnAccessor. Fix
-    const Subexpr& get_qexp_column() const {
+    Subexpr& clone() {
         return *new Columns<float>(col_idx, (Table*)Base::m_table->get_impl(), true);
     }
 
@@ -966,7 +966,7 @@ public:
     }
 
     // todo: very quick/dirty hack to get a non-temporary column from ColumnAccessor. Fix
-    const Subexpr& get_qexp_column() const {
+    Subexpr& clone() {
         return *new Columns<double>(col_idx, (Table*)Base::m_table->get_impl(), true);
     }
 

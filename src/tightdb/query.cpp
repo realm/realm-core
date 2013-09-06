@@ -79,7 +79,7 @@ Expression* Query::get_expression() {
 
 Query& Query::expression(Expression* compare)
 {
-    ParentNode* const p = new ExpressionNode(compare);
+    ParentNode* const p = new ExpressionNode(compare); // leak!
     UpdatePointers(p, &p->m_child);
     return *this;
 }

@@ -91,37 +91,38 @@ int main(int argc, char* argv[])
     typed.add(20, 19.9f, 3.0);
     typed.add(20, 20.1f, 4.0);
 
+    Query q4 = untyped.column<float>(1) + untyped.column<int64_t>(0) > 40;
+    Query q5 = 20 < untyped.column<float>(1);
 
 
-    Query q4 = untyped.columns<float>(1) + untyped.columns<int64_t>(0) > 40;
-    Query q5 = 20 < untyped.columns<float>(1);
-
-
-//    match = q4.expression(  q5.get_expression()  ).find_next();
- //   assert(match == 1);
+    match = q4.expression(  q5.get_expression()  ).find_next();
+    assert(match == 1);
 
 
     // Untyped, direct column addressing
     Value<int64_t> uv1(1);
 
-    Columns<float> uc1 = untyped.columns<float>(1);
-    
-    Query q2 = untyped.columns<float>(1) >= uv1;
+    Columns<float> uc1 = untyped.column<float>(1);
+
+    Query q2 = uv1 <= uc1;
     match = q2.find_next();
     assert(match == 0);
 
 
+    Query q0 = uv1 <= uc1;
+    match = q0.find_next();
+    assert(match == 0);
+
+    Query q8 = uv1 <= untyped.column<float>(1);
+    match = q8.find_next();
+    assert(match == 0);
 
 
-
-    Query q3 = untyped.columns<float>(1) + untyped.columns<int64_t>(0) > 10 + untyped.columns<int64_t>(0);
+    Query q3 = untyped.column<float>(1) + untyped.column<int64_t>(0) > 10 + untyped.column<int64_t>(0);
     match = q3.find_next();
 
     match = q2.find_next();
     assert(match == 0);    
-
-
-
 
 
     // Typed, direct column addressing
@@ -146,26 +147,24 @@ int main(int argc, char* argv[])
     match = (t0 + t1 > 40).find_next();
     assert(match == 1);
 
+    match = q1.find_next();
+    assert(match == 1);   
 
-
-
-
-
-    match = (untyped.columns<int64_t>(0) + untyped.columns<float>(1) > 40).find_next();
+    match = (untyped.column<int64_t>(0) + untyped.column<float>(1) > 40).find_next();
     assert(match == 1);    
 
-    match = (untyped.columns<int64_t>(0) + untyped.columns<float>(1) < 40).find_next();
+    match = (untyped.column<int64_t>(0) + untyped.column<float>(1) < 40).find_next();
     assert(match == 0);    
 
-    match = (untyped.columns<float>(1) <= untyped.columns<int64_t>(0)).find_next();
+    match = (untyped.column<float>(1) <= untyped.column<int64_t>(0)).find_next();
     assert(match == 0);    
 
-    match = (untyped.columns<int64_t>(0) + untyped.columns<float>(1) >= untyped.columns<int64_t>(0) + untyped.columns<float>(1)).find_next();
+    match = (untyped.column<int64_t>(0) + untyped.column<float>(1) >= untyped.column<int64_t>(0) + untyped.column<float>(1)).find_next();
     assert(match == 0);    
 
     // Untyped, column objects
-    Columns<int64_t> u0 = untyped.columns<int64_t>(0);
-    Columns<float> u1 = untyped.columns<float>(1);
+    Columns<int64_t> u0 = untyped.column<int64_t>(0);
+    Columns<float> u1 = untyped.column<float>(1);
 
     match = (u0 + u1 > 40).find_next();
     assert(match == 1);    
@@ -180,11 +179,12 @@ int main(int argc, char* argv[])
     Expression *e = new Compare<Greater, float>(*plus, *constant);
 
     // Bind table and do search
-
     match = untyped.where().expression(e).find_next();
     assert(match == 1);    
 
-
+    Query q9 = untyped.where().expression(e);
+    match = q9.find_next();
+    assert(match == 1);    
 
 
     Subexpr* first2 = new Columns<int64_t>(0);
@@ -197,19 +197,26 @@ int main(int argc, char* argv[])
     match = untyped.where().expression(e).expression(e2).find_next();
     assert(match == 1);    
 
+    Query q10 = untyped.where().expression(q9.get_expression()).expression(e2);
+    match = q10.find_next();
+    assert(match == 1);    
 
 
+    Query tq3 = tq1;
+    match = tq3.find_next();
+    assert(match == 0);   
+ 
 
-    
 
-
-    // you MUST delete these in reversed order of creation
+    // you MUST delete these in reversed order of creation. Will be fixed very soon
     delete e;
     delete plus;
     delete constant;
     delete third;
     delete second;
     delete first;
+
+    
 
     
     delete e2;

@@ -134,7 +134,7 @@ public:
     
     }
 
-    bool m_auto_delete;
+    mutable bool m_auto_delete;
 };
 
 class ValueBase 
@@ -155,7 +155,7 @@ public:
     
     }
 
-    virtual const Subexpr& get_qexp_column() const {
+    virtual Subexpr& clone() {
         return *this;
     }
 
@@ -163,9 +163,9 @@ public:
     virtual void set_table(const Table*) { }    
     virtual Table* get_table() { return NULL; }
 
-    TIGHTDB_FORCEINLINE virtual void evaluate(size_t, ValueBase&) { TIGHTDB_ASSERT(false); }
+    TIGHTDB_FORCEINLINE virtual void evaluate(size_t, ValueBase&) = 0; //{ TIGHTDB_ASSERT(false); }
 
-    bool m_auto_delete;
+    mutable bool m_auto_delete; // todo, there are two of these?!
 };
 
 class ColumnsBase {
@@ -272,6 +272,15 @@ public:
         return ValueBase::elements; // no match
     }
 
+    Subexpr& clone()
+    {
+        Value<T>& n = *new Value<T>();
+        n = *this;    
+        n.m_auto_delete = true;
+        Subexpr::m_auto_delete = false;
+        return n;
+    }
+
     // Performance note: Declaring values as separately named members generates faster (10% or so) code in VS2010, 
     // compared to array, even if the array accesses elements individually instead of in for-loops.
     T m_v[elements];
@@ -294,71 +303,71 @@ public:
 
     // Arithmetic, right side constant
     Operator<Plus<CommonType> >& operator + (R right) { 
-       return *new Operator<Plus<CommonType> >(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true), true); 
+       return *new Operator<Plus<CommonType> >(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(const_cast<Subexpr2<R>&>(right).clone(), true), true); 
     }
     Operator<Minus<CommonType> >& operator - (R right) { 
-       return *new Operator<Minus<CommonType> > (static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true), true); 
+       return *new Operator<Minus<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(const_cast<Subexpr2<R>&>(right).clone(), true), true); 
     }
     Operator<Mul<CommonType> >& operator * (R right) { 
-       return *new Operator<Mul<CommonType> > (static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true), true); 
+       return *new Operator<Mul<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(const_cast<Subexpr2<R>&>(right).clone(), true), true); 
     }
     Operator<Div<CommonType> >& operator / (R right) { 
-        return *new Operator<Div<CommonType> > (static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true), true); 
+        return *new Operator<Div<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(const_cast<Subexpr2<R>&>(right).clone(), true), true); 
     }    
 
     // Arithmetic, right side subexpression
     Operator<Plus<CommonType> >& operator + (const Subexpr2<R>& right) { 
-        return *new Operator<Plus<CommonType> > (static_cast<Subexpr2<L>&>(*this), right, true); 
+        return *new Operator<Plus<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
     }
         
     Operator<Minus<CommonType> >& operator - (const Subexpr2<R>& right) { 
-        return *new Operator<Minus<CommonType> > (static_cast<Subexpr2<L>&>(*this), right, true); 
+        return *new Operator<Minus<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
     }
     Operator<Mul<CommonType> >& operator * (const Subexpr2<R>& right) { 
-        return *new Operator<Mul<CommonType> > (static_cast<Subexpr2<L>&>(*this), right, true); 
+        return *new Operator<Mul<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
     }
     Operator<Div<CommonType> >& operator / (const Subexpr2<R>& right) { 
-        return *new Operator<Div<CommonType> > (static_cast<Subexpr2<L>&>(*this), right, true); 
+        return *new Operator<Div<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
     }
 
     // Compare, right side constant
     Query operator > (R right) {
-        return *new Compare<Greater, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true), true);
+        return *new Compare<Greater, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right, true), true);
     }
     Query operator < (R right) {
-        return *new Compare<Less, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true), true);
+        return *new Compare<Less, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right, true), true);
     }
     Query operator >= (R right) {
-        return *new Compare<GreaterEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true), true);
+        return *new Compare<GreaterEqual, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right, true), true);
     }
     Query operator <= (R right) {
-        return *new Compare<LessEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true), true);
+        return *new Compare<LessEqual, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right, true), true);
     }
     Query operator == (R right) {
-        return *new Compare<Equal, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true), true);
+        return *new Compare<Equal, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right, true), true);
     }
     Query operator != (R right) {
-        return *new Compare<NotEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), *new Value<R>(right, true), true);
+        return *new Compare<NotEqual, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right, true), true);
     }
 
     // Compare, right side subexpression
     Query operator == (const Subexpr2<R>& right) { 
-        return *new Compare<Equal, CommonType>(static_cast<Subexpr2<L>&>(*this), right, true); 
+        return *new Compare<Equal, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
     }
     Query operator != (const Subexpr2<R>& right) { 
-        return *new Compare<NotEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), right, true); 
+        return *new Compare<NotEqual, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
     }
     Query operator > (const Subexpr2<R>& right) { 
-        return *new Compare<Greater, CommonType>(static_cast<Subexpr2<L>&>(*this), right, true); 
+        return *new Compare<Greater, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
     }
     Query operator < (const Subexpr2<R>& right) { 
-        return *new Compare<Less, CommonType>(static_cast<Subexpr2<L>&>(*this), right, true); 
+        return *new Compare<Less, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
     }
     Query operator >= (const Subexpr2<R>& right) { 
-        return *new Compare<GreaterEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), right, true); 
+        return *new Compare<GreaterEqual, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
     }
-    Query operator <= (const Subexpr2<R>& right) { 
-        return *new Compare<LessEqual, CommonType>(static_cast<Subexpr2<L>&>(*this), right, true); 
+    Query operator <= (const Subexpr2<R>& right) {    
+        return *new Compare<LessEqual, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
     }
 };
 
@@ -386,137 +395,150 @@ public:
 
 // Compare
 template <class R> Query operator > (double left, const Subexpr2<R>& right) { 
-    return *new Compare<Greater, typename Common<R, double>::type>(*new Value<double>(left, true), right, true); 
+    return *new Compare<Greater, typename Common<R, double>::type>(*new Value<double>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Query operator > (float left, const Subexpr2<R>& right) {
-    return *new Compare<Greater, typename Common<R, float>::type>(*new Value<float>(left, true), right, true);
+    return *new Compare<Greater, typename Common<R, float>::type>(*new Value<float>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Query operator > (int left, const Subexpr2<R>& right) {
-    return *new Compare<Greater, typename Common<R, int>::type>(*new Value<int>(left, true), right, true);
+    return *new Compare<Greater, typename Common<R, int>::type>(*new Value<int>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Query operator > (int64_t left, const Subexpr2<R>& right) {
-    return *new Compare<Greater, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right, true); 
+    return *new Compare<Greater, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Query operator < (double left, const Subexpr2<R>& right) {
-    return *new Compare<Less, typename Common<R, double>::type>(*new Value<double>(left, true), right, true); 
+    return *new Compare<Less, typename Common<R, double>::type>(*new Value<double>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Query operator < (float left, const Subexpr2<R>& right) { 
-    return *new Compare<Less, typename Common<R, float>::type>(*new Value<float>(left, true), right, true); 
+    return *new Compare<Less, typename Common<R, float>::type>(*new Value<float>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Query operator < (int left, const Subexpr2<R>& right) {
-    return *new Compare<Less, typename Common<R, int>::type>(*new Value<int>(left, true), right, true);
+    return *new Compare<Less, typename Common<R, int>::type>(*new Value<int>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Query operator < (int64_t left, const Subexpr2<R>& right) {
-    return *new Compare<Less, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right, true); 
+    return *new Compare<Less, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Query operator == (double left, const Subexpr2<R>& right) { 
-    return *new Compare<Equal, typename Common<R, double>::type>(*new Value<double>(left, true), right, true);
+    return *new Compare<Equal, typename Common<R, double>::type>(*new Value<double>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Query operator == (float left, const Subexpr2<R>& right) {
-    return *new Compare<Equal, typename Common<R, float>::type>(*new Value<float>(left, true), right, true); 
+    return *new Compare<Equal, typename Common<R, float>::type>(*new Value<float>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Query operator == (int left, const Subexpr2<R>& right) {
-    return *new Compare<Equal, typename Common<R, int>::type>(*new Value<int>(left, true), right, true); 
+    return *new Compare<Equal, typename Common<R, int>::type>(*new Value<int>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Query operator == (int64_t left, const Subexpr2<R>& right) { 
-    return *new Compare<Equal, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right, true); 
+    return *new Compare<Equal, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Query operator >= (double left, const Subexpr2<R>& right) {
-    return *new Compare<GreaterEqual, typename Common<R, double>::type>(*new Value<double>(left, true), right, true);
+    return *new Compare<GreaterEqual, typename Common<R, double>::type>(*new Value<double>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Query operator >= (float left, const Subexpr2<R>& right) {
-    return *new Compare<GreaterEqual, typename Common<R, float>::type>(*new Value<float>(left, true), right, true);
+    return *new Compare<GreaterEqual, typename Common<R, float>::type>(*new Value<float>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Query operator >= (int left, const Subexpr2<R>& right) {
-    return *new Compare<GreaterEqual, typename Common<R, int>::type>(*new Value<int>(left, true), right, true);
+    return *new Compare<GreaterEqual, typename Common<R, int>::type>(*new Value<int>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Query operator >= (int64_t left, const Subexpr2<R>& right) {
-    return *new Compare<GreaterEqual, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right, true); 
+    return *new Compare<GreaterEqual, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Query operator <= (double left, const Subexpr2<R>& right) {
-    return *new Compare<LessEqual, typename Common<R, double>::type>(*new Value<double>(left, true), right, true); 
+    return *new Compare<LessEqual, typename Common<R, double>::type>(*new Value<double>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Query operator <= (float left, const Subexpr2<R>& right) {
-    return *new Compare<LessEqual, typename Common<R, float>::type>(*new Value<float>(left, true), right, true); 
+    return *new Compare<LessEqual, typename Common<R, float>::type>(*new Value<float>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Query operator <= (int left, const Subexpr2<R>& right) {
-    return *new Compare<LessEqual, typename Common<R, int>::type>(*new Value<int>(left, true), right, true); 
+    return *new Compare<LessEqual, typename Common<R, int>::type>(*new Value<int>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Query operator <= (int64_t left, const Subexpr2<R>& right) { 
-    return *new Compare<LessEqual, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right, true);
+    return *new Compare<LessEqual, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Query operator != (double left, const Subexpr2<R>& right) {
-    return *new Compare<NotEqual, typename Common<R, double>::type>(*new Value<double>(left, true), right, true); 
+    return *new Compare<NotEqual, typename Common<R, double>::type>(*new Value<double>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Query operator != (float left, const Subexpr2<R>& right) {
-    return *new Compare<NotEqual, typename Common<R, float>::type>(*new Value<float>(left, true), right, true); 
+    return *new Compare<NotEqual, typename Common<R, float>::type>(*new Value<float>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Query operator != (int left, const Subexpr2<R>& right) {
-    return *new Compare<NotEqual, typename Common<R, int>::type>(*new Value<int>(left, true), right, true); 
+    return *new Compare<NotEqual, typename Common<R, int>::type>(*new Value<int>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Query operator != (int64_t left, const Subexpr2<R>& right) { 
-    return *new Compare<NotEqual, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), right, true);
+    return *new Compare<NotEqual, typename Common<R, int64_t>::type>(*new Value<int64_t>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 
 // Arithmetic
 template <class R> Operator<Plus<typename Common<R, double>::type> >& operator + (double left, const Subexpr2<R>& right) { 
-    return *new Operator<Plus<typename Common<R, double>::type> >(*new Value<double>(left, true), right, true); 
+    return *new Operator<Plus<typename Common<R, double>::type> >(*new Value<double>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Operator<Plus<typename Common<R, float>::type> >& operator + (float left, const Subexpr2<R>& right) {
-    return *new Operator<Plus<typename Common<R, float>::type> >(*new Value<float>(left, true), right, true); 
+    return *new Operator<Plus<typename Common<R, float>::type> >(*new Value<float>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Operator<Plus<typename Common<R, int>::type> >& operator + (int left, const Subexpr2<R>& right) {
-    return *new Operator<Plus<typename Common<R, int>::type> >(*new Value<int>(left, true), right, true);
+    return *new Operator<Plus<typename Common<R, int>::type> >(*new Value<int>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Operator<Plus<typename Common<R, int64_t>::type> >& operator + (int64_t left, const Subexpr2<R>& right) { 
-    return *new Operator<Plus<typename Common<R, int64_t>::type> >(*new Value<int64_t>(left, true), right, true);
+    return *new Operator<Plus<typename Common<R, int64_t>::type> >(*new Value<int64_t>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Operator<Minus<typename Common<R, double>::type> >& operator - (double left, const Subexpr2<R>& right) {
-    return *new Operator<Minus<typename Common<R, double>::type> >(*new Value<double>(left, true), right, true); 
+    return *new Operator<Minus<typename Common<R, double>::type> >(*new Value<double>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Operator<Minus<typename Common<R, float>::type> >& operator - (float left, const Subexpr2<R>& right) { 
-    return *new Operator<Minus<typename Common<R, float>::type> >(*new Value<float>(left, true), right, true);
+    return *new Operator<Minus<typename Common<R, float>::type> >(*new Value<float>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Operator<Minus<typename Common<R, int>::type> >& operator - (int left, const Subexpr2<R>& right) { 
-    return *new Operator<Minus<typename Common<R, int>::type> >(*new Value<int>(left, true), right, true);
+    return *new Operator<Minus<typename Common<R, int>::type> >(*new Value<int>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Operator<Minus<typename Common<R, int64_t>::type> >& operator - (int64_t left, const Subexpr2<R>& right) { 
-    return *new Operator<Minus<typename Common<R, int64_t>::type> >(*new Value<int64_t>(left, true), right, true); 
+    return *new Operator<Minus<typename Common<R, int64_t>::type> >(*new Value<int64_t>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Operator<Mul<typename Common<R, double>::type> >& operator * (double left, const Subexpr2<R>& right) {
-    return *new Operator<Mul<typename Common<R, double>::type> >(*new Value<double>(left, true), right, true); 
+    return *new Operator<Mul<typename Common<R, double>::type> >(*new Value<double>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Operator<Mul<typename Common<R, float>::type> >& operator * (float left, const Subexpr2<R>& right) { 
-    return *new Operator<Mul<typename Common<R, float>::type> >(*new Value<float>(left, true), right, true); 
+    return *new Operator<Mul<typename Common<R, float>::type> >(*new Value<float>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true); 
 }
 template <class R> Operator<Mul<typename Common<R, int>::type> >& operator * (int left, const Subexpr2<R>& right) { 
-    return *new Operator<Mul<typename Common<R, int>::type> >(*new Value<int>(left, true), right, true);
+    return *new Operator<Mul<typename Common<R, int>::type> >(*new Value<int>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Operator<Mul<typename Common<R, int64_t>::type> >& operator * (int64_t left, const Subexpr2<R>& right) { 
-    return *new Operator<Mul<typename Common<R, int64_t>::type> >(*new Value<int64_t>(left, true), right, true);
+    return *new Operator<Mul<typename Common<R, int64_t>::type> >(*new Value<int64_t>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Operator<Div<typename Common<R, double>::type> >& operator / (double left, const Subexpr2<R>& right) { 
-    return *new Operator<Div<typename Common<R, double>::type> >(*new Value<double>(left, true), right, true);
+    return *new Operator<Div<typename Common<R, double>::type> >(*new Value<double>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Operator<Div<typename Common<R, float>::type> >& operator / (float left, const Subexpr2<R>& right) { 
-    return *new Operator<Div<typename Common<R, float>::type> >*(new Value<float>(left, true), right, true);
+    return *new Operator<Div<typename Common<R, float>::type> >*(new Value<float>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Operator<Div<typename Common<R, int>::type> >& operator / (int left, const Subexpr2<R>& right) { 
-    return *new Operator<Div<typename Common<R, int>::type> >(*new Value<int>(left, true), right, true);
+    return *new Operator<Div<typename Common<R, int>::type> >(*new Value<int>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 template <class R> Operator<Div<typename Common<R, int64_t>::type> >& operator / (int64_t left, const Subexpr2<R>& right) { 
-    return *new Operator<Div<typename Common<R, int64_t>::type> >(*new Value<int64_t>(left, true), right, true);
+    return *new Operator<Div<typename Common<R, int64_t>::type> >(*new Value<int64_t>(left, true), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 
 
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
-
+    
     ~Columns()
     {
-   //     delete sg;
-   //     sg = NULL;
+  //      if(Subexpr::m_auto_delete)
+  //          delete sg;
+    }
+
+    Subexpr& clone() 
+    {
+        Columns<T>& n = *new Columns<T>();
+        n = *this;
+
+        SequentialGetter<T> *s = new SequentialGetter<T>();
+        s = n.sg;
+
+        n.m_auto_delete = true;
+        Subexpr::m_auto_delete = false;
+        return n;
     }
 
     explicit Columns(size_t column, bool auto_delete) : m_table2(NULL), sg(NULL)
@@ -584,29 +606,29 @@ template <class oper, class TLeft, class TRight> class Operator : public Subexpr
 public:
     // todo: get_qexp_column was a very quick/dirty hack to get a non-temporary column from ColumnAccessor. Todo, fix
     Operator(TLeft& left, const TRight& right) : 
-    m_left(const_cast<TLeft&>(left.get_qexp_column())), 
-    m_right(const_cast<TRight&>(right.get_qexp_column()))
+    m_left(const_cast<TLeft&>(left)), 
+    m_right(const_cast<TRight&>(right))
     {
+        
         Subexpr::m_auto_delete = false;
     }
 
     // todo, make protected
     Operator(TLeft& left, const TRight& right, bool auto_delete) :
-    m_left(const_cast<TLeft&>(left.get_qexp_column())),
-    m_right(const_cast<TRight&>(right.get_qexp_column()))
+    m_left(const_cast<TLeft&>(left)),
+    m_right(const_cast<TRight&>(const_cast<TRight&>(right)))
     {
         Subexpr::m_auto_delete = auto_delete;
     }
 
     ~Operator() 
-    {
-        /*
-        if(m_left.m_auto_delete)
+    {        
+/*        if(m_left.m_auto_delete)
             delete &m_left;
 
         if(m_right.m_auto_delete)
-            delete &m_right;
-            */
+            delete &m_right;            
+*/
     }
 
     void set_table(const Table* table)
@@ -665,18 +687,17 @@ template <class TCond, class T, class TLeft, class TRight> class Compare : publi
 public:
     ~Compare()
     {
-/*        if(m_left.m_auto_delete)
-            delete &m_left;
+ //       if(m_left.m_auto_delete)
+ //           delete &m_left;
 
-        if(m_right.m_auto_delete)
-            delete &m_right;
-  */          
+ //       if(m_right.m_auto_delete)
+ //           delete &m_right;          
     }
 
     // todo: get_qexp_column was a very quick/dirty hack to get a non-temporary column from ColumnAccessor. Todo, fix
     Compare(TLeft& left, const TRight& right) : 
-    m_left(const_cast<TLeft&>(left.get_qexp_column())), 
-    m_right(const_cast<TRight&>(right.get_qexp_column()))
+    m_left(const_cast<TLeft&>(left)), 
+    m_right(const_cast<TRight&>(const_cast<TRight&>(right)))
     {
         m_auto_delete = false;
         Query::expression(this);
@@ -687,8 +708,8 @@ public:
 
     // todo: get_qexp_column was a very quick/dirty hack to get a non-temporary column from ColumnAccessor. Todo, fix
     Compare(TLeft& left, const TRight& right, bool auto_delete) : 
-    m_left(const_cast<TLeft&>(left.get_qexp_column())), 
-    m_right(const_cast<TRight&>(right.get_qexp_column()))
+    m_left(const_cast<TLeft&>(left)), 
+    m_right(const_cast<TRight&>( const_cast<TRight&>(right)))
     {
         m_auto_delete = auto_delete;
         Query::expression(this);

@@ -169,11 +169,10 @@ public:
     void set_index(std::size_t column_ndx);
     //@}
 
-    template <class T> Columns<T>& columns(size_t column)
+    template <class T> Columns<T> column(size_t column)
     {
-        return *new Columns<T>(column, this, false);
+        return Columns<T>(column, this, false);
     }
-
 
     // Table size and deletion
     bool        is_empty() const TIGHTDB_NOEXCEPT { return m_size == 0; }
