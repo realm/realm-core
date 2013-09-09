@@ -108,6 +108,11 @@ public:
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
     // Has db been modified since last transaction?
+    // Repeated calls to this function MUST be interspersed with calls
+    // to functions that synchronize memory. Failure to do so may cause the
+    // function to return false, even though the database has actually changed.
+    // Any threading primitive will suffice. Calls to begin_read, begin_write, 
+    // end_read, commit or rollback also synchronizes memory.
     bool has_changed() const TIGHTDB_NOEXCEPT;
 
     // Read transactions
