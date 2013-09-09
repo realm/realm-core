@@ -2,7 +2,6 @@
 
 #include <tightdb/exceptions.hpp>
 #include <tightdb/thread.hpp>
-#include <features.h>
 
 #if !defined _WIN32
 #  include <unistd.h>
