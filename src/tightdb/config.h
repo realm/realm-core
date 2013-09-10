@@ -120,6 +120,16 @@
 #else
 #  define TIGHTDB_NOEXCEPT
 #endif
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_6
+#  define TIGHTDB_NOEXCEPT_IF(cond) noexcept(cond)
+#else
+#  define TIGHTDB_NOEXCEPT_IF(cond)
+#endif
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_6
+#  define TIGHTDB_NOEXCEPT_OR_NOTHROW noexcept
+#else
+#  define TIGHTDB_NOEXCEPT_OR_NOTHROW throw()
+#endif
 
 
 /* Support for C++11 explicit virtual overrides */

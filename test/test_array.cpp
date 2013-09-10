@@ -21,7 +21,7 @@ struct db_setup_array {
 
 Array db_setup_array::c;
 
-void hasZeroByte(int64_t value, size_t reps)
+void has_zero_byte(int64_t value, size_t reps)
 {
     Array a;
     Array r;
@@ -472,39 +472,39 @@ TEST_FIXTURE(db_setup_array, Array_LowerUpperBound)
     a.add(70);
     a.add(80);
 
-    CHECK_EQUAL(0, a.lower_bound(0));  CHECK_EQUAL(0, a.upper_bound(0));
-    CHECK_EQUAL(0, a.lower_bound(1));  CHECK_EQUAL(0, a.upper_bound(1));
-    CHECK_EQUAL(0, a.lower_bound(9));  CHECK_EQUAL(0, a.upper_bound(9));
-    CHECK_EQUAL(0, a.lower_bound(10)); CHECK_EQUAL(1, a.upper_bound(10));
-    CHECK_EQUAL(1, a.lower_bound(11)); CHECK_EQUAL(1, a.upper_bound(11));
-    CHECK_EQUAL(1, a.lower_bound(19)); CHECK_EQUAL(1, a.upper_bound(19));
-    CHECK_EQUAL(1, a.lower_bound(20)); CHECK_EQUAL(2, a.upper_bound(20));
-    CHECK_EQUAL(2, a.lower_bound(21)); CHECK_EQUAL(2, a.upper_bound(21));
-    CHECK_EQUAL(2, a.lower_bound(29)); CHECK_EQUAL(2, a.upper_bound(29));
-    CHECK_EQUAL(2, a.lower_bound(30)); CHECK_EQUAL(3, a.upper_bound(30));
-    CHECK_EQUAL(3, a.lower_bound(31)); CHECK_EQUAL(3, a.upper_bound(31));
-    CHECK_EQUAL(3, a.lower_bound(32)); CHECK_EQUAL(3, a.upper_bound(32));
-    CHECK_EQUAL(3, a.lower_bound(39)); CHECK_EQUAL(3, a.upper_bound(39));
-    CHECK_EQUAL(3, a.lower_bound(40)); CHECK_EQUAL(4, a.upper_bound(40));
-    CHECK_EQUAL(4, a.lower_bound(41)); CHECK_EQUAL(4, a.upper_bound(41));
-    CHECK_EQUAL(4, a.lower_bound(42)); CHECK_EQUAL(4, a.upper_bound(42));
-    CHECK_EQUAL(4, a.lower_bound(49)); CHECK_EQUAL(4, a.upper_bound(49));
-    CHECK_EQUAL(4, a.lower_bound(50)); CHECK_EQUAL(5, a.upper_bound(50));
-    CHECK_EQUAL(5, a.lower_bound(51)); CHECK_EQUAL(5, a.upper_bound(51));
-    CHECK_EQUAL(5, a.lower_bound(52)); CHECK_EQUAL(5, a.upper_bound(52));
-    CHECK_EQUAL(5, a.lower_bound(59)); CHECK_EQUAL(5, a.upper_bound(59));
-    CHECK_EQUAL(5, a.lower_bound(60)); CHECK_EQUAL(6, a.upper_bound(60));
-    CHECK_EQUAL(6, a.lower_bound(61)); CHECK_EQUAL(6, a.upper_bound(61));
-    CHECK_EQUAL(6, a.lower_bound(62)); CHECK_EQUAL(6, a.upper_bound(62));
-    CHECK_EQUAL(6, a.lower_bound(69)); CHECK_EQUAL(6, a.upper_bound(69));
-    CHECK_EQUAL(6, a.lower_bound(70)); CHECK_EQUAL(7, a.upper_bound(70));
-    CHECK_EQUAL(7, a.lower_bound(71)); CHECK_EQUAL(7, a.upper_bound(71));
-    CHECK_EQUAL(7, a.lower_bound(72)); CHECK_EQUAL(7, a.upper_bound(72));
-    CHECK_EQUAL(7, a.lower_bound(78)); CHECK_EQUAL(7, a.upper_bound(78));
-    CHECK_EQUAL(7, a.lower_bound(79)); CHECK_EQUAL(7, a.upper_bound(79));
-    CHECK_EQUAL(7, a.lower_bound(80)); CHECK_EQUAL(8, a.upper_bound(80));
-    CHECK_EQUAL(8, a.lower_bound(81)); CHECK_EQUAL(8, a.upper_bound(81));
-    CHECK_EQUAL(8, a.lower_bound(82)); CHECK_EQUAL(8, a.upper_bound(82));
+    CHECK_EQUAL(0, a.lower_bound_int(0));  CHECK_EQUAL(0, a.upper_bound_int(0));
+    CHECK_EQUAL(0, a.lower_bound_int(1));  CHECK_EQUAL(0, a.upper_bound_int(1));
+    CHECK_EQUAL(0, a.lower_bound_int(9));  CHECK_EQUAL(0, a.upper_bound_int(9));
+    CHECK_EQUAL(0, a.lower_bound_int(10)); CHECK_EQUAL(1, a.upper_bound_int(10));
+    CHECK_EQUAL(1, a.lower_bound_int(11)); CHECK_EQUAL(1, a.upper_bound_int(11));
+    CHECK_EQUAL(1, a.lower_bound_int(19)); CHECK_EQUAL(1, a.upper_bound_int(19));
+    CHECK_EQUAL(1, a.lower_bound_int(20)); CHECK_EQUAL(2, a.upper_bound_int(20));
+    CHECK_EQUAL(2, a.lower_bound_int(21)); CHECK_EQUAL(2, a.upper_bound_int(21));
+    CHECK_EQUAL(2, a.lower_bound_int(29)); CHECK_EQUAL(2, a.upper_bound_int(29));
+    CHECK_EQUAL(2, a.lower_bound_int(30)); CHECK_EQUAL(3, a.upper_bound_int(30));
+    CHECK_EQUAL(3, a.lower_bound_int(31)); CHECK_EQUAL(3, a.upper_bound_int(31));
+    CHECK_EQUAL(3, a.lower_bound_int(32)); CHECK_EQUAL(3, a.upper_bound_int(32));
+    CHECK_EQUAL(3, a.lower_bound_int(39)); CHECK_EQUAL(3, a.upper_bound_int(39));
+    CHECK_EQUAL(3, a.lower_bound_int(40)); CHECK_EQUAL(4, a.upper_bound_int(40));
+    CHECK_EQUAL(4, a.lower_bound_int(41)); CHECK_EQUAL(4, a.upper_bound_int(41));
+    CHECK_EQUAL(4, a.lower_bound_int(42)); CHECK_EQUAL(4, a.upper_bound_int(42));
+    CHECK_EQUAL(4, a.lower_bound_int(49)); CHECK_EQUAL(4, a.upper_bound_int(49));
+    CHECK_EQUAL(4, a.lower_bound_int(50)); CHECK_EQUAL(5, a.upper_bound_int(50));
+    CHECK_EQUAL(5, a.lower_bound_int(51)); CHECK_EQUAL(5, a.upper_bound_int(51));
+    CHECK_EQUAL(5, a.lower_bound_int(52)); CHECK_EQUAL(5, a.upper_bound_int(52));
+    CHECK_EQUAL(5, a.lower_bound_int(59)); CHECK_EQUAL(5, a.upper_bound_int(59));
+    CHECK_EQUAL(5, a.lower_bound_int(60)); CHECK_EQUAL(6, a.upper_bound_int(60));
+    CHECK_EQUAL(6, a.lower_bound_int(61)); CHECK_EQUAL(6, a.upper_bound_int(61));
+    CHECK_EQUAL(6, a.lower_bound_int(62)); CHECK_EQUAL(6, a.upper_bound_int(62));
+    CHECK_EQUAL(6, a.lower_bound_int(69)); CHECK_EQUAL(6, a.upper_bound_int(69));
+    CHECK_EQUAL(6, a.lower_bound_int(70)); CHECK_EQUAL(7, a.upper_bound_int(70));
+    CHECK_EQUAL(7, a.lower_bound_int(71)); CHECK_EQUAL(7, a.upper_bound_int(71));
+    CHECK_EQUAL(7, a.lower_bound_int(72)); CHECK_EQUAL(7, a.upper_bound_int(72));
+    CHECK_EQUAL(7, a.lower_bound_int(78)); CHECK_EQUAL(7, a.upper_bound_int(78));
+    CHECK_EQUAL(7, a.lower_bound_int(79)); CHECK_EQUAL(7, a.upper_bound_int(79));
+    CHECK_EQUAL(7, a.lower_bound_int(80)); CHECK_EQUAL(8, a.upper_bound_int(80));
+    CHECK_EQUAL(8, a.lower_bound_int(81)); CHECK_EQUAL(8, a.upper_bound_int(81));
+    CHECK_EQUAL(8, a.lower_bound_int(82)); CHECK_EQUAL(8, a.upper_bound_int(82));
 
     a.destroy();
 }
@@ -795,18 +795,18 @@ TEST(findallint7)
     r.destroy();
 }
 
-// Tests the case where a value does *not* exist in one entire 64-bit chunk (triggers the 'if (hasZeroByte) break;' condition)
-TEST(FindhasZeroByte)
+// Tests the case where a value does *not* exist in one entire 64-bit chunk (triggers the 'if (has_zero_byte()) break;' condition)
+TEST(FindHasZeroByte)
 {
     // we want at least 1 entire 64-bit chunk-test, and we also want a remainder-test, so we chose n to be a prime > 64
     size_t n = 73;
-    hasZeroByte(1, n); // width = 1
-    hasZeroByte(3, n); // width = 2
-    hasZeroByte(13, n); // width = 4
-    hasZeroByte(100, n); // 8
-    hasZeroByte(10000, n); // 16
-    hasZeroByte(100000, n); // 32
-    hasZeroByte(8000000000LL, n); // 64
+    has_zero_byte(1, n); // width = 1
+    has_zero_byte(3, n); // width = 2
+    has_zero_byte(13, n); // width = 4
+    has_zero_byte(100, n); // 8
+    has_zero_byte(10000, n); // 16
+    has_zero_byte(100000, n); // 32
+    has_zero_byte(8000000000LL, n); // 64
 }
 
 // New find test for SSE search, to trigger partial finds (see FindSSE()) before and after the aligned data area

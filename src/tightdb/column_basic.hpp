@@ -45,9 +45,7 @@ public:
     explicit BasicColumn(Allocator& = Allocator::get_default());
     explicit BasicColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                          Allocator& = Allocator::get_default());
-    ~BasicColumn();
-
-    void destroy() TIGHTDB_OVERRIDE;
+    ~BasicColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
@@ -75,22 +73,21 @@ public:
     size_t find_first(T value, size_t start=0 , size_t end=-1) const;
     void find_all(Array& result, T value, size_t start = 0, size_t end = -1) const;
 
-    ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
-    void set_parent(ArrayParent* parent, size_t pndx) TIGHTDB_OVERRIDE { m_array->set_parent(parent, pndx); }
+    //@{
+    /// Find the lower/upper bound for the specified value assuming
+    /// that the elements are already sorted in ascending order.
+    std::size_t lower_bound(T value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound(T value) const TIGHTDB_NOEXCEPT;
+    //@{
 
     /// Compare two columns for equality.
     bool compare(const BasicColumn&) const;
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
+    void Verify() const TIGHTDB_OVERRIDE {}; // Must be upper case to avoid conflict with macro in ObjC
 #endif
 
 private:
-    friend class Array;
-    friend class ColumnBase;
-
-    void update_ref(ref_type ref);
-
     void LeafSet(size_t ndx, T value);
     void LeafDelete(size_t ndx);
 
@@ -105,11 +102,14 @@ private:
                                 Array::TreeInsert<BasicColumn<T> >&);
 
 #ifdef TIGHTDB_DEBUG
-    virtual void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
+    void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
 #endif
 
     template <typename R, Action action, class cond>
     R aggregate(T target, size_t start, size_t end, size_t *matchcount = 0) const;
+
+    friend class Array;
+    friend class ColumnBase;
 };
 
 

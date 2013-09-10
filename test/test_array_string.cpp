@@ -479,13 +479,13 @@ TEST(ArrayStringCompare)
 {
     ArrayString a, b;
 
-    CHECK(a.Compare(b));
+    CHECK(a.compare_string(b));
     a.add("");
-    CHECK(!a.Compare(b));
+    CHECK(!a.compare_string(b));
     b.add("x");
-    CHECK(!a.Compare(b));
+    CHECK(!a.compare_string(b));
     a.set(0, "x");
-    CHECK(a.Compare(b));
+    CHECK(a.compare_string(b));
 
     a.destroy();
     b.destroy();

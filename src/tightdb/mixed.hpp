@@ -118,6 +118,8 @@ public:
     struct subtable_tag {};
     Mixed(subtable_tag) TIGHTDB_NOEXCEPT: m_type(type_Table) {}
 
+    ~Mixed() TIGHTDB_NOEXCEPT {}
+
     DataType get_type() const TIGHTDB_NOEXCEPT { return m_type; }
 
     int64_t     get_int()    const TIGHTDB_NOEXCEPT;

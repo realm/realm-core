@@ -41,52 +41,23 @@ template<class T>
 BasicColumn<T>::BasicColumn(ref_type ref, ArrayParent* parent, std::size_t pndx, Allocator& alloc)
 {
     bool root_is_leaf = root_is_leaf_from_ref(ref, alloc);
-    if (root_is_leaf)
+    if (root_is_leaf) {
         m_array = new BasicArray<T>(ref, parent, pndx, alloc);
-    else
-        m_array = new Array(ref, parent, pndx, alloc);
-}
-
-template<class T>
-BasicColumn<T>::~BasicColumn()
-{
-    if (root_is_leaf())
-        delete static_cast<BasicArray<T>*>(m_array);
-    else
-        delete m_array;
-}
-
-template<class T>
-void BasicColumn<T>::destroy()
-{
-    if (root_is_leaf())
-        static_cast<BasicArray<T>*>(m_array)->destroy();
-    else
-        m_array->destroy();
-}
-
-
-template<class T>
-void BasicColumn<T>::update_ref(ref_type ref)
-{
-    TIGHTDB_ASSERT(!root_is_leaf_from_ref(ref, m_array->get_alloc())); // Can only be called when creating node
-
-    if (!root_is_leaf()) {
-        m_array->update_ref(ref);
-        return;
     }
+    else {
+        m_array = new Array(ref, parent, pndx, alloc);
+    }
+}
 
-    ArrayParent* parent = m_array->get_parent();
-    std::size_t pndx = m_array->get_ndx_in_parent();
-
-    // Replace the generic array with int array for node
-    Array* array = new Array(ref, parent, pndx, m_array->get_alloc());
-    delete m_array;
-    m_array = array;
-
-    // Update ref in parent
-    if (parent)
-        parent->update_child_ref(pndx, ref);
+template<class T>
+BasicColumn<T>::~BasicColumn() TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        delete static_cast<BasicArray<T>*>(m_array);
+    }
+    else {
+        delete m_array;
+    }
 }
 
 template<class T>
@@ -114,17 +85,20 @@ template<class T>
 void BasicColumn<T>::clear()
 {
     if (m_array->is_leaf()) {
-        static_cast<BasicArray<T>*>(m_array)->clear();
+        static_cast<BasicArray<T>*>(m_array)->clear(); // Throws
         return;
     }
 
     ArrayParent* parent = m_array->get_parent();
     std::size_t pndx = m_array->get_ndx_in_parent();
 
+    // FIXME: ExceptionSafety: Array accessor as well as underlying
+    // array node is leaked if ArrayParent::update_child_ref() throws.
+
     // Revert to generic array
-    BasicArray<T>* array = new BasicArray<T>(parent, pndx, m_array->get_alloc());
+    BasicArray<T>* array = new BasicArray<T>(parent, pndx, m_array->get_alloc()); // Throws
     if (parent)
-        parent->update_child_ref(pndx, array->get_ref());
+        parent->update_child_ref(pndx, array->get_ref()); // Throws
 
     // Remove original node
     m_array->destroy();
@@ -344,6 +318,23 @@ ref_type BasicColumn<T>::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
 {
     BasicArray<T> leaf(leaf_mem, &parent, ndx_in_parent, alloc);
     return leaf.btree_leaf_insert(insert_ndx, state.m_value, state);
+}
+
+
+template<class T> inline std::size_t BasicColumn<T>::lower_bound(T value) const TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        return static_cast<const BasicArray<T>*>(m_array)->lower_bound(value);
+    }
+    return ColumnBase::lower_bound(*this, value);
+}
+
+template<class T> inline std::size_t BasicColumn<T>::upper_bound(T value) const TIGHTDB_NOEXCEPT
+{
+    if (root_is_leaf()) {
+        return static_cast<const BasicArray<T>*>(m_array)->upper_bound(value);
+    }
+    return ColumnBase::upper_bound(*this, value);
 }
 
 

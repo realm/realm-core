@@ -66,11 +66,9 @@ public:
     ColumnMixed(Allocator&, const Table* table, std::size_t column_ndx,
                 ArrayParent*, std::size_t ndx_in_parent, ref_type);
 
-    ~ColumnMixed();
-    void destroy() TIGHTDB_OVERRIDE;
+    ~ColumnMixed() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void set_parent(ArrayParent*, std::size_t ndx_in_parent);
-    void UpdateFromParent();
+    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     DataType get_type(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_types->size(); }
@@ -116,27 +114,24 @@ public:
     void insert_subtable(std::size_t ndx, const Table*);
 
     void add() TIGHTDB_OVERRIDE { insert_int(size(), 0); }
-    void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert_int(ndx, 0); invalidate_subtables(); }
+    void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert_int(ndx, 0); }
     void clear() TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
     void fill(std::size_t count);
 
-    ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
-
     /// Compare two mixed columns for equality.
-    bool compare(const ColumnMixed&) const;
+    bool compare_mixed(const ColumnMixed&) const;
 
-    void invalidate_subtables();
+    void detach_subtable_accessors() TIGHTDB_NOEXCEPT;
 
-    // Overriding virtual method.
-    void invalidate_subtables_virtual();
+    void detach_subtable_accessors_virtual() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     static ref_type create(std::size_t num_default_values, Allocator&);
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-    void to_dot(std::ostream&, StringData title) const;
+    void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
+    void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
 #endif
 
 private:
@@ -174,16 +169,16 @@ private:
     /// For string and binary data types, the bytes are stored here.
     ColumnBinary* m_data;
 
-    void Create(Allocator& alloc, const Table* table, std::size_t column_ndx);
-    void Create(Allocator& alloc, const Table* table, std::size_t column_ndx,
-                ArrayParent* parent, std::size_t ndx_in_parent, ref_type ref);
-    void InitDataColumn();
+    void create(Allocator&, const Table*, std::size_t column_ndx);
+    void create(Allocator&, const Table*, std::size_t column_ndx,
+                ArrayParent*, std::size_t ndx_in_parent, ref_type);
+    void init_data_column();
 
-    void clear_value(std::size_t ndx, MixedColType newtype);
+    void clear_value(std::size_t ndx, MixedColType new_type);
 
     // Get/set/insert 64-bit values in m_refs/m_types
     int64_t get_value(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    void set_value(std::size_t ndx, int64_t value, MixedColType coltype);
+    void set_value(std::size_t ndx, int64_t value, MixedColType);
     void insert_int64(std::size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
     void set_int64(std::size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
 };
@@ -196,6 +191,7 @@ public:
     RefsColumn(Allocator& alloc, const Table* table, std::size_t column_ndx,
                ArrayParent* parent, std::size_t ndx_in_parent, ref_type ref):
         ColumnSubtableParent(alloc, table, column_ndx, parent, ndx_in_parent, ref) {}
+    ~RefsColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
     using ColumnSubtableParent::get_subtable_ptr;
     using ColumnSubtableParent::get_subtable;
 };

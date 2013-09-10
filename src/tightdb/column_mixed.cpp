@@ -1,10 +1,10 @@
 #include <tightdb/column_mixed.hpp>
 
 using namespace std;
+using namespace tightdb;
 
-namespace tightdb {
 
-ColumnMixed::~ColumnMixed()
+ColumnMixed::~ColumnMixed() TIGHTDB_NOEXCEPT
 {
     delete m_types;
     delete m_refs;
@@ -12,30 +12,20 @@ ColumnMixed::~ColumnMixed()
     delete m_array;
 }
 
-void ColumnMixed::destroy()
-{
-    if (m_array != 0)
-        m_array->destroy();
-}
 
-void ColumnMixed::set_parent(ArrayParent* parent, size_t ndx_in_parent)
+void ColumnMixed::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
-    m_array->set_parent(parent, ndx_in_parent);
-}
-
-void ColumnMixed::UpdateFromParent()
-{
-    if (!m_array->UpdateFromParent())
+    if (!m_array->update_from_parent(old_baseline))
         return;
 
-    m_types->UpdateFromParent();
-    m_refs->UpdateFromParent();
+    m_types->update_from_parent(old_baseline);
+    m_refs->update_from_parent(old_baseline);
     if (m_data)
-        m_data->UpdateFromParent();
+        m_data->update_from_parent(old_baseline);
 }
 
 
-void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx)
+void ColumnMixed::create(Allocator& alloc, const Table* table, size_t column_ndx)
 {
     m_array = new Array(Array::type_HasRefs, 0, 0, alloc);
 
@@ -49,7 +39,7 @@ void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx
     m_refs->set_parent(m_array, 1);
 }
 
-void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx,
+void ColumnMixed::create(Allocator& alloc, const Table* table, size_t column_ndx,
                          ArrayParent* parent, size_t ndx_in_parent, ref_type ref)
 {
     m_array = new Array(ref, parent, ndx_in_parent, alloc);
@@ -70,7 +60,7 @@ void ColumnMixed::Create(Allocator& alloc, const Table* table, size_t column_ndx
     }
 }
 
-void ColumnMixed::InitDataColumn()
+void ColumnMixed::init_data_column()
 {
     if (m_data)
         return;
@@ -133,19 +123,19 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType new_type)
 void ColumnMixed::erase(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
+    detach_subtable_accessors();
 
     // Remove refs or binary data
     clear_value(ndx, mixcol_Int);
 
     m_types->erase(ndx);
     m_refs->erase(ndx);
-
-    invalidate_subtables();
 }
 
 void ColumnMixed::move_last_over(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx+1 < size());
+    detach_subtable_accessors();
 
     // Remove refs or binary data
     clear_value(ndx, mixcol_Int);
@@ -156,6 +146,7 @@ void ColumnMixed::move_last_over(size_t ndx)
 
 void ColumnMixed::clear()
 {
+    detach_subtable_accessors();
     m_types->clear();
     m_refs->clear();
     if (m_data)
@@ -196,9 +187,10 @@ void ColumnMixed::fill(size_t count)
 void ColumnMixed::set_string(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
-    InitDataColumn();
+    detach_subtable_accessors();
+    init_data_column();
 
-    const MixedColType type = MixedColType(m_types->get(ndx));
+    MixedColType type = MixedColType(m_types->get(ndx));
 
     // See if we can reuse data position
     if (type == mixcol_String) {
@@ -229,7 +221,8 @@ void ColumnMixed::set_string(size_t ndx, StringData value)
 void ColumnMixed::set_binary(size_t ndx, BinaryData value)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
-    InitDataColumn();
+    detach_subtable_accessors();
+    init_data_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
 
@@ -259,7 +252,7 @@ void ColumnMixed::set_binary(size_t ndx, BinaryData value)
     }
 }
 
-bool ColumnMixed::compare(const ColumnMixed& c) const
+bool ColumnMixed::compare_mixed(const ColumnMixed& c) const
 {
     const size_t n = size();
     if (c.size() != n)
@@ -270,37 +263,37 @@ bool ColumnMixed::compare(const ColumnMixed& c) const
         if (c.get_type(i) != type)
             return false;
         switch (type) {
-        case type_Int:
-            if (get_int(i) != c.get_int(i)) return false;
-            break;
-        case type_Bool:
-            if (get_bool(i) != c.get_bool(i)) return false;
-            break;
-        case type_Date:
-            if (get_date(i) != c.get_date(i)) return false;
-            break;
-        case type_Float:
-            if (get_float(i) != c.get_float(i)) return false;
-            break;
-        case type_Double:
-            if (get_double(i) != c.get_double(i)) return false;
-            break;
-        case type_String:
-            if (get_string(i) != c.get_string(i)) return false;
-            break;
-        case type_Binary:
-            if (get_binary(i) != c.get_binary(i)) return false;
-            break;
-        case type_Table: {
+            case type_Int:
+                if (get_int(i) != c.get_int(i)) return false;
+                break;
+            case type_Bool:
+                if (get_bool(i) != c.get_bool(i)) return false;
+                break;
+            case type_Date:
+                if (get_date(i) != c.get_date(i)) return false;
+                break;
+            case type_Float:
+                if (get_float(i) != c.get_float(i)) return false;
+                break;
+            case type_Double:
+                if (get_double(i) != c.get_double(i)) return false;
+                break;
+            case type_String:
+                if (get_string(i) != c.get_string(i)) return false;
+                break;
+            case type_Binary:
+                if (get_binary(i) != c.get_binary(i)) return false;
+                break;
+            case type_Table: {
                 ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
                 ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();
                 if (*t1 != *t2)
                     return false;
+                break;
             }
-            break;
-        case type_Mixed:
-            TIGHTDB_ASSERT(false);
-            break;
+            case type_Mixed:
+                TIGHTDB_ASSERT(false);
+                break;
         }
     }
     return true;
@@ -366,5 +359,3 @@ void ColumnMixed::to_dot(ostream& out, StringData title) const
 }
 
 #endif // TIGHTDB_DEBUG
-
-} // namespace tightdb

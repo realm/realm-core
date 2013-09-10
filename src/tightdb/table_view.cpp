@@ -3,8 +3,8 @@
 #include <tightdb/column_basic.hpp>
 
 using namespace std;
+using namespace tightdb;
 
-namespace tightdb {
 
 // Searching
 
@@ -68,7 +68,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
         return 0;
 
     typedef typename ColumnTypeTraits<T>::array_type ArrType;
-    const ColType* column = static_cast<ColType*>(&m_table->GetColumnBase(column_ndx));
+    const ColType* column = static_cast<ColType*>(&m_table->get_column_base(column_ndx));
 
     if (m_refs.size() == column->size()) {
         // direct aggregate on the column
@@ -251,8 +251,6 @@ void TableViewBase::sort(size_t column, bool Ascending)
         result.add(rr);
     }
 
-    ref.destroy();
-
     // Copy result to m_refs (todo, there might be a shortcut)
     m_refs.clear();
     if (Ascending) {
@@ -268,6 +266,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
         }
     }
     result.destroy();
+    ref.destroy();
 }
 
 void TableViewBase::to_json(ostream& out) const
@@ -339,6 +338,3 @@ void TableView::clear()
 
     m_refs.clear();
 }
-
-
-} // namespace tightdb

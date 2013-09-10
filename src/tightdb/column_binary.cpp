@@ -6,11 +6,9 @@ using namespace std;
 using namespace tightdb;
 
 
-namespace tightdb {
-
 ColumnBinary::ColumnBinary(Allocator& alloc)
 {
-    m_array = new ArrayBinary(NULL, 0, alloc);
+    m_array = new ArrayBinary(0, 0, alloc);
 }
 
 ColumnBinary::ColumnBinary(ref_type ref, ArrayParent* parent, size_t pndx, Allocator& alloc)
@@ -24,42 +22,14 @@ ColumnBinary::ColumnBinary(ref_type ref, ArrayParent* parent, size_t pndx, Alloc
     }
 }
 
-ColumnBinary::~ColumnBinary()
+ColumnBinary::~ColumnBinary() TIGHTDB_NOEXCEPT
 {
-    if (root_is_leaf())
+    if (root_is_leaf()) {
         delete static_cast<ArrayBinary*>(m_array);
-    else
-        delete m_array;
-}
-
-void ColumnBinary::destroy()
-{
-    if (root_is_leaf())
-        static_cast<ArrayBinary*>(m_array)->destroy();
-    else
-        m_array->destroy();
-}
-
-void ColumnBinary::update_ref(ref_type ref)
-{
-    TIGHTDB_ASSERT(!root_is_leaf_from_ref(ref, m_array->get_alloc())); // Can only be called when creating node
-
-    if (!root_is_leaf()) {
-        m_array->update_ref(ref);
-        return;
     }
-
-    ArrayParent* parent = m_array->get_parent();
-    size_t pndx   = m_array->get_ndx_in_parent();
-
-    // Replace the Binary array with int array for node
-    Array* array = new Array(ref, parent, pndx, m_array->get_alloc());
-    delete m_array;
-    m_array = array;
-
-    // Update ref in parent
-    if (parent)
-        parent->update_child_ref(pndx, ref);
+    else {
+        delete m_array;
+    }
 }
 
 bool ColumnBinary::is_empty() const TIGHTDB_NOEXCEPT
@@ -166,7 +136,7 @@ void ColumnBinary::move_last_over(size_t ndx)
     erase(ndx_last);
 }
 
-bool ColumnBinary::compare(const ColumnBinary& c) const
+bool ColumnBinary::compare_binary(const ColumnBinary& c) const
 {
     const size_t n = size();
     if (c.size() != n)
@@ -239,5 +209,3 @@ void ColumnBinary::leaf_to_dot(ostream& out, const Array& array) const
 }
 
 #endif // TIGHTDB_DEBUG
-
-}

@@ -231,7 +231,6 @@ int main(int argc, char* argv[])
     delete first2;
     
  
-    return 0;
 
 
     CustomTestReporter reporter;

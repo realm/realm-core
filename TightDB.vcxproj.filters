@@ -4,46 +4,43 @@
     <ClCompile Include="src\win32\pthread\pthread.c">
       <Filter>pthreads</Filter>
     </ClCompile>
-    <ClCompile Include="test\testarrayblob.cpp">
+    <ClCompile Include="test\test_array_blob.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testarraystring.cpp">
+    <ClCompile Include="test\test_array_string.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testarraystringlong.cpp">
+    <ClCompile Include="test\test_array_string_long.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testcolumn.cpp">
+    <ClCompile Include="test\test_column_binary.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testcolumnbinary.cpp">
+    <ClCompile Include="test\test_column_mixed.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testcolumnmixed.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
-    <ClCompile Include="test\testcolumnstring.cpp">
+    <ClCompile Include="test\test_column_string.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="test\test_array_binary.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testgroup.cpp">
+    <ClCompile Include="test\test_group.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testindex.cpp">
+    <ClCompile Include="test\test_index.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testtable.cpp">
+    <ClCompile Include="test\test_table.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="test\main.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testalloc.cpp">
+    <ClCompile Include="test\test_alloc.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testarray.cpp">
+    <ClCompile Include="test\test_array.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="test\large_tests\test_strings.cpp">
@@ -53,9 +50,6 @@
       <Filter>test\large_tests</Filter>
     </ClCompile>
     <ClCompile Include="test\large_tests\verified_string.cpp">
-      <Filter>test\large_tests</Filter>
-    </ClCompile>
-    <ClCompile Include="test\large_tests\test_column.cpp">
       <Filter>test\large_tests</Filter>
     </ClCompile>
     <ClCompile Include="src\tightdb\column.cpp">
@@ -115,7 +109,7 @@
     <ClCompile Include="src\tightdb\array_string_long.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="test\testshared.cpp">
+    <ClCompile Include="test\test_shared.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="src\tightdb\file.cpp">
@@ -133,7 +127,7 @@
     <ClCompile Include="src\tightdb\lang_bind_helper.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="test\testindexstring.cpp">
+    <ClCompile Include="test\test_index_string.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="src\tightdb\terminate.cpp">
@@ -142,13 +136,13 @@
     <ClCompile Include="test\test_transactions.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testarrayfloat.cpp">
+    <ClCompile Include="test\test_array_float.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testcolumnfloat.cpp">
+    <ClCompile Include="test\test_column_float.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\testtransactions_lasse.cpp">
+    <ClCompile Include="test\test_transactions_lasse.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="src\tightdb\array.cpp">
@@ -167,6 +161,27 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="test\test_file.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_thread.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_column.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\large_tests\test_column_large.cpp">
+      <Filter>test\large_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_utf8.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_column_basic.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_string_data.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_lang_bind_helper.cpp">
       <Filter>test</Filter>
     </ClCompile>
   </ItemGroup>

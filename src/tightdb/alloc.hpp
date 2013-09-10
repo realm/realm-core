@@ -50,58 +50,73 @@ struct MemRef {
     ref_type m_ref;
 };
 
-// FIXME: Casting a pointer to std::size_t is inherently nonportable
-// (see the default definition of Allocator::alloc()). For example,
-// systems exist where pointers are 64 bits and std::size_t is 32. One
-// idea would be to use a different type for refs such as
-// std::uintptr_t, the problem with this one is that while it is
-// described by the C++11 standard it is not required to be
-// present. C++03 does not even mention it. A real working solution
-// will be to introduce a new name for the type of refs. The typedef
-// can then be made as complex as required to pick out an appropriate
-// type on any supported platform.
 
+/// The common interface for TightDB allocators.
+///
+/// A TightDB allocator must associate a 'ref' to each allocated
+/// object and be able to efficiently map any 'ref' to the
+/// corresponding memory address. The 'ref' is an integer and it must
+/// always be divisible by 8. Also, a value of zero is used to
+/// indicate a null-reference, and must therefore never be returned by
+/// Allocator::alloc().
+///
+/// The purpose of the 'refs' is to decouple the memory reference from
+/// the actual address and thereby allowing objects to be relocated in
+/// memory without having to modify stored references.
+///
+/// \sa SlabAlloc
 class Allocator {
 public:
     /// The specified size must not be zero.
     ///
     /// \throw std::bad_alloc If insufficient memory was available.
-    virtual MemRef alloc(std::size_t size);
+    virtual MemRef alloc(std::size_t size) = 0;
 
     /// The specified size must not be zero.
     ///
     /// \throw std::bad_alloc If insufficient memory was available.
     ///
-    /// Note: The underscore was added because the name \c realloc
+    /// Note: The underscore has been added because the name `realloc`
     /// would conflict with a macro on the Windows platform.
-    virtual MemRef realloc_(ref_type ref, const char* addr, std::size_t size);
+    virtual MemRef realloc_(ref_type ref, const char* addr, std::size_t old_size,
+                            std::size_t new_size) = 0;
 
-    // FIXME: SlabAlloc::free_() should be modified such than this
-    // method never throws.
+    /// Release the specified chunk of memory.
     ///
-    /// Note: The underscore was added because the name \c free would
-    /// conflict with a macro on the Windows platform.
-    virtual void free_(ref_type, const char* addr);
+    /// Note: The underscore has been added because the name `free
+    /// would conflict with a macro on the Windows platform.
+    virtual void free_(ref_type, const char* addr) TIGHTDB_NOEXCEPT = 0;
 
-    virtual char* translate(ref_type) const TIGHTDB_NOEXCEPT;
-    virtual bool is_read_only(ref_type) const TIGHTDB_NOEXCEPT;
+    /// Map the specified \a ref to the corresponding memory
+    /// address. Note that if is_read_only(ref) returns true, then the
+    /// referenced object is to be considered immutable, and it is
+    /// then entirely the responsibility of the caller that the memory
+    /// is not modified by way of the returned memory pointer.
+    virtual char* translate(ref_type ref) const TIGHTDB_NOEXCEPT = 0;
 
+    /// Returns true if, and only if the object at the specified 'ref'
+    /// is in the immutable part of the memory managed by this
+    /// allocator. The method by which some objects become part of the
+    /// immuatble part is entirely up to the class that implements
+    /// this interface.
+    virtual bool is_read_only(ref_type) const TIGHTDB_NOEXCEPT = 0;
+
+    /// Returns a simple allocator that can be used with free-standing
+    /// TightDB objects (such as a free-standing table). A
+    /// free-standing object is one that is not part of a Group, and
+    /// therefore, is not part of an actual database.
     static Allocator& get_default() TIGHTDB_NOEXCEPT;
+
+    virtual ~Allocator() TIGHTDB_NOEXCEPT {}
+
+#ifdef TIGHTDB_DEBUG
+    virtual void Verify() const = 0;
+#endif
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Allocator() TIGHTDB_NOEXCEPT: m_replication(0) {}
-#endif
-    virtual ~Allocator() {}
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_replication() TIGHTDB_NOEXCEPT { return m_replication; }
-#endif
 
-#ifdef TIGHTDB_DEBUG
-    virtual void Verify() const {}
-#endif // TIGHTDB_DEBUG
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
 protected:
     Replication* m_replication;
 #endif

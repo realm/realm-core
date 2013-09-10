@@ -33,9 +33,7 @@ public:
     explicit ColumnBinary(Allocator& = Allocator::get_default());
     explicit ColumnBinary(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                           Allocator& = Allocator::get_default());
-    ~ColumnBinary();
-
-    void destroy() TIGHTDB_OVERRIDE;
+    ~ColumnBinary() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     std::size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
@@ -60,32 +58,22 @@ public:
     void set_string(std::size_t ndx, StringData value);
     void insert_string(std::size_t ndx, StringData value);
 
-    ref_type get_ref() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_array->get_ref(); }
-    void set_parent(ArrayParent* parent, std::size_t pndx) { m_array->set_parent(parent, pndx); }
-    void UpdateParentNdx(int diff) { m_array->UpdateParentNdx(diff); }
-
     /// Compare two binary columns for equality.
-    bool compare(const ColumnBinary&) const;
+    bool compare_binary(const ColumnBinary&) const;
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const {}; // Must be upper case to avoid conflict with macro in ObjC
+    void Verify() const TIGHTDB_OVERRIDE {}; // Must be upper case to avoid conflict with macro in ObjC
 #endif
 
 protected:
-    friend class ColumnBase;
-
-    void update_ref(ref_type ref);
-
     void LeafSet(std::size_t ndx, BinaryData value);
     void LeafDelete(std::size_t ndx);
 
 #ifdef TIGHTDB_DEBUG
-    virtual void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
+    void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
 #endif
 
 private:
-    friend class Array;
-
     void add(StringData value) { add_string(value); }
     void set(std::size_t ndx, StringData value) { set_string(ndx, value); }
     void LeafSet(std::size_t ndx, StringData value);
@@ -100,6 +88,9 @@ private:
     struct InsertState: Array::TreeInsert<ColumnBinary> {
         bool m_add_zero_term;
     };
+
+    friend class Array;
+    friend class ColumnBase;
 };
 
 

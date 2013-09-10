@@ -562,7 +562,7 @@ public:
         m_table2 = table;
         typedef typename ColumnTypeTraits<T>::column_type ColType;
         ColType* c;
-        c = (ColType*)&table->GetColumnBase(m_column);
+        c = (ColType*)&table->get_column_base(m_column);
         if(sg == NULL)
             sg = new SequentialGetter<T>();
         sg->init(c);

@@ -58,7 +58,7 @@ Query::Query(const Query& copy)
     do_delete = true;
 }
 
-Query::~Query()
+Query::~Query() TIGHTDB_NOEXCEPT
 {
 #if TIGHTDB_MULTITHREAD_QUERY
     for (size_t i = 0; i < m_threadcount; i++)
@@ -490,7 +490,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end) const
         end = m_table->size();
 
     const ColType& column =
-        m_table->GetColumn<ColType, ColumnType(ColumnTypeTraits<T>::id)>(column_ndx);
+        m_table->get_column<ColType, ColumnType(ColumnTypeTraits<T>::id)>(column_ndx);
 
     if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; aggregate range

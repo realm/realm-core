@@ -5,66 +5,62 @@
 #endif
 
 using namespace std;
+using namespace tightdb;
 
-namespace tightdb {
 
-Spec::~Spec()
+Spec::~Spec() TIGHTDB_NOEXCEPT
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    Replication* repl = m_specSet.get_alloc().get_replication();
-    if (repl) repl->on_spec_destroyed(this);
+    if (Replication* repl = m_top.get_alloc().get_replication())
+        repl->on_spec_destroyed(this);
 #endif
 }
 
-void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
+void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT
 {
-    m_specSet.update_ref(ref);
-    m_specSet.set_parent(parent, ndx_in_parent);
-    TIGHTDB_ASSERT(m_specSet.size() == 2 || m_specSet.size() == 3);
+    m_top.init_from_ref(ref);
+    m_top.set_parent(parent, ndx_in_parent);
+    TIGHTDB_ASSERT(m_top.size() == 2 || m_top.size() == 3);
 
-    m_spec.update_ref(m_specSet.get_as_ref(0));
-    m_spec.set_parent(&m_specSet, 0);
-    m_names.update_ref(m_specSet.get_as_ref(1));
-    m_names.set_parent(&m_specSet, 1);
+    m_spec.init_from_ref(m_top.get_as_ref(0));
+    m_spec.set_parent(&m_top, 0);
+    m_names.init_from_ref(m_top.get_as_ref(1));
+    m_names.set_parent(&m_top, 1);
 
     // SubSpecs array is only there when there are subtables
-    if (m_specSet.size() == 3) {
-        m_subSpecs.update_ref(m_specSet.get_as_ref(2));
-        m_subSpecs.set_parent(&m_specSet, 2);
+    if (m_top.size() == 3) {
+        m_subspecs.init_from_ref(m_top.get_as_ref(2));
+        m_subspecs.set_parent(&m_top, 2);
     }
 }
 
-void Spec::destroy()
+void Spec::destroy() TIGHTDB_NOEXCEPT
 {
-    m_specSet.destroy();
+    m_top.destroy();
 }
 
-ref_type Spec::get_ref() const
+ref_type Spec::get_ref() const TIGHTDB_NOEXCEPT
 {
-    return m_specSet.get_ref();
+    return m_top.get_ref();
 }
 
-void Spec::update_ref(ref_type ref, ArrayParent* parent, size_t pndx)
+void Spec::set_parent(ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT
 {
-    init_from_ref(ref, parent, pndx);
+    m_top.set_parent(parent, ndx_in_parent);
 }
 
-void Spec::set_parent(ArrayParent* parent, size_t pndx)
+void Spec::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
-    m_specSet.set_parent(parent, pndx);
-}
+    if (!m_top.update_from_parent(old_baseline))
+        return;
 
-bool Spec::update_from_parent()
-{
-    if (m_specSet.UpdateFromParent()) {
-        m_spec.UpdateFromParent();
-        m_names.UpdateFromParent();
-        if (m_specSet.size() == 3) {
-            m_subSpecs.UpdateFromParent();
-        }
-        return true;
+    m_spec.update_from_parent(old_baseline);
+    m_names.update_from_parent(old_baseline);
+
+    if (m_top.size() > 2) {
+        TIGHTDB_ASSERT(m_top.size() == 3);
+        m_subspecs.update_from_parent(old_baseline);
     }
-    else return false;
 }
 
 size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
@@ -81,15 +77,16 @@ size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
 
     if (type == type_Table) {
         // SubSpecs array is only there when there are subtables
-        if (m_specSet.size() == 2) {
-            m_subSpecs.set_type(Array::type_HasRefs);
-            //m_subSpecs.set_type((ColumnDef)4);
-            //return;
-            m_specSet.add(m_subSpecs.get_ref());
-            m_subSpecs.set_parent(&m_specSet, 2);
+        if (m_top.size() == 2) {
+            // FIXME: Is this check required? Could m_subspecs ever be
+            // attached at this point?
+            if (!m_subspecs.is_attached())
+                m_subspecs.create(Array::type_HasRefs);
+            m_top.add(m_subspecs.get_ref());
+            m_subspecs.set_parent(&m_top, 2);
         }
 
-        Allocator& alloc = m_specSet.get_alloc();
+        Allocator& alloc = m_top.get_alloc();
 
         // Create spec for new subtable
         Array spec(Array::type_Normal, 0, 0, alloc);
@@ -100,15 +97,15 @@ size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
 
         // Add to list of subspecs
         ref_type ref = spec_set.get_ref();
-        m_subSpecs.add(ref);
+        m_subspecs.add(ref);
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    Replication* repl = m_spec_set.get_alloc().get_replication();
-    if (repl) repl->add_column(m_table, this, type, name); // Throws
+    if (Replication* repl = m_top.get_alloc().get_replication())
+        repl->add_column(m_table, this, type, name); // Throws
 #endif
 
-    return (m_names.size()-1); // column_ndx
+    return m_names.size() - 1; // column_ndx
 }
 
 size_t Spec::add_subcolumn(const vector<size_t>& column_path, DataType type, StringData name)
@@ -176,11 +173,11 @@ void Spec::remove_column(size_t column_ndx)
     ColumnType type = ColumnType(m_spec.get(type_ndx));
     if (type == col_type_Table) {
         size_t subspec_ndx = get_subspec_ndx(column_ndx);
-        ref_type subspec_ref = m_subSpecs.get_as_ref(subspec_ndx);
+        ref_type subspec_ref = m_subspecs.get_as_ref(subspec_ndx);
 
-        Array subspec_top(subspec_ref, 0, 0, m_specSet.get_alloc());
+        Array subspec_top(subspec_ref, 0, 0, m_top.get_alloc());
         subspec_top.destroy(); // recursively delete entire subspec
-        m_subSpecs.erase(subspec_ndx);
+        m_subspecs.erase(subspec_ndx);
     }
 
     // Delete the actual name and type entries
@@ -220,10 +217,10 @@ Spec Spec::get_subtable_spec(size_t column_ndx)
 
     size_t subspec_ndx = get_subspec_ndx(column_ndx);
 
-    Allocator& alloc = m_specSet.get_alloc();
-    ref_type ref = m_subSpecs.get_as_ref(subspec_ndx);
+    Allocator& alloc = m_top.get_alloc();
+    ref_type ref = m_subspecs.get_as_ref(subspec_ndx);
 
-    return Spec(m_table, alloc, ref, &m_subSpecs, subspec_ndx);
+    return Spec(m_table, alloc, ref, &m_subspecs, subspec_ndx);
 }
 
 const Spec Spec::get_subtable_spec(size_t column_ndx) const
@@ -233,8 +230,8 @@ const Spec Spec::get_subtable_spec(size_t column_ndx) const
 
     size_t subspec_ndx = get_subspec_ndx(column_ndx);
 
-    Allocator& alloc = m_specSet.get_alloc();
-    ref_type ref = m_subSpecs.get_as_ref(subspec_ndx);
+    Allocator& alloc = m_top.get_alloc();
+    ref_type ref = m_subspecs.get_as_ref(subspec_ndx);
 
     return Spec(m_table, alloc, ref, 0, 0);
 }
@@ -247,18 +244,19 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const
     // so we need to count up to it's position
     size_t pos = 0;
     for (size_t i = 0; i < type_ndx; ++i) {
-        if (ColumnType(m_spec.get(i)) == col_type_Table) ++pos;
+        if (ColumnType(m_spec.get(i)) == col_type_Table)
+            ++pos;
     }
     return pos;
 }
 
 ref_type Spec::get_subspec_ref(size_t subspec_ndx) const
 {
-    TIGHTDB_ASSERT(subspec_ndx < m_subSpecs.size());
+    TIGHTDB_ASSERT(subspec_ndx < m_subspecs.size());
 
     // Note that this addresses subspecs directly, indexing
     // by number of sub-table columns
-    return m_subSpecs.get_as_ref(subspec_ndx);
+    return m_subspecs.get_as_ref(subspec_ndx);
 }
 
 size_t Spec::get_type_attr_count() const
@@ -287,7 +285,8 @@ size_t Spec::get_column_type_pos(size_t column_ndx) const TIGHTDB_NOEXCEPT
     size_t type_ndx = 0;
     for (; type_ndx < column_ndx; ++i) {
         ColumnType type = ColumnType(m_spec.get(i));
-        if (type >= col_attr_Indexed) continue; // ignore attributes
+        if (type >= col_attr_Indexed)
+            continue; // ignore attributes
         ++type_ndx;
     }
     return i;
@@ -301,7 +300,8 @@ ColumnType Spec::get_real_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
     size_t column_ndx = 0;
     for (size_t i = 0; column_ndx <= ndx; ++i) {
         type = ColumnType(m_spec.get(i));
-        if (type >= col_attr_Indexed) continue; // ignore attributes
+        if (type >= col_attr_Indexed)
+            continue; // ignore attributes
         ++column_ndx;
     }
 
@@ -315,7 +315,8 @@ DataType Spec::get_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
     ColumnType type = get_real_column_type(ndx);
 
     // Hide internal types
-    if (type == col_type_StringEnum) return type_String;
+    if (type == col_type_StringEnum)
+        return type_String;
 
     return DataType(type);
 }
@@ -329,8 +330,10 @@ void Spec::set_column_type(size_t column_ndx, ColumnType type)
     size_t count = m_spec.size();
     for (;type_ndx < count; ++type_ndx) {
         ColumnType t = ColumnType(m_spec.get(type_ndx));
-        if (t >= col_attr_Indexed) continue; // ignore attributes
-        if (column_count == column_ndx) break;
+        if (t >= col_attr_Indexed)
+            continue; // ignore attributes
+        if (column_count == column_ndx)
+            break;
         ++column_count;
     }
 
@@ -351,7 +354,8 @@ ColumnType Spec::get_column_attr(size_t ndx) const
     for (size_t i = 0; column_ndx <= ndx; ++i) {
         ColumnType type = ColumnType(m_spec.get(i));
         if (type >= col_attr_Indexed) {
-            if (column_ndx == ndx) return type;
+            if (column_ndx == ndx)
+                return type;
         }
         else ++column_ndx;
     }
@@ -371,7 +375,8 @@ void Spec::set_column_attr(size_t ndx, ColumnType attr)
         if (type >= col_attr_Indexed) {
             if (column_ndx == ndx) {
                 // if column already has an attr, we replace it
-                if (attr == col_attr_None) m_spec.erase(i);
+                if (attr == col_attr_None)
+                    m_spec.erase(i);
                 else m_spec.set(i, attr);
                 return;
             }
@@ -433,8 +438,10 @@ void Spec::get_column_info(size_t column_ndx, ColumnInfo& info) const
                 }
                 ++i;
                 ++column_ref_ndx;
-                if (type_attr == col_type_StringEnum) ++column_ref_ndx;
-                if (has_index) ++column_ref_ndx;
+                if (type_attr == col_type_StringEnum)
+                    ++column_ref_ndx;
+                if (has_index)
+                    ++column_ref_ndx;
                 has_index = false;
                 continue;
             case col_attr_Indexed:
@@ -465,7 +472,7 @@ void Spec::get_subcolumn_info(const vector<size_t>& column_path, size_t column_p
 
     size_t subspec_ndx = get_subspec_ndx(column_ndx);
     ref_type subspec_ref = get_subspec_ref(subspec_ndx);
-    Spec subspec(0, m_specSet.get_alloc(), subspec_ref, 0, 0);
+    Spec subspec(0, m_top.get_alloc(), subspec_ref, 0, 0);
     subspec.get_subcolumn_info(column_path, column_path_ndx+1, info);
 }
 
@@ -475,13 +482,15 @@ size_t* Spec::record_subspec_path(const Array* root_subspecs, size_t* begin,
                                   size_t* end) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(begin < end);
-    const Array* spec_set = &m_specSet;
+    const Array* spec_set = &m_top;
     for (;;) {
         size_t subspec_ndx = spec_set->get_ndx_in_parent();
         *begin++ = subspec_ndx;
         const Array* parent_subspecs = static_cast<const Array*>(spec_set->get_parent());
-        if (parent_subspecs == root_subspecs) break;
-        if (begin == end) return 0; // Error, not enough space in buffer
+        if (parent_subspecs == root_subspecs)
+            break;
+        if (begin == end)
+            return 0; // Error, not enough space in buffer
         spec_set = static_cast<const Array*>(parent_subspecs->get_parent());
     }
     return begin;
@@ -490,8 +499,10 @@ size_t* Spec::record_subspec_path(const Array* root_subspecs, size_t* begin,
 
 bool Spec::operator==(const Spec& spec) const
 {
-    if (!m_spec.Compare(spec.m_spec)) return false;
-    if (!m_names.Compare(spec.m_names)) return false;
+    if (!m_spec.compare_int(spec.m_spec))
+        return false;
+    if (!m_names.compare_string(spec.m_names))
+        return false;
     return true;
 }
 
@@ -507,23 +518,23 @@ void Spec::Verify() const
 
 void Spec::to_dot(ostream& out, StringData) const
 {
-    ref_type ref = m_specSet.get_ref();
+    ref_type ref = m_top.get_ref();
 
     out << "subgraph cluster_specset" << ref << " {" << endl;
     out << " label = \"specset\";" << endl;
 
-    m_specSet.to_dot(out);
+    m_top.to_dot(out);
     m_spec.to_dot(out, "spec");
     m_names.to_dot(out, "names");
-    if (m_subSpecs.IsValid()) {
-        m_subSpecs.to_dot(out, "subspecs");
+    if (m_subspecs.is_attached()) {
+        m_subspecs.to_dot(out, "subspecs");
 
-        Allocator& alloc = m_specSet.get_alloc();
+        Allocator& alloc = m_top.get_alloc();
 
         // Write out subspecs
-        size_t count = m_subSpecs.size();
+        size_t count = m_subspecs.size();
         for (size_t i = 0; i < count; ++i) {
-            ref_type ref = m_subSpecs.get_as_ref(i);
+            ref_type ref = m_subspecs.get_as_ref(i);
             Spec s(m_table, alloc, ref, 0, 0);
             s.to_dot(out);
         }
@@ -533,6 +544,3 @@ void Spec::to_dot(ostream& out, StringData) const
 }
 
 #endif // TIGHTDB_DEBUG
-
-
-} //namespace tightdb

@@ -2,51 +2,51 @@
 #include <tightdb/index_string.hpp>
 
 using namespace std;
+using namespace tightdb;
+
 
 namespace {
 
 // Getter function for string index
-tightdb::StringData get_string(void* column, size_t ndx)
+StringData get_string(void* column, size_t ndx)
 {
-    return static_cast<tightdb::ColumnStringEnum*>(column)->get(ndx);
+    return static_cast<ColumnStringEnum*>(column)->get(ndx);
 }
 
 } // anonymous namespace
 
 
-namespace tightdb {
-
 ColumnStringEnum::ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* parent,
                                    size_t ndx_in_parent, Allocator& alloc):
     Column(values, parent, ndx_in_parent+1, alloc), // Throws
     m_keys(keys,   parent, ndx_in_parent,   alloc), // Throws
-    m_index(0) {}
-
-ColumnStringEnum::~ColumnStringEnum()
+    m_index(0)
 {
-    if (m_index)
-        delete m_index;
 }
 
-void ColumnStringEnum::destroy()
+ColumnStringEnum::~ColumnStringEnum() TIGHTDB_NOEXCEPT
+{
+    delete m_index;
+}
+
+void ColumnStringEnum::destroy() TIGHTDB_NOEXCEPT
 {
     m_keys.destroy();
     Column::destroy();
-
     if (m_index)
         m_index->destroy();
 }
 
-void ColumnStringEnum::UpdateParentNdx(int diff)
+void ColumnStringEnum::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
 {
-    m_keys.UpdateParentNdx(diff);
-    Column::UpdateParentNdx(diff);
+    m_keys.adjust_ndx_in_parent(diff);
+    Column::adjust_ndx_in_parent(diff);
 }
 
-void ColumnStringEnum::UpdateFromParent()
+void ColumnStringEnum::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
-    m_array->UpdateFromParent();
-    m_keys.UpdateFromParent();
+    m_array->update_from_parent(old_baseline);
+    m_keys.update_from_parent(old_baseline);
 }
 
 void ColumnStringEnum::add(StringData value)
@@ -188,7 +188,7 @@ size_t ColumnStringEnum::GetKeyNdxOrAdd(StringData value)
     }
 }
 
-bool ColumnStringEnum::compare(const AdaptiveStringColumn& c) const
+bool ColumnStringEnum::compare_string(const AdaptiveStringColumn& c) const
 {
     const size_t n = size();
     if (c.size() != n) return false;
@@ -198,7 +198,7 @@ bool ColumnStringEnum::compare(const AdaptiveStringColumn& c) const
     return true;
 }
 
-bool ColumnStringEnum::compare(const ColumnStringEnum& c) const
+bool ColumnStringEnum::compare_string(const ColumnStringEnum& c) const
 {
     const size_t n = size();
     if (c.size() != n) return false;
@@ -265,5 +265,3 @@ void ColumnStringEnum::to_dot(ostream& out, StringData title) const
 }
 
 #endif // TIGHTDB_DEBUG
-
-}
