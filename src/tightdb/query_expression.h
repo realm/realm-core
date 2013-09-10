@@ -524,8 +524,8 @@ public:
     
     ~Columns()
     {
-  //      if(Subexpr::m_auto_delete)
-  //          delete sg;
+   //     if(Subexpr::m_auto_delete)
+            delete sg;
     }
 
     Subexpr& clone() 
@@ -534,10 +534,10 @@ public:
         n = *this;
 
         SequentialGetter<T> *s = new SequentialGetter<T>();
-        s = n.sg;
+        n.sg = s; // fixme, copy more
 
-        n.m_auto_delete = true;
-        Subexpr::m_auto_delete = false;
+    //    n.m_auto_delete = true;
+    //    Subexpr::m_auto_delete = false;
         return n;
     }
 
@@ -604,31 +604,16 @@ public:
 template <class oper, class TLeft, class TRight> class Operator : public Subexpr2<typename oper::type>
 {
 public:
-    // todo: get_qexp_column was a very quick/dirty hack to get a non-temporary column from ColumnAccessor. Todo, fix
-    Operator(TLeft& left, const TRight& right) : 
-    m_left(const_cast<TLeft&>(left)), 
-    m_right(const_cast<TRight&>(right))
-    {
-        
-        Subexpr::m_auto_delete = false;
-    }
 
-    // todo, make protected
-    Operator(TLeft& left, const TRight& right, bool auto_delete) :
-    m_left(const_cast<TLeft&>(left)),
-    m_right(const_cast<TRight&>(const_cast<TRight&>(right)))
+    Operator(TLeft& left, const TRight& right, bool auto_delete = false) : m_left(left), m_right(const_cast<TRight&>(right))
     {
         Subexpr::m_auto_delete = auto_delete;
     }
 
     ~Operator() 
-    {        
-/*        if(m_left.m_auto_delete)
-            delete &m_left;
-
-        if(m_right.m_auto_delete)
-            delete &m_right;            
-*/
+    {   
+        if(m_auto_delete)
+            delete &m_left, delete &m_right;
     }
 
     void set_table(const Table* table)
@@ -687,32 +672,17 @@ template <class TCond, class T, class TLeft, class TRight> class Compare : publi
 public:
     ~Compare()
     {
- //       if(m_left.m_auto_delete)
- //           delete &m_left;
-
- //       if(m_right.m_auto_delete)
- //           delete &m_right;          
+        if(m_auto_delete) {
+            delete &m_left;
+            delete &m_right;   
+        }
     }
 
-    // todo: get_qexp_column was a very quick/dirty hack to get a non-temporary column from ColumnAccessor. Todo, fix
-    Compare(TLeft& left, const TRight& right) : 
-    m_left(const_cast<TLeft&>(left)), 
-    m_right(const_cast<TRight&>(const_cast<TRight&>(right)))
-    {
-        m_auto_delete = false;
-        Query::expression(this);
-        Table* t = get_table();
-        if(t)
-            m_table = t->get_table_ref(); // todo, review, Lasse
-    }
 
-    // todo: get_qexp_column was a very quick/dirty hack to get a non-temporary column from ColumnAccessor. Todo, fix
-    Compare(TLeft& left, const TRight& right, bool auto_delete) : 
-    m_left(const_cast<TLeft&>(left)), 
-    m_right(const_cast<TRight&>( const_cast<TRight&>(right)))
+    Compare(TLeft& left, const TRight& right, bool auto_delete = false) : m_left(left), m_right(const_cast<TRight&>(right))
     {
         m_auto_delete = auto_delete;
-        Query::expression(this);
+        Query::expression(this, auto_delete);
         Table* t = get_table();
         if(t)
             m_table = t->get_table_ref(); // todo, review, Lasse

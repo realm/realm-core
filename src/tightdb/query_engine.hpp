@@ -1398,12 +1398,13 @@ class ExpressionNode: public ParentNode {
 public:
     ~ExpressionNode()
     {
-    //    if(m_compare && m_compare->m_auto_delete)
-     //       delete m_compare, m_compare = NULL;
+        if(m_auto_delete)
+            delete m_compare, m_compare = NULL;
     }
 
-    ExpressionNode(Expression* compare) 
+    ExpressionNode(Expression* compare, bool auto_delete) 
     {
+        m_auto_delete = auto_delete;
         m_child = 0;
         m_compare = compare;
     }
@@ -1421,6 +1422,7 @@ public:
         return res;
     }
     
+    bool m_auto_delete;
     Expression* m_compare;
 };
 

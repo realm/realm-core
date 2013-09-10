@@ -54,7 +54,7 @@ public:
     Query(const Query& copy); // FIXME: Try to remove this
     ~Query();
 
-    Query& expression(Expression* compare);
+    Query& expression(Expression* compare, bool auto_delete = false);
     Expression* get_expression();
 
     // Conditions: Query only rows contained in tv
