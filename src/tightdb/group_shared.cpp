@@ -414,7 +414,8 @@ void SharedGroup::do_async_commits()
         // reacquire it! At the moment this is not used for anything,
         // because ONLY the daemon ever asks for an exclusive lock
         // when async commits are used.
-        m_file.lock_shared();
+        else
+            m_file.lock_shared();
 
         // the existence of function calls above protects us against
         // the compiler "registerizing" info->current_version, which
