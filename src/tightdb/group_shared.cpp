@@ -294,14 +294,13 @@ void SharedGroup::open(const string& path, bool no_create_file,
             SharedInfo* const info = m_file_map.get_addr();
             int maxwait = 100000;
             while (maxwait--) {
-                // FIXME: using put_pos is not nice. Look for a better way
-                if (info->put_pos != 0) {
+                if (info->init_complete == 2) {
                     // NOTE: access to info following the return is separeted
                     // from the above check by synchronization primitives. Were
                     // that not the case, a read barrier would be needed here.
                     return;
                 }
-                // this function call prevents access to put_pos from beeing
+                // this function call prevents access to init_complete from beeing
                 // optimized into a register - if removed, a read barrier is
                 // required instead to prevent optimization.
                 usleep(10);
@@ -377,9 +376,8 @@ void SharedGroup::do_async_commits()
     bool shutdown = false;
     SharedInfo* info = m_file_map.get_addr();
     // NO client are allowed to proceed and update current_version
-    // until they see the memory changes triggered by begin_read,
-    // which will update the info->put_pos field. As we haven't called
-    // begin read yet, it is safe to assert the following:
+    // until they see the init_complete == 2. 
+    // As we haven't set init_complete to 2 yet, it is safe to assert the following:
     TIGHTDB_ASSERT(info->current_version == 0);
 
     // We always want to keep a read lock on the last version
@@ -389,6 +387,7 @@ void SharedGroup::do_async_commits()
     // processes that that they can start commiting to the db.
     begin_read();
     size_t last_version = m_version;
+    info->init_complete = 2; // allow waiting clients to proceed
     m_group.detach();
     while(true) {
 
@@ -405,7 +404,6 @@ void SharedGroup::do_async_commits()
         // finish syncing will see the lock file, but detect that
         // the daemon has abandoned it. It can then wait for the
         // lock file to be removed (with a timeout). 
-        // Currently, it just throws a runtim exception, though.
         if (m_file.try_lock_exclusive()) {
             info->shutdown_started = 1;
             // FIXME: barrier?
