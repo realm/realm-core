@@ -164,10 +164,11 @@ void SharedGroup::open(const string& path, bool no_create_file,
     TIGHTDB_ASSERT(!is_attached());
 
     m_file_path = path + ".lock";
-
-    {
+    bool must_retry;
+    do {
         bool need_init = false;
         size_t file_size = 0;
+        must_retry = false;
 
         // Open shared coordination buffer
         try {
@@ -254,6 +255,12 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 throw runtime_error("Lock file initialization incomplete");
             if (info->version != 0)
                 throw runtime_error("Unsupported version");
+            if (info->shutdown_started) {
+                must_retry = true;
+                usleep(100);
+                continue;
+                // this will unmap and close the lock file. Then we retry
+            }
 
             // Durability level cannot be changed at runtime
             if (info->flags != dlevel)
@@ -265,16 +272,12 @@ void SharedGroup::open(const string& path, bool no_create_file,
             bool no_create = true;
             alloc.attach_file(path, is_shared, read_only, no_create); // Throws
 
-            if (info->shutdown_started) {
-                    // FIXME: this one should restart the entire procedure
-                    throw runtime_error("Daemon shutting down");
-            }
         }
 
         fug_2.release(); // Do not unmap
         fug_1.release(); // Do not unmap
         fcg.release(); // Do not close
-    }
+    } while (must_retry);
 
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
