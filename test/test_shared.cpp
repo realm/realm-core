@@ -1324,35 +1324,18 @@ TEST(Shared_MixedWithNonShared)
 }
 
 
-TEST(MultipleCommits) 
-{
-    SharedGroup sg("test.tightdb");    
-    sg.begin_write();
-    sg.commit();
-    bool ok = false;
-    try { sg.commit(); }
-    catch (runtime_error re) { ok = true; }
-    CHECK(ok);
-}
-
-TEST(CommitAfterRollback) 
-{
-    SharedGroup sg("test.tightdb");    
-    sg.begin_write();
-    sg.rollback();
-    bool ok = false;
-    try { sg.commit(); }
-    catch (runtime_error re) { ok = true; }
-    CHECK(ok);
-}
-
 TEST(MultipleRollbacks) 
 {
     SharedGroup sg("test.tightdb");    
     sg.begin_write();
     sg.rollback();
-    bool ok = true;
-    try { sg.rollback(); }
-    catch (runtime_error re) { ok = false; }
-    CHECK(ok);
+    sg.rollback();
+}
+
+TEST(MultipleEndReads) 
+{
+    SharedGroup sg("test.tightdb");    
+    sg.begin_read();
+    sg.end_read();
+    sg.end_read();
 }
