@@ -1418,7 +1418,7 @@ public:
 
     size_t find_first_local(size_t start, size_t end)
     {
-        size_t res = m_compare->compare(start, end);
+        size_t res = m_compare->find_first(start, end);
         return res;
     }
     

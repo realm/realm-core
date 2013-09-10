@@ -114,9 +114,15 @@ int main(int argc, char* argv[])
     match = q0.find_next();
     assert(match == 0);
 
-    Query q8 = uv1 <= untyped.column<float>(1);
-    match = q8.find_next();
+    Query q99 = uv1 <= untyped.column<float>(1);
+    match = q99.find_next();
     assert(match == 0);
+
+
+    Query q8 = 1 > untyped.column<float>(1) + 5;
+    match = q8.find_next();
+    assert(match == not_found);
+
 
 
     Query q3 = untyped.column<float>(1) + untyped.column<int64_t>(0) > 10 + untyped.column<int64_t>(0);

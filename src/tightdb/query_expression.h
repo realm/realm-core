@@ -46,7 +46,7 @@ Subexpr2
     void evaluate(size_t i, ValueBase* destination)
 
 Compare: public Subexpr2
-    size_t compare(size_t start, size_t end)        // main method that executes query
+    size_t find_first(size_t start, size_t end)        // main method that executes query
 
     bool m_auto_delete
     Subexpr2& m_left;                               // left expression subtree
@@ -88,6 +88,7 @@ Todo
       bloated, with non-trivial copy constructors instead of defaults
     * Hack: In compare operator overloads (==, !=, >, etc), Compare class is returned as Query class, resulting in object 
       slicing. Just be aware.
+    * clone() some times new's, sometimes it just returns *this. Can be confusing. Rename method or copy always.
 */
 
 
@@ -150,7 +151,7 @@ class Expression : public Query
 public:
     Expression() {}
 
-    virtual size_t compare(size_t start, size_t end) = 0;
+    virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_table(const Table* table) = 0;
     virtual ~Expression() {}
 
@@ -164,7 +165,7 @@ public:
     virtual void export_float(ValueBase& destination) const = 0;
     virtual void export_int64_t(ValueBase& destination) const = 0;
     virtual void export_double(ValueBase& destination) const = 0;
-    virtual void import(ValueBase& destination) = 0;
+    virtual void import(const ValueBase& destination) = 0;
 };
 
 class Subexpr
@@ -172,6 +173,7 @@ class Subexpr
 public:
     virtual ~Subexpr() {}
 
+    // todo, think about renaming, or actualy copying
     virtual Subexpr& clone() {
         return *this;
     }
@@ -184,7 +186,7 @@ public:
         return NULL; 
     }
 
-    TIGHTDB_FORCEINLINE virtual void evaluate(size_t, ValueBase&) = 0;
+    TIGHTDB_FORCEINLINE virtual void evaluate(size_t index, ValueBase& destination) = 0;
 };
 
 class ColumnsBase {};
@@ -209,7 +211,7 @@ public:
         destination.import(*this);
     }
 
-    template <class TOperator> TIGHTDB_FORCEINLINE void fun(Value* left, Value* right) {
+    template <class TOperator> TIGHTDB_FORCEINLINE void fun(const Value* left, const Value* right) {
         TOperator o;
         for(size_t t = 0; t < ValueBase::elements; t++)
             m_v[t] = o(left->m_v[t], right->m_v[t]);
@@ -243,7 +245,7 @@ public:
         export2<double>(destination);
     }
 
-    TIGHTDB_FORCEINLINE void import(ValueBase& source)
+    TIGHTDB_FORCEINLINE void import(const ValueBase& source)
     {
         if(SameType<T, int>::value)
             source.export_int(*this);
@@ -257,7 +259,7 @@ public:
             TIGHTDB_ASSERT(false);
     }
 
-    template <class TCond> TIGHTDB_FORCEINLINE static size_t compare(Value<T>* left, Value<T>* right)
+    template <class TCond> TIGHTDB_FORCEINLINE size_t static compare(Value<T>* left, Value<T>* right)
     {        
         TCond c;
 
@@ -311,16 +313,16 @@ public:
 
     // Arithmetic, right side constant
     Operator<Plus<CommonType> >& operator + (R right) { 
-       return *new Operator<Plus<CommonType> >(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(const_cast<Subexpr2<R>&>(right).clone()), true); 
+       return *new Operator<Plus<CommonType> >(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true); 
     }
     Operator<Minus<CommonType> >& operator - (R right) { 
-       return *new Operator<Minus<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(const_cast<Subexpr2<R>&>(right).clone()), true); 
+       return *new Operator<Minus<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true); 
     }
     Operator<Mul<CommonType> >& operator * (R right) { 
-       return *new Operator<Mul<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(const_cast<Subexpr2<R>&>(right).clone()), true); 
+       return *new Operator<Mul<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true); 
     }
     Operator<Div<CommonType> >& operator / (R right) { 
-        return *new Operator<Div<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(const_cast<Subexpr2<R>&>(right).clone()), true); 
+        return *new Operator<Div<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true); 
     }    
 
     // Arithmetic, right side subexpression
@@ -571,16 +573,16 @@ public:
         return (Table*) m_table2;
     }
 
-    TIGHTDB_FORCEINLINE void evaluate(size_t i, ValueBase& destination) {
+    TIGHTDB_FORCEINLINE void evaluate(size_t index, ValueBase& destination) {
         Value<T> v;            
-        sg->cache_next(i);
+        sg->cache_next(index);
         if(SameType<T, int64_t>::value) {
             // int64_t leafs have a get_chunk optimization that returns an 8 int64_t values at once
-            sg->m_array_ptr->get_chunk(i - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
+            sg->m_array_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
         }
         else {
-            for(size_t t = 0; t < ValueBase::elements && i + t < sg->m_leaf_end; t++)
-                v.m_v[t] = sg->get_next(i + t);
+            for(size_t t = 0; t < ValueBase::elements && index + t < sg->m_leaf_end; t++)
+                v.m_v[t] = sg->get_next(index + t);
         }
         destination.import(v);
     }
@@ -620,7 +622,7 @@ public:
         return l ? l : r;
     }
 
-    TIGHTDB_FORCEINLINE void evaluate(size_t i, ValueBase& destination) {
+    TIGHTDB_FORCEINLINE void evaluate(size_t index, ValueBase& destination) {
         Value<T> result;
         Value<T> left;
         Value<T> right;
@@ -639,12 +641,12 @@ public:
             if(!SameType<TLeft, Subexpr>::value)
                 m_left->TLeft::evaluate(i, &left);
             else */
-                m_left.evaluate(i, left);
+                m_left.evaluate(index, left);
     /*
             if(!SameType<TRight, Subexpr>::value)
                 m_right->TRight::evaluate(i, &right);
             else*/
-                m_right.evaluate(i, right);
+                m_right.evaluate(index, right);
 
             result.template fun<oper>(&left, &right);
 //        }
@@ -692,7 +694,7 @@ public:
         return l ? l : r;
     }
 
-    size_t compare(size_t start, size_t end) {
+    size_t find_first(size_t start, size_t end) const {
         size_t match;
         Value<T> right;
         Value<T> left;
