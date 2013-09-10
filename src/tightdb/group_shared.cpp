@@ -350,6 +350,8 @@ const Group& SharedGroup::begin_read()
 
 void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
+    if (!m_group.is_attached()) return;
+
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
@@ -433,9 +435,6 @@ Group& SharedGroup::begin_write()
 
 void SharedGroup::commit()
 {
-    if (!m_group.is_attached()) {
-        throw runtime_error("Multiple commit");
-    }
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
     SharedInfo* info = m_file_map.get_addr();
