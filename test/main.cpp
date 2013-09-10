@@ -256,12 +256,12 @@ int main(int argc, char* argv[])
  
 
 
-/*
+
     CustomTestReporter reporter;
     TestRunner runner(reporter);
     const int res = runner.RunTestsIf(Test::GetTestList(), 0, True(), 0);
 
-    */
+    
     return 0;
 }
  

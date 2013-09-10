@@ -171,7 +171,7 @@ public:
 
     template <class T> Columns<T> column(size_t column)
     {
-        return Columns<T>(column, this, false);
+        return Columns<T>(column, this);
     }
 
     // Table size and deletion
