@@ -822,15 +822,12 @@ private:
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {
         Columns::m_column = col_idx; 
-        Columns::m_table2 = (Table*)Base::m_table->get_impl();
+        Columns::m_table2 = reinterpret_cast<const Table*>(Base::m_table->get_impl());
     }
 
-    // todo: very quick/dirty hack to get a non-temporary column from ColumnAccessor. Fix
-    // todo, review get_impl()
-    // C cast to accept TableView (not supported yet), just to make it compile. Todo, beautify
-    // or support TableView
-    Subexpr& clone() {
-        return *new Columns<int64_t>(col_idx, (Table*)Base::m_table->get_impl());
+    // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
+    virtual Subexpr& clone() {
+        return *new Columns<int64_t>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
     }
 
     std::size_t find_first(int64_t value) const
@@ -901,12 +898,12 @@ private:
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {
         Columns::m_column = col_idx; 
-        Columns::m_table2 = (Table*)Base::m_table->get_impl();
+        Columns::m_table2 = reinterpret_cast<const Table*>(Base::m_table->get_impl());
     }
 
-    // todo: very quick/dirty hack to get a non-temporary column from ColumnAccessor. Fix
-    Subexpr& clone() {
-        return *new Columns<float>(col_idx, (Table*)Base::m_table->get_impl());
+    // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
+    virtual Subexpr& clone() {
+        return *new Columns<float>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
     }
 
     std::size_t find_first(float value) const
@@ -962,12 +959,12 @@ private:
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {
         Columns::m_column = col_idx;
-        Columns::m_table2 = (Table*)Base::m_table->get_impl();
+        Columns::m_table2 = reinterpret_cast<const Table*>(Base::m_table->get_impl());
     }
 
-    // todo: very quick/dirty hack to get a non-temporary column from ColumnAccessor. Fix
-    Subexpr& clone() {
-        return *new Columns<double>(col_idx, (Table*)Base::m_table->get_impl());
+    // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
+    virtual Subexpr& clone() {
+        return *new Columns<double>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
     }
 
     std::size_t find_first(double value) const

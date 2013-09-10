@@ -92,41 +92,12 @@ int main(int argc, char* argv[])
     typed.add(20, 20.1f, 4.0);
 
 
-
-
-
-    // Flexible language binding style
-    Subexpr* first9 = new Columns<int64_t>(0);
-    Subexpr* second9 = new Columns<float>(1);
-    Subexpr* constant9 = new Value<int64_t>(40);    
-    Subexpr* plus9 = new Operator<Plus<float> >(*first9, *second9);  
-    Expression *e9 = new Compare<Greater, float>(*plus9, *constant9);
-    delete e9;
-    delete plus9;
-    delete constant9;
-    delete second9;
-    delete first9;
-
-    {
-        Query q44 = untyped.column<int64_t>(0) > 40;
-        match = q44.find_next();
-    }
-
-  //  return 0;
-
-
     Query q4 = untyped.column<float>(1) + untyped.column<int64_t>(0) > 40;
     Query q5 = 20 < untyped.column<float>(1);
 
 
     match = q4.expression(  q5.get_expression()  ).find_next();
     assert(match == 1);
-
-//    return 0;
-
-
-
-
 
 
     // Untyped, direct column addressing
@@ -254,7 +225,7 @@ int main(int argc, char* argv[])
     delete first2;
     
  
-
+    return 0;
 
 
     CustomTestReporter reporter;

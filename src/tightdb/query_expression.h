@@ -22,7 +22,9 @@
 This file lets you write queries in C++ syntax like: Expression* e = (first + 1 / second >= third + 12.3);
 
 Type conversion/promotion semantics is the same as in the C++ expressions, e.g float + int > double == float + 
-(float)int > double. Grammar and classes:
+(float)int > double. 
+
+Grammar:
 -----------------------------------------------------------------------------------------------------------------------
     Expression:         Subexpr2<T>  Compare<Cond, T>  Subexpr2<T>
 
@@ -38,31 +40,54 @@ Type conversion/promotion semantics is the same as in the C++ expressions, e.g f
 
     T:                  int, int64_t, float, double
 
+Class diagram
 -----------------------------------------------------------------------------------------------------------------------
-The Value<T> type can contain values and is used for both user-specified constants and internal intermediate results.
+Subexpr2
+    void evaluate(size_t i, ValueBase* destination)
 
-All Subexpr2<T> subclasses (Value, Columns and Operator) contain the method:
+Compare: public Subexpr2
+    size_t compare(size_t start, size_t end)        // main method that executes query
 
-    void evaluate(size_t i, ValueBase* destination) 
-    
-which returns a Value<T> representing the value for table row i. This evaluate() is called recursively by Operator if 
-you have syntax trees with multiple levels of Subexpr2.
+    bool m_auto_delete
+    Subexpr2& m_left;                               // left expression subtree
+    Subexpr2& m_right;                              // right expression subtree
 
-Furthermore, Value<T> actually contains 8 concecutive values and all operations are based on these chunks. This is
+Operator: public Subexpr2
+    bool m_auto_delete
+    Subexpr2& m_left;                               // left expression subtree 
+    Subexpr2& m_right;                              // right expression subtree
+
+Value<T>: public Subexpr2
+    T m_v[8];
+
+Columns<T>: public Subexpr2
+    SequentialGetter<T> sg;                         // class bound to a column, lets you read values in a fast way
+
+
+Flow chart:
+-----------------------------------------------------------------------------------------------------------------------
+Compare, Operator, Value and Columns have an evaluate() method which returns a Value<T> representing the value for 
+table row i. 
+
+Value<T> actually contains 8 concecutive values and all operations are based on these chunks. This is
 to save overhead by virtual calls needed for evaluating a query that has been dynamically constructed at runtime.
 
-The Compare class contains the method:
-
-    size_t compare(size_t start, size_t end)
-
-which performs the final query search. 
+Memory allocation: 
 -----------------------------------------------------------------------------------------------------------------------
+Operator and Compare contain a 'bool m_auto_delete' which tell if their subtrees were created by the query system or by the 
+end-user. If created by query system, they are deleted upon destructed of Operator and Compare.
 
-Todo:    
+Value and Columns given to any constructor are cloned with 'new' and hence deleted unconditionally by query system.
+
+Todo
+-----------------------------------------------------------------------------------------------------------------------
     * Use query_engine.hpp for execution of simple queries that are supported there, because it's faster
     * Support unary operators like power and sqrt
-    * The name Columns for query-expression-columns can be confusing
-
+    * The name Columns (with s) an be confusing because we also have Column (without s)
+    * Memory allocation: Maybe clone Compare and Operator to get rid of m_auto_delete. However, this might become
+      bloated, with non-trivial copy constructors instead of defaults
+    * Hack: In compare operator overloads (==, !=, >, etc), Compare class is returned as Query class, resulting in object 
+      slicing. Just be aware.
 */
 
 
@@ -123,18 +148,12 @@ template<class T1, class T2, bool b> struct Common<T1, T2, true , false, b> {
 class Expression : public Query
 {
 public:
-    Expression() {
-
-    }
+    Expression() {}
 
     virtual size_t compare(size_t start, size_t end) = 0;
     virtual void set_table(const Table* table) = 0;
-    virtual ~Expression() {
-    
-    
-    }
+    virtual ~Expression() {}
 
-    mutable bool m_auto_delete;
 };
 
 class ValueBase 
@@ -151,26 +170,24 @@ public:
 class Subexpr
 {
 public:
-    virtual ~Subexpr() {
-    
-    }
+    virtual ~Subexpr() {}
 
     virtual Subexpr& clone() {
         return *this;
     }
 
     // Values need no table attached and have no children to call set_table() on either, so do nothing
-    virtual void set_table(const Table*) { }    
-    virtual Table* get_table() { return NULL; }
+    virtual void set_table(const Table*) {}    
 
-    TIGHTDB_FORCEINLINE virtual void evaluate(size_t, ValueBase&) = 0; //{ TIGHTDB_ASSERT(false); }
+    virtual Table* get_table() 
+    { 
+        return NULL; 
+    }
 
-    mutable bool m_auto_delete; // todo, there are two of these?!
+    TIGHTDB_FORCEINLINE virtual void evaluate(size_t, ValueBase&) = 0;
 };
 
-class ColumnsBase {
-
-};
+class ColumnsBase {};
 
 template <class T> class Columns;
 template <class T> class Value;
@@ -182,7 +199,7 @@ template <class TCond, class T, class TLeft = Subexpr, class TRight = Subexpr> c
 template<class T> class Value : public ValueBase, public Subexpr2<T>
 {
 public:
-    Value() { }
+    Value() {}
 
     Value(T v) {
         std::fill(m_v, m_v + ValueBase::elements, v); 
@@ -265,7 +282,7 @@ public:
         return ValueBase::elements; // no match
     }
 
-    Subexpr& clone()
+    virtual Subexpr& clone()
     {
         Value<T>& n = *new Value<T>();
         n = *this;
@@ -367,9 +384,7 @@ template <class T> class Subexpr2 : public Subexpr, public Overloads<T, int>, pu
                                     public Overloads<T, double>, public Overloads<T, int64_t> 
 {
 public:
-    virtual ~Subexpr2() {
-    
-    };
+    virtual ~Subexpr2() {};
 
     #define TDB_U2(t, o) using Overloads<T, t>::operator o;
     #define TDB_U(o) TDB_U2(int, o) TDB_U2(float, o) TDB_U2(double, o) TDB_U2(int64_t, o)
@@ -512,13 +527,25 @@ template <class R> Operator<Div<typename Common<R, int64_t>::type> >& operator /
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
-    
+    explicit Columns(size_t column, const Table* table) : m_table2(NULL), sg(NULL)
+    {
+        m_column = column;
+        set_table(table);
+    }
+
+    explicit Columns() : m_table2(NULL), sg(NULL) { }
+
+    explicit Columns(size_t column) : m_table2(NULL), sg(NULL)
+    {
+        m_column = column;
+    }
+
     ~Columns()
     {
         delete sg;
     }
 
-    Subexpr& clone() 
+    virtual Subexpr& clone() 
     {
         Columns<T>& n = *new Columns<T>();
         n = *this;
@@ -526,21 +553,6 @@ public:
         SequentialGetter<T> *s = new SequentialGetter<T>();
         n.sg = s;
         return n;
-    }
-
-    explicit Columns(size_t column, Table* table) : m_table2(NULL), sg(NULL)
-    {
-        m_column = column;
-        set_table(table);
-    }
-
-    explicit Columns() : m_table2(NULL), sg(NULL)
-    {
-    }
-
-    explicit Columns(size_t column) : m_table2(NULL), sg(NULL)
-    {
-        m_column = column;
     }
 
     virtual void set_table(const Table* table) 
@@ -575,9 +587,10 @@ public:
 
     const Table* m_table2;
     size_t m_column;
-//private:
+private:
     SequentialGetter<T>* sg;
 };
+
 
 template <class oper, class TLeft, class TRight> class Operator : public Subexpr2<typename oper::type>
 {
@@ -585,12 +598,12 @@ public:
 
     Operator(TLeft& left, const TRight& right, bool auto_delete = false) : m_left(left), m_right(const_cast<TRight&>(right))
     {
-        Subexpr::m_auto_delete = auto_delete;
+        m_auto_delete = auto_delete;
     }
 
     ~Operator() 
     {   
-        if(Subexpr::m_auto_delete)
+        if(m_auto_delete)
             delete &m_left, delete &m_right;
     }
 
@@ -640,23 +653,15 @@ public:
 
 private:
     typedef typename oper::type T;
-
+    bool m_auto_delete;
     TLeft& m_left;
     TRight& m_right;
 };
 
+
 template <class TCond, class T, class TLeft, class TRight> class Compare : public Expression
 {
 public:
-    ~Compare()
-    {
-        if(m_auto_delete) {
-            delete &m_left;
-            delete &m_right;   
-        }
-    }
-
-
     Compare(TLeft& left, const TRight& right, bool auto_delete = false) : m_left(left), m_right(const_cast<TRight&>(right))
     {
         m_auto_delete = auto_delete;
@@ -666,6 +671,13 @@ public:
             m_table = t->get_table_ref(); // todo, review, Lasse
     }
 
+    ~Compare()
+    {
+        if(m_auto_delete) {
+            delete &m_left;
+            delete &m_right;   
+        }
+    }
 
     void set_table(const Table* table) 
     {
@@ -722,6 +734,7 @@ public:
     }
     
 private: 
+    bool m_auto_delete;
     TLeft& m_left;
     TRight& m_right;
 };
