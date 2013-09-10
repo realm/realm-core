@@ -433,6 +433,9 @@ Group& SharedGroup::begin_write()
 
 void SharedGroup::commit()
 {
+    if (!m_group.is_attached()) {
+        throw runtime_error("Multiple commit");
+    }
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
     SharedInfo* info = m_file_map.get_addr();
