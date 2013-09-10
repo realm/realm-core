@@ -95,6 +95,7 @@ void spawn_daemon(const string& file)
         int i;
         for (i=m-1;i>=0;--i) close(i); 
         i=::open("/dev/null",O_RDWR);
+        // FIXME: Do we want to always open the log file? Should it be configurable?
         i=::open((file+".log").c_str(),O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
         i = dup(i); static_cast<void>(i);
         cerr << "Detaching" << endl;
