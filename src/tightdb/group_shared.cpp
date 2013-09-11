@@ -641,12 +641,9 @@ void SharedGroup::commit()
         // Reset version tracking in group if we are
         // starting from a new lock file
         if (new_version == 2) {
-            // FIXME: Why is this not dealt with in begin_write()? Note
-            // that we can read the value of info->current_version without
-            // a lock on info->readmutex as long as we have a lock on
-            // info->writemutex. This is true (not a data race) becasue
-            // info->current_version is modified only while
-            // info->writemutex is locked.
+            // The reason this is not done in begin_write is that a rollback will
+            // leave the versioning unchanged, hence a new begin_write following
+            // a rollback would call init_shared again.
             m_group.init_shared();
         }
 
