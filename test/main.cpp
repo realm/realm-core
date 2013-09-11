@@ -90,7 +90,11 @@ int main(int argc, char* argv[])
     typed.add(20, 19.9f, 3.0);
     typed.add(20, 20.1f, 4.0);
 
-    // Testing &&
+    // Small typed table test:
+    match = (typed.column().second + 100 > 120 && typed.column().first > 2).find_next();
+    assert(match == 1);
+
+    // Untyped &&
 
     // Left condition makes first row non-match
     match = (untyped.column<float>(1) + 1 > 21 && untyped.column<double>(2) > 2).find_next();
@@ -116,7 +120,7 @@ int main(int argc, char* argv[])
     match = (untyped.column<float>(1) > 20 && untyped.column<double>(2) < 3.5).find_next();
     assert(match == not_found);
 
-    // Testing ||
+    // Untyped ||
 
     // Left match 0
     match = (untyped.column<float>(1) < 20 || untyped.column<double>(2) < 3.5).find_next();
@@ -134,6 +138,10 @@ int main(int argc, char* argv[])
 
 
     
+
+
+
+
     // Tons of other tests. More in test_query.cpp
 
 
