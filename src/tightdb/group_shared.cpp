@@ -22,7 +22,7 @@ struct SharedGroup::ReadCount {
 };
 
 struct SharedGroup::SharedInfo {
-    uint16_t init_complete; // indicates lock file has valid content
+    Atomic<uint16_t> init_complete; // indicates lock file has valid content
     uint16_t shutdown_started; // indicates that shutdown is in progress
     uint16_t version;
     uint16_t flags;
@@ -32,7 +32,7 @@ struct SharedGroup::SharedInfo {
     uint64_t filesize;
 
     uint64_t current_top;
-    uint32_t current_version;
+    Atomic<uint32_t> current_version;
 
     uint32_t infosize;
     uint32_t capacity_mask; // Must be on the form 2**n - 1
@@ -56,12 +56,12 @@ SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
     filesize = alloc.get_baseline();
     infosize = uint32_t(file_size);
     current_top     = alloc.get_top_ref();
-    current_version = 1;
+    current_version.store(1);
     capacity_mask   = init_readers_size - 1;
     put_pos = 0;
     get_pos = 0;
     shutdown_started = 0;
-    init_complete = 1;
+    init_complete.store(1);
 }
 
 
@@ -238,7 +238,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
             // Set initial version so we can track if other instances
             // change the db
-            m_version = info->current_version;
+            m_version = info->current_version.load();
             // In async mode we need a separate process to do the async commits
             // We start it up here during init so that it only get started once
             if (dlevel == durability_Async) {
@@ -248,11 +248,11 @@ void SharedGroup::open(const string& path, bool no_create_file,
         else {
             // wait for init complete:
             int wait_count = 100000;
-            while (wait_count && info->init_complete == 0) {
+            while (wait_count && (info->init_complete.load() == 0)) {
                 wait_count--;
                 usleep(10);
             }
-            if (info->init_complete == 0)
+            if (info->init_complete.load() == 0)
                 throw runtime_error("Lock file initialization incomplete");
             if (info->version != 0)
                 throw runtime_error("Unsupported version");
@@ -294,7 +294,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             SharedInfo* const info = m_file_map.get_addr();
             int maxwait = 100000;
             while (maxwait--) {
-                if (info->init_complete == 2) {
+                if (info->init_complete.load() == 2) {
                     // NOTE: access to info following the return is separeted
                     // from the above check by synchronization primitives. Were
                     // that not the case, a read barrier would be needed here.
@@ -363,11 +363,7 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
     const SharedInfo* info = m_file_map.get_addr();
     // this variable is changed under lock (the readmutex), but
     // inspected here without taking a lock. This is intentional.
-    // Callers of has_changed MUST lock the readmutex before
-    // accessing any parts of the info structure, OR it may see
-    // an inconsistent view of memory on systems with weak memory
-    // consistency.
-    bool changed = m_version != info->current_version;
+    bool changed = m_version != info->current_version.load();
     return changed;
 }
 
@@ -378,7 +374,7 @@ void SharedGroup::do_async_commits()
     // NO client are allowed to proceed and update current_version
     // until they see the init_complete == 2. 
     // As we haven't set init_complete to 2 yet, it is safe to assert the following:
-    TIGHTDB_ASSERT(info->current_version == 0);
+    TIGHTDB_ASSERT(info->current_version.load() == 0);
 
     // We always want to keep a read lock on the last version
     // that was commited to disk, to protect it against being
@@ -387,7 +383,7 @@ void SharedGroup::do_async_commits()
     // processes that that they can start commiting to the db.
     begin_read();
     size_t last_version = m_version;
-    info->init_complete = 2; // allow waiting clients to proceed
+    info->init_complete.store(2); // allow waiting clients to proceed
     m_group.detach();
     while(true) {
 
@@ -416,12 +412,6 @@ void SharedGroup::do_async_commits()
         else
             m_file.lock_shared();
 
-        // the existence of function calls above protects us against
-        // the compiler "registerizing" info->current_version, which
-        // must be refetched from cache by has_changed(). The call to
-        // begin_read below BOTH has a memory barrier ensuring a consistent
-        // memory view AND ensures exclusive access to the relevant part
-        // of the info structure.
         if (has_changed()) {
 
             cerr << "Syncing...";
@@ -479,20 +469,20 @@ const Group& SharedGroup::begin_read()
         // Get the current top ref
         new_top_ref   = to_size_t(info->current_top);
         new_file_size = to_size_t(info->filesize);
-        m_version     = to_size_t(info->current_version); // fixme, remember to remove to_size_t when m_version becomes 64 bit
+        m_version     = to_size_t(info->current_version.load()); // fixme, remember to remove to_size_t when m_version becomes 64 bit
 
         // Update reader list
         if (ringbuf_is_empty()) {
-            ReadCount r2 = { info->current_version, 1 };
+            ReadCount r2 = { info->current_version.load(), 1 };
             ringbuf_put(r2); // Throws
         }
         else {
             ReadCount& r = ringbuf_get_last();
-            if (r.version == info->current_version) {
+            if (r.version == info->current_version.load()) {
                 ++r.count;
             }
             else {
-                ReadCount r2 = { info->current_version, 1 };
+                ReadCount r2 = { info->current_version.load(), 1 };
                 ringbuf_put(r2); // Throws
             }
         }
@@ -636,10 +626,10 @@ void SharedGroup::commit()
             new_version = repl->commit_write_transact(*this); // Throws
         }
         else {
-            new_version = info->current_version + 1; // FIXME: Eventual overflow
+            new_version = info->current_version.load() + 1; // FIXME: Eventual overflow
         }
 #else
-        new_version = info->current_version + 1; // FIXME: Eventual overflow
+        new_version = info->current_version.load() + 1; // FIXME: Eventual overflow
 #endif
         // Reset version tracking in group if we are
         // starting from a new lock file
@@ -924,7 +914,7 @@ void SharedGroup::zero_free_space()
 
     {
         Mutex::Lock lock(info->readmutex);
-        current_version = info->current_version + 1;
+        current_version = info->current_version.load() + 1;
         file_size = to_size_t(info->filesize);
 
         if (ringbuf_is_empty()) {
@@ -945,7 +935,7 @@ void SharedGroup::zero_free_space()
 size_t SharedGroup::get_current_version() TIGHTDB_NOEXCEPT
 {
     SharedInfo* info = m_file_map.get_addr();
-    return info->current_version;
+    return info->current_version.load();
 }
 
 
@@ -997,13 +987,7 @@ void SharedGroup::low_level_commit(size_t new_version)
         Mutex::Lock lock(info->readmutex);
         info->current_top = new_top_ref;
         info->filesize    = new_file_size;
-        // The following assignment may be observed by other threads 
-        // without taking a lock, by calling the has_changed() function. 
-        // On architectures with weak memory consistency, an observer might 
-        // see this change *before* the corresponding updates to current_top
-        // and filesize. To avoid this race, any observer reacting to has_changed()
-        // must obtain a lock on the readmutex before accessing these variables.
-        info->current_version = new_version;//FIXME src\tightdb\group_shared.cpp(772): warning C4267: '=' : conversion from 'size_t' to 'volatile uint32_t', possible loss of data
+        info->current_version.store(new_version);//FIXME src\tightdb\group_shared.cpp(772): warning C4267: '=' : conversion from 'size_t' to 'volatile uint32_t', possible loss of data
     }
 
     // Save last version for has_changed()

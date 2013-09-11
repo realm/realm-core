@@ -418,6 +418,116 @@ inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 }
 
 
+// Support for simple atomic variables with memory barriers. 
+//
+// Useful for non-blocking data structures.
+//
+// These primitives ensure that memory appears consistent around load/store
+// of the variables, and ensures that the compiler will not optimize away
+// relevant instructions.
+//
+// Use it only on naturally aligned and naturally atomic objects,
+// should work on integers and pointers on all machines.
+//
+// Usage: For non blocking data structures, you need to wrap any synchronization
+// variables using the Atomic template. Variables which are not used for
+// synchronization need no special declaration. As long as signaling between threads
+// is done using the store and load methods declared here, memory barriers will
+// ensure a consistent view of the other variables.
+
+#ifdef TIGHTDB_HAVE_CXX11_ATOMIC
+#include <atomic>
+#endif
+
+template<class T>
+class Atomic
+{
+public:
+    inline Atomic()
+    {
+        state = 0;
+    }
+
+    inline Atomic(T init_value) 
+    { 
+        state = init_value; 
+    }
+
+    T load() const;
+    void store(T value); 
+
+private:
+    // the following is not supported
+    Atomic(Atomic<T>&);
+    Atomic<T>& operator=(const Atomic<T>&);
+
+    // Assumed to be naturally aligned - if not, hardware might not guarantee atomicity
+#ifdef TIGHTDB_HAVE_CXX11_ATOMIC
+    atomic<T> state;
+#else
+#ifdef _MSC_VER
+    volatile T state;
+#endif
+#ifdef TIGHTDB_HAVE_GCC_GE_4_3
+    T state; 
+#endif
+#endif
+};
+
+
+#ifdef TIGHTDB_HAVE_CXX11_ATOMIC
+template<typename T>
+inline T Atomic<T>::load() const
+{
+    return state.load(std::memory_order_acquire);
+}
+
+template<typename T>
+inline void Atomic<T>::store(T value) 
+{
+    state.store(value, std::memory_order_release);
+}
+#else
+#ifdef _MSC_VER
+template<typename T>
+inline T Atomic<T>::load() const
+{
+    return state;
+}
+
+template<typename T>
+inline void Atomic<T>::store(T value) 
+{
+    state = value;
+}
+
+#endif
+#ifdef TIGHTDB_HAVE_GCC_GE_4_3
+// gcc implementation, pre c++11:
+template<typename T>
+inline T Atomic<T>::load() const
+{
+    // prevent registerization of state (this is not really needed, I think)
+    asm volatile ("" : : : "memory");
+    T retval = state;
+    __sync_synchronize();
+    // consider this for x86 instead: asm volatile ("lfence" : : : "memory");
+    return retval;
+}
+
+template<typename T>
+inline void Atomic<T>::store(T value) 
+{
+    __sync_synchronize();
+    // consider this for x86 instead: asm volatile ("sfence" : : : "memory");
+    state = value;
+    // prevent registerization of state (this is not really needed, I think)
+    asm volatile ("" : : : "memory");
+}
+
+#endif // GCC
+#endif // C++11 else
+
 } // namespace tightdb
 
 #endif // TIGHTDB_THREAD_HPP
