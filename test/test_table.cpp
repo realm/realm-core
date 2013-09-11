@@ -6,6 +6,7 @@
 
 #include <UnitTest++.h>
 #include "testsettings.hpp"
+#include "test_utilities.hpp"
 #include <tightdb/table_macros.hpp>
 #include <tightdb/lang_bind_helper.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -420,7 +421,7 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
         }
 
         // Add sub-tables to table column
-        for (size_t j=0; j<sub_rows; j++) {
+        for (size_t j=0; j<sub_rows+i; j++) {
             TableRef subtable = table.get_subtable(10, i);
             int64_t val = -123+i*j*1234*sign;
             subtable->insert_int(0, j, val);
@@ -478,34 +479,36 @@ TEST(Table_Move_All_Types)
     }
 }
 
+
 // enable to generate testfiles for to_string and json below
 #define GENERATE 0
 
 TEST(Table_test_to_string)
 {
     Table table;
-    setup_multi_table(table, 15, 2);
+    setup_multi_table(table, 15, 6);
 
     stringstream ss;
     table.to_string(ss);
     const string result = ss.str();
-
 #if _MSC_VER
     const char* filename = "expect_string-win.txt";
 #else
     const char* filename = "expect_string.txt";
 #endif
 #if GENERATE   // enable to generate testfile - check it manually
-    ofstream testFile(filename, ios::out | ios::binary);
+    ofstream testFile(filename, ios::out);
     testFile << result;
+    cerr << "to_string() test:\n" << result << endl;
 #else
-    ifstream testFile(filename, ios::in | ios::binary);
+    ifstream testFile(filename, ios::in);
     CHECK(!testFile.fail());
     string expected;
     expected.assign( istreambuf_iterator<char>(testFile),
                      istreambuf_iterator<char>() );
-    CHECK_EQUAL(true, result == expected);
-    if (result != expected) {
+    bool test_ok = test_util::equal_without_cr(result, expected);
+    CHECK_EQUAL(true, test_ok);
+    if (!test_ok) {
         ofstream testFile("expect_string.error.txt", ios::out | ios::binary);
         testFile << result;
         cerr << "\n error result in 'expect_string.error.txt'\n";
@@ -578,7 +581,12 @@ TEST(Table_test_json_simple)
      table.to_json(ss);
      const string json = ss.str();
      CHECK_EQUAL(true, json.length() > 0);
+#if _MSC_VER
+     // On Windows floats in scientific notation contains 3 "0", as opposed to 2 on Linux
+     CHECK_EQUAL("[{\"int\":0,\"bool\":true,\"date\":\"2038-01-19 02:01:18\",\"float\":3.1400001e+000,\"double\":2.7100000000000000e+000,\"string\":\"helloooooo\",\"binary\":\"3132333435363738393031323334353637383930313233343536373839306e6f707100\"}]", json);
+#else
      CHECK_EQUAL("[{\"int\":0,\"bool\":true,\"date\":\"2038-01-19 02:01:18\",\"float\":3.1400001e+00,\"double\":2.7100000000000000e+00,\"string\":\"helloooooo\",\"binary\":\"3132333435363738393031323334353637383930313233343536373839306e6f707100\"}]", json);
+#endif
 }
 
 
