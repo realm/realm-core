@@ -95,20 +95,16 @@ TEST(QueryExpressions0)
 
     Many of them are combined and tested together in equality classes below
 */
-
-
-    /*
     Table table;
     table.add_column(type_Int, "first1");
     table.add_column(type_Float, "second1");
     table.add_column(type_Double, "third");
 
-    Expression* exp;
     size_t match;
 
-    Columns<int64_t> first(0);
-    Columns<float> second(1);
-    Columns<double> third(2);
+    Columns<int64_t> first = table.column<int64_t>(0);
+    Columns<float> second = table.column<float>(1);
+    Columns<double> third = table.column<double>(2);
 
     table.add_empty_row(2);
 
@@ -121,231 +117,145 @@ TEST(QueryExpressions0)
     table.set_double(2, 1, 4.0);
    
     // 20 must convert to float    
-    exp = second + 0.2f > 20;
-    match = table.where().expression(exp).find_next();
+    match = (second + 0.2f > 20).find_next();
     CHECK(match == 0);
-    delete exp;
 
-    exp = first >= 20.0f;
-    match = table.where().expression(exp).find_next();
+    match = (first >= 20.0f).find_next();
     CHECK(match == 0);
-    delete exp;
 
     // 20.1f must remain float
-    exp = first >= 20.1f;
-    match = table.where().expression(exp).find_next();
+    match = (first >= 20.1f).find_next();
     CHECK(match == not_found);
-    delete exp;
 
     // first must convert to float
-    exp = second >= first;
-    match = table.where().expression(exp).find_next();
+    match = (second >= first).find_next();
     CHECK(match == 1);
-    delete exp;
 
     // 20 and 40 must convert to float
-    exp = second + 20 > 40;
-    match = table.where().expression(exp).find_next();
+    match = (second + 20 > 40).find_next();
     CHECK(match == 1);
-    delete exp;
 
     // first and 40 must convert to float
-    exp = second + first >= 40;
-    match = table.where().expression(exp).find_next();
+    match = (second + first >= 40).find_next();
     CHECK(match == 1);
-    delete exp;
 
     // 20 must convert to float
-    exp = 0.2f + second > 20;
-    match = table.where().expression(exp).find_next();
+    match = (0.2f + second > 20).find_next();
     CHECK(match == 0);
-    delete exp;
-    
-    // Compare, left = Subexpr, right = Value
-    exp = second + first >= 40;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 1);
-    delete exp;
-
-    exp = second + first > 40;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 1);
-    delete exp;
-
-    exp = first - second < 0;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 1);
-    delete exp;
-
-    exp = second - second == 0;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 0);
-    delete exp;
-
-    exp = first - second <= 0;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 1);
-    delete exp;
-
-    exp = first * first != 400;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == -1);
-    delete exp;    
-
-    // Compare, left = Column, right = Value
-    exp = second >= 20;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 1);
-    delete exp;
-
-    exp = second > 20;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 1);
-    delete exp;
-
-    exp = second < 20;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 0);
-    delete exp;
-
-    exp = second == 20.1f;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 1);
-    delete exp;
-
-    exp = second != 19.9f;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 1);
-    delete exp;
-
-    exp = second <= 21;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 0);
-    delete exp;
-
-    // Compare, left = Column, right = Value
-    exp = 20 <= second;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 1);
-    delete exp;
-
-    exp = 20 < second;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 1);
-    delete exp;
-
-    exp = 20 > second;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 0);
-    delete exp;
-
-    exp = 20.1f == second;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 1);
-    delete exp;
-
-    exp = 19.9f != second;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 1);
-    delete exp;
-
-    exp = 21 >= second;
-    match = table.where().expression(exp).find_next();
-    CHECK(match == 0);
-    delete exp;
 
     // Compare, left = Subexpr, right = Value
-    exp = 40 <= second + first;
-    match = table.where().expression(exp).find_next();
+    match = (second + first >= 40).find_next();
     CHECK(match == 1);
-    delete exp;
 
-    exp = 40 < second + first;
-    match = table.where().expression(exp).find_next();
+    match = (second + first > 40).find_next();
     CHECK(match == 1);
-    delete exp;
 
-    exp = 0 > first - second;
-    match = table.where().expression(exp).find_next();
+    match = (first - second < 0).find_next();
     CHECK(match == 1);
-    delete exp;
 
-    exp = 0 == second - second;
-    match = table.where().expression(exp).find_next();
+    match = (second - second == 0).find_next();
     CHECK(match == 0);
-    delete exp;
 
-    exp = 0 >= first - second;
-    match = table.where().expression(exp).find_next();
+    match = (first - second <= 0).find_next();
     CHECK(match == 1);
-    delete exp;
 
-    exp = 400 != first * first;
-    match = table.where().expression(exp).find_next();
+    match = (first * first != 400).find_next();
     CHECK(match == -1);
-    delete exp;
+  
+    // Compare, left = Column, right = Value
+    match = (second >= 20).find_next();
+    CHECK(match == 1);
+
+    match = (second > 20).find_next();
+    CHECK(match == 1);
+
+    match = (second < 20).find_next();
+    CHECK(match == 0);
+
+    match = (second == 20.1f).find_next();
+    CHECK(match == 1);
+
+    match = (second != 19.9f).find_next();
+    CHECK(match == 1);
+
+    match = (second <= 21).find_next();
+    CHECK(match == 0);
+
+    // Compare, left = Column, right = Value
+    match = (20 <= second).find_next();
+    CHECK(match == 1);
+
+    match = (20 < second).find_next();
+    CHECK(match == 1);
+
+    match = (20 > second).find_next();
+    CHECK(match == 0);
+
+    match = (20.1f == second).find_next();
+    CHECK(match == 1);
+
+    match = (19.9f != second).find_next();
+    CHECK(match == 1);
+
+    match = (21 >= second).find_next();
+    CHECK(match == 0);
+
+    // Compare, left = Subexpr, right = Value
+    match = (40 <= second + first).find_next();
+    CHECK(match == 1);
+
+    match = (40 < second + first).find_next();
+    CHECK(match == 1);
+
+    match = (0 > first - second).find_next();
+    CHECK(match == 1);
+
+    match = (0 == second - second).find_next();
+    CHECK(match == 0);
+
+    match = (0 >= first - second).find_next();
+    CHECK(match == 1);
+
+    match = (400 != first * first).find_next();
+    CHECK(match == -1);
 
     // Col compare Col
-    exp = second > first; 
-    match = table.where().expression(exp).find_next();
+    match = (second > first).find_next();
     CHECK(match == 1);
-    delete exp;
 
-    exp = second >= first; 
-    match = table.where().expression(exp).find_next();
+    match = (second >= first).find_next();
     CHECK(match == 1);
-    delete exp;
 
-    exp = second == first; 
-    match = table.where().expression(exp).find_next();
+    match = (second == first).find_next();
     CHECK(match == not_found);
-    delete exp;
 
-    exp = second != second; 
-    match = table.where().expression(exp).find_next();
+    match = (second != second).find_next();
     CHECK(match == not_found);
-    delete exp;
 
-    exp = first < second; 
-    match = table.where().expression(exp).find_next();
+    match = (first < second).find_next();
     CHECK(match == 1);
-    delete exp;
 
-    exp = first <= second; 
-    match = table.where().expression(exp).find_next();
+    match = (first <= second).find_next();
     CHECK(match == 1);
-    delete exp;
 
     // Subexpr compare Subexpr
-    exp = second + 0 > first + 0; 
-    match = table.where().expression(exp).find_next();
+    match = (second + 0 > first + 0).find_next();
     CHECK(match == 1);
-    delete exp;
 
-    exp = second + 0 >= first + 0; 
-    match = table.where().expression(exp).find_next();
+    match = (second + 0 >= first + 0).find_next();
     CHECK(match == 1);
-    delete exp;
 
-    exp = second + 0 == first + 0; 
-    match = table.where().expression(exp).find_next();
+    match = (second + 0 == first + 0).find_next();
     CHECK(match == not_found);
-    delete exp;
 
-    exp = second + 0 != second + 0; 
-    match = table.where().expression(exp).find_next();
+    match = (second + 0 != second + 0).find_next();
     CHECK(match == not_found);
-    delete exp;
 
-    exp = first + 0 < second + 0; 
-    match = table.where().expression(exp).find_next();
+    match = (first + 0 < second + 0).find_next();
     CHECK(match == 1);
-    delete exp;
 
-    exp = first + 0 <= second + 0; 
-    match = table.where().expression(exp).find_next();
+    match = (first + 0 <= second + 0).find_next();
     CHECK(match == 1);
-    delete exp;
 
     // Conversions, again
     table.clear();
@@ -355,23 +265,18 @@ TEST(QueryExpressions0)
     table.set_float(1, 0, 3.0);
     table.set_double(2, 0, 3.0);
 
-    exp = 1 / second == 1 / second; 
-    match = table.where().expression(exp).find_next();
+    match = (1 / second == 1 / second).find_next();
     CHECK(match == 0);
-    delete exp;
 
-    exp = 1 / third == 1 / third; 
-    match = table.where().expression(exp).find_next();
+    match = (1 / third == 1 / third).find_next();
     CHECK(match == 0);
-    delete exp;
 
     // Compare operator must preserve precision of each side, hence no match
-    exp = 1 / second == 1 / third; 
-    match = table.where().expression(exp).find_next();
+    match = (1 / second == 1 / third).find_next();
     CHECK(match == not_found);
-    delete exp;
+
     
-    */
+    
 }
 
 

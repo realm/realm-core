@@ -821,8 +821,9 @@ private:
 
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {
+        // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
         Columns::m_column = col_idx; 
-        Columns::m_table2 = reinterpret_cast<const Table*>(Base::m_table->get_impl());
+        Columns::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
     }
 
     // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
@@ -892,8 +893,9 @@ private:
 
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {
+        // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
         Columns::m_column = col_idx; 
-        Columns::m_table2 = reinterpret_cast<const Table*>(Base::m_table->get_impl());
+        Columns::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
     }
 
     // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
@@ -963,8 +965,9 @@ private:
 
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {
+        // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
         Columns::m_column = col_idx;
-        Columns::m_table2 = reinterpret_cast<const Table*>(Base::m_table->get_impl());
+        Columns::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
     }
 
     // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet

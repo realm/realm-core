@@ -24,6 +24,7 @@ This file lets you write queries in C++ syntax like: Expression* e = (first + 1 
 Type conversion/promotion semantics is the same as in the C++ expressions, e.g float + int > double == float + 
 (float)int > double. 
 
+
 Grammar:
 -----------------------------------------------------------------------------------------------------------------------
     Expression:         Subexpr2<T>  Compare<Cond, T>  Subexpr2<T>
@@ -40,13 +41,14 @@ Grammar:
 
     T:                  int, int64_t, float, double
 
+
 Class diagram
 -----------------------------------------------------------------------------------------------------------------------
 Subexpr2
     void evaluate(size_t i, ValueBase* destination)
 
 Compare: public Subexpr2
-    size_t find_first(size_t start, size_t end)        // main method that executes query
+    size_t find_first(size_t start, size_t end)     // main method that executes query
 
     bool m_auto_delete
     Subexpr2& m_left;                               // left expression subtree
@@ -62,6 +64,9 @@ Value<T>: public Subexpr2
 
 Columns<T>: public Subexpr2
     SequentialGetter<T> sg;                         // class bound to a column, lets you read values in a fast way
+    Table* m_table;
+
+class ColumnAccessor<>: public Columns<double>
 
 
 Flow chart:
@@ -72,15 +77,19 @@ table row i.
 Value<T> actually contains 8 concecutive values and all operations are based on these chunks. This is
 to save overhead by virtual calls needed for evaluating a query that has been dynamically constructed at runtime.
 
+
 Memory allocation: 
 -----------------------------------------------------------------------------------------------------------------------
 Operator and Compare contain a 'bool m_auto_delete' which tell if their subtrees were created by the query system or by the 
 end-user. If created by query system, they are deleted upon destructed of Operator and Compare.
 
-Value and Columns given to any constructor are cloned with 'new' and hence deleted unconditionally by query system.
+Value and Columns given to Operator or Compare constructors are cloned with 'new' and hence deleted unconditionally
+by query system.
 
-Todo
+
+Caveats, notes and todos
 -----------------------------------------------------------------------------------------------------------------------
+    * Perhaps disallow columns from two different tables in same expression
     * Use query_engine.hpp for execution of simple queries that are supported there, because it's faster
     * Support unary operators like power and sqrt
     * The name Columns (with s) an be confusing because we also have Column (without s)
@@ -89,6 +98,10 @@ Todo
     * Hack: In compare operator overloads (==, !=, >, etc), Compare class is returned as Query class, resulting in object 
       slicing. Just be aware.
     * clone() some times new's, sometimes it just returns *this. Can be confusing. Rename method or copy always.
+    * We have Columns::m_table, Query::m_table and ColumnAccessorBase::m_table that point at the same thing, even with 
+      ColumnAccessor<> extending Columns. So m_table is redundant, but this is in order to keep class dependencies and
+      entanglement low so that the design is flexible (if you perhaps later want a Columns class that is not dependent 
+      on ColumnAccessor)
 */
 
 
@@ -118,6 +131,7 @@ template<class T>struct Mul {
     typedef T type;
 };
 
+// Unary not supported yet
 template<class T>struct Pow { 
     T operator()(T v) const {return v * v;} 
     typedef T type;
@@ -128,19 +142,15 @@ template<class T1, class T2,
     bool T1_is_int = std::numeric_limits<T1>::is_integer,
     bool T2_is_int = std::numeric_limits<T2>::is_integer,
     bool T1_is_widest = (sizeof(T1) > sizeof(T2)) > struct Common;
-
 template<class T1, class T2, bool b> struct Common<T1, T2, b, b, true > { 
     typedef T1 type; 
 };
-
 template<class T1, class T2, bool b> struct Common<T1, T2, b, b, false> {
     typedef T2 type; 
 };
-
 template<class T1, class T2, bool b> struct Common<T1, T2, false, true , b> { 
     typedef T1 type; 
 };
-
 template<class T1, class T2, bool b> struct Common<T1, T2, true , false, b> { 
     typedef T2 type; 
 };
@@ -173,15 +183,17 @@ class Subexpr
 public:
     virtual ~Subexpr() {}
 
-    // todo, think about renaming, or actualy copying
+    // todo, think about renaming, or actualy doing deep copy
     virtual Subexpr& clone() {
         return *this;
     }
 
-    // Values need no table attached and have no children to call set_table() on either, so do nothing
+    // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
     virtual void set_table(const Table*) {}    
 
-    virtual Table* get_table() 
+    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and 
+    // binds it to a Query at a later time
+    virtual const Table* get_table() 
     { 
         return NULL; 
     }
@@ -217,6 +229,7 @@ public:
             m_v[t] = o(left->m_v[t], right->m_v[t]);
     }
 
+    // Below import and export methods are for type conversion between float, double, int64_t, etc.
     template<class D> TIGHTDB_FORCEINLINE void export2(ValueBase& destination) const
     {
         Value<D>& d = static_cast<Value<D>&>(destination);
@@ -224,7 +237,6 @@ public:
             d.m_v[t] = static_cast<D>(m_v[t]);
     }
 
-    // Import and export methods are for type conversion of expression elements that have different types
     TIGHTDB_FORCEINLINE void export_int64_t(ValueBase& destination) const
     {
         export2<int64_t>(destination);
@@ -259,6 +271,7 @@ public:
             TIGHTDB_ASSERT(false);
     }
 
+    // Given a TCond (==, !=, >, <, >=, <=) and two Value<T>, return index of first match
     template <class TCond> TIGHTDB_FORCEINLINE size_t static compare(Value<T>* left, Value<T>* right)
     {        
         TCond c;
@@ -296,6 +309,7 @@ public:
     T m_v[elements];
 };
 
+class ColumnAccessorBase;
 
 // All overloads where left-hand-side is Subexpr2<L>:
 //
@@ -303,9 +317,6 @@ public:
 // Subexpr2<L>          +, -, *, /, <, >, ==, !=, <=, >=      R, Subexpr2<R>
 //
 // For L = R = {int, int64_t, float, double}:  
-
-class ColumnAccessorBase;
-
 template <class L, class R> class Overloads
 {
     typedef typename Common<L, R>::type CommonType;
@@ -529,15 +540,15 @@ template <class R> Operator<Div<typename Common<R, int64_t>::type> >& operator /
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
-    explicit Columns(size_t column, const Table* table) : m_table2(NULL), sg(NULL)
+    explicit Columns(size_t column, const Table* table) : m_table(NULL), sg(NULL)
     {
         m_column = column;
         set_table(table);
     }
 
-    explicit Columns() : m_table2(NULL), sg(NULL) { }
+    explicit Columns() : m_table(NULL), sg(NULL) { }
 
-    explicit Columns(size_t column) : m_table2(NULL), sg(NULL)
+    explicit Columns(size_t column) : m_table(NULL), sg(NULL)
     {
         m_column = column;
     }
@@ -551,26 +562,27 @@ public:
     {
         Columns<T>& n = *new Columns<T>();
         n = *this;
-
         SequentialGetter<T> *s = new SequentialGetter<T>();
         n.sg = s;
         return n;
     }
 
+    // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
     virtual void set_table(const Table* table) 
     {
-        m_table2 = table;
+        m_table = table;
         typedef typename ColumnTypeTraits<T>::column_type ColType;
-        ColType* c;
-        c = (ColType*)&table->get_column_base(m_column);
+        const ColType* c = static_cast<const ColType*>(&table->get_column_base(m_column));
         if(sg == NULL)
             sg = new SequentialGetter<T>();
         sg->init(c);
     }
 
-    virtual Table* get_table() 
+    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and 
+    // binds it to a Query at a later time
+    virtual const Table* get_table() 
     {
-        return (Table*) m_table2;
+        return m_table;
     }
 
     TIGHTDB_FORCEINLINE void evaluate(size_t index, ValueBase& destination) {
@@ -587,7 +599,8 @@ public:
         destination.import(v);
     }
 
-    const Table* m_table2;
+    // m_table is redundant with ColumnAccessorBase<>::m_table, but is in order to decrease class dependency/entanglement
+    const Table* m_table;
     size_t m_column;
 private:
     SequentialGetter<T>* sg;
@@ -609,16 +622,19 @@ public:
             delete &m_left, delete &m_right;
     }
 
+    // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
     void set_table(const Table* table)
     {
         m_left.set_table(table);
         m_right.set_table(table);
     }
 
-    Table* get_table()
+    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and 
+    // binds it to a Query at a later time
+    virtual const Table* get_table()
     {
-        Table* l = m_left.get_table();
-        Table* r = m_right.get_table();
+        const Table* l = m_left.get_table();
+        const Table* r = m_right.get_table();
         return l ? l : r;
     }
 
@@ -664,13 +680,18 @@ private:
 template <class TCond, class T, class TLeft, class TRight> class Compare : public Expression
 {
 public:
+   
+    // Compare extends Expression which extends Query. This constructor for Compare initializes the Query part by 
+    // adding an ExpressionNode (see query_engine.hpp) and initializes Query::table so that it's ready to call
+    // Query methods on, like find_first(), etc.
     Compare(TLeft& left, const TRight& right, bool auto_delete = false) : m_left(left), m_right(const_cast<TRight&>(right))
     {
         m_auto_delete = auto_delete;
         Query::expression(this, auto_delete);
-        Table* t = get_table();
+        Table* t = const_cast<Table*>(get_table()); // todo, const
+
         if(t)
-            m_table = t->get_table_ref(); // todo, review, Lasse
+            Query::m_table = t->get_table_ref();
     }
 
     ~Compare()
@@ -681,16 +702,19 @@ public:
         }
     }
 
+    // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
     void set_table(const Table* table) 
     {
         m_left.set_table(table);
         m_right.set_table(table);
     }
 
-    Table* get_table()
+    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and 
+    // binds it to a Query at a later time
+    virtual const Table* get_table()
     {
-        Table* l = m_left.get_table();
-        Table* r = m_right.get_table();
+        const Table* l = m_left.get_table();
+        const Table* r = m_right.get_table();
         return l ? l : r;
     }
 
