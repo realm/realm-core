@@ -1322,3 +1322,20 @@ TEST(Shared_MixedWithNonShared)
     }
     File::remove("test.tightdb");
 }
+
+
+TEST(MultipleRollbacks) 
+{
+    SharedGroup sg("test.tightdb");    
+    sg.begin_write();
+    sg.rollback();
+    sg.rollback();
+}
+
+TEST(MultipleEndReads) 
+{
+    SharedGroup sg("test.tightdb");    
+    sg.begin_read();
+    sg.end_read();
+    sg.end_read();
+}
