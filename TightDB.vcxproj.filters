@@ -166,9 +166,6 @@
     <ClCompile Include="test\test_thread.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\test_utilities.cpp">
-      <Filter>test\util</Filter>
-    </ClCompile>
     <ClCompile Include="test\test_column.cpp">
       <Filter>test</Filter>
     </ClCompile>
@@ -186,6 +183,9 @@
     </ClCompile>
     <ClCompile Include="test\test_lang_bind_helper.cpp">
       <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_utilities.cpp">
+      <Filter>test\util</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
