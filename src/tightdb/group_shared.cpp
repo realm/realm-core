@@ -95,10 +95,16 @@ void spawn_daemon(const string& file)
         int i;
         for (i=m-1;i>=0;--i) close(i); 
         i=::open("/dev/null",O_RDWR);
+#ifdef TIGHTDB_ENABLE_LOGFILE
         // FIXME: Do we want to always open the log file? Should it be configurable?
         i=::open((file+".log").c_str(),O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
+#else
+        i = dup(i);
+#endif
         i = dup(i); static_cast<void>(i);
+#ifdef TIGHTDB_ENABLE_LOGFILE
         cerr << "Detaching" << endl;
+#endif
         // detach from current session:
         setsid();
 
@@ -392,7 +398,9 @@ void SharedGroup::do_async_commits()
             info->shutdown_started = 1;
             // FIXME: barrier?
             shutdown = true;
+#ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Lock file removed, initiating shutdown" << endl;
+#endif
         }
 
         // detect if we're the last "client", and if so mark the
@@ -414,14 +422,18 @@ void SharedGroup::do_async_commits()
 
         if (has_changed()) {
 
+#ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Syncing...";
+#endif
             // Get a read lock on the (current) version that we want
             // to commit to disk.
 #ifdef TIGHTDB_DEBUG
             m_transact_stage = transact_Ready;
 #endif
             begin_read();
+#ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "(version " << m_version << ")...";
+#endif
             size_t current_version = m_version;
             size_t current_top_ref = m_group.m_top.get_ref();
 
@@ -433,7 +445,9 @@ void SharedGroup::do_async_commits()
             m_version = last_version;
             end_read();
             last_version = current_version;
+#ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "..and Done" << endl;
+#endif
         }
         else if (!shutdown) {
             usleep(100);
@@ -443,9 +457,13 @@ void SharedGroup::do_async_commits()
             // Being the backend process, we own the lock file, so we
             // have to clean up when we shut down.
             info->~SharedInfo(); // Call destructor
+#ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Removing coordination file" << endl;
+#endif
             File::remove(m_file_path);
+#ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Daemon exiting nicely";
+#endif
             exit(EXIT_SUCCESS);
         }
     }

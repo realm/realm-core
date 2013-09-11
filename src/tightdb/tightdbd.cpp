@@ -23,15 +23,13 @@ int main(int argc, char* argv[])
     int pid = fork();
     if (pid == 0) { // in daemon process:
 
+#ifdef TIGHTDB_ENABLE_LOGFILE
         cerr << "Daemon starting" << endl;
-        try {
-            SharedGroup::unattached_tag tag;
-            SharedGroup async_committer(tag);
-            char* file = argv[1];
-            async_committer.open(file, true, SharedGroup::durability_Async, true);
-        } catch (...) {
-            cerr << "Daemon threw an exception" << endl;
-        }
+#endif
+        SharedGroup::unattached_tag tag;
+        SharedGroup async_committer(tag);
+        char* file = argv[1];
+        async_committer.open(file, true, SharedGroup::durability_Async, true);
 
     } else if (pid > 0) { // in parent, fork was ok, so return succes
 
