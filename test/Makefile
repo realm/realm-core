@@ -1,9 +1,8 @@
-PASSIVE_SUBDIRS = util test-tightdb test-sqlite3 test-stl performance experiments
+PASSIVE_SUBDIRS = util test-tightdb test-sqlite3 test-stl performance benchmark-insert-add experiments benchmark-prealloc
 
 test_tightdb_DEPS = util
 test_sqlite3_DEPS = util
 test_stl_DEPS     = util
-performance_DEPS  = util
 
 TEST_PROGRAMS = tightdb-tests
 
@@ -41,6 +40,11 @@ benchmark: subdir/test-tightdb/minimal subdir/test-sqlite3/minimal subdir/test-s
 UnitTest++:
 	$(MAKE) -C UnitTest++ CXXFLAGS="-g -Wall -W -ansi" LDFLAGS= >/dev/null
 
+# Build the add/insert benchmark
+.PHONY: benchmark-insert-add
+benchmark-insert-add: subdir/util/minimal
+	@$(MAKE) -C benchmark-insert-add
+
 # Run the performance matrix benchmarking program
 .PHONY: performance
 performance: subdir/util/minimal
@@ -52,3 +56,7 @@ testcase:
 	@$(MAKE) -C experiments test
 testcase-debug:
 	@$(MAKE) -C experiments test-debug
+
+.PHONY: benchmark-prealloc
+benchmark-prealloc:
+	@$(MAKE) -C benchmark-prealloc test

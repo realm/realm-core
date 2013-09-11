@@ -1,11 +1,58 @@
 #include <UnitTest++.h>
 #include <tightdb/table_macros.hpp>
+#include <string>
+#include <sstream>
 
 using namespace tightdb;
 
 namespace {
 TIGHTDB_TABLE_1(TestTableInt,
                 first, Int)
+
+TIGHTDB_TABLE_2(TestTableInt2,
+                first,  Int,
+                second, Int)
+
+TIGHTDB_TABLE_2(TestTableDate,
+                first, Date,
+                second, Int)
+
+}
+
+TEST(TableViewJSON)
+{
+    Table table;
+    table.add_column(type_Int, "first");
+
+    size_t ndx = table.add_empty_row();
+    table.set_int(0, ndx, 1);
+    ndx = table.add_empty_row();
+    table.set_int(0, ndx, 2);
+    ndx = table.add_empty_row();
+    table.set_int(0, ndx, 3);
+
+    TableView v = table.where().find_all(1);
+    std::stringstream ss;
+    v.to_json(ss);
+    const std::string json = ss.str();
+    CHECK_EQUAL(true, json.length() > 0);
+    CHECK_EQUAL("[{\"first\":2},{\"first\":3}]", json);
+}
+
+
+TEST(TableViewDateMaxMin)
+{
+    TestTableDate ttd;
+
+    ttd.add(Date(2014, 7, 10), 1);
+    ttd.add(Date(2013, 7, 10), 1);
+    ttd.add(Date(2015, 8, 10), 1);
+    ttd.add(Date(2015, 7, 10), 1);
+
+    TestTableDate::View v = ttd.column().second.find_all(1);
+
+    CHECK_EQUAL(Date(2015, 8, 10), v.column().first.maximum());
+    CHECK_EQUAL(Date(2013, 7, 10), v.column().first.minimum());
 }
 
 TEST(GetSetInteger)
@@ -128,7 +175,21 @@ TEST(TableView_Floats_Find_and_Aggregations)
     CHECK_EQUAL(-1.1f, v_all.column().col_float.minimum());
     CHECK_EQUAL(-1.1f, v_some.column().col_float.minimum());
 
-    // TODO: Test +=, average, count
+    // Test avg
+    CHECK_EQUAL(sum_d / 6.0, v_all.column().col_double.average());
+    CHECK_EQUAL((-1.2 + -1.2) / 2.0, v_some.column().col_double.average());
+    CHECK_EQUAL(sum_f / 6.0, v_all.column().col_float.average());
+
+    // Need to test this way because items summed one at a time differ with compile-time constant by some infinitesimal
+    CHECK_EQUAL(int(0.05 * 1000), int(v_some.column().col_float.average() * 1000));
+
+    CHECK_EQUAL(1, v_some.column().col_float.count(1.2f));
+    CHECK_EQUAL(2, v_some.column().col_double.count(-1.2));
+    CHECK_EQUAL(2, v_some.column().col_int.count(1));
+
+    CHECK_EQUAL(2, v_all.column().col_float.count(2.1f));
+    CHECK_EQUAL(2, v_all.column().col_double.count(-1.2));
+    CHECK_EQUAL(6, v_all.column().col_int.count(1));
 }
 
 TEST(TableViewSum)
@@ -261,12 +322,14 @@ TEST(TableViewFindAll)
     table.add(0);
 
     TestTableInt::View v = table.column().first.find_all(0);
+    CHECK_EQUAL(3, v.size());
     v[0].first = 5;
     v[1].first = 4; // match
     v[2].first = 4; // match
 
     // todo, add creation to wrapper function in table.h
     TestTableInt::View v2 = v.column().first.find_all(4);
+    CHECK_EQUAL(2, v2.size());
     CHECK_EQUAL(1, v2.get_source_ndx(0));
     CHECK_EQUAL(2, v2.get_source_ndx(1));
 }
@@ -358,6 +421,27 @@ TEST(TableViewClear)
 }
 
 
+//exposes a bug in stacked tableview:
+//view V1 selects a subset of rows from Table T1
+//View V2 selects rows from  view V1
+//Then, some rows in V2 can be found, that are not in V1
+TEST(TableViewStacked)
+{
+    Table t;
+    t.add_column(type_Int,"i1");
+    t.add_column(type_Int,"i2");
+    t.add_column(type_String,"S1");
+    t.add_empty_row(2);
+    t.set_int(0,0,1);    t.set_int(1,0,2); t.set_string(2,0,"A");    //   1 2   "A"
+    t.set_int(0,1,2);    t.set_int(1,1,2); t.set_string(2,1,"B");    //   2 2   "B"
+
+    TableView tv = t.find_all_int(0,2);
+    TableView tv2 = tv.find_all_int(1,2);
+    CHECK_EQUAL(1,tv2.size()); //evaluates tv2.size to 1 which is expected
+    CHECK_EQUAL("B",tv2.get_string(2,0)); //evalates get_string(2,0) to "A" which is not expected
+}
+
+
 TEST(TableViewClearNone)
 {
     TestTableInt table;
@@ -366,6 +450,28 @@ TEST(TableViewClearNone)
     CHECK_EQUAL(0, v.size());
 
     v.clear();
+}
+
+
+TEST(TableViewFindAllStacked)
+{
+    TestTableInt2 table;
+
+    table.add(0, 1);
+    table.add(0, 2);
+    table.add(0, 3);
+    table.add(1, 1);
+    table.add(1, 2);
+    table.add(1, 3);
+
+    TestTableInt2::View v = table.column().first.find_all(0);
+    CHECK_EQUAL(3, v.size());
+
+    TestTableInt2::View v2 = v.column().second.find_all(2);
+    CHECK_EQUAL(1, v2.size());
+    CHECK_EQUAL(0, v2[0].first);
+    CHECK_EQUAL(2, v2[0].second);
+    CHECK_EQUAL(1, v2.get_source_ndx(0));
 }
 
 

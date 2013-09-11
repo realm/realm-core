@@ -71,7 +71,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringSetEmpty2)
 
 TEST_FIXTURE(db_setup_string, ArrayStringClear)
 {
-    c.Clear();
+    c.clear();
     c.add("");
     c.add("");
     c.add("");
@@ -136,7 +136,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringSetExpand8)
 
 TEST_FIXTURE(db_setup_string, ArrayArrayStringAdd0)
 {
-    c.Clear();
+    c.clear();
     c.add();
     CHECK_EQUAL("", c.get(0));
     CHECK_EQUAL(1, c.size());
@@ -317,7 +317,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringEraseAll)
 TEST_FIXTURE(db_setup_string, ArrayStringInsert2)
 {
     // Create new list
-    c.Clear();
+    c.clear();
     c.add("a");
     c.add("b");
     c.add("c");
@@ -351,7 +351,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringInsert3)
 TEST_FIXTURE(db_setup_string, ArrayStringFind3)
 {
     // Create new list
-    c.Clear();
+    c.clear();
     c.add("a");
     c.add("b");
     c.add("c");
@@ -409,7 +409,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringFind7)
 
 TEST_FIXTURE(db_setup_string, ArrayStringFindAll)
 {
-    c.Clear();
+    c.clear();
     Array col;
 
     // first, middle and end
@@ -421,17 +421,17 @@ TEST_FIXTURE(db_setup_string, ArrayStringFindAll)
 
     c.find_all(col, "foobar");
     CHECK_EQUAL(3, col.size());
-    CHECK_EQUAL(0, col.Get(0));
-    CHECK_EQUAL(2, col.Get(1));
-    CHECK_EQUAL(4, col.Get(2));
+    CHECK_EQUAL(0, col.get(0));
+    CHECK_EQUAL(2, col.get(1));
+    CHECK_EQUAL(4, col.get(2));
 
     // Cleanup
-    col.Destroy();
+    col.destroy();
 }
 
 TEST_FIXTURE(db_setup_string, ArrayStringCount)
 {
-    c.Clear();
+    c.clear();
 
     // first, middle and end
     c.add("foobar");
@@ -449,7 +449,7 @@ TEST_FIXTURE(db_setup_string, ArrayStringCount)
 /*
 TEST_FIXTURE(db_setup_string, ArrayStringWithZeroBytes)
 {
-    c.Clear();
+    c.clear();
 
     const char buf_1[] = { 'a', 0, 'b', 0, 'c' };
     const char buf_2[] = { 0, 'a', 0, 'b', 0 };
@@ -472,21 +472,21 @@ TEST_FIXTURE(db_setup_string, ArrayStringWithZeroBytes)
 TEST_FIXTURE(db_setup_string, ArrayStringDestroy)
 {
     // clean up (ALWAYS PUT THIS LAST)
-    c.Destroy();
+    c.destroy();
 }
 
 TEST(ArrayStringCompare)
 {
     ArrayString a, b;
 
-    CHECK(a.Compare(b));
+    CHECK(a.compare_string(b));
     a.add("");
-    CHECK(!a.Compare(b));
+    CHECK(!a.compare_string(b));
     b.add("x");
-    CHECK(!a.Compare(b));
+    CHECK(!a.compare_string(b));
     a.set(0, "x");
-    CHECK(a.Compare(b));
+    CHECK(a.compare_string(b));
 
-    a.Destroy();
-    b.Destroy();
+    a.destroy();
+    b.destroy();
 }

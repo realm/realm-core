@@ -3,34 +3,34 @@
 #include <tightdb/array_blob.hpp>
 
 using namespace std;
+using namespace tightdb;
 
-namespace tightdb {
 
 void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size, bool add_zero_term)
 {
     TIGHTDB_ASSERT(begin <= end);
-    TIGHTDB_ASSERT(end <= m_len);
+    TIGHTDB_ASSERT(end <= m_size);
     TIGHTDB_ASSERT(size == 0 || data);
 
-    CopyOnWrite(); // Throws
+    copy_on_write(); // Throws
 
     // Reallocate if needed
     size_t remove_size = end - begin;
     size_t add_size = size;
     if (add_zero_term)
         ++add_size;
-    size_t new_size = m_len - remove_size + add_size;
+    size_t new_size = m_size - remove_size + add_size;
     // also updates header
-    Alloc(new_size, 1); // Throws
+    alloc(new_size, 1); // Throws
 
     char* base = reinterpret_cast<char*>(m_data);
     char* modify_begin = base + begin;
 
     // Resize previous space to fit new data
     // (not needed if we append to end)
-    if (begin != m_len) {
+    if (begin != m_size) {
         const char* old_begin = base + end;
-        const char* old_end   = base + m_len;
+        const char* old_end   = base + m_size;
         if (remove_size < add_size) { // expand gap
             char* new_end = base + new_size;
             copy_backward(old_begin, old_end, new_end);
@@ -46,14 +46,14 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
     if (add_zero_term)
         *modify_begin = 0;
 
-    m_len = new_size;
+    m_size = new_size;
 }
 
 #ifdef TIGHTDB_DEBUG
 
-void ArrayBlob::ToDot(ostream& out, const char* title) const
+void ArrayBlob::to_dot(ostream& out, const char* title) const
 {
-    const size_t ref = GetRef();
+    ref_type ref = get_ref();
 
     if (title) {
         out << "subgraph cluster_" << ref << " {" << endl;
@@ -81,5 +81,3 @@ void ArrayBlob::ToDot(ostream& out, const char* title) const
 }
 
 #endif // TIGHTDB_DEBUG
-
-}

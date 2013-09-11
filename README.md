@@ -34,7 +34,7 @@ each of our major platforms:
     sudo apt-get install libunittest++-dev
     sudo apt-get install libproc-dev
 
-### Ubuntu 13.04
+### Ubuntu 13.04, Linux Mint 15
 
     sudo apt-get install build-essential
     sudo apt-get install python-cheetah
@@ -68,6 +68,7 @@ then:
     tar xf Cheetah-2.4.4.tar.gz
     cd Cheetah-2.4.4/
     sudo python setup.py install
+
 
 
 Building, testing, and installing
@@ -110,9 +111,10 @@ GCC. Here is an example:
     g++  my_app.cpp  `tightdb-config --cflags --libs`
 
 After building, you might want to see exactly what will be installed,
-without actually instyalling anything. This can be done as follows:
+without actually installing anything. This can be done as follows:
 
     DESTDIR=/tmp/check sh build.sh install && find /tmp/check -type f
+
 
 
 Building for iPhone
@@ -144,6 +146,7 @@ simulator. Each one also comes with a `config` program that can be
 used to enquire about required compiler and linker flags.
 
 
+
 Configuration
 -------------
 
@@ -170,6 +173,7 @@ replication. For example:
     TIGHTDB_ENABLE_REPLICATION=1 sh build.sh src-dist all
 
 
+
 Packaging
 ---------
 
@@ -181,16 +185,18 @@ following command:
 The packages will be signed by the maintainer's signature.
 
 
+
 Building a distribution package
 -------------------------------
 
 In general, it is necessary (and crucial) to properly update the
-versions of the following shared libraries (do this by editing the the
-indicated Makefiles):
+versions of the following shared libraries:
 
     libtightdb.so      (/tightdb/src/tightdb/Makefile)
     libtightdb-c.so    (/tightdb_c/src/tightdb/c/Makefile)
     libtightdb-objc.so (/tightdb_objc/src/tightdb/objc/Makefile)
+
+Do this by editing the the indicated Makefiles.
 
 Please note that these versions are completely independent of each
 other and of the package version. When the library versions are set
@@ -205,5 +211,16 @@ package:
     git tag -a 'bNNN' -m "New tag for 'Build NNN'"
     git push --tags
 
-This will produce a package whose name and whose top-level directory
+This will produce a package whose name, and whose top-level directory
 is named according to the tag.
+
+`Pandoc` is required to build a distribution package.
+
+On Ubuntu, install Pandoc and XeLaTeX with the following commands:
+
+    sudo apt-get install texlive-latex-base
+    sudo apt-get install pandoc 
+
+On Mac OSX, install Pandoc and XeLaTeX (aka MacTeX) via the following link:
+
+    http://www.texts.io/support

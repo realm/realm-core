@@ -14,9 +14,11 @@
 using namespace std;
 using namespace tightdb;
 
+namespace {
 TIGHTDB_TABLE_2(TupleTableType,
                 first,  Int,
                 second, String)
+}
 
 #ifndef TIGHTDB_BYPASS_OPTIMIZE_CRASH_BUG
 TEST(TestOptimizeCrash)
@@ -257,12 +259,15 @@ TEST(Table_LowLevelCopy)
     Table table;
     table.add_column(type_Int, "i1");
     table.add_column(type_Int, "i2");
+    table.add_column(type_Int, "xxxxxxxxxxxxxxxxxxxxxxx");
 
     table.insert_int(0, 0, 10);
     table.insert_int(1, 0, 120);
+    table.insert_int(2, 0, 1230);
     table.insert_done();
     table.insert_int(0, 1, 12);
     table.insert_int(1, 1, 100);
+    table.insert_int(2, 1, 1300);
     table.insert_done();
 
 #ifdef TIGHTDB_DEBUG
@@ -550,7 +555,8 @@ TEST(Table_test_json_simple)
     s.add_column(type_Int,    "int");
     s.add_column(type_Bool,   "bool");
     s.add_column(type_Date,   "date");
-    // FIXME: Add float, double
+    s.add_column(type_Float,  "float");
+    s.add_column(type_Double, "double");
     s.add_column(type_String, "string");
     s.add_column(type_Binary, "binary");
     table.update_from_spec();
@@ -558,11 +564,13 @@ TEST(Table_test_json_simple)
     // Add some rows
     for (size_t i = 0; i < 1; ++i) {
         table.insert_int(0, i, i);
-        table.insert_bool(1, i, (i % 2 ? true : false));
+        table.insert_bool(1, i, (i % 2 == 0? true : false));
         table.insert_date(2, i, 0x7fffeeeeL);
-        table.insert_string(3, i, "helloooooo");
+        table.insert_float(3, i, 3.14f);
+        table.insert_double(4, i, 2.71);
+        table.insert_string(5, i, "helloooooo");
         const char bin[] = "123456789012345678901234567890nopq";
-        table.insert_binary(4, i, BinaryData(bin, sizeof bin));
+        table.insert_binary(6, i, BinaryData(bin, sizeof bin));
         table.insert_done();
     }
 
@@ -570,7 +578,7 @@ TEST(Table_test_json_simple)
      table.to_json(ss);
      const string json = ss.str();
      CHECK_EQUAL(true, json.length() > 0);
-     //cerr << "JSON:" << json << "\n";
+     CHECK_EQUAL("[{\"int\":0,\"bool\":true,\"date\":\"2038-01-19 02:01:18\",\"float\":3.1400001e+00,\"double\":2.7100000000000000e+00,\"string\":\"helloooooo\",\"binary\":\"3132333435363738393031323334353637383930313233343536373839306e6f707100\"}]", json);
 }
 
 
@@ -721,6 +729,25 @@ TEST(Table_Index_String)
     CHECK_EQUAL(2, c1);
 }
 
+TEST(Table_Index_String_Twice)
+{
+    TestTableEnum table;
+
+    table.add(Mon, "jeff");
+    table.add(Tue, "jim");
+    table.add(Wed, "jennifer");
+    table.add(Thu, "john");
+    table.add(Fri, "jimmy");
+    table.add(Sat, "jimbo");
+    table.add(Sun, "johnny");
+    table.add(Mon, "jennifer"); // duplicate
+
+    table.column().second.set_index();
+    CHECK_EQUAL(true, table.column().second.has_index());
+    table.column().second.set_index();
+    CHECK_EQUAL(true, table.column().second.has_index());
+}
+
 namespace {
 TIGHTDB_TABLE_2(LookupTable,
                 first,  String,
@@ -779,6 +806,39 @@ TEST(Table_Lookup)
     CHECK_EQUAL(6, b6);
     CHECK_EQUAL(not_found, b7);
 }
+
+namespace {
+TIGHTDB_TABLE_1(TestSubtableLookup2,
+                str, String)
+TIGHTDB_TABLE_1(TestSubtableLookup1,
+                subtab, Subtable<TestSubtableLookup2>)
+} // anonymous namespace
+
+
+/*
+TEST(Table_SubtableLookup)
+{
+    TestSubtableLookup1 t;
+    t.add();
+    t.add();
+    {
+        TestSubtableLookup2::Ref r0 = t[0].subtab;
+        r0->add("foo");
+        r0->add("bar");
+        size_t i1 = r0->lookup("bar");
+        CHECK_EQUAL(1, i1);
+        size_t i2 = r0->lookup("foobar");
+        CHECK_EQUAL(not_found, i2);
+    }
+
+    {
+        TestSubtableLookup2::Ref r1 = t[1].subtab;
+        size_t i3 = r1->lookup("bar");
+        CHECK_EQUAL(not_found, i3);
+    }
+}
+*/
+
 
 TEST(Table_Distinct)
 {
@@ -1056,6 +1116,7 @@ TEST(Table_OptimizeCompare)
 TEST(Table_SlabAlloc)
 {
     SlabAlloc alloc;
+    alloc.attach_empty();
     TestTable table(alloc);
 
     table.add(0, 10, true, Wed);
@@ -1191,7 +1252,7 @@ TEST(Table_Spec_RenameColumns)
 
     // Rename sub-column
     column_path.push_back(0); // third
-    table->rename_column(column_path, "sub_1st");
+    table->rename_subcolumn(column_path, "sub_1st");
 
     // Get the sub-table
     {
@@ -1266,7 +1327,7 @@ TEST(Table_Spec_DeleteColumns)
     column_path.push_back(1); // sub_second
 
     // Remove a column in sub-table
-    table->remove_column(column_path);
+    table->remove_subcolumn(column_path);
 
     // Get the sub-table again and see if the values
     // still match.
@@ -1972,6 +2033,128 @@ TEST(Table_Test_Clear_With_Subtable_AND_Group)
 }
 
 
+//set a subtable in an already exisitng row by providing an existing subtable as the example to copy
+TEST(Table_SetSubTableByExample)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    // Create specification with sub-table
+    table->add_column(type_Int,    "first");
+    table->add_column(type_String, "second");
+    table->add_column(type_Table,  "third");
+
+    // Create path to sub-table column
+    vector<size_t> column_path;
+    column_path.push_back(2); // third
+
+    table->add_subcolumn(column_path, type_Int,    "sub_first");
+    table->add_subcolumn(column_path, type_String, "sub_second");
+
+    // Add a row
+    table->insert_int(0, 0, 4);
+    table->insert_string(1, 0, "Hello");
+    table->insert_subtable(2, 0);
+    table->insert_done();
+
+    // create a freestanding table to be used as a source by set_subtable
+
+    Table  sub = Table();
+    sub.add_column(type_Int,"sub_first");
+    sub.add_column(type_String,"sub_second");
+    sub.add_empty_row();
+    sub.set_int(0,0,42);
+    sub.set_string(1,0,"forty two");
+    sub.add_empty_row();
+    sub.set_int(0,1,3);
+    sub.set_string(1,1,"PI");
+
+    // Get the sub-table back for inspection
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+        CHECK(subtable->is_empty());
+
+        //add a subtable into the row, resembling the sub we just created
+        table->set_subtable(2,0,&sub);
+
+        TableRef subtable2 = table->get_subtable(2, 0);
+
+        CHECK_EQUAL(42,     subtable2->get_int(0, 0));
+        CHECK_EQUAL("forty two", subtable2->get_string(1, 0));
+        CHECK_EQUAL(3,     subtable2->get_int(0, 1));
+        CHECK_EQUAL("PI", subtable2->get_string(1,1));
+    }
+}
+
+//In the tableview class, set a subtable in an already exisitng row by providing an existing subtable as the example to copy
+TEST(TableView_SetSubTableByExample)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    // Create specification with sub-table
+    table->add_column(type_Int,    "first");
+    table->add_column(type_String, "second");
+    table->add_column(type_Table,  "third");
+
+    // Create path to sub-table column
+    vector<size_t> column_path;
+    column_path.push_back(2); // third
+
+    table->add_subcolumn(column_path, type_Int,    "sub_first");
+    table->add_subcolumn(column_path, type_String, "sub_second");
+
+    // Add two rows
+    table->insert_int(0, 0, 4);
+    table->insert_string(1, 0, "Hello");
+    table->insert_subtable(2, 0);// create a freestanding table to be used as a source by set_subtable
+    table->insert_done();
+
+    table->insert_int(0, 1, 8);
+    table->insert_string(1, 1, "Hi!, Hello?");
+    table->insert_subtable(2, 1);
+    table->insert_done();
+
+    Table  sub = Table();
+    sub.add_column(type_Int,"sub_first");
+    sub.add_column(type_String,"sub_second");
+    sub.add_empty_row();
+    sub.set_int(0,0,42);
+    sub.set_string(1,0,"forty two");
+    sub.add_empty_row();
+    sub.set_int(0,1,3);
+    sub.set_string(1,1,"PI");
+
+    //create a tableview with the table as source
+
+    TableView view = table->find_all_int(0,8);//select the second of the two rows
+
+    // Verify the sub table is empty
+    {
+        TableRef subtable = view.get_subtable(2, 0);
+        CHECK(subtable->is_empty());
+
+        //add a subtable into the second table row (first view row), resembling the sub we just created
+        view.set_subtable(2,0,&sub);
+
+        TableRef subtable2 = view.get_subtable(2, 0);//fetch back the subtable from the view
+
+        CHECK_EQUAL(42,     subtable2->get_int(0, 0));
+        CHECK_EQUAL("forty two", subtable2->get_string(1, 0));
+        CHECK_EQUAL(3,     subtable2->get_int(0, 1));
+        CHECK_EQUAL("PI", subtable2->get_string(1,1));
+
+        TableRef subtable3 = table->get_subtable(2, 1);//fetch back the subtable from the table.
+
+        CHECK_EQUAL(42,     subtable3->get_int(0, 0));
+        CHECK_EQUAL("forty two", subtable3->get_string(1, 0));
+        CHECK_EQUAL(3,     subtable3->get_int(0, 1));
+        CHECK_EQUAL("PI", subtable3->get_string(1,1));
+    }
+}
+
+
+
 TEST(Table_SubtableWithParentChange)
 {
     // FIXME: Also check that when a freestanding table is destroyed, it invalidates all its subtable wrappers.
@@ -1981,28 +2164,28 @@ TEST(Table_SubtableWithParentChange)
     table.add();
     MyTable2::Ref subtab = table[1].subtab;
     subtab->add(7, 0);
-    CHECK(table.is_valid());
-    CHECK(subtab->is_valid());
+    CHECK(table.is_attached());
+    CHECK(subtab->is_attached());
     CHECK_EQUAL(subtab, MyTable2::Ref(table[1].subtab));
     CHECK_EQUAL(table[1].subtab[0].val, 7);
     CHECK_EQUAL(subtab[0].val, 7);
-    CHECK(subtab->is_valid());
+    CHECK(subtab->is_attached());
 #ifdef TIGHTDB_DEBUG
     table.Verify();
     subtab->Verify();
 #endif
-    CHECK(table.is_valid());
-    CHECK(subtab->is_valid());
+    CHECK(table.is_attached());
+    CHECK(subtab->is_attached());
     table.insert(0, 0);
-    CHECK(table.is_valid());
-    CHECK(!subtab->is_valid());
+    CHECK(table.is_attached());
+    CHECK(!subtab->is_attached());
     subtab = table[2].subtab;
-    CHECK(subtab->is_valid());
+    CHECK(subtab->is_attached());
     table.remove(1);
-    CHECK(!subtab->is_valid());
+    CHECK(!subtab->is_attached());
     subtab = table[1].subtab;
-    CHECK(table.is_valid());
-    CHECK(subtab->is_valid());
+    CHECK(table.is_attached());
+    CHECK(subtab->is_attached());
 }
 
 TEST(Table_HasSharedSpec)
@@ -2108,7 +2291,7 @@ TEST(Table_Aggregates2)
 TEST(Table_LanguageBindings)
 {
    Table* table = LangBindHelper::new_table();
-   CHECK(table->is_valid());
+   CHECK(table->is_attached());
 
    table->add_column(type_Int, "i");
    table->insert_int(0, 0, 10);
@@ -2117,7 +2300,7 @@ TEST(Table_LanguageBindings)
    table->insert_done();
 
    Table* table2 = LangBindHelper::copy_table(*table);
-   CHECK(table2->is_valid());
+   CHECK(table2->is_attached());
 
    CHECK(*table == *table2);
 
@@ -2127,10 +2310,25 @@ TEST(Table_LanguageBindings)
 
 TEST(Table_MultipleColumn)
 {
-
     Table table;
     table.add_column(type_Int, "first");
     table.add_column(type_Int, "first");
     CHECK_EQUAL(table.get_column_count(), 2);
     CHECK_EQUAL(table.get_column_index("first"), 0);
+}
+
+
+TEST(Table_FormerLeakCase)
+{
+    Table sub;
+    sub.add_column(type_Int, "a");
+
+    Table root;
+    Spec& s = root.get_spec();
+    Spec subs = s.add_subtable_column("b");
+    subs.add_column(type_Int, "a");
+    root.update_from_spec();
+    root.add_empty_row(1);
+    root.set_subtable(0, 0, &sub);
+    root.set_subtable(0, 0, 0);
 }

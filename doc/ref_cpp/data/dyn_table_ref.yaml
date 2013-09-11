@@ -1,5 +1,5 @@
 #
-# C++ reference documentation for Table class
+# C++ reference documentation for the Table (dynamic) class.
 #
 
 ID         : class_dyn_table
@@ -32,20 +32,20 @@ DESCR      : &g_dyn_table_intro_descr
 
              It is possible to query a dynamic table using {@link class_dyn_query} objects. The result
              set is often returned as a {@link class_dyn_tableview} object.
-             
-             NOTICE: 
+
+             NOTICE:
              For all methods which takes row and column index as parameters,
              you must ensure that these are in a valid range.
              You must also ensure that you use the correct type of method for
              the correct type of column. I.e. it's invalid to use 'getString(...)'
-             with a column index which is of Boolean type - it must be of 'String' 
+             with a column index which is of Boolean type - it must be of 'String'
              type and so forth.
-             
+
 
 SEE        : &g_dyn_table_intro_see
              >
              Besides the dynamic table described here, {@link class_typed_table} are preferred
-             when the structure of your data is know at compile time. It provides additional 
+             when the structure of your data is know at compile time. It provides additional
              type safety and auto-completion productivity compared to the dynamic table.
 EXAMPLES   :
 - DESCR:
@@ -85,21 +85,33 @@ CATEGORIES :
       - CODE   : ex_cpp_dyn_table_is_empty
         DESCR  :
 
-# TODO: describe what to use it for...
-  - g_dyn_table_is_valid:
-      NAME     : is_valid
-      SUMMARY  : &g_dyn_table_is_valid_summary
-                 Is table valid/consistent?
-      DESCR    : &g_dyn_table_is_valid_descr
-                 This method will perform a number of consistency checks on a table and its
-                 columns.
+  - g_dyn_table_is_attached:
+      NAME     : is_attached
+      SUMMARY  : &g_dyn_table_is_attached_summary
+                 Check whether this table accessor is still in the
+                 attached state.
+      DESCR    : &g_dyn_table_is_attached_descr
+                 A table accessor that is no longer attached must not
+                 be accessed in any way except by calling
+                 is_attached(). A table accessor that is obtained from
+                 a Group becomes detached if its group accessor is
+                 destroyed. This is also true for any subtable
+                 accessor that is obtained indirectly from a group. A
+                 subtable accessor will generally become detached if
+                 its parent table is modified. Calling a const member
+                 function on a parent table accessor, will never
+                 detach its subtable accessors, though. An accessor
+                 for a freestanding table will never become
+                 detached. An accessor for a subtable of a
+                 freestanding table may become detached.
       CONST    : true
       RETURN:
         TYPES  : bool
-        DESCR  : &g_dyn_table_is_valid_return_descr
-                 <code>true</code> if table is valid, <code>false</code> otherwise.
+        DESCR  : &g_dyn_table_is_attached_return_descr
+                 <code>true</code> if, and only if this table accessor
+                 is still in the attached state.
       EXAMPLES:
-      - CODE   : ex_cpp_dyn_table_is_valid
+      - CODE   : ex_cpp_dyn_table_is_attached
         DESCR  :
 
 
@@ -160,7 +172,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_operator_neq_summary
                  Compare two tables for inequality.
       DESCR    : &g_dyn_table_operator_neq_descr
-                 This method compares two tables for inequality. 
+                 This method compares two tables for inequality.
                  Two tables are equal only if they contain the same columns and
                  rows in the same order.
       CONST    : True
@@ -187,19 +199,19 @@ CATEGORIES :
                  >
                  This method appends a column of the specified type and name to the table.
                  If it's used in a table which already has rows, the new column will just get
-                 default values (0, "", null) in those rows.
-                 
+                 default values in those rows.
+
                  Currently, the following types are supported:
                  <ul>
-                   <li><code>type_Bool</code></li>
-                   <li><code>type_Int</code></li>
-                   <li><code>type_Float</code></li>
-                   <li><code>type_Double</code></li>
-                   <li><code>type_String</code></li>
-                   <li><code>type_Binary</code></li>
-                   <li><code>type_Date</code></li>
-                   <li><code>type_Table</code></li>
-                   <li><code>type_Mixed</code></li>
+                   <li><code>type_Bool</code> (default false)</li>
+                   <li><code>type_Int</code> (default 0)</li>
+                   <li><code>type_Float</code> (default 0.0)</li>
+                   <li><code>type_Double</code> (default 0.0)</li>
+                   <li><code>type_String</code> (default "")</li>
+                   <li><code>type_Binary</code> (default ("")</li>
+                   <li><code>type_Date</code> (default 0 - 1970-01-01 00:00:00)</li>
+                   <li><code>type_Table</code> (default NULL)</li>
+                   <li><code>type_Mixed</code> (default NULL)</li>
                  </ul>
       PARAMS:
       - NAME   : type
@@ -247,7 +259,7 @@ CATEGORIES :
       DESCR    : &g_dyn_table_rename_column_descr
                  This method renames the specified column.
 # TODO: Add when vector indexing has been fixed
-#      SIGNATURE: | 
+#      SIGNATURE: |
 #                 void rename_column(size_t column_ndx, StringData name);
 #                 void rename_column(const vector<size_t>& column_path, StringData name);
       PARAMS:
@@ -289,15 +301,18 @@ CATEGORIES :
       - NAME   : column_ndx
         TYPES  : size_t
         DESCR  : &g_dyn_table_get_column_name_param1_descr
-                 The column index (starting from 0).
+                 >
+                 The column index (starting from 0), and it is not checked if the column
+                 index is out of range.
+
       RETURN:
         TYPES  : StringData
         DESCR  : &g_dyn_table_get_column_name_return_descr
-                 The column name.
+                 The column name. An empty string if index is out of range.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_column_name
         DESCR  :
-  
+
   - g_dyn_table_get_column_index:
       NAME     : get_column_index
       SUMMARY  : &g_dyn_table_get_column_index_summary
@@ -356,7 +371,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_add_int_summary
                  Add value to all cells in a column.
       DESCR    : &g_dyn_table_add_int_descr
-                 Add an integer value to all the cells in the specified column. 
+                 Add an integer value to all the cells in the specified column.
                  There is no overflow or underflow protection.
       PARAMS:
       - NAME   : column_ndx
@@ -367,7 +382,7 @@ CATEGORIES :
         TYPES  : int64_t
         DESCR  : &g_dyn_table_add_int_parm2_descr
                  Value to add to all cells in the column.
-        
+
 - Rows:
   METHODS:
   - g_dyn_table_add_empty_row:
@@ -391,7 +406,8 @@ CATEGORIES :
                  Insert empty rows.
       DESCR    : &g_dyn_table_insert_empty_row_descr
                  This method inserts one or more empty rows with default values at a given position.
-                 The default cell values are 0, null, or "", as appropriate to the column types.
+                 The old rows will be shifted downwards i.e., the row numbers will be incremented.
+                 The default cell values are 0, 0.0, null, or "", as appropriate to the column types.
       SIGNATURE: |
                  void insert_empty_row(size_t row_ndx, size_t num_rows = 1)
       PARAMS:
@@ -408,7 +424,7 @@ CATEGORIES :
   - g_dyn_table_insert_int:
   - g_dyn_table_insert_enum:
   - g_dyn_table_insert_float:
-  - g_dyn_table_insert_double:  
+  - g_dyn_table_insert_double:
   - g_dyn_table_insert_date:
   - g_dyn_table_insert_string:
   - g_dyn_table_insert_binary:
@@ -466,7 +482,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_remove_row_summary
                  Delete a row.
       DESCR    : &g_dyn_table_remove_row_descr
-                 This method deletes a specific row. 
+                 This method deletes a specific row.
                  All rows with a larger row index will be repositioned with a row index one lower.
       SIGNATURE: void remove(size_t row_ndx);
       PARAMS:
@@ -571,6 +587,8 @@ CATEGORIES :
       IGNORE   : ""
   - g_dyn_table_set_mixed:
       NAME     : set_mixed
+  - g_dyn_table_set_subtable:
+      NAME     : set_subtable
 
       TITLE    : set_*
       SUMMARY  : &g_dyn_table_set_xxx_summary
@@ -578,15 +596,16 @@ CATEGORIES :
       DESCR    : &g_dyn_table_set_xxx_descr
                  This method will replace the value of an existing cell (column/row).
       SIGNATURE: |
-                 void set_bool(size_t column_ndx, size_t row_ndx, bool value);
-                 void set_int(size_t column_ndx, size_t row_ndx, int64_t value);
-                 void set_float(size_t column_ndx, size_t row_ndx, float value);
-                 void set_double(size_t column_ndx, size_t row_ndx, double value);
-                 template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
-                 void set_date(size_t column_ndx, size_t row_ndx, Date value);
-                 void set_string(size_t column_ndx, size_t row_ndx, StringData value);
-                 void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
-                 void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
+                 void set_bool(size_t column_ndx, size_t row_ndx, bool value)
+                 void set_int(size_t column_ndx, size_t row_ndx, int64_t value)
+                 void set_float(size_t column_ndx, size_t row_ndx, float value)
+                 void set_double(size_t column_ndx, size_t row_ndx, double value)
+                 template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value)
+                 void set_date(size_t column_ndx, size_t row_ndx, Date value)
+                 void set_string(size_t column_ndx, size_t row_ndx, StringData value)
+                 void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value)
+                 void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value)
+                 void set_subtable(size_t column_ndx, size_t row_ndx, const Table*)
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
@@ -595,7 +614,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : *g_dyn_table_get_xxx_parm2_descr
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed]
+        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed, const Table*]
         DESCR  : &g_dyn_table_set_xxx_parm3_descr
                  The value to assign to the specified cell.
       EXAMPLES:
@@ -654,16 +673,12 @@ CATEGORIES :
                  Add an index to a column.
       DESCR    : &g_dyn_table_set_index_descr
                  This method adds an index to a column, and queries will be faster. But the table
-                 will require more memory and inserts will be slower.
-                 Currently only String columns can be indexed.
+                 will require more memory and inserts will be slower. This method is idempotent.
+                 Currently only String columns can be indexed. Note, index cannot be removed.
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
         DESCR  : *g_dyn_table_get_xxx_parm1_descr
-# TODO: Describe purpose???
-      - NAME   : update_spec
-        TYPES  : bool
-        DESCR  : "If <code>true</code>, the table spec will be updated. Default: <code>true</code>."
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_set_index
         DESCR  :
@@ -686,8 +701,8 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_has_index
         DESCR  :
-        
-        
+
+
 - Searching:
   METHODS:
   - g_dyn_table_lookup:
@@ -712,7 +727,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_lookup
         DESCR  :
-        
+
   - g_dyn_table_find_first_bool:
       NAME     : find_first_bool
   - g_dyn_table_find_first_int:
@@ -758,7 +773,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_find_first_xxx
         DESCR  :
-        
+
   - g_dyn_table_find_all_bool:
   - g_dyn_table_find_all_int:
   - g_dyn_table_find_all_float:
@@ -817,33 +832,93 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_find_all_xxx
         DESCR  :
-        
-  - g_dyn_table_find_sorted_int:
-      NAMES    : find_sorted_int
-      SUMMARY  : Find matching row or insert position in sorted column.
-      DESCR    : This method is used for making quick lookups and maintaining order in sorted columns.
+
+  - g_dyn_table_lower_bound_int:
+  - g_dyn_table_upper_bound_int:
+  - g_dyn_table_lower_bound_bool:
+  - g_dyn_table_upper_bound_bool:
+  - g_dyn_table_lower_bound_float:
+  - g_dyn_table_upper_bound_float:
+  - g_dyn_table_lower_bound_double:
+  - g_dyn_table_upper_bound_double:
+  - g_dyn_table_lower_bound_string:
+  - g_dyn_table_upper_bound_string:
+      TITLE    : lower_bound_* , upper_bound_*
+      NAMES    : [ lower_bound_int,upper_bound_int, lower_bound_bool, upper_bound_bool,
+                   lower_bound_float, upper_bound_float, lower_bound_double, upper_bound_double,
+                   lower_bound_string, upper_bound_string ]
+      SUMMARY  : Find the lower/upper bound in a sorted column.
+
+      DESCR:
+      - TEXT   : Find the lower/upper bound of the specified value
+                 according to the specified column. The column must
+                 already be sorted in ascending order.
+
+                 For an integer column at index 0, and an integer
+                 value '`v`', lower_bound_int(0,v) returns the index
+                 '`l`' of the first row such that `get_int(0,l) &ge;
+                 v`, and upper_bound_int(0,v) returns the index '`u`'
+                 of the first row such that `get_int(0,u) &gt; v`. In
+                 both cases, if no such row is found, the returned
+                 value is the number of rows in the table.
+
+      - TEXT   : |
+                 <pre>
+                     3 3 3 4 4 4 5 6 7 9 9 9
+                     ^     ^     ^     ^     ^
+                     |     |     |     |     |
+                     |     |     |     |      -- Lower and upper bound of 15
+                     |     |     |     |
+                     |     |     |      -- Lower and upper bound of 8
+                     |     |     |
+                     |     |      -- Upper bound of 4
+                     |     |
+                     |      -- Lower bound of 4
+                     |
+                      -- Lower and upper bound of 1
+                 </pre>
+
+      - TEXT   : The string version assumes the order that is imposed
+                 by StringData::operator<(). It uses simple byte-wise
+                 lexicographical comparison. No Unicode or locale
+                 dependent collation is taken into account.
       SIGNATURE: |
-                 bool find_sorted_int(size_t column_ndx, int64_t value, size_t& pos) const;
+                 std::size_t lower_bound_int(std::size_t column_ndx, std::int64_t value) const noexcept;
+                 std::size_t upper_bound_int(std::size_t column_ndx, std::int64_t value) const noexcept;
+                 std::size_t lower_bound_bool(std::size_t column_ndx, bool value) const noexcept;
+                 std::size_t upper_bound_bool(std::size_t column_ndx, bool value) const noexcept;
+                 std::size_t lower_bound_float(std::size_t column_ndx, float value) const noexcept;
+                 std::size_t upper_bound_float(std::size_t column_ndx, float value) const noexcept;
+                 std::size_t lower_bound_double(std::size_t column_ndx, double value) const noexcept;
+                 std::size_t upper_bound_double(std::size_t column_ndx, double value) const noexcept;
+                 std::size_t lower_bound_string(std::size_t column_ndx, StringData value) const noexcept;
+                 std::size_t upper_bound_string(std::size_t column_ndx, StringData value) const noexcept;
       CONST    : True
+      # NOEXCEPT : True
       PARAMS:
       - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : *g_dyn_table_find_all_xxx_parm1_descr
+        TYPES  : std::size_t
+        DESCR  : The index of a sorted column whose type matches the
+                 suffix of the function name. These functions have
+                 undefined behaviour if the specified column index is
+                 out of bounds or does not correspond to a column of
+                 the right type. It is safe to call these functions
+                 even if the specified column is not sorted. Although
+                 the returned index is then unspecified, it is still
+                 guaranteed to be within the usual range.
       - NAME   : value
-        TYPES  : int64_t
-        DESCR  : *g_dyn_table_find_all_xxx_parm2_descr
-      - NAME   : pos
-        TYPES  : "size_t&"
-        DESCR  : &g_dyn_table_find_sorted_int_parm3_descr
-                 Position of matching value or insert position.
+        TYPES  : [ int64_t, bool, float, double, StringData ]
+        DESCR  : The value whose bound is queried for.
       RETURN:
-        TYPES  : bool
-        DESCR  : &g_dyn_table_find_sorted_int_return_descr
-                 "true if value was found, otherwise false."
+        TYPES  : std::size_t
+        DESCR  : The row index corresponding to the lower/upper
+                 bound. Note that this index is always in the range
+                 `[0,N]` where `N` is the number of rows in this
+                 table, even if the column was not sorted.
       EXAMPLES:
-      - CODE   : ex_cpp_dyn_table_find_first_xxx
+      - CODE   : ex_cpp_dyn_table_lower_upper_bound
         DESCR  :
-        
+
   - g_dyn_table_get_sorted_view:
   - g_dyn_table_get_sorted_view_const:
       NAMES    : [get_sorted_view, get_sorted_view]
@@ -871,7 +946,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_sorted_view
         DESCR  :
-        
+
   - g_dyn_table_distinct:
   - g_dyn_table_distinct_const:
       NAMES    : [distinct, distinct]
@@ -897,7 +972,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_distinct
         DESCR  :
-        
+
   - g_dyn_table_where:
   - g_dyn_table_where_const:
       NAMES    : [where, where]
@@ -915,8 +990,8 @@ CATEGORIES :
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_table_where
-        
-        
+
+
 - Aggregates:
   METHODS:
   - g_dyn_table_count_int:
@@ -924,16 +999,16 @@ CATEGORIES :
   - g_dyn_table_count_double:
   - g_dyn_table_count_string:
       TITLE    : count_*
-      NAMES    : [count, count_float, count_double, count_string]
+      NAMES    : [count_int, count_float, count_double, count_string]
       SUMMARY  : &g_dyn_table_count_summary
                  Count rows with a specfic value.
       DESCR    : &g_dyn_table_count_descr
                  This method counts the number of rows matching a specified value
                  in the specified column.
-                 It is convinient to determine the number briefly compared to using 
+                 It is convinient to determine the number briefly compared to using
                  a {@link class_dyn_query} object.
       SIGNATURE: |
-                 size_t count(size_t column_ndx, int64_t target) const;
+                 size_t count_int(size_t column_ndx, int64_t target) const;
                  size_t count_float(size_t column_ndx, float target) const;
                  size_t count_double(size_t column_ndx, double target) const;
                  size_t count_string(size_t column_ndx, StringData target) const;
@@ -963,8 +1038,13 @@ CATEGORIES :
       NAMES    : [sum, sum_float, sum_double]
       SUMMARY  : &g_dyn_table_sum_summary
                  Calculates the sum.
-      DESCR    : &g_dyn_table_sum_descr
+      DESCR    :
+      - TEXT   : &g_dyn_table_sum_descr
                  This method calculates the sum of all values in the specified column.
+      - TEXT   : >
+                 As the sum of many <code>float</code>
+                 values can be greater than the maximum value of the type, a <code>double</code>
+                 is returned.
       SIGNATURE: |
                  int64_t sum(size_t column_ndx) const;
                  double  sum_float(size_t column_ndx) const;
@@ -976,7 +1056,7 @@ CATEGORIES :
         DESCR  : &g_dyn_table_sum_parm1_descr
                  The column index (starting from 0) to summarize.
       RETURN:
-        TYPES  : [int64_t, double]
+        TYPES  : [int64_t, double, double]
         DESCR  : &g_dyn_table_sum_return_descr
                  The sum.
       EXAMPLES:
@@ -1040,7 +1120,7 @@ CATEGORIES :
   - g_dyn_table_average_float:
   - g_dyn_table_average_double:
       TITLE    : average_*
-      NAMES    : [average, average_float, average_double]      
+      NAMES    : [average, average_float, average_double]
       SUMMARY  : &g_dyn_table_average_summary
                  Calculates the average.
       DESCR    : &g_dyn_table_average_descr
@@ -1068,11 +1148,15 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_to_json_summary
                  Convert table to JSON.
       DESCR    : &g_dyn_table_to_json_descr
-                 This method will convert a table and its columns and rows to a 
+                 This method will convert a table and its columns and rows to a
                  JSON compatible representation.
-                 
-                 The JavaScript Object Notation (<a href="http://json.org">JSON</a>) 
-                 is useful for web/mobile applications and serialization. 
+
+                 The JavaScript Object Notation (<a href="http://json.org">JSON</a>)
+                 is useful for web/mobile applications and serialization.
+
+                 A table (and subtables) will be formatted as a array of rows, and row will
+                 be formatted as an object.
+      CONST    : true
       PARAMS:
       - NAME   : out
         TYPES  : std::ostream&

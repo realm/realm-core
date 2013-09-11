@@ -55,7 +55,8 @@ public:
     static const Table* get_subtable_ptr(const Table*, std::size_t column_ndx,
                                          std::size_t row_ndx);
 
-    // FIXME: This is an oddball, do we really need it? If we do, please provide a comment that explains why it is needed!
+    // FIXME: This is an 'oddball', do we really need it? If we do,
+    // please provide a comment that explains why it is needed!
     static Table* get_subtable_ptr_during_insert(Table*, std::size_t col_ndx,
                                                  std::size_t row_ndx);
 
@@ -70,7 +71,7 @@ public:
     static const Table* get_table_ptr(const Group* grp, StringData name);
 
     static void unbind_table_ref(const Table*);
-    static void bind_table_ref(const Table*);
+    static void bind_table_ref(const Table*) TIGHTDB_NOEXCEPT;
 
     /// Calls parent.insert_subtable(col_ndx, row_ndx, &source). Note
     /// that the source table must have a spec that is compatible with
@@ -78,10 +79,6 @@ public:
     static void insert_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
                                 const Table& source);
 
-    /// Like insert_subtable() but overwrites the specified cell
-    /// rather than inserting a new one.
-    static void set_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
-                             const Table& source);
 
     /// Calls parent.insert_mixed_subtable(col_ndx, row_ndx, &source).
     static void insert_mixed_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
@@ -95,7 +92,24 @@ public:
     /// legally called even for a table with shared spec. It is then
     /// the responsibility of the language binding to ensure that
     /// modification is only done through it when it is not shared.
-    static Spec& get_spec(Table&);
+    static Spec& get_spec(Table&) TIGHTDB_NOEXCEPT;
+
+    /// Returns the name of the spaceified data type as follows:
+    ///
+    /// <pre>
+    ///
+    ///   type_Int     ->  "int"
+    ///   type_Bool    ->  "bool"
+    ///   type_Float   ->  "float"
+    ///   type_Double  ->  "double"
+    ///   type_String  ->  "string"
+    ///   type_Binary  ->  "binary"
+    ///   type_Date    ->  "date"
+    ///   type_Table   ->  "table"
+    ///   type_Mixed   ->  "mixed"
+    ///
+    /// </pre>
+    static const char* get_data_type_name(DataType) TIGHTDB_NOEXCEPT;
 };
 
 
@@ -105,7 +119,7 @@ inline Table* LangBindHelper::new_table()
 {
     Allocator& alloc = Allocator::get_default();
     std::size_t ref = Table::create_empty_table(alloc); // Throws
-    Table* const table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
+    Table* const table = new Table(Table::ref_count_tag(), alloc, ref, 0, 0); // Throws
     table->bind_ref();
     return table;
 }
@@ -114,7 +128,7 @@ inline Table* LangBindHelper::copy_table(const Table& t)
 {
     Allocator& alloc = Allocator::get_default();
     std::size_t ref = t.clone(alloc); // Throws
-    Table* const table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
+    Table* const table = new Table(Table::ref_count_tag(), alloc, ref, 0, 0); // Throws
     table->bind_ref();
     return table;
 }
@@ -162,7 +176,8 @@ inline Table* LangBindHelper::get_table_ptr(Group* grp, StringData name)
 
 inline Table* LangBindHelper::get_table_ptr(Group* grp, StringData name, bool& was_created)
 {
-    Table* subtab = grp->get_table_ptr(name, was_created);
+    Group::SpecSetter spec_setter = 0; // Do not add any columns
+    Table* subtab = grp->get_table_ptr(name, spec_setter, was_created);
     subtab->bind_ref();
     return subtab;
 }
@@ -179,7 +194,7 @@ inline void LangBindHelper::unbind_table_ref(const Table* t)
    t->unbind_ref();
 }
 
-inline void LangBindHelper::bind_table_ref(const Table* t)
+inline void LangBindHelper::bind_table_ref(const Table* t) TIGHTDB_NOEXCEPT
 {
    t->bind_ref();
 }
@@ -190,11 +205,6 @@ inline void LangBindHelper::insert_subtable(Table& parent, std::size_t col_ndx,
     parent.insert_subtable(col_ndx, row_ndx, &source);
 }
 
-inline void LangBindHelper::set_subtable(Table& parent, std::size_t col_ndx,
-                                         std::size_t row_ndx, const Table& source)
-{
-    parent.set_subtable(col_ndx, row_ndx, &source);
-}
 
 inline void LangBindHelper::insert_mixed_subtable(Table& parent, std::size_t col_ndx,
                                                   std::size_t row_ndx, const Table& source)
@@ -208,9 +218,9 @@ inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_nd
     parent.set_mixed_subtable(col_ndx, row_ndx, &source);
 }
 
-inline Spec& LangBindHelper::get_spec(Table& t)
+inline Spec& LangBindHelper::get_spec(Table& t) TIGHTDB_NOEXCEPT
 {
-    return t.m_spec_set;
+    return t.m_spec;
 }
 
 

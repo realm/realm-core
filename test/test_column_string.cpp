@@ -19,7 +19,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringMultiEmpty)
     c.add("");
     c.add("");
     c.add("");
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
 
     CHECK_EQUAL("", c.get(0));
     CHECK_EQUAL("", c.get(1));
@@ -34,7 +34,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringSetExpand4)
 {
     c.set(0, "hey");
 
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
     CHECK_EQUAL("hey", c.get(0));
     CHECK_EQUAL("", c.get(1));
     CHECK_EQUAL("", c.get(2));
@@ -47,7 +47,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringSetExpand8)
 {
     c.set(1, "test");
 
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
     CHECK_EQUAL("hey", c.get(0));
     CHECK_EQUAL("test", c.get(1));
     CHECK_EQUAL("", c.get(2));
@@ -58,10 +58,10 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringSetExpand8)
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd0)
 {
-    c.Clear();
+    c.clear();
     c.add();
     CHECK_EQUAL("", c.get(0));
-    CHECK_EQUAL(1, c.Size());
+    CHECK_EQUAL(1, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd1)
@@ -69,7 +69,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd1)
     c.add("a");
     CHECK_EQUAL("",  c.get(0));
     CHECK_EQUAL("a", c.get(1));
-    CHECK_EQUAL(2, c.Size());
+    CHECK_EQUAL(2, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd2)
@@ -78,7 +78,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd2)
     CHECK_EQUAL("",   c.get(0));
     CHECK_EQUAL("a",  c.get(1));
     CHECK_EQUAL("bb", c.get(2));
-    CHECK_EQUAL(3, c.Size());
+    CHECK_EQUAL(3, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd3)
@@ -88,7 +88,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd3)
     CHECK_EQUAL("a",   c.get(1));
     CHECK_EQUAL("bb",  c.get(2));
     CHECK_EQUAL("ccc", c.get(3));
-    CHECK_EQUAL(4, c.Size());
+    CHECK_EQUAL(4, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd4)
@@ -99,7 +99,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd4)
     CHECK_EQUAL("bb",   c.get(2));
     CHECK_EQUAL("ccc",  c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
-    CHECK_EQUAL(5, c.Size());
+    CHECK_EQUAL(5, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd8)
@@ -111,7 +111,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd8)
     CHECK_EQUAL("ccc",  c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd16)
@@ -124,7 +124,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd16)
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
-    CHECK_EQUAL(7, c.Size());
+    CHECK_EQUAL(7, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd32)
@@ -139,7 +139,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd32)
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(7));
-    CHECK_EQUAL(8, c.Size());
+    CHECK_EQUAL(8, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringAdd64)
@@ -156,7 +156,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringAdd64)
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
     CHECK_EQUAL("gggggggggggggggggggggggggggggggg", c.get(7));
     CHECK_EQUAL("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx", c.get(8));
-    CHECK_EQUAL(9, c.Size());
+    CHECK_EQUAL(9, c.size());
 }
 
 
@@ -167,7 +167,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringSet1)
     c.set(2, "a");
     c.set(3, "");
 
-    CHECK_EQUAL(9, c.Size());
+    CHECK_EQUAL(9, c.size());
 
     CHECK_EQUAL("ccc",  c.get(0));
     CHECK_EQUAL("bb",   c.get(1));
@@ -185,7 +185,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringInsert1)
     // Insert in middle
     c.insert(4, "xx");
 
-    CHECK_EQUAL(10, c.Size());
+    CHECK_EQUAL(10, c.size());
 
     CHECK_EQUAL("ccc",  c.get(0));
     CHECK_EQUAL("bb",   c.get(1));
@@ -204,7 +204,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete1)
     // Delete from end
     c.erase(9);
 
-    CHECK_EQUAL(9, c.Size());
+    CHECK_EQUAL(9, c.size());
 
     CHECK_EQUAL("ccc",  c.get(0));
     CHECK_EQUAL("bb",   c.get(1));
@@ -222,7 +222,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete2)
     // Delete from top
     c.erase(0);
 
-    CHECK_EQUAL(8, c.Size());
+    CHECK_EQUAL(8, c.size());
 
     CHECK_EQUAL("bb",   c.get(0));
     CHECK_EQUAL("a",    c.get(1));
@@ -239,7 +239,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete3)
     // Delete from middle
     c.erase(3);
 
-    CHECK_EQUAL(7, c.Size());
+    CHECK_EQUAL(7, c.size());
 
     CHECK_EQUAL("bb",   c.get(0));
     CHECK_EQUAL("a",    c.get(1));
@@ -254,19 +254,19 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDeleteAll)
 {
     // Delete all items one at a time
     c.erase(0);
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
     c.erase(0);
-    CHECK_EQUAL(5, c.Size());
+    CHECK_EQUAL(5, c.size());
     c.erase(0);
-    CHECK_EQUAL(4, c.Size());
+    CHECK_EQUAL(4, c.size());
     c.erase(0);
-    CHECK_EQUAL(3, c.Size());
+    CHECK_EQUAL(3, c.size());
     c.erase(0);
-    CHECK_EQUAL(2, c.Size());
+    CHECK_EQUAL(2, c.size());
     c.erase(0);
-    CHECK_EQUAL(1, c.Size());
+    CHECK_EQUAL(1, c.size());
     c.erase(0);
-    CHECK_EQUAL(0, c.Size());
+    CHECK_EQUAL(0, c.size());
 
     CHECK(c.is_empty());
 }
@@ -274,7 +274,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDeleteAll)
 TEST_FIXTURE(db_setup_column_string, ColumnStringInsert2)
 {
     // Create new list
-    c.Clear();
+    c.clear();
     c.add("a");
     c.add("b");
     c.add("c");
@@ -288,7 +288,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringInsert2)
     CHECK_EQUAL("b",     c.get(2));
     CHECK_EQUAL("c",     c.get(3));
     CHECK_EQUAL("d",     c.get(4));
-    CHECK_EQUAL(5, c.Size());
+    CHECK_EQUAL(5, c.size());
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnStringInsert3)
@@ -302,7 +302,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringInsert3)
     CHECK_EQUAL("xxxxxxxxxx", c.get(3));
     CHECK_EQUAL("c",     c.get(4));
     CHECK_EQUAL("d",     c.get(5));
-    CHECK_EQUAL(6, c.Size());
+    CHECK_EQUAL(6, c.size());
 }
 
 TEST(ColumnStringFind1)
@@ -325,7 +325,7 @@ TEST(ColumnStringFind1)
     CHECK_EQUAL(4, res3);
 
     // Cleanup
-    c.Destroy();
+    c.destroy();
 }
 
 TEST(ColumnStringFind2)
@@ -354,7 +354,7 @@ TEST(ColumnStringFind2)
     CHECK_EQUAL(5, res4);
 
     // Cleanup
-    c.Destroy();
+    c.destroy();
 }
 
 TEST(ColumnStringAutoEnumerate)
@@ -371,31 +371,31 @@ TEST(ColumnStringAutoEnumerate)
     }
 
     // Create StringEnum
-    size_t keys;
-    size_t values;
-    const bool res = c.AutoEnumerate(keys, values);
+    ref_type keys;
+    ref_type values;
+    bool res = c.auto_enumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
 
     // Verify that all entries match source
-    CHECK_EQUAL(c.Size(), e.Size());
-    for (size_t i = 0; i < c.Size(); ++i) {
+    CHECK_EQUAL(c.size(), e.size());
+    for (size_t i = 0; i < c.size(); ++i) {
         StringData s1 = c.get(i);
         StringData s2 = e.get(i);
         CHECK_EQUAL(s1, s2);
     }
 
     // Search for a value that does not exist
-    const size_t res1 = e.find_first("nonexist");
+    size_t res1 = e.find_first("nonexist");
     CHECK_EQUAL(size_t(-1), res1);
 
     // Search for an existing value
-    const size_t res2 = e.find_first("klmop");
+    size_t res2 = e.find_first("klmop");
     CHECK_EQUAL(4, res2);
 
     // Cleanup
-    c.Destroy();
-    e.Destroy();
+    c.destroy();
+    e.destroy();
 }
 
 TEST(ColumnStringAutoEnumerateIndex)
@@ -412,18 +412,18 @@ TEST(ColumnStringAutoEnumerateIndex)
     }
 
     // Create StringEnum
-    size_t keys;
-    size_t values;
-    const bool res = c.AutoEnumerate(keys, values);
+    ref_type keys;
+    ref_type values;
+    bool res = c.auto_enumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
 
     // Set index
-    e.CreateIndex();
-    CHECK(e.HasIndex());
+    e.create_index();
+    CHECK(e.has_index());
 
     // Search for a value that does not exist
-    const size_t res1 = e.find_first("nonexist");
+    size_t res1 = e.find_first("nonexist");
     CHECK_EQUAL(not_found, res1);
 
     Array results;
@@ -431,53 +431,53 @@ TEST(ColumnStringAutoEnumerateIndex)
     CHECK(results.is_empty());
 
     // Search for an existing value
-    const size_t res2 = e.find_first("klmop");
+    size_t res2 = e.find_first("klmop");
     CHECK_EQUAL(4, res2);
 
     e.find_all(results, "klmop");
     CHECK_EQUAL(5, results.size());
-    CHECK_EQUAL(4, results.Get(0));
-    CHECK_EQUAL(9, results.Get(1));
-    CHECK_EQUAL(14, results.Get(2));
-    CHECK_EQUAL(19, results.Get(3));
-    CHECK_EQUAL(24, results.Get(4));
+    CHECK_EQUAL(4, results.get(0));
+    CHECK_EQUAL(9, results.get(1));
+    CHECK_EQUAL(14, results.get(2));
+    CHECK_EQUAL(19, results.get(3));
+    CHECK_EQUAL(24, results.get(4));
 
     // Set a value
     e.set(1, "newval");
-    const size_t res3 = e.count("a");
-    const size_t res4 = e.count("bc");
-    const size_t res5 = e.count("newval");
+    size_t res3 = e.count("a");
+    size_t res4 = e.count("bc");
+    size_t res5 = e.count("newval");
     CHECK_EQUAL(5, res3);
     CHECK_EQUAL(4, res4);
     CHECK_EQUAL(1, res5);
 
-    results.Clear();
+    results.clear();
     e.find_all(results, "newval");
     CHECK_EQUAL(1, results.size());
-    CHECK_EQUAL(1, results.Get(0));
+    CHECK_EQUAL(1, results.get(0));
 
     // Insert a value
     e.insert(4, "newval");
-    const size_t res6 = e.count("newval");
+    size_t res6 = e.count("newval");
     CHECK_EQUAL(2, res6);
 
     // Delete values
     e.erase(1);
     e.erase(0);
-    const size_t res7 = e.count("a");
-    const size_t res8 = e.count("newval");
+    size_t res7 = e.count("a");
+    size_t res8 = e.count("newval");
     CHECK_EQUAL(4, res7);
     CHECK_EQUAL(1, res8);
 
     // Clear all
-    e.Clear();
-    const size_t res9 = e.count("a");
+    e.clear();
+    size_t res9 = e.count("a");
     CHECK_EQUAL(0, res9);
 
     // Cleanup
-    c.Destroy();
-    e.Destroy();
-    results.Destroy();
+    c.destroy();
+    e.destroy();
+    results.destroy();
 }
 
 TEST(ColumnStringAutoEnumerateIndexReuse)
@@ -494,38 +494,38 @@ TEST(ColumnStringAutoEnumerateIndexReuse)
     }
 
     // Set index
-    c.CreateIndex();
-    CHECK(c.HasIndex());
+    c.create_index();
+    CHECK(c.has_index());
 
     // Create StringEnum
-    size_t keys;
-    size_t values;
-    const bool res = c.AutoEnumerate(keys, values);
+    ref_type keys;
+    ref_type values;
+    bool res = c.auto_enumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
 
     // Reuse the index from original column
-    StringIndex& ndx = c.PullIndex();
-    e.ReuseIndex(ndx);
-    CHECK(e.HasIndex());
+    StringIndex* index = c.release_index();
+    e.install_index(index);
+    CHECK(e.has_index());
 
     // Search for a value that does not exist
-    const size_t res1 = e.find_first("nonexist");
+    size_t res1 = e.find_first("nonexist");
     CHECK_EQUAL(not_found, res1);
 
     // Search for an existing value
-    const size_t res2 = e.find_first("klmop");
+    size_t res2 = e.find_first("klmop");
     CHECK_EQUAL(4, res2);
 
     // Cleanup
-    c.Destroy();
-    e.Destroy();
+    c.destroy();
+    e.destroy();
 }
 
 // Test "Replace string array with long string array" when doing it through LeafSet()
 TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2)
 {
-    c.Clear();
+    c.clear();
     Column col;
 
     c.add("foobar");
@@ -534,19 +534,19 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2)
 
     c.set(1, "70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
 
-    CHECK_EQUAL(c.Size(), c.Size());
+    CHECK_EQUAL(c.size(), c.size());
     CHECK_EQUAL("foobar", c.get(0));
     CHECK_EQUAL("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", c.get(1));
     CHECK_EQUAL("baz", c.get(2));
 
     // Cleanup
-    col.Destroy();
+    col.destroy();
 }
 
 // Test against a bug where FindWithLen() would fail finding ajacent hits
 TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent)
 {
-    c.Clear();
+    c.clear();
     Array col;
 
     c.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
@@ -559,7 +559,7 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent)
     CHECK_EQUAL(2, col.size());
 
     // Cleanup
-    col.Destroy();
+    col.destroy();
 }
 
 TEST(AdaptiveStringColumnFindAllExpand)
@@ -575,11 +575,11 @@ TEST(AdaptiveStringColumnFindAllExpand)
 
     asc.find_all(c, "HEJ");
 
-    CHECK_EQUAL(5, asc.Size());
+    CHECK_EQUAL(5, asc.size());
     CHECK_EQUAL(3, c.size());
-    CHECK_EQUAL(0, c.Get(0));
-    CHECK_EQUAL(2, c.Get(1));
-    CHECK_EQUAL(4, c.Get(2));
+    CHECK_EQUAL(0, c.get(0));
+    CHECK_EQUAL(2, c.get(1));
+    CHECK_EQUAL(4, c.get(2));
 
     // Expand to ArrayStringLong
     asc.add("dfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfs");
@@ -589,19 +589,19 @@ TEST(AdaptiveStringColumnFindAllExpand)
     asc.add("dfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfgdfg djf gjkfdghkfds");
 
     // Todo, should the API behaviour really require us to clear c manually?
-    c.Clear();
+    c.clear();
     asc.find_all(c, "HEJ");
 
-    CHECK_EQUAL(10, asc.Size());
+    CHECK_EQUAL(10, asc.size());
     CHECK_EQUAL(5, c.size());
-    CHECK_EQUAL(0, c.Get(0));
-    CHECK_EQUAL(2, c.Get(1));
-    CHECK_EQUAL(4, c.Get(2));
-    CHECK_EQUAL(6, c.Get(3));
-    CHECK_EQUAL(8, c.Get(4));
+    CHECK_EQUAL(0, c.get(0));
+    CHECK_EQUAL(2, c.get(1));
+    CHECK_EQUAL(4, c.get(2));
+    CHECK_EQUAL(6, c.get(3));
+    CHECK_EQUAL(8, c.get(4));
 
-    asc.Destroy();
-    c.Destroy();
+    asc.destroy();
+    c.destroy();
 
 }
 
@@ -630,33 +630,33 @@ TEST(AdaptiveStringColumnFindAllRangesLong)
     asc.add("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
     asc.add("HEJSA"); // 16
 
-    c.Clear();
+    c.clear();
     asc.find_all(c, "HEJSA", 0, 17);
     CHECK_EQUAL(9, c.size());
-    CHECK_EQUAL(0, c.Get(0));
-    CHECK_EQUAL(2, c.Get(1));
-    CHECK_EQUAL(4, c.Get(2));
-    CHECK_EQUAL(6, c.Get(3));
-    CHECK_EQUAL(8, c.Get(4));
-    CHECK_EQUAL(10, c.Get(5));
-    CHECK_EQUAL(12, c.Get(6));
-    CHECK_EQUAL(14, c.Get(7));
-    CHECK_EQUAL(16, c.Get(8));
+    CHECK_EQUAL(0, c.get(0));
+    CHECK_EQUAL(2, c.get(1));
+    CHECK_EQUAL(4, c.get(2));
+    CHECK_EQUAL(6, c.get(3));
+    CHECK_EQUAL(8, c.get(4));
+    CHECK_EQUAL(10, c.get(5));
+    CHECK_EQUAL(12, c.get(6));
+    CHECK_EQUAL(14, c.get(7));
+    CHECK_EQUAL(16, c.get(8));
 
-    c.Clear();
+    c.clear();
     asc.find_all(c, "HEJSA", 1, 16);
     CHECK_EQUAL(7, c.size());
-    CHECK_EQUAL(2, c.Get(0));
-    CHECK_EQUAL(4, c.Get(1));
-    CHECK_EQUAL(6, c.Get(2));
-    CHECK_EQUAL(8, c.Get(3));
-    CHECK_EQUAL(10, c.Get(4));
-    CHECK_EQUAL(12, c.Get(5));
-    CHECK_EQUAL(14, c.Get(6));
+    CHECK_EQUAL(2, c.get(0));
+    CHECK_EQUAL(4, c.get(1));
+    CHECK_EQUAL(6, c.get(2));
+    CHECK_EQUAL(8, c.get(3));
+    CHECK_EQUAL(10, c.get(4));
+    CHECK_EQUAL(12, c.get(5));
+    CHECK_EQUAL(14, c.get(6));
 
     // Clean-up
-    asc.Destroy();
-    c.Destroy();
+    asc.destroy();
+    c.destroy();
 }
 
 // FindAll using ranges, when not expanded (using ArrayString)
@@ -684,33 +684,33 @@ TEST(AdaptiveStringColumnFindAllRanges)
     asc.add("15");
     asc.add("HEJSA"); // 16
 
-    c.Clear();
+    c.clear();
     asc.find_all(c, "HEJSA", 0, 17);
     CHECK_EQUAL(9, c.size());
-    CHECK_EQUAL(0, c.Get(0));
-    CHECK_EQUAL(2, c.Get(1));
-    CHECK_EQUAL(4, c.Get(2));
-    CHECK_EQUAL(6, c.Get(3));
-    CHECK_EQUAL(8, c.Get(4));
-    CHECK_EQUAL(10, c.Get(5));
-    CHECK_EQUAL(12, c.Get(6));
-    CHECK_EQUAL(14, c.Get(7));
-    CHECK_EQUAL(16, c.Get(8));
+    CHECK_EQUAL(0, c.get(0));
+    CHECK_EQUAL(2, c.get(1));
+    CHECK_EQUAL(4, c.get(2));
+    CHECK_EQUAL(6, c.get(3));
+    CHECK_EQUAL(8, c.get(4));
+    CHECK_EQUAL(10, c.get(5));
+    CHECK_EQUAL(12, c.get(6));
+    CHECK_EQUAL(14, c.get(7));
+    CHECK_EQUAL(16, c.get(8));
 
-    c.Clear();
+    c.clear();
     asc.find_all(c, "HEJSA", 1, 16);
     CHECK_EQUAL(7, c.size());
-    CHECK_EQUAL(2, c.Get(0));
-    CHECK_EQUAL(4, c.Get(1));
-    CHECK_EQUAL(6, c.Get(2));
-    CHECK_EQUAL(8, c.Get(3));
-    CHECK_EQUAL(10, c.Get(4));
-    CHECK_EQUAL(12, c.Get(5));
-    CHECK_EQUAL(14, c.Get(6));
+    CHECK_EQUAL(2, c.get(0));
+    CHECK_EQUAL(4, c.get(1));
+    CHECK_EQUAL(6, c.get(2));
+    CHECK_EQUAL(8, c.get(3));
+    CHECK_EQUAL(10, c.get(4));
+    CHECK_EQUAL(12, c.get(5));
+    CHECK_EQUAL(14, c.get(6));
 
     // Clean-up
-    asc.Destroy();
-    c.Destroy();
+    asc.destroy();
+    c.destroy();
 }
 
 TEST(AdaptiveStringColumnCount)
@@ -742,7 +742,7 @@ TEST(AdaptiveStringColumnCount)
     // Create StringEnum
     size_t keys;
     size_t values;
-    const bool res = asc.AutoEnumerate(keys, values);
+    const bool res = asc.auto_enumerate(keys, values);
     CHECK(res);
     ColumnStringEnum e(keys, values);
 
@@ -751,8 +751,8 @@ TEST(AdaptiveStringColumnCount)
     CHECK_EQUAL(9, ecount);
 
     // Clean-up
-    asc.Destroy();
-    e.Destroy();
+    asc.destroy();
+    e.destroy();
 }
 
 TEST(AdaptiveStringColumnIndex)
@@ -778,8 +778,8 @@ TEST(AdaptiveStringColumnIndex)
     asc.add("15");
     asc.add("HEJSA"); // 16
 
-    asc.CreateIndex();
-    CHECK(asc.HasIndex());
+    asc.create_index();
+    CHECK(asc.has_index());
 
     const size_t count0 = asc.count("HEJ");
     const size_t count1 = asc.count("HEJSA");
@@ -838,18 +838,18 @@ TEST(AdaptiveStringColumnIndex)
     CHECK_EQUAL(15, del5);
 
     // Remove all
-    asc.Clear();
+    asc.clear();
     const size_t c1 = asc.find_first("HEJSA");
     const size_t c2 = asc.find_first("fifteen");
     CHECK_EQUAL(not_found, c1);
     CHECK_EQUAL(not_found, c2);
 
     // Clean-up
-    asc.Destroy();
+    asc.destroy();
 }
 
 TEST_FIXTURE(db_setup_column_string, ColumnString_Destroy)
 {
     // clean up (ALWAYS PUT THIS LAST)
-    c.Destroy();
+    c.destroy();
 }

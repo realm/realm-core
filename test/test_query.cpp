@@ -1,11 +1,12 @@
+#include <cstdlib> // itoa()
 #include <vector>
 
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
 #include "testsettings.hpp"
-#include <stdlib.h> // itoa()
 
+using namespace std;
 using namespace tightdb;
 
 namespace {
@@ -344,8 +345,6 @@ TEST(MergeQueriesMonkey)
 
 
 
-
-
 TEST(MergeQueriesMonkeyOverloads)
 {
     for(int iter = 0; iter < 5; iter++)
@@ -452,9 +451,6 @@ TEST(MergeQueriesMonkeyOverloads)
 }
 
 
-
-
-
 TEST(CountLimit)
 {
     PeopleTable2 table;
@@ -482,9 +478,10 @@ TEST(CountLimit)
     CHECK_EQUAL(1, count3);
 }
 
+
 TEST(TestQueryStrIndexCrash)
 {
-    // Rasmus "8" index crash 
+    // Rasmus "8" index crash
     for(int iter = 0; iter < 5; iter++)
     {
         Group group;
@@ -494,12 +491,12 @@ TEST(TestQueryStrIndexCrash)
         s.add_column(type_String, "first");
         table->update_from_spec();
 
-        int64_t eights = 0;
+        size_t eights = 0;
 
         for(int i = 0; i < 2000; i++) {
             int v = rand() % 10;
             if(v == 8) {
-                eights++;            
+                eights++;
             }
             char dst[100];
             memset(dst, 0, sizeof(dst));
@@ -511,7 +508,7 @@ TEST(TestQueryStrIndexCrash)
         table->set_index(0);
         TableView v = table->where().equal(0, StringData("8")).find_all();
         CHECK_EQUAL(eights, v.size());
-    
+
         v = table->where().equal(0, StringData("10")).find_all();
 
         v = table->where().equal(0, StringData("8")).find_all();
@@ -522,12 +519,12 @@ TEST(TestQueryStrIndexCrash)
 
 TEST(QueryTwoColsEqualVaryWidthAndValues)
 {
-    std::vector<size_t> ints1;
-    std::vector<size_t> ints2;
-    std::vector<size_t> ints3;
+    vector<size_t> ints1;
+    vector<size_t> ints2;
+    vector<size_t> ints3;
 
-    std::vector<size_t> floats;
-    std::vector<size_t> doubles;
+    vector<size_t> floats;
+    vector<size_t> doubles;
 
     Table table;
     table.add_column(type_Int, "first1");
@@ -619,9 +616,9 @@ TEST(QueryTwoColsEqualVaryWidthAndValues)
 
 TEST(QueryTwoColsVaryOperators)
 {
-    std::vector<size_t> ints1;
-    std::vector<size_t> floats;
-    std::vector<size_t> doubles;
+    vector<size_t> ints1;
+    vector<size_t> floats;
+    vector<size_t> doubles;
 
     Table table;
     table.add_column(type_Int, "first1");
@@ -737,8 +734,8 @@ TEST(TestQueryHuge)
         size_t mdist2 = 1;
         size_t mdist3 = 1;
 
-        std::string first;
-        std::string second;
+        string first;
+        string second;
         int64_t third;
 
         size_t res1 = 0;
@@ -750,7 +747,6 @@ TEST(TestQueryHuge)
         size_t res7 = 0;
         size_t res8 = 0;
 
-        
         size_t start = rand() % 6000;
         size_t end = start + rand() % (6000 - start);
         size_t limit;
@@ -768,8 +764,7 @@ TEST(TestQueryHuge)
                 long1 = (rand() % 2 == 0);
                 long2 = (rand() % 2 == 0);
 
-                if (rand() % 2 == 0)
-                {
+                if (rand() % 2 == 0) {
                     mdist1 = rand() % 500 + 1;
                     mdist2 = rand() % 500 + 1;
                     mdist3 = rand() % 500 + 1;
@@ -814,9 +809,9 @@ TEST(TestQueryHuge)
             else
                 third = 2;
 
-            tt[row].first = first.c_str();
-            tt[row].second = second.c_str();
-            tt[row].third = third;
+            tt[row].first  = first;
+            tt[row].second = second;
+            tt[row].third  = third;
 
 
 
@@ -856,8 +851,6 @@ TEST(TestQueryHuge)
                 tt.column().first.set_index();
             else if (t == 3)
                 tt.column().second.set_index();
-            else if (t == 4)
-                tt.column().third.set_index();
 
 
 
@@ -911,7 +904,7 @@ TEST(TestQueryStrIndex3)
 #endif
         TupleTableType ttt;
 
-        std::vector<size_t> vec;
+        vector<size_t> vec;
         size_t row = 0;
 
         size_t n = 0;
@@ -1228,15 +1221,15 @@ TEST(TestQueryFloat4)
 {
     FloatTable3 t;
 
-    t.add(std::numeric_limits<float>::max(), std::numeric_limits<double>::max(), 11111);
-    t.add(std::numeric_limits<float>::infinity(), std::numeric_limits<double>::infinity(), 11111);
+    t.add(numeric_limits<float>::max(), numeric_limits<double>::max(), 11111);
+    t.add(numeric_limits<float>::infinity(), numeric_limits<double>::infinity(), 11111);
     t.add(12345.0, 12345.0, 11111);
 
     FloatTable3::Query q1 = t.where();
     float a1 = q1.col_float.maximum();
     double a2 = q1.col_double.maximum();
-    CHECK_EQUAL(std::numeric_limits<float>::infinity(), a1);
-    CHECK_EQUAL(std::numeric_limits<double>::infinity(), a2);
+    CHECK_EQUAL(numeric_limits<float>::infinity(), a1);
+    CHECK_EQUAL(numeric_limits<double>::infinity(), a2);
 
 
     FloatTable3::Query q2 = t.where();
@@ -1323,6 +1316,28 @@ TEST(TestQueryFloat)
     CHECK_EQUAL(1.13f, q2.col_float.minimum());
     CHECK_EQUAL(3.20, q2.col_double.maximum());
     CHECK_EQUAL(2.21, q2.col_double.minimum());
+
+    size_t count = 0;
+    // ... NO conditions
+    CHECK_EQUAL(1.20f, t.where().col_float.maximum(&count));
+    CHECK_EQUAL(5, count);
+    CHECK_EQUAL(1.10f, t.where().col_float.minimum(&count));
+    CHECK_EQUAL(5, count);
+    CHECK_EQUAL(3.20, t.where().col_double.maximum(&count));
+    CHECK_EQUAL(5, count);
+    CHECK_EQUAL(2.20, t.where().col_double.minimum(&count));
+    CHECK_EQUAL(5, count);
+
+    // ... with conditions
+    CHECK_EQUAL(1.20f, q2.col_float.maximum(&count));
+    CHECK_EQUAL(2, count);
+    CHECK_EQUAL(1.13f, q2.col_float.minimum(&count));
+    CHECK_EQUAL(2, count);
+    CHECK_EQUAL(3.20, q2.col_double.maximum(&count));
+    CHECK_EQUAL(2, count);
+    CHECK_EQUAL(2.21, q2.col_double.minimum(&count));
+    CHECK_EQUAL(2, count);
+
 }
 
 
@@ -1546,11 +1561,11 @@ TEST(TestQueryFindAll_range_or_monkey2)
 
         CHECK_EQUAL(s1, s2);
         for (size_t t = 0; t < a.size(); t++) {
-            size_t i1 = a.GetAsSizeT(t);
+            size_t i1 = to_size_t(a.get(t));
             size_t i2 = tv1.get_source_ndx(t);
             CHECK_EQUAL(i1, i2);
         }
-        a.Destroy();
+        a.destroy();
     }
 
 }
@@ -2738,7 +2753,7 @@ TEST(TestQueryFindAll_ContainsUNICODE)
 TEST(TestQuerySyntaxCheck)
 {
     TupleTableType ttt;
-    std::string s;
+    string s;
 
     ttt.add(1, "a");
     ttt.add(2, "a");

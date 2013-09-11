@@ -405,7 +405,7 @@ EOF
     "install-shared")
         require_config || exit 1
         install_prefix="$(get_config_param "install-prefix")" || exit 1
-        make install DESTDIR="$DESTDIR" prefix="$install_prefix" INSTALL_FILTER=shared-libs || exit 1
+        make install DESTDIR="$DESTDIR" prefix="$install_prefix" INSTALL_FILTER=shared-libs,progs || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
@@ -416,7 +416,7 @@ EOF
     "install-devel")
         require_config || exit 1
         install_prefix="$(get_config_param "install-prefix")" || exit 1
-        make install DESTDIR="$DESTDIR" prefix="$install_prefix" INSTALL_FILTER=static-libs,progs,headers || exit 1
+        make install DESTDIR="$DESTDIR" prefix="$install_prefix" INSTALL_FILTER=static-libs,dev-progs,headers || exit 1
         echo "Done installing"
         exit 0
         ;;
@@ -435,7 +435,7 @@ EOF
     "uninstall-shared")
         require_config || exit 1
         install_prefix="$(get_config_param "install-prefix")" || exit 1
-        make uninstall prefix="$install_prefix" INSTALL_FILTER=shared-libs || exit 1
+        make uninstall prefix="$install_prefix" INSTALL_FILTER=shared-libs,progs || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
@@ -446,7 +446,7 @@ EOF
     "uninstall-devel")
         require_config || exit 1
         install_prefix="$(get_config_param "install-prefix")" || exit 1
-        make uninstall prefix="$install_prefix" INSTALL_FILTER=static-libs,progs,extra || exit 1
+        make uninstall prefix="$install_prefix" INSTALL_FILTER=static-libs,dev-progs,extra || exit 1
         echo "Done uninstalling"
         exit 0
         ;;
@@ -924,6 +924,7 @@ EOF
                 grep -v -f "$TEMP_DIR/transfer/exclude.bre" "$TEMP_DIR/transfer/files2" >"$TEMP_DIR/transfer/files3" || exit 1
                 tar czf "$TEMP_DIR/transfer/core.tar.gz" -T "$TEMP_DIR/transfer/files3" || exit 1
                 (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/transfer/core.tar.gz") || exit 1
+                (cd "$PKG_DIR/tightdb" && pandoc README.md -o README.pdf) || exit 1
                 printf "\nNO_BUILD_ON_INSTALL = 1\n" >> "$PKG_DIR/tightdb/config.mk"
                 INST_HEADERS="$(cd src/tightdb && make get-inst-headers)" || exit 1
                 INST_LIBRARIES="$(cd src/tightdb && make get-inst-libraries)" || exit 1
@@ -1674,6 +1675,7 @@ EOF
         grep -v -f "$TEMP_DIR/exclude.bre" "$TEMP_DIR/files2" >"$TEMP_DIR/files3" || exit 1
         tar czf "$TEMP_DIR/archive.tar.gz" -T "$TEMP_DIR/files3" || exit 1
         (cd "$TARGET_DIR" && tar xzf "$TEMP_DIR/archive.tar.gz") || exit 1
+        (cd "$TARGET_DIR" && pandoc README.md -o README.pdf) || exit 1
         exit 0
         ;;
 

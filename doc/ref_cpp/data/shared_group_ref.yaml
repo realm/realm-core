@@ -1,5 +1,5 @@
 #
-# C++ reference documentation for Shared Group class
+# C++ reference documentation for the SharedGroup class.
 #
 
 ID         : class_shared_group
@@ -8,7 +8,7 @@ SUMMARY    : &g_shared_group_summary
              Sharing groups
 DESCR      : &g_shared_group_descr
              >
-             Database files can be shared across running applications.
+             Database files can be shared between running applications.
 
              When two threads or processes want to access the same
              database file, they must each create their own
@@ -29,7 +29,7 @@ DESCR      : &g_shared_group_descr
              Processes that share a database file must reside on
              the same host.
 
-             Moreover, the class also provide a transactional
+             Moreover, the class also provides a transactional
              interface to TightDB. Transactions are divided into
              read and write transactions. While read transactions
              do not modify the table and thereby the group, write
@@ -48,7 +48,8 @@ CATEGORIES:
       NAMES    : SharedGroup
       SUMMARY  : &g_shared_group_constructor_summary
                  Create a shared group.
-      DESCR    : &g_shared_group_constructor_descr
+      DESCR    :
+      - TEXT   : &g_shared_group_constructor_descr
                  >
                  Open a shared group (will be created if it does not already exist).
 
@@ -57,22 +58,25 @@ CATEGORIES:
 
                  If your data is transient, and does not need to persist to disk (like for caching or
                  shared state between processes). You can open the shared group in mem-only mode. Then the
-                 file will just be used for identification and backing and will be removed again when there
+                 file will just be used for identification and backing; it will be removed when there
                  are no more processes using it.
 
                  Note that a shared group can only be opened in the mode it was created in.
 
+      - TEXT   : &g_shared_group_constructor_descr_unattached
+                 >
                  A SharedGroup may also be constructed in an unattached
-                 state (2). See open() and is_attached() for more on
-                 this.
-      SIGNATURE: >
-                 SharedGroup(const std::string& file, bool no_create = false, DurabilityLevel dlevel);
-                 SharedGroup(unattached_tag);
+                 state (2). See {@link g_shared_group_open} and
+                 {@link g_shared_group_is_attached} for more on this.
+      ENUM_SIG :
+      - SIG    : >
+                 SharedGroup(const std::string& path, bool no_create = false,
+                             DurabilityLevel dlevel = durability_Full);
+      - SIG    : SharedGroup(unattached_tag);
       PARAMS:
-      - NAME   : file
+      - NAME   : path
         TYPES  : const std::string&
-        DESCR  : &g_shared_group_constructor_parm1_descr
-                 Filesystem path of the TightDB database file to be opened.
+        DESCR  : *g_open_filesystem_path_descr
       - NAME   : no_create
         TYPES  : bool
         DESCR  : &g_shared_group_constructor_parm2_descr
@@ -87,13 +91,28 @@ CATEGORIES:
         DESCR  : &g_shared_group_constructor_return1_descr
                  A shared group.
       THROWS:
-      - EXCEPT : File::AccessError
-        DESCR  : &g_shared_group_constructor_throws_descr
-                 If the file could not be opened. If the reason
-                 corresponds to one of the exception types that are
-                 derived from File::AccessError, the derived exception
-                 type is thrown. Note that InvalidDatabase is among
-                 these derived exception types.
+      - EXCEPT : &cpp_permission_denied_except
+                 File::PermissionDenied
+        DESCR  : &g_permission_denied_descr
+                 >
+                 The user has insufficient permissions to perform the IO
+                 operation.
+      - EXCEPT : &cpp_not_found_except
+                 File::NotFound
+        DESCR  : &g_not_found_descr
+                 A part of the path was not found.
+      - EXCEPT : &cpp_invalid_database_except
+                 InvalidDatabase
+        DESCR  : &g_shared_group_invalid_database_descr
+                 The file does not appear to contain a valid TightDB database.
+      - EXCEPT : &cpp_access_error_except
+                 File::AccessError
+        DESCR  : &g_access_error_descr
+                 For some reason, we can't access the database.
+      - EXCEPT : &cpp_runtime_error_except
+                 std::runtime_error
+        DESCR  : &g_runtime_error_descr
+                 A serious error occurred.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_constructor
         DESCR  :
@@ -103,6 +122,8 @@ CATEGORIES:
       NAMES    : open
       SUMMARY  : &g_shared_group_open_summary
                  Is this SharedGroup instance in its attached state?
+      SIGNATURE: >
+                 open(const std::string& file, bool no_create = false, DurabilityLevel dlevel = durability_Full);
       DESCR    : &g_shared_group_open_descr
                  Attach this SharedGroup instance to the specified
                  database file.
@@ -127,10 +148,9 @@ CATEGORIES:
                  Calling open() on a SharedGroup instance that is
                  already in the attached state has undefined behavior.
       PARAMS:
-      - NAME   : file
+      - NAME   : path
         TYPES  : const std::string&
-        DESCR  : &g_shared_group_open_parm1_descr
-                 Filesystem path of the TightDB database file to be opened.
+        DESCR  : *g_open_filesystem_path_descr
       - NAME   : no_create
         TYPES  : bool
         DESCR  : &g_shared_group_open_parm2_descr
@@ -215,7 +235,9 @@ CATEGORIES:
       SUMMARY  : &g_shared_group_rollback_summary
                  Rollback a transaction.
       DESCR    : &g_shared_group_rollback_descr
-                 This method closes a transaction and discards all changes done to the shared group.
+                 This method closes a transaction and discards all changes done to the shared group,
+                 unless a commit has already been done. It is ok to call rollback multiple times. 
+                 Any additional calls to rollback following a commit or rollback are treated as no-ops.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_rollback
         DESCR  :
@@ -265,7 +287,7 @@ CATEGORIES:
                  Initiate reading from a shared group.
       DESCR    : &g_shared_group_begin_read_descr
                  >
-                 Begin reading from a shared group. During the read transaction, 
+                 Begin reading from a shared group. During the read transaction,
                  you have a fully consistent immutable view of the group.
       CONST    : True
       RETURN:
@@ -277,10 +299,11 @@ CATEGORIES:
   - g_shared_group_end_read:
       NAMES    : end_read
       SUMMARY  : &g_shared_group_end_read_summary
-                 Terminate read transaction.
+                 Terminate read transaction. It is ok to call end_read multiple times, the
+                 first call will terminate the transaction. Any additional calls are treated
+                 as no-ops
       DESCR    : &g_shared_group_end_read_descr
                  This method terminates the read transaction.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_end_read
         DESCR  :
-

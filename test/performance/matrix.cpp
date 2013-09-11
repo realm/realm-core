@@ -240,7 +240,7 @@ int main()
 
                 const size_t expected = (i == 0) ? 0 : 1;
 
-                timer.start();
+                timer.reset();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         const size_t res = q.count();
@@ -252,7 +252,7 @@ int main()
                 cout << "TightDB: Column "<<i<<": Sparse:  "<<timer<<"\n";
 
                 // Search with column intrinsic functions
-                timer.start();
+                timer.reset();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         size_t res;
@@ -289,7 +289,7 @@ int main()
                 size_t expected = row_count;
                 if (i == 0) ++expected;
 
-                timer.start();
+                timer.reset();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         const size_t res = q.count();
@@ -301,7 +301,7 @@ int main()
                 cout << "TightDB: Column "<<i<<": Many:    "<<timer<<"\n";
 
                 // Search with column intrinsic functions
-                timer.start();
+                timer.reset();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         size_t res;
@@ -335,7 +335,7 @@ int main()
                 else if (i == 6) expected = row_count * 0x7FFFFFFFLL;
                 else if (i == 7) expected = row_count * 0x7FFFFFFFFFFFFFFFLL;
 
-                timer.start();
+                timer.reset();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         size_t res;
@@ -368,7 +368,7 @@ int main()
                 else if (i == 6) expected = row_count * 0x7FFFFFFFLL;
                 else if (i == 7) expected = row_count * 0x7FFFFFFFFFFFFFFFLL;
 
-                timer.start();
+                timer.reset();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         int64_t res;
@@ -398,7 +398,7 @@ int main()
                 {
                     const size_t expected = 1;
 
-                    timer.start();
+                    timer.reset();
                     {
                         for (size_t n = 0; n < rounds; ++n) {
                             size_t res;
@@ -422,7 +422,7 @@ int main()
 
                     const size_t expected = 1;
 
-                    timer.start();
+                    timer.reset();
                     {
                         for (size_t n = 0; n < rounds; ++n) {
                             const size_t res = q.count();
@@ -444,7 +444,7 @@ int main()
                     const size_t expected = i == 2 ? row_count / 2 : row_count;
                     const size_t len = table.size();
 
-                    timer.start();
+                    timer.reset();
                     {
                         for (size_t n = 0; n < rounds; ++n) {
                             size_t res;
@@ -468,7 +468,7 @@ int main()
 
                     const size_t expected = i == 2 ? row_count / 2 : row_count;
 
-                    timer.start();
+                    timer.reset();
                     {
                         for (size_t n = 0; n < rounds; ++n) {
                             const size_t res = q.count();
@@ -523,7 +523,7 @@ int main()
             {
                 const size_t expected = (i == 0) ? 0 : 1;
 
-                timer.start();
+                timer.reset();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         size_t res;
@@ -549,7 +549,7 @@ int main()
                 size_t expected = row_count;
                 if (i == 0) ++expected;
 
-                timer.start();
+                timer.reset();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         size_t res;
@@ -572,7 +572,7 @@ int main()
 
             // Do a sum over entire column (all matches)
             {
-                timer.start();
+                timer.reset();
                 for (size_t n = 0; n < rounds; ++n) {
                     int64_t expected;
                     if      (i == 0) expected = 0;
@@ -640,7 +640,7 @@ int main()
             {
                 const size_t expected = 1;
 
-                timer.start();
+                timer.reset();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         size_t res;
@@ -660,7 +660,7 @@ int main()
             {
                 const size_t expected = row_count;
 
-                timer.start();
+                timer.reset();
                 {
                     for (size_t n = 0; n < rounds; ++n) {
                         size_t res;
@@ -719,7 +719,7 @@ int main()
             TestTable::Query q = table.where().bits_1.equal(1).bits_2.equal(3);
             const size_t expected = row_count / 4;
 
-            timer.start();
+            timer.reset();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count();
@@ -736,7 +736,7 @@ int main()
             TestTable::Query q = table.where().bits_1.equal(1).bits_2.equal(3).bits_4.equal(15);
             const size_t expected = row_count / 8;
 
-            timer.start();
+            timer.reset();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count();
@@ -756,7 +756,7 @@ int main()
                                               .bits_8.equal(0x7FLL);
             const size_t expected = row_count / 16;
 
-            timer.start();
+            timer.reset();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count();
@@ -777,7 +777,7 @@ int main()
                                               .bits_16.equal(0x7FFFLL);
             const size_t expected = row_count / 32;
 
-            timer.start();
+            timer.reset();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count();
@@ -799,7 +799,7 @@ int main()
                                               .bits_32.equal(0x7FFFFFFFLL);
             const size_t expected = row_count / 64;
 
-            timer.start();
+            timer.reset();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count();
@@ -822,7 +822,7 @@ int main()
                                               .bits_64.equal(0x7FFFFFFFFFFFFFFFLL);
             const size_t expected = row_count / 128;
 
-            timer.start();
+            timer.reset();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = q.count();
@@ -856,12 +856,12 @@ int main()
             // Create strings that can be auto-enumerated
             const string enum_str = (i % 2) ? "monday" : "tuesday";
 
-            const int64_t v1 = (i % 2) ? 0 : 1;
-            const int64_t v2 = (i % 4) ? 0 : 3;
-            const int64_t v3 = (i % 8) ? 0 : 15;
-            const int64_t v4 = (i % 16) ? 0 : 0x7FLL;
-            const int64_t v5 = (i % 32) ? 0 : 0x7FFFLL;
-            const int64_t v6 = (i % 64) ? 0 : 0x7FFFFFFFLL;
+            const bool    v1 = (i %   2) ? false : true;
+            const int     v2 = (i %   4) ? 0 : 0x3;
+            const int     v3 = (i %   8) ? 0 : 0xF;
+            const int     v4 = (i %  16) ? 0 : 0x7F;
+            const int     v5 = (i %  32) ? 0 : 0x7FFF;
+            const int     v6 = (i %  64) ? 0 : 0x7FFFFFFF;
             const int64_t v7 = (i % 128) ? 0 : 0x7FFFFFFFFFFFFFFFLL;
 
             const TestStruct ts = {0, v1, v2, v3, v4, v5, v6, v7, short_str, long_str, enum_str};
@@ -874,7 +874,7 @@ int main()
         {
             const size_t expected = row_count / 4;
 
-            timer.start();
+            timer.reset();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns2());
@@ -890,7 +890,7 @@ int main()
         {
             const size_t expected = row_count / 8;
 
-            timer.start();
+            timer.reset();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns3());
@@ -906,7 +906,7 @@ int main()
         {
             const size_t expected = row_count / 16;
 
-            timer.start();
+            timer.reset();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns4());
@@ -922,7 +922,7 @@ int main()
         {
             const size_t expected = row_count / 32;
 
-            timer.start();
+            timer.reset();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns5());
@@ -938,7 +938,7 @@ int main()
         {
             const size_t expected = row_count / 64;
 
-            timer.start();
+            timer.reset();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns6());
@@ -954,7 +954,7 @@ int main()
         {
             const size_t expected = row_count / 128;
 
-            timer.start();
+            timer.reset();
             {
                 for (size_t n = 0; n < rounds; ++n) {
                     const size_t res = count_if(table.begin(), table.end(), columns7());

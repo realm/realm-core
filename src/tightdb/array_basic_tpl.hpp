@@ -24,107 +24,130 @@
 
 namespace tightdb {
 
-template<typename T>
-inline size_t BasicArray<T>::create_empty_basic_array(Allocator& alloc)
-{
-    const size_t capacity = Array::initial_capacity;
-    const MemRef mem_ref = alloc.Alloc(capacity); // Throws
-
-    init_header(static_cast<char*>(mem_ref.pointer), false, false, wtype_Multiply,
-                sizeof(T), 0, capacity);
-
-    return mem_ref.ref;
-}
-
-template<typename T>
-inline BasicArray<T>::BasicArray(ArrayParent *parent, size_t ndx_in_parent, Allocator& alloc):
+template<class T>
+inline BasicArray<T>::BasicArray(ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
     Array(alloc)
 {
-    const size_t ref = create_empty_basic_array(alloc); // Throws
-    init_from_ref(ref);
-    SetParent(parent, ndx_in_parent);
-    update_ref_in_parent();
+    create(); // Throws
+    set_parent(parent, ndx_in_parent);
+    update_parent(); // Throws
 }
 
-template<typename T>
-inline BasicArray<T>::BasicArray(size_t ref, ArrayParent *parent, size_t ndx_in_parent,
-                               Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
+template<class T>
+inline BasicArray<T>::BasicArray(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
+                                 Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
+{
+    // Manually create array as doing it in initializer list
+    // will not be able to call correct virtual functions
+    init_from_mem(mem);
+    set_parent(parent, ndx_in_parent);
+}
+
+template<class T>
+inline BasicArray<T>::BasicArray(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
+                                 Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
 {
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
     init_from_ref(ref);
-    SetParent(const_cast<ArrayParent *>(parent), ndx_in_parent);
+    set_parent(parent, ndx_in_parent);
 }
 
-template<typename T>
-inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT : Array(no_prealloc_tag())
+template<class T>
+inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT: Array(no_prealloc_tag())
 {
-}
-
-
-template<typename T>
-inline void BasicArray<T>::Clear()
-{
-    CopyOnWrite(); // Throws
-
-    // Truncate size to zero (but keep capacity and width)
-    m_len = 0;
-    set_header_len(0);
-}
-
-template<typename T>
-inline void BasicArray<T>::add(T value)
-{
-    Insert(m_len, value);
-}
-
-
-template<typename T> inline T BasicArray<T>::Get(std::size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    return *(reinterpret_cast<T*>(m_data) + ndx);
 }
 
 
 template<class T>
-inline T BasicArray<T>::column_get(const Array* root, std::size_t ndx) TIGHTDB_NOEXCEPT
+inline void BasicArray<T>::create()
 {
-    if (root->is_leaf()) return static_cast<const BasicArray*>(root)->Get(ndx);
-    std::pair<const char*, std::size_t> p = find_leaf(root, ndx);
-    const char* data = get_data_from_header(p.first);
-    return *(reinterpret_cast<const T*>(data) + p.second);
+    ref_type ref = create_empty_array(get_alloc()); // Throws
+    init_from_ref(ref);
 }
 
 
-template<typename T>
-inline void BasicArray<T>::Set(size_t ndx, T value)
+template<class T>
+inline ref_type BasicArray<T>::create_empty_array(Allocator& alloc)
 {
-    TIGHTDB_ASSERT(ndx < m_len);
+    std::size_t capacity = Array::initial_capacity;
+    MemRef mem_ref = alloc.alloc(capacity); // Throws
+
+    bool is_leaf = true;
+    bool has_refs = false;
+    int width = sizeof (T);
+    std::size_t size = 0;
+    init_header(mem_ref.m_addr, is_leaf, has_refs, wtype_Multiply, width, size, capacity);
+
+    return mem_ref.m_ref;
+}
+
+
+template<class T>
+inline void BasicArray<T>::clear()
+{
+    copy_on_write(); // Throws
+
+    // Truncate size to zero (but keep capacity and width)
+    m_size = 0;
+    set_header_size(0);
+}
+
+template<class T>
+inline void BasicArray<T>::add(T value)
+{
+    insert(m_size, value);
+}
+
+
+template<class T> inline T BasicArray<T>::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return *(reinterpret_cast<const T*>(m_data) + ndx);
+}
+
+
+template<class T>
+inline T BasicArray<T>::get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT
+{
+    const char* data = get_data_from_header(header);
+    // FIXME: This casting assumes that T can be aliged on an 8-bype
+    // boundary (since data is aligned on an 8-byte boundary.) This
+    // restricts portability. The same problem recurs several times in
+    // the remainder of this file.
+    return *(reinterpret_cast<const T*>(data) + ndx);
+}
+
+
+template<class T>
+inline void BasicArray<T>::set(std::size_t ndx, T value)
+{
+    TIGHTDB_ASSERT(ndx < m_size);
 
     // Check if we need to copy before modifying
-    CopyOnWrite(); // Throws
+    copy_on_write(); // Throws
 
     // Set the value
     T* data = reinterpret_cast<T*>(m_data) + ndx;
     *data = value;
 }
 
-template<typename T>
-void BasicArray<T>::Insert(size_t ndx, T value)
+template<class T>
+void BasicArray<T>::insert(std::size_t ndx, T value)
 {
-    TIGHTDB_ASSERT(ndx <= m_len);
+    TIGHTDB_ASSERT(ndx <= m_size);
 
     // Check if we need to copy before modifying
-    CopyOnWrite(); // Throws
+    copy_on_write(); // Throws
 
     // Make room for the new value
-    Alloc(m_len+1, m_width); // Throws
+    alloc(m_size+1, m_width); // Throws
 
     // Move values below insertion
-    if (ndx != m_len) {
-        char* const base = reinterpret_cast<char*>(m_data);
-        char* const src_begin = base + ndx*m_width;
-        char* const src_end   = base + m_len*m_width;
-        char* const dst_end   = src_end + m_width;
+    if (ndx != m_size) {
+        char* base = reinterpret_cast<char*>(m_data);
+        char* src_begin = base + ndx*m_width;
+        char* src_end   = base + m_size*m_width;
+        char* dst_end   = src_end + m_width;
         std::copy_backward(src_begin, src_end, dst_end);
     }
 
@@ -132,88 +155,82 @@ void BasicArray<T>::Insert(size_t ndx, T value)
     T* data = reinterpret_cast<T*>(m_data) + ndx;
     *data = value;
 
-     ++m_len;
+     ++m_size;
 }
 
-template<typename T>
-void BasicArray<T>::Delete(size_t ndx)
+template<class T>
+void BasicArray<T>::erase(std::size_t ndx)
 {
-    TIGHTDB_ASSERT(ndx < m_len);
+    TIGHTDB_ASSERT(ndx < m_size);
 
     // Check if we need to copy before modifying
-    CopyOnWrite(); // Throws
+    copy_on_write(); // Throws
 
     // move data under deletion up
-    if (ndx < m_len-1) {
-        char* const base = reinterpret_cast<char*>(m_data);
-        char* const dst_begin = base + ndx*m_width;
-        const char* const src_begin = dst_begin + m_width;
-        const char* const src_end   = base + m_len*m_width;
+    if (ndx < m_size-1) {
+        char* base = reinterpret_cast<char*>(m_data);
+        char* dst_begin = base + ndx*m_width;
+        const char* src_begin = dst_begin + m_width;
+        const char* src_end   = base + m_size*m_width;
         std::copy(src_begin, src_end, dst_begin);
     }
 
-    // Update length (also in header)
-    --m_len;
-    set_header_len(m_len);
+    // Update size (also in header)
+    --m_size;
+    set_header_size(m_size);
 }
 
-template<typename T>
-bool BasicArray<T>::Compare(const BasicArray<T>& c) const
+template<class T>
+bool BasicArray<T>::compare(const BasicArray<T>& a) const
 {
-    for (size_t i = 0; i < size(); ++i) {
-        if (Get(i) != c.Get(i))
-            return false;
-    }
-    return true;
+    size_t n = size();
+    if (a.size() != n) return false;
+    const T* data_1 = reinterpret_cast<const T*>(m_data);
+    const T* data_2 = reinterpret_cast<const T*>(a.m_data);
+    return std::equal(data_1, data_1+n, data_2);
 }
 
 
-template<typename T>
-size_t BasicArray<T>::CalcByteLen(size_t count, size_t /*width*/) const
+template<class T>
+std::size_t BasicArray<T>::CalcByteLen(std::size_t count, std::size_t) const
 {
     // FIXME: This arithemtic could overflow. Consider using <tightdb/safe_int_ops.hpp>
-    return 8 + (count * sizeof(T));
+    return header_size + (count * sizeof (T));
 }
 
-template<typename T>
-size_t BasicArray<T>::CalcItemCount(size_t bytes, size_t /*width*/) const TIGHTDB_NOEXCEPT
+template<class T>
+std::size_t BasicArray<T>::CalcItemCount(std::size_t bytes, std::size_t) const TIGHTDB_NOEXCEPT
 {
-    // fixme: ??? what about width = 0? return -1?
+    // FIXME: ??? what about width = 0? return -1?
 
-    const size_t bytes_without_header = bytes - 8;
-    return bytes_without_header / sizeof(T);
+    std::size_t bytes_without_header = bytes - header_size;
+    return bytes_without_header / sizeof (T);
 }
 
-template<typename T>
-size_t BasicArray<T>::Find(T target, size_t start, size_t end) const
+template<class T>
+std::size_t BasicArray<T>::find(T value, std::size_t begin, std::size_t end) const
 {
-    if (end == (size_t)-1)
-        end = m_len;
-    if (start >= end)
-        return not_found;
-    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
-    if (m_len == 0)
-        return not_found; // empty list
-
-    for (size_t i = start; i < end; ++i) {
-        if (target == Get(i))
-            return i;
-    }
-    return not_found;
+    if (end == npos)
+        end = m_size;
+    TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
+    const T* data = reinterpret_cast<const T*>(m_data);
+    const T* i = std::find(data + begin, data + end, value);
+    return i == data + end ? not_found : i - data;
 }
 
-template<typename T>
-size_t BasicArray<T>::find_first(T value, size_t start, size_t end) const
+template<class T>
+inline std::size_t BasicArray<T>::find_first(T value, std::size_t begin, std::size_t end) const
 {
-    return Find(value, start, end);
+    return this->find(value, begin, end);
 }
 
-template<typename T>
-void BasicArray<T>::find_all(Array& result, T value, size_t add_offset, size_t start, size_t end)
+template<class T>
+void BasicArray<T>::find_all(Array& result, T value, std::size_t add_offset,
+                             std::size_t begin, std::size_t end) const
 {
-    size_t first = start - 1;
+    std::size_t first = begin - 1;
     for (;;) {
-        first = Find(value, first + 1, end);
+        first = this->find(value, first + 1, end);
         if (first != not_found)
             result.add(first + add_offset);
         else
@@ -221,53 +238,42 @@ void BasicArray<T>::find_all(Array& result, T value, size_t add_offset, size_t s
     }
 }
 
-template<typename T>
-size_t BasicArray<T>::count(T value, size_t start, size_t end) const
+template<class T>
+std::size_t BasicArray<T>::count(T value, std::size_t begin, std::size_t end) const
 {
-    size_t count = 0;
-    size_t lastmatch = start - 1;
-    for (;;) {
-        lastmatch = Find(value, lastmatch+1, end);
-        if (lastmatch != not_found)
-            ++count;
-        else
-            break;
-    }
-    return count;
+    if (end == npos)
+        end = m_size;
+    TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
+    const T* data = reinterpret_cast<const T*>(m_data);
+    return std::count(data + begin, data + end, value);
 }
 
 #if 0
 // currently unused
-template<typename T>
-double BasicArray<T>::sum(size_t start, size_t end) const
+template<class T>
+double BasicArray<T>::sum(std::size_t begin, std::size_t end) const
 {
-    if (end == (size_t)-1)
-        end = m_len;
-    if (m_len == 0)
-        return 0;
-    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
-
-    R sum = 0;
-    for (size_t i = start; i < end; ++i) {
-        sum += Get(i);
-    }
-    return sum;
+    if (end == npos)
+        end = m_size;
+    TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
+    const T* data = reinterpret_cast<const T*>(m_data);
+    return std::accumulate(data + begin, data + end, double(0));
 }
 #endif
 
-template <typename T> template<bool find_max>
-bool BasicArray<T>::minmax(T& result, size_t start, size_t end) const
+template<class T> template<bool find_max>
+bool BasicArray<T>::minmax(T& result, std::size_t begin, std::size_t end) const
 {
-    if (end == (size_t)-1)
-        end = m_len;
-    if (m_len == 0)
+    if (end == npos)
+        end = m_size;
+    if (m_size == 0)
         return false;
-    TIGHTDB_ASSERT(start < m_len && end <= m_len && start < end);
+    TIGHTDB_ASSERT(begin < m_size && end <= m_size && begin < end);
 
-    T m = Get(start);
-    ++start;
-    for (; start < end; ++start) {
-        const T val = Get(start);
+    T m = get(begin);
+    ++begin;
+    for (; begin < end; ++begin) {
+        T val = get(begin);
         if (find_max ? val > m : val < m)
             m = val;
     }
@@ -275,16 +281,64 @@ bool BasicArray<T>::minmax(T& result, size_t start, size_t end) const
     return true;
 }
 
-template <typename T>
-bool BasicArray<T>::maximum(T& result, size_t start, size_t end) const
+template<class T>
+bool BasicArray<T>::maximum(T& result, std::size_t begin, std::size_t end) const
 {
-    return minmax<true>(result, start, end);
+    return minmax<true>(result, begin, end);
 }
 
-template <typename T>
-bool BasicArray<T>::minimum(T& result, size_t start, size_t end) const
+template<class T>
+bool BasicArray<T>::minimum(T& result, std::size_t begin, std::size_t end) const
 {
-    return minmax<false>(result, start, end);
+    return minmax<false>(result, begin, end);
+}
+
+
+template<class T>
+ref_type BasicArray<T>::btree_leaf_insert(size_t ndx, T value, TreeInsertBase& state)
+{
+    size_t leaf_size = size();
+    TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_LIST_SIZE);
+    if (leaf_size < ndx) ndx = leaf_size;
+    if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_LIST_SIZE)) {
+        insert(ndx, value);
+        return 0; // Leaf was not split
+    }
+
+    // Split leaf node
+    BasicArray<T> new_leaf(0, 0, get_alloc());
+    if (ndx == leaf_size) {
+        new_leaf.add(value);
+        state.m_split_offset = ndx;
+    }
+    else {
+        // FIXME: Could be optimized by first resizing the target
+        // array, then copy elements with std::copy().
+        for (size_t i = ndx; i != leaf_size; ++i) {
+            new_leaf.add(get(i));
+        }
+        resize(ndx);
+        add(value);
+        state.m_split_offset = ndx + 1;
+    }
+    state.m_split_size = leaf_size + 1;
+    return new_leaf.get_ref();
+}
+
+template<class T>
+inline std::size_t BasicArray<T>::lower_bound(T value) const TIGHTDB_NOEXCEPT
+{
+    const T* begin = reinterpret_cast<const T*>(m_data);
+    const T* end = begin + size();
+    return std::lower_bound(begin, end, value) - begin;
+}
+
+template<class T>
+inline std::size_t BasicArray<T>::upper_bound(T value) const TIGHTDB_NOEXCEPT
+{
+    const T* begin = reinterpret_cast<const T*>(m_data);
+    const T* end = begin + size();
+    return std::upper_bound(begin, end, value) - begin;
 }
 
 

@@ -120,6 +120,16 @@
 #else
 #  define TIGHTDB_NOEXCEPT
 #endif
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_6
+#  define TIGHTDB_NOEXCEPT_IF(cond) noexcept(cond)
+#else
+#  define TIGHTDB_NOEXCEPT_IF(cond)
+#endif
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_6
+#  define TIGHTDB_NOEXCEPT_OR_NOTHROW noexcept
+#else
+#  define TIGHTDB_NOEXCEPT_OR_NOTHROW throw()
+#endif
 
 
 /* Support for C++11 explicit virtual overrides */
@@ -162,6 +172,16 @@
 #  define TIGHTDB_UNLIKELY(expr) (expr)
 #  define TIGHTDB_LIKELY(expr)   (expr)
 #endif
+
+
+#if defined(__GNUC__) || defined(__HP_aCC)
+    #define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+    #define TIGHTDB_FORCEINLINE __forceinline
+#else
+    #define TIGHTDB_FORCEINLINE inline
+#endif
+
 
 
 #endif /* TIGHTDB_CONFIG_H */

@@ -65,6 +65,7 @@ public:
 
     /// Initialize from a zero terminated C style string.
     StringData(const char* c_str) TIGHTDB_NOEXCEPT;
+    ~StringData() TIGHTDB_NOEXCEPT {}
 
     char operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
 
@@ -74,8 +75,13 @@ public:
     friend bool operator==(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
     friend bool operator!=(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
 
+    //@{
     /// Trivial bytewise lexicographical comparison.
     friend bool operator<(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
+    friend bool operator>(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
+    friend bool operator<=(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
+    friend bool operator>=(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
+    //@}
 
     bool begins_with(StringData) const TIGHTDB_NOEXCEPT;
     bool ends_with(StringData) const TIGHTDB_NOEXCEPT;
@@ -127,6 +133,21 @@ inline bool operator<(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
 {
     return std::lexicographical_compare(a.m_data, a.m_data + a.m_size,
                                         b.m_data, b.m_data + b.m_size);
+}
+
+inline bool operator>(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
+{
+    return b < a;
+}
+
+inline bool operator<=(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
+{
+    return !(b < a);
+}
+
+inline bool operator>=(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
+{
+    return !(a < b);
 }
 
 inline bool StringData::begins_with(StringData d) const TIGHTDB_NOEXCEPT

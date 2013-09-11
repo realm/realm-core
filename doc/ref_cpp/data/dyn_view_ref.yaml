@@ -1,5 +1,5 @@
 #
-# C++ reference documentation for TableView class
+# C++ reference documentation for the TableView (dynamic) class.
 #
 
 ID         : class_dyn_tableview
@@ -26,15 +26,15 @@ DESCR      : &g_dyn_view_intro_descr
 
              It is possible to create multiple views for the table as
              long as you do not change the original table.
-             
-             NOTICE: 
+
+             NOTICE:
              For all methods which takes row and column index as parameters,
              you must ensure that these are in a valid range.
              You must also ensure that you use the correct type of method for
              the correct type of column. I.e. it's invalid to use 'getString(...)'
-             with a column index which is of Boolean type - it must be of 'String' 
+             with a column index which is of Boolean type - it must be of 'String'
              type and so forth.
-             
+
 SEE        :
 EXAMPLES   :
 - DESCR:
@@ -74,7 +74,9 @@ CATEGORIES :
       NAME     : clear
       SUMMARY  : *g_dyn_table_clear_summary
       DESCR    : &g_dyn_view_clear_descr
-                 This method will remove all rows in a view.
+                 >
+                 This method will remove all rows in a view. This implies that
+                 the rows in the originating table will be removed.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_clear
         DESCR  :
@@ -161,6 +163,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_get_source_ndx
         DESCR  :
+
   - g_dyn_view_remove_row:
       NAME     : remove
       SUMMARY  : *g_dyn_table_remove_row_summary
@@ -174,6 +177,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_remove
         DESCR  :
+
   - g_dyn_view_remove_last_row:
       NAME     : remove_last
       SUMMARY  : *g_dyn_table_remove_last_row_summary
@@ -283,7 +287,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_set_xxx
         DESCR  :
-        
+
 - Sub-tables:
   METHODS:
   - g_dyn_view_get_subtable_size:
@@ -319,8 +323,8 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_clear_subtable
         DESCR  :
-        
-        
+
+
 - Searching:
   METHODS:
   - g_dyn_view_find_first_bool:
@@ -362,7 +366,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_find_first_xxx
         DESCR  :
-        
+
   - g_dyn_view_find_all_bool:
       NAME     : find_all_bool
   - g_dyn_view_find_all_int:
@@ -448,8 +452,13 @@ CATEGORIES :
       NAMES    : [sum, sum_float, sum_double]
       SUMMARY  : &g_dyn_view_sum_summary
                  Calculates the sum.
-      DESCR    : &g_dyn_view_sum_descr
+      DESCR    :
+      - TEXT   : &g_dyn_view_sum_descr
                  Calculates the sum of a column.
+      - TEXT   : >
+                 As the sum of many <code>float</code>
+                 values can be greater than the maximum value of the type, a <code>double</code>
+                 is returned.
       CONST    : True
       SIGNATURE: |
                  int64_t sum(size_t column_ndx) const;
@@ -460,8 +469,9 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : *g_dyn_view_column_index_descr
       RETURN:
-        TYPES  : [int64_t, float, double]
-        DESCR  : The sum.
+        TYPES  : [int64_t, double, double]
+        DESCR  : >
+                 The sum of values of the cells.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_sum
         DESCR  :
@@ -524,10 +534,14 @@ CATEGORIES :
                  >
                  This method will convert a view and its columns and rows
                  to a JSON compatible representation.
-                 
+
                  The JavaScript Object Notation (<a
                  href="http://json.org">JSON</a>) is useful for
-                 web/mobile applications and serialization. 
+                 web/mobile applications and serialization.
+
+                 A table (and subtables) will be formatted as a array of rows, and row will
+                 be formatted as an object.
+      CONST    : true
       PARAMS:
       - NAME   : out
         TYPES  : std::ostream&

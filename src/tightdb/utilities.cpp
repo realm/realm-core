@@ -44,27 +44,35 @@ void cpuid_init()
 }
 
 
+// FIXME: Move all these rounding functions to the header file to
+// allow inlining.
 void* round_up(void* p, size_t align)
 {
-    size_t r = ((size_t)p % align == 0 ? 0 : align - (size_t)p % align);
-    return (char *)p + r;
+    // FIXME: The C++ standard does not guarantee that a pointer can
+    // be stored in size_t. Use uintptr_t instead. The problem with
+    // uintptr_t, is that is is not part of C++03.
+    size_t r = size_t(p) % align == 0 ? 0 : align - size_t(p) % align;
+    return static_cast<char *>(p) + r;
 }
 
 void* round_down(void* p, size_t align)
 {
-    size_t r = (size_t)p;
-    return (void *)(r & (~(align - 1)));
+    // FIXME: The C++ standard does not guarantee that a pointer can
+    // be stored in size_t. Use uintptr_t instead. The problem with
+    // uintptr_t, is that is is not part of C++03.
+    size_t r = size_t(p);
+    return reinterpret_cast<void *>(r & ~(align - 1));
 }
 
 size_t round_up(size_t p, size_t align)
 {
-    size_t r = ((size_t)p % align == 0 ? 0 : align - (size_t)p % align);
+    size_t r = p % align == 0 ? 0 : align - p % align;
     return p + r;
 }
 
 size_t round_down(size_t p, size_t align)
 {
-    size_t r = (size_t)p;
+    size_t r = p;
     return r & (~(align - 1));
 }
 
@@ -91,7 +99,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
     while (t->remainder_len < 8 && len > 0)
     {
         t->remainder = t->remainder >> 8;
-        t->remainder = t->remainder | (unsigned long long)*data << (7*8);
+        t->remainder = t->remainder | static_cast<unsigned long long>(*data) << (7*8);
         t->remainder_len++;
         data++;
         len--;
@@ -111,13 +119,13 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
     while (len >= 8)
     {
 #ifdef TIGHTDB_X86_OR_X64
-        t->a_val += (*(unsigned long long *)data) * t->b_val;
+        t->a_val += (*reinterpret_cast<unsigned long long*>(data)) * t->b_val;
 #else
         unsigned long long l = 0;
         for (unsigned int i = 0; i < 8; i++)
         {
             l = l >> 8;
-            l = l | (unsigned long long)*(data + i) << (7*8);
+            l = l | static_cast<unsigned long long>(*(data + i)) << (7*8);
         }
         t->a_val += l * t->b_val;
 #endif
@@ -129,7 +137,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
     while (len > 0)
     {
         t->remainder = t->remainder >> 8;
-        t->remainder = t->remainder | (unsigned long long)*data << (7*8);
+        t->remainder = t->remainder | static_cast<unsigned long long>(*data) << (7*8);
         t->remainder_len++;
         data++;
         len--;
@@ -139,8 +147,11 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
     return;
 }
 
-// popcount
-#if defined(_MSC_VER) && _MSC_VER >= 1500
+// popcount, counts number of set (1) bits in argument. Intrinsics has been disabled because it's just 10-20% faster 
+// than fallback method, so a runtime-detection of support would be more expensive in total. Popcount is supported
+// with SSE42 but not with SSE3, and we don't want separate builds for each architecture - hence a runtime check would
+// be required.
+#if 0 // defined(_MSC_VER) && _MSC_VER >= 1500
     #include <intrin.h>
     int fast_popcount32(int32_t x)
     {
@@ -157,7 +168,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
             return __popcnt((unsigned)(x)) + __popcnt((unsigned)(x >> 32));
         }
     #endif
-#elif defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
+#elif 0 // defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
     #define fast_popcount32 __builtin_popcount
     #if ULONG_MAX == 0xffffffff
         int fast_popcount64(int64_t x)
@@ -176,13 +187,13 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
     };
 
     // Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
-    inline int fast_popcount32(uint32_t x)
+    int fast_popcount32(int32_t x)
     {
         return a_popcount_bits[255 & x] + a_popcount_bits[255 & x>> 8] + a_popcount_bits[255 & x>>16] + a_popcount_bits[255 & x>>24];
     }
-    inline int fast_popcount64(uint64_t x)
+    int fast_popcount64(int64_t x)
     {
-        return fast_popcount32(x) + fast_popcount32(x >> 32);
+        return fast_popcount32(static_cast<int32_t>(x)) + fast_popcount32(static_cast<int32_t>(x >> 32));
     }
 
 #endif // select best popcount implementations

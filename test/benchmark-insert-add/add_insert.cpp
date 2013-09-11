@@ -1,13 +1,19 @@
-#include <tightdb.hpp>
-#include <tightdb/group_shared.hpp>
+#include <iostream>
+
 #include <unistd.h>
-#include <time.h>
-#include <cstdio>
+
+#include <tightdb.hpp>
+
+#include "../util/timer.hpp"
 
 using namespace tightdb;
 using namespace std;
 
-enum Mode {USE_SHARED, USE_GROUP, USE_TABLE};
+enum Mode {
+    mode_UseShared,
+    mode_UseGroup,
+    mode_UseTable
+};
 
 TIGHTDB_TABLE_5(TestTable,
                 x,  Int,
@@ -16,12 +22,9 @@ TIGHTDB_TABLE_5(TestTable,
                 s2, String,
                 s3, String)
 
-double delta_time(struct timespec ts_1, struct timespec ts_2) {
-    return (double)ts_2.tv_sec+1e-9*(double)ts_2.tv_nsec - ((double)ts_1.tv_sec+1e-9*(double)ts_1.tv_nsec);
-}
 
-
-void usage(void) {
+void usage()
+{
     cout << "Usage: add_insert [-h] [-s mem|full] [-a]" << endl;
     cout << "  -h : this text" << endl;
     cout << "  -s : use shared group (default: no)" << endl;
@@ -30,29 +33,36 @@ void usage(void) {
     cout << "  -n : rows between print outs" << endl;
     cout << "  -g : use group (default: no)" << endl;
     cout << "  -r : rows/commit (default: 1)" << endl;
-    exit(-1);
+    cout << "  -R : insert at random position (only useful with -i)" << endl;
 }
 
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
     size_t N = 100000000;
     size_t n = 50000;
     size_t rows_per_commit = 1;
-    struct timespec ts_begin, ts_now;
     TestTable t;
 
     int c;
     extern char *optarg;
 
-    bool use_shared = false;
-    SharedGroup::DurabilityLevel dlevel;
-    bool do_insert  = false;
-    bool use_group  = false;
+    bool use_shared    = false;
+    SharedGroup::DurabilityLevel dlevel = SharedGroup::durability_Full;
+    bool do_insert     = false;
+    bool use_group     = false;
+    bool random_insert = false;
 
-    while ((c = getopt(argc, argv, "hs:iN:n:r:g")) != EOF) {
+    // FIXME: 'getopt' is POSIX/Linux specific. We should replace with
+    // code similar to what appears in main() in
+    // "tightdb_tools/src/tightdb/tools/prompt/prompt.cpp".
+    while ((c = getopt(argc, argv, "hs:iN:n:r:gR")) != EOF) {
         switch (c) {
             case 'h':
                 usage();
+                return 0;
+            case 'R':
+                random_insert = true;
                 break;
             case 's':
                 use_shared = true;
@@ -65,7 +75,7 @@ int main(int argc, char *argv[]) {
                     }
                     else {
                         cout << "durability must be either mem or full" << endl;
-                        exit(-1);
+                        return 1;
                     }
                 }
                 break;
@@ -87,24 +97,26 @@ int main(int argc, char *argv[]) {
             default:
                 cout << "Unknown option" << endl;
                 usage();
+                return 1;
         }
     }
 
     if (use_group && use_shared) {
         cout << "You cannot specify -g and -s at the same time." << endl;
         usage();
+        return 1;
     }
 
     Mode m;
     if (use_group) {
-        m = USE_GROUP;
+        m = mode_UseGroup;
     }
     else {
         if (use_shared) {
-            m = USE_SHARED;
+            m = mode_UseShared;
         }
         else {
-            m = USE_TABLE;
+            m = mode_UseTable;
         }
     }
 
@@ -114,7 +126,12 @@ int main(int argc, char *argv[]) {
     cout << "#  output frequency  : " << n << endl;
     cout << "#  mode              : " << m << endl;
     if (do_insert) {
-        cout << "# do inserts" << endl;
+        cout << "#  do inserts" << endl;
+        cout << "#  random insert     : " << random_insert << endl;
+    }
+
+    if (random_insert) {  // initialize RNG
+        srandom(0);
     }
 
     File::try_remove("test.tightdb");
@@ -122,31 +139,44 @@ int main(int argc, char *argv[]) {
     File::try_remove("gtest.tightdb");
 
     SharedGroup sg = SharedGroup("test.tightdb", false, dlevel);
+    Group g("gtest.tightdb", Group::mode_ReadWrite);
 
-    switch (m) {
-        case USE_SHARED:
-            {
-                WriteTransaction wt(sg);
-                BasicTableRef<TestTable> t = wt.get_table<TestTable>("test");
-                wt.commit();
+    switch(m) {
+        case mode_UseShared: {
+            WriteTransaction wt(sg);
+            BasicTableRef<TestTable> t = wt.get_table<TestTable>("test");
+            wt.commit();
+            break;
+        }
+        case mode_UseGroup: {
+            BasicTableRef<TestTable> t = g.get_table<TestTable>("test");
+            try {
+                g.commit();
+            }
+            catch (std::runtime_error& e) {
+                cerr << "Cannot create table: " << e.what() << endl;
+                return 1;
             }
             break;
-        case USE_GROUP:
-            Group g("gtest.tightdb");
-            BasicTableRef<TestTable> t = g.get_table<TestTable>("test");
+        }
+        case mode_UseTable:
             break;
     }
 
-    clock_gettime(CLOCK_REALTIME, &ts_begin);
+    test_util::Timer timer(test_util::Timer::type_RealTime);
     for(size_t i=0; i<N/rows_per_commit; ++i) {
-        switch (m) {
-            case USE_SHARED: {
+        switch(m) {
+            case mode_UseShared: {
                 WriteTransaction wt(sg);
                 BasicTableRef<TestTable> t1 = wt.get_table<TestTable>("test");
                 {
                     for(size_t j=0; j<rows_per_commit; ++j) {
                         if (do_insert) {
-                            t1->insert(0, N, "Hello", i%2, "World", "Smurf");
+                            size_t k = 0;
+                            if (random_insert && t1->size() > 0) {
+                                k = size_t(random() % t1->size());
+                            }
+                            t1->insert(k, N, "Hello", i%2, "World", "Smurf");
                         }
                         else {
                             t1->add(N, "Hello", i%2, "World", "Smurf");
@@ -156,28 +186,41 @@ int main(int argc, char *argv[]) {
                 wt.commit();
                 break;
             }
-            case USE_GROUP: {
-                {
-                    Group g("gtest.tightdb");
-                    BasicTableRef<TestTable> t1 = g.get_table<TestTable>("test");
-                    for(size_t j=0; j<rows_per_commit; ++j) {
-                        if (do_insert) {
-                            t1->insert(0, N, "Hello", i%2, "World", "Smurf");
-                        }
-                        else {
-                            t1->add(N, "Hello", i%2, "World", "Smurf");
-                        }
-                    }
-                    File::try_remove("tmp.tightdb");
-                    g.write("tmp.tightdb");
-                }
-                rename("tmp.tightdb", "gtest.tightdb");
-                break;
-            }
-            case USE_TABLE:
+            case mode_UseGroup: {
+                BasicTableRef<TestTable> t1 = g.get_table<TestTable>("test");
                 for(size_t j=0; j<rows_per_commit; ++j) {
                     if (do_insert) {
-                        t.insert(0, N, "Hello", i%2, "World", "Smurf");
+                        size_t k = 0;
+                        if (random_insert && t1->size() > 0) {
+                            k = size_t(random() % t1->size());
+                        }
+                        t1->insert(k, N, "Hello", i%2, "World", "Smurf");
+                    }
+                    else {
+                        t1->add(N, "Hello", i%2, "World", "Smurf");
+                    }
+                }
+                try {
+                    g.commit();
+                }
+                catch (File::PermissionDenied& e) {
+                    cerr << "commit (permission denied): " << e.what() << endl;
+                    return 1;
+                }
+                catch (std::runtime_error& e) {
+                    cerr << "commit (runtime error): " << e.what() << endl;
+                    return 1;
+                }
+                break;
+            }
+            case mode_UseTable:
+                for(size_t j=0; j<rows_per_commit; ++j) {
+                    if (do_insert) {
+                        size_t k = 0;
+                        if (random_insert && t.size() > 0) {
+                            k = size_t(random() % t.size());
+                        }
+                        t.insert(k, N, "Hello", i%2, "World", "Smurf");
                     }
                     else {
                         t.add(N, "Hello", i%2, "World", "Smurf");
@@ -187,10 +230,8 @@ int main(int argc, char *argv[]) {
         }
 
         if (((i*rows_per_commit) % n) == 0 && i > 0) {
-            clock_gettime(CLOCK_REALTIME, &ts_now);
-            double dt = delta_time(ts_begin, ts_now);
+            double dt = timer.get_elapsed_time();
             cout << i*rows_per_commit << ";" << dt << ";" << double(i*rows_per_commit)/dt << ";" << dt/double(i*rows_per_commit) << endl;
         }
     }
-    return 0;
 }

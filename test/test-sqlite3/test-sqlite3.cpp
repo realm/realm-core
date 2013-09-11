@@ -73,7 +73,7 @@ int main()
             cerr << "SQL error: "<<sqlite3_errmsg(db)<<"\n";
         }
 
-        timer.start();
+        timer.reset();
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < TESTS; ++i) {
@@ -98,7 +98,7 @@ int main()
             cerr << "SQL error: "<<sqlite3_errmsg(db)<<"\n";
         }
 
-        timer.start();
+        timer.reset();
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < TESTS; ++i) {
@@ -122,7 +122,7 @@ int main()
             cerr << "SQL error: "<<sqlite3_errmsg(db)<<"\n";
         }
 
-        timer.start();
+        timer.reset();
 
         // Do a search over entire column (value not found)
         rc = sqlite3_step(ppStmt);
@@ -146,7 +146,7 @@ int main()
             cerr << "SQL error: "<<sqlite3_errmsg(db)<<"\n";
         }
 
-        timer.start();
+        timer.reset();
 
         // Do a search over entire column
         for (size_t i = 0; i < TESTS*10; ++i) {

@@ -28,7 +28,7 @@ TEST(StringIndex_BuildIndex)
     col.add(s6); // common prefix
 
     // Create a new index on column
-    const StringIndex& ndx = col.CreateIndex();
+    const StringIndex& ndx = col.create_index();
 
     const size_t r1 = ndx.find_first(s1);
     const size_t r2 = ndx.find_first(s2);
@@ -45,7 +45,7 @@ TEST(StringIndex_BuildIndex)
     CHECK_EQUAL(6, r6);
 
     // Clean up
-    col.Destroy();
+    col.destroy();
 }
 
 TEST(StringIndex_DeleteAll)
@@ -61,7 +61,7 @@ TEST(StringIndex_DeleteAll)
     col.add(s6); // common prefix
 
     // Create a new index on column
-    const StringIndex& ndx = col.CreateIndex();
+    const StringIndex& ndx = col.create_index();
 
     // Delete all entries
     // (reverse order to avoid ref updates)
@@ -103,7 +103,7 @@ TEST(StringIndex_DeleteAll)
 #endif
 
     // Clean up
-    col.Destroy();
+    col.destroy();
 }
 
 TEST(StringIndex_Delete)
@@ -117,7 +117,7 @@ TEST(StringIndex_Delete)
     col.add(s1); // duplicate value
 
     // Create a new index on column
-    const StringIndex& ndx = col.CreateIndex();
+    const StringIndex& ndx = col.create_index();
 
     // Delete first item (in index)
     col.erase(1);
@@ -151,7 +151,7 @@ TEST(StringIndex_Delete)
 #endif
 
     // Clean up
-    col.Destroy();
+    col.destroy();
 }
 
 TEST(StringIndex_Insert)
@@ -165,7 +165,7 @@ TEST(StringIndex_Insert)
     col.add(s1); // duplicate value
 
     // Create a new index on column
-    col.CreateIndex();
+    col.create_index();
 
     // Insert item in top of column
     col.insert(0, s5);
@@ -199,7 +199,7 @@ TEST(StringIndex_Insert)
     CHECK_EQUAL(7, col.find_first(s6));
 
     // Clean up
-    col.Destroy();
+    col.destroy();
 }
 
 TEST(StringIndex_Set)
@@ -213,7 +213,7 @@ TEST(StringIndex_Set)
     col.add(s1); // duplicate value
 
     // Create a new index on column
-    col.CreateIndex();
+    col.create_index();
 
     // Set top value
     col.set(0, s5);
@@ -246,7 +246,7 @@ TEST(StringIndex_Set)
     CHECK_EQUAL(4, col.find_first(s6));
 
     // Clean up
-    col.Destroy();
+    col.destroy();
 }
 
 TEST(StringIndex_Count)
@@ -265,7 +265,7 @@ TEST(StringIndex_Count)
     col.add(s4);
 
     // Create a new index on column
-    col.CreateIndex();
+    col.create_index();
 
     // Counts
     const size_t c0 = col.count(s5);
@@ -280,7 +280,7 @@ TEST(StringIndex_Count)
     CHECK_EQUAL(4, c4);
 
     // Clean up
-    col.Destroy();
+    col.destroy();
 }
 
 TEST(StringIndex_Distinct)
@@ -299,7 +299,7 @@ TEST(StringIndex_Distinct)
     col.add(s4);
 
     // Create a new index on column
-    StringIndex& ndx = col.CreateIndex();
+    StringIndex& ndx = col.create_index();
 
     // Get view of unique values
     // (sorted in alphabetical order, each ref to first match)
@@ -313,8 +313,8 @@ TEST(StringIndex_Distinct)
     CHECK_EQUAL(6, result[3]); // s4 = Tom
 
     // Clean up
-    result.Destroy();
-    col.Destroy();
+    result.destroy();
+    col.destroy();
 }
 
 #if 0 // fixme
@@ -354,6 +354,6 @@ TEST(StringIndex_FindAllNoCopy)
     CHECK_EQUAL(9, results.Get(3));
 
     // Clean up
-    col.Destroy();
+    col.destroy();
 }
 #endif

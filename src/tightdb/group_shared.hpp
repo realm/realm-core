@@ -53,7 +53,7 @@ public:
     /// state has undefined behavior.
     SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT;
 
-    ~SharedGroup();
+    ~SharedGroup() TIGHTDB_NOEXCEPT;
 
     /// Attach this SharedGroup instance to the specified database
     /// file.
@@ -84,7 +84,7 @@ public:
     /// thrown. Note that InvalidDatabase is among these derived
     /// exception types.
     void open(const std::string& file, bool no_create = false,
-              DurabilityLevel dlevel=durability_Full);
+              DurabilityLevel dlevel = durability_Full);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
@@ -110,12 +110,12 @@ public:
 
     // Read transactions
     const Group& begin_read();
-    void end_read();
+    void end_read() TIGHTDB_NOEXCEPT;
 
     // Write transactions
     Group& begin_write();
     void commit();
-    void rollback();
+    void rollback() TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
     void test_ringbuf();
@@ -150,7 +150,7 @@ private:
 
     // Member variables
     Group                 m_group;
-    size_t                m_version;
+    std::size_t           m_version;
     File                  m_file;
     File::Map<SharedInfo> m_file_map; // Never remapped
     File::Map<SharedInfo> m_reader_map;
@@ -169,17 +169,17 @@ private:
     struct ReadCount;
 
     // Ring buffer managment
-    bool       ringbuf_is_empty() const TIGHTDB_NOEXCEPT;
-    size_t     ringbuf_size() const TIGHTDB_NOEXCEPT;
-    size_t     ringbuf_capacity() const TIGHTDB_NOEXCEPT;
-    bool       ringbuf_is_first(size_t ndx) const TIGHTDB_NOEXCEPT;
-    void       ringbuf_remove_first() TIGHTDB_NOEXCEPT;
-    size_t     ringbuf_find(uint32_t version) const TIGHTDB_NOEXCEPT;
-    ReadCount& ringbuf_get(size_t ndx) TIGHTDB_NOEXCEPT;
-    ReadCount& ringbuf_get_first() TIGHTDB_NOEXCEPT;
-    ReadCount& ringbuf_get_last() TIGHTDB_NOEXCEPT;
-    void       ringbuf_put(const ReadCount& v);
-    void       ringbuf_expand();
+    bool        ringbuf_is_empty() const TIGHTDB_NOEXCEPT;
+    std::size_t ringbuf_size() const TIGHTDB_NOEXCEPT;
+    std::size_t ringbuf_capacity() const TIGHTDB_NOEXCEPT;
+    bool        ringbuf_is_first(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    void        ringbuf_remove_first() TIGHTDB_NOEXCEPT;
+    std::size_t ringbuf_find(uint32_t version) const TIGHTDB_NOEXCEPT;
+    ReadCount&  ringbuf_get(std::size_t ndx) TIGHTDB_NOEXCEPT;
+    ReadCount&  ringbuf_get_first() TIGHTDB_NOEXCEPT;
+    ReadCount&  ringbuf_get_last() TIGHTDB_NOEXCEPT;
+    void        ringbuf_put(const ReadCount& v);
+    void        ringbuf_expand();
 
     // Must be called only by someone that has a lock on the write
     // mutex.
@@ -201,9 +201,14 @@ public:
         m_shared_group.begin_read();
     }
 
-    ~ReadTransaction()
+    ~ReadTransaction() TIGHTDB_NOEXCEPT
     {
         m_shared_group.end_read();
+    }
+
+    bool has_table(StringData name) const
+    {
+        return get_group().has_table(name);
     }
 
     ConstTableRef get_table(StringData name) const
@@ -216,7 +221,7 @@ public:
         return get_group().get_table<T>(name);
     }
 
-    const Group& get_group() const
+    const Group& get_group() const TIGHTDB_NOEXCEPT
     {
         return m_shared_group.m_group;
     }
@@ -233,9 +238,10 @@ public:
         m_shared_group->begin_write();
     }
 
-    ~WriteTransaction()
+    ~WriteTransaction() TIGHTDB_NOEXCEPT
     {
-        if (m_shared_group) m_shared_group->rollback();
+        if (m_shared_group)
+            m_shared_group->rollback();
     }
 
     TableRef get_table(StringData name) const
@@ -248,7 +254,7 @@ public:
         return get_group().get_table<T>(name);
     }
 
-    Group& get_group() const
+    Group& get_group() const TIGHTDB_NOEXCEPT
     {
         TIGHTDB_ASSERT(m_shared_group);
         return m_shared_group->m_group;
@@ -272,20 +278,22 @@ private:
 // Implementation:
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel):
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<size_t>::max())
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
 {
     open(file, no_create, dlevel);
 }
 
 
 inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<size_t>::max()) {}
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
+{
+}
 
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
 inline SharedGroup::SharedGroup(Replication::Provider& repl_provider):
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<size_t>::max())
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
 {
     open(repl_provider);
 }
@@ -296,12 +304,12 @@ inline void SharedGroup::open(Replication::Provider& repl_provider)
     // We receive ownership of the Replication instance. Note that
     // even though we store the pointer in the Group instance, it is
     // still ~SharedGroup() that is responsible for deleting it.
-    Replication* repl = repl_provider.new_instance();
-    m_group.set_replication(repl);
+    Replication* repl = repl_provider.new_instance(); // Throws
     std::string file       = repl->get_database_path();
     bool no_create         = false;
     DurabilityLevel dlevel = durability_Full;
-    open(file, no_create, dlevel);
+    open(file, no_create, dlevel); // Throws
+    m_group.set_replication(repl);
 }
 
 inline void SharedGroup::interrupt_transact()
