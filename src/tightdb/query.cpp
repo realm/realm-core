@@ -68,7 +68,9 @@ Query::~Query() TIGHTDB_NOEXCEPT
     if (do_delete) {
         for (size_t t = 0; t < all_nodes.size(); t++) {
             ParentNode *p = all_nodes[t];
-            delete p;
+            std::vector<ParentNode *>::iterator it = std::find(all_nodes.begin(), all_nodes.begin() + t, p);
+            if(it == all_nodes.begin() + t)
+                delete p;
         }
     }
 }
@@ -908,6 +910,11 @@ size_t Query::FindInternal(size_t start, size_t end) const
         return r;
 }
 
+bool Query::comp(const pair<size_t, size_t>& a, const pair<size_t, size_t>& b)
+{
+    return a.first < b.first;
+}
+
 void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
 {
     all_nodes.push_back(p);
@@ -920,10 +927,50 @@ void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
     update[update.size()-1] = newnode;
 }
 
-bool Query::comp(const pair<size_t, size_t>& a, const pair<size_t, size_t>& b)
+/* ********************************************************************************************************************
+*
+*  Stuff related to next-generation query syntax
+*
+******************************************************************************************************************** */
+
+Query& Query::and_query(Query q) 
 {
-    return a.first < b.first;
+    ParentNode* const p = q.first[0];
+    UpdatePointers(p, &p->m_child);
+
+    // The query on which AddQuery() was called is now responsible for destruction of query given as argument. do_delete
+    // indicates not to do cleanup in deconstructor, and all_nodes contains a list of all objects to be deleted. So
+    // take all objects of argument and copy to this node's all_nodes list.
+    q.do_delete = false;
+    all_nodes.insert( all_nodes.end(), q.all_nodes.begin(), q.all_nodes.end() );
+
+    return *this;
 }
 
 
+Query Query::operator||(Query q)
+{
+    Query q2(*this->m_table);
+    q2.and_query(*this);
+    q2.Or();
+    q2.and_query(q);
 
+    return q2;
+}
+ 
+
+Query Query::operator&&(Query q)
+{
+    if(first[0] == NULL)
+        return q;
+
+    if(q.first[0] == NULL)
+        return (*this);
+
+    Query q2(*this->m_table);
+    q2.and_query(*this);
+    q2.and_query(q);
+
+    return q2;
+}
+ 

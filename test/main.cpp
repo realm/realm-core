@@ -9,7 +9,6 @@
 #include <tightdb/query_engine.hpp>
 #include <assert.h>
 
-
 #define USE_VLD
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
     #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
@@ -91,10 +90,55 @@ int main(int argc, char* argv[])
     typed.add(20, 19.9f, 3.0);
     typed.add(20, 20.1f, 4.0);
 
+    // Testing &&
+
+    // Left condition makes first row non-match
+    match = (untyped.column<float>(1) + 1 > 21 && untyped.column<double>(2) > 2).find_next();
+    assert(match == 1);
+
+    // Right condition makes first row a non-match
+    match = (untyped.column<float>(1) > 10 && untyped.column<double>(2) > 3.5).find_next();
+    assert(match == 1);
+
+    // Both make first row match
+    match = (untyped.column<float>(1) < 20 && untyped.column<double>(2) > 2).find_next();
+    assert(match == 0);
+
+    // Both make first row non-match
+    match = (untyped.column<float>(1) > 20 && untyped.column<double>(2) > 3.5).find_next();
+    assert(match == 1);
+
+    // Left cond match 0, right match 1
+    match = (untyped.column<float>(1) < 20 && untyped.column<double>(2) > 3.5).find_next();
+    assert(match == not_found);
+
+    // Left match 1, right match 0
+    match = (untyped.column<float>(1) > 20 && untyped.column<double>(2) < 3.5).find_next();
+    assert(match == not_found);
+
+    // Testing ||
+
+    // Left match 0
+    match = (untyped.column<float>(1) < 20 || untyped.column<double>(2) < 3.5).find_next();
+    assert(match == 0);
+
+    // Right match 0
+    match = (untyped.column<float>(1) > 20 || untyped.column<double>(2) < 3.5).find_next();
+    assert(match == 0);
+
+    // Left match 1
+
+    match = (untyped.column<float>(1) > 20 || untyped.column<double>(2) > 9.5).find_next();
+    
+    assert(match == 1);
+
+
+    
+    // Tons of other tests. More in test_query.cpp
+
 
     Query q4 = untyped.column<float>(1) + untyped.column<int64_t>(0) > 40;
     Query q5 = 20 < untyped.column<float>(1);
-
 
     match = q4.expression(  q5.get_expression()  ).find_next();
     assert(match == 1);
@@ -230,9 +274,6 @@ int main(int argc, char* argv[])
     delete second2;
     delete first2;
     
- 
-
-
     CustomTestReporter reporter;
     TestRunner runner(reporter);
     const int res = runner.RunTestsIf(Test::GetTestList(), 0, True(), 0);
