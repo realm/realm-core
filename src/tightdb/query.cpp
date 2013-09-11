@@ -892,6 +892,11 @@ size_t Query::FindInternal(size_t start, size_t end) const
         return r;
 }
 
+bool Query::comp(const pair<size_t, size_t>& a, const pair<size_t, size_t>& b)
+{
+    return a.first < b.first;
+}
+
 void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
 {
     all_nodes.push_back(p);
@@ -904,18 +909,13 @@ void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
     update[update.size()-1] = newnode;
 }
 
-bool Query::comp(const pair<size_t, size_t>& a, const pair<size_t, size_t>& b)
-{
-    return a.first < b.first;
-}
-
 /* ********************************************************************************************************************
 *
 *  Stuff related to next-generation query syntax
 *
 ******************************************************************************************************************** */
 
-Query& Query::and_query(Query& q) 
+Query& Query::and_query(Query q) 
 {
     ParentNode* const p = q.first[0];
     UpdatePointers(p, &p->m_child);

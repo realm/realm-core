@@ -86,16 +86,27 @@ TEST(MergeQueriesOverloads)
     table.add_column(type_Int, "second");
 
     table.add_empty_row(3);
-    table.set_int(0, 0, 10);
+    table.set_int(0, 0, 20);
     table.set_int(1, 0, 20);        
 
     table.set_int(0, 1, 20);
     table.set_int(1, 1, 30);        
 
     table.set_int(0, 2, 30);
-    table.set_int(1, 2, 20);        
+    table.set_int(1, 2, 30);        
 
     size_t c;
+
+
+
+        // q1_0 && q2_0
+    tightdb::Query q1_110 = table.where().equal(0, 20);
+    tightdb::Query q2_110 = table.where().equal(1, 30);
+    tightdb::Query q3_110 = q1_110.and_query(q2_110);
+    c = q1_110.count();
+    c = q2_110.count();
+    c = q3_110.count();
+
 
     // The overloads must behave such as if each side of the operator is inside parentheses, that is,
     // (first == 1 || first == 20) operator&& (second == 30), regardless of order of operands
@@ -110,6 +121,8 @@ TEST(MergeQueriesOverloads)
     // q2_0 && q1_0 (reversed operand order)
     tightdb::Query q1_1 = table.where().equal(0, 10).Or().equal(0, 20);
     tightdb::Query q2_1 = table.where().equal(1, 30);
+    c = q1_1.count();
+
     tightdb::Query q3_1 = q2_1 && q1_1;
     c = q3_1.count();
     CHECK_EQUAL(1, c);
