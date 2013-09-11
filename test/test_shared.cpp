@@ -1457,6 +1457,17 @@ TEST(Shared_Multiprocess)
     File::try_remove("test_shared.tightdb.lock");
     usleep(100);
 
+#if TEST_DURATION < 1
+    make_table(4);
+
+    multi_threaded(2,0);
+    validate_and_clear(2, INCREMENTS);
+
+    for (int k=1; k<3; k++) {
+        multi_process(2,2);
+        validate_and_clear(4,INCREMENTS);
+    }
+#else
     make_table(100);
 
     multi_threaded(10,0);
@@ -1466,7 +1477,7 @@ TEST(Shared_Multiprocess)
         multi_process(10,10);
         validate_and_clear(100,INCREMENTS);
     }
-
+#endif
 }
 
 
