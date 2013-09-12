@@ -37,6 +37,7 @@
 
 #include <tightdb/table_ref.hpp>
 #include <tightdb/binary_data.hpp>
+#include <tightdb/date.hpp>
 
 namespace tightdb {
 

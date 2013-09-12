@@ -5,6 +5,38 @@
 using namespace std;
 using namespace tightdb;
 
+template<class T> struct ColumnTypeTraits;
+
+template<> struct ColumnTypeTraits<int64_t> {
+    typedef Column column_type;
+    typedef Array array_type;
+    typedef int64_t sum_type;
+    static const DataType id = type_Int;
+};
+template<> struct ColumnTypeTraits<bool> {
+    typedef Column column_type;
+    typedef Array array_type;
+    typedef int64_t sum_type;
+    static const DataType id = type_Bool;
+};
+template<> struct ColumnTypeTraits<float> {
+    typedef ColumnFloat column_type;
+    typedef ArrayFloat array_type;
+    typedef double sum_type;
+    static const DataType id = type_Float;
+};
+template<> struct ColumnTypeTraits<double> {
+    typedef ColumnDouble column_type;
+    typedef ArrayDouble array_type;
+    typedef double sum_type;
+    static const DataType id = type_Double;
+};
+template<> struct ColumnTypeTraits<Date> {
+    typedef Column column_type;
+    typedef Array array_type;
+    typedef int64_t sum_type;
+    static const DataType id = type_Int;
+};
 
 // Searching
 
