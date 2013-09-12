@@ -17,7 +17,7 @@ using namespace tightdb;
 
 
 struct SharedGroup::ReadCount {
-    uint32_t version;
+    uint64_t version;
     uint32_t count;
 };
 
@@ -32,7 +32,7 @@ struct SharedGroup::SharedInfo {
     uint64_t filesize;
 
     uint64_t current_top;
-    Atomic<uint32_t> current_version;
+    Atomic<uint64_t> current_version;
 
     uint32_t infosize;
     uint32_t capacity_mask; // Must be on the form 2**n - 1
@@ -388,7 +388,7 @@ void SharedGroup::do_async_commits()
     // Note that taking this lock also signals to the other
     // processes that that they can start commiting to the db.
     begin_read();
-    size_t last_version = m_version;
+    uint64_t last_version = m_version;
     info->init_complete.store(2); // allow waiting clients to proceed
     m_group.detach();
     while(true) {
@@ -432,7 +432,7 @@ void SharedGroup::do_async_commits()
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "(version " << m_version << ")...";
 #endif
-            size_t current_version = m_version;
+            uint64_t current_version = m_version;
             size_t current_top_ref = m_group.m_top.get_ref();
 
             GroupWriter writer(m_group);
@@ -485,7 +485,7 @@ const Group& SharedGroup::begin_read()
         // Get the current top ref
         new_top_ref   = to_size_t(info->current_top);
         new_file_size = to_size_t(info->filesize);
-        m_version     = to_size_t(info->current_version.load()); // fixme, remember to remove to_size_t when m_version becomes 64 bit
+        m_version     = info->current_version.load();
 
         // Update reader list
         if (ringbuf_is_empty()) {
@@ -545,15 +545,8 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
             m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
         }
 
-
-        // FIXME: m_version may well be a 64-bit integer so this cast
-        // to uint32_t seems quite dangerous. Should the type of
-        // m_version be changed to uint32_t? The problem with uint32_t
-        // is that it is not part of C++03. It was introduced in C++11
-        // though.
-
         // Find entry for current version
-        size_t ndx = ringbuf_find(uint32_t(m_version));
+        size_t ndx = ringbuf_find(m_version);
         TIGHTDB_ASSERT(ndx != not_found);
         ReadCount& r = ringbuf_get(ndx);
 
@@ -633,7 +626,7 @@ void SharedGroup::commit()
     // rethrown, because the commit was effectively successful.
 
     {
-        size_t new_version;
+        uint64_t new_version;
 #ifdef TIGHTDB_ENABLE_REPLICATION
         // It is essential that if Replicatin::commit_write_transact()
         // fails, then the transaction is not completed. A subsequent call
@@ -642,10 +635,10 @@ void SharedGroup::commit()
             new_version = repl->commit_write_transact(*this); // Throws
         }
         else {
-            new_version = info->current_version.load() + 1; // FIXME: Eventual overflow
+            new_version = info->current_version.load() + 1; 
         }
 #else
-        new_version = info->current_version.load() + 1; // FIXME: Eventual overflow
+        new_version = info->current_version.load() + 1; 
 #endif
         // Reset version tracking in group if we are
         // starting from a new lock file
@@ -822,7 +815,7 @@ void SharedGroup::ringbuf_expand()
 }
 
 
-size_t SharedGroup::ringbuf_find(uint32_t version) const TIGHTDB_NOEXCEPT
+size_t SharedGroup::ringbuf_find(uint64_t version) const TIGHTDB_NOEXCEPT
 {
     const SharedInfo* info = m_reader_map.get_addr();
     uint32_t pos = info->get_pos;
@@ -924,7 +917,7 @@ void SharedGroup::zero_free_space()
     SharedInfo* info = m_file_map.get_addr();
 
     // Get version info
-    size_t current_version;
+    uint64_t current_version;
     size_t readlock_version;
     size_t file_size;
 
@@ -948,24 +941,16 @@ void SharedGroup::zero_free_space()
 #endif // TIGHTDB_DEBUG
 
 
-size_t SharedGroup::get_current_version() TIGHTDB_NOEXCEPT
+uint64_t SharedGroup::get_current_version() TIGHTDB_NOEXCEPT
 {
     SharedInfo* info = m_file_map.get_addr();
     return info->current_version.load();
 }
 
-
-// FIXME: What type is the right type for storing the database
-// version? Somtimes we use size_t, other times we use uint32_t?
-// uint32_t is manifestly a bad choice, since it doesn't always exist,
-// and even if it exists, it may not be efficient on the target
-// platform. If 32 bits are are enough to hold a database version,
-// then the type should be 'unsigned long', 'uint_fast32_t', or
-// 'uint_least32_t'.
-void SharedGroup::low_level_commit(size_t new_version)
+void SharedGroup::low_level_commit(uint64_t new_version)
 {
     SharedInfo* info = m_file_map.get_addr();
-    size_t readlock_version;
+    uint64_t readlock_version;
     {
         Mutex::Lock lock(info->readmutex);
 
@@ -1003,7 +988,7 @@ void SharedGroup::low_level_commit(size_t new_version)
         Mutex::Lock lock(info->readmutex);
         info->current_top = new_top_ref;
         info->filesize    = new_file_size;
-        info->current_version.store(new_version);//FIXME src\tightdb\group_shared.cpp(772): warning C4267: '=' : conversion from 'size_t' to 'volatile uint32_t', possible loss of data
+        info->current_version.store(new_version);
     }
 
     // Save last version for has_changed()

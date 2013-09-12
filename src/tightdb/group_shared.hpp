@@ -152,7 +152,7 @@ private:
 
     // Member variables
     Group                 m_group;
-    std::size_t           m_version;
+    uint64_t              m_version;
     File                  m_file;
     File::Map<SharedInfo> m_file_map; // Never remapped
     File::Map<SharedInfo> m_reader_map;
@@ -176,7 +176,7 @@ private:
     std::size_t ringbuf_capacity() const TIGHTDB_NOEXCEPT;
     bool        ringbuf_is_first(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void        ringbuf_remove_first() TIGHTDB_NOEXCEPT;
-    std::size_t ringbuf_find(uint32_t version) const TIGHTDB_NOEXCEPT;
+    std::size_t ringbuf_find(uint64_t version) const TIGHTDB_NOEXCEPT;
     ReadCount&  ringbuf_get(std::size_t ndx) TIGHTDB_NOEXCEPT;
     ReadCount&  ringbuf_get_first() TIGHTDB_NOEXCEPT;
     ReadCount&  ringbuf_get_last() TIGHTDB_NOEXCEPT;
