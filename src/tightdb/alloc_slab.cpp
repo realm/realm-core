@@ -331,7 +331,7 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
     m_file.open(path.c_str(), access, create, 0); // Throws
     File::CloseGuard fcg(m_file);
 
-    size_t initial_size = 1024 * 1024;
+    size_t initial_size = 4 * 1024; // a single page sure feels tight
 
     // The size of a database file must not exceed what can be encoded
     // in std::size_t.
