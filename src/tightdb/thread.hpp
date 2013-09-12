@@ -474,7 +474,7 @@ private:
 
     // Assumed to be naturally aligned - if not, hardware might not guarantee atomicity
 #ifdef TIGHTDB_HAVE_CXX11_ATOMIC
-    atomic<T> state;
+    std::atomic<T> state;
 #else
 #ifdef _MSC_VER
     volatile T state;
