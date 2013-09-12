@@ -23,7 +23,7 @@ struct SharedGroup::ReadCount {
 
 struct SharedGroup::SharedInfo {
     Atomic<uint16_t> init_complete; // indicates lock file has valid content
-    uint16_t shutdown_started; // indicates that shutdown is in progress
+    Atomic<uint16_t> shutdown_started; // indicates that shutdown is in progress
     uint16_t version;
     uint16_t flags;
 
@@ -60,7 +60,7 @@ SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
     capacity_mask   = init_readers_size - 1;
     put_pos = 0;
     get_pos = 0;
-    shutdown_started = 0;
+    shutdown_started.store(0);
     init_complete.store(1);
 }
 
@@ -262,7 +262,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 throw runtime_error("Lock file initialization incomplete");
             if (info->version != 0)
                 throw runtime_error("Unsupported version");
-            if (info->shutdown_started) {
+            if (info->shutdown_started.load()) {
                 must_retry = true;
                 usleep(100);
                 continue;
@@ -340,11 +340,11 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
         return;
     }
 
-    if (info->shutdown_started) {
+    if (info->shutdown_started.load()) {
         m_file.unlock();
         return;
     }
-    info->shutdown_started = 1;
+    info->shutdown_started.store(1);
 
     // If the db file is just backing for a transient data structure,
     // we can delete it when done.
@@ -395,8 +395,7 @@ void SharedGroup::do_async_commits()
 
         if (m_file.is_removed()) { // operator removed the lock file. take a hint!
 
-            info->shutdown_started = 1;
-            // FIXME: barrier?
+            info->shutdown_started.store(1);
             shutdown = true;
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Lock file removed, initiating shutdown" << endl;
@@ -409,8 +408,7 @@ void SharedGroup::do_async_commits()
         // the daemon has abandoned it. It can then wait for the
         // lock file to be removed (with a timeout). 
         if (m_file.try_lock_exclusive()) {
-            info->shutdown_started = 1;
-            // FIXME: barrier?
+            info->shutdown_started.store(1);
             shutdown = true;
         }
         // if try_lock_exclusive fails, we loose our read lock, so
