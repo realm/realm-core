@@ -1,8 +1,8 @@
 #include <algorithm>
 #include <string>
-#include <sstream>
 #include <fstream>
 #include <ostream>
+
 
 #include <UnitTest++.h>
 #include "testsettings.hpp"
@@ -550,43 +550,29 @@ TEST(Table_test_json_all_data)
 #endif
 }
 
-TEST(Table_test_json_simple)
+TEST(Table_test_row_to_string)
 {
     // Create table with all column types
     Table table;
-    Spec& s = table.get_spec();
-    s.add_column(type_Int,    "int");
-    s.add_column(type_Bool,   "bool");
-    s.add_column(type_Date,   "date");
-    s.add_column(type_Float,  "float");
-    s.add_column(type_Double, "double");
-    s.add_column(type_String, "string");
-    s.add_column(type_Binary, "binary");
-    table.update_from_spec();
+    setup_multi_table(table, 2, 2);
 
-    // Add some rows
-    for (size_t i = 0; i < 1; ++i) {
-        table.insert_int(0, i, i);
-        table.insert_bool(1, i, (i % 2 == 0? true : false));
-        table.insert_date(2, i, 0x7fffeeeeL);
-        table.insert_float(3, i, 3.14f);
-        table.insert_double(4, i, 2.71);
-        table.insert_string(5, i, "helloooooo");
-        const char bin[] = "123456789012345678901234567890nopq";
-        table.insert_binary(6, i, BinaryData(bin, sizeof bin));
-        table.insert_done();
-    }
-
-     stringstream ss;
-     table.to_json(ss);
-     const string json = ss.str();
-     CHECK_EQUAL(true, json.length() > 0);
-#if _MSC_VER
-     // On Windows floats in scientific notation contains 3 "0", as opposed to 2 on Linux
-     CHECK_EQUAL("[{\"int\":0,\"bool\":true,\"date\":\"2038-01-19 02:01:18\",\"float\":3.1400001e+000,\"double\":2.7100000000000000e+000,\"string\":\"helloooooo\",\"binary\":\"3132333435363738393031323334353637383930313233343536373839306e6f707100\"}]", json);
-#else
-     CHECK_EQUAL("[{\"int\":0,\"bool\":true,\"date\":\"2038-01-19 02:01:18\",\"float\":3.1400001e+00,\"double\":2.7100000000000000e+00,\"string\":\"helloooooo\",\"binary\":\"3132333435363738393031323334353637383930313233343536373839306e6f707100\"}]", json);
+    stringstream ss;
+    table.row_to_string(1, ss);
+    const string row_str = ss.str();
+#if 0
+    ofstream testFile("row_to_string.txt", ios::out);
+    testFile << row_str;
 #endif
+
+    string expected = "    int   bool                 date           float          double   string              string_long  string_enum     binary  mixed  tables\n"
+                      "1:   -1   true  1970-01-01 03:25:45  -1.234560e+002  -9.876543e+003  string1  string1 very long st...  enum2          7 bytes     -1     [3]\n";
+    bool test_ok = test_util::equal_without_cr(row_str, expected);
+    CHECK_EQUAL(true, test_ok);
+    if (!test_ok) {
+        cerr << "row_to_string() failed\n" 
+             << "Expected: " << expected << "\n"
+             << "Got     : " << row_str << endl;
+    }
 }
 
 
