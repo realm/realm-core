@@ -413,8 +413,18 @@ public:
 // For L = R = {int, int64_t, float, double}:
 
 // Compare
-template <class R> Query operator > (double left, const Subexpr2<R>& right) { 
-    return *new Compare<Greater, typename Common<R, double>::type>(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
+template <class R> Query operator > (double left, const Subexpr2<R>& right) {
+    const Columns<R>* c = dynamic_cast<const Columns<R>*>(&right);
+    if(c) {
+        // Fallback to old query_engine which supports this particular condition and is 5-15 times faster.
+        const Table* t = (const_cast<Columns<R>*>(c))->get_table();
+        Query q = t->where();
+        q.less(c->m_column, left);
+        return q;
+    }
+    else
+        return *new Compare<Greater, typename Common<R, double>::type>(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
+
 }
 template <class R> Query operator > (float left, const Subexpr2<R>& right) {
     return *new Compare<Greater, typename Common<R, float>::type>(*new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true);

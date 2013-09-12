@@ -69,7 +69,7 @@ TIGHTDB_TABLE_3(ThreeColTable,
 
 int main(int argc, char* argv[])
 {
-    size_t match;
+    volatile size_t match;
 
     // Setup untyped table
     Table untyped;
@@ -89,6 +89,37 @@ int main(int argc, char* argv[])
     ThreeColTable typed;
     typed.add(20, 19.9f, 3.0);
     typed.add(20, 20.1f, 4.0);
+
+
+    // This is the first demonstration of fallback to old query_engine for the specific cases where it's possible
+    // because old engine is faster. This will return a ->less(...) query
+    match = (20.3 > untyped.column<double>(2)).find_next();
+    assert(match == 0);
+
+
+
+/*
+    // Benchmark against old query_engine. Old is around 10 times faster
+
+    for(int i = 0; i < 10000; i++) {
+        typed.add(2000, 19.6, 3.0);
+    }
+
+    cerr << "start\n";
+    for(int i = 0; i < 200000; i++) {
+        match = (typed.column().first < 10).find_next();     
+    }
+    cerr << "end1\n";
+
+    for(int i = 0; i < 2000000; i++) {
+        match = typed.where().first.less(10).find_next();     
+    }
+
+    cerr << "end2\n";
+    return 0;
+
+    */
+
 
     // Small typed table test:
     match = (typed.column().second + 100 > 120 && typed.column().first > 2).find_next();
@@ -146,6 +177,7 @@ int main(int argc, char* argv[])
 
 
     Query q4 = untyped.column<float>(1) + untyped.column<int64_t>(0) > 40;
+
     Query q5 = 20 < untyped.column<float>(1);
 
     match = q4.expression(  q5.get_expression()  ).find_next();
