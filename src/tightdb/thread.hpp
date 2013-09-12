@@ -418,7 +418,7 @@ inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 }
 
 
-// Support for simple atomic variables with memory barriers. 
+// Support for simple atomic variables with release and acquire semantics
 //
 // Useful for non-blocking data structures.
 //
@@ -434,6 +434,17 @@ inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 // synchronization need no special declaration. As long as signaling between threads
 // is done using the store and load methods declared here, memory barriers will
 // ensure a consistent view of the other variables.
+//
+// Technical note: The intent is to provide acquire semantics on load and release
+// semantics on store. This means that things like Petersons algorithm cannot be
+// implemented using these primitive, because it requires sequential consistency.
+//
+// Prior to gcc 4.7 there was no portable ways of providing acquire/release semantics,
+// so for earlier versions we fall back to sequential consistency.
+// As some architectures, most notably x86, provide release and acquire semantics
+// in hardware, this is somewhat annoying, because we will use a full memory barrier
+// where no-one is needed. FIXME: introduce x86 specific optimization to avoid the
+// memory barrier!
 
 #ifdef TIGHTDB_HAVE_CXX11_ATOMIC
 #include <atomic>
@@ -509,18 +520,24 @@ inline T Atomic<T>::load() const
 {
     // prevent registerization of state (this is not really needed, I think)
     asm volatile ("" : : : "memory");
+#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+    T retval = __atomic_load_n(&state, __ATOMIC_ACQUIRE);
+#else
     T retval = state;
     __sync_synchronize();
-    // consider this for x86 instead: asm volatile ("lfence" : : : "memory");
+#endif
     return retval;
 }
 
 template<typename T>
 inline void Atomic<T>::store(T value) 
 {
+#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+    __atomic_store_n(&state, value, __ATOMIC_RELEASE);
+#else
     __sync_synchronize();
-    // consider this for x86 instead: asm volatile ("sfence" : : : "memory");
     state = value;
+#endif
     // prevent registerization of state (this is not really needed, I think)
     asm volatile ("" : : : "memory");
 }
