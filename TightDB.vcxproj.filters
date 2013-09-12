@@ -399,4 +399,7 @@
       <UniqueIdentifier>{0a19bdba-d588-4ba1-935d-8de54bde0675}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="changelog.txt" />
+  </ItemGroup>
 </Project>
