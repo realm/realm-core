@@ -628,7 +628,7 @@
     <ClInclude Include="src\tightdb\array_string.hpp" />
     <ClInclude Include="src\tightdb\array_string_long.hpp" />
     <ClInclude Include="src\tightdb\binary_data.hpp" />
-    <ClInclude Include="src\tightdb\query_expression.h" />
+    <ClInclude Include="src\tightdb\query_expression.hpp" />
     <ClInclude Include="src\tightdb\unique_ptr.hpp" />
     <ClInclude Include="src\tightdb\bind_ptr.hpp" />
     <ClInclude Include="src\tightdb\column.hpp" />

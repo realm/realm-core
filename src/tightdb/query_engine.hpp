@@ -1403,8 +1403,8 @@ protected:
     SequentialGetter<TConditionValue> m_getter2;
 };
 
-
-#include "query_expression.h"
+// todo, fixme: move this up! There are just some annoying compiler errors that need to be resolved when doing this
+#include "query_expression.hpp"
 
 
 // For expressions like col1 / col2 + 123 > col4 * 100

@@ -6,7 +6,7 @@
 #include <tightdb.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/utilities.hpp>
-#include <tightdb/query_engine.hpp>
+#include <tightdb/query_expression.hpp>
 #include <assert.h>
 
 #define USE_VLD
