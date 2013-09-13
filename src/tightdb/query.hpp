@@ -52,6 +52,7 @@ class Expression;
 
 class Query {
 public:
+    Query(const Table& table);
     Query();
     Query(const Query& copy); // FIXME: Try to remove this
     ~Query() TIGHTDB_NOEXCEPT;
@@ -217,7 +218,7 @@ public:
 
 protected:
     Query(Table& table);
-    Query(const Table& table); // FIXME: This constructor should not exist. We need a ConstQuery class.
+//    Query(const Table& table); // FIXME: This constructor should not exist. We need a ConstQuery class.
     void Create();
 
     void   Init(const Table& table) const;

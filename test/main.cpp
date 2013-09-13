@@ -96,6 +96,12 @@ int main(int argc, char* argv[])
     match = (20.3 > untyped.column<double>(2)).find_next();
     assert(match == 0);
 
+    match = (untyped.column<int64_t>(0) == untyped.column<int64_t>(0)).find_next();
+    assert(match == 0);
+
+    match = (untyped.column<int64_t>(0) > untyped.column<int64_t>(0)).find_next();
+    assert(match == not_found);
+
 
 
 /*

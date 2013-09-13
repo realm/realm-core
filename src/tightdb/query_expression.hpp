@@ -311,6 +311,44 @@ public:
 
 class ColumnAccessorBase;
 
+
+// Handle cases where left side is a constant (int, float, int64_t, double)
+template <class L, class Cond, class R> Query& create (L left, const Subexpr2<R>& right) 
+{
+    // Fallback to old query_engine if it supports this particular condition because it's faster. Supported conditions
+    // are 'int_col Cond int' and 'int Cond int_col' (by reversing expression).
+    const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
+    if(column && (SameType<L, int>::value || SameType<L, int64_t>::value) && (SameType<R, int>::value || SameType<R, int64_t>::value)) {
+        const Table* t = (const_cast<Columns<R>*>(column))->get_table();
+        Query* q = new Query(*t);
+
+        if(SameType<Cond, Less>::value)
+            q->greater(column->m_column, left);
+        else if(SameType<Cond, Greater>::value)
+            q->less(column->m_column, left);        
+        else if(SameType<Cond, Equal>::value)
+            q->equal(column->m_column, left);        
+        else if(SameType<Cond, NotEqual>::value)
+            q->not_equal(column->m_column, left);        
+        else if(SameType<Cond, LessEqual>::value)
+            q->greater_equal(column->m_column, left);        
+        else if(SameType<Cond, GreaterEqual>::value)
+            q->less_equal(column->m_column, left);
+        else {
+            // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
+            // fallback to using use 'return *new Compare<>' instead.
+            TIGHTDB_ASSERT(false); 
+        }
+        return *q;
+    }
+    else {
+        return *new Compare<Cond, typename Common<R, float>::type>(*new Value<L>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+    }
+}
+
+
+
+
 // All overloads where left-hand-side is Subexpr2<L>:
 //
 // left-hand-side       operator                              right-hand-side
@@ -340,7 +378,6 @@ public:
     Operator<Plus<CommonType> >& operator + (const Subexpr2<R>& right) { 
         return *new Operator<Plus<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
     }
-        
     Operator<Minus<CommonType> >& operator - (const Subexpr2<R>& right) { 
         return *new Operator<Minus<CommonType> > (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
     }
@@ -353,42 +390,117 @@ public:
 
     // Compare, right side constant
     Query operator > (R right) {
-        return *new Compare<Greater, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
+        return create<R, Less, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator < (R right) {
-        return *new Compare<Less, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
+        return create<R, Greater, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator >= (R right) {
-        return *new Compare<GreaterEqual, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
+        return create<R, LessEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator <= (R right) {
-        return *new Compare<LessEqual, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
+        return create<R, GreaterEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator == (R right) {
-        return *new Compare<Equal, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
+        return create<R, Equal, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
     Query operator != (R right) {
-        return *new Compare<NotEqual, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), *new Value<R>(right), true);
+        return create<R, NotEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
+
+
+
+
+template <class Cond> Query& create2 (const Subexpr2<R>& right) 
+{
+    // Fallback to old query_engine if it supports this particular condition because it's faster.
+    const Columns<R>* left_col = dynamic_cast<const Columns<R>*>(      static_cast<Subexpr2<L>*>(this)    );
+    const Columns<R>* right_col = dynamic_cast<const Columns<R>*>(&right);
+
+    if(left_col && right_col && SameType<L, R>::value) {
+        const Table* t = (const_cast<Columns<R>*>(left_col))->get_table();
+        Query* q = new Query(*t);
+
+        if(SameType<L, int>::value || SameType<L, int64_t>::value) {
+            if(SameType<Cond, Less>::value)
+                q->less_int(left_col->m_column, right_col->m_column);
+            else if(SameType<Cond, Greater>::value)
+                q->greater_int(left_col->m_column, right_col->m_column);
+            else if(SameType<Cond, Equal>::value)
+                q->equal_int(left_col->m_column, right_col->m_column);
+            else if(SameType<Cond, NotEqual>::value)
+                q->not_equal_int(left_col->m_column, right_col->m_column);
+            else if(SameType<Cond, LessEqual>::value)
+                q->less_equal_int(left_col->m_column, right_col->m_column);
+            else if(SameType<Cond, GreaterEqual>::value)
+                q->greater_equal_int(left_col->m_column, right_col->m_column);
+            else {
+                TIGHTDB_ASSERT(false); 
+            }
+        }
+        else if(SameType<L, float>::value) {
+            if(SameType<Cond, Less>::value)
+                q->less_float(left_col->m_column, right_col->m_column);
+            else if(SameType<Cond, Greater>::value)
+                q->greater_float(left_col->m_column, right_col->m_column);
+            else if(SameType<Cond, Equal>::value)
+                q->equal_float(left_col->m_column, right_col->m_column);
+            else if(SameType<Cond, NotEqual>::value)
+                q->not_equal_float(left_col->m_column, right_col->m_column);
+            else if(SameType<Cond, LessEqual>::value)
+                q->less_equal_float(left_col->m_column, right_col->m_column);
+            else if(SameType<Cond, GreaterEqual>::value)
+                q->greater_equal_float(left_col->m_column, right_col->m_column);
+            else {
+                TIGHTDB_ASSERT(false); 
+            }
+        }
+        else if(SameType<L, double>::value) {
+            if(SameType<Cond, Less>::value)
+                q->less_double(left_col->m_column, right_col->m_column);
+            else if(SameType<Cond, Greater>::value)
+                q->greater_double(left_col->m_column, right_col->m_column);
+            else if(SameType<Cond, Equal>::value)
+                q->equal_double(left_col->m_column, right_col->m_column);
+            else if(SameType<Cond, NotEqual>::value)
+                q->not_equal_double(left_col->m_column, right_col->m_column);
+            else if(SameType<Cond, LessEqual>::value)
+                q->less_equal_double(left_col->m_column, right_col->m_column);
+            else if(SameType<Cond, GreaterEqual>::value)
+                q->greater_equal_double(left_col->m_column, right_col->m_column);
+            else {
+                TIGHTDB_ASSERT(false); 
+            }
+        }
+        else {
+            TIGHTDB_ASSERT(false); 
+        }
+
+        return *q;
+    }
+    else {
+        return *new Compare<Cond, typename Common<R, float>::type>(static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
+    }
+}
 
     // Compare, right side subexpression
     Query operator == (const Subexpr2<R>& right) { 
-        return *new Compare<Equal, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
+        return create2<Equal>(right); 
     }
     Query operator != (const Subexpr2<R>& right) { 
-        return *new Compare<NotEqual, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
+        return create2<NotEqual>(right); 
     }
     Query operator > (const Subexpr2<R>& right) { 
-        return *new Compare<Greater, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
+        return create2<Greater>(right); 
     }
     Query operator < (const Subexpr2<R>& right) { 
-        return *new Compare<Less, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
+        return create2<Less>(right); 
     }
     Query operator >= (const Subexpr2<R>& right) { 
-        return *new Compare<GreaterEqual, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
+        return create2<GreaterEqual>(right); 
     }
     Query operator <= (const Subexpr2<R>& right) {    
-        return *new Compare<LessEqual, CommonType>(static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true); 
+        return create2<LessEqual>(right); 
     }
 };
 
@@ -412,88 +524,81 @@ public:
 // 
 // For L = R = {int, int64_t, float, double}:
 
+
+
+
 // Compare
 template <class R> Query operator > (double left, const Subexpr2<R>& right) {
-    const Columns<R>* c = dynamic_cast<const Columns<R>*>(&right);
-    if(c) {
-        // Fallback to old query_engine which supports this particular condition and is 5-15 times faster.
-        const Table* t = (const_cast<Columns<R>*>(c))->get_table();
-        Query q = t->where();
-        q.less(c->m_column, left);
-        return q;
-    }
-    else
-        return *new Compare<Greater, typename Common<R, double>::type>(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
-
+    return create<double, Greater, R>(left, right);
 }
 template <class R> Query operator > (float left, const Subexpr2<R>& right) {
-    return *new Compare<Greater, typename Common<R, float>::type>(*new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+    return create<float, Greater, R>(left, right);
 }
 template <class R> Query operator > (int left, const Subexpr2<R>& right) {
-    return *new Compare<Greater, typename Common<R, int>::type>(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+    return create<int, Greater, R>(left, right);
 }
 template <class R> Query operator > (int64_t left, const Subexpr2<R>& right) {
-    return *new Compare<Greater, typename Common<R, int64_t>::type>(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
+    return create<int64_t, Greater, R>(left, right);
 }
 template <class R> Query operator < (double left, const Subexpr2<R>& right) {
-    return *new Compare<Less, typename Common<R, double>::type>(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
+    return create<float, Less, R>(left, right);
 }
 template <class R> Query operator < (float left, const Subexpr2<R>& right) { 
-    return *new Compare<Less, typename Common<R, float>::type>(*new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
+    return create<int, Less, R>(left, right);
 }
 template <class R> Query operator < (int left, const Subexpr2<R>& right) {
-    return *new Compare<Less, typename Common<R, int>::type>(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+    return create<int, Less, R>(left, right);
 }
 template <class R> Query operator < (int64_t left, const Subexpr2<R>& right) {
-    return *new Compare<Less, typename Common<R, int64_t>::type>(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
+    return create<int64_t, Less, R>(left, right);
 }
 template <class R> Query operator == (double left, const Subexpr2<R>& right) { 
-    return *new Compare<Equal, typename Common<R, double>::type>(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+    return create<double, Equal, R>(left, right);
 }
 template <class R> Query operator == (float left, const Subexpr2<R>& right) {
-    return *new Compare<Equal, typename Common<R, float>::type>(*new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
+    return create<float, Equal, R>(left, right);
 }
 template <class R> Query operator == (int left, const Subexpr2<R>& right) {
-    return *new Compare<Equal, typename Common<R, int>::type>(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
+    return create<int, Equal, R>(left, right);
 }
 template <class R> Query operator == (int64_t left, const Subexpr2<R>& right) { 
-    return *new Compare<Equal, typename Common<R, int64_t>::type>(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
+    return create<int64_t, Equal, R>(left, right);
 }
 template <class R> Query operator >= (double left, const Subexpr2<R>& right) {
-    return *new Compare<GreaterEqual, typename Common<R, double>::type>(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+    return create<double, GreaterEqual, R>(left, right);
 }
 template <class R> Query operator >= (float left, const Subexpr2<R>& right) {
-    return *new Compare<GreaterEqual, typename Common<R, float>::type>(*new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+    return create<float, GreaterEqual, R>(left, right);
 }
 template <class R> Query operator >= (int left, const Subexpr2<R>& right) {
-    return *new Compare<GreaterEqual, typename Common<R, int>::type>(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+    return create<int, GreaterEqual, R>(left, right);
 }
 template <class R> Query operator >= (int64_t left, const Subexpr2<R>& right) {
-    return *new Compare<GreaterEqual, typename Common<R, int64_t>::type>(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
+    return create<int64_t, GreaterEqual, R>(left, right);
 }
 template <class R> Query operator <= (double left, const Subexpr2<R>& right) {
-    return *new Compare<LessEqual, typename Common<R, double>::type>(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
+    return create<double, LessEqual, R>(left, right);
 }
 template <class R> Query operator <= (float left, const Subexpr2<R>& right) {
-    return *new Compare<LessEqual, typename Common<R, float>::type>(*new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
+    return create<float, LessEqual, R>(left, right);
 }
 template <class R> Query operator <= (int left, const Subexpr2<R>& right) {
-    return *new Compare<LessEqual, typename Common<R, int>::type>(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
+    return create<int, LessEqual, R>(left, right);
 }
 template <class R> Query operator <= (int64_t left, const Subexpr2<R>& right) { 
-    return *new Compare<LessEqual, typename Common<R, int64_t>::type>(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+    return create<int64_t, LessEqual, R>(left, right);
 }
 template <class R> Query operator != (double left, const Subexpr2<R>& right) {
-    return *new Compare<NotEqual, typename Common<R, double>::type>(*new Value<double>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
+    return create<double, NotEqual, R>(left, right);
 }
 template <class R> Query operator != (float left, const Subexpr2<R>& right) {
-    return *new Compare<NotEqual, typename Common<R, float>::type>(*new Value<float>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
+    return create<float, NotEqual, R>(left, right);
 }
 template <class R> Query operator != (int left, const Subexpr2<R>& right) {
-    return *new Compare<NotEqual, typename Common<R, int>::type>(*new Value<int>(left), const_cast<Subexpr2<R>&>(right).clone(), true); 
+    return create<int, NotEqual, R>(left, right);
 }
 template <class R> Query operator != (int64_t left, const Subexpr2<R>& right) { 
-    return *new Compare<NotEqual, typename Common<R, int64_t>::type>(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
+    return create<int64_t, NotEqual, R>(left, right);
 }
 
 // Arithmetic
