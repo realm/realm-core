@@ -195,33 +195,35 @@ CATEGORIES :
       NAME     : add_column
       SUMMARY  : &g_dyn_table_add_column_summary
                  Add a column.
-      DESCR    : &g_dyn_table_add_column_descr
+      DESCR    :
+      - TEXT   : &g_dyn_table_add_column_descr
                  >
                  This method appends a column of the specified type and name to the table.
                  If it's used in a table which already has rows, the new column will just get
                  default values in those rows.
-
+        TEXT   : &g_dyn_table_add_column_support
                  Currently, the following types are supported:
+        TEXT   : >
                  <ul>
-                   <li><code>type_Bool</code> (default false)</li>
-                   <li><code>type_Int</code> (default 0)</li>
-                   <li><code>type_Float</code> (default 0.0)</li>
-                   <li><code>type_Double</code> (default 0.0)</li>
-                   <li><code>type_String</code> (default "")</li>
-                   <li><code>type_Binary</code> (default ("")</li>
-                   <li><code>type_Date</code> (default 0 - 1970-01-01 00:00:00)</li>
-                   <li><code>type_Table</code> (default NULL)</li>
-                   <li><code>type_Mixed</code> (default NULL)</li>
+                   <li><code>type_Bool</code> (default: false)</li>
+                   <li><code>type_Int</code> (default: 0)</li>
+                   <li><code>type_Float</code> (default: 0.0)</li>
+                   <li><code>type_Double</code> (default: 0.0)</li>
+                   <li><code>type_String</code> (default: "")</li>
+                   <li><code>type_Binary</code> (default: "")</li>
+                   <li><code>type_Date</code> (default: 1970-01-01 00:00:00)</li>
+                   <li><code>type_Table</code> (default: NULL)</li>
+                   <li><code>type_Mixed</code> (default: NULL)</li>
                  </ul>
       PARAMS:
       - NAME   : type
         TYPES  : DataType
-        DESCR  : &g_dyn_table_add_column_param1_descr
-                 Type of data in the new column.
+        DESCR  : &g_dyn_table_add_column_type_descr
+                 Type of data to store in the new column.
       - NAME   : name
         TYPES  : StringData
-        DESCR  : &g_dyn_table_add_column_param2_descr
-                 Name of the new column.
+        DESCR  : &g_dyn_table_add_column_name_descr
+                 Name for the new column.
       RETURN:
         TYPES  : size_t
         DESCR  : &g_dyn_table_add_column_return_descr
