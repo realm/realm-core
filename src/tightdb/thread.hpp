@@ -479,7 +479,7 @@ private:
 #ifdef _MSC_VER
     volatile T state;
 #endif
-#ifdef TIGHTDB_HAVE_GCC_GE_4_3
+#ifdef __GNUC__
     T state; 
 #endif
 #endif
@@ -513,7 +513,7 @@ inline void Atomic<T>::store(T value)
 }
 
 #endif
-#ifdef TIGHTDB_HAVE_GCC_GE_4_3
+#ifdef __GNUC__
 // gcc implementation, pre c++11:
 template<typename T>
 inline T Atomic<T>::load() const
