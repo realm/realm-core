@@ -365,7 +365,6 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 
 bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_SYNC_IF_NO_CACHE_COHERENCE
     const SharedInfo* info = m_file_map.get_addr();
     // this variable is changed under lock (the readmutex), but
     // inspected here without taking a lock. This is intentional.
