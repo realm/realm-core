@@ -22,6 +22,7 @@ struct SharedGroup::ReadCount {
 };
 
 struct SharedGroup::SharedInfo {
+    Atomic<uint64_t> current_version;
     Atomic<uint16_t> init_complete; // indicates lock file has valid content
     Atomic<uint16_t> shutdown_started; // indicates that shutdown is in progress
     uint16_t version;
@@ -32,7 +33,6 @@ struct SharedGroup::SharedInfo {
     uint64_t filesize;
 
     uint64_t current_top;
-    Atomic<uint64_t> current_version;
 
     uint32_t infosize;
     uint32_t capacity_mask; // Must be on the form 2**n - 1
