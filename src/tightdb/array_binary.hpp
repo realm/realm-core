@@ -34,6 +34,7 @@ public:
                 Allocator&) TIGHTDB_NOEXCEPT;
     ArrayBinary(ref_type, ArrayParent*, std::size_t ndx_in_parent,
                 Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
+    ~ArrayBinary() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     bool is_empty() const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT;

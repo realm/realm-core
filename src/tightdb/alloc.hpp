@@ -50,17 +50,6 @@ struct MemRef {
     ref_type m_ref;
 };
 
-// FIXME: Casting a pointer to std::size_t is inherently nonportable
-// (see the default definition of Allocator::alloc()). For example,
-// systems exist where pointers are 64 bits and std::size_t is 32. One
-// idea would be to use a different type for refs such as
-// std::uintptr_t, the problem with this one is that while it is
-// described by the C++11 standard it is not required to be
-// present. C++03 does not even mention it. A real working solution
-// will be to introduce a new name for the type of refs. The typedef
-// can then be made as complex as required to pick out an appropriate
-// type on any supported platform.
-
 
 /// The common interface for TightDB allocators.
 ///
@@ -87,16 +76,16 @@ public:
     ///
     /// \throw std::bad_alloc If insufficient memory was available.
     ///
-    /// Note: The underscore was added because the name \c realloc
+    /// Note: The underscore has been added because the name `realloc`
     /// would conflict with a macro on the Windows platform.
-    virtual MemRef realloc_(ref_type ref, const char* addr, std::size_t size) = 0;
+    virtual MemRef realloc_(ref_type ref, const char* addr, std::size_t old_size,
+                            std::size_t new_size) = 0;
 
-    // FIXME: SlabAlloc::free_() should be modified such than this
-    // method never throws.
+    /// Release the specified chunk of memory.
     ///
-    /// Note: The underscore was added because the name \c free would
-    /// conflict with a macro on the Windows platform.
-    virtual void free_(ref_type, const char* addr) = 0;
+    /// Note: The underscore has been added because the name `free
+    /// would conflict with a macro on the Windows platform.
+    virtual void free_(ref_type, const char* addr) TIGHTDB_NOEXCEPT = 0;
 
     /// Map the specified \a ref to the corresponding memory
     /// address. Note that if is_read_only(ref) returns true, then the
@@ -118,7 +107,7 @@ public:
     /// therefore, is not part of an actual database.
     static Allocator& get_default() TIGHTDB_NOEXCEPT;
 
-    virtual ~Allocator() {}
+    virtual ~Allocator() TIGHTDB_NOEXCEPT {}
 
 #ifdef TIGHTDB_DEBUG
     virtual void Verify() const = 0;

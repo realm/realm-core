@@ -85,21 +85,33 @@ CATEGORIES :
       - CODE   : ex_cpp_dyn_table_is_empty
         DESCR  :
 
-# TODO: describe what to use it for...
-  - g_dyn_table_is_valid:
-      NAME     : is_valid
-      SUMMARY  : &g_dyn_table_is_valid_summary
-                 Is table valid/consistent?
-      DESCR    : &g_dyn_table_is_valid_descr
-                 This method will perform a number of consistency checks on a table and its
-                 columns.
+  - g_dyn_table_is_attached:
+      NAME     : is_attached
+      SUMMARY  : &g_dyn_table_is_attached_summary
+                 Check whether this table accessor is still in the
+                 attached state.
+      DESCR    : &g_dyn_table_is_attached_descr
+                 A table accessor that is no longer attached must not
+                 be accessed in any way except by calling
+                 is_attached(). A table accessor that is obtained from
+                 a Group becomes detached if its group accessor is
+                 destroyed. This is also true for any subtable
+                 accessor that is obtained indirectly from a group. A
+                 subtable accessor will generally become detached if
+                 its parent table is modified. Calling a const member
+                 function on a parent table accessor, will never
+                 detach its subtable accessors, though. An accessor
+                 for a freestanding table will never become
+                 detached. An accessor for a subtable of a
+                 freestanding table may become detached.
       CONST    : true
       RETURN:
         TYPES  : bool
-        DESCR  : &g_dyn_table_is_valid_return_descr
-                 <code>true</code> if table is valid, <code>false</code> otherwise.
+        DESCR  : &g_dyn_table_is_attached_return_descr
+                 <code>true</code> if, and only if this table accessor
+                 is still in the attached state.
       EXAMPLES:
-      - CODE   : ex_cpp_dyn_table_is_valid
+      - CODE   : ex_cpp_dyn_table_is_attached
         DESCR  :
 
 
@@ -1142,8 +1154,8 @@ CATEGORIES :
                  The JavaScript Object Notation (<a href="http://json.org">JSON</a>)
                  is useful for web/mobile applications and serialization.
 
-                 A table (and subtables) will be formatted as a array of rows, and row will
-                 be formatted as an object.
+                 A table (and subtables) will be formatted as an array of rows, 
+                 and a row will be formatted as an object.
       CONST    : true
       PARAMS:
       - NAME   : out
@@ -1153,14 +1165,16 @@ CATEGORIES :
       - CODE   : ex_cpp_dyn_table_to_json
         DESCR  :
 
+  - g_dyn_table_to_string_2:
+      IGNORE   : ""
   - g_dyn_table_to_string:
       NAME     : to_string
       SUMMARY  : &g_dyn_table_to_string_summary
                  Convert table to a string.
       DESCR    : &g_dyn_table_to_string_descr
-                 >
-                 This method will convert a table and its columns and rows to a format
-                 which is easily read by humans.
+                 This method will convert a table and its columns and rows to a 
+                 human readable format.
+      SIGNATURE: void to_string(std::ostream& out, std::size_t limit = 500) const
       CONST    : true
       PARAMS:
       - NAME   : out
@@ -1168,7 +1182,7 @@ CATEGORIES :
         DESCR  : &g_dyn_table_to_string_parm1_descr
                  Output stream.
       - NAME   : limit
-        TYPES  : size_t
+        TYPES  : std::size_t
         DESCR  : &g_dyn_table_to_string_parm2_descr
                  "The number of rows to convert. Default: 500."
       EXAMPLES:
@@ -1177,19 +1191,18 @@ CATEGORIES :
       SEE      : See also {@link g_dyn_table_row_to_string} which do the same for a specific row.
 
   - g_dyn_table_row_to_string:
-      NAME     : to_string
+      NAME     : row_to_string
       SUMMARY  : &g_dyn_table_row_to_string_summary
                  Convert a row to a string.
       DESCR    : &g_dyn_table_row_to_string_descr
-                 >
-                 This method will convert a row to a format
-                 which is easily read by humans.
+                 This method will convert a specified row to a
+                 human readable format.
       CONST    : true
       PARAMS:
       - NAME   : row_ndx
-        TYPES  : size_t
+        TYPES  : std::size_t
         DESCR  : &g_dyn_table_row_to_string_parm1_descr
-                 The row index.
+                 The index of the row to convert.
       - NAME   : out
         TYPES  : std::ostream&
         DESCR  : &g_dyn_table_row_to_string_parm2_descr

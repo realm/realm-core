@@ -18,7 +18,7 @@ using namespace tightdb::test_util;
 #ifdef _WIN32
 
 
-uint_fast64_t Timer::get_timer_ticks()
+uint_fast64_t Timer::get_timer_ticks() const
 {
     return GetTickCount();
 }

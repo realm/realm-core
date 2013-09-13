@@ -34,7 +34,7 @@ using std::size_t;
 class TableViewBase {
 public:
     bool is_empty() const TIGHTDB_NOEXCEPT { return m_refs.is_empty(); }
-    size_t size() const TIGHTDB_NOEXCEPT { return m_refs.size(); }
+    std::size_t size() const TIGHTDB_NOEXCEPT { return m_refs.size(); }
 
     // Column information
     size_t      get_column_count() const TIGHTDB_NOEXCEPT;
@@ -46,11 +46,11 @@ public:
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     bool        get_bool(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     Date        get_date(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    float       get_float(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
-    double      get_double(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
+    float       get_float(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    double      get_double(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     StringData  get_string(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
-    Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const; // FIXME: Should be modified so it never throws
+    BinaryData  get_binary(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    Mixed       get_mixed(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     DataType    get_mixed_type(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     // Subtables
@@ -95,7 +95,7 @@ public:
 
     // Sort the view according to the specified column and the
     // specified direction.
-    void sort(size_t column, bool ascending = true);
+    void sort(size_t column_ndx, bool ascending = true);
 
     // Get row index in the source table this view is "looking" at.
     size_t get_source_ndx(size_t row_ndx) const TIGHTDB_NOEXCEPT
@@ -106,16 +106,9 @@ public:
     // Conversion
     void to_json(std::ostream& out) const;
     void to_string(std::ostream& out, size_t limit=500) const;
+    void row_to_string(std::size_t row_ndx, std::ostream& out) const;
 
 protected:
-    friend class Table;
-    friend class Query;
-
-    template <class R, class V> static R find_all_integer(V*, size_t, int64_t);
-    template <class R, class V> static R find_all_float(V*, size_t, float);
-    template <class R, class V> static R find_all_double(V*, size_t, double);
-    template <class R, class V> static R find_all_string(V*, size_t, StringData);
-
     Table* m_table;
     Array m_refs;
 
@@ -130,17 +123,25 @@ protected:
         m_table(tv.m_table), m_refs(tv.m_refs, Allocator::get_default()) {}
 
     /// Moving constructor.
-    TableViewBase(TableViewBase*);
+    TableViewBase(TableViewBase*) TIGHTDB_NOEXCEPT;
 
-    ~TableViewBase() { m_refs.destroy(); }
+    ~TableViewBase() TIGHTDB_NOEXCEPT { m_refs.destroy(); }
 
-    void move_assign(TableViewBase*);
+    void move_assign(TableViewBase*) TIGHTDB_NOEXCEPT;
 
-    Array& get_ref_column() { return m_refs; }
-    const Array& get_ref_column() const { return m_refs; }
+    Array& get_ref_column() TIGHTDB_NOEXCEPT { return m_refs; }
+    const Array& get_ref_column() const TIGHTDB_NOEXCEPT { return m_refs; }
+
+    template <class R, class V> static R find_all_integer(V*, std::size_t, int64_t);
+    template <class R, class V> static R find_all_float(V*, std::size_t, float);
+    template <class R, class V> static R find_all_double(V*, std::size_t, double);
+    template <class R, class V> static R find_all_string(V*, std::size_t, StringData);
 
 private:
-    size_t find_first_integer(size_t column_ndx, int64_t value) const;
+    std::size_t find_first_integer(std::size_t column_ndx, int64_t value) const;
+
+    friend class Table;
+    friend class Query;
 };
 
 
@@ -180,6 +181,7 @@ class ConstTableView;
 class TableView: public TableViewBase {
 public:
     TableView() {}
+    ~TableView() TIGHTDB_NOEXCEPT {}
     TableView& operator=(TableView tv) { move_assign(&tv); return *this; }
     friend TableView move(TableView& tv) { return TableView(&tv); }
 
@@ -226,16 +228,16 @@ public:
     const Table& get_parent() const TIGHTDB_NOEXCEPT { return *m_table; }
 
 private:
+    TableView(Table& parent): TableViewBase(&parent) {}
+    TableView(TableView* tv) TIGHTDB_NOEXCEPT: TableViewBase(tv) {}
+
+    TableView find_all_integer(size_t column_ndx, int64_t value);
+    ConstTableView find_all_integer(size_t column_ndx, int64_t value) const;
+
     friend class ConstTableView;
     friend class Table;
     friend class Query;
     friend class TableViewBase;
-
-    TableView(Table& parent): TableViewBase(&parent) {}
-    TableView(TableView* tv): TableViewBase(tv) {}
-
-    TableView find_all_integer(size_t column_ndx, int64_t value);
-    ConstTableView find_all_integer(size_t column_ndx, int64_t value) const;
 };
 
 
@@ -254,6 +256,7 @@ private:
 class ConstTableView: public TableViewBase {
 public:
     ConstTableView() {}
+    ~ConstTableView() TIGHTDB_NOEXCEPT {}
     ConstTableView& operator=(ConstTableView tv) { move_assign(&tv); return *this; }
     friend ConstTableView move(ConstTableView& tv) { return ConstTableView(&tv); }
 
@@ -274,16 +277,18 @@ public:
    const Table& get_parent() const TIGHTDB_NOEXCEPT { return *m_table; }
 
 private:
+    ConstTableView(const Table& parent): TableViewBase(const_cast<Table*>(&parent)) {}
+    ConstTableView(ConstTableView* tv) TIGHTDB_NOEXCEPT: TableViewBase(tv) {}
+
+    ConstTableView find_all_integer(size_t column_ndx, int64_t value) const;
+
     friend class TableView;
     friend class Table;
     friend class Query;
     friend class TableViewBase;
-
-    ConstTableView(const Table& parent): TableViewBase(const_cast<Table*>(&parent)) {}
-    ConstTableView(ConstTableView* tv): TableViewBase(tv) {}
-
-    ConstTableView find_all_integer(size_t column_ndx, int64_t value) const;
 };
+
+
 
 
 // ================================================================================================
@@ -307,14 +312,14 @@ private:
     TIGHTDB_ASSERT(row_ndx < m_refs.size());
 
 
-inline TableViewBase::TableViewBase(TableViewBase* tv):
+inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
     m_table(tv->m_table),
     m_refs(tv->m_refs) // Note: This is a moving copy
 {
     tv->m_table = 0;
 }
 
-inline void TableViewBase::move_assign(TableViewBase* tv)
+inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
 {
     m_table = tv->m_table;
     tv->m_table = 0;
@@ -353,7 +358,8 @@ inline DataType TableViewBase::get_column_type(size_t column_ndx) const TIGHTDB_
 // Getters
 
 
-inline int64_t TableViewBase::get_int(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline int64_t TableViewBase::get_int(size_t column_ndx, size_t row_ndx) const
+    TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX(column_ndx, row_ndx);
 
@@ -361,7 +367,8 @@ inline int64_t TableViewBase::get_int(size_t column_ndx, size_t row_ndx) const T
     return m_table->get_int(column_ndx, real_ndx);
 }
 
-inline bool TableViewBase::get_bool(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline bool TableViewBase::get_bool(size_t column_ndx, size_t row_ndx) const
+    TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Bool);
 
@@ -369,7 +376,8 @@ inline bool TableViewBase::get_bool(size_t column_ndx, size_t row_ndx) const TIG
     return m_table->get_bool(column_ndx, real_ndx);
 }
 
-inline Date TableViewBase::get_date(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT
+inline Date TableViewBase::get_date(size_t column_ndx, size_t row_ndx) const
+    TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Date);
 
@@ -378,6 +386,7 @@ inline Date TableViewBase::get_date(size_t column_ndx, size_t row_ndx) const TIG
 }
 
 inline float TableViewBase::get_float(size_t column_ndx, size_t row_ndx) const
+    TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Float);
 
@@ -386,6 +395,7 @@ inline float TableViewBase::get_float(size_t column_ndx, size_t row_ndx) const
 }
 
 inline double TableViewBase::get_double(size_t column_ndx, size_t row_ndx) const
+    TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Double);
 
@@ -403,6 +413,7 @@ inline StringData TableViewBase::get_string(size_t column_ndx, size_t row_ndx) c
 }
 
 inline BinaryData TableViewBase::get_binary(size_t column_ndx, size_t row_ndx) const
+    TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Binary);
 
@@ -411,6 +422,7 @@ inline BinaryData TableViewBase::get_binary(size_t column_ndx, size_t row_ndx) c
 }
 
 inline Mixed TableViewBase::get_mixed(size_t column_ndx, size_t row_ndx) const
+    TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Mixed);
 
@@ -465,7 +477,7 @@ R TableViewBase::find_all_integer(V* view, size_t column_ndx, int64_t value)
     R tv(*view->m_table);
     for (size_t i = 0; i < view->m_refs.size(); i++)
         if (view->get_int(column_ndx, i) == value)
-            tv.get_ref_column().add(i);
+            tv.get_ref_column().add(view->get_source_ndx(i));
     return move(tv);
 }
 
@@ -475,7 +487,7 @@ R TableViewBase::find_all_float(V* view, size_t column_ndx, float value)
     R tv(*view->m_table);
     for (size_t i = 0; i < view->m_refs.size(); i++)
         if (view->get_float(column_ndx, i) == value)
-            tv.get_ref_column().add(i);
+            tv.get_ref_column().add(view->get_source_ndx(i));
     return move(tv);
 }
 
@@ -485,7 +497,7 @@ R TableViewBase::find_all_double(V* view, size_t column_ndx, double value)
     R tv(*view->m_table);
     for (size_t i = 0; i < view->m_refs.size(); i++)
         if (view->get_double(column_ndx, i) == value)
-            tv.get_ref_column().add(i);
+            tv.get_ref_column().add(view->get_source_ndx(i));
     return move(tv);
 }
 
@@ -499,7 +511,7 @@ R TableViewBase::find_all_string(V* view, size_t column_ndx, StringData value)
     R tv(*view->m_table);
     for (size_t i = 0; i < view->m_refs.size(); i++) {
         if (view->get_string(column_ndx, i) == value)
-            tv.get_ref_column().add(i);
+            tv.get_ref_column().add(view->get_source_ndx(i));
     }
     return move(tv);
 }

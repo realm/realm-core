@@ -1,7 +1,6 @@
 SOURCE_ROOT = src
 ENABLE_INSTALL_STATIC_LIBS = 1
 ENABLE_INSTALL_DEBUG_LIBS  = 1
-ENABLE_INSTALL_DEBUG_PROGS = 1
 
 # Construct fat binaries on Darwin when using Clang
 ifneq ($(TIGHTDB_ENABLE_FAT_BINARIES),)
