@@ -313,33 +313,33 @@ class ColumnAccessorBase;
 
 
 // Handle cases where left side is a constant (int, float, int64_t, double)
-template <class L, class Cond, class R> Query& create (L left, const Subexpr2<R>& right) 
+template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>& right) 
 {
     // Fallback to old query_engine if it supports this particular condition because it's faster. Supported conditions
     // are 'int_col Cond int' and 'int Cond int_col' (by reversing expression).
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
     if(column && (SameType<L, int>::value || SameType<L, int64_t>::value) && (SameType<R, int>::value || SameType<R, int64_t>::value)) {
         const Table* t = (const_cast<Columns<R>*>(column))->get_table();
-        Query* q = new Query(*t);
+        Query q = Query(*t);
 
         if(SameType<Cond, Less>::value)
-            q->greater(column->m_column, left);
+            q.greater(column->m_column, left);
         else if(SameType<Cond, Greater>::value)
-            q->less(column->m_column, left);        
+            q.less(column->m_column, left);        
         else if(SameType<Cond, Equal>::value)
-            q->equal(column->m_column, left);        
+            q.equal(column->m_column, left);        
         else if(SameType<Cond, NotEqual>::value)
-            q->not_equal(column->m_column, left);        
+            q.not_equal(column->m_column, left);        
         else if(SameType<Cond, LessEqual>::value)
-            q->greater_equal(column->m_column, left);        
+            q.greater_equal(column->m_column, left);        
         else if(SameType<Cond, GreaterEqual>::value)
-            q->less_equal(column->m_column, left);
+            q.less_equal(column->m_column, left);
         else {
             // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
             // fallback to using use 'return *new Compare<>' instead.
             TIGHTDB_ASSERT(false); 
         }
-        return *q;
+        return q;
     }
     else {
         return *new Compare<Cond, typename Common<R, float>::type>(*new Value<L>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
@@ -411,7 +411,7 @@ public:
 
 
 
-template <class Cond> Query& create2 (const Subexpr2<R>& right) 
+template <class Cond> Query create2 (const Subexpr2<R>& right) 
 {
     // Fallback to old query_engine if it supports this particular condition because it's faster.
     const Columns<R>* left_col = dynamic_cast<const Columns<R>*>(      static_cast<Subexpr2<L>*>(this)    );
@@ -419,55 +419,55 @@ template <class Cond> Query& create2 (const Subexpr2<R>& right)
 
     if(left_col && right_col && SameType<L, R>::value) {
         const Table* t = (const_cast<Columns<R>*>(left_col))->get_table();
-        Query* q = new Query(*t);
+        Query q = Query(*t);
 
         if(SameType<L, int>::value || SameType<L, int64_t>::value) {
             if(SameType<Cond, Less>::value)
-                q->less_int(left_col->m_column, right_col->m_column);
+                q.less_int(left_col->m_column, right_col->m_column);
             else if(SameType<Cond, Greater>::value)
-                q->greater_int(left_col->m_column, right_col->m_column);
+                q.greater_int(left_col->m_column, right_col->m_column);
             else if(SameType<Cond, Equal>::value)
-                q->equal_int(left_col->m_column, right_col->m_column);
+                q.equal_int(left_col->m_column, right_col->m_column);
             else if(SameType<Cond, NotEqual>::value)
-                q->not_equal_int(left_col->m_column, right_col->m_column);
+                q.not_equal_int(left_col->m_column, right_col->m_column);
             else if(SameType<Cond, LessEqual>::value)
-                q->less_equal_int(left_col->m_column, right_col->m_column);
+                q.less_equal_int(left_col->m_column, right_col->m_column);
             else if(SameType<Cond, GreaterEqual>::value)
-                q->greater_equal_int(left_col->m_column, right_col->m_column);
+                q.greater_equal_int(left_col->m_column, right_col->m_column);
             else {
                 TIGHTDB_ASSERT(false); 
             }
         }
         else if(SameType<L, float>::value) {
             if(SameType<Cond, Less>::value)
-                q->less_float(left_col->m_column, right_col->m_column);
+                q.less_float(left_col->m_column, right_col->m_column);
             else if(SameType<Cond, Greater>::value)
-                q->greater_float(left_col->m_column, right_col->m_column);
+                q.greater_float(left_col->m_column, right_col->m_column);
             else if(SameType<Cond, Equal>::value)
-                q->equal_float(left_col->m_column, right_col->m_column);
+                q.equal_float(left_col->m_column, right_col->m_column);
             else if(SameType<Cond, NotEqual>::value)
-                q->not_equal_float(left_col->m_column, right_col->m_column);
+                q.not_equal_float(left_col->m_column, right_col->m_column);
             else if(SameType<Cond, LessEqual>::value)
-                q->less_equal_float(left_col->m_column, right_col->m_column);
+                q.less_equal_float(left_col->m_column, right_col->m_column);
             else if(SameType<Cond, GreaterEqual>::value)
-                q->greater_equal_float(left_col->m_column, right_col->m_column);
+                q.greater_equal_float(left_col->m_column, right_col->m_column);
             else {
                 TIGHTDB_ASSERT(false); 
             }
         }
         else if(SameType<L, double>::value) {
             if(SameType<Cond, Less>::value)
-                q->less_double(left_col->m_column, right_col->m_column);
+                q.less_double(left_col->m_column, right_col->m_column);
             else if(SameType<Cond, Greater>::value)
-                q->greater_double(left_col->m_column, right_col->m_column);
+                q.greater_double(left_col->m_column, right_col->m_column);
             else if(SameType<Cond, Equal>::value)
-                q->equal_double(left_col->m_column, right_col->m_column);
+                q.equal_double(left_col->m_column, right_col->m_column);
             else if(SameType<Cond, NotEqual>::value)
-                q->not_equal_double(left_col->m_column, right_col->m_column);
+                q.not_equal_double(left_col->m_column, right_col->m_column);
             else if(SameType<Cond, LessEqual>::value)
-                q->less_equal_double(left_col->m_column, right_col->m_column);
+                q.less_equal_double(left_col->m_column, right_col->m_column);
             else if(SameType<Cond, GreaterEqual>::value)
-                q->greater_equal_double(left_col->m_column, right_col->m_column);
+                q.greater_equal_double(left_col->m_column, right_col->m_column);
             else {
                 TIGHTDB_ASSERT(false); 
             }
@@ -476,7 +476,7 @@ template <class Cond> Query& create2 (const Subexpr2<R>& right)
             TIGHTDB_ASSERT(false); 
         }
 
-        return *q;
+        return q;
     }
     else {
         return *new Compare<Cond, typename Common<R, float>::type>(static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);

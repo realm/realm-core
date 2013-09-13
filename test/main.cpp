@@ -93,11 +93,16 @@ int main(int argc, char* argv[])
 
     // This is the first demonstration of fallback to old query_engine for the specific cases where it's possible
     // because old engine is faster. This will return a ->less(...) query
-    match = (20.3 > untyped.column<double>(2)).find_next();
-    assert(match == 0);
 
     match = (untyped.column<int64_t>(0) == untyped.column<int64_t>(0)).find_next();
     assert(match == 0);
+
+
+//    return 0;
+
+    match = (20.3 > untyped.column<double>(2) + 2).find_next();
+    assert(match == 0);
+
 
     match = (untyped.column<int64_t>(0) > untyped.column<int64_t>(0)).find_next();
     assert(match == not_found);
