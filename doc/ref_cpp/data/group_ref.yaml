@@ -74,7 +74,7 @@ CATEGORIES  :
                  Group::mode_ReadWriteNoCreate: Open in read/write mode. Fail if the file does not already exist.
       - NAME   : buffer
         TYPES  : BinaryData
-        DESCR  : &g_group_constructor_memory_parm3_descr
+        DESCR  : &g_in_memory_binary_descr
                  In-memory binary encoded representation of a group.
       RETURN:
         TYPES  : Group
