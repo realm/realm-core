@@ -465,7 +465,11 @@ public:
     }
 
     T load() const;
+    T load_acquire() const;
+    T load_relaxed() const;
     void store(T value); 
+    void store_release(T value); 
+    void store_relaxed(T value); 
 
 private:
     // the following is not supported
@@ -490,14 +494,37 @@ private:
 template<typename T>
 inline T Atomic<T>::load() const
 {
+    return state.load();
+}
+
+template<typename T>
+inline T Atomic<T>::load_acquire() const
+{
     return state.load(std::memory_order_acquire);
+}
+
+template<typename T>
+inline T Atomic<T>::load_relaxed() const
+{
+    return state.load(std::memory_order_relaxed);
 }
 
 template<typename T>
 inline void Atomic<T>::store(T value) 
 {
+    state.store(value);
+}
+
+inline void Atomic<T>::store_release(T value) 
+{
     state.store(value, std::memory_order_release);
 }
+
+inline void Atomic<T>::store_relaxed(T value) 
+{
+    state.store(value, std::memory_order_relaxed);
+}
+
 #else
 #ifdef _MSC_VER
 template<typename T>
@@ -516,13 +543,41 @@ inline void Atomic<T>::store(T value)
 #ifdef __GNUC__
 // gcc implementation, pre c++11:
 template<typename T>
-inline T Atomic<T>::load() const
+inline T Atomic<T>::load_acquire() const
 {
-    // prevent registerization of state (this is not really needed, I think)
-    asm volatile ("" : : : "memory");
 #ifdef TIGHTDB_HAVE_GCC_GE_4_7
     T retval = __atomic_load_n(&state, __ATOMIC_ACQUIRE);
 #else
+    // prevent registerization of state (this is not really needed, I think)
+    asm volatile ("" : : : "memory");
+    TIGHTDB_STATIC_ASSERT(sizeof(T) <= sizeof(ptrdiff_t), "Unsupported atomic size");
+    T retval = state;
+    __sync_synchronize();
+#endif
+    return retval;
+}
+
+template<typename T>
+inline T Atomic<T>::load_relaxed() const
+{
+#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+    T retval = __atomic_load_n(&state, __ATOMIC_RELAXED);
+#else
+    // prevent registerization of state (this is not really needed, I think)
+    asm volatile ("" : : : "memory");
+    T retval = state;
+#endif
+    return retval;
+}
+
+template<typename T>
+inline T Atomic<T>::load() const
+{
+#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+    T retval = __atomic_load_n(&state, __ATOMIC_SEQ_CST);
+#else
+    // prevent registerization of state (this is not really needed, I think)
+    asm volatile ("" : : : "memory");
     T retval = state;
     __sync_synchronize();
 #endif
@@ -533,18 +588,46 @@ template<typename T>
 inline void Atomic<T>::store(T value) 
 {
 #ifdef TIGHTDB_HAVE_GCC_GE_4_7
+    __atomic_store_n(&state, value, __ATOMIC_SEQ_CST);
+#else
+    __sync_synchronize();
+    state = value;
+    // prevent registerization of state (this is not really needed, I think)
+    asm volatile ("" : : : "memory");
+#endif
+}
+
+template<typename T>
+inline void Atomic<T>::store_release(T value) 
+{
+#ifdef TIGHTDB_HAVE_GCC_GE_4_7
     __atomic_store_n(&state, value, __ATOMIC_RELEASE);
 #else
     __sync_synchronize();
     state = value;
-#endif
     // prevent registerization of state (this is not really needed, I think)
     asm volatile ("" : : : "memory");
+#endif
+}
+
+template<typename T>
+inline void Atomic<T>::store_relaxed(T value) 
+{
+#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+    __atomic_store_n(&state, value, __ATOMIC_RELAXED);
+#else
+    state = value;
+    // prevent registerization of state (this is not really needed, I think)
+    asm volatile ("" : : : "memory");
+#endif
 }
 
 #endif // GCC
 #endif // C++11 else
 
+
 } // namespace tightdb
+
+
 
 #endif // TIGHTDB_THREAD_HPP

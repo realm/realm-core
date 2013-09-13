@@ -185,11 +185,11 @@ private:
 
     // Must be called only by someone that has a lock on the write
     // mutex.
-    std::size_t get_current_version() TIGHTDB_NOEXCEPT;
+    uint64_t get_current_version() TIGHTDB_NOEXCEPT;
 
     // Must be called only by someone that has a lock on the write
     // mutex.
-    void low_level_commit(std::size_t new_version);
+    void low_level_commit(uint64_t new_version);
 
     void do_async_commits();
 

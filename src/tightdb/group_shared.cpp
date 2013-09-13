@@ -56,12 +56,12 @@ SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
     filesize = alloc.get_baseline();
     infosize = uint32_t(file_size);
     current_top     = alloc.get_top_ref();
-    current_version.store(1);
+    current_version.store_relaxed(1);
     capacity_mask   = init_readers_size - 1;
     put_pos = 0;
     get_pos = 0;
-    shutdown_started.store(0);
-    init_complete.store(1);
+    shutdown_started.store_release(0);
+    init_complete.store_release(1);
 }
 
 
@@ -244,7 +244,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
             // Set initial version so we can track if other instances
             // change the db
-            m_version = info->current_version.load();
+            m_version = info->current_version.load_relaxed();
             // In async mode we need a separate process to do the async commits
             // We start it up here during init so that it only get started once
             if (dlevel == durability_Async) {
@@ -254,15 +254,15 @@ void SharedGroup::open(const string& path, bool no_create_file,
         else {
             // wait for init complete:
             int wait_count = 100000;
-            while (wait_count && (info->init_complete.load() == 0)) {
+            while (wait_count && (info->init_complete.load_acquire() == 0)) {
                 wait_count--;
                 usleep(10);
             }
-            if (info->init_complete.load() == 0)
+            if (info->init_complete.load_acquire() == 0)
                 throw runtime_error("Lock file initialization incomplete");
             if (info->version != 0)
                 throw runtime_error("Unsupported version");
-            if (info->shutdown_started.load()) {
+            if (info->shutdown_started.load_acquire()) {
                 must_retry = true;
                 usleep(100);
                 continue;
@@ -300,7 +300,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             SharedInfo* const info = m_file_map.get_addr();
             int maxwait = 100000;
             while (maxwait--) {
-                if (info->init_complete.load() == 2) {
+                if (info->init_complete.load_acquire() == 2) {
                     // NOTE: access to info following the return is separeted
                     // from the above check by synchronization primitives. Were
                     // that not the case, a read barrier would be needed here.
@@ -340,11 +340,11 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
         return;
     }
 
-    if (info->shutdown_started.load()) {
+    if (info->shutdown_started.load_acquire()) {
         m_file.unlock();
         return;
     }
-    info->shutdown_started.store(1);
+    info->shutdown_started.store_release(1);
 
     // If the db file is just backing for a transient data structure,
     // we can delete it when done.
@@ -368,7 +368,7 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
     const SharedInfo* info = m_file_map.get_addr();
     // this variable is changed under lock (the readmutex), but
     // inspected here without taking a lock. This is intentional.
-    bool changed = m_version != info->current_version.load();
+    bool changed = m_version != info->current_version.load_acquire();
     return changed;
 }
 
@@ -379,7 +379,7 @@ void SharedGroup::do_async_commits()
     // NO client are allowed to proceed and update current_version
     // until they see the init_complete == 2. 
     // As we haven't set init_complete to 2 yet, it is safe to assert the following:
-    TIGHTDB_ASSERT(info->current_version.load() == 0);
+    TIGHTDB_ASSERT(info->current_version.load_relaxed() == 0);
 
     // We always want to keep a read lock on the last version
     // that was commited to disk, to protect it against being
@@ -388,13 +388,13 @@ void SharedGroup::do_async_commits()
     // processes that that they can start commiting to the db.
     begin_read();
     uint64_t last_version = m_version;
-    info->init_complete.store(2); // allow waiting clients to proceed
+    info->init_complete.store_release(2); // allow waiting clients to proceed
     m_group.detach();
     while(true) {
 
         if (m_file.is_removed()) { // operator removed the lock file. take a hint!
 
-            info->shutdown_started.store(1);
+            info->shutdown_started.store_release(1);
             shutdown = true;
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Lock file removed, initiating shutdown" << endl;
@@ -407,7 +407,7 @@ void SharedGroup::do_async_commits()
         // the daemon has abandoned it. It can then wait for the
         // lock file to be removed (with a timeout). 
         if (m_file.try_lock_exclusive()) {
-            info->shutdown_started.store(1);
+            info->shutdown_started.store_release(1);
             shutdown = true;
         }
         // if try_lock_exclusive fails, we loose our read lock, so
@@ -484,20 +484,20 @@ const Group& SharedGroup::begin_read()
         // Get the current top ref
         new_top_ref   = to_size_t(info->current_top);
         new_file_size = to_size_t(info->filesize);
-        m_version     = info->current_version.load();
+        m_version     = info->current_version.load_relaxed();
 
         // Update reader list
         if (ringbuf_is_empty()) {
-            ReadCount r2 = { info->current_version.load(), 1 };
+            ReadCount r2 = { info->current_version.load_relaxed(), 1 };
             ringbuf_put(r2); // Throws
         }
         else {
             ReadCount& r = ringbuf_get_last();
-            if (r.version == info->current_version.load()) {
+            if (r.version == info->current_version.load_relaxed()) {
                 ++r.count;
             }
             else {
-                ReadCount r2 = { info->current_version.load(), 1 };
+                ReadCount r2 = { info->current_version.load_relaxed(), 1 };
                 ringbuf_put(r2); // Throws
             }
         }
@@ -634,10 +634,10 @@ void SharedGroup::commit()
             new_version = repl->commit_write_transact(*this); // Throws
         }
         else {
-            new_version = info->current_version.load() + 1; 
+            new_version = info->current_version.load_relaxed() + 1; 
         }
 #else
-        new_version = info->current_version.load() + 1; 
+        new_version = info->current_version.load_relaxed() + 1; 
 #endif
         // Reset version tracking in group if we are
         // starting from a new lock file
@@ -922,7 +922,7 @@ void SharedGroup::zero_free_space()
 
     {
         Mutex::Lock lock(info->readmutex);
-        current_version = info->current_version.load() + 1;
+        current_version = info->current_version.load_relaxed() + 1;
         file_size = to_size_t(info->filesize);
 
         if (ringbuf_is_empty()) {
@@ -943,7 +943,7 @@ void SharedGroup::zero_free_space()
 uint64_t SharedGroup::get_current_version() TIGHTDB_NOEXCEPT
 {
     SharedInfo* info = m_file_map.get_addr();
-    return info->current_version.load();
+    return info->current_version.load_relaxed();
 }
 
 void SharedGroup::low_level_commit(uint64_t new_version)
@@ -987,7 +987,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
         Mutex::Lock lock(info->readmutex);
         info->current_top = new_top_ref;
         info->filesize    = new_file_size;
-        info->current_version.store(new_version);
+        info->current_version.store_relaxed(new_version);
     }
 
     // Save last version for has_changed()
