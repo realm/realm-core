@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_TABLE_VIEW
+
 #include <UnitTest++.h>
 #include <tightdb/table_macros.hpp>
 #include <string>
@@ -648,3 +651,5 @@ TEST(TableView_to_string)
     tv.row_to_string(0,ss3);
     CHECK_EQUAL(s+s1, ss3.str());
 }
+
+#endif // TEST_TABLE_VIEW

@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_TABLE
+
 #include <algorithm>
 #include <string>
 #include <fstream>
@@ -2326,3 +2329,5 @@ TEST(Table_FormerLeakCase)
     root.set_subtable(0, 0, &sub);
     root.set_subtable(0, 0, 0);
 }
+
+#endif // TEST_TABLE

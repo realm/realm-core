@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_TRANSACTIONS_LASSE
+
 #include <cstdlib>
 #include <iostream>
 
@@ -28,9 +31,6 @@ using namespace tightdb;
 
 
 // The tests in this file are run if you #define STRESSTEST1 and/or #define STRESSTEST2. Please define them in testsettings.hpp
-
-
-#if defined STRESSTEST1 || defined STRESSTEST3 || defined STRESSTEST4
 
 namespace {
 
@@ -77,11 +77,7 @@ TIGHTDB_FORCEINLINE void rand_sleep()
 
 } // anonymous namespace
 
-#endif // defined STRESSTEST1 || defined STRESSTEST3 || defined STRESSTEST4
 
-
-
-#ifdef STRESSTEST1
 
 // *************************************************************************************
 // *
@@ -177,11 +173,6 @@ TEST(Transactions_Stress1)
     File::try_remove("database.tightdb");
 }
 
-#endif // STRESSTEST1
-
-
-
-#ifdef STRESSTEST2
 
 // *************************************************************************************
 // *
@@ -239,11 +230,6 @@ TEST(Transactions_Stress2)
     File::try_remove("database.tightdb");
 }
 
-#endif // STRESSTEST2
-
-
-
-#ifdef STRESSTEST3
 
 // *************************************************************************************
 // *
@@ -360,12 +346,6 @@ TEST(Transactions_Stress3)
     File::try_remove("database.tightdb");
 }
 
-#endif // STRESSTEST3
-
-
-
-
-#ifdef STRESSTEST4
 
 // *************************************************************************************
 // *
@@ -464,4 +444,4 @@ TEST(Transactions_Stress4)
     File::try_remove("database.tightdb");
 }
 
-#endif // STRESSTEST4
+#endif // TEST_TRANSACTIONS_LASSE

@@ -1,3 +1,5 @@
+
+
 #ifndef TESTSETTINGS_H
 #define TESTSETTINGS_H
 
@@ -15,11 +17,34 @@
 // #including pthread_test.h. Works both in debug and release mode.
 //#define TIGHTDB_PTHREADS_TEST
 
-// Transaction stress tests in test_transactions_lasse.cpp that take a long time to run
-//#define STRESSTEST1
-//#define STRESSTEST2
-//#define STRESSTEST3
-//#define STRESSTEST4
+
+#define TEST_ALLOC
+#define TEST_ARRAY
+#define TEST_ARRAY_BINARY
+#define TEST_ARRAY_BLOB
+#define TEST_ARRAY_FLOAT
+#define TEST_ARRAY_STRING
+#define TEST_ARRAY_STRING_LONG
+#define TEST_COLUMN
+#define TEST_COLUMN_BASIC
+#define TEST_COLUMN_BINARY
+#define TEST_COLUMN_FLOAT
+#define TEST_COLUMN_MIXED
+#define TEST_COLUMN_STRING
+#define TEST_FILE
+#define TEST_GROUP
+#define TEST_INDEX_STRING
+#define TEST_LANG_BIND_HELPER
+#define TEST_QUERY
+#define TEST_SHARED
+#define TEST_STRING_DATA
+#define TEST_TABLE
+#define TEST_TABLE_VIEW
+#define TEST_THREAD
+#define TEST_TRANSACTIONS
+#define TEST_UTF8
+//#define TEST_TRANSACTIONS_LASSE // Takes a long time
+//#define TEST_INDEX // not implemented yet
 
 // Bypass an overflow bug in BinaryData. Todo/fixme
 #define TIGHTDB_BYPASS_BINARYDATA_BUG
