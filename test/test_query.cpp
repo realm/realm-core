@@ -106,6 +106,7 @@ TEST(CountLimit)
     CHECK_EQUAL(1, count3);
 }
 
+
 TEST(TestQueryStrIndexCrash)
 {
     // Rasmus "8" index crash
@@ -716,10 +717,9 @@ TEST(TestQueryStrIndex)
 
 }
 
+
 TEST(Group_GameAnalytics)
 {
-    UnitTest::Timer timer;
-
     {
         Group g;
         GATable::Ref t = g.get_table<GATable>("firstevents");
@@ -740,13 +740,11 @@ TEST(Group_GameAnalytics)
 
     GATable::Query q = t->where().country.equal("US");
 
-    timer.Start();
     size_t c1 = 0;
     for (size_t i = 0; i < 100; ++i) {
         c1 += t->column().country.count("US");
     }
 
-    timer.Start();
     size_t c2 = 0;
     for (size_t i = 0; i < 100; ++i) {
         c2 += q.count();
@@ -754,9 +752,8 @@ TEST(Group_GameAnalytics)
 
     CHECK_EQUAL(c1, t->size() * 100);
     CHECK_EQUAL(c1, c2);
-
-
 }
+
 
 TEST(TestQueryFloat3)
 {

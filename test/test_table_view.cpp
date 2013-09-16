@@ -6,6 +6,7 @@
 using namespace tightdb;
 
 namespace {
+
 TIGHTDB_TABLE_1(TestTableInt,
                 first, Int)
 
@@ -17,7 +18,8 @@ TIGHTDB_TABLE_2(TestTableDate,
                 first, Date,
                 second, Int)
 
-}
+} // anonymous namespace
+
 
 TEST(TableViewJSON)
 {

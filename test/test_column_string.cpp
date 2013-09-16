@@ -202,7 +202,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringInsert1)
 TEST_FIXTURE(db_setup_column_string, ColumnStringDelete1)
 {
     // Delete from end
-    c.erase(9);
+    c.erase(9, 9 == c.size()-1);
 
     CHECK_EQUAL(9, c.size());
 
@@ -220,7 +220,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete1)
 TEST_FIXTURE(db_setup_column_string, ColumnStringDelete2)
 {
     // Delete from top
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
 
     CHECK_EQUAL(8, c.size());
 
@@ -237,7 +237,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete2)
 TEST_FIXTURE(db_setup_column_string, ColumnStringDelete3)
 {
     // Delete from middle
-    c.erase(3);
+    c.erase(3, 3 == c.size()-1);
 
     CHECK_EQUAL(7, c.size());
 
@@ -253,19 +253,19 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete3)
 TEST_FIXTURE(db_setup_column_string, ColumnStringDeleteAll)
 {
     // Delete all items one at a time
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(6, c.size());
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(5, c.size());
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(4, c.size());
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(3, c.size());
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(2, c.size());
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(1, c.size());
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(0, c.size());
 
     CHECK(c.is_empty());
@@ -398,6 +398,9 @@ TEST(ColumnStringAutoEnumerate)
     e.destroy();
 }
 
+
+#if !defined DISABLE_INDEX
+
 TEST(ColumnStringAutoEnumerateIndex)
 {
     AdaptiveStringColumn c;
@@ -462,8 +465,8 @@ TEST(ColumnStringAutoEnumerateIndex)
     CHECK_EQUAL(2, res6);
 
     // Delete values
-    e.erase(1);
-    e.erase(0);
+    e.erase(1, 1 == e.size()-1);
+    e.erase(0, 0 == e.size()-1);
     size_t res7 = e.count("a");
     size_t res8 = e.count("newval");
     CHECK_EQUAL(4, res7);
@@ -521,6 +524,9 @@ TEST(ColumnStringAutoEnumerateIndexReuse)
     c.destroy();
     e.destroy();
 }
+
+#endif // !defined DISABLE_INDEX
+
 
 // Test "Replace string array with long string array" when doing it through LeafSet()
 TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2)
@@ -755,6 +761,9 @@ TEST(AdaptiveStringColumnCount)
     e.destroy();
 }
 
+
+#if !defined DISABLE_INDEX
+
 TEST(AdaptiveStringColumnIndex)
 {
     AdaptiveStringColumn asc;
@@ -823,9 +832,9 @@ TEST(AdaptiveStringColumnIndex)
     CHECK_EQUAL(19, ins3);
 
     // Delete some values
-    asc.erase(0);  // top
-    asc.erase(7);  // middle
-    asc.erase(17); // bottom
+    asc.erase(0,  0  == asc.size()-1);  // top
+    asc.erase(7,  7  == asc.size()-1);  // middle
+    asc.erase(17, 17 == asc.size()-1); // bottom
     const size_t del1 = asc.find_first("top");
     const size_t del2 = asc.find_first("middle");
     const size_t del3 = asc.find_first("bottom");
@@ -847,6 +856,9 @@ TEST(AdaptiveStringColumnIndex)
     // Clean-up
     asc.destroy();
 }
+
+#endif // !defined DISABLE_INDEX
+
 
 TEST_FIXTURE(db_setup_column_string, ColumnString_Destroy)
 {

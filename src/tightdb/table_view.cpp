@@ -319,7 +319,13 @@ void TableView::remove(size_t ndx)
 
     // Update refs
     m_refs.erase(ndx);
-    m_refs.IncrementIf(ndx, -1);
+
+    // Decrement row indexes greater than or equal to ndx
+    //
+    // FIXME: I believe this should have been 'real_ndx', not 'ndx'
+    //
+    // FIXME: Dangerous cast below: unsigned -> signed
+    m_refs.adjust_ge(int_fast64_t(ndx), -1);
 }
 
 

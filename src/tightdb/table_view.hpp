@@ -315,6 +315,7 @@ inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
     m_table(tv->m_table),
     m_refs(tv->m_refs) // Note: This is a moving copy
 {
+    tv->m_refs.detach();
     tv->m_table = 0;
 }
 

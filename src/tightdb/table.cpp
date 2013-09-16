@@ -174,7 +174,7 @@ void Table::detach_subtable_accessors() TIGHTDB_NOEXCEPT
     size_t n = m_cols.size();
     for (size_t i=0; i<n; ++i) {
         ColumnBase* c = reinterpret_cast<ColumnBase*>(uintptr_t(m_cols.get(i)));
-        c->detach_subtable_accessors_virtual();
+        c->detach_subtable_accessors();
     }
 }
 
@@ -879,7 +879,7 @@ const ColumnMixed& Table::get_column_mixed(size_t ndx) const TIGHTDB_NOEXCEPT
 size_t Table::add_empty_row(size_t num_rows)
 {
     size_t n = get_column_count();
-    for (size_t i=0; i<n; ++i) {
+    for (size_t i = 0; i != n; ++i) {
         ColumnBase& column = get_column_base(i);
         for (size_t j=0; j<num_rows; ++j) {
             column.add();
@@ -901,7 +901,7 @@ void Table::insert_empty_row(size_t ndx, size_t num_rows)
 {
     size_t ndx2 = ndx + num_rows; // FIXME: Should we check for overflow?
     size_t n = get_column_count();
-    for (size_t i=0; i<n; ++i) {
+    for (size_t i = 0; i != n; ++i) {
         ColumnBase& column = get_column_base(i);
         // FIXME: This could maybe be optimized by passing 'num_rows' to column.insert()
         for (size_t j=ndx; j<ndx2; ++j) {
@@ -918,8 +918,8 @@ void Table::insert_empty_row(size_t ndx, size_t num_rows)
 
 void Table::clear()
 {
-    size_t count = get_column_count();
-    for (size_t i = 0; i < count; ++i) {
+    size_t n = get_column_count();
+    for (size_t i = 0; i != n; ++i) {
         ColumnBase& column = get_column_base(i);
         column.clear();
     }
@@ -934,10 +934,12 @@ void Table::remove(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_size);
 
-    size_t count = get_column_count();
-    for (size_t i = 0; i < count; ++i) {
+    bool is_last = ndx == m_size - 1;
+
+    size_t n = get_column_count();
+    for (size_t i = 0; i != n; ++i) {
         ColumnBase& column = get_column_base(i);
-        column.erase(ndx);
+        column.erase(ndx, is_last);
     }
     --m_size;
 
@@ -950,8 +952,8 @@ void Table::move_last_over(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx+1 < m_size);
 
-    size_t count = get_column_count();
-    for (size_t i = 0; i < count; ++i) {
+    size_t n = get_column_count();
+    for (size_t i = 0; i != n; ++i) {
         ColumnBase& column = get_column_base(i);
         column.move_last_over(ndx);
     }
@@ -1135,7 +1137,7 @@ void Table::add_int(size_t column_ndx, int64_t value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Int);
-    get_column(column_ndx).Increment64(value);
+    get_column(column_ndx).adjust(value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().add_int_to_column(column_ndx, value); // Throws
@@ -2703,74 +2705,28 @@ pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) 
 
 void Table::Verify() const
 {
+    TIGHTDB_ASSERT(is_attached());
+    if (!m_columns.is_attached())
+        return; // Accessor for degenerate subtable
+
     if (m_top.is_attached())
         m_top.Verify();
     m_columns.Verify();
     if (m_columns.is_attached()) {
-        size_t column_count = get_column_count();
-        TIGHTDB_ASSERT(column_count == m_cols.size());
+        size_t n = get_column_count();
+        TIGHTDB_ASSERT(n == m_cols.size());
 
-        for (size_t i = 0; i < column_count; ++i) {
-            ColumnType type = get_real_column_type(i);
-            switch (type) {
-                case type_Int:
-                case type_Bool:
-                case type_Date: {
-                    const Column& column = get_column(i);
-                    TIGHTDB_ASSERT(column.size() == m_size);
-                    column.Verify();
-                    break;
-                }
-                case type_Float: {
-                    const ColumnFloat& column = get_column_float(i);
-                    TIGHTDB_ASSERT(column.size() == m_size);
-                    column.Verify();
-                    break;
-                }
-                case type_Double: {
-                    const ColumnDouble& column = get_column_double(i);
-                    TIGHTDB_ASSERT(column.size() == m_size);
-                    column.Verify();
-                    break;
-                }
-                case type_String: {
-                    const AdaptiveStringColumn& column = get_column_string(i);
-                    TIGHTDB_ASSERT(column.size() == m_size);
-                    column.Verify();
-                    break;
-                }
-                case col_type_StringEnum: {
-                    const ColumnStringEnum& column = get_column_string_enum(i);
-                    TIGHTDB_ASSERT(column.size() == m_size);
-                    column.Verify();
-                    break;
-                }
-                case type_Binary: {
-                    const ColumnBinary& column = get_column_binary(i);
-                    TIGHTDB_ASSERT(column.size() == m_size);
-                    column.Verify();
-                    break;
-                }
-                case type_Table: {
-                    const ColumnTable& column = get_column_table(i);
-                    TIGHTDB_ASSERT(column.size() == m_size);
-                    column.Verify();
-                    break;
-                }
-                case type_Mixed: {
-                    const ColumnMixed& column = get_column_mixed(i);
-                    TIGHTDB_ASSERT(column.size() == m_size);
-                    column.Verify();
-                    break;
-                }
-                default:
-                    TIGHTDB_ASSERT(false);
-            }
+        for (size_t i = 0; i != n; ++i) {
+            const ColumnBase& column = get_column_base(i);
+            TIGHTDB_ASSERT(column.size() == m_size);
+            column.Verify();
         }
     }
 
     m_spec.Verify();
 
+    // FIXME: It is a waste of time to check the allocator for each
+    // table in a group.
     Allocator& alloc = m_columns.get_alloc();
     alloc.Verify();
 }
@@ -2779,8 +2735,8 @@ void Table::Verify() const
 void Table::to_dot(ostream& out, StringData title) const
 {
     if (m_top.is_attached()) {
-        out << "subgraph cluster_topleveltable" << m_top.get_ref() << " {" << endl;
-        out << " label = \"TopLevelTable";
+        out << "subgraph cluster_table_with_spec" << m_top.get_ref() << " {" << endl;
+        out << " label = \"Table";
         if (0 < title.size())
             out << "\\n'" << title << "'";
         out << "\";" << endl;
@@ -2807,8 +2763,8 @@ void Table::to_dot_internal(ostream& out) const
     m_columns.to_dot(out, "columns");
 
     // Columns
-    size_t column_count = get_column_count();
-    for (size_t i = 0; i < column_count; ++i) {
+    size_t n = get_column_count();
+    for (size_t i = 0; i != n; ++i) {
         const ColumnBase& column = get_column_base(i);
         StringData name = get_column_name(i);
         column.to_dot(out, name);
@@ -2893,6 +2849,23 @@ MemStats Table::stats() const
     MemStats stats;
     m_top.stats(stats);
     return stats;
+}
+
+
+void Table::dump_node_structure() const
+{
+    dump_node_structure(cerr, 0);
+}
+
+void Table::dump_node_structure(ostream& out, int level) const
+{
+    int indent = level * 2;
+    out << setw(indent) << "" << "Table (top_ref: "<<m_top.get_ref()<<")\n";
+    size_t n = get_column_count();
+    for (size_t i = 0; i != n; ++i) {
+        const ColumnBase& column = get_column_base(i);
+        column.dump_node_structure(out, level+1);
+    }
 }
 
 

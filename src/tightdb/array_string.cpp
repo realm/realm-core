@@ -2,6 +2,7 @@
 #include <cstdio> // debug
 #include <algorithm>
 #include <iostream>
+#include <iomanip>
 
 #include <tightdb/utilities.hpp>
 #include <tightdb/column.hpp>
@@ -295,22 +296,23 @@ size_t ArrayString::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEX
     return bytes_without_header / width;
 }
 
-size_t ArrayString::count(StringData value, size_t begin, size_t end) const
+size_t ArrayString::count(StringData value, size_t begin, size_t end) const TIGHTDB_NOEXCEPT
 {
-    size_t count = 0;
+    size_t num_matches = 0;
 
-    size_t lastmatch = begin - 1;
+    size_t begin_2 = begin;
     for (;;) {
-        lastmatch = find_first(value, lastmatch+1, end);
-        if (lastmatch != not_found)
-            ++count;
-        else break;
+        size_t ndx = find_first(value, begin_2, end);
+        if (ndx == not_found)
+            break;
+        ++num_matches;
+        begin_2 = ndx + 1;
     }
 
-    return count;
+    return num_matches;
 }
 
-size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
+size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const TIGHTDB_NOEXCEPT
 {
     if (end == size_t(-1))
         end = m_size;
@@ -329,7 +331,8 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
 // https://github.com/Tightdb/tightdb/pull/84
         const char* data = m_data;
         for (size_t i = begin; i != end; ++i) {
-            if (TIGHTDB_UNLIKELY(data[i * m_width] == 0)) return i;
+            if (TIGHTDB_UNLIKELY(data[i * m_width] == 0))
+                return i;
         }
 //        const char* data = m_data + (m_width-1);
 //        for (size_t i = begin; i != end; ++i) {
@@ -342,13 +345,15 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
             const char* data = m_data + (i * m_width);
             size_t j = 0;
             for (;;) {
-                if (TIGHTDB_LIKELY(data[j] != value[j])) break;
+                if (TIGHTDB_LIKELY(data[j] != value[j]))
+                    break;
                 ++j;
                 if (TIGHTDB_UNLIKELY(j == value.size())) {
 // FIXME: The following line is a temporary fix, and will soon be
 // replaced by the commented block that follows it. See
 // https://github.com/Tightdb/tightdb/pull/84
-                    if (TIGHTDB_LIKELY(data[j] == 0)) return i;
+                    if (TIGHTDB_LIKELY(data[j] == 0))
+                        return i;
 //                    size_t size = (m_width-1) - data[m_width-1];
 //                    if (TIGHTDB_LIKELY(size == value.size())) return i;
                     break;
@@ -357,18 +362,19 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
         }
     }
 
-    return size_t(-1); // not found
+    return not_found;
 }
 
 void ArrayString::find_all(Array& result, StringData value, size_t add_offset,
                            size_t begin, size_t end)
 {
-    size_t first = begin - 1;
+    size_t begin_2 = begin;
     for (;;) {
-        first = find_first(value, first + 1, end);
-        if (first != size_t(-1))
-            result.add(first + add_offset);
-        else break;
+        size_t ndx = find_first(value, begin_2, end);
+        if (ndx == not_found)
+            break;
+        result.add(add_offset + ndx); // Throws
+        begin_2 = ndx + 1;
     }
 }
 
@@ -385,7 +391,7 @@ bool ArrayString::compare_string(const ArrayString& c) const
     return true;
 }
 
-ref_type ArrayString::btree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
+ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
     TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_LIST_SIZE);
@@ -442,28 +448,12 @@ void ArrayString::string_stats() const
     cout << "         avg: " << zavg << "\n";
 }
 
-/*
-void ArrayString::to_dot(FILE* f) const
-{
-    const size_t ref = getRef();
-
-    fprintf(f, "n%zx [label=\"", ref);
-
-    for (size_t i = 0; i < m_size; ++i) {
-        if (i > 0) fprintf(f, " | ");
-
-        fprintf(f, "%s", get_c_str(i));
-    }
-
-    fprintf(f, "\"];\n");
-}
-*/
 
 void ArrayString::to_dot(ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
 
-    if (title.size() > 0) {
+    if (title.size() != 0) {
         out << "subgraph cluster_" << ref << " {" << endl;
         out << " label = \"" << title << "\";" << endl;
         out << " color = white;" << endl;
@@ -476,13 +466,15 @@ void ArrayString::to_dot(ostream& out, StringData title) const
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\">";
     out << "0x" << hex << ref << dec << "</FONT></TD>" << endl;
 
-    for (size_t i = 0; i < m_size; ++i) {
+    for (size_t i = 0; i < m_size; ++i)
         out << "<TD>\"" << get(i) << "\"</TD>" << endl;
-    }
 
     out << "</TR></TABLE>>];" << endl;
-    if (title.size() > 0)
+
+    if (title.size() != 0)
         out << "}" << endl;
+
+    to_dot_parent_edge(out);
 }
 
 #endif // TIGHTDB_DEBUG

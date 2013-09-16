@@ -1,6 +1,10 @@
+#include <cstring>
+
 #include <UnitTest++.h>
+
 #include <tightdb/array_blob.hpp>
 
+using namespace std;
 using namespace tightdb;
 
 TEST(ArrayBlob)

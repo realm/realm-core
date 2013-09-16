@@ -170,29 +170,29 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryDelete)
     c.add(BinaryData("ghij", 5));
     c.add(BinaryData("klmno", 6));
 
-    c.erase(0); // first
+    c.erase(0, 0 == c.size()-1); // first
     CHECK_EQUAL("bc", c.get(0).data());
     CHECK_EQUAL("def", c.get(1).data());
     CHECK_EQUAL("ghij", c.get(2).data());
     CHECK_EQUAL("klmno", c.get(3).data());
     CHECK_EQUAL(4, c.size());
 
-    c.erase(3); // last
+    c.erase(3, 3 == c.size()-1); // last
     CHECK_EQUAL("bc", c.get(0).data());
     CHECK_EQUAL("def", c.get(1).data());
     CHECK_EQUAL("ghij", c.get(2).data());
     CHECK_EQUAL(3, c.size());
 
-    c.erase(1); // middle
+    c.erase(1, 1 == c.size()-1); // middle
     CHECK_EQUAL("bc", c.get(0).data());
     CHECK_EQUAL("ghij", c.get(1).data());
     CHECK_EQUAL(2, c.size());
 
-    c.erase(0); // single
+    c.erase(0, 0 == c.size()-1); // single
     CHECK_EQUAL("ghij", c.get(0).data());
     CHECK_EQUAL(1, c.size());
 
-    c.erase(0); // all
+    c.erase(0, 0 == c.size()-1); // all
     CHECK_EQUAL(0, c.size());
     CHECK(c.is_empty());
 }

@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <iostream>
+#include <iomanip>
 
 #include <tightdb/column_binary.hpp>
 
@@ -32,25 +34,6 @@ ColumnBinary::~ColumnBinary() TIGHTDB_NOEXCEPT
     }
 }
 
-bool ColumnBinary::is_empty() const TIGHTDB_NOEXCEPT
-{
-    if (root_is_leaf())
-        return static_cast<ArrayBinary*>(m_array)->is_empty();
-
-    Array offsets = NodeGetOffsets();
-    return offsets.is_empty();
-}
-
-size_t ColumnBinary::size() const  TIGHTDB_NOEXCEPT
-{
-    if (root_is_leaf())
-        return static_cast<ArrayBinary*>(m_array)->size();
-
-    Array offsets = NodeGetOffsets();
-    size_t size = offsets.is_empty() ? 0 : to_size_t(offsets.back());
-    return size;
-}
-
 void ColumnBinary::clear()
 {
     if (m_array->is_leaf()) {
@@ -73,17 +56,55 @@ void ColumnBinary::clear()
     m_array = array;
 }
 
-void ColumnBinary::set(size_t ndx, BinaryData bin)
+
+namespace {
+
+struct SetLeafElem: Array::UpdateHandler {
+    Allocator& m_alloc;
+    const BinaryData m_value;
+    const bool m_add_zero_term;
+    SetLeafElem(Allocator& alloc, BinaryData value, bool add_zero_term) TIGHTDB_NOEXCEPT:
+        m_alloc(alloc), m_value(value), m_add_zero_term(add_zero_term) {}
+    void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
+                size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+    {
+        ArrayBinary leaf(mem, parent, ndx_in_parent, m_alloc);
+        leaf.set(elem_ndx_in_leaf, m_value, m_add_zero_term); // Throws
+    }
+};
+
+} // anonymous namespace
+
+void ColumnBinary::set(size_t ndx, BinaryData value)
 {
     TIGHTDB_ASSERT(ndx < size());
-    TreeSet<BinaryData, ColumnBinary>(ndx, bin);
+
+    if (m_array->is_leaf()) {
+        static_cast<ArrayBinary*>(m_array)->set(ndx, value); // Throws
+        return;
+    }
+
+    bool add_zero_term = false;
+    SetLeafElem set_leaf_elem(m_array->get_alloc(), value, add_zero_term);
+    m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
 void ColumnBinary::set_string(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < size());
-    TreeSet<StringData, ColumnBinary>(ndx, value);
+
+    BinaryData value_2(value.data(), value.size());
+    bool add_zero_term = true;
+
+    if (m_array->is_leaf()) {
+        static_cast<ArrayBinary*>(m_array)->set(ndx, value_2, add_zero_term); // Throws
+        return;
+    }
+
+    SetLeafElem set_leaf_elem(m_array->get_alloc(), value_2, add_zero_term);
+    m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
+
 
 void ColumnBinary::fill(size_t count)
 {
@@ -102,10 +123,63 @@ void ColumnBinary::fill(size_t count)
 }
 
 
-void ColumnBinary::erase(size_t ndx)
+class ColumnBinary::EraseLeafElem: public ColumnBase::EraseHandlerBase {
+public:
+    EraseLeafElem(ColumnBinary& column) TIGHTDB_NOEXCEPT:
+        EraseHandlerBase(column) {}
+    bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
+                         size_t leaf_ndx_in_parent,
+                         size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+    {
+        ArrayBinary leaf(leaf_mem, parent, leaf_ndx_in_parent, get_alloc());
+        TIGHTDB_ASSERT(leaf.size() >= 1);
+        size_t last_ndx = leaf.size() - 1;
+        if (last_ndx == 0)
+            return true;
+        size_t ndx = elem_ndx_in_leaf;
+        if (ndx == npos)
+            ndx = last_ndx;
+        leaf.erase(ndx); // Throws
+        return false;
+    }
+    void destroy_leaf(MemRef leaf_mem) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    {
+        ArrayParent* parent = 0;
+        size_t ndx_in_parent = 0;
+        Array leaf(leaf_mem, parent, ndx_in_parent, get_alloc());
+        leaf.destroy();
+    }
+    void replace_root_by_leaf(MemRef leaf_mem) TIGHTDB_OVERRIDE
+    {
+        ArrayParent* parent = 0;
+        size_t ndx_in_parent = 0;
+        UniquePtr<Array> leaf(new ArrayBinary(leaf_mem, parent, ndx_in_parent,
+                                              get_alloc())); // Throws
+        replace_root(leaf); // Throws
+    }
+    void replace_root_by_empty_leaf() TIGHTDB_OVERRIDE
+    {
+        ArrayParent* parent = 0;
+        size_t ndx_in_parent = 0;
+        UniquePtr<Array> leaf(new ArrayBinary(parent, ndx_in_parent,
+                                              get_alloc())); // Throws
+        replace_root(leaf); // Throws
+    }
+};
+
+void ColumnBinary::erase(size_t ndx, bool is_last)
 {
     TIGHTDB_ASSERT(ndx < size());
-    TreeDelete<BinaryData,ColumnBinary>(ndx);
+    TIGHTDB_ASSERT(is_last == (ndx == size()-1));
+
+    if (m_array->is_leaf()) {
+        static_cast<ArrayBinary*>(m_array)->erase(ndx); // Throws
+        return;
+    }
+
+    size_t ndx_2 = is_last ? npos : ndx;
+    EraseLeafElem erase_leaf_elem(*this);
+    Array::erase_bptree_elem(m_array, ndx_2, erase_leaf_elem); // Throws
 }
 
 void ColumnBinary::resize(size_t ndx)
@@ -117,52 +191,45 @@ void ColumnBinary::resize(size_t ndx)
 
 void ColumnBinary::move_last_over(size_t ndx)
 {
+    // FIXME: ExceptionSafety: The current implementation of this
+    // function is not exception-safe, and it is hard to see how to
+    // repair it.
+
+    // FIXME: Consider doing two nested calls to
+    // update_bptree_elem(). If the two leafs are not the same, no
+    // copying is needed. If they are the same, call
+    // ArrayBinary::move_last_over() (does not yet
+    // exist). ArrayBinary::move_last_over() could be implemented in a
+    // way that avoids the intermediate copy. This approach is also
+    // likely to be necesseray for exception safety.
+
     TIGHTDB_ASSERT(ndx+1 < size());
 
-    const size_t ndx_last = size()-1;
+    size_t last_ndx = size() - 1;
+    BinaryData value = get(last_ndx);
 
-    const BinaryData v = get(ndx_last);
-    set(ndx, v);
+    // Copying binary data from a column to itself requires an
+    // intermediate copy of the data (constr:bptree-copy-to-self).
+    UniquePtr<char[]> buffer(new char[value.size()]);
+    copy(value.data(), value.data()+value.size(), buffer.get());
+    BinaryData copy_of_value(buffer.get(), value.size());
 
-    // If the copy happened within the same array
-    // it might have moved the source data when making
-    // room for the insert. In that case we wil have to
-    // copy again from the new position
-    // TODO: manual resize before copy
-    const BinaryData v2 = get(ndx_last);
-    if (v != v2)
-        set(ndx, v2);
+    set(ndx, copy_of_value);
 
-    erase(ndx_last);
+    bool is_last = true;
+    erase(last_ndx, is_last);
 }
 
 bool ColumnBinary::compare_binary(const ColumnBinary& c) const
 {
-    const size_t n = size();
+    size_t n = size();
     if (c.size() != n)
         return false;
-    for (size_t i=0; i<n; ++i) {
+    for (size_t i = 0; i != n; ++i) {
         if (get(i) != c.get(i))
             return false;
     }
     return true;
-}
-
-void ColumnBinary::LeafSet(size_t ndx, BinaryData value)
-{
-    static_cast<ArrayBinary*>(m_array)->set(ndx, value);
-}
-
-void ColumnBinary::LeafSet(size_t ndx, StringData value)
-{
-    BinaryData value_2(value.data(), value.size());
-    bool add_zero_term = true;
-    static_cast<ArrayBinary*>(m_array)->set(ndx, value_2, add_zero_term);
-}
-
-void ColumnBinary::LeafDelete(size_t ndx)
-{
-    static_cast<ArrayBinary*>(m_array)->erase(ndx);
 }
 
 
@@ -174,16 +241,23 @@ void ColumnBinary::do_insert(size_t ndx, BinaryData value, bool add_zero_term)
     if (root_is_leaf()) {
         TIGHTDB_ASSERT(ndx == npos || ndx < TIGHTDB_MAX_LIST_SIZE);
         ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
-        new_sibling_ref = leaf->btree_leaf_insert(ndx, value, add_zero_term, state);
+        new_sibling_ref = leaf->bptree_leaf_insert(ndx, value, add_zero_term, state);
     }
     else {
         state.m_value = value;
         state.m_add_zero_term = add_zero_term;
-        new_sibling_ref = m_array->btree_insert(ndx, state);
+        if (ndx == npos) {
+            new_sibling_ref = m_array->bptree_append(state);
+        }
+        else {
+            new_sibling_ref = m_array->bptree_insert(ndx, state);
+        }
     }
 
-    if (TIGHTDB_UNLIKELY(new_sibling_ref))
-        introduce_new_root(new_sibling_ref, state);
+    if (TIGHTDB_UNLIKELY(new_sibling_ref)) {
+        bool is_append = ndx == npos;
+        introduce_new_root(new_sibling_ref, state, is_append);
+    }
 }
 
 
@@ -194,18 +268,68 @@ ref_type ColumnBinary::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
 {
     ArrayBinary leaf(leaf_mem, &parent, ndx_in_parent, alloc);
     InsertState& state_2 = static_cast<InsertState&>(state);
-    return leaf.btree_leaf_insert(insert_ndx, state.m_value, state_2.m_add_zero_term, state);
+    return leaf.bptree_leaf_insert(insert_ndx, state.m_value, state_2.m_add_zero_term, state);
 }
 
 
 #ifdef TIGHTDB_DEBUG
 
-void ColumnBinary::leaf_to_dot(ostream& out, const Array& array) const
+namespace {
+
+size_t verify_leaf(MemRef mem, Allocator& alloc)
 {
-    // Rebuild array to get correct type
-    ref_type ref = array.get_ref();
-    ArrayBinary binarray(ref, 0, 0, array.get_alloc());
-    binarray.to_dot(out);
+    ArrayBinary leaf(mem, 0, 0, alloc);
+    leaf.Verify();
+    return leaf.size();
+}
+
+} // anonymous namespace
+
+void ColumnBinary::Verify() const
+{
+    if (root_is_leaf()) {
+        static_cast<ArrayBinary*>(m_array)->Verify();
+        return;
+    }
+
+    m_array->verify_bptree(&verify_leaf);
+}
+
+
+void ColumnBinary::to_dot(ostream& out, StringData title) const
+{
+    ref_type ref = m_array->get_ref();
+    out << "subgraph cluster_binary_column" << ref << " {" << endl;
+    out << " label = \"Binary column";
+    if (title.size() != 0)
+        out << "\\n'" << title << "'";
+    out << "\";" << endl;
+    tree_to_dot(out);
+    out << "}" << endl;
+}
+
+void ColumnBinary::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
+                               ostream& out) const
+{
+    ArrayBinary leaf(leaf_mem.m_ref, parent, ndx_in_parent, m_array->get_alloc());
+    leaf.to_dot(out);
+}
+
+
+namespace {
+
+void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
+{
+    ArrayBinary leaf(mem, 0, 0, alloc);
+    int indent = level * 2;
+    out << setw(indent) << "" << "Binary leaf (size: "<<leaf.size()<<")\n";
+}
+
+} // anonymous namespace
+
+void ColumnBinary::dump_node_structure(ostream& out, int level) const
+{
+    m_array->dump_bptree_structure(out, level, &leaf_dumper);
 }
 
 #endif // TIGHTDB_DEBUG

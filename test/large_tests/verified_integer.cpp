@@ -113,7 +113,7 @@ void VerifiedInteger::set(size_t ndx, int64_t value)
 void VerifiedInteger::erase(size_t ndx)
 {
     v.erase(v.begin() + ndx);
-    u.erase(ndx);
+    u.erase(ndx, ndx == u.size());
     TIGHTDB_ASSERT(v.size() == u.size());
     verify_neighbours(ndx);
     TIGHTDB_ASSERT(conditional_verify());

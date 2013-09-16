@@ -319,11 +319,10 @@ TEST(Table_HighLevelCopy)
     CHECK(*table3 == table);
 }
 
+
 namespace {
 
-void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows); // pre-declaration
-
-void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
+void setup_multi_table(Table& table, size_t rows, size_t sub_rows)
 {
     // Create table with all column types
     Spec& s = table.get_spec();
@@ -420,7 +419,7 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
         }
 
         // Add sub-tables to table column
-        for (size_t j=0; j<sub_rows; j++) {
+        for (size_t j = 0; j != sub_rows; ++j) {
             TableRef subtable = table.get_subtable(10, i);
             int64_t val = -123+i*j*1234*sign;
             subtable->insert_int(0, j, val);
@@ -467,8 +466,8 @@ TEST(Table_Move_All_Types)
     table.set_index(6);
 
     while (table.size() > 1) {
-        const size_t len = table.size();
-        const size_t ndx = size_t(rand()) % (len-1);
+        size_t size = table.size();
+        size_t ndx = size_t(rand()) % (size-1);
 
         table.move_last_over(ndx);
 
@@ -1353,6 +1352,7 @@ TEST(Table_Spec_DeleteColumns)
     table->Verify();
 #endif
 }
+
 
 TEST(Table_Spec_AddColumns)
 {

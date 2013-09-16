@@ -13,7 +13,7 @@ TEST(ColumnMixed_Int)
     ColumnMixed c;
     int64_t maxval = numeric_limits<int64_t>::max();
     int64_t minval = numeric_limits<int64_t>::min();
-    int64_t allbit = 0xFFFFFFFFFFFFFFFF;
+    int64_t allbit = 0xFFFFFFFFFFFFFFFFULL; // FIXME: Undefined cast from unsigned to signed
 
     c.insert_int(0,     2);
     c.insert_int(1, minval);
@@ -86,7 +86,7 @@ TEST(ColumnMixed_Double)
 {
     ColumnMixed c;
 
-    uint64_t v = 0xFFFFFFFFFFFFFFFF;
+    uint64_t v = 0xFFFFFFFFFFFFFFFFULL;
     double d = double(v);
     double fval1[] = {1.0, 200.123, -111.222, d};
     double fval2[] = {-1.0, -100.123, numeric_limits<double>::max(), numeric_limits<double>::min()};

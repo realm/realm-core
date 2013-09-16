@@ -20,6 +20,10 @@
 #ifndef TIGHTDB_COLUMN_BASIC_TPL_HPP
 #define TIGHTDB_COLUMN_BASIC_TPL_HPP
 
+#include <algorithm>
+#include <utility>
+#include <iomanip>
+
 #include <tightdb/query_engine.hpp>
 
 
@@ -61,24 +65,11 @@ BasicColumn<T>::~BasicColumn() TIGHTDB_NOEXCEPT
 }
 
 template<class T>
-bool BasicColumn<T>::is_empty() const TIGHTDB_NOEXCEPT
-{
-    if (root_is_leaf())
-        return static_cast<BasicArray<T>*>(m_array)->is_empty();
-
-    Array offsets = NodeGetOffsets();
-    return offsets.is_empty();
-}
-
-template<class T>
-std::size_t BasicColumn<T>::size() const TIGHTDB_NOEXCEPT
+inline std::size_t BasicColumn<T>::size() const TIGHTDB_NOEXCEPT
 {
     if (root_is_leaf())
         return m_array->size();
-
-    Array offsets = NodeGetOffsets();
-    std::size_t size = offsets.is_empty() ? 0 : to_size_t(offsets.back());
-    return size;
+    return m_array->get_bptree_size();
 }
 
 template<class T>
@@ -120,11 +111,13 @@ void BasicColumn<T>::move_last_over(std::size_t ndx)
 {
     TIGHTDB_ASSERT(ndx+1 < size());
 
-    std::size_t ndx_last = size()-1;
-    T v = get(ndx_last);
+    std::size_t last_ndx = size() - 1;
+    T v = get(last_ndx);
 
     set(ndx, v);
-    erase(ndx_last);
+
+    bool is_last = true;
+    erase(last_ndx, is_last);
 }
 
 
@@ -135,17 +128,37 @@ T BasicColumn<T>::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     if (root_is_leaf())
         return static_cast<const BasicArray<T>*>(m_array)->get(ndx);
 
-    std::pair<MemRef, std::size_t> p = m_array->find_btree_leaf(ndx);
+    std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(ndx);
     const char* leaf_header = p.first.m_addr;
     std::size_t ndx_in_leaf = p.second;
     return BasicArray<T>::get(leaf_header, ndx_in_leaf);
 }
 
+
+template<class T>
+class BasicColumn<T>::SetLeafElem: public Array::UpdateHandler {
+public:
+    Allocator& m_alloc;
+    const T m_value;
+    SetLeafElem(Allocator& alloc, T value) TIGHTDB_NOEXCEPT: m_alloc(alloc), m_value(value) {}
+    void update(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
+                std::size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+    {
+        BasicArray<T> leaf(mem, parent, ndx_in_parent, m_alloc);
+        leaf.set(elem_ndx_in_leaf, m_value); // Throws
+    }
+};
+
 template<class T>
 void BasicColumn<T>::set(std::size_t ndx, T value)
 {
-    TIGHTDB_ASSERT(ndx < size());
-    TreeSet<T,BasicColumn<T> >(ndx, value);
+    if (m_array->is_leaf()) {
+        static_cast<BasicArray<T>*>(m_array)->set(ndx, value); // Throws
+        return;
+    }
+
+    SetLeafElem set_leaf_elem(m_array->get_alloc(), value);
+    m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
 template<class T>
@@ -170,9 +183,8 @@ void BasicColumn<T>::fill(std::size_t count)
     // Fill column with default values
     // TODO: this is a very naive approach
     // we could speedup by creating full nodes directly
-    for (std::size_t i = 0; i < count; ++i) {
+    for (std::size_t i = 0; i < count; ++i)
         add(T());
-    }
 
 #ifdef TIGHTDB_DEBUG
     Verify();
@@ -196,63 +208,185 @@ bool BasicColumn<T>::compare(const BasicColumn& c) const
 
 
 template<class T>
-void BasicColumn<T>::erase(std::size_t ndx)
+class BasicColumn<T>::EraseLeafElem: public ColumnBase::EraseHandlerBase {
+public:
+    EraseLeafElem(BasicColumn<T>& column) TIGHTDB_NOEXCEPT:
+        EraseHandlerBase(column) {}
+    bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
+                         std::size_t leaf_ndx_in_parent,
+                         std::size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+    {
+        BasicArray<T> leaf(leaf_mem, parent, leaf_ndx_in_parent, get_alloc());
+        TIGHTDB_ASSERT(leaf.size() >= 1);
+        std::size_t last_ndx = leaf.size() - 1;
+        if (last_ndx == 0)
+            return true;
+        std::size_t ndx = elem_ndx_in_leaf;
+        if (ndx == npos)
+            ndx = last_ndx;
+        leaf.erase(ndx); // Throws
+        return false;
+    }
+    void destroy_leaf(MemRef leaf_mem) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    {
+        get_alloc().free_(leaf_mem);
+    }
+    void replace_root_by_leaf(MemRef leaf_mem) TIGHTDB_OVERRIDE
+    {
+        ArrayParent* parent = 0;
+        std::size_t ndx_in_parent = 0;
+        UniquePtr<Array> leaf(new BasicArray<T>(leaf_mem, parent, ndx_in_parent,
+                                                get_alloc())); // Throws
+        replace_root(leaf); // Throws
+    }
+    void replace_root_by_empty_leaf() TIGHTDB_OVERRIDE
+    {
+        ArrayParent* parent = 0;
+        std::size_t ndx_in_parent = 0;
+        UniquePtr<Array> leaf(new BasicArray<T>(parent, ndx_in_parent,
+                                                get_alloc())); // Throws
+        replace_root(leaf); // Throws
+    }
+};
+
+template<class T>
+void BasicColumn<T>::erase(std::size_t ndx, bool is_last)
 {
     TIGHTDB_ASSERT(ndx < size());
-    TreeDelete<T, BasicColumn<T> >(ndx);
-}
+    TIGHTDB_ASSERT(is_last == (ndx == size()-1));
 
-template<class T>
-void BasicColumn<T>::LeafSet(std::size_t ndx, T value)
-{
-    static_cast<BasicArray<T>*>(m_array)->set(ndx, value);
-}
+    if (m_array->is_leaf()) {
+        static_cast<BasicArray<T>*>(m_array)->erase(ndx); // Throws
+        return;
+    }
 
-template<class T>
-void BasicColumn<T>::LeafDelete(std::size_t ndx)
-{
-    static_cast<BasicArray<T>*>(m_array)->erase(ndx);
+    size_t ndx_2 = is_last ? npos : ndx;
+    EraseLeafElem erase_leaf_elem(*this);
+    Array::erase_bptree_elem(m_array, ndx_2, erase_leaf_elem); // Throws
 }
 
 
 #ifdef TIGHTDB_DEBUG
 
 template<class T>
-void BasicColumn<T>::leaf_to_dot(std::ostream& out, const Array& array) const
+std::size_t BasicColumn<T>::verify_leaf(MemRef mem, Allocator& alloc)
 {
-    // Rebuild array to get correct type
-    ref_type ref = array.get_ref();
-    BasicArray<T> new_array(ref, 0, 0, array.get_alloc());
+    BasicArray<T> leaf(mem, 0, 0, alloc);
+    leaf.Verify();
+    return leaf.size();
+}
 
-    new_array.to_dot(out);
+template<class T>
+void BasicColumn<T>::Verify() const
+{
+    if (root_is_leaf()) {
+        static_cast<BasicArray<T>*>(m_array)->Verify();
+        return;
+    }
+
+    m_array->verify_bptree(&BasicColumn<T>::verify_leaf);
+}
+
+
+template<class T>
+void BasicColumn<T>::to_dot(std::ostream& out, StringData title) const
+{
+    ref_type ref = m_array->get_ref();
+    out << "subgraph cluster_basic_column" << ref << " {\n";
+    out << " label = \"Basic column";
+    if (title.size() != 0)
+        out << "\\n'" << title << "'";
+    out << "\";\n";
+    tree_to_dot(out);
+    out << "}\n";
+}
+
+template<class T>
+void BasicColumn<T>::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, std::size_t ndx_in_parent,
+                                 std::ostream& out) const
+{
+    BasicArray<T> leaf(leaf_mem.m_ref, parent, ndx_in_parent, m_array->get_alloc());
+    leaf.to_dot(out);
+}
+
+template<class T>
+inline void BasicColumn<T>::leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
+{
+    BasicArray<T> leaf(mem, 0, 0, alloc);
+    int indent = level * 2;
+    out << std::setw(indent) << "" << "Basic leaf (size: "<<leaf.size()<<")\n";
+}
+
+template<class T>
+inline void BasicColumn<T>::dump_node_structure(std::ostream& out, int level) const
+{
+    m_array->dump_bptree_structure(out, level, &leaf_dumper);
 }
 
 #endif // TIGHTDB_DEBUG
 
 
-template<class T> template<class F>
-std::size_t BasicColumn<T>::LeafFind(T value, std::size_t start, std::size_t end) const
+template<class T>
+std::size_t BasicColumn<T>::find_first(T value, std::size_t begin, std::size_t end) const
 {
-    return static_cast<BasicArray<T>*>(m_array)->find_first(value, start, end);
+    TIGHTDB_ASSERT(begin <= size());
+    TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
+
+    if (root_is_leaf())
+        return static_cast<BasicArray<T>*>(m_array)->
+            find_first(value, begin, end); // Throws (maybe)
+
+    // FIXME: It would be better to always require that 'end' is
+    // specified explicitely, since Table has the size readily
+    // available, and Array::get_bptree_size() is deprecated.
+    if (end == npos)
+        end = m_array->get_bptree_size();
+
+    std::size_t ndx_in_tree = begin;
+    while (ndx_in_tree < end) {
+        std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(ndx_in_tree);
+        BasicArray<T> leaf(p.first, 0, 0, m_array->get_alloc());
+        std::size_t ndx_in_leaf = p.second;
+        std::size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
+        std::size_t end_in_leaf = std::min(leaf.size(), end - leaf_offset);
+        std::size_t ndx = leaf.find_first(value, ndx_in_leaf, end_in_leaf); // Throws (maybe)
+        if (ndx != not_found)
+            return leaf_offset + ndx;
+        ndx_in_tree = leaf_offset + end_in_leaf;
+    }
+
+    return not_found;
 }
 
 template<class T>
-void BasicColumn<T>::LeafFindAll(Array &result, T value, std::size_t add_offset,
-                                 std::size_t start, std::size_t end) const
+void BasicColumn<T>::find_all(Array &result, T value, std::size_t begin, std::size_t end) const
 {
-    return static_cast<BasicArray<T>*>(m_array)->find_all(result, value, add_offset, start, end);
-}
+    TIGHTDB_ASSERT(begin <= size());
+    TIGHTDB_ASSERT(end == npos || (begin <= end && end <= size()));
 
-template<class T>
-std::size_t BasicColumn<T>::find_first(T value, std::size_t start, std::size_t end) const
-{
-    return TreeFind<T, BasicColumn<T>, Equal>(value, start, end);
-}
+    if (root_is_leaf()) {
+        std::size_t leaf_offset = 0;
+        static_cast<BasicArray<T>*>(m_array)->
+            find_all(result, value, leaf_offset, begin, end); // Throws
+        return;
+    }
 
-template<class T>
-void BasicColumn<T>::find_all(Array &result, T value, std::size_t start, std::size_t end) const
-{
-    TreeFindAll<T, BasicColumn<T> >(result, value, 0, start, end);
+    // FIXME: It would be better to always require that 'end' is
+    // specified explicitely, since Table has the size readily
+    // available, and Array::get_bptree_size() is deprecated.
+    if (end == npos)
+        end = m_array->get_bptree_size();
+
+    std::size_t ndx_in_tree = begin;
+    while (ndx_in_tree < end) {
+        std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(ndx_in_tree);
+        BasicArray<T> leaf(p.first, 0, 0, m_array->get_alloc());
+        std::size_t ndx_in_leaf = p.second;
+        std::size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
+        std::size_t end_in_leaf = std::min(leaf.size(), end - leaf_offset);
+        leaf.find_all(result, value, leaf_offset, ndx_in_leaf, end_in_leaf); // Throws
+        ndx_in_tree = leaf_offset + end_in_leaf;
+    }
 }
 
 template<class T>
@@ -262,36 +396,36 @@ std::size_t BasicColumn<T>::count(T target) const
 }
 
 template<class T>
-typename BasicColumn<T>::SumType BasicColumn<T>::sum(std::size_t start, std::size_t end) const
+typename BasicColumn<T>::SumType BasicColumn<T>::sum(std::size_t begin, std::size_t end) const
 {
-    return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, 0);
+    return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, begin, end, 0);
 }
 
 template<class T>
-double BasicColumn<T>::average(std::size_t start, std::size_t end) const
+double BasicColumn<T>::average(std::size_t begin, std::size_t end) const
 {
-    if (end == std::size_t(-1))
+    if (end == npos)
         end = size();
-    std::size_t size = end - start;
-    double sum1 = ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, 0);
-    double avg = sum1 / ( size == 0 ? 1 : size );
+    std::size_t size = end - begin;
+    double sum1 = ColumnBase::aggregate<T, SumType, act_Sum, None>(0, begin, end, 0);
+    double avg = sum1 / (size == 0 ? 1 : size);
     return avg;
 }
 
 template<class T>
-T BasicColumn<T>::minimum(std::size_t start, std::size_t end) const
+T BasicColumn<T>::minimum(std::size_t begin, std::size_t end) const
 {
-    return ColumnBase::aggregate<T, T, act_Min, None>(0, start, end, 0);
+    return ColumnBase::aggregate<T, T, act_Min, None>(0, begin, end, 0);
 }
 
 template<class T>
-T BasicColumn<T>::maximum(std::size_t start, std::size_t end) const
+T BasicColumn<T>::maximum(std::size_t begin, std::size_t end) const
 {
-    return ColumnBase::aggregate<T, T, act_Max, None>(0, start, end, 0);
+    return ColumnBase::aggregate<T, T, act_Max, None>(0, begin, end, 0);
 }
 
 
-template<class T> void BasicColumn<T>::do_insert(std::size_t ndx, T value)
+template<class T> inline void BasicColumn<T>::do_insert(std::size_t ndx, T value)
 {
     TIGHTDB_ASSERT(ndx == npos || ndx < size());
     ref_type new_sibling_ref;
@@ -299,15 +433,22 @@ template<class T> void BasicColumn<T>::do_insert(std::size_t ndx, T value)
     if (root_is_leaf()) {
         TIGHTDB_ASSERT(ndx == npos || ndx < TIGHTDB_MAX_LIST_SIZE);
         BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array);
-        new_sibling_ref = leaf->btree_leaf_insert(ndx, value, state);
+        new_sibling_ref = leaf->bptree_leaf_insert(ndx, value, state);
     }
     else {
         state.m_value = value;
-        new_sibling_ref = m_array->btree_insert(ndx, state);
+        if (ndx == npos) {
+            new_sibling_ref = m_array->bptree_append(state);
+        }
+        else {
+            new_sibling_ref = m_array->bptree_insert(ndx, state);
+        }
     }
 
-    if (TIGHTDB_UNLIKELY(new_sibling_ref))
-        introduce_new_root(new_sibling_ref, state);
+    if (TIGHTDB_UNLIKELY(new_sibling_ref)) {
+        bool is_append = ndx == npos;
+        introduce_new_root(new_sibling_ref, state, is_append);
+    }
 }
 
 template<class T> TIGHTDB_FORCEINLINE
@@ -317,7 +458,7 @@ ref_type BasicColumn<T>::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
                                      Array::TreeInsert<BasicColumn<T> >& state)
 {
     BasicArray<T> leaf(leaf_mem, &parent, ndx_in_parent, alloc);
-    return leaf.btree_leaf_insert(insert_ndx, state.m_value, state);
+    return leaf.bptree_leaf_insert(insert_ndx, state.m_value, state);
 }
 
 
