@@ -539,8 +539,8 @@ CATEGORIES :
                  href="http://json.org">JSON</a>) is useful for
                  web/mobile applications and serialization.
 
-                 A table (and subtables) will be formatted as a array of rows, and row will
-                 be formatted as an object.
+                 A table (and subtables) will be formatted as an array of rows, and
+                 a row will be formatted as an object.
       CONST    : true
       PARAMS:
       - NAME   : out
