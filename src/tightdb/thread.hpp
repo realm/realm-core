@@ -545,24 +545,25 @@ inline void Atomic<T>::store(T value)
 template<typename T>
 inline T Atomic<T>::load_acquire() const
 {
+    T retval;
 #ifdef TIGHTDB_HAVE_GCC_GE_4_7
-    T retval = __atomic_load_n(&state, __ATOMIC_ACQUIRE);
+    retval = __atomic_load_n(&state, __ATOMIC_ACQUIRE);
 #else
-#if (sizeof(T) >= sizeof(ptrdiff_t)
-    // do repeated reads until we've seen the same value twice,
-    // then we know that the reads were done without changes to the value.
-    // under normal circumstances, the loop is never executed
-    T retval = state;
-    T val = state;
-    while (retval != val) { 
+    if (sizeof(T) >= sizeof(ptrdiff_t)) {
+        // do repeated reads until we've seen the same value twice,
+        // then we know that the reads were done without changes to the value.
+        // under normal circumstances, the loop is never executed
+        retval = state;
+        T val = state;
+        while (retval != val) { 
+            asm volatile ("" : : : "memory");
+            val = retval;
+            retval = state;
+        }
+    } else {
         asm volatile ("" : : : "memory");
-        val = retval;
         retval = state;
     }
-#else
-    asm volatile ("" : : : "memory");
-    T retval = state;
-#endif
     __sync_synchronize();
 #endif
     return retval;
@@ -614,17 +615,17 @@ inline void Atomic<T>::store_release(T value)
 #ifdef TIGHTDB_HAVE_GCC_GE_4_7
     __atomic_store_n(&state, value, __ATOMIC_RELEASE);
 #else
-#if (sizeof(T) >= sizeof(ptrdiff_t)
-    T old_value = state;
-    // Ensure atomic store for type larger than largest native word.
-    // normally, this loop will not be entered.
-    while ( ! __sync_bool_compare_and_swap(&state, old_value, value)) {
-        old_value = state;
-    };
-#else
-    __sync_synchronize();
-    state = value;
-#endif
+    if (sizeof(T) >= sizeof(ptrdiff_t)) {
+        T old_value = state;
+        // Ensure atomic store for type larger than largest native word.
+        // normally, this loop will not be entered.
+        while ( ! __sync_bool_compare_and_swap(&state, old_value, value)) {
+            old_value = state;
+        };
+    } else {
+        __sync_synchronize();
+        state = value;
+    }
     // prevent registerization of state (this is not really needed, I think)
     asm volatile ("" : : : "memory");
 #endif
