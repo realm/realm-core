@@ -74,7 +74,7 @@ CATEGORIES  :
                  Group::mode_ReadWriteNoCreate: Open in read/write mode. Fail if the file does not already exist.
       - NAME   : buffer
         TYPES  : BinaryData
-        DESCR  : &g_group_constructor_memory_parm3_descr
+        DESCR  : &g_in_memory_binary_descr
                  In-memory binary encoded representation of a group.
       RETURN:
         TYPES  : Group
@@ -244,7 +244,23 @@ CATEGORIES  :
         CODE   : ex_cpp_group_open_memory
 
   - g_group_commit:
-      TODO     : very soon
+      NAME     : commit
+      SUMMARY  : &g_group_commit_summary
+                 Write changes to attached file.
+      DESCR    : &g_group_commit_descr
+                 >
+                 Write any changes made in the group or its tables to the 
+                 attached file.
+                 
+                 Note: This method can only be used on groups which is
+                 attached to a writable file.
+                 
+                 Table accessors will remain valid across the commit 
+                 (which is not the case for SharedGroup commits).
+                 
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_group_commit
 
   - g_group_size:
       NAME     : size
@@ -323,15 +339,15 @@ CATEGORIES  :
       NAME     : has_table
       SUMMARY  : &g_group_has_table_summary
                  Does group have table?
-      DESCR    :
+      DESCR:
       - TEXT   : &g_group_has_table_descr
-                 The method checks whether this group contains the specified table.
+                 The method checks if this group contains the specified table.
       - TEXT   : >
                  When no table class is specified, this function
                  returns <code>true</code> if the group contains a
-                 table with the specified name. When a table class
-                 (<code>MyTable</code>) is specified as a template
-                 parameter, it returns true if the group contains a
+                 table with the specified name.
+                 When a table class (<code>MyTable</code>) is specified as a
+                 template parameter, it returns true if the group contains a
                  table with the specified name, and the type of that
                  table is compatible with the specified type. 
                  See {@link concepts_table_type_compatibility} for details.

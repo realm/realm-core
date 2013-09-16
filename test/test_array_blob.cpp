@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_ARRAY_BLOB
+
 #include <cstring>
 
 #include <UnitTest++.h>
@@ -65,3 +68,5 @@ TEST(ArrayBlob)
     // Cleanup
     blob.destroy();
 }
+
+#endif // TEST_ARRAY_BLOB

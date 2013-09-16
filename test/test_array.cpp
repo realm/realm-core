@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_ARRAY
+
 #include <map>
 #include <string>
 #include <vector>
@@ -1510,3 +1513,5 @@ TEST(ArrayCount)
     // Clean-up
     a.destroy();
 }
+
+#endif // TEST_ARRAY

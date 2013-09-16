@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_COLUMN
+
 #include <vector>
 #include <algorithm>
 #include <UnitTest++.h>
@@ -761,3 +764,5 @@ TEST(Column_prepend_many)
 }
 
 #endif
+
+#endif TEST_COLUMN

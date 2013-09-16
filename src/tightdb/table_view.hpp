@@ -95,7 +95,7 @@ public:
 
     // Sort the view according to the specified column and the
     // specified direction.
-    void sort(size_t column, bool ascending = true);
+    void sort(size_t column_ndx, bool ascending = true);
 
     // Get row index in the source table this view is "looking" at.
     size_t get_source_ndx(size_t row_ndx) const TIGHTDB_NOEXCEPT
@@ -106,6 +106,7 @@ public:
     // Conversion
     void to_json(std::ostream& out) const;
     void to_string(std::ostream& out, size_t limit=500) const;
+    void row_to_string(std::size_t row_ndx, std::ostream& out) const;
 
 protected:
     Table* m_table;

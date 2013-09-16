@@ -1,3 +1,5 @@
+#ifdef TEST_QUERY
+
 #include <cstdlib> // itoa()
 #include <vector>
 
@@ -2771,3 +2773,5 @@ TEST(TestQuery_AllTypes_StaticallyTyped)
     CHECK_EQUAL(0.8, query.double_col.sum());
     CHECK_EQUAL(0.8, query.double_col.average());
 }
+
+#endif // TEST_QUERY

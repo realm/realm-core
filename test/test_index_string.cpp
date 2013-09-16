@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_INDEX_STRING
+
 #include "tightdb/index_string.hpp"
 #include <UnitTest++.h>
 
@@ -357,3 +360,5 @@ TEST(StringIndex_FindAllNoCopy)
     col.destroy();
 }
 #endif
+
+#endif // TEST_INDEX_STRING

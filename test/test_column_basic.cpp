@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_COLUMN_BASIC
+
 #include <UnitTest++.h>
 
 #include <tightdb/column_basic.hpp>
@@ -42,3 +45,5 @@ TEST(ColumnBasic_LowerUpperBound)
     // Clean up
     col.destroy();
 }
+
+#endif // TEST_COLUMN_BASIC
