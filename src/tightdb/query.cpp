@@ -74,11 +74,12 @@ Query::~Query() TIGHTDB_NOEXCEPT
         }
     }
 }
-
+/*
+// use and_query() instead!
 Expression* Query::get_expression() {
     return (static_cast<ExpressionNode*>(first[first.size()-1]))->m_compare;
 }
-
+*/
 Query& Query::expression(Expression* compare, bool auto_delete)
 {
     ParentNode* const p = new ExpressionNode(compare, auto_delete); // leak!

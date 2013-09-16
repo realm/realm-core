@@ -191,7 +191,7 @@ int main(int argc, char* argv[])
 
     Query q5 = 20 < untyped.column<float>(1);
 
-    match = q4.expression(  q5.get_expression()  ).find_next();
+    match = q4.and_query(q5).find_next();
     assert(match == 1);
 
 
@@ -300,7 +300,7 @@ int main(int argc, char* argv[])
     match = untyped.where().expression(e).expression(e2).find_next();
     assert(match == 1);    
 
-    Query q10 = untyped.where().expression(q9.get_expression()).expression(e2);
+    Query q10 = untyped.where().and_query(q9).expression(e2);
     match = q10.find_next();
     assert(match == 1);    
 
