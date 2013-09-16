@@ -218,11 +218,11 @@ CATEGORIES :
       PARAMS:
       - NAME   : type
         TYPES  : DataType
-        DESCR  : &g_dyn_table_add_column_type_descr
+        DESCR  : &g_dyn_table_add_column_param1_descr
                  Type of data to store in the new column.
       - NAME   : name
         TYPES  : StringData
-        DESCR  : &g_dyn_table_add_column_name_descr
+        DESCR  : &g_dyn_table_add_column_param2_descr
                  Name for the new column.
       RETURN:
         TYPES  : size_t
@@ -1156,7 +1156,7 @@ CATEGORIES :
                  The JavaScript Object Notation (<a href="http://json.org">JSON</a>)
                  is useful for web/mobile applications and serialization.
 
-                 A table (and subtables) will be formatted as an array of rows, 
+                 A table (and subtables) will be formatted as an array of rows,
                  and a row will be formatted as an object.
       CONST    : true
       PARAMS:
@@ -1174,7 +1174,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_to_string_summary
                  Convert table to a string.
       DESCR    : &g_dyn_table_to_string_descr
-                 This method will convert a table and its columns and rows to a 
+                 This method will convert a table and its columns and rows to a
                  human readable format.
       SIGNATURE: void to_string(std::ostream& out, std::size_t limit = 500) const
       CONST    : true
