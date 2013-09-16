@@ -118,6 +118,7 @@
 		36F3823A170D000300C95BCD /* array_basic.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36F38238170D000300C95BCD /* array_basic.hpp */; };
 		36FD6F3614BDC61A009E0003 /* test_query.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36FD6F3414BDC61A009E0003 /* test_query.cpp */; };
 		36FD6F3714BDC61A009E0003 /* test_table_view.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36FD6F3514BDC61A009E0003 /* test_table_view.cpp */; };
+		3AC208C717E200F100640AFA /* test_utilities.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3AC208C517E200F100640AFA /* test_utilities.cpp */; };
 		4142C93B1623478700B3B902 /* alloc_slab.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 365CCDF1157CC37D00172BF8 /* alloc_slab.cpp */; };
 		4142C93C1623478700B3B902 /* array_binary.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 365CCDF4157CC37D00172BF8 /* array_binary.cpp */; };
 		4142C93D1623478700B3B902 /* array_blob.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 365CCDF6157CC37D00172BF8 /* array_blob.cpp */; };
@@ -437,6 +438,8 @@
 		36F38238170D000300C95BCD /* array_basic.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = array_basic.hpp; path = tightdb/array_basic.hpp; sourceTree = "<group>"; };
 		36FD6F3414BDC61A009E0003 /* test_query.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_query.cpp; sourceTree = "<group>"; };
 		36FD6F3514BDC61A009E0003 /* test_table_view.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_table_view.cpp; sourceTree = "<group>"; };
+		3AC208C517E200F100640AFA /* test_utilities.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_utilities.cpp; sourceTree = "<group>"; };
+		3AC208C617E200F100640AFA /* test_utilities.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = test_utilities.hpp; sourceTree = "<group>"; };
 		4142C9951623478700B3B902 /* liblibtightdb ios.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "liblibtightdb ios.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		520588C916C1DA9D009DA6D8 /* data_type.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = data_type.hpp; path = tightdb/data_type.hpp; sourceTree = "<group>"; };
 		52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = lang_bind_helper.cpp; path = tightdb/lang_bind_helper.cpp; sourceTree = "<group>"; };
@@ -611,6 +614,8 @@
 		3647DFF214209CE600D56FD7 /* test */ = {
 			isa = PBXGroup;
 			children = (
+				3AC208C517E200F100640AFA /* test_utilities.cpp */,
+				3AC208C617E200F100640AFA /* test_utilities.hpp */,
 				52D6E056175BDBDD00B423E5 /* util */,
 				3647DFF314209CE600D56FD7 /* main.cpp */,
 				3647DFF414209CE600D56FD7 /* Makefile */,
@@ -1158,6 +1163,7 @@
 				52F2E0E517D5F93D00415958 /* test_strings.cpp in Sources */,
 				52F2E0E717D5F95500415958 /* verified_integer.cpp in Sources */,
 				52F2E0E917D5F96100415958 /* verified_string.cpp in Sources */,
+				3AC208C717E200F100640AFA /* test_utilities.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

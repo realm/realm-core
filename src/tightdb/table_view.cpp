@@ -308,6 +308,19 @@ void TableViewBase::to_string(ostream& out, size_t limit) const
     }
 }
 
+void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
+{
+    TIGHTDB_ASSERT(row_ndx < m_refs.size());
+
+    // Print header (will also calculate widths)
+    vector<size_t> widths;
+    m_table->to_string_header(out, widths);
+
+    // Print row contents
+    m_table->to_string_row(get_source_ndx(row_ndx), out, widths);
+}
+
+
 void TableView::remove(size_t ndx)
 {
     TIGHTDB_ASSERT(m_table);
