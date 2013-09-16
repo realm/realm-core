@@ -401,8 +401,9 @@ private:
 
     // Column accessor instances
     Array m_cols;
-
+public:
     mutable std::size_t m_ref_count;
+private:
     mutable const StringIndex* m_lookup_index;
 
     /// Disable copying assignment.

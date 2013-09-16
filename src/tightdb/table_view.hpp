@@ -115,17 +115,36 @@ protected:
     /// Construct null view (no memory allocated).
     TableViewBase(): m_table(0), m_refs(Allocator::get_default()) {}
 
+#define ENABLE_REF_COUNT 1
+
     /// Construct empty view, ready for addition of row indices.
-    TableViewBase(Table* parent): m_table(parent) {}
+    TableViewBase(Table* parent): m_table(parent) {
+#if ENABLE_REF_COUNT
+        parent->bind_ref(); 
+#endif
+    }
 
     /// Copy constructor.
     TableViewBase(const TableViewBase& tv):
-        m_table(tv.m_table), m_refs(tv.m_refs, Allocator::get_default()) {}
+        m_table(tv.m_table), m_refs(tv.m_refs, Allocator::get_default()) 
+        {
+#if ENABLE_REF_COUNT
+            if (tv.m_table)
+                tv.m_table->bind_ref();
+#endif
+        }
 
     /// Moving constructor.
     TableViewBase(TableViewBase*) TIGHTDB_NOEXCEPT;
 
-    ~TableViewBase() TIGHTDB_NOEXCEPT { m_refs.destroy(); }
+    ~TableViewBase() TIGHTDB_NOEXCEPT
+    {
+#if ENABLE_REF_COUNT
+        if (m_table)
+            m_table->unbind_ref();
+#endif
+        m_refs.destroy();
+    }
 
     void move_assign(TableViewBase*) TIGHTDB_NOEXCEPT;
 
