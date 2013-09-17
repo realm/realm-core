@@ -523,7 +523,28 @@ TEST(ColumnStringAutoEnumerateIndexReuse)
 }
 
 // Test "Replace string array with long string array" when doing it through LeafSet()
-TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2)
+TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong)
+{
+    c.clear();
+    Column col;
+
+    c.add("foobar");
+    c.add("bar abc");
+    c.add("baz");
+
+    c.set(1, "40 chars  40 chars  40 chars  40 chars  ");
+
+    CHECK_EQUAL(c.size(), c.size());
+    CHECK_EQUAL("foobar", c.get(0));
+    CHECK_EQUAL("40 chars  40 chars  40 chars  40 chars  ", c.get(1));
+    CHECK_EQUAL("baz", c.get(2));
+
+    // Cleanup
+    col.destroy();
+}
+
+// Test "Replace string array with long string array" when doing it through LeafSet()
+TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToBig)
 {
     c.clear();
     Column col;
@@ -545,6 +566,24 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2)
 
 // Test against a bug where FindWithLen() would fail finding ajacent hits
 TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent)
+{
+    c.clear();
+    Array col;
+
+    c.add("40 chars  40 chars  40 chars  40 chars  ");
+    c.add("baz");
+    c.add("baz");
+    c.add("foo");
+
+    c.find_all(col, "baz");
+
+    CHECK_EQUAL(2, col.size());
+
+    // Cleanup
+    col.destroy();
+}
+
+TEST_FIXTURE(db_setup_column_string, ArrayStringBigFindAjacent)
 {
     c.clear();
     Array col;

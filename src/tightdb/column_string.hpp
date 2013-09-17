@@ -23,6 +23,7 @@
 #include <tightdb/unique_ptr.hpp>
 #include <tightdb/array_string.hpp>
 #include <tightdb/array_string_long.hpp>
+#include <tightdb/array_blobs_big.hpp>
 #include <tightdb/column.hpp>
 
 namespace tightdb {
@@ -85,6 +86,12 @@ public:
     /// Compare two string columns for equality.
     bool compare_string(const AdaptiveStringColumn&) const;
 
+    enum LeafType {
+        leaf_short = 0,
+        leaf_long  = 1,
+        leaf_big   = 2
+    };
+
     bool GetBlock(std::size_t ndx, ArrayParent** ap, std::size_t& off) const
     {
         Allocator& alloc = m_array->get_alloc();
@@ -92,6 +99,9 @@ public:
             off = 0;
             bool long_strings = m_array->has_refs();
             if (long_strings) {
+                if (m_array->context_bit()) {
+                    TIGHTDB_ASSERT(false);
+                }
                 ArrayStringLong* asl2 = new ArrayStringLong(m_array->get_ref(), 0, 0, alloc);
                 *ap = asl2;
                 return true;
@@ -104,6 +114,9 @@ public:
         std::pair<MemRef, std::size_t> p = m_array->find_btree_leaf(ndx);
         bool long_strings = Array::get_hasrefs_from_header(p.first.m_addr);
         if (long_strings) {
+            if (Array::get_context_bit_from_header(p.first.m_addr)) {
+                TIGHTDB_ASSERT(false);
+            }
             ArrayStringLong* asl2 = new ArrayStringLong(p.first, 0, 0, alloc);
             *ap = asl2;
         }
@@ -133,6 +146,7 @@ protected:
 
 private:
     static const size_t short_string_max_size = 15;
+    static const size_t long_string_max_size  = 63;
 
     StringIndex* m_index;
 
@@ -143,7 +157,11 @@ private:
                                 Allocator&, std::size_t insert_ndx,
                                 Array::TreeInsert<AdaptiveStringColumn>& state);
 
+    LeafType get_leaf_type() const TIGHTDB_NOEXCEPT;
+    void upgrade_leaf(LeafType target_type);
     static void copy_leaf(const ArrayString&, ArrayStringLong&);
+    static void copy_leaf(const ArrayString&, ArrayBigBlobs&);
+    static void copy_leaf(const ArrayStringLong&, ArrayBigBlobs&);
 
     friend class Array;
     friend class ColumnBase;
@@ -155,12 +173,19 @@ private:
 
 // Implementation:
 
+inline AdaptiveStringColumn::LeafType AdaptiveStringColumn::get_leaf_type() const TIGHTDB_NOEXCEPT {
+    return m_array->has_refs() ? (m_array->context_bit() ? leaf_big : leaf_long) : leaf_short;
+}
+
 inline StringData AdaptiveStringColumn::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < size());
     if (root_is_leaf()) {
         if (m_array->has_refs()) {
-            return static_cast<const ArrayStringLong*>(m_array)->get(ndx);
+            if (m_array->context_bit())
+                return static_cast<StringData>(static_cast<const ArrayBigBlobs*>(m_array)->get(ndx));
+            else
+                return static_cast<const ArrayStringLong*>(m_array)->get(ndx);
         }
         return static_cast<const ArrayString*>(m_array)->get(ndx);
     }

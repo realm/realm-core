@@ -40,7 +40,12 @@ public:
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
     void insert(std::size_t ndx, BinaryData value, bool add_zero_term = false);
 
-    //ref_type btree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term, TreeInsertBase& state);
+    std::size_t count(BinaryData value, std::size_t begin = 0, std::size_t end = -1) const;
+    std::size_t find_first(BinaryData value, std::size_t begin = 0 , std::size_t end = -1) const;
+    void find_all(Array& result, BinaryData value, std::size_t add_offset = 0,
+                  std::size_t begin = 0, std::size_t end = -1);
+
+    ref_type btree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term, TreeInsertBase& state);
 
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, const char* title = 0) const;

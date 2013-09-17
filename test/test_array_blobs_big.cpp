@@ -193,6 +193,21 @@ TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsErase)
     CHECK(c.is_empty());
 }
 
+TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsCount)
+{
+    c.clear();
+
+    // first, middle and end
+    c.add(BinaryData("foobar", 7));
+    c.add(BinaryData("bar abc", 8));
+    c.add(BinaryData("foobar", 7));
+    c.add(BinaryData("baz", 4));
+    c.add(BinaryData("foobar", 7));
+
+    const size_t count = c.count(BinaryData("foobar", 7));
+    CHECK_EQUAL(3, count);
+}
+
 TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobs_Destroy)
 {
     // clean up (ALWAYS PUT THIS LAST)

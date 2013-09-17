@@ -704,6 +704,7 @@ public:
 
     static bool get_isleaf_from_header(const char*) TIGHTDB_NOEXCEPT;
     static bool get_hasrefs_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static bool get_context_bit_from_header(const char* h) TIGHTDB_NOEXCEPT {return get_indexflag_from_header(h);}
     static bool get_indexflag_from_header(const char*) TIGHTDB_NOEXCEPT;
     static WidthType get_wtype_from_header(const char*) TIGHTDB_NOEXCEPT;
     static int get_width_from_header(const char*) TIGHTDB_NOEXCEPT;
