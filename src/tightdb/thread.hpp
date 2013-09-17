@@ -549,6 +549,19 @@ inline T Atomic<T>::load_acquire() const
 #ifdef TIGHTDB_HAVE_GCC_GE_4_7
     retval = __atomic_load_n(&state, __ATOMIC_ACQUIRE);
 #else
+    __sync_synchronize();
+    retval = load_relaxed();
+#endif
+    return retval;
+}
+
+template<typename T>
+inline T Atomic<T>::load_relaxed() const
+{
+    T retval;
+#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+    retval = __atomic_load_n(&state, __ATOMIC_RELAXED);
+#else
     if (sizeof(T) >= sizeof(ptrdiff_t)) {
         // do repeated reads until we've seen the same value twice,
         // then we know that the reads were done without changes to the value.
@@ -564,20 +577,6 @@ inline T Atomic<T>::load_acquire() const
         asm volatile ("" : : : "memory");
         retval = state;
     }
-    __sync_synchronize();
-#endif
-    return retval;
-}
-
-template<typename T>
-inline T Atomic<T>::load_relaxed() const
-{
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
-    T retval = __atomic_load_n(&state, __ATOMIC_RELAXED);
-#else
-    // prevent registerization of state (this is not really needed, I think)
-    asm volatile ("" : : : "memory");
-    T retval = state;
 #endif
     return retval;
 }
@@ -588,10 +587,8 @@ inline T Atomic<T>::load() const
 #ifdef TIGHTDB_HAVE_GCC_GE_4_7
     T retval = __atomic_load_n(&state, __ATOMIC_SEQ_CST);
 #else
-    // prevent registerization of state (this is not really needed, I think)
-    asm volatile ("" : : : "memory");
-    T retval = state;
     __sync_synchronize();
+    T retval = load_relaxed();
 #endif
     return retval;
 }
@@ -601,19 +598,6 @@ inline void Atomic<T>::store(T value)
 {
 #ifdef TIGHTDB_HAVE_GCC_GE_4_7
     __atomic_store_n(&state, value, __ATOMIC_SEQ_CST);
-#else
-    __sync_synchronize();
-    state = value;
-    // prevent registerization of state (this is not really needed, I think)
-    asm volatile ("" : : : "memory");
-#endif
-}
-
-template<typename T>
-inline void Atomic<T>::store_release(T value) 
-{
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
-    __atomic_store_n(&state, value, __ATOMIC_RELEASE);
 #else
     if (sizeof(T) >= sizeof(ptrdiff_t)) {
         T old_value = state;
@@ -632,14 +616,26 @@ inline void Atomic<T>::store_release(T value)
 }
 
 template<typename T>
+inline void Atomic<T>::store_release(T value) 
+{
+#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+    __atomic_store_n(&state, value, __ATOMIC_RELEASE);
+#else
+    // prior to gcc 4.7 we have no portable way of expressing
+    // release semantics, so we do seq_consistent store instead
+    store(value);
+#endif
+}
+
+template<typename T>
 inline void Atomic<T>::store_relaxed(T value) 
 {
 #ifdef TIGHTDB_HAVE_GCC_GE_4_7
     __atomic_store_n(&state, value, __ATOMIC_RELAXED);
 #else
-    state = value;
-    // prevent registerization of state (this is not really needed, I think)
-    asm volatile ("" : : : "memory");
+    // prior to gcc 4.7 we have no portable way of expressing
+    // relaxed semantics, so we do seq_consistent store instead
+    store(value);
 #endif
 }
 
