@@ -21,7 +21,8 @@ namespace {
 
 int compare(const void* a, const void* b)
 {
-    if (*PDWORD(a) == *PDWORD(b)) return 0;
+    if (*PDWORD(a) == *PDWORD(b))
+        return 0;
     return *PDWORD(a) > *PDWORD(b) ? 1 : -1;
 }
 
