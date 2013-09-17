@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_COLUMN_FLOAT
+
 #include <iostream>
 #include <UnitTest++.h>
 #include <tightdb/column_basic.hpp>
@@ -27,7 +30,6 @@ double doubleVal[] = {0.0,
                      };
 const size_t doubleValLen = SizeOfArray(doubleVal);
 
-}
 
 void printCol(ColumnFloat& c)
 {
@@ -36,6 +38,7 @@ void printCol(ColumnFloat& c)
     }
 }
 
+} //namespace
 
 template <class C>
 void BasicColumn_IsEmpty()
@@ -228,3 +231,5 @@ void BasicColumn_Delete(T val[], size_t valLen)
 }
 TEST(ColumnFloat_Delete) { BasicColumn_Delete<ColumnFloat, float>(floatVal, floatValLen); }
 TEST(ColumnDouble_Delete){ BasicColumn_Delete<ColumnDouble, double>(doubleVal, doubleValLen); }
+
+#endif // TEST_COLUMN_FLOAT

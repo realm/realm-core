@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_UTF8
+
 #include <cstddef>
 #include <limits>
 #include <stdexcept>
@@ -269,3 +272,5 @@ TEST(Utf8_Utf16_Transcode)
 }
 
 #endif // _WIN32
+
+#endif // TEST_UTF8

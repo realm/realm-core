@@ -1,3 +1,5 @@
+#ifdef TEST_COLUMN_STRING
+
 #include <UnitTest++.h>
 #include <tightdb/column_string.hpp>
 #include <tightdb/column_string_enum.hpp>
@@ -892,3 +894,5 @@ TEST_FIXTURE(db_setup_column_string, ColumnString_Destroy)
     // clean up (ALWAYS PUT THIS LAST)
     c.destroy();
 }
+
+#endif // TEST_COLUMN_STRING

@@ -1,4 +1,5 @@
-#if 0
+#include "testsettings.hpp"
+#ifdef TEST_INDEX
 
 #include <UnitTest++.h>
 #include <tightdb/index.hpp>

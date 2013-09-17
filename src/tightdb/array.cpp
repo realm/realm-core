@@ -1715,9 +1715,8 @@ ref_type Array::insert_btree_child(Array& offsets, Array& refs, size_t orig_chil
     TIGHTDB_ASSERT(insert_ndx <= node_size);
     if (TIGHTDB_LIKELY(node_size < TIGHTDB_MAX_LIST_SIZE)) {
         refs.insert(insert_ndx, new_sibling_ref);
-        offsets.set(orig_child_ndx, elem_ndx_offset + state.m_split_offset);
-        offsets.insert(insert_ndx, elem_ndx_offset + state.m_split_size);
-        offsets.adjust(insert_ndx + 1, 1);
+        offsets.insert(insert_ndx - 1, elem_ndx_offset + state.m_split_offset);
+        offsets.adjust(insert_ndx, 1);
         return 0; // Parent node was not split
     }
 

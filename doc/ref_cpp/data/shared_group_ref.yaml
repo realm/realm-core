@@ -235,7 +235,9 @@ CATEGORIES:
       SUMMARY  : &g_shared_group_rollback_summary
                  Rollback a transaction.
       DESCR    : &g_shared_group_rollback_descr
-                 This method closes a transaction and discards all changes done to the shared group.
+                 This method closes a transaction and discards all changes done to the shared group,
+                 unless a commit has already been done. It is ok to call rollback multiple times. 
+                 Any additional calls to rollback following a commit or rollback are treated as no-ops.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_rollback
         DESCR  :
@@ -297,7 +299,9 @@ CATEGORIES:
   - g_shared_group_end_read:
       NAMES    : end_read
       SUMMARY  : &g_shared_group_end_read_summary
-                 Terminate read transaction.
+                 Terminate read transaction. It is ok to call end_read multiple times, the
+                 first call will terminate the transaction. Any additional calls are treated
+                 as no-ops
       DESCR    : &g_shared_group_end_read_descr
                  This method terminates the read transaction.
       EXAMPLES:

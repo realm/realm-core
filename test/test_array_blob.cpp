@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_ARRAY_BLOB
+
 #include <UnitTest++.h>
 #include <tightdb/array_blob.hpp>
 
@@ -71,3 +74,5 @@ TEST(ArrayBlob)
     // Cleanup
     blob.destroy();
 }
+
+#endif // TEST_ARRAY_BLOB
