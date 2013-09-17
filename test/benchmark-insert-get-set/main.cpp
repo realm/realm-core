@@ -15,21 +15,6 @@ namespace {
 TIGHTDB_TABLE_1(IntTable,
                 i, Int)
 
-inline int_fast64_t sequential_read(IntTable& table)
-{
-    int_fast64_t dummy = 0;
-    size_t n = table.size();
-    for (size_t i = 0; i != n; ++i)
-        dummy += table[i].i;
-    return dummy;
-}
-
-inline void sequential_write(IntTable& table)
-{
-    size_t n = table.size();
-    for (size_t i = 0; i != n; ++i)
-        table[i].i = 126;
-}
 
 inline int_fast64_t read(IntTable& table, const vector<size_t> order)
 {
@@ -45,20 +30,6 @@ inline void write(IntTable& table, const vector<size_t> order)
     size_t n = order.size();
     for (size_t i = 0; i != n; ++i)
         table[order[i]].i = 125;
-}
-
-
-inline void append(IntTable& table, size_t n)
-{
-    for (size_t i = 0; i != n; ++i)
-        table.add(127);
-}
-
-inline void erase_all_from_end(IntTable& table)
-{
-    size_t n = table.size();
-    for (size_t i = 0; i != n; ++i)
-        table.remove(n-i-1);
 }
 
 inline void insert(IntTable& table, const vector<size_t> order)
@@ -85,16 +56,19 @@ int main()
     cout << "Number of tables: " << num_tables << endl;
     cout << "Elements per table: " << target_size << endl;
 
-    vector<size_t> random_read_write_order;
+    vector<size_t> rising_order;
+    vector<size_t> falling_order;
+    vector<size_t> random_order;
     vector<size_t> random_insert_order;
     vector<size_t> random_erase_order;
     for (size_t i = 0; i != target_size; ++i) {
-        random_read_write_order.push_back(i);
+        rising_order.push_back(i);
+        falling_order.push_back(target_size-1-i);
+        random_order.push_back(i);
         random_insert_order.push_back(rand() % (i+1));
         random_erase_order.push_back(rand() % (target_size-i));
     }
-    random_shuffle(random_read_write_order.begin(),
-                   random_read_write_order.end());
+    random_shuffle(random_order.begin(), random_order.end());
 
     IntTable tables_1[num_tables], tables_2[num_tables];
 
@@ -105,27 +79,27 @@ int main()
     {
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            append(tables_1[i], target_size);
+            insert(tables_1[i], rising_order);
         cout << "Insert at end (compact):    "<<timer<<endl;
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            dummy += sequential_read(tables_1[i]);
+            dummy += read(tables_1[i], rising_order);
         cout << "Sequential read (compact):  "<<timer<<endl;
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            dummy += read(tables_1[i], random_read_write_order);
+            dummy += read(tables_1[i], random_order);
         cout << "Random read (compact):      "<<timer<<endl;
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            sequential_write(tables_1[i]);
+            write(tables_1[i], rising_order);
         cout << "Sequential write (compact): "<<timer<<endl;
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            write(tables_1[i], random_read_write_order);
+            write(tables_1[i], random_order);
         cout << "Random write (compact):     "<<timer<<endl;
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            erase_all_from_end(tables_1[i]);
+            erase(tables_1[i], falling_order);
         cout << "Erase from end (compact):   "<<timer<<endl;
     }
     {
@@ -135,19 +109,19 @@ int main()
         cout << "Random insert (general):    "<<timer<<endl;
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            dummy += sequential_read(tables_2[i]);
+            dummy += read(tables_2[0], rising_order);
         cout << "Sequential read (general):  "<<timer<<endl;
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            dummy += read(tables_2[i], random_read_write_order);
+            dummy += read(tables_2[0], random_order);
         cout << "Random read (general):      "<<timer<<endl;
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            sequential_write(tables_2[i]);
+            write(tables_2[i], rising_order);
         cout << "Sequential write (general): "<<timer<<endl;
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
-            write(tables_2[i], random_read_write_order);
+            write(tables_2[i], random_order);
         cout << "Random write (general):     "<<timer<<endl;
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
