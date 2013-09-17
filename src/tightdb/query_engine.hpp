@@ -826,7 +826,7 @@ public:
         m_condition_column_idx = column;
         m_child = 0;
         m_dT = 10.0;
-        m_long = false; m_leaf = NULL;
+        m_leaf = NULL;
 
         // FIXME: Store these in std::string instead.
         // FIXME: Why are these sizes 6 times the required size?
@@ -850,12 +850,14 @@ public:
         delete[] m_value.data();
         delete[] m_ucase;
         delete[] m_lcase;
-        m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
+
+        clear_leaf_state();
     }
 
     void init(const Table& table)
     {
-        m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
+        clear_leaf_state();
+
         m_leaf = NULL;
         m_dD = 100.0;
         m_probes = 0;
@@ -867,6 +869,15 @@ public:
 
         if (m_child)
             m_child->init(table);
+    }
+
+    void clear_leaf_state() {
+        if (m_leaf_type == AdaptiveStringColumn::leaf_short)
+            delete(static_cast<ArrayString*>(m_leaf));
+        else if (m_leaf_type ==  AdaptiveStringColumn::leaf_long)
+            delete(static_cast<ArrayStringLong*>(m_leaf));
+        else
+            delete(static_cast<ArrayBigBlobs*>(m_leaf));
     }
 
     size_t find_first_local(size_t start, size_t end)
@@ -885,14 +896,23 @@ public:
                 const AdaptiveStringColumn* asc = static_cast<const AdaptiveStringColumn*>(m_condition_column);
                 if (s >= m_end_s) {
                     // we exceeded current leaf's range
+                    clear_leaf_state();
 
-                    m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
-
-                    m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
-                    m_end_s = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
+                    m_leaf_type = asc->GetBlock(s, &m_leaf, m_leaf_start);
+                    if (m_leaf_type == AdaptiveStringColumn::leaf_short)
+                        m_end_s = m_leaf_start + static_cast<ArrayString*>(m_leaf)->size();
+                    else if (m_leaf_type ==  AdaptiveStringColumn::leaf_long)
+                        m_end_s = m_leaf_start + static_cast<ArrayStringLong*>(m_leaf)->size();
+                    else
+                        m_end_s = m_leaf_start + static_cast<ArrayBigBlobs*>(m_leaf)->size();
                 }
 
-                t = (m_long ? static_cast<ArrayStringLong*>(m_leaf)->get(s - m_leaf_start) : static_cast<ArrayString*>(m_leaf)->get(s - m_leaf_start));
+                if (m_leaf_type == AdaptiveStringColumn::leaf_short)
+                    t = static_cast<ArrayString*>(m_leaf)->get(s - m_leaf_start);
+                else if (m_leaf_type ==  AdaptiveStringColumn::leaf_long)
+                    t = static_cast<ArrayStringLong*>(m_leaf)->get(s - m_leaf_start);
+                else
+                    t = static_cast<ArrayBigBlobs*>(m_leaf)->get(s - m_leaf_start);
             }
             if (cond(m_value, m_ucase, m_lcase, t))
                 return s;
@@ -911,7 +931,7 @@ protected:
 
     ArrayParent *m_leaf;
 
-    bool m_long;
+    AdaptiveStringColumn::LeafType m_leaf_type;
     size_t m_end_s;
 //    size_t m_first_s;
     size_t m_leaf_start;
@@ -1041,7 +1061,7 @@ public:
         char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
         std::copy(v.data(), v.data()+v.size(), data);
         m_value = StringData(data, v.size());
-        m_long = false; m_leaf = NULL;
+        m_leaf = NULL;
         m_index_getter = 0;
         m_index_matches = 0;
         m_index_matches_destroy = false;
@@ -1050,15 +1070,24 @@ public:
     {
         deallocate();
         delete[] m_value.data();
-        m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
+        clear_leaf_state();
         m_index.destroy();
+    }
+
+    void clear_leaf_state() {
+        if (m_leaf_type == AdaptiveStringColumn::leaf_short)
+            delete(static_cast<ArrayString*>(m_leaf));
+        else if (m_leaf_type ==  AdaptiveStringColumn::leaf_long)
+            delete(static_cast<ArrayStringLong*>(m_leaf));
+        else
+            delete(static_cast<ArrayBigBlobs*>(m_leaf));
     }
 
     void deallocate() TIGHTDB_NOEXCEPT
     {
         // Must be called after each query execution too free temporary resources used by the execution. Run in
         // destructor, but also in Init because a user could define a query once and execute it multiple times.
-        m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
+        clear_leaf_state();
         m_leaf = NULL;
 
         if (m_index_matches_destroy)
@@ -1192,13 +1221,24 @@ public:
                     // Normal string column, with long or short leaf
                     AdaptiveStringColumn* asc = (AdaptiveStringColumn*)m_condition_column;
                     if (s >= m_leaf_end) {
-                        m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
-                        m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
-                        m_leaf_end = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
+                        clear_leaf_state();
+                        m_leaf_type = asc->GetBlock(s, &m_leaf, m_leaf_start);
+                        if (m_leaf_type == AdaptiveStringColumn::leaf_short)
+                            m_leaf_end = m_leaf_start + static_cast<ArrayString*>(m_leaf)->size();
+                        else if (m_leaf_type ==  AdaptiveStringColumn::leaf_long)
+                            m_leaf_end = m_leaf_start + static_cast<ArrayStringLong*>(m_leaf)->size();
+                        else
+                            m_leaf_end = m_leaf_start + static_cast<ArrayBigBlobs*>(m_leaf)->size();
                     }
-
                     size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
-                    s = (m_long ? static_cast<ArrayStringLong*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2) : static_cast<ArrayString*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2));
+
+                    if (m_leaf_type == AdaptiveStringColumn::leaf_short)
+                        s = static_cast<ArrayString*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2);
+                    else if (m_leaf_type ==  AdaptiveStringColumn::leaf_long)
+                        s = static_cast<ArrayStringLong*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2);
+                    else
+                        s = static_cast<ArrayBigBlobs*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2);
+
                     if (s == not_found)
                         s = m_leaf_end - 1;
                     else
@@ -1221,8 +1261,8 @@ private:
     SequentialGetter<int64_t> m_cse;
 
     // Used for linear scan through short/long-string
-    ArrayParent *m_leaf;
-    bool m_long;
+    ArrayParent* m_leaf;
+    AdaptiveStringColumn::LeafType m_leaf_type;
     size_t m_leaf_end;
 //    size_t m_first_s;
     size_t m_leaf_start;

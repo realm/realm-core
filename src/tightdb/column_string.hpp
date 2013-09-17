@@ -92,7 +92,7 @@ public:
         leaf_big   = 2
     };
 
-    bool GetBlock(std::size_t ndx, ArrayParent** ap, std::size_t& off) const
+    LeafType GetBlock(std::size_t ndx, ArrayParent** ap, std::size_t& off) const
     {
         Allocator& alloc = m_array->get_alloc();
         if (root_is_leaf()) {
@@ -100,32 +100,37 @@ public:
             bool long_strings = m_array->has_refs();
             if (long_strings) {
                 if (m_array->context_bit()) {
-                    TIGHTDB_ASSERT(false);
+                    ArrayBigBlobs* asb2 = new ArrayBigBlobs(m_array->get_ref(), 0, 0, alloc);
+                    *ap = asb2;
+                    return leaf_big;
                 }
                 ArrayStringLong* asl2 = new ArrayStringLong(m_array->get_ref(), 0, 0, alloc);
                 *ap = asl2;
-                return true;
+                return leaf_long;
             }
             ArrayString* as2 = new ArrayString(m_array->get_ref(), 0, 0, alloc);
             *ap = as2;
-            return false;
+            return leaf_short;
         }
 
         std::pair<MemRef, std::size_t> p = m_array->find_btree_leaf(ndx);
+        off = ndx - p.second;
         bool long_strings = Array::get_hasrefs_from_header(p.first.m_addr);
         if (long_strings) {
             if (Array::get_context_bit_from_header(p.first.m_addr)) {
-                TIGHTDB_ASSERT(false);
+                ArrayBigBlobs* asb2 = new ArrayBigBlobs(p.first, 0, 0, alloc);
+                *ap = asb2;
+                return leaf_big;
             }
             ArrayStringLong* asl2 = new ArrayStringLong(p.first, 0, 0, alloc);
             *ap = asl2;
+            return leaf_long;
         }
         else {
             ArrayString* as2 = new ArrayString(p.first, 0, 0, alloc);
             *ap = as2;
+            return leaf_short;
         }
-        off = ndx - p.second;
-        return long_strings;
     }
 
 #ifdef TIGHTDB_DEBUG
