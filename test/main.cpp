@@ -76,7 +76,8 @@ struct CustomTestReporter: TestReporter {
         cerr << "\nTop 5 time usage:\n";
         std::sort(results.begin(), results.end(), compare);
         for(size_t t = 0; t < 5; t++) {
-            cerr << results[t].name << ": " << results[t].time << " s\n";
+            size_t space = 30 - (results[t].name.size() > 30 ? 30 : results[t].name.size());
+            cerr << results[t].name << ": " << string(space, ' ').c_str() << results[t].time << " s\n";
         }
     }
 };
