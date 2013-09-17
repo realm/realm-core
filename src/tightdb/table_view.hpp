@@ -109,42 +109,25 @@ public:
     void row_to_string(std::size_t row_ndx, std::ostream& out) const;
 
 protected:
-    Table* m_table;
+    TableRef m_table;
     Array m_refs;
 
-    /// Construct null view (no memory allocated).
-    TableViewBase(): m_table(0), m_refs(Allocator::get_default()) {}
 
-#define ENABLE_REF_COUNT 1
+/// Copy constructor.
+    /// Construct null view (no memory allocated).
+    TableViewBase(): m_refs(Allocator::get_default()) {}
 
     /// Construct empty view, ready for addition of row indices.
-    TableViewBase(Table* parent): m_table(parent) {
-#if ENABLE_REF_COUNT
-        parent->bind_ref(); 
-#endif
-    }
+    TableViewBase(Table* parent): m_table(parent->get_table_ref()) {}
 
     /// Copy constructor.
     TableViewBase(const TableViewBase& tv):
-        m_table(tv.m_table), m_refs(tv.m_refs, Allocator::get_default()) 
-        {
-#if ENABLE_REF_COUNT
-            if (tv.m_table)
-                tv.m_table->bind_ref();
-#endif
-        }
+        m_table(tv.m_table), m_refs(tv.m_refs, Allocator::get_default()) {}
 
     /// Moving constructor.
     TableViewBase(TableViewBase*) TIGHTDB_NOEXCEPT;
 
-    ~TableViewBase() TIGHTDB_NOEXCEPT
-    {
-#if ENABLE_REF_COUNT
-        if (m_table)
-            m_table->unbind_ref();
-#endif
-        m_refs.destroy();
-    }
+    ~TableViewBase() TIGHTDB_NOEXCEPT;
 
     void move_assign(TableViewBase*) TIGHTDB_NOEXCEPT;
 
@@ -313,6 +296,28 @@ private:
 // ================================================================================================
 // TableViewBase Implementation:
 
+
+inline TableViewBase::~TableViewBase() TIGHTDB_NOEXCEPT
+{
+    m_refs.destroy();
+}
+ 
+inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
+    m_table(tv->m_table),
+    m_refs(tv->m_refs) // Note: This is a moving copy
+{
+    tv->m_table = TableRef();
+}
+
+inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
+{
+    m_table = tv->m_table;
+    tv->m_table = TableRef();
+    m_refs.move_assign(tv->m_refs);
+}
+
+
+
 #define TIGHTDB_ASSERT_COLUMN(column_ndx)                                   \
     TIGHTDB_ASSERT(m_table);                                                \
     TIGHTDB_ASSERT(column_ndx < m_table->get_column_count());
@@ -329,21 +334,6 @@ private:
 #define TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, column_type)     \
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type)                 \
     TIGHTDB_ASSERT(row_ndx < m_refs.size());
-
-
-inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
-    m_table(tv->m_table),
-    m_refs(tv->m_refs) // Note: This is a moving copy
-{
-    tv->m_table = 0;
-}
-
-inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
-{
-    m_table = tv->m_table;
-    tv->m_table = 0;
-    m_refs.move_assign(tv->m_refs);
-}
 
 
 // Column information

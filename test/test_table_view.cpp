@@ -653,28 +653,24 @@ TEST(TableView_ref_counting)
 {
     TableView tv, tv2;
     {
-        Table t;
-        CHECK_EQUAL(1, t.m_ref_count);
-        t.add_column(type_Int, "myint");
-        t.insert_int(0, 0, 12);
-        t.insert_done();
-        tv = t.where().find_all();
-       // CHECK_EQUAL(2, t.m_ref_count);
+        TableRef t = Table::create();
+        t->add_column(type_Int, "myint");
+        t->insert_int(0, 0, 12);
+        t->insert_done();
+        tv = t->where().find_all();
     }
 
     {
-        Table t2;
-        t2.add_column(type_String, "mystr");
-        t2.insert_string(0, 0, "overwrite heap and stack");
-        t2.insert_done();
-        tv2 = t2.where().find_all();
-       // CHECK_EQUAL(2, t2.m_ref_count);
+        TableRef t2 = Table::create();
+        t2->add_column(type_String, "mystr");
+        t2->insert_string(0, 0, "just a test string");
+        t2->insert_done();
+        tv2 = t2->where().find_all();
     }
-#if 0
+
+    // Now try to access TableView and see that the Table is still alive
     size_t i = tv.get_int(0, 0);
     CHECK_EQUAL(i, 12);
-    string s = tv.get_string(0, 0);
-    CHECK_EQUAL(s, "overwrite heap and stack");
-#endif
-    
+    string s = tv2.get_string(0, 0);
+    CHECK_EQUAL(s, "just a test string");
 }
