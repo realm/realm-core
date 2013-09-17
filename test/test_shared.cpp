@@ -1,5 +1,6 @@
-#include <pthread.h>
-#include <unistd.h>
+#include "testsettings.hpp"
+#ifdef TEST_SHARED
+
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
@@ -1609,3 +1610,5 @@ TEST(MultipleEndReads)
     sg.end_read();
     sg.end_read();
 }
+
+#endif // TEST_SHARED

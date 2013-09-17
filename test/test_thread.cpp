@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_THREAD
+
 #include <cstring>
 #include <algorithm>
 #include <queue>
@@ -394,3 +397,5 @@ TEST(Thread_CondVar)
         CHECK_EQUAL(1000, n);
     }
 }
+
+#endif

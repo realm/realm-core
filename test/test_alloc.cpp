@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_ALLOC
+
 #include <UnitTest++.h>
 
 #include <tightdb/alloc_slab.hpp>
@@ -197,3 +200,5 @@ TEST(Alloc_BadBuffer)
 
     File::remove("test.tightdb");
 }
+
+#endif // TEST_ALLOC
