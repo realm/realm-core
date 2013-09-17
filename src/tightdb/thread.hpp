@@ -567,6 +567,7 @@ inline T Atomic<T>::load_relaxed() const
         // then we know that the reads were done without changes to the value.
         // under normal circumstances, the loop is never executed
         retval = state;
+        asm volatile ("" : : : "memory");
         T val = state;
         while (retval != val) { 
             asm volatile ("" : : : "memory");
