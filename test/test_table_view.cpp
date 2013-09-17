@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_TABLE_VIEW
+
 #include <UnitTest++.h>
 #include <tightdb/table_macros.hpp>
 #include <string>
@@ -674,3 +677,5 @@ TEST(TableView_ref_counting)
     string s = tv2.get_string(0, 0);
     CHECK_EQUAL(s, "just a test string");
 }
+
+#endif // TEST_TABLE_VIEW

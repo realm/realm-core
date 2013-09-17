@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_TRANSACTIONS_LASSE
+
 #include <cstdlib>
 #include <iostream>
 
@@ -28,9 +31,6 @@ using namespace tightdb;
 
 
 // The tests in this file are run if you #define STRESSTEST1 and/or #define STRESSTEST2. Please define them in testsettings.hpp
-
-
-#if defined STRESSTEST1 || defined STRESSTEST3 || defined STRESSTEST4
 
 namespace {
 
@@ -77,11 +77,7 @@ TIGHTDB_FORCEINLINE void rand_sleep()
 
 } // anonymous namespace
 
-#endif // defined STRESSTEST1 || defined STRESSTEST3 || defined STRESSTEST4
 
-
-
-#ifdef STRESSTEST1
 
 // *************************************************************************************
 // *
@@ -92,8 +88,8 @@ TIGHTDB_FORCEINLINE void rand_sleep()
 namespace {
 
 const int ITER1 =    2000;
-const int READERS1 =   20;
-const int WRITERS1 =   20;
+const int READERS1 =   10;
+const int WRITERS1 =   10;
 
 void write_thread(int thread_ndx)
 {
@@ -141,47 +137,43 @@ TEST(Transactions_Stress1)
     File::try_remove("database.tightdb");
     File::try_remove("database.tightdb.lock");
 
-    SharedGroup sg("database.tightdb");
-
     {
-        WriteTransaction wt(sg);
-        TableRef table = wt.get_table("table");
-        Spec& spec = table->get_spec();
-        spec.add_column(type_Int, "row");
-        table->update_from_spec();
-        table->insert_empty_row(0, 1);
-        table->set_int(0, 0, 0);
-        wt.commit();
-    }
+        SharedGroup sg("database.tightdb");
+        {
+            WriteTransaction wt(sg);
+            TableRef table = wt.get_table("table");
+            Spec& spec = table->get_spec();
+            spec.add_column(type_Int, "row");
+            table->update_from_spec();
+            table->insert_empty_row(0, 1);
+            table->set_int(0, 0, 0);
+            wt.commit();
+        }
 
-    #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-        pthread_win32_process_attach_np ();
-    #endif
+        #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+            pthread_win32_process_attach_np ();
+        #endif
 
-    for (int i = 0; i < READERS1; ++i)
-        read_threads[i].start(&read_thread);
+        for (int i = 0; i < READERS1; ++i)
+            read_threads[i].start(&read_thread);
 
-    for (int i = 0; i < WRITERS1; ++i)
-        write_threads[i].start(util::bind(write_thread, i));
+        for (int i = 0; i < WRITERS1; ++i)
+            write_threads[i].start(util::bind(write_thread, i));
 
-    for (int i = 0; i < READERS1; ++i) {
-        bool reader_has_thrown = read_threads[i].join();
-        CHECK(!reader_has_thrown);
-    }
+        for (int i = 0; i < READERS1; ++i) {
+            bool reader_has_thrown = read_threads[i].join();
+            CHECK(!reader_has_thrown);
+        }
 
-    for (int i = 0; i < WRITERS1; ++i) {
-        bool writer_has_thrown = write_threads[i].join();
-        CHECK(!writer_has_thrown);
+        for (int i = 0; i < WRITERS1; ++i) {
+            bool writer_has_thrown = write_threads[i].join();
+            CHECK(!writer_has_thrown);
+        }    
     }
 
     File::try_remove("database.tightdb");
 }
 
-#endif // STRESSTEST1
-
-
-
-#ifdef STRESSTEST2
 
 // *************************************************************************************
 // *
@@ -239,11 +231,6 @@ TEST(Transactions_Stress2)
     File::try_remove("database.tightdb");
 }
 
-#endif // STRESSTEST2
-
-
-
-#ifdef STRESSTEST3
 
 // *************************************************************************************
 // *
@@ -360,12 +347,6 @@ TEST(Transactions_Stress3)
     File::try_remove("database.tightdb");
 }
 
-#endif // STRESSTEST3
-
-
-
-
-#ifdef STRESSTEST4
 
 // *************************************************************************************
 // *
@@ -464,4 +445,4 @@ TEST(Transactions_Stress4)
     File::try_remove("database.tightdb");
 }
 
-#endif // STRESSTEST4
+#endif // TEST_TRANSACTIONS_LASSE

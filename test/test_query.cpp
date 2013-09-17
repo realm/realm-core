@@ -1,3 +1,5 @@
+#ifdef TEST_QUERY
+
 #include <cstdlib> // itoa()
 #include <vector>
 
@@ -2792,3 +2794,5 @@ TEST(Query_ref_counting)
     TableView tv = q.find_all();
     CHECK_EQUAL(1, tv.size());
 }
+
+#endif // TEST_QUERY
