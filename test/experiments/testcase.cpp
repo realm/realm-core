@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iostream>
 #include <unistd.h>
+#include <sys/wait.h>
 
 #include <tightdb/column.hpp>
 #include <tightdb.hpp>
