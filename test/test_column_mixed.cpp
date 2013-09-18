@@ -319,4 +319,4 @@ TEST(ColumnMixed_Mixed)
     c.destroy();
 }
 
-#endif TEST_COLUMN_MIXED
+#endif // TEST_COLUMN_MIXED
