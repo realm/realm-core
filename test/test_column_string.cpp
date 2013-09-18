@@ -1,3 +1,4 @@
+#include "testsettings.hpp"
 #ifdef TEST_COLUMN_STRING
 
 #include <UnitTest++.h>

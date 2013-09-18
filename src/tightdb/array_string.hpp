@@ -20,8 +20,6 @@
 #ifndef TIGHTDB_ARRAY_STRING_HPP
 #define TIGHTDB_ARRAY_STRING_HPP
 
-#include <string>
-
 #include <tightdb/array.hpp>
 
 namespace tightdb {
@@ -140,11 +138,7 @@ inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(ndx < m_size);
     if (m_width == 0) return StringData("", 0);
     const char* data = m_data + (ndx * m_width);
-// FIXME: The following line is a temporary fix, and will soon be
-// replaced by the commented line that follows it. See
-// https://github.com/Tightdb/tightdb/pull/84
-    std::size_t size = std::char_traits<char>::length(data);
-//    std::size_t size = (m_width-1) - data[m_width-1];
+    std::size_t size = (m_width-1) - data[m_width-1];
     return StringData(data, size);
 }
 
@@ -164,11 +158,7 @@ inline StringData ArrayString::get(const char* header, std::size_t ndx) TIGHTDB_
     std::size_t width = get_width_from_header(header);
     if (width == 0) return StringData("", 0);
     const char* data = get_data_from_header(header) + (ndx * width);
-// FIXME: The following line is a temporary fix, and will soon be
-// replaced by the commented line that follows it. See
-// https://github.com/Tightdb/tightdb/pull/84
-    std::size_t size = std::char_traits<char>::length(data);
-//    std::size_t size = (width-1) - data[width-1];
+    std::size_t size = (width-1) - data[width-1];
     return StringData(data, size);
 }
 

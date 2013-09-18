@@ -5,6 +5,7 @@
 #include <tightdb.hpp>
 
 #include "../util/timer.hpp"
+#include "../util/benchmark_results.hpp"
 
 using namespace std;
 using namespace tightdb;
@@ -74,62 +75,65 @@ int main()
 
     int_fast64_t dummy = 0;
 
+    int max_lead_text_size = 26;
+    test_util::BenchmarkResults results(max_lead_text_size);
+
     test_util::Timer timer_total(test_util::Timer::type_UserTime);
     test_util::Timer timer(test_util::Timer::type_UserTime);
     {
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             insert(tables_1[i], rising_order);
-        cout << "Insert at end (compact):    "<<timer<<endl;
+        results.submit(timer, "insert_end_compact", "Insert at end (compact)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             dummy += read(tables_1[i], rising_order);
-        cout << "Sequential read (compact):  "<<timer<<endl;
+        results.submit(timer, "read_seq_compact", "Sequential read (compact)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             dummy += read(tables_1[i], random_order);
-        cout << "Random read (compact):      "<<timer<<endl;
+        results.submit(timer, "read_ran_compact", "Random read (compact)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             write(tables_1[i], rising_order);
-        cout << "Sequential write (compact): "<<timer<<endl;
+        results.submit(timer, "write_seq_compact", "Sequential write (compact)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             write(tables_1[i], random_order);
-        cout << "Random write (compact):     "<<timer<<endl;
+        results.submit(timer, "write_ran_compact", "Random write (compact)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             erase(tables_1[i], falling_order);
-        cout << "Erase from end (compact):   "<<timer<<endl;
+        results.submit(timer, "erase_end_compact", "Erase from end (compact)");
     }
     {
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             insert(tables_2[i], random_insert_order);
-        cout << "Random insert (general):    "<<timer<<endl;
+        results.submit(timer, "insert_ran_general", "Random insert (general)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             dummy += read(tables_2[0], rising_order);
-        cout << "Sequential read (general):  "<<timer<<endl;
+        results.submit(timer, "read_seq_general", "Sequential read (general)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             dummy += read(tables_2[0], random_order);
-        cout << "Random read (general):      "<<timer<<endl;
+        results.submit(timer, "read_ran_general", "Random read (general)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             write(tables_2[i], rising_order);
-        cout << "Sequential write (general): "<<timer<<endl;
+        results.submit(timer, "write_seq_general", "Sequential write (general)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             write(tables_2[i], random_order);
-        cout << "Random write (general):     "<<timer<<endl;
+        results.submit(timer, "write_ran_general", "Random write (general)");
         timer.reset();
         for (int i = 0; i != num_tables; ++i)
             erase(tables_2[i], random_erase_order);
-        cout << "Random erase (general):     "<<timer<<endl;
+        results.submit(timer, "erase_ran_general", "Random erase (general)");
     }
 
-    cout << "Total time: "<<timer_total<<endl;
+    results.submit(timer_total, "total_time", "Total time");
 
     cout << "dummy = "<<dummy<<" (to avoid over-optimization)"<<endl;
 }

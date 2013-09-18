@@ -765,4 +765,4 @@ TEST(Column_prepend_many)
 
 #endif
 
-#endif TEST_COLUMN
+#endif // TEST_COLUMN

@@ -94,7 +94,7 @@ public:
     /// modification is only done through it when it is not shared.
     static Spec& get_spec(Table&) TIGHTDB_NOEXCEPT;
 
-    /// Returns the name of the spaceified data type as follows:
+    /// Returns the name of the specified data type as follows:
     ///
     /// <pre>
     ///
