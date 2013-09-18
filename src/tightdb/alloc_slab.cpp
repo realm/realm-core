@@ -37,7 +37,8 @@ const char SlabAlloc::default_header[24] = {
     0,   0,   0,   0,   0,   0,   0,   0,
     0,   0,   0,   0,   0,   0,   0,   0,
     'T', '-', 'D', 'B',
-    current_file_format_version, 0, 0, 0
+    current_file_format_version,
+    current_file_format_version, 0, 0
 };
 
 void SlabAlloc::detach() TIGHTDB_NOEXCEPT
