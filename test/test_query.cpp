@@ -6,6 +6,8 @@
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
+#include <tightdb/lang_bind_helper.hpp>
+
 #include "testsettings.hpp"
 
 using namespace std;
@@ -2775,6 +2777,22 @@ TEST(TestQuery_AllTypes_StaticallyTyped)
     CHECK_EQUAL(0.8, query.double_col.maximum());
     CHECK_EQUAL(0.8, query.double_col.sum());
     CHECK_EQUAL(0.8, query.double_col.average());
+}
+
+TEST(Query_ref_counting)
+{
+    Table* t = LangBindHelper::new_table();
+    t->add_column(type_Int, "myint");
+    t->insert_int(0, 0, 12);
+    t->insert_done();
+
+    Query q = t->where();
+
+    LangBindHelper::unbind_table_ref(t);
+
+    // Now try to access Query and see that the Table is still alive
+    TableView tv = q.find_all();
+    CHECK_EQUAL(1, tv.size());
 }
 
 #endif // TEST_QUERY
