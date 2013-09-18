@@ -554,7 +554,6 @@ TEST(Table_test_json_all_data)
 }
 
 
-/* DISABLED BECAUSE IT FAILS - A PULL REQUEST WILL BE MADE WHERE IT IS REENABLED!
 TEST(Table_test_row_to_string)
 {
     // Create table with all column types
@@ -574,7 +573,7 @@ TEST(Table_test_row_to_string)
     bool test_ok = test_util::equal_without_cr(row_str, expected);
     CHECK_EQUAL(true, test_ok);
     if (!test_ok) {
-        cerr << "row_to_string() failed\n" 
+        cerr << "row_to_string() failed\n"
              << "Expected: " << expected << "\n"
              << "Got     : " << row_str << endl;
     }
@@ -597,7 +596,6 @@ TEST(Table_Find_Int)
     table.Verify();
 #endif
 }
-*/
 
 
 /*
