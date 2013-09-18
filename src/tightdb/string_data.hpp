@@ -56,14 +56,14 @@ namespace tightdb {
 ///
 /// \sa BinaryData
 /// \sa Mixed
-class StringData : public BinaryData {
+class StringData {
 public:
-    StringData() TIGHTDB_NOEXCEPT {m_size = 1;}
-    StringData(const char* d, std::size_t s) TIGHTDB_NOEXCEPT: BinaryData(d, s+1) {}
-    StringData(BinaryData d) TIGHTDB_NOEXCEPT: BinaryData(d) {}
+    StringData() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
+    StringData(const char* d, std::size_t s) TIGHTDB_NOEXCEPT: m_data(d), m_size(s) {}
 
     template<class T, class A> StringData(const std::basic_string<char, T, A>&);
     template<class T, class A> operator std::basic_string<char, T, A>() const;
+    StringData(const BinaryData& b) TIGHTDB_NOEXCEPT;
 
     /// Initialize from a zero terminated C style string.
     StringData(const char* c_str) TIGHTDB_NOEXCEPT;
@@ -72,7 +72,7 @@ public:
     char operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
 
     const char* data() const TIGHTDB_NOEXCEPT { return m_data; }
-    std::size_t size() const TIGHTDB_NOEXCEPT { return m_size-1; }
+    std::size_t size() const TIGHTDB_NOEXCEPT { return m_size; }
 
     friend bool operator==(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
     friend bool operator!=(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
@@ -98,8 +98,14 @@ public:
     StringData substr(std::size_t i) const TIGHTDB_NOEXCEPT;
     //@}
 
+    BinaryData to_binary_z() const TIGHTDB_NOEXCEPT;
+
     template<class C, class T>
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const StringData&);
+
+private:
+    const char* m_data;
+    std::size_t m_size;
 };
 
 
@@ -107,24 +113,27 @@ public:
 // Implementation:
 
 template<class T, class A> inline StringData::StringData(const std::basic_string<char, T, A>& s):
-    BinaryData(s.data(), s.size()+1) {}
+    m_data(s.data()), m_size(s.size()) {}
 
 template<class T, class A> inline StringData::operator std::basic_string<char, T, A>() const
 {
-    return std::basic_string<char, T, A>(m_data, m_size-1);
+    return std::basic_string<char, T, A>(m_data, m_size);
 }
 
 inline StringData::StringData(const char* c_str) TIGHTDB_NOEXCEPT:
-    BinaryData(c_str, std::char_traits<char>::length(c_str)+1) {}
+    m_data(c_str), m_size(std::char_traits<char>::length(c_str)) {}
+
+inline StringData::StringData(const BinaryData& b) TIGHTDB_NOEXCEPT:
+    m_data(b.data()), m_size(b.size()-1) {}
 
 inline bool operator==(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
 {
-    return a.m_size == b.m_size && std::equal(a.m_data, a.m_data + (a.m_size-1), b.m_data);
+    return a.m_size == b.m_size && std::equal(a.m_data, a.m_data + a.m_size, b.m_data);
 }
 
 inline bool operator!=(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
 {
-    return a.m_size != b.m_size || !std::equal(a.m_data, a.m_data + (a.m_size-1), b.m_data);
+    return a.m_size != b.m_size || !std::equal(a.m_data, a.m_data + a.m_size, b.m_data);
 }
 
 inline bool operator<(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
@@ -150,7 +159,7 @@ inline bool operator>=(const StringData& a, const StringData& b) TIGHTDB_NOEXCEP
 
 inline bool StringData::begins_with(StringData d) const TIGHTDB_NOEXCEPT
 {
-    return d.m_size <= m_size && std::equal(m_data, m_data + (d.m_size-1), d.m_data);
+    return d.m_size <= m_size && std::equal(m_data, m_data + d.m_size, d.m_data);
 }
 
 inline bool StringData::ends_with(StringData d) const TIGHTDB_NOEXCEPT
@@ -160,8 +169,7 @@ inline bool StringData::ends_with(StringData d) const TIGHTDB_NOEXCEPT
 
 inline bool StringData::contains(StringData d) const TIGHTDB_NOEXCEPT
 {
-    const char* end = m_data + (m_size-1);
-    return std::search(m_data, end, d.m_data, d.m_data + (d.m_size-1)) != end;
+    return std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
 
 inline StringData StringData::prefix(std::size_t n) const TIGHTDB_NOEXCEPT
@@ -171,7 +179,7 @@ inline StringData StringData::prefix(std::size_t n) const TIGHTDB_NOEXCEPT
 
 inline StringData StringData::suffix(std::size_t n) const TIGHTDB_NOEXCEPT
 {
-    return substr(size() - n);
+    return substr(m_size - n);
 }
 
 inline StringData StringData::substr(std::size_t i, std::size_t n) const TIGHTDB_NOEXCEPT
@@ -181,15 +189,20 @@ inline StringData StringData::substr(std::size_t i, std::size_t n) const TIGHTDB
 
 inline StringData StringData::substr(std::size_t i) const TIGHTDB_NOEXCEPT
 {
-    return substr(i, size() - i);
+    return substr(i, m_size - i);
 }
 
 template<class C, class T>
 inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const StringData& d)
 {
-    for (const char* i = d.m_data; i != d.m_data + (d.m_size-1); ++i)
+    for (const char* i = d.m_data; i != d.m_data + d.m_size; ++i)
         out << *i;
     return out;
+}
+
+inline BinaryData StringData::to_binary_z() const TIGHTDB_NOEXCEPT
+{
+    return BinaryData(m_data, m_size+1); // include zero-termination
 }
 
 } // namespace tightdb

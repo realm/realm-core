@@ -872,12 +872,17 @@ public:
     }
 
     void clear_leaf_state() {
-        if (m_leaf_type == AdaptiveStringColumn::leaf_short)
-            delete(static_cast<ArrayString*>(m_leaf));
-        else if (m_leaf_type ==  AdaptiveStringColumn::leaf_long)
-            delete(static_cast<ArrayStringLong*>(m_leaf));
-        else
-            delete(static_cast<ArrayBigBlobs*>(m_leaf));
+        switch (m_leaf_type) {
+            case AdaptiveStringColumn::leaf_short:
+                delete(static_cast<ArrayString*>(m_leaf));
+                break;
+            case AdaptiveStringColumn::leaf_long:
+                delete(static_cast<ArrayStringLong*>(m_leaf));
+                break;
+            case AdaptiveStringColumn::leaf_big:
+                delete(static_cast<ArrayBigBlobs*>(m_leaf));
+                break;
+        }
     }
 
     size_t find_first_local(size_t start, size_t end)
@@ -1237,7 +1242,7 @@ public:
                     else if (m_leaf_type ==  AdaptiveStringColumn::leaf_long)
                         s = static_cast<ArrayStringLong*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2);
                     else
-                        s = static_cast<ArrayBigBlobs*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2);
+                        s = static_cast<ArrayBigBlobs*>(m_leaf)->find_first(m_value.to_binary_z(), s - m_leaf_start, end2);
 
                     if (s == not_found)
                         s = m_leaf_end - 1;

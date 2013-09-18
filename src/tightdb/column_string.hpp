@@ -188,7 +188,7 @@ inline StringData AdaptiveStringColumn::get(std::size_t ndx) const TIGHTDB_NOEXC
     if (root_is_leaf()) {
         if (m_array->has_refs()) {
             if (m_array->context_bit())
-                return static_cast<StringData>(static_cast<const ArrayBigBlobs*>(m_array)->get(ndx));
+                return static_cast<const ArrayBigBlobs*>(m_array)->get(ndx);
             else
                 return static_cast<const ArrayStringLong*>(m_array)->get(ndx);
         }

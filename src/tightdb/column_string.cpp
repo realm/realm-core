@@ -274,7 +274,7 @@ size_t AdaptiveStringColumn::count(StringData target) const
         if (long_strings) {
             bool is_big = m_array->context_bit();
             if (is_big)
-                count += static_cast<ArrayBigBlobs*>(m_array)->count(target);
+                count += static_cast<ArrayBigBlobs*>(m_array)->count(target.to_binary_z());
             else
                 count += static_cast<ArrayStringLong*>(m_array)->count(target);
         }
@@ -344,7 +344,7 @@ void AdaptiveStringColumn::LeafSet(size_t ndx, StringData value)
         static_cast<ArrayStringLong*>(m_array)->set(ndx, value);
     }
     else {
-        static_cast<ArrayBigBlobs*>(m_array)->set(ndx, value);
+        static_cast<ArrayBigBlobs*>(m_array)->set(ndx, value.to_binary_z());
     }
 }
 
@@ -358,7 +358,7 @@ template<class> size_t AdaptiveStringColumn::LeafFind(StringData value, size_t b
         return static_cast<ArrayStringLong*>(m_array)->find_first(value, begin, end);
     }
     else {
-        return static_cast<ArrayBigBlobs*>(m_array)->find_first(value, begin, end);
+        return static_cast<ArrayBigBlobs*>(m_array)->find_first(value.to_binary_z(), begin, end);
     }
 }
 
@@ -372,7 +372,7 @@ void AdaptiveStringColumn::LeafFindAll(Array &result, StringData value, size_t a
         return static_cast<ArrayStringLong*>(m_array)->find_all(result, value, add_offset, begin, end);
     }
     else {
-        return static_cast<ArrayBigBlobs*>(m_array)->find_all(result, value, add_offset, begin, end);
+        return static_cast<ArrayBigBlobs*>(m_array)->find_all(result, value.to_binary_z(), add_offset, begin, end);
     }
 }
 
@@ -440,7 +440,8 @@ bool AdaptiveStringColumn::compare_string(const AdaptiveStringColumn& c) const
     return true;
 }
 
-void AdaptiveStringColumn::upgrade_leaf(LeafType target_type) {
+void AdaptiveStringColumn::upgrade_leaf(LeafType target_type)
+{
     TIGHTDB_ASSERT(root_is_leaf());
     TIGHTDB_ASSERT(target_type > get_leaf_type());
 
@@ -511,7 +512,7 @@ void AdaptiveStringColumn::do_insert(size_t ndx, StringData value)
         }
         else {
             ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
-            new_sibling_ref = leaf->btree_leaf_insert(ndx, value, false, state);
+            new_sibling_ref = leaf->btree_leaf_insert(ndx, value.to_binary_z(), false, state);
         }
     }
     else {
@@ -561,7 +562,7 @@ ref_type AdaptiveStringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
             ArrayBigBlobs new_leaf(&parent, ndx_in_parent, alloc);
             copy_leaf(leaf, new_leaf);
             leaf.destroy();
-            return new_leaf.btree_leaf_insert(insert_ndx, state.m_value, false, state);
+            return new_leaf.btree_leaf_insert(insert_ndx, state.m_value.to_binary_z(), false, state);
         }
     }
     else if (leaf_type == leaf_long) {
@@ -575,12 +576,12 @@ ref_type AdaptiveStringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
             ArrayBigBlobs new_leaf(&parent, ndx_in_parent, alloc);
             copy_leaf(leaf, new_leaf);
             leaf.destroy();
-            return new_leaf.btree_leaf_insert(insert_ndx, state.m_value, false, state);
+            return new_leaf.btree_leaf_insert(insert_ndx, state.m_value.to_binary_z(), false, state);
         }
     }
     else {
         ArrayBigBlobs leaf(leaf_mem, &parent, ndx_in_parent, alloc);
-        return leaf.btree_leaf_insert(insert_ndx, state.m_value, false, state);
+        return leaf.btree_leaf_insert(insert_ndx, state.m_value.to_binary_z(), false, state);
     }
 }
 
@@ -597,7 +598,7 @@ void AdaptiveStringColumn::copy_leaf(const ArrayString& from, ArrayBigBlobs& to)
 {
     size_t n = from.size();
     for (size_t i=0; i<n; ++i) {
-        to.add(static_cast<BinaryData>(from.get(i)));
+        to.add(from.get(i).to_binary_z());
     }
 }
 
@@ -605,7 +606,7 @@ void AdaptiveStringColumn::copy_leaf(const ArrayStringLong& from, ArrayBigBlobs&
 {
     size_t n = from.size();
     for (size_t i=0; i<n; ++i) {
-        to.add(static_cast<BinaryData>(from.get(i)));
+        to.add(from.get(i).to_binary_z());
     }
 }
 

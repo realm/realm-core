@@ -2,7 +2,7 @@
 #include <win32/types.h>
 #endif
 
-#include "array_blobs_big.hpp"
+#include <tightdb/array_blobs_big.hpp>
 #include <tightdb/array_blob.hpp>
 
 using namespace std;
