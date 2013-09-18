@@ -61,23 +61,12 @@ pthread_mutex_init (pthread_mutex_t * mutex, const pthread_mutexattr_t * attr)
            * Creating mutex that can be shared between
            * processes.
            */
-#if _POSIX_THREAD_PROCESS_SHARED >= 0
-
-          /*
-           * Not implemented yet.
-           */
-
-#error ERROR [__FILE__, line __LINE__]: Process shared mutexes are not supported yet.
-
-#else
           mutex->is_shared = 1;
 
           // Create unique and random mutex name. UuidCreate() needs linking with Rpcrt4.lib, so we use CoCreateGuid() 
           // instead. That way end-user won't need to mess with Visual Studio project settings
           CoCreateGuid(&guid);
-          sprintf(mutex->shared_name, "Global\\%08X%04hX%04hX%02X%02X%02X%02X%02X%02X%02X%02X", guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
-          mutex->shared_name[33] = '\0';
-
+          sprintf_s(mutex->shared_name, sizeof(mutex->shared_name), "Global\\%08X%04X%04X%02X%02X%02X%02X%02X", guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4]);
           h = CreateMutexA(NULL, 0, mutex->shared_name);
           if(h == NULL)
               return EAGAIN;
@@ -87,8 +76,6 @@ pthread_mutex_init (pthread_mutex_t * mutex, const pthread_mutexattr_t * attr)
           mutex->cached_windows_pid = GetCurrentProcessId();
 
           return 0;
-
-#endif /* _POSIX_THREAD_PROCESS_SHARED */
         }
     }
 
@@ -144,7 +131,6 @@ pthread_mutex_init (pthread_mutex_t * mutex, const pthread_mutexattr_t * attr)
         }
     }
 
-  mutex->original = mx.original;
-
+  memcpy(mutex, &mx, sizeof(mx));
   return (result);
 }

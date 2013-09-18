@@ -1,3 +1,7 @@
+#include "testsettings.hpp"
+#ifdef TEST_THREAD
+
+#include <cstring>
 #include <algorithm>
 #include <queue>
 
@@ -20,18 +24,31 @@ void increment(int* i)
     ++*i;
 }
 
-
 struct Shared {
     Mutex m_mutex;
     int m_value;
 
-    void increment_1000_times()
+    // 10000 takes less than 0.1 sec
+    void increment_10000_times()
     {
-        for (int i=0; i<1000; ++i) {
+        for (int i=0; i<10000; ++i) {
             Mutex::Lock lock(m_mutex);
             ++m_value;
         }
     }
+
+    void increment_10000_times2()
+    {
+        for (int i=0; i<10000; ++i) {
+            Mutex::Lock lock(m_mutex);
+            // Create a time window where thread interference can take place. Problem with ++m_value is that it
+            // could assemble into 'inc [addr]' which has very tiny gap
+            double f = m_value;
+            f += 1.;
+            m_value = int(f);
+        }
+    }
+
 };
 
 
@@ -161,18 +178,6 @@ TEST(Thread_Start)
 }
 
 
-// FIXME: Our POSIX Threads port for Windows seems to have a number
-// of bugs that prevent the rest of the unit-tests from working.
-// One bug appears to be that pthread_mutex_lock() incorrectly
-// believes that a regular mutex is a process-shared mutex.
-// It also looks like there is an error when calling
-// pthread_mutex_destroy() on a process-shared mutex.
-// And finally, it appears that it incorrectly claims support for
-// robust mutexes.
-// Lasse, could you take a look at it?
-
-#ifndef _WIN32
-
 TEST(Thread_MutexLock)
 {
     Mutex mutex;
@@ -203,10 +208,23 @@ TEST(Thread_CriticalSection)
     shared.m_value = 0;
     Thread threads[10];
     for (int i = 0; i < 10; ++i)
-        threads[i].start(util::bind(&Shared::increment_1000_times, &shared));
+        threads[i].start(util::bind(&Shared::increment_10000_times, &shared));
     for (int i = 0; i < 10; ++i)
         threads[i].join();
-    CHECK_EQUAL(10000, shared.m_value);
+    CHECK_EQUAL(100000, shared.m_value);
+}
+
+
+TEST(Thread_CriticalSection2)
+{
+    Shared shared;
+    shared.m_value = 0;
+    Thread threads[10];
+    for (int i = 0; i < 10; ++i)
+        threads[i].start(util::bind(&Shared::increment_10000_times2, &shared));
+    for (int i = 0; i < 10; ++i)
+        threads[i].join();
+    CHECK_EQUAL(100000, shared.m_value);
 }
 
 
@@ -356,11 +374,11 @@ TEST(Thread_DeathDuringRecovery)
 TEST(Thread_CondVar)
 {
     QueueMonitor queue;
-    const int num_producers = 2; // 32;
-    const int num_consumers = 2; // 32;
+    const int num_producers = 32;
+    const int num_consumers = 32;
     Thread producers[num_producers], consumers[num_consumers];
     int consumed_counts[num_consumers][num_producers];
-    fill(&consumed_counts[0][0], &consumed_counts[num_consumers][num_producers], 0);
+    memset(consumed_counts, 0, sizeof consumed_counts);
 
     for (int i = 0; i < num_producers; ++i)
         producers[i].start(util::bind(&producer_thread, &queue, i));
@@ -380,4 +398,4 @@ TEST(Thread_CondVar)
     }
 }
 
-#endif // _WIN32
+#endif

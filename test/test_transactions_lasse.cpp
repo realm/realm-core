@@ -1,9 +1,12 @@
+#include "testsettings.hpp"
+#ifdef TEST_TRANSACTIONS_LASSE
+
 #include <cstdlib>
 #include <iostream>
 
 #ifdef _WIN32
 #  define NOMINMAX
-#  include <windows.h> // Sleep()
+#  include <windows.h> // Sleep(), sched_yield()
 #  include <pthread.h> // pthread_win32_process_attach_np()
 #else
 #  include <sched.h>  // sched_yield()
@@ -29,27 +32,9 @@ using namespace tightdb;
 
 // The tests in this file are run if you #define STRESSTEST1 and/or #define STRESSTEST2. Please define them in testsettings.hpp
 
-
 namespace {
 
-inline void yield()
-{
-#ifndef _WIN32
-    sched_yield();
-#endif
-}
-
-unsigned int fastrand()
-{
-    // Must be fast because important edge case is 0 delay. Not thread safe, but that just adds randomnes.
-    static unsigned int u = 1;
-    static unsigned int v = 1;
-    v = 36969*(v & 65535) + (v >> 16);
-    u = 18000*(u & 65535) + (u >> 16);
-    return (v << 16) + u;
-}
-
-TIGHTDB_FORCEINLINE void randsleep(void)
+TIGHTDB_FORCEINLINE void rand_sleep()
 {
     const int64_t ms = 500000;
     unsigned char r = rand();
@@ -70,7 +55,7 @@ TIGHTDB_FORCEINLINE void randsleep(void)
     }
     else if (r <= 252) {
         // Release current time slice but get next available
-        yield();
+        sched_yield();
     }
     else if (r <= 254) {
         // Release current time slice and get time slice according to normal scheduling
@@ -94,8 +79,6 @@ TIGHTDB_FORCEINLINE void randsleep(void)
 
 
 
-#ifdef STRESSTEST1
-
 // *************************************************************************************
 // *
 // *        Stress test 1
@@ -105,8 +88,8 @@ TIGHTDB_FORCEINLINE void randsleep(void)
 namespace {
 
 const int ITER1 =    2000;
-const int READERS1 =   20;
-const int WRITERS1 =   20;
+const int READERS1 =   10;
+const int WRITERS1 =   10;
 
 void write_thread(int thread_ndx)
 {
@@ -118,7 +101,7 @@ void write_thread(int thread_ndx)
             WriteTransaction wt(sg);
             TableRef table = wt.get_table("table");
             table->set_int(0, 0, w);
-            randsleep();
+            rand_sleep();
             int64_t r = table->get_int(0, 0);
             CHECK_EQUAL(r, w); // FIXME: Is UnitTest++ thread-safe to this extent?
             wt.commit();
@@ -135,7 +118,7 @@ void read_thread()
     for (size_t i = 0; i < ITER1; ++i) {
         ReadTransaction rt(sg);
         int64_t r1 = rt.get_table("table")->get_int(0, 0);
-        randsleep();
+        rand_sleep();
         int64_t r2 = rt.get_table("table")->get_int(0, 0);
         CHECK_EQUAL(r1, r2); // FIXME: Is UnitTest++ thread-safe to this extent?
     }
@@ -154,47 +137,43 @@ TEST(Transactions_Stress1)
     File::try_remove("database.tightdb");
     File::try_remove("database.tightdb.lock");
 
-    SharedGroup sg("database.tightdb");
-
     {
-        WriteTransaction wt(sg);
-        TableRef table = wt.get_table("table");
-        Spec& spec = table->get_spec();
-        spec.add_column(type_Int, "row");
-        table->update_from_spec();
-        table->insert_empty_row(0, 1);
-        table->set_int(0, 0, 0);
-        wt.commit();
-    }
+        SharedGroup sg("database.tightdb");
+        {
+            WriteTransaction wt(sg);
+            TableRef table = wt.get_table("table");
+            Spec& spec = table->get_spec();
+            spec.add_column(type_Int, "row");
+            table->update_from_spec();
+            table->insert_empty_row(0, 1);
+            table->set_int(0, 0, 0);
+            wt.commit();
+        }
 
-    #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-        pthread_win32_process_attach_np ();
-    #endif
+        #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
+            pthread_win32_process_attach_np ();
+        #endif
 
-    for (int i = 0; i < READERS1; ++i)
-        read_threads[i].start(&read_thread);
+        for (int i = 0; i < READERS1; ++i)
+            read_threads[i].start(&read_thread);
 
-    for (int i = 0; i < WRITERS1; ++i)
-        write_threads[i].start(util::bind(write_thread, i));
+        for (int i = 0; i < WRITERS1; ++i)
+            write_threads[i].start(util::bind(write_thread, i));
 
-    for (int i = 0; i < READERS1; ++i) {
-        bool reader_has_thrown = read_threads[i].join();
-        CHECK(!reader_has_thrown);
-    }
+        for (int i = 0; i < READERS1; ++i) {
+            bool reader_has_thrown = read_threads[i].join();
+            CHECK(!reader_has_thrown);
+        }
 
-    for (int i = 0; i < WRITERS1; ++i) {
-        bool writer_has_thrown = write_threads[i].join();
-        CHECK(!writer_has_thrown);
+        for (int i = 0; i < WRITERS1; ++i) {
+            bool writer_has_thrown = write_threads[i].join();
+            CHECK(!writer_has_thrown);
+        }    
     }
 
     File::try_remove("database.tightdb");
 }
 
-#endif // STRESSTEST1
-
-
-
-#ifdef STRESSTEST2
 
 // *************************************************************************************
 // *
@@ -252,11 +231,6 @@ TEST(Transactions_Stress2)
     File::try_remove("database.tightdb");
 }
 
-#endif // STRESSTEST2
-
-
-
-#ifdef STRESSTEST3
 
 // *************************************************************************************
 // *
@@ -265,6 +239,16 @@ TEST(Transactions_Stress2)
 // *************************************************************************************
 
 namespace {
+
+unsigned int fast_rand()
+{
+    // Must be fast because important edge case is 0 delay. Not thread safe, but that just adds randomnes.
+    static unsigned int u = 1;
+    static unsigned int v = 1;
+    v = 36969*(v & 65535) + (v >> 16);
+    u = 18000*(u & 65535) + (u >> 16);
+    return (v << 16) + u;
+}
 
 const int ITER3 =     20;
 const int WRITERS3 =   4;
@@ -282,17 +266,17 @@ void write_thread3()
         size_t s = table->size();
 
         if (rand() % 2 == 0 && s > 0) {
-            size_t from = fastrand() % s;
-            size_t n = fastrand() % (s - from + 1);
+            size_t from = fast_rand() % s;
+            size_t n = fast_rand() % (s - from + 1);
             for (size_t t = 0; t < n; ++t)
                 table->remove(from);
         }
         else if (s < ROWS3 / 2) {
-            size_t at = fastrand() % (s + 1);
-            size_t n = fastrand() % ROWS3;
+            size_t at = fast_rand() % (s + 1);
+            size_t n = fast_rand() % ROWS3;
             for (size_t t = 0; t < n; ++t) {
                 table->insert_empty_row(at);
-                table->set_int(0, at, fastrand() % 80);
+                table->set_int(0, at, fast_rand() % 80);
             }
         }
 
@@ -307,7 +291,7 @@ void read_thread3()
         ReadTransaction rt(sg);
         if(rt.get_table("table")->size() > 0) {
             int64_t r1 = rt.get_table("table")->get_int(0,0);
-            randsleep();
+            rand_sleep();
             int64_t r2 = rt.get_table("table")->get_int(0,0);
             CHECK_EQUAL(r1, r2);
         }
@@ -363,12 +347,6 @@ TEST(Transactions_Stress3)
     File::try_remove("database.tightdb");
 }
 
-#endif // STRESSTEST3
-
-
-
-
-#ifdef STRESSTEST4
 
 // *************************************************************************************
 // *
@@ -394,7 +372,7 @@ void write_thread4(int thread_ndx)
             WriteTransaction wt(sg);
             TableRef table = wt.get_table("table");
             table->set_int(0, 0, w);
-            randsleep();
+            rand_sleep();
             int64_t r = table->get_int(0, 0);
             CHECK_EQUAL(r, w);
             wt.commit();
@@ -411,7 +389,7 @@ void read_thread4()
     while (!terminate4) { // FIXME: Oops - this 'read' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
         ReadTransaction rt(sg);
         int64_t r1 = rt.get_table("table")->get_int(0, 0);
-        randsleep();
+        rand_sleep();
         int64_t r2 = rt.get_table("table")->get_int(0, 0);
         CHECK_EQUAL(r1, r2);
     }
@@ -467,4 +445,4 @@ TEST(Transactions_Stress4)
     File::try_remove("database.tightdb");
 }
 
-#endif // STRESSTEST4
+#endif // TEST_TRANSACTIONS_LASSE

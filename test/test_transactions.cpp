@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_TRANSACTIONS
+
 #include <cstdio>
 #include <vector>
 #include <sstream>
@@ -514,3 +517,5 @@ TEST(Transactions)
     }
     // End of read transaction
 }
+
+#endif

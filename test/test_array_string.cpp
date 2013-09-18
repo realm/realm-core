@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_ARRAY_STRING
+
 #include <UnitTest++.h>
 #include <tightdb/array_string.hpp>
 #include <tightdb/column.hpp>
@@ -486,3 +489,5 @@ TEST(ArrayStringCompare)
     a.destroy();
     b.destroy();
 }
+
+#endif // TEST_ARRAY_STRING

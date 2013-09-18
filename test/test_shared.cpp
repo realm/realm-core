@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_SHARED
+
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
@@ -406,7 +409,12 @@ TEST(Shared_ManyReaders)
     for (int i = 0; i < chunk_2_size; ++i)
         chunk_2[i] = (i + 11) % 241;
 
+#if TEST_DURATION < 1
+    // Mac OS X 10.8 cannot handle more than 15 due to its default ulimit settings.
+    int rounds[] = { 3, 5, 7, 9, 11, 13, 15 };
+#else
     int rounds[] = { 3, 5, 11, 17, 23, 27, 31, 47, 59 };
+#endif
     const int num_rounds = sizeof rounds / sizeof *rounds;
 
     const int max_N = 64;
@@ -1145,12 +1153,12 @@ TEST(StringIndex_Bug1)
 
 
 namespace {
-void randstr(char* res, size_t len) {
+void rand_str(char* res, size_t len) {
     for (size_t i = 0; i < len; ++i) {
         res[i] = 'a' + rand() % 10;
     }
 }
-}
+} // anonymous namespace
 
 TEST(StringIndex_Bug2)
 {
@@ -1193,7 +1201,7 @@ TEST(StringIndex_Bug2)
             TableRef table = group.get_table("users");
             table->add_empty_row();
             char txt[100];
-            randstr(txt, 8);
+            rand_str(txt, 8);
             txt[8] = 0;
             //cerr << "+" << txt << endl;
             table->set_string(0, table->size() - 1, txt);
@@ -1317,3 +1325,22 @@ TEST(Shared_MixedWithNonShared)
     }
     File::remove("test.tightdb");
 }
+
+
+TEST(MultipleRollbacks) 
+{
+    SharedGroup sg("test.tightdb");    
+    sg.begin_write();
+    sg.rollback();
+    sg.rollback();
+}
+
+TEST(MultipleEndReads) 
+{
+    SharedGroup sg("test.tightdb");    
+    sg.begin_read();
+    sg.end_read();
+    sg.end_read();
+}
+
+#endif // TEST_SHARED
