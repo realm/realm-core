@@ -1,3 +1,4 @@
+#include "testsettings.hpp"
 #ifdef TEST_QUERY
 
 #include <cstdlib> // itoa()
