@@ -5,6 +5,8 @@
 #include <TestReporter.h> // Part of UnitTest++
 #include <tightdb.hpp>
 #include <tightdb/utilities.hpp>
+#include <vector>
+
 
 //#define USE_VLD
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
@@ -13,14 +15,30 @@
 
 using namespace std;
 using namespace UnitTest;
+using namespace tightdb;
+
+struct 
+{
+    string name;
+    float time;
+} typedef result_t;
+
+vector<result_t> results;
 
 namespace {
 
+bool compare (const result_t &lhs, const result_t &rhs){
+    return lhs.time > rhs.time;
+}
+
 struct CustomTestReporter: TestReporter {
+    
+
+
     void ReportTestStart(TestDetails const& test)
     {
         static_cast<void>(test);
-//        cerr << test.filename << ":" << test.lineNumber << ": Begin " << test.testName << "\n";
+        cerr << test.filename << ":" << test.lineNumber << ": Begin " << test.testName << "\n";
     }
 
     void ReportFailure(TestDetails const& test, char const* failure)
@@ -33,6 +51,11 @@ struct CustomTestReporter: TestReporter {
     {
         static_cast<void>(test);
         static_cast<void>(seconds_elapsed);
+        result_t r;
+        r.name = test.testName;
+        r.time = seconds_elapsed;
+        results.push_back(r);
+
 //        cerr << test.filename << ":" << test.lineNumber << ": End\n";
     }
 
@@ -49,6 +72,13 @@ struct CustomTestReporter: TestReporter {
         cerr.precision(2);
         cerr << "Test time: " << seconds_elapsed << " seconds.\n";
         cerr.precision(orig_prec);
+
+        cerr << "\nTop 5 time usage:\n";
+        std::sort(results.begin(), results.end(), compare);
+        for(size_t t = 0; t < 5; t++) {
+            size_t space = 30 - (results[t].name.size() > 30 ? 30 : results[t].name.size());
+            cerr << results[t].name << ": " << string(space, ' ').c_str() << results[t].time << " s\n";
+        }
     }
 };
 

@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_GROUP
+
 #include <algorithm>
 #include <fstream>
 
@@ -1220,3 +1223,5 @@ TEST(Group_ToDot)
 
 #endif // TIGHTDB_TO_DOT
 #endif // TIGHTDB_DEBUG
+
+#endif // TEST_GROUP

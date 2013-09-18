@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_COLUMN_MIXED
+
 #include <limits>
 
 #include <UnitTest++.h>
@@ -316,3 +319,5 @@ TEST(ColumnMixed_Mixed)
 
     c.destroy();
 }
+
+#endif // TEST_COLUMN_MIXED

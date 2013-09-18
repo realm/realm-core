@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_ARRAY_STRING_LONG
+
 #include <UnitTest++.h>
 #include <tightdb/array_string_long.hpp>
 
@@ -224,3 +227,5 @@ TEST_FIXTURE(db_setup_string_long, ArrayStringLong_Destroy)
     // clean up (ALWAYS PUT THIS LAST)
     c.destroy();
 }
+
+#endif // TEST_ARRAY_STRING_LONG

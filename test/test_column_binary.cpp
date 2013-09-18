@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_COLUMN_BINARY
+
 #include <UnitTest++.h>
 #include <tightdb/column_binary.hpp>
 
@@ -202,3 +205,5 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinary_Destroy)
     // clean up (ALWAYS PUT THIS LAST)
     c.destroy();
 }
+
+#endif // TEST_COLUMN_BINARY

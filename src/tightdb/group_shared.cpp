@@ -350,6 +350,9 @@ const Group& SharedGroup::begin_read()
 
 void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
+    if (!m_group.is_attached()) 
+        return;
+
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
@@ -480,24 +483,26 @@ void SharedGroup::commit()
 // rollback() does not handle all cases.
 void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
+    if (m_group.is_attached()) {
+        TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication())
-        repl->rollback_write_transact(*this);
+        if (Replication* repl = m_group.get_replication())
+            repl->rollback_write_transact(*this);
 #endif
 
-    SharedInfo* info = m_file_map.get_addr();
+        SharedInfo* info = m_file_map.get_addr();
 
-    // Release write lock
-    info->writemutex.unlock();
+        // Release write lock
+        info->writemutex.unlock();
 
-    // Clear all changes made during transaction
-    m_group.detach();
+        // Clear all changes made during transaction
+        m_group.detach();
 
 #ifdef TIGHTDB_DEBUG
-    m_transact_stage = transact_Ready;
+        m_transact_stage = transact_Ready;
 #endif
+    }
 }
 
 

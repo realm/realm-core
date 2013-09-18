@@ -195,33 +195,35 @@ CATEGORIES :
       NAME     : add_column
       SUMMARY  : &g_dyn_table_add_column_summary
                  Add a column.
-      DESCR    : &g_dyn_table_add_column_descr
+      DESCR    :
+      - TEXT   : &g_dyn_table_add_column_descr
                  >
                  This method appends a column of the specified type and name to the table.
                  If it's used in a table which already has rows, the new column will just get
                  default values in those rows.
-
+        TEXT   : &g_dyn_table_add_column_support
                  Currently, the following types are supported:
+        TEXT   : >
                  <ul>
-                   <li><code>type_Bool</code> (default false)</li>
-                   <li><code>type_Int</code> (default 0)</li>
-                   <li><code>type_Float</code> (default 0.0)</li>
-                   <li><code>type_Double</code> (default 0.0)</li>
-                   <li><code>type_String</code> (default "")</li>
-                   <li><code>type_Binary</code> (default ("")</li>
-                   <li><code>type_Date</code> (default 0 - 1970-01-01 00:00:00)</li>
-                   <li><code>type_Table</code> (default NULL)</li>
-                   <li><code>type_Mixed</code> (default NULL)</li>
+                   <li><code>type_Bool</code> (default: false)</li>
+                   <li><code>type_Int</code> (default: 0)</li>
+                   <li><code>type_Float</code> (default: 0.0)</li>
+                   <li><code>type_Double</code> (default: 0.0)</li>
+                   <li><code>type_String</code> (default: "")</li>
+                   <li><code>type_Binary</code> (default: "")</li>
+                   <li><code>type_Date</code> (default: 1970-01-01 00:00:00)</li>
+                   <li><code>type_Table</code> (default: NULL)</li>
+                   <li><code>type_Mixed</code> (default: NULL)</li>
                  </ul>
       PARAMS:
       - NAME   : type
         TYPES  : DataType
-        DESCR  : &g_dyn_table_add_column_param1_descr
-                 Type of data in the new column.
+        DESCR  : &g_dyn_table_add_column_type_descr
+                 Type of data to store in the new column.
       - NAME   : name
         TYPES  : StringData
-        DESCR  : &g_dyn_table_add_column_param2_descr
-                 Name of the new column.
+        DESCR  : &g_dyn_table_add_column_name_descr
+                 Name for the new column.
       RETURN:
         TYPES  : size_t
         DESCR  : &g_dyn_table_add_column_return_descr
@@ -1154,8 +1156,8 @@ CATEGORIES :
                  The JavaScript Object Notation (<a href="http://json.org">JSON</a>)
                  is useful for web/mobile applications and serialization.
 
-                 A table (and subtables) will be formatted as a array of rows, and row will
-                 be formatted as an object.
+                 A table (and subtables) will be formatted as an array of rows, 
+                 and a row will be formatted as an object.
       CONST    : true
       PARAMS:
       - NAME   : out
@@ -1165,14 +1167,16 @@ CATEGORIES :
       - CODE   : ex_cpp_dyn_table_to_json
         DESCR  :
 
+  - g_dyn_table_to_string_2:
+      IGNORE   : ""
   - g_dyn_table_to_string:
       NAME     : to_string
       SUMMARY  : &g_dyn_table_to_string_summary
                  Convert table to a string.
       DESCR    : &g_dyn_table_to_string_descr
-                 >
-                 This method will convert a table and its columns and rows to a format
-                 which is easily read by humans.
+                 This method will convert a table and its columns and rows to a 
+                 human readable format.
+      SIGNATURE: void to_string(std::ostream& out, std::size_t limit = 500) const
       CONST    : true
       PARAMS:
       - NAME   : out
@@ -1180,7 +1184,7 @@ CATEGORIES :
         DESCR  : &g_dyn_table_to_string_parm1_descr
                  Output stream.
       - NAME   : limit
-        TYPES  : size_t
+        TYPES  : std::size_t
         DESCR  : &g_dyn_table_to_string_parm2_descr
                  "The number of rows to convert. Default: 500."
       EXAMPLES:
@@ -1189,19 +1193,18 @@ CATEGORIES :
       SEE      : See also {@link g_dyn_table_row_to_string} which do the same for a specific row.
 
   - g_dyn_table_row_to_string:
-      NAME     : to_string
+      NAME     : row_to_string
       SUMMARY  : &g_dyn_table_row_to_string_summary
                  Convert a row to a string.
       DESCR    : &g_dyn_table_row_to_string_descr
-                 >
-                 This method will convert a row to a format
-                 which is easily read by humans.
+                 This method will convert a specified row to a
+                 human readable format.
       CONST    : true
       PARAMS:
       - NAME   : row_ndx
-        TYPES  : size_t
+        TYPES  : std::size_t
         DESCR  : &g_dyn_table_row_to_string_parm1_descr
-                 The row index.
+                 The index of the row to convert.
       - NAME   : out
         TYPES  : std::ostream&
         DESCR  : &g_dyn_table_row_to_string_parm2_descr
