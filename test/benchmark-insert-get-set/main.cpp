@@ -53,7 +53,7 @@ inline void erase(IntTable& table, const vector<size_t> order)
 int main()
 {
     const size_t target_size = 1100*1000L;
-    const int num_tables = 1; // 50;
+    const int num_tables = 50;
     cout << "Number of tables: " << num_tables << endl;
     cout << "Elements per table: " << target_size << endl;
 

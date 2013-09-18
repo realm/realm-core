@@ -65,14 +65,20 @@ void BenchmarkResults::submit(double elapsed_seconds, const char *ident, const c
     string lead_text_2 = lead_text;
     lead_text_2 += ":";
     out << setw(m_max_lead_text_width+1+separation_1) << lead_text_2;
-    if (have_baseline) {
-        int time_width = 6;
-        out << setw(time_width+separation_2) << format_elapsed_time(baseline_seconds);
-        out << setw(time_width+separation_3) << format_elapsed_time(elapsed_seconds);
-        out << "("<<format_change_percent(baseline_seconds, elapsed_seconds)<<")";
+    if (m_baseline_results.empty()) {
+        out << format_elapsed_time(elapsed_seconds);
     }
     else {
-        out << format_elapsed_time(elapsed_seconds);
+        int time_width = 6;
+        if (have_baseline) {
+            out << setw(time_width+separation_2) << format_elapsed_time(baseline_seconds);
+            out << setw(time_width+separation_3) << format_elapsed_time(elapsed_seconds);
+            out << "("<<format_change_percent(baseline_seconds, elapsed_seconds)<<")";
+        }
+        else {
+            out << setw(time_width+separation_2) << "";
+            out << format_elapsed_time(elapsed_seconds);
+        }
     }
     cout << out.str() << endl;
     m_results.push_back(Result(elapsed_seconds, ident));
