@@ -26,6 +26,7 @@ struct SharedGroup::SharedInfo {
     Atomic<uint64_t> current_version;
     Atomic<uint16_t> init_complete; // indicates lock file has valid content
     Atomic<uint16_t> shutdown_started; // indicates that shutdown is in progress
+    Atomic<uint16_t> writeahead_space;
     uint16_t version;
     uint16_t flags;
 
@@ -62,6 +63,7 @@ SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
     put_pos = 0;
     get_pos = 0;
     shutdown_started.store_release(0);
+    writeahead_space.store_release(0);
     init_complete.store_release(1);
 }
 
@@ -390,6 +392,7 @@ void SharedGroup::do_async_commits()
     begin_read();
     uint64_t last_version = m_version;
     info->init_complete.store_release(2); // allow waiting clients to proceed
+    info->writeahead_space.store_release(100);
     m_group.detach();
     while(true) {
 
@@ -444,6 +447,7 @@ void SharedGroup::do_async_commits()
             // to disk and just keep the lock on the latest version.
             m_version = last_version;
             end_read();
+            info->writeahead_space.store_release(100);
             last_version = current_version;
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "..and Done" << endl;
@@ -583,6 +587,13 @@ Group& SharedGroup::begin_write()
     // Note that this will not get released until we call
     // commit() or rollback()
     info->writemutex.lock(&recover_from_dead_write_transact); // Throws
+
+    uint16_t writeahead;
+    while (0 == (writeahead = info->writeahead_space.load_relaxed()))
+        usleep(100);
+    cout << "Sees writeahead = " << writeahead << endl;
+    while (! info->writeahead_space.compare_and_swap(writeahead, writeahead-1))
+        writeahead = info->writeahead_space.load_relaxed();
 
     // Get the current top ref
     ref_type new_top_ref = to_size_t(info->current_top);

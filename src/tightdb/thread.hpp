@@ -470,7 +470,7 @@ public:
     void store(T value); 
     void store_release(T value); 
     void store_relaxed(T value); 
-
+    bool compare_and_swap(T oldvalue, T newvalue);
 private:
     // the following is not supported
     Atomic(Atomic<T>&);
@@ -515,14 +515,22 @@ inline void Atomic<T>::store(T value)
     state.store(value);
 }
 
+template<typename T>
 inline void Atomic<T>::store_release(T value) 
 {
     state.store(value, std::memory_order_release);
 }
 
+template<typename T>
 inline void Atomic<T>::store_relaxed(T value) 
 {
     state.store(value, std::memory_order_relaxed);
+}
+
+template<typename T>
+inline bool Atomic<T>::compare_and_swap(T oldvalue, T newvalue) 
+{
+    return state.compare_exchange_weak(oldvalue, newvalue);
 }
 
 #else
@@ -636,9 +644,17 @@ inline void Atomic<T>::store_relaxed(T value)
 #else
     // prior to gcc 4.7 we have no portable way of expressing
     // relaxed semantics, so we do seq_consistent store instead
+    // FIXME: we did! ordinary stores (with atomicity..)
     store(value);
 #endif
 }
+
+template<typename T>
+inline bool Atomic<T>::compare_and_swap(T oldvalue, T newvalue) 
+{
+    return __sync_bool_compare_and_swap(&state, oldvalue, newvalue);
+}
+
 
 #endif // GCC
 #endif // C++11 else
