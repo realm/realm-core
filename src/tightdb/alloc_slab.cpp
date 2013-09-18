@@ -13,6 +13,16 @@ using namespace tightdb;
 
 namespace {
 
+// Limited to 7 bits (max 127).
+//
+// 8-bit values are not allowed because 'char' may be a signed 8-bit
+// type, and C++ does not define the result of casting to any signed
+// type unless the original value can be represented unchanged in the
+// target type [C++11 4.7/3]. This, of course, is not a hard
+// limitation, only a limitation due to the way we currently buld the
+// default header.
+const int current_file_format_version = 1;
+
 class InvalidFreeSpace: std::exception {
 public:
     const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
@@ -26,7 +36,8 @@ public:
 const char SlabAlloc::default_header[24] = {
     0,   0,   0,   0,   0,   0,   0,   0,
     0,   0,   0,   0,   0,   0,   0,   0,
-    'T', '-', 'D', 'B', 0,   0,   0,   0
+    'T', '-', 'D', 'B',
+    current_file_format_version, 0, 0, 0
 };
 
 void SlabAlloc::detach() TIGHTDB_NOEXCEPT
@@ -436,8 +447,8 @@ bool SlabAlloc::validate_buffer(const char* data, size_t len) const
     int valid_part = file_header[16 + 7] & 0x1;
 
     // Byte 4 and 5 (depending on valid_part) in the info block is version
-    uint8_t version = file_header[16 + 4 + valid_part];
-    if (version != 0)
+    int version = static_cast<unsigned char>(file_header[16 + 4 + valid_part]);
+    if (version != current_file_format_version)
         return false; // unsupported version
 
     // Top_ref should always point within buffer
