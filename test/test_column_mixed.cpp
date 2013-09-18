@@ -1,3 +1,4 @@
+#include "testsettings.hpp"
 #ifdef TEST_COLUMN_MIXED
 
 #include <limits>
