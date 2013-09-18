@@ -11,6 +11,7 @@
 #include <tightdb/group_shared.hpp>
 #include <tightdb/group_writer.hpp>
 
+#define TIGHTDB_ENABLE_LOGFILE
 
 using namespace std;
 using namespace tightdb;
@@ -429,7 +430,9 @@ void SharedGroup::do_async_commits()
 #endif
             begin_read();
 #ifdef TIGHTDB_ENABLE_LOGFILE
-            cerr << "(version " << m_version << ")...";
+            cerr << "(version " << m_version << " from " 
+                 << last_version << "), ringbuf_size = " 
+                 << ringbuf_size() << "...";
 #endif
             uint64_t current_version = m_version;
             size_t current_top_ref = m_group.m_top.get_ref();
@@ -447,7 +450,7 @@ void SharedGroup::do_async_commits()
 #endif
         }
         else if (!shutdown) {
-            usleep(100);
+            usleep(10000);
         }
 
         if (shutdown) {
