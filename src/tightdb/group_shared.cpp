@@ -24,9 +24,10 @@ struct SharedGroup::ReadCount {
 
 struct SharedGroup::SharedInfo {
     Atomic<uint64_t> current_version;
+    CondVar room_to_write;
     Atomic<uint16_t> init_complete; // indicates lock file has valid content
     Atomic<uint16_t> shutdown_started; // indicates that shutdown is in progress
-    Atomic<uint16_t> writeahead_space;
+    uint16_t writeahead_count;
     uint16_t version;
     uint16_t flags;
 
@@ -51,6 +52,7 @@ struct SharedGroup::SharedInfo {
 SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
                                     DurabilityLevel dlevel):
     readmutex(Mutex::process_shared_tag()), // Throws
+    room_to_write(CondVar::process_shared_tag()), // Throws
     writemutex() // Throws
 {
     version  = 0;
@@ -63,7 +65,7 @@ SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
     put_pos = 0;
     get_pos = 0;
     shutdown_started.store_release(0);
-    writeahead_space.store_release(0);
+    writeahead_count = 0;
     init_complete.store_release(1);
 }
 
@@ -73,6 +75,7 @@ namespace {
 void recover_from_dead_write_transact()
 {
     // Nothing needs to be done
+    cerr << "** DEAD Writemutex holder **" << endl;
 }
 
 } // anonymous namespace
@@ -391,8 +394,8 @@ void SharedGroup::do_async_commits()
     // processes that that they can start commiting to the db.
     begin_read();
     uint64_t last_version = m_version;
+    info->writeahead_count = 100;
     info->init_complete.store_release(2); // allow waiting clients to proceed
-    info->writeahead_space.store_release(100);
     m_group.detach();
     while(true) {
 
@@ -447,7 +450,6 @@ void SharedGroup::do_async_commits()
             // to disk and just keep the lock on the latest version.
             m_version = last_version;
             end_read();
-            info->writeahead_space.store_release(100);
             last_version = current_version;
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "..and Done" << endl;
@@ -456,7 +458,15 @@ void SharedGroup::do_async_commits()
         else if (!shutdown) {
             usleep(10);
         }
-
+        cerr << "locking" << endl;
+        info->writemutex.lock(&recover_from_dead_write_transact);
+        cerr << "locked, writeahead_count" << info->writeahead_count << endl;
+        info->writeahead_count = 100;
+        cerr << "notifying (1)" << endl;
+        info->room_to_write.notify_all();
+        cerr << "notifying (2)" << endl;
+        info->writemutex.unlock();
+        cerr << "unlocking" << endl;
         if (shutdown) {
             // Being the backend process, we own the lock file, so we
             // have to clean up when we shut down.
@@ -466,7 +476,7 @@ void SharedGroup::do_async_commits()
 #endif
             File::remove(m_file_path);
 #ifdef TIGHTDB_ENABLE_LOGFILE
-            cerr << "Daemon exiting nicely";
+            cerr << "Daemon exiting nicely" << endl << endl;
 #endif
             exit(EXIT_SUCCESS);
         }
@@ -547,10 +557,6 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
 
-        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size())) {
-            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
-        }
-
         // Find entry for current version
         size_t ndx = ringbuf_find(m_version);
         TIGHTDB_ASSERT(ndx != not_found);
@@ -589,11 +595,14 @@ Group& SharedGroup::begin_write()
     info->writemutex.lock(&recover_from_dead_write_transact); // Throws
 
     if (info->flags == durability_Async) {
-        uint16_t writeahead;
-        while (0 == (writeahead = info->writeahead_space.load_acquire()))
-            usleep(1000);
-        while (! info->writeahead_space.compare_and_swap(writeahead, writeahead-1))
-            writeahead = info->writeahead_space.load_relaxed();
+        cout << "writeahead_count " << info->writeahead_count << endl;
+        while (info->writeahead_count <= 0) {
+            cout << "Waiting on barrier" << endl;
+            info->room_to_write.wait(info->writemutex,
+                                     recover_from_dead_write_transact);
+        }
+        info->writeahead_count--;
+        cout << "Passed barrier, count = " << info->writeahead_count << endl;
     }
 
     // Get the current top ref
