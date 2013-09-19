@@ -40,12 +40,12 @@ namespace tightdb {
 ///
 /// For compatibility with C-style strings, when a string is stored in
 /// a TightDB database, it is always followed by a terminating null
-/// character, regardles of whether the string itself has internal
+/// character, regardless of whether the string itself has internal
 /// null characters. This means that when a StringData object is
 /// extracted from TightDB, the referenced region is guaranteed to be
-/// followed immediatly by an extra null character, but that null
-/// character is not inside the referenced region. All of the
-/// following forms are guaranteed to return a pointer to a
+/// followed immediately by an extra null character, but that null
+/// character is not inside the referenced region. Therefore, all of
+/// the following forms are guaranteed to return a pointer to a
 /// null-terminated string:
 ///
 /// \code{.cpp}
@@ -59,7 +59,7 @@ namespace tightdb {
 ///
 /// Note that in general, no assumptions can be made about what
 /// follows a StringData object, or whether anything follows it at
-/// all. In particular, the receiver of a StingData object cannot
+/// all. In particular, the receiver of a StringData object cannot
 /// assume that the referenced string is followed by a null character
 /// unless there is an externally provided guarantee.
 ///
