@@ -11,12 +11,13 @@ using namespace tightdb;
 
 namespace {
 
-void set_capacity(char* addr, size_t size)
+void set_capacity(char* header, size_t value)
 {
-    unsigned char* header = reinterpret_cast<unsigned char*>(addr);
-    header[4] = (size >> 16) & 0x000000FF;
-    header[5] = (size >> 8) & 0x000000FF;
-    header[6] = size & 0x000000FF;
+    typedef unsigned char uchar;
+    uchar* h = reinterpret_cast<uchar*>(header);
+    h[1] = uchar((value >> 16) & 0x000000FF);
+    h[2] = uchar((value >>  8) & 0x000000FF);
+    h[3] = uchar( value        & 0x000000FF);
 }
 
 } // anonymous namespace

@@ -23,9 +23,9 @@
 // ------------------------
 //
 // |--------|--------|--------|--------|--------|--------|--------|--------|
-// |12344555|           size           |         capacity         |reserved|
+// |12344555|    capacity/checksum     |         capacity         |reserved|
 //
-//  1: 'not_leaf' (inner node of B+-tree).
+//  1: 'inner_bpnode' (inner node of B+-tree).
 //
 //  2: 'has_refs' (elements whose first bit is zero are refs to subarrays).
 //
@@ -46,10 +46,13 @@
 //      value of 'width'  |  0 |  1 |  2 |  4 |  8 | 16 | 32 | 64 |
 //
 //
-// 'size' (aka length) is the number of elements in the array.
-//
 // 'capacity' is the total number of bytes allocated for this array
-// including the header.
+// including the header. Although not yet implemented, the plan is to
+// use this slot for a checksum when writing arrays to the file. This
+// would mean that the slot must be intepreted as a checksum whenever
+// Allocator::is_read_only(Array::m_ref) returns true.
+//
+// 'size' (aka length) is the number of elements in the array.
 //
 //
 // Inner node of B+-tree:
