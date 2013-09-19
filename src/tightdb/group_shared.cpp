@@ -454,7 +454,7 @@ void SharedGroup::do_async_commits()
 #endif
         }
         else if (!shutdown) {
-            usleep(10000);
+            usleep(10);
         }
 
         if (shutdown) {
@@ -588,12 +588,13 @@ Group& SharedGroup::begin_write()
     // commit() or rollback()
     info->writemutex.lock(&recover_from_dead_write_transact); // Throws
 
-    uint16_t writeahead;
-    while (0 == (writeahead = info->writeahead_space.load_relaxed()))
-        usleep(100);
-    cout << "Sees writeahead = " << writeahead << endl;
-    while (! info->writeahead_space.compare_and_swap(writeahead, writeahead-1))
-        writeahead = info->writeahead_space.load_relaxed();
+    if (info->flags == durability_Async) {
+        uint16_t writeahead;
+        while (0 == (writeahead = info->writeahead_space.load_acquire()))
+            usleep(1000);
+        while (! info->writeahead_space.compare_and_swap(writeahead, writeahead-1))
+            writeahead = info->writeahead_space.load_relaxed();
+    }
 
     // Get the current top ref
     ref_type new_top_ref = to_size_t(info->current_top);
