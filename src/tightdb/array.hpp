@@ -262,14 +262,14 @@ public:
     enum Type {
         type_Normal,
 
-        /// This array is the root of an innner node of a B+-tree as
-        /// used in table columns.
+        /// This array is the main array of an innner node of a
+        /// B+-tree as used in table columns.
         type_InnerColumnNode,
 
-        /// This array may contain refs to subarrays. A element value
-        /// whose least significant bit is zero, is a ref pointing to
-        /// a subarray. An element value whose least significant bit
-        /// is one, is just a value. Is is the responsibility of the
+        /// This array may contain refs to subarrays. An element whose
+        /// least significant bit is zero, is a ref pointing to a
+        /// subarray. An element whose least significant bit is one,
+        /// is just a value. It is the responsibility of the
         /// application to ensure that non-ref values have their least
         /// significant bit set. This will generally be done by
         /// shifting the desired vlue to the left by one bit position,
