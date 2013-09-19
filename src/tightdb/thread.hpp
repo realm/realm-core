@@ -184,6 +184,8 @@ public:
     /// directly. It is called automatically when using the ordinary
     /// lock() function.
     void mark_as_consistent() TIGHTDB_NOEXCEPT;
+
+    friend class CondVar;
 };
 
 class RobustMutex::NotRecoverable: std::exception {
@@ -215,6 +217,8 @@ public:
 
     /// Wait for another thread to call notify() or notify_all().
     void wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT;
+    template<class Func>
+    void wait(RobustMutex& m, Func recover_func);
 
     /// If any threads are wating for this condition, wake up at least
     /// one.
@@ -401,6 +405,36 @@ inline void CondVar::wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT
     int r = pthread_cond_wait(&m_impl, &l.m_mutex.m_impl);
     if (TIGHTDB_UNLIKELY(r != 0))
         TIGHTDB_TERMINATE("pthread_cond_wait() failed");
+}
+
+template<class Func>
+inline void CondVar::wait(RobustMutex& m, Func recover_func)
+{
+    int r = pthread_cond_wait(&m_impl, &m.m_impl);
+    if (TIGHTDB_LIKELY(r == 0))
+        return;
+#ifdef TIGHTDB_HAVE_ROBUST_PTHREAD_MUTEX
+    if (r == ENOTRECOVERABLE)
+        throw NotRecoverable();
+    if (r != EOWNERDEAD) 
+        lock_failed(r); // does not return
+#endif
+    try {
+        recover_func(); // Throws
+        m.mark_as_consistent();
+        // If we get this far, the protected memory has been
+        // brought back into a consistent state, and the mutex has
+        // been notified aboit this. This means that we can safely
+        // enter the applications critical section.
+    }
+    catch (...) {
+        // Unlocking without first calling mark_as_consistent()
+        // means that the mutex enters the "not recoverable"
+        // state, which will cause all future attempts at locking
+        // to fail.
+        m.unlock();
+        throw;
+    }
 }
 
 inline void CondVar::notify() TIGHTDB_NOEXCEPT
