@@ -184,12 +184,18 @@ void Array::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
     m_size     = get_size_from_header(header);
 
     // Capacity is how many items there are room for
-    size_t byte_capacity = get_capacity_from_header(header);
-    // FIXME: Avoid calling virtual method CalcItemCount() here,
-    // instead calculate the capacity in a way similar to what is done
-    // in get_byte_size_from_header(). The virtual call makes "life"
-    // hard for constructors in derived array classes.
-    m_capacity = CalcItemCount(byte_capacity, m_width);
+    bool is_read_only = m_alloc.is_read_only(mem.m_ref);
+    if (is_read_only) {
+        m_capacity = m_size;
+    }
+    else {
+        size_t byte_capacity = get_capacity_from_header(header);
+        // FIXME: Avoid calling virtual method CalcItemCount() here,
+        // instead calculate the capacity in a way similar to what is done
+        // in get_byte_size_from_header(). The virtual call makes "life"
+        // hard for constructors in derived array classes.
+        m_capacity = CalcItemCount(byte_capacity, m_width);
+    }
 
     m_ref = mem.m_ref;
     m_data = get_data_from_header(header);
@@ -1331,6 +1337,7 @@ ref_type Array::create_empty_array(Type type, WidthType width_type, Allocator& a
 void Array::alloc(size_t size, size_t width)
 {
     TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(!m_alloc.is_read_only(m_ref));
     TIGHTDB_ASSERT(m_capacity > 0);
     if (m_capacity < size || width != m_width) {
         size_t needed_bytes   = CalcByteLen(size, width);
@@ -2192,8 +2199,15 @@ pair<ref_type, size_t> Array::get_to_dot_parent(size_t ndx_in_parent) const TIGH
 
 void Array::stats(MemStats& stats) const
 {
-    size_t capacity_bytes = get_capacity_from_header();
+    size_t capacity_bytes;
     size_t bytes_used     = CalcByteLen(m_size, m_width);
+
+    if (m_alloc.is_read_only(m_ref)) {
+        capacity_bytes = bytes_used;
+    }
+    else {
+        capacity_bytes = get_capacity_from_header();
+    }
 
     MemStats m(capacity_bytes, bytes_used, 1);
     stats.add(m);

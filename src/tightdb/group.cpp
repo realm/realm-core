@@ -40,16 +40,32 @@ public:
         free(m_buffer);
     }
 
-    size_t getpos() const {return m_pos;}
+    size_t getpos() const { return m_pos; }
 
-    size_t write(const char* p, size_t n)
+    void write(const char* data, size_t size)
     {
-        const size_t pos = m_pos;
-        copy(p, p+n, m_buffer+m_pos);
-        m_pos += n;
+        char* dest = m_buffer + m_pos;
+        copy(data, data+size, dest);
+        m_pos += size;
+    }
+
+    size_t write_array(const char* data, size_t size, uint_fast32_t checksum)
+    {
+        size_t pos = m_pos;
+        char* dest = m_buffer + pos;
+#ifdef TIGHTDB_DEBUG
+        const char* cksum_bytes = reinterpret_cast<const char*>(&checksum);
+        copy(cksum_bytes, cksum_bytes+4, dest);
+        copy(data+4, data+size, dest+4);
+#else
+        static_cast<void>(checksum);
+        copy(data, data+size, dest);
+#endif
+        m_pos += size;
         return pos;
     }
-    void seek(size_t pos) {m_pos = pos;}
+
+    void seek(size_t pos) { m_pos = pos; }
 
     char* release_buffer() TIGHTDB_NOEXCEPT
     {
@@ -72,26 +88,48 @@ public:
 
     size_t getpos() const { return m_pos; }
 
-    size_t write(const char* data, size_t size)
+    void write(const char* data, size_t size)
     {
         size_t size_0 = size;
+
+        const char* data_1 = data;
+        size_t size_1 = size_0;
 
         // Handle the case where 'size_t' has a larger range than 'streamsize'
         streamsize max_streamsize = numeric_limits<streamsize>::max();
         size_t max_put = numeric_limits<size_t>::max();
         if (int_less_than(max_streamsize, max_put))
             max_put = size_t(max_streamsize);
-        while (max_put < size) {
-            m_out.write(data, max_put);
-            data += max_put;
-            size -= max_put;
+        while (max_put < size_1) {
+            m_out.write(data_1, max_put);
+            data_1 += max_put;
+            size_1 -= max_put;
         }
 
-        m_out.write(data, size);
+        m_out.write(data_1, size_1);
 
-        size_t pos = m_pos;
+//        size_t pos = m_pos;
         if (int_add_with_overflow_detect(m_pos, size_0))
             throw runtime_error("File size overflow");
+//        return pos;
+    }
+
+    size_t write_array(const char* data, size_t size, uint_fast32_t checksum)
+    {
+        const char* data_1 = data;
+        size_t size_1 = size;
+        size_t pos = m_pos;
+
+#ifdef TIGHTDB_DEBUG
+        const char* cksum_bytes = reinterpret_cast<const char*>(&checksum);
+        m_out.write(cksum_bytes, 4);
+        data_1 += 4;
+        size_1 -= 4;
+        if (int_add_with_overflow_detect(m_pos, 4))
+            throw runtime_error("File size overflow");
+#endif
+
+        write(data_1, size_1);
         return pos;
     }
 

@@ -160,13 +160,13 @@ size_t GroupWriter::write_group()
 
     // The free-list now have their final form, so we can write them
     // to the file
-    write_at(free_positions_pos, fpositions.get_header(), free_positions_size); // Throws
-    write_at(free_sizes_pos, flengths.get_header(), free_sizes_size); // Throws
+    write_array_at(free_positions_pos, fpositions.get_header(), free_positions_size); // Throws
+    write_array_at(free_sizes_pos, flengths.get_header(), free_sizes_size); // Throws
     if (is_shared)
-        write_at(free_versions_pos, fversions.get_header(), free_versions_size); // Throws
+        write_array_at(free_versions_pos, fversions.get_header(), free_versions_size); // Throws
 
     // Write top
-    write_at(top_pos, top.get_header(), top_size); // Throws
+    write_array_at(top_pos, top.get_header(), top_size); // Throws
 
     // Return top_pos so that it can be saved in lock file used
     // for coordination
@@ -399,7 +399,7 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
 }
 
 
-size_t GroupWriter::write(const char* data, size_t size)
+void GroupWriter::write(const char* data, size_t size)
 {
     // Get position of free space to write in (expanding file if needed)
     size_t pos = get_free_space(size);
@@ -408,13 +408,31 @@ size_t GroupWriter::write(const char* data, size_t size)
     // Write the block
     char* dest = m_file_map.get_addr() + pos;
     copy(data, data+size, dest);
+}
+
+
+size_t GroupWriter::write_array(const char* data, size_t size, uint_fast32_t checksum)
+{
+    // Get position of free space to write in (expanding file if needed)
+    size_t pos = get_free_space(size);
+    TIGHTDB_ASSERT((pos & 0x7) == 0); // Write position should always be 64bit aligned
+
+    // Write the block
+    char* dest = m_file_map.get_addr() + pos;
+#ifdef TIGHTDB_DEBUG
+    const char* cksum_bytes = reinterpret_cast<const char*>(&checksum);
+    copy(cksum_bytes, cksum_bytes+4, dest);
+    copy(data+4, data+size, dest+4);
+#else
+    copy(data, data+size, dest);
+#endif
 
     // return the position it was written
     return pos;
 }
 
 
-void GroupWriter::write_at(size_t pos, const char* data, size_t size)
+void GroupWriter::write_array_at(size_t pos, const char* data, size_t size)
 {
     char* dest = m_file_map.get_addr() + pos;
 
@@ -424,7 +442,14 @@ void GroupWriter::write_at(size_t pos, const char* data, size_t size)
     static_cast<void>(mmap_end);
     static_cast<void>(copy_end);
 
+#ifdef TIGHTDB_DEBUG
+    uint_fast32_t dummy_checksum = 0x01010101UL;
+    const char* cksum_bytes = reinterpret_cast<const char*>(&dummy_checksum);
+    copy(cksum_bytes, cksum_bytes+4, dest);
+    copy(data+4, data+size, dest+4);
+#else
     copy(data, data+size, dest);
+#endif
 }
 
 

@@ -903,6 +903,8 @@ protected:
     WidthType get_wtype_from_header() const TIGHTDB_NOEXCEPT;
     int get_width_from_header() const TIGHTDB_NOEXCEPT;
     std::size_t get_size_from_header() const TIGHTDB_NOEXCEPT;
+
+    // Undefined behavior if m_alloc.is_read_only(m_ref) returns true
     std::size_t get_capacity_from_header() const TIGHTDB_NOEXCEPT;
 
     void set_header_isleaf(bool value) TIGHTDB_NOEXCEPT;
@@ -974,6 +976,7 @@ protected:
     /// Same as get_byte_size().
     static std::size_t get_byte_size_from_header(const char*) TIGHTDB_NOEXCEPT;
 
+    // Undefined behavior if array is in immutable memory
     static std::size_t get_capacity_from_header(const char*) TIGHTDB_NOEXCEPT;
 
     /// Get the maximum number of bytes that can be written by a
@@ -1646,7 +1649,8 @@ inline std::size_t Array::get_byte_size() const TIGHTDB_NOEXCEPT
 
     num_bytes += header_size;
 
-    TIGHTDB_ASSERT(num_bytes <= get_capacity_from_header(header));
+    TIGHTDB_ASSERT(m_alloc.is_read_only(m_ref) ||
+                   num_bytes <= get_capacity_from_header(header));
 
     return num_bytes;
 }
@@ -1683,8 +1687,6 @@ inline std::size_t Array::get_byte_size_from_header(const char* header) TIGHTDB_
         num_bytes += rest;
 
     num_bytes += header_size;
-
-    TIGHTDB_ASSERT(num_bytes <= get_capacity_from_header(header));
 
     return num_bytes;
 }
@@ -1755,12 +1757,13 @@ template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) c
         return refs_pos; // Return position
     }
 
-    // TODO: replace capacity with checksum
+    // FIXME: Replace capacity with checksum
 
     // Write array
     const char* header = get_header_from_data(m_data);
     std::size_t size = get_byte_size();
-    std::size_t array_pos = out.write(header, size);
+    uint_fast32_t dummy_checksum = 0x01010101UL;
+    std::size_t array_pos = out.write_array(header, size, dummy_checksum);
     TIGHTDB_ASSERT((array_pos & 0x7) == 0); /// 64-bit alignment
 
     return array_pos;
