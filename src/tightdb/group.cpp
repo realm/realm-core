@@ -127,6 +127,8 @@ public:
         size_1 -= 4;
         if (int_add_with_overflow_detect(m_pos, 4))
             throw runtime_error("File size overflow");
+#else
+        static_cast<void>(checksum);
 #endif
 
         write(data_1, size_1);

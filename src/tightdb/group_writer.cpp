@@ -424,6 +424,7 @@ size_t GroupWriter::write_array(const char* data, size_t size, uint_fast32_t che
     copy(cksum_bytes, cksum_bytes+4, dest);
     copy(data+4, data+size, dest+4);
 #else
+    static_cast<void>(checksum);
     copy(data, data+size, dest);
 #endif
 
