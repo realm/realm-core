@@ -15,9 +15,9 @@ void set_capacity(char* header, size_t value)
 {
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
-    h[1] = uchar((value >> 16) & 0x000000FF);
-    h[2] = uchar((value >>  8) & 0x000000FF);
-    h[3] = uchar( value        & 0x000000FF);
+    h[0] = uchar((value >> 16) & 0x000000FF);
+    h[1] = uchar((value >>  8) & 0x000000FF);
+    h[2] = uchar( value        & 0x000000FF);
 }
 
 } // anonymous namespace

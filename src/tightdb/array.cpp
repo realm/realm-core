@@ -22,8 +22,17 @@
 // Header format (8 bytes):
 // ------------------------
 //
+// In mutable part / outside file:
+//
 // |--------|--------|--------|--------|--------|--------|--------|--------|
-// |12344555|    capacity/checksum     |         capacity         |reserved|
+// |         capacity         |reserved|12344555|           size           |
+//
+//
+// In immutable part / in file:
+//
+// |--------|--------|--------|--------|--------|--------|--------|--------|
+// |             checksum              |12344555|           size           |
+//
 //
 //  1: 'inner_bpnode' (inner node of B+-tree).
 //
@@ -47,12 +56,12 @@
 //
 //
 // 'capacity' is the total number of bytes allocated for this array
-// including the header. Although not yet implemented, the plan is to
-// use this slot for a checksum when writing arrays to the file. This
-// would mean that the slot must be intepreted as a checksum whenever
-// Allocator::is_read_only(Array::m_ref) returns true.
+// including the header.
 //
 // 'size' (aka length) is the number of elements in the array.
+//
+// 'checksum' (not yet implemented) is the checksum of the array
+// including the header.
 //
 //
 // Inner node of B+-tree:
