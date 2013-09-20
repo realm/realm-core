@@ -218,7 +218,7 @@ public:
     /// Wait for another thread to call notify() or notify_all().
     void wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT;
     template<class Func>
-    void wait(RobustMutex& m, Func recover_func);
+    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = NULL);
 
     /// If any threads are wating for this condition, wake up at least
     /// one.
@@ -408,9 +408,16 @@ inline void CondVar::wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT
 }
 
 template<class Func>
-inline void CondVar::wait(RobustMutex& m, Func recover_func)
+inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
-    int r = pthread_cond_wait(&m_impl, &m.m_impl);
+    int r;
+    if (tp == NULL) {
+        r = pthread_cond_wait(&m_impl, &m.m_impl);
+    } else {
+        r = pthread_cond_timedwait(&m_impl, &m.m_impl, tp);
+        if (r == ETIMEDOUT)
+            return;
+    }
     if (TIGHTDB_LIKELY(r == 0))
         return;
 #ifdef TIGHTDB_HAVE_ROBUST_PTHREAD_MUTEX

@@ -24,15 +24,17 @@ struct SharedGroup::ReadCount {
 
 struct SharedGroup::SharedInfo {
     Atomic<uint64_t> current_version;
-    CondVar room_to_write;
     Atomic<uint16_t> init_complete; // indicates lock file has valid content
     Atomic<uint16_t> shutdown_started; // indicates that shutdown is in progress
-    uint16_t writeahead_count;
     uint16_t version;
     uint16_t flags;
 
     Mutex readmutex;
     RobustMutex writemutex;
+    RobustMutex balancemutex;
+    CondVar room_to_write;
+    CondVar work_to_do;
+    uint16_t writeahead_count;
     uint64_t filesize;
 
     uint64_t current_top;
@@ -52,8 +54,10 @@ struct SharedGroup::SharedInfo {
 SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
                                     DurabilityLevel dlevel):
     readmutex(Mutex::process_shared_tag()), // Throws
+    writemutex(), // Throws
+    balancemutex(), // Throws
     room_to_write(CondVar::process_shared_tag()), // Throws
-    writemutex() // Throws
+    work_to_do(CondVar::process_shared_tag()) // Throws
 {
     version  = 0;
     flags    = dlevel; // durability level is fixed from creation
@@ -455,18 +459,25 @@ void SharedGroup::do_async_commits()
             cerr << "..and Done" << endl;
 #endif
         }
-        else if (!shutdown) {
-            usleep(10);
-        }
-        cerr << "locking" << endl;
-        info->writemutex.lock(&recover_from_dead_write_transact);
-        cerr << "locked, writeahead_count" << info->writeahead_count << endl;
+        info->balancemutex.lock(&recover_from_dead_write_transact);
+        uint16_t writeahead = info->writeahead_count;
         info->writeahead_count = 100;
-        cerr << "notifying (1)" << endl;
-        info->room_to_write.notify_all();
-        cerr << "notifying (2)" << endl;
-        info->writemutex.unlock();
-        cerr << "unlocking" << endl;
+        if (writeahead <= 0) {
+            info->room_to_write.notify_all();
+        }
+        if (writeahead > 50) {
+            timespec ts;
+            clock_gettime(CLOCK_REALTIME, &ts);
+            ts.tv_nsec += 10000000; // 10 msec
+            if (ts.tv_nsec > 1000000000) { // overflow
+                ts.tv_nsec -= 1000000000;
+                ts.tv_sec += 1;
+            }
+            info->work_to_do.wait(info->balancemutex,
+                                  &recover_from_dead_write_transact,
+                                  &ts);
+        }
+        info->balancemutex.unlock();
         if (shutdown) {
             // Being the backend process, we own the lock file, so we
             // have to clean up when we shut down.
@@ -595,14 +606,15 @@ Group& SharedGroup::begin_write()
     info->writemutex.lock(&recover_from_dead_write_transact); // Throws
 
     if (info->flags == durability_Async) {
-        cout << "writeahead_count " << info->writeahead_count << endl;
+        info->balancemutex.lock(&recover_from_dead_write_transact); // Throws
+        if (info->writeahead_count < 50)
+            info->work_to_do.notify();
         while (info->writeahead_count <= 0) {
-            cout << "Waiting on barrier" << endl;
-            info->room_to_write.wait(info->writemutex,
+            info->room_to_write.wait(info->balancemutex,
                                      recover_from_dead_write_transact);
         }
         info->writeahead_count--;
-        cout << "Passed barrier, count = " << info->writeahead_count << endl;
+        info->balancemutex.unlock();
     }
 
     // Get the current top ref
