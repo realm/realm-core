@@ -1,6 +1,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <algorithm>
 
@@ -467,7 +468,11 @@ void SharedGroup::do_async_commits()
         }
         if (writeahead > 50) {
             timespec ts;
-            clock_gettime(CLOCK_REALTIME, &ts);
+            timeval tv;
+            // clock_gettime(CLOCK_REALTIME, &ts);
+            gettimeofday(&tv, NULL);
+            ts.tv_sec = tv.tv_sec;
+            ts.tv_nsec = tv.tv_usec * 1000;
             ts.tv_nsec += 10000000; // 10 msec
             if (ts.tv_nsec > 1000000000) { // overflow
                 ts.tv_nsec -= 1000000000;
