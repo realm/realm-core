@@ -380,7 +380,7 @@ CATEGORIES :
   - g_dyn_table_add_int:
       NAME     : add_int
       SUMMARY  : &g_dyn_table_add_int_summary
-                 Add value to all cells in a column.
+                 Add a value to all cells in a column.
       DESCR    : &g_dyn_table_add_int_descr
                  Add an integer value to all the cells in the specified column.
                  There is no overflow or underflow protection.
