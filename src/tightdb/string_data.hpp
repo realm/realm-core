@@ -26,7 +26,6 @@
 #include <ostream>
 
 #include <tightdb/config.h>
-#include <tightdb/binary_data.hpp>
 
 namespace tightdb {
 

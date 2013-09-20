@@ -57,7 +57,7 @@ void ArrayBigBlobs::insert(size_t ndx, BinaryData value, bool add_zero_term)
     Array::insert(ndx, new_blob.get_ref());
 }
 
-size_t ArrayBigBlobs::count(BinaryData value, size_t begin, size_t end) const
+size_t ArrayBigBlobs::count(BinaryData value, bool is_string, size_t begin, size_t end) const
 {
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == size_t(-1) || end <= size());
@@ -66,11 +66,16 @@ size_t ArrayBigBlobs::count(BinaryData value, size_t begin, size_t end) const
         end = size();
     size_t count = 0;
 
+    // When strings are stored as blobs, they are always zero-terminated
+    // but the value we get as input might not be.
+    size_t value_size = value.size();
+    if (is_string) ++value_size;
+
     for (size_t i = begin; i < end; ++i) {
         ref_type ref = get_as_ref(i);
         const char* blob_header = get_alloc().translate(ref);
         size_t blob_size = get_size_from_header(blob_header);
-        if (blob_size == value.size()) {
+        if (blob_size == value_size) {
             const char* blob_value = ArrayBlob::get(blob_header, 0);
             if (std::equal(blob_value, blob_value + blob_size, value.data()))
                 ++count;
@@ -79,7 +84,7 @@ size_t ArrayBigBlobs::count(BinaryData value, size_t begin, size_t end) const
     return count;
 }
 
-size_t ArrayBigBlobs::find_first(BinaryData value, size_t begin, size_t end) const
+size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string, size_t begin, size_t end) const
 {
     TIGHTDB_ASSERT(begin <= size());
     TIGHTDB_ASSERT(end == size_t(-1) || end <= size());
@@ -87,11 +92,16 @@ size_t ArrayBigBlobs::find_first(BinaryData value, size_t begin, size_t end) con
     if (end == size_t(-1))
         end = m_size;
 
+    // When strings are stored as blobs, they are always zero-terminated
+    // but the value we get as input might not be.
+    size_t value_size = value.size();
+    if (is_string) ++value_size;
+
     for (size_t i = begin; i < end; ++i) {
         ref_type ref = get_as_ref(i);
         const char* blob_header = get_alloc().translate(ref);
         size_t blob_size = get_size_from_header(blob_header);
-        if (blob_size == value.size()) {
+        if (blob_size == value_size) {
             const char* blob_value = ArrayBlob::get(blob_header, 0);
             if (std::equal(blob_value, blob_value + blob_size, value.data()))
                 return i;
@@ -101,12 +111,12 @@ size_t ArrayBigBlobs::find_first(BinaryData value, size_t begin, size_t end) con
     return not_found;
 }
 
-void ArrayBigBlobs::find_all(Array& result, BinaryData value, size_t add_offset,
-                           size_t begin, size_t end)
+void ArrayBigBlobs::find_all(Array& result, BinaryData value, bool is_string, size_t add_offset,
+                             size_t begin, size_t end)
 {
     size_t first = begin - 1;
     for (;;) {
-        first = find_first(value, first + 1, end);
+        first = find_first(value, is_string, first + 1, end);
         if (first != size_t(-1))
             result.add(first + add_offset);
         else break;

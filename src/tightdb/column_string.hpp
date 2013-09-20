@@ -169,7 +169,7 @@ private:
     static void copy_leaf(const ArrayStringLong&, ArrayBigBlobs&);
 
     static StringData zbin_to_str(const BinaryData& b) TIGHTDB_NOEXCEPT;
-    static BinaryData zstr_to_bin(const StringData& b) TIGHTDB_NOEXCEPT;
+    static BinaryData str_to_bin(const StringData& s) TIGHTDB_NOEXCEPT;
 
     friend class Array;
     friend class ColumnBase;
@@ -253,11 +253,10 @@ inline StringData AdaptiveStringColumn::zbin_to_str(const BinaryData& b) TIGHTDB
     return StringData(b.data(), b.size()-1); // ignore trailing zero
 }
 
-inline BinaryData AdaptiveStringColumn::zstr_to_bin(const StringData& b) TIGHTDB_NOEXCEPT
+inline BinaryData AdaptiveStringColumn::str_to_bin(const StringData& s) TIGHTDB_NOEXCEPT
 {
-    return BinaryData(b.data(), b.size()+1); // include zero-terminator
+    return BinaryData(s.data(), s.size());
 }
-
 
 } // namespace tightdb
 

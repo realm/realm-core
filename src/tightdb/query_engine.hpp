@@ -1246,7 +1246,7 @@ public:
                     else if (m_leaf_type ==  AdaptiveStringColumn::leaf_long)
                         s = static_cast<ArrayStringLong*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2);
                     else
-                        s = static_cast<ArrayBigBlobs*>(m_leaf)->find_first(zstr_to_bin(m_value), s - m_leaf_start, end2);
+                        s = static_cast<ArrayBigBlobs*>(m_leaf)->find_first(str_to_bin(m_value), true, s - m_leaf_start, end2);
 
                     if (s == not_found)
                         s = m_leaf_end - 1;
@@ -1259,9 +1259,9 @@ public:
     }
 
 private:
-    static BinaryData zstr_to_bin(const StringData& b) TIGHTDB_NOEXCEPT
+    inline BinaryData str_to_bin(const StringData& s) TIGHTDB_NOEXCEPT
     {
-        return BinaryData(b.data(), b.size()+1); // include zero-terminator
+        return BinaryData(s.data(), s.size());
     }
 
     StringData m_value;
