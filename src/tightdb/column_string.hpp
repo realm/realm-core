@@ -168,6 +168,9 @@ private:
     static void copy_leaf(const ArrayString&, ArrayBigBlobs&);
     static void copy_leaf(const ArrayStringLong&, ArrayBigBlobs&);
 
+    static StringData zbin_to_str(const BinaryData& b) TIGHTDB_NOEXCEPT;
+    static BinaryData zstr_to_bin(const StringData& b) TIGHTDB_NOEXCEPT;
+
     friend class Array;
     friend class ColumnBase;
 };
@@ -188,7 +191,7 @@ inline StringData AdaptiveStringColumn::get(std::size_t ndx) const TIGHTDB_NOEXC
     if (root_is_leaf()) {
         if (m_array->has_refs()) {
             if (m_array->context_bit())
-                return static_cast<const ArrayBigBlobs*>(m_array)->get(ndx);
+                return zbin_to_str(static_cast<const ArrayBigBlobs*>(m_array)->get(ndx));
             else
                 return static_cast<const ArrayStringLong*>(m_array)->get(ndx);
         }
@@ -243,6 +246,16 @@ inline std::size_t AdaptiveStringColumn::upper_bound_string(StringData value) co
         return ColumnBase::upper_bound(*leaf, value);
     }
     return ColumnBase::upper_bound(*this, value);
+}
+
+inline StringData AdaptiveStringColumn::zbin_to_str(const BinaryData& b) TIGHTDB_NOEXCEPT
+{
+    return StringData(b.data(), b.size()-1); // ignore trailing zero
+}
+
+inline BinaryData AdaptiveStringColumn::zstr_to_bin(const StringData& b) TIGHTDB_NOEXCEPT
+{
+    return BinaryData(b.data(), b.size()+1); // include zero-terminator
 }
 
 

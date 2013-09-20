@@ -63,7 +63,6 @@ public:
 
     template<class T, class A> StringData(const std::basic_string<char, T, A>&);
     template<class T, class A> operator std::basic_string<char, T, A>() const;
-    StringData(const BinaryData& b) TIGHTDB_NOEXCEPT;
 
     /// Initialize from a zero terminated C style string.
     StringData(const char* c_str) TIGHTDB_NOEXCEPT;
@@ -98,8 +97,6 @@ public:
     StringData substr(std::size_t i) const TIGHTDB_NOEXCEPT;
     //@}
 
-    BinaryData to_binary_z() const TIGHTDB_NOEXCEPT;
-
     template<class C, class T>
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const StringData&);
 
@@ -123,8 +120,6 @@ template<class T, class A> inline StringData::operator std::basic_string<char, T
 inline StringData::StringData(const char* c_str) TIGHTDB_NOEXCEPT:
     m_data(c_str), m_size(std::char_traits<char>::length(c_str)) {}
 
-inline StringData::StringData(const BinaryData& b) TIGHTDB_NOEXCEPT:
-    m_data(b.data()), m_size(b.size()-1) {}
 
 inline bool operator==(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
 {
@@ -198,11 +193,6 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const S
     for (const char* i = d.m_data; i != d.m_data + d.m_size; ++i)
         out << *i;
     return out;
-}
-
-inline BinaryData StringData::to_binary_z() const TIGHTDB_NOEXCEPT
-{
-    return BinaryData(m_data, m_size+1); // include zero-termination
 }
 
 } // namespace tightdb
