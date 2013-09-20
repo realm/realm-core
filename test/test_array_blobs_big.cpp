@@ -206,6 +206,30 @@ TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsCount)
 
     const size_t count = c.count(BinaryData("foobar", 7));
     CHECK_EQUAL(3, count);
+
+    // str may not be zero-terminated
+    const size_t count2 = c.count(BinaryData("foobarx", 6), true);
+    CHECK_EQUAL(3, count2);
+}
+
+TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsFind)
+{
+    const size_t res = c.find_first(BinaryData("baz", 4));
+    CHECK_EQUAL(3, res);
+
+    Array results;
+    c.find_all(results, BinaryData("foobar", 7));
+    CHECK_EQUAL(3, results.size());
+
+    // str may not be zero-terminated
+    const size_t res2 = c.find_first(BinaryData("bazx", 3), true);
+    CHECK_EQUAL(3, res2);
+
+    results.clear();
+    c.find_all(results, BinaryData("foobarx", 6), true);
+    CHECK_EQUAL(3, results.size());
+
+    results.destroy();
 }
 
 TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobs_Destroy)
