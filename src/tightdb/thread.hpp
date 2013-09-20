@@ -524,9 +524,12 @@ private:
 #else
 #ifdef _MSC_VER
     volatile T state;
-#endif
+#else
 #ifdef __GNUC__
     T state; 
+#else
+#error "Atomic is not support on this compiler"
+#endif
 #endif
 #endif
 };
@@ -700,6 +703,57 @@ inline bool Atomic<T>::compare_and_swap(T oldvalue, T newvalue)
 
 #endif // GCC
 #endif // C++11 else
+
+// Template Relaxed is used to mark a variable as used for interthread
+// communication with relaxed semantics, i.e. no guarantee of atomicity
+// and no guarantee of ordering. It does guarantee, however, that reads
+// cannot be cached in a register inside a tight loop.
+
+template<class T>
+class Relaxed
+{
+public:
+    inline Relaxed()
+    {
+        state = 0;
+    }
+
+    inline Relaxed(T init_value) 
+    { 
+        state = init_value; 
+    }
+
+    T load_relaxed() const
+    {
+#ifdef __GNUC__
+        asm volatile("" : : : "memory");
+#endif
+        return state;
+    }
+    void store_relaxed(T value)
+    {
+        state = value;
+#ifdef __GNUC__
+        asm volatile("" : : : "memory");
+#endif
+    }
+private:
+    // the following is not supported
+    Relaxed(Relaxed<T>&);
+    Relaxed<T>& operator=(const Relaxed<T>&);
+
+#ifdef _MSC_VER
+    volatile T state;
+#else
+#ifdef __GNUC__
+    T state; 
+#else
+#error "Unsupported use of Relaxed on this compiler"
+#endif
+#endif
+};
+
+
 
 
 } // namespace tightdb

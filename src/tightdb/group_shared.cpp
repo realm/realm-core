@@ -24,7 +24,7 @@ struct SharedGroup::ReadCount {
 };
 
 struct SharedGroup::SharedInfo {
-    Atomic<uint64_t> current_version;
+    Relaxed<uint64_t> current_version;
     Atomic<uint16_t> init_complete; // indicates lock file has valid content
     Atomic<uint16_t> shutdown_started; // indicates that shutdown is in progress
     uint16_t version;
@@ -379,7 +379,16 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
     const SharedInfo* info = m_file_map.get_addr();
     // this variable is changed under lock (the readmutex), but
     // inspected here without taking a lock. This is intentional.
-    bool changed = m_version != info->current_version.load_acquire();
+    // The variable is only compared for inequality against a value
+    // it is known to have had once, let's call it INIT. 
+    // Any change to info->current_version, even if it is
+    // only a partially communicated one, is indicative of a change
+    // in the value away from INIT. info->current_version is only
+    // ever incremented, and it is so large (64 bit) that it does
+    // not wrap around until hell freezes over. The net result is
+    // that even though there is formally a data race on this variable,
+    // the code can still be considered correct.
+    bool changed = m_version != info->current_version.load_relaxed();
     return changed;
 }
 
@@ -521,16 +530,16 @@ const Group& SharedGroup::begin_read()
 
         // Update reader list
         if (ringbuf_is_empty()) {
-            ReadCount r2 = { info->current_version.load_relaxed(), 1 };
+            ReadCount r2 = { m_version, 1 };
             ringbuf_put(r2); // Throws
         }
         else {
             ReadCount& r = ringbuf_get_last();
-            if (r.version == info->current_version.load_relaxed()) {
+            if (r.version == m_version) {
                 ++r.count;
             }
             else {
-                ReadCount r2 = { info->current_version.load_relaxed(), 1 };
+                ReadCount r2 = { m_version, 1 };
                 ringbuf_put(r2); // Throws
             }
         }
