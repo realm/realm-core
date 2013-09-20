@@ -17,6 +17,12 @@
 using namespace std;
 using namespace tightdb;
 
+// Constants controlling the amount of uncommited writes in flight:
+static const uint16_t MAX_WRITE_SLOTS = 100;
+static const uint16_t RELAXED_SYNC_THRESHOLD = 50;
+
+
+
 
 struct SharedGroup::ReadCount {
     uint64_t version;
@@ -35,7 +41,7 @@ struct SharedGroup::SharedInfo {
     RobustMutex balancemutex;
     CondVar room_to_write;
     CondVar work_to_do;
-    uint16_t writeahead_count;
+    uint16_t free_write_slots;
     uint64_t filesize;
 
     uint64_t current_top;
@@ -70,7 +76,7 @@ SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
     put_pos = 0;
     get_pos = 0;
     shutdown_started.store_release(0);
-    writeahead_count = 0;
+    free_write_slots = 0;
     init_complete.store_release(1);
 }
 
@@ -408,9 +414,10 @@ void SharedGroup::do_async_commits()
     // processes that that they can start commiting to the db.
     begin_read();
     uint64_t last_version = m_version;
-    info->writeahead_count = 100;
+    info->free_write_slots = MAX_WRITE_SLOTS;
     info->init_complete.store_release(2); // allow waiting clients to proceed
     m_group.detach();
+
     while(true) {
 
         if (m_file.is_removed()) { // operator removed the lock file. take a hint!
@@ -469,29 +476,7 @@ void SharedGroup::do_async_commits()
             cerr << "..and Done" << endl;
 #endif
         }
-        info->balancemutex.lock(&recover_from_dead_write_transact);
-        uint16_t writeahead = info->writeahead_count;
-        info->writeahead_count = 100;
-        if (writeahead <= 0) {
-            info->room_to_write.notify_all();
-        }
-        if (writeahead > 50) {
-            timespec ts;
-            timeval tv;
-            // clock_gettime(CLOCK_REALTIME, &ts);
-            gettimeofday(&tv, NULL);
-            ts.tv_sec = tv.tv_sec;
-            ts.tv_nsec = tv.tv_usec * 1000;
-            ts.tv_nsec += 10000000; // 10 msec
-            if (ts.tv_nsec > 1000000000) { // overflow
-                ts.tv_nsec -= 1000000000;
-                ts.tv_sec += 1;
-            }
-            info->work_to_do.wait(info->balancemutex,
-                                  &recover_from_dead_write_transact,
-                                  &ts);
-        }
-        info->balancemutex.unlock();
+
         if (shutdown) {
             // Being the backend process, we own the lock file, so we
             // have to clean up when we shut down.
@@ -505,6 +490,39 @@ void SharedGroup::do_async_commits()
 #endif
             exit(EXIT_SUCCESS);
         }
+
+        info->balancemutex.lock(&recover_from_dead_write_transact);
+
+        // We have caught up with the writers, let them know that there are
+        // now free write slots, wakeup any that has been suspended.
+        uint16_t free_write_slots = info->free_write_slots;
+        info->free_write_slots = MAX_WRITE_SLOTS;
+        if (free_write_slots <= 0) {
+            info->room_to_write.notify_all();
+        }
+
+        // If we have plenty of write slots available, relax and wait a bit before syncing
+        if (free_write_slots > RELAXED_SYNC_THRESHOLD) {
+            timespec ts;
+            timeval tv;
+            // clock_gettime(CLOCK_REALTIME, &ts); <- would like to use this, but not there on mac
+            gettimeofday(&tv, NULL);
+            ts.tv_sec = tv.tv_sec;
+            ts.tv_nsec = tv.tv_usec * 1000;
+            ts.tv_nsec += 10000000; // 10 msec
+            if (ts.tv_nsec > 1000000000) { // overflow
+                ts.tv_nsec -= 1000000000;
+                ts.tv_sec += 1;
+            }
+            
+            // we do a conditional wait instead of a sleep, allowing writers to wake us up
+            // immediately if we run low on write slots.
+            info->work_to_do.wait(info->balancemutex,
+                                  &recover_from_dead_write_transact,
+                                  &ts);
+        }
+        info->balancemutex.unlock();
+
     }
 }
 
@@ -620,14 +638,20 @@ Group& SharedGroup::begin_write()
     info->writemutex.lock(&recover_from_dead_write_transact); // Throws
 
     if (info->flags == durability_Async) {
+
         info->balancemutex.lock(&recover_from_dead_write_transact); // Throws
-        if (info->writeahead_count < 50)
+
+        // if we are running low on write slots, kick the sync daemon
+        if (info->free_write_slots < RELAXED_SYNC_THRESHOLD)
             info->work_to_do.notify();
-        while (info->writeahead_count <= 0) {
+
+        // if we are out of write slots, wait for the sync daemon to catch up
+        while (info->free_write_slots <= 0) {
             info->room_to_write.wait(info->balancemutex,
                                      recover_from_dead_write_transact);
         }
-        info->writeahead_count--;
+
+        info->free_write_slots--;
         info->balancemutex.unlock();
     }
 
