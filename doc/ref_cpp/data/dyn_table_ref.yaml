@@ -201,9 +201,10 @@ CATEGORIES :
                  This method appends a column of the specified type and name to the table.
                  If it's used in a table which already has rows, the new column will just get
                  default values in those rows.
-        TEXT   : &g_dyn_table_add_column_support
+      - TEXT   : &g_dyn_table_add_column_support
+                 >
                  Currently, the following types are supported:
-        TEXT   : >
+      - TEXT   : >
                  <ul>
                    <li><code>type_Bool</code> (default: false)</li>
                    <li><code>type_Int</code> (default: 0)</li>
@@ -329,8 +330,13 @@ CATEGORIES :
                  The name of the column to find.
       RETURN:
         TYPES  : size_t
-        DESCR  : &g_dyn_table_column_index_return_descr
-                 The column index or <code>std::size_t(-1)</code> if there is no column with the specified name.
+        DESCR  :
+        - TEXT : &g_dyn_table_column_index_descr_1
+                 The column index or
+        - TEXT : &g_dyn_table_column_index_descr_2
+                 <code>std::size_t(-1)</code>
+        - TEXT : &g_dyn_table_column_descr_3
+                 if there is no column with the specified name.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_column_index
         DESCR  :
@@ -339,10 +345,13 @@ CATEGORIES :
       NAME     : get_column_type
       SUMMARY  : &g_dyn_table_get_column_type_summary
                  Get the type of a column.
-      DESCR    : &g_dyn_table_get_column_type_descr
+      DESCR    :
+      - TEXT   : &g_dyn_table_get_column_type_descr1
                  >
                  This method gets the type of a column using the column index. Currently,
                  the following types are supported:
+      - TEXT   : &g_dyn_table_get_column_type_descr2
+                 >
                  <ul>
                    <li><code>type_Bool</code></li>
                    <li><code>type_Int</code></li>

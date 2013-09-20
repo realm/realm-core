@@ -129,7 +129,9 @@ CATEGORIES :
   - g_dyn_view_get_column_type:
       NAME     : get_column_type
       SUMMARY  : *g_dyn_table_get_column_type_summary
-      DESCR    : *g_dyn_table_get_column_type_descr
+      DESCR    :
+      - TEXT   : *g_dyn_table_get_column_type_descr1
+        TEXT   : *g_dyn_table_get_column_type_descr2
       CONST    : True
       PARAMS:
       - NAME   : column_ndx
