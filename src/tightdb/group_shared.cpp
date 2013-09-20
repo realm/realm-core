@@ -12,7 +12,7 @@
 #include <tightdb/group_shared.hpp>
 #include <tightdb/group_writer.hpp>
 
-#define TIGHTDB_ENABLE_LOGFILE
+// #define TIGHTDB_ENABLE_LOGFILE
 
 using namespace std;
 using namespace tightdb;
@@ -86,7 +86,6 @@ namespace {
 void recover_from_dead_write_transact()
 {
     // Nothing needs to be done
-    cerr << "** DEAD Writemutex holder **" << endl;
 }
 
 } // anonymous namespace
