@@ -23,6 +23,7 @@
 #include <stdexcept>
 
 #include <pthread.h>
+#include <errno.h>
 
 #include <tightdb/config.h>
 #include <tightdb/assert.hpp>
