@@ -42,6 +42,7 @@
 #define TEST_TABLE_VIEW
 #define TEST_THREAD
 #define TEST_TRANSACTIONS
+#define TEST_REPLICATION
 #define TEST_UTF8
 //#define TEST_TRANSACTIONS_LASSE // Takes a long time
 //#define TEST_INDEX // not implemented yet
