@@ -129,7 +129,9 @@ CATEGORIES :
   - g_dyn_view_get_column_type:
       NAME     : get_column_type
       SUMMARY  : *g_dyn_table_get_column_type_summary
-      DESCR    : *g_dyn_table_get_column_type_descr
+      DESCR    :
+      - TEXT   : *g_dyn_table_get_column_type_descr1
+        TEXT   : *g_dyn_table_get_column_type_descr2
       CONST    : True
       PARAMS:
       - NAME   : column_ndx
@@ -540,8 +542,8 @@ CATEGORIES :
                  href="http://json.org">JSON</a>) is useful for
                  web/mobile applications and serialization.
 
-                 A table (and subtables) will be formatted as a array of rows, and row will
-                 be formatted as an object.
+                 A table (and subtables) will be formatted as an array of rows, and
+                 a row will be formatted as an object.
       CONST    : true
       PARAMS:
       - NAME   : out
