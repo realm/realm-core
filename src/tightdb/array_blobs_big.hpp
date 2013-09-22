@@ -45,6 +45,12 @@ public:
     void find_all(Array& result, BinaryData value, bool is_string = false, std::size_t add_offset = 0,
                   std::size_t begin = 0, std::size_t end = -1);
 
+    /// Get the specified element without the cost of constructing an
+    /// array instance. If an array instance is already available, or
+    /// you need to get multiple values, then this method will be
+    /// slower.
+    static BinaryData get(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
+
     ref_type btree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term, TreeInsertBase& state);
 
 #ifdef TIGHTDB_DEBUG
@@ -62,6 +68,16 @@ inline BinaryData ArrayBigBlobs::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     size_t size = get_size_from_header(blob_header);
     return BinaryData(value, size);
 }
+
+inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx, Allocator& alloc) TIGHTDB_NOEXCEPT
+{
+    size_t blob_ref = Array::get(header, ndx);
+    const char* blob_header = alloc.translate(blob_ref);
+    const char* blob_data = Array::get_data_from_header(blob_header);
+    size_t blob_size = Array::get_size_from_header(blob_header);
+    return BinaryData(blob_data, blob_size);
+}
+
 
 } // namespace tightdb
 

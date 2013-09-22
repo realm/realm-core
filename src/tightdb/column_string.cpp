@@ -560,6 +560,7 @@ ref_type AdaptiveStringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
         else {
             // Upgrade leaf from short to big strings
             ArrayBigBlobs new_leaf(&parent, ndx_in_parent, alloc);
+            new_leaf.set_context_bit(true);
             copy_leaf(leaf, new_leaf);
             leaf.destroy();
             return new_leaf.btree_leaf_insert(insert_ndx, str_to_bin(state.m_value), true, state);
@@ -574,6 +575,7 @@ ref_type AdaptiveStringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
         else {
             // Upgrade leaf from long to big strings
             ArrayBigBlobs new_leaf(&parent, ndx_in_parent, alloc);
+            new_leaf.set_context_bit(true);
             copy_leaf(leaf, new_leaf);
             leaf.destroy();
             return new_leaf.btree_leaf_insert(insert_ndx, str_to_bin(state.m_value), true, state);

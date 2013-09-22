@@ -202,9 +202,15 @@ inline StringData AdaptiveStringColumn::get(std::size_t ndx) const TIGHTDB_NOEXC
     const char* leaf_header = p.first.m_addr;
     std::size_t ndx_in_leaf = p.second;
     bool long_strings = Array::get_hasrefs_from_header(leaf_header);
-    if (long_strings)
-        return ArrayStringLong::get(leaf_header, ndx_in_leaf, m_array->get_alloc());
-    return ArrayString::get(leaf_header, ndx_in_leaf);
+    if (long_strings) {
+        bool is_big = Array::get_context_bit_from_header(leaf_header);
+        if (is_big)
+            return zbin_to_str(ArrayBigBlobs::get(leaf_header, ndx_in_leaf, m_array->get_alloc()));
+        else
+            return ArrayStringLong::get(leaf_header, ndx_in_leaf, m_array->get_alloc());
+    }
+    else
+        return ArrayString::get(leaf_header, ndx_in_leaf);
 }
 
 inline void AdaptiveStringColumn::add(StringData value)
