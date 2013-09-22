@@ -210,11 +210,6 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication())
-        delete repl;
-#endif
-
     // If we can get an exclusive lock on the file we know that we are
     // the only user (since all users take at least shared locks on
     // the file.  So that means that we have to delete it when done
@@ -350,7 +345,7 @@ const Group& SharedGroup::begin_read()
 
 void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
-    if (!m_group.is_attached()) 
+    if (!m_group.is_attached())
         return;
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
@@ -455,7 +450,7 @@ void SharedGroup::commit()
         // fails, then the transaction is not completed. A subsequent call
         // to rollback() must roll it back.
         if (Replication* repl = m_group.get_replication()) {
-            new_version = repl->commit_write_transact(*this); // Throws
+            new_version = repl->commit_write_transact(*this, info->current_version); // Throws
         }
         else {
             new_version = info->current_version + 1; // FIXME: Eventual overflow
