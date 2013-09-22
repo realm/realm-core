@@ -22,6 +22,7 @@
 
 #include <tightdb/column.hpp>
 #include <tightdb/array_binary.hpp>
+#include <tightdb/array_blobs_big.hpp>
 
 namespace tightdb {
 
@@ -74,9 +75,12 @@ protected:
 #endif
 
 private:
+    static const size_t short_bin_max_size = 64;
+
     void add(StringData value) { add_string(value); }
     void set(std::size_t ndx, StringData value) { set_string(ndx, value); }
     void LeafSet(std::size_t ndx, StringData value);
+    void upgrade_leaf();
 
     void do_insert(std::size_t ndx, BinaryData value, bool add_zero_term);
 
@@ -88,6 +92,11 @@ private:
     struct InsertState: Array::TreeInsert<ColumnBinary> {
         bool m_add_zero_term;
     };
+
+    bool is_big_blobs() const TIGHTDB_NOEXCEPT {
+        TIGHTDB_ASSERT(m_array->is_leaf());
+        return m_array->context_bit();
+    }
 
     friend class Array;
     friend class ColumnBase;
@@ -101,13 +110,21 @@ private:
 inline BinaryData ColumnBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < size());
-    if (root_is_leaf())
-        return static_cast<const ArrayBinary*>(m_array)->get(ndx);
+    if (root_is_leaf()) {
+        if (is_big_blobs())
+            return static_cast<const ArrayBigBlobs*>(m_array)->get(ndx);
+        else
+            return static_cast<const ArrayBinary*>(m_array)->get(ndx);
+    }
 
     std::pair<MemRef, std::size_t> p = m_array->find_btree_leaf(ndx);
     const char* leaf_header = p.first.m_addr;
     std::size_t ndx_in_leaf = p.second;
-    return ArrayBinary::get(leaf_header, ndx_in_leaf, m_array->get_alloc());
+    bool is_big = Array::get_context_bit_from_header(leaf_header);
+    if (is_big)
+        return ArrayBigBlobs::get(leaf_header, ndx_in_leaf, m_array->get_alloc());
+    else
+        return ArrayBinary::get(leaf_header, ndx_in_leaf, m_array->get_alloc());
 }
 
 inline StringData ColumnBinary::get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT

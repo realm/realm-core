@@ -1,6 +1,7 @@
 #include <algorithm>
 
 #include <tightdb/column_binary.hpp>
+#include <tightdb/unique_ptr.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -13,9 +14,14 @@ ColumnBinary::ColumnBinary(Allocator& alloc)
 
 ColumnBinary::ColumnBinary(ref_type ref, ArrayParent* parent, size_t pndx, Allocator& alloc)
 {
-    bool root_is_leaf = root_is_leaf_from_ref(ref, alloc);
+    const char* header = alloc.translate(ref);
+    bool root_is_leaf = Array::get_isleaf_from_header(header);
     if (root_is_leaf) {
-        m_array = new ArrayBinary(ref, parent, pndx, alloc);
+        bool is_big = Array::get_context_bit_from_header(header);
+        if (is_big)
+            m_array = new ArrayBigBlobs(ref, parent, pndx, alloc);
+        else
+            m_array = new ArrayBinary(ref, parent, pndx, alloc);
     }
     else {
         m_array = new Array(ref, parent, pndx, alloc);
@@ -24,18 +30,17 @@ ColumnBinary::ColumnBinary(ref_type ref, ArrayParent* parent, size_t pndx, Alloc
 
 ColumnBinary::~ColumnBinary() TIGHTDB_NOEXCEPT
 {
-    if (root_is_leaf()) {
-        delete static_cast<ArrayBinary*>(m_array);
-    }
-    else {
-        delete m_array;
-    }
+    delete m_array;
 }
 
 bool ColumnBinary::is_empty() const TIGHTDB_NOEXCEPT
 {
-    if (root_is_leaf())
-        return static_cast<ArrayBinary*>(m_array)->is_empty();
+    if (root_is_leaf()) {
+        if (is_big_blobs())
+            return static_cast<ArrayBigBlobs*>(m_array)->is_empty();
+        else
+            return static_cast<ArrayBinary*>(m_array)->is_empty();
+    }
 
     Array offsets = NodeGetOffsets();
     return offsets.is_empty();
@@ -43,8 +48,12 @@ bool ColumnBinary::is_empty() const TIGHTDB_NOEXCEPT
 
 size_t ColumnBinary::size() const  TIGHTDB_NOEXCEPT
 {
-    if (root_is_leaf())
-        return static_cast<ArrayBinary*>(m_array)->size();
+    if (root_is_leaf()) {
+        if (is_big_blobs())
+            return static_cast<ArrayBigBlobs*>(m_array)->size();
+        else
+            return static_cast<ArrayBinary*>(m_array)->size();
+    }
 
     Array offsets = NodeGetOffsets();
     size_t size = offsets.is_empty() ? 0 : to_size_t(offsets.back());
@@ -54,7 +63,10 @@ size_t ColumnBinary::size() const  TIGHTDB_NOEXCEPT
 void ColumnBinary::clear()
 {
     if (m_array->is_leaf()) {
-        static_cast<ArrayBinary*>(m_array)->clear();
+        if (is_big_blobs())
+            static_cast<ArrayBigBlobs*>(m_array)->clear();
+        else
+            static_cast<ArrayBinary*>(m_array)->clear();
         return;
     }
 
@@ -112,7 +124,10 @@ void ColumnBinary::resize(size_t ndx)
 {
     TIGHTDB_ASSERT(root_is_leaf()); // currently only available on leaf level (used by b-tree code)
     TIGHTDB_ASSERT(ndx < size());
-    static_cast<ArrayBinary*>(m_array)->resize(ndx);
+    if (is_big_blobs())
+        static_cast<ArrayBigBlobs*>(m_array)->resize(ndx);
+    else
+        static_cast<ArrayBinary*>(m_array)->resize(ndx);
 }
 
 void ColumnBinary::move_last_over(size_t ndx)
@@ -148,21 +163,71 @@ bool ColumnBinary::compare_binary(const ColumnBinary& c) const
     return true;
 }
 
+void ColumnBinary::upgrade_leaf()
+{
+    TIGHTDB_ASSERT(root_is_leaf());
+    TIGHTDB_ASSERT(!is_big_blobs());
+
+    ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
+    UniquePtr<Array> new_leaf(new ArrayBigBlobs(NULL, 0, m_array->get_alloc()));
+    new_leaf->set_context_bit(true);
+
+    // Copy the leaf
+    size_t n = leaf->size();
+    for (size_t i = 0; i < n; ++i) {
+        static_cast<ArrayBigBlobs&>(*new_leaf).add(leaf->get(i));
+    }
+
+    // Update parent to point to new array
+    Array* oldarray = m_array;
+    ArrayParent* parent = oldarray->get_parent();
+    if (parent) {
+        size_t pndx = oldarray->get_ndx_in_parent();
+        parent->update_child_ref(pndx, new_leaf->get_ref());
+        new_leaf->set_parent(parent, pndx);
+    }
+
+    // Replace string array with long string array
+    m_array = new_leaf.release();
+    oldarray->destroy();
+    delete oldarray;
+}
+
 void ColumnBinary::LeafSet(size_t ndx, BinaryData value)
 {
-    static_cast<ArrayBinary*>(m_array)->set(ndx, value);
+    if (is_big_blobs())
+        static_cast<ArrayBigBlobs*>(m_array)->set(ndx, value);
+    else {
+        if (value.size() > short_bin_max_size) {
+            upgrade_leaf();
+            static_cast<ArrayBigBlobs*>(m_array)->set(ndx, value);
+        }
+        else
+            static_cast<ArrayBinary*>(m_array)->set(ndx, value);
+    }
 }
 
 void ColumnBinary::LeafSet(size_t ndx, StringData value)
 {
     BinaryData value_2(value.data(), value.size());
-    bool add_zero_term = true;
-    static_cast<ArrayBinary*>(m_array)->set(ndx, value_2, add_zero_term);
+    if (is_big_blobs())
+        static_cast<ArrayBigBlobs*>(m_array)->set(ndx, value_2, true);
+    else {
+        if (value_2.size() > short_bin_max_size-1) {
+            upgrade_leaf();
+            static_cast<ArrayBigBlobs*>(m_array)->set(ndx, value_2, true);
+        }
+        else
+            static_cast<ArrayBinary*>(m_array)->set(ndx, value_2, true);
+    }
 }
 
 void ColumnBinary::LeafDelete(size_t ndx)
 {
-    static_cast<ArrayBinary*>(m_array)->erase(ndx);
+    if (is_big_blobs())
+        static_cast<ArrayBigBlobs*>(m_array)->erase(ndx);
+    else
+        static_cast<ArrayBinary*>(m_array)->erase(ndx);
 }
 
 
@@ -173,8 +238,21 @@ void ColumnBinary::do_insert(size_t ndx, BinaryData value, bool add_zero_term)
     InsertState state;
     if (root_is_leaf()) {
         TIGHTDB_ASSERT(ndx == npos || ndx < TIGHTDB_MAX_LIST_SIZE);
-        ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
-        new_sibling_ref = leaf->btree_leaf_insert(ndx, value, add_zero_term, state);
+        bool is_big = is_big_blobs();
+
+        if (!is_big && value.size() > (add_zero_term ? short_bin_max_size-1 : short_bin_max_size)) {
+            upgrade_leaf();
+            is_big = true;
+        }
+
+        if (is_big) {
+            ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+            new_sibling_ref = leaf->btree_leaf_insert(ndx, value, add_zero_term, state);
+        }
+        else {
+            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
+            new_sibling_ref = leaf->btree_leaf_insert(ndx, value, add_zero_term, state);
+        }
     }
     else {
         state.m_value = value;
@@ -192,9 +270,35 @@ ref_type ColumnBinary::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
                                    size_t insert_ndx,
                                    Array::TreeInsert<ColumnBinary>& state)
 {
-    ArrayBinary leaf(leaf_mem, &parent, ndx_in_parent, alloc);
     InsertState& state_2 = static_cast<InsertState&>(state);
-    return leaf.btree_leaf_insert(insert_ndx, state.m_value, state_2.m_add_zero_term, state);
+
+    const char* leaf_header = leaf_mem.m_addr;
+    bool is_big = Array::get_context_bit_from_header(leaf_header);
+
+    if (is_big) {
+        ArrayBigBlobs leaf(leaf_mem, &parent, ndx_in_parent, alloc);
+        return leaf.btree_leaf_insert(insert_ndx, state.m_value, state_2.m_add_zero_term, state);
+    }
+    else {
+        ArrayBinary leaf(leaf_mem, &parent, ndx_in_parent, alloc);
+
+        // Check if we need to upgrade first
+        if (state.m_value.size() > (state_2.m_add_zero_term ? short_bin_max_size-1 : short_bin_max_size)) {
+            ArrayBigBlobs new_leaf(&parent, ndx_in_parent, alloc);
+            new_leaf.set_context_bit(true);
+
+            // Copy the leaf
+            size_t n = leaf.size();
+            for (size_t i = 0; i < n; ++i) {
+                new_leaf.add(leaf.get(i));
+            }
+
+            leaf.destroy();
+            return new_leaf.btree_leaf_insert(insert_ndx, state.m_value, state_2.m_add_zero_term, state);
+        }
+        else
+            return leaf.btree_leaf_insert(insert_ndx, state.m_value, state_2.m_add_zero_term, state);
+    }
 }
 
 

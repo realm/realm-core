@@ -1,6 +1,8 @@
 #include "testsettings.hpp"
 #ifdef TEST_COLUMN_BINARY
 
+#include <string>
+
 #include <UnitTest++.h>
 #include <tightdb/column_binary.hpp>
 
@@ -198,6 +200,52 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryDelete)
     c.erase(0); // all
     CHECK_EQUAL(0, c.size());
     CHECK(c.is_empty());
+}
+
+TEST_FIXTURE(db_setup_column_binary, ColumnBinaryBig)
+{
+    c.clear();
+
+    c.add(BinaryData("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", 71));
+    CHECK_EQUAL("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", c.get(0).data());
+
+    c.clear();
+    c.add(BinaryData("a", 2));
+    c.add(BinaryData("bc", 3));
+    c.add(BinaryData("def", 4));
+    c.add(BinaryData("ghij", 5));
+    c.add(BinaryData("klmno", 6));
+    c.add(BinaryData("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", 71));
+    CHECK_EQUAL("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", c.get(5).data());
+
+    // Insert all sizes
+    c.clear();
+    std::string s;
+    for (int i = 0; i < 100; ++i) {
+        c.add(BinaryData(s.c_str(), s.size()));
+        s += 'x';
+    }
+    s.clear();
+    for (int i = 0; i < 100; ++i) {
+        CHECK_EQUAL(BinaryData(s.c_str(), s.size()), c.get(i));
+        s += 'x';
+    }
+
+    // Set all sizes
+    c.clear();
+    s.clear();
+    for (int i = 0; i < 100; ++i) {
+        c.add();
+    }
+    for (int i = 0; i < 100; ++i) {
+        c.set(i, BinaryData(s.c_str(), s.size()));
+        s += 'x';
+    }
+    s.clear();
+    for (int i = 0; i < 100; ++i) {
+        CHECK_EQUAL(BinaryData(s.c_str(), s.size()), c.get(i));
+        s += 'x';
+    }
 }
 
 TEST_FIXTURE(db_setup_column_binary, ColumnBinary_Destroy)
