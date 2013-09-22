@@ -444,7 +444,7 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
             (*spec_setter)(*table_ug); // Throws
 
         TIGHTDB_ASSERT(ndx == m_table_names.size());
-        m_tables.insert(ndx, ref_dg.get()); // Throws
+        m_tables.insert(ndx, ref); // Throws
         try {
             m_table_names.insert(ndx, name); // Throws
             // The rest is guaranteed not to throw
