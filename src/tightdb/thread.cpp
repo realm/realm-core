@@ -1,4 +1,5 @@
 #include <cerrno>
+#include <stdexcept>
 
 #include <tightdb/exceptions.hpp>
 #include <tightdb/thread.hpp>
