@@ -57,6 +57,13 @@ void ArrayBigBlobs::insert(size_t ndx, BinaryData value, bool add_zero_term)
     Array::insert(ndx, new_blob.get_ref());
 }
 
+void ArrayBigBlobs::erase(size_t ndx)
+{
+    size_t blob_ref = Array::get(ndx);
+    Array::destroy(blob_ref, get_alloc());
+    Array::erase(ndx);
+}
+
 size_t ArrayBigBlobs::count(BinaryData value, bool is_string, size_t begin, size_t end) const
 {
     TIGHTDB_ASSERT(begin <= size());

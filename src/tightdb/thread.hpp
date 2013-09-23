@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_THREAD_HPP
 #define TIGHTDB_THREAD_HPP
 
-#include <stdexcept>
+#include <exception>
 
 #include <pthread.h>
 
@@ -162,7 +162,7 @@ public:
     /// Low-level locking of robust mutex.
     ///
     /// If the present platform does not support robust mutexes, this
-    /// function always returns true. Otherwise it returns true if,
+    /// function always returns true. Otherwise it returns false if,
     /// and only if a thread has died while holding a lock.
     ///
     /// \note Most application should never call this function
@@ -178,7 +178,7 @@ public:
 
     /// Pull this mutex out of the 'inconsistent' state.
     ///
-    /// Must be called only after robust_lock() has returned false.
+    /// Must be called only after low_level_lock() has returned false.
     ///
     /// \note Most application should never call this function
     /// directly. It is called automatically when using the ordinary
@@ -186,7 +186,7 @@ public:
     void mark_as_consistent() TIGHTDB_NOEXCEPT;
 };
 
-class RobustMutex::NotRecoverable: std::exception {
+class RobustMutex::NotRecoverable: public std::exception {
 public:
     const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
     {

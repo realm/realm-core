@@ -39,6 +39,7 @@ public:
     void add(BinaryData value, bool add_zero_term = false);
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
     void insert(std::size_t ndx, BinaryData value, bool add_zero_term = false);
+    void erase(std::size_t ndx);
 
     std::size_t count(BinaryData value, bool is_string = false, std::size_t begin = 0, std::size_t end = -1) const;
     std::size_t find_first(BinaryData value, bool is_string = false, std::size_t begin = 0 , std::size_t end = -1) const;
