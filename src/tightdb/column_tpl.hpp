@@ -54,19 +54,20 @@ template<class cond> struct ColumnTypeTraits2<cond, double> {
 
 
 template <class T, class R, Action action, class condition>
-R ColumnBase::aggregate(T target, size_t start, size_t end, size_t* matchcount) const
+R ColumnBase::aggregate(T target, std::size_t start, std::size_t end, std::size_t* matchcount,
+                        std::size_t limit) const
 {
     typedef typename ColumnTypeTraits2<condition,T>::column_type ColType;
     typedef typename ColumnTypeTraits2<condition,T>::node_type NodeType;
 
-    if (end == size_t(-1))
+    if (end == std::size_t(-1))
         end = size();
 
     NodeType node(target, 0);
 
     node.QuickInit(const_cast<ColType*>(static_cast<const ColType*>(this)), target);
     QueryState<R> state;
-    state.init(action, 0, std::size_t(-1));
+    state.init(action, 0, limit);
 
     ColType* column = const_cast<ColType*>(static_cast<const ColType*>(this));
     SequentialGetter<T> sg(column);

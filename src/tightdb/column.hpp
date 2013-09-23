@@ -165,7 +165,7 @@ protected:
     static bool root_is_leaf_from_ref(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
 
     template <class T, class R, Action action, class condition>
-    R aggregate(T target, std::size_t start, std::size_t end, std::size_t* matchcount) const;
+    R aggregate(T target, std::size_t start, std::size_t end, std::size_t* matchcount, size_t limit = size_t(-1)) const;
 
     /// Introduce a new root node which increments the height of the
     /// tree by one.
@@ -227,10 +227,10 @@ public:
     void fill(std::size_t count);
 
     std::size_t count(int64_t target) const;
-    int64_t sum(std::size_t start = 0, std::size_t end = -1) const;
-    int64_t maximum(std::size_t start = 0, std::size_t end = -1) const;
-    int64_t minimum(std::size_t start = 0, std::size_t end = -1) const;
-    double  average(std::size_t start = 0, std::size_t end = -1) const;
+    int64_t sum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1)) const;
+    int64_t maximum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1)) const;
+    int64_t minimum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1)) const;
+    double  average(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1)) const;
 
     // FIXME: Be careful, clear() currently forgets if the leaf type
     // is Array::type_HasRefs.

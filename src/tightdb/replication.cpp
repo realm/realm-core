@@ -324,7 +324,11 @@ void Replication::TransactLogApplier::add_subspec(Spec* spec)
         util::Buffer<Spec*> new_subspecs;
         size_t new_size = m_subspecs.size();
         if (new_size == 0) {
-            new_size = 16; // FIXME: Use a small value (1) when compiling in debug mode
+#ifdef TIGHTDB_DEBUG
+            new_size = 1;
+#else
+            new_size = 16;
+#endif
         }
         else {
             if (int_multiply_with_overflow_detect(new_size, 2))
