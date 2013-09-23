@@ -260,7 +260,7 @@ private:
     template<typename T>
         double average(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
     template <Action action, typename T, typename R, class ColClass>
-        R aggregate(R (ColClass::*method)(size_t, size_t) const,
+        R aggregate(R (ColClass::*method)(size_t, size_t, size_t) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
 
     friend class Table;
