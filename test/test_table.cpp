@@ -1038,6 +1038,56 @@ TEST(TableAutoEnumerationFindFindAll)
 }
 
 namespace {
+TIGHTDB_TABLE_4(TestTableEnum4,
+                col1, String,
+                col2, String,
+                col3, String,
+                col4, String)
+} // anonymous namespace
+
+TEST(TableAutoEnumerationOptimize)
+{
+    TestTableEnum4 t;
+
+    // Insert non-optimzable strings
+    string s;
+    for (size_t i = 0; i < 10; ++i) {
+        t.add(s.c_str(), s.c_str(), s.c_str(), s.c_str());
+        s += "x";
+    }
+    t.optimize();
+
+    // AutoEnumerate in reverse order
+    for (size_t i = 0; i < 10; ++i) {
+        t[i].col4 = "test";
+    }
+    t.optimize();
+    for (size_t i = 0; i < 10; ++i) {
+        t[i].col3 = "test";
+    }
+    t.optimize();
+    for (size_t i = 0; i < 10; ++i) {
+        t[i].col2 = "test";
+    }
+    t.optimize();
+    for (size_t i = 0; i < 10; ++i) {
+        t[i].col1 = "test";
+    }
+    t.optimize();
+
+    for (size_t i = 0; i < 10; ++i) {
+        CHECK_EQUAL("test", t[i].col1);
+        CHECK_EQUAL("test", t[i].col2);
+        CHECK_EQUAL("test", t[i].col3);
+        CHECK_EQUAL("test", t[i].col4);
+    }
+
+#ifdef TIGHTDB_DEBUG
+    t.Verify();
+#endif
+}
+
+namespace {
 TIGHTDB_TABLE_1(TestSubtabEnum2,
                 str, String)
 TIGHTDB_TABLE_1(TestSubtabEnum1,
