@@ -1008,8 +1008,13 @@ TIGHTDB_TABLE_1(OverAllocTable,
 
 TEST(Shared_SpaceOveruse)
 {
+#if TEST_DURATION < 1
+    const int n_outer = 300;
+    const int n_inner = 21;
+#else
     const int n_outer = 3000;
     const int n_inner = 42;
+#endif
 
     // Many transactions
     {

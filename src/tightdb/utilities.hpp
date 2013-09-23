@@ -127,15 +127,16 @@ inline std::size_t to_size_t(int64_t v) TIGHTDB_NOEXCEPT
 
 
 template<typename ReturnType, typename OriginalType>
-ReturnType type_punning( OriginalType variable ) TIGHTDB_NOEXCEPT
+ReturnType type_punning(OriginalType variable) TIGHTDB_NOEXCEPT
 {
-    union {
+    union Both {
         OriginalType in;
         ReturnType   out;
     };
-    out = ReturnType(); // Clear all bits in case ReturnType is larger than OriginalType
-    in = variable;
-    return out;
+    Both both;
+    both.out = ReturnType(); // Clear all bits in case ReturnType is larger than OriginalType
+    both.in = variable;
+    return both.out;
 }
 
 enum FindRes {

@@ -54,11 +54,11 @@ public:
     /// slower.
     static BinaryData get(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
 
-    ref_type btree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term,
+    ref_type bptree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term,
                                TreeInsertBase& state);
 
 #ifdef TIGHTDB_DEBUG
-    void to_dot(std::ostream&, const char* title = 0) const;
+    void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
 private:

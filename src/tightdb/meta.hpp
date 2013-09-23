@@ -26,13 +26,15 @@
 
 #include <tightdb/config.h>
 
+#ifdef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+#  include <type_traits>
+#endif
+
 namespace tightdb {
 
 
-/**
- * A ternary operator that selects the first type if the condition
- * evaluates to true, otherwise it selects the second type.
- */
+/// A ternary operator that selects the first type if the condition
+/// evaluates to true, otherwise it selects the second type.
 template<bool cond, class A, class B> struct CondType   { typedef A type; };
 template<class A, class B> struct CondType<false, A, B> { typedef B type; };
 
@@ -55,12 +57,32 @@ template<class T> struct DerefType<T*> { typedef T type; };
 
 
 
-/**
- * Determine the type resulting from integral promotion.
- *
- * \note Enum types are supported only when the compiler supports the
- * C++11 'decltype' feature.
- */
+/// Determine whether a type is an integral type.
+#ifdef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+template<class T> struct IsIntegral { static const bool value = std::is_integral<T>::value; };
+#else // !TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+template<class T> struct IsIntegral { static const bool value = false; };
+template<> struct IsIntegral<bool>               { static const bool value = true; };
+template<> struct IsIntegral<char>               { static const bool value = true; };
+template<> struct IsIntegral<signed char>        { static const bool value = true; };
+template<> struct IsIntegral<unsigned char>      { static const bool value = true; };
+template<> struct IsIntegral<wchar_t>            { static const bool value = true; };
+template<> struct IsIntegral<short>              { static const bool value = true; };
+template<> struct IsIntegral<unsigned short>     { static const bool value = true; };
+template<> struct IsIntegral<int>                { static const bool value = true; };
+template<> struct IsIntegral<unsigned>           { static const bool value = true; };
+template<> struct IsIntegral<long>               { static const bool value = true; };
+template<> struct IsIntegral<unsigned long>      { static const bool value = true; };
+template<> struct IsIntegral<long long>          { static const bool value = true; };
+template<> struct IsIntegral<unsigned long long> { static const bool value = true; };
+#endif // !TIGHTDB_HAVE_CXX11_TYPE_TRAITS
+
+
+
+/// Determine the type resulting from integral promotion.
+///
+/// \note Enum types are supported only when the compiler supports the
+/// C++11 'decltype' feature.
 #ifdef TIGHTDB_HAVE_CXX11_DECLTYPE
 template<class T> struct IntegralPromote { typedef decltype(+T()) type; };
 #else // !TIGHTDB_HAVE_CXX11_DECLTYPE
@@ -103,15 +125,13 @@ template<> struct IntegralPromote<long double> { typedef long double type; };
 
 
 
-/**
- * Determine type of the result of an arithmetic operation (+, -, *,
- * /, %, |, &, ^). The type of the result of a shift operation (<<,
- * >>) can instead be found as the type resulting from integral
- * promotion of the left operand.
- *
- * \note Enum types are supported only when the compiler supports the
- * C++11 'decltype' feature.
- */
+/// Determine the type of the result of an arithmetic operation (+, -,
+/// *, /, %, |, &, ^). The type of the result of a shift operation
+/// (<<, >>) can instead be found as the type resulting from integral
+/// promotion of the left operand.
+///
+/// \note Enum types are supported only when the compiler supports the
+/// C++11 'decltype' feature.
 #ifdef TIGHTDB_HAVE_CXX11_DECLTYPE
 template<class A, class B> struct ArithBinOpType { typedef decltype(A()+B()) type; };
 #else // !TIGHTDB_HAVE_CXX11_DECLTYPE

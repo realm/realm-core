@@ -15,9 +15,8 @@ TEST(ColumnBasic_LowerUpperBound)
     // Create column with sorted members
     BasicColumn<int> col;
     col.add(5);
-    for (size_t i = 5; i < 100; i += 5) {
+    for (size_t i = 5; i < 100; i += 5)
         col.add(i);
-    }
 
     // before first entry
     CHECK_EQUAL(0, col.lower_bound(0));

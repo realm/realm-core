@@ -11,6 +11,7 @@ using namespace std;
 using namespace tightdb;
 
 namespace {
+
 TIGHTDB_TABLE_1(TestTableInt,
                 first, Int)
 
@@ -22,7 +23,8 @@ TIGHTDB_TABLE_2(TestTableDate,
                 first, Date,
                 second, Int)
 
-}
+} // anonymous namespace
+
 
 TEST(TableViewJSON)
 {
@@ -651,6 +653,7 @@ TEST(TableView_to_string)
     tv.row_to_string(0,ss3);
     CHECK_EQUAL(s+s1, ss3.str());
 }
+
 
 TEST(TableView_ref_counting)
 {
