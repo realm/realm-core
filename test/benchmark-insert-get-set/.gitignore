@@ -1,0 +1,13 @@
+/*.d
+/*.o
+
+# Coverage data
+/*.gcno
+/*.gcda
+
+/bench
+/bench-dbg
+/bench-cov
+
+# Result files
+/results.*

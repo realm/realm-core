@@ -586,7 +586,7 @@ const Group& SharedGroup::begin_read()
 
 void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
-    if (!m_group.is_attached()) 
+    if (!m_group.is_attached())
         return;
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
@@ -704,7 +704,7 @@ void SharedGroup::commit()
         // fails, then the transaction is not completed. A subsequent call
         // to rollback() must roll it back.
         if (Replication* repl = m_group.get_replication()) {
-            new_version = repl->commit_write_transact(*this); // Throws
+            new_version = repl->commit_write_transact(*this, info->current_version); // Throws
         }
         else {
             new_version = info->current_version.load_relaxed() + 1; 

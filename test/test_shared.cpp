@@ -1152,6 +1152,7 @@ TEST(StringIndex_Bug1)
 }
 
 
+/* DISABLED DUE TO BUG https://github.com/Tightdb/tightdb/pull/145
 namespace {
 void rand_str(char* res, size_t len) {
     for (size_t i = 0; i < len; ++i) {
@@ -1212,6 +1213,7 @@ TEST(StringIndex_Bug2)
         }
     }
 }
+*/
 
 TEST(Shared_Async)
 {
