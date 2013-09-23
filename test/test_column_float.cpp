@@ -30,14 +30,6 @@ double doubleVal[] = {0.0,
                      };
 const size_t doubleValLen = SizeOfArray(doubleVal);
 
-
-void printCol(ColumnFloat& c)
-{
-    for (size_t i=0; i < c.size(); ++i) {
-        std::cerr << " Col[" << i << "] = " << c.get(i) << " \n";
-    }
-}
-
 } //namespace
 
 template <class C>

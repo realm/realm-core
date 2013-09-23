@@ -15,7 +15,7 @@ TEST(ColumnBasic_LowerUpperBound)
     // Create column with sorted members
     BasicColumn<int> col;
     col.add(5);
-    for (size_t i = 5; i < 100; i += 5) {
+    for (int i = 5; i < 100; i += 5) {
         col.add(i);
     }
 

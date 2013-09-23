@@ -620,9 +620,9 @@ void Group::to_string(ostream& out) const
 
 
     // Print header
-    out << setw(index_width+1) << left << " ";
-    out << setw(name_width+1)  << left << "tables";
-    out << setw(rows_width)    << left << "rows"    << endl;
+    out << setw(int(index_width+1)) << left << " ";
+    out << setw(int(name_width+1))  << left << "tables";
+    out << setw(int(rows_width))    << left << "rows"    << endl;
 
     // Print tables
     for (size_t i = 0; i < count; ++i) {
@@ -630,9 +630,9 @@ void Group::to_string(ostream& out) const
         ConstTableRef table = get_table(name);
         size_t row_count = table->size();
 
-        out << setw(index_width) << right << i           << " ";
-        out << setw(name_width)  << left  << name.data() << " ";
-        out << setw(rows_width)  << left  << row_count   << endl;
+        out << setw(int(index_width)) << right << i           << " ";
+        out << setw(int(name_width))  << left  << name.data() << " ";
+        out << setw(int(rows_width))  << left  << row_count   << endl;
     }
 }
 
