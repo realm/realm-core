@@ -74,7 +74,7 @@ CATEGORIES  :
                  Group::mode_ReadWriteNoCreate: Open in read/write mode. Fail if the file does not already exist.
       - NAME   : buffer
         TYPES  : BinaryData
-        DESCR  : &g_in_memory_binary_descr
+        DESCR  : &g_group_constructor_memory_parm3_descr
                  In-memory binary encoded representation of a group.
       RETURN:
         TYPES  : Group
@@ -249,15 +249,15 @@ CATEGORIES  :
                  Write changes to attached file.
       DESCR    : &g_group_commit_descr
                  >
-                 Write any changes made in the group or its tables to the 
+                 Write any changes made in the group or its tables to the
                  attached file.
-                 
+
                  Note: This method can only be used on groups which is
                  attached to a writable file.
-                 
-                 Table accessors will remain valid across the commit 
+
+                 Table accessors will remain valid across the commit
                  (which is not the case for SharedGroup commits).
-                 
+
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_commit
@@ -300,7 +300,7 @@ CATEGORIES  :
                  Compare two groups.
       DESCR    : &g_group_operator_equal_descr
                  >
-                 Compare two groups for equality. Two groups are equal if 
+                 Compare two groups for equality. Two groups are equal if
                  they contain the same tables in the same order. That
                  is, for each table T at index I in one of the groups, there is
                  a table at index I in the other group that is equal to T.
@@ -349,7 +349,7 @@ CATEGORIES  :
                  When a table class (<code>MyTable</code>) is specified as a
                  template parameter, it returns true if the group contains a
                  table with the specified name, and the type of that
-                 table is compatible with the specified type. 
+                 table is compatible with the specified type.
                  See {@link concepts_table_type_compatibility} for details.
       CONST    : true
       PARAMS:

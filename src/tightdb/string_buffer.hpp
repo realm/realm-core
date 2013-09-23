@@ -25,6 +25,7 @@
 #include <string>
 
 #include <tightdb/config.h>
+#include <tightdb/buffer.hpp>
 
 namespace tightdb {
 
@@ -32,9 +33,10 @@ namespace tightdb {
 // FIXME: Check whether this class provides anything that a C++03
 // std::string does not already provide. In particular, can a C++03
 // std::string be used as a contiguous mutable buffer?
-struct StringBuffer {
+class StringBuffer {
+public:
     StringBuffer() TIGHTDB_NOEXCEPT;
-    ~StringBuffer() TIGHTDB_NOEXCEPT;
+    ~StringBuffer() TIGHTDB_NOEXCEPT {}
 
     std::string str() const;
 
@@ -82,23 +84,22 @@ struct StringBuffer {
     /// unchanged.
     void resize(std::size_t size);
 
-    /// The specified capacity is understood as not including the
-    /// terminating zero. This operation does not change the size of
-    /// the string in the buffer as returned by size(). If the
+    /// The specified minimum capacity is understood as not including
+    /// the terminating zero. This operation does not change the size
+    /// of the string in the buffer as returned by size(). If the
     /// specified capacity is less than the current capacity, this
     /// operation has no effect.
-    void reserve(std::size_t capacity);
+    void reserve(std::size_t min_capacity);
 
     /// Set size to zero. The capacity remains unchanged.
     void clear() TIGHTDB_NOEXCEPT;
 
 private:
-    char* m_data;
-    std::size_t m_size;      // Excluding the terminating zero
-    std::size_t m_allocated; // Including the terminating zero
+    util::Buffer<char> m_buffer;
+    std::size_t m_size; // Excluding the terminating zero
     static char m_zero;
 
-    void reallocate(std::size_t capacity);
+    void reallocate(std::size_t min_capacity);
 };
 
 
@@ -107,16 +108,13 @@ private:
 
 // Implementation:
 
-inline StringBuffer::StringBuffer() TIGHTDB_NOEXCEPT: m_data(0), m_size(0), m_allocated(0) {}
-
-inline StringBuffer::~StringBuffer() TIGHTDB_NOEXCEPT
+inline StringBuffer::StringBuffer() TIGHTDB_NOEXCEPT: m_size(0)
 {
-    delete[] m_data;
 }
 
 inline std::string StringBuffer::str() const
 {
-    return std::string(m_data, m_size);
+    return std::string(m_buffer.data(), m_size);
 }
 
 inline std::size_t StringBuffer::size() const TIGHTDB_NOEXCEPT
@@ -126,22 +124,24 @@ inline std::size_t StringBuffer::size() const TIGHTDB_NOEXCEPT
 
 inline char* StringBuffer::data() TIGHTDB_NOEXCEPT
 {
-    return m_data;
+    return m_buffer.data();
 }
 
 inline const char* StringBuffer::data() const TIGHTDB_NOEXCEPT
 {
-    return m_data;
+    return m_buffer.data();
 }
 
 inline char* StringBuffer::c_str() TIGHTDB_NOEXCEPT
 {
-    return m_data ? m_data : &m_zero;
+    char* d = data();
+    return d ? d : &m_zero;
 }
 
 inline const char* StringBuffer::c_str() const TIGHTDB_NOEXCEPT
 {
-    return m_data ? m_data : &m_zero;
+    const char* d = data();
+    return d ? d : &m_zero;
 }
 
 inline void StringBuffer::append(const std::string& s)
@@ -154,9 +154,11 @@ inline void StringBuffer::append_c_str(const char* c_str)
     append(c_str, std::strlen(c_str));
 }
 
-inline void StringBuffer::reserve(std::size_t capacity)
+inline void StringBuffer::reserve(std::size_t min_capacity)
 {
-    if (m_allocated == 0 || m_allocated-1 < capacity) reallocate(capacity);
+    std::size_t capacity = m_buffer.size();
+    if (capacity == 0 || capacity-1 < min_capacity)
+        reallocate(min_capacity);
 }
 
 inline void StringBuffer::resize(std::size_t size)
@@ -166,16 +168,16 @@ inline void StringBuffer::resize(std::size_t size)
     // buffer, so we can safely write the truncating zero at this
     // time.
     m_size = size;
-    m_data[size] = 0;
+    m_buffer[size] = 0;
 }
 
 inline void StringBuffer::clear() TIGHTDB_NOEXCEPT
 {
-    if (m_allocated == 0) return;
+    if (m_buffer.size() == 0)
+        return;
     m_size = 0;
-    m_data[0] = 0;
+    m_buffer[0] = 0;
 }
-
 
 
 } // namespace tightdb

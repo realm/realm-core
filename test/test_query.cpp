@@ -1,3 +1,4 @@
+#include "testsettings.hpp"
 #ifdef TEST_QUERY
 
 #include <cstdlib> // itoa()
@@ -6,6 +7,8 @@
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
+#include <tightdb/lang_bind_helper.hpp>
+
 #include "testsettings.hpp"
 
 using namespace std;
@@ -1710,16 +1713,16 @@ TEST(TestQueryLongEnum)
 TEST(TestQueryBigString)
 {
     TupleTableType ttt;
-    ttt.add(1, "a")
-    size_t res1 = ttt.where().second.equal("a");
+    ttt.add(1, "a");
+    size_t res1 = ttt.where().second.equal("a").find_next();
     CHECK_EQUAL(0, res1);
 
     ttt.add(2, "40 chars  40 chars  40 chars  40 chars  ");
-    size_t res2 = ttt.where().second.equal("40 chars  40 chars  40 chars  40 chars  ");
+    size_t res2 = ttt.where().second.equal("40 chars  40 chars  40 chars  40 chars  ").find_next();
     CHECK_EQUAL(1, res2);
 
     ttt.add(1, "70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
-    size_t res3 = ttt.where().second.equal("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
+    size_t res3 = ttt.where().second.equal("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ").find_next();
     CHECK_EQUAL(2, res3);
 }
 
@@ -2791,6 +2794,22 @@ TEST(TestQuery_AllTypes_StaticallyTyped)
     CHECK_EQUAL(0.8, query.double_col.maximum());
     CHECK_EQUAL(0.8, query.double_col.sum());
     CHECK_EQUAL(0.8, query.double_col.average());
+}
+
+TEST(Query_ref_counting)
+{
+    Table* t = LangBindHelper::new_table();
+    t->add_column(type_Int, "myint");
+    t->insert_int(0, 0, 12);
+    t->insert_done();
+
+    Query q = t->where();
+
+    LangBindHelper::unbind_table_ref(t);
+
+    // Now try to access Query and see that the Table is still alive
+    TableView tv = q.find_all();
+    CHECK_EQUAL(1, tv.size());
 }
 
 #endif // TEST_QUERY
