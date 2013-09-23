@@ -509,7 +509,7 @@ void SharedGroup::do_async_commits()
             ts.tv_sec = tv.tv_sec;
             ts.tv_nsec = tv.tv_usec * 1000;
             ts.tv_nsec += 10000000; // 10 msec
-            if (ts.tv_nsec > 1000000000) { // overflow
+            if (ts.tv_nsec >= 1000000000) { // overflow
                 ts.tv_nsec -= 1000000000;
                 ts.tv_sec += 1;
             }
