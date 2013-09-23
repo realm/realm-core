@@ -1880,7 +1880,10 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     // call find_action() on all items in array if all items are guaranteed to match (such as cond2 == NotEqual and
     // value == 100 and m_ubound == 15)
     if (c.will_match(value, m_lbound, m_ubound)) {
-        if (action == act_Sum || action == act_Max || action == act_Min) {
+        // todo, this optimization has been disabled because it won't work when user has specified a 'limit' argument.
+        // We could easily read the 'limit' argument from 'state' and take it in count, but that's bad design because 
+        // it violates encapsulation principle.
+/*        if (action == act_Sum || action == act_Max || action == act_Min) {
             int64_t res;
             if (action == act_Sum)
                 res = Array::sum(start, end);
@@ -1894,7 +1897,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         else if (action == act_Count) {
             state->m_state += end - start;
         }
-        else {
+        else */ {
             for (; start < end; start++)
                 if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
                     return false;

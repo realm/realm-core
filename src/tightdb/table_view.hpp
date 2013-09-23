@@ -68,7 +68,7 @@ public:
     // Aggregate functions. count_target is ignored by all <int function> except Count. Hack because of bug in optional
     // arguments in clang and vs2010 (fixed in 2012)
     template <int function, typename T, typename R, class ColType>
-    R aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx, T count_target) const;
+    R aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t) const, size_t column_ndx, T count_target) const;
 
 
     // TODO, FIXME: rename int versions
