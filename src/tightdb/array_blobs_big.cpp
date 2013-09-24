@@ -135,12 +135,27 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
 
 #ifdef TIGHTDB_DEBUG
 
-void ArrayBigBlobs::to_dot(std::ostream& out, bool is_strings, StringData title) const
+void ArrayBigBlobs::to_dot(std::ostream& out, bool, StringData title) const
 {
-    static_cast<void>(out);
-    static_cast<void>(is_strings);
-    static_cast<void>(title);
-    // FIXME: Implement this
+    ref_type ref = get_ref();
+
+    out << "subgraph cluster_binary" << ref << " {" << endl;
+    out << " label = \"ArrayBinary";
+    if (title.size() != 0)
+        out << "\\n'" << title << "'";
+    out << "\";" << endl;
+
+    Array::to_dot(out, "big_blobs_leaf");
+
+    for (size_t i = 0; i < size(); ++i) {
+        ref_type blob_ref = Array::get_as_ref(i);
+        ArrayBlob blob(blob_ref, (ArrayParent*)this, i, get_alloc());
+        blob.to_dot(out);
+    }
+
+    out << "}" << endl;
+
+    to_dot_parent_edge(out);
 }
 
 #endif
