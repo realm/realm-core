@@ -273,6 +273,7 @@ TEST(Group_Read0)
     Group g("table_test.tightdb");
 }
 
+
 TEST(Group_Serialize1)
 {
     // Create group with one table
@@ -324,6 +325,7 @@ TEST(Group_Serialize1)
     from_disk.Verify();
 #endif
 }
+
 
 TEST(Group_Read1)
 {
@@ -1031,12 +1033,11 @@ TEST(Group_toJSON)
     Group g;
     TestTableGroup::Ref table = g.get_table<TestTableGroup>("test");
 
-    table->add("jeff",     1, true, Wed);
-    table->add("jim",      1, true, Wed);
-    std::ostringstream ss;
-    ss.sync_with_stdio(false); // for performance
-    g.to_json(ss);
-    const std::string str = ss.str();
+    table->add("jeff", 1, true, Wed);
+    table->add("jim",  1, true, Wed);
+    ostringstream out;
+    g.to_json(out);
+    string str = out.str();
     CHECK(str.length() > 0);
     CHECK_EQUAL("{\"test\":[{\"first\":\"jeff\",\"second\":1,\"third\":true,\"fourth\":2},{\"first\":\"jim\",\"second\":1,\"third\":true,\"fourth\":2}]}", str);
 }
@@ -1046,12 +1047,11 @@ TEST(Group_toString)
     Group g;
     TestTableGroup::Ref table = g.get_table<TestTableGroup>("test");
 
-    table->add("jeff",     1, true, Wed);
-    table->add("jim",      1, true, Wed);
-    std::ostringstream ss;
-    ss.sync_with_stdio(false); // for performance
-    g.to_string(ss);
-    const std::string str = ss.str();
+    table->add("jeff", 1, true, Wed);
+    table->add("jim",  1, true, Wed);
+    ostringstream out;
+    g.to_string(out);
+    string str = out.str();
     CHECK(str.length() > 0);
     CHECK_EQUAL("     tables     rows  \n   0 test       2     \n", str.c_str());
 }
@@ -1073,19 +1073,19 @@ TEST(Group_Index_String)
     table->column().first.set_index();
     CHECK(table->column().first.has_index());
 
-    const size_t r1 = table->column().first.find_first("jimmi");
+    size_t r1 = table->column().first.find_first("jimmi");
     CHECK_EQUAL(not_found, r1);
 
-    const size_t r2 = table->column().first.find_first("jeff");
-    const size_t r3 = table->column().first.find_first("jim");
-    const size_t r4 = table->column().first.find_first("jimbo");
-    const size_t r5 = table->column().first.find_first("johnny");
+    size_t r2 = table->column().first.find_first("jeff");
+    size_t r3 = table->column().first.find_first("jim");
+    size_t r4 = table->column().first.find_first("jimbo");
+     size_t r5 = table->column().first.find_first("johnny");
     CHECK_EQUAL(0, r2);
     CHECK_EQUAL(1, r3);
     CHECK_EQUAL(5, r4);
     CHECK_EQUAL(6, r5);
 
-    const size_t c1 = table->column().first.count("jennifer");
+    size_t c1 = table->column().first.count("jennifer");
     CHECK_EQUAL(2, c1);
 
     // Serialize to memory (we now own the buffer)
@@ -1099,19 +1099,19 @@ TEST(Group_Index_String)
 
     CHECK(t->column().first.has_index());
 
-    const size_t m1 = table->column().first.find_first("jimmi");
+    size_t m1 = table->column().first.find_first("jimmi");
     CHECK_EQUAL(not_found, m1);
 
-    const size_t m2 = t->column().first.find_first("jeff");
-    const size_t m3 = t->column().first.find_first("jim");
-    const size_t m4 = t->column().first.find_first("jimbo");
-    const size_t m5 = t->column().first.find_first("johnny");
+    size_t m2 = t->column().first.find_first("jeff");
+    size_t m3 = t->column().first.find_first("jim");
+    size_t m4 = t->column().first.find_first("jimbo");
+    size_t m5 = t->column().first.find_first("johnny");
     CHECK_EQUAL(0, m2);
     CHECK_EQUAL(1, m3);
     CHECK_EQUAL(5, m4);
     CHECK_EQUAL(6, m5);
 
-    const size_t m6 = t->column().first.count("jennifer");
+    size_t m6 = t->column().first.count("jennifer");
     CHECK_EQUAL(2, m6);
 }
 
@@ -1145,7 +1145,7 @@ TEST(Group_ToDot)
         table->insert_bool(1, i, (i % 2 ? true : false));
         table->insert_date(2, i, 12345);
 
-        std::stringstream ss;
+        stringstream ss;
         ss << "string" << i;
         table->insert_string(3, i, ss.str().c_str());
 
@@ -1209,14 +1209,15 @@ TEST(Group_ToDot)
 
 #if 1
     // Write array graph to cout
-    std::stringstream ss;
+    stringstream ss;
     mygroup.ToDot(ss);
     cout << ss.str() << endl;
 #endif
 
     // Write array graph to file in dot format
-    std::ofstream fs("tightdb_graph.dot", ios::out | ios::binary);
-    if (!fs.is_open()) cout << "file open error " << strerror << endl;
+    ofstream fs("tightdb_graph.dot", ios::out | ios::binary);
+    if (!fs.is_open())
+        cout << "file open error " << strerror << endl;
     mygroup.to_dot(fs);
     fs.close();
 }

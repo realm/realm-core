@@ -242,11 +242,11 @@ TEST(CountLimit)
     CHECK_EQUAL(1, count3);
 }
 
+
 TEST(TestQueryStrIndexCrash)
 {
     // Rasmus "8" index crash
-    for(int iter = 0; iter < 5; iter++)
-    {
+    for(int iter = 0; iter < 5; ++iter) {
         Group group;
         TableRef table = group.get_table("test");
 
@@ -256,7 +256,7 @@ TEST(TestQueryStrIndexCrash)
 
         size_t eights = 0;
 
-        for(int i = 0; i < 2000; i++) {
+        for(int i = 0; i < 2000; ++i) {
             int v = rand() % 10;
             if(v == 8) {
                 eights++;
@@ -475,6 +475,7 @@ TEST(QueryTwoColsNoRows)
     CHECK_EQUAL(not_found, table.where().not_equal_int(size_t(0), size_t(1)).find_next());
 }
 
+
 TEST(TestQueryHuge)
 {
 #if TEST_DURATION == 0
@@ -654,6 +655,7 @@ TEST(TestQueryHuge)
     }
 }
 
+
 TEST(TestQueryStrIndex3)
 {
     // Create two columns where query match-density varies alot throughout the rows. This forces the query engine to
@@ -759,16 +761,13 @@ TEST(TestQueryStrIndex3)
 }
 
 
-
-
 TEST(TestQueryStrIndex2)
 {
     TupleTableType ttt;
 
-
     int64_t s;
 
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 100; ++i) {
         ttt.add(1, "AA");
     }
     ttt.add(1, "BB");
@@ -782,8 +781,8 @@ TEST(TestQueryStrIndex2)
 
     s = ttt.where().second.equal("CC").count();
     CHECK_EQUAL(0, s);
-
 }
+
 
 TEST(TestQueryStrEnum)
 {
@@ -792,13 +791,13 @@ TEST(TestQueryStrEnum)
     int aa;
     int64_t s;
 
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 100; ++i) {
         ttt.clear();
         aa = 0;
-        for (size_t t = 0; t < 2000; t++) {
+        for (size_t t = 0; t < 2000; ++t) {
             if (rand() % 3 == 0) {
                 ttt.add(1, "AA");
-                aa++;
+                ++aa;
             }
             else {
                 ttt.add(1, "BB");
@@ -808,7 +807,6 @@ TEST(TestQueryStrEnum)
         s = ttt.where().second.equal("AA").count();
         CHECK_EQUAL(aa, s);
     }
-
 }
 
 
@@ -852,10 +850,9 @@ TEST(TestQueryStrIndex)
 
 }
 
+
 TEST(Group_GameAnalytics)
 {
-    UnitTest::Timer timer;
-
     {
         Group g;
         GATable::Ref t = g.get_table<GATable>("firstevents");
@@ -876,13 +873,11 @@ TEST(Group_GameAnalytics)
 
     GATable::Query q = t->where().country.equal("US");
 
-    timer.Start();
     size_t c1 = 0;
     for (size_t i = 0; i < 100; ++i) {
         c1 += t->column().country.count("US");
     }
 
-    timer.Start();
     size_t c2 = 0;
     for (size_t i = 0; i < 100; ++i) {
         c2 += q.count();
@@ -890,9 +885,8 @@ TEST(Group_GameAnalytics)
 
     CHECK_EQUAL(c1, t->size() * 100);
     CHECK_EQUAL(c1, c2);
-
-
 }
+
 
 TEST(TestQueryFloat3)
 {
@@ -2926,6 +2920,7 @@ TEST(TestQuery_AllTypes_StaticallyTyped)
     CHECK_EQUAL(0.8, query.double_col.sum());
     CHECK_EQUAL(0.8, query.double_col.average());
 }
+
 
 TEST(Query_ref_counting)
 {

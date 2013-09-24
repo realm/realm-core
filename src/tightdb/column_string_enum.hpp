@@ -41,7 +41,7 @@ public:
     void add(StringData value);
     void set(std::size_t ndx, StringData value);
     void insert(std::size_t ndx, StringData value);
-    void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
+    void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
 
     using Column::move_last_over;
@@ -49,8 +49,9 @@ public:
     using Column::insert;
 
     std::size_t count(StringData value) const;
-    size_t find_first(StringData value, std::size_t begin=0, std::size_t end=-1) const;
-    void find_all(Array& res, StringData value, std::size_t begin=0, std::size_t end=-1) const;
+    size_t find_first(StringData value, std::size_t begin = 0, std::size_t end = npos) const;
+    void find_all(Array& res, StringData value,
+                  std::size_t begin = 0, std::size_t end = npos) const;
     FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
     std::size_t count(std::size_t key_index) const;
@@ -86,6 +87,8 @@ public:
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
+    void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
+    using Column::dump_node_structure;
 #endif
 
     std::size_t GetKeyNdx(StringData value) const;

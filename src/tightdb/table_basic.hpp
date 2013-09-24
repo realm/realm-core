@@ -242,6 +242,7 @@ public:
 #ifdef TIGHTDB_DEBUG
     using Table::Verify;
     using Table::print;
+    using Table::dump_node_structure;
 #endif
 
 private:

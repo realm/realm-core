@@ -296,7 +296,7 @@ public:
     MemStats stats();
     void enable_mem_diagnostics(bool enable = true) { m_alloc.enable_debug(enable); }
     void to_dot(std::ostream&) const;
-    void to_dot() const; // For GDB
+    void to_dot() const; // To std::cerr (for GDB)
     void to_dot(const char* file_path) const;
     void zero_free_space(std::size_t file_size, std::size_t readlock_version);
 #endif
@@ -373,15 +373,20 @@ private:
 
     void detach_table_accessors() TIGHTDB_NOEXCEPT;
 
-    friend class GroupWriter;
-    friend class SharedGroup;
-    friend class LangBindHelper;
+#ifdef TIGHTDB_DEBUG
+    std::pair<ref_type, std::size_t>
+    get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
+#endif
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     friend class Replication;
     Replication* get_replication() const TIGHTDB_NOEXCEPT { return m_alloc.get_replication(); }
     void set_replication(Replication* r) TIGHTDB_NOEXCEPT { m_alloc.set_replication(r); }
 #endif
+
+    friend class GroupWriter;
+    friend class SharedGroup;
+    friend class LangBindHelper;
 };
 
 
@@ -579,8 +584,8 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
     top.add(m_top.get(1));
 
     // Recursively write all arrays
-    const uint64_t top_pos = top.write(out);
-    const std::size_t byte_size = out.getpos();
+    uint_fast64_t top_pos = top.write(out);
+    std::size_t byte_size = out.getpos();
 
     // Write top ref
     // (since we initially set the last bit in the file header to
