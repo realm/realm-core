@@ -61,10 +61,12 @@ struct CustomTestReporter: TestReporter {
 } // anonymous namespace
 
 
-TIGHTDB_TABLE_3(ThreeColTable,
+TIGHTDB_TABLE_5(ThreeColTable,
     first,  Int,
     second, Float,
-    third, Double)
+    third, Double,
+    fourth, Bool,
+    fifth, String)
 
 
 int main(int argc, char* argv[])
@@ -76,26 +78,49 @@ int main(int argc, char* argv[])
     untyped.add_column(type_Int, "firs1");
     untyped.add_column(type_Float, "second");
     untyped.add_column(type_Double, "third");
+    untyped.add_column(type_Bool, "third2");
+    untyped.add_column(type_String, "fourth");
     untyped.add_empty_row(2);
     untyped.set_int(0, 0, 20);
     untyped.set_float(1, 0, 19.9f);
     untyped.set_double(2, 0, 3.0);
+    untyped.set_bool(3, 0, true);
+    untyped.set_string(4, 0, "hello");
+
     untyped.set_int(0, 1, 20);
     untyped.set_float(1, 1, 20.1f);
     untyped.set_double(2, 1, 4.0);
-
+    untyped.set_bool(3, 1, false);
+    untyped.set_string(4, 1, "world");
 
     // Setup typed table, same contents as untyped
     ThreeColTable typed;
-    typed.add(20, 19.9f, 3.0);
-    typed.add(20, 20.1f, 4.0);
+    typed.add(20, 19.9f, 3.0, true, "hello");
+    typed.add(20, 20.1f, 4.0, false, "world");
+
+    
+    match = (untyped.column<String>(4) == "world").find_next();
+    assert(match == 1);
+    
+    match = ("world" == untyped.column<String>(4)).find_next();
+    assert(match == 1);
+    
+    match = ("hello" != untyped.column<String>(4)).find_next();
+    assert(match == 1);
+
+    match = (untyped.column<String>(4) != StringData("hello")).find_next();
+    assert(match == 1);
+    
 
 
-    // This is the first demonstration of fallback to old query_engine for the specific cases where it's possible
+    // This is a demonstration of fallback to old query_engine for the specific cases where it's possible
     // because old engine is faster. This will return a ->less(...) query
-
     match = (untyped.column<int64_t>(0) == untyped.column<int64_t>(0)).find_next();
     assert(match == 0);
+
+
+    match = (untyped.column<bool>(3) == false).find_next();
+    assert(match == 1);
 
 
 //    return 0;

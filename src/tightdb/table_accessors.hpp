@@ -1115,7 +1115,7 @@ public:
 /// Column accessor specialization for strings.
 template<class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, StringData>:
-    public ColumnAccessorBase<Taboid, col_idx, StringData> {
+    public ColumnAccessorBase<Taboid, col_idx, StringData>, public Columns<StringData> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, StringData> Base;
 

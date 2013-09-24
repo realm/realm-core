@@ -19,6 +19,8 @@
  **************************************************************************/
 
 /*
+Todo: describe strings
+
 This file lets you write queries in C++ syntax like: Expression* e = (first + 1 / second >= third + 12.3);
 
 Type conversion/promotion semantics is the same as in the C++ expressions, e.g float + int > double == float + 
@@ -109,6 +111,14 @@ Caveats, notes and todos
 #define TIGHTDB_QUERY_EXPRESSION_HPP
 
 // namespace tightdb {
+
+    // FIXME, this needs to exist elsewhere
+    typedef int64_t             Int;
+    typedef bool                Bool;
+    typedef tightdb::Date       Date;
+    typedef float               Float;
+    typedef double              Double;
+    typedef tightdb::StringData String;
 
 
 template<class T>struct Plus { 
@@ -318,7 +328,7 @@ template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>&
     // Fallback to old query_engine if it supports this particular condition because it's faster. Supported conditions
     // are 'int_col Cond int' and 'int Cond int_col' (by reversing expression).
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
-    if(column && (SameType<L, int>::value || SameType<L, int64_t>::value) && (SameType<R, int>::value || SameType<R, int64_t>::value)) {
+    if(column && (std::numeric_limits<L>::is_integer) && (std::numeric_limits<R>::is_integer)) {
         const Table* t = (const_cast<Columns<R>*>(column))->get_table();
         Query q = Query(*t);
 
@@ -421,7 +431,7 @@ template <class Cond> Query create2 (const Subexpr2<R>& right)
         const Table* t = (const_cast<Columns<R>*>(left_col))->get_table();
         Query q = Query(*t);
 
-        if(SameType<L, int>::value || SameType<L, int64_t>::value) {
+        if(std::numeric_limits<L>::is_integer) {
             if(SameType<Cond, Less>::value)
                 q.less_int(left_col->m_column, right_col->m_column);
             else if(SameType<Cond, Greater>::value)
@@ -505,8 +515,8 @@ template <class Cond> Query create2 (const Subexpr2<R>& right)
 };
 
 // With this wrapper class we can define just 20 overloads inside Overloads<L, R> instead of 4 * 20 = 80.
-template <class T> class Subexpr2 : public Subexpr, public Overloads<T, int>, public Overloads<T, float>, 
-                                    public Overloads<T, double>, public Overloads<T, int64_t> 
+template <class T> class Subexpr2 : public Subexpr, public Overloads<T, const char*>, public Overloads<T, int>, public
+                                    Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t> 
 {
 public:
     virtual ~Subexpr2() {};
@@ -526,8 +536,7 @@ public:
 
 
 
-
-// Compare
+// Compare numeric values
 template <class R> Query operator > (double left, const Subexpr2<R>& right) {
     return create<double, Greater, R>(left, right);
 }
@@ -652,6 +661,60 @@ template <class R> Operator<Div<typename Common<R, int64_t>::type> >& operator /
 }
 
 
+template <> class Columns<StringData>
+{
+public:
+    explicit Columns(size_t column, const Table* table) : m_table(NULL)
+    {
+        m_column = column;
+        set_table(table);
+    }
+
+    explicit Columns() : m_table(NULL) { }
+
+    explicit Columns(size_t column) : m_table(NULL)
+    {
+        m_column = column;
+    }
+
+    virtual void set_table(const Table* table) 
+    {
+        m_table = table;
+    }
+
+    virtual const Table* get_table() 
+    {
+        return m_table;
+    }
+
+    const Table* m_table;
+    size_t m_column;
+};
+
+
+template <class T> Query operator == (T left, const Columns<StringData>& right) {
+    return operator==(right, left);
+}
+
+template <class T> Query operator != (T left, const Columns<StringData>& right) {
+    return operator!=(right, left);
+}
+
+template <class T> Query operator == (const Columns<StringData>& left, T right) {
+    const Table* t = const_cast<Columns<StringData>*>(&left)->get_table();
+    Query q = Query(*t);
+    q.equal(left.m_column, right);
+    return q;
+}
+
+template <class T> Query operator != (const Columns<StringData>& left, T right) {
+    const Table* t = const_cast<Columns<StringData>*>(&left)->get_table();
+    Query q = Query(*t);
+    q.not_equal(left.m_column, right);
+    return q;
+}
+
+
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
@@ -720,6 +783,11 @@ public:
 private:
     SequentialGetter<T>* sg;
 };
+
+
+
+
+
 
 
 template <class oper, class TLeft, class TRight> class Operator : public Subexpr2<typename oper::type>

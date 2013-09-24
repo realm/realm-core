@@ -101,7 +101,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/array_basic.hpp>
-//#include <tightdb/query_expression.h>
+#include <tightdb/array_string.hpp>
 
 namespace tightdb {
 
@@ -154,6 +154,14 @@ template<> struct ColumnTypeTraits<Date> {
     typedef int64_t sum_type;
     static const DataType id = type_Int;
 };
+
+template<> struct ColumnTypeTraits<StringData> {
+    typedef Column column_type;
+    typedef Array array_type;
+    typedef int64_t sum_type;
+    static const DataType id = type_String;
+};
+
 // Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
 template<class T, Action A> struct ColumnTypeTraitsSum {
     typedef T sum_type;

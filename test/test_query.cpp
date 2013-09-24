@@ -82,6 +82,31 @@ TIGHTDB_TABLE_2(PeopleTable2,
 
 } // anonymous namespace
 
+TEST(LimitUntyped)
+{
+    Table table;
+    table.add_column(type_Int, "first1");
+    table.add_column(type_Int, "second1");
+
+    table.add_empty_row(3);
+    table.set_int(0, 0, 10000);
+    table.set_int(0, 1, 30000);
+    table.set_int(0, 2, 10000);
+
+    Query q = table.where();
+    int64_t sum;
+    
+    sum = q.sum(0, NULL, 0, -1, 1);
+    CHECK_EQUAL(10000, sum);
+
+    sum = q.sum(0, NULL, 0, -1, 2);
+    CHECK_EQUAL(40000, sum);
+
+    sum = q.sum(0, NULL, 0, -1, 3);
+    CHECK_EQUAL(50000, sum);
+
+}
+
 
 TEST(MergeQueriesOverloads)
 {
