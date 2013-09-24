@@ -9,8 +9,8 @@ using namespace std;
 using namespace tightdb;
 
 
-ArrayBinary::ArrayBinary(ArrayParent* parent, size_t pndx, Allocator& alloc):
-    Array(type_HasRefs, parent, pndx, alloc),
+ArrayBinary::ArrayBinary(ArrayParent* parent, size_t ndx_in_parent, Allocator& alloc):
+    Array(type_HasRefs, parent, ndx_in_parent, alloc),
     m_offsets(type_Normal, 0, 0, alloc), m_blob(0, 0, alloc)
 {
     // Add subarrays for long string
@@ -20,9 +20,9 @@ ArrayBinary::ArrayBinary(ArrayParent* parent, size_t pndx, Allocator& alloc):
     m_blob.set_parent(this, 1);
 }
 
-ArrayBinary::ArrayBinary(MemRef mem, ArrayParent* parent, size_t pndx,
+ArrayBinary::ArrayBinary(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
                          Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(mem, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
+    Array(mem, parent, ndx_in_parent, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
     m_blob(Array::get_as_ref(1), 0, 0, alloc)
 {
     TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
@@ -33,9 +33,9 @@ ArrayBinary::ArrayBinary(MemRef mem, ArrayParent* parent, size_t pndx,
     m_blob.set_parent(this, 1);
 }
 
-ArrayBinary::ArrayBinary(ref_type ref, ArrayParent* parent, size_t pndx,
+ArrayBinary::ArrayBinary(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
                          Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(ref, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
+    Array(ref, parent, ndx_in_parent, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
     m_blob(Array::get_as_ref(1), 0, 0, alloc)
 {
     TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
@@ -135,7 +135,8 @@ ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_
 {
     size_t leaf_size = size();
     TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_LIST_SIZE);
-    if (leaf_size < ndx) ndx = leaf_size;
+    if (leaf_size < ndx)
+        ndx = leaf_size;
     if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_LIST_SIZE)) {
         insert(ndx, value, add_zero_term);
         return 0; // Leaf was not split
@@ -148,9 +149,8 @@ ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_
         state.m_split_offset = ndx;
     }
     else {
-        for (size_t i = ndx; i != leaf_size; ++i) {
+        for (size_t i = ndx; i != leaf_size; ++i)
             new_leaf.add(get(i));
-        }
         resize(ndx);
         add(value, add_zero_term);
         state.m_split_offset = ndx + 1;
@@ -162,7 +162,7 @@ ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_
 
 #ifdef TIGHTDB_DEBUG
 
-void ArrayBinary::to_dot(ostream& out, StringData title) const
+void ArrayBinary::to_dot(ostream& out, bool, StringData title) const
 {
     ref_type ref = get_ref();
 

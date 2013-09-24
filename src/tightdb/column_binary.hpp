@@ -22,6 +22,7 @@
 
 #include <tightdb/column.hpp>
 #include <tightdb/array_binary.hpp>
+#include <tightdb/array_blobs_big.hpp>
 
 namespace tightdb {
 
@@ -42,7 +43,7 @@ public:
 
     void add() TIGHTDB_OVERRIDE { add(BinaryData()); }
     void add(BinaryData value);
-    void set(std::size_t ndx, BinaryData value);
+    void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
     void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, BinaryData()); }
     void insert(std::size_t ndx, BinaryData value);
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
@@ -71,8 +72,8 @@ public:
 private:
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
 
-    void add(StringData value) { add_string(value); }
-    void set(std::size_t ndx, StringData value) { set_string(ndx, value); }
+//    void add(StringData value) { add_string(value); }
+//    void set(std::size_t ndx, StringData value) { set_string(ndx, value); }
 
     void do_insert(std::size_t ndx, BinaryData value, bool add_zero_term);
 
@@ -86,6 +87,11 @@ private:
     };
 
     class EraseLeafElem;
+
+    /// Root must be a leaf. Upgrades the root leaf if
+    /// necessary. Returns true if, and only if the root is a 'big
+    /// blobs' leaf upon return.
+    bool upgrade_root_leaf(std::size_t value_size);
 
 #ifdef TIGHTDB_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
@@ -103,21 +109,48 @@ private:
 
 inline std::size_t ColumnBinary::size() const  TIGHTDB_NOEXCEPT
 {
-    if (root_is_leaf())
-        return static_cast<ArrayBinary*>(m_array)->size();
+    if (root_is_leaf()) {
+        bool is_big = m_array->context_bit();
+        if (!is_big) {
+            // Small blobs root leaf
+            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
+            return leaf->size();
+        }
+        // Big blobs root leaf
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        return leaf->size();
+    }
+    // Non-leaf root
     return m_array->get_bptree_size();
 }
 
 inline BinaryData ColumnBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < size());
-    if (root_is_leaf())
-        return static_cast<const ArrayBinary*>(m_array)->get(ndx);
+    if (root_is_leaf()) {
+        bool is_big = m_array->context_bit();
+        if (!is_big) {
+            // Small blobs root leaf
+            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
+            return leaf->get(ndx);
+        }
+        // Big blobs root leaf
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        return leaf->get(ndx);
+    }
 
+    // Non-leaf root
     std::pair<MemRef, std::size_t> p = m_array->get_bptree_leaf(ndx);
     const char* leaf_header = p.first.m_addr;
     std::size_t ndx_in_leaf = p.second;
-    return ArrayBinary::get(leaf_header, ndx_in_leaf, m_array->get_alloc());
+    Allocator& alloc = m_array->get_alloc();
+    bool is_big = Array::get_context_bit_from_header(leaf_header);
+    if (!is_big) {
+        // Small blobs
+        return ArrayBinary::get(leaf_header, ndx_in_leaf, alloc);
+    }
+    // Big blobs
+    return ArrayBigBlobs::get(leaf_header, ndx_in_leaf, alloc);
 }
 
 inline StringData ColumnBinary::get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT
@@ -125,6 +158,13 @@ inline StringData ColumnBinary::get_string(std::size_t ndx) const TIGHTDB_NOEXCE
     BinaryData bin = get(ndx);
     TIGHTDB_ASSERT(0 < bin.size());
     return StringData(bin.data(), bin.size()-1);
+}
+
+inline void ColumnBinary::set_string(std::size_t ndx, StringData value)
+{
+    BinaryData bin(value.data(), value.size());
+    bool add_zero_term = true;
+    set(ndx, bin, add_zero_term);
 }
 
 inline void ColumnBinary::add(BinaryData value)
@@ -143,18 +183,18 @@ inline void ColumnBinary::insert(std::size_t ndx, BinaryData value)
 
 inline void ColumnBinary::add_string(StringData value)
 {
-    BinaryData value_2(value.data(), value.size());
+    BinaryData bin(value.data(), value.size());
     bool add_zero_term = true;
-    do_insert(npos, value_2, add_zero_term);
+    do_insert(npos, bin, add_zero_term);
 }
 
 inline void ColumnBinary::insert_string(std::size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx <= size());
     if (size() <= ndx) ndx = npos;
-    BinaryData value_2(value.data(), value.size());
+    BinaryData bin(value.data(), value.size());
     bool add_zero_term = true;
-    do_insert(ndx, value_2, add_zero_term);
+    do_insert(ndx, bin, add_zero_term);
 }
 
 } // namespace tightdb

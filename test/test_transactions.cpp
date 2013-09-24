@@ -49,17 +49,8 @@ TIGHTDB_TABLE_8(MyTable,
 const int num_threads = 23;
 const int num_rounds  = 2;
 
-// FIXME: TightDB currently imposes a limitation on the number of
-// elements in any array node. It must not exceed 2**24. Because a
-// single array is used to hold all the strings (or blobs) of a leaf
-// in the B+-tree, the maximum size of a stored string (and of a
-// stored blob) can be calculated as (2**24 /
-// TIGHTDB_MAX_LIST_SIZE). It is extremely unfortunate that the string
-// size limitation is a function of TIGHTDB_MAX_LIST_SIZE. The
-// limitation should be entirely removed, but that requires a
-// non-trivial change that will also break the file format.
-const size_t max_blob_size = 0x1000000 / TIGHTDB_MAX_LIST_SIZE / 2; // Dividing by two to be on the safe side.
-const size_t max_string_size = max_blob_size - 1; // Discount the mandatory null-terminator.
+const size_t max_blob_size   = 32*1024; // 32 KiB
+const size_t max_string_size = 32*1024; // 32 KiB
 
 
 void round(SharedGroup& db, int index)
