@@ -68,13 +68,13 @@ TEST(StringIndex_DeleteAll)
 
     // Delete all entries
     // (reverse order to avoid ref updates)
-    col.erase(6);
-    col.erase(5);
-    col.erase(4);
-    col.erase(3);
-    col.erase(2);
-    col.erase(1);
-    col.erase(0);
+    col.erase(6, 6 == col.size()-1);
+    col.erase(5, 5 == col.size()-1);
+    col.erase(4, 4 == col.size()-1);
+    col.erase(3, 3 == col.size()-1);
+    col.erase(2, 2 == col.size()-1);
+    col.erase(1, 1 == col.size()-1);
+    col.erase(0, 0 == col.size()-1);
 #ifdef TIGHTDB_DEBUG
     CHECK(ndx.is_empty());
 #else
@@ -92,13 +92,13 @@ TEST(StringIndex_DeleteAll)
 
     // Delete all entries
     // (in order to force constant ref updating)
-    col.erase(0);
-    col.erase(0);
-    col.erase(0);
-    col.erase(0);
-    col.erase(0);
-    col.erase(0);
-    col.erase(0);
+    col.erase(0, 0 == col.size()-1);
+    col.erase(0, 0 == col.size()-1);
+    col.erase(0, 0 == col.size()-1);
+    col.erase(0, 0 == col.size()-1);
+    col.erase(0, 0 == col.size()-1);
+    col.erase(0, 0 == col.size()-1);
+    col.erase(0, 0 == col.size()-1);
 #ifdef TIGHTDB_DEBUG
     CHECK(ndx.is_empty());
 #else
@@ -123,7 +123,7 @@ TEST(StringIndex_Delete)
     const StringIndex& ndx = col.create_index();
 
     // Delete first item (in index)
-    col.erase(1);
+    col.erase(1, 1 == col.size()-1);
 
     CHECK_EQUAL(0, col.find_first(s1));
     CHECK_EQUAL(1, col.find_first(s3));
@@ -131,7 +131,7 @@ TEST(StringIndex_Delete)
     CHECK_EQUAL(not_found, ndx.find_first(s2));
 
     // Delete last item (in index)
-    col.erase(2);
+    col.erase(2, 2 == col.size()-1);
 
     CHECK_EQUAL(0, col.find_first(s1));
     CHECK_EQUAL(1, col.find_first(s3));
@@ -139,7 +139,7 @@ TEST(StringIndex_Delete)
     CHECK_EQUAL(not_found, col.find_first(s2));
 
     // Delete middle item (in index)
-    col.erase(1);
+    col.erase(1, 1 == col.size()-1);
 
     CHECK_EQUAL(0, col.find_first(s1));
     CHECK_EQUAL(not_found, col.find_first(s3));
@@ -147,8 +147,8 @@ TEST(StringIndex_Delete)
     CHECK_EQUAL(not_found, col.find_first(s2));
 
     // Delete all items
-    col.erase(0);
-    col.erase(0);
+    col.erase(0, 0 == col.size()-1);
+    col.erase(0, 0 == col.size()-1);
 #ifdef TIGHTDB_DEBUG
     CHECK(ndx.is_empty());
 #endif

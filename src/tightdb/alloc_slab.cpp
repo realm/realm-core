@@ -2,6 +2,11 @@
 #include <algorithm>
 #include <iostream>
 
+#ifdef TIGHTDB_SLAB_ALLOC_DEBUG
+#include <cstdlib>
+#include <map>
+#endif
+
 #include <tightdb/safe_int_ops.hpp>
 #include <tightdb/terminate.hpp>
 #include <tightdb/array.hpp>
@@ -22,6 +27,10 @@ namespace {
 // limitation, only a limitation due to the way we currently buld the
 // default header.
 const int current_file_format_version = 1;
+
+#ifdef TIGHTDB_SLAB_ALLOC_DEBUG
+map<ref_type, void*> malloc_debug_map;
+#endif
 
 class InvalidFreeSpace: std::exception {
 public:
@@ -73,7 +82,12 @@ SlabAlloc::~SlabAlloc() TIGHTDB_NOEXCEPT
                 if (!is_all_free()) {
                     m_slabs.print();
                     m_free_space.print();
+#  ifndef TIGHTDB_SLAB_ALLOC_DEBUG
+                    cerr << "To get the stack-traces of the corresponding allocations,"
+                        "first compile with TIGHTDB_SLAB_ALLOC_DEBUG defined,"
+                        "then run under Valgrind with --leak-check=full\n";
                     TIGHTDB_TERMINATE("SlabAlloc detected a leak");
+#  endif
                 }
             }
         }
@@ -126,7 +140,7 @@ MemRef SlabAlloc::alloc(size_t size)
                 }
                 else {
                     r.size = rest;
-                    r.ref += unsigned(size);
+                    r.ref += unsigned(size); // FIXME: Bad cast ('unsigned' may be smaller than 'size_t')
                 }
 
 #ifdef TIGHTDB_DEBUG
@@ -137,6 +151,9 @@ MemRef SlabAlloc::alloc(size_t size)
                 char* addr = translate(ref);
 #ifdef TIGHTDB_ALLOC_SET_ZERO
                 fill(addr, addr+size, 0);
+#endif
+#ifdef TIGHTDB_SLAB_ALLOC_DEBUG
+                malloc_debug_map[ref] = malloc(1);
 #endif
                 return MemRef(addr, ref);
             }
@@ -189,6 +206,9 @@ MemRef SlabAlloc::alloc(size_t size)
 #ifdef TIGHTDB_ALLOC_SET_ZERO
     fill(addr, addr+size, 0);
 #endif
+#ifdef TIGHTDB_SLAB_ALLOC_DEBUG
+    malloc_debug_map[ref] = malloc(1);
+#endif
 
     return MemRef(addr, ref);
 }
@@ -201,6 +221,10 @@ void SlabAlloc::free_(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
     // Free space in read only segment is tracked separately
     bool read_only = is_read_only(ref);
     FreeSpace& free_space = read_only ? m_free_read_only : m_free_space;
+
+#ifdef TIGHTDB_SLAB_ALLOC_DEBUG
+    free(malloc_debug_map[ref]);
+#endif
 
     // Get size from segment
     size_t size = read_only ? Array::get_byte_size_from_header(addr) :
@@ -261,8 +285,9 @@ void SlabAlloc::free_(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
         }
 
         // Else just add to freelist
-        if (merged_with == npos)
+        if (merged_with == npos) {
             free_space.add(ref, size); // Throws
+        }
     }
     catch (...) {
         m_free_space_invalid = true;

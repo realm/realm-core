@@ -1,3 +1,6 @@
+#include <iostream>
+#include <iomanip>
+
 #include <tightdb/column_mixed.hpp>
 
 using namespace std;
@@ -95,13 +98,16 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType new_type)
                 // it to avoid having to adjust refs to following items
                 // FIXME: this is a leak. We should adjust
                 size_t data_ndx = size_t(uint64_t(m_refs->get(ndx)) >> 1);
-                if (data_ndx == m_data->size()-1)
-                    m_data->erase(data_ndx);
-                else
+                if (data_ndx == m_data->size()-1) {
+                    bool is_last = true;
+                    m_data->erase(data_ndx, is_last);
+                }
+                else {
                     // FIXME: But this will lead to unbounded in-file
                     // leaking in for(;;) { insert_binary(i, ...);
                     // erase(i); }
                     m_data->set(data_ndx, BinaryData());
+                }
                 break;
             }
             case mixcol_Table: {
@@ -120,16 +126,17 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType new_type)
     m_refs->set(ndx, 0);
 }
 
-void ColumnMixed::erase(size_t ndx)
+void ColumnMixed::erase(size_t ndx, bool is_last)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
+
     detach_subtable_accessors();
 
     // Remove refs or binary data
     clear_value(ndx, mixcol_Int);
 
-    m_types->erase(ndx);
-    m_refs->erase(ndx);
+    m_types->erase(ndx, is_last);
+    m_refs->erase(ndx, is_last);
 }
 
 void ColumnMixed::move_last_over(size_t ndx)
@@ -171,12 +178,10 @@ void ColumnMixed::fill(size_t count)
     // Fill column with default values
     // TODO: this is a very naive approach
     // we could speedup by creating full nodes directly
-    for (size_t i = 0; i < count; ++i) {
+    for (size_t i = 0; i < count; ++i)
         m_types->insert(i, mixcol_Int);
-    }
-    for (size_t i = 0; i < count; ++i) {
+    for (size_t i = 0; i < count; ++i)
         m_refs->insert(i, 1); // 1 is zero shifted one and low bit set;
-    }
 
 #ifdef TIGHTDB_DEBUG
     Verify();
@@ -299,6 +304,11 @@ bool ColumnMixed::compare_mixed(const ColumnMixed& c) const
     return true;
 }
 
+void ColumnMixed::do_detach_subtable_accessors() TIGHTDB_NOEXCEPT
+{
+    detach_subtable_accessors();
+}
+
 
 #ifdef TIGHTDB_DEBUG
 
@@ -329,18 +339,21 @@ void ColumnMixed::Verify() const
 void ColumnMixed::to_dot(ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
-
-    out << "subgraph cluster_columnmixed" << ref << " {" << endl;
-    out << " label = \"ColumnMixed";
-    if (0 < title.size())
+    out << "subgraph cluster_mixed_column" << ref << " {" << endl;
+    out << " label = \"Mixed column";
+    if (title.size() != 0)
         out << "\\n'" << title << "'";
     out << "\";" << endl;
 
     m_array->to_dot(out, "mixed_top");
+    m_types->to_dot(out, "types");
+    m_refs->to_dot(out, "refs");
+    if (m_array->size() > 2)
+        m_data->to_dot(out, "data");
 
     // Write sub-tables
-    size_t count = size();
-    for (size_t i = 0; i < count; ++i) {
+    size_t n = size();
+    for (size_t i = 0; i != n; ++i) {
         MixedColType type = MixedColType(m_types->get(i));
         if (type != mixcol_Table)
             continue;
@@ -348,14 +361,12 @@ void ColumnMixed::to_dot(ostream& out, StringData title) const
         subtable->to_dot(out);
     }
 
-    m_types->to_dot(out, "types");
-    m_refs->to_dot(out, "refs");
-
-    if (m_array->size() > 2) {
-        m_data->to_dot(out, "data");
-    }
-
     out << "}" << endl;
+}
+
+void ColumnMixed::dump_node_structure(ostream& out, int level) const
+{
+    m_types->dump_node_structure(out, level); // FIXME: How to do this?
 }
 
 #endif // TIGHTDB_DEBUG

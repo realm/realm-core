@@ -44,10 +44,12 @@ public:
     void insert(std::size_t ndx, StringData value);
     void erase(std::size_t ndx);
 
-    std::size_t count(StringData value, std::size_t begin = 0, std::size_t end = -1) const;
-    std::size_t find_first(StringData value, std::size_t begin = 0 , std::size_t end = -1) const;
+    std::size_t count(StringData value, std::size_t begin = 0,
+                      std::size_t end = npos) const TIGHTDB_NOEXCEPT;
+    std::size_t find_first(StringData value, std::size_t begin = 0,
+                           std::size_t end = npos) const TIGHTDB_NOEXCEPT;
     void find_all(Array& result, StringData value, std::size_t add_offset = 0,
-                  std::size_t begin = 0, std::size_t end = -1);
+                  std::size_t begin = 0, std::size_t end = npos);
 
     /// Compare two string arrays for equality.
     bool compare_string(const ArrayString&) const;
@@ -58,7 +60,7 @@ public:
     /// slower.
     static StringData get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
 
-    ref_type btree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase& state);
+    ref_type bptree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase& state);
 
     /// Create a new empty string array and attach to it. This does
     /// not modify the parent reference information.

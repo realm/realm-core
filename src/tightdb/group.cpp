@@ -391,21 +391,24 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
     Table::UnbindGuard table_ug(new Table(Table::ref_count_tag(), m_alloc,
                                           ref_dg.get(), 0, 0)); // Throws
 
+    // The table accessor owns the ref until the point below where a
+    // parent is set in Table::m_top.
+    ref_type ref = ref_dg.release();
+    table_ug->bind_ref(); // Increase reference count from 0 to 1
+
     size_t ndx = m_tables.size();
     m_table_accessors.resize(ndx+1); // Throws
     table_ug->m_top.set_parent(this, ndx);
     try {
-        table_ug->bind_ref(); // Increase reference count from 0 to 1
         if (spec_setter)
             (*spec_setter)(*table_ug); // Throws
 
         TIGHTDB_ASSERT(ndx == m_table_names.size());
-        m_tables.insert(ndx, ref_dg.get()); // Throws
+        m_tables.insert(ndx, ref); // Throws
         try {
             m_table_names.insert(ndx, name); // Throws
             // The rest is guaranteed not to throw
             Table* table = table_ug.release();
-            ref_dg.release();
             m_table_accessors[ndx] = table;
             return table;
         }
@@ -666,7 +669,7 @@ void Group::Verify() const
         size_t file_size = m_alloc.nonempty_attachment() ? m_alloc.get_baseline() : 0;
 
         size_t prev_end = 0;
-        for (size_t i = 0; i < n; ++i) {
+        for (size_t i = 0; i != n; ++i) {
             size_t pos  = to_size_t(m_free_positions.get(i));
             size_t size = to_size_t(m_free_lengths.get(i));
 
@@ -685,7 +688,7 @@ void Group::Verify() const
     // Verify tables
     {
         size_t n = m_tables.size();
-        for (size_t i = 0; i < n; ++i)
+        for (size_t i = 0; i != n; ++i)
             get_table_by_ndx(i)->Verify();
     }
 }
@@ -763,6 +766,11 @@ void Group::to_dot(const char* file_path) const
 {
     ofstream out(file_path);
     to_dot(out);
+}
+
+pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const TIGHTDB_OVERRIDE
+{
+    return make_pair(m_tables.get_ref(), ndx_in_parent);
 }
 
 
