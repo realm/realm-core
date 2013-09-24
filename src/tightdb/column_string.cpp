@@ -187,23 +187,16 @@ void AdaptiveStringColumn::clear()
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
-        if (!long_strings) {
-            // Small strings
-            ArrayString* leaf = static_cast<ArrayString*>(m_array);
-            leaf->clear();
-            return;
+        if (long_strings) {
+            bool is_big = m_array->context_bit();
+            if (is_big)
+                static_cast<ArrayBigBlobs*>(m_array)->clear();
+            else
+                static_cast<ArrayStringLong*>(m_array)->clear();
         }
-        bool is_big = m_array->context_bit();
-        if (!is_big) {
-            // Medium strings
-            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
-            leaf->clear();
-            return;
+        else {
+            static_cast<ArrayString*>(m_array)->clear();
         }
-        // Big strings
-        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
-        leaf->clear();
-        return;
     }
 
     // Revert to string array

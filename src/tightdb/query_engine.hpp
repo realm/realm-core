@@ -857,7 +857,6 @@ public:
     {
         clear_leaf_state();
 
-        m_leaf = NULL;
         m_dD = 100.0;
         m_probes = 0;
         m_matches = 0;
@@ -872,18 +871,21 @@ public:
 
     void clear_leaf_state()
     {
+        if (!m_leaf)
+            return;
+
         switch (m_leaf_type) {
             case AdaptiveStringColumn::leaf_type_Small:
                 delete static_cast<ArrayString*>(m_leaf);
-                return;
+                break;
             case AdaptiveStringColumn::leaf_type_Medium:
                 delete static_cast<ArrayStringLong*>(m_leaf);
-                return;
+                break;
             case AdaptiveStringColumn::leaf_type_Big:
                 delete static_cast<ArrayBigBlobs*>(m_leaf);
-                return;
+                break;
         }
-        TIGHTDB_ASSERT(false);
+        m_leaf = NULL;
     }
 
     size_t find_first_local(size_t start, size_t end)
@@ -1087,18 +1089,21 @@ public:
 
     void clear_leaf_state()
     {
+        if (!m_leaf)
+            return;
+
         switch (m_leaf_type) {
             case AdaptiveStringColumn::leaf_type_Small:
                 delete static_cast<ArrayString*>(m_leaf);
-                return;
+                break;
             case AdaptiveStringColumn::leaf_type_Medium:
                 delete static_cast<ArrayStringLong*>(m_leaf);
-                return;
+                break;
             case AdaptiveStringColumn::leaf_type_Big:
                 delete static_cast<ArrayBigBlobs*>(m_leaf);
-                return;
+                break;
         }
-        TIGHTDB_ASSERT(false);
+        m_leaf = NULL;
     }
 
     void deallocate() TIGHTDB_NOEXCEPT
@@ -1106,7 +1111,6 @@ public:
         // Must be called after each query execution too free temporary resources used by the execution. Run in
         // destructor, but also in Init because a user could define a query once and execute it multiple times.
         clear_leaf_state();
-        m_leaf = NULL;
 
         if (m_index_matches_destroy)
             m_index_matches->destroy();
