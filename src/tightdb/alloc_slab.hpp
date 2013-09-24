@@ -174,7 +174,6 @@ public:
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
     void free_(ref_type, const char*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     char* translate(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    bool is_read_only(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void enable_debug(bool enable) { m_debug_out = enable; }
@@ -216,7 +215,6 @@ private:
     /// padding between members due to alignment requirements.
     bool m_free_space_invalid;
 
-    std::size_t m_baseline; // Also size of memory mapped portion of database file
     Slabs m_slabs;
     FreeSpace m_free_space;
     FreeSpace m_free_read_only;
@@ -257,6 +255,7 @@ private:
 
 inline SlabAlloc::SlabAlloc(): m_attach_mode(attach_None), m_free_space_invalid(false)
 {
+    m_baseline = 0; // Unattached
 #ifdef TIGHTDB_DEBUG
     m_debug_out = false;
 #endif
