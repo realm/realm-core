@@ -584,8 +584,8 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
     top.add(m_top.get(1));
 
     // Recursively write all arrays
-    const uint64_t top_pos = top.write(out);
-    const std::size_t byte_size = out.getpos();
+    uint_fast64_t top_pos = top.write(out);
+    std::size_t byte_size = out.getpos();
 
     // Write top ref
     // (since we initially set the last bit in the file header to

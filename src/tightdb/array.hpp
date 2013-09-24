@@ -903,6 +903,8 @@ protected:
     WidthType get_wtype_from_header() const TIGHTDB_NOEXCEPT;
     int get_width_from_header() const TIGHTDB_NOEXCEPT;
     std::size_t get_size_from_header() const TIGHTDB_NOEXCEPT;
+
+    // Undefined behavior if m_alloc.is_read_only(m_ref) returns true
     std::size_t get_capacity_from_header() const TIGHTDB_NOEXCEPT;
 
     void set_header_isleaf(bool value) TIGHTDB_NOEXCEPT;
@@ -974,6 +976,7 @@ protected:
     /// Same as get_byte_size().
     static std::size_t get_byte_size_from_header(const char*) TIGHTDB_NOEXCEPT;
 
+    // Undefined behavior if array is in immutable memory
     static std::size_t get_capacity_from_header(const char*) TIGHTDB_NOEXCEPT;
 
     /// Get the maximum number of bytes that can be written by a
@@ -1406,38 +1409,45 @@ inline void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 
 inline bool Array::get_isleaf_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
-    return (h[0] & 0x80) == 0;
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return (int(h[4]) & 0x80) == 0;
 }
 inline bool Array::get_hasrefs_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
-    return (h[0] & 0x40) != 0;
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return (int(h[4]) & 0x40) != 0;
 }
 inline bool Array::get_indexflag_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
-    return (h[0] & 0x20) != 0;
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return (int(h[4]) & 0x20) != 0;
 }
 inline Array::WidthType Array::get_wtype_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
-    return WidthType((h[0] & 0x18) >> 3);
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return WidthType((int(h[4]) & 0x18) >> 3);
 }
 inline int Array::get_width_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
-    return (1 << (h[0] & 0x07)) >> 1;
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return (1 << (int(h[4]) & 0x07)) >> 1;
 }
 inline std::size_t Array::get_size_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
-    return (std::size_t(h[1]) << 16) + (std::size_t(h[2]) << 8) + h[3];
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return (std::size_t(h[5]) << 16) + (std::size_t(h[6]) << 8) + h[7];
 }
 inline std::size_t Array::get_capacity_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
-    return (std::size_t(h[4]) << 16) + (std::size_t(h[5]) << 8) + h[6];
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return (std::size_t(h[0]) << 16) + (std::size_t(h[1]) << 8) + h[2];
 }
 
 
@@ -1487,20 +1497,23 @@ inline std::size_t Array::get_capacity_from_header() const TIGHTDB_NOEXCEPT
 
 inline void Array::set_header_isleaf(bool value, char* header) TIGHTDB_NOEXCEPT
 {
-    uint8_t* h = reinterpret_cast<uint8_t*>(header);
-    h[0] = (h[0] & ~0x80) | uint8_t(!value << 7);
+    typedef unsigned char uchar;
+    uchar* h = reinterpret_cast<uchar*>(header);
+    h[4] = uchar((int(h[4]) & ~0x80) | int(!value) << 7);
 }
 
 inline void Array::set_header_hasrefs(bool value, char* header) TIGHTDB_NOEXCEPT
 {
-    uint8_t* h = reinterpret_cast<uint8_t*>(header);
-    h[0] = (h[0] & ~0x40) | uint8_t(value << 6);
+    typedef unsigned char uchar;
+    uchar* h = reinterpret_cast<uchar*>(header);
+    h[4] = uchar((int(h[4]) & ~0x40) | int(value) << 6);
 }
 
 inline void Array::set_header_indexflag(bool value, char* header) TIGHTDB_NOEXCEPT
 {
-    uint8_t* h = reinterpret_cast<uint8_t*>(header);
-    h[0] = (h[0] & ~0x20) | uint8_t(value << 5);
+    typedef unsigned char uchar;
+    uchar* h = reinterpret_cast<uchar*>(header);
+    h[4] = uchar((int(h[4]) & ~0x20) | int(value) << 5);
 }
 
 inline void Array::set_header_wtype(WidthType value, char* header) TIGHTDB_NOEXCEPT
@@ -1509,37 +1522,45 @@ inline void Array::set_header_wtype(WidthType value, char* header) TIGHTDB_NOEXC
     // 0: bits      (width/8) * size
     // 1: multiply  width * size
     // 2: ignore    1 * size
-    uint8_t* h = reinterpret_cast<uint8_t*>(header);
-    h[0] = (h[0] & ~0x18) | uint8_t(value << 3);
+    typedef unsigned char uchar;
+    uchar* h = reinterpret_cast<uchar*>(header);
+    h[4] = uchar((int(h[4]) & ~0x18) | int(value) << 3);
 }
 
 inline void Array::set_header_width(int value, char* header) TIGHTDB_NOEXCEPT
 {
     // Pack width in 3 bits (log2)
     int w = 0;
-    while (value) { ++w; value >>= 1; }
+    while (value) {
+        ++w;
+        value >>= 1;
+    }
     TIGHTDB_ASSERT(w < 8);
 
-    uint8_t* h = reinterpret_cast<uint8_t*>(header);
-    h[0] = (h[0] & ~0x7) | uint8_t(w);
+    typedef unsigned char uchar;
+    uchar* h = reinterpret_cast<uchar*>(header);
+    h[4] = uchar((int(h[4]) & ~0x7) | w);
 }
 
 inline void Array::set_header_size(std::size_t value, char* header) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(value <= 0xFFFFFF);
-    uint8_t* h = reinterpret_cast<uint8_t*>(header);
-    h[1] = (value >> 16) & 0x000000FF;
-    h[2] = (value >>  8) & 0x000000FF;
-    h[3] =  value        & 0x000000FF;
+    TIGHTDB_ASSERT(value <= 0xFFFFFFL);
+    typedef unsigned char uchar;
+    uchar* h = reinterpret_cast<uchar*>(header);
+    h[5] = uchar((value >> 16) & 0x000000FF);
+    h[6] = uchar((value >>  8) & 0x000000FF);
+    h[7] = uchar( value        & 0x000000FF);
 }
 
+// Note: There is a copy of this function is test_alloc.cpp
 inline void Array::set_header_capacity(std::size_t value, char* header) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(value <= 0xFFFFFF);
-    uint8_t* h = reinterpret_cast<uint8_t*>(header);
-    h[4] = (value >> 16) & 0x000000FF;
-    h[5] = (value >>  8) & 0x000000FF;
-    h[6] =  value        & 0x000000FF;
+    TIGHTDB_ASSERT(value <= 0xFFFFFFL);
+    typedef unsigned char uchar;
+    uchar* h = reinterpret_cast<uchar*>(header);
+    h[0] = uchar((value >> 16) & 0x000000FF);
+    h[1] = uchar((value >>  8) & 0x000000FF);
+    h[2] = uchar( value        & 0x000000FF);
 }
 
 
@@ -1628,7 +1649,8 @@ inline std::size_t Array::get_byte_size() const TIGHTDB_NOEXCEPT
 
     num_bytes += header_size;
 
-    TIGHTDB_ASSERT(num_bytes <= get_capacity_from_header(header));
+    TIGHTDB_ASSERT(m_alloc.is_read_only(m_ref) ||
+                   num_bytes <= get_capacity_from_header(header));
 
     return num_bytes;
 }
@@ -1665,8 +1687,6 @@ inline std::size_t Array::get_byte_size_from_header(const char* header) TIGHTDB_
         num_bytes += rest;
 
     num_bytes += header_size;
-
-    TIGHTDB_ASSERT(num_bytes <= get_capacity_from_header(header));
 
     return num_bytes;
 }
@@ -1737,12 +1757,13 @@ template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) c
         return refs_pos; // Return position
     }
 
-    // TODO: replace capacity with checksum
+    // FIXME: Replace capacity with checksum
 
     // Write array
     const char* header = get_header_from_data(m_data);
     std::size_t size = get_byte_size();
-    std::size_t array_pos = out.write(header, size);
+    uint_fast32_t dummy_checksum = 0x01010101UL;
+    std::size_t array_pos = out.write_array(header, size, dummy_checksum);
     TIGHTDB_ASSERT((array_pos & 0x7) == 0); /// 64-bit alignment
 
     return array_pos;

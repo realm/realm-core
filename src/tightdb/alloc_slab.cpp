@@ -342,13 +342,6 @@ char* SlabAlloc::translate(ref_type ref) const TIGHTDB_NOEXCEPT
 }
 
 
-bool SlabAlloc::is_read_only(ref_type ref) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(is_attached());
-    return ref < m_baseline;
-}
-
-
 void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create)
 {
     TIGHTDB_ASSERT(!is_attached());
