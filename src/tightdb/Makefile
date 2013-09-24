@@ -9,6 +9,7 @@ table_view.hpp table_view_basic.hpp table_macros.hpp group.hpp group_shared.hpp 
 query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h replication.hpp
 
 lib_LIBRARIES = libtightdb.a
+bin_PROGRAMS  = tightdbd
 DEV_PROGRAMS = tightdb-config
 
 libtightdb_a_SOURCES = terminate.cpp string_buffer.cpp file.cpp thread.cpp utf8.cpp \
@@ -43,6 +44,8 @@ endif
 libtightdb_a_VERSION = 3:0:0
 
 tightdb_config_SOURCES = config.cpp
+tightdbd_SOURCES = tightdbd.cpp
+tightdbd_LIBS = libtightdb.a
 
 include ../../generic.mk
 

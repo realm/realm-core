@@ -35,7 +35,8 @@ class SharedGroup {
 public:
     enum DurabilityLevel {
         durability_Full,
-        durability_MemOnly
+        durability_MemOnly,
+        durability_Async
     };
 
     /// Equivalent to calling open(const std::string&, bool,
@@ -84,7 +85,8 @@ public:
     /// thrown. Note that InvalidDatabase is among these derived
     /// exception types.
     void open(const std::string& file, bool no_create = false,
-              DurabilityLevel dlevel = durability_Full);
+              DurabilityLevel dlevel = durability_Full,
+              bool is_backend = false);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
@@ -129,7 +131,7 @@ private:
 
     // Member variables
     Group                 m_group;
-    std::size_t           m_version;
+    uint64_t              m_version;
     File                  m_file;
     File::Map<SharedInfo> m_file_map; // Never remapped
     File::Map<SharedInfo> m_reader_map;
@@ -153,7 +155,7 @@ private:
     std::size_t ringbuf_capacity() const TIGHTDB_NOEXCEPT;
     bool        ringbuf_is_first(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void        ringbuf_remove_first() TIGHTDB_NOEXCEPT;
-    std::size_t ringbuf_find(uint32_t version) const TIGHTDB_NOEXCEPT;
+    std::size_t ringbuf_find(uint64_t version) const TIGHTDB_NOEXCEPT;
     ReadCount&  ringbuf_get(std::size_t ndx) TIGHTDB_NOEXCEPT;
     ReadCount&  ringbuf_get_first() TIGHTDB_NOEXCEPT;
     ReadCount&  ringbuf_get_last() TIGHTDB_NOEXCEPT;
@@ -162,11 +164,13 @@ private:
 
     // Must be called only by someone that has a lock on the write
     // mutex.
-    std::size_t get_current_version() TIGHTDB_NOEXCEPT;
+    uint64_t get_current_version() TIGHTDB_NOEXCEPT;
 
     // Must be called only by someone that has a lock on the write
     // mutex.
-    void low_level_commit(std::size_t new_version);
+    void low_level_commit(uint64_t new_version);
+
+    void do_async_commits();
 
     friend class ReadTransaction;
     friend class WriteTransaction;
