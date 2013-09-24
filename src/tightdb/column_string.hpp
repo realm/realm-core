@@ -105,8 +105,6 @@ public:
 private:
     StringIndex* m_index;
 
-    LeafType upgrade_root_leaf(std::size_t value_size);
-
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
 
     void do_insert(std::size_t ndx, StringData value);
@@ -117,6 +115,11 @@ private:
                                 Array::TreeInsert<AdaptiveStringColumn>& state);
 
     class EraseLeafElem;
+
+    /// Root must be a leaf. Upgrades the root leaf as
+    /// necessary. Returns the type of the root leaf as it is upon
+    /// return.
+    LeafType upgrade_root_leaf(std::size_t value_size);
 
 #ifdef TIGHTDB_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
@@ -138,20 +141,21 @@ inline std::size_t AdaptiveStringColumn::size() const TIGHTDB_NOEXCEPT
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
-            // Small strings
+            // Small strings root leaf
             ArrayString* leaf = static_cast<ArrayString*>(m_array);
             return leaf->size();
         }
         bool is_big = m_array->context_bit();
         if (!is_big) {
-            // Medium strings
+            // Medium strings root leaf
             ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
             return leaf->size();
         }
-        // Big strings
+        // Big strings root leaf
         ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
         return leaf->size();
     }
+    // Non-leaf root
     return m_array->get_bptree_size();
 }
 

@@ -923,7 +923,7 @@ public:
                 else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
                     t = static_cast<ArrayStringLong*>(m_leaf)->get(s - m_leaf_start);
                 else
-                    t = zbin_to_str(static_cast<ArrayBigBlobs*>(m_leaf)->get(s - m_leaf_start));
+                    t = static_cast<ArrayBigBlobs*>(m_leaf)->get_string(s - m_leaf_start);
             }
             if (cond(m_value, m_ucase, m_lcase, t))
                 return s;
@@ -932,11 +932,6 @@ public:
     }
 
 private:
-    static StringData zbin_to_str(const BinaryData& b) TIGHTDB_NOEXCEPT
-    {
-        return StringData(b.data(), b.size()-1);
-    }
-
     StringData m_value;
     const char* m_lcase;
     const char* m_ucase;

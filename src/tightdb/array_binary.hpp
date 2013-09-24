@@ -58,7 +58,7 @@ public:
                                TreeInsertBase& state);
 
 #ifdef TIGHTDB_DEBUG
-    void to_dot(std::ostream&, StringData title = StringData()) const;
+    void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
 #endif
 
 private:
