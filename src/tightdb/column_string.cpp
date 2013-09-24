@@ -30,8 +30,10 @@ StringData get_string(void* column, size_t ndx)
 void copy_leaf(const ArrayString& from, ArrayStringLong& to)
 {
     size_t n = from.size();
-    for (size_t i = 0; i != n; ++i)
+    for (size_t i = 0; i != n; ++i) {
+        StringData str = from.get(i);
         to.add(from.get(i)); // Throws
+    }
 }
 
 void copy_leaf(const ArrayString& from, ArrayBigBlobs& to)
@@ -39,9 +41,7 @@ void copy_leaf(const ArrayString& from, ArrayBigBlobs& to)
     size_t n = from.size();
     for (size_t i = 0; i != n; ++i) {
         StringData str = from.get(i);
-        BinaryData bin(str.data(), str.size());
-        bool add_zero_term = true;
-        to.add(bin, add_zero_term); // Throws
+        to.add_string(str); // Throws
     }
 }
 
@@ -50,9 +50,7 @@ void copy_leaf(const ArrayStringLong& from, ArrayBigBlobs& to)
     size_t n = from.size();
     for (size_t i = 0; i != n; ++i) {
         StringData str = from.get(i);
-        BinaryData bin(str.data(), str.size());
-        bool add_zero_term = true;
-        to.add(bin, add_zero_term); // Throws
+        to.add_string(str); // Throws
     }
 }
 
@@ -277,9 +275,7 @@ public:
             bool is_big = Array::get_context_bit_from_header(mem.m_addr);
             if (is_big) {
                 ArrayBigBlobs leaf(mem, parent, ndx_in_parent, m_alloc);
-                BinaryData bin(m_value.data(), m_value.size());
-                bool add_zero_term = true;
-                leaf.set(elem_ndx_in_leaf, bin, add_zero_term); // Throws
+                leaf.set_string(elem_ndx_in_leaf, m_value); // Throws
                 return;
             }
             ArrayStringLong leaf(mem, parent, ndx_in_parent, m_alloc);
@@ -291,9 +287,7 @@ public:
             ArrayBigBlobs new_leaf(parent, ndx_in_parent, m_alloc); // Throws
             copy_leaf(leaf, new_leaf); // Throws
             leaf.destroy();
-            BinaryData bin(m_value.data(), m_value.size());
-            bool add_zero_term = true;
-            new_leaf.set(elem_ndx_in_leaf, bin, add_zero_term); // Throws
+            new_leaf.set_string(elem_ndx_in_leaf, m_value); // Throws
             return;
         }
         ArrayString leaf(mem, parent, ndx_in_parent, m_alloc);
@@ -313,9 +307,7 @@ public:
         ArrayBigBlobs new_leaf(parent, ndx_in_parent, m_alloc); // Throws
         copy_leaf(leaf, new_leaf); // Throws
         leaf.destroy();
-        BinaryData bin(m_value.data(), m_value.size());
-        bool add_zero_term = true;
-        new_leaf.set(elem_ndx_in_leaf, bin, add_zero_term); // Throws
+        new_leaf.set_string(elem_ndx_in_leaf, m_value); // Throws
     }
 };
 
@@ -349,9 +341,7 @@ void AdaptiveStringColumn::set(size_t ndx, StringData value)
             }
             case leaf_type_Big: {
                 ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
-                BinaryData bin(value.data(), value.size());
-                bool add_zero_term = true;
-                leaf->set(ndx, bin, add_zero_term); // Throws
+                leaf->set_string(ndx, value); // Throws
                 return;
             }
         }
@@ -568,9 +558,7 @@ void AdaptiveStringColumn::move_last_over(size_t ndx)
         }
         // Big strings root leaf
         ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
-        BinaryData bin(copy_of_value.data(), copy_of_value.size());
-        bool add_zero_term = true;
-        leaf->set(ndx, bin, add_zero_term); // Throws
+        leaf->set_string(ndx, copy_of_value); // Throws
         leaf->erase(last_ndx); // Throws
         return;
     }
@@ -954,10 +942,7 @@ void AdaptiveStringColumn::do_insert(size_t ndx, StringData value)
             case leaf_type_Big: {
                 // Big strings root leaf
                 ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
-                BinaryData bin(value.data(), value.size());
-                bool add_zero_term = true;
-                new_sibling_ref = leaf->bptree_leaf_insert(ndx, bin, add_zero_term,
-                                                           state); // Throws
+                new_sibling_ref = leaf->bptree_leaf_insert_string(ndx, value, state); // Throws
                 goto insert_done;
             }
         }
@@ -1002,9 +987,7 @@ ref_type AdaptiveStringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
         bool is_big = Array::get_context_bit_from_header(leaf_mem.m_addr);
         if (is_big) {
             ArrayBigBlobs leaf(leaf_mem, &parent, ndx_in_parent, alloc);
-            BinaryData bin(state.m_value.data(), state.m_value.size());
-            bool add_zero_term = true;
-            return leaf.bptree_leaf_insert(insert_ndx, bin, add_zero_term, state); // Throws
+            return leaf.bptree_leaf_insert_string(insert_ndx, state.m_value, state); // Throws
         }
         ArrayStringLong leaf(leaf_mem, &parent, ndx_in_parent, alloc);
         if (state.m_value.size() <= medium_string_max_size)
@@ -1013,9 +996,7 @@ ref_type AdaptiveStringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
         ArrayBigBlobs new_leaf(&parent, ndx_in_parent, alloc); // Throws
         copy_leaf(leaf, new_leaf); // Throws
         leaf.destroy();
-        BinaryData bin(state.m_value.data(), state.m_value.size());
-        bool add_zero_term = true;
-        return new_leaf.bptree_leaf_insert(insert_ndx, bin, add_zero_term, state); // Throws
+        return new_leaf.bptree_leaf_insert_string(insert_ndx, state.m_value, state); // Throws
     }
     ArrayString leaf(leaf_mem, &parent, ndx_in_parent, alloc);
     if (state.m_value.size() <= small_string_max_size)
@@ -1031,9 +1012,7 @@ ref_type AdaptiveStringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
     ArrayBigBlobs new_leaf(&parent, ndx_in_parent, alloc); // Throws
     copy_leaf(leaf, new_leaf); // Throws
     leaf.destroy();
-    BinaryData bin(state.m_value.data(), state.m_value.size());
-    bool add_zero_term = true;
-    return new_leaf.bptree_leaf_insert(insert_ndx, bin, add_zero_term, state); // Throws
+    return new_leaf.bptree_leaf_insert_string(insert_ndx, state.m_value, state); // Throws
 }
 
 

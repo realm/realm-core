@@ -37,12 +37,8 @@ public:
                 Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
 
     BinaryData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-
-    /// Discards terminating zero
-    StringData get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-
-    void add(BinaryData value, bool add_zero_term = false);
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
+    void add(BinaryData value, bool add_zero_term = false);
     void insert(std::size_t ndx, BinaryData value, bool add_zero_term = false);
     void erase(std::size_t ndx);
 
@@ -60,11 +56,20 @@ public:
     /// slower.
     static BinaryData get(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
 
-    /// Discards terminating zero
-    static StringData get_string(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
-
     ref_type bptree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term,
                                 TreeInsertBase& state);
+
+    //@{
+    /// Those that return a string, discard the terminating zero from
+    /// the stored value. Those that accept a string argument, add a
+    /// terminating zero before storing the value.
+    StringData get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    void add_string(StringData value);
+    void set_string(std::size_t ndx, StringData value);
+    void insert_string(std::size_t ndx, StringData value);
+    static StringData get_string(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
+    ref_type bptree_leaf_insert_string(std::size_t ndx, StringData, TreeInsertBase& state);
+    //@}
 
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
@@ -105,12 +110,6 @@ inline BinaryData ArrayBigBlobs::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     return BinaryData(value, size);
 }
 
-inline StringData ArrayBigBlobs::get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    BinaryData bin = get(ndx);
-    return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
-}
-
 inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
                                      Allocator& alloc) TIGHTDB_NOEXCEPT
 {
@@ -121,6 +120,40 @@ inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
     return BinaryData(blob_data, blob_size);
 }
 
+inline void ArrayBigBlobs::erase(std::size_t ndx)
+{
+    ref_type blob_ref = Array::get_as_ref(ndx);
+    Array::destroy(blob_ref, get_alloc());
+    Array::erase(ndx);
+}
+
+inline StringData ArrayBigBlobs::get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    BinaryData bin = get(ndx);
+    return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
+}
+
+inline void ArrayBigBlobs::set_string(std::size_t ndx, StringData value)
+{
+    BinaryData bin(value.data(), value.size());
+    bool add_zero_term = true;
+    set(ndx, bin, add_zero_term);
+}
+
+inline void ArrayBigBlobs::add_string(StringData value)
+{
+    BinaryData bin(value.data(), value.size());
+    bool add_zero_term = true;
+    add(bin, add_zero_term);
+}
+
+inline void ArrayBigBlobs::insert_string(std::size_t ndx, StringData value)
+{
+    BinaryData bin(value.data(), value.size());
+    bool add_zero_term = true;
+    insert(ndx, bin, add_zero_term);
+}
+
 inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
                                             Allocator& alloc) TIGHTDB_NOEXCEPT
 {
@@ -128,11 +161,12 @@ inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
     return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
 }
 
-inline void ArrayBigBlobs::erase(std::size_t ndx)
+inline ref_type ArrayBigBlobs::bptree_leaf_insert_string(std::size_t ndx, StringData value,
+                                                         TreeInsertBase& state)
 {
-    ref_type blob_ref = Array::get_as_ref(ndx);
-    Array::destroy(blob_ref, get_alloc());
-    Array::erase(ndx);
+    BinaryData bin(value.data(), value.size());
+    bool add_zero_term = true;
+    return bptree_leaf_insert(ndx, bin, add_zero_term, state);
 }
 
 

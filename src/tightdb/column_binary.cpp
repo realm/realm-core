@@ -16,8 +16,10 @@ const size_t small_blob_max_size = 64;
 void copy_leaf(const ArrayBinary& from, ArrayBigBlobs& to)
 {
     size_t n = from.size();
-    for (size_t i = 0; i != n; ++i)
-        to.add(from.get(i)); // Throws
+    for (size_t i = 0; i != n; ++i) {
+        BinaryData bin = from.get(i);
+        to.add(bin); // Throws
+    }
 }
 
 } // anonymous namespace
