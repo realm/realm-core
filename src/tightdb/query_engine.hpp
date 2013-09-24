@@ -877,15 +877,18 @@ public:
         switch (m_leaf_type) {
             case AdaptiveStringColumn::leaf_type_Small:
                 delete static_cast<ArrayString*>(m_leaf);
-                break;
+                goto delete_done;
             case AdaptiveStringColumn::leaf_type_Medium:
                 delete static_cast<ArrayStringLong*>(m_leaf);
-                break;
+                goto delete_done;
             case AdaptiveStringColumn::leaf_type_Big:
                 delete static_cast<ArrayBigBlobs*>(m_leaf);
-                break;
+                goto delete_done;
         }
-        m_leaf = NULL;
+        TIGHTDB_ASSERT(false);
+
+      delete_done:
+        m_leaf = 0;
     }
 
     size_t find_first_local(size_t start, size_t end)
@@ -1095,15 +1098,18 @@ public:
         switch (m_leaf_type) {
             case AdaptiveStringColumn::leaf_type_Small:
                 delete static_cast<ArrayString*>(m_leaf);
-                break;
+                goto delete_done;
             case AdaptiveStringColumn::leaf_type_Medium:
                 delete static_cast<ArrayStringLong*>(m_leaf);
-                break;
+                goto delete_done;
             case AdaptiveStringColumn::leaf_type_Big:
                 delete static_cast<ArrayBigBlobs*>(m_leaf);
-                break;
+                goto delete_done;
         }
-        m_leaf = NULL;
+        TIGHTDB_ASSERT(false);
+
+      delete_done:
+        m_leaf = 0;
     }
 
     void deallocate() TIGHTDB_NOEXCEPT

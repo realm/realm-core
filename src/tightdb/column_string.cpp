@@ -65,6 +65,7 @@ AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc): m_index(0)
     m_array = new ArrayString(0, 0, alloc);
 }
 
+
 AdaptiveStringColumn::AdaptiveStringColumn(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
                                            Allocator& alloc): m_index(0)
 {
@@ -106,11 +107,13 @@ AdaptiveStringColumn::AdaptiveStringColumn(ref_type ref, ArrayParent* parent, si
     TIGHTDB_ASSERT(false);
 }
 
+
 AdaptiveStringColumn::~AdaptiveStringColumn() TIGHTDB_NOEXCEPT
 {
     delete m_array;
     delete m_index;
 }
+
 
 void AdaptiveStringColumn::destroy() TIGHTDB_NOEXCEPT
 {
@@ -118,6 +121,7 @@ void AdaptiveStringColumn::destroy() TIGHTDB_NOEXCEPT
     if (m_index)
         m_index->destroy();
 }
+
 
 StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
@@ -159,6 +163,7 @@ StringData AdaptiveStringColumn::get(size_t ndx) const TIGHTDB_NOEXCEPT
     return ArrayBigBlobs::get_string(leaf_header, ndx_in_leaf, alloc);
 }
 
+
 StringIndex& AdaptiveStringColumn::create_index()
 {
     TIGHTDB_ASSERT(!m_index);
@@ -177,38 +182,50 @@ StringIndex& AdaptiveStringColumn::create_index()
     return *m_index;
 }
 
+
 void AdaptiveStringColumn::set_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     TIGHTDB_ASSERT(!m_index);
     m_index = new StringIndex(ref, parent, ndx_in_parent, this, &get_string, m_array->get_alloc());
 }
 
+
 void AdaptiveStringColumn::clear()
 {
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
-        if (long_strings) {
-            bool is_big = m_array->context_bit();
-            if (is_big)
-                static_cast<ArrayBigBlobs*>(m_array)->clear();
-            else
-                static_cast<ArrayStringLong*>(m_array)->clear();
+        if (!long_strings) {
+            // Small strings
+            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            leaf->clear();
         }
         else {
-            static_cast<ArrayString*>(m_array)->clear();
+            bool is_big = m_array->context_bit();
+            if (!is_big) {
+                // Medium strings
+                ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+                leaf->clear();
+            }
+            else {
+                // Big strings
+                ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+                leaf->clear();
+            }
         }
     }
-
-    // Revert to string array
-    m_array->destroy();
-    Array* array = new ArrayString(m_array->get_parent(), m_array->get_ndx_in_parent(),
-                                   m_array->get_alloc());
-    delete m_array;
-    m_array = array;
+    else {
+        // Revert to string array
+        m_array->destroy();
+        Array* array = new ArrayString(m_array->get_parent(), m_array->get_ndx_in_parent(),
+                                       m_array->get_alloc());
+        delete m_array;
+        m_array = array;
+    }
 
     if (m_index)
         m_index->clear();
 }
+
 
 void AdaptiveStringColumn::resize(size_t ndx)
 {
@@ -883,6 +900,7 @@ bool AdaptiveStringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_r
     return true;
 }
 
+
 bool AdaptiveStringColumn::compare_string(const AdaptiveStringColumn& c) const
 {
     size_t n = size();
@@ -894,6 +912,7 @@ bool AdaptiveStringColumn::compare_string(const AdaptiveStringColumn& c) const
     }
     return true;
 }
+
 
 AdaptiveStringColumn::LeafType AdaptiveStringColumn::upgrade_root_leaf(size_t value_size)
 {
@@ -1184,6 +1203,7 @@ void AdaptiveStringColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, siz
     bool is_strings = true;
     leaf.to_dot(out, is_strings);
 }
+
 
 namespace {
 
