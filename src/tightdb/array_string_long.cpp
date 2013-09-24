@@ -70,7 +70,7 @@ void ArrayStringLong::set(size_t ndx, StringData value)
 
     size_t new_end = begin + value.size() + 1;
     int64_t diff =  int64_t(new_end) - int64_t(end);
-    m_offsets.adjust(ndx, diff);
+    m_offsets.adjust(ndx, m_offsets.size(), diff);
 }
 
 void ArrayStringLong::insert(size_t ndx, StringData value)
@@ -81,8 +81,8 @@ void ArrayStringLong::insert(size_t ndx, StringData value)
     bool add_zero_term = true;
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
 
-    m_offsets.insert(ndx,   pos + value.size() + 1);
-    m_offsets.adjust(ndx+1,       value.size() + 1);
+    m_offsets.insert(ndx, pos + value.size() + 1);
+    m_offsets.adjust(ndx+1, m_offsets.size(), value.size() + 1);
 }
 
 void ArrayStringLong::erase(size_t ndx)
@@ -94,7 +94,7 @@ void ArrayStringLong::erase(size_t ndx)
 
     m_blob.erase(begin, end);
     m_offsets.erase(ndx);
-    m_offsets.adjust(ndx, int64_t(begin) - int64_t(end));
+    m_offsets.adjust(ndx, m_offsets.size(), int64_t(begin) - int64_t(end));
 }
 
 void ArrayStringLong::resize(size_t ndx)
@@ -113,33 +113,39 @@ void ArrayStringLong::clear()
     m_offsets.clear();
 }
 
-size_t ArrayStringLong::count(StringData value, size_t begin, size_t end) const
+size_t ArrayStringLong::count(StringData value, size_t begin,
+                              size_t end) const TIGHTDB_NOEXCEPT
 {
-    size_t count = 0;
+    size_t num_matches = 0;
 
-    size_t lastmatch = begin - 1;
+    size_t begin_2 = begin;
     for (;;) {
-        lastmatch = find_first(value, lastmatch+1, end);
-        if (lastmatch != not_found)
-            ++count;
-        else break;
+        size_t ndx = find_first(value, begin_2, end);
+        if (ndx == not_found)
+            break;
+        ++num_matches;
+        begin_2 = ndx + 1;
     }
 
-    return count;
+    return num_matches;
 }
 
-size_t ArrayStringLong::find_first(StringData value, size_t begin, size_t end) const
+size_t ArrayStringLong::find_first(StringData value, size_t begin,
+                                   size_t end) const TIGHTDB_NOEXCEPT
 {
     size_t n = m_offsets.size();
-    if (end == size_t(-1)) end = n;
+    if (end == npos)
+        end = n;
     TIGHTDB_ASSERT(begin <= n && end <= n && begin <= end);
 
-    size_t begin2 = 0 < begin ? to_size_t(m_offsets.get(begin-1)) : 0;
-    for (size_t i=begin; i<end; ++i) {
-        size_t end2 = to_size_t(m_offsets.get(i));
-        size_t end3 = end2 - 1; // Discount terminating zero
-        if (StringData(m_blob.get(begin2), end3-begin2) == value) return i;
-        begin2 = end2;
+    size_t begin_2 = 0 < begin ? to_size_t(m_offsets.get(begin-1)) : 0;
+    for (size_t i = begin; i < end; ++i) {
+        size_t end_2 = to_size_t(m_offsets.get(i));
+        size_t end_3 = end_2 - 1; // Discount terminating zero
+        StringData value_2 = StringData(m_blob.get(begin_2), end_3-begin_2);
+        if (value_2 == value)
+            return i;
+        begin_2 = end_2;
     }
 
     return not_found;
@@ -148,12 +154,13 @@ size_t ArrayStringLong::find_first(StringData value, size_t begin, size_t end) c
 void ArrayStringLong::find_all(Array& result, StringData value, size_t add_offset,
                               size_t begin, size_t end) const
 {
-    size_t first = begin - 1;
+    size_t begin_2 = begin;
     for (;;) {
-        first = find_first(value, first + 1, end);
-        if (first != not_found)
-            result.add(first + add_offset);
-        else break;
+        size_t ndx = find_first(value, begin_2, end);
+        if (ndx == not_found)
+            break;
+        result.add(add_offset + ndx); // Throws
+        begin_2 = ndx + 1;
     }
 }
 
@@ -184,7 +191,7 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
 }
 
 
-ref_type ArrayStringLong::btree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
+ref_type ArrayStringLong::bptree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
     TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_LIST_SIZE);
@@ -221,7 +228,8 @@ void ArrayStringLong::to_dot(ostream& out, StringData title) const
 
     out << "subgraph cluster_arraystringlong" << ref << " {" << endl;
     out << " label = \"ArrayStringLong";
-    if (0 < title.size()) out << "\\n'" << title << "'";
+    if (title.size() != 0)
+        out << "\\n'" << title << "'";
     out << "\";" << endl;
 
     Array::to_dot(out, "stringlong_top");

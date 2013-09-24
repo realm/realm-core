@@ -82,7 +82,10 @@ void round(SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #2
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        if (table->size() < 100) for (int i=0; i<10; ++i) table->add();
+        if (table->size() < 100) {
+            for (int i=0; i<10; ++i)
+                table->add();
+        }
         ++table[0].alpha;
         wt.commit();
     }
@@ -115,9 +118,8 @@ void round(SharedGroup& db, int index)
         MySubtable::Ref subtable = table[0].eta;
         ++subtable[0].foo;
         MySubsubtable::Ref subsubtable = subtable[0].bar;
-        for (int i=int(subsubtable->size()); i<=index; ++i) {
+        for (int i=int(subsubtable->size()); i<=index; ++i)
             subsubtable->add();
-        }
         ++table[0].alpha;
         wt.commit();
     }
@@ -127,8 +129,12 @@ void round(SharedGroup& db, int index)
         WriteTransaction wt(db); // Write transaction #6
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         if (3 <= table->size()) {
-            if (table[2].alpha == 749321) table->remove(1);
-            else table->remove(2);
+            if (table[2].alpha == 749321) {
+                table->remove(1);
+            }
+            else {
+                table->remove(2);
+            }
         }
         MySubtable::Ref subtable = table[0].eta;
         ++subtable[0].foo;
@@ -304,13 +310,11 @@ void round(SharedGroup& db, int index)
             subsubtable = subtable[1].theta.set_subtable<MySubtable>();
         }
         int num = 8;
-        for (int i=0; i<num; ++i) {
+        for (int i=0; i<num; ++i)
             subsubtable->add(i, 0);
-        }
         vector<MySubsubtable::Ref> subsubsubtables;
-        for (int i=0; i<num; ++i) {
+        for (int i=0; i<num; ++i)
             subsubsubtables.push_back(subsubtable[i].bar);
-        }
         for (int i=0; i<3; ++i) {
             for (int j=0; j<num; j+=2) {
                 BinaryData bin(0,0);
@@ -342,9 +346,8 @@ void round(SharedGroup& db, int index)
             subsubtable = subtable[2].theta.set_subtable<MySubsubtable>();
         }
         int num = 9;
-        for (int i=0; i<num; ++i) {
+        for (int i=0; i<num; ++i)
             subsubtable->add(i, BinaryData(0,0));
-        }
         subsubtable->column().value += 31;
         wt.commit();
     }
@@ -364,9 +367,8 @@ void round(SharedGroup& db, int index)
 //            subsubtable->column().value.set_index();
         }
         int num = 9;
-        for (int i=0; i<num; ++i) {
+        for (int i=0; i<num; ++i)
             subsubtable->add(i, BinaryData(0,0));
-        }
         wt.commit();
     }
 }
@@ -394,9 +396,8 @@ TEST(Transactions)
         test_util::ThreadWrapper threads[num_threads];
 
         // Start threads
-        for (int i=0; i<num_threads; ++i) {
+        for (int i=0; i<num_threads; ++i)
             threads[i].start(util::bind(&thread, i, database_path));
-        }
 
         // Wait for threads to finish
         for (int i=0; i<num_threads; ++i) {
@@ -412,7 +413,8 @@ TEST(Transactions)
 
     // Verify database contents
     size_t table1_theta_size = 0;
-    for (int i=0; i<num_threads; ++i) table1_theta_size += (1 + 13 / (1+i)) * 8;
+    for (int i=0; i<num_threads; ++i)
+        table1_theta_size += (1 + 13 / (1+i)) * 8;
     table1_theta_size *= num_rounds;
     table1_theta_size += 2;
 
@@ -464,9 +466,8 @@ TEST(Transactions)
             CHECK_EQUAL(0,               subtable[i].delta);
             CHECK_EQUAL(BinaryData(0,0), subtable[i].zeta);
             CHECK_EQUAL(0u,              subtable[i].eta->size());
-            if (4 <= i) {
+            if (4 <= i)
                 CHECK_EQUAL(type_Int, subtable[i].theta.get_type());
-            }
         }
         CHECK_EQUAL(size_t(num_threads*num_rounds*5),
                     subtable[0].theta.get_subtable_size());

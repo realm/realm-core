@@ -87,6 +87,9 @@ public:
     /// would conflict with a macro on the Windows platform.
     virtual void free_(ref_type, const char* addr) TIGHTDB_NOEXCEPT = 0;
 
+    /// Shorthand for free_(mem.m_ref, mem.m_addr).
+    void free_(MemRef mem) TIGHTDB_NOEXCEPT { free_(mem.m_ref, mem.m_addr); }
+
     /// Map the specified \a ref to the corresponding memory
     /// address. Note that if is_read_only(ref) returns true, then the
     /// referenced object is to be considered immutable, and it is

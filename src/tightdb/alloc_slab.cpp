@@ -2,6 +2,11 @@
 #include <algorithm>
 #include <iostream>
 
+#ifdef TIGHTDB_SLAB_ALLOC_DEBUG
+#include <cstdlib>
+#include <map>
+#endif
+
 #include <tightdb/safe_int_ops.hpp>
 #include <tightdb/terminate.hpp>
 #include <tightdb/array.hpp>
@@ -12,6 +17,20 @@ using namespace tightdb;
 
 
 namespace {
+
+// Limited to 7 bits (max 127).
+//
+// 8-bit values are not allowed because 'char' may be a signed 8-bit
+// type, and C++ does not define the result of casting to any signed
+// type unless the original value can be represented unchanged in the
+// target type [C++11 4.7/3]. This, of course, is not a hard
+// limitation, only a limitation due to the way we currently buld the
+// default header.
+const int current_file_format_version = 1;
+
+#ifdef TIGHTDB_SLAB_ALLOC_DEBUG
+map<ref_type, void*> malloc_debug_map;
+#endif
 
 class InvalidFreeSpace: std::exception {
 public:
@@ -26,7 +45,9 @@ public:
 const char SlabAlloc::default_header[24] = {
     0,   0,   0,   0,   0,   0,   0,   0,
     0,   0,   0,   0,   0,   0,   0,   0,
-    'T', '-', 'D', 'B', 0,   0,   0,   0
+    'T', '-', 'D', 'B',
+    current_file_format_version,
+    current_file_format_version, 0, 0
 };
 
 void SlabAlloc::detach() TIGHTDB_NOEXCEPT
@@ -61,7 +82,12 @@ SlabAlloc::~SlabAlloc() TIGHTDB_NOEXCEPT
                 if (!is_all_free()) {
                     m_slabs.print();
                     m_free_space.print();
+#  ifndef TIGHTDB_SLAB_ALLOC_DEBUG
+                    cerr << "To get the stack-traces of the corresponding allocations,"
+                        "first compile with TIGHTDB_SLAB_ALLOC_DEBUG defined,"
+                        "then run under Valgrind with --leak-check=full\n";
                     TIGHTDB_TERMINATE("SlabAlloc detected a leak");
+#  endif
                 }
             }
         }
@@ -114,7 +140,7 @@ MemRef SlabAlloc::alloc(size_t size)
                 }
                 else {
                     r.size = rest;
-                    r.ref += unsigned(size);
+                    r.ref += unsigned(size); // FIXME: Bad cast ('unsigned' may be smaller than 'size_t')
                 }
 
 #ifdef TIGHTDB_DEBUG
@@ -125,6 +151,9 @@ MemRef SlabAlloc::alloc(size_t size)
                 char* addr = translate(ref);
 #ifdef TIGHTDB_ALLOC_SET_ZERO
                 fill(addr, addr+size, 0);
+#endif
+#ifdef TIGHTDB_SLAB_ALLOC_DEBUG
+                malloc_debug_map[ref] = malloc(1);
 #endif
                 return MemRef(addr, ref);
             }
@@ -177,6 +206,9 @@ MemRef SlabAlloc::alloc(size_t size)
 #ifdef TIGHTDB_ALLOC_SET_ZERO
     fill(addr, addr+size, 0);
 #endif
+#ifdef TIGHTDB_SLAB_ALLOC_DEBUG
+    malloc_debug_map[ref] = malloc(1);
+#endif
 
     return MemRef(addr, ref);
 }
@@ -189,6 +221,10 @@ void SlabAlloc::free_(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
     // Free space in read only segment is tracked separately
     bool read_only = is_read_only(ref);
     FreeSpace& free_space = read_only ? m_free_read_only : m_free_space;
+
+#ifdef TIGHTDB_SLAB_ALLOC_DEBUG
+    free(malloc_debug_map[ref]);
+#endif
 
     // Get size from segment
     size_t size = read_only ? Array::get_byte_size_from_header(addr) :
@@ -249,8 +285,9 @@ void SlabAlloc::free_(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
         }
 
         // Else just add to freelist
-        if (merged_with == npos)
+        if (merged_with == npos) {
             free_space.add(ref, size); // Throws
+        }
     }
     catch (...) {
         m_free_space_invalid = true;
@@ -436,8 +473,8 @@ bool SlabAlloc::validate_buffer(const char* data, size_t len) const
     int valid_part = file_header[16 + 7] & 0x1;
 
     // Byte 4 and 5 (depending on valid_part) in the info block is version
-    uint8_t version = file_header[16 + 4 + valid_part];
-    if (version != 0)
+    int version = static_cast<unsigned char>(file_header[16 + 4 + valid_part]);
+    if (version != current_file_format_version)
         return false; // unsupported version
 
     // Top_ref should always point within buffer

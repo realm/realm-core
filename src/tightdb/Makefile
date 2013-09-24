@@ -13,7 +13,7 @@ DEV_PROGRAMS = tightdb-config
 
 libtightdb_a_SOURCES = terminate.cpp string_buffer.cpp file.cpp thread.cpp utf8.cpp \
 utilities.cpp alloc.cpp alloc_slab.cpp array.cpp array_string.cpp array_string_long.cpp \
-array_binary.cpp array_blob.cpp column.cpp column_string.cpp column_string_enum.cpp \
+array_binary.cpp array_blob.cpp array_blobs_big.cpp column.cpp column_string.cpp column_string_enum.cpp \
 column_binary.cpp column_table.cpp column_mixed.cpp spec.cpp table.cpp table_view.cpp group.cpp \
 group_writer.cpp group_shared.cpp index_string.cpp query.cpp lang_bind_helper.cpp
 
