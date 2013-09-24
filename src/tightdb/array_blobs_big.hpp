@@ -44,6 +44,7 @@ public:
     void add(BinaryData value, bool add_zero_term = false);
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
     void insert(std::size_t ndx, BinaryData value, bool add_zero_term = false);
+    void erase(std::size_t ndx);
 
     std::size_t count(BinaryData value, bool is_string = false, std::size_t begin = 0,
                       std::size_t end = npos) const TIGHTDB_NOEXCEPT;
@@ -125,6 +126,13 @@ inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
 {
     BinaryData bin = get(header, ndx, alloc);
     return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
+}
+
+inline void ArrayBigBlobs::erase(std::size_t ndx)
+{
+    ref_type blob_ref = Array::get_as_ref(ndx);
+    Array::destroy(blob_ref, get_alloc());
+    Array::erase(ndx);
 }
 
 
