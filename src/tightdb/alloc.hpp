@@ -87,6 +87,9 @@ public:
     /// would conflict with a macro on the Windows platform.
     virtual void free_(ref_type, const char* addr) TIGHTDB_NOEXCEPT = 0;
 
+    /// Shorthand for free_(mem.m_ref, mem.m_addr).
+    void free_(MemRef mem) TIGHTDB_NOEXCEPT { free_(mem.m_ref, mem.m_addr); }
+
     /// Map the specified \a ref to the corresponding memory
     /// address. Note that if is_read_only(ref) returns true, then the
     /// referenced object is to be considered immutable, and it is
@@ -99,7 +102,7 @@ public:
     /// allocator. The method by which some objects become part of the
     /// immuatble part is entirely up to the class that implements
     /// this interface.
-    virtual bool is_read_only(ref_type) const TIGHTDB_NOEXCEPT = 0;
+    bool is_read_only(ref_type) const TIGHTDB_NOEXCEPT;
 
     /// Returns a simple allocator that can be used with free-standing
     /// TightDB objects (such as a free-standing table). A
@@ -116,11 +119,26 @@ public:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Allocator() TIGHTDB_NOEXCEPT: m_replication(0) {}
     Replication* get_replication() TIGHTDB_NOEXCEPT { return m_replication; }
+#endif
 
 protected:
+    std::size_t m_baseline; // Separation line between immutable and mutable refs.
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* m_replication;
 #endif
 };
+
+
+
+// Implementation:
+
+inline bool Allocator::is_read_only(ref_type ref) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ref != 0);
+    TIGHTDB_ASSERT(m_baseline != 0); // Attached SlabAlloc
+    return ref < m_baseline;
+}
 
 
 } // namespace tightdb

@@ -857,7 +857,6 @@ public:
     {
         clear_leaf_state();
 
-        m_leaf = NULL;
         m_dD = 100.0;
         m_probes = 0;
         m_matches = 0;
@@ -870,18 +869,26 @@ public:
             m_child->init(table);
     }
 
-    void clear_leaf_state() {
+    void clear_leaf_state()
+    {
+        if (!m_leaf)
+            return;
+
         switch (m_leaf_type) {
-            case AdaptiveStringColumn::leaf_short:
-                delete(static_cast<ArrayString*>(m_leaf));
-                break;
-            case AdaptiveStringColumn::leaf_long:
-                delete(static_cast<ArrayStringLong*>(m_leaf));
-                break;
-            case AdaptiveStringColumn::leaf_big:
-                delete(static_cast<ArrayBigBlobs*>(m_leaf));
-                break;
+            case AdaptiveStringColumn::leaf_type_Small:
+                delete static_cast<ArrayString*>(m_leaf);
+                goto delete_done;
+            case AdaptiveStringColumn::leaf_type_Medium:
+                delete static_cast<ArrayStringLong*>(m_leaf);
+                goto delete_done;
+            case AdaptiveStringColumn::leaf_type_Big:
+                delete static_cast<ArrayBigBlobs*>(m_leaf);
+                goto delete_done;
         }
+        TIGHTDB_ASSERT(false);
+
+      delete_done:
+        m_leaf = 0;
     }
 
     size_t find_first_local(size_t start, size_t end)
@@ -903,17 +910,17 @@ public:
                     clear_leaf_state();
 
                     m_leaf_type = asc->GetBlock(s, &m_leaf, m_leaf_start);
-                    if (m_leaf_type == AdaptiveStringColumn::leaf_short)
+                    if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
                         m_end_s = m_leaf_start + static_cast<ArrayString*>(m_leaf)->size();
-                    else if (m_leaf_type ==  AdaptiveStringColumn::leaf_long)
+                    else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
                         m_end_s = m_leaf_start + static_cast<ArrayStringLong*>(m_leaf)->size();
                     else
                         m_end_s = m_leaf_start + static_cast<ArrayBigBlobs*>(m_leaf)->size();
                 }
 
-                if (m_leaf_type == AdaptiveStringColumn::leaf_short)
+                if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
                     t = static_cast<ArrayString*>(m_leaf)->get(s - m_leaf_start);
-                else if (m_leaf_type ==  AdaptiveStringColumn::leaf_long)
+                else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
                     t = static_cast<ArrayStringLong*>(m_leaf)->get(s - m_leaf_start);
                 else
                     t = zbin_to_str(static_cast<ArrayBigBlobs*>(m_leaf)->get(s - m_leaf_start));
@@ -1083,13 +1090,26 @@ public:
         m_index.destroy();
     }
 
-    void clear_leaf_state() {
-        if (m_leaf_type == AdaptiveStringColumn::leaf_short)
-            delete(static_cast<ArrayString*>(m_leaf));
-        else if (m_leaf_type ==  AdaptiveStringColumn::leaf_long)
-            delete(static_cast<ArrayStringLong*>(m_leaf));
-        else
-            delete(static_cast<ArrayBigBlobs*>(m_leaf));
+    void clear_leaf_state()
+    {
+        if (!m_leaf)
+            return;
+
+        switch (m_leaf_type) {
+            case AdaptiveStringColumn::leaf_type_Small:
+                delete static_cast<ArrayString*>(m_leaf);
+                goto delete_done;
+            case AdaptiveStringColumn::leaf_type_Medium:
+                delete static_cast<ArrayStringLong*>(m_leaf);
+                goto delete_done;
+            case AdaptiveStringColumn::leaf_type_Big:
+                delete static_cast<ArrayBigBlobs*>(m_leaf);
+                goto delete_done;
+        }
+        TIGHTDB_ASSERT(false);
+
+      delete_done:
+        m_leaf = 0;
     }
 
     void deallocate() TIGHTDB_NOEXCEPT
@@ -1097,7 +1117,6 @@ public:
         // Must be called after each query execution too free temporary resources used by the execution. Run in
         // destructor, but also in Init because a user could define a query once and execute it multiple times.
         clear_leaf_state();
-        m_leaf = NULL;
 
         if (m_index_matches_destroy)
             m_index_matches->destroy();
@@ -1232,18 +1251,18 @@ public:
                     if (s >= m_leaf_end) {
                         clear_leaf_state();
                         m_leaf_type = asc->GetBlock(s, &m_leaf, m_leaf_start);
-                        if (m_leaf_type == AdaptiveStringColumn::leaf_short)
+                        if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
                             m_leaf_end = m_leaf_start + static_cast<ArrayString*>(m_leaf)->size();
-                        else if (m_leaf_type ==  AdaptiveStringColumn::leaf_long)
+                        else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
                             m_leaf_end = m_leaf_start + static_cast<ArrayStringLong*>(m_leaf)->size();
                         else
                             m_leaf_end = m_leaf_start + static_cast<ArrayBigBlobs*>(m_leaf)->size();
                     }
                     size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
 
-                    if (m_leaf_type == AdaptiveStringColumn::leaf_short)
+                    if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
                         s = static_cast<ArrayString*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2);
-                    else if (m_leaf_type ==  AdaptiveStringColumn::leaf_long)
+                    else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
                         s = static_cast<ArrayStringLong*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2);
                     else
                         s = static_cast<ArrayBigBlobs*>(m_leaf)->find_first(str_to_bin(m_value), true, s - m_leaf_start, end2);

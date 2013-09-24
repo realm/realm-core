@@ -100,6 +100,11 @@ protected:
 
     static ref_type create(std::size_t size, Allocator&);
 
+#ifdef TIGHTDB_DEBUG
+    std::pair<ref_type, std::size_t>
+    get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
+#endif
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
     std::size_t* record_subtable_path(std::size_t* begin,
                                       std::size_t* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -176,7 +181,7 @@ public:
     void insert(std::size_t ndx) TIGHTDB_OVERRIDE;
     void insert(std::size_t ndx, const Table*);
     void set(std::size_t ndx, const Table*);
-    void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
+    void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear_table(std::size_t ndx);
     void fill(std::size_t count);
 
@@ -187,12 +192,13 @@ public:
     /// Compare two subtable columns for equality.
     bool compare_table(const ColumnTable&) const;
 
-    void detach_subtable_accessors_virtual() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
     static ref_type create(std::size_t size, Allocator&);
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
+    void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
+    using ColumnSubtableParent::dump_node_structure;
+    void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
 #endif
 
 private:
@@ -200,9 +206,7 @@ private:
 
     void destroy_subtable(std::size_t ndx);
 
-#ifdef TIGHTDB_DEBUG
-    void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
-#endif
+    void do_detach_subtable_accessors() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 };
 
 
@@ -390,11 +394,6 @@ inline ColumnTable::ColumnTable(Allocator& alloc, const Table* table, std::size_
 inline void ColumnTable::add(const Table* subtable)
 {
     insert(size(), subtable);
-}
-
-inline void ColumnTable::detach_subtable_accessors_virtual() TIGHTDB_NOEXCEPT
-{
-    detach_subtable_accessors();
 }
 
 inline ref_type ColumnTable::create(std::size_t size, Allocator& alloc)

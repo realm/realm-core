@@ -40,16 +40,32 @@ public:
         free(m_buffer);
     }
 
-    size_t getpos() const {return m_pos;}
+    size_t getpos() const { return m_pos; }
 
-    size_t write(const char* p, size_t n)
+    void write(const char* data, size_t size)
     {
-        const size_t pos = m_pos;
-        copy(p, p+n, m_buffer+m_pos);
-        m_pos += n;
+        char* dest = m_buffer + m_pos;
+        copy(data, data+size, dest);
+        m_pos += size;
+    }
+
+    size_t write_array(const char* data, size_t size, uint_fast32_t checksum)
+    {
+        size_t pos = m_pos;
+        char* dest = m_buffer + pos;
+#ifdef TIGHTDB_DEBUG
+        const char* cksum_bytes = reinterpret_cast<const char*>(&checksum);
+        copy(cksum_bytes, cksum_bytes+4, dest);
+        copy(data+4, data+size, dest+4);
+#else
+        static_cast<void>(checksum);
+        copy(data, data+size, dest);
+#endif
+        m_pos += size;
         return pos;
     }
-    void seek(size_t pos) {m_pos = pos;}
+
+    void seek(size_t pos) { m_pos = pos; }
 
     char* release_buffer() TIGHTDB_NOEXCEPT
     {
@@ -72,26 +88,50 @@ public:
 
     size_t getpos() const { return m_pos; }
 
-    size_t write(const char* data, size_t size)
+    void write(const char* data, size_t size)
     {
         size_t size_0 = size;
+
+        const char* data_1 = data;
+        size_t size_1 = size_0;
 
         // Handle the case where 'size_t' has a larger range than 'streamsize'
         streamsize max_streamsize = numeric_limits<streamsize>::max();
         size_t max_put = numeric_limits<size_t>::max();
         if (int_less_than(max_streamsize, max_put))
             max_put = size_t(max_streamsize);
-        while (max_put < size) {
-            m_out.write(data, max_put);
-            data += max_put;
-            size -= max_put;
+        while (max_put < size_1) {
+            m_out.write(data_1, max_put);
+            data_1 += max_put;
+            size_1 -= max_put;
         }
 
-        m_out.write(data, size);
+        m_out.write(data_1, size_1);
 
-        size_t pos = m_pos;
+//        size_t pos = m_pos;
         if (int_add_with_overflow_detect(m_pos, size_0))
             throw runtime_error("File size overflow");
+//        return pos;
+    }
+
+    size_t write_array(const char* data, size_t size, uint_fast32_t checksum)
+    {
+        const char* data_1 = data;
+        size_t size_1 = size;
+        size_t pos = m_pos;
+
+#ifdef TIGHTDB_DEBUG
+        const char* cksum_bytes = reinterpret_cast<const char*>(&checksum);
+        m_out.write(cksum_bytes, 4);
+        data_1 += 4;
+        size_1 -= 4;
+        if (int_add_with_overflow_detect(m_pos, 4))
+            throw runtime_error("File size overflow");
+#else
+        static_cast<void>(checksum);
+#endif
+
+        write(data_1, size_1);
         return pos;
     }
 
@@ -391,21 +431,24 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
     Table::UnbindGuard table_ug(new Table(Table::ref_count_tag(), m_alloc,
                                           ref_dg.get(), 0, 0)); // Throws
 
+    // The table accessor owns the ref until the point below where a
+    // parent is set in Table::m_top.
+    ref_type ref = ref_dg.release();
+    table_ug->bind_ref(); // Increase reference count from 0 to 1
+
     size_t ndx = m_tables.size();
     m_table_accessors.resize(ndx+1); // Throws
     table_ug->m_top.set_parent(this, ndx);
     try {
-        table_ug->bind_ref(); // Increase reference count from 0 to 1
         if (spec_setter)
             (*spec_setter)(*table_ug); // Throws
 
         TIGHTDB_ASSERT(ndx == m_table_names.size());
-        m_tables.insert(ndx, ref_dg.get()); // Throws
+        m_tables.insert(ndx, ref); // Throws
         try {
             m_table_names.insert(ndx, name); // Throws
             // The rest is guaranteed not to throw
             Table* table = table_ug.release();
-            ref_dg.release();
             m_table_accessors[ndx] = table;
             return table;
         }
@@ -666,7 +709,7 @@ void Group::Verify() const
         size_t file_size = m_alloc.nonempty_attachment() ? m_alloc.get_baseline() : 0;
 
         size_t prev_end = 0;
-        for (size_t i = 0; i < n; ++i) {
+        for (size_t i = 0; i != n; ++i) {
             size_t pos  = to_size_t(m_free_positions.get(i));
             size_t size = to_size_t(m_free_lengths.get(i));
 
@@ -685,7 +728,7 @@ void Group::Verify() const
     // Verify tables
     {
         size_t n = m_tables.size();
-        for (size_t i = 0; i < n; ++i)
+        for (size_t i = 0; i != n; ++i)
             get_table_by_ndx(i)->Verify();
     }
 }
@@ -763,6 +806,11 @@ void Group::to_dot(const char* file_path) const
 {
     ofstream out(file_path);
     to_dot(out);
+}
+
+pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const TIGHTDB_OVERRIDE
+{
+    return make_pair(m_tables.get_ref(), ndx_in_parent);
 }
 
 

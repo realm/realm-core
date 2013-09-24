@@ -25,8 +25,9 @@
  * nondefault value is in effect. */
 #define TIGHTDB_DEFAULT_MAX_LIST_SIZE 1000
 
-/* The maximum number of elements in a B-tree node. Allow this value
- * to be overridden on the command-line. */
+/* The maximum number of elements in a B+-tree node. You may override
+ * this on the compiler command line. The minimum allowable value is
+ * 2. */
 #ifndef TIGHTDB_MAX_LIST_SIZE
 #  define TIGHTDB_MAX_LIST_SIZE TIGHTDB_DEFAULT_MAX_LIST_SIZE
 #endif
@@ -54,6 +55,12 @@
 #endif
 #if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 8
 #  define TIGHTDB_HAVE_GCC_GE_4_8 1
+#endif
+
+
+/* Support for C++11 type traits. */
+#if TIGHTDB_HAVE_CXX11
+#  define TIGHTDB_HAVE_CXX11_TYPE_TRAITS 1
 #endif
 
 

@@ -184,7 +184,12 @@ public:
     void        insert_empty_row(std::size_t row_ndx, std::size_t num_rows = 1);
     void        remove(std::size_t row_ndx);
     void        remove_last() { if (!is_empty()) remove(m_size-1); }
-    void        move_last_over(std::size_t ndx);
+
+    /// Move the last row to the specified index. This overwrites the
+    /// target row and reduces the number of rows by one. The
+    /// specified index must be strictly less than `N-1`, where `N` is
+    /// the number of rows in the table.
+    void move_last_over(std::size_t ndx);
 
     // Insert row
     // NOTE: You have to insert values in ALL columns followed by insert_done().
@@ -364,6 +369,8 @@ public:
     void to_dot(std::ostream&, StringData title = StringData()) const;
     void print() const;
     MemStats stats() const;
+    void dump_node_structure() const; // To std::cerr (for GDB)
+    void dump_node_structure(std::ostream&, int level) const;
 #endif
 
     class Parent;

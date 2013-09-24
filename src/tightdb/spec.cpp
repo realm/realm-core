@@ -535,7 +535,7 @@ void Spec::to_dot(ostream& out, StringData) const
         size_t count = m_subspecs.size();
         for (size_t i = 0; i < count; ++i) {
             ref_type ref = m_subspecs.get_as_ref(i);
-            Spec s(m_table, alloc, ref, 0, 0);
+            Spec s(m_table, alloc, ref, const_cast<Array*>(&m_subspecs), i);
             s.to_dot(out);
         }
     }
