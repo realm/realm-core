@@ -40,13 +40,25 @@ set ylabel "Rows/sec"
 plot "insert_group.dat" using 1:3 with lines
 
 # ./add_insert -s full -N 50000 -n 500 | tee append_transact_full.dat
-set title "To-disk transaction append"
+set title "To-disk sync transaction append"
 set xlabel "Number of rows"
 set ylabel "Rows/sec"
 plot "append_transact_full.dat" using 1:3 with lines
 
 # ./add_insert -s full -N 50000 -n 500 | tee insert_transact_full.dat
-set title "To-disk transaction insert"
+set title "To-disk sync transaction insert"
 set xlabel "Number of rows"
 set ylabel "Rows/sec"
 plot "insert_transact_full.dat" using 1:3 with lines
+
+# ./add_insert -s async -N 50000 -n 500 | tee append_transact_async.dat
+set title "To-disk async transaction append"
+set xlabel "Number of rows"
+set ylabel "Rows/sec"
+plot "append_transact_async.dat" using 1:3 with lines
+
+# ./add_insert -s async -N 50000 -n 500 | tee insert_transact_async.dat
+set title "To-disk async transaction insert"
+set xlabel "Number of rows"
+set ylabel "Rows/sec"
+plot "insert_transact_async.dat" using 1:3 with lines
