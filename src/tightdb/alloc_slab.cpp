@@ -179,6 +179,7 @@ MemRef SlabAlloc::alloc(size_t size)
     // Allocate memory
     TIGHTDB_ASSERT(0 < new_size);
     char* slab = new char[new_size]; // Throws
+    fill(slab, slab+new_size, 0);
 
     // Add to slab table
     size_t new_ref_end = curr_ref_end + new_size;

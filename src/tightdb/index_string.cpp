@@ -529,6 +529,7 @@ void StringIndex::clear()
     get_child(*m_array, 1, refs);
     values.clear();
     refs.clear();
+    values.ensure_minimum_width(0x7FFFFFFF); // This ensures 31 bits plus a sign bit
 }
 
 void StringIndex::erase(size_t row_ndx, StringData value, bool is_last)

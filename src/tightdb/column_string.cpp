@@ -471,10 +471,7 @@ void AdaptiveStringColumn::erase(size_t ndx, bool is_last)
     //  position to update (as it looks for the old value))
     if (m_index) {
         StringData old_val = get(ndx);
-        // FIXME: This always evaluates to false. Alexander, what was
-        // the intention? See also ColumnStringEnum::erase().
-        bool is_last_2 = ndx == size();
-        m_index->erase(ndx, old_val, is_last_2);
+        m_index->erase(ndx, old_val, is_last);
     }
 
     if (m_array->is_leaf()) {

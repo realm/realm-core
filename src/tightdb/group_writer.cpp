@@ -16,7 +16,7 @@ GroupWriter::GroupWriter(Group& group) :
 }
 
 
-void GroupWriter::set_versions(size_t current, size_t read_lock)
+void GroupWriter::set_versions(uint64_t current, uint64_t read_lock)
 {
     TIGHTDB_ASSERT(read_lock <= current);
     m_current_version  = current;
