@@ -1135,6 +1135,35 @@ TEST(StringIndex_Bug1)
 {
     File::try_remove("test.tightdb");
     File::try_remove("test.tightdb.lock");
+    SharedGroup db("test.tightdb");
+
+    {
+        Group& group = db.begin_write();
+        TableRef table = group.get_table("users");
+        table->add_column(type_String, "username");
+        table->set_index(0);
+        for (int i = 0; i < TIGHTDB_MAX_LIST_SIZE + 1; ++i)
+            table->add_empty_row();
+        for (int i = 0; i < TIGHTDB_MAX_LIST_SIZE + 1; ++i)
+            table->remove(0);
+        db.commit();
+    }
+
+    {
+        Group& group = db.begin_write();
+        TableRef table = group.get_table("users");
+        table->add_empty_row();
+        db.commit();
+    }
+
+    File::try_remove("test.tightdb");
+}
+
+
+TEST(StringIndex_Bug2)
+{
+    File::try_remove("test.tightdb");
+    File::try_remove("test.tightdb.lock");
     SharedGroup sg("test.tightdb");
 
     {
@@ -1152,7 +1181,6 @@ TEST(StringIndex_Bug1)
 }
 
 
-/* DISABLED DUE TO BUG https://github.com/Tightdb/tightdb/pull/145
 namespace {
 void rand_str(char* res, size_t len) {
     for (size_t i = 0; i < len; ++i) {
@@ -1161,7 +1189,7 @@ void rand_str(char* res, size_t len) {
 }
 } // anonymous namespace
 
-TEST(StringIndex_Bug2)
+TEST(StringIndex_Bug3)
 {
     File::try_remove("indexbug.tightdb");
     File::try_remove("indexbug.tightdb.lock");
@@ -1213,7 +1241,6 @@ TEST(StringIndex_Bug2)
         }
     }
 }
-*/
 
 TEST(Shared_Async)
 {
