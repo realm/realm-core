@@ -248,10 +248,11 @@ int main(int argc, char *argv[])
 {
     int res = -1;
     try {
-        char* arg1[] = {"gylle","-s","async","-N1000"};
+        char* arg1[] = {"gylle","-s","async","-N20000"};
         res = main2(4,arg1);
-        char* arg2[] = {"gylle","-s","async","-N200"};
-        // res = main2(4,arg2);
+        optind = 1;
+        char* arg2[] = {"gylle","-s","async","-N10000"};
+        res = main2(4,arg2);
     } catch (runtime_error e) {
         cerr << "Caught exception!" << endl;
         cerr << "What: " << e.what() << endl;
