@@ -31,8 +31,9 @@ class ColumnStringEnum: public Column {
 public:
     typedef StringData value_type;
 
-    ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* = 0,
-                     std::size_t ndx_in_parent = 0, Allocator& = Allocator::get_default());
+    ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* column_parent = NULL,
+                     size_t column_ndx_in_parent = 0, ArrayParent* keys_parent = NULL,
+                     size_t keys_ndx_in_parent = 0, Allocator& = Allocator::get_default());
     ~ColumnStringEnum() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void destroy() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -66,6 +67,7 @@ public:
     std::size_t upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
     //@{
 
+    void adjust_keys_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT;
     void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 

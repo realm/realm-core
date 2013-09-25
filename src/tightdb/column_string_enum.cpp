@@ -19,10 +19,11 @@ StringData get_string(void* column, size_t ndx)
 } // anonymous namespace
 
 
-ColumnStringEnum::ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* parent,
-                                   size_t ndx_in_parent, Allocator& alloc):
-    Column(values, parent, ndx_in_parent+1, alloc), // Throws
-    m_keys(keys,   parent, ndx_in_parent,   alloc), // Throws
+ColumnStringEnum::ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* column_parent,
+                                   size_t column_ndx_in_parent, ArrayParent* keys_parent,
+                                   size_t keys_ndx_in_parent, Allocator& alloc):
+    Column(values, column_parent, column_ndx_in_parent, alloc), // Throws
+    m_keys(keys,   keys_parent,   keys_ndx_in_parent,   alloc), // Throws
     m_index(0)
 {
 }
@@ -40,9 +41,13 @@ void ColumnStringEnum::destroy() TIGHTDB_NOEXCEPT
         m_index->destroy();
 }
 
-void ColumnStringEnum::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
+void ColumnStringEnum::adjust_keys_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
 {
     m_keys.adjust_ndx_in_parent(diff);
+}
+
+void ColumnStringEnum::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
+{
     Column::adjust_ndx_in_parent(diff);
 }
 

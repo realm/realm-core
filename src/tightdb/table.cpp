@@ -239,12 +239,16 @@ void Table::cache_columns()
                 break;
             }
             case col_type_StringEnum: {
-                ref_type values_ref = m_columns.get_as_ref(ndx_in_parent+1);
+                ArrayParent* keys_parent;
+                size_t keys_ndx;
+                ref_type keys_ref = m_spec.get_enumkeys_ref(ndx_in_parent, &keys_parent, &keys_ndx);
+                ref_type values_ref = m_columns.get_as_ref(ndx_in_parent);
+
                 ColumnStringEnum* c =
-                    new ColumnStringEnum(ref, values_ref, &m_columns, ndx_in_parent, alloc);
+                    new ColumnStringEnum(keys_ref, values_ref, &m_columns,
+                                         ndx_in_parent, keys_parent, keys_ndx, alloc);
                 colsize = c->size();
                 new_col = c;
-                ++ndx_in_parent; // advance one matchcount pos to account for keys/values pair
                 break;
             }
             case type_Table: {
@@ -2084,22 +2088,27 @@ void Table::optimize()
             if (!res)
                 continue;
 
-            // Add to spec and column refs
-            m_spec.set_column_type(i, col_type_StringEnum);
             Spec::ColumnInfo info;
             m_spec.get_column_info(i, info);
-            size_t column_ref_ndx = info.m_column_ref_ndx;
-            m_columns.set(column_ref_ndx, keys_ref);
-            m_columns.insert(column_ref_ndx+1, values_ref);
+            ArrayParent* keys_parent;
+            size_t keys_ndx;
+            m_spec.upgrade_string_to_enum(i, keys_ref, keys_parent, keys_ndx);
 
-            // There are still same number of columns, but since
-            // the enum type takes up two posistions in m_columns
-            // we have to move refs in all following columns
-            adjust_column_ndx_in_parent(i+1, 1);
+            // Upgrading the column may have moved the
+            // refs to keylists in other columns so we
+            // have to update their parent info
+            for (size_t c = i+1; c < m_cols.size(); ++c) {
+                ColumnType type = get_real_column_type(c);
+                if (type == col_type_StringEnum) {
+                    ColumnStringEnum& column = get_column_string_enum(c);
+                    column.adjust_keys_ndx_in_parent(1);
+                }
+            }
 
-            // Replace cached column
+            // Replace column
             ColumnStringEnum* e =
-                new ColumnStringEnum(keys_ref, values_ref, &m_columns, column_ref_ndx, alloc);
+                new ColumnStringEnum(keys_ref, values_ref, &m_columns, i, keys_parent, keys_ndx, alloc);
+            m_columns.set(i, values_ref);
             m_cols.set(i, intptr_t(e));
 
             // Inherit any existing index

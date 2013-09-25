@@ -3247,7 +3247,7 @@ pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(!is_leaf());
 
     size_t ndx_2 = ndx;
-    int width = m_width;
+    int width = int(m_width);
     const char* data = m_data;
 
     for (;;) {
