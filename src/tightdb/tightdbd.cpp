@@ -33,12 +33,11 @@ int main(int argc, char* argv[])
 
     } else if (pid > 0) { // in parent, fork was ok, so return succes
 
-        exit(0);
+        _exit(0);
 
     } else { // in parent, fork failed, so return error code
 
-        exit(2);
+        return 2;
     }
-    // never come here
 }
 
