@@ -312,19 +312,12 @@ void SharedGroup::open(const string& path, bool no_create_file,
         }
         else {
             // In async mode we need to wait for the commit process to get ready
-            // so we wait for first begin_read being made by async_commit process
             SharedInfo* const info = m_file_map.get_addr();
             int maxwait = 100000;
             while (maxwait--) {
                 if (info->init_complete.load_acquire() == 2) {
-                    // NOTE: access to info following the return is separeted
-                    // from the above check by synchronization primitives. Were
-                    // that not the case, a read barrier would be needed here.
                     return;
                 }
-                // this function call prevents access to init_complete from beeing
-                // optimized into a register - if removed, a read barrier is
-                // required instead to prevent optimization.
                 usleep(10);
             }
             throw runtime_error("Failed to observe async commit starting");
