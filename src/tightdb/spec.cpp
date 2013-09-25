@@ -27,7 +27,8 @@ void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent
     m_names.init_from_ref(m_top.get_as_ref(1));
     m_names.set_parent(&m_top, 1);
 
-    // SubSpecs array is only there and valid when there are subtables or enumkeys
+    // SubSpecs array is only there and valid when there are subtables
+    // if there are enumkey, but no subtables yet it will be a zero-ref
     if (m_top.size() >= 3) {
         ref_type ref = m_top.get_as_ref(2);
         if (ref) {
@@ -36,7 +37,7 @@ void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent
         }
     }
 
-    // Enumkeys array is only there when there are subtables
+    // Enumkeys array is only there when there are StringEnum columns
     if (m_top.size() == 4) {
         m_enumkeys.init_from_ref(m_top.get_as_ref(3));
         m_enumkeys.set_parent(&m_top, 3);
