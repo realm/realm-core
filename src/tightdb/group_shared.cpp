@@ -150,8 +150,10 @@ void spawn_daemon(const string& file)
             throw runtime_error("failed to wait for daemon start");
         if (!WIFEXITED(status))
             throw runtime_error("failed starting async commit (exit)");
-        if (WEXITSTATUS(status) == 1)
+        if (WEXITSTATUS(status) == 1) {
+            // FIXME: Or `ld` could not find a required shared library
             throw runtime_error("async commit daemon not found");
+        }
         if (WEXITSTATUS(status) == 2)
             throw runtime_error("async commit daemon failed");
         if (WEXITSTATUS(status) == 3)
