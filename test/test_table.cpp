@@ -856,7 +856,7 @@ TEST(Table_Distinct)
     table.column().second.set_index();
     CHECK(table.column().second.has_index());
 
-    TestTableEnum::View view = table.column().second.distinct();
+    TestTableEnum::View view = table.column().second.get_distinct_view();
 
     CHECK_EQUAL(4, view.size());
     CHECK_EQUAL(0, view.get_source_ndx(0));

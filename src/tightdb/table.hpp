@@ -284,8 +284,8 @@ public:
     TableView      find_all_binary(std::size_t column_ndx, BinaryData value);
     ConstTableView find_all_binary(std::size_t column_ndx, BinaryData value) const;
 
-    TableView      distinct(std::size_t column_ndx);
-    ConstTableView distinct(std::size_t column_ndx) const;
+    TableView      get_distinct_view(std::size_t column_ndx);
+    ConstTableView get_distinct_view(std::size_t column_ndx) const;
 
     TableView      get_sorted_view(std::size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;

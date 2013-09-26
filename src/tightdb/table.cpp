@@ -1910,7 +1910,7 @@ ConstTableView Table::find_all_binary(size_t, BinaryData) const
     throw runtime_error("Not implemented");
 }
 
-TableView Table::distinct(size_t column_ndx)
+TableView Table::get_distinct_view(size_t column_ndx)
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(has_index(column_ndx));
@@ -1933,7 +1933,7 @@ TableView Table::distinct(size_t column_ndx)
     return move(tv);
 }
 
-ConstTableView Table::distinct(size_t column_ndx) const
+ConstTableView Table::get_distinct_view(size_t column_ndx) const
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(has_index(column_ndx));

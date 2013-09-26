@@ -1109,9 +1109,9 @@ public:
         return Base::m_table->get_impl()->find_all_string(col_idx, value);
     }
 
-    BasicTableView<typename Base::RealTable> distinct() const
+    BasicTableView<typename Base::RealTable> get_distinct_view() const
     {
-        return Base::m_table->get_impl()->distinct(col_idx);
+        return Base::m_table->get_impl()->get_distinct_view(col_idx);
     }
 
     std::size_t lower_bound(StringData value) const TIGHTDB_NOEXCEPT
