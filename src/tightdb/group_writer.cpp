@@ -312,7 +312,7 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     size_t file_size = m_file_map.get_size();
 
     bool extend_last_chunk = false;
-    size_t last_chunk_size;
+    size_t last_chunk_size = 0;
     if (!positions.is_empty()) {
         bool in_use = false;
         if (is_shared) {
