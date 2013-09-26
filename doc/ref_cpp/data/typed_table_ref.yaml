@@ -37,7 +37,7 @@ EXAMPLES:
 IGNORE     : []                   # List of method-ids to ignore
 
 CATEGORIES:
-- Definition:
+- Schema:
   METHODS:
   - g_typed_table_macros:
       NAME     : TIGHTDB_TABLE_*
@@ -75,7 +75,7 @@ CATEGORIES:
                  <tr><td>Bool</td>              <td>Boolean</td>        <td>(bool)</td>      <td>false</td></tr>
                  <tr><td>Float</td>             <td>Floating-point</td> <td>(float)</td>     <td>0.0</td></tr>
                  <tr><td>Double</td>            <td>Floating-point</td> <td>(double)</td>    <td>0.0</td></tr>
-                 <tr><td>Date</td>              <td>UTC datetime</td>   <td>(Date)</td>      <td>0 - 1970-01-01 00:00:00</td></tr>
+                 <tr><td>DateTime</td>          <td>UTC datetime</td>   <td>(DateTime)</td>  <td>0 - 1970-01-01 00:00:00</td></tr>
                  <tr><td>Enum&lt;T&gt;</td>     <td>Enum</td>           <td>(T as enum type)</td></tr>
                  <tr><td>String</td>            <td>Text</td>           <td>(StringData)</td>  <td>empty - ""</td></tr>
                  <tr><td>Binary</td>            <td>Arbitrary data</td> <td>(BinaryData)</td>  <td>empty</td></tr>
@@ -88,7 +88,7 @@ CATEGORIES:
         DESCR  :
 
 
-- State:
+- Table-Operations:
   METHODS:
   - g_typed_table_is_empty:
       NAME     : is_empty
@@ -120,8 +120,6 @@ CATEGORIES:
       - CODE   :  ex_cpp_type_table_size
         DESCR  :
 
-- Table:
-  METHODS:
   - g_typed_table_clear:
       NAME     : clear
       SUMMARY  : &g_typed_table_clear_summary
@@ -151,19 +149,6 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_optimize
         DESCR  :
-
-  - g_typed_table_columns:
-  - g_typed_table_columns_const:
-      NAMES     : [column, column]
-      SIGNATURE: |
-                 ColsAccessor      column()
-                 ConstColsAccessor column() const
-      SUMMARY  : Access and do operation on columns.
-      DESCR    : Access and do operation on columns.
-      RETURN:
-        TYPES  : ColumnAccessor
-        DESCR  : &g_typed_table_columns_return1_descr
-                 Cursor that lets you access and do operations on columns.
 
   - g_typed_table_operator==:
       NAME     : operator==
@@ -215,7 +200,26 @@ CATEGORIES:
       - CODE   : ex_cpp_typed_table_operator!=
         DESCR  :
 
-- Rows:
+  - g_typed_table_columns:
+  - g_typed_table_columns_const:
+      NAMES    : [column, column]
+      SIGNATURE: |
+                 ColsAccessor      column()
+                 ConstColsAccessor column() const
+      SUMMARY  : Access to predefined columns.
+      DESCR    : The column names that you have defined in the {@link g_typed_table_macros} macro,
+                 are the only members of the ColsAccessor class. It therefore provides you with
+                 typesafe access to your specific columns for the table. See the example below.
+      RETURN:
+        TYPES  : ColumnAccessor
+        DESCR  : &g_typed_table_columns_return1_descr
+                 Cursor that lets you access and do operations on columns.
+      EXAMPLES:
+      - CODE   : ex_cpp_typed_table_columns
+        DESCR  :
+
+
+- Row-Operations:
 #TODO: Describe RowAccessor
   METHODS:
   - g_typed_table_operator_brackets:
@@ -228,6 +232,7 @@ CATEGORIES:
                  Access rows.
       DESCR    : &g_typed_table_operator_brackets_descr
                  Access rows.
+#TODO: Describe what you can with the operator
       PARAMS:
       - NAME   : row_ndx
         TYPES  : size_t
@@ -317,7 +322,7 @@ CATEGORIES:
       SUMMARY  : &g_typed_table_insert_summary
                  Insert a new row at the specified position.
       DESCR    : &g_typed_table_insert_descr
-                 This method inserts new row at a given position.
+                 This method inserts a new row at the specified position.
                  Rows with index greater or equal to position will be
                  shifted downwards i.e. their index will be incremented.
                  The types of the parameters must match the
@@ -390,12 +395,12 @@ CATEGORIES:
   - g_typed_table_lookup:
       NAME     : lookup
       SUMMARY  : &g_typed_table_lookup_summary
-                 Lookup a value.
+                 Lookup a value (in a hash array).
       DESCR    : &g_typed_table_lookup_descr
                  This method will find the first row where the value of first column matches
-                 a given string value. Defining the first column as a string with unique values,
-                 it is possible to combine such a table with this method to emulate a hash
-                 array using TightDB.
+                 a given string value - emulating a hash array.
+                 It's required that the first column is a string column
+                 containing unique values.
       CONST    : True
       PARAMS:
       - NAME   : value
@@ -426,12 +431,12 @@ CATEGORIES:
                  size_t find_first(int64_t value) const;
                  size_t find_first(float value) const;
                  size_t find_first(double value) const;
-                 size_t find_first(Date value) const;
+                 size_t find_first(DateTime value) const;
                  size_t find_first(StringData value) const;
       CONST    : True
       PARAMS:
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, Date, StringData]
+        TYPES  : [bool, int64_t, float, double, DateTime, StringData]
         DESCR  : &g_typed_table_value_parameter_descr
                  The value.
       RETURN:
@@ -466,18 +471,18 @@ CATEGORIES:
                  TableView      find_all(int64_t value);
                  TableView      find_all(float value);
                  TableView      find_all(double value);
-                 TableView      find_all(Date value);
+                 TableView      find_all(DateTime value);
                  TableView      find_all(StringData value);
 
                  ConstTableView find_all(bool value) const;
                  ConstTableView find_all(int64_t value) const;
                  ConstTableView find_all(float value) const;
                  ConstTableView find_all(double value) const;
-                 ConstTableView find_all(Date value) const;
+                 ConstTableView find_all(DateTime value) const;
                  ConstTableView find_all(StringData value) const;
       PARAMS:
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, Date, StringData]
+        TYPES  : [bool, int64_t, float, double, DateTime, StringData]
         DESCR  : *g_typed_table_value_parameter_descr
       RETURN:
         TYPES  : TableView
@@ -521,16 +526,12 @@ CATEGORIES:
                  (first matching row for each unique value in column).
                  The rows are returned as a {@link class_typed_tableview} object.
       SIGNATURE: |
-                 TableView      distinct(std::size_t column_ndx);
-                 ConstTableView distinct(std::size_t column_ndx) const;
-      PARAMS:
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : The column to use to find distinct rows.
+                 TableView      distinct();
+                 ConstTableView distinct() const;
       RETURN:
         TYPES  : TableView
         DESCR  : &g_typed_table_distinct_return1_descr
-                 A view.
+                 A view containing the unique values.
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_distinct
         DESCR  :

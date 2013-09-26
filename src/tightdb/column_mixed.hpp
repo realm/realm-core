@@ -76,7 +76,7 @@ public:
 
     int64_t get_int(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     bool get_bool(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    Date get_date(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    DateTime get_date(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     float get_float(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     double get_double(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     StringData get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT;
@@ -97,7 +97,7 @@ public:
 
     void set_int(std::size_t ndx, int64_t value);
     void set_bool(std::size_t ndx, bool value);
-    void set_date(std::size_t ndx, Date value);
+    void set_date(std::size_t ndx, DateTime value);
     void set_float(std::size_t ndx, float value);
     void set_double(std::size_t ndx, double value);
     void set_string(std::size_t ndx, StringData value);
@@ -106,7 +106,7 @@ public:
 
     void insert_int(std::size_t ndx, int64_t value);
     void insert_bool(std::size_t ndx, bool value);
-    void insert_date(std::size_t ndx, Date value);
+    void insert_date(std::size_t ndx, DateTime value);
     void insert_float(std::size_t ndx, float value);
     void insert_double(std::size_t ndx, double value);
     void insert_string(std::size_t ndx, StringData value);

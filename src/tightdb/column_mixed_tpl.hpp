@@ -123,11 +123,11 @@ inline bool ColumnMixed::get_bool(std::size_t ndx) const TIGHTDB_NOEXCEPT
     return (get_value(ndx) != 0);
 }
 
-inline Date ColumnMixed::get_date(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline DateTime ColumnMixed::get_date(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_types->get(ndx) == mixcol_Date);
 
-    return Date(std::time_t(get_value(ndx)));
+    return DateTime(std::time_t(get_value(ndx)));
 }
 
 inline float ColumnMixed::get_float(std::size_t ndx) const TIGHTDB_NOEXCEPT
@@ -236,7 +236,7 @@ inline void ColumnMixed::set_bool(std::size_t ndx, bool value)
     set_value(ndx, (value ? 1 : 0), mixcol_Bool);
 }
 
-inline void ColumnMixed::set_date(std::size_t ndx, Date value)
+inline void ColumnMixed::set_date(std::size_t ndx, DateTime value)
 {
     detach_subtable_accessors();
     set_value(ndx, int64_t(value.get_date()), mixcol_Date);
@@ -319,7 +319,7 @@ inline void ColumnMixed::insert_bool(std::size_t ndx, bool value)
     m_refs->insert(ndx, v);
 }
 
-inline void ColumnMixed::insert_date(std::size_t ndx, Date value)
+inline void ColumnMixed::insert_date(std::size_t ndx, DateTime value)
 {
     TIGHTDB_ASSERT(ndx <= m_types->size());
     detach_subtable_accessors();

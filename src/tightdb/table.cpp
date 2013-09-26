@@ -1173,7 +1173,7 @@ void Table::set_bool(size_t column_ndx, size_t ndx, bool value)
 #endif
 }
 
-Date Table::get_date(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
+DateTime Table::get_date(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Date);
@@ -1183,7 +1183,7 @@ Date Table::get_date(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
     return time_t(column.get(ndx));
 }
 
-void Table::set_date(size_t column_ndx, size_t ndx, Date value)
+void Table::set_date(size_t column_ndx, size_t ndx, DateTime value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Date);
@@ -1392,7 +1392,7 @@ Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
         case type_Bool:
             return Mixed(column.get_bool(ndx));
         case type_Date:
-            return Mixed(Date(column.get_date(ndx)));
+            return Mixed(DateTime(column.get_date(ndx)));
         case type_Float:
             return Mixed(column.get_float(ndx));
         case type_Double:
@@ -1710,7 +1710,7 @@ size_t Table::find_first_bool(size_t column_ndx, bool value) const
     return column.find_first(value ? 1 : 0);
 }
 
-size_t Table::find_first_date(size_t column_ndx, Date value) const
+size_t Table::find_first_date(size_t column_ndx, DateTime value) const
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Date);
@@ -1846,7 +1846,7 @@ ConstTableView Table::find_all_double(size_t column_ndx, double value) const
     return move(tv);
 }
 
-TableView Table::find_all_date(size_t column_ndx, Date value)
+TableView Table::find_all_date(size_t column_ndx, DateTime value)
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
@@ -1857,7 +1857,7 @@ TableView Table::find_all_date(size_t column_ndx, Date value)
     return move(tv);
 }
 
-ConstTableView Table::find_all_date(size_t column_ndx, Date value) const
+ConstTableView Table::find_all_date(size_t column_ndx, DateTime value) const
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
@@ -1916,7 +1916,7 @@ ConstTableView Table::find_all_binary(size_t, BinaryData) const
     throw runtime_error("Not implemented");
 }
 
-TableView Table::distinct(size_t column_ndx)
+TableView Table::get_distinct_view(size_t column_ndx)
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(has_index(column_ndx));
@@ -1939,7 +1939,7 @@ TableView Table::distinct(size_t column_ndx)
     return move(tv);
 }
 
-ConstTableView Table::distinct(size_t column_ndx) const
+ConstTableView Table::get_distinct_view(size_t column_ndx) const
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(has_index(column_ndx));
@@ -2191,7 +2191,7 @@ void Table::to_json(ostream& out) const
 
 namespace {
 
-inline void out_date(ostream& out, Date value)
+inline void out_date(ostream& out, DateTime value)
 {
     time_t rawtime = value.get_date();
     struct tm* t = gmtime(&rawtime);
