@@ -61,8 +61,10 @@ uninstall/extra:
 	-rmdir $(DESTDIR)$(includedir)/tightdb
 
 # Used by ../../build.sh
-.PHONY: get-inst-headers get-inst-libraries
+.PHONY: get-inst-headers get-inst-libraries get-inst-programs
 get-inst-headers:
 	@echo $(INST_HEADERS)
 get-inst-libraries:
 	@echo $(filter-out libtightdb-cov.% libtightdb-dbg.a,$(TARGETS_LIB_STATIC) $(TARGETS_LIB_SHARED_ALIASES))
+get-inst-programs:
+	@echo $(filter-out %-cov,$(TARGETS_PROG) $(TARGETS_DEV_PROG))
