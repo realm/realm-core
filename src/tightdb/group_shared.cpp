@@ -138,7 +138,7 @@ void spawn_daemon(const string& file)
 
         // if we continue here, exec has failed so return error
         // if exec succeeds, we don't come back here.
-        exit(1);
+        _Exit(1);
         // child process ends here
 
     } else if (pid > 0) { // parent process, fork succeeded:
@@ -308,7 +308,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
     if (dlevel == durability_Async) {
         if (is_backend) {
-            do_async_commits(); // will never return
+            do_async_commits();
         }
         else {
             // In async mode we need to wait for the commit process to get ready
@@ -473,6 +473,7 @@ void SharedGroup::do_async_commits()
             // Being the backend process, we own the lock file, so we
             // have to clean up when we shut down.
             info->~SharedInfo(); // Call destructor
+            m_file_map.unmap();
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Removing coordination file" << endl;
 #endif
@@ -480,7 +481,7 @@ void SharedGroup::do_async_commits()
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Daemon exiting nicely" << endl << endl;
 #endif
-            exit(EXIT_SUCCESS);
+            return;
         }
 
         info->balancemutex.lock(&recover_from_dead_write_transact);
