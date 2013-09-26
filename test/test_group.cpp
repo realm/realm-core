@@ -123,7 +123,6 @@ TEST(Group_OpenBuffer)
     }
 }
 
-
 TEST(Group_BadBuffer)
 {
     File::try_remove("test.tightdb");
@@ -179,6 +178,29 @@ TEST(Group_GetTable)
     TestTableGroup::Ref t3 = g.get_table<TestTableGroup>("beta");
     TestTableGroup::ConstRef t4 = cg.get_table<TestTableGroup>("beta");
     CHECK_EQUAL(t3, t4);
+}
+
+namespace {
+void setupTable(TestTableGroup::Ref t)
+{
+    t->add("a",  1, true, Wed);
+    t->add("b", 15, true, Wed);
+    t->add("ccc", 10, true, Wed);
+    t->add("dddd", 20, true, Wed);
+}
+}
+
+TEST(Group_Equal)
+{
+    Group g1, g2;
+    TestTableGroup::Ref t1 = g1.get_table<TestTableGroup>("TABLE1");
+    setupTable(t1);
+    TestTableGroup::Ref t2 = g2.get_table<TestTableGroup>("TABLE1");
+    setupTable(t2);
+    CHECK_EQUAL(true, g1 == g2);
+
+    t2->add("hey", 2, false, Thu);
+    CHECK_EQUAL(true, g1 != g2);
 }
 
 TEST(Group_TableAccessorLeftBehind)
