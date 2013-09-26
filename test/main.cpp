@@ -96,9 +96,9 @@ public:
 int main(int argc, char* argv[])
 {
 #ifdef TIGHTDB_DEBUG
-    string path = "../src/tightdb/tightdbd-dbg";
+    string path = "../src/tightdb/tightdbd-dbg-noinst";
 #else
-    string path = "../src/tightdb/tightdbd";
+    string path = "../src/tightdb/tightdbd-noinst";
 #endif
     setenv("TIGHTDBD_PATH",path.c_str(),0);
     bool const no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
