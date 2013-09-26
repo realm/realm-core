@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_GROUP
+
 #include <algorithm>
 #include <fstream>
 
@@ -1156,7 +1159,7 @@ TEST(Group_ToDot)
     Spec sub = s.add_subtable_column("tables");
     sub.add_column(type_Int,  "sub_first");
     sub.add_column(type_String, "sub_second");
-    table->UpdateFromSpec(s.GetRef());
+    table->UpdateFromSpec(s.get_ref());
 
     // Add some rows
     for (size_t i = 0; i < 15; ++i) {
@@ -1209,7 +1212,7 @@ TEST(Group_ToDot)
             Spec s = subtable->get_spec();
             s.add_column(type_Int,    "first");
             s.add_column(type_String, "second");
-            subtable->UpdateFromSpec(s.GetRef());
+            subtable->UpdateFromSpec(s.get_ref());
 
             subtable->insert_int(0, 0, 42);
             subtable->insert_string(1, 0, "meaning");
@@ -1242,3 +1245,5 @@ TEST(Group_ToDot)
 
 #endif // TIGHTDB_TO_DOT
 #endif // TIGHTDB_DEBUG
+
+#endif // TEST_GROUP

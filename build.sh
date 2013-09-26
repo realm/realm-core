@@ -26,7 +26,7 @@ map_ext_name_to_dir()
     local ext_name
     ext_name="$1"
     case $ext_name in
-        "java") echo "tightdb_java2";;
+        "java") echo "tightdb_java";;
         *)      echo "tightdb_$ext_name";;
     esac
     return 0

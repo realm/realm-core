@@ -1200,7 +1200,7 @@ void Array::copy_on_write()
     // Create new copy of array
     MemRef mref = m_alloc.alloc(new_size); // Throws
     const char* old_begin = get_header_from_data(m_data);
-    const char* old_end   = m_data + size;
+    const char* old_end   = get_header_from_data(m_data) + size;
     char* new_begin = mref.m_addr;
     copy(old_begin, old_end, new_begin);
 
