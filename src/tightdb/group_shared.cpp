@@ -1,8 +1,10 @@
 #include <fcntl.h>
 #include <errno.h>
+#ifndef _WIN32
 #include <sys/wait.h>
 #include <sys/time.h>
 #include <unistd.h>
+#endif
 #include <algorithm>
 
 #include <tightdb/safe_int_ops.hpp>
@@ -90,6 +92,7 @@ void recover_from_dead_write_transact()
 
 } // anonymous namespace
 
+#ifndef _WIN32
 
 void spawn_daemon(const string& file)
 {
@@ -162,6 +165,9 @@ void spawn_daemon(const string& file)
         throw runtime_error("Failed to spawn async commit");
     }
 }
+#else
+void spawn_daemon(const string& file) {}
+#endif
 
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
 //
