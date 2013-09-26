@@ -53,8 +53,8 @@ struct InvalidDatabase: File::AccessError {
 /// attach_file() or attach_buffer(). To create a new database
 /// in-memory, call attach_empty().
 ///
-/// For efficiency, this allocator manages its memory as a set of
-/// slabs.
+/// For efficiency, this allocator manages its mutable memory as a set
+/// of slabs.
 class SlabAlloc: public Allocator {
 public:
     /// Construct a slab allocator in the unattached state.
@@ -127,6 +127,25 @@ public:
     /// the attached state and attachment was not established using
     /// attach_empty().
     bool nonempty_attachment() const TIGHTDB_NOEXCEPT;
+
+    /// Reserve disk space now to avoid allocation errors at a later
+    /// point in time, and to minimize on-disk fragmentation. In some
+    /// cases, less fragmentation translates into improved
+    /// performance.
+    ///
+    /// A call to this method will make the database file at least as
+    /// big as the specified size, and, if the platform supports it,
+    /// disk space will be allocated for the entire file.
+    ///
+    /// If the database file is already as big as the specified size,
+    /// or bigger, this method will not affect the size of the file,
+    /// but, if the platform supports it, it will still cause
+    /// previously unallocated disk space to be allocated.
+    ///
+    /// It is an error to call this function on an allocator that is
+    /// not attached to a file. Doing so will result in undefined
+    /// behavior.
+    void reserve(std::size_t size_in_bytes);
 
     /// Get the 'ref' corresponding to the current root node.
     ///
@@ -284,6 +303,11 @@ inline std::size_t SlabAlloc::get_baseline() const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_data);
     return m_baseline;
+}
+
+inline void SlabAlloc::reserve(std::size_t size)
+{
+    m_file.prealloc_if_supported(0, size);
 }
 
 inline SlabAlloc::DetachGuard::~DetachGuard() TIGHTDB_NOEXCEPT
