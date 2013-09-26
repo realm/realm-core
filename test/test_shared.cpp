@@ -1247,9 +1247,10 @@ TEST(StringIndex_Bug3)
     }
 }
 
+/* Disabled because it malfunctions
+
 // disable shared async on windows
 #ifndef _WIN32
-
 
 TEST(Shared_Async)
 {
@@ -1485,9 +1486,7 @@ void multi_process(int numprocs, size_t numthreads)
     for (int i=0; i<numprocs; i++) wait(&status);
 }
 
-
 } // anonymous namespace
-
 
 
 TEST(Shared_Multiprocess)
@@ -1519,8 +1518,9 @@ TEST(Shared_Multiprocess)
 #endif
 }
 
-#endif
-// endif not on windows
+#endif // endif not on windows
+*/
+
 
 TEST(Shared_MixedWithNonShared)
 {
