@@ -58,7 +58,7 @@ struct SharedGroup::SharedInfo {
     ~SharedInfo() TIGHTDB_NOEXCEPT {}
 };
 
-SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
+SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t info_size,
                                     DurabilityLevel dlevel):
     readmutex(Mutex::process_shared_tag()), // Throws
     writemutex(), // Throws
@@ -69,7 +69,7 @@ SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
     version  = 0;
     flags    = dlevel; // durability level is fixed from creation
     filesize = alloc.get_baseline();
-    infosize = uint32_t(file_size);
+    infosize = uint32_t(info_size);
     current_top     = alloc.get_top_ref();
     current_version.store_relaxed(1);
     capacity_mask   = init_readers_size - 1;

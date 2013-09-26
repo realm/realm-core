@@ -119,6 +119,13 @@ inline std::size_t GroupWriter::get_file_size() const TIGHTDB_NOEXCEPT
     return m_file_map.get_size();
 }
 
+inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock)
+{
+    TIGHTDB_ASSERT(read_lock <= current);
+    m_current_version  = current;
+    m_readlock_version = read_lock;
+}
+
 } // namespace tightdb
 
 #endif // TIGHTDB_GROUP_WRITER_HPP
