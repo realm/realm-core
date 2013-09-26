@@ -648,7 +648,7 @@
     <ClInclude Include="src\tightdb\data_type.hpp" />
     <ClInclude Include="src\tightdb\column_type.hpp" />
     <ClInclude Include="src\tightdb\config.h" />
-    <ClInclude Include="src\tightdb\date.hpp" />
+    <ClInclude Include="src\tightdb\datetime.hpp" />
     <ClInclude Include="src\tightdb\group.hpp" />
     <ClInclude Include="src\tightdb\group_shared.hpp" />
     <ClInclude Include="src\tightdb\group_writer.hpp" />

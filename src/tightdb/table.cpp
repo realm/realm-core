@@ -1173,7 +1173,7 @@ void Table::set_bool(size_t column_ndx, size_t ndx, bool value)
 #endif
 }
 
-DateTime Table::get_date(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
+DateTime Table::get_datetime(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Date);
@@ -1183,17 +1183,17 @@ DateTime Table::get_date(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
     return time_t(column.get(ndx));
 }
 
-void Table::set_date(size_t column_ndx, size_t ndx, DateTime value)
+void Table::set_datetime(size_t column_ndx, size_t ndx, DateTime value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Date);
     TIGHTDB_ASSERT(ndx < m_size);
 
     Column& column = get_column(column_ndx);
-    column.set(ndx, int64_t(value.get_date()));
+    column.set(ndx, int64_t(value.get_datetime()));
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().set_value(column_ndx, ndx, value.get_date()); // Throws
+    transact_log().set_value(column_ndx, ndx, value.get_datetime()); // Throws
 #endif
 }
 
@@ -1392,7 +1392,7 @@ Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
         case type_Bool:
             return Mixed(column.get_bool(ndx));
         case type_DateTime:
-            return Mixed(DateTime(column.get_date(ndx)));
+            return Mixed(DateTime(column.get_datetime(ndx)));
         case type_Float:
             return Mixed(column.get_float(ndx));
         case type_Double:
@@ -1435,7 +1435,7 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
             column.set_bool(ndx, value.get_bool());
             break;
         case type_DateTime:
-            column.set_date(ndx, value.get_date());
+            column.set_datetime(ndx, value.get_datetime());
             break;
         case type_Float:
             column.set_float(ndx, value.get_float());
@@ -1478,7 +1478,7 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value)
             column.insert_bool(ndx, value.get_bool());
             break;
         case type_DateTime:
-            column.insert_date(ndx, value.get_date());
+            column.insert_datetime(ndx, value.get_datetime());
             break;
         case type_Float:
             column.insert_float(ndx, value.get_float());
@@ -1710,13 +1710,13 @@ size_t Table::find_first_bool(size_t column_ndx, bool value) const
     return column.find_first(value ? 1 : 0);
 }
 
-size_t Table::find_first_date(size_t column_ndx, DateTime value) const
+size_t Table::find_first_datetime(size_t column_ndx, DateTime value) const
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Date);
     const Column& column = get_column(column_ndx);
 
-    return column.find_first(int64_t(value.get_date()));
+    return column.find_first(int64_t(value.get_datetime()));
 }
 
 size_t Table::find_first_float(size_t column_ndx, float value) const
@@ -1846,25 +1846,25 @@ ConstTableView Table::find_all_double(size_t column_ndx, double value) const
     return move(tv);
 }
 
-TableView Table::find_all_date(size_t column_ndx, DateTime value)
+TableView Table::find_all_datetime(size_t column_ndx, DateTime value)
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const Column& column = get_column(column_ndx);
 
     TableView tv(*this);
-    column.find_all(tv.get_ref_column(), int64_t(value.get_date()));
+    column.find_all(tv.get_ref_column(), int64_t(value.get_datetime()));
     return move(tv);
 }
 
-ConstTableView Table::find_all_date(size_t column_ndx, DateTime value) const
+ConstTableView Table::find_all_datetime(size_t column_ndx, DateTime value) const
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const Column& column = get_column(column_ndx);
 
     ConstTableView tv(*this);
-    column.find_all(tv.get_ref_column(), int64_t(value.get_date()));
+    column.find_all(tv.get_ref_column(), int64_t(value.get_datetime()));
     return move(tv);
 }
 
@@ -2191,9 +2191,9 @@ void Table::to_json(ostream& out) const
 
 namespace {
 
-inline void out_date(ostream& out, DateTime value)
+inline void out_datetime(ostream& out, DateTime value)
 {
-    time_t rawtime = value.get_date();
+    time_t rawtime = value.get_datetime();
     struct tm* t = gmtime(&rawtime);
     if (t) {
         // We need a buffer for formatting dates (and binary to hex). Max
@@ -2252,7 +2252,7 @@ void Table::to_json_row(size_t row_ndx, ostream& out) const
                 out << "\"" << get_string(i, row_ndx) << "\"";
                 break;
             case type_DateTime:
-                out << "\""; out_date(out, get_date(i, row_ndx)); out << "\"";
+                out << "\""; out_datetime(out, get_datetime(i, row_ndx)); out << "\"";
                 break;
             case type_Binary:
                 out << "\""; out_binary(out, get_binary(i, row_ndx)); out << "\"";
@@ -2285,7 +2285,7 @@ void Table::to_json_row(size_t row_ndx, ostream& out) const
                             out << "\"" << m.get_string() << "\"";
                             break;
                         case type_DateTime:
-                            out << "\""; out_date(out, m.get_date()); out << "\"";
+                            out << "\""; out_datetime(out, m.get_datetime()); out << "\"";
                             break;
                         case type_Binary:
                             out << "\""; out_binary(out, m.get_binary()); out << "\"";
@@ -2523,7 +2523,7 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
                 out_string(out, get_string(col, row_ndx), 20);
                 break;
             case type_DateTime:
-                out_date(out, get_date(col, row_ndx));
+                out_datetime(out, get_datetime(col, row_ndx));
                 break;
             case type_Table:
                 out_table(out, get_subtable_size(col, row_ndx));
@@ -2557,7 +2557,7 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
                             out_string(out, m.get_string(), 20);
                             break;
                         case type_DateTime:
-                            out_date(out, m.get_date());
+                            out_datetime(out, m.get_datetime());
                             break;
                         case type_Binary:
                             out.width(widths[col+1]-6); // adjust for " bytes" text

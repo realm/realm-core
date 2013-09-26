@@ -845,7 +845,7 @@ TEST(Shared_FormerErrorCase1)
             spec.add_column(type_Int, "alpha");
             spec.add_column(type_Bool, "beta");
             spec.add_column(type_Int, "gamma");
-            spec.add_column(type_Date, "delta");
+            spec.add_column(type_DateTime, "delta");
             spec.add_column(type_String, "epsilon");
             spec.add_column(type_Binary, "zeta");
             {

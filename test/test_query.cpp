@@ -1107,8 +1107,8 @@ TEST(TestDateQuery)
     table.add("Bob",   24, true,  tightdb::DateTime(2010, 12,  1), tightdb::BinaryData("bin \0\n data 3", 13));
 
     // Find people where hired year == 2012 (hour:minute:second is default initialized to 00:00:00)
-    PeopleTable::View view5 = table.where().hired.greater_equal(tightdb::DateTime(2012, 1, 1).get_date())
-                                           .hired.less(         tightdb::DateTime(2013, 1, 1).get_date()).find_all();
+    PeopleTable::View view5 = table.where().hired.greater_equal(tightdb::DateTime(2012, 1, 1).get_datetime())
+                                           .hired.less(         tightdb::DateTime(2013, 1, 1).get_datetime()).find_all();
     CHECK_EQUAL(1, view5.size());
     CHECK_EQUAL("Mary", view5[0].name);
 }
@@ -1696,11 +1696,11 @@ TEST(TestQuerySort_Dates)
     Table table;
     table.add_column(type_DateTime, "first");
 
-    table.insert_date(0, 0, 1000);
+    table.insert_datetime(0, 0, 1000);
     table.insert_done();
-    table.insert_date(0, 1, 3000);
+    table.insert_datetime(0, 1, 3000);
     table.insert_done();
-    table.insert_date(0, 2, 2000);
+    table.insert_datetime(0, 2, 2000);
     table.insert_done();
 
     TableView tv = table.where().find_all();
@@ -1712,9 +1712,9 @@ TEST(TestQuerySort_Dates)
     tv.sort(0);
 
     CHECK(tv.size() == 3);
-    CHECK(tv.get_date(0, 0) == 1000);
-    CHECK(tv.get_date(0, 1) == 2000);
-    CHECK(tv.get_date(0, 2) == 3000);
+    CHECK(tv.get_datetime(0, 0) == 1000);
+    CHECK(tv.get_datetime(0, 1) == 2000);
+    CHECK(tv.get_datetime(0, 2) == 3000);
 }
 
 
@@ -2810,23 +2810,23 @@ TEST(TestQuery_AllTypes_DynamicallyTyped)
     Mixed mix_subtab((Mixed::subtable_tag()));
 
     table.add_empty_row();
-    table.set_bool   (0, 0, false);
-    table.set_int    (1, 0, 54);
-    table.set_float  (2, 0, 0.7f);
-    table.set_double (3, 0, 0.8);
-    table.set_string (4, 0, "foo");
-    table.set_binary (5, 0, bin1);
-    table.set_date   (6, 0, 0);
-    table.set_mixed  (8, 0, mix_int);
+    table.set_bool    (0, 0, false);
+    table.set_int     (1, 0, 54);
+    table.set_float   (2, 0, 0.7f);
+    table.set_double  (3, 0, 0.8);
+    table.set_string  (4, 0, "foo");
+    table.set_binary  (5, 0, bin1);
+    table.set_datetime(6, 0, 0);
+    table.set_mixed   (8, 0, mix_int);
 
     table.add_empty_row();
-    table.set_bool   (0, 1, true);
-    table.set_int    (1, 1, 506);
-    table.set_float  (2, 1, 7.7f);
-    table.set_double (3, 1, 8.8);
-    table.set_string (4, 1, "banach");
-    table.set_binary (5, 1, bin2);
-    table.set_date   (6, 1, time_now);
+    table.set_bool    (0, 1, true);
+    table.set_int     (1, 1, 506);
+    table.set_float   (2, 1, 7.7f);
+    table.set_double  (3, 1, 8.8);
+    table.set_string  (4, 1, "banach");
+    table.set_binary  (5, 1, bin2);
+    table.set_datetime(6, 1, time_now);
     TableRef subtab = table.get_subtable(7, 1);
     subtab->add_empty_row();
     subtab->set_int(0, 0, 100);
@@ -2838,7 +2838,7 @@ TEST(TestQuery_AllTypes_DynamicallyTyped)
     CHECK_EQUAL(1, table.where().equal(3, 0.8).count());
     CHECK_EQUAL(1, table.where().equal(4, "foo").count());
     CHECK_EQUAL(1, table.where().equal(5, bin1).count());
-    CHECK_EQUAL(1, table.where().equal_date(6, 0).count());
+    CHECK_EQUAL(1, table.where().equal_datetime(6, 0).count());
 //    CHECK_EQUAL(1, table.where().equal(7, subtab).count());
 //    CHECK_EQUAL(1, table.where().equal(8, mix_int).count());
 

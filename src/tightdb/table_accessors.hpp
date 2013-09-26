@@ -394,12 +394,12 @@ private:
 public:
     DateTime get() const TIGHTDB_NOEXCEPT
     {
-        return Base::m_table->get_impl()->get_date(col_idx, Base::m_row_idx);
+        return Base::m_table->get_impl()->get_datetime(col_idx, Base::m_row_idx);
     }
 
     void set(DateTime value) const
     {
-        Base::m_table->get_impl()->set_date(col_idx, Base::m_row_idx, value);
+        Base::m_table->get_impl()->set_datetime(col_idx, Base::m_row_idx, value);
     }
 
     operator DateTime() const TIGHTDB_NOEXCEPT { return get(); }
@@ -598,7 +598,7 @@ public:
 
     bool get_bool() const TIGHTDB_NOEXCEPT { return get().get_bool(); }
 
-    DateTime get_date() const TIGHTDB_NOEXCEPT { return get().get_date(); }
+    DateTime get_datetime() const TIGHTDB_NOEXCEPT { return get().get_datetime(); }
 
     float get_float() const TIGHTDB_NOEXCEPT { return get().get_float(); }
 
@@ -1064,22 +1064,22 @@ public:
 
     DateTime maximum() const
     {
-        return Base::m_table->get_impl()->maximum_date(col_idx);
+        return Base::m_table->get_impl()->maximum_datetime(col_idx);
     }
 
     DateTime minimum() const
     {
-        return Base::m_table->get_impl()->minimum_date(col_idx);
+        return Base::m_table->get_impl()->minimum_datetime(col_idx);
     }
 
     std::size_t find_first(DateTime value) const
     {
-        return Base::m_table->get_impl()->find_first_date(col_idx, value);
+        return Base::m_table->get_impl()->find_first_datetime(col_idx, value);
     }
 
     BasicTableView<typename Base::RealTable> find_all(DateTime value) const
     {
-        return Base::m_table->get_impl()->find_all_date(col_idx, value);
+        return Base::m_table->get_impl()->find_all_datetime(col_idx, value);
     }
 };
 
@@ -1451,56 +1451,56 @@ public:
 
     Query& equal(DateTime value) const
     {
-        Base::m_query->m_impl.equal_date(col_idx, value);
+        Base::m_query->m_impl.equal_datetime(col_idx, value);
         return *Base::m_query;
     }
 
     Query& not_equal(DateTime value) const
     {
-        Base::m_query->m_impl.not_equal_date(col_idx, value);
+        Base::m_query->m_impl.not_equal_datetime(col_idx, value);
         return *Base::m_query;
     }
 
     Query& greater(DateTime value) const
     {
-        Base::m_query->m_impl.greater_date(col_idx, value);
+        Base::m_query->m_impl.greater_datetime(col_idx, value);
         return *Base::m_query;
     }
 
     Query& greater_equal(DateTime value) const
     {
-        Base::m_query->m_impl.greater_equal_date(col_idx, value);
+        Base::m_query->m_impl.greater_equal_datetime(col_idx, value);
         return *Base::m_query;
     }
 
     Query& less(DateTime value) const
     {
-        Base::m_query->m_impl.less_date(col_idx, value);
+        Base::m_query->m_impl.less_datetime(col_idx, value);
         return *Base::m_query;
     }
 
     Query& less_equal(DateTime value) const
     {
-        Base::m_query->m_impl.less_equal_date(col_idx, value);
+        Base::m_query->m_impl.less_equal_datetime(col_idx, value);
         return *Base::m_query;
     }
 
     Query& between(DateTime from, DateTime to) const
     {
-        Base::m_query->m_impl.between_date(col_idx, from, to);
+        Base::m_query->m_impl.between_datetime(col_idx, from, to);
         return *Base::m_query;
     };
 
     DateTime maximum(const Taboid& tab, std::size_t* resultcount=NULL, std::size_t start=0,
                  std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.maximum_date(tab, col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.maximum_datetime(tab, col_idx, resultcount, start, end, limit);
     }
 
     DateTime minimum(const Taboid& tab, std::size_t* resultcount=NULL, std::size_t start=0,
                  std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.minimum_date(tab, col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.minimum_datetime(tab, col_idx, resultcount, start, end, limit);
     }
 };
 

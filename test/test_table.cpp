@@ -350,7 +350,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows)
         int64_t sign = (i%2 == 0) ? 1 : -1;
         table.insert_int(0, i, int64_t(i*sign));
         table.insert_bool(1, i, (i % 2 ? true : false));
-        table.insert_date(2, i, 12345);
+        table.insert_datetime(2, i, 12345);
         table.insert_float(3, i, 123.456f*sign);
         table.insert_double(4, i, 9876.54321*sign);
 
@@ -1664,7 +1664,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
 
     table.insert_int(0, 4, 43);
     table.insert_mixed(1, 4, Mixed(BinaryData("binary", 7)));
@@ -1682,7 +1682,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
     CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
 
@@ -1704,7 +1704,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
     CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
 
@@ -1749,7 +1749,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
     CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
     CHECK_EQUAL(float(1.123),  table.get_mixed(1, 6).get_float());
@@ -1782,7 +1782,7 @@ TEST(Table_Mixed2)
 
     CHECK_EQUAL(1,            table[0].first.get_int());
     CHECK_EQUAL(true,         table[1].first.get_bool());
-    CHECK_EQUAL(time_t(1234), table[2].first.get_date());
+    CHECK_EQUAL(time_t(1234), table[2].first.get_datetime());
     CHECK_EQUAL("test",       table[3].first.get_string());
 }
 

@@ -414,15 +414,15 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
         case type_DateTime: {
             time_t value = read_int<time_t>(); // Throws
             if (insert)
-                m_table->insert_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                m_table->insert_datetime(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
             else
-                m_table->set_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                m_table->set_datetime(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
             if (m_log) {
                 if (insert)
-                    *m_log << "table->insert_date("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                    *m_log << "table->insert_datetime("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
                 else
-                    *m_log << "table->set_date("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                    *m_log << "table->set_datetime("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
             }
 #endif
             return;

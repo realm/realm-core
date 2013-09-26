@@ -128,7 +128,7 @@ public:
     double      get_double() const TIGHTDB_NOEXCEPT;
     StringData  get_string() const TIGHTDB_NOEXCEPT;
     BinaryData  get_binary() const TIGHTDB_NOEXCEPT;
-    DateTime    get_date()   const TIGHTDB_NOEXCEPT;
+    DateTime    get_datetime()   const TIGHTDB_NOEXCEPT;
 
     void set_int(int64_t) TIGHTDB_NOEXCEPT;
     void set_bool(bool) TIGHTDB_NOEXCEPT;
@@ -137,7 +137,7 @@ public:
     void set_string(StringData) TIGHTDB_NOEXCEPT;
     void set_binary(BinaryData) TIGHTDB_NOEXCEPT;
     void set_binary(const char* data, std::size_t size) TIGHTDB_NOEXCEPT;
-    void set_date(DateTime) TIGHTDB_NOEXCEPT;
+    void set_datetime(DateTime) TIGHTDB_NOEXCEPT;
 
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const Mixed&);
@@ -266,7 +266,7 @@ inline Mixed::Mixed(BinaryData v) TIGHTDB_NOEXCEPT
 inline Mixed::Mixed(DateTime v) TIGHTDB_NOEXCEPT
 {
     m_type = type_DateTime;
-    m_date = v.get_date();
+    m_date = v.get_datetime();
 }
 
 
@@ -306,7 +306,7 @@ inline BinaryData Mixed::get_binary() const TIGHTDB_NOEXCEPT
     return BinaryData(m_data, m_size);
 }
 
-inline DateTime Mixed::get_date() const TIGHTDB_NOEXCEPT
+inline DateTime Mixed::get_datetime() const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_type == type_DateTime);
     return m_date;
@@ -356,10 +356,10 @@ inline void Mixed::set_binary(const char* data, std::size_t size) TIGHTDB_NOEXCE
     m_size = size;
 }
 
-inline void Mixed::set_date(DateTime v) TIGHTDB_NOEXCEPT
+inline void Mixed::set_datetime(DateTime v) TIGHTDB_NOEXCEPT
 {
     m_type = type_DateTime;
-    m_date = v.get_date();
+    m_date = v.get_datetime();
 }
 
 
@@ -565,22 +565,22 @@ inline bool operator!=(BinaryData a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 
 inline bool operator==(Wrap<Mixed> a, DateTime b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(a).get_type() == type_DateTime && DateTime(Mixed(a).get_date()) == b;
+    return Mixed(a).get_type() == type_DateTime && DateTime(Mixed(a).get_datetime()) == b;
 }
 
 inline bool operator!=(Wrap<Mixed> a, DateTime b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(a).get_type() != type_DateTime || DateTime(Mixed(a).get_date()) != b;
+    return Mixed(a).get_type() != type_DateTime || DateTime(Mixed(a).get_datetime()) != b;
 }
 
 inline bool operator==(DateTime a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
-    return type_DateTime == Mixed(b).get_type() && a == DateTime(Mixed(b).get_date());
+    return type_DateTime == Mixed(b).get_type() && a == DateTime(Mixed(b).get_datetime());
 }
 
 inline bool operator!=(DateTime a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
-    return type_DateTime != Mixed(b).get_type() || a != DateTime(Mixed(b).get_date());
+    return type_DateTime != Mixed(b).get_type() || a != DateTime(Mixed(b).get_datetime());
 }
 
 

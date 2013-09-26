@@ -28,8 +28,8 @@ int main()
 
 // @@EndFold@@
     // Find people where hired year == 2012 using a 'between' clause
-    PeopleTable::View view5 = table.where().hired.between(tightdb::DateTime(2012,  1,  1,  0,  0,  0).get_date(),
-                                                          tightdb::DateTime(2012, 12, 31, 23, 59, 59).get_date()).find_all();
+    PeopleTable::View view5 = table.where().hired.between(tightdb::DateTime(2012,  1,  1,  0,  0,  0).get_datetime(),
+                                                          tightdb::DateTime(2012, 12, 31, 23, 59, 59).get_datetime()).find_all();
 // @@Fold@@
     assert(view5.size() == 1 && view5[0].name == "Jack");
 }

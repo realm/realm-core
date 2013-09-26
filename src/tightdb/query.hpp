@@ -122,13 +122,13 @@ public:
     Query& equal(size_t column_ndx, bool value);
 
     // Conditions: date
-    Query& equal_date(size_t column_ndx, DateTime value) { return equal(column_ndx, int64_t(value.get_date())); }
-    Query& not_equal_date(size_t column_ndx, DateTime value) { return not_equal(column_ndx, int64_t(value.get_date())); }
-    Query& greater_date(size_t column_ndx, DateTime value) { return greater(column_ndx, int64_t(value.get_date())); }
-    Query& greater_equal_date(size_t column_ndx, DateTime value) { return greater_equal(column_ndx, int64_t(value.get_date())); }
-    Query& less_date(size_t column_ndx, DateTime value) { return less(column_ndx, int64_t(value.get_date())); }
-    Query& less_equal_date(size_t column_ndx, DateTime value) { return less_equal(column_ndx, int64_t(value.get_date())); }
-    Query& between_date(size_t column_ndx, DateTime from, DateTime to) { return between(column_ndx, int64_t(from.get_date()), int64_t(to.get_date())); }
+    Query& equal_datetime(size_t column_ndx, DateTime value) { return equal(column_ndx, int64_t(value.get_datetime())); }
+    Query& not_equal_datetime(size_t column_ndx, DateTime value) { return not_equal(column_ndx, int64_t(value.get_datetime())); }
+    Query& greater_datetime(size_t column_ndx, DateTime value) { return greater(column_ndx, int64_t(value.get_datetime())); }
+    Query& greater_equal_datetime(size_t column_ndx, DateTime value) { return greater_equal(column_ndx, int64_t(value.get_datetime())); }
+    Query& less_datetime(size_t column_ndx, DateTime value) { return less(column_ndx, int64_t(value.get_datetime())); }
+    Query& less_equal_datetime(size_t column_ndx, DateTime value) { return less_equal(column_ndx, int64_t(value.get_datetime())); }
+    Query& between_datetime(size_t column_ndx, DateTime from, DateTime to) { return between(column_ndx, int64_t(from.get_datetime()), int64_t(to.get_datetime())); }
 
     // Conditions: strings
 
@@ -182,8 +182,8 @@ public:
     double minimum_double(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 
 /*
-  TODO:  time_t maximum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-  TODO:  time_t minimum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+  TODO:  time_t maximum_datetime(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+  TODO:  time_t minimum_datetime(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 */
 
     // Deletion

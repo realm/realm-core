@@ -195,7 +195,7 @@ public:
     // NOTE: You have to insert values in ALL columns followed by insert_done().
     void insert_int(std::size_t column_ndx, std::size_t row_ndx, int64_t value);
     void insert_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
-    void insert_date(std::size_t column_ndx, std::size_t row_ndx, DateTime value);
+    void insert_datetime(std::size_t column_ndx, std::size_t row_ndx, DateTime value);
     template<class E> void insert_enum(std::size_t column_ndx, std::size_t row_ndx, E value);
     void insert_float(std::size_t column_ndx, std::size_t row_ndx, float value);
     void insert_double(std::size_t column_ndx, std::size_t row_ndx, double value);
@@ -208,7 +208,7 @@ public:
     // Get cell values
     int64_t     get_int(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     bool        get_bool(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    DateTime    get_date(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    DateTime    get_datetime(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     float       get_float(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     double      get_double(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     StringData  get_string(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -219,7 +219,7 @@ public:
     // Set cell values
     void set_int(std::size_t column_ndx, std::size_t row_ndx, int64_t value);
     void set_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
-    void set_date(std::size_t column_ndx, std::size_t row_ndx, DateTime value);
+    void set_datetime(std::size_t column_ndx, std::size_t row_ndx, DateTime value);
     template<class E> void set_enum(std::size_t column_ndx, std::size_t row_ndx, E value);
     void set_float(std::size_t column_ndx, std::size_t row_ndx, float value);
     void set_double(std::size_t column_ndx, std::size_t row_ndx, double value);
@@ -268,7 +268,7 @@ public:
     std::size_t    lookup(StringData value) const;
     std::size_t    find_first_int(std::size_t column_ndx, int64_t value) const;
     std::size_t    find_first_bool(std::size_t column_ndx, bool value) const;
-    std::size_t    find_first_date(std::size_t column_ndx, DateTime value) const;
+    std::size_t    find_first_datetime(std::size_t column_ndx, DateTime value) const;
     std::size_t    find_first_float(std::size_t column_ndx, float value) const;
     std::size_t    find_first_double(std::size_t column_ndx, double value) const;
     std::size_t    find_first_string(std::size_t column_ndx, StringData value) const;
@@ -278,8 +278,8 @@ public:
     ConstTableView find_all_int(std::size_t column_ndx, int64_t value) const;
     TableView      find_all_bool(std::size_t column_ndx, bool value);
     ConstTableView find_all_bool(std::size_t column_ndx, bool value) const;
-    TableView      find_all_date(std::size_t column_ndx, DateTime value);
-    ConstTableView find_all_date(std::size_t column_ndx, DateTime value) const;
+    TableView      find_all_datetime(std::size_t column_ndx, DateTime value);
+    ConstTableView find_all_datetime(std::size_t column_ndx, DateTime value) const;
     TableView      find_all_float(std::size_t column_ndx, float value);
     ConstTableView find_all_float(std::size_t column_ndx, float value) const;
     TableView      find_all_double(std::size_t column_ndx, double value);
@@ -810,9 +810,9 @@ inline void Table::insert_bool(std::size_t column_ndx, std::size_t row_ndx, bool
     insert_int(column_ndx, row_ndx, value);
 }
 
-inline void Table::insert_date(std::size_t column_ndx, std::size_t row_ndx, DateTime value)
+inline void Table::insert_datetime(std::size_t column_ndx, std::size_t row_ndx, DateTime value)
 {
-    insert_int(column_ndx, row_ndx, value.get_date());
+    insert_int(column_ndx, row_ndx, value.get_datetime());
 }
 
 template<class E>

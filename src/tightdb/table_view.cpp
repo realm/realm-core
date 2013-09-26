@@ -148,7 +148,7 @@ double TableViewBase::maximum_double(size_t column_ndx) const
 {
     return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx, 0.0);
 }
-DateTime TableViewBase::maximum_date(size_t column_ndx) const
+DateTime TableViewBase::maximum_datetime(size_t column_ndx) const
 {
     return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0);
 }
@@ -167,7 +167,7 @@ double TableViewBase::minimum_double(size_t column_ndx) const
 {
     return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx, 0.0);
 }
-DateTime TableViewBase::minimum_date(size_t column_ndx) const
+DateTime TableViewBase::minimum_datetime(size_t column_ndx) const
 {
     return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0);
 }
@@ -230,7 +230,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
     else if (m_table->get_column_type(column) == type_DateTime) {
         for (size_t t = 0; t < m_refs.size(); t++) {
             size_t idx = size_t(m_refs.get(t));
-            int64_t v = int64_t(m_table->get_date(column, idx).get_date());
+            int64_t v = int64_t(m_table->get_datetime(column, idx).get_datetime());
             vals.add(v);
         }
     }

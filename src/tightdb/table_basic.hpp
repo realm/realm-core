@@ -532,7 +532,7 @@ namespace _impl
     template<int col_idx> struct InsertIntoCol<DateTime, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
-            t->insert_date(col_idx, row_idx, at<col_idx>(tuple));
+            t->insert_datetime(col_idx, row_idx, at<col_idx>(tuple));
         }
     };
 
@@ -614,7 +614,7 @@ namespace _impl
     template<int col_idx> struct AssignIntoCol<DateTime, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
-            t->set_date(col_idx, row_idx, at<col_idx>(tuple));
+            t->set_datetime(col_idx, row_idx, at<col_idx>(tuple));
         }
     };
 
