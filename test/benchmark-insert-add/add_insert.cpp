@@ -37,7 +37,7 @@ void usage()
 }
 
 
-int main2(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
     size_t N = 100000000;
     size_t n = 50000;
@@ -140,7 +140,7 @@ int main2(int argc, char *argv[])
     }
 
     while (File::exists("test.tightdb.lock")) {
-        File::try_remove("test.tightdb.lock");
+        usleep(10000);
     }
     File::try_remove("test.tightdb");
     File::try_remove("gtest.tightdb");
@@ -244,19 +244,3 @@ int main2(int argc, char *argv[])
     return 0;
 }
 
-int main(int argc, char *argv[])
-{
-    int res = -1;
-    try {
-        char* arg1[] = {"gylle","-s","async","-N20000"};
-        res = main2(4,arg1);
-        optind = 1;
-        char* arg2[] = {"gylle","-s","async","-N10000"};
-        res = main2(4,arg2);
-    } catch (runtime_error e) {
-        cerr << "Caught exception!" << endl;
-        cerr << "What: " << e.what() << endl;
-        res = -2;
-    }
-    return res;
-}
