@@ -8,7 +8,7 @@ using namespace tightdb;
 
 // Searching
 
-// find_*_integer() methods are used for all "kinds" of integer values (bool, int, Date)
+// find_*_integer() methods are used for all "kinds" of integer values (bool, int, DateTime)
 
 size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
 {
@@ -148,7 +148,7 @@ double TableViewBase::maximum_double(size_t column_ndx) const
 {
     return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx, 0.0);
 }
-Date TableViewBase::maximum_date(size_t column_ndx) const
+DateTime TableViewBase::maximum_date(size_t column_ndx) const
 {
     return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0);
 }
@@ -167,7 +167,7 @@ double TableViewBase::minimum_double(size_t column_ndx) const
 {
     return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx, 0.0);
 }
-Date TableViewBase::minimum_date(size_t column_ndx) const
+DateTime TableViewBase::minimum_date(size_t column_ndx) const
 {
     return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0);
 }

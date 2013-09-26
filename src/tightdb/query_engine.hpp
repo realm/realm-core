@@ -148,7 +148,7 @@ template<> struct ColumnTypeTraits<double> {
     typedef double sum_type;
     static const DataType id = type_Double;
 };
-template<> struct ColumnTypeTraits<Date> {
+template<> struct ColumnTypeTraits<DateTime> {
     typedef Column column_type;
     typedef Array array_type;
     typedef int64_t sum_type;

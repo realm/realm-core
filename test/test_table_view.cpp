@@ -49,15 +49,15 @@ TEST(TableViewDateMaxMin)
 {
     TestTableDate ttd;
 
-    ttd.add(Date(2014, 7, 10), 1);
-    ttd.add(Date(2013, 7, 10), 1);
-    ttd.add(Date(2015, 8, 10), 1);
-    ttd.add(Date(2015, 7, 10), 1);
+    ttd.add(DateTime(2014, 7, 10), 1);
+    ttd.add(DateTime(2013, 7, 10), 1);
+    ttd.add(DateTime(2015, 8, 10), 1);
+    ttd.add(DateTime(2015, 7, 10), 1);
 
     TestTableDate::View v = ttd.column().second.find_all(1);
 
-    CHECK_EQUAL(Date(2015, 8, 10), v.column().first.maximum());
-    CHECK_EQUAL(Date(2013, 7, 10), v.column().first.minimum());
+    CHECK_EQUAL(DateTime(2015, 8, 10), v.column().first.maximum());
+    CHECK_EQUAL(DateTime(2013, 7, 10), v.column().first.minimum());
 }
 
 TEST(GetSetInteger)
