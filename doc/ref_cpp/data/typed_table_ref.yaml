@@ -71,16 +71,16 @@ CATEGORIES:
                  <tr><th>Name</th>              <th>Desc</th>         <th>C++ type</th>   <th>Default value</th></tr>
                  </thead>
                  <tbody>
-                 <tr><td>Int</td>               <td>Integer</td>        <td>(int64_t)</td>   <td>0</td></tr>
-                 <tr><td>Bool</td>              <td>Boolean</td>        <td>(bool)</td>      <td>false</td></tr>
-                 <tr><td>Float</td>             <td>Floating-point</td> <td>(float)</td>     <td>0.0</td></tr>
-                 <tr><td>Double</td>            <td>Floating-point</td> <td>(double)</td>    <td>0.0</td></tr>
-                 <tr><td>DateTime</td>          <td>UTC datetime</td>   <td>(DateTime)</td>  <td>0 - 1970-01-01 00:00:00</td></tr>
-                 <tr><td>Enum&lt;T&gt;</td>     <td>Enum</td>           <td>(T as enum type)</td></tr>
-                 <tr><td>String</td>            <td>Text</td>           <td>(StringData)</td>  <td>empty - ""</td></tr>
-                 <tr><td>Binary</td>            <td>Arbitrary data</td> <td>(BinaryData)</td>  <td>empty</td></tr>
-                 <tr><td>Subtable&lt;T&gt;</td> <td>Sub-tables</td>     <td>(T as table class)</td><td>empty - <code>NULL</code></td></tr>
-                 <tr><td>Mixed</td>             <td>Dynamic</td>        <td>(any of the above)</td><td>empty - <code>NULL</code></td></tr>
+                 <tr><td>Int</td>               <td>Integer</td>        <td>(int64_t)</td>          <td>0</td></tr>
+                 <tr><td>Bool</td>              <td>Boolean</td>        <td>(bool)</td>             <td>false</td></tr>
+                 <tr><td>Float</td>             <td>Floating-point</td> <td>(float)</td>            <td>0.0</td></tr>
+                 <tr><td>Double</td>            <td>Floating-point</td> <td>(double)</td>           <td>0.0</td></tr>
+                 <tr><td>DateTime</td>          <td>UTC datetime</td>   <td>(DateTime)</td>         <td>0 - 1970-01-01 00:00:00</td></tr>
+                 <tr><td>Enum&lt;T&gt;</td>     <td>Enum</td>           <td>(T as enum type)</td>   </tr>
+                 <tr><td>String</td>            <td>Text</td>           <td>(StringData)</td>       <td>empty - ""</td></tr>
+                 <tr><td>Binary</td>            <td>Arbitrary data</td> <td>(BinaryData)</td>       <td>empty</td></tr>
+                 <tr><td>Subtable&lt;T&gt;</td> <td>Sub-tables</td>     <td>(T as table class)</td> <td>empty - <code>NULL</code></td></tr>
+                 <tr><td>Mixed</td>             <td>Dynamic</td>        <td>(any of the above)</td> <td>empty - <code>NULL</code></td></tr>
                  </tbody>
                  </table>
       EXAMPLES:

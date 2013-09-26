@@ -265,7 +265,7 @@ inline Mixed::Mixed(BinaryData v) TIGHTDB_NOEXCEPT
 
 inline Mixed::Mixed(DateTime v) TIGHTDB_NOEXCEPT
 {
-    m_type = type_Date;
+    m_type = type_DateTime;
     m_date = v.get_date();
 }
 
@@ -308,7 +308,7 @@ inline BinaryData Mixed::get_binary() const TIGHTDB_NOEXCEPT
 
 inline DateTime Mixed::get_date() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_type == type_Date);
+    TIGHTDB_ASSERT(m_type == type_DateTime);
     return m_date;
 }
 
@@ -358,7 +358,7 @@ inline void Mixed::set_binary(const char* data, std::size_t size) TIGHTDB_NOEXCE
 
 inline void Mixed::set_date(DateTime v) TIGHTDB_NOEXCEPT
 {
-    m_type = type_Date;
+    m_type = type_DateTime;
     m_date = v.get_date();
 }
 
@@ -368,15 +368,15 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
 {
     out << "Mixed(";
     switch (m.m_type) {
-        case type_Int:    out << m.m_int;                        break;
-        case type_Bool:   out << m.m_bool;                       break;
-        case type_Float:  out << m.m_float;                      break;
-        case type_Double: out << m.m_double;                     break;
-        case type_String: out << StringData(m.m_data, m.m_size); break;
-        case type_Binary: out << BinaryData(m.m_data, m.m_size); break;
-        case type_Date:   out << DateTime(m.m_date);             break;
-        case type_Table:  out << "subtable";                     break;
-        case type_Mixed:  TIGHTDB_ASSERT(false);                 break;
+        case type_Int:      out << m.m_int;                        break;
+        case type_Bool:     out << m.m_bool;                       break;
+        case type_Float:    out << m.m_float;                      break;
+        case type_Double:   out << m.m_double;                     break;
+        case type_String:   out << StringData(m.m_data, m.m_size); break;
+        case type_Binary:   out << BinaryData(m.m_data, m.m_size); break;
+        case type_DateTime: out << DateTime(m.m_date);             break;
+        case type_Table:    out << "subtable";                     break;
+        case type_Mixed:    TIGHTDB_ASSERT(false);                 break;
     }
     out << ")";
     return out;
@@ -565,22 +565,22 @@ inline bool operator!=(BinaryData a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 
 inline bool operator==(Wrap<Mixed> a, DateTime b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(a).get_type() == type_Date && DateTime(Mixed(a).get_date()) == b;
+    return Mixed(a).get_type() == type_DateTime && DateTime(Mixed(a).get_date()) == b;
 }
 
 inline bool operator!=(Wrap<Mixed> a, DateTime b) TIGHTDB_NOEXCEPT
 {
-    return Mixed(a).get_type() != type_Date || DateTime(Mixed(a).get_date()) != b;
+    return Mixed(a).get_type() != type_DateTime || DateTime(Mixed(a).get_date()) != b;
 }
 
 inline bool operator==(DateTime a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
-    return type_Date == Mixed(b).get_type() && a == DateTime(Mixed(b).get_date());
+    return type_DateTime == Mixed(b).get_type() && a == DateTime(Mixed(b).get_date());
 }
 
 inline bool operator!=(DateTime a, Wrap<Mixed> b) TIGHTDB_NOEXCEPT
 {
-    return type_Date != Mixed(b).get_type() || a != DateTime(Mixed(b).get_date());
+    return type_DateTime != Mixed(b).get_type() || a != DateTime(Mixed(b).get_date());
 }
 
 

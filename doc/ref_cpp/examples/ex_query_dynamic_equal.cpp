@@ -15,7 +15,7 @@ int main()
     s.add_column(type_String, "name");
     s.add_column(type_Int,    "age");
     s.add_column(type_Bool,   "male");
-    s.add_column(type_Date,   "hired");
+    s.add_column(type_DateTime,   "hired");
     s.add_column(type_Binary, "photo");
     table->update_from_spec();
 
@@ -47,7 +47,7 @@ int main()
     assert(view3.size() == 1 && view3.get_string(0,0) == "Frank");
 
     // Find people where hired (column 3) == 50000
-    TableView view4 = table->where().equal(3, tightdb::Date(50000).get_date()).find_all();
+    TableView view4 = table->where().equal(3, tightdb::DateTime(50000).get_date()).find_all();
     assert(view4.size() == 1 && view4.get_string(0,0) == "Mary");
 
     // Find people where photo (column 4) equals the binary data "bin \0\n data 1"

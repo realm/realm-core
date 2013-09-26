@@ -47,7 +47,7 @@ TIGHTDB_TABLE_5(PeopleTable,
                 name,  String,
                 age,   Int,
                 male,  Bool,
-                hired, Date,
+                hired, DateTime,
                 photo, Binary)
 
 TIGHTDB_TABLE_2(FloatTable,
@@ -1694,7 +1694,7 @@ TEST(TestQuerySort_Descending)
 TEST(TestQuerySort_Dates)
 {
     Table table;
-    table.add_column(type_Date, "first");
+    table.add_column(type_DateTime, "first");
 
     table.insert_date(0, 0, 1000);
     table.insert_done();
@@ -2787,13 +2787,13 @@ TEST(TestQuery_AllTypes_DynamicallyTyped)
     Table table;
     {
         Spec& spec = table.get_spec();
-        spec.add_column(type_Bool,   "boo");
-        spec.add_column(type_Int,    "int");
-        spec.add_column(type_Float,  "flt");
-        spec.add_column(type_Double, "dbl");
-        spec.add_column(type_String, "str");
-        spec.add_column(type_Binary, "bin");
-        spec.add_column(type_Date,   "dat");
+        spec.add_column(type_Bool,     "boo");
+        spec.add_column(type_Int,      "int");
+        spec.add_column(type_Float,    "flt");
+        spec.add_column(type_Double,   "dbl");
+        spec.add_column(type_String,   "str");
+        spec.add_column(type_Binary,   "bin");
+        spec.add_column(type_DateTime, "dat");
         {
             Spec subspec = spec.add_subtable_column("tab");
             subspec.add_column(type_Int, "sub_int");
@@ -2872,7 +2872,7 @@ TIGHTDB_TABLE_9(TestQueryAllTypes,
                 double_col, Double,
                 string_col, String,
                 binary_col, Binary,
-                date_col,   Date,
+                date_col,   DateTime,
                 table_col,  Subtable<TestQuerySub>,
                 mixed_col,  Mixed)
 }

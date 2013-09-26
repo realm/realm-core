@@ -14,6 +14,7 @@ Format:
 
 2013-09-26 (Brian Munkholm)
 +/- Renamed Table::distinct() to Table::get_distinct_view()
++/- Renamed class Date to DateTime. Renamed DataType::type_Date to type_DateTime
 
 2013-09-19 (Kristian Spangsege)
 . CRUD performance has been greatly improved for large tables, as long as they are kept on the "compact" form. A table is kept on the compact form when every row insertion and removal, since the creation of that table, has occured, and continues to occur at the end (i.e., insert after last row, and remove last row).
