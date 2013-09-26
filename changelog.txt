@@ -70,6 +70,10 @@ Format:
 . Group::write(path) now throws File::Exists if 'path' already exists in the file system.
 
 
+2013-05-16 (Kristian Spangsege)
++ New SharedGroup::reserve() method added.
+
+
 2013-05-13 (Kenneth Geisshirt)
 . Added "uninstall" target in build.sh for simple uninstallation.
 

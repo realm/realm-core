@@ -527,6 +527,10 @@ public:
     // FIXME: Carefull with this one. It handles only shortening
     // operations. Either rename to truncate() or implement expanding
     // case.
+    ///
+    /// FIXME: Carefull with this one. It does not destroy/deallocate
+    /// subarrays as clear() does. This difference is surprising and
+    /// highly counterintuitive.
     void resize(std::size_t count);
 
     /// Returns true if type is not type_InnerColumnNode
@@ -705,11 +709,7 @@ public:
     std::pair<MemRef, std::size_t> get_bptree_leaf(std::size_t elem_ndx) const TIGHTDB_NOEXCEPT;
 
 
-    struct UpdateHandler {
-        virtual void update(MemRef, ArrayParent*, std::size_t leaf_ndx_in_parent,
-                            std::size_t elem_ndx_in_leaf) = 0;
-        virtual ~UpdateHandler() TIGHTDB_NOEXCEPT {}
-    };
+    class UpdateHandler;
 
     /// Call the handler for every leaf. This function must be called
     /// on an inner B+-tree node, never a leaf.
@@ -720,39 +720,8 @@ public:
     /// B+-tree node, never a leaf.
     void update_bptree_elem(std::size_t elem_ndx, UpdateHandler&);
 
-    struct EraseHandler {
-        /// If the specified leaf has more than one element, this
-        /// function must erase the specified element from the leaf
-        /// and return false. Otherwise, when the leaf has a single
-        /// element, this function must return true without modifying
-        /// the leaf. If \a elem_ndx_in_leaf is `npos`, it refers to
-        /// the last element in the leaf. The implementation of this
-        /// function must be exception safe. This function is
-        /// guaranteed to be called at most once during each execution
-        /// of Array::erase_bptree_elem(), and *exactly* once during
-        /// each *successful* execution of Array::erase_bptree_elem().
-        virtual bool erase_leaf_elem(MemRef, ArrayParent*,
-                                     std::size_t leaf_ndx_in_parent,
-                                     std::size_t elem_ndx_in_leaf) = 0;
 
-        virtual void destroy_leaf(MemRef leaf_mem) TIGHTDB_NOEXCEPT = 0;
-
-        /// Must replace the current root with the specified leaf. The
-        /// implementation of this function must not destroy the
-        /// underlying root node, or any of its children, as that will
-        /// be done by Array::erase_bptree_elem(). The implementation
-        /// of this function must be exception safe.
-        virtual void replace_root_by_leaf(MemRef leaf_mem) = 0;
-
-        /// Same as replace_root_by_leaf(), but must replace the root
-        /// with an empty leaf. Also, if this function is called
-        /// during an execution of Array::erase_bptree_elem(), it is
-        /// guaranteed that it will be preceeded by a call to
-        /// erase_leaf_elem().
-        virtual void replace_root_by_empty_leaf() = 0;
-
-        virtual ~EraseHandler() TIGHTDB_NOEXCEPT {}
-    };
+    class EraseHandler;
 
     /// Erase the element at the specified index in the B+-tree with
     /// the specified root. When erasing the last element, you must
@@ -844,6 +813,21 @@ public:
     static std::size_t get_size_from_header(const char*) TIGHTDB_NOEXCEPT;
 
     static Type get_type_from_header(const char*) TIGHTDB_NOEXCEPT;
+
+    /// Get the number of bytes currently in use by this array. This
+    /// includes the array header, but it does not include allocated
+    /// bytes corresponding to excess capacity. The result is
+    /// guaranteed to be a multiple of 8 (i.e., 64-bit aligned).
+    ///
+    /// This number is exactly the number of bytes that will be
+    /// written by a non-recursive invocation of write().
+    std::size_t get_byte_size() const TIGHTDB_NOEXCEPT;
+
+    /// Get the maximum number of bytes that can be written by a
+    /// non-recursive invocation of write() on an array with the
+    /// specified number of elements, that is, the maximum value that
+    /// can be returned by get_byte_size().
+    static std::size_t get_max_byte_size(std::size_t num_elems) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
     void print() const;
@@ -968,26 +952,11 @@ protected:
     /// Get the address of the header of this array.
     char* get_header() TIGHTDB_NOEXCEPT;
 
-    /// Get the number of bytes currently in use by this array. This
-    /// includes the array header, but it does not include allocated
-    /// bytes corresponding to excess capacity. The result is
-    /// guaranteed to be a multiple of 8 (i.e., 64-bit aligned).
-    ///
-    /// This number is exactly the number of bytes that will be
-    /// written by a non-recursive invocation of write().
-    std::size_t get_byte_size() const TIGHTDB_NOEXCEPT;
-
     /// Same as get_byte_size().
     static std::size_t get_byte_size_from_header(const char*) TIGHTDB_NOEXCEPT;
 
     // Undefined behavior if array is in immutable memory
     static std::size_t get_capacity_from_header(const char*) TIGHTDB_NOEXCEPT;
-
-    /// Get the maximum number of bytes that can be written by a
-    /// non-recursive invocation of write() on an array with the
-    /// specified number of elements, that is, the maxumum value that
-    /// can be returned by get_byte_size().
-    static std::size_t get_max_byte_size(std::size_t num_elems) TIGHTDB_NOEXCEPT;
 
     void update_child_ref(std::size_t child_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
     ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -1018,6 +987,50 @@ protected:
     friend class SlabAlloc;
     friend class GroupWriter;
     friend class AdaptiveStringColumn;
+};
+
+
+
+class Array::UpdateHandler {
+public:
+    virtual void update(MemRef, ArrayParent*, std::size_t leaf_ndx_in_parent,
+                        std::size_t elem_ndx_in_leaf) = 0;
+    virtual ~UpdateHandler() TIGHTDB_NOEXCEPT {}
+};
+
+
+class Array::EraseHandler {
+public:
+    /// If the specified leaf has more than one element, this function
+    /// must erase the specified element from the leaf and return
+    /// false. Otherwise, when the leaf has a single element, this
+    /// function must return true without modifying the leaf. If \a
+    /// elem_ndx_in_leaf is `npos`, it refers to the last element in
+    /// the leaf. The implementation of this function must be
+    /// exception safe. This function is guaranteed to be called at
+    /// most once during each execution of Array::erase_bptree_elem(),
+    /// and *exactly* once during each *successful* execution of
+    /// Array::erase_bptree_elem().
+    virtual bool erase_leaf_elem(MemRef, ArrayParent*,
+                                 std::size_t leaf_ndx_in_parent,
+                                 std::size_t elem_ndx_in_leaf) = 0;
+
+    virtual void destroy_leaf(MemRef leaf_mem) TIGHTDB_NOEXCEPT = 0;
+
+    /// Must replace the current root with the specified leaf. The
+    /// implementation of this function must not destroy the
+    /// underlying root node, or any of its children, as that will be
+    /// done by Array::erase_bptree_elem(). The implementation of this
+    /// function must be exception safe.
+    virtual void replace_root_by_leaf(MemRef leaf_mem) = 0;
+
+    /// Same as replace_root_by_leaf(), but must replace the root with
+    /// an empty leaf. Also, if this function is called during an
+    /// execution of Array::erase_bptree_elem(), it is guaranteed that
+    /// it will be preceeded by a call to erase_leaf_elem().
+    virtual void replace_root_by_empty_leaf() = 0;
+
+    virtual ~EraseHandler() TIGHTDB_NOEXCEPT {}
 };
 
 

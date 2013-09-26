@@ -12,6 +12,7 @@
 using namespace std;
 using namespace tightdb;
 
+
 namespace {
 
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
@@ -23,6 +24,7 @@ TIGHTDB_TABLE_4(TestTableGroup,
                 fourth, Enum<Days>)
 
 } // Anonymous namespace
+
 
 TEST(Group_Unattached)
 {
