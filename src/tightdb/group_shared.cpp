@@ -308,7 +308,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
     if (dlevel == durability_Async) {
         if (is_backend) {
-            do_async_commits(); // will never return
+            do_async_commits();
         }
         else {
             // In async mode we need to wait for the commit process to get ready
