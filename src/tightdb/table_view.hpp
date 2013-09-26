@@ -325,7 +325,7 @@ inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
 #define TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type)             \
     TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \
     TIGHTDB_ASSERT(m_table->get_column_type(column_ndx) == column_type ||   \
-                  (m_table->get_column_type(column_ndx) == type_Date && column_type == type_Int));
+                  (m_table->get_column_type(column_ndx) == type_DateTime && column_type == type_Int));
 
 #define TIGHTDB_ASSERT_INDEX(column_ndx, row_ndx)                           \
     TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \
@@ -388,7 +388,7 @@ inline bool TableViewBase::get_bool(size_t column_ndx, size_t row_ndx) const
 inline DateTime TableViewBase::get_date(size_t column_ndx, size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Date);
+    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_DateTime);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     return m_table->get_date(column_ndx, real_ndx);
@@ -475,7 +475,7 @@ inline size_t TableViewBase::find_first_bool(size_t column_ndx, bool value) cons
 
 inline size_t TableViewBase::find_first_date(size_t column_ndx, DateTime value) const
 {
-    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Date);
+    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_DateTime);
     return find_first_integer(column_ndx, int64_t(value.get_date()));
 }
 
@@ -611,7 +611,7 @@ inline TableView TableView::find_all_bool(size_t column_ndx, bool value)
 
 inline TableView TableView::find_all_date(size_t column_ndx, DateTime value)
 {
-    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Date);
+    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_DateTime);
     return find_all_integer(column_ndx, int64_t(value.get_date()));
 }
 
@@ -630,7 +630,7 @@ inline ConstTableView TableView::find_all_bool(size_t column_ndx, bool value) co
 
 inline ConstTableView TableView::find_all_date(size_t column_ndx, DateTime value) const
 {
-    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Date);
+    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_DateTime);
     return find_all_integer(column_ndx, int64_t(value.get_date()));
 }
 
@@ -649,7 +649,7 @@ inline ConstTableView ConstTableView::find_all_bool(size_t column_ndx, bool valu
 
 inline ConstTableView ConstTableView::find_all_date(size_t column_ndx, DateTime value) const
 {
-    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Date);
+    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_DateTime);
     return find_all_integer(column_ndx, int64_t(value.get_date()));
 }
 
@@ -711,7 +711,7 @@ inline void TableView::set_bool(size_t column_ndx, size_t row_ndx, bool value)
 
 inline void TableView::set_date(size_t column_ndx, size_t row_ndx, DateTime value)
 {
-    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Date);
+    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_DateTime);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     m_table->set_date(column_ndx, real_ndx, value);

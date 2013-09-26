@@ -205,7 +205,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
 {
     TIGHTDB_ASSERT(m_table);
     TIGHTDB_ASSERT(m_table->get_column_type(column) == type_Int  ||
-                   m_table->get_column_type(column) == type_Date ||
+                   m_table->get_column_type(column) == type_DateTime ||
                    m_table->get_column_type(column) == type_Bool);
 
     if (m_refs.size() == 0)
@@ -227,7 +227,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
             vals.add(v);
         }
     }
-    else if (m_table->get_column_type(column) == type_Date) {
+    else if (m_table->get_column_type(column) == type_DateTime) {
         for (size_t t = 0; t < m_refs.size(); t++) {
             size_t idx = size_t(m_refs.get(t));
             int64_t v = int64_t(m_table->get_date(column, idx).get_date());

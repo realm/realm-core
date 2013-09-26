@@ -40,7 +40,7 @@ namespace tightdb {
 struct SpecBase {
     typedef int64_t             Int;
     typedef bool                Bool;
-    typedef tightdb::DateTime   Date;
+    typedef tightdb::DateTime   DateTime;
     typedef float               Float;
     typedef double              Double;
     typedef tightdb::StringData String;

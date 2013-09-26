@@ -218,7 +218,7 @@ private:
         switch (type) {
             case type_Int:
             case type_Bool:
-            case type_Date:
+            case type_DateTime:
             case type_String:
             case type_Binary:
             case type_Table:
@@ -411,7 +411,7 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
 #endif
             return;
         }
-        case type_Date: {
+        case type_DateTime: {
             time_t value = read_int<time_t>(); // Throws
             if (insert)
                 m_table->insert_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
@@ -511,7 +511,7 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
 #endif
                     return;
                 }
-                case type_Date: {
+                case type_DateTime: {
                     time_t value = read_int<time_t>(); // Throws
                     if (insert)
                         m_table->insert_mixed(column_ndx, ndx, DateTime(value)); // FIXME: Memory allocation failure!!!

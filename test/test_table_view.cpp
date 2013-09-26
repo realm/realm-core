@@ -19,7 +19,7 @@ TIGHTDB_TABLE_2(TestTableInt2,
                 second, Int)
 
 TIGHTDB_TABLE_2(TestTableDate,
-                first, Date,
+                first, DateTime,
                 second, Int)
 
 }

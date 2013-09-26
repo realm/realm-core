@@ -77,7 +77,7 @@ void Table::create_columns()
         switch (type) {
             case type_Int:
             case type_Bool:
-            case type_Date: {
+            case type_DateTime: {
                 Column* c = new Column(Array::type_Normal, alloc);
                 m_columns.add(c->get_ref());
                 c->set_parent(&m_columns, ref_pos);
@@ -207,7 +207,7 @@ void Table::cache_columns()
         switch (type) {
             case type_Int:
             case type_Bool:
-            case type_Date: {
+            case type_DateTime: {
                 Column* c = new Column(ref, &m_columns, ndx_in_parent, alloc);
                 colsize = c->size();
                 new_col = c;
@@ -426,7 +426,7 @@ size_t Table::do_add_column(DataType type)
     switch (type) {
         case type_Int:
         case type_Bool:
-        case type_Date: {
+        case type_DateTime: {
             Column* c = new Column(Array::type_Normal, alloc);
             m_columns.add(c->get_ref());
             c->set_parent(&m_columns, m_columns.size()-1);
@@ -716,7 +716,7 @@ ref_type Table::create_column(DataType column_type, size_t num_default_values, A
     switch (column_type) {
         case type_Int:
         case type_Bool:
-        case type_Date: {
+        case type_DateTime: {
             Column c(Array::type_Normal, alloc);
             c.fill(num_default_values);
             return c.get_ref();
@@ -1385,7 +1385,7 @@ Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
             return Mixed(column.get_int(ndx));
         case type_Bool:
             return Mixed(column.get_bool(ndx));
-        case type_Date:
+        case type_DateTime:
             return Mixed(DateTime(column.get_date(ndx)));
         case type_Float:
             return Mixed(column.get_float(ndx));
@@ -1428,7 +1428,7 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
         case type_Bool:
             column.set_bool(ndx, value.get_bool());
             break;
-        case type_Date:
+        case type_DateTime:
             column.set_date(ndx, value.get_date());
             break;
         case type_Float:
@@ -1471,7 +1471,7 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value)
         case type_Bool:
             column.insert_bool(ndx, value.get_bool());
             break;
-        case type_Date:
+        case type_DateTime:
             column.insert_date(ndx, value.get_date());
             break;
         case type_Float:
@@ -2240,7 +2240,7 @@ void Table::to_json_row(size_t row_ndx, ostream& out) const
             case type_String:
                 out << "\"" << get_string(i, row_ndx) << "\"";
                 break;
-            case type_Date:
+            case type_DateTime:
                 out << "\""; out_date(out, get_date(i, row_ndx)); out << "\"";
                 break;
             case type_Binary:
@@ -2273,7 +2273,7 @@ void Table::to_json_row(size_t row_ndx, ostream& out) const
                         case type_String:
                             out << "\"" << m.get_string() << "\"";
                             break;
-                        case type_Date:
+                        case type_DateTime:
                             out << "\""; out_date(out, m.get_date()); out << "\"";
                             break;
                         case type_Binary:
@@ -2362,7 +2362,7 @@ void Table::to_string_header(ostream& out, vector<size_t>& widths) const
             case type_Bool:
                 width = 5;
                 break;
-            case type_Date:
+            case type_DateTime:
                 width = 19;
                 break;
             case type_Int:
@@ -2414,7 +2414,7 @@ void Table::to_string_header(ostream& out, vector<size_t>& widths) const
                         case type_Bool:
                             width = max(width, size_t(5));
                             break;
-                        case type_Date:
+                        case type_DateTime:
                             width = max(width, size_t(19));
                             break;
                         case type_Int:
@@ -2511,7 +2511,7 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
             case type_String:
                 out_string(out, get_string(col, row_ndx), 20);
                 break;
-            case type_Date:
+            case type_DateTime:
                 out_date(out, get_date(col, row_ndx));
                 break;
             case type_Table:
@@ -2545,7 +2545,7 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
                         case type_String:
                             out_string(out, m.get_string(), 20);
                             break;
-                        case type_Date:
+                        case type_DateTime:
                             out_date(out, m.get_date());
                             break;
                         case type_Binary:
@@ -2715,7 +2715,7 @@ void Table::Verify() const
             switch (type) {
                 case type_Int:
                 case type_Bool:
-                case type_Date: {
+                case type_DateTime: {
                     const Column& column = get_column(i);
                     TIGHTDB_ASSERT(column.size() == m_size);
                     column.Verify();

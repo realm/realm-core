@@ -14,6 +14,7 @@ Format:
 
 2013-09-26 (Brian Munkholm)
 +/- Renamed Table::distinct() to Table::get_distinct_view()
++/- Renamed class Date to DateTime. Renamed DataType::type_Date to type_DateTime
 
 2013-09-12 (Brian Munkholm)
 + Added TableView::row_to_string() and testcases for to_string() and row_to_string()

@@ -427,7 +427,7 @@ namespace _impl
         static const DataType id = type_Binary;
     };
     template<> struct GetColumnTypeId<DateTime> {
-        static const DataType id = type_Date;
+        static const DataType id = type_DateTime;
     };
     template<> struct GetColumnTypeId<Mixed> {
         static const DataType id = type_Mixed;
