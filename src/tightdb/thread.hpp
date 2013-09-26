@@ -24,6 +24,7 @@
 
 #include <pthread.h>
 #include <errno.h>
+#include <cstddef>
 
 #include <tightdb/config.h>
 #include <tightdb/assert.hpp>

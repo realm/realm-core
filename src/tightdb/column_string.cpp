@@ -228,7 +228,7 @@ void AdaptiveStringColumn::erase(size_t ndx)
     //  position to update (as it looks for the old value))
     if (m_index) {
         StringData oldVal = get(ndx);
-        const bool isLast = (ndx == size());
+        const bool isLast = (ndx+1 == size());
         m_index->erase(ndx, oldVal, isLast);
     }
 
