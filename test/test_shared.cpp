@@ -1242,9 +1242,8 @@ TEST(StringIndex_Bug3)
     }
 }
 
-// disable async test until valgrind memory leak handled
-// then change this condition to only disable on windows
-#if 0
+// disable shared async on windows
+#ifndef _WIN32
 
 
 TEST(Shared_Async)
@@ -1515,6 +1514,8 @@ TEST(Shared_Multiprocess)
 #endif
 }
 
+#endif
+// endif not on windows
 
 TEST(Shared_MixedWithNonShared)
 {
@@ -1645,5 +1646,4 @@ TEST(MultipleEndReads)
     sg.end_read();
 }
 
-#endif
 #endif // TEST_SHARED
