@@ -38,6 +38,7 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 } // anonymous namespace
 
+
 TEST(Shared_Initial)
 {
     // Delete old files if there
@@ -65,6 +66,7 @@ TEST(Shared_Initial)
     CHECK(!File::exists("test_shared.tightdb.lock"));
 #endif
 }
+
 
 TEST(Shared_Initial_Mem)
 {
@@ -95,6 +97,7 @@ TEST(Shared_Initial_Mem)
 #endif
 
 }
+
 
 TEST(Shared_Initial2)
 {
@@ -142,6 +145,7 @@ TEST(Shared_Initial2)
     CHECK(!File::exists("test_shared.tightdb.lock"));
 #endif
 }
+
 
 TEST(Shared_Initial2_Mem)
 {

@@ -55,7 +55,7 @@ public:
     static BinaryData get(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
 
     ref_type bptree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term,
-                               TreeInsertBase& state);
+                                TreeInsertBase& state);
 
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
