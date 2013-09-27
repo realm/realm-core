@@ -77,7 +77,7 @@ void Table::create_columns()
         switch (type) {
             case type_Int:
             case type_Bool:
-            case type_Date: {
+            case type_DateTime: {
                 Column* c = new Column(Array::type_Normal, alloc);
                 m_columns.add(c->get_ref());
                 c->set_parent(&m_columns, ref_pos);
@@ -207,7 +207,7 @@ void Table::cache_columns()
         switch (type) {
             case type_Int:
             case type_Bool:
-            case type_Date: {
+            case type_DateTime: {
                 Column* c = new Column(ref, &m_columns, ndx_in_parent, alloc);
                 colsize = c->size();
                 new_col = c;
@@ -430,7 +430,7 @@ size_t Table::do_add_column(DataType type)
     switch (type) {
         case type_Int:
         case type_Bool:
-        case type_Date: {
+        case type_DateTime: {
             Column* c = new Column(Array::type_Normal, alloc);
             m_columns.add(c->get_ref());
             c->set_parent(&m_columns, m_columns.size()-1);
@@ -720,7 +720,7 @@ ref_type Table::create_column(DataType column_type, size_t num_default_values, A
     switch (column_type) {
         case type_Int:
         case type_Bool:
-        case type_Date: {
+        case type_DateTime: {
             Column c(Array::type_Normal, alloc);
             c.fill(num_default_values);
             return c.get_ref();
@@ -1173,7 +1173,7 @@ void Table::set_bool(size_t column_ndx, size_t ndx, bool value)
 #endif
 }
 
-Date Table::get_date(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
+DateTime Table::get_datetime(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Date);
@@ -1183,17 +1183,17 @@ Date Table::get_date(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
     return time_t(column.get(ndx));
 }
 
-void Table::set_date(size_t column_ndx, size_t ndx, Date value)
+void Table::set_datetime(size_t column_ndx, size_t ndx, DateTime value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Date);
     TIGHTDB_ASSERT(ndx < m_size);
 
     Column& column = get_column(column_ndx);
-    column.set(ndx, int64_t(value.get_date()));
+    column.set(ndx, int64_t(value.get_datetime()));
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().set_value(column_ndx, ndx, value.get_date()); // Throws
+    transact_log().set_value(column_ndx, ndx, value.get_datetime()); // Throws
 #endif
 }
 
@@ -1391,8 +1391,8 @@ Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
             return Mixed(column.get_int(ndx));
         case type_Bool:
             return Mixed(column.get_bool(ndx));
-        case type_Date:
-            return Mixed(Date(column.get_date(ndx)));
+        case type_DateTime:
+            return Mixed(DateTime(column.get_datetime(ndx)));
         case type_Float:
             return Mixed(column.get_float(ndx));
         case type_Double:
@@ -1434,8 +1434,8 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
         case type_Bool:
             column.set_bool(ndx, value.get_bool());
             break;
-        case type_Date:
-            column.set_date(ndx, value.get_date());
+        case type_DateTime:
+            column.set_datetime(ndx, value.get_datetime());
             break;
         case type_Float:
             column.set_float(ndx, value.get_float());
@@ -1477,8 +1477,8 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value)
         case type_Bool:
             column.insert_bool(ndx, value.get_bool());
             break;
-        case type_Date:
-            column.insert_date(ndx, value.get_date());
+        case type_DateTime:
+            column.insert_datetime(ndx, value.get_datetime());
             break;
         case type_Float:
             column.insert_float(ndx, value.get_float());
@@ -1554,7 +1554,7 @@ size_t Table::count_string(size_t column_ndx, StringData value) const
 
 // sum ----------------------------------------------
 
-int64_t Table::sum(size_t column_ndx) const
+int64_t Table::sum_int(size_t column_ndx) const
 {
     const Column& column = get_column<Column, col_type_Int>(column_ndx);
     return column.sum();
@@ -1572,7 +1572,7 @@ double Table::sum_double(size_t column_ndx) const
 
 // average ----------------------------------------------
 
-double Table::average(size_t column_ndx) const
+double Table::average_int(size_t column_ndx) const
 {
     const Column& column = get_column<Column, col_type_Int>(column_ndx);
     return column.average();
@@ -1592,7 +1592,7 @@ double Table::average_double(size_t column_ndx) const
 
 #define USE_COLUMN_AGGREGATE 1
 
-int64_t Table::minimum(size_t column_ndx) const
+int64_t Table::minimum_int(size_t column_ndx) const
 {
 #if USE_COLUMN_AGGREGATE
     const Column& column = get_column<Column, col_type_Int>(column_ndx);
@@ -1625,7 +1625,7 @@ double Table::minimum_double(size_t column_ndx) const
 
 // maximum ----------------------------------------------
 
-int64_t Table::maximum(size_t column_ndx) const
+int64_t Table::maximum_int(size_t column_ndx) const
 {
 #if USE_COLUMN_AGGREGATE
     const Column& column = get_column<Column, col_type_Int>(column_ndx);
@@ -1710,13 +1710,13 @@ size_t Table::find_first_bool(size_t column_ndx, bool value) const
     return column.find_first(value ? 1 : 0);
 }
 
-size_t Table::find_first_date(size_t column_ndx, Date value) const
+size_t Table::find_first_datetime(size_t column_ndx, DateTime value) const
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Date);
     const Column& column = get_column(column_ndx);
 
-    return column.find_first(int64_t(value.get_date()));
+    return column.find_first(int64_t(value.get_datetime()));
 }
 
 size_t Table::find_first_float(size_t column_ndx, float value) const
@@ -1846,25 +1846,25 @@ ConstTableView Table::find_all_double(size_t column_ndx, double value) const
     return move(tv);
 }
 
-TableView Table::find_all_date(size_t column_ndx, Date value)
+TableView Table::find_all_datetime(size_t column_ndx, DateTime value)
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const Column& column = get_column(column_ndx);
 
     TableView tv(*this);
-    column.find_all(tv.get_ref_column(), int64_t(value.get_date()));
+    column.find_all(tv.get_ref_column(), int64_t(value.get_datetime()));
     return move(tv);
 }
 
-ConstTableView Table::find_all_date(size_t column_ndx, Date value) const
+ConstTableView Table::find_all_datetime(size_t column_ndx, DateTime value) const
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
 
     const Column& column = get_column(column_ndx);
 
     ConstTableView tv(*this);
-    column.find_all(tv.get_ref_column(), int64_t(value.get_date()));
+    column.find_all(tv.get_ref_column(), int64_t(value.get_datetime()));
     return move(tv);
 }
 
@@ -1916,7 +1916,7 @@ ConstTableView Table::find_all_binary(size_t, BinaryData) const
     throw runtime_error("Not implemented");
 }
 
-TableView Table::distinct(size_t column_ndx)
+TableView Table::get_distinct_view(size_t column_ndx)
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(has_index(column_ndx));
@@ -1939,7 +1939,7 @@ TableView Table::distinct(size_t column_ndx)
     return move(tv);
 }
 
-ConstTableView Table::distinct(size_t column_ndx) const
+ConstTableView Table::get_distinct_view(size_t column_ndx) const
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(has_index(column_ndx));
@@ -2191,9 +2191,9 @@ void Table::to_json(ostream& out) const
 
 namespace {
 
-inline void out_date(ostream& out, Date value)
+inline void out_datetime(ostream& out, DateTime value)
 {
-    time_t rawtime = value.get_date();
+    time_t rawtime = value.get_datetime();
     struct tm* t = gmtime(&rawtime);
     if (t) {
         // We need a buffer for formatting dates (and binary to hex). Max
@@ -2251,8 +2251,8 @@ void Table::to_json_row(size_t row_ndx, ostream& out) const
             case type_String:
                 out << "\"" << get_string(i, row_ndx) << "\"";
                 break;
-            case type_Date:
-                out << "\""; out_date(out, get_date(i, row_ndx)); out << "\"";
+            case type_DateTime:
+                out << "\""; out_datetime(out, get_datetime(i, row_ndx)); out << "\"";
                 break;
             case type_Binary:
                 out << "\""; out_binary(out, get_binary(i, row_ndx)); out << "\"";
@@ -2284,8 +2284,8 @@ void Table::to_json_row(size_t row_ndx, ostream& out) const
                         case type_String:
                             out << "\"" << m.get_string() << "\"";
                             break;
-                        case type_Date:
-                            out << "\""; out_date(out, m.get_date()); out << "\"";
+                        case type_DateTime:
+                            out << "\""; out_datetime(out, m.get_datetime()); out << "\"";
                             break;
                         case type_Binary:
                             out << "\""; out_binary(out, m.get_binary()); out << "\"";
@@ -2373,11 +2373,11 @@ void Table::to_string_header(ostream& out, vector<size_t>& widths) const
             case type_Bool:
                 width = 5;
                 break;
-            case type_Date:
+            case type_DateTime:
                 width = 19;
                 break;
             case type_Int:
-                width = chars_in_int(maximum(col));
+                width = chars_in_int(maximum_int(col));
                 break;
             case type_Float:
                 // max chars for scientific notation:
@@ -2425,7 +2425,7 @@ void Table::to_string_header(ostream& out, vector<size_t>& widths) const
                         case type_Bool:
                             width = max(width, size_t(5));
                             break;
-                        case type_Date:
+                        case type_DateTime:
                             width = max(width, size_t(19));
                             break;
                         case type_Int:
@@ -2522,8 +2522,8 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
             case type_String:
                 out_string(out, get_string(col, row_ndx), 20);
                 break;
-            case type_Date:
-                out_date(out, get_date(col, row_ndx));
+            case type_DateTime:
+                out_datetime(out, get_datetime(col, row_ndx));
                 break;
             case type_Table:
                 out_table(out, get_subtable_size(col, row_ndx));
@@ -2556,8 +2556,8 @@ void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& wi
                         case type_String:
                             out_string(out, m.get_string(), 20);
                             break;
-                        case type_Date:
-                            out_date(out, m.get_date());
+                        case type_DateTime:
+                            out_datetime(out, m.get_datetime());
                             break;
                         case type_Binary:
                             out.width(widths[col+1]-6); // adjust for " bytes" text

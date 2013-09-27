@@ -274,8 +274,8 @@ bool ColumnMixed::compare_mixed(const ColumnMixed& c) const
             case type_Bool:
                 if (get_bool(i) != c.get_bool(i)) return false;
                 break;
-            case type_Date:
-                if (get_date(i) != c.get_date(i)) return false;
+            case type_DateTime:
+                if (get_datetime(i) != c.get_datetime(i)) return false;
                 break;
             case type_Float:
                 if (get_float(i) != c.get_float(i)) return false;

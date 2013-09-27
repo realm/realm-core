@@ -128,7 +128,6 @@ TEST(Group_OpenBuffer)
     }
 }
 
-
 TEST(Group_BadBuffer)
 {
     File::try_remove("test.tightdb");
@@ -184,6 +183,29 @@ TEST(Group_GetTable)
     TestTableGroup::Ref t3 = g.get_table<TestTableGroup>("beta");
     TestTableGroup::ConstRef t4 = cg.get_table<TestTableGroup>("beta");
     CHECK_EQUAL(t3, t4);
+}
+
+namespace {
+void setupTable(TestTableGroup::Ref t)
+{
+    t->add("a",  1, true, Wed);
+    t->add("b", 15, true, Wed);
+    t->add("ccc", 10, true, Wed);
+    t->add("dddd", 20, true, Wed);
+}
+}
+
+TEST(Group_Equal)
+{
+    Group g1, g2;
+    TestTableGroup::Ref t1 = g1.get_table<TestTableGroup>("TABLE1");
+    setupTable(t1);
+    TestTableGroup::Ref t2 = g2.get_table<TestTableGroup>("TABLE1");
+    setupTable(t2);
+    CHECK_EQUAL(true, g1 == g2);
+
+    t2->add("hey", 2, false, Thu);
+    CHECK_EQUAL(true, g1 != g2);
 }
 
 TEST(Group_TableAccessorLeftBehind)
@@ -510,14 +532,14 @@ TEST(Group_Serialize_All)
 
     table->add_column(type_Int,    "int");
     table->add_column(type_Bool,   "bool");
-    table->add_column(type_Date,   "date");
+    table->add_column(type_DateTime,   "date");
     table->add_column(type_String, "string");
     table->add_column(type_Binary, "binary");
     table->add_column(type_Mixed,  "mixed");
 
     table->insert_int(0, 0, 12);
     table->insert_bool(1, 0, true);
-    table->insert_date(2, 0, 12345);
+    table->insert_datetime(2, 0, 12345);
     table->insert_string(3, 0, "test");
     table->insert_binary(4, 0, BinaryData("binary", 7));
     table->insert_mixed(5, 0, false);
@@ -534,7 +556,7 @@ TEST(Group_Serialize_All)
     CHECK_EQUAL(1, t->size());
     CHECK_EQUAL(12, t->get_int(0, 0));
     CHECK_EQUAL(true, t->get_bool(1, 0));
-    CHECK_EQUAL(time_t(12345), t->get_date(2, 0));
+    CHECK_EQUAL(time_t(12345), t->get_datetime(2, 0));
     CHECK_EQUAL("test", t->get_string(3, 0));
     CHECK_EQUAL(7, t->get_binary(4, 0).size());
     CHECK_EQUAL("binary", t->get_binary(4, 0).data());
@@ -554,13 +576,13 @@ TEST(Group_Persist)
     TableRef table = db.get_table("test");
     table->add_column(type_Int,    "int");
     table->add_column(type_Bool,   "bool");
-    table->add_column(type_Date,   "date");
+    table->add_column(type_DateTime,   "date");
     table->add_column(type_String, "string");
     table->add_column(type_Binary, "binary");
     table->add_column(type_Mixed,  "mixed");
     table->insert_int(0, 0, 12);
     table->insert_bool(1, 0, true);
-    table->insert_date(2, 0, 12345);
+    table->insert_datetime(2, 0, 12345);
     table->insert_string(3, 0, "test");
     table->insert_binary(4, 0, BinaryData("binary", 7));
     table->insert_mixed(5, 0, false);
@@ -577,7 +599,7 @@ TEST(Group_Persist)
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL(time_t(12345), table->get_date(2, 0));
+    CHECK_EQUAL(time_t(12345), table->get_datetime(2, 0));
     CHECK_EQUAL("test", table->get_string(3, 0));
     CHECK_EQUAL(7, table->get_binary(4, 0).size());
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
@@ -598,7 +620,7 @@ TEST(Group_Persist)
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL(time_t(12345), table->get_date(2, 0));
+    CHECK_EQUAL(time_t(12345), table->get_datetime(2, 0));
     CHECK_EQUAL("Changed!", table->get_string(3, 0));
     CHECK_EQUAL(7, table->get_binary(4, 0).size());
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
@@ -1130,7 +1152,7 @@ TEST(Group_ToDot)
     Spec s = table->get_spec();
     s.add_column(type_Int,    "int");
     s.add_column(type_Bool,   "bool");
-    s.add_column(type_Date,   "date");
+    s.add_column(type_DateTime,   "date");
     s.add_column(type_String, "string");
     s.add_column(type_String, "string_long");
     s.add_column(type_String, "string_enum"); // becomes ColumnStringEnum
@@ -1145,7 +1167,7 @@ TEST(Group_ToDot)
     for (size_t i = 0; i < 15; ++i) {
         table->insert_int(0, i, i);
         table->insert_bool(1, i, (i % 2 ? true : false));
-        table->insert_date(2, i, 12345);
+        table->insert_datetime(2, i, 12345);
 
         stringstream ss;
         ss << "string" << i;
