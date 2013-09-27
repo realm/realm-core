@@ -510,7 +510,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     // Searching:
 
     CHECK_EQUAL(not_found, degen_child->lookup(StringData()));
-    CHECK_EQUAL(0, degen_child->distinct(0).size());
+//    CHECK_EQUAL(0, degen_child->distinct(0).size()); // needs index but you cannot set index on ConstTableRef
     CHECK_EQUAL(0, degen_child->get_sorted_view(0).size());
 
     CHECK_EQUAL(not_found, degen_child->find_first_int(0, 0));
