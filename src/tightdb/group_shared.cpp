@@ -233,7 +233,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             m_file.prealloc(0,file_size);
             need_init = true;
 
-        } catch (runtime_error e) {
+        } catch (runtime_error& e) {
 
             // if this one throws, just propagate it:
             m_file.open(m_file_path, 
