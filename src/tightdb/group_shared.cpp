@@ -281,11 +281,15 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // Set initial version so we can track if other instances
             // change the db
             m_version = info->current_version.load_relaxed();
+
+#ifndef _WIN32
             // In async mode we need a separate process to do the async commits
             // We start it up here during init so that it only get started once
             if (dlevel == durability_Async) {
                 spawn_daemon(path);
             }
+#endif
+
         }
         else {
             // wait for init complete:
@@ -360,10 +364,13 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 #endif
 
     SharedInfo* info = m_file_map.get_addr();
+
+#ifndef _WIN32
     if (info->flags == durability_Async) {
         m_file.unlock();
         return;
     }
+#endif
 
     if (!m_file.try_lock_exclusive()) {
         m_file.unlock();
@@ -652,6 +659,7 @@ Group& SharedGroup::begin_write()
     // commit() or rollback()
     info->writemutex.lock(&recover_from_dead_write_transact); // Throws
 
+#ifndef _WIN32
     if (info->flags == durability_Async) {
 
         info->balancemutex.lock(&recover_from_dead_write_transact); // Throws
@@ -669,6 +677,7 @@ Group& SharedGroup::begin_write()
         info->free_write_slots--;
         info->balancemutex.unlock();
     }
+#endif
 
     // Get the current top ref
     ref_type new_top_ref = to_size_t(info->current_top);
