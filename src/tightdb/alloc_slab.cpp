@@ -18,14 +18,7 @@ using namespace tightdb;
 
 namespace {
 
-// Limited to 7 bits (max 127).
-//
-// 8-bit values are not allowed because 'char' may be a signed 8-bit
-// type, and C++ does not define the result of casting to any signed
-// type unless the original value can be represented unchanged in the
-// target type [C++11 4.7/3]. This, of course, is not a hard
-// limitation, only a limitation due to the way we currently buld the
-// default header.
+// Limited to 8 bits (max 255).
 const int current_file_format_version = 1;
 
 #ifdef TIGHTDB_SLAB_ALLOC_DEBUG
@@ -42,12 +35,20 @@ public:
 
 } // anonymous namespace
 
-const char SlabAlloc::default_header[24] = {
-    0,   0,   0,   0,   0,   0,   0,   0,
-    0,   0,   0,   0,   0,   0,   0,   0,
-    'T', '-', 'D', 'B',
-    current_file_format_version,
-    current_file_format_version, 0, 0
+const SlabAlloc::Header SlabAlloc::empty_file_header = {
+    { 0, 0 }, // top-refs
+    { 'T', '-', 'D', 'B' },
+    { current_file_format_version, current_file_format_version },
+    0, // reserved
+    0  // select bit
+};
+
+const SlabAlloc::Header SlabAlloc::streaming_header = {
+    { 0xFFFFFFFFFFFFFFFFULL, 0 }, // top-refs
+    { 'T', '-', 'D', 'B' },
+    { current_file_format_version, current_file_format_version },
+    0, // reserved
+    0  // select bit
 };
 
 void SlabAlloc::detach() TIGHTDB_NOEXCEPT
@@ -343,8 +344,8 @@ char* SlabAlloc::translate(ref_type ref) const TIGHTDB_NOEXCEPT
 }
 
 
-void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create,
-                            bool skip_validate)
+ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create,
+                                bool skip_validate)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -363,6 +364,8 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
     File::CloseGuard fcg(m_file);
 
     size_t initial_size = 4 * 1024; // a single page sure feels tight
+
+    ref_type top_ref = 0;
 
     // The size of a database file must not exceed what can be encoded
     // in std::size_t.
@@ -389,7 +392,8 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
         if (read_only)
             goto invalid_database;
 
-        m_file.write(default_header); // Throws
+        const char* data = reinterpret_cast<const char*>(&empty_file_header);
+        m_file.write(data, sizeof empty_file_header); // Throws
 
         // Pre-alloc initial space
         m_file.prealloc(0, initial_size); // Throws
@@ -399,9 +403,10 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
     {
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
 
+        m_file_on_streaming_form = false; // May be updated by validate_buffer()
         if (!skip_validate) {
             // Verify the data structures
-            if (!validate_buffer(map.get_addr(), size))
+            if (!validate_buffer(map.get_addr(), size, top_ref))
                 goto invalid_database;
         }
 
@@ -411,24 +416,28 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
     }
 
     fcg.release(); // Do not close
-    return;
+    return top_ref;
 
   invalid_database:
     throw InvalidDatabase();
 }
 
 
-void SlabAlloc::attach_buffer(char* data, size_t size)
+ref_type SlabAlloc::attach_buffer(char* data, size_t size)
 {
     TIGHTDB_ASSERT(!is_attached());
 
     // Verify the data structures
-    if (!validate_buffer(data, size))
+    m_file_on_streaming_form = false; // May be updated by validate_buffer()
+    ref_type top_ref;
+    if (!validate_buffer(data, size, top_ref))
         throw InvalidDatabase();
 
     m_data        = data;
     m_baseline    = size;
     m_attach_mode = attach_UsersBuffer;
+
+    return top_ref;
 }
 
 
@@ -448,13 +457,13 @@ void SlabAlloc::attach_empty()
 }
 
 
-bool SlabAlloc::validate_buffer(const char* data, size_t len) const
+bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref)
 {
-    // Verify that data is 64bit aligned
-    if (len < sizeof default_header || (len & 0x7) != 0)
+    // Verify that size is sane and 8-byte aligned
+    if (size < sizeof (Header) || size % 8 != 0)
         return false;
 
-    // File header is 24 bytes, composed of three 64bit
+    // File header is 24 bytes, composed of three 64-bit
     // blocks. The two first being top_refs (only one valid
     // at a time) and the last being the info block.
     const char* file_header = data;
@@ -476,33 +485,35 @@ bool SlabAlloc::validate_buffer(const char* data, size_t len) const
 
     // Top_ref should always point within buffer
     const uint64_t* top_refs = reinterpret_cast<const uint64_t*>(data);
-    ref_type ref = to_ref(top_refs[valid_part]);
-    if (ref >= len)
+    uint_fast64_t ref = top_refs[valid_part];
+    if (valid_part == 0 && ref == 0xFFFFFFFFFFFFFFFFULL) {
+        if (size < sizeof (Header) + sizeof (StreamingFooter))
+            return false;
+        const StreamingFooter* footer = reinterpret_cast<const StreamingFooter*>(data+size) - 1;
+        ref = footer->m_top_ref;
+        if (footer->m_magic_cookie != footer_magic_cookie)
+            return false;
+        m_file_on_streaming_form = true;
+    }
+    if (ref >= size || ref % 8 != 0 || ref > numeric_limits<ref_type>::max())
         return false; // invalid top_ref
 
+    top_ref = ref;
     return true;
 }
 
 
-ref_type SlabAlloc::get_top_ref() const TIGHTDB_NOEXCEPT
+void SlabAlloc::do_prepare_for_update(char* mutable_data)
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(m_baseline > 0);
-
-    // File header is 24 bytes, composed of three 64bit
-    // blocks. The two first being top_refs (only one valid
-    // at a time) and the last being the info block.
-    const char* file_header = m_data;
-
-    // Last bit in info block indicates which top_ref block
-    // is valid
-    int valid_ref = file_header[16 + 7] & 0x1;
-
-    const uint64_t* top_refs = reinterpret_cast<uint64_t*>(m_data);
-    ref_type ref = to_ref(top_refs[valid_ref]);
-    TIGHTDB_ASSERT(ref < m_baseline);
-
-    return ref;
+    TIGHTDB_ASSERT(m_file_on_streaming_form);
+    Header* header = reinterpret_cast<Header*>(mutable_data);
+    TIGHTDB_ASSERT(equal(reinterpret_cast<char*>(header), reinterpret_cast<char*>(header+1),
+                         reinterpret_cast<const char*>(&streaming_header)));
+    StreamingFooter* footer = reinterpret_cast<StreamingFooter*>(mutable_data+m_baseline) - 1;
+    TIGHTDB_ASSERT(footer->m_magic_cookie == footer_magic_cookie);
+    header->m_top_ref[1] = footer->m_top_ref;
+    header->m_select_bit = 1;
+    m_file_on_streaming_form = false;
 }
 
 

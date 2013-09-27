@@ -63,11 +63,11 @@ struct SharedGroup::SharedInfo {
     static const int init_readers_size = 32; // Must be a power of two
     ReadCount readers[init_readers_size];
 
-    SharedInfo(const SlabAlloc&, size_t file_size, DurabilityLevel);
+    SharedInfo(ref_type top_ref, size_t file_size, size_t info_size, DurabilityLevel);
     ~SharedInfo() TIGHTDB_NOEXCEPT {}
 };
 
-SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t info_size,
+SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, size_t info_size,
                                     DurabilityLevel dlevel):
 #ifndef _WIN32
     readmutex(Mutex::process_shared_tag()), // Throws
@@ -83,11 +83,11 @@ SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t info_size,
 {
     version  = 0;
     flags    = dlevel; // durability level is fixed from creation
-    filesize = alloc.get_baseline();
+    filesize = file_size;
     infosize = uint32_t(info_size);
-    current_top     = alloc.get_top_ref();
+    current_top = top_ref;
     current_version.store_relaxed(1);
-    capacity_mask   = init_readers_size - 1;
+    capacity_mask = init_readers_size - 1;
     put_pos = 0;
     get_pos = 0;
     shutdown_started.store_release(0);
@@ -222,7 +222,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
     bool must_retry;
     do {
         bool need_init = false;
-        size_t file_size = 0;
+        size_t info_size = 0;
         must_retry = false;
 
         // Open shared coordination buffer
@@ -230,8 +230,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
             m_file.open(m_file_path, 
                         File::access_ReadWrite, File::create_Must, 0);
-            file_size = sizeof (SharedInfo);
-            m_file.prealloc(0,file_size);
+            info_size = sizeof (SharedInfo);
+            m_file.prealloc(0, info_size);
             need_init = true;
 
         } catch (runtime_error e) {
@@ -253,13 +253,13 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // need to validate the size of the file before trying to map it
             // possibly waiting a little for size to go nonzero, if another
             // process is creating the file in parallel.
-            if (int_cast_with_overflow_detect(m_file.get_size(), file_size))
+            if (int_cast_with_overflow_detect(m_file.get_size(), info_size))
                 throw runtime_error("Lock file too large");
             if (time_left <= 0)
                 throw runtime_error("Stale lock file");
             // wait for file to at least contain the basic shared info block
             // NB! it might be larger due to expansion of the ring buffer.
-            if (file_size < sizeof(SharedInfo))
+            if (info_size < sizeof (SharedInfo))
                 micro_sleep(10);
             else
                 break;
@@ -286,10 +286,12 @@ void SharedGroup::open(const string& path, bool no_create_file,
             bool is_shared = true;
             bool read_only = false;
             bool skip_validate = false;
-            alloc.attach_file(path, is_shared, read_only, no_create_file, skip_validate); // Throws
+            ref_type top_ref = alloc.attach_file(path, is_shared, read_only, no_create_file,
+                                                 skip_validate); // Throws
 
             // Call SharedInfo::SharedInfo() (placement new)
-            new (info) SharedInfo(alloc, file_size, dlevel); // Throws
+            size_t file_size = alloc.get_baseline();
+            new (info) SharedInfo(top_ref, file_size, info_size, dlevel); // Throws
 
             // Set initial version so we can track if other instances
             // change the db
@@ -1108,4 +1110,17 @@ void SharedGroup::low_level_commit(uint64_t new_version)
 
     // Save last version for has_changed()
     m_version = new_version;
+}
+
+
+void SharedGroup::reserve(size_t size)
+{
+    TIGHTDB_ASSERT(is_attached());
+    // FIXME: There is currently no synchronization between this and
+    // concurrent commits in progress. This is so because it is
+    // believed that the OS guarantees race free behaviour when
+    // File::prealloc_if_supported() (posix_fallocate() on Linux) runs
+    // concurrently with modfications via a memory map of the
+    // file. This assumption must be verified though.
+    m_group.m_alloc.reserve(size);
 }
