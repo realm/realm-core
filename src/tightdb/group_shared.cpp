@@ -374,10 +374,9 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     }
 #endif
 
-    if (!m_file.try_lock_exclusive()) {
-        m_file.unlock();
+    m_file.unlock();
+    if (!m_file.try_lock_exclusive())
         return;
-    }
 
     if (info->shutdown_started.load_acquire()) {
         m_file.unlock();
