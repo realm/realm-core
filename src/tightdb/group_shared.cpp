@@ -1,10 +1,5 @@
 #include <fcntl.h>
 #include <errno.h>
-#ifndef _WIN32
-#include <sys/wait.h>
-#include <sys/time.h>
-#include <unistd.h>
-#endif
 #include <algorithm>
 
 #include <tightdb/safe_int_ops.hpp>
@@ -13,6 +8,15 @@
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group_shared.hpp>
 #include <tightdb/group_writer.hpp>
+
+#ifndef _WIN32
+#include <sys/wait.h>
+#include <sys/time.h>
+#include <unistd.h>
+#else
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 // #define TIGHTDB_ENABLE_LOGFILE
 
@@ -169,6 +173,16 @@ void spawn_daemon(const string& file)
 void spawn_daemon(const string& file) {}
 #endif
 
+
+inline void micro_sleep(uint64_t microsec_delay)
+{
+#ifdef _WIN32
+    // FIXME: this is not optimal, but it should work
+    Sleep(microsec_delay/1000+1);
+#else
+    usleep(microsec_delay);
+#endif
+}
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
 //
 // According to the 'process-sharing example' in the POSIX man page
@@ -234,7 +248,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // wait for file to at least contain the basic shared info block
             // NB! it might be larger due to expansion of the ring buffer.
             if (file_size < sizeof(SharedInfo))
-                usleep(10);
+                micro_sleep(10);
             else
                 break;
         }
@@ -278,7 +292,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             int wait_count = 100000;
             while (wait_count && (info->init_complete.load_acquire() == 0)) {
                 wait_count--;
-                usleep(10);
+                micro_sleep(10);
             }
             if (info->init_complete.load_acquire() == 0)
                 throw runtime_error("Lock file initialization incomplete");
@@ -286,7 +300,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 throw runtime_error("Unsupported version");
             if (info->shutdown_started.load_acquire()) {
                 must_retry = true;
-                usleep(100);
+                micro_sleep(100);
                 continue;
                 // this will unmap and close the lock file. Then we retry
             }
@@ -311,7 +325,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
 #endif
-
+#ifndef _WIN32
     if (dlevel == durability_Async) {
         if (is_backend) {
             do_async_commits(); // will never return
@@ -324,11 +338,12 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 if (info->init_complete.load_acquire() == 2) {
                     return;
                 }
-                usleep(10);
+                micro_sleep(10);
             }
             throw runtime_error("Failed to observe async commit starting");
         }
     }
+#endif
 }
 
 
@@ -395,6 +410,8 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
     bool changed = m_version != info->current_version.load_relaxed();
     return changed;
 }
+
+#ifndef _WIN32
 
 void SharedGroup::do_async_commits()
 {
@@ -523,7 +540,7 @@ void SharedGroup::do_async_commits()
 
     }
 }
-
+#endif // _WIN32
 
 const Group& SharedGroup::begin_read()
 {
