@@ -12,7 +12,7 @@
 #include <tightdb/group_shared.hpp>
 #include <tightdb/group_writer.hpp>
 
-// #define TIGHTDB_ENABLE_LOGFILE
+#define TIGHTDB_ENABLE_LOGFILE
 
 using namespace std;
 using namespace tightdb;
@@ -395,11 +395,12 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 void SharedGroup::do_async_commits()
 {
     bool shutdown = false;
+    bool file_already_removed = false;
     SharedInfo* info = m_file_map.get_addr();
     // NO client are allowed to proceed and update current_version
     // until they see the init_complete == 2. 
     // As we haven't set init_complete to 2 yet, it is safe to assert the following:
-    TIGHTDB_ASSERT(info->current_version.load_relaxed() == 0);
+    TIGHTDB_ASSERT(info->current_version.load_relaxed() == 0 || info->current_version.load_relaxed() == 1);
 
     // We always want to keep a read lock on the last version
     // that was commited to disk, to protect it against being
@@ -416,6 +417,7 @@ void SharedGroup::do_async_commits()
 
         if (m_file.is_removed()) { // operator removed the lock file. take a hint!
 
+            file_already_removed = true; // don't remove what is already gone
             info->shutdown_started.store_release(1);
             shutdown = true;
 #ifdef TIGHTDB_ENABLE_LOGFILE
@@ -479,7 +481,8 @@ void SharedGroup::do_async_commits()
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Removing coordination file" << endl;
 #endif
-            File::remove(m_file_path);
+            if (!file_already_removed)
+                File::remove(m_file_path);
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Daemon exiting nicely" << endl << endl;
 #endif
