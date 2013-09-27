@@ -5,9 +5,6 @@
 using namespace std;
 using namespace tightdb;
 
-// Convert ConstTableView to TableView. Used to let const and non-const public methods Table::find_all_xxx re-use
-// eachothers code
-TableView::TableView(ConstTableView tv): TableViewBase(&tv) {}
 
 // Searching
 
