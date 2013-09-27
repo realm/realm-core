@@ -497,7 +497,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
 
 // Sum
 
-int64_t Query::sum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+int64_t Query::sum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, resultcount, start, end, limit);
 }
@@ -512,7 +512,7 @@ double Query::sum_double(size_t column_ndx, size_t* resultcount, size_t start, s
 
 // Maximum
 
-int64_t Query::maximum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, resultcount, start, end, limit);
 }
@@ -527,7 +527,7 @@ double Query::maximum_double(size_t column_ndx, size_t* resultcount, size_t star
 
 // Minimum
 
-int64_t Query::minimum(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+int64_t Query::minimum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, resultcount, start, end, limit);
 }
@@ -557,7 +557,7 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
     return avg1;
 }
 
-double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
+double Query::average_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     return average<int64_t>(column_ndx, resultcount, start, end, limit);
 }

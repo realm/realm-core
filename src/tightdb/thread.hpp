@@ -588,7 +588,32 @@ inline T Atomic<T>::load() const
 }
 
 template<typename T>
+inline T Atomic<T>::load_relaxed() const
+{
+    return state;
+}
+
+template<typename T>
+inline T Atomic<T>::load_acquire() const
+{
+    return state;
+}
+
+template<typename T>
 inline void Atomic<T>::store(T value) 
+{
+    state = value;
+}
+
+template<typename T>
+inline void Atomic<T>::store_relaxed(T value) 
+{
+    state = value;
+
+}
+
+template<typename T>
+inline void Atomic<T>::store_release(T value) 
 {
     state = value;
 }

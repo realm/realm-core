@@ -40,7 +40,7 @@ namespace tightdb {
 struct SpecBase {
     typedef int64_t             Int;
     typedef bool                Bool;
-    typedef tightdb::Date       Date;
+    typedef tightdb::DateTime   DateTime;
     typedef float               Float;
     typedef double              Double;
     typedef tightdb::StringData String;
@@ -387,23 +387,23 @@ public:
 
 /// Field accessor specialization for dates.
 template<class Taboid, int col_idx, bool const_tab>
-class FieldAccessor<Taboid, col_idx, Date, const_tab>: public FieldAccessorBase<Taboid> {
+class FieldAccessor<Taboid, col_idx, DateTime, const_tab>: public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    Date get() const TIGHTDB_NOEXCEPT
+    DateTime get() const TIGHTDB_NOEXCEPT
     {
-        return Base::m_table->get_impl()->get_date(col_idx, Base::m_row_idx);
+        return Base::m_table->get_impl()->get_datetime(col_idx, Base::m_row_idx);
     }
 
-    void set(Date value) const
+    void set(DateTime value) const
     {
-        Base::m_table->get_impl()->set_date(col_idx, Base::m_row_idx, value);
+        Base::m_table->get_impl()->set_datetime(col_idx, Base::m_row_idx, value);
     }
 
-    operator Date() const TIGHTDB_NOEXCEPT { return get(); }
-    const FieldAccessor& operator=(Date value) const { set(value); return *this; }
+    operator DateTime() const TIGHTDB_NOEXCEPT { return get(); }
+    const FieldAccessor& operator=(DateTime value) const { set(value); return *this; }
 
 
     explicit FieldAccessor(typename Base::Init i) TIGHTDB_NOEXCEPT: Base(i) {}
@@ -598,7 +598,7 @@ public:
 
     bool get_bool() const TIGHTDB_NOEXCEPT { return get().get_bool(); }
 
-    Date get_date() const TIGHTDB_NOEXCEPT { return get().get_date(); }
+    DateTime get_datetime() const TIGHTDB_NOEXCEPT { return get().get_datetime(); }
 
     float get_float() const TIGHTDB_NOEXCEPT { return get().get_float(); }
 
@@ -838,22 +838,22 @@ public:
 
     int64_t sum() const
     {
-        return Base::m_table->get_impl()->sum(col_idx);
+        return Base::m_table->get_impl()->sum_int(col_idx);
     }
 
     int64_t maximum() const
     {
-        return Base::m_table->get_impl()->maximum(col_idx);
+        return Base::m_table->get_impl()->maximum_int(col_idx);
     }
 
     int64_t minimum() const
     {
-        return Base::m_table->get_impl()->minimum(col_idx);
+        return Base::m_table->get_impl()->minimum_int(col_idx);
     }
 
     double average() const
     {
-        return Base::m_table->get_impl()->average(col_idx);
+        return Base::m_table->get_impl()->average_int(col_idx);
     }
 
     const ColumnAccessor& operator+=(int64_t value) const
@@ -1055,31 +1055,31 @@ public:
 
 /// Column accessor specialization for dates.
 template<class Taboid, int col_idx>
-class ColumnAccessor<Taboid, col_idx, Date>: public ColumnAccessorBase<Taboid, col_idx, Date> {
+class ColumnAccessor<Taboid, col_idx, DateTime>: public ColumnAccessorBase<Taboid, col_idx, DateTime> {
 private:
-    typedef ColumnAccessorBase<Taboid, col_idx, Date> Base;
+    typedef ColumnAccessorBase<Taboid, col_idx, DateTime> Base;
 
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
 
-    Date maximum() const
+    DateTime maximum() const
     {
-        return Base::m_table->get_impl()->maximum_date(col_idx);
+        return Base::m_table->get_impl()->maximum_datetime(col_idx);
     }
 
-    Date minimum() const
+    DateTime minimum() const
     {
-        return Base::m_table->get_impl()->minimum_date(col_idx);
+        return Base::m_table->get_impl()->minimum_datetime(col_idx);
     }
 
-    std::size_t find_first(Date value) const
+    std::size_t find_first(DateTime value) const
     {
-        return Base::m_table->get_impl()->find_first_date(col_idx, value);
+        return Base::m_table->get_impl()->find_first_datetime(col_idx, value);
     }
 
-    BasicTableView<typename Base::RealTable> find_all(Date value) const
+    BasicTableView<typename Base::RealTable> find_all(DateTime value) const
     {
-        return Base::m_table->get_impl()->find_all_date(col_idx, value);
+        return Base::m_table->get_impl()->find_all_datetime(col_idx, value);
     }
 };
 
@@ -1109,9 +1109,9 @@ public:
         return Base::m_table->get_impl()->find_all_string(col_idx, value);
     }
 
-    BasicTableView<typename Base::RealTable> distinct() const
+    BasicTableView<typename Base::RealTable> get_distinct_view() const
     {
-        return Base::m_table->get_impl()->distinct(col_idx);
+        return Base::m_table->get_impl()->get_distinct_view(col_idx);
     }
 
     std::size_t lower_bound(StringData value) const TIGHTDB_NOEXCEPT
@@ -1248,25 +1248,25 @@ public:
     int64_t sum(std::size_t* resultcount=NULL, std::size_t start=0,
                 std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.sum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.sum_int(col_idx, resultcount, start, end, limit);
     }
 
     int64_t maximum(std::size_t* resultcount=NULL, std::size_t start=0,
                     std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.maximum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.maximum_int(col_idx, resultcount, start, end, limit);
     }
 
     int64_t minimum(std::size_t* resultcount=NULL, std::size_t start=0,
                     std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.minimum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.minimum_int(col_idx, resultcount, start, end, limit);
     }
 
     double average(std::size_t* resultcount=NULL, std::size_t start=0,
                    std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.average(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.average_int(col_idx, resultcount, start, end, limit);
     }
 };
 
@@ -1441,66 +1441,66 @@ public:
 
 /// QueryColumn specialization for dates.
 template<class Taboid, int col_idx>
-class QueryColumn<Taboid, col_idx, Date>: public QueryColumnBase<Taboid, col_idx, Date> {
+class QueryColumn<Taboid, col_idx, DateTime>: public QueryColumnBase<Taboid, col_idx, DateTime> {
 private:
-    typedef QueryColumnBase<Taboid, col_idx, Date> Base;
+    typedef QueryColumnBase<Taboid, col_idx, DateTime> Base;
     typedef typename Taboid::Query Query;
 
 public:
     explicit QueryColumn(Query* q) TIGHTDB_NOEXCEPT: Base(q) {}
 
-    Query& equal(Date value) const
+    Query& equal(DateTime value) const
     {
-        Base::m_query->m_impl.equal_date(col_idx, value);
+        Base::m_query->m_impl.equal_datetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& not_equal(Date value) const
+    Query& not_equal(DateTime value) const
     {
-        Base::m_query->m_impl.not_equal_date(col_idx, value);
+        Base::m_query->m_impl.not_equal_datetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& greater(Date value) const
+    Query& greater(DateTime value) const
     {
-        Base::m_query->m_impl.greater_date(col_idx, value);
+        Base::m_query->m_impl.greater_datetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& greater_equal(Date value) const
+    Query& greater_equal(DateTime value) const
     {
-        Base::m_query->m_impl.greater_equal_date(col_idx, value);
+        Base::m_query->m_impl.greater_equal_datetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& less(Date value) const
+    Query& less(DateTime value) const
     {
-        Base::m_query->m_impl.less_date(col_idx, value);
+        Base::m_query->m_impl.less_datetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& less_equal(Date value) const
+    Query& less_equal(DateTime value) const
     {
-        Base::m_query->m_impl.less_equal_date(col_idx, value);
+        Base::m_query->m_impl.less_equal_datetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& between(Date from, Date to) const
+    Query& between(DateTime from, DateTime to) const
     {
-        Base::m_query->m_impl.between_date(col_idx, from, to);
+        Base::m_query->m_impl.between_datetime(col_idx, from, to);
         return *Base::m_query;
     };
 
-    Date maximum(const Taboid& tab, std::size_t* resultcount=NULL, std::size_t start=0,
+    DateTime maximum(const Taboid& tab, std::size_t* resultcount=NULL, std::size_t start=0,
                  std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.maximum_date(tab, col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.maximum_datetime(tab, col_idx, resultcount, start, end, limit);
     }
 
-    Date minimum(const Taboid& tab, std::size_t* resultcount=NULL, std::size_t start=0,
+    DateTime minimum(const Taboid& tab, std::size_t* resultcount=NULL, std::size_t start=0,
                  std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.minimum_date(tab, col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.minimum_datetime(tab, col_idx, resultcount, start, end, limit);
     }
 };
 

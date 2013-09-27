@@ -1,8 +1,5 @@
 #include <fcntl.h>
 #include <errno.h>
-#include <sys/wait.h>
-#include <sys/time.h>
-#include <unistd.h>
 #include <algorithm>
 
 #include <tightdb/safe_int_ops.hpp>
@@ -11,6 +8,15 @@
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group_shared.hpp>
 #include <tightdb/group_writer.hpp>
+
+#ifndef _WIN32
+#include <sys/wait.h>
+#include <sys/time.h>
+#include <unistd.h>
+#else
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 // #define TIGHTDB_ENABLE_LOGFILE
 
@@ -58,7 +64,7 @@ struct SharedGroup::SharedInfo {
     ~SharedInfo() TIGHTDB_NOEXCEPT {}
 };
 
-SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
+SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t info_size,
                                     DurabilityLevel dlevel):
     readmutex(Mutex::process_shared_tag()), // Throws
     writemutex(), // Throws
@@ -69,7 +75,7 @@ SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
     version  = 0;
     flags    = dlevel; // durability level is fixed from creation
     filesize = alloc.get_baseline();
-    infosize = uint32_t(file_size);
+    infosize = uint32_t(info_size);
     current_top     = alloc.get_top_ref();
     current_version.store_relaxed(1);
     capacity_mask   = init_readers_size - 1;
@@ -90,6 +96,7 @@ void recover_from_dead_write_transact()
 
 } // anonymous namespace
 
+#ifndef _WIN32
 
 void spawn_daemon(const string& file)
 {
@@ -150,8 +157,10 @@ void spawn_daemon(const string& file)
             throw runtime_error("failed to wait for daemon start");
         if (!WIFEXITED(status))
             throw runtime_error("failed starting async commit (exit)");
-        if (WEXITSTATUS(status) == 1)
+        if (WEXITSTATUS(status) == 1) {
+            // FIXME: Or `ld` could not find a required shared library
             throw runtime_error("async commit daemon not found");
+        }
         if (WEXITSTATUS(status) == 2)
             throw runtime_error("async commit daemon failed");
         if (WEXITSTATUS(status) == 3)
@@ -162,7 +171,20 @@ void spawn_daemon(const string& file)
         throw runtime_error("Failed to spawn async commit");
     }
 }
+#else
+void spawn_daemon(const string& file) {}
+#endif
 
+
+inline void micro_sleep(uint64_t microsec_delay)
+{
+#ifdef _WIN32
+    // FIXME: this is not optimal, but it should work
+    Sleep(microsec_delay/1000+1);
+#else
+    usleep(microsec_delay);
+#endif
+}
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
 //
 // According to the 'process-sharing example' in the POSIX man page
@@ -228,7 +250,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // wait for file to at least contain the basic shared info block
             // NB! it might be larger due to expansion of the ring buffer.
             if (file_size < sizeof(SharedInfo))
-                usleep(10);
+                micro_sleep(10);
             else
                 break;
         }
@@ -253,7 +275,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // with old state when starting transactions
             bool is_shared = true;
             bool read_only = false;
-            alloc.attach_file(path, is_shared, read_only, no_create_file); // Throws
+            bool skip_validate = false;
+            alloc.attach_file(path, is_shared, read_only, no_create_file, skip_validate); // Throws
 
             // Call SharedInfo::SharedInfo() (placement new)
             new (info) SharedInfo(alloc, file_size, dlevel); // Throws
@@ -261,18 +284,22 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // Set initial version so we can track if other instances
             // change the db
             m_version = info->current_version.load_relaxed();
+
+#ifndef _WIN32
             // In async mode we need a separate process to do the async commits
             // We start it up here during init so that it only get started once
             if (dlevel == durability_Async) {
                 spawn_daemon(path);
             }
+#endif
+
         }
         else {
             // wait for init complete:
             int wait_count = 100000;
             while (wait_count && (info->init_complete.load_acquire() == 0)) {
                 wait_count--;
-                usleep(10);
+                micro_sleep(10);
             }
             if (info->init_complete.load_acquire() == 0)
                 throw runtime_error("Lock file initialization incomplete");
@@ -280,7 +307,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 throw runtime_error("Unsupported version");
             if (info->shutdown_started.load_acquire()) {
                 must_retry = true;
-                usleep(100);
+                micro_sleep(100);
                 continue;
                 // this will unmap and close the lock file. Then we retry
             }
@@ -293,7 +320,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
             bool is_shared = true;
             bool read_only = false;
             bool no_create = true;
-            alloc.attach_file(path, is_shared, read_only, no_create); // Throws
+            bool skip_validate = true; // To avoid race conditions
+            alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
 
         }
 
@@ -305,7 +333,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
 #endif
-
+#ifndef _WIN32
     if (dlevel == durability_Async) {
         if (is_backend) {
             do_async_commits();
@@ -318,11 +346,12 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 if (info->init_complete.load_acquire() == 2) {
                     return;
                 }
-                usleep(10);
+                micro_sleep(10);
             }
             throw runtime_error("Failed to observe async commit starting");
         }
     }
+#endif
 }
 
 
@@ -339,10 +368,13 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 #endif
 
     SharedInfo* info = m_file_map.get_addr();
+
+#ifndef _WIN32
     if (info->flags == durability_Async) {
         m_file.unlock();
         return;
     }
+#endif
 
     if (!m_file.try_lock_exclusive()) {
         m_file.unlock();
@@ -389,6 +421,8 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
     bool changed = m_version != info->current_version.load_relaxed();
     return changed;
 }
+
+#ifndef _WIN32
 
 void SharedGroup::do_async_commits()
 {
@@ -518,7 +552,7 @@ void SharedGroup::do_async_commits()
 
     }
 }
-
+#endif // _WIN32
 
 const Group& SharedGroup::begin_read()
 {
@@ -630,6 +664,7 @@ Group& SharedGroup::begin_write()
     // commit() or rollback()
     info->writemutex.lock(&recover_from_dead_write_transact); // Throws
 
+#ifndef _WIN32
     if (info->flags == durability_Async) {
 
         info->balancemutex.lock(&recover_from_dead_write_transact); // Throws
@@ -647,6 +682,7 @@ Group& SharedGroup::begin_write()
         info->free_write_slots--;
         info->balancemutex.unlock();
     }
+#endif
 
     // Get the current top ref
     ref_type new_top_ref = to_size_t(info->current_top);

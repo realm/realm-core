@@ -34,9 +34,12 @@ namespace tightdb {
 class SharedGroup {
 public:
     enum DurabilityLevel {
-        durability_Full,
-        durability_MemOnly,
-        durability_Async
+        durability_Full
+        , durability_MemOnly
+#ifndef _WIN32
+        // Async commits are not yet supported on windows
+        , durability_Async
+#endif
     };
 
     /// Equivalent to calling open(const std::string&, bool,
@@ -108,6 +111,24 @@ public:
     /// method other than open(), is_attached(), and ~SharedGroup() on
     /// an unattached instance results in undefined behavior.
     bool is_attached() const TIGHTDB_NOEXCEPT;
+
+    /// Reserve disk space now to avoid allocation errors at a later
+    /// point in time, and to minimize on-disk fragmentation. In some
+    /// cases, less fragmentation translates into improved
+    /// performance.
+    ///
+    /// A call to this method will make the database file at least as
+    /// big as the specified size, and, if the platform supports it,
+    /// disk space will be allocated for the entire file.
+    ///
+    /// If the database file is already as big as the specified size,
+    /// or bigger, this method will not affect the size of the file,
+    /// but, if the platform supports it, it will still cause
+    /// previously unallocated disk space to be allocated.
+    ///
+    /// It is an error to call this function on an unattached shared
+    /// group. Doing so will result in undefined behavior.
+    void reserve(std::size_t size_in_bytes);
 
     // Has db been modified since last transaction?
     bool has_changed() const TIGHTDB_NOEXCEPT;
@@ -296,6 +317,12 @@ inline void SharedGroup::open(Replication& repl)
 }
 
 #endif // TIGHTDB_ENABLE_REPLICATION
+
+
+inline void SharedGroup::reserve(std::size_t size)
+{
+    m_group.m_alloc.reserve(size);
+}
 
 
 } // namespace tightdb

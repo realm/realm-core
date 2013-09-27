@@ -143,7 +143,7 @@ CATEGORIES :
                  int64_t       get(size_t row_ndx) const;
                  float         get(size_t row_ndx) const;
                  double        get(size_t row_ndx) const;
-                 Date          get(size_t row_ndx) const;
+                 DateTime      get(size_t row_ndx) const;
                  StringData    get(size_t row_ndx) const;
                  BinaryData    get(size_t row_ndx) const;
                  Mixed         get(size_t row_ndx) const;
@@ -156,7 +156,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : *g_typed_view_parameter_row_position_descr
       RETURN:
-        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed, DataType, TableRef, ConstTableRef]
+        TYPES  : [bool, int64_t, float, double, DateTime, StringData, BinaryData, Mixed, DataType, TableRef, ConstTableRef]
         DESCR  : &g_typed_view_value_return_descr
                  The value.
       EXAMPLES:
@@ -184,7 +184,7 @@ CATEGORIES :
                  void set(size_t row_ndx, float value);
                  void set(size_t row_ndx, double value);
                  void set(size_t row_ndx, EnumType value);
-                 void set(size_t row_ndx, Date value);
+                 void set(size_t row_ndx, DateTime value);
                  void set(size_t row_ndx, StringData value);
                  void set(size_t row_ndx, BinaryData value);
                  void set(size_t row_ndx, Mixed value);
@@ -193,7 +193,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : *g_typed_view_parameter_row_position_descr
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, EnumType, Date, StringData, BinaryData, Mixed]
+        TYPES  : [bool, int64_t, float, double, EnumType, DateTime, StringData, BinaryData, Mixed]
         DESCR  : &g_typed_view_value_parameter_descr
                  The value.
       EXAMPLES:
@@ -253,12 +253,12 @@ CATEGORIES :
                  size_t find_first(int64_t value) const;
                  size_t find_first(float value) const;
                  size_t find_first(double value) const;
-                 size_t find_first(Date value) const;
+                 size_t find_first(DateTime value) const;
                  size_t find_first(StringData value) const;
       CONST    : True
       PARAMS:
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, Date, StringData]
+        TYPES  : [bool, int64_t, float, double, DateTime, StringData]
         DESCR  : *g_typed_view_value_parameter_descr
       RETURN:
         TYPES  : size_t
@@ -292,19 +292,19 @@ CATEGORIES :
                  TableView      find_all(int64_t value);
                  TableView      find_all(float value);
                  TableView      find_all(double value);
-                 TableView      find_all(Date value);
+                 TableView      find_all(DateTime value);
                  TableView      find_all(StringData value);
 
                  ConstTableView find_all(bool value) const;
                  ConstTableView find_all(int64_t value) const;
                  ConstTableView find_all(float value) const;
                  ConstTableView find_all(double value) const;
-                 ConstTableView find_all(Date value) const;
+                 ConstTableView find_all(DateTime value) const;
                  ConstTableView find_all(StringData value) const;
       PARAMS:
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, Date, StringData,
-                  bool, int64_t, float, double, Date, StringData]
+        TYPES  : [bool, int64_t, float, double, DateTime, StringData,
+                  bool, int64_t, float, double, DateTime, StringData]
         DESCR  : *g_typed_view_value_parameter_descr
       RETURN:
         TYPES  : TableView
@@ -331,7 +331,7 @@ CATEGORIES :
 
 - Aggregates:
   METHODS:
-  - g_typed_view_sum:
+  - g_typed_view_sum_int:
   - g_typed_view_sum_float:
   - g_typed_view_sum_double:
       NAMES    : [sum, sum, sum]
@@ -349,7 +349,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_sum
         DESCR  :
-  - g_typed_view_maximum:
+  - g_typed_view_maximum_int:
   - g_typed_view_maximum_float:
   - g_typed_view_maximum_double:
       NAMES    : [maximum, maximum, maximum]
@@ -359,7 +359,7 @@ CATEGORIES :
                  Find the highest value.
       CONST    : True
       SIGNATURE: |
-                 int64_t maximum(size_t column_ndx) const;
+                 int64_t maximum() const;
                  float   maximum() const;
                  double  maximum() const;
       RETURN:
@@ -369,7 +369,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_maximum
         DESCR  :
-  - g_typed_view_minimum:
+  - g_typed_view_minimum_int:
   - g_typed_view_minimum_float:
   - g_typed_view_minimum_double:
       NAMES    : [minimum, minimum, minimum]
@@ -389,7 +389,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_minimum
         DESCR  :
-  - g_typed_view_average:
+  - g_typed_view_average_int:
   - g_typed_view_average_float:
   - g_typed_view_average_double:
       NAMES    : [average, average, average]

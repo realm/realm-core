@@ -40,7 +40,7 @@ public:
         free(m_buffer);
     }
 
-    size_t getpos() const { return m_pos; }
+    size_t get_pos() const { return m_pos; }
 
     void write(const char* data, size_t size)
     {
@@ -86,7 +86,7 @@ public:
         m_file.open(path, File::access_ReadWrite, File::create_Must, 0);
     }
 
-    size_t getpos() const { return m_pos; }
+    size_t get_pos() const { return m_pos; }
 
     void write(const char* data, size_t size)
     {
@@ -108,10 +108,8 @@ public:
 
         m_out.write(data_1, size_1);
 
-//        size_t pos = m_pos;
         if (int_add_with_overflow_detect(m_pos, size_0))
             throw runtime_error("File size overflow");
-//        return pos;
     }
 
     size_t write_array(const char* data, size_t size, uint_fast32_t checksum)
@@ -160,7 +158,8 @@ void Group::open(const string& file_path, OpenMode mode)
     bool is_shared = false;
     bool read_only = mode == mode_ReadOnly;
     bool no_create = mode == mode_ReadWriteNoCreate;
-    m_alloc.attach_file(file_path, is_shared, read_only, no_create); // Throws
+    bool skip_validate = false;
+    m_alloc.attach_file(file_path, is_shared, read_only, no_create, skip_validate); // Throws
     SlabAlloc::DetachGuard dg(m_alloc);
     m_alloc.reset_free_space_tracking(); // Throws
     ref_type top_ref = m_alloc.get_top_ref();
@@ -202,34 +201,26 @@ void Group::create(bool add_free_versions)
 {
     TIGHTDB_ASSERT(!is_attached());
 
+    size_t initial_logical_file_size = sizeof SlabAlloc::default_header;
+
     try {
         m_top.create(Array::type_HasRefs); // Throws
-        m_tables.create(Array::type_HasRefs); // Throws
         m_table_names.create(); // Throws
+        m_tables.create(Array::type_HasRefs); // Throws
         m_free_positions.create(Array::type_Normal); // Throws
         m_free_lengths.create(Array::type_Normal); // Throws
 
         m_top.add(m_table_names.get_ref()); // Throws
         m_top.add(m_tables.get_ref()); // Throws
+        m_top.add(1 + 2*initial_logical_file_size); // Throws
         m_top.add(m_free_positions.get_ref()); // Throws
         m_top.add(m_free_lengths.get_ref()); // Throws
-
-        // We may have been attached to a newly created file, that is,
-        // to a file consisting only of a default header and possibly
-        // some free space. In that case, we must add as free space,
-        // the size of the file minus its header.
-        if (m_alloc.nonempty_attachment()) {
-            size_t free = m_alloc.get_baseline() - sizeof SlabAlloc::default_header;
-            if (free > 0) {
-                m_free_positions.add(sizeof SlabAlloc::default_header); // Throws
-                m_free_lengths.add(free); // Throws
-            }
-        }
 
         if (add_free_versions) {
             m_free_versions.create(Array::type_Normal); // Throws
             m_top.add(m_free_versions.get_ref()); // Throws
-            m_free_versions.add(0); // Throws
+            size_t initial_database_version = 0; // A.k.a. transaction number
+            m_top.add(1 + 2*initial_database_version); // Throws
         }
     }
     catch (...) {
@@ -248,25 +239,33 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 {
     m_top.init_from_ref(top_ref);
     size_t top_size = m_top.size();
-    TIGHTDB_ASSERT(top_size >= 2);
+    TIGHTDB_ASSERT(top_size >= 3);
 
-    size_t names_ref = m_top.get_as_ref(0);
-    size_t tables_ref = m_top.get_as_ref(1);
+    ref_type names_ref = m_top.get_as_ref(0);
+    ref_type tables_ref = m_top.get_as_ref(1);
     m_table_names.init_from_ref(names_ref);
     m_tables.init_from_ref(tables_ref);
+
+    // Note that the third slot is the logical file size.
 
     // File created by Group::write() do not have free space markers
     // at all, and files that are not shared does not need version
     // info for free space.
-    if (top_size > 2) {
-        TIGHTDB_ASSERT(top_size >= 4);
-        size_t fp_ref = m_top.get_as_ref(2);
-        size_t fl_ref = m_top.get_as_ref(3);
-        m_free_positions.init_from_ref(fp_ref);
-        m_free_lengths.init_from_ref(fl_ref);
+    if (top_size > 3) {
+        TIGHTDB_ASSERT(top_size >= 5);
+        ref_type free_positions_ref = m_top.get_as_ref(3);
+        ref_type free_sizes_ref     = m_top.get_as_ref(4);
+        m_free_positions.init_from_ref(free_positions_ref);
+        m_free_lengths.init_from_ref(free_sizes_ref);
 
-        if (m_is_shared && top_size > 4)
-            m_free_versions.init_from_ref(m_top.get_as_ref(4));
+        if (m_is_shared && top_size > 5) {
+            TIGHTDB_ASSERT(top_size >= 7);
+            ref_type free_versions_ref = m_top.get_as_ref(5);
+            m_free_versions.init_from_ref(free_versions_ref);
+            // Note that the seventh slot is the database version
+            // (a.k.a. transaction count,) which is not yet used for
+            // anything.
+        }
     }
 }
 
@@ -274,39 +273,44 @@ void Group::init_from_ref(ref_type top_ref) TIGHTDB_NOEXCEPT
 void Group::init_shared()
 {
     if (m_free_versions.is_attached()) {
+        TIGHTDB_ASSERT(m_top.size() == 7);
         // If free space tracking is enabled
         // we just have to reset it
-        m_free_versions.set_all_to_zero();
+        m_free_versions.set_all_to_zero(); // Throws
+        return;
     }
-    else {
-        // Serialized files have no free space tracking
-        // at all so we have to add the basic free lists
-        if (m_top.size() == 2) {
-            // FIXME: There is a risk that these are already
-            // allocated, and that would cause a leak. This could
-            // happen if an earlier commit attempt failed.
-            TIGHTDB_ASSERT(!m_free_positions.is_attached());
-            TIGHTDB_ASSERT(!m_free_lengths.is_attached());
-            m_free_positions.create(Array::type_Normal);
-            m_free_lengths.create(Array::type_Normal);
-            m_top.add(m_free_positions.get_ref());
-            m_top.add(m_free_lengths.get_ref());
-        }
 
-        // Files that have only been used in single thread
-        // mode do not have version tracking for the free lists
-        if (m_top.size() == 4) {
-            // FIXME: There is a risk that this one is already
-            // allocated, and that would cause a leak. This could
-            // happen if an earlier commit attempt failed.
-            TIGHTDB_ASSERT(!m_free_versions.is_attached());
-            m_free_versions.create(Array::type_Normal);
-            size_t n = m_free_positions.size();
-            for (size_t i = 0; i < n; ++i)
-                m_free_versions.add(0);
-            m_top.add(m_free_versions.get_ref());
-        }
+    // Serialized files have no free space tracking at all, so we have
+    // to add the basic free lists
+    if (m_top.size() == 3) {
+        // FIXME: There is a risk that these are already allocated,
+        // and that would cause a leak. This could happen if an
+        // earlier commit attempt failed.
+        TIGHTDB_ASSERT(!m_free_positions.is_attached());
+        TIGHTDB_ASSERT(!m_free_lengths.is_attached());
+        m_free_positions.create(Array::type_Normal); // Throws
+        m_free_lengths.create(Array::type_Normal); // Throws
+        m_top.add(m_free_positions.get_ref()); // Throws
+        m_top.add(m_free_lengths.get_ref()); // Throws
     }
+    TIGHTDB_ASSERT(m_top.size() >= 5);
+
+    // Files that have nevner been modified via SharedGroup do not
+    // have version tracking for the free lists
+    if (m_top.size() == 5) {
+        // FIXME: There is a risk that this one is already allocated,
+        // and that would cause a leak. This could happen if an
+        // earlier commit attempt failed.
+        TIGHTDB_ASSERT(!m_free_versions.is_attached());
+        m_free_versions.create(Array::type_Normal); // Throws
+        size_t n = m_free_positions.size();
+        for (size_t i = 0; i != n; ++i)
+            m_free_versions.add(0); // Throws
+        m_top.add(m_free_versions.get_ref()); // Throws
+        size_t initial_database_version = 0; // A.k.a. transaction number
+        m_top.add(1 + 2*initial_database_version); // Throws
+    }
+    TIGHTDB_ASSERT(m_top.size() >= 7);
 }
 
 
@@ -501,15 +505,17 @@ void Group::commit()
     // database files created by Group::write() do not have free-space
     // tracking information.
     if (m_free_positions.is_attached()) {
-        TIGHTDB_ASSERT(m_top.size() >= 4);
-        if (m_top.size() > 4) {
-            // Delete free-list version information
-            Array::destroy(m_top.get_as_ref(4), m_top.get_alloc());
-            m_top.erase(4);
+        TIGHTDB_ASSERT(m_top.size() >= 5);
+        if (m_top.size() > 5) {
+            TIGHTDB_ASSERT(m_top.size() >= 7);
+            // Delete free-list version information and database
+            // version (a.k.a. transaction number)
+            Array::destroy(m_top.get_as_ref(5), m_top.get_alloc());
+            m_top.erase(5, 7);
         }
     }
     else {
-        TIGHTDB_ASSERT(m_top.size() == 2);
+        TIGHTDB_ASSERT(m_top.size() == 3);
         m_free_positions.create(Array::type_Normal);
         m_free_lengths.create(Array::type_Normal);
         m_top.add(m_free_positions.get_ref());
@@ -523,11 +529,11 @@ void Group::commit()
     // thrown.
     ref_type top_ref = out.write_group(); // Throws
 
-    // Since the group is persisiting in single-thread (un-shared)
+    // Since the group is persisiting in single-thread (unshared)
     // mode we have to make sure that the group stays valid after
     // commit
 
-    // Mark all managed space (beyond the atatched file) as free
+    // Mark all managed space (beyond the attached file) as free.
     //
     // FIXME: Perform this as part of m_alloc.remap(), but that
     // requires that we always call remap().
@@ -537,8 +543,7 @@ void Group::commit()
 
     // Remap file if it has grown
     size_t new_file_size = out.get_file_size();
-    TIGHTDB_ASSERT(new_file_size >= m_alloc.get_baseline());
-    if (new_file_size > m_alloc.get_baseline()) {
+    if (new_file_size > old_baseline) {
         if (m_alloc.remap(new_file_size)) { // Throws
             // The file was mapped to a new address, so all array
             // accessors must be updated.
@@ -563,7 +568,7 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
 
     // After Group::commit() we will always have free space tracking
     // info.
-    TIGHTDB_ASSERT(m_top.size() >= 4);
+    TIGHTDB_ASSERT(m_top.size() >= 5);
 
     // Array nodes that a part of the previous version of the database
     // will not be overwritte by Group::commit(). This is necessary
@@ -611,7 +616,6 @@ void Group::update_from_shared(ref_type new_top_ref, size_t new_file_size)
     m_alloc.reset_free_space_tracking(); // Throws
 
     // Update memory mapping if database file has grown
-    TIGHTDB_ASSERT(new_file_size >= m_alloc.get_baseline());
     if (new_file_size > m_alloc.get_baseline())
         m_alloc.remap(new_file_size); // Throws
 
@@ -696,26 +700,22 @@ void Group::Verify() const
         if (m_free_versions.is_attached())
             TIGHTDB_ASSERT(n == m_free_versions.size());
 
-        // FIXME: What we really need here is the "logical" size of
-        // the file and not the real size. The real size may have
-        // changed without the free space information having been
-        // adjusted accordingly. This can happen, for example, if
-        // commit() fails before writing the new top-ref, but after
-        // having extended the file size. We currently do not have a
-        // concept of a logical file size, but if provided, it would
-        // have to be stored as part of a database version such that
-        // it is updated atomically together with the rest of the
-        // contents of the version.
-        size_t file_size = m_alloc.nonempty_attachment() ? m_alloc.get_baseline() : 0;
+        // We need to consider the "logical" size of the file here,
+        // and not the real size. The real size may have changed
+        // without the free space information having been adjusted
+        // accordingly. This can happen, for example, if commit()
+        // fails before writing the new top-ref, but after having
+        // extended the file size.
+        size_t logical_file_size = to_size_t(m_top.get(2) / 2);
 
         size_t prev_end = 0;
         for (size_t i = 0; i != n; ++i) {
             size_t pos  = to_size_t(m_free_positions.get(i));
             size_t size = to_size_t(m_free_lengths.get(i));
 
-            TIGHTDB_ASSERT(pos < file_size);
+            TIGHTDB_ASSERT(pos < logical_file_size);
             TIGHTDB_ASSERT(size > 0);
-            TIGHTDB_ASSERT(pos + size <= file_size);
+            TIGHTDB_ASSERT(pos + size <= logical_file_size);
             TIGHTDB_ASSERT(prev_end <= pos);
 
             TIGHTDB_ASSERT(pos  % 8 == 0); // 8-byte alignment
@@ -752,24 +752,24 @@ void Group::print() const
 void Group::print_free() const
 {
     if (!m_free_positions.is_attached()) {
-        printf("none\n");
+        cout << "none\n";
         return;
     }
     bool has_versions = m_free_versions.is_attached();
 
-    size_t count = m_free_positions.size();
-    for (size_t i = 0; i < count; ++i) {
+    size_t n = m_free_positions.size();
+    for (size_t i = 0; i != n; ++i) {
         size_t pos  = to_size_t(m_free_positions[i]);
         size_t size = to_size_t(m_free_lengths[i]);
-        printf("%d: %d %d", int(i), int(pos), int(size));
+        cout << i << ": " << pos << " " << size;
 
         if (has_versions) {
             size_t version = to_size_t(m_free_versions[i]);
-            printf(" %d", int(version));
+            cout << " " << version;
         }
-        printf("\n");
+        cout << "\n";
     }
-    printf("\n");
+    cout << "\n";
 }
 
 
