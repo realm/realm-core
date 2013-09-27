@@ -1822,7 +1822,7 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
         }
         else {
             int_fast64_t elems_per_child = get(0) / 2;
-            elem_ndx_offset = orig_child_ndx * elems_per_child;
+            elem_ndx_offset = size_t(orig_child_ndx * elems_per_child);
         }
     }
 

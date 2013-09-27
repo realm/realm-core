@@ -189,6 +189,7 @@ inline void micro_sleep(uint64_t microsec_delay)
 {
 #ifdef _WIN32
     // FIXME: this is not optimal, but it should work
+    // also vs2012 warns : src\tightdb\group_shared.cpp(192): warning C4244: 'argument' : conversion from 'uint64_t' to 'DWORD', possible loss of data
     Sleep(microsec_delay/1000+1);
 #else
     usleep(microsec_delay);
