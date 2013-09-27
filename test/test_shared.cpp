@@ -1671,7 +1671,8 @@ TEST(GroupShared_ReserveDiskSpace)
 
         // Check that reserve() does not change the file size if the
         // specified size is less than the actual file size.
-        File::SizeType reserve_size_1 = orig_file_size / 2;
+        File::SizeType reserve_size_1 = orig_file_size / 2;        
+        //FIXME:VS2012(32bit) warning warning C4244: 'argument' : conversion from 'tightdb::File::SizeType' to 'size_t', possible loss of data
         sg.reserve(reserve_size_1);
         File::SizeType new_file_size_1 = File("test.tightdb").get_size();
         CHECK_EQUAL(orig_file_size, new_file_size_1);
