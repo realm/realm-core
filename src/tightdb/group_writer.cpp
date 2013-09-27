@@ -18,6 +18,12 @@ GroupWriter::GroupWriter(Group& group):
 
 size_t GroupWriter::write_group()
 {
+    // Streamed files have the top-ref specified in a footer but this
+    // form is incompatible with in-place updating of database
+    // files. For this reason we have to convert the file now if it is
+    // the the streamed form.
+    m_group.m_alloc.prepare_for_update(m_file_map.get_addr());
+
     merge_free_space(); // Throws
 
     Array& top        = m_group.m_top;
