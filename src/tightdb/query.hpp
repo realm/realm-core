@@ -122,13 +122,13 @@ public:
     Query& equal(size_t column_ndx, bool value);
 
     // Conditions: date
-    Query& equal_date(size_t column_ndx, Date value) { return equal(column_ndx, int64_t(value.get_date())); }
-    Query& not_equal_date(size_t column_ndx, Date value) { return not_equal(column_ndx, int64_t(value.get_date())); }
-    Query& greater_date(size_t column_ndx, Date value) { return greater(column_ndx, int64_t(value.get_date())); }
-    Query& greater_equal_date(size_t column_ndx, Date value) { return greater_equal(column_ndx, int64_t(value.get_date())); }
-    Query& less_date(size_t column_ndx, Date value) { return less(column_ndx, int64_t(value.get_date())); }
-    Query& less_equal_date(size_t column_ndx, Date value) { return less_equal(column_ndx, int64_t(value.get_date())); }
-    Query& between_date(size_t column_ndx, Date from, Date to) { return between(column_ndx, int64_t(from.get_date()), int64_t(to.get_date())); }
+    Query& equal_date(size_t column_ndx, DateTime value) { return equal(column_ndx, int64_t(value.get_date())); }
+    Query& not_equal_date(size_t column_ndx, DateTime value) { return not_equal(column_ndx, int64_t(value.get_date())); }
+    Query& greater_date(size_t column_ndx, DateTime value) { return greater(column_ndx, int64_t(value.get_date())); }
+    Query& greater_equal_date(size_t column_ndx, DateTime value) { return greater_equal(column_ndx, int64_t(value.get_date())); }
+    Query& less_date(size_t column_ndx, DateTime value) { return less(column_ndx, int64_t(value.get_date())); }
+    Query& less_equal_date(size_t column_ndx, DateTime value) { return less_equal(column_ndx, int64_t(value.get_date())); }
+    Query& between_date(size_t column_ndx, DateTime from, DateTime to) { return between(column_ndx, int64_t(from.get_date()), int64_t(to.get_date())); }
 
     // Conditions: strings
 

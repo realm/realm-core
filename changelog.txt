@@ -12,6 +12,9 @@ Format:
 
 ==================
 
+2013-09-26 (Brian Munkholm)
++/- Renamed Table::distinct() to Table::get_distinct_view()
+
 2013-09-12 (Brian Munkholm)
 + Added TableView::row_to_string() and testcases for to_string() and row_to_string()
 + Added row_to_string(), to_string() and to_json() in typed TableView.

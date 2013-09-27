@@ -387,7 +387,7 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
                 table.insert_mixed(9, i, "string");
                 break;
             case 3:
-                table.insert_mixed(9, i, Date(123456789));
+                table.insert_mixed(9, i, DateTime(123456789));
                 break;
             case 4:
                 table.insert_mixed(9, i, BinaryData("binary", 7));
@@ -856,7 +856,7 @@ TEST(Table_Distinct)
     table.column().second.set_index();
     CHECK(table.column().second.has_index());
 
-    TestTableEnum::View view = table.column().second.distinct();
+    TestTableEnum::View view = table.column().second.get_distinct_view();
 
     CHECK_EQUAL(4, view.size());
     CHECK_EQUAL(0, view.get_source_ndx(0));
@@ -1601,7 +1601,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
 
     table.insert_int(0, 3, 0);
-    table.insert_mixed(1, 3, Date(324234));
+    table.insert_mixed(1, 3, DateTime(324234));
     table.insert_done();
 
     CHECK_EQUAL(0,  table.get_int(0, 0));
@@ -1722,7 +1722,7 @@ TEST(Table_Mixed2)
 
     table.add(int64_t(1));
     table.add(true);
-    table.add(Date(1234));
+    table.add(DateTime(1234));
     table.add("test");
 
     CHECK_EQUAL(type_Int,    table[0].first.get_type());

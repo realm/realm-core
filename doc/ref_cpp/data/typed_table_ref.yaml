@@ -37,7 +37,7 @@ EXAMPLES:
 IGNORE     : []                   # List of method-ids to ignore
 
 CATEGORIES:
-- Definition:
+- Schema:
   METHODS:
   - g_typed_table_macros:
       NAME     : TIGHTDB_TABLE_*
@@ -88,7 +88,7 @@ CATEGORIES:
         DESCR  :
 
 
-- State:
+- Table Operations:
   METHODS:
   - g_typed_table_is_empty:
       NAME     : is_empty
@@ -120,8 +120,6 @@ CATEGORIES:
       - CODE   :  ex_cpp_type_table_size
         DESCR  :
 
-- Table:
-  METHODS:
   - g_typed_table_clear:
       NAME     : clear
       SUMMARY  : &g_typed_table_clear_summary
@@ -151,19 +149,6 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_optimize
         DESCR  :
-
-  - g_typed_table_columns:
-  - g_typed_table_columns_const:
-      NAMES     : [column, column]
-      SIGNATURE: |
-                 ColsAccessor      column()
-                 ConstColsAccessor column() const
-      SUMMARY  : Access and do operation on columns.
-      DESCR    : Access and do operation on columns.
-      RETURN:
-        TYPES  : ColumnAccessor
-        DESCR  : &g_typed_table_columns_return1_descr
-                 Cursor that lets you access and do operations on columns.
 
   - g_typed_table_operator==:
       NAME     : operator==
@@ -215,7 +200,50 @@ CATEGORIES:
       - CODE   : ex_cpp_typed_table_operator!=
         DESCR  :
 
-- Rows:
+  - g_typed_table_columns:
+  - g_typed_table_columns_const:
+      NAMES     : [column, column]
+      SIGNATURE: |
+                 ColsAccessor      column()
+                 ConstColsAccessor column() const
+      SUMMARY  : Access to predefined columns.
+      DESCR    : The column names that you have defined in the {@link g_typed_table_macros} macro,
+                 are the only members of the ColsAccessor class. It therefore provides you with
+                 typesafe access to your specific columns for the table. See the example below.
+      RETURN:
+        TYPES  : ColumnAccessor
+        DESCR  : &g_typed_table_columns_return1_descr
+                 Cursor that lets you access and do operations on columns.
+      EXAMPLES:
+      - CODE   : ex_cpp_typed_table_columns
+        DESCR  :
+
+- column() Operations:
+  METHODS:
+  - v[]              # Int, bool, enum, str
+
+  - sort            # Int, bool, enum, str
+
+  - find_first      # Int, bool, enum, str
+  - find_all        # Int, bool, enum, str
+  - get_sorted_view # Int, bool, enum, str
+  - distinct        # , str
+  
+  - has_index       # Int, bool, enum, str
+  - set_index       # Int, bool, enum, str
+  - lower_bound     # Int, bool, ????, str
+  - upper_bound     # Int, bool, ????, str
+
+  - +=              # Int
+
+  - count           # Int, bool, ????, str
+  - average         # Int
+  - maximum         # Int
+  - minimum         # Int
+  - sum             # Int
+  
+
+- Row Operations:
 #TODO: Describe RowAccessor
   METHODS:
   - g_typed_table_operator_brackets:
@@ -226,8 +254,11 @@ CATEGORIES:
                  ConstRowAccessor operator[](size_t row_ndx) const
       SUMMARY  : &g_typed_table_operator_brackets_summary
                  Access rows.
+
       DESCR    : &g_typed_table_operator_brackets_descr
                  Access rows.
+#TODO: Describe what you can with the operator
+
       PARAMS:
       - NAME   : row_ndx
         TYPES  : size_t
@@ -317,7 +348,7 @@ CATEGORIES:
       SUMMARY  : &g_typed_table_insert_summary
                  Insert a new row at the specified position.
       DESCR    : &g_typed_table_insert_descr
-                 This method inserts new row at a given position.
+                 This method inserts a new row at the specified position.
                  Rows with index greater or equal to position will be
                  shifted downwards i.e. their index will be incremented.
                  The types of the parameters must match the
@@ -390,12 +421,12 @@ CATEGORIES:
   - g_typed_table_lookup:
       NAME     : lookup
       SUMMARY  : &g_typed_table_lookup_summary
-                 Lookup a value.
+                 Lookup a value (in a hash array).
       DESCR    : &g_typed_table_lookup_descr
                  This method will find the first row where the value of first column matches
-                 a given string value. Defining the first column as a string with unique values,
-                 it is possible to combine such a table with this method to emulate a hash
-                 array using TightDB.
+                 a given string value - emulating a hash array.
+                 It's required that the first column is a string column
+                 containing unique values.
       CONST    : True
       PARAMS:
       - NAME   : value
@@ -521,16 +552,13 @@ CATEGORIES:
                  (first matching row for each unique value in column).
                  The rows are returned as a {@link class_typed_tableview} object.
       SIGNATURE: |
-                 TableView      distinct(std::size_t column_ndx);
-                 ConstTableView distinct(std::size_t column_ndx) const;
+                 TableView      distinct();
+                 ConstTableView distinct() const;
       PARAMS:
-      - NAME   : column_ndx
-        TYPES  : size_t
-        DESCR  : The column to use to find distinct rows.
       RETURN:
         TYPES  : TableView
         DESCR  : &g_typed_table_distinct_return1_descr
-                 A view.
+                 A view containing the unique values.
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_distinct
         DESCR  :
