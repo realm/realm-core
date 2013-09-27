@@ -200,8 +200,16 @@ public:
 
 
     class Query;
-    Query       where() {return Query(*this);}
-    const Query where() const {return Query(*this);}
+
+    Query where() 
+    {
+        return Query(*this);
+    }
+
+    const Query where() const 
+    {
+        return Query(*this);
+    }
 
     /// Compare two tables for equality. Two tables are equal if, and
     /// only if, they contain the same rows in the same order, that
@@ -320,7 +328,7 @@ private:
 template<class Spec> class BasicTable<Spec>::Query:
         public Spec::template ColNames<QueryCol, Query*> {
 public:
-    Query(const Query&q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
+    Query(Query&q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
     ~Query() TIGHTDB_NOEXCEPT {}
 
     Query& tableview(const Array& arr) { m_impl.tableview(arr); return *this; }
