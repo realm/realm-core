@@ -158,7 +158,8 @@ void Group::open(const string& file_path, OpenMode mode)
     bool is_shared = false;
     bool read_only = mode == mode_ReadOnly;
     bool no_create = mode == mode_ReadWriteNoCreate;
-    m_alloc.attach_file(file_path, is_shared, read_only, no_create); // Throws
+    bool skip_validate = false;
+    m_alloc.attach_file(file_path, is_shared, read_only, no_create, skip_validate); // Throws
     SlabAlloc::DetachGuard dg(m_alloc);
     m_alloc.reset_free_space_tracking(); // Throws
     ref_type top_ref = m_alloc.get_top_ref();
