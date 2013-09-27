@@ -150,6 +150,7 @@ MemRef SlabAlloc::alloc(size_t size)
     // Allocate memory
     TIGHTDB_ASSERT(0 < new_size);
     char* slab = new char[new_size]; // Throws
+    fill(slab, slab+new_size, 0);
 
     // Add to slab table
     size_t new_ref_end = curr_ref_end + new_size;
@@ -312,7 +313,8 @@ bool SlabAlloc::is_read_only(ref_type ref) const TIGHTDB_NOEXCEPT
 }
 
 
-void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create)
+void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create,
+                            bool skip_validate)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -330,7 +332,7 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
     m_file.open(path.c_str(), access, create, 0); // Throws
     File::CloseGuard fcg(m_file);
 
-    size_t initial_size = 1024 * 1024;
+    size_t initial_size = 4 * 1024; // a single page sure feels tight
 
     // The size of a database file must not exceed what can be encoded
     // in std::size_t.
@@ -367,9 +369,11 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
     {
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
 
-        // Verify the data structures
-        if (!validate_buffer(map.get_addr(), size))
-            goto invalid_database;
+        if (!skip_validate) {
+            // Verify the data structures
+            if (!validate_buffer(map.get_addr(), size))
+                goto invalid_database;
+        }
 
         m_data        = map.release();
         m_baseline    = size;

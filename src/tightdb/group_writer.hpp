@@ -37,7 +37,7 @@ class GroupWriter {
 public:
     GroupWriter(Group&);
 
-    void set_versions(std::size_t current, std::size_t read_lock);
+    void set_versions(uint64_t current, uint64_t read_lock);
 
     /// Write all changed array nodes into free space.
     ///
@@ -65,8 +65,8 @@ public:
 private:
     Group&          m_group;
     SlabAlloc&      m_alloc;
-    std::size_t     m_current_version;
-    std::size_t     m_readlock_version;
+    uint64_t        m_current_version;
+    uint64_t        m_readlock_version;
     File::Map<char> m_file_map;
 
     void merge_free_space();

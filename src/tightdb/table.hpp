@@ -412,7 +412,6 @@ private:
 
     // Column accessor instances
     Array m_cols;
-
     mutable std::size_t m_ref_count;
     mutable const StringIndex* m_lookup_index;
 

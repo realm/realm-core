@@ -227,9 +227,9 @@ void AdaptiveStringColumn::erase(size_t ndx)
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
     if (m_index) {
-        StringData oldVal = get(ndx);
-        const bool isLast = (ndx == size());
-        m_index->erase(ndx, oldVal, isLast);
+        StringData old_val = get(ndx);
+        bool is_last = (ndx == size()-1);
+        m_index->erase(ndx, old_val, is_last);
     }
 
     TreeDelete<StringData, AdaptiveStringColumn>(ndx);

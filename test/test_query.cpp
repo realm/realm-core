@@ -1,9 +1,14 @@
+#include "testsettings.hpp"
+#ifdef TEST_QUERY
+
 #include <cstdlib> // itoa()
 #include <vector>
 
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
+#include <tightdb/lang_bind_helper.hpp>
+
 #include "testsettings.hpp"
 
 using namespace std;
@@ -77,6 +82,137 @@ TIGHTDB_TABLE_2(PeopleTable2,
 
 
 } // anonymous namespace
+
+
+TEST(LimitUntyped)
+{
+    Table table;
+    table.add_column(type_Int, "first1");
+    table.add_column(type_Float, "second1");
+    table.add_column(type_Double, "second1");
+
+    table.add_empty_row(3);
+    table.set_int(0, 0, 10000);
+    table.set_int(0, 1, 30000);
+    table.set_int(0, 2, 40000);
+
+    table.set_float(1, 0, 10000.);
+    table.set_float(1, 1, 30000.);
+    table.set_float(1, 2, 40000.);
+
+    table.set_double(2, 0, 10000.);
+    table.set_double(2, 1, 30000.);
+    table.set_double(2, 2, 40000.);
+
+
+    Query q = table.where();
+    int64_t sum;
+    float sumf;
+    double sumd;
+    
+    // sum, limited by 'limit'
+    sum = q.sum(0, NULL, 0, -1, 1);
+    CHECK_EQUAL(10000, sum);
+    sum = q.sum(0, NULL, 0, -1, 2);
+    CHECK_EQUAL(40000, sum);
+    sum = q.sum(0, NULL, 0, -1);
+    CHECK_EQUAL(80000, sum);
+
+    sumd = q.sum_float(1, NULL, 0, -1, 1);
+    CHECK_EQUAL(10000., sumd);
+    sumd = q.sum_float(1, NULL, 0, -1, 2);
+    CHECK_EQUAL(40000., sumd);
+    sumd = q.sum_float(1, NULL, 0, -1);
+    CHECK_EQUAL(80000., sumd);
+
+    sumd = q.sum_double(2, NULL, 0, -1, 1);
+    CHECK_EQUAL(10000., sumd);
+    sumd = q.sum_double(2, NULL, 0, -1, 2);
+    CHECK_EQUAL(40000., sumd);
+    sumd = q.sum_double(2, NULL, 0, -1);
+    CHECK_EQUAL(80000., sumd);
+
+    // sum, limited by 'end', but still having 'limit' specified
+    sum = q.sum(0, NULL, 0, 1, 3);
+    CHECK_EQUAL(10000, sum);
+    sum = q.sum(0, NULL, 0, 2, 3);
+    CHECK_EQUAL(40000, sum);
+
+    sumd = q.sum_float(1, NULL, 0, 1, 3);
+    CHECK_EQUAL(10000., sumd);
+    sumd = q.sum_float(1, NULL, 0, 2, 3);
+    CHECK_EQUAL(40000., sumd);
+
+    sumd = q.sum_double(2, NULL, 0, 1, 3);
+    CHECK_EQUAL(10000., sumd);
+    sumd = q.sum_double(2, NULL, 0, 2, 3);
+    CHECK_EQUAL(40000., sumd);
+
+    // max, limited by 'limit'
+    sum = q.maximum(0, NULL, 0, -1, 1);
+    CHECK_EQUAL(10000, sum);
+    sum = q.maximum(0, NULL, 0, -1, 2);
+    CHECK_EQUAL(30000, sum);
+    sum = q.maximum(0, NULL, 0, -1);
+    CHECK_EQUAL(40000, sum);
+
+    sumf = q.maximum_float(1, NULL, 0, -1, 1);
+    CHECK_EQUAL(10000., sumf);
+    sumf = q.maximum_float(1, NULL, 0, -1, 2);
+    CHECK_EQUAL(30000., sumf);
+    sumf = q.maximum_float(1, NULL, 0, -1);
+    CHECK_EQUAL(40000., sumf);
+
+    sumd = q.maximum_double(2, NULL, 0, -1, 1);
+    CHECK_EQUAL(10000., sumd);
+    sumd = q.maximum_double(2, NULL, 0, -1, 2);
+    CHECK_EQUAL(30000., sumd);
+    sumd = q.maximum_double(2, NULL, 0, -1);
+    CHECK_EQUAL(40000., sumd);
+
+
+    // max, limited by 'end', but still having 'limit' specified
+    sum = q.maximum(0, NULL, 0, 1, 3);
+    CHECK_EQUAL(10000, sum);
+    sum = q.maximum(0, NULL, 0, 2, 3);
+    CHECK_EQUAL(30000, sum);
+
+    sumf = q.maximum_float(1, NULL, 0, 1, 3);
+    CHECK_EQUAL(10000., sumf);
+    sumf = q.maximum_float(1, NULL, 0, 2, 3);
+    CHECK_EQUAL(30000., sumf);
+
+    sumd = q.maximum_double(2, NULL, 0, 1, 3);
+    CHECK_EQUAL(10000., sumd);
+    sumd = q.maximum_double(2, NULL, 0, 2, 3);
+    CHECK_EQUAL(30000., sumd);
+
+
+    // avg
+    sumd = q.average(0, NULL, 0, -1, 1);
+    CHECK_EQUAL(10000, sumd);
+    sumd = q.average(0, NULL, 0, -1, 2);
+    CHECK_EQUAL((10000 + 30000) / 2, sumd);
+
+    sumd = q.average_float(1, NULL, 0, -1, 1);
+    CHECK_EQUAL(10000., sumd);
+    sumd = q.average_float(1, NULL, 0, -1, 2);
+    CHECK_EQUAL((10000. + 30000.) / 2., sumd);
+
+
+    // avg, limited by 'end', but still having 'limit' specified
+    sumd = q.average(0, NULL, 0, 1, 3);
+    CHECK_EQUAL(10000, sumd);
+    sumd = q.average(0, NULL, 0, 2, 3);
+    CHECK_EQUAL((10000 + 30000) / 2, sumd);
+
+    sumd = q.average_float(1, NULL, 0, 1, 3);
+    CHECK_EQUAL(10000., sumd);
+    sumd = q.average_float(1, NULL, 0, 2, 3);
+    CHECK_EQUAL((10000. + 30000.) / 2., sumd);
+
+}
+
 
 
 TEST(CountLimit)
@@ -2774,3 +2910,21 @@ TEST(TestQuery_AllTypes_StaticallyTyped)
     CHECK_EQUAL(0.8, query.double_col.sum());
     CHECK_EQUAL(0.8, query.double_col.average());
 }
+
+TEST(Query_ref_counting)
+{
+    Table* t = LangBindHelper::new_table();
+    t->add_column(type_Int, "myint");
+    t->insert_int(0, 0, 12);
+    t->insert_done();
+
+    Query q = t->where();
+
+    LangBindHelper::unbind_table_ref(t);
+
+    // Now try to access Query and see that the Table is still alive
+    TableView tv = q.find_all();
+    CHECK_EQUAL(1, tv.size());
+}
+
+#endif // TEST_QUERY

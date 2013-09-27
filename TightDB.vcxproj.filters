@@ -13,9 +13,6 @@
     <ClCompile Include="test\test_array_string_long.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\test_column.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
     <ClCompile Include="test\test_column_binary.cpp">
       <Filter>test</Filter>
     </ClCompile>
@@ -53,9 +50,6 @@
       <Filter>test\large_tests</Filter>
     </ClCompile>
     <ClCompile Include="test\large_tests\verified_string.cpp">
-      <Filter>test\large_tests</Filter>
-    </ClCompile>
-    <ClCompile Include="test\large_tests\test_column.cpp">
       <Filter>test\large_tests</Filter>
     </ClCompile>
     <ClCompile Include="src\tightdb\column.cpp">
@@ -171,6 +165,27 @@
     </ClCompile>
     <ClCompile Include="test\test_thread.cpp">
       <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_column.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\large_tests\test_column_large.cpp">
+      <Filter>test\large_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_utf8.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_column_basic.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_string_data.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_lang_bind_helper.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_utilities.cpp">
+      <Filter>test\util</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -360,6 +375,9 @@
     <ClInclude Include="test\pthread_test.hpp">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="test\test_utilities.hpp">
+      <Filter>test\util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="pthreads">
@@ -377,5 +395,11 @@
     <Filter Include="src\include">
       <UniqueIdentifier>{4436af4e-59db-4e36-9b8c-acb6e5d85aea}</UniqueIdentifier>
     </Filter>
+    <Filter Include="test\util">
+      <UniqueIdentifier>{0a19bdba-d588-4ba1-935d-8de54bde0675}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="changelog.txt" />
   </ItemGroup>
 </Project>

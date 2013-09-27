@@ -94,7 +94,7 @@ void ColumnStringEnum::erase(size_t ndx)
     //  position to update (as it looks for the old value))
     if (m_index) {
         StringData old_val = get(ndx);
-        const bool is_last = ndx == size();
+        bool is_last = (ndx == size()-1);
         m_index->erase(ndx, old_val, is_last);
     }
 
