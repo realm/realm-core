@@ -120,7 +120,8 @@ void Group::open(const string& file_path, OpenMode mode)
     bool is_shared = false;
     bool read_only = mode == mode_ReadOnly;
     bool no_create = mode == mode_ReadWriteNoCreate;
-    m_alloc.attach_file(file_path, is_shared, read_only, no_create); // Throws
+    bool skip_validate = false;
+    m_alloc.attach_file(file_path, is_shared, read_only, no_create, skip_validate); // Throws
     SlabAlloc::DetachGuard dg(m_alloc);
     m_alloc.reset_free_space_tracking(); // Throws
     ref_type top_ref = m_alloc.get_top_ref();
@@ -378,40 +379,44 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
     // side-effects when it throws, at least not in any way that
     // matters.
 
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    // FIXME: ExceptionSafety: If this succeeds, but some of the
+    // following fails, then we must ask the replication instance to
+    // discard everything written to the log since this point. This
+    // should probably be handled with a 'scoped guard'.
+    if (Replication* repl = m_alloc.get_replication())
+        repl->new_top_level_table(name); // Throws
+#endif
+
     Array::DestroyGuard ref_dg(Table::create_empty_table(m_alloc), m_alloc); // Throws
     Table::UnbindGuard table_ug(new Table(Table::ref_count_tag(), m_alloc,
                                           ref_dg.get(), 0, 0)); // Throws
-    table_ug->bind_ref(); // Increase reference count from 0 to 1
-    if (spec_setter)
-        (*spec_setter)(*table_ug); // Throws
 
     size_t ndx = m_tables.size();
     m_table_accessors.resize(ndx+1); // Throws
-
-    TIGHTDB_ASSERT(ndx == m_table_names.size());
-    m_tables.insert(ndx, ref_dg.get()); // Throws
+    table_ug->m_top.set_parent(this, ndx);
     try {
-        m_table_names.insert(ndx, name); // Throws
-        try {
-#ifdef TIGHTDB_ENABLE_REPLICATION
-            if (Replication* repl = m_alloc.get_replication())
-                repl->new_top_level_table(name); // Throws
-#endif
+        table_ug->bind_ref(); // Increase reference count from 0 to 1
+        if (spec_setter)
+            (*spec_setter)(*table_ug); // Throws
 
+        TIGHTDB_ASSERT(ndx == m_table_names.size());
+        m_tables.insert(ndx, ref_dg.get()); // Throws
+        try {
+            m_table_names.insert(ndx, name); // Throws
             // The rest is guaranteed not to throw
             Table* table = table_ug.release();
             ref_dg.release();
-            table->m_top.set_parent(this, ndx);
             m_table_accessors[ndx] = table;
             return table;
         }
         catch (...) {
-            m_table_names.erase(ndx); // Guaranteed not to throw
+            m_tables.erase(ndx); // Guaranteed not to throw
             throw;
         }
     }
     catch (...) {
-        m_tables.erase(ndx); // Guaranteed not to throw
+        table_ug->m_top.set_parent(0,0);
         throw;
     }
 }

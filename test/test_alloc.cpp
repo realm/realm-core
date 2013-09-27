@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_ALLOC
+
 #include <UnitTest++.h>
 
 #include <tightdb/alloc_slab.hpp>
@@ -60,21 +63,22 @@ TEST(Alloc_AttachFile)
 
     {
         SlabAlloc alloc;
-        bool is_shared = false;
-        bool read_only = false;
-        bool no_create = false;
-        alloc.attach_file("test.tightdb", is_shared, read_only, no_create);
+        bool is_shared     = false;
+        bool read_only     = false;
+        bool no_create     = false;
+        bool skip_validate = false;
+        alloc.attach_file("test.tightdb", is_shared, read_only, no_create, skip_validate);
         CHECK(alloc.is_attached());
         CHECK(alloc.nonempty_attachment());
         alloc.detach();
         CHECK(!alloc.is_attached());
-        alloc.attach_file("test.tightdb", is_shared, read_only, no_create);
+        alloc.attach_file("test.tightdb", is_shared, read_only, no_create, skip_validate);
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
         read_only = true;
         no_create = true;
-        alloc.attach_file("test.tightdb", is_shared, read_only, no_create);
+        alloc.attach_file("test.tightdb", is_shared, read_only, no_create, skip_validate);
         CHECK(alloc.is_attached());
     }
 
@@ -94,22 +98,27 @@ TEST(Alloc_BadFile)
 
     {
         SlabAlloc alloc;
-        bool is_shared = false;
-        bool read_only = true;
-        bool no_create = true;
-        CHECK_THROW(alloc.attach_file("test.tightdb", is_shared, read_only, no_create), InvalidDatabase);
+        bool is_shared     = false;
+        bool read_only     = true;
+        bool no_create     = true;
+        bool skip_validate = false;
+        CHECK_THROW(alloc.attach_file("test.tightdb", is_shared, read_only, no_create,
+                                      skip_validate), InvalidDatabase);
         CHECK(!alloc.is_attached());
-        CHECK_THROW(alloc.attach_file("test.tightdb", is_shared, read_only, no_create), InvalidDatabase);
+        CHECK_THROW(alloc.attach_file("test.tightdb", is_shared, read_only, no_create,
+                                      skip_validate), InvalidDatabase);
         CHECK(!alloc.is_attached());
         read_only = false;
         no_create = false;
-        CHECK_THROW(alloc.attach_file("test.tightdb", is_shared, read_only, no_create), InvalidDatabase);
+        CHECK_THROW(alloc.attach_file("test.tightdb", is_shared, read_only, no_create,
+                                      skip_validate), InvalidDatabase);
         CHECK(!alloc.is_attached());
-        alloc.attach_file("test2.tightdb", is_shared, read_only, no_create);
+        alloc.attach_file("test2.tightdb", is_shared, read_only, no_create, skip_validate);
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
-        CHECK_THROW(alloc.attach_file("test.tightdb", is_shared, read_only, no_create), InvalidDatabase);
+        CHECK_THROW(alloc.attach_file("test.tightdb", is_shared, read_only, no_create,
+                                      skip_validate), InvalidDatabase);
     }
 
     File::remove("test.tightdb");
@@ -126,10 +135,11 @@ TEST(Alloc_AttachBuffer)
         File::try_remove("test.tightdb");
         {
             SlabAlloc alloc;
-            bool is_shared = false;
-            bool read_only = false;
-            bool no_create = false;
-            alloc.attach_file("test.tightdb", is_shared, read_only, no_create);
+            bool is_shared     = false;
+            bool read_only     = false;
+            bool no_create     = false;
+            bool skip_validate = false;
+            alloc.attach_file("test.tightdb", is_shared, read_only, no_create, skip_validate);
         }
         {
             File file("test.tightdb");
@@ -152,10 +162,11 @@ TEST(Alloc_AttachBuffer)
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
-        bool is_shared = false;
-        bool read_only = false;
-        bool no_create = false;
-        alloc.attach_file("test.tightdb", is_shared, read_only, no_create);
+        bool is_shared     = false;
+        bool read_only     = false;
+        bool no_create     = false;
+        bool skip_validate = false;
+        alloc.attach_file("test.tightdb", is_shared, read_only, no_create, skip_validate);
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
@@ -184,10 +195,11 @@ TEST(Alloc_BadBuffer)
         CHECK(!alloc.is_attached());
         CHECK_THROW(alloc.attach_buffer(buffer, sizeof buffer), InvalidDatabase);
         CHECK(!alloc.is_attached());
-        bool is_shared = false;
-        bool read_only = false;
-        bool no_create = false;
-        alloc.attach_file("test.tightdb", is_shared, read_only, no_create);
+        bool is_shared     = false;
+        bool read_only     = false;
+        bool no_create     = false;
+        bool skip_validate = false;
+        alloc.attach_file("test.tightdb", is_shared, read_only, no_create, skip_validate);
         CHECK(alloc.is_attached());
         alloc.detach();
         CHECK(!alloc.is_attached());
@@ -197,3 +209,5 @@ TEST(Alloc_BadBuffer)
 
     File::remove("test.tightdb");
 }
+
+#endif // TEST_ALLOC

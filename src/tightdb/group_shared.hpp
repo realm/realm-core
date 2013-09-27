@@ -34,8 +34,12 @@ namespace tightdb {
 class SharedGroup {
 public:
     enum DurabilityLevel {
-        durability_Full,
-        durability_MemOnly
+        durability_Full
+        , durability_MemOnly
+#ifndef _WIN32
+        // Async commits are not yet supported on windows
+        , durability_Async
+#endif
     };
 
     /// Equivalent to calling open(const std::string&, bool,
@@ -84,16 +88,19 @@ public:
     /// thrown. Note that InvalidDatabase is among these derived
     /// exception types.
     void open(const std::string& file, bool no_create = false,
-              DurabilityLevel dlevel = durability_Full);
+              DurabilityLevel dlevel = durability_Full,
+              bool is_backend = false);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
-    /// Equivalent to calling open(Replication::Provider&) on a
+    /// Equivalent to calling open(Replication&) on a
     /// default constructed instance.
-    explicit SharedGroup(Replication::Provider&);
+    explicit SharedGroup(Replication&);
 
-    /// Open this group in replication mode.
-    void open(Replication::Provider&);
+    /// Open this group in replication mode. The specified Replication
+    /// instance must remain in exixtence for as long as the
+    /// SharedGroup.
+    void open(Replication&);
 
     friend class Replication;
 
@@ -122,35 +129,12 @@ public:
     void zero_free_space();
 #endif
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    /// This function may be called asynchronously to interrupt any
-    /// blocking call that is part of a transaction in a replication
-    /// setup. Only begin_write() and modifying functions, that are
-    /// part of a write transaction, can block. The transaction is
-    /// interrupted only if such a call is blocked, or would
-    /// block. This function may be called from a diffrent thread. It
-    /// may not be called from a system signal handler. When a
-    /// transaction is interrupted, the only member function, that is
-    /// allowed to be called, is rollback(). If a client calls
-    /// clear_interrupt_transact() after having called rollback(), it
-    /// may then resume normal operation on this database. Currently,
-    /// transaction interruption works by throwing an exception from
-    /// one of the mentioned member functions that may block.
-    void interrupt_transact();
-
-    /// Clear the interrupted state of this database after rolling
-    /// back a transaction. It is not an error to call this function
-    /// in a situation where no interruption has occured. See
-    /// interrupt_transact() for more.
-    void clear_interrupt_transact();
-#endif
-
 private:
     struct SharedInfo;
 
     // Member variables
     Group                 m_group;
-    std::size_t           m_version;
+    uint64_t              m_version;
     File                  m_file;
     File::Map<SharedInfo> m_file_map; // Never remapped
     File::Map<SharedInfo> m_reader_map;
@@ -174,7 +158,7 @@ private:
     std::size_t ringbuf_capacity() const TIGHTDB_NOEXCEPT;
     bool        ringbuf_is_first(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void        ringbuf_remove_first() TIGHTDB_NOEXCEPT;
-    std::size_t ringbuf_find(uint32_t version) const TIGHTDB_NOEXCEPT;
+    std::size_t ringbuf_find(uint64_t version) const TIGHTDB_NOEXCEPT;
     ReadCount&  ringbuf_get(std::size_t ndx) TIGHTDB_NOEXCEPT;
     ReadCount&  ringbuf_get_first() TIGHTDB_NOEXCEPT;
     ReadCount&  ringbuf_get_last() TIGHTDB_NOEXCEPT;
@@ -183,11 +167,13 @@ private:
 
     // Must be called only by someone that has a lock on the write
     // mutex.
-    std::size_t get_current_version() TIGHTDB_NOEXCEPT;
+    uint64_t get_current_version() TIGHTDB_NOEXCEPT;
 
     // Must be called only by someone that has a lock on the write
     // mutex.
-    void low_level_commit(std::size_t new_version);
+    void low_level_commit(uint64_t new_version);
+
+    void do_async_commits();
 
     friend class ReadTransaction;
     friend class WriteTransaction;
@@ -283,52 +269,36 @@ inline SharedGroup::SharedGroup(const std::string& file, bool no_create, Durabil
     open(file, no_create, dlevel);
 }
 
-
 inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
     m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
 {
 }
 
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-
-inline SharedGroup::SharedGroup(Replication::Provider& repl_provider):
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
-{
-    open(repl_provider);
-}
-
-inline void SharedGroup::open(Replication::Provider& repl_provider)
-{
-    TIGHTDB_ASSERT(!is_attached());
-    // We receive ownership of the Replication instance. Note that
-    // even though we store the pointer in the Group instance, it is
-    // still ~SharedGroup() that is responsible for deleting it.
-    Replication* repl = repl_provider.new_instance(); // Throws
-    std::string file       = repl->get_database_path();
-    bool no_create         = false;
-    DurabilityLevel dlevel = durability_Full;
-    open(file, no_create, dlevel); // Throws
-    m_group.set_replication(repl);
-}
-
-inline void SharedGroup::interrupt_transact()
-{
-    m_group.get_replication()->interrupt();
-}
-
-inline void SharedGroup::clear_interrupt_transact()
-{
-    m_group.get_replication()->clear_interrupt();
-}
-
-#endif
-
-
 inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 {
     return m_file_map.is_attached();
 }
+
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+inline SharedGroup::SharedGroup(Replication& repl):
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
+{
+    open(repl);
+}
+
+inline void SharedGroup::open(Replication& repl)
+{
+    TIGHTDB_ASSERT(!is_attached());
+    std::string file = repl.get_database_path();
+    bool no_create   = false;
+    DurabilityLevel dlevel = durability_Full;
+    open(file, no_create, dlevel); // Throws
+    m_group.set_replication(&repl);
+}
+
+#endif // TIGHTDB_ENABLE_REPLICATION
 
 
 } // namespace tightdb

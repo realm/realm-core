@@ -80,8 +80,14 @@ public:
     ///
     /// \param no_create Fail if the file does not already exist.
     ///
+    /// \param bool skip_validate Skip validation of file header. In a
+    /// set of overlapping SharedGroups, only the first one (the one
+    /// that creates/initlializes the coordination file) may validate
+    /// the header, otherwise it will result in a race condition.
+    ///
     /// \throw File::AccessError
-    void attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create);
+    void attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create,
+                     bool skip_validate);
 
     /// Attach this allocator to the specified memory buffer.
     ///

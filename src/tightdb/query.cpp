@@ -466,7 +466,7 @@ Query& Query::not_equal(size_t column_ndx, StringData value, bool case_sensitive
 // Aggregates =================================================================================
 
 template <Action action, typename T, typename R, class ColType>
-R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end) const,
+R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_t limit) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
     if(m_table->is_degenerate()) {
@@ -483,10 +483,11 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end) const
 
     if (first.size() == 0 || first[0] == 0) {
         // User created query with no criteria; aggregate range
-        if (resultcount)
-            *resultcount = end-start;
+        if (resultcount) {
+            *resultcount = limit < (end - start) ? limit : (end - start);            
+        }
         // direct aggregate on the column
-        return (column.*aggregateMethod)(start, end);
+        return (column.*aggregateMethod)(start, end, limit);
     }
 
     // Aggregate with criteria

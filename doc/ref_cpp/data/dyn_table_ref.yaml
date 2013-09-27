@@ -25,8 +25,8 @@ DESCR      : &g_dyn_table_intro_descr
              timestamps and strings are supported. It is also possible to use a TightDB table class
              as column type. This means that you can have tables of tables structure.
 
-             Moreover, TightDB introduces a column type called {@link class_mixed}. A value of the
-             Mixed type can be any supported value of TightDB. This implies - as the name
+             Moreover, TightDB introduces a column type called mixed. A value of the
+             mixed type can be any supported value of TightDB. This implies - as the name
              indicates - that you can mix the type of values in the column. In one row the
              value could be an integer, in another row the value could be a string or even a table.
 
@@ -195,33 +195,36 @@ CATEGORIES :
       NAME     : add_column
       SUMMARY  : &g_dyn_table_add_column_summary
                  Add a column.
-      DESCR    : &g_dyn_table_add_column_descr
+      DESCR    :
+      - TEXT   : &g_dyn_table_add_column_descr
                  >
                  This method appends a column of the specified type and name to the table.
                  If it's used in a table which already has rows, the new column will just get
                  default values in those rows.
-
+      - TEXT   : &g_dyn_table_add_column_support
+                 >
                  Currently, the following types are supported:
+      - TEXT   : >
                  <ul>
-                   <li><code>type_Bool</code> (default false)</li>
-                   <li><code>type_Int</code> (default 0)</li>
-                   <li><code>type_Float</code> (default 0.0)</li>
-                   <li><code>type_Double</code> (default 0.0)</li>
-                   <li><code>type_String</code> (default "")</li>
-                   <li><code>type_Binary</code> (default ("")</li>
-                   <li><code>type_Date</code> (default 0 - 1970-01-01 00:00:00)</li>
-                   <li><code>type_Table</code> (default NULL)</li>
-                   <li><code>type_Mixed</code> (default NULL)</li>
+                   <li><code>type_Bool</code> (default: false)</li>
+                   <li><code>type_Int</code> (default: 0)</li>
+                   <li><code>type_Float</code> (default: 0.0)</li>
+                   <li><code>type_Double</code> (default: 0.0)</li>
+                   <li><code>type_String</code> (default: "")</li>
+                   <li><code>type_Binary</code> (default: "")</li>
+                   <li><code>type_Date</code> (default: 1970-01-01 00:00:00)</li>
+                   <li><code>type_Table</code> (default: NULL)</li>
+                   <li><code>type_Mixed</code> (default: NULL)</li>
                  </ul>
       PARAMS:
       - NAME   : type
         TYPES  : DataType
         DESCR  : &g_dyn_table_add_column_param1_descr
-                 Type of data in the new column.
+                 Type of data to store in the new column.
       - NAME   : name
         TYPES  : StringData
         DESCR  : &g_dyn_table_add_column_param2_descr
-                 Name of the new column.
+                 Name for the new column.
       RETURN:
         TYPES  : size_t
         DESCR  : &g_dyn_table_add_column_return_descr
@@ -327,8 +330,13 @@ CATEGORIES :
                  The name of the column to find.
       RETURN:
         TYPES  : size_t
-        DESCR  : &g_dyn_table_column_index_return_descr
-                 The column index or <code>std::size_t(-1)</code> if there is no column with the specified name.
+        DESCR  :
+        - TEXT : &g_dyn_table_column_index_descr_1
+                 The column index or
+        - TEXT : &g_dyn_table_column_index_descr_2
+                 <code>std::size_t(-1)</code>
+        - TEXT : &g_dyn_table_column_descr_3
+                 if there is no column with the specified name.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_column_index
         DESCR  :
@@ -337,10 +345,13 @@ CATEGORIES :
       NAME     : get_column_type
       SUMMARY  : &g_dyn_table_get_column_type_summary
                  Get the type of a column.
-      DESCR    : &g_dyn_table_get_column_type_descr
+      DESCR    :
+      - TEXT   : &g_dyn_table_get_column_type_descr1
                  >
                  This method gets the type of a column using the column index. Currently,
                  the following types are supported:
+      - TEXT   : &g_dyn_table_get_column_type_descr2
+                 >
                  <ul>
                    <li><code>type_Bool</code></li>
                    <li><code>type_Int</code></li>
@@ -369,7 +380,7 @@ CATEGORIES :
   - g_dyn_table_add_int:
       NAME     : add_int
       SUMMARY  : &g_dyn_table_add_int_summary
-                 Add value to all cells in a column.
+                 Add a value to all cells in a column.
       DESCR    : &g_dyn_table_add_int_descr
                  Add an integer value to all the cells in the specified column.
                  There is no overflow or underflow protection.
@@ -489,7 +500,7 @@ CATEGORIES :
       - NAME   : row_ndx
         TYPES  : size_t
         DESCR  : &g_dyn_table_remove_row_param1_descr
-                 Position of the row to delete (first row index is 0).
+                 Position of the row to delete. First row index is 0.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_remove
         DESCR  :
@@ -1154,8 +1165,8 @@ CATEGORIES :
                  The JavaScript Object Notation (<a href="http://json.org">JSON</a>)
                  is useful for web/mobile applications and serialization.
 
-                 A table (and subtables) will be formatted as a array of rows, and row will
-                 be formatted as an object.
+                 A table (and subtables) will be formatted as an array of rows,
+                 and a row will be formatted as an object.
       CONST    : true
       PARAMS:
       - NAME   : out
@@ -1165,14 +1176,16 @@ CATEGORIES :
       - CODE   : ex_cpp_dyn_table_to_json
         DESCR  :
 
+  - g_dyn_table_to_string_2:
+      IGNORE   : ""
   - g_dyn_table_to_string:
       NAME     : to_string
       SUMMARY  : &g_dyn_table_to_string_summary
                  Convert table to a string.
       DESCR    : &g_dyn_table_to_string_descr
-                 >
-                 This method will convert a table and its columns and rows to a format
-                 which is easily read by humans.
+                 This method will convert a table and its columns and rows to a
+                 human readable format.
+      SIGNATURE: void to_string(std::ostream& out, std::size_t limit = 500) const
       CONST    : true
       PARAMS:
       - NAME   : out
@@ -1180,7 +1193,7 @@ CATEGORIES :
         DESCR  : &g_dyn_table_to_string_parm1_descr
                  Output stream.
       - NAME   : limit
-        TYPES  : size_t
+        TYPES  : std::size_t
         DESCR  : &g_dyn_table_to_string_parm2_descr
                  "The number of rows to convert. Default: 500."
       EXAMPLES:
@@ -1189,19 +1202,18 @@ CATEGORIES :
       SEE      : See also {@link g_dyn_table_row_to_string} which do the same for a specific row.
 
   - g_dyn_table_row_to_string:
-      NAME     : to_string
+      NAME     : row_to_string
       SUMMARY  : &g_dyn_table_row_to_string_summary
                  Convert a row to a string.
       DESCR    : &g_dyn_table_row_to_string_descr
-                 >
-                 This method will convert a row to a format
-                 which is easily read by humans.
+                 This method will convert a specified row to a
+                 human readable format.
       CONST    : true
       PARAMS:
       - NAME   : row_ndx
-        TYPES  : size_t
+        TYPES  : std::size_t
         DESCR  : &g_dyn_table_row_to_string_parm1_descr
-                 The row index.
+                 The index of the row to convert.
       - NAME   : out
         TYPES  : std::ostream&
         DESCR  : &g_dyn_table_row_to_string_parm2_descr
