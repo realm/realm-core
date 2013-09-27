@@ -36,7 +36,7 @@
 #define TEST_INDEX_STRING
 #define TEST_LANG_BIND_HELPER
 #define TEST_QUERY
-#define TEST_SHARED
+//#define TEST_SHARED
 #define TEST_STRING_DATA
 #define TEST_TABLE
 #define TEST_TABLE_VIEW

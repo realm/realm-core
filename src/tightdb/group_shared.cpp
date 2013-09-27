@@ -78,7 +78,7 @@ SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
 #else
     readmutex(Mutex::process_shared_tag()), // Throws
     writemutex(), // Throws
-    balancemutex(), // Throws
+    balancemutex() // Throws
 #endif
 {
     version  = 0;
@@ -384,9 +384,8 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
         return;
     }
 #endif
-
+    m_file.unlock();
     if (!m_file.try_lock_exclusive()) {
-        m_file.unlock();
         return;
     }
 
