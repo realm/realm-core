@@ -70,12 +70,10 @@ public:
     template <int function, typename T, typename R, class ColType>
     R aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t) const, size_t column_ndx, T count_target) const;
 
-
-    // TODO, FIXME: rename int versions
-    int64_t sum(size_t column_ndx) const;
-    int64_t maximum(size_t column_ndx) const;
-    int64_t minimum(size_t column_ndx) const;
-    double average(size_t column_ndx) const;
+    int64_t sum_int(size_t column_ndx) const;
+    int64_t maximum_int(size_t column_ndx) const;
+    int64_t minimum_int(size_t column_ndx) const;
+    double average_int(size_t column_ndx) const;
     size_t count_int(size_t column_ndx, int64_t target) const;
 
     double sum_float(size_t column_ndx) const;

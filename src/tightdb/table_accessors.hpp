@@ -838,22 +838,22 @@ public:
 
     int64_t sum() const
     {
-        return Base::m_table->get_impl()->sum(col_idx);
+        return Base::m_table->get_impl()->sum_int(col_idx);
     }
 
     int64_t maximum() const
     {
-        return Base::m_table->get_impl()->maximum(col_idx);
+        return Base::m_table->get_impl()->maximum_int(col_idx);
     }
 
     int64_t minimum() const
     {
-        return Base::m_table->get_impl()->minimum(col_idx);
+        return Base::m_table->get_impl()->minimum_int(col_idx);
     }
 
     double average() const
     {
-        return Base::m_table->get_impl()->average(col_idx);
+        return Base::m_table->get_impl()->average_int(col_idx);
     }
 
     const ColumnAccessor& operator+=(int64_t value) const
@@ -1248,25 +1248,25 @@ public:
     int64_t sum(std::size_t* resultcount=NULL, std::size_t start=0,
                 std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.sum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.sum_int(col_idx, resultcount, start, end, limit);
     }
 
     int64_t maximum(std::size_t* resultcount=NULL, std::size_t start=0,
                     std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.maximum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.maximum_int(col_idx, resultcount, start, end, limit);
     }
 
     int64_t minimum(std::size_t* resultcount=NULL, std::size_t start=0,
                     std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.minimum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.minimum_int(col_idx, resultcount, start, end, limit);
     }
 
     double average(std::size_t* resultcount=NULL, std::size_t start=0,
                    std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.average(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.average_int(col_idx, resultcount, start, end, limit);
     }
 };
 

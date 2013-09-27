@@ -1554,7 +1554,7 @@ size_t Table::count_string(size_t column_ndx, StringData value) const
 
 // sum ----------------------------------------------
 
-int64_t Table::sum(size_t column_ndx) const
+int64_t Table::sum_int(size_t column_ndx) const
 {
     const Column& column = get_column<Column, col_type_Int>(column_ndx);
     return column.sum();
@@ -1572,7 +1572,7 @@ double Table::sum_double(size_t column_ndx) const
 
 // average ----------------------------------------------
 
-double Table::average(size_t column_ndx) const
+double Table::average_int(size_t column_ndx) const
 {
     const Column& column = get_column<Column, col_type_Int>(column_ndx);
     return column.average();
@@ -1592,7 +1592,7 @@ double Table::average_double(size_t column_ndx) const
 
 #define USE_COLUMN_AGGREGATE 1
 
-int64_t Table::minimum(size_t column_ndx) const
+int64_t Table::minimum_int(size_t column_ndx) const
 {
 #if USE_COLUMN_AGGREGATE
     const Column& column = get_column<Column, col_type_Int>(column_ndx);
@@ -1625,7 +1625,7 @@ double Table::minimum_double(size_t column_ndx) const
 
 // maximum ----------------------------------------------
 
-int64_t Table::maximum(size_t column_ndx) const
+int64_t Table::maximum_int(size_t column_ndx) const
 {
 #if USE_COLUMN_AGGREGATE
     const Column& column = get_column<Column, col_type_Int>(column_ndx);
@@ -2377,7 +2377,7 @@ void Table::to_string_header(ostream& out, vector<size_t>& widths) const
                 width = 19;
                 break;
             case type_Int:
-                width = chars_in_int(maximum(col));
+                width = chars_in_int(maximum_int(col));
                 break;
             case type_Float:
                 // max chars for scientific notation:

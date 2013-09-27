@@ -111,11 +111,11 @@ TEST(LimitUntyped)
     double sumd;
     
     // sum, limited by 'limit'
-    sum = q.sum(0, NULL, 0, -1, 1);
+    sum = q.sum_int(0, NULL, 0, -1, 1);
     CHECK_EQUAL(10000, sum);
-    sum = q.sum(0, NULL, 0, -1, 2);
+    sum = q.sum_int(0, NULL, 0, -1, 2);
     CHECK_EQUAL(40000, sum);
-    sum = q.sum(0, NULL, 0, -1);
+    sum = q.sum_int(0, NULL, 0, -1);
     CHECK_EQUAL(80000, sum);
 
     sumd = q.sum_float(1, NULL, 0, -1, 1);
@@ -133,9 +133,9 @@ TEST(LimitUntyped)
     CHECK_EQUAL(80000., sumd);
 
     // sum, limited by 'end', but still having 'limit' specified
-    sum = q.sum(0, NULL, 0, 1, 3);
+    sum = q.sum_int(0, NULL, 0, 1, 3);
     CHECK_EQUAL(10000, sum);
-    sum = q.sum(0, NULL, 0, 2, 3);
+    sum = q.sum_int(0, NULL, 0, 2, 3);
     CHECK_EQUAL(40000, sum);
 
     sumd = q.sum_float(1, NULL, 0, 1, 3);
@@ -149,11 +149,11 @@ TEST(LimitUntyped)
     CHECK_EQUAL(40000., sumd);
 
     // max, limited by 'limit'
-    sum = q.maximum(0, NULL, 0, -1, 1);
+    sum = q.maximum_int(0, NULL, 0, -1, 1);
     CHECK_EQUAL(10000, sum);
-    sum = q.maximum(0, NULL, 0, -1, 2);
+    sum = q.maximum_int(0, NULL, 0, -1, 2);
     CHECK_EQUAL(30000, sum);
-    sum = q.maximum(0, NULL, 0, -1);
+    sum = q.maximum_int(0, NULL, 0, -1);
     CHECK_EQUAL(40000, sum);
 
     sumf = q.maximum_float(1, NULL, 0, -1, 1);
@@ -172,9 +172,9 @@ TEST(LimitUntyped)
 
 
     // max, limited by 'end', but still having 'limit' specified
-    sum = q.maximum(0, NULL, 0, 1, 3);
+    sum = q.maximum_int(0, NULL, 0, 1, 3);
     CHECK_EQUAL(10000, sum);
-    sum = q.maximum(0, NULL, 0, 2, 3);
+    sum = q.maximum_int(0, NULL, 0, 2, 3);
     CHECK_EQUAL(30000, sum);
 
     sumf = q.maximum_float(1, NULL, 0, 1, 3);
@@ -189,9 +189,9 @@ TEST(LimitUntyped)
 
 
     // avg
-    sumd = q.average(0, NULL, 0, -1, 1);
+    sumd = q.average_int(0, NULL, 0, -1, 1);
     CHECK_EQUAL(10000, sumd);
-    sumd = q.average(0, NULL, 0, -1, 2);
+    sumd = q.average_int(0, NULL, 0, -1, 2);
     CHECK_EQUAL((10000 + 30000) / 2, sumd);
 
     sumd = q.average_float(1, NULL, 0, -1, 1);
@@ -201,9 +201,9 @@ TEST(LimitUntyped)
 
 
     // avg, limited by 'end', but still having 'limit' specified
-    sumd = q.average(0, NULL, 0, 1, 3);
+    sumd = q.average_int(0, NULL, 0, 1, 3);
     CHECK_EQUAL(10000, sumd);
-    sumd = q.average(0, NULL, 0, 2, 3);
+    sumd = q.average_int(0, NULL, 0, 2, 3);
     CHECK_EQUAL((10000 + 30000) / 2, sumd);
 
     sumd = q.average_float(1, NULL, 0, 1, 3);
@@ -2844,10 +2844,10 @@ TEST(TestQuery_AllTypes_DynamicallyTyped)
 
     Query query = table.where().equal(0, false);
 
-    CHECK_EQUAL(54, query.minimum(1));
-    CHECK_EQUAL(54, query.maximum(1));
-    CHECK_EQUAL(54, query.sum(1));
-    CHECK_EQUAL(54, query.average(1));
+    CHECK_EQUAL(54, query.minimum_int(1));
+    CHECK_EQUAL(54, query.maximum_int(1));
+    CHECK_EQUAL(54, query.sum_int(1));
+    CHECK_EQUAL(54, query.average_int(1));
 
     CHECK_EQUAL(0.7f, query.minimum_float(2));
     CHECK_EQUAL(0.7f, query.maximum_float(2));

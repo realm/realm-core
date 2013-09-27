@@ -331,7 +331,7 @@ CATEGORIES :
 
 - Aggregates:
   METHODS:
-  - g_typed_view_sum:
+  - g_typed_view_sum_int:
   - g_typed_view_sum_float:
   - g_typed_view_sum_double:
       NAMES    : [sum, sum, sum]
@@ -349,7 +349,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_sum
         DESCR  :
-  - g_typed_view_maximum:
+  - g_typed_view_maximum_int:
   - g_typed_view_maximum_float:
   - g_typed_view_maximum_double:
       NAMES    : [maximum, maximum, maximum]
@@ -359,7 +359,7 @@ CATEGORIES :
                  Find the highest value.
       CONST    : True
       SIGNATURE: |
-                 int64_t maximum(size_t column_ndx) const;
+                 int64_t maximum() const;
                  float   maximum() const;
                  double  maximum() const;
       RETURN:
@@ -369,7 +369,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_maximum
         DESCR  :
-  - g_typed_view_minimum:
+  - g_typed_view_minimum_int:
   - g_typed_view_minimum_float:
   - g_typed_view_minimum_double:
       NAMES    : [minimum, minimum, minimum]
@@ -389,7 +389,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_minimum
         DESCR  :
-  - g_typed_view_average:
+  - g_typed_view_average_int:
   - g_typed_view_average_float:
   - g_typed_view_average_double:
       NAMES    : [average, average, average]

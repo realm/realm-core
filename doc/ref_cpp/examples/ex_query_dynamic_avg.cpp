@@ -18,11 +18,8 @@ int main()
 // @@EndShow@@
     Group group;
     TableRef table = group.get_table("test");
-
-    Spec& s = table->get_spec();
-    s.add_column(type_String, "Name");
-    s.add_column(type_Int,    "Age");
-    table->update_from_spec();
+    table->add_column(type_String, "Name");
+    table->add_column(type_Int,    "Age");
 
     table->add_empty_row(3);
     table->set_string(0, 0, "Alice");
@@ -36,12 +33,12 @@ int main()
 
 // @@Show@@
     // Find the average Age (column 1) of entire table (no criteria)
-    double avg = table->where().average(1);
+    double avg = table->where().average_int(1);
     assert(avg == (27 + 50 + 44) / 3.0);
 
     // Find the average Age (column 1) where Name (column 0) contains "e"
     Query q = table->where().contains(0, "e");
-    avg = q.average(1);
+    avg = q.average_int(1);
     assert(avg == (27 + 44) / 2.0);
 // @@EndShow@@
 }

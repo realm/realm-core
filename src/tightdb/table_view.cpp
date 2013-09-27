@@ -121,7 +121,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t)
 
 // sum
 
-int64_t TableViewBase::sum(size_t column_ndx) const
+int64_t TableViewBase::sum_int(size_t column_ndx) const
 {
     return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, 0);
 }
@@ -136,7 +136,7 @@ double TableViewBase::sum_double(size_t column_ndx) const
 
 // Maximum
 
-int64_t TableViewBase::maximum(size_t column_ndx) const
+int64_t TableViewBase::maximum_int(size_t column_ndx) const
 {
     return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0);
 }
@@ -155,7 +155,7 @@ DateTime TableViewBase::maximum_datetime(size_t column_ndx) const
 
 // Minimum
 
-int64_t TableViewBase::minimum(size_t column_ndx) const
+int64_t TableViewBase::minimum_int(size_t column_ndx) const
 {
     return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0);
 }
@@ -174,7 +174,7 @@ DateTime TableViewBase::minimum_datetime(size_t column_ndx) const
 
 // Average
 
-double TableViewBase::average(size_t column_ndx) const
+double TableViewBase::average_int(size_t column_ndx) const
 {
     return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, 0) / static_cast<double>(size());
 }

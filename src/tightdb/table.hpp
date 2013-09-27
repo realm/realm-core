@@ -250,17 +250,17 @@ public:
     std::size_t  count_float(std::size_t column_ndx, float value) const;
     std::size_t  count_double(std::size_t column_ndx, double value) const;
 
-    int64_t sum(std::size_t column_ndx) const;
+    int64_t sum_int(std::size_t column_ndx) const;
     double  sum_float(std::size_t column_ndx) const;
     double  sum_double(std::size_t column_ndx) const;
     // FIXME: What to return for below when table empty? 0?
-    int64_t maximum(std::size_t column_ndx) const;
+    int64_t maximum_int(std::size_t column_ndx) const;
     float   maximum_float(std::size_t column_ndx) const;
     double  maximum_double(std::size_t column_ndx) const;
-    int64_t minimum(std::size_t column_ndx) const;
+    int64_t minimum_int(std::size_t column_ndx) const;
     float   minimum_float(std::size_t column_ndx) const;
     double  minimum_double(std::size_t column_ndx) const;
-    double  average(std::size_t column_ndx) const;
+    double  average_int(std::size_t column_ndx) const;
     double  average_float(std::size_t column_ndx) const;
     double  average_double(std::size_t column_ndx) const;
 
