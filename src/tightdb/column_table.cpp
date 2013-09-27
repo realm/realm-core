@@ -47,7 +47,7 @@ size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
         return 0;
 
     const char* columns_header = get_alloc().translate(columns_ref);
-    ref_type first_col_ref = Array::get(columns_header, 0);
+    ref_type first_col_ref = to_ref(Array::get(columns_header, 0));
     return get_size_from_ref(first_col_ref, get_alloc());
 }
 

@@ -585,7 +585,7 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
     // not be included, as it is not needed in the streamed format.
     std::size_t names_pos  = m_table_names.write(out); // Throws
     std::size_t tables_pos = m_tables.write(out); // Throws
-    std::size_t top_pos = out.get_pos();
+    uint64_t top_pos = out.get_pos();
 
     // Produce a preliminary version of the top array whose
     // representation is guaranteed to be able to hold the final file

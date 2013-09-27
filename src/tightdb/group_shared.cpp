@@ -78,7 +78,7 @@ SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t info_size,
 #else
     readmutex(Mutex::process_shared_tag()), // Throws
     writemutex(), // Throws
-    balancemutex(), // Throws
+    balancemutex() // Throws
 #endif
 {
     version  = 0;
@@ -189,6 +189,7 @@ inline void micro_sleep(uint64_t microsec_delay)
 {
 #ifdef _WIN32
     // FIXME: this is not optimal, but it should work
+    // also vs2012 warns : src\tightdb\group_shared.cpp(192): warning C4244: 'argument' : conversion from 'uint64_t' to 'DWORD', possible loss of data
     Sleep(microsec_delay/1000+1);
 #else
     usleep(microsec_delay);
@@ -1083,6 +1084,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
     TIGHTDB_ASSERT(m_group.m_top.is_attached());
     TIGHTDB_ASSERT(readlock_version <= new_version);
     GroupWriter out(m_group); // Throws
+    //FIXME: VS2012 warning:  src\tightdb\group_shared.cpp(1087): warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
     m_group.m_readlock_version = readlock_version;
     out.set_versions(new_version, readlock_version);
     // Recursively write all changed arrays to end of file
