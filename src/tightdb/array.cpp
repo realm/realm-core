@@ -2192,7 +2192,7 @@ void Array::to_dot_parent_edge(ostream& out) const
     }
 }
 
-pair<ref_type, size_t> Array::get_to_dot_parent(size_t ndx_in_parent) const TIGHTDB_OVERRIDE
+pair<ref_type, size_t> Array::get_to_dot_parent(size_t ndx_in_parent) const
 {
     return make_pair(get_ref(), ndx_in_parent);
 }

@@ -45,8 +45,11 @@ struct SharedGroup::SharedInfo {
     Mutex readmutex;
     RobustMutex writemutex;
     RobustMutex balancemutex;
+#ifndef _WIN32
+    // FIXME: windows pthread support for condvar not ready
     CondVar room_to_write;
     CondVar work_to_do;
+#endif
     uint16_t free_write_slots;
     uint64_t filesize;
 
@@ -66,11 +69,17 @@ struct SharedGroup::SharedInfo {
 
 SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t info_size,
                                     DurabilityLevel dlevel):
+#ifndef _WIN32
     readmutex(Mutex::process_shared_tag()), // Throws
     writemutex(), // Throws
     balancemutex(), // Throws
     room_to_write(CondVar::process_shared_tag()), // Throws
     work_to_do(CondVar::process_shared_tag()) // Throws
+#else
+    readmutex(Mutex::process_shared_tag()), // Throws
+    writemutex(), // Throws
+    balancemutex(), // Throws
+#endif
 {
     version  = 0;
     flags    = dlevel; // durability level is fixed from creation
@@ -426,11 +435,12 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 void SharedGroup::do_async_commits()
 {
     bool shutdown = false;
+    bool file_already_removed = false;
     SharedInfo* info = m_file_map.get_addr();
     // NO client are allowed to proceed and update current_version
     // until they see the init_complete == 2. 
     // As we haven't set init_complete to 2 yet, it is safe to assert the following:
-    TIGHTDB_ASSERT(info->current_version.load_relaxed() == 0);
+    TIGHTDB_ASSERT(info->current_version.load_relaxed() == 0 || info->current_version.load_relaxed() == 1);
 
     // We always want to keep a read lock on the last version
     // that was commited to disk, to protect it against being
@@ -447,6 +457,7 @@ void SharedGroup::do_async_commits()
 
         if (m_file.is_removed()) { // operator removed the lock file. take a hint!
 
+            file_already_removed = true; // don't remove what is already gone
             info->shutdown_started.store_release(1);
             shutdown = true;
 #ifdef TIGHTDB_ENABLE_LOGFILE
@@ -510,7 +521,8 @@ void SharedGroup::do_async_commits()
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Removing coordination file" << endl;
 #endif
-            File::remove(m_file_path);
+            if (!file_already_removed)
+                File::remove(m_file_path);
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Daemon exiting nicely" << endl << endl;
 #endif
