@@ -590,8 +590,10 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     // FIXME: Whoops, queries currently does not work on a const
     // qualified table. Please reanable the following tests when this
     // is fixed.
+
 /*
     CHECK_EQUAL(not_found, degen_child->where().equal(0, int64_t()).find_next());
+
     CHECK_EQUAL(not_found, degen_child->where().equal(1, false).find_next());
     CHECK_EQUAL(not_found, degen_child->where().equal(2, float()).find_next());
     CHECK_EQUAL(not_found, degen_child->where().equal(3, double()).find_next());

@@ -469,6 +469,12 @@ template <Action action, typename T, typename R, class ColType>
 R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
+    if(m_table->is_degenerate()) {
+        if (resultcount)
+            *resultcount = 0;
+        return static_cast<R>(0);
+    }
+
     if (end == size_t(-1))
         end = m_table->size();
 
@@ -544,6 +550,12 @@ double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t star
 template <typename T>
 double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
+    if(m_table->is_degenerate()) {
+        if (resultcount)
+            *resultcount = 0;
+        return 0.;
+    }
+
     size_t resultcount2 = 0;
     typedef typename ColumnTypeTraits<T>::column_type ColType;
     typedef typename ColumnTypeTraits<T>::sum_type SumType;
@@ -551,6 +563,7 @@ double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size
     double avg1 = 0;
     if (resultcount2 != 0)
         avg1 = static_cast<double>(sum1) / resultcount2;
+
     if (resultcount)
         *resultcount = resultcount2;
     return avg1;
@@ -635,6 +648,9 @@ void Query::end_subtable()
 
 size_t Query::find_next(size_t lastmatch)
 {
+    if(m_table->is_degenerate())
+        return not_found;
+
     if (lastmatch == size_t(-1)) Init(*m_table);
 
     const size_t end = m_table->size();
@@ -645,6 +661,9 @@ size_t Query::find_next(size_t lastmatch)
 
 TableView Query::find_all(size_t start, size_t end, size_t limit)
 {
+    if(m_table->is_degenerate())
+        return TableView(*m_table);
+
     Init(*m_table);
 
     if (end == size_t(-1))
@@ -676,6 +695,9 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 
 size_t Query::count(size_t start, size_t end, size_t limit) const
 {
+    if(m_table->is_degenerate())
+        return 0;
+
     if (end == size_t(-1))
         end = m_table->size();
 

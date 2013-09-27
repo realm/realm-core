@@ -1815,59 +1815,59 @@ template <class T> ConstTableView Table::find_all(size_t column_ndx, T value) co
         const ColType& column = get_column<ColType, ColumnTypeTraits<T>::ct_id>(column_ndx);
         column.find_all(tv.get_ref_column(), value);
     }
-    return move(tv);
+    return tv;
 }
 
 
 TableView Table::find_all_int(size_t column_ndx, int64_t value)
 {
-    return move(const_cast<const Table*>(this)->find_all<int64_t>(column_ndx, value));
+    return const_cast<const Table*>(this)->find_all<int64_t>(column_ndx, value);
 }
 
 ConstTableView Table::find_all_int(size_t column_ndx, int64_t value) const
 {
-    return move(find_all<int64_t>(column_ndx, value));
+    return find_all<int64_t>(column_ndx, value);
 }
 
 TableView Table::find_all_bool(size_t column_ndx, bool value)
 {
-    return move(const_cast<const Table*>(this)->find_all<bool>(column_ndx, value));
+    return const_cast<const Table*>(this)->find_all<bool>(column_ndx, value);
 }
 
 ConstTableView Table::find_all_bool(size_t column_ndx, bool value) const
 {
-    return move(find_all<int64_t>(column_ndx, value));
+    return find_all<int64_t>(column_ndx, value);
 }
 
 
 TableView Table::find_all_float(size_t column_ndx, float value)
 {
-    return move(const_cast<const Table*>(this)->find_all<float>(column_ndx, value));
+    return const_cast<const Table*>(this)->find_all<float>(column_ndx, value);
 }
 
 ConstTableView Table::find_all_float(size_t column_ndx, float value) const
 {
-    return move(find_all<float>(column_ndx, value));
+    return find_all<float>(column_ndx, value);
 }
 
 TableView Table::find_all_double(size_t column_ndx, double value)
 {
-    return move(const_cast<const Table*>(this)->find_all<double>(column_ndx, value));
+    return const_cast<const Table*>(this)->find_all<double>(column_ndx, value);
 }
 
 ConstTableView Table::find_all_double(size_t column_ndx, double value) const
 {
-    return move(find_all<double>(column_ndx, value));
+    return find_all<double>(column_ndx, value);
 }
 
 TableView Table::find_all_date(size_t column_ndx, Date value)
 {
-    return move(const_cast<const Table*>(this)->find_all<double>(column_ndx, static_cast<int64_t>(value.get_date())));
+    return const_cast<const Table*>(this)->find_all<int64_t>(column_ndx, static_cast<int64_t>(value.get_date()));
 }
 
 ConstTableView Table::find_all_date(size_t column_ndx, Date value) const
 {
-    return move(find_all<double>(column_ndx, static_cast<int64_t>(value.get_date())));
+    return find_all<int64_t>(column_ndx, static_cast<int64_t>(value.get_date()));
 }
 
 TableView Table::find_all_string(size_t column_ndx, StringData value)
