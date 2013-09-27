@@ -586,11 +586,6 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
 
 
     // Queries:
-
-    // FIXME: Whoops, queries currently does not work on a const
-    // qualified table. Please reanable the following tests when this
-    // is fixed.
-/*
     CHECK_EQUAL(not_found, degen_child->where().equal(0, int64_t()).find_next());
     CHECK_EQUAL(not_found, degen_child->where().equal(1, false).find_next());
     CHECK_EQUAL(not_found, degen_child->where().equal(2, float()).find_next());
@@ -609,7 +604,22 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(not_found, degen_child->where().not_equal(6, BinaryData()).find_next());
 //    CHECK_EQUAL(not_found, degen_child->where().not_equal(7, subtab).find_next()); // Not yet implemented
 //    CHECK_EQUAL(not_found, degen_child->where().not_equal(8, Mixed()).find_next()); // Not yet implemented
-*/
+
+    TableView v = degen_child->where().equal(0, int64_t()).find_all();
+    CHECK_EQUAL(0, v.size());
+
+    v = degen_child->where().equal(5, "hello").find_all();
+    CHECK_EQUAL(0, v.size());
+
+    size_t r = degen_child->where().equal(5, "hello").count();
+    CHECK_EQUAL(0, r);
+
+    r = degen_child->where().equal(5, "hello").remove();
+    CHECK_EQUAL(0, r);
+
+    size_t res;
+    degen_child->where().equal(5, "hello").average(0, &res);
+    CHECK_EQUAL(0, res);
 }
 
 

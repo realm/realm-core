@@ -124,6 +124,11 @@ public:
     /// that even Table::is_attached() is disallowed in this case.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
+    // A degenerate table is a subtable which isn't instantiated in the
+    // database file yet because there has not yet been write-access to 
+    // it. Avoiding instantiation is an optimization to save space, etc.
+    bool is_degenerate() const TIGHTDB_NOEXCEPT { return m_columns.m_data == NULL; }
+
     /// A shared spec is a column specification that in general
     /// applies to many tables. A table is not allowed to directly
     /// modify its own spec if it is shared. A shared spec may only be
@@ -339,7 +344,7 @@ public:
 
     // Queries
     Query       where()       { return Query(*this); }
-    const Query where() const { return Query(*this); } // FIXME: There is no point in returning a const Query. We need a ConstQuery class.
+    Query where() const { return Query(*this); } 
 
     // Optimizing
     void optimize();
