@@ -290,6 +290,12 @@ public:
     TableView      get_sorted_view(std::size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;
 
+private:
+    template <class T> std::size_t find_first(std::size_t column_ndx, T value) const; // called by above methods
+    template <class T> ConstTableView find_all(size_t column_ndx, int64_t value) const;
+public:
+
+
     //@{
     /// Find the lower/upper bound according to a column that is
     /// already sorted in ascending order.
