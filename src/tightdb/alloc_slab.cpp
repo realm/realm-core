@@ -343,7 +343,8 @@ char* SlabAlloc::translate(ref_type ref) const TIGHTDB_NOEXCEPT
 }
 
 
-void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create)
+void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, bool no_create,
+                            bool skip_validate)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -398,9 +399,11 @@ void SlabAlloc::attach_file(const string& path, bool is_shared, bool read_only, 
     {
         File::Map<char> map(m_file, File::access_ReadOnly, size); // Throws
 
-        // Verify the data structures
-        if (!validate_buffer(map.get_addr(), size))
-            goto invalid_database;
+        if (!skip_validate) {
+            // Verify the data structures
+            if (!validate_buffer(map.get_addr(), size))
+                goto invalid_database;
+        }
 
         m_data        = map.release();
         m_baseline    = size;
