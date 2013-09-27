@@ -45,8 +45,11 @@ struct SharedGroup::SharedInfo {
     Mutex readmutex;
     RobustMutex writemutex;
     RobustMutex balancemutex;
+#ifndef _WIN32
+    // FIXME: windows pthread support for condvar not ready
     CondVar room_to_write;
     CondVar work_to_do;
+#endif
     uint16_t free_write_slots;
     uint64_t filesize;
 
@@ -66,11 +69,17 @@ struct SharedGroup::SharedInfo {
 
 SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
                                     DurabilityLevel dlevel):
+#ifndef _WIN32
     readmutex(Mutex::process_shared_tag()), // Throws
     writemutex(), // Throws
     balancemutex(), // Throws
     room_to_write(CondVar::process_shared_tag()), // Throws
     work_to_do(CondVar::process_shared_tag()) // Throws
+#else
+    readmutex(Mutex::process_shared_tag()), // Throws
+    writemutex(), // Throws
+    balancemutex(), // Throws
+#endif
 {
     version  = 0;
     flags    = dlevel; // durability level is fixed from creation
