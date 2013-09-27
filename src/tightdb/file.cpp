@@ -816,7 +816,7 @@ bool File::try_remove(const string& path)
     if (::unlink(path.c_str()) == 0) return true;
 #endif
     int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("open() failed: ", err);
+    string msg = get_errno_msg("unlink() failed: ", err);
     switch (err) {
         case EACCES:
         case EROFS:
