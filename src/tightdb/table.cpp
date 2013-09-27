@@ -1805,7 +1805,7 @@ size_t Table::find_first_binary(size_t, BinaryData) const
 }
 
 
-template <class T> ConstTableView Table::find_all(size_t column_ndx, int64_t value) const
+template <class T> ConstTableView Table::find_all(size_t column_ndx, T value) const
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
     TableView tv(*this);
