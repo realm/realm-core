@@ -704,7 +704,7 @@ const ColumnBase& Table::get_column_base(size_t ndx) const TIGHTDB_NOEXCEPT
 
 void Table::validate_column_type(const ColumnBase& column, ColumnType coltype, size_t ndx) const
 {
-    if (coltype == col_type_Int || coltype == col_type_Date || coltype == col_type_Bool) {
+    if (coltype == col_type_Int || coltype == col_type_DateTime || coltype == col_type_Bool) {
         TIGHTDB_ASSERT(column.IsIntColumn());
     }
     else {
@@ -1176,7 +1176,7 @@ void Table::set_bool(size_t column_ndx, size_t ndx, bool value)
 DateTime Table::get_datetime(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Date);
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_DateTime);
     TIGHTDB_ASSERT(ndx < m_size);
 
     const Column& column = get_column(column_ndx);
@@ -1186,7 +1186,7 @@ DateTime Table::get_datetime(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCE
 void Table::set_datetime(size_t column_ndx, size_t ndx, DateTime value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Date);
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_DateTime);
     TIGHTDB_ASSERT(ndx < m_size);
 
     Column& column = get_column(column_ndx);
@@ -1713,7 +1713,7 @@ size_t Table::find_first_bool(size_t column_ndx, bool value) const
 size_t Table::find_first_datetime(size_t column_ndx, DateTime value) const
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Date);
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_DateTime);
     const Column& column = get_column(column_ndx);
 
     return column.find_first(int64_t(value.get_datetime()));
@@ -2600,7 +2600,7 @@ bool Table::compare_rows(const Table& t) const
         switch (type) {
             case col_type_Int:
             case col_type_Bool:
-            case col_type_Date: {
+            case col_type_DateTime: {
                 const Column& c1 = get_column(i);
                 const Column& c2 = t.get_column(i);
                 if (!c1.compare_int(c2))
