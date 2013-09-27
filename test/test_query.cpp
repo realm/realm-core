@@ -47,7 +47,7 @@ TIGHTDB_TABLE_5(PeopleTable,
                 name,  String,
                 age,   Int,
                 male,  Bool,
-                hired, Date,
+                hired, DateTime,
                 photo, Binary)
 
 TIGHTDB_TABLE_2(FloatTable,
@@ -111,11 +111,11 @@ TEST(LimitUntyped)
     double sumd;
     
     // sum, limited by 'limit'
-    sum = q.sum(0, NULL, 0, -1, 1);
+    sum = q.sum_int(0, NULL, 0, -1, 1);
     CHECK_EQUAL(10000, sum);
-    sum = q.sum(0, NULL, 0, -1, 2);
+    sum = q.sum_int(0, NULL, 0, -1, 2);
     CHECK_EQUAL(40000, sum);
-    sum = q.sum(0, NULL, 0, -1);
+    sum = q.sum_int(0, NULL, 0, -1);
     CHECK_EQUAL(80000, sum);
 
     sumd = q.sum_float(1, NULL, 0, -1, 1);
@@ -133,9 +133,9 @@ TEST(LimitUntyped)
     CHECK_EQUAL(80000., sumd);
 
     // sum, limited by 'end', but still having 'limit' specified
-    sum = q.sum(0, NULL, 0, 1, 3);
+    sum = q.sum_int(0, NULL, 0, 1, 3);
     CHECK_EQUAL(10000, sum);
-    sum = q.sum(0, NULL, 0, 2, 3);
+    sum = q.sum_int(0, NULL, 0, 2, 3);
     CHECK_EQUAL(40000, sum);
 
     sumd = q.sum_float(1, NULL, 0, 1, 3);
@@ -149,11 +149,11 @@ TEST(LimitUntyped)
     CHECK_EQUAL(40000., sumd);
 
     // max, limited by 'limit'
-    sum = q.maximum(0, NULL, 0, -1, 1);
+    sum = q.maximum_int(0, NULL, 0, -1, 1);
     CHECK_EQUAL(10000, sum);
-    sum = q.maximum(0, NULL, 0, -1, 2);
+    sum = q.maximum_int(0, NULL, 0, -1, 2);
     CHECK_EQUAL(30000, sum);
-    sum = q.maximum(0, NULL, 0, -1);
+    sum = q.maximum_int(0, NULL, 0, -1);
     CHECK_EQUAL(40000, sum);
 
     sumf = q.maximum_float(1, NULL, 0, -1, 1);
@@ -172,9 +172,9 @@ TEST(LimitUntyped)
 
 
     // max, limited by 'end', but still having 'limit' specified
-    sum = q.maximum(0, NULL, 0, 1, 3);
+    sum = q.maximum_int(0, NULL, 0, 1, 3);
     CHECK_EQUAL(10000, sum);
-    sum = q.maximum(0, NULL, 0, 2, 3);
+    sum = q.maximum_int(0, NULL, 0, 2, 3);
     CHECK_EQUAL(30000, sum);
 
     sumf = q.maximum_float(1, NULL, 0, 1, 3);
@@ -189,9 +189,9 @@ TEST(LimitUntyped)
 
 
     // avg
-    sumd = q.average(0, NULL, 0, -1, 1);
+    sumd = q.average_int(0, NULL, 0, -1, 1);
     CHECK_EQUAL(10000, sumd);
-    sumd = q.average(0, NULL, 0, -1, 2);
+    sumd = q.average_int(0, NULL, 0, -1, 2);
     CHECK_EQUAL((10000 + 30000) / 2, sumd);
 
     sumd = q.average_float(1, NULL, 0, -1, 1);
@@ -201,9 +201,9 @@ TEST(LimitUntyped)
 
 
     // avg, limited by 'end', but still having 'limit' specified
-    sumd = q.average(0, NULL, 0, 1, 3);
+    sumd = q.average_int(0, NULL, 0, 1, 3);
     CHECK_EQUAL(10000, sumd);
-    sumd = q.average(0, NULL, 0, 2, 3);
+    sumd = q.average_int(0, NULL, 0, 2, 3);
     CHECK_EQUAL((10000 + 30000) / 2, sumd);
 
     sumd = q.average_float(1, NULL, 0, 1, 3);
@@ -1102,13 +1102,13 @@ TEST(TestDateQuery)
 {
     PeopleTable table;
 
-    table.add("Mary",  28, false, tightdb::Date(2012,  1, 24), tightdb::BinaryData("bin \0\n data 1", 13));
-    table.add("Frank", 56, true,  tightdb::Date(2008,  4, 15), tightdb::BinaryData("bin \0\n data 2", 13));
-    table.add("Bob",   24, true,  tightdb::Date(2010, 12,  1), tightdb::BinaryData("bin \0\n data 3", 13));
+    table.add("Mary",  28, false, tightdb::DateTime(2012,  1, 24), tightdb::BinaryData("bin \0\n data 1", 13));
+    table.add("Frank", 56, true,  tightdb::DateTime(2008,  4, 15), tightdb::BinaryData("bin \0\n data 2", 13));
+    table.add("Bob",   24, true,  tightdb::DateTime(2010, 12,  1), tightdb::BinaryData("bin \0\n data 3", 13));
 
     // Find people where hired year == 2012 (hour:minute:second is default initialized to 00:00:00)
-    PeopleTable::View view5 = table.where().hired.greater_equal(tightdb::Date(2012, 1, 1).get_date())
-                                           .hired.less(         tightdb::Date(2013, 1, 1).get_date()).find_all();
+    PeopleTable::View view5 = table.where().hired.greater_equal(tightdb::DateTime(2012, 1, 1).get_datetime())
+                                           .hired.less(         tightdb::DateTime(2013, 1, 1).get_datetime()).find_all();
     CHECK_EQUAL(1, view5.size());
     CHECK_EQUAL("Mary", view5[0].name);
 }
@@ -1694,13 +1694,13 @@ TEST(TestQuerySort_Descending)
 TEST(TestQuerySort_Dates)
 {
     Table table;
-    table.add_column(type_Date, "first");
+    table.add_column(type_DateTime, "first");
 
-    table.insert_date(0, 0, 1000);
+    table.insert_datetime(0, 0, 1000);
     table.insert_done();
-    table.insert_date(0, 1, 3000);
+    table.insert_datetime(0, 1, 3000);
     table.insert_done();
-    table.insert_date(0, 2, 2000);
+    table.insert_datetime(0, 2, 2000);
     table.insert_done();
 
     TableView tv = table.where().find_all();
@@ -1712,9 +1712,9 @@ TEST(TestQuerySort_Dates)
     tv.sort(0);
 
     CHECK(tv.size() == 3);
-    CHECK(tv.get_date(0, 0) == 1000);
-    CHECK(tv.get_date(0, 1) == 2000);
-    CHECK(tv.get_date(0, 2) == 3000);
+    CHECK(tv.get_datetime(0, 0) == 1000);
+    CHECK(tv.get_datetime(0, 1) == 2000);
+    CHECK(tv.get_datetime(0, 2) == 3000);
 }
 
 
@@ -2787,13 +2787,13 @@ TEST(TestQuery_AllTypes_DynamicallyTyped)
     Table table;
     {
         Spec& spec = table.get_spec();
-        spec.add_column(type_Bool,   "boo");
-        spec.add_column(type_Int,    "int");
-        spec.add_column(type_Float,  "flt");
-        spec.add_column(type_Double, "dbl");
-        spec.add_column(type_String, "str");
-        spec.add_column(type_Binary, "bin");
-        spec.add_column(type_Date,   "dat");
+        spec.add_column(type_Bool,     "boo");
+        spec.add_column(type_Int,      "int");
+        spec.add_column(type_Float,    "flt");
+        spec.add_column(type_Double,   "dbl");
+        spec.add_column(type_String,   "str");
+        spec.add_column(type_Binary,   "bin");
+        spec.add_column(type_DateTime, "dat");
         {
             Spec subspec = spec.add_subtable_column("tab");
             subspec.add_column(type_Int, "sub_int");
@@ -2810,23 +2810,23 @@ TEST(TestQuery_AllTypes_DynamicallyTyped)
     Mixed mix_subtab((Mixed::subtable_tag()));
 
     table.add_empty_row();
-    table.set_bool   (0, 0, false);
-    table.set_int    (1, 0, 54);
-    table.set_float  (2, 0, 0.7f);
-    table.set_double (3, 0, 0.8);
-    table.set_string (4, 0, "foo");
-    table.set_binary (5, 0, bin1);
-    table.set_date   (6, 0, 0);
-    table.set_mixed  (8, 0, mix_int);
+    table.set_bool    (0, 0, false);
+    table.set_int     (1, 0, 54);
+    table.set_float   (2, 0, 0.7f);
+    table.set_double  (3, 0, 0.8);
+    table.set_string  (4, 0, "foo");
+    table.set_binary  (5, 0, bin1);
+    table.set_datetime(6, 0, 0);
+    table.set_mixed   (8, 0, mix_int);
 
     table.add_empty_row();
-    table.set_bool   (0, 1, true);
-    table.set_int    (1, 1, 506);
-    table.set_float  (2, 1, 7.7f);
-    table.set_double (3, 1, 8.8);
-    table.set_string (4, 1, "banach");
-    table.set_binary (5, 1, bin2);
-    table.set_date   (6, 1, time_now);
+    table.set_bool    (0, 1, true);
+    table.set_int     (1, 1, 506);
+    table.set_float   (2, 1, 7.7f);
+    table.set_double  (3, 1, 8.8);
+    table.set_string  (4, 1, "banach");
+    table.set_binary  (5, 1, bin2);
+    table.set_datetime(6, 1, time_now);
     TableRef subtab = table.get_subtable(7, 1);
     subtab->add_empty_row();
     subtab->set_int(0, 0, 100);
@@ -2838,16 +2838,16 @@ TEST(TestQuery_AllTypes_DynamicallyTyped)
     CHECK_EQUAL(1, table.where().equal(3, 0.8).count());
     CHECK_EQUAL(1, table.where().equal(4, "foo").count());
     CHECK_EQUAL(1, table.where().equal(5, bin1).count());
-    CHECK_EQUAL(1, table.where().equal_date(6, 0).count());
+    CHECK_EQUAL(1, table.where().equal_datetime(6, 0).count());
 //    CHECK_EQUAL(1, table.where().equal(7, subtab).count());
 //    CHECK_EQUAL(1, table.where().equal(8, mix_int).count());
 
     Query query = table.where().equal(0, false);
 
-    CHECK_EQUAL(54, query.minimum(1));
-    CHECK_EQUAL(54, query.maximum(1));
-    CHECK_EQUAL(54, query.sum(1));
-    CHECK_EQUAL(54, query.average(1));
+    CHECK_EQUAL(54, query.minimum_int(1));
+    CHECK_EQUAL(54, query.maximum_int(1));
+    CHECK_EQUAL(54, query.sum_int(1));
+    CHECK_EQUAL(54, query.average_int(1));
 
     CHECK_EQUAL(0.7f, query.minimum_float(2));
     CHECK_EQUAL(0.7f, query.maximum_float(2));
@@ -2872,7 +2872,7 @@ TIGHTDB_TABLE_9(TestQueryAllTypes,
                 double_col, Double,
                 string_col, String,
                 binary_col, Binary,
-                date_col,   Date,
+                date_col,   DateTime,
                 table_col,  Subtable<TestQuerySub>,
                 mixed_col,  Mixed)
 }

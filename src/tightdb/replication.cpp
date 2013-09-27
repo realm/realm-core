@@ -218,7 +218,7 @@ private:
         switch (type) {
             case type_Int:
             case type_Bool:
-            case type_Date:
+            case type_DateTime:
             case type_String:
             case type_Binary:
             case type_Table:
@@ -411,18 +411,18 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
 #endif
             return;
         }
-        case type_Date: {
+        case type_DateTime: {
             time_t value = read_int<time_t>(); // Throws
             if (insert)
-                m_table->insert_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                m_table->insert_datetime(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
             else
-                m_table->set_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                m_table->set_datetime(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
             if (m_log) {
                 if (insert)
-                    *m_log << "table->insert_date("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                    *m_log << "table->insert_datetime("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
                 else
-                    *m_log << "table->set_date("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                    *m_log << "table->set_datetime("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
             }
 #endif
             return;
@@ -511,18 +511,18 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
 #endif
                     return;
                 }
-                case type_Date: {
+                case type_DateTime: {
                     time_t value = read_int<time_t>(); // Throws
                     if (insert)
-                        m_table->insert_mixed(column_ndx, ndx, Date(value)); // FIXME: Memory allocation failure!!!
+                        m_table->insert_mixed(column_ndx, ndx, DateTime(value)); // FIXME: Memory allocation failure!!!
                     else
-                        m_table->set_mixed(column_ndx, ndx, Date(value)); // FIXME: Memory allocation failure!!!
+                        m_table->set_mixed(column_ndx, ndx, DateTime(value)); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
                     if (m_log) {
                         if (insert)
-                            *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", Date("<<value<<"))\n";
+                            *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", DateTime("<<value<<"))\n";
                         else
-                            *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", Date("<<value<<"))\n";
+                            *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", DateTime("<<value<<"))\n";
                     }
 #endif
                     return;

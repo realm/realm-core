@@ -332,7 +332,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows)
     Spec& s = table.get_spec();
     s.add_column(type_Int,    "int");
     s.add_column(type_Bool,   "bool");
-    s.add_column(type_Date,   "date");
+    s.add_column(type_DateTime,"date");
     s.add_column(type_Float,  "float");
     s.add_column(type_Double, "double");
     s.add_column(type_String, "string");
@@ -350,7 +350,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows)
         int64_t sign = (i%2 == 0) ? 1 : -1;
         table.insert_int(0, i, int64_t(i*sign));
         table.insert_bool(1, i, (i % 2 ? true : false));
-        table.insert_date(2, i, 12345);
+        table.insert_datetime(2, i, 12345);
         table.insert_float(3, i, 123.456f*sign);
         table.insert_double(4, i, 9876.54321*sign);
 
@@ -386,7 +386,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows)
                 table.insert_mixed(9, i, "string");
                 break;
             case 3:
-                table.insert_mixed(9, i, Date(123456789));
+                table.insert_mixed(9, i, DateTime(123456789));
                 break;
             case 4:
                 table.insert_mixed(9, i, BinaryData("binary", 7));
@@ -855,7 +855,7 @@ TEST(Table_Distinct)
     table.column().second.set_index();
     CHECK(table.column().second.has_index());
 
-    TestTableEnum::View view = table.column().second.distinct();
+    TestTableEnum::View view = table.column().second.get_distinct_view();
 
     CHECK_EQUAL(4, view.size());
     CHECK_EQUAL(0, view.get_source_ndx(0));
@@ -1651,20 +1651,20 @@ TEST(Table_Mixed)
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
 
     table.insert_int(0, 3, 0);
-    table.insert_mixed(1, 3, Date(324234));
+    table.insert_mixed(1, 3, DateTime(324234));
     table.insert_done();
 
     CHECK_EQUAL(0,  table.get_int(0, 0));
     CHECK_EQUAL(43, table.get_int(0, 1));
     CHECK_EQUAL(0,  table.get_int(0, 3));
-    CHECK_EQUAL(type_Bool,   table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(type_Int,    table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_Date,   table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_Bool,    table.get_mixed(1, 0).get_type());
+    CHECK_EQUAL(type_Int,     table.get_mixed(1, 1).get_type());
+    CHECK_EQUAL(type_String,  table.get_mixed(1, 2).get_type());
+    CHECK_EQUAL(type_DateTime,table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
 
     table.insert_int(0, 4, 43);
     table.insert_mixed(1, 4, Mixed(BinaryData("binary", 7)));
@@ -1674,15 +1674,15 @@ TEST(Table_Mixed)
     CHECK_EQUAL(43, table.get_int(0, 1));
     CHECK_EQUAL(0,  table.get_int(0, 3));
     CHECK_EQUAL(43, table.get_int(0, 4));
-    CHECK_EQUAL(type_Bool,   table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(type_Int,    table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_Date,   table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_Bool,     table.get_mixed(1, 0).get_type());
+    CHECK_EQUAL(type_Int,      table.get_mixed(1, 1).get_type());
+    CHECK_EQUAL(type_String,   table.get_mixed(1, 2).get_type());
+    CHECK_EQUAL(type_DateTime, table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(type_Binary, table.get_mixed(1, 4).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
     CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
 
@@ -1695,16 +1695,16 @@ TEST(Table_Mixed)
     CHECK_EQUAL(0,  table.get_int(0, 3));
     CHECK_EQUAL(43, table.get_int(0, 4));
     CHECK_EQUAL(0,  table.get_int(0, 5));
-    CHECK_EQUAL(type_Bool,   table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(type_Int,    table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_Date,   table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_Bool,     table.get_mixed(1, 0).get_type());
+    CHECK_EQUAL(type_Int,      table.get_mixed(1, 1).get_type());
+    CHECK_EQUAL(type_String,   table.get_mixed(1, 2).get_type());
+    CHECK_EQUAL(type_DateTime, table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(type_Binary, table.get_mixed(1, 4).get_type());
     CHECK_EQUAL(type_Table,  table.get_mixed(1, 5).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
     CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
 
@@ -1738,10 +1738,10 @@ TEST(Table_Mixed)
     CHECK_EQUAL(0,  table.get_int(0, 5));
     CHECK_EQUAL(31, table.get_int(0, 6));
     CHECK_EQUAL(0,  table.get_int(0, 7));
-    CHECK_EQUAL(type_Bool,   table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(type_Int,    table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_Date,   table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_Bool,     table.get_mixed(1, 0).get_type());
+    CHECK_EQUAL(type_Int,      table.get_mixed(1, 1).get_type());
+    CHECK_EQUAL(type_String,   table.get_mixed(1, 2).get_type());
+    CHECK_EQUAL(type_DateTime, table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(type_Binary, table.get_mixed(1, 4).get_type());
     CHECK_EQUAL(type_Table,  table.get_mixed(1, 5).get_type());
     CHECK_EQUAL(type_Float,  table.get_mixed(1, 6).get_type());
@@ -1749,7 +1749,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
     CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
     CHECK_EQUAL(float(1.123),  table.get_mixed(1, 6).get_float());
@@ -1772,17 +1772,17 @@ TEST(Table_Mixed2)
 
     table.add(int64_t(1));
     table.add(true);
-    table.add(Date(1234));
+    table.add(DateTime(1234));
     table.add("test");
 
-    CHECK_EQUAL(type_Int,    table[0].first.get_type());
-    CHECK_EQUAL(type_Bool,   table[1].first.get_type());
-    CHECK_EQUAL(type_Date,   table[2].first.get_type());
-    CHECK_EQUAL(type_String, table[3].first.get_type());
+    CHECK_EQUAL(type_Int,      table[0].first.get_type());
+    CHECK_EQUAL(type_Bool,     table[1].first.get_type());
+    CHECK_EQUAL(type_DateTime, table[2].first.get_type());
+    CHECK_EQUAL(type_String,   table[3].first.get_type());
 
     CHECK_EQUAL(1,            table[0].first.get_int());
     CHECK_EQUAL(true,         table[1].first.get_bool());
-    CHECK_EQUAL(time_t(1234), table[2].first.get_date());
+    CHECK_EQUAL(time_t(1234), table[2].first.get_datetime());
     CHECK_EQUAL("test",       table[3].first.get_string());
 }
 
@@ -2027,7 +2027,7 @@ TEST(Table_SubtableCopyOnSetAndInsert)
 
 namespace {
 TIGHTDB_TABLE_2(TableDateAndBinary,
-                date, Date,
+                date, DateTime,
                 bin, Binary)
 } // anonymous namespace
 
@@ -2268,7 +2268,7 @@ TIGHTDB_TABLE_3(TableAgg,
                 c_float, Float,
                 c_double, Double)
 
-                // TODO: Bool? Date
+                // TODO: Bool? DateTime
 } // anonymous namespace
 
 #if TEST_DURATION > 0

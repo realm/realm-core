@@ -309,7 +309,7 @@
     <ClInclude Include="src\tightdb\config.h">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\date.hpp">
+    <ClInclude Include="src\tightdb\datetime.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\group.hpp">
