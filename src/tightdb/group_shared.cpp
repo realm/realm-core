@@ -255,7 +255,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // with old state when starting transactions
             bool is_shared = true;
             bool read_only = false;
-            alloc.attach_file(path, is_shared, read_only, no_create_file); // Throws
+            bool skip_validate = false;
+            alloc.attach_file(path, is_shared, read_only, no_create_file, skip_validate); // Throws
 
             // Call SharedInfo::SharedInfo() (placement new)
             new (info) SharedInfo(alloc, file_size, dlevel); // Throws
@@ -295,7 +296,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
             bool is_shared = true;
             bool read_only = false;
             bool no_create = true;
-            alloc.attach_file(path, is_shared, read_only, no_create); // Throws
+            bool skip_validate = true; // To avoid race conditions
+            alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
 
         }
 
