@@ -31,6 +31,10 @@
 #include <tightdb/terminate.hpp>
 #include <tightdb/unique_ptr.hpp>
 
+#ifdef TIGHTDB_HAVE_CXX11_ATOMIC
+#include <atomic>
+#endif
+
 
 namespace tightdb {
 
@@ -488,10 +492,6 @@ inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 // in hardware, this is somewhat annoying, because we will use a full memory barrier
 // where no-one is needed. FIXME: introduce x86 specific optimization to avoid the
 // memory barrier!
-
-#ifdef TIGHTDB_HAVE_CXX11_ATOMIC
-#include <atomic>
-#endif
 
 template<class T>
 class Atomic
