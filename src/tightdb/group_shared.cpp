@@ -78,7 +78,7 @@ SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t info_size,
 #else
     readmutex(Mutex::process_shared_tag()), // Throws
     writemutex(), // Throws
-    balancemutex(), // Throws
+    balancemutex() // Throws
 #endif
 {
     version  = 0;
