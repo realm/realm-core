@@ -36,10 +36,7 @@
 #define TEST_INDEX_STRING
 #define TEST_LANG_BIND_HELPER
 #define TEST_QUERY
-// TEST_SHARED was temporarily disabled because the 'async' changes fails on Windows
-#ifndef _WIN32
-#  define TEST_SHARED
-#endif
+#define TEST_SHARED
 #define TEST_STRING_DATA
 #define TEST_TABLE
 #define TEST_TABLE_VIEW
