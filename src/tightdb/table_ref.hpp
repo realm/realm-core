@@ -115,7 +115,14 @@ public:
 #ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
     using bind_ptr<T>::operator bool;
 #else
+#  ifdef __clang__
+    // Clang 3.0 and 3.1 has a bug that causes it to effectively
+    // ignore the 'using' declaration.
+    typedef typename bind_ptr<T>::unspecified_bool_type unspecified_bool_type;
+    operator unspecified_bool_type() const TIGHTDB_NOEXCEPT { return bind_ptr<T>::operator unspecified_bool_type(); }
+#  else
     using bind_ptr<T>::operator typename bind_ptr<T>::unspecified_bool_type;
+#  endif
 #endif
 
     void reset() TIGHTDB_NOEXCEPT { bind_ptr<T>::reset(); }
