@@ -961,7 +961,6 @@ TIGHTDB_TABLE_1(TestSubtableLookup1,
 } // anonymous namespace
 
 
-/*
 TEST(Table_SubtableLookup)
 {
     TestSubtableLookup1 t;
@@ -983,7 +982,6 @@ TEST(Table_SubtableLookup)
         CHECK_EQUAL(not_found, i3);
     }
 }
-*/
 
 
 TEST(Table_Distinct)
