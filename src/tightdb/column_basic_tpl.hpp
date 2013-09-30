@@ -20,9 +20,6 @@
 #ifndef TIGHTDB_COLUMN_BASIC_TPL_HPP
 #define TIGHTDB_COLUMN_BASIC_TPL_HPP
 
-// #include <tightdb/query_engine.hpp>
-
-
 namespace tightdb {
 
 // Predeclarations from query_engine.hpp
@@ -265,8 +262,9 @@ std::size_t BasicColumn<T>::count(T target) const
 
     return cnt;
 // Above because we need to get rid of #include query_engine dependency in this header. Todo, 
-// we must put below call inside a .cpp file and #include query_engine there.
-//    return std::size_t(ColumnBase::aggregate<T, int64_t, act_Count, Equal>(target, 0, size(), 0));
+// we must put below call inside a .cpp file and #include query_engine there and use that instead
+// because it's faster than above loop.
+// return std::size_t(ColumnBase::aggregate<T, int64_t, act_Count, Equal>(target, 0, size(), 0));
 }
 
 template<class T>
@@ -284,8 +282,9 @@ typename BasicColumn<T>::SumType BasicColumn<T>::sum(std::size_t start, std::siz
 
     return sum;
 // Above because we need to get rid of #include query_engine dependency in this header. Todo, 
-// we must put below call inside a .cpp file and #include query_engine there.
-//    return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, 0);
+// we must put below call inside a .cpp file and #include query_engine there and use that instead
+// because it's faster than above loop.
+// return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, 0);
 }
 
 template<class T>
@@ -319,9 +318,9 @@ T BasicColumn<T>::minimum(std::size_t start, std::size_t end, size_t limit) cons
 
     return min;
 // Above because we need to get rid of #include query_engine dependency in this header. Todo, 
-// we must put below call inside a .cpp file and #include query_engine there.
-
-//    return ColumnBase::aggregate<T, T, act_Min, None>(0, start, end, 0);
+// we must put below call inside a .cpp file and #include query_engine there and use that instead
+// because it's faster than above loop.
+// return ColumnBase::aggregate<T, T, act_Min, None>(0, start, end, 0);
 }
 
 template<class T>
@@ -340,8 +339,9 @@ T BasicColumn<T>::maximum(std::size_t start, std::size_t end, size_t limit) cons
 
     return max;
 // Above because we need to get rid of #include query_engine dependency in this header. Todo, 
-// we must put below call inside a .cpp file and #include query_engine there.
-//    return ColumnBase::aggregate<T, T, act_Max, None>(0, start, end, 0);
+// we must put below call inside a .cpp file and #include query_engine there and use that instead
+// because it's faster than above loop.
+// return ColumnBase::aggregate<T, T, act_Max, None>(0, start, end, 0);
 }
 
 

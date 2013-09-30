@@ -147,35 +147,6 @@ struct GreaterEqual {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 >= v2;}
     int condition() {return cond_GreaterEqual;}
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 } // namespace tightdb
 
 #endif // TIGHTDB_QUERY_CONDITIONS_HPP
