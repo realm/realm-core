@@ -85,8 +85,11 @@ public:
     /// Compare two string columns for equality.
     bool compare_string(const AdaptiveStringColumn&) const;
 
-    bool GetBlock(std::size_t ndx, ArrayParent** ap, std::size_t& off) const
+    bool GetBlock(std::size_t ndx, ArrayParent** ap, std::size_t& off, bool use_retval = false) const
     {
+        static_cast<void>(use_retval);
+        TIGHTDB_ASSERT(use_retval == false); // retval optimization not supported. See Array on how to implement
+
         Allocator& alloc = m_array->get_alloc();
         if (root_is_leaf()) {
             off = 0;

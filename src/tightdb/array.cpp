@@ -290,7 +290,7 @@ void Array::set(size_t ndx, int64_t value)
     // Set the value
     (this->*m_setter)(ndx, value);
 }
-
+ 
 /*
 // Optimization for the common case of adding positive values to a local array
 // (happens a lot when returning results to TableViews)
@@ -1349,6 +1349,9 @@ template<size_t width> void Array::set_width() TIGHTDB_NOEXCEPT
     Getter temp_getter = &Array::Get<width>;
     m_getter = temp_getter;
 
+    ChunkGetter temp_chunk_getter = &Array::get_chunk<width>;
+    m_chunk_getter = temp_chunk_getter;
+
     Setter temp_setter = &Array::Set<width>;
     m_setter = temp_setter;
 
@@ -1368,6 +1371,46 @@ template<size_t width> void Array::set_width() TIGHTDB_NOEXCEPT
 template<size_t w> int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     return GetUniversal<w>(m_data, ndx);
+}
+
+template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT
+{
+    // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
+    // exceed array length; in this case, remainder of res[8] will be left untouched.
+
+    TIGHTDB_ASSERT(ndx < m_size);
+
+    if(TIGHTDB_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 16 < m_size) {
+        // This method is *multiple* times faster than performing 8 times Get<w>, even if unrolled. Apparently compilers
+        // can't figure out to optimize it.
+        uint64_t c;
+        if(w == 1) {
+            c = *reinterpret_cast<uint16_t*>(m_data + ndx / 8);
+            c >>= ndx - ndx / 8 * 8;
+        }
+        else if(w == 2) {
+            c = *reinterpret_cast<uint32_t*>(m_data + ndx / 4);
+            c >>= ndx - ndx / 4 * 4;
+        }
+        else if(w == 4) {
+            c = *reinterpret_cast<uint64_t*>(m_data + ndx / 2);
+            c >>= ndx - ndx / 4 * 2;
+        }
+        uint64_t mask = (w == 64 ? ~0ULL : ((1ULL << (w == 64 ? 0 : w)) - 1ULL));
+        // The '?' is to avoid warnings about shifting too much
+        res[0] = (c >> 0 * (w > 4 ? 0 : w)) & mask;
+        res[1] = (c >> 1 * (w > 4 ? 0 : w)) & mask;
+        res[2] = (c >> 2 * (w > 4 ? 0 : w)) & mask;
+        res[3] = (c >> 3 * (w > 4 ? 0 : w)) & mask;
+        res[4] = (c >> 4 * (w > 4 ? 0 : w)) & mask;
+        res[5] = (c >> 5 * (w > 4 ? 0 : w)) & mask;
+        res[6] = (c >> 6 * (w > 4 ? 0 : w)) & mask;
+        res[7] = (c >> 7 * (w > 4 ? 0 : w)) & mask;
+    }
+    else {
+        for(size_t i = 0; i < m_size && i < 8; i++) 
+            res[i] = Get<w>(ndx + i);
+    }
 }
 
 #ifdef _MSC_VER

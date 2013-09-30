@@ -375,6 +375,9 @@
     <ClInclude Include="test\pthread_test.hpp">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="src\tightdb\query_expression.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
     <ClInclude Include="test\test_utilities.hpp">
       <Filter>test\util</Filter>
     </ClInclude>
@@ -396,7 +399,7 @@
       <UniqueIdentifier>{4436af4e-59db-4e36-9b8c-acb6e5d85aea}</UniqueIdentifier>
     </Filter>
     <Filter Include="test\util">
-      <UniqueIdentifier>{0a19bdba-d588-4ba1-935d-8de54bde0675}</UniqueIdentifier>
+      <UniqueIdentifier>{b58f9a8c-f069-420b-a04d-a090821a51eb}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

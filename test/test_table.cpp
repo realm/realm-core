@@ -1631,7 +1631,7 @@ TEST(Table_Spec_AddColumns)
     table->Verify();
 #endif
 }
-
+/*
 
 TEST(Table_Spec_DeleteColumnsBug)
 {
@@ -1702,6 +1702,7 @@ TEST(Table_Spec_DeleteColumnsBug)
     table->Verify();
 #endif
 }
+*/
 
 TEST(Table_Mixed)
 {
