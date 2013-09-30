@@ -50,15 +50,6 @@
 #endif
 
 
-// On platforms with cache coherence this macro should not do anything
-// on all other platforms it must implement a sync or memory barrier
-// FIXME: It is common to define at least two diffrent levels of cache coherency. Which one do we require? Which ones are guaranteed by Intel and ARM? See http://en.wikipedia.org/wiki/Cache_coherence.
-#if defined(TIGHTDB_X86_OR_X64)
-#  define TIGHTDB_SYNC_IF_NO_CACHE_COHERENCE
-#elif defined (TIGHTDB_ARCH_ARM)
-#  define TIGHTDB_SYNC_IF_NO_CACHE_COHERENCE
-#endif
-
 #if defined(TIGHTDB_PTR_64) && defined(TIGHTDB_X86_OR_X64)
     #define TIGHTDB_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
 #endif

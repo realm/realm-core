@@ -5,6 +5,11 @@
 using namespace std;
 using namespace tightdb;
 
+// Convert ConstTableView to TableView. Used to let const and non-const public methods Table::find_all_xxx re-use
+// eachothers code
+TableView::TableView(ConstTableView tv): TableViewBase(&tv) {}
+
+// todo, redundant. Declare one single place instead
 template<class T> struct ColumnTypeTraits;
 
 template<> struct ColumnTypeTraits<int64_t> {
@@ -90,7 +95,7 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
 // count_target is ignored by all <int function> except Count. Hack because of bug in optional
 // arguments in clang and vs2010 (fixed in 2012)
 template <int function, typename T, typename R, class ColType>
-R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx, T count_target) const
+R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t) const, size_t column_ndx, T count_target) const
 {
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, ColumnTypeTraits<T>::id);
     TIGHTDB_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count);
@@ -107,7 +112,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, 
         if(function == act_Count)
             return static_cast<R>(column->count(count_target));
         else
-            return (column->*aggregateMethod)(0, size_t(-1));
+            return (column->*aggregateMethod)(0, size_t(-1), size_t(-1)); // end == limit == -1
     }
 
     // Array object instantiation must NOT allocate initial memory (capacity)
@@ -339,6 +344,19 @@ void TableViewBase::to_string(ostream& out, size_t limit) const
         out << "... and " << rest << " more rows (total " << row_count << ")";
     }
 }
+
+void TableViewBase::row_to_string(size_t row_ndx, ostream& out) const
+{
+    TIGHTDB_ASSERT(row_ndx < m_refs.size());
+
+    // Print header (will also calculate widths)
+    vector<size_t> widths;
+    m_table->to_string_header(out, widths);
+
+    // Print row contents
+    m_table->to_string_row(get_source_ndx(row_ndx), out, widths);
+}
+
 
 void TableView::remove(size_t ndx)
 {

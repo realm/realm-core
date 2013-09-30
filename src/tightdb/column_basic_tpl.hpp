@@ -264,30 +264,38 @@ std::size_t BasicColumn<T>::count(T target) const
             cnt++;
 
     return cnt;
-// Above because we need to get rid of #include query_engine dependency in this header
+// Above because we need to get rid of #include query_engine dependency in this header. Todo, 
+// we must put below call inside a .cpp file and #include query_engine there.
 //    return std::size_t(ColumnBase::aggregate<T, int64_t, act_Count, Equal>(target, 0, size(), 0));
 }
 
 template<class T>
-typename BasicColumn<T>::SumType BasicColumn<T>::sum(std::size_t start, std::size_t end) const
+typename BasicColumn<T>::SumType BasicColumn<T>::sum(std::size_t start, std::size_t end, size_t limit) const
 {
     if (end == std::size_t(-1))
         end = size();
+
+    if(limit != size_t(-1) && start + limit < end)
+        end = start + limit;
 
     BasicColumn<T>::SumType sum = static_cast<BasicColumn<T>::SumType>(0);
     for(size_t i = start; i < end; i++)
         sum += get(i);
 
     return sum;
-// Above because we need to get rid of #include query_engine dependency in this header
+// Above because we need to get rid of #include query_engine dependency in this header. Todo, 
+// we must put below call inside a .cpp file and #include query_engine there.
 //    return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, 0);
 }
 
 template<class T>
-double BasicColumn<T>::average(std::size_t start, std::size_t end) const
+double BasicColumn<T>::average(std::size_t start, std::size_t end, size_t limit) const
 {
     if (end == std::size_t(-1))
         end = size();
+
+    if(limit != size_t(-1) && start + limit < end)
+        end = start + limit;
 
     std::size_t size = end - start;
     double sum1 = sum(start, end);
@@ -296,34 +304,43 @@ double BasicColumn<T>::average(std::size_t start, std::size_t end) const
 }
 
 template<class T>
-T BasicColumn<T>::minimum(std::size_t start, std::size_t end) const
+T BasicColumn<T>::minimum(std::size_t start, std::size_t end, size_t limit) const
 {
     if (end == std::size_t(-1))
         end = size();
 
+    if (limit != size_t(-1) && start + limit < end)
+        end = start + limit;
+
     T min = std::numeric_limits<T>::max();
     for(size_t i = start; i < end; i++)
-        if(get(i) < min)
+        if (get(i) < min)
             min = get(i);
 
     return min;
-// Above because we need to get rid of #include query_engine dependency in this header
+// Above because we need to get rid of #include query_engine dependency in this header. Todo, 
+// we must put below call inside a .cpp file and #include query_engine there.
+
 //    return ColumnBase::aggregate<T, T, act_Min, None>(0, start, end, 0);
 }
 
 template<class T>
-T BasicColumn<T>::maximum(std::size_t start, std::size_t end) const
+T BasicColumn<T>::maximum(std::size_t start, std::size_t end, size_t limit) const
 {
     if (end == std::size_t(-1))
         end = size();
 
+    if (limit != size_t(-1) && start + limit < end)
+        end = start + limit;
+
     T max = std::numeric_limits<T>::min();
     for(size_t i = start; i < end; i++)
-        if(get(i) > max)
+        if (get(i) > max)
             max = get(i);
 
     return max;
-
+// Above because we need to get rid of #include query_engine dependency in this header. Todo, 
+// we must put below call inside a .cpp file and #include query_engine there.
 //    return ColumnBase::aggregate<T, T, act_Max, None>(0, start, end, 0);
 }
 

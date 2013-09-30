@@ -1,8 +1,13 @@
+#include "testsettings.hpp"
+#ifdef TEST_TABLE_VIEW
+
 #include <UnitTest++.h>
 #include <tightdb/table_macros.hpp>
 #include <string>
 #include <sstream>
+#include <ostream>
 
+using namespace std;
 using namespace tightdb;
 
 namespace {
@@ -612,3 +617,65 @@ TEST(TableView_HighLevelSubtables)
     CHECK_EQUAL(cv[0].subtab[0].subtab[0].val,                              6);
     CHECK_EQUAL(cv.column().subtab[0]->column().subtab[0]->column().val[0], 6);
 }
+
+
+TEST(TableView_to_string)
+{
+    TestTableInt2 tbl;
+
+    tbl.add(2, 123456);
+    tbl.add(4, 1234567);
+    tbl.add(6, 12345678);
+    tbl.add(4, 12345678);
+
+    string s  = "    first    second\n";
+    string s0 = "0:      2    123456\n";
+    string s1 = "1:      4   1234567\n";
+    string s2 = "2:      6  12345678\n";
+    string s3 = "3:      4  12345678\n";
+
+    // Test full view
+    stringstream ss;
+    TestTableInt2::View tv = tbl.where().find_all();
+    tv.to_string(ss);
+    CHECK_EQUAL(s+s0+s1+s2+s3, ss.str());
+
+    // Find partial view: row 1+3
+    stringstream ss2;
+    tv = tbl.where().first.equal(4).find_all();
+    tv.to_string(ss2);
+    CHECK_EQUAL(s+s1+s3, ss2.str());
+
+    // test row_to_string. get row 0 of previous view - i.e. row 1 in tbl
+    stringstream ss3;
+    tv.row_to_string(0,ss3);
+    CHECK_EQUAL(s+s1, ss3.str());
+}
+
+TEST(TableView_ref_counting)
+{
+    TableView tv, tv2;
+    {
+        TableRef t = Table::create();
+        t->add_column(type_Int, "myint");
+        t->insert_int(0, 0, 12);
+        t->insert_done();
+        tv = t->where().find_all();
+    }
+
+    {
+        TableRef t2 = Table::create();
+        t2->add_column(type_String, "mystr");
+        t2->insert_string(0, 0, "just a test string");
+        t2->insert_done();
+        tv2 = t2->where().find_all();
+    }
+
+    // Now try to access TableView and see that the Table is still alive
+    size_t i = tv.get_int(0, 0);
+    CHECK_EQUAL(i, 12);
+    string s = tv2.get_string(0, 0);
+    CHECK_EQUAL(s, "just a test string");
+}
+
+#endif // TEST_TABLE_VIEW

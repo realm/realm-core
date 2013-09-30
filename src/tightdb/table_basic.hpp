@@ -201,7 +201,7 @@ public:
 
     class Query;
     Query       where() {return Query(*this);}
-    const Query where() const {return Query(*this);}
+    Query where() const {return Query(*this);}
 
     /// Compare two tables for equality. Two tables are equal if, and
     /// only if, they contain the same rows in the same order, that

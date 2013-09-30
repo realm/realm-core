@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_STRING_DATA
+
 #include <cstring>
 #include <string>
 #include <sstream>
@@ -96,3 +99,5 @@ TEST(StringData_STL_Stream)
     out << sd;
     CHECK_EQUAL(s, out.str());
 }
+
+#endif

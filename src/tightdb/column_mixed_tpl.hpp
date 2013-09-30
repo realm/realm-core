@@ -89,7 +89,7 @@ inline ref_type ColumnMixed::create(std::size_t size, Allocator& alloc)
 // Getters
 //
 
-#define TIGHTDB_BIT63 0x8000000000000000
+#define TIGHTDB_BIT63 0x8000000000000000ull
 
 inline int64_t ColumnMixed::get_value(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {

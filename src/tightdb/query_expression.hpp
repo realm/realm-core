@@ -92,7 +92,6 @@ by query system.
 Caveats, notes and todos
 -----------------------------------------------------------------------------------------------------------------------
     * Perhaps disallow columns from two different tables in same expression
-    * Use query_engine.hpp for execution of simple queries that are supported there, because it's faster
     * Support unary operators like power and sqrt
     * The name Columns (with s) an be confusing because we also have Column (without s)
     * Memory allocation: Maybe clone Compare and Operator to get rid of m_auto_delete. However, this might become
@@ -208,7 +207,7 @@ public:
         return NULL; 
     }
 
-    TIGHTDB_FORCEINLINE virtual void evaluate(size_t index, ValueBase& destination) = 0;
+    virtual void evaluate(size_t index, ValueBase& destination) = 0;
 };
 
 class ColumnsBase {};
@@ -229,7 +228,7 @@ public:
         std::fill(m_v, m_v + ValueBase::elements, v); 
     }
 
-    TIGHTDB_FORCEINLINE void evaluate(size_t, ValueBase& destination) {
+    void evaluate(size_t, ValueBase& destination) {
         destination.import(*this);
     }
 
@@ -763,7 +762,7 @@ public:
         return m_table;
     }
 
-    TIGHTDB_FORCEINLINE void evaluate(size_t index, ValueBase& destination) {
+    void evaluate(size_t index, ValueBase& destination) {
         Value<T> v;            
         sg->cache_next(index);
         if(SameType<T, int64_t>::value) {
@@ -821,7 +820,7 @@ public:
         return l ? l : r;
     }
 
-    TIGHTDB_FORCEINLINE void evaluate(size_t index, ValueBase& destination) {
+    void evaluate(size_t index, ValueBase& destination) {
         Value<T> result;
         Value<T> left;
         Value<T> right;
