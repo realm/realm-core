@@ -319,12 +319,6 @@ inline void SharedGroup::open(Replication& repl)
 #endif // TIGHTDB_ENABLE_REPLICATION
 
 
-inline void SharedGroup::reserve(std::size_t size)
-{
-    m_group.m_alloc.reserve(size);
-}
-
-
 } // namespace tightdb
 
 #endif // TIGHTDB_GROUP_SHARED_HPP
