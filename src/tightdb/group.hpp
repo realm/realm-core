@@ -606,7 +606,7 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
     // Finalize the top array by adding the projected final file size
     // to it
     std::size_t top_byte_size = top.get_byte_size();
-    std::size_t final_file_size = top_pos + top_byte_size;
+    std::size_t final_file_size = top_pos + top_byte_size;//FIXME: VS2012  warning C4244: 'initializing' : conversion from 'uint64_t' to 'size_t', possible loss of data
     // FIXME: Dangerous cast: unsigned -> signed
     top.set(2, 1 + 2*final_file_size);
 
