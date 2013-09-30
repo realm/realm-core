@@ -593,7 +593,7 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
     // size
     int top_size = 3;
     std::size_t max_top_byte_size = Array::get_max_byte_size(top_size);
-    std::size_t max_final_file_size = top_pos + max_top_byte_size;
+    uint64_t max_final_file_size = top_pos + max_top_byte_size;
     Array top(Array::type_HasRefs); // Throws
     // FIXME: Dangerous cast: unsigned -> signed
     top.ensure_minimum_width(1 + 2*max_final_file_size); // Throws
