@@ -406,12 +406,21 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
         // m_file_path.substr(). Currently, if it throws, the program
         // will be terminated due to 'noexcept' on ~SharedGroup().
         string db_path = m_file_path.substr(0, path_len); // Throws
+        m_group.m_alloc.detach();
         File::remove(db_path.c_str());
     }
 
     info->~SharedInfo(); // Call destructor
 
-    File::remove(m_file_path.c_str());
+    // m_file.unlock(); // should not be needed, implied by close
+    m_file.close();
+    m_file_map.unmap();
+    m_reader_map.unmap();
+    try {
+        File::remove(m_file_path.c_str());
+    } catch (runtime_error& e) {
+        cerr << "failed to remove .lock file, problem ignored" << endl;
+    }
 }
 
 
