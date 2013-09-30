@@ -94,11 +94,14 @@
 #  define TIGHTDB_HAVE_CXX11_INITIALIZER_LISTS 1
 #endif
 
-
+//fixme:somehow vs2012 doesn't build well when atomic is included in thread.cpp
+//so for now, disable on windows
 /* Support for C++11 atomics. */
-#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_4 || \
+#ifndef _MSC_VER
+#  if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_4 || \
     _MSC_VER >= 1700
-#  define TIGHTDB_HAVE_CXX11_ATOMIC 1
+#    define TIGHTDB_HAVE_CXX11_ATOMIC 1
+#  endif
 #endif
 
 

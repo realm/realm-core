@@ -26,7 +26,7 @@ void ColumnSubtableParent::child_accessor_destroyed(size_t subtable_ndx) TIGHTDB
 
 #ifdef TIGHTDB_DEBUG
 
-pair<ref_type, size_t> ColumnSubtableParent::get_to_dot_parent(size_t ndx_in_parent) const TIGHTDB_OVERRIDE
+pair<ref_type, size_t> ColumnSubtableParent::get_to_dot_parent(size_t ndx_in_parent) const
 {
     pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_parent);
     return make_pair(p.first.m_ref, p.second);
@@ -47,7 +47,7 @@ size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
         return 0;
 
     const char* columns_header = get_alloc().translate(columns_ref);
-    ref_type first_col_ref = Array::get(columns_header, 0);
+    ref_type first_col_ref = to_ref(Array::get(columns_header, 0));
     return get_size_from_ref(first_col_ref, get_alloc());
 }
 

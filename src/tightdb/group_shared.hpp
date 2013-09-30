@@ -34,9 +34,12 @@ namespace tightdb {
 class SharedGroup {
 public:
     enum DurabilityLevel {
-        durability_Full,
-        durability_MemOnly,
-        durability_Async
+        durability_Full
+        , durability_MemOnly
+#ifndef _WIN32
+        // Async commits are not yet supported on windows
+        , durability_Async
+#endif
     };
 
     /// Equivalent to calling open(const std::string&, bool,
@@ -314,12 +317,6 @@ inline void SharedGroup::open(Replication& repl)
 }
 
 #endif // TIGHTDB_ENABLE_REPLICATION
-
-
-inline void SharedGroup::reserve(std::size_t size)
-{
-    m_group.m_alloc.reserve(size);
-}
 
 
 } // namespace tightdb

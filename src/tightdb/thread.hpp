@@ -31,6 +31,10 @@
 #include <tightdb/terminate.hpp>
 #include <tightdb/unique_ptr.hpp>
 
+#ifdef TIGHTDB_HAVE_CXX11_ATOMIC
+#include <atomic>
+#endif
+
 
 namespace tightdb {
 
@@ -489,10 +493,6 @@ inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 // where no-one is needed. FIXME: introduce x86 specific optimization to avoid the
 // memory barrier!
 
-#ifdef TIGHTDB_HAVE_CXX11_ATOMIC
-#include <atomic>
-#endif
-
 template<class T>
 class Atomic
 {
@@ -588,7 +588,32 @@ inline T Atomic<T>::load() const
 }
 
 template<typename T>
+inline T Atomic<T>::load_relaxed() const
+{
+    return state;
+}
+
+template<typename T>
+inline T Atomic<T>::load_acquire() const
+{
+    return state;
+}
+
+template<typename T>
 inline void Atomic<T>::store(T value) 
+{
+    state = value;
+}
+
+template<typename T>
+inline void Atomic<T>::store_relaxed(T value) 
+{
+    state = value;
+
+}
+
+template<typename T>
+inline void Atomic<T>::store_release(T value) 
 {
     state = value;
 }

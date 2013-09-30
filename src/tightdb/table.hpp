@@ -253,7 +253,6 @@ public:
     int64_t sum_int(std::size_t column_ndx) const;
     double  sum_float(std::size_t column_ndx) const;
     double  sum_double(std::size_t column_ndx) const;
-    // FIXME: What to return for below when table empty? 0?
     int64_t maximum_int(std::size_t column_ndx) const;
     float   maximum_float(std::size_t column_ndx) const;
     double  maximum_double(std::size_t column_ndx) const;

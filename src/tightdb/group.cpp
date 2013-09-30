@@ -158,10 +158,11 @@ void Group::open(const string& file_path, OpenMode mode)
     bool is_shared = false;
     bool read_only = mode == mode_ReadOnly;
     bool no_create = mode == mode_ReadWriteNoCreate;
-    m_alloc.attach_file(file_path, is_shared, read_only, no_create); // Throws
+    bool skip_validate = false;
+    ref_type top_ref = m_alloc.attach_file(file_path, is_shared, read_only, no_create,
+                                           skip_validate); // Throws
     SlabAlloc::DetachGuard dg(m_alloc);
     m_alloc.reset_free_space_tracking(); // Throws
-    ref_type top_ref = m_alloc.get_top_ref();
     if (top_ref == 0) {
         // Attaching to a newly created file
         bool add_free_versions = false;
@@ -179,10 +180,14 @@ void Group::open(BinaryData buffer, bool take_ownership)
 {
     TIGHTDB_ASSERT(!is_attached());
     TIGHTDB_ASSERT(buffer.data());
-    m_alloc.attach_buffer(const_cast<char*>(buffer.data()), buffer.size()); // Throws
+    // FIXME: Why do we have to pass a const-unqualified data pointer
+    // to SlabAlloc::attach_buffer()? It seems unnecessary given that
+    // the data is going to become the immutable part of its managed
+    // memory.
+    char* data = const_cast<char*>(buffer.data());
+    ref_type top_ref = m_alloc.attach_buffer(data, buffer.size()); // Throws
     SlabAlloc::DetachGuard dg(m_alloc);
     m_alloc.reset_free_space_tracking(); // Throws
-    ref_type top_ref = m_alloc.get_top_ref();
     if (top_ref == 0) {
         bool add_free_versions = false;
         create(add_free_versions); // Throws
@@ -200,7 +205,7 @@ void Group::create(bool add_free_versions)
 {
     TIGHTDB_ASSERT(!is_attached());
 
-    size_t initial_logical_file_size = sizeof SlabAlloc::default_header;
+    size_t initial_logical_file_size = sizeof (SlabAlloc::Header);
 
     try {
         m_top.create(Array::type_HasRefs); // Throws
@@ -472,7 +477,7 @@ void Group::write(const string& path) const
     TIGHTDB_ASSERT(is_attached());
 
     FileOStream out(path);
-    write_to_stream(out);
+    write_to_stream(out); // Throws
 }
 
 
@@ -487,7 +492,7 @@ BinaryData Group::write_to_mem() const
     size_t max_size = m_alloc.get_total_size();
 
     MemoryOStream out(max_size);
-    size_t size = write_to_stream(out);
+    size_t size = write_to_stream(out); // Throws
 
     char* data = out.release_buffer();
     return BinaryData(data, size);
@@ -807,7 +812,7 @@ void Group::to_dot(const char* file_path) const
     to_dot(out);
 }
 
-pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const TIGHTDB_OVERRIDE
+pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const
 {
     return make_pair(m_tables.get_ref(), ndx_in_parent);
 }

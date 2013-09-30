@@ -1822,7 +1822,7 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
         }
         else {
             int_fast64_t elems_per_child = get(0) / 2;
-            elem_ndx_offset = orig_child_ndx * elems_per_child;
+            elem_ndx_offset = size_t(orig_child_ndx * elems_per_child);
         }
     }
 
@@ -2192,7 +2192,7 @@ void Array::to_dot_parent_edge(ostream& out) const
     }
 }
 
-pair<ref_type, size_t> Array::get_to_dot_parent(size_t ndx_in_parent) const TIGHTDB_OVERRIDE
+pair<ref_type, size_t> Array::get_to_dot_parent(size_t ndx_in_parent) const
 {
     return make_pair(get_ref(), ndx_in_parent);
 }

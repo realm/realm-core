@@ -576,7 +576,8 @@ inline const Table* Group::get_table_by_ndx(std::size_t ndx) const
 template<class S> std::size_t Group::write_to_stream(S& out) const
 {
     // Write the file header
-    out.write(SlabAlloc::default_header, sizeof SlabAlloc::default_header);
+    const char* data = reinterpret_cast<const char*>(&SlabAlloc::streaming_header);
+    out.write(data, sizeof SlabAlloc::streaming_header);
 
     // Because we need to include the total logical file size in the
     // top-array, we have to start by writing everything except the
@@ -585,7 +586,7 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
     // not be included, as it is not needed in the streamed format.
     std::size_t names_pos  = m_table_names.write(out); // Throws
     std::size_t tables_pos = m_tables.write(out); // Throws
-    std::size_t top_pos = out.get_pos();
+    uint64_t top_pos = out.get_pos();
 
     // Produce a preliminary version of the top array whose
     // representation is guaranteed to be able to hold the final file
@@ -617,13 +618,13 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
     top.resize(0); // Avoid recursive destruction
     top.destroy();
 
-    // Write top ref
-    // (since we initially set the last bit in the file header to
-    //  zero, it is the first ref block that is valid)
-    out.seek(0);
-    out.write(reinterpret_cast<const char*>(&top_pos), 8);
+    // Write streaming footer
+    SlabAlloc::StreamingFooter footer;
+    footer.m_top_ref = top_pos;
+    footer.m_magic_cookie = SlabAlloc::footer_magic_cookie;
+    out.write(reinterpret_cast<const char*>(&footer), sizeof footer);
 
-    return final_file_size;
+    return final_file_size + sizeof footer;
 }
 
 template<class S> void Group::to_json(S& out) const
