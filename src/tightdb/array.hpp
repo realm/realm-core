@@ -398,6 +398,8 @@ public:
 
     int64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     template<std::size_t w> int64_t Get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    void get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT;
+    template<size_t w> void get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT;
 
     ref_type get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
@@ -844,10 +846,11 @@ protected:
     // Getters and Setters for adaptive-packed arrays
     typedef int64_t (Array::*Getter)(std::size_t) const; // Note: getters must not throw
     typedef void (Array::*Setter)(std::size_t, int64_t);
-    typedef bool (Array::*Finder)(int64_t, std::size_t, std::size_t, std::size_t,
-                                  QueryState<int64_t>*) const;
+    typedef bool (Array::*Finder)(int64_t, std::size_t, std::size_t, std::size_t, QueryState<int64_t>*) const;
+    typedef void (Array::*ChunkGetter)(size_t, int64_t res[8]) const; // Note: getters must not throw
 
     Getter m_getter;
+    ChunkGetter m_chunk_getter;
     Setter m_setter;
     Finder m_finder[cond_Count]; // one for each COND_XXX enum
 
@@ -1082,6 +1085,13 @@ inline int64_t Array::back() const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_size > 0);
     return get(m_size - 1);
+}
+
+
+inline void Array::get_chunk(std::size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < m_size);
+    (this->*m_chunk_getter)(ndx, res);
 }
 
 inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
@@ -2410,7 +2420,9 @@ bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t 
                          Callback callback) const
 {
     cond c;
-    TIGHTDB_ASSERT(start < end);
+    TIGHTDB_ASSERT(start <= end);
+    if(start == end)
+        return true;
 
 
     int64_t v;

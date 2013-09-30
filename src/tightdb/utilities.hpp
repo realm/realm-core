@@ -35,6 +35,9 @@
 // GCC defines __i386__ and __x86_64__
 #if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
     #define TIGHTDB_X86_OR_X64
+    #define TIGHTDB_X86_OR_X64_TRUE true
+#else
+    #define TIGHTDB_X86_OR_X64_TRUE false
 #endif
 
 // GCC defines __arm__
