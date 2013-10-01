@@ -319,7 +319,7 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
     const Char16* in = in_begin;
     char* out = out_begin;
     while (in != in_end) {
-        uint_fast16_t v1 = Traits16::to_int_type(in[0]);
+        uint_fast16_t v1 = uint_fast16_t(Traits16::to_int_type(in[0]));
         if (TIGHTDB_LIKELY(v1 < 0x80)) {
             if (TIGHTDB_UNLIKELY(out == out_end)) {
                 break; // Not enough output buffer space
@@ -363,7 +363,7 @@ inline bool Utf8x16<Char16, Traits16>::to_utf8(const Char16*& in_begin, const Ch
             invalid = true;
             break; // Incomplete surrogate pair
         }
-        uint_fast16_t v2 = Traits16::to_int_type(in[1]);
+        uint_fast16_t v2 = uint_fast16_t(Traits16::to_int_type(in[1]));
         if (TIGHTDB_UNLIKELY(v2 < 0xDC00 || 0xE000 <= v2)) {
             invalid = true;
             break; // Invalid second half of surrogate pair
@@ -391,7 +391,7 @@ inline std::size_t Utf8x16<Char16, Traits16>::find_utf8_buf_size(const Char16*& 
     size_t num_out = 0;
     const Char16* in = in_begin;
     while (in != in_end) {
-        uint_fast16_t v = Traits16::to_int_type(in[0]);
+        uint_fast16_t v = uint_fast16_t(Traits16::to_int_type(in[0]));
         if (TIGHTDB_LIKELY(v < 0x80)) {
             if (TIGHTDB_UNLIKELY(int_add_with_overflow_detect(num_out, 1)))
                 break; // Avoid overflow
