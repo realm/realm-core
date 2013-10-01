@@ -2773,12 +2773,39 @@ TEST(TestQueryFindNext)
     TupleTableType::Query q1 = ttt.where().second.equal("X").first.greater(4);
 
     const size_t res1 = q1.find_next();
-    const size_t res2 = q1.find_next(res1);
-    const size_t res3 = q1.find_next(res2);
+    const size_t res2 = q1.find_next(res1 + 1);
+    const size_t res3 = q1.find_next(res2 + 1);
 
     CHECK_EQUAL(5, res1);
     CHECK_EQUAL(6, res2);
-    CHECK_EQUAL(size_t(-1), res3); // no more matches
+    CHECK_EQUAL(not_found, res3); // no more matches
+
+    // Do same searches with new query every time
+    const size_t res4 = ttt.where().second.equal("X").first.greater(4).find_next();
+    const size_t res5 = ttt.where().second.equal("X").first.greater(4).find_next(res1 + 1);
+    const size_t res6 = ttt.where().second.equal("X").first.greater(4).find_next(res2 + 1);
+
+    CHECK_EQUAL(5, res4);
+    CHECK_EQUAL(6, res5);
+    CHECK_EQUAL(not_found, res6); // no more matches
+}
+
+TEST(TestQueryFindNext2)
+{
+    TupleTableType ttt;
+
+    ttt.add(1, "a");
+    ttt.add(2, "a");
+    ttt.add(3, "X");
+    ttt.add(4, "a");
+    ttt.add(5, "a");
+    ttt.add(6, "X");
+    ttt.add(7, "X"); // match
+
+    TupleTableType::Query q1 = ttt.where().second.equal("X").first.greater(4);
+
+    const size_t res1 = q1.find_next(6);
+    CHECK_EQUAL(6, res1);
 }
 
 TEST(TestQueryFindAll1)

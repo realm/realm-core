@@ -111,7 +111,7 @@ void spawn_daemon(const string& file)
 {
     // determine maximum number of open descriptors
     errno = 0; 
-    int m = sysconf(_SC_OPEN_MAX); 
+    int m = int(sysconf(_SC_OPEN_MAX));
     if (m < 0) { 
         if (errno) { 
             // int err = errno; // TODO: include err in exception string 
@@ -161,7 +161,10 @@ void spawn_daemon(const string& file)
         
         // use childs exit code to catch and report any errors:
         int status;
-        int pid_changed = waitpid(pid, &status, 0);
+        int pid_changed;
+        do {
+            pid_changed = waitpid(pid, &status, 0);
+        } while (pid_changed == -1 && errno == EINTR);
         if (pid_changed != pid)
             throw runtime_error("failed to wait for daemon start");
         if (!WIFEXITED(status))
@@ -191,7 +194,7 @@ inline void micro_sleep(uint64_t microsec_delay)
     // FIXME: this is not optimal, but it should work
     Sleep(microsec_delay/1000+1);
 #else
-    usleep(microsec_delay);
+    usleep(useconds_t(microsec_delay));
 #endif
 }
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:

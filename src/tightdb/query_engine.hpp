@@ -320,6 +320,11 @@ public:
             m_child->init(table);
     }
 
+    virtual bool is_initialized() const
+    {
+        return m_table != NULL;
+    }
+
     virtual size_t find_first_local(size_t start, size_t end) = 0;
 
     virtual ParentNode* child_criteria()
