@@ -215,7 +215,7 @@ std::size_t BasicArray<T>::find(T value, std::size_t begin, std::size_t end) con
     TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
     const T* data = reinterpret_cast<const T*>(m_data);
     const T* i = std::find(data + begin, data + end, value);
-    return i == data + end ? not_found : i - data;
+    return i == data + end ? not_found : std::size_t(i - data);
 }
 
 template<class T>

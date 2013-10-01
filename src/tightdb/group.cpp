@@ -621,8 +621,8 @@ void Group::to_string(ostream& out) const
 
 
     // Print header
-    out << setw(int(index_width)+1) << left << " ";
-    out << setw(int(name_width)+1)  << left << "tables";
+    out << setw(int(index_width+1)) << left << " ";
+    out << setw(int(name_width+1))  << left << "tables";
     out << setw(int(rows_width))    << left << "rows"    << endl;
 
     // Print tables

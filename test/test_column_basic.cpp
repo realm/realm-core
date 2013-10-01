@@ -16,7 +16,7 @@ TEST(ColumnBasic_LowerUpperBound)
     BasicColumn<int> col;
     col.add(5);
     for (size_t i = 5; i < 100; i += 5) {
-        col.add(i);
+        col.add(int(i));
     }
 
     // before first entry
