@@ -1680,7 +1680,7 @@ TEST(GroupShared_ReserveDiskSpace)
         // Check that reserve() does not change the file size if the
         // specified size is equal to the actual file size.
         File::SizeType reserve_size_2 = orig_file_size;
-        sg.reserve(reserve_size_2);
+        sg.reserve(reserve_size_2);//FIXME:vs2012(32bit) 'argument' : conversion from 'tightdb::File::SizeType' to 'size_t', possible loss of data
         File::SizeType new_file_size_2 = File("test.tightdb").get_size();
         CHECK_EQUAL(orig_file_size, new_file_size_2);
 
@@ -1688,7 +1688,7 @@ TEST(GroupShared_ReserveDiskSpace)
         // specified size is greater than the actual file size, and
         // that the new size is at least as big as the requested size.
         File::SizeType reserve_size_3 = orig_file_size + 1;
-        sg.reserve(reserve_size_3);
+        sg.reserve(reserve_size_3);//FIXME:vs2012(32bit) 'argument' : conversion from 'tightdb::File::SizeType' to 'size_t', possible loss of data
         File::SizeType new_file_size_3 = File("test.tightdb").get_size();
         CHECK(new_file_size_3 >= reserve_size_3);
 
@@ -1700,21 +1700,21 @@ TEST(GroupShared_ReserveDiskSpace)
         }
         orig_file_size = File("test.tightdb").get_size();
         File::SizeType reserve_size_4 = 2 * orig_file_size + 1;
-        sg.reserve(reserve_size_4);
+        sg.reserve(reserve_size_4);//FIXME:vs2012(32bit) 'argument' : conversion from 'tightdb::File::SizeType' to 'size_t', possible loss of data
         File::SizeType new_file_size_4 = File("test.tightdb").get_size();
         CHECK(new_file_size_4 >= reserve_size_4);
         WriteTransaction wt(sg);
         wt.get_table<TestTableShared>("table_2")->add_empty_row(2000);
         orig_file_size = File("test.tightdb").get_size();
         File::SizeType reserve_size_5 = orig_file_size + 333;
-        sg.reserve(reserve_size_5);
+        sg.reserve(reserve_size_5);//FIXME:vs2012(32bit) 'argument' : conversion from 'tightdb::File::SizeType' to 'size_t', possible loss of data
         File::SizeType new_file_size_5 = File("test.tightdb").get_size();
         CHECK(new_file_size_5 >= reserve_size_5);
         wt.get_table<TestTableShared>("table_3")->add_empty_row(2000);
         wt.commit();
         orig_file_size = File("test.tightdb").get_size();
         File::SizeType reserve_size_6 = orig_file_size + 459;
-        sg.reserve(reserve_size_6);
+        sg.reserve(reserve_size_6);//FIXME:vs2012(32bit) 'argument' : conversion from 'tightdb::File::SizeType' to 'size_t', possible loss of data
         File::SizeType new_file_size_6 = File("test.tightdb").get_size();
         CHECK(new_file_size_6 >= reserve_size_6);
         {
