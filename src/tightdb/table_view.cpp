@@ -5,6 +5,48 @@
 using namespace std;
 using namespace tightdb;
 
+// Convert ConstTableView to TableView. Used to let const and non-const public methods Table::find_all_xxx re-use
+// eachothers code
+TableView::TableView(ConstTableView tv): TableViewBase(&tv) {}
+
+namespace {
+
+// todo, redundant. Declare one single place instead
+template<class T> struct ColumnTypeTraits;
+
+template<> struct ColumnTypeTraits<int64_t> {
+    typedef Column column_type;
+    typedef Array array_type;
+    typedef int64_t sum_type;
+    static const DataType id = type_Int;
+};
+template<> struct ColumnTypeTraits<bool> {
+    typedef Column column_type;
+    typedef Array array_type;
+    typedef int64_t sum_type;
+    static const DataType id = type_Bool;
+};
+template<> struct ColumnTypeTraits<float> {
+    typedef ColumnFloat column_type;
+    typedef ArrayFloat array_type;
+    typedef double sum_type;
+    static const DataType id = type_Float;
+};
+template<> struct ColumnTypeTraits<double> {
+    typedef ColumnDouble column_type;
+    typedef ArrayDouble array_type;
+    typedef double sum_type;
+    static const DataType id = type_Double;
+};
+template<> struct ColumnTypeTraits<DateTime> {
+    typedef Column column_type;
+    typedef Array array_type;
+    typedef int64_t sum_type;
+    static const DataType id = type_Int;
+};
+
+} // anonymous namespace
+
 
 // Searching
 

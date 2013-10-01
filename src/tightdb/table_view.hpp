@@ -230,6 +230,7 @@ public:
 private:
     TableView(Table& parent): TableViewBase(&parent) {}
     TableView(TableView* tv) TIGHTDB_NOEXCEPT: TableViewBase(tv) {}
+    TableView(ConstTableView tv);
 
     TableView find_all_integer(size_t column_ndx, int64_t value);
     ConstTableView find_all_integer(size_t column_ndx, int64_t value) const;

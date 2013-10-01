@@ -61,7 +61,12 @@ pthread_mutex_init (pthread_mutex_t * mutex, const pthread_mutexattr_t * attr)
            * Creating mutex that can be shared between
            * processes.
            */
+
+          // IF YOU PAGEFAULT HERE, IT'S LIKELY CAUSED BY DATABASE RESIDING ON NETWORK SHARE (WINDOWS + *NIX). Memory 
+          // mapping is not coherent there. Note that this issue is NOT pthread related. Only reason why it happens in 
+          // this mutex->is_shared is that mutex coincidentally happens to be the first member that shared group accesses.
           mutex->is_shared = 1;
+          // ^^^^ Look above
 
           // Create unique and random mutex name. UuidCreate() needs linking with Rpcrt4.lib, so we use CoCreateGuid() 
           // instead. That way end-user won't need to mess with Visual Studio project settings

@@ -14,6 +14,12 @@ namespace {
 const size_t thread_chunk_size = 1000;
 }
 
+Query::Query() 
+{
+    Create();
+//    expression(static_cast<Expression*>(this));
+}
+
 Query::Query(Table& table) : m_table(table.get_table_ref())
 {
     Create();
@@ -62,9 +68,23 @@ Query::~Query() TIGHTDB_NOEXCEPT
     if (do_delete) {
         for (size_t t = 0; t < all_nodes.size(); t++) {
             ParentNode *p = all_nodes[t];
-            delete p;
+            std::vector<ParentNode *>::iterator it = std::find(all_nodes.begin(), all_nodes.begin() + t, p);
+            if(it == all_nodes.begin() + t)
+                delete p;
         }
     }
+}
+/*
+// use and_query() instead!
+Expression* Query::get_expression() {
+    return (static_cast<ExpressionNode*>(first[first.size()-1]))->m_compare;
+}
+*/
+Query& Query::expression(Expression* compare, bool auto_delete)
+{
+    ParentNode* const p = new ExpressionNode(compare, auto_delete);
+    UpdatePointers(p, &p->m_child);
+    return *this;
 }
 
 // Makes query search only in rows contained in tv
@@ -469,6 +489,12 @@ template <Action action, typename T, typename R, class ColType>
 R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_t limit) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
+    if(m_table->is_degenerate()) {
+        if (resultcount)
+            *resultcount = 0;
+        return static_cast<R>(0);
+    }
+
     if (end == size_t(-1))
         end = m_table->size();
 
@@ -545,6 +571,12 @@ double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t star
 template <typename T>
 double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
+    if(m_table->is_degenerate()) {
+        if (resultcount)
+            *resultcount = 0;
+        return 0.;
+    }
+
     size_t resultcount2 = 0;
     typedef typename ColumnTypeTraits<T>::column_type ColType;
     typedef typename ColumnTypeTraits<T>::sum_type SumType;
@@ -636,16 +668,22 @@ void Query::end_subtable()
 
 size_t Query::find_next(size_t lastmatch)
 {
-    if (lastmatch == size_t(-1)) Init(*m_table);
+    if(m_table->is_degenerate())
+        return not_found;
+
+    if (!is_initialized()) Init(*m_table);
 
     const size_t end = m_table->size();
-    const size_t res = first[0]->find_first(lastmatch + 1, end);
+    const size_t res = first[0]->find_first(lastmatch, end);
 
     return (res == end) ? not_found : res;
 }
 
 TableView Query::find_all(size_t start, size_t end, size_t limit)
 {
+    if(m_table->is_degenerate())
+        return TableView(*m_table);
+
     Init(*m_table);
 
     if (end == size_t(-1))
@@ -677,6 +715,9 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 
 size_t Query::count(size_t start, size_t end, size_t limit) const
 {
+    if(m_table->is_degenerate())
+        return 0;
+
     if (end == size_t(-1))
         end = m_table->size();
 
@@ -696,6 +737,9 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 // todo, not sure if start, end and limit could be useful for delete.
 size_t Query::remove(size_t start, size_t end, size_t limit)
 {
+    if(m_table->is_degenerate())
+        return 0;
+
     if (end == not_found)
         end = m_table->size();
 
@@ -873,6 +917,15 @@ void Query::Init(const Table& table) const
     }
 }
 
+bool Query::is_initialized() const
+{
+    const ParentNode* top = first[0];
+    if (top != NULL) {
+        return top->is_initialized();
+    }
+    return true;
+}
+
 size_t Query::FindInternal(size_t start, size_t end) const
 {
     if (end == size_t(-1))
@@ -892,6 +945,11 @@ size_t Query::FindInternal(size_t start, size_t end) const
         return r;
 }
 
+bool Query::comp(const pair<size_t, size_t>& a, const pair<size_t, size_t>& b)
+{
+    return a.first < b.first;
+}
+
 void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
 {
     all_nodes.push_back(p);
@@ -904,10 +962,50 @@ void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
     update[update.size()-1] = newnode;
 }
 
-bool Query::comp(const pair<size_t, size_t>& a, const pair<size_t, size_t>& b)
+/* ********************************************************************************************************************
+*
+*  Stuff related to next-generation query syntax
+*
+******************************************************************************************************************** */
+
+Query& Query::and_query(Query q) 
 {
-    return a.first < b.first;
+    ParentNode* const p = q.first[0];
+    UpdatePointers(p, &p->m_child);
+
+    // The query on which AddQuery() was called is now responsible for destruction of query given as argument. do_delete
+    // indicates not to do cleanup in deconstructor, and all_nodes contains a list of all objects to be deleted. So
+    // take all objects of argument and copy to this node's all_nodes list.
+    q.do_delete = false;
+    all_nodes.insert( all_nodes.end(), q.all_nodes.begin(), q.all_nodes.end() );
+
+    return *this;
 }
 
 
+Query Query::operator||(Query q)
+{
+    Query q2(*this->m_table);
+    q2.and_query(*this);
+    q2.Or();
+    q2.and_query(q);
 
+    return q2;
+}
+ 
+
+Query Query::operator&&(Query q)
+{
+    if(first[0] == NULL)
+        return q;
+
+    if(q.first[0] == NULL)
+        return (*this);
+
+    Query q2(*this->m_table);
+    q2.and_query(*this);
+    q2.and_query(q);
+
+    return q2;
+}
+ 

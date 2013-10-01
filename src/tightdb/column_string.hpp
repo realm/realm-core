@@ -93,7 +93,8 @@ public:
         leaf_type_Big     ///< ArrayBigBlobs
     };
 
-    LeafType GetBlock(std::size_t ndx, ArrayParent**, std::size_t& off) const;
+    LeafType GetBlock(std::size_t ndx, ArrayParent**, std::size_t& off,
+                      bool use_retval = false) const;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
