@@ -671,10 +671,10 @@ size_t Query::find_next(size_t lastmatch)
     if(m_table->is_degenerate())
         return not_found;
 
-    if (lastmatch == size_t(-1)) Init(*m_table);
+    if (!is_initialized()) Init(*m_table);
 
     const size_t end = m_table->size();
-    const size_t res = first[0]->find_first(lastmatch + 1, end);
+    const size_t res = first[0]->find_first(lastmatch, end);
 
     return (res == end) ? not_found : res;
 }
@@ -915,6 +915,15 @@ void Query::Init(const Table& table) const
         vector<ParentNode*> v;
         top->gather_children(v);
     }
+}
+
+bool Query::is_initialized() const
+{
+    const ParentNode* top = first[0];
+    if (top != NULL) {
+        return top->is_initialized();
+    }
+    return true;
 }
 
 size_t Query::FindInternal(size_t start, size_t end) const

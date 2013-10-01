@@ -171,7 +171,7 @@ public:
 
 
     // Searching
-    size_t         find_next(size_t lastmatch=size_t(-1));
+    size_t         find_next(size_t lastmatch=size_t(0));
     TableView      find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
     ConstTableView find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
 
@@ -222,6 +222,7 @@ protected:
     void Create();
 
     void   Init(const Table& table) const;
+    bool   is_initialized() const;
     size_t FindInternal(size_t start=0, size_t end=size_t(-1)) const;
     void   UpdatePointers(ParentNode* p, ParentNode** newnode);
 
