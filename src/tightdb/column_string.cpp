@@ -10,26 +10,26 @@
 #include <tightdb/index_string.hpp>
 
 using namespace std;
+using namespace tightdb;
 
 
 namespace {
 
-tightdb::Array::Type get_type_from_ref(tightdb::ref_type ref, tightdb::Allocator& alloc)
+Array::Type get_type_from_ref(ref_type ref, Allocator& alloc)
 {
     const char* header = alloc.translate(ref);
-    return tightdb::Array::get_type_from_header(header);
+    return Array::get_type_from_header(header);
 }
 
 // Getter function for string index
-tightdb::StringData get_string(void* column, size_t ndx)
+StringData get_string(void* column, size_t ndx)
 {
-    return static_cast<tightdb::AdaptiveStringColumn*>(column)->get(ndx);
+    return static_cast<AdaptiveStringColumn*>(column)->get(ndx);
 }
 
 } // anonymous namespace
 
 
-namespace tightdb {
 
 AdaptiveStringColumn::AdaptiveStringColumn(Allocator& alloc): m_index(0)
 {
@@ -53,28 +53,15 @@ AdaptiveStringColumn::AdaptiveStringColumn(ref_type ref, ArrayParent* parent, si
     }
 }
 
-AdaptiveStringColumn::~AdaptiveStringColumn()
+AdaptiveStringColumn::~AdaptiveStringColumn() TIGHTDB_NOEXCEPT
 {
     delete m_array;
-    if (m_index)
-        delete m_index;
+    delete m_index;
 }
 
-void AdaptiveStringColumn::destroy()
+void AdaptiveStringColumn::destroy() TIGHTDB_NOEXCEPT
 {
-    if (root_is_leaf()) {
-        bool long_strings = m_array->has_refs();
-        if (long_strings) {
-            static_cast<ArrayStringLong*>(m_array)->destroy();
-        }
-        else {
-            static_cast<ArrayString*>(m_array)->destroy();
-        }
-    }
-    else {
-        m_array->destroy();
-    }
-
+    ColumnBase::destroy();
     if (m_index)
         m_index->destroy();
 }
@@ -240,9 +227,9 @@ void AdaptiveStringColumn::erase(size_t ndx)
     //  the value, or the index would not be able to find the correct
     //  position to update (as it looks for the old value))
     if (m_index) {
-        StringData oldVal = get(ndx);
-        const bool isLast = (ndx == size());
-        m_index->erase(ndx, oldVal, isLast);
+        StringData old_val = get(ndx);
+        bool is_last = (ndx == size()-1);
+        m_index->erase(ndx, old_val, is_last);
     }
 
     TreeDelete<StringData, AdaptiveStringColumn>(ndx);
@@ -532,5 +519,3 @@ void AdaptiveStringColumn::leaf_to_dot(ostream& out, const Array& array) const
 }
 
 #endif // TIGHTDB_DEBUG
-
-} // namespace tightdb

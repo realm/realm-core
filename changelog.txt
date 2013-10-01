@@ -12,8 +12,29 @@ Format:
 
 ==================
 
+2013-09-12 (Brian Munkholm)
++ Added TableView::row_to_string() and testcases for to_string() and row_to_string()
++ Added row_to_string(), to_string() and to_json() in typed TableView.
+
+2013-08-31 (Kristian Spangsege)
++ Database files are now exanded by doubling the size until it reaches 128 MiB. After that, it is expanded in chunks of 128 MiB. Until now, it was always expanded in chunks of 1 MiB.
+
+
+2013-08-28 (Kristian Spangsege)
++ Table::is_valid() renamed to Table::is_attached(). The notion of accessor attachment describes much better what is going on than the notion of validity.
+
+
+2013-08-23 (Kristian Spangsege)
++ Stop throwing from destructors (all), and from SharedGroup::rollback() and SharedGRoup::end_read().
++ General stability and error checking improvements.
+! Fixed many bugs relating to Group::commit().
+! Fixed some bugs relating to SharedGroup::commit().
+! Fixed bug in TableViewBase::sort().
+
+
 2013-08-18 (Kenneth Geisshirt)
 ! Group::to_string formatting was incorrect. See https://app.asana.com/0/1441391972580/5659532773181.
+
 
 2013-08-03 (Kristian Spangsege)
 + Table::find_sorted_int() replaced by Table::lower_bound_int() and Table::upper_bound_int() as these are standardized and provide more flexibility.

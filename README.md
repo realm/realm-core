@@ -100,13 +100,17 @@ Note: '.so' is replaced by '.dylib' on OS X.
 
 The following programs are installed:
 
+    /usr/local/bin/tightdbd
+    /usr/local/bin/tightdbd-dbg
     /usr/local/bin/tightdb-config
     /usr/local/bin/tightdb-config-dbg
 
-These programs provide the necessary compiler flags for an application
-that needs to link against TightDB. They work with GCC and other
-compilers, such as Clang, that are mostly command line compatible with
-GCC. Here is an example:
+The first two are used transparently by the TightDB library when
+`async` transactions are enabled. The two `config` programs provide
+the necessary compiler flags for an application that needs to link
+against TightDB. They work with GCC and other compilers, such as
+Clang, that are mostly command line compatible with GCC. Here is an
+example:
 
     g++  my_app.cpp  `tightdb-config --cflags --libs`
 
@@ -215,6 +219,11 @@ This will produce a package whose name, and whose top-level directory
 is named according to the tag.
 
 `Pandoc` is required to build a distribution package.
+
+On Ubuntu, install Pandoc and XeLaTeX with the following commands:
+
+    sudo apt-get install texlive-latex-base
+    sudo apt-get install pandoc 
 
 On Mac OSX, install Pandoc and XeLaTeX (aka MacTeX) via the following link:
 

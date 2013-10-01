@@ -1,16 +1,22 @@
-#include <UnitTest++.h>
-#include <tightdb/column_mixed.hpp>
+#include "testsettings.hpp"
+#ifdef TEST_COLUMN_MIXED
 
 #include <limits>
 
+#include <UnitTest++.h>
+
+#include <tightdb/column_mixed.hpp>
+
+using namespace std;
 using namespace tightdb;
+
 
 TEST(ColumnMixed_Int)
 {
     ColumnMixed c;
-    const int64_t maxval = std::numeric_limits<int64_t>::max();
-    const int64_t minval = std::numeric_limits<int64_t>::min();
-    const int64_t allbit = 0xFFFFFFFFFFFFFFFF;
+    int64_t maxval = numeric_limits<int64_t>::max();
+    int64_t minval = numeric_limits<int64_t>::min();
+    int64_t allbit = 0xFFFFFFFFFFFFFFFF;
 
     c.insert_int(0,     2);
     c.insert_int(1, minval);
@@ -50,10 +56,10 @@ TEST(ColumnMixed_Float)
 {
     ColumnMixed c;
 
-    const uint32_t v = 0xFFFFFFFF;
-    const float f = static_cast<float>(v);
+    uint32_t v = 0xFFFFFFFF;
+    float f = float(v);
     float fval1[] = {0.0f, 100.123f, -111.222f, f};
-    float fval2[] = {-0.0f, -100.123f, std::numeric_limits<float>::max(), std::numeric_limits<float>::min()};
+    float fval2[] = {-0.0f, -100.123f, numeric_limits<float>::max(), numeric_limits<float>::min()};
 
     // Test insert
     for (size_t i=0; i<4; ++i)
@@ -83,10 +89,10 @@ TEST(ColumnMixed_Double)
 {
     ColumnMixed c;
 
-    const uint64_t v = 0xFFFFFFFFFFFFFFFF;
-    const double d = static_cast<double>(v);
+    uint64_t v = 0xFFFFFFFFFFFFFFFF;
+    double d = double(v);
     double fval1[] = {1.0, 200.123, -111.222, d};
-    double fval2[] = {-1.0, -100.123, std::numeric_limits<double>::max(), std::numeric_limits<double>::min()};
+    double fval2[] = {-1.0, -100.123, numeric_limits<double>::max(), numeric_limits<double>::min()};
 
     // Test insert
     for (size_t i=0; i<4; ++i) {
@@ -313,3 +319,5 @@ TEST(ColumnMixed_Mixed)
 
     c.destroy();
 }
+
+#endif // TEST_COLUMN_MIXED

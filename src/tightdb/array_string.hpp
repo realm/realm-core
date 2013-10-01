@@ -37,6 +37,8 @@ public:
     ArrayString(ref_type, ArrayParent*, std::size_t ndx_in_parent,
                 Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
     explicit ArrayString(Allocator&) TIGHTDB_NOEXCEPT;
+    explicit ArrayString(no_prealloc_tag) TIGHTDB_NOEXCEPT;
+    ~ArrayString() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add();
@@ -86,9 +88,12 @@ private:
 
 
 
-
-
 // Implementation:
+
+// Fastest way to instantiate an Array. For use with GetDirect() that only fills out m_width, m_data
+// and a few other basic things needed for read-only access. Or for use if you just want a way to call
+// some methods written in ArrayString.*
+inline ArrayString::ArrayString(no_prealloc_tag) TIGHTDB_NOEXCEPT: Array(*static_cast<Allocator*>(0)) {}
 
 inline ArrayString::ArrayString(ArrayParent* parent, std::size_t ndx_in_parent,
                                 Allocator& alloc): Array(alloc)

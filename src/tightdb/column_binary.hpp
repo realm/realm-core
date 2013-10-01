@@ -33,9 +33,7 @@ public:
     explicit ColumnBinary(Allocator& = Allocator::get_default());
     explicit ColumnBinary(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                           Allocator& = Allocator::get_default());
-    ~ColumnBinary();
-
-    void destroy() TIGHTDB_OVERRIDE;
+    ~ColumnBinary() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     std::size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;

@@ -20,9 +20,6 @@
 #ifndef TIGHTDB_COLUMN_BASIC_TPL_HPP
 #define TIGHTDB_COLUMN_BASIC_TPL_HPP
 
-#include <tightdb/query_engine.hpp>
-
-
 namespace tightdb {
 
 // Predeclarations from query_engine.hpp
@@ -41,28 +38,23 @@ template<class T>
 BasicColumn<T>::BasicColumn(ref_type ref, ArrayParent* parent, std::size_t pndx, Allocator& alloc)
 {
     bool root_is_leaf = root_is_leaf_from_ref(ref, alloc);
-    if (root_is_leaf)
+    if (root_is_leaf) {
         m_array = new BasicArray<T>(ref, parent, pndx, alloc);
-    else
+    }
+    else {
         m_array = new Array(ref, parent, pndx, alloc);
+    }
 }
 
 template<class T>
-BasicColumn<T>::~BasicColumn()
+BasicColumn<T>::~BasicColumn() TIGHTDB_NOEXCEPT
 {
-    if (root_is_leaf())
+    if (root_is_leaf()) {
         delete static_cast<BasicArray<T>*>(m_array);
-    else
+    }
+    else {
         delete m_array;
-}
-
-template<class T>
-void BasicColumn<T>::destroy()
-{
-    if (root_is_leaf())
-        static_cast<BasicArray<T>*>(m_array)->destroy();
-    else
-        m_array->destroy();
+    }
 }
 
 template<class T>
@@ -90,17 +82,20 @@ template<class T>
 void BasicColumn<T>::clear()
 {
     if (m_array->is_leaf()) {
-        static_cast<BasicArray<T>*>(m_array)->clear();
+        static_cast<BasicArray<T>*>(m_array)->clear(); // Throws
         return;
     }
 
     ArrayParent* parent = m_array->get_parent();
     std::size_t pndx = m_array->get_ndx_in_parent();
 
+    // FIXME: ExceptionSafety: Array accessor as well as underlying
+    // array node is leaked if ArrayParent::update_child_ref() throws.
+
     // Revert to generic array
-    BasicArray<T>* array = new BasicArray<T>(parent, pndx, m_array->get_alloc());
+    BasicArray<T>* array = new BasicArray<T>(parent, pndx, m_array->get_alloc()); // Throws
     if (parent)
-        parent->update_child_ref(pndx, array->get_ref());
+        parent->update_child_ref(pndx, array->get_ref()); // Throws
 
     // Remove original node
     m_array->destroy();
@@ -260,36 +255,93 @@ void BasicColumn<T>::find_all(Array &result, T value, std::size_t start, std::si
 template<class T>
 std::size_t BasicColumn<T>::count(T target) const
 {
-    return std::size_t(ColumnBase::aggregate<T, int64_t, act_Count, Equal>(target, 0, size(), 0));
+    size_t cnt = 0;
+    for(size_t i = 0; i < size(); i++)
+        if(get(i) == target)
+            cnt++;
+
+    return cnt;
+// Above because we need to get rid of #include query_engine dependency in this header. Todo, 
+// we must put below call inside a .cpp file and #include query_engine there and use that instead
+// because it's faster than above loop.
+// return std::size_t(ColumnBase::aggregate<T, int64_t, act_Count, Equal>(target, 0, size(), 0));
 }
 
 template<class T>
-typename BasicColumn<T>::SumType BasicColumn<T>::sum(std::size_t start, std::size_t end) const
-{
-    return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, 0);
-}
-
-template<class T>
-double BasicColumn<T>::average(std::size_t start, std::size_t end) const
+typename BasicColumn<T>::SumType BasicColumn<T>::sum(std::size_t start, std::size_t end, size_t limit) const
 {
     if (end == std::size_t(-1))
         end = size();
+
+    if(limit != size_t(-1) && start + limit < end)
+        end = start + limit;
+
+    BasicColumn<T>::SumType sum = static_cast<BasicColumn<T>::SumType>(0);
+    for(size_t i = start; i < end; i++)
+        sum += get(i);
+
+    return sum;
+// Above because we need to get rid of #include query_engine dependency in this header. Todo, 
+// we must put below call inside a .cpp file and #include query_engine there and use that instead
+// because it's faster than above loop.
+// return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, 0);
+}
+
+template<class T>
+double BasicColumn<T>::average(std::size_t start, std::size_t end, size_t limit) const
+{
+    if (end == std::size_t(-1))
+        end = size();
+
+    if(limit != size_t(-1) && start + limit < end)
+        end = start + limit;
+
     std::size_t size = end - start;
-    double sum1 = ColumnBase::aggregate<T, SumType, act_Sum, None>(0, start, end, 0);
+    double sum1 = sum(start, end);
     double avg = sum1 / ( size == 0 ? 1 : size );
     return avg;
 }
 
 template<class T>
-T BasicColumn<T>::minimum(std::size_t start, std::size_t end) const
+T BasicColumn<T>::minimum(std::size_t start, std::size_t end, size_t limit) const
 {
-    return ColumnBase::aggregate<T, T, act_Min, None>(0, start, end, 0);
+    if (end == std::size_t(-1))
+        end = size();
+
+    if (limit != size_t(-1) && start + limit < end)
+        end = start + limit;
+
+    T min = std::numeric_limits<T>::max();
+    for(size_t i = start; i < end; i++)
+        if (get(i) < min)
+            min = get(i);
+
+    return min;
+// Above because we need to get rid of #include query_engine dependency in this header. Todo, 
+// we must put below call inside a .cpp file and #include query_engine there and use that instead
+// because it's faster than above loop.
+// return ColumnBase::aggregate<T, T, act_Min, None>(0, start, end, 0);
 }
 
 template<class T>
-T BasicColumn<T>::maximum(std::size_t start, std::size_t end) const
+T BasicColumn<T>::maximum(std::size_t start, std::size_t end, size_t limit) const
 {
-    return ColumnBase::aggregate<T, T, act_Max, None>(0, start, end, 0);
+    if (end == std::size_t(-1))
+        end = size();
+
+    if (limit != size_t(-1) && start + limit < end)
+        end = start + limit;
+
+    T max = std::numeric_limits<T>::min();
+    for(size_t i = start; i < end; i++)
+        if (get(i) > max)
+            max = get(i);
+
+    return max;
+// Above because we need to get rid of #include query_engine dependency in this header. Todo, 
+// we must put below call inside a .cpp file and #include query_engine there and use that instead
+// because it's faster than above loop.
+// return ColumnBase::aggregate<T, T, act_Max, None>(0, start, end, 0);
 }
 
 

@@ -101,7 +101,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/array_basic.hpp>
-
+#include <tightdb/array_string.hpp>
 
 namespace tightdb {
 
@@ -125,35 +125,53 @@ typedef bool (*CallbackDummy)(int64_t);
 template<class T> struct ColumnTypeTraits;
 
 template<> struct ColumnTypeTraits<int64_t> {
+    const static ColumnType ct_id = col_type_Int;
+    const static ColumnType ct_id_real = col_type_Int;
     typedef Column column_type;
     typedef Array array_type;
     typedef int64_t sum_type;
     static const DataType id = type_Int;
 };
 template<> struct ColumnTypeTraits<bool> {
+    const static ColumnType ct_id = col_type_Bool;
+    const static ColumnType ct_id_real = col_type_Bool;
     typedef Column column_type;
     typedef Array array_type;
     typedef int64_t sum_type;
     static const DataType id = type_Bool;
 };
 template<> struct ColumnTypeTraits<float> {
+    const static ColumnType ct_id = col_type_Float;
+    const static ColumnType ct_id_real = col_type_Float;
     typedef ColumnFloat column_type;
     typedef ArrayFloat array_type;
     typedef double sum_type;
     static const DataType id = type_Float;
 };
 template<> struct ColumnTypeTraits<double> {
+    const static ColumnType ct_id = col_type_Double;
+    const static ColumnType ct_id_real = col_type_Double;
     typedef ColumnDouble column_type;
     typedef ArrayDouble array_type;
     typedef double sum_type;
     static const DataType id = type_Double;
 };
 template<> struct ColumnTypeTraits<Date> {
+    const static ColumnType ct_id = col_type_Date;
+    const static ColumnType ct_id_real = col_type_Int;
     typedef Column column_type;
     typedef Array array_type;
     typedef int64_t sum_type;
     static const DataType id = type_Int;
 };
+
+template<> struct ColumnTypeTraits<StringData> {
+    typedef Column column_type;
+    typedef Array array_type;
+    typedef int64_t sum_type;
+    static const DataType id = type_String;
+};
+
 // Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
 template<class T, Action A> struct ColumnTypeTraitsSum {
     typedef T sum_type;
@@ -163,31 +181,33 @@ template<> struct ColumnTypeTraitsSum<float, act_Sum> {
     typedef double sum_type;
 };
 
-// Lets you access elements of an integer column in increasing order in a fast way where leafs are cached
-struct SequentialGetterBase { virtual ~SequentialGetterBase() {} };
+
+struct SequentialGetterBase {
+    virtual ~SequentialGetterBase() TIGHTDB_NOEXCEPT {}
+};
 
 template<class T>class SequentialGetter : public SequentialGetterBase {
 public:
     typedef typename ColumnTypeTraits<T>::column_type ColType;
     typedef typename ColumnTypeTraits<T>::array_type ArrayType;
 
-    SequentialGetter() : m_array((Array::no_prealloc_tag()))
-    {
-    }
+    SequentialGetter(): m_array((Array::no_prealloc_tag())) {}
 
-    SequentialGetter(const Table& table, size_t column_ndx) : m_array((Array::no_prealloc_tag()))
+    SequentialGetter(const Table& table, size_t column_ndx): m_array((Array::no_prealloc_tag()))
     {
         if (column_ndx != not_found)
             m_column = static_cast<const ColType*>(&table.get_column_base(column_ndx));
         m_leaf_end = 0;
     }
 
-    SequentialGetter(const ColType* column) : m_array((Array::no_prealloc_tag()))
+    SequentialGetter(const ColType* column): m_array((Array::no_prealloc_tag()))
     {
         init(column);
     }
 
-    void init (const ColType* column)
+    ~SequentialGetter() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+
+    void init(const ColType* column)
     {
         m_column = column;
         m_leaf_end = 0;
@@ -196,7 +216,7 @@ public:
     TIGHTDB_FORCEINLINE bool cache_next(size_t index)
     {
         // Return wether or not leaf array has changed (could be useful to know for caller)
-        if (index >= m_leaf_end) {
+        if (index >= m_leaf_end || index < m_leaf_start) {
             // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
             // leave m_array untouched. Else call init_from_header() on m_array (more time consuming) and return pointer to m_array.
             m_array_ptr = static_cast<const ArrayType*>(m_column->GetBlock(index, m_array, m_leaf_start, true));
@@ -233,9 +253,10 @@ private:
     ArrayType m_array;
 };
 
+
 class ParentNode {
 public:
-    ParentNode() : m_is_integer_node(false), m_table(NULL) {}
+    ParentNode(): m_is_integer_node(false), m_table(0) {}
 
     void gather_children(std::vector<ParentNode*>& v)
     {
@@ -245,7 +266,7 @@ public:
         v.push_back(this);
         p = p->child_criteria();
 
-        if (p != NULL)
+        if (p)
             p->gather_children(v);
 
         m_children = v;
@@ -256,7 +277,7 @@ public:
     }
 
     struct score_compare {
-        bool operator ()(ParentNode const* a, ParentNode const* b) const { return (a->cost() < b->cost()); }
+        bool operator ()(const ParentNode* a, const ParentNode* b) const { return a->cost() < b->cost(); }
     };
 
     double cost() const
@@ -290,7 +311,7 @@ public:
     }
 
 
-    virtual ~ParentNode() {}
+    virtual ~ParentNode() TIGHTDB_NOEXCEPT {}
 
     virtual void init(const Table& table)
     {
@@ -470,12 +491,22 @@ protected:
     const Table* m_table;
     std::string error_code;
 
+    const ColumnBase& get_column_base(const Table& table, std::size_t ndx)
+    {
+        return table.get_column_base(ndx);
+    }
+
+    ColumnType get_real_column_type(const Table& table, std::size_t ndx)
+    {
+        return table.get_real_column_type(ndx);
+    }
 };
 
 
 class ArrayNode: public ParentNode {
 public:
     ArrayNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.size()) {m_child = 0; m_dT = 0.0;}
+    ~ArrayNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     void init(const Table& table)
     {
@@ -513,6 +544,7 @@ class SubtableNode: public ParentNode {
 public:
     SubtableNode(size_t column): m_column(column) {m_child = 0; m_child2 = 0; m_dT = 100.0;}
     SubtableNode() {};
+    ~SubtableNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
     void init(const Table& table)
     {
         m_dD = 10.0;
@@ -575,6 +607,7 @@ public:
         m_probes = 0;
         m_matches = 0;
     }
+    ~IntegerNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     // Only purpose of this function is to let you quickly create a IntegerNode object and call aggregate_local() on it to aggregate
     // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
@@ -590,7 +623,7 @@ public:
     void init(const Table& table)
     {
         m_dD = 100.0;
-        m_condition_column = static_cast<const ColType*>(&table.get_column_base(m_condition_column_idx));
+        m_condition_column = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx));
         m_table = &table;
         m_leaf_end = 0;
         if (m_child)
@@ -836,7 +869,7 @@ public:
         m_lcase = lower;
     }
 
-    ~StringNode()
+    ~StringNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         delete[] m_value.data();
         delete[] m_ucase;
@@ -853,8 +886,8 @@ public:
         m_matches = 0;
         m_end_s = 0;
         m_table = &table;
-        m_condition_column = &table.get_column_base(m_condition_column_idx);
-        m_column_type = table.get_real_column_type(m_condition_column_idx);
+        m_condition_column = &get_column_base(table, m_condition_column_idx);
+        m_column_type = get_real_column_type(table, m_condition_column_idx);
 
         if (m_child)
             m_child->init(table);
@@ -872,7 +905,7 @@ public:
                 t = static_cast<const ColumnStringEnum*>(m_condition_column)->get(s);
             }
             else {
-                // short or long 
+                // short or long
                 const AdaptiveStringColumn* asc = static_cast<const AdaptiveStringColumn*>(m_condition_column);
                 if (s >= m_end_s) {
                     // we exceeded current leaf's range
@@ -920,6 +953,7 @@ public:
         m_child = 0;
         m_dT = 1.0;
     }
+    ~BasicNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     // Only purpose of this function is to let you quickly create a IntegerNode object and call aggregate_local() on it to aggregate
     // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
@@ -936,7 +970,7 @@ public:
     {
         m_dD = 100.0;
         m_table = &table;
-        m_condition_column.m_column = static_cast<const ColType*>(&table.get_column_base(m_condition_column_idx));
+        m_condition_column.m_column = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx));
         m_condition_column.m_leaf_end = 0;
 
         if (m_child)
@@ -977,7 +1011,7 @@ public:
         m_value = BinaryData(data, v.size());
     }
 
-    ~BinaryNode()
+    ~BinaryNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         delete[] m_value.data();
     }
@@ -986,8 +1020,8 @@ public:
     {
         m_dD = 100.0;
         m_table = &table;
-        m_condition_column = static_cast<const ColumnBinary*>(&table.get_column_base(m_condition_column_idx));
-        m_column_type = table.get_real_column_type(m_condition_column_idx);
+        m_condition_column = static_cast<const ColumnBinary*>(&get_column_base(table, m_condition_column_idx));
+        m_column_type = get_real_column_type(table, m_condition_column_idx);
 
         if (m_child)
             m_child->init(table);
@@ -1036,7 +1070,7 @@ public:
         m_index_matches = 0;
         m_index_matches_destroy = false;
     }
-    ~StringNode()
+    ~StringNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         deallocate();
         delete[] m_value.data();
@@ -1044,7 +1078,7 @@ public:
         m_index.destroy();
     }
 
-    void deallocate()
+    void deallocate() TIGHTDB_NOEXCEPT
     {
         // Must be called after each query execution too free temporary resources used by the execution. Run in
         // destructor, but also in Init because a user could define a query once and execute it multiple times.
@@ -1069,8 +1103,8 @@ public:
         m_dD = 10.0;
         m_leaf_end = 0;
         m_table = &table;
-        m_condition_column = &table.get_column_base(m_condition_column_idx);
-        m_column_type = table.get_real_column_type(m_condition_column_idx);
+        m_condition_column = &get_column_base(table, m_condition_column_idx);
+        m_column_type = get_real_column_type(table, m_condition_column_idx);
 
         if (m_column_type == col_type_StringEnum) {
             m_dT = 1.0;
@@ -1233,7 +1267,8 @@ public:
         return 0;
     }
 
-    OrNode(ParentNode* p1) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL; m_dT = 50.0;};
+    OrNode(ParentNode* p1) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL; m_dT = 50.0;}
+    ~OrNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     void init(const Table& table)
     {
@@ -1324,7 +1359,7 @@ public:
         m_child = 0;
     }
 
-    ~TwoColumnsNode()
+    ~TwoColumnsNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         delete[] m_value.data();
     }
@@ -1335,10 +1370,10 @@ public:
         m_dD = 100.0;
         m_table = &table;
 
-        const ColType* c = static_cast<const ColType*>(&table.get_column_base(m_condition_column_idx1));
+        const ColType* c = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx1));
         m_getter1.init(c);
 
-        c = static_cast<const ColType*>(&table.get_column_base(m_condition_column_idx2));
+        c = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx2));
         m_getter2.init(c);
 
         if (m_child)
@@ -1391,7 +1426,48 @@ protected:
     SequentialGetter<TConditionValue> m_getter2;
 };
 
+// todo, fixme: move this up! There are just some annoying compiler errors that need to be resolved when doing this
+#include "query_expression.hpp"
+
+
+// For expressions like col1 / col2 + 123 > col4 * 100
+class ExpressionNode: public ParentNode {
+
+public:
+    ~ExpressionNode() TIGHTDB_NOEXCEPT
+    {
+        if(m_auto_delete)
+            delete m_compare, m_compare = NULL;
+    }
+
+    ExpressionNode(Expression* compare, bool auto_delete) 
+    {
+        m_auto_delete = auto_delete;
+        m_child = 0;
+        m_compare = compare;
+    }
+
+    void init(const Table& table) 
+    {
+        m_compare->set_table(&table);
+        if (m_child)
+            m_child->init(table);
+    }
+
+    size_t find_first_local(size_t start, size_t end)
+    {
+        size_t res = m_compare->find_first(start, end);
+        return res;
+    }
+    
+    bool m_auto_delete;
+    Expression* m_compare;
+};
 
 } // namespace tightdb
+
+
+
+
 
 #endif // TIGHTDB_QUERY_ENGINE_HPP

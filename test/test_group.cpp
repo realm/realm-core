@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_GROUP
+
 #include <algorithm>
 #include <fstream>
 
@@ -21,18 +24,151 @@ TIGHTDB_TABLE_4(TestTableGroup,
 
 } // Anonymous namespace
 
+TEST(Group_Unattached)
+{
+    Group group((Group::unattached_tag()));
+    CHECK(!group.is_attached());
+}
+
+
+TEST(Group_OpenFile)
+{
+    File::try_remove("test.tightdb");
+
+    {
+        Group group((Group::unattached_tag()));
+        group.open("test.tightdb", Group::mode_ReadWrite);
+        CHECK(group.is_attached());
+    }
+
+    {
+        Group group((Group::unattached_tag()));
+        group.open("test.tightdb", Group::mode_ReadWriteNoCreate);
+        CHECK(group.is_attached());
+    }
+
+    {
+        Group group((Group::unattached_tag()));
+        group.open("test.tightdb", Group::mode_ReadOnly);
+        CHECK(group.is_attached());
+    }
+
+    File::remove("test.tightdb");
+}
+
+
+TEST(Group_BadFile)
+{
+    File::try_remove("test.tightdb");
+    File::try_remove("test2.tightdb");
+
+    {
+        File file("test.tightdb", File::mode_Append);
+        file.write("foo");
+    }
+
+    {
+        Group group((Group::unattached_tag()));
+        CHECK_THROW(group.open("test.tightdb", Group::mode_ReadOnly), InvalidDatabase);
+        CHECK(!group.is_attached());
+        CHECK_THROW(group.open("test.tightdb", Group::mode_ReadOnly), InvalidDatabase); // Again
+        CHECK(!group.is_attached());
+        CHECK_THROW(group.open("test.tightdb", Group::mode_ReadWrite), InvalidDatabase);
+        CHECK(!group.is_attached());
+        CHECK_THROW(group.open("test.tightdb", Group::mode_ReadWriteNoCreate), InvalidDatabase);
+        CHECK(!group.is_attached());
+        group.open("test2.tightdb", Group::mode_ReadWrite); // This one must work
+        CHECK(group.is_attached());
+    }
+
+    File::remove("test.tightdb");
+    File::remove("test2.tightdb");
+}
+
+
+TEST(Group_OpenBuffer)
+{
+    // Produce a valid buffer
+    UniquePtr<char[]> buffer;
+    size_t buffer_size;
+    {
+        File::try_remove("test.tightdb");
+        {
+            Group group;
+            group.write("test.tightdb");
+        }
+        {
+            File file("test.tightdb");
+            buffer_size = size_t(file.get_size());
+            buffer.reset(static_cast<char*>(malloc(buffer_size)));
+            CHECK(bool(buffer));
+            file.read(buffer.get(), buffer_size);
+        }
+        File::remove("test.tightdb");
+    }
+
+
+    // Keep ownership of buffer
+    {
+        Group group((Group::unattached_tag()));
+        bool take_ownership = false;
+        group.open(BinaryData(buffer.get(), buffer_size), take_ownership);
+        CHECK(group.is_attached());
+    }
+
+    // Pass ownership of buffer
+    {
+        Group group((Group::unattached_tag()));
+        bool take_ownership = true;
+        group.open(BinaryData(buffer.get(), buffer_size), take_ownership);
+        CHECK(group.is_attached());
+        buffer.release();
+    }
+}
+
+
+TEST(Group_BadBuffer)
+{
+    File::try_remove("test.tightdb");
+
+    // Produce an invalid buffer
+    char buffer[32];
+    for (size_t i=0; i<sizeof buffer; ++i)
+        buffer[i] = char((i+192)%128);
+
+    {
+        Group group((Group::unattached_tag()));
+        bool take_ownership = false;
+        CHECK_THROW(group.open(BinaryData(buffer), take_ownership), InvalidDatabase);
+        CHECK(!group.is_attached());
+        // Check that ownership is not passed on failure during
+        // open. If it was, we would get a bad delete on stack
+        // allocated memory wich would at least be caught by Valgrind.
+        take_ownership = true;
+        CHECK_THROW(group.open(BinaryData(buffer), take_ownership), InvalidDatabase);
+        CHECK(!group.is_attached());
+        // Check that the group is still able to attach to a file,
+        // even after failures.
+        group.open("test.tightdb", Group::mode_ReadWrite);
+        CHECK(group.is_attached());
+    }
+
+    File::remove("test.tightdb");
+}
+
+
 TEST(Group_Size)
 {
     Group g;
-
-    CHECK_EQUAL(true, g.is_empty());
+    CHECK(g.is_attached());
+    CHECK(g.is_empty());
 
     TableRef t = g.get_table("a");
-    CHECK_EQUAL(false, g.is_empty());
+    CHECK(!g.is_empty());
     CHECK_EQUAL(1, g.size());
 
     TableRef t1 = g.get_table("b");
-    CHECK_EQUAL(false, g.is_empty());
+    CHECK(!g.is_empty());
     CHECK_EQUAL(2, g.size());
 }
 
@@ -46,6 +182,23 @@ TEST(Group_GetTable)
     TestTableGroup::Ref t3 = g.get_table<TestTableGroup>("beta");
     TestTableGroup::ConstRef t4 = cg.get_table<TestTableGroup>("beta");
     CHECK_EQUAL(t3, t4);
+}
+
+TEST(Group_TableAccessorLeftBehind)
+{
+    TableRef table;
+    TableRef subtable;
+    {
+        Group group;
+        table = group.get_table("test");
+        CHECK(table->is_attached());
+        table->add_column(type_Table, "sub");
+        table->add_empty_row();
+        subtable = table->get_subtable(0,0);
+        CHECK(subtable->is_attached());
+    }
+    CHECK(!table->is_attached());
+    CHECK(!subtable->is_attached());
 }
 
 TEST(Group_Invalid1)
@@ -138,7 +291,7 @@ TEST(Group_Serialize1)
 
 #ifdef TIGHTDB_DEBUG
     to_disk.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Delete old file if there
     File::try_remove("table_test.tightdb");
@@ -153,10 +306,8 @@ TEST(Group_Serialize1)
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(10, t->size());
 
-#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
     CHECK(*table == *t);
-#endif
 
     // Modify both tables
     table[0].first = "test";
@@ -166,12 +317,12 @@ TEST(Group_Serialize1)
     table->remove(1);
     t->remove(1);
 
-#ifdef TIGHTDB_DEBUG
     // Verify that both changed correctly
     CHECK(*table == *t);
+#ifdef TIGHTDB_DEBUG
     to_disk.Verify();
     from_disk.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Group_Read1)
@@ -196,7 +347,7 @@ TEST(Group_Serialize2)
 
 #ifdef TIGHTDB_DEBUG
     to_disk.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Delete old file if there
     File::try_remove("table_test.tightdb");
@@ -211,13 +362,14 @@ TEST(Group_Serialize2)
     static_cast<void>(t2);
     static_cast<void>(t1);
 
-#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
     CHECK(*table1 == *t1);
     CHECK(*table2 == *t2);
+
+#ifdef TIGHTDB_DEBUG
     to_disk.Verify();
     from_disk.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Group_Serialize3)
@@ -230,7 +382,7 @@ TEST(Group_Serialize3)
 
 #ifdef TIGHTDB_DEBUG
     to_disk.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Delete old file if there
     File::try_remove("table_test.tightdb");
@@ -243,13 +395,12 @@ TEST(Group_Serialize3)
     TestTableGroup::Ref t = from_disk.get_table<TestTableGroup>("test");
     static_cast<void>(t);
 
-
-#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
     CHECK(*table == *t);
+#ifdef TIGHTDB_DEBUG
     to_disk.Verify();
     from_disk.Verify();
-#endif // TIGHTDB_DEBUG}
+#endif
 }
 
 TEST(Group_Serialize_Mem)
@@ -270,7 +421,7 @@ TEST(Group_Serialize_Mem)
 
 #ifdef TIGHTDB_DEBUG
     to_mem.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Serialize to memory (we now own the buffer)
     BinaryData buffer = to_mem.write_to_mem();
@@ -282,27 +433,25 @@ TEST(Group_Serialize_Mem)
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(10, t->size());
 
-#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
     CHECK(*table == *t);
+#ifdef TIGHTDB_DEBUG
     to_mem.Verify();
     from_mem.Verify();
-#endif //_DEBUG
+#endif
 }
 
 TEST(Group_Close)
 {
-    Group* to_mem = new Group();
-    TestTableGroup::Ref table = to_mem->get_table<TestTableGroup>("test");
+    Group to_mem;
+    TestTableGroup::Ref table = to_mem.get_table<TestTableGroup>("test");
     table->add("",  1, true, Wed);
     table->add("",  2, true, Wed);
 
     // Serialize to memory (we now own the buffer)
-    BinaryData buffer = to_mem->write_to_mem();
+    BinaryData buffer = to_mem.write_to_mem();
 
-    Group* from_mem = new Group(buffer);
-    delete to_mem;
-    delete from_mem;
+    Group from_mem(buffer);
 }
 
 TEST(Group_Serialize_Optimized)
@@ -323,7 +472,7 @@ TEST(Group_Serialize_Optimized)
 
 #ifdef TIGHTDB_DEBUG
     to_mem.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Serialize to memory (we now own the buffer)
     BinaryData buffer = to_mem.write_to_mem();
@@ -335,9 +484,7 @@ TEST(Group_Serialize_Optimized)
     CHECK_EQUAL(4, t->get_column_count());
 
     // Verify that original values are there
-#ifdef TIGHTDB_DEBUG
     CHECK(*table == *t);
-#endif
 
     // Add a row with a known (but unique) value
     table->add("search_target", 9, true, Fri);
@@ -348,7 +495,7 @@ TEST(Group_Serialize_Optimized)
 #ifdef TIGHTDB_DEBUG
     to_mem.Verify();
     from_mem.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Group_Serialize_All)
@@ -420,7 +567,7 @@ TEST(Group_Persist)
 
 #ifdef TIGHTDB_DEBUG
     db.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     CHECK_EQUAL(6, table->get_column_count());
     CHECK_EQUAL(1, table->size());
@@ -441,7 +588,7 @@ TEST(Group_Persist)
 
 #ifdef TIGHTDB_DEBUG
     db.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     CHECK_EQUAL(6, table->get_column_count());
     CHECK_EQUAL(1, table->size());
@@ -848,35 +995,35 @@ TEST(Group_InvalidateTables)
     {
         Group group;
         table = group.get_table<TestTableGroup2>("foo");
-        CHECK(table->is_valid());
+        CHECK(table->is_attached());
         table->add(Mixed::subtable_tag(), 0, 0);
-        CHECK(table->is_valid());
+        CHECK(table->is_attached());
         subtable1 = table[0].first.get_subtable();
-        CHECK(table->is_valid());
+        CHECK(table->is_attached());
         CHECK(subtable1);
-        CHECK(subtable1->is_valid());
+        CHECK(subtable1->is_attached());
         subtable2 = table[0].second;
-        CHECK(table->is_valid());
-        CHECK(subtable1->is_valid());
+        CHECK(table->is_attached());
+        CHECK(subtable1->is_attached());
         CHECK(subtable2);
-        CHECK(subtable2->is_valid());
+        CHECK(subtable2->is_attached());
         subtable3 = table[0].third;
-        CHECK(table->is_valid());
-        CHECK(subtable1->is_valid());
-        CHECK(subtable2->is_valid());
+        CHECK(table->is_attached());
+        CHECK(subtable1->is_attached());
+        CHECK(subtable2->is_attached());
         CHECK(subtable3);
-        CHECK(subtable3->is_valid());
+        CHECK(subtable3->is_attached());
         subtable3->add("alpha", 79542, true,  Wed);
         subtable3->add("beta",     97, false, Mon);
-        CHECK(table->is_valid());
-        CHECK(subtable1->is_valid());
-        CHECK(subtable2->is_valid());
-        CHECK(subtable3->is_valid());
+        CHECK(table->is_attached());
+        CHECK(subtable1->is_attached());
+        CHECK(subtable2->is_attached());
+        CHECK(subtable3->is_attached());
     }
-    CHECK(!table->is_valid());
-    CHECK(!subtable1->is_valid());
-    CHECK(!subtable2->is_valid());
-    CHECK(!subtable3->is_valid());
+    CHECK(!table->is_attached());
+    CHECK(!subtable1->is_attached());
+    CHECK(!subtable2->is_attached());
+    CHECK(!subtable3->is_attached());
 }
 
 TEST(Group_toJSON)
@@ -990,7 +1137,7 @@ TEST(Group_ToDot)
     Spec sub = s.add_subtable_column("tables");
     sub.add_column(type_Int,  "sub_first");
     sub.add_column(type_String, "sub_second");
-    table->UpdateFromSpec(s.GetRef());
+    table->UpdateFromSpec(s.get_ref());
 
     // Add some rows
     for (size_t i = 0; i < 15; ++i) {
@@ -1043,7 +1190,7 @@ TEST(Group_ToDot)
             Spec s = subtable->get_spec();
             s.add_column(type_Int,    "first");
             s.add_column(type_String, "second");
-            subtable->UpdateFromSpec(s.GetRef());
+            subtable->UpdateFromSpec(s.get_ref());
 
             subtable->insert_int(0, 0, 42);
             subtable->insert_string(1, 0, "meaning");
@@ -1074,5 +1221,7 @@ TEST(Group_ToDot)
     fs.close();
 }
 
-#endif //TIGHTDB_TO_DOT
+#endif // TIGHTDB_TO_DOT
 #endif // TIGHTDB_DEBUG
+
+#endif // TEST_GROUP

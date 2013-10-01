@@ -1,14 +1,15 @@
 GENERATED_SOURCES = table_macros.hpp
 
 INST_HEADERS = config.h meta.hpp assert.hpp exceptions.hpp terminate.hpp type_list.hpp tuple.hpp \
-bind.hpp safe_int_ops.hpp unique_ptr.hpp bind_ptr.hpp string_buffer.hpp file.hpp thread.hpp \
-utf8.hpp utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp data_type.hpp \
-column_type.hpp column_fwd.hpp spec.hpp date.hpp string_data.hpp binary_data.hpp mixed.hpp \
-table.hpp table_ref.hpp table_basic_fwd.hpp table_accessors.hpp table_basic.hpp table_view.hpp \
-table_view_basic.hpp table_macros.hpp group.hpp group_shared.hpp query.hpp \
+bind.hpp safe_int_ops.hpp unique_ptr.hpp bind_ptr.hpp buffer.hpp string_buffer.hpp file.hpp \
+thread.hpp utf8.hpp utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp \
+data_type.hpp column_type.hpp column_fwd.hpp spec.hpp date.hpp string_data.hpp binary_data.hpp \
+mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp table_accessors.hpp table_basic.hpp \
+table_view.hpp table_view_basic.hpp table_macros.hpp group.hpp group_shared.hpp query.hpp \
 query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h replication.hpp
 
 lib_LIBRARIES = libtightdb.a
+bin_PROGRAMS  = tightdbd
 DEV_PROGRAMS = tightdb-config
 
 libtightdb_a_SOURCES = terminate.cpp string_buffer.cpp file.cpp thread.cpp utf8.cpp \
@@ -43,6 +44,8 @@ endif
 libtightdb_a_VERSION = 3:0:0
 
 tightdb_config_SOURCES = config.cpp
+tightdbd_SOURCES = tightdbd.cpp
+tightdbd_LIBS = libtightdb.a
 
 include ../../generic.mk
 
@@ -58,8 +61,10 @@ uninstall/extra:
 	-rmdir $(DESTDIR)$(includedir)/tightdb
 
 # Used by ../../build.sh
-.PHONY: get-inst-headers get-inst-libraries
+.PHONY: get-inst-headers get-inst-libraries get-inst-programs
 get-inst-headers:
 	@echo $(INST_HEADERS)
 get-inst-libraries:
 	@echo $(filter-out libtightdb-cov.% libtightdb-dbg.a,$(TARGETS_LIB_STATIC) $(TARGETS_LIB_SHARED_ALIASES))
+get-inst-programs:
+	@echo $(filter-out %-cov,$(TARGETS_PROG) $(TARGETS_DEV_PROG))

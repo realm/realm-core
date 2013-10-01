@@ -45,9 +45,7 @@ public:
     explicit BasicColumn(Allocator& = Allocator::get_default());
     explicit BasicColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                          Allocator& = Allocator::get_default());
-    ~BasicColumn();
-
-    void destroy() TIGHTDB_OVERRIDE;
+    ~BasicColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     bool is_empty() const TIGHTDB_NOEXCEPT;
@@ -68,10 +66,10 @@ public:
     size_t count(T value) const;
 
     typedef typename AggReturnType<T>::sum_type SumType;
-    SumType sum(size_t start = 0, size_t end = -1) const;
-    double average(size_t start = 0, size_t end = -1) const;
-    T maximum(size_t start = 0, size_t end = -1) const;
-    T minimum(size_t start = 0, size_t end = -1) const;
+    SumType sum(size_t start = 0, size_t end = -1, size_t limit = size_t(-1)) const;
+    double average(size_t start = 0, size_t end = -1, size_t limit = size_t(-1)) const;
+    T maximum(size_t start = 0, size_t end = -1, size_t limit = size_t(-1)) const;
+    T minimum(size_t start = 0, size_t end = -1, size_t limit = size_t(-1)) const;
     size_t find_first(T value, size_t start=0 , size_t end=-1) const;
     void find_all(Array& result, T value, size_t start = 0, size_t end = -1) const;
 

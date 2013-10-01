@@ -45,6 +45,16 @@ public:
         return m_impl.get_source_ndx(row_ndx);
     }
 
+    void to_json(std::ostream& out) const { m_impl.to_json(out); };
+    void to_string(std::ostream& out, size_t limit=500) const
+    {
+        m_impl.to_string(out, limit);
+    }
+    void row_to_string(std::size_t row_ndx, std::ostream& out) const
+    {
+        m_impl.row_to_string(row_ndx, out);
+    }
+
 private:
     typedef typename Tab::spec_type Spec;
 
