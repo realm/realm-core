@@ -409,7 +409,7 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     info->~SharedInfo(); // Call destructor
     m_file.close();
     m_file_map.unmap();
-    m_reader.map.unmap();
+    m_reader_map.unmap();
     try {
         File::remove(m_file_path.c_str());
     }
