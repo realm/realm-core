@@ -161,7 +161,10 @@ void spawn_daemon(const string& file)
         
         // use childs exit code to catch and report any errors:
         int status;
-        int pid_changed = waitpid(pid, &status, 0);
+        int pid_changed;
+        do {
+            pid_changed = waitpid(pid, &status, 0);
+        } while (pid_changed == -1 && errno == EINTR);
         if (pid_changed != pid)
             throw runtime_error("failed to wait for daemon start");
         if (!WIFEXITED(status))
