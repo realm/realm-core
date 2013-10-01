@@ -181,12 +181,15 @@ replication. For example:
 Packaging
 ---------
 
-It is possible to create Debian packages (`.deb`) by running the
+It is possible to create Debian/Ubuntu packages (`.deb`) by running the
 following command:
 
     dpkg-buildpackage -rfakeroot
 
-The packages will be signed by the maintainer's signature.
+The packages will be signed by the maintainer's signature. It is also
+possible to create packages without signature:
+
+    dpkg-buildpackage -rfakeroot -us -uc
 
 
 
@@ -223,7 +226,7 @@ is named according to the tag.
 On Ubuntu, install Pandoc and XeLaTeX with the following commands:
 
     sudo apt-get install texlive-latex-base
-    sudo apt-get install pandoc 
+    sudo apt-get install pandoc
 
 On Mac OSX, install Pandoc and XeLaTeX (aka MacTeX) via the following link:
 
