@@ -394,23 +394,22 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
         return;
     }
     info->shutdown_started.store_release(1);
-    try {
-        // If the db file is just backing for a transient data structure,
-        // we can delete it when done.
-        if (info->flags == durability_MemOnly) {
+    // If the db file is just backing for a transient data structure,
+    // we can delete it when done.
+    if (info->flags == durability_MemOnly) {
+        try {
             size_t path_len = m_file_path.size()-5; // remove ".lock"
-            // FIXME: Find a way to avoid the possible exception from
-            // m_file_path.substr(). Currently, if it throws, the program
-            // will be terminated due to 'noexcept' on ~SharedGroup().
             string db_path = m_file_path.substr(0, path_len); // Throws
             m_group.m_alloc.detach();
             File::remove(db_path.c_str());
         } 
+        catch(...) { } // ignored on purpose
     }
-    catch(...) { } // ignored on purpose
 
     info->~SharedInfo(); // Call destructor
-
+    m_file.close();
+    m_file_map.unmap();
+    m_reader.map.unmap();
     try {
         File::remove(m_file_path.c_str());
     }
