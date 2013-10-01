@@ -486,11 +486,11 @@ CATEGORIES :
       - NAME   : lastmatch
         TYPES  : size_t
         DESCR  : &g_dyn_query_find_next_parm1_descr
-                 "Row to start search from (not inclusive). Default is -1 (start from beginning)."
+                 Row index to start the search from (inclusive). Default is 0.
       RETURN:
         TYPES  : size_t
         DESCR  : &g_dyn_query_find_next
-                 Row index that matches the query (or -1 if none).
+                 Row index that matches the query (or -1 if no match found).
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_find_next
