@@ -35,7 +35,7 @@ template<class Char, class Int> struct IntCharTraits: private char_traits<Char> 
     typedef typename char_traits<Char>::off_type off_type;
     typedef typename char_traits<Char>::pos_type pos_type;
     static Int to_int_type(Char c)  { return c.value(); }
-    static Char to_char_type(Int i) { return Char(i); }
+    static Char to_char_type(Int i) { return Char(int(i)); }
     static bool eq_int_type(Int i1, Int i2) { return i1 == i2; }
     static Int eof() { return numeric_limits<Int>::max(); }
     static Int not_eof(Int i) { return i != eof() ? i : Int(); }
