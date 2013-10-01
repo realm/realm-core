@@ -345,7 +345,7 @@ public:
 
     Query& Or() { m_impl.Or(); return *this; }
 
-    std::size_t find_next(std::size_t lastmatch = std::size_t(-1))
+    std::size_t find_next(std::size_t lastmatch = 0)
     {
         return m_impl.find_next(lastmatch);
     }
