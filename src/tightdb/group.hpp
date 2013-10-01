@@ -593,7 +593,7 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
     // size
     int top_size = 3;
     std::size_t max_top_byte_size = Array::get_max_byte_size(top_size);
-    std::size_t max_final_file_size = top_pos + max_top_byte_size;
+    uint64_t max_final_file_size = top_pos + max_top_byte_size;
     Array top(Array::type_HasRefs); // Throws
     // FIXME: Dangerous cast: unsigned -> signed
     top.ensure_minimum_width(1 + 2*max_final_file_size); // Throws
@@ -606,7 +606,7 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
     // Finalize the top array by adding the projected final file size
     // to it
     std::size_t top_byte_size = top.get_byte_size();
-    std::size_t final_file_size = top_pos + top_byte_size;
+    std::size_t final_file_size = top_pos + top_byte_size;//FIXME: VS2012  warning C4244: 'initializing' : conversion from 'uint64_t' to 'size_t', possible loss of data
     // FIXME: Dangerous cast: unsigned -> signed
     top.set(2, 1 + 2*final_file_size);
 
