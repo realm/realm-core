@@ -456,7 +456,7 @@ TEST(MergeQueriesMonkey)
 {
     for(int iter = 0; iter < 5; iter++)
     {
-        const size_t rows = 4000;
+        const size_t rows = TIGHTDB_MAX_LIST_SIZE * 4;
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
@@ -634,7 +634,7 @@ TEST(MergeQueriesMonkeyOverloads)
 {
     for(int iter = 0; iter < 5; iter++)
     {
-        const size_t rows = 4000;
+        const size_t rows = TIGHTDB_MAX_LIST_SIZE * 4;
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
@@ -1103,7 +1103,7 @@ TEST(TestQueryStrIndexCrash)
 
         size_t eights = 0;
 
-        for(int i = 0; i < 2000; i++) {
+        for(int i = 0; i < TIGHTDB_MAX_LIST_SIZE * 2; i++) {
             int v = rand() % 10;
             if(v == 8) {
                 eights++;
@@ -1152,7 +1152,7 @@ TEST(QueryTwoColsEqualVaryWidthAndValues)
     table.add_column(type_Double, "sixth");
 
 #ifdef TIGHTDB_DEBUG
-    for (int i = 0; i < 5000; i++) {
+    for (int i = 0; i < TIGHTDB_MAX_LIST_SIZE * 5; i++) {
 #else
     for (int i = 0; i < 50000; i++) {
 #endif
@@ -1325,7 +1325,7 @@ TEST(QueryTwoColsNoRows)
 TEST(TestQueryHuge)
 {
 #if TEST_DURATION == 0
-    for (int N = 0; N < 2; N++) {
+    for (int N = 0; N < 1; N++) {
 #elif TEST_DURATION == 1
     for (int N = 0; N < 100; N++) {
 #elif TEST_DURATION == 2
@@ -1357,18 +1357,18 @@ TEST(TestQueryHuge)
         size_t res7 = 0;
         size_t res8 = 0;
 
-        size_t start = rand() % 6000;
-        size_t end = start + rand() % (6000 - start);
+        size_t start = rand() % 3000;
+        size_t end = start + rand() % (3000 - start);
         size_t limit;
         if(rand() % 2 == 0)
-            limit = rand() % 10000;
+            limit = rand() % 5000;
         else
             limit = size_t(-1);
 
 
         size_t blocksize = rand() % 800 + 1;
 
-        for (size_t row = 0; row < 6000; row++) {
+        for (size_t row = 0; row < 3000; row++) {
 
             if (row % blocksize == 0) {
                 long1 = (rand() % 2 == 0);
@@ -1422,11 +1422,6 @@ TEST(TestQueryHuge)
             tt[row].first  = first;
             tt[row].second = second;
             tt[row].third  = third;
-
-
-
-
-
 
             if ((row >= start && row < end && limit > res1) && (first == "A" && second == "A" && third == 1))
                 res1++;
@@ -1525,13 +1520,13 @@ TEST(TestQueryStrIndex3)
 #endif
             // 1/500 match probability because we want possibility for a 1000 sized leaf to contain 0 matches (important
             // edge case)
-            int f1 = rand() % 500 + 1;
-            int f2 = rand() % 500 + 1;
+            int f1 = rand() % TIGHTDB_MAX_LIST_SIZE / 2 + 1;
+            int f2 = rand() % TIGHTDB_MAX_LIST_SIZE / 2 + 1;
             bool longstrings = (rand() % 5 == 1);
 
             // 2200 entries with that probability to fill out two concecutive 1000 sized leafs with above probability,
             // plus a remainder (edge case)
-            for (int j = 0; j < 2200; j++) {
+            for (int j = 0; j < TIGHTDB_MAX_LIST_SIZE * 2 + TIGHTDB_MAX_LIST_SIZE / 5; j++) {
                 if (rand() % f1 == 0)
                     if (rand() % f2 == 0) {
                         ttt.add(0, longstrings ? "AAAAAAAAAAAAAAAAAAAAAAAA" : "AA");
@@ -1642,7 +1637,7 @@ TEST(TestQueryStrEnum)
     for (int i = 0; i < 100; i++) {
         ttt.clear();
         aa = 0;
-        for (size_t t = 0; t < 2000; t++) {
+        for (size_t t = 0; t < TIGHTDB_MAX_LIST_SIZE * 2; t++) {
             if (rand() % 3 == 0) {
                 ttt.add(1, "AA");
                 aa++;
@@ -2630,7 +2625,7 @@ TEST(TestQueryLongString)
 
     // Spread query search hits in an odd way to test more edge cases
     // (thread job size is THREAD_CHUNK_SIZE = 10)
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < TIGHTDB_MAX_LIST_SIZE / 10; i++) {
         for (int j = 0; j < 10; j++) {
             ttt.add(5, "aaaaaaaaaaaaaaaaaa");
             ttt.add(j, "bbbbbbbbbbbbbbbbbb");
@@ -2662,7 +2657,7 @@ TEST(TestQueryLongEnum)
 
     // Spread query search hits in an odd way to test more edge cases
     // (thread job size is THREAD_CHUNK_SIZE = 10)
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < TIGHTDB_MAX_LIST_SIZE / 10; i++) {
         for (int j = 0; j < 10; j++) {
             ttt.add(5, "aaaaaaaaaaaaaaaaaa");
             ttt.add(j, "bbbbbbbbbbbbbbbbbb");

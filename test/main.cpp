@@ -40,7 +40,7 @@ public:
     void ReportTestStart(TestDetails const& test)
     {
         static_cast<void>(test);
-//        cerr << test.filename << ":" << test.lineNumber << ": Begin " << test.testName << "\n";
+        cerr << test.filename << ":" << test.lineNumber << ": Begin " << test.testName << "\n";
     }
 
     void ReportFailure(TestDetails const& test, char const* failure)
