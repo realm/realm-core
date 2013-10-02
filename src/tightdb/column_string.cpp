@@ -1065,8 +1065,11 @@ AdaptiveStringColumn::LeafType AdaptiveStringColumn::upgrade_root_leaf(size_t va
 
 
 AdaptiveStringColumn::LeafType
-AdaptiveStringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off) const
+AdaptiveStringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off, bool use_retval) const
 {
+    static_cast<void>(use_retval);
+    TIGHTDB_ASSERT(use_retval == false); // retval optimization not supported. See Array on how to implement
+
     Allocator& alloc = m_array->get_alloc();
     if (root_is_leaf()) {
         off = 0;

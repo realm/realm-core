@@ -333,6 +333,10 @@ public:
     /// specified path is not a directory, this function is equivalent
     /// to std::remove(const char*).
     ///
+    /// The specified file must not be open by the calling process. If
+    /// it is, this function has undefined behaviour. Note that an
+    /// open memory map of the file counts as "the file being open".
+    ///
     /// \throw AccessError If the file could not be removed. If the
     /// reason corresponds to one of the exception types that are
     /// derived from AccessError, the derived exception type is thrown

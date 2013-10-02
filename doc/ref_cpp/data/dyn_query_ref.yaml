@@ -477,21 +477,20 @@ CATEGORIES :
       NAME     : find_next
       DESCR    : &g_dyn_query_find_next_descr
                  >
-                 Initially call the method with -1 or no parameter.
                  This will find the first row that fulfil the query condition.
                  Use the return value (row number) or greater (but not less!) as parameter
-                 for successive calls to iterate through matching row.
+                 for successive calls to iterate through matching rows.
       SUMMARY  : &g_dyn_query_find_next_summary
                  Find next matching row.
       PARAMS:
       - NAME   : lastmatch
         TYPES  : size_t
         DESCR  : &g_dyn_query_find_next_parm1_descr
-                 "Row to start search"
+                 Row index to start the search from (inclusive). Default is 0.
       RETURN:
         TYPES  : size_t
         DESCR  : &g_dyn_query_find_next
-                 Row index that matches the query (or -1 if none).
+                 Row index that matches the query (or -1 if no match found).
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_dyn_query_find_next

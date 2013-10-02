@@ -479,7 +479,15 @@ void Group::write(const string& path) const
     FileOStream out(path);
     write_to_stream(out); // Throws
 }
-
+/*
+FIXME VS2012 warning on the line write_to_stream(out) above :
+warning C4244: 'initializing' : conversion from 'uint64_t' to 'size_t', possible loss of data
+          src\tightdb\group.cpp(480) : see reference to function template instantiation 'size_t tightdb::Group::write_to_stream<`anonymous-namespace'::FileOStream>(S &) const' being compiled
+          with
+          [
+              S=`anonymous-namespace'::FileOStream
+          ]
+*/
 
 BinaryData Group::write_to_mem() const
 {
