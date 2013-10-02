@@ -121,12 +121,21 @@ inline StringData::StringData(const char* c_str) TIGHTDB_NOEXCEPT:
 
 inline bool operator==(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
 {
+#if defined(_MSC_VER) && defined(_DEBUG)
+    // Windows has a special check in debug mode against passing null
+    // pointer to std::equal(). This conflicts with the C++
+    // standard. For details, see
+    // http://stackoverflow.com/questions/19120779/is-char-p-0-stdequalp-p-p-well-defined-according-to-the-c-standard.
+    // Below check 'a.m_size==0' is to prevent failure in debug mode.
+    return a.m_size == b.m_size && (a.m_size == 0 || std::equal(a.m_data, a.m_data + a.m_size, b.m_data));
+#else
     return a.m_size == b.m_size && std::equal(a.m_data, a.m_data + a.m_size, b.m_data);
+#endif
 }
 
 inline bool operator!=(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
 {
-    return a.m_size != b.m_size || !std::equal(a.m_data, a.m_data + a.m_size, b.m_data);
+    return !(a == b);
 }
 
 inline bool operator<(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
