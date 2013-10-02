@@ -1,6 +1,6 @@
 #include "testsettings.hpp"
 #ifdef TEST_SHARED
-
+#include <fstream>
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
@@ -116,7 +116,7 @@ TEST(Shared_Stale_Lock_File_CopiedInFlight)
         File::try_remove("test_shared.tightdb.lock"); // also the info file
     }
     // lock file should be gone when we get here:
-    CHECK(File::Exists("test_shared.tightdb.lock") == false);
+    CHECK(File::exists("test_shared.tightdb.lock") == false);
 }
 
 TEST(Shared_Stale_Lock_File_CopiedAtCommit)
@@ -145,7 +145,7 @@ TEST(Shared_Stale_Lock_File_CopiedAtCommit)
         File::try_remove("test_shared.tightdb.lock"); // also the info file
     }
     // lock file should be gone when we get here:
-    CHECK(File::Exists("test_shared.tightdb.lock") == false);
+    CHECK(File::exists("test_shared.tightdb.lock") == false);
 }
 
 TEST(Shared_Stale_Lock_File_Renamed)
@@ -168,7 +168,7 @@ TEST(Shared_Stale_Lock_File_Renamed)
         File::try_remove("test_shared.tightdb.lock"); // also the info file
     }
     // lock file should be gone when we get here:
-    CHECK(File::Exists("test_shared.tightdb.lock") == false);
+    CHECK(File::exists("test_shared.tightdb.lock") == false);
 }
 
 TEST(Shared_Initial_Mem)
