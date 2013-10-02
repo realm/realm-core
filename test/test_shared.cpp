@@ -1291,8 +1291,6 @@ TEST(StringIndex_Bug1)
         table->add_empty_row();
         db.commit();
     }
-
-    File::try_remove("test.tightdb");
 }
 #endif
 
@@ -1425,12 +1423,12 @@ namespace  {
 
 void* IncrementEntry(void* arg)
 {
-    try 
+    try
     {
         const size_t row_ndx = (size_t)arg;
 
         // Open shared db
-        SharedGroup sg("test_shared.tightdb", 
+        SharedGroup sg("test_shared.tightdb",
                        false, SharedGroup::durability_Async );
 
         for (size_t i = 0; i < INCREMENTS; ++i) {
@@ -1474,7 +1472,7 @@ void* IncrementEntry(void* arg)
 }
 
 
-void make_table(size_t rows) 
+void make_table(size_t rows)
 {
     File::try_remove("test_shared.tightdb");
     File::try_remove("test_shared.tightdb.log");
@@ -1519,7 +1517,7 @@ void make_table(size_t rows)
     }
 #else
     {
-        SharedGroup sg("test_shared.tightdb", 
+        SharedGroup sg("test_shared.tightdb",
                        false, SharedGroup::durability_Async);
         WriteTransaction wt(sg);
         TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
@@ -1547,7 +1545,7 @@ void make_table(size_t rows)
 #endif
 }
 
-void multi_threaded(size_t thread_count, size_t base) 
+void multi_threaded(size_t thread_count, size_t base)
 {
     // Do some changes in a async db
     {
@@ -1570,7 +1568,7 @@ void multi_threaded(size_t thread_count, size_t base)
 
         // Verify that the changes were made
         {
-            SharedGroup sg("test_shared.tightdb", 
+            SharedGroup sg("test_shared.tightdb",
                            false, SharedGroup::durability_Async);
             ReadTransaction rt(sg);
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
@@ -1594,7 +1592,7 @@ void validate_and_clear(size_t rows, int result)
         SharedGroup sg("test_shared.tightdb");
         WriteTransaction wt(sg);
         TestTableShared::Ref t = wt.get_table<TestTableShared>("test");
-        
+
         for (size_t i = 0; i < rows; ++i) {
             const int64_t v = t[i].first;
             t[i].first = 0;
@@ -1604,7 +1602,7 @@ void validate_and_clear(size_t rows, int result)
     }
 }
 
-void multi_process(int numprocs, size_t numthreads) 
+void multi_process(int numprocs, size_t numthreads)
 {
     for (int i=0; i<numprocs; i++) {
         if (fork()==0) {

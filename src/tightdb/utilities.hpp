@@ -125,7 +125,7 @@ ReturnType type_punning(OriginalType variable) TIGHTDB_NOEXCEPT
 {
     union Both {
         OriginalType in;
-        ReturnType   out;
+        ReturnType out;
     };
     Both both;
     both.out = ReturnType(); // Clear all bits in case ReturnType is larger than OriginalType
