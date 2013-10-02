@@ -346,9 +346,9 @@ public:
 
     Query& Or() { m_impl.Or(); return *this; }
 
-    std::size_t find_next(std::size_t lastmatch = 0)
+    std::size_t find(std::size_t begin_at_table_row = 0)
     {
-        return m_impl.find_next(lastmatch);
+        return m_impl.find(begin_at_table_row);
     }
 
     typename BasicTable<Spec>::View find_all(std::size_t start = 0,
