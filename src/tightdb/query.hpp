@@ -171,7 +171,7 @@ public:
 
 
     // Searching
-    size_t         find_first(size_t begin_row=size_t(0));
+    size_t         find(size_t begin_at_table_row=size_t(0));
     TableView      find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
     ConstTableView find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
 
