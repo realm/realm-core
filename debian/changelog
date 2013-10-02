@@ -1,3 +1,10 @@
+libtightdb (0.1.0-1) UNRELEASED; urgency=low
+
+  * Beta release. (Closes: #00001)
+
+ -- Kenneth Geisshirt <kg@tightdb.com>  Fri, 29 May 2013 16:51:45 +0200
+
+
 libtightdb (0.0.1-1) UNRELEASED; urgency=low
 
   * Initial release. (Closes: #00001)
