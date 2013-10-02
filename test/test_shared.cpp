@@ -1,6 +1,9 @@
 #include "testsettings.hpp"
 #ifdef TEST_SHARED
 
+#include <fcntl.h>   // open
+#include <fstream>
+
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
@@ -67,31 +70,105 @@ TEST(Shared_Initial)
 #endif
 }
 
-TEST(Shared_Stale_Lock_File)
+void copy_file(const char* from, const char* to)
+{
+    std::ifstream  src(from, std::ios::binary);
+    std::ofstream  dst(to,   std::ios::binary);
+
+    dst << src.rdbuf();
+}
+
+TEST(Shared_Stale_Lock_File_Faked)
 {
     // Delete old files if there
     File::try_remove("test_shared.tightdb");
     File::try_remove("test_shared.tightdb.lock"); // also the info file
-#ifndef _WIN32
+
+    cerr << "Stale lock file faked" << endl;
+    {
+        // create fake lock file
+        std::ofstream dst("test_shared.tightdb.lock", std::ios::binary);
+        dst << 0ULL;
+    }
+    try {
+        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+    }
+    catch (SharedGroup::PresumablyStaleLockFile& e) {
+        cerr << "Detected a Presumably Stale lock file: " << e.what() << endl;
+    }
+    cerr << "Stale lock file faked done" << endl;
+}
+
+TEST(Shared_Stale_Lock_File_CopiedInFlight)
+{
+    // Delete old files if there
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
+
+    cerr << "Stale lock file copied" << endl;
     {
         // create lock file
         SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
-        system("cp test_shared.tightdb.lock test_shared.tightdb.lock.backup");
+        copy_file("test_shared.tightdb.lock", "test_shared.tightdb.lock.backup");
     }
     rename("test_shared.tightdb.lock.backup","test_shared.tightdb.lock");
-    {
+    try {
         SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
     }
-#endif
+    catch (SharedGroup::PresumablyStaleLockFile& e) {
+        cerr << "Detected a Presumably Stale lock file: " << e.what() << endl;
+    }
+    cerr << "Stale lock file copied done" << endl;
+}
+
+TEST(Shared_Stale_Lock_File_CopiedAtCommit)
+{
+    // Delete old files if there
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
+
+    cerr << "Stale lock file copied @commit" << endl;
+    {
+        // create lock file
+        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+        {
+            WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            t1->add(1, 2, false, "test");
+            wt.commit();
+        }
+        copy_file("test_shared.tightdb.lock", "test_shared.tightdb.lock.backup");
+    }
+    rename("test_shared.tightdb.lock.backup","test_shared.tightdb.lock");
+    try {
+        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+    }
+    catch (SharedGroup::PresumablyStaleLockFile& e) {
+        cerr << "Detected a Presumably Stale lock file: " << e.what() << endl;
+    }
+    cerr << "Stale lock file copied @commit done" << endl;
+}
+
+TEST(Shared_Stale_Lock_File_Renamed)
+{
+    // Delete old files if there
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
+
+    cerr << "Stale lock file renamed" << endl;
     {
         // create lock file
         SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
         rename("test_shared.tightdb.lock","test_shared.tightdb.lock.backup");
     }
     rename("test_shared.tightdb.lock.backup","test_shared.tightdb.lock");
-    {
+    try {
         SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
     }
+    catch (SharedGroup::PresumablyStaleLockFile& e) {
+        cerr << "Detected a Presumably Stale lock file: " << e.what() << endl;
+    }
+    cerr << "Stale lock file renamed done" << endl;
 }
 
 TEST(Shared_Initial_Mem)

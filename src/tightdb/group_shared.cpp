@@ -193,7 +193,7 @@ inline void micro_sleep(uint64_t microsec_delay)
 #ifdef _WIN32
     // FIXME: this is not optimal, but it should work
     // also vs2012 warns : src\tightdb\group_shared.cpp(192): warning C4244: 'argument' : conversion from 'uint64_t' to 'DWORD', possible loss of data
-    Sleep(microsec_delay/1000+1);
+    Sleep(static_cast<DWORD>(microsec_delay/1000+1));
 #else
     usleep(useconds_t(microsec_delay));
 #endif
@@ -223,6 +223,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
     m_file_path = path + ".lock";
     bool must_retry;
+    int retry_count = 5;
     do {
         bool need_init = false;
         size_t info_size = 0;
@@ -238,7 +239,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             need_init = true;
 
         } 
-        catch (File::Exists& e) {
+        catch (File::Exists&) {
 
             // if this one throws, just propagate it:
             m_file.open(m_file_path, 
@@ -251,7 +252,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
         // them to exclusive to detect if we can shutdown.
         m_file.lock_shared();
         File::CloseGuard fcg(m_file);
-        int time_left = 100000;
+        int time_left = 100;
         while (1) {
             time_left--;
             // need to validate the size of the file before trying to map it
@@ -260,11 +261,11 @@ void SharedGroup::open(const string& path, bool no_create_file,
             if (int_cast_with_overflow_detect(m_file.get_size(), info_size))
                 throw runtime_error("Lock file too large");
             if (time_left <= 0)
-                throw runtime_error("Stale lock file");
+                throw PresumablyStaleLockFile(m_file_path);
             // wait for file to at least contain the basic shared info block
             // NB! it might be larger due to expansion of the ring buffer.
             if (info_size < sizeof (SharedInfo))
-                micro_sleep(10);
+                micro_sleep(1000);
             else
                 break;
         }
@@ -312,18 +313,21 @@ void SharedGroup::open(const string& path, bool no_create_file,
         }
         else {
             // wait for init complete:
-            int wait_count = 100000;
+            int wait_count = 100;
             while (wait_count && (info->init_complete.load_acquire() == 0)) {
                 wait_count--;
-                micro_sleep(10);
+                micro_sleep(1000);
             }
             if (info->init_complete.load_acquire() == 0)
-                throw runtime_error("Lock file initialization incomplete");
+                throw PresumablyStaleLockFile(m_file_path);
             if (info->version != 0)
                 throw runtime_error("Unsupported version");
             if (info->shutdown_started.load_acquire()) {
+                retry_count--;
+                if (retry_count == 0)
+                    throw PresumablyStaleLockFile(m_file_path);
                 must_retry = true;
-                micro_sleep(100);
+                micro_sleep(1000);
                 continue;
                 // this will unmap and close the lock file. Then we retry
             }
@@ -483,6 +487,7 @@ void SharedGroup::do_async_commits()
         // finish syncing will see the lock file, but detect that
         // the daemon has abandoned it. It can then wait for the
         // lock file to be removed (with a timeout). 
+        m_file.unlock();
         if (m_file.try_lock_exclusive()) {
             info->shutdown_started.store_release(1);
             shutdown = true;

@@ -146,6 +146,18 @@ public:
     void test_ringbuf();
     void zero_free_space();
 #endif
+    /// If a stale .lock file is present when a SharedGroup is opened,
+    /// an Exception of type PresumablyStaleLockFile will be thrown.
+    /// The name of the stale lock file will be given as argument to the
+    /// exception. Important: In a heavily loaded scenario a lock file
+    /// may be considered stale, merely because the system is unresponsive
+    /// for a long period of time. Depending on your knowledge of the
+    /// system and its load, you must choose to either retry the operation
+    /// or manually remove the stale lock file.
+    class PresumablyStaleLockFile : public std::runtime_error {
+    public:
+        PresumablyStaleLockFile(const std::string& msg): std::runtime_error(msg) {}
+    };
 
 private:
     struct SharedInfo;
