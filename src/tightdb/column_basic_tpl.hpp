@@ -276,7 +276,7 @@ typename BasicColumn<T>::SumType BasicColumn<T>::sum(std::size_t start, std::siz
     if(limit != size_t(-1) && start + limit < end)
         end = start + limit;
 
-    BasicColumn<T>::SumType sum = static_cast<BasicColumn<T>::SumType>(0);
+    typename BasicColumn<T>::SumType sum(0);
     for(size_t i = start; i < end; i++)
         sum += get(i);
 
