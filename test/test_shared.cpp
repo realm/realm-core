@@ -61,9 +61,7 @@ TEST(Shared_Initial)
     }
 
     // Verify that lock file was deleted after use
-#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
-#endif
 }
 
 void copy_file(const char* from, const char* to)
@@ -196,10 +194,8 @@ TEST(Shared_Initial_Mem)
     }
 
     // Verify that both db and lock file was deleted after use
-#ifndef _WIN32 // GroupShared cannot clean lock/db file on Windows
     CHECK(!File::exists("test_shared.tightdb"));
     CHECK(!File::exists("test_shared.tightdb.lock"));
-#endif
 
 }
 
@@ -245,9 +241,7 @@ TEST(Shared_Initial2)
     }
 
     // Verify that lock file was deleted after use
-#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
-#endif
 }
 
 TEST(Shared_Initial2_Mem)
@@ -292,10 +286,8 @@ TEST(Shared_Initial2_Mem)
     }
 
     // Verify that both db and lock file was deleted after use
-#ifndef _WIN32 // GroupShared cannot clean lock/db file on Windows
     CHECK(!File::exists("test_shared.tightdb"));
     CHECK(!File::exists("test_shared.tightdb.lock"));
-#endif
 }
 
 TEST(Shared1)
@@ -385,9 +377,7 @@ TEST(Shared1)
     }
 
     // Verify that lock file was deleted after use
-#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
-#endif
 }
 
 TEST(Shared_rollback)
@@ -454,9 +444,7 @@ TEST(Shared_rollback)
     }
 
     // Verify that lock file was deleted after use
-#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
-#endif
 }
 
 TEST(Shared_Writes)
@@ -495,9 +483,7 @@ TEST(Shared_Writes)
     }
 
     // Verify that lock file was deleted after use
-#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
-#endif
 }
 
 
@@ -861,9 +847,7 @@ TEST(Shared_WriterThreads)
     }
 
     // Verify that lock file was deleted after use
-#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
-#endif
 }
 
 
