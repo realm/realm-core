@@ -12,6 +12,9 @@ Format:
 
 ==================
 
+2013-10-02 (Lasse Reinhold)
+- Renamed find_next(lastmatch) into find_first(begin_row) for queries and typed tables
+
 2013-09-12 (Brian Munkholm)
 + Added TableView::row_to_string() and testcases for to_string() and row_to_string()
 + Added row_to_string(), to_string() and to_json() in typed TableView.

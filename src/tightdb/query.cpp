@@ -666,7 +666,7 @@ void Query::end_subtable()
 }
 
 
-size_t Query::find_next(size_t lastmatch)
+size_t Query::find_first(size_t begin_row)
 {
     if(m_table->is_degenerate())
         return not_found;
@@ -674,7 +674,7 @@ size_t Query::find_next(size_t lastmatch)
     if (!is_initialized()) Init(*m_table);
 
     const size_t end = m_table->size();
-    const size_t res = first[0]->find_first(lastmatch, end);
+    const size_t res = first[0]->find_first(begin_row, end);
 
     return (res == end) ? not_found : res;
 }
