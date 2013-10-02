@@ -208,7 +208,8 @@ public:
     /// increased as necessary.
     ///
     /// On systems that do not support this operation, this method has
-    /// no effect.
+    /// no effect. You may call is_prealloc_supported() to determine
+    /// if it is supported on your system.
     ///
     /// Calling this method on an instance that is not attached to an
     /// open file has undefined behavior. Calling this method on a
@@ -219,7 +220,11 @@ public:
     /// concurrent invocations.
     ///
     /// \sa prealloc()
+    /// \sa is_prealloc_supported()
     void prealloc_if_supported(SizeType offset, std::size_t size);
+
+    /// See prealloc_if_supported().
+    static bool is_prealloc_supported();
 
     /// Reposition the read/write offset of this File
     /// instance. Distinct File instances have separate independent
