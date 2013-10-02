@@ -1694,7 +1694,7 @@ TEST(TestQueryStrIndex)
 
 }
 
-TEST(Group_GameAnalytics)
+TEST(Group_GA)
 {
     UnitTest::Timer timer;
 
@@ -1702,9 +1702,9 @@ TEST(Group_GameAnalytics)
         Group g;
         GATable::Ref t = g.get_table<GATable>("firstevents");
 
-        for (size_t i = 0; i < 1000; ++i) {
-            const int64_t r1 = rand() % 1000;
-            const int64_t r2 = rand() % 1000;
+        for (size_t i = 0; i < 100; ++i) {
+            const int64_t r1 = rand() % 100;
+            const int64_t r2 = rand() % 100;
 
             t->add("10", "US", "1.0", r1, r2);
         }
@@ -2593,7 +2593,7 @@ TEST(TestQueryThreads)
 
     // Spread query search hits in an odd way to test more edge cases
     // (thread job size is THREAD_CHUNK_SIZE = 10)
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 30; i++) {
         for (int j = 0; j < 10; j++) {
             ttt.add(5, "a");
             ttt.add(j, "b");
@@ -2610,8 +2610,8 @@ TEST(TestQueryThreads)
     //q1.set_threads(5);
     TupleTableType::View tv = q1.find_all();
 
-    CHECK_EQUAL(100, tv.size());
-    for (int i = 0; i < 100; i++) {
+    CHECK_EQUAL(30, tv.size());
+    for (int i = 0; i < 30; i++) {
         const size_t expected = i*7*10 + 14 + 1;
         const size_t actual   = tv.get_source_ndx(i);
         CHECK_EQUAL(expected, actual);
@@ -2625,7 +2625,7 @@ TEST(TestQueryLongString)
 
     // Spread query search hits in an odd way to test more edge cases
     // (thread job size is THREAD_CHUNK_SIZE = 10)
-    for (int i = 0; i < TIGHTDB_MAX_LIST_SIZE / 10; i++) {
+    for (int i = 0; i < 30; i++) {
         for (int j = 0; j < 10; j++) {
             ttt.add(5, "aaaaaaaaaaaaaaaaaa");
             ttt.add(j, "bbbbbbbbbbbbbbbbbb");
@@ -2642,8 +2642,8 @@ TEST(TestQueryLongString)
     //q1.set_threads(5);
     TupleTableType::View tv = q1.find_all();
 
-    CHECK_EQUAL(100, tv.size());
-    for (int i = 0; i < 100; i++) {
+    CHECK_EQUAL(30, tv.size());
+    for (int i = 0; i < 30; i++) {
         const size_t expected = i*7*10 + 14 + 1;
         const size_t actual   = tv.get_source_ndx(i);
         CHECK_EQUAL(expected, actual);
@@ -2657,7 +2657,7 @@ TEST(TestQueryLongEnum)
 
     // Spread query search hits in an odd way to test more edge cases
     // (thread job size is THREAD_CHUNK_SIZE = 10)
-    for (int i = 0; i < TIGHTDB_MAX_LIST_SIZE / 10; i++) {
+    for (int i = 0; i < 30; i++) {
         for (int j = 0; j < 10; j++) {
             ttt.add(5, "aaaaaaaaaaaaaaaaaa");
             ttt.add(j, "bbbbbbbbbbbbbbbbbb");
@@ -2675,8 +2675,8 @@ TEST(TestQueryLongEnum)
     //q1.set_threads(5);
     TupleTableType::View tv = q1.find_all();
 
-    CHECK_EQUAL(100, tv.size());
-    for (int i = 0; i < 100; i++) {
+    CHECK_EQUAL(30, tv.size());
+    for (int i = 0; i < 30; i++) {
         const size_t expected = i*7*10 + 14 + 1;
         const size_t actual   = tv.get_source_ndx(i);
         CHECK_EQUAL(expected, actual);
