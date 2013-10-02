@@ -125,78 +125,78 @@ TEST(NextGenSyntax)
     typed.add(20, 20.1f, 4.0, false, "world");
 
     
-    match = (untyped.column<String>(4) == "world").find_first();
+    match = (untyped.column<String>(4) == "world").find();
     CHECK(match == 1);
     
-    match = ("world" == untyped.column<String>(4)).find_first();
+    match = ("world" == untyped.column<String>(4)).find();
     CHECK(match == 1);
     
-    match = ("hello" != untyped.column<String>(4)).find_first();
+    match = ("hello" != untyped.column<String>(4)).find();
     CHECK(match == 1);
 
-    match = (untyped.column<String>(4) != StringData("hello")).find_first();
+    match = (untyped.column<String>(4) != StringData("hello")).find();
     CHECK(match == 1);
 
     // This is a demonstration of fallback to old query_engine for the specific cases where it's possible
     // because old engine is faster. This will return a ->less(...) query
-    match = (untyped.column<int64_t>(0) == untyped.column<int64_t>(0)).find_first();
+    match = (untyped.column<int64_t>(0) == untyped.column<int64_t>(0)).find();
     CHECK(match == 0);
 
 
-    match = (untyped.column<bool>(3) == false).find_first();
+    match = (untyped.column<bool>(3) == false).find();
     CHECK(match == 1);
 
-    match = (20.3 > untyped.column<double>(2) + 2).find_first();
+    match = (20.3 > untyped.column<double>(2) + 2).find();
     CHECK(match == 0);
 
 
-    match = (untyped.column<int64_t>(0) > untyped.column<int64_t>(0)).find_first();
+    match = (untyped.column<int64_t>(0) > untyped.column<int64_t>(0)).find();
     CHECK(match == not_found);
 
 
     // Small typed table test:
-    match = (typed.column().second + 100 > 120 && typed.column().first > 2).find_first();
+    match = (typed.column().second + 100 > 120 && typed.column().first > 2).find();
     CHECK(match == 1);
 
     // Untyped &&
 
     // Left condition makes first row non-match
-    match = (untyped.column<float>(1) + 1 > 21 && untyped.column<double>(2) > 2).find_first();
+    match = (untyped.column<float>(1) + 1 > 21 && untyped.column<double>(2) > 2).find();
     CHECK(match == 1);
 
     // Right condition makes first row a non-match
-    match = (untyped.column<float>(1) > 10 && untyped.column<double>(2) > 3.5).find_first();
+    match = (untyped.column<float>(1) > 10 && untyped.column<double>(2) > 3.5).find();
     CHECK(match == 1);
 
     // Both make first row match
-    match = (untyped.column<float>(1) < 20 && untyped.column<double>(2) > 2).find_first();
+    match = (untyped.column<float>(1) < 20 && untyped.column<double>(2) > 2).find();
     CHECK(match == 0);
 
     // Both make first row non-match
-    match = (untyped.column<float>(1) > 20 && untyped.column<double>(2) > 3.5).find_first();
+    match = (untyped.column<float>(1) > 20 && untyped.column<double>(2) > 3.5).find();
     CHECK(match == 1);
 
     // Left cond match 0, right match 1
-    match = (untyped.column<float>(1) < 20 && untyped.column<double>(2) > 3.5).find_first();
+    match = (untyped.column<float>(1) < 20 && untyped.column<double>(2) > 3.5).find();
     CHECK(match == not_found);
 
     // Left match 1, right match 0
-    match = (untyped.column<float>(1) > 20 && untyped.column<double>(2) < 3.5).find_first();
+    match = (untyped.column<float>(1) > 20 && untyped.column<double>(2) < 3.5).find();
     CHECK(match == not_found);
 
     // Untyped ||
 
     // Left match 0
-    match = (untyped.column<float>(1) < 20 || untyped.column<double>(2) < 3.5).find_first();
+    match = (untyped.column<float>(1) < 20 || untyped.column<double>(2) < 3.5).find();
     CHECK(match == 0);
 
     // Right match 0
-    match = (untyped.column<float>(1) > 20 || untyped.column<double>(2) < 3.5).find_first();
+    match = (untyped.column<float>(1) > 20 || untyped.column<double>(2) < 3.5).find();
     CHECK(match == 0);
 
     // Left match 1
 
-    match = (untyped.column<float>(1) > 20 || untyped.column<double>(2) > 9.5).find_first();
+    match = (untyped.column<float>(1) > 20 || untyped.column<double>(2) > 9.5).find();
     
     CHECK(match == 1);
 
@@ -206,7 +206,7 @@ TEST(NextGenSyntax)
 
     Query q5 = 20 < untyped.column<float>(1);
 
-    match = q4.and_query(q5).find_first();
+    match = q4.and_query(q5).find();
     CHECK(match == 1);
 
 
@@ -216,42 +216,42 @@ TEST(NextGenSyntax)
     Columns<float> uc1 = untyped.column<float>(1);
 
     Query q2 = uv1 <= uc1;
-    match = q2.find_first();
+    match = q2.find();
     CHECK(match == 0);
 
 
     Query q0 = uv1 <= uc1;
-    match = q0.find_first();
+    match = q0.find();
     CHECK(match == 0);
 
     Query q99 = uv1 <= untyped.column<float>(1);
-    match = q99.find_first();
+    match = q99.find();
     CHECK(match == 0);
 
 
     Query q8 = 1 > untyped.column<float>(1) + 5;
-    match = q8.find_first();
+    match = q8.find();
     CHECK(match == not_found);
 
     Query q3 = untyped.column<float>(1) + untyped.column<int64_t>(0) > 10 + untyped.column<int64_t>(0);
-    match = q3.find_first();
+    match = q3.find();
 
-    match = q2.find_first();
+    match = q2.find();
     CHECK(match == 0);    
 
 
     // Typed, direct column addressing
     Query q1 = typed.column().second + typed.column().first > 40;
-    match = q1.find_first();
+    match = q1.find();
     CHECK(match == 1);   
 
 
-    match = (typed.column().first + typed.column().second > 40).find_first();
+    match = (typed.column().first + typed.column().second > 40).find();
     CHECK(match == 1);   
 
 
     Query tq1 = typed.column().first + typed.column().second >= typed.column().first + typed.column().second;
-    match = tq1.find_first();
+    match = tq1.find();
     CHECK(match == 0);   
 
 
@@ -259,29 +259,29 @@ TEST(NextGenSyntax)
     Columns<int64_t> t0 = typed.column().first;
     Columns<float> t1 = typed.column().second;
 
-    match = (t0 + t1 > 40).find_first();
+    match = (t0 + t1 > 40).find();
     CHECK(match == 1);
 
-    match = q1.find_first();
+    match = q1.find();
     CHECK(match == 1);   
 
-    match = (untyped.column<int64_t>(0) + untyped.column<float>(1) > 40).find_first();
+    match = (untyped.column<int64_t>(0) + untyped.column<float>(1) > 40).find();
     CHECK(match == 1);    
 
-    match = (untyped.column<int64_t>(0) + untyped.column<float>(1) < 40).find_first();
+    match = (untyped.column<int64_t>(0) + untyped.column<float>(1) < 40).find();
     CHECK(match == 0);    
 
-    match = (untyped.column<float>(1) <= untyped.column<int64_t>(0)).find_first();
+    match = (untyped.column<float>(1) <= untyped.column<int64_t>(0)).find();
     CHECK(match == 0);    
 
-    match = (untyped.column<int64_t>(0) + untyped.column<float>(1) >= untyped.column<int64_t>(0) + untyped.column<float>(1)).find_first();
+    match = (untyped.column<int64_t>(0) + untyped.column<float>(1) >= untyped.column<int64_t>(0) + untyped.column<float>(1)).find();
     CHECK(match == 0);    
 
     // Untyped, column objects
     Columns<int64_t> u0 = untyped.column<int64_t>(0);
     Columns<float> u1 = untyped.column<float>(1);
 
-    match = (u0 + u1 > 40).find_first();
+    match = (u0 + u1 > 40).find();
     CHECK(match == 1);    
     
     
@@ -295,11 +295,11 @@ TEST(NextGenSyntax)
 
 
     // Bind table and do search
-    match = untyped.where().expression(e).find_first();
+    match = untyped.where().expression(e).find();
     CHECK(match == 1);    
 
     Query q9 = untyped.where().expression(e);
-    match = q9.find_first();
+    match = q9.find();
     CHECK(match == 1);    
 
 
@@ -310,16 +310,16 @@ TEST(NextGenSyntax)
     Subexpr* plus2 = new Operator<Plus<float> >(*first, *second);  
     Expression *e2 = new Compare<Greater, float>(*plus, *constant);
 
-    match = untyped.where().expression(e).expression(e2).find_first();
+    match = untyped.where().expression(e).expression(e2).find();
     CHECK(match == 1);    
 
     Query q10 = untyped.where().and_query(q9).expression(e2);
-    match = q10.find_first();
+    match = q10.find();
     CHECK(match == 1);    
 
 
     Query tq3 = tq1;
-    match = tq3.find_first();
+    match = tq3.find();
     CHECK(match == 0);   
  
     delete e;
@@ -799,144 +799,144 @@ TEST(QueryExpressions0)
     table.set_double(2, 1, 4.0);
    
     // 20 must convert to float    
-    match = (second + 0.2f > 20).find_first();
+    match = (second + 0.2f > 20).find();
     CHECK(match == 0);
 
-    match = (first >= 20.0f).find_first();
+    match = (first >= 20.0f).find();
     CHECK(match == 0);
 
     // 20.1f must remain float
-    match = (first >= 20.1f).find_first();
+    match = (first >= 20.1f).find();
     CHECK(match == not_found);
 
     // first must convert to float
-    match = (second >= first).find_first();
+    match = (second >= first).find();
     CHECK(match == 1);
 
     // 20 and 40 must convert to float
-    match = (second + 20 > 40).find_first();
+    match = (second + 20 > 40).find();
     CHECK(match == 1);
 
     // first and 40 must convert to float
-    match = (second + first >= 40).find_first();
+    match = (second + first >= 40).find();
     CHECK(match == 1);
 
     // 20 must convert to float
-    match = (0.2f + second > 20).find_first();
+    match = (0.2f + second > 20).find();
     CHECK(match == 0);
 
     // Compare, left = Subexpr, right = Value
-    match = (second + first >= 40).find_first();
+    match = (second + first >= 40).find();
     CHECK(match == 1);
 
-    match = (second + first > 40).find_first();
+    match = (second + first > 40).find();
     CHECK(match == 1);
 
-    match = (first - second < 0).find_first();
+    match = (first - second < 0).find();
     CHECK(match == 1);
 
-    match = (second - second == 0).find_first();
+    match = (second - second == 0).find();
     CHECK(match == 0);
 
-    match = (first - second <= 0).find_first();
+    match = (first - second <= 0).find();
     CHECK(match == 1);
 
-    match = (first * first != 400).find_first();
+    match = (first * first != 400).find();
     CHECK(match == size_t(-1));
   
     // Compare, left = Column, right = Value
-    match = (second >= 20).find_first();
+    match = (second >= 20).find();
     CHECK(match == 1);
 
-    match = (second > 20).find_first();
+    match = (second > 20).find();
     CHECK(match == 1);
 
-    match = (second < 20).find_first();
+    match = (second < 20).find();
     CHECK(match == 0);
 
-    match = (second == 20.1f).find_first();
+    match = (second == 20.1f).find();
     CHECK(match == 1);
 
-    match = (second != 19.9f).find_first();
+    match = (second != 19.9f).find();
     CHECK(match == 1);
 
-    match = (second <= 21).find_first();
+    match = (second <= 21).find();
     CHECK(match == 0);
 
     // Compare, left = Column, right = Value
-    match = (20 <= second).find_first();
+    match = (20 <= second).find();
     CHECK(match == 1);
 
-    match = (20 < second).find_first();
+    match = (20 < second).find();
     CHECK(match == 1);
 
-    match = (20 > second).find_first();
+    match = (20 > second).find();
     CHECK(match == 0);
 
-    match = (20.1f == second).find_first();
+    match = (20.1f == second).find();
     CHECK(match == 1);
 
-    match = (19.9f != second).find_first();
+    match = (19.9f != second).find();
     CHECK(match == 1);
 
-    match = (21 >= second).find_first();
+    match = (21 >= second).find();
     CHECK(match == 0);
 
     // Compare, left = Subexpr, right = Value
-    match = (40 <= second + first).find_first();
+    match = (40 <= second + first).find();
     CHECK(match == 1);
 
-    match = (40 < second + first).find_first();
+    match = (40 < second + first).find();
     CHECK(match == 1);
 
-    match = (0 > first - second).find_first();
+    match = (0 > first - second).find();
     CHECK(match == 1);
 
-    match = (0 == second - second).find_first();
+    match = (0 == second - second).find();
     CHECK(match == 0);
 
-    match = (0 >= first - second).find_first();
+    match = (0 >= first - second).find();
     CHECK(match == 1);
 
-    match = (400 != first * first).find_first();
+    match = (400 != first * first).find();
     CHECK(match == size_t(-1));
 
     // Col compare Col
-    match = (second > first).find_first();
+    match = (second > first).find();
     CHECK(match == 1);
 
-    match = (second >= first).find_first();
+    match = (second >= first).find();
     CHECK(match == 1);
 
-    match = (second == first).find_first();
+    match = (second == first).find();
     CHECK(match == not_found);
 
-    match = (second != second).find_first();
+    match = (second != second).find();
     CHECK(match == not_found);
 
-    match = (first < second).find_first();
+    match = (first < second).find();
     CHECK(match == 1);
 
-    match = (first <= second).find_first();
+    match = (first <= second).find();
     CHECK(match == 1);
 
     // Subexpr compare Subexpr
-    match = (second + 0 > first + 0).find_first();
+    match = (second + 0 > first + 0).find();
     CHECK(match == 1);
 
-    match = (second + 0 >= first + 0).find_first();
+    match = (second + 0 >= first + 0).find();
     CHECK(match == 1);
 
-    match = (second + 0 == first + 0).find_first();
+    match = (second + 0 == first + 0).find();
     CHECK(match == not_found);
 
-    match = (second + 0 != second + 0).find_first();
+    match = (second + 0 != second + 0).find();
     CHECK(match == not_found);
 
-    match = (first + 0 < second + 0).find_first();
+    match = (first + 0 < second + 0).find();
     CHECK(match == 1);
 
-    match = (first + 0 <= second + 0).find_first();
+    match = (first + 0 <= second + 0).find();
     CHECK(match == 1);
 
     // Conversions, again
@@ -947,14 +947,14 @@ TEST(QueryExpressions0)
     table.set_float(1, 0, 3.0);
     table.set_double(2, 0, 3.0);
 
-    match = (1 / second == 1 / second).find_first();
+    match = (1 / second == 1 / second).find();
     CHECK(match == 0);
 
-    match = (1 / third == 1 / third).find_first();
+    match = (1 / third == 1 / third).find();
     CHECK(match == 0);
 
     // Compare operator must preserve precision of each side, hence no match
-    match = (1 / second == 1 / third).find_first();
+    match = (1 / second == 1 / third).find();
     CHECK(match == not_found);
 }
 
@@ -1267,26 +1267,26 @@ TEST(QueryTwoColsVaryOperators)
     table.set_double(5, 2, -5);
 
 
-    CHECK_EQUAL(not_found, table.where().equal_int(size_t(0), size_t(1)).find_first());
-    CHECK_EQUAL(0, table.where().not_equal_int(size_t(0), size_t(1)).find_first());
-    CHECK_EQUAL(0, table.where().less_int(size_t(0), size_t(1)).find_first());
-    CHECK_EQUAL(1, table.where().greater_int(size_t(0), size_t(1)).find_first());
-    CHECK_EQUAL(1, table.where().greater_equal_int(size_t(0), size_t(1)).find_first());
-    CHECK_EQUAL(0, table.where().less_equal_int(size_t(0), size_t(1)).find_first());
+    CHECK_EQUAL(not_found, table.where().equal_int(size_t(0), size_t(1)).find());
+    CHECK_EQUAL(0, table.where().not_equal_int(size_t(0), size_t(1)).find());
+    CHECK_EQUAL(0, table.where().less_int(size_t(0), size_t(1)).find());
+    CHECK_EQUAL(1, table.where().greater_int(size_t(0), size_t(1)).find());
+    CHECK_EQUAL(1, table.where().greater_equal_int(size_t(0), size_t(1)).find());
+    CHECK_EQUAL(0, table.where().less_equal_int(size_t(0), size_t(1)).find());
 
-    CHECK_EQUAL(not_found, table.where().equal_float(size_t(2), size_t(3)).find_first());
-    CHECK_EQUAL(0, table.where().not_equal_float(size_t(2), size_t(3)).find_first());
-    CHECK_EQUAL(0, table.where().less_float(size_t(2), size_t(3)).find_first());
-    CHECK_EQUAL(1, table.where().greater_float(size_t(2), size_t(3)).find_first());
-    CHECK_EQUAL(1, table.where().greater_equal_float(size_t(2), size_t(3)).find_first());
-    CHECK_EQUAL(0, table.where().less_equal_float(size_t(2), size_t(3)).find_first());
+    CHECK_EQUAL(not_found, table.where().equal_float(size_t(2), size_t(3)).find());
+    CHECK_EQUAL(0, table.where().not_equal_float(size_t(2), size_t(3)).find());
+    CHECK_EQUAL(0, table.where().less_float(size_t(2), size_t(3)).find());
+    CHECK_EQUAL(1, table.where().greater_float(size_t(2), size_t(3)).find());
+    CHECK_EQUAL(1, table.where().greater_equal_float(size_t(2), size_t(3)).find());
+    CHECK_EQUAL(0, table.where().less_equal_float(size_t(2), size_t(3)).find());
 
-    CHECK_EQUAL(not_found, table.where().equal_double(size_t(4), size_t(5)).find_first());
-    CHECK_EQUAL(0, table.where().not_equal_double(size_t(4), size_t(5)).find_first());
-    CHECK_EQUAL(0, table.where().less_double(size_t(4), size_t(5)).find_first());
-    CHECK_EQUAL(1, table.where().greater_double(size_t(4), size_t(5)).find_first());
-    CHECK_EQUAL(1, table.where().greater_equal_double(size_t(4), size_t(5)).find_first());
-    CHECK_EQUAL(0, table.where().less_equal_double(size_t(4), size_t(5)).find_first());
+    CHECK_EQUAL(not_found, table.where().equal_double(size_t(4), size_t(5)).find());
+    CHECK_EQUAL(0, table.where().not_equal_double(size_t(4), size_t(5)).find());
+    CHECK_EQUAL(0, table.where().less_double(size_t(4), size_t(5)).find());
+    CHECK_EQUAL(1, table.where().greater_double(size_t(4), size_t(5)).find());
+    CHECK_EQUAL(1, table.where().greater_equal_double(size_t(4), size_t(5)).find());
+    CHECK_EQUAL(0, table.where().less_equal_double(size_t(4), size_t(5)).find());
 }
 
 
@@ -1318,8 +1318,8 @@ TEST(QueryTwoColsNoRows)
     table.add_column(type_Int, "first1");
     table.add_column(type_Int, "second1");
 
-    CHECK_EQUAL(not_found, table.where().equal_int(size_t(0), size_t(1)).find_first());
-    CHECK_EQUAL(not_found, table.where().not_equal_int(size_t(0), size_t(1)).find_first());
+    CHECK_EQUAL(not_found, table.where().equal_int(size_t(0), size_t(1)).find());
+    CHECK_EQUAL(not_found, table.where().not_equal_int(size_t(0), size_t(1)).find());
 }
 
 TEST(TestQueryHuge)
@@ -2772,18 +2772,18 @@ TEST(TestQueryFindNext)
 
     TupleTableType::Query q1 = ttt.where().second.equal("X").first.greater(4);
 
-    const size_t res1 = q1.find_first();
-    const size_t res2 = q1.find_first(res1 + 1);
-    const size_t res3 = q1.find_first(res2 + 1);
+    const size_t res1 = q1.find();
+    const size_t res2 = q1.find(res1 + 1);
+    const size_t res3 = q1.find(res2 + 1);
 
     CHECK_EQUAL(5, res1);
     CHECK_EQUAL(6, res2);
     CHECK_EQUAL(not_found, res3); // no more matches
 
     // Do same searches with new query every time
-    const size_t res4 = ttt.where().second.equal("X").first.greater(4).find_first();
-    const size_t res5 = ttt.where().second.equal("X").first.greater(4).find_first(res1 + 1);
-    const size_t res6 = ttt.where().second.equal("X").first.greater(4).find_first(res2 + 1);
+    const size_t res4 = ttt.where().second.equal("X").first.greater(4).find();
+    const size_t res5 = ttt.where().second.equal("X").first.greater(4).find(res1 + 1);
+    const size_t res6 = ttt.where().second.equal("X").first.greater(4).find(res2 + 1);
 
     CHECK_EQUAL(5, res4);
     CHECK_EQUAL(6, res5);
@@ -2804,7 +2804,7 @@ TEST(TestQueryFindNext2)
 
     TupleTableType::Query q1 = ttt.where().second.equal("X").first.greater(4);
 
-    const size_t res1 = q1.find_first(6);
+    const size_t res1 = q1.find(6);
     CHECK_EQUAL(6, res1);
 }
 
@@ -3570,26 +3570,26 @@ TEST(TestQuery_OfByOne)
 
     // Top
     t[0].first = 0;
-    size_t res = t.where().first.equal(0).find_first();
+    size_t res = t.where().first.equal(0).find();
     CHECK_EQUAL(0, res);
     t[0].first = 1; // reset
 
     // Before split
     t[TIGHTDB_MAX_LIST_SIZE-1].first = 0;
-    res = t.where().first.equal(0).find_first();
+    res = t.where().first.equal(0).find();
     CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE-1, res);
     t[TIGHTDB_MAX_LIST_SIZE-1].first = 1; // reset
 
     // After split
     t[TIGHTDB_MAX_LIST_SIZE].first = 0;
-    res = t.where().first.equal(0).find_first();
+    res = t.where().first.equal(0).find();
     CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE, res);
     t[TIGHTDB_MAX_LIST_SIZE].first = 1; // reset
 
     // Before end
     const size_t last_pos = (TIGHTDB_MAX_LIST_SIZE*2)-1;
     t[last_pos].first = 0;
-    res = t.where().first.equal(0).find_first();
+    res = t.where().first.equal(0).find();
     CHECK_EQUAL(last_pos, res);
 }
 
