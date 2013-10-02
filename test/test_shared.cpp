@@ -66,6 +66,33 @@ TEST(Shared_Initial)
 #endif
 }
 
+TEST(Shared_Stale_Lock_File)
+{
+    // Delete old files if there
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
+#ifndef _WIN32
+    {
+        // create lock file
+        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+        system("cp test_shared.tightdb.lock test_shared.tightdb.lock.backup");
+    }
+    rename("test_shared.tightdb.lock.backup","test_shared.tightdb.lock");
+    {
+        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+    }
+#endif
+    {
+        // create lock file
+        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+        rename("test_shared.tightdb.lock","test_shared.tightdb.lock.backup");
+    }
+    rename("test_shared.tightdb.lock.backup","test_shared.tightdb.lock");
+    {
+        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+    }
+}
+
 TEST(Shared_Initial_Mem)
 {
     // Delete old files if there
@@ -1130,7 +1157,7 @@ TEST(Shared_FromSerialized)
     }
 }
 
-
+#ifndef _WIN32
 TEST(StringIndex_Bug1)
 {
     File::try_remove("test.tightdb");
@@ -1156,7 +1183,7 @@ TEST(StringIndex_Bug1)
         db.commit();
     }
 }
-
+#endif
 
 TEST(StringIndex_Bug2)
 {
