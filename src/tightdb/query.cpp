@@ -666,7 +666,7 @@ void Query::end_subtable()
 }
 
 
-size_t Query::find(size_t begin_row)
+size_t Query::find_first(size_t begin_row)
 {
     if(m_table->is_degenerate())
         return not_found;

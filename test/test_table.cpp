@@ -592,24 +592,24 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
 
 
     // Queries:
-    CHECK_EQUAL(not_found, degen_child->where().equal(0, int64_t()).find());
-    CHECK_EQUAL(not_found, degen_child->where().equal(1, false).find());
-    CHECK_EQUAL(not_found, degen_child->where().equal(2, float()).find());
-    CHECK_EQUAL(not_found, degen_child->where().equal(3, double()).find());
-    CHECK_EQUAL(not_found, degen_child->where().equal_date(4, Date()).find());
-    CHECK_EQUAL(not_found, degen_child->where().equal(5, StringData()).find());
-    CHECK_EQUAL(not_found, degen_child->where().equal(6, BinaryData()).find());
-//    CHECK_EQUAL(not_found, degen_child->where().equal(7, subtab).find()); // Not yet implemented
-//    CHECK_EQUAL(not_found, degen_child->where().equal(8, Mixed()).find()); // Not yet implemented
+    CHECK_EQUAL(not_found, degen_child->where().equal(0, int64_t()).find_first());
+    CHECK_EQUAL(not_found, degen_child->where().equal(1, false).find_first());
+    CHECK_EQUAL(not_found, degen_child->where().equal(2, float()).find_first());
+    CHECK_EQUAL(not_found, degen_child->where().equal(3, double()).find_first());
+    CHECK_EQUAL(not_found, degen_child->where().equal_date(4, Date()).find_first());
+    CHECK_EQUAL(not_found, degen_child->where().equal(5, StringData()).find_first());
+    CHECK_EQUAL(not_found, degen_child->where().equal(6, BinaryData()).find_first());
+//    CHECK_EQUAL(not_found, degen_child->where().equal(7, subtab).find_first()); // Not yet implemented
+//    CHECK_EQUAL(not_found, degen_child->where().equal(8, Mixed()).find_first()); // Not yet implemented
 
-    CHECK_EQUAL(not_found, degen_child->where().not_equal(0, int64_t()).find());
-    CHECK_EQUAL(not_found, degen_child->where().not_equal(2, float()).find());
-    CHECK_EQUAL(not_found, degen_child->where().not_equal(3, double()).find());
-    CHECK_EQUAL(not_found, degen_child->where().not_equal_date(4, Date()).find());
-    CHECK_EQUAL(not_found, degen_child->where().not_equal(5, StringData()).find());
-    CHECK_EQUAL(not_found, degen_child->where().not_equal(6, BinaryData()).find());
-//    CHECK_EQUAL(not_found, degen_child->where().not_equal(7, subtab).find()); // Not yet implemented
-//    CHECK_EQUAL(not_found, degen_child->where().not_equal(8, Mixed()).find()); // Not yet implemented
+    CHECK_EQUAL(not_found, degen_child->where().not_equal(0, int64_t()).find_first());
+    CHECK_EQUAL(not_found, degen_child->where().not_equal(2, float()).find_first());
+    CHECK_EQUAL(not_found, degen_child->where().not_equal(3, double()).find_first());
+    CHECK_EQUAL(not_found, degen_child->where().not_equal_date(4, Date()).find_first());
+    CHECK_EQUAL(not_found, degen_child->where().not_equal(5, StringData()).find_first());
+    CHECK_EQUAL(not_found, degen_child->where().not_equal(6, BinaryData()).find_first());
+//    CHECK_EQUAL(not_found, degen_child->where().not_equal(7, subtab).find_first()); // Not yet implemented
+//    CHECK_EQUAL(not_found, degen_child->where().not_equal(8, Mixed()).find_first()); // Not yet implemented
 
     TableView v = degen_child->where().equal(0, int64_t()).find_all();
     CHECK_EQUAL(0, v.size());
