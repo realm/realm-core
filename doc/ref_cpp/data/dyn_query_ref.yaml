@@ -473,27 +473,27 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_dyn_query_findall
 
-  - g_dyn_query_find_next:
-      NAME     : find_next
-      DESCR    : &g_dyn_query_find_next_descr
+  - g_dyn_query_find_first:
+      NAME     : find_first
+      DESCR    : &g_dyn_query_find_first_descr
                  >
-                 This will find the first row that fulfil the query condition.
-                 Use the return value (row number) or greater (but not less!) as parameter
-                 for successive calls to iterate through matching rows.
-      SUMMARY  : &g_dyn_query_find_next_summary
-                 Find next matching row.
+                 This will find the first row that fulfils the query condition. Use the return 
+                 value + 1 as parameter for successive calls to iterate through 
+                 matching rows.
+      SUMMARY  : &g_dyn_query_find_first_summary
+                 Find first matching row.
       PARAMS:
-      - NAME   : lastmatch
+      - NAME   : begin_row
         TYPES  : size_t
-        DESCR  : &g_dyn_query_find_next_parm1_descr
-                 "Row to start search from (not inclusive). Default is -1 (start from beginning)."
+        DESCR  : &g_dyn_query_find_first_parm1_descr
+                 "Row to start search from (inclusive). Default is 0 (start from beginning)."
       RETURN:
         TYPES  : size_t
-        DESCR  : &g_dyn_query_find_next
+        DESCR  : &g_dyn_query_find_first
                  Row index that matches the query (or -1 if none).
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_dyn_query_find_next
+        CODE   : ex_cpp_dyn_query_find_first
 
   - g_dyn_query_count:
       NAME     : count
