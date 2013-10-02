@@ -226,8 +226,15 @@ is named according to the tag.
 
 ### Fedora 17
 
-    sudo yum install pandoc-markdown2pdf 
+    sudo yum install pandoc-markdown2pdf
 
 ## Mac OSX
 
-Install Pandoc and XeLaTeX (aka MacTeX) by following the instructions on: http://www.texts.io/support
+Install Pandoc and XeLaTeX (aka MacTeX) by following the instructions
+on http://johnmacfarlane.net/pandoc/installing.html. This boils down
+to installing the following two packages:
+
+- http://pandoc.googlecode.com/files/pandoc-1.12.0.2.dmg
+- http://mirror.ctan.org/systems/mac/mactex/mactex-basic.pkg
+
+
