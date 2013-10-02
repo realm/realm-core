@@ -1,9 +1,6 @@
 #include "testsettings.hpp"
 #ifdef TEST_SHARED
 
-#include <fcntl.h>   // open
-#include <fstream>
-
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
@@ -122,13 +119,7 @@ TEST(Shared_Stale_Lock_File_CopiedInFlight)
         File::try_remove("test_shared.tightdb.lock"); // also the info file
     }
     // lock file should be gone when we get here:
-    {
-        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
-    }
-    // and be automatically cleaned up before getting here
-    {
-        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
-    }
+    CHECK(File::Exists("test_shared.tightdb.lock") == false);
 }
 
 TEST(Shared_Stale_Lock_File_CopiedAtCommit)
@@ -157,13 +148,7 @@ TEST(Shared_Stale_Lock_File_CopiedAtCommit)
         File::try_remove("test_shared.tightdb.lock"); // also the info file
     }
     // lock file should be gone when we get here:
-    {
-        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
-    }
-    // and be automatically cleaned up before getting here
-    {
-        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
-    }
+    CHECK(File::Exists("test_shared.tightdb.lock") == false);
 }
 
 TEST(Shared_Stale_Lock_File_Renamed)
@@ -186,13 +171,7 @@ TEST(Shared_Stale_Lock_File_Renamed)
         File::try_remove("test_shared.tightdb.lock"); // also the info file
     }
     // lock file should be gone when we get here:
-    {
-        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
-    }
-    // and be automatically cleaned up before getting here
-    {
-        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
-    }
+    CHECK(File::Exists("test_shared.tightdb.lock") == false);
 }
 
 TEST(Shared_Initial_Mem)
