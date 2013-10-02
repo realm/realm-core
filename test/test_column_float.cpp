@@ -30,22 +30,14 @@ double doubleVal[] = {0.0,
                      };
 const size_t doubleValLen = SizeOfArray(doubleVal);
 
-}
-
-void printCol(ColumnFloat& c)
-{
-    for (size_t i=0; i < c.size(); ++i) {
-        std::cerr << " Col[" << i << "] = " << c.get(i) << " \n";
-    }
-}
-
+} //namespace
 
 template <class C>
 void BasicColumn_IsEmpty()
 {
     C c;
     CHECK(c.is_empty());
-    CHECK_EQUAL(c.size(), (size_t)0);
+    CHECK_EQUAL(0U, c.size());
     c.destroy();
 }
 TEST(ColumnFloat_IsEmpty) { BasicColumn_IsEmpty<ColumnFloat>(); }
@@ -198,7 +190,7 @@ void BasicColumn_Delete(T val[], size_t valLen)
     CHECK_EQUAL(val[4], c.get(4));
 
     // Delete first
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(4, c.size());
     CHECK_EQUAL(val[1], c.get(0));
     CHECK_EQUAL(val[2], c.get(1));
@@ -206,25 +198,25 @@ void BasicColumn_Delete(T val[], size_t valLen)
     CHECK_EQUAL(val[4], c.get(3));
 
     // Delete middle
-    c.erase(2);
+    c.erase(2, 2 == c.size()-1);
     CHECK_EQUAL(3, c.size());
     CHECK_EQUAL(val[1], c.get(0));
     CHECK_EQUAL(val[2], c.get(1));
     CHECK_EQUAL(val[4], c.get(2));
 
     // Delete last
-    c.erase(2);
+    c.erase(2, 2 == c.size()-1);
     CHECK_EQUAL(2, c.size());
     CHECK_EQUAL(val[1], c.get(0));
     CHECK_EQUAL(val[2], c.get(1));
 
     // Delete single
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(1, c.size());
     CHECK_EQUAL(val[2], c.get(0));
 
     // Delete all
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(0, c.size());
 
     c.destroy();

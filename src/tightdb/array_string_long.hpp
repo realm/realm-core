@@ -48,10 +48,12 @@ public:
     void resize(std::size_t ndx);
     void clear();
 
-    std::size_t count(StringData value, std::size_t begin = 0, std::size_t end = -1) const;
-    std::size_t find_first(StringData value, std::size_t begin = 0 , std::size_t end = -1) const;
+    std::size_t count(StringData value, std::size_t begin = 0,
+                      std::size_t end = npos) const TIGHTDB_NOEXCEPT;
+    std::size_t find_first(StringData value, std::size_t begin = 0,
+                           std::size_t end = npos) const TIGHTDB_NOEXCEPT;
     void find_all(Array &result, StringData value, std::size_t add_offset = 0,
-                  std::size_t begin = 0, std::size_t end = -1) const;
+                  std::size_t begin = 0, std::size_t end = npos) const;
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
@@ -59,7 +61,7 @@ public:
     /// slower.
     static StringData get(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
 
-    ref_type btree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase&);
+    ref_type bptree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase&);
 
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, StringData title = StringData()) const;

@@ -16,7 +16,7 @@ TEST(ColumnMixed_Int)
     ColumnMixed c;
     int64_t maxval = numeric_limits<int64_t>::max();
     int64_t minval = numeric_limits<int64_t>::min();
-    int64_t allbit = 0xFFFFFFFFFFFFFFFF;
+    int64_t allbit = 0xFFFFFFFFFFFFFFFFULL; // FIXME: Undefined cast from unsigned to signed
 
     c.insert_int(0,     2);
     c.insert_int(1, minval);
@@ -89,7 +89,7 @@ TEST(ColumnMixed_Double)
 {
     ColumnMixed c;
 
-    uint64_t v = 0xFFFFFFFFFFFFFFFF;
+    uint64_t v = 0xFFFFFFFFFFFFFFFFULL;
     double d = double(v);
     double fval1[] = {1.0, 200.123, -111.222, d};
     double fval2[] = {-1.0, -100.123, numeric_limits<double>::max(), numeric_limits<double>::min()};
@@ -156,30 +156,30 @@ TEST(ColumnMixed_Date)
 {
     ColumnMixed c;
 
-    c.insert_date(0,     2);
-    c.insert_date(1,   100);
-    c.insert_date(2, 20000);
+    c.insert_datetime(0,     2);
+    c.insert_datetime(1,   100);
+    c.insert_datetime(2, 20000);
     CHECK_EQUAL(3, c.size());
 
     for (size_t i = 0; i < c.size(); ++i) {
-        CHECK_EQUAL(type_Date, c.get_type(i));
+        CHECK_EQUAL(type_DateTime, c.get_type(i));
     }
 
-    CHECK_EQUAL(    2, c.get_date(0));
-    CHECK_EQUAL(  100, c.get_date(1));
-    CHECK_EQUAL(20000, c.get_date(2));
+    CHECK_EQUAL(    2, c.get_datetime(0));
+    CHECK_EQUAL(  100, c.get_datetime(1));
+    CHECK_EQUAL(20000, c.get_datetime(2));
 
-    c.set_date(0,   400);
-    c.set_date(1,     0);
-    c.set_date(2, 99999);
+    c.set_datetime(0,   400);
+    c.set_datetime(1,     0);
+    c.set_datetime(2, 99999);
 
     for (size_t i = 0; i < c.size(); ++i) {
-        CHECK_EQUAL(type_Date, c.get_type(i));
+        CHECK_EQUAL(type_DateTime, c.get_type(i));
     }
 
-    CHECK_EQUAL(  400, c.get_date(0));
-    CHECK_EQUAL(    0, c.get_date(1));
-    CHECK_EQUAL(99999, c.get_date(2));
+    CHECK_EQUAL(  400, c.get_datetime(0));
+    CHECK_EQUAL(    0, c.get_datetime(1));
+    CHECK_EQUAL(99999, c.get_datetime(2));
     CHECK_EQUAL(3, c.size());
 
     c.destroy();
@@ -280,7 +280,7 @@ TEST(ColumnMixed_Mixed)
     // Insert mixed types
     c.insert_int(0, 23);
     c.insert_bool(0, false);
-    c.insert_date(0, 23423);
+    c.insert_datetime(0, 23423);
     c.insert_string(0, "Hello");
     c.insert_binary(0, BinaryData("binary", 7));
     c.insert_subtable(0, 0);
@@ -293,14 +293,14 @@ TEST(ColumnMixed_Mixed)
     CHECK_EQUAL(type_Table,  c.get_type(2));
     CHECK_EQUAL(type_Binary, c.get_type(3));
     CHECK_EQUAL(type_String, c.get_type(4));
-    CHECK_EQUAL(type_Date,   c.get_type(5));
+    CHECK_EQUAL(type_DateTime,   c.get_type(5));
     CHECK_EQUAL(type_Bool,   c.get_type(6));
     CHECK_EQUAL(type_Int,    c.get_type(7));
 
     // Change all entries to new types
     c.set_int(0, 23);
     c.set_bool(1, false);
-    c.set_date(2, 23423);
+    c.set_datetime(2, 23423);
     c.set_string(3, "Hello");
     c.set_binary(4, BinaryData("binary", 7));
     c.set_subtable(5, 0);
@@ -313,7 +313,7 @@ TEST(ColumnMixed_Mixed)
     CHECK_EQUAL(type_Table,  c.get_type(5));
     CHECK_EQUAL(type_Binary, c.get_type(4));
     CHECK_EQUAL(type_String, c.get_type(3));
-    CHECK_EQUAL(type_Date,   c.get_type(2));
+    CHECK_EQUAL(type_DateTime,   c.get_type(2));
     CHECK_EQUAL(type_Bool,   c.get_type(1));
     CHECK_EQUAL(type_Int,    c.get_type(0));
 

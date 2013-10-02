@@ -1,20 +1,20 @@
-#include "testsettings.hpp"
-#ifdef TEST_COLUMN_BINARY
-
-#include <string>
-
 #include <UnitTest++.h>
-#include <tightdb/column_binary.hpp>
+#include <tightdb/array_blobs_big.hpp>
 
 using namespace tightdb;
 
-struct db_setup_column_binary {
-    static ColumnBinary c;
+struct db_setup_big_blobs {
+    static ArrayBigBlobs c;
 };
 
-ColumnBinary db_setup_column_binary::c;
+ArrayBigBlobs db_setup_big_blobs::c;
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinaryMultiEmpty)
+TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsIsEmpty)
+{
+    CHECK_EQUAL(true, c.is_empty());
+}
+
+TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsMultiEmpty)
 {
     c.add(BinaryData("", 0));
     c.add(BinaryData("", 0));
@@ -33,7 +33,7 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryMultiEmpty)
     CHECK_EQUAL(0, c.get(5).size());
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet)
+TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsSet)
 {
     c.set(0, BinaryData("hey", 4));
 
@@ -48,7 +48,7 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet)
     CHECK_EQUAL(0, c.get(5).size());
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinaryAdd)
+TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsAdd)
 {
     c.clear();
     CHECK_EQUAL(0, c.size());
@@ -66,7 +66,7 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryAdd)
     CHECK_EQUAL(2, c.size());
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet2)
+TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsSet2)
 {
     // {shrink, grow} x {first, middle, last, single}
     c.clear();
@@ -121,7 +121,7 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinarySet2)
     CHECK_EQUAL(3, c.size());
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinaryInsert)
+TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsInsert)
 {
     c.clear();
 
@@ -154,18 +154,9 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryInsert)
     CHECK_EQUAL("d", c.get(3).data());
     CHECK_EQUAL("ef", c.get(4).data());
     CHECK_EQUAL(5, c.size());
-
-    c.insert(2, BinaryData("as", 3)); // middle again
-    CHECK_EQUAL("klmno", c.get(0).data());
-    CHECK_EQUAL("abc",   c.get(1).data());
-    CHECK_EQUAL("as",    c.get(2).data());
-    CHECK_EQUAL("ghij",  c.get(3).data());
-    CHECK_EQUAL("d",     c.get(4).data());
-    CHECK_EQUAL("ef",    c.get(5).data());
-    CHECK_EQUAL(6, c.size());
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinaryDelete)
+TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsErase)
 {
     c.clear();
 
@@ -175,83 +166,74 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryDelete)
     c.add(BinaryData("ghij", 5));
     c.add(BinaryData("klmno", 6));
 
-    c.erase(0, 0 == c.size()-1); // first
+    c.erase(0); // first
     CHECK_EQUAL("bc", c.get(0).data());
     CHECK_EQUAL("def", c.get(1).data());
     CHECK_EQUAL("ghij", c.get(2).data());
     CHECK_EQUAL("klmno", c.get(3).data());
     CHECK_EQUAL(4, c.size());
 
-    c.erase(3, 3 == c.size()-1); // last
+    c.erase(3); // last
     CHECK_EQUAL("bc", c.get(0).data());
     CHECK_EQUAL("def", c.get(1).data());
     CHECK_EQUAL("ghij", c.get(2).data());
     CHECK_EQUAL(3, c.size());
 
-    c.erase(1, 1 == c.size()-1); // middle
+    c.erase(1); // middle
     CHECK_EQUAL("bc", c.get(0).data());
     CHECK_EQUAL("ghij", c.get(1).data());
     CHECK_EQUAL(2, c.size());
 
-    c.erase(0, 0 == c.size()-1); // single
+    c.erase(0); // single
     CHECK_EQUAL("ghij", c.get(0).data());
     CHECK_EQUAL(1, c.size());
 
-    c.erase(0, 0 == c.size()-1); // all
+    c.erase(0); // all
     CHECK_EQUAL(0, c.size());
     CHECK(c.is_empty());
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinaryBig)
+TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsCount)
 {
     c.clear();
 
-    c.add(BinaryData("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", 71));
-    CHECK_EQUAL("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", c.get(0).data());
+    // first, middle and end
+    c.add(BinaryData("foobar", 7));
+    c.add(BinaryData("bar abc", 8));
+    c.add(BinaryData("foobar", 7));
+    c.add(BinaryData("baz", 4));
+    c.add(BinaryData("foobar", 7));
 
-    c.clear();
-    c.add(BinaryData("a", 2));
-    c.add(BinaryData("bc", 3));
-    c.add(BinaryData("def", 4));
-    c.add(BinaryData("ghij", 5));
-    c.add(BinaryData("klmno", 6));
-    c.add(BinaryData("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", 71));
-    CHECK_EQUAL("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", c.get(5).data());
+    const size_t count = c.count(BinaryData("foobar", 7));
+    CHECK_EQUAL(3, count);
 
-    // Insert all sizes
-    c.clear();
-    std::string s;
-    for (int i = 0; i < 100; ++i) {
-        c.add(BinaryData(s.c_str(), s.size()));
-        s += 'x';
-    }
-    s.clear();
-    for (int i = 0; i < 100; ++i) {
-        CHECK_EQUAL(BinaryData(s.c_str(), s.size()), c.get(i));
-        s += 'x';
-    }
-
-    // Set all sizes
-    c.clear();
-    s.clear();
-    for (int i = 0; i < 100; ++i) {
-        c.add();
-    }
-    for (int i = 0; i < 100; ++i) {
-        c.set(i, BinaryData(s.c_str(), s.size()));
-        s += 'x';
-    }
-    s.clear();
-    for (int i = 0; i < 100; ++i) {
-        CHECK_EQUAL(BinaryData(s.c_str(), s.size()), c.get(i));
-        s += 'x';
-    }
+    // str may not be zero-terminated
+    const size_t count2 = c.count(BinaryData("foobarx", 6), true);
+    CHECK_EQUAL(3, count2);
 }
 
-TEST_FIXTURE(db_setup_column_binary, ColumnBinary_Destroy)
+TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobsFind)
+{
+    const size_t res = c.find_first(BinaryData("baz", 4));
+    CHECK_EQUAL(3, res);
+
+    Array results;
+    c.find_all(results, BinaryData("foobar", 7));
+    CHECK_EQUAL(3, results.size());
+
+    // str may not be zero-terminated
+    const size_t res2 = c.find_first(BinaryData("bazx", 3), true);
+    CHECK_EQUAL(3, res2);
+
+    results.clear();
+    c.find_all(results, BinaryData("foobarx", 6), true);
+    CHECK_EQUAL(3, results.size());
+
+    results.destroy();
+}
+
+TEST_FIXTURE(db_setup_big_blobs, ArrayBigBlobs_Destroy)
 {
     // clean up (ALWAYS PUT THIS LAST)
     c.destroy();
 }
-
-#endif // TEST_COLUMN_BINARY

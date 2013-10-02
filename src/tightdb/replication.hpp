@@ -591,8 +591,8 @@ inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
         buf = encode_double(buf, value.get_double());
         transact_log_advance(buf);
         break;
-    case type_Date:
-        buf = encode_int(buf, value.get_date().get_date());
+    case type_DateTime:
+        buf = encode_int(buf, value.get_datetime().get_datetime());
         transact_log_advance(buf);
         break;
     case type_String:

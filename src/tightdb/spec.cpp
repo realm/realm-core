@@ -20,17 +20,27 @@ void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent
 {
     m_top.init_from_ref(ref);
     m_top.set_parent(parent, ndx_in_parent);
-    TIGHTDB_ASSERT(m_top.size() == 2 || m_top.size() == 3);
+    TIGHTDB_ASSERT(m_top.size() >= 2 && m_top.size() <= 4);
 
     m_spec.init_from_ref(m_top.get_as_ref(0));
     m_spec.set_parent(&m_top, 0);
     m_names.init_from_ref(m_top.get_as_ref(1));
     m_names.set_parent(&m_top, 1);
 
-    // SubSpecs array is only there when there are subtables
-    if (m_top.size() == 3) {
-        m_subspecs.init_from_ref(m_top.get_as_ref(2));
-        m_subspecs.set_parent(&m_top, 2);
+    // SubSpecs array is only there and valid when there are subtables
+    // if there are enumkey, but no subtables yet it will be a zero-ref
+    if (m_top.size() >= 3) {
+        ref_type ref = m_top.get_as_ref(2);
+        if (ref) {
+            m_subspecs.init_from_ref(m_top.get_as_ref(2));
+            m_subspecs.set_parent(&m_top, 2);
+        }
+    }
+
+    // Enumkeys array is only there when there are StringEnum columns
+    if (m_top.size() == 4) {
+        m_enumkeys.init_from_ref(m_top.get_as_ref(3));
+        m_enumkeys.set_parent(&m_top, 3);
     }
 }
 
@@ -77,12 +87,12 @@ size_t Spec::add_column(DataType type, StringData name, ColumnType attr)
 
     if (type == type_Table) {
         // SubSpecs array is only there when there are subtables
-        if (m_top.size() == 2) {
-            // FIXME: Is this check required? Could m_subspecs ever be
-            // attached at this point?
-            if (!m_subspecs.is_attached())
-                m_subspecs.create(Array::type_HasRefs);
-            m_top.add(m_subspecs.get_ref());
+        if (!m_subspecs.is_attached()) {
+            m_subspecs.create(Array::type_HasRefs);
+            if (m_top.size() == 2)
+                m_top.add(m_subspecs.get_ref());
+            else
+                m_top.set(2, m_subspecs.get_ref());
             m_subspecs.set_parent(&m_top, 2);
         }
 
@@ -259,6 +269,61 @@ ref_type Spec::get_subspec_ref(size_t subspec_ndx) const
     return m_subspecs.get_as_ref(subspec_ndx);
 }
 
+void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
+                                  ArrayParent*& keys_parent, size_t& keys_ndx)
+{
+    TIGHTDB_ASSERT(get_column_type(column_ndx) == type_String);
+
+    // Create the enumkeys list if needed
+    if (!m_enumkeys.is_attached()) {
+        m_enumkeys.create(Array::type_HasRefs);
+        if (m_top.size() == 2)
+            m_top.add(0); // no subtables
+        if (m_top.size() == 3)
+            m_top.add(m_enumkeys.get_ref());
+        else
+            m_top.set(3, m_enumkeys.get_ref());
+        m_enumkeys.set_parent(&m_top, 3);
+    }
+
+    // Insert the new key list
+    size_t ins_pos = get_enumkeys_ndx(column_ndx);
+    m_enumkeys.insert(ins_pos, keys_ref);
+
+    set_column_type(column_ndx, col_type_StringEnum);
+
+    // Return parent info
+    keys_parent = &m_enumkeys;
+    keys_ndx    = ins_pos;
+}
+
+size_t Spec::get_enumkeys_ndx(size_t column_ndx) const
+{
+    size_t type_ndx = get_column_type_pos(column_ndx);
+
+    // The enumkeys array only keep info for subtables
+    // so we need to count up to it's position
+    size_t pos = 0;
+    for (size_t i = 0; i < type_ndx; ++i) {
+        if (ColumnType(m_spec.get(i)) == col_type_StringEnum)
+            ++pos;
+    }
+    return pos;
+}
+
+ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent, size_t* keys_ndx)
+{
+    size_t enumkeys_ndx = get_enumkeys_ndx(column_ndx);
+
+    // We may also need to return parent info
+    if (keys_parent)
+        *keys_parent = &m_enumkeys;
+    if (keys_ndx)
+        *keys_ndx = enumkeys_ndx;
+
+    return m_enumkeys.get_as_ref(enumkeys_ndx);
+}
+
 size_t Spec::get_type_attr_count() const
 {
     return m_spec.size();
@@ -424,7 +489,7 @@ void Spec::get_column_info(size_t column_ndx, ColumnInfo& info) const
             case col_type_Binary:
             case col_type_Table:
             case col_type_Mixed:
-            case col_type_Date:
+            case col_type_DateTime:
             case col_type_Reserved1:
             case col_type_Float:
             case col_type_Double:
@@ -438,8 +503,6 @@ void Spec::get_column_info(size_t column_ndx, ColumnInfo& info) const
                 }
                 ++i;
                 ++column_ref_ndx;
-                if (type_attr == col_type_StringEnum)
-                    ++column_ref_ndx;
                 if (has_index)
                     ++column_ref_ndx;
                 has_index = false;
@@ -535,7 +598,7 @@ void Spec::to_dot(ostream& out, StringData) const
         size_t count = m_subspecs.size();
         for (size_t i = 0; i < count; ++i) {
             ref_type ref = m_subspecs.get_as_ref(i);
-            Spec s(m_table, alloc, ref, 0, 0);
+            Spec s(m_table, alloc, ref, const_cast<Array*>(&m_subspecs), i);
             s.to_dot(out);
         }
     }

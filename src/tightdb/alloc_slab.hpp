@@ -53,8 +53,8 @@ struct InvalidDatabase: File::AccessError {
 /// attach_file() or attach_buffer(). To create a new database
 /// in-memory, call attach_empty().
 ///
-/// For efficiency, this allocator manages its memory as a set of
-/// slabs.
+/// For efficiency, this allocator manages its mutable memory as a set
+/// of slabs.
 class SlabAlloc: public Allocator {
 public:
     /// Construct a slab allocator in the unattached state.
@@ -85,19 +85,23 @@ public:
     /// that creates/initlializes the coordination file) may validate
     /// the header, otherwise it will result in a race condition.
     ///
+    /// \return The `ref` of the root node, or zero if there is none.
+    ///
     /// \throw File::AccessError
-    void attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create,
-                     bool skip_validate);
+    ref_type attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create,
+                         bool skip_validate);
 
     /// Attach this allocator to the specified memory buffer.
     ///
     /// It is an error to call this function on an attached
     /// allocator. Doing so will result in undefined behavor.
     ///
+    /// \return The `ref` of the root node, or zero if there is none.
+    ///
     /// \sa own_buffer()
     ///
     /// \throw InvalidDatabase
-    void attach_buffer(char* data, std::size_t size);
+    ref_type attach_buffer(char* data, std::size_t size);
 
     /// Attach this allocator to an empty buffer.
     ///
@@ -134,12 +138,45 @@ public:
     /// attach_empty().
     bool nonempty_attachment() const TIGHTDB_NOEXCEPT;
 
-    /// Get the 'ref' corresponding to the current root node.
+    /// Convert the attached file if the top-ref is not specified in
+    /// the header, but in the footer, that is, if the file is on the
+    /// streaming form. The streaming form is incompatible with
+    /// in-place file modification.
     ///
-    /// It is an error to call this function on a detached allocator,
-    /// or one that was attached using attach_empty(). Doing so will
-    /// result in undefined behavior.
-    ref_type get_top_ref() const TIGHTDB_NOEXCEPT;
+    /// If validation was disabled at the time the file was attached,
+    /// this function does nothing, as it assumes that the file is
+    /// already prepared for update in that case.
+    ///
+    /// It is an error to call this function on an allocator that is
+    /// not attached to a file. Doing so will result in undefined
+    /// behavior.
+    ///
+    /// The caller must ensure that the file is not accessed
+    /// concurrently by anyone else while this function executes.
+    ///
+    /// The specified address must be a writable memory mapping of the
+    /// attached file, and the mapped region must be at least as big
+    /// as what is returned by get_baseline().
+    void prepare_for_update(char* mutable_data);
+
+    /// Reserve disk space now to avoid allocation errors at a later
+    /// point in time, and to minimize on-disk fragmentation. In some
+    /// cases, less fragmentation translates into improved
+    /// performance.
+    ///
+    /// A call to this method will make the database file at least as
+    /// big as the specified size, and, if the platform supports it,
+    /// disk space will be allocated for the entire file.
+    ///
+    /// If the database file is already as big as the specified size,
+    /// or bigger, this method will not affect the size of the file,
+    /// but, if the platform supports it, it will still cause
+    /// previously unallocated disk space to be allocated.
+    ///
+    /// It is an error to call this function on an allocator that is
+    /// not attached to a file. Doing so will result in undefined
+    /// behavior.
+    void reserve(std::size_t size_in_bytes);
 
     /// Get the size of the attached database file or buffer in number
     /// of bytes. This size is not affected by new allocations. After
@@ -180,7 +217,6 @@ public:
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
     void free_(ref_type, const char*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     char* translate(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    bool is_read_only(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void enable_debug(bool enable) { m_debug_out = enable; }
@@ -206,11 +242,42 @@ private:
                     ref,    Int,
                     size,   Int)
 
-    static const char default_header[24];
+    // 24 bytes
+    struct Header {
+        uint64_t m_top_ref[2]; // 2 * 8 bytes
+        // Info-block 8-bytes
+        uint8_t m_mnemonic[4]; // "T-DB"
+        uint8_t m_file_format_version[2];
+        uint8_t m_reserved;
+        uint8_t m_select_bit;
+    };
+
+    // 16 bytes
+    struct StreamingFooter {
+        uint64_t m_top_ref;
+        uint64_t m_magic_cookie;
+    };
+
+    TIGHTDB_STATIC_ASSERT(sizeof (Header) == 24, "Bad header size");
+    TIGHTDB_STATIC_ASSERT(sizeof (StreamingFooter) == 16, "Bad footer size");
+
+    static const Header empty_file_header;
+    static const Header streaming_header;
+
+    static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
 
     File m_file;
     char* m_data;
     AttachMode m_attach_mode;
+
+    /// If a file of buffer is currently attached and validation was
+    /// not skipped during attachement, this flag is true if, and only
+    /// if the attached file has a footer specifying the top-ref, that
+    /// is, if the file is on the streaming form. This member is
+    /// deliberately placed here (after m_attach_mode) in the hope
+    /// that it leads to less padding between members due to alignment
+    /// requirements.
+    bool m_file_on_streaming_form;
 
     /// When set to true, the free lists are no longer
     /// up-to-date. This happens if free_() or
@@ -218,11 +285,10 @@ private:
     /// std::bad_alloc being thrown during updating of the free space
     /// list. In this this case, alloc(), realloc_(), and
     /// get_free_read_only() must throw. This member is deliberately
-    /// placed after m_alloc_mode in the hope that it leads to less
-    /// padding between members due to alignment requirements.
+    /// placed here (after m_attach_mode) in the hope that it leads to
+    /// less padding between members due to alignment requirements.
     bool m_free_space_invalid;
 
-    std::size_t m_baseline; // Also size of memory mapped portion of database file
     Slabs m_slabs;
     FreeSpace m_free_space;
     FreeSpace m_free_read_only;
@@ -234,7 +300,9 @@ private:
     /// Throws if free-lists are no longer valid.
     const FreeSpace& get_free_read_only() const;
 
-    bool validate_buffer(const char* data, std::size_t len) const;
+    bool validate_buffer(const char* data, std::size_t len, ref_type& top_ref);
+
+    void do_prepare_for_update(char* mutable_data);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* get_replication() const TIGHTDB_NOEXCEPT { return m_replication; }
@@ -263,6 +331,7 @@ private:
 
 inline SlabAlloc::SlabAlloc(): m_attach_mode(attach_None), m_free_space_invalid(false)
 {
+    m_baseline = 0; // Unattached
 #ifdef TIGHTDB_DEBUG
     m_debug_out = false;
 #endif
@@ -291,6 +360,19 @@ inline std::size_t SlabAlloc::get_baseline() const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_data);
     return m_baseline;
+}
+
+inline void SlabAlloc::prepare_for_update(char* mutable_data)
+{
+    TIGHTDB_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
+    if (TIGHTDB_LIKELY(!m_file_on_streaming_form))
+        return;
+    do_prepare_for_update(mutable_data);
+}
+
+inline void SlabAlloc::reserve(std::size_t size)
+{
+    m_file.prealloc_if_supported(0, size);
 }
 
 inline SlabAlloc::DetachGuard::~DetachGuard() TIGHTDB_NOEXCEPT
