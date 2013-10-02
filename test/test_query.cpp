@@ -2684,15 +2684,15 @@ TEST(TestQueryBigString)
 {
     TupleTableType ttt;
     ttt.add(1, "a");
-    size_t res1 = ttt.where().second.equal("a").find_next();
+    size_t res1 = ttt.where().second.equal("a").find();
     CHECK_EQUAL(0, res1);
 
     ttt.add(2, "40 chars  40 chars  40 chars  40 chars  ");
-    size_t res2 = ttt.where().second.equal("40 chars  40 chars  40 chars  40 chars  ").find_next();
+    size_t res2 = ttt.where().second.equal("40 chars  40 chars  40 chars  40 chars  ").find();
     CHECK_EQUAL(1, res2);
 
     ttt.add(1, "70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
-    size_t res3 = ttt.where().second.equal("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ").find_next();
+    size_t res3 = ttt.where().second.equal("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ").find();
     CHECK_EQUAL(2, res3);
 }
 
