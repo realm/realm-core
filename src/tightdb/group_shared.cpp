@@ -420,7 +420,7 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
         catch(...) {} // ignored on purpose.
     }
 
-    info->~SharedInfo(); // Call destructor
+    // info->~SharedInfo(); // DO NOT Call destructor
 
     m_file.close();
     m_file_map.unmap();
@@ -537,7 +537,7 @@ void SharedGroup::do_async_commits()
         if (shutdown) {
             // Being the backend process, we own the lock file, so we
             // have to clean up when we shut down.
-            info->~SharedInfo(); // Call destructor
+            // info->~SharedInfo(); // DO NOT Call destructor
             m_file_map.unmap();
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Removing coordination file" << endl;
