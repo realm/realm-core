@@ -287,7 +287,7 @@ public:
 
     size_t find_first(size_t start, size_t end)
     {
-        size_t m = 0;
+        size_t m = start;
         size_t next_cond = 0;
         size_t first_cond = 0;
 

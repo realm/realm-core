@@ -2785,6 +2785,64 @@ TEST(TestQueryFindNext)
     CHECK_EQUAL(not_found, res6); // no more matches
 }
 
+
+TEST(TestQueryFindNextBackwards)
+{
+    TupleTableType ttt;
+
+    // Create multiple leafs
+    for(size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 4; i++) {
+        ttt.add(6, "X");
+        ttt.add(7, "X");
+    }
+
+    TupleTableType::Query q = ttt.where().first.greater(4);
+
+    // Check if leaf caching works correctly in the case you go backwards. 'res' result is not so important
+    // in this test; this test tests if we assert errorneously. Next test (TestQueryFindRandom) is more exhaustive
+    size_t res = q.find(TIGHTDB_MAX_LIST_SIZE * 2);
+    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE * 2, res);
+    res = q.find(0);
+    CHECK_EQUAL(0, res);
+}
+
+
+// Begin search at arbitrary positions for *same* query object (other tests in this test_query file test same thing,
+// but for independent query objects) to test if leaf cacher works correctly (can go backwards, etc).
+TEST(TestQueryFindRandom)
+{
+    TupleTableType ttt;
+    int64_t search = TIGHTDB_MAX_LIST_SIZE / 2;
+    size_t rows = TIGHTDB_MAX_LIST_SIZE * 20;
+
+    // Create multiple leafs
+    for(size_t i = 0; i < rows; i++) {
+        // This value distribution makes us sometimes cross a leaf boundary, and sometimes not, with both having
+        // a fair probability of happening
+        ttt.add(rand() % TIGHTDB_MAX_LIST_SIZE, "X");
+    }
+
+    TupleTableType::Query q = ttt.where().first.equal(search);
+
+    for(size_t t = 0; t < 100; t++) {
+        size_t begin = rand() % rows;
+        size_t res = q.find(begin);
+
+        // Find correct match position manually in a for-loop
+        size_t expected = not_found;
+        for(size_t u = begin; u < rows; u++) {
+            if(ttt.column().first[u] == search) {
+                expected = u;
+                break;
+            }
+        }
+
+        // Compare .find() with manual for-loop-result
+        CHECK_EQUAL(expected, res);
+    }
+
+}
+
 TEST(TestQueryFindNext2)
 {
     TupleTableType ttt;
