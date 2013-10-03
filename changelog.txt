@@ -13,10 +13,10 @@ Format:
 2013-09-26 (Brian Munkholm)
 +/- Renamed Table::distinct() to Table::get_distinct_view()
 +/- Renamed class Date to DateTime. Renamed DataType::type_Date to type_DateTime
-+/- Renamed all methods operating on the renamed DateTime column, to have '_datetime(' appended
-    in method names instead of the old '_date('.
++/- Renamed suffix of all methods operating on DateTime from '_date' to '_datetime'.
 
 2013-09-26 (Kristian Spangsege)
++ File format support for streaming of output from Group::write() (not yet suported by API.)
 + Support for internal null characters in strings. This applies to table and column names as well.
 
 2013-09-19 (Kristian Spangsege)
