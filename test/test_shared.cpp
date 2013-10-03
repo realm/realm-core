@@ -1221,7 +1221,6 @@ TEST(Shared_FromSerialized)
     }
 }
 
-#ifndef _WIN32
 TEST(StringIndex_Bug1)
 {
     File::try_remove("test.tightdb");
@@ -1247,7 +1246,6 @@ TEST(StringIndex_Bug1)
         db.commit();
     }
 }
-#endif
 
 TEST(StringIndex_Bug2)
 {
