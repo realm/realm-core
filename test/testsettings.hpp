@@ -43,7 +43,7 @@
 #define TEST_THREAD
 
 // TEST_TRANSACTIONS temporarily disabled because it fails on Windows. Fixme. Keywords: winbug
-#ifdef _WIN32
+#ifndef _WIN32
 #define TEST_TRANSACTIONS
 #endif
 
