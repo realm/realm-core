@@ -28,6 +28,8 @@
 #include <tightdb/mixed.hpp>
 #include <tightdb/query.hpp>
 
+//#include "query_expression.h"
+
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
@@ -39,6 +41,7 @@ class TableView;
 class ConstTableView;
 class StringIndex;
 
+template <class T> class Columns;
 
 /// The Table class is non-polymorphic, that is, it has no virtual
 /// functions. This is important because it ensures that there is no
@@ -124,6 +127,11 @@ public:
     /// that even Table::is_attached() is disallowed in this case.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
+    // A degenerate table is a subtable which isn't instantiated in the
+    // database file yet because there has not yet been write-access to 
+    // it. Avoiding instantiation is an optimization to save space, etc.
+    bool is_degenerate() const TIGHTDB_NOEXCEPT { return m_columns.m_data == NULL; }
+
     /// A shared spec is a column specification that in general
     /// applies to many tables. A table is not allowed to directly
     /// modify its own spec if it is shared. A shared spec may only be
@@ -167,6 +175,10 @@ public:
     void set_index(std::size_t column_ndx);
     //@}
 
+    template <class T> Columns<T> column(size_t column)
+    {
+        return Columns<T>(column, this);
+    }
 
     // Table size and deletion
     bool        is_empty() const TIGHTDB_NOEXCEPT { return m_size == 0; }
@@ -294,6 +306,12 @@ public:
     TableView      get_sorted_view(std::size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;
 
+private:
+    template <class T> std::size_t find_first(std::size_t column_ndx, T value) const; // called by above methods
+    template <class T> ConstTableView find_all(size_t column_ndx, T value) const;
+public:
+
+
     //@{
     /// Find the lower/upper bound according to a column that is
     /// already sorted in ascending order.
@@ -336,8 +354,10 @@ public:
     //@}
 
     // Queries
-    Query       where() { return Query(*this); }
-    const Query where() const { return Query(*this); } // FIXME: There is no point in returning a const Query. We need a ConstQuery class.
+    Query       where()       { return Query(*this); }
+
+    // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
+    Query where() const { return Query(*this); } 
 
     // Optimizing
     void optimize();
@@ -586,6 +606,7 @@ private:
     friend class ColumnSubtableParent;
     friend class LangBindHelper;
     friend class TableViewBase;
+    template<class T> friend class Columns;
     friend class ParentNode;
     template<class> friend class SequentialGetter;
 };

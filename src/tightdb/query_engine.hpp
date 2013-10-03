@@ -101,6 +101,8 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/array_basic.hpp>
+#include <tightdb/array_string.hpp>
+
 
 namespace tightdb {
 
@@ -124,35 +126,53 @@ typedef bool (*CallbackDummy)(int64_t);
 template<class T> struct ColumnTypeTraits;
 
 template<> struct ColumnTypeTraits<int64_t> {
+    const static ColumnType ct_id = col_type_Int;
+    const static ColumnType ct_id_real = col_type_Int;
     typedef Column column_type;
     typedef Array array_type;
     typedef int64_t sum_type;
     static const DataType id = type_Int;
 };
 template<> struct ColumnTypeTraits<bool> {
+    const static ColumnType ct_id = col_type_Bool;
+    const static ColumnType ct_id_real = col_type_Bool;
     typedef Column column_type;
     typedef Array array_type;
     typedef int64_t sum_type;
     static const DataType id = type_Bool;
 };
 template<> struct ColumnTypeTraits<float> {
+    const static ColumnType ct_id = col_type_Float;
+    const static ColumnType ct_id_real = col_type_Float;
     typedef ColumnFloat column_type;
     typedef ArrayFloat array_type;
     typedef double sum_type;
     static const DataType id = type_Float;
 };
 template<> struct ColumnTypeTraits<double> {
+    const static ColumnType ct_id = col_type_Double;
+    const static ColumnType ct_id_real = col_type_Double;
     typedef ColumnDouble column_type;
     typedef ArrayDouble array_type;
     typedef double sum_type;
     static const DataType id = type_Double;
 };
 template<> struct ColumnTypeTraits<DateTime> {
+    const static ColumnType ct_id = col_type_DateTime;
+    const static ColumnType ct_id_real = col_type_Int;
     typedef Column column_type;
     typedef Array array_type;
     typedef int64_t sum_type;
     static const DataType id = type_Int;
 };
+
+template<> struct ColumnTypeTraits<StringData> {
+    typedef Column column_type;
+    typedef Array array_type;
+    typedef int64_t sum_type;
+    static const DataType id = type_String;
+};
+
 // Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
 template<class T, Action A> struct ColumnTypeTraitsSum {
     typedef T sum_type;
@@ -162,7 +182,7 @@ template<> struct ColumnTypeTraitsSum<float, act_Sum> {
     typedef double sum_type;
 };
 
-// Lets you access elements of an integer column in increasing order in a fast way where leafs are cached
+
 struct SequentialGetterBase {
     virtual ~SequentialGetterBase() TIGHTDB_NOEXCEPT {}
 };
@@ -197,7 +217,7 @@ public:
     TIGHTDB_FORCEINLINE bool cache_next(size_t index)
     {
         // Return wether or not leaf array has changed (could be useful to know for caller)
-        if (index >= m_leaf_end) {
+        if (index >= m_leaf_end || index < m_leaf_start) {
             // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
             // leave m_array untouched. Else call init_from_header() on m_array (more time consuming) and return pointer to m_array.
             m_array_ptr = static_cast<const ArrayType*>(m_column->GetBlock(index, m_array, m_leaf_start, true));
@@ -233,6 +253,7 @@ private:
     // Never access through m_array because it's uninitialized if column is just a leaf
     ArrayType m_array;
 };
+
 
 class ParentNode {
 public:
@@ -298,6 +319,11 @@ public:
         m_table = &table;
         if (m_child)
             m_child->init(table);
+    }
+
+    virtual bool is_initialized() const
+    {
+        return m_table != NULL;
     }
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
@@ -1470,7 +1496,48 @@ protected:
     SequentialGetter<TConditionValue> m_getter2;
 };
 
+// todo, fixme: move this up! There are just some annoying compiler errors that need to be resolved when doing this
+#include "query_expression.hpp"
+
+
+// For expressions like col1 / col2 + 123 > col4 * 100
+class ExpressionNode: public ParentNode {
+
+public:
+    ~ExpressionNode() TIGHTDB_NOEXCEPT
+    {
+        if(m_auto_delete)
+            delete m_compare, m_compare = NULL;
+    }
+
+    ExpressionNode(Expression* compare, bool auto_delete) 
+    {
+        m_auto_delete = auto_delete;
+        m_child = 0;
+        m_compare = compare;
+    }
+
+    void init(const Table& table) 
+    {
+        m_compare->set_table(&table);
+        if (m_child)
+            m_child->init(table);
+    }
+
+    size_t find_first_local(size_t start, size_t end)
+    {
+        size_t res = m_compare->find_first(start, end);
+        return res;
+    }
+    
+    bool m_auto_delete;
+    Expression* m_compare;
+};
 
 } // namespace tightdb
+
+
+
+
 
 #endif // TIGHTDB_QUERY_ENGINE_HPP

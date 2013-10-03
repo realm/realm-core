@@ -1164,8 +1164,6 @@ TEST(StringIndex_Bug1)
         table->add_empty_row();
         db.commit();
     }
-
-    File::try_remove("test.tightdb");
 }
 
 
@@ -1298,12 +1296,12 @@ namespace  {
 
 void* IncrementEntry(void* arg)
 {
-    try 
+    try
     {
         const size_t row_ndx = (size_t)arg;
 
         // Open shared db
-        SharedGroup sg("test_shared.tightdb", 
+        SharedGroup sg("test_shared.tightdb",
                        false, SharedGroup::durability_Async );
 
         for (size_t i = 0; i < INCREMENTS; ++i) {
@@ -1347,7 +1345,7 @@ void* IncrementEntry(void* arg)
 }
 
 
-void make_table(size_t rows) 
+void make_table(size_t rows)
 {
     File::try_remove("test_shared.tightdb");
     File::try_remove("test_shared.tightdb.log");
@@ -1392,7 +1390,7 @@ void make_table(size_t rows)
     }
 #else
     {
-        SharedGroup sg("test_shared.tightdb", 
+        SharedGroup sg("test_shared.tightdb",
                        false, SharedGroup::durability_Async);
         WriteTransaction wt(sg);
         TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
@@ -1420,7 +1418,7 @@ void make_table(size_t rows)
 #endif
 }
 
-void multi_threaded(size_t thread_count, size_t base) 
+void multi_threaded(size_t thread_count, size_t base)
 {
     // Do some changes in a async db
     {
@@ -1443,7 +1441,7 @@ void multi_threaded(size_t thread_count, size_t base)
 
         // Verify that the changes were made
         {
-            SharedGroup sg("test_shared.tightdb", 
+            SharedGroup sg("test_shared.tightdb",
                            false, SharedGroup::durability_Async);
             ReadTransaction rt(sg);
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
@@ -1467,7 +1465,7 @@ void validate_and_clear(size_t rows, int result)
         SharedGroup sg("test_shared.tightdb");
         WriteTransaction wt(sg);
         TestTableShared::Ref t = wt.get_table<TestTableShared>("test");
-        
+
         for (size_t i = 0; i < rows; ++i) {
             const int64_t v = t[i].first;
             t[i].first = 0;
@@ -1477,7 +1475,7 @@ void validate_and_clear(size_t rows, int result)
     }
 }
 
-void multi_process(int numprocs, size_t numthreads) 
+void multi_process(int numprocs, size_t numthreads)
 {
     for (int i=0; i<numprocs; i++) {
         if (fork()==0) {
@@ -1664,32 +1662,36 @@ TEST(GroupShared_MultipleEndReads)
 
 TEST(GroupShared_ReserveDiskSpace)
 {
+    // SharedGroup::reserve() has no effect unless file preallocation
+    // is supported.
+    if (!File::is_prealloc_supported())
+        return;
+
     File::try_remove("test.tightdb");
     {
         SharedGroup sg("test.tightdb");
-        File::SizeType orig_file_size = File("test.tightdb").get_size();
+        size_t orig_file_size = size_t(File("test.tightdb").get_size());
 
         // Check that reserve() does not change the file size if the
         // specified size is less than the actual file size.
-        File::SizeType reserve_size_1 = orig_file_size / 2;        
-        //FIXME:VS2012(32bit) warning warning C4244: 'argument' : conversion from 'tightdb::File::SizeType' to 'size_t', possible loss of data
+        size_t reserve_size_1 = orig_file_size / 2;
         sg.reserve(reserve_size_1);
-        File::SizeType new_file_size_1 = File("test.tightdb").get_size();
+        size_t new_file_size_1 = size_t(File("test.tightdb").get_size());
         CHECK_EQUAL(orig_file_size, new_file_size_1);
 
         // Check that reserve() does not change the file size if the
         // specified size is equal to the actual file size.
-        File::SizeType reserve_size_2 = orig_file_size;
+        size_t reserve_size_2 = orig_file_size;
         sg.reserve(reserve_size_2);
-        File::SizeType new_file_size_2 = File("test.tightdb").get_size();
+        size_t new_file_size_2 = size_t(File("test.tightdb").get_size());
         CHECK_EQUAL(orig_file_size, new_file_size_2);
 
         // Check that reserve() does change the file size if the
         // specified size is greater than the actual file size, and
         // that the new size is at least as big as the requested size.
-        File::SizeType reserve_size_3 = orig_file_size + 1;
+        size_t reserve_size_3 = orig_file_size + 1;
         sg.reserve(reserve_size_3);
-        File::SizeType new_file_size_3 = File("test.tightdb").get_size();
+        size_t new_file_size_3 = File("test.tightdb").get_size();
         CHECK(new_file_size_3 >= reserve_size_3);
 
         // Check that disk space reservation is independent of transactions
@@ -1698,24 +1700,24 @@ TEST(GroupShared_ReserveDiskSpace)
             wt.get_table<TestTableShared>("table_1")->add_empty_row(2000);
             wt.commit();
         }
-        orig_file_size = File("test.tightdb").get_size();
-        File::SizeType reserve_size_4 = 2 * orig_file_size + 1;
+        orig_file_size = size_t(File("test.tightdb").get_size());
+        size_t reserve_size_4 = 2 * orig_file_size + 1;
         sg.reserve(reserve_size_4);
-        File::SizeType new_file_size_4 = File("test.tightdb").get_size();
+        size_t new_file_size_4 = size_t(File("test.tightdb").get_size());
         CHECK(new_file_size_4 >= reserve_size_4);
         WriteTransaction wt(sg);
         wt.get_table<TestTableShared>("table_2")->add_empty_row(2000);
-        orig_file_size = File("test.tightdb").get_size();
-        File::SizeType reserve_size_5 = orig_file_size + 333;
+        orig_file_size = size_t(File("test.tightdb").get_size());
+        size_t reserve_size_5 = orig_file_size + 333;
         sg.reserve(reserve_size_5);
-        File::SizeType new_file_size_5 = File("test.tightdb").get_size();
+        size_t new_file_size_5 = size_t(File("test.tightdb").get_size());
         CHECK(new_file_size_5 >= reserve_size_5);
         wt.get_table<TestTableShared>("table_3")->add_empty_row(2000);
         wt.commit();
-        orig_file_size = File("test.tightdb").get_size();
-        File::SizeType reserve_size_6 = orig_file_size + 459;
+        orig_file_size = size_t(File("test.tightdb").get_size());
+        size_t reserve_size_6 = orig_file_size + 459;
         sg.reserve(reserve_size_6);
-        File::SizeType new_file_size_6 = File("test.tightdb").get_size();
+        size_t new_file_size_6 = size_t(File("test.tightdb").get_size());
         CHECK(new_file_size_6 >= reserve_size_6);
         {
             WriteTransaction wt(sg);

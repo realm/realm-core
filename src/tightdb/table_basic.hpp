@@ -201,7 +201,7 @@ public:
 
     class Query;
     Query       where() {return Query(*this);}
-    const Query where() const {return Query(*this);}
+    Query where() const {return Query(*this);}
 
     /// Compare two tables for equality. Two tables are equal if, and
     /// only if, they contain the same rows in the same order, that
@@ -342,11 +342,13 @@ public:
 
     Query& end_subtable() { m_impl.end_subtable(); return *this; }
 
+    Query& expression(Expression* exp) { m_impl.expression(exp); return *this; }
+
     Query& Or() { m_impl.Or(); return *this; }
 
-    std::size_t find_next(std::size_t lastmatch = std::size_t(-1))
+    std::size_t find(std::size_t begin_at_table_row = 0)
     {
-        return m_impl.find_next(lastmatch);
+        return m_impl.find(begin_at_table_row);
     }
 
     typename BasicTable<Spec>::View find_all(std::size_t start = 0,

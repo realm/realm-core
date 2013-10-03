@@ -498,7 +498,7 @@ bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref
     if (ref >= size || ref % 8 != 0 || ref > numeric_limits<ref_type>::max())
         return false; // invalid top_ref
 
-    top_ref = ref;
+    top_ref = ref;//FIXME:vs2012 warning C4244: '=' : conversion from 'uint_fast64_t' to 'tightdb::ref_type', possible loss of data
     return true;
 }
 

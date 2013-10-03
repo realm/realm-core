@@ -223,11 +223,24 @@ is named according to the tag.
 
 `Pandoc` is required to build a distribution package.
 
-On Ubuntu, install Pandoc and XeLaTeX with the following commands:
+### Ubuntu 10.04, 12.04, and 13.04
 
     sudo apt-get install texlive-latex-base
     sudo apt-get install pandoc
 
-On Mac OSX, install Pandoc and XeLaTeX (aka MacTeX) via the following link:
 
-    http://www.texts.io/support
+### Fedora 17
+
+    sudo yum install pandoc-markdown2pdf
+
+## Mac OSX
+
+Install Pandoc and XeLaTeX (aka MacTeX) by following the instructions
+on http://johnmacfarlane.net/pandoc/installing.html. This boils down
+to installing the following two packages:
+
+- http://pandoc.googlecode.com/files/pandoc-1.12.0.2.dmg
+- http://mirror.ctan.org/systems/mac/mactex/mactex-basic.pkg
+
+
+

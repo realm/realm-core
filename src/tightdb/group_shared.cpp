@@ -111,7 +111,7 @@ void spawn_daemon(const string& file)
 {
     // determine maximum number of open descriptors
     errno = 0; 
-    int m = sysconf(_SC_OPEN_MAX); 
+    int m = int(sysconf(_SC_OPEN_MAX));
     if (m < 0) { 
         if (errno) { 
             // int err = errno; // TODO: include err in exception string 
@@ -161,7 +161,10 @@ void spawn_daemon(const string& file)
         
         // use childs exit code to catch and report any errors:
         int status;
-        int pid_changed = waitpid(pid, &status, 0);
+        int pid_changed;
+        do {
+            pid_changed = waitpid(pid, &status, 0);
+        } while (pid_changed == -1 && errno == EINTR);
         if (pid_changed != pid)
             throw runtime_error("failed to wait for daemon start");
         if (!WIFEXITED(status))
@@ -192,7 +195,7 @@ inline void micro_sleep(uint64_t microsec_delay)
     // also vs2012 warns : src\tightdb\group_shared.cpp(192): warning C4244: 'argument' : conversion from 'uint64_t' to 'DWORD', possible loss of data
     Sleep(microsec_delay/1000+1);
 #else
-    usleep(microsec_delay);
+    usleep(useconds_t(microsec_delay));
 #endif
 }
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
@@ -234,7 +237,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             m_file.prealloc(0, info_size);
             need_init = true;
 
-        } catch (runtime_error e) {
+        } catch (runtime_error& e) {
 
             // if this one throws, just propagate it:
             m_file.open(m_file_path, 
@@ -411,7 +414,6 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 
     info->~SharedInfo(); // Call destructor
 
-    // m_file.unlock(); // should not be needed, implied by close
     m_file.close();
     m_file_map.unmap();
     m_reader_map.unmap();
@@ -1050,11 +1052,11 @@ void SharedGroup::zero_free_space()
         file_size = to_size_t(info->filesize);
 
         if (ringbuf_is_empty()) {
-            readlock_version = current_version;
+            readlock_version = current_version;//FIXME:vs2012 warning  warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
         }
         else {
             const ReadCount& r = ringbuf_get_first();
-            readlock_version = r.version;
+            readlock_version = r.version;//FIXME:vs2012 warning C4244: '=' : conversion from 'const uint64_t' to 'size_t', possible loss of data
         }
     }
 

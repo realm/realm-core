@@ -428,24 +428,26 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_typed_query_findall
 
-  - g_typed_query_find_next:
-      NAME     : find_next
-      DESCR    : &g_typed_query_find_next_descr
-                 Find next row.
-      SUMMARY  : &g_typed_query_find_next_summary
-                 Find next row.
+  - g_typed_query_find:
+      NAME     : find
+      DESCR    : &g_typed_query_find_descr
+                 This will find the first row that fulfils the query condition.
+                 Use the return value + 1 as parameter for successive calls to iterate through 
+                 matching rows.
+      SUMMARY  : &g_typed_query_find_summary
+                 Find first matching row.
       PARAMS:
       - NAME   : lastmatch
         TYPES  : size_t
-        DESCR  : &g_typed_query_find_next_parm_lastmatch_descr
-                 "Row to stop search. Default: -1 (infinity)."
+        DESCR  : &g_typed_query_find_parm_lastmatch_descr
+                 "Table row to start search from (inclusive). Default is 0 (start from beginning)."
       RETURN:
         TYPES  : size_t
-        DESCR  : &g_typed_query_find_next_return_descr
-                 Row number.
+        DESCR  : &g_typed_query_find_return_descr
+                 Row index that matches the query (or -1 if none).
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_typed_query_find_next
+        CODE   : ex_cpp_typed_query_find
 
   - g_typed_query_sum_2:
       IGNORE: ""

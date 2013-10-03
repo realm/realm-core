@@ -22,6 +22,9 @@ Format:
 2013-09-19 (Kristian Spangsege)
 . CRUD performance has been greatly improved for large tables, as long as they are kept on the "compact" form. A table is kept on the compact form when every row insertion and removal, since the creation of that table, has occured, and continues to occur at the end (i.e., insert after last row, and remove last row).
 
+2013-10-02 (Lasse Reinhold)
+- Renamed find_next(lastmatch) into find(begin_at_table_row) for queries and typed tables.
+
 2013-09-12 (Brian Munkholm)
 + Added TableView::row_to_string() and testcases for to_string() and row_to_string()
 + Added row_to_string(), to_string() and to_json() in typed TableView.
