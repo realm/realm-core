@@ -42,7 +42,7 @@
 #define TEST_TABLE_VIEW
 #define TEST_THREAD
 
-// TEST_TRANSACTIONS temporarily disabled because it fails on Windows
+// TEST_TRANSACTIONS temporarily disabled because it fails on Windows. Fixme. Keywords: winbug
 #ifndef _WIN32
 #define TEST_TRANSACTIONS
 #endif

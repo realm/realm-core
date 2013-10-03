@@ -762,14 +762,18 @@ public:
         return m_table;
     }
 
-    void evaluate(size_t index, ValueBase& destination) {
-        Value<T> v;            
+    void evaluate(size_t index, ValueBase& destination) {  
+        Value<T> v;          
         sg->cache_next(index);
-        if(SameType<T, int64_t>::value) {
-            // int64_t leafs have a get_chunk optimization that returns an 8 int64_t values at once
+        if(SameType<T, int64_t>::value && index + ValueBase::elements < sg->m_leaf_end) {
+            // int64_t leafs have a get_chunk optimization that returns multiple int64_t values at once
             sg->m_array_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
         }
         else {
+            // To make Valgrind happy we must initialize all elements in v even if Column ends earlier. Todo, benchmark
+            // if an unconditional zero out is faster
+            if(index + ValueBase::elements >= sg->m_leaf_end)
+                v = Value<T>(static_cast<T>(0));              
             for(size_t t = 0; t < ValueBase::elements && index + t < sg->m_leaf_end; t++)
                 v.m_v[t] = sg->get_next(index + t);
         }
@@ -782,11 +786,6 @@ public:
 private:
     SequentialGetter<T>* sg;
 };
-
-
-
-
-
 
 
 template <class oper, class TLeft, class TRight> class Operator : public Subexpr2<typename oper::type>
