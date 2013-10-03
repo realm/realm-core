@@ -456,7 +456,7 @@ TEST(MergeQueriesMonkey)
 {
     for(int iter = 0; iter < 5; iter++)
     {
-        const size_t rows = 4000;
+        const size_t rows = TIGHTDB_MAX_LIST_SIZE * 4;
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
@@ -634,7 +634,7 @@ TEST(MergeQueriesMonkeyOverloads)
 {
     for(int iter = 0; iter < 5; iter++)
     {
-        const size_t rows = 4000;
+        const size_t rows = TIGHTDB_MAX_LIST_SIZE * 4;
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
@@ -1103,7 +1103,7 @@ TEST(TestQueryStrIndexCrash)
 
         size_t eights = 0;
 
-        for(int i = 0; i < 2000; i++) {
+        for(int i = 0; i < TIGHTDB_MAX_LIST_SIZE * 2; i++) {
             int v = rand() % 10;
             if(v == 8) {
                 eights++;
@@ -1152,7 +1152,7 @@ TEST(QueryTwoColsEqualVaryWidthAndValues)
     table.add_column(type_Double, "sixth");
 
 #ifdef TIGHTDB_DEBUG
-    for (int i = 0; i < 5000; i++) {
+    for (int i = 0; i < TIGHTDB_MAX_LIST_SIZE * 5; i++) {
 #else
     for (int i = 0; i < 50000; i++) {
 #endif
@@ -1325,7 +1325,7 @@ TEST(QueryTwoColsNoRows)
 TEST(TestQueryHuge)
 {
 #if TEST_DURATION == 0
-    for (int N = 0; N < 2; N++) {
+    for (int N = 0; N < 1; N++) {
 #elif TEST_DURATION == 1
     for (int N = 0; N < 100; N++) {
 #elif TEST_DURATION == 2
@@ -1357,18 +1357,18 @@ TEST(TestQueryHuge)
         size_t res7 = 0;
         size_t res8 = 0;
 
-        size_t start = rand() % 6000;
-        size_t end = start + rand() % (6000 - start);
+        size_t start = rand() % 3000;
+        size_t end = start + rand() % (3000 - start);
         size_t limit;
         if(rand() % 2 == 0)
-            limit = rand() % 10000;
+            limit = rand() % 5000;
         else
             limit = size_t(-1);
 
 
         size_t blocksize = rand() % 800 + 1;
 
-        for (size_t row = 0; row < 6000; row++) {
+        for (size_t row = 0; row < 3000; row++) {
 
             if (row % blocksize == 0) {
                 long1 = (rand() % 2 == 0);
@@ -1422,11 +1422,6 @@ TEST(TestQueryHuge)
             tt[row].first  = first;
             tt[row].second = second;
             tt[row].third  = third;
-
-
-
-
-
 
             if ((row >= start && row < end && limit > res1) && (first == "A" && second == "A" && third == 1))
                 res1++;
@@ -1525,13 +1520,13 @@ TEST(TestQueryStrIndex3)
 #endif
             // 1/500 match probability because we want possibility for a 1000 sized leaf to contain 0 matches (important
             // edge case)
-            int f1 = rand() % 500 + 1;
-            int f2 = rand() % 500 + 1;
+            int f1 = rand() % TIGHTDB_MAX_LIST_SIZE / 2 + 1;
+            int f2 = rand() % TIGHTDB_MAX_LIST_SIZE / 2 + 1;
             bool longstrings = (rand() % 5 == 1);
 
             // 2200 entries with that probability to fill out two concecutive 1000 sized leafs with above probability,
             // plus a remainder (edge case)
-            for (int j = 0; j < 2200; j++) {
+            for (int j = 0; j < TIGHTDB_MAX_LIST_SIZE * 2 + TIGHTDB_MAX_LIST_SIZE / 5; j++) {
                 if (rand() % f1 == 0)
                     if (rand() % f2 == 0) {
                         ttt.add(0, longstrings ? "AAAAAAAAAAAAAAAAAAAAAAAA" : "AA");
@@ -1642,7 +1637,7 @@ TEST(TestQueryStrEnum)
     for (int i = 0; i < 100; i++) {
         ttt.clear();
         aa = 0;
-        for (size_t t = 0; t < 2000; t++) {
+        for (size_t t = 0; t < TIGHTDB_MAX_LIST_SIZE * 2; t++) {
             if (rand() % 3 == 0) {
                 ttt.add(1, "AA");
                 aa++;
@@ -1699,7 +1694,7 @@ TEST(TestQueryStrIndex)
 
 }
 
-TEST(Group_GameAnalytics)
+TEST(Group_GA)
 {
     UnitTest::Timer timer;
 
@@ -1707,9 +1702,9 @@ TEST(Group_GameAnalytics)
         Group g;
         GATable::Ref t = g.get_table<GATable>("firstevents");
 
-        for (size_t i = 0; i < 1000; ++i) {
-            const int64_t r1 = rand() % 1000;
-            const int64_t r2 = rand() % 1000;
+        for (size_t i = 0; i < 100; ++i) {
+            const int64_t r1 = rand() % 100;
+            const int64_t r2 = rand() % 100;
 
             t->add("10", "US", "1.0", r1, r2);
         }
@@ -2598,7 +2593,7 @@ TEST(TestQueryThreads)
 
     // Spread query search hits in an odd way to test more edge cases
     // (thread job size is THREAD_CHUNK_SIZE = 10)
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 30; i++) {
         for (int j = 0; j < 10; j++) {
             ttt.add(5, "a");
             ttt.add(j, "b");
@@ -2615,8 +2610,8 @@ TEST(TestQueryThreads)
     //q1.set_threads(5);
     TupleTableType::View tv = q1.find_all();
 
-    CHECK_EQUAL(100, tv.size());
-    for (int i = 0; i < 100; i++) {
+    CHECK_EQUAL(30, tv.size());
+    for (int i = 0; i < 30; i++) {
         const size_t expected = i*7*10 + 14 + 1;
         const size_t actual   = tv.get_source_ndx(i);
         CHECK_EQUAL(expected, actual);
@@ -2630,7 +2625,7 @@ TEST(TestQueryLongString)
 
     // Spread query search hits in an odd way to test more edge cases
     // (thread job size is THREAD_CHUNK_SIZE = 10)
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 30; i++) {
         for (int j = 0; j < 10; j++) {
             ttt.add(5, "aaaaaaaaaaaaaaaaaa");
             ttt.add(j, "bbbbbbbbbbbbbbbbbb");
@@ -2647,8 +2642,8 @@ TEST(TestQueryLongString)
     //q1.set_threads(5);
     TupleTableType::View tv = q1.find_all();
 
-    CHECK_EQUAL(100, tv.size());
-    for (int i = 0; i < 100; i++) {
+    CHECK_EQUAL(30, tv.size());
+    for (int i = 0; i < 30; i++) {
         const size_t expected = i*7*10 + 14 + 1;
         const size_t actual   = tv.get_source_ndx(i);
         CHECK_EQUAL(expected, actual);
@@ -2662,7 +2657,7 @@ TEST(TestQueryLongEnum)
 
     // Spread query search hits in an odd way to test more edge cases
     // (thread job size is THREAD_CHUNK_SIZE = 10)
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 30; i++) {
         for (int j = 0; j < 10; j++) {
             ttt.add(5, "aaaaaaaaaaaaaaaaaa");
             ttt.add(j, "bbbbbbbbbbbbbbbbbb");
@@ -2680,8 +2675,8 @@ TEST(TestQueryLongEnum)
     //q1.set_threads(5);
     TupleTableType::View tv = q1.find_all();
 
-    CHECK_EQUAL(100, tv.size());
-    for (int i = 0; i < 100; i++) {
+    CHECK_EQUAL(30, tv.size());
+    for (int i = 0; i < 30; i++) {
         const size_t expected = i*7*10 + 14 + 1;
         const size_t actual   = tv.get_source_ndx(i);
         CHECK_EQUAL(expected, actual);
@@ -2788,6 +2783,64 @@ TEST(TestQueryFindNext)
     CHECK_EQUAL(5, res4);
     CHECK_EQUAL(6, res5);
     CHECK_EQUAL(not_found, res6); // no more matches
+}
+
+
+TEST(TestQueryFindNextBackwards)
+{
+    TupleTableType ttt;
+
+    // Create multiple leafs
+    for(size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 4; i++) {
+        ttt.add(6, "X");
+        ttt.add(7, "X");
+    }
+
+    TupleTableType::Query q = ttt.where().first.greater(4);
+
+    // Check if leaf caching works correctly in the case you go backwards. 'res' result is not so important
+    // in this test; this test tests if we assert errorneously. Next test (TestQueryFindRandom) is more exhaustive
+    size_t res = q.find(TIGHTDB_MAX_LIST_SIZE * 2);
+    CHECK_EQUAL(TIGHTDB_MAX_LIST_SIZE * 2, res);
+    res = q.find(0);
+    CHECK_EQUAL(0, res);
+}
+
+
+// Begin search at arbitrary positions for *same* query object (other tests in this test_query file test same thing,
+// but for independent query objects) to test if leaf cacher works correctly (can go backwards, etc).
+TEST(TestQueryFindRandom)
+{
+    TupleTableType ttt;
+    int64_t search = TIGHTDB_MAX_LIST_SIZE / 2;
+    size_t rows = TIGHTDB_MAX_LIST_SIZE * 20;
+
+    // Create multiple leafs
+    for(size_t i = 0; i < rows; i++) {
+        // This value distribution makes us sometimes cross a leaf boundary, and sometimes not, with both having
+        // a fair probability of happening
+        ttt.add(rand() % TIGHTDB_MAX_LIST_SIZE, "X");
+    }
+
+    TupleTableType::Query q = ttt.where().first.equal(search);
+
+    for(size_t t = 0; t < 100; t++) {
+        size_t begin = rand() % rows;
+        size_t res = q.find(begin);
+
+        // Find correct match position manually in a for-loop
+        size_t expected = not_found;
+        for(size_t u = begin; u < rows; u++) {
+            if(ttt.column().first[u] == search) {
+                expected = u;
+                break;
+            }
+        }
+
+        // Compare .find() with manual for-loop-result
+        CHECK_EQUAL(expected, res);
+    }
+
 }
 
 TEST(TestQueryFindNext2)

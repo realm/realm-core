@@ -1375,12 +1375,13 @@ template<size_t w> int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
 
 template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT
 {
+    memset(res, 0, 8*8);
     // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
     // exceed array length; in this case, remainder of res[8] will be left untouched.
 
     TIGHTDB_ASSERT(ndx < m_size);
 
-    if(TIGHTDB_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 16 < m_size) {
+    if(TIGHTDB_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
         // This method is *multiple* times faster than performing 8 times Get<w>, even if unrolled. Apparently compilers
         // can't figure out to optimize it.
         uint64_t c;
@@ -1408,8 +1409,12 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
         res[7] = (c >> 7 * (w > 4 ? 0 : w)) & mask;
     }
     else {
-        for(size_t i = 0; i < m_size && i < 8; i++) 
+        size_t i = 0;
+        for(; i + ndx < m_size && i < 8; i++) 
             res[i] = Get<w>(ndx + i);
+
+        for(; i < 8; i++) 
+            res[i] = 0;
     }
 }
 

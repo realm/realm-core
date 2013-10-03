@@ -473,27 +473,27 @@ CATEGORIES :
       - DESCR  :
         CODE   : ex_cpp_dyn_query_findall
 
-  - g_dyn_query_find_first:
-      NAME     : find_first
-      DESCR    : &g_dyn_query_find_first_descr
+  - g_dyn_query_find:
+      NAME     : find
+      DESCR    : &g_dyn_query_find_descr
                  >
                  This will find the first row that fulfils the query condition. Use the return 
                  value + 1 as parameter for successive calls to iterate through 
                  matching rows.
-      SUMMARY  : &g_dyn_query_find_first_summary
+      SUMMARY  : &g_dyn_query_find_summary
                  Find first matching row.
       PARAMS:
       - NAME   : begin_row
         TYPES  : size_t
-        DESCR  : &g_dyn_query_find_first_parm1_descr
-                 "Row to start search from (inclusive). Default is 0 (start from beginning)."
+        DESCR  : &g_dyn_query_find_parm1_descr
+                 "Table row to start search from (inclusive). Default is 0 (start from beginning)."
       RETURN:
         TYPES  : size_t
-        DESCR  : &g_dyn_query_find_first
-                 Row index that matches the query (or -1 if none).
+        DESCR  : &g_dyn_query_find
+                 Table row index that matches the query (or -1 if none).
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_dyn_query_find_first
+        CODE   : ex_cpp_dyn_query_find
 
   - g_dyn_query_count:
       NAME     : count

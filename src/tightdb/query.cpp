@@ -671,7 +671,7 @@ size_t Query::find(size_t begin_at_table_row)
     if(m_table->is_degenerate())
         return not_found;
 
-    if (!is_initialized()) Init(*m_table);
+    Init(*m_table);
 
     const size_t end = m_table->size();
     const size_t res = first[0]->find_first(begin_at_table_row, end);
