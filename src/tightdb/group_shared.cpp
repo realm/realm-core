@@ -27,8 +27,12 @@ using namespace tightdb;
 static const uint16_t MAX_WRITE_SLOTS = 100;
 static const uint16_t RELAXED_SYNC_THRESHOLD = 50;
 
-
-
+// Constants controlling timeout behaviour during opening of a shared group
+static const int MAX_RETRIES_AWAITING_SHUTDOWN = 5;
+// rough limits, milliseconds:
+static const int MAX_WAIT_FOR_OK_FILESIZE = 100;
+static const int MAX_WAIT_FOR_SHAREDINFO_VALID = 100;
+static const int MAX_WAIT_FOR_DAEMON_START = 100;
 
 struct SharedGroup::ReadCount {
     uint64_t version;
@@ -222,7 +226,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
     m_file_path = path + ".lock";
     bool must_retry;
-    int retry_count = 5;
+    int retry_count = MAX_RETRIES_AWAITING_SHUTDOWN;
     do {
         bool need_init = false;
         size_t file_size = 0;
@@ -251,7 +255,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
         // them to exclusive to detect if we can shutdown.
         m_file.lock_shared();
         File::CloseGuard fcg(m_file);
-        int time_left = 100;
+        int time_left = MAX_WAIT_FOR_OK_FILESIZE;
         while (1) {
             time_left--;
             // need to validate the size of the file before trying to map it
@@ -310,7 +314,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
         }
         else {
             // wait for init complete:
-            int wait_count = 100;
+            int wait_count = MAX_WAIT_FOR_SHAREDINFO_VALID;
             while (wait_count && (info->init_complete.load_acquire() == 0)) {
                 wait_count--;
                 micro_sleep(1000);
@@ -358,12 +362,12 @@ void SharedGroup::open(const string& path, bool no_create_file,
         else {
             // In async mode we need to wait for the commit process to get ready
             SharedInfo* const info = m_file_map.get_addr();
-            int maxwait = 100000;
+            int maxwait = MAX_WAIT_FOR_DAEMON_START;
             while (maxwait--) {
                 if (info->init_complete.load_acquire() == 2) {
                     return;
                 }
-                micro_sleep(10);
+                micro_sleep(1000);
             }
             throw runtime_error("Failed to observe async commit starting");
         }
