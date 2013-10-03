@@ -267,7 +267,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 throw PresumablyStaleLockFile(m_file_path);
             // wait for file to at least contain the basic shared info block
             // NB! it might be larger due to expansion of the ring buffer.
-            if (info_size < sizeof (SharedInfo))
+            if (file_size < sizeof (SharedInfo))
                 micro_sleep(1000);
             else
                 break;
