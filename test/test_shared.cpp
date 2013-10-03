@@ -1,6 +1,6 @@
 #include "testsettings.hpp"
 #ifdef TEST_SHARED
-
+#include <fstream>
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
@@ -62,9 +62,114 @@ TEST(Shared_Initial)
     }
 
     // Verify that lock file was deleted after use
-#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
-#endif
+}
+
+void copy_file(const char* from, const char* to)
+{
+    std::ifstream  src(from, std::ios::binary);
+    std::ofstream  dst(to,   std::ios::binary);
+
+    dst << src.rdbuf();
+}
+
+TEST(Shared_Stale_Lock_File_Faked)
+{
+    // Delete old files if there
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    bool ok = false;
+    {
+        // create fake lock file
+        std::ofstream dst("test_shared.tightdb.lock", std::ios::binary);
+        dst << 0ULL;
+    }
+    try {
+        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+    }
+    catch (SharedGroup::PresumablyStaleLockFile& ) {
+        ok = true; // this should happen on all platforms
+    }
+    CHECK(ok);
+}
+
+// The following 3 tests are different ways of creating stale lock files.
+// Unfortunately the resulting behavior differs, depending on platform, and
+// possibly even depending on timing. All three cases are allowed to throw
+// an exception, but also allowed to work without doing so.
+TEST(Shared_Stale_Lock_File_CopiedInFlight)
+{
+    // Delete old files if there
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
+
+    {
+        // create lock file
+        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+        copy_file("test_shared.tightdb.lock", "test_shared.tightdb.lock.backup");
+    }
+    rename("test_shared.tightdb.lock.backup","test_shared.tightdb.lock");
+    try {
+        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+    }
+    catch (SharedGroup::PresumablyStaleLockFile& ) {
+        // cerr << "Detected a Presumably Stale lock file (1): " << e.what() << endl;
+        File::try_remove("test_shared.tightdb.lock"); // also the info file
+    }
+    // lock file should be gone when we get here:
+    CHECK(File::exists("test_shared.tightdb.lock") == false);
+}
+
+TEST(Shared_Stale_Lock_File_CopiedAtCommit)
+{
+    // Delete old files if there
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
+
+    {
+        // create lock file
+        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+        {
+            WriteTransaction wt(sg);
+            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+            t1->add(1, 2, false, "test");
+            wt.commit();
+        }
+        copy_file("test_shared.tightdb.lock", "test_shared.tightdb.lock.backup");
+    }
+    rename("test_shared.tightdb.lock.backup","test_shared.tightdb.lock");
+    try {
+        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+    }
+    catch (SharedGroup::PresumablyStaleLockFile& ) {
+        // cerr << "Detected a Presumably Stale lock file (2): " << e.what() << endl;
+        File::try_remove("test_shared.tightdb.lock"); // also the info file
+    }
+    // lock file should be gone when we get here:
+    CHECK(File::exists("test_shared.tightdb.lock") == false);
+}
+
+TEST(Shared_Stale_Lock_File_Renamed)
+{
+    // Delete old files if there
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
+
+    {
+        // create lock file
+        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+        rename("test_shared.tightdb.lock","test_shared.tightdb.lock.backup");
+    }
+    rename("test_shared.tightdb.lock.backup","test_shared.tightdb.lock");
+    try {
+        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+    }
+    catch (SharedGroup::PresumablyStaleLockFile& ) {
+        // cerr << "Detected a Presumably Stale lock file (3): " << e.what() << endl;
+        File::try_remove("test_shared.tightdb.lock"); // also the info file
+    }
+    // lock file should be gone when we get here:
+    CHECK(File::exists("test_shared.tightdb.lock") == false);
 }
 
 
@@ -91,10 +196,8 @@ TEST(Shared_Initial_Mem)
     }
 
     // Verify that both db and lock file was deleted after use
-#ifndef _WIN32 // GroupShared cannot clean lock/db file on Windows
     CHECK(!File::exists("test_shared.tightdb"));
     CHECK(!File::exists("test_shared.tightdb.lock"));
-#endif
 
 }
 
@@ -141,9 +244,7 @@ TEST(Shared_Initial2)
     }
 
     // Verify that lock file was deleted after use
-#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
-#endif
 }
 
 
@@ -189,10 +290,8 @@ TEST(Shared_Initial2_Mem)
     }
 
     // Verify that both db and lock file was deleted after use
-#ifndef _WIN32 // GroupShared cannot clean lock/db file on Windows
     CHECK(!File::exists("test_shared.tightdb"));
     CHECK(!File::exists("test_shared.tightdb.lock"));
-#endif
 }
 
 TEST(Shared1)
@@ -282,9 +381,7 @@ TEST(Shared1)
     }
 
     // Verify that lock file was deleted after use
-#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
-#endif
 }
 
 TEST(Shared_rollback)
@@ -351,9 +448,7 @@ TEST(Shared_rollback)
     }
 
     // Verify that lock file was deleted after use
-#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
-#endif
 }
 
 TEST(Shared_Writes)
@@ -392,9 +487,7 @@ TEST(Shared_Writes)
     }
 
     // Verify that lock file was deleted after use
-#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
-#endif
 }
 
 
@@ -758,9 +851,7 @@ TEST(Shared_WriterThreads)
     }
 
     // Verify that lock file was deleted after use
-#ifndef _WIN32 // GroupShared cannot clean lock file on Windows
     CHECK(!File::exists("test_shared.tightdb.lock"));
-#endif
 }
 
 
@@ -1139,7 +1230,6 @@ TEST(Shared_FromSerialized)
     }
 }
 
-
 TEST(StringIndex_Bug1)
 {
     File::try_remove("test.tightdb");
@@ -1165,7 +1255,6 @@ TEST(StringIndex_Bug1)
         db.commit();
     }
 }
-
 
 TEST(StringIndex_Bug2)
 {
