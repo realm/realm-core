@@ -761,7 +761,7 @@ TEST(Shared_WriterThreads)
 
 
 #if defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
-
+// Not supported on Windows in particular? Keywords: winbug
 TEST(Shared_RobustAgainstDeathDuringWrite)
 {
     // Abort if robust mutexes are not supported on the current
@@ -1243,7 +1243,7 @@ TEST(StringIndex_Bug3)
 
 // disable shared async on windows
 #ifndef _WIN32
-
+// Todo. Keywords: winbug
 TEST(Shared_Async)
 {
     // Clean up old state

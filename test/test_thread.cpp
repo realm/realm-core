@@ -229,7 +229,7 @@ TEST(Thread_CriticalSection2)
 
 
 #ifdef TEST_ROBUSTNESS
-
+// Todo. Not supported on Windows in particular? Keywords: winbug
 TEST(Thread_RobustMutex)
 {
     // Abort if robust mutexes are not supported on the current
