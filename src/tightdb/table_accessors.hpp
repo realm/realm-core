@@ -1118,9 +1118,12 @@ class ColumnAccessor<Taboid, col_idx, StringData>:
     public ColumnAccessorBase<Taboid, col_idx, StringData>, public Columns<StringData> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, StringData> Base;
-
 public:
-    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {
+        // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
+        Columns<StringData>::m_column = col_idx;
+        Columns<StringData>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
+    }
 
     size_t count(StringData value) const
     {

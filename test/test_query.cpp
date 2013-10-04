@@ -91,9 +91,36 @@ TIGHTDB_TABLE_5(ThreeColTable,
     fourth, Bool,
     fifth, String)
 
+TIGHTDB_TABLE_3(Books,
+                title,  String,
+                author, String,
+                pages, Int)
 
 } // anonymous namespace
 
+
+TEST(NextGenSyntaxTypedString) 
+{
+    Books books;
+
+    books.add("Computer Architecture and Organization", "B. Govindarajalu", 752);
+    books.add("Introduction to Quantum Mechanics", "David Griffiths", 480);
+    books.add("Biophysics: Searching for Principles", "William Bialek", 640);
+
+    // Typed table:
+    Query q = books.column().pages >= 200 && books.column().author == "David Griffiths";
+    size_t match = q.find();
+    CHECK_EQUAL(1, match);
+    // You don't need to create a query object first:
+    match = (books.column().pages >= 200 && books.column().author == "David Griffiths").find();
+    CHECK_EQUAL(1, match);
+
+    // You can also create column objects and use them in expressions:
+    Columns<Int> pages = books.column().pages;
+    Columns<String> author = books.column().author;
+    match = (pages >= 200 && author == "David Griffiths").find(); 
+    CHECK_EQUAL(1, match);
+}
 
 TEST(NextGenSyntax) 
 {

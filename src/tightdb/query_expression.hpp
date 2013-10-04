@@ -660,7 +660,7 @@ template <class R> Operator<Div<typename Common<R, int64_t>::type> >& operator /
 }
 
 
-template <> class Columns<StringData>
+template <> class Columns<StringData> : public Subexpr
 {
 public:
     explicit Columns(size_t column, const Table* table) : m_table(NULL)
@@ -684,6 +684,15 @@ public:
     virtual const Table* get_table() 
     {
         return m_table;
+    }
+
+    virtual void evaluate(size_t index, ValueBase& destination) 
+    {
+        static_cast<void>(index);
+        static_cast<void>(destination);
+        // String column conditions use fallback to old query_engine.hpp, hence bypassing all the query_expression.hpp
+        // pathways like this method.
+        TIGHTDB_ASSERT(false);
     }
 
     const Table* m_table;
