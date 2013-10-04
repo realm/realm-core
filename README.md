@@ -225,9 +225,7 @@ is named according to the tag.
 
 ### Ubuntu 10.04, 12.04, and 13.04
 
-    sudo apt-get install texlive-latex-base
-    sudo apt-get install pandoc
-
+    sudo apt-get install texlive-latex-base texlive-latex-extra pandoc
 
 ### Fedora 17
 
