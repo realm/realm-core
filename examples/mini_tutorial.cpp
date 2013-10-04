@@ -11,11 +11,11 @@ TIGHTDB_TABLE_2(MyTable,
                 age,     Int)
 
 int main() {
-    // create an in-memory database
-    SharedGroup db("persons.tightdb", false, SharedGroup::durability_MemOnly);
+    // create an in-memory data structure
+    SharedGroup sg("persons.tightdb", false, SharedGroup::durability_MemOnly);
     {
         // a write transaction
-        WriteTransaction tr(db);
+        WriteTransaction tr(sg);
         // create a table
         MyTable::Ref table = tr.get_table<MyTable>("persons");
         // add three rows
@@ -27,7 +27,7 @@ int main() {
     }
     {
         // a read transaction
-        ReadTransaction tr(db);
+        ReadTransaction tr(sg);
         // get the table
         MyTable::ConstRef table = tr.get_table<MyTable>("persons");
         // calculate number of rows and total age
