@@ -847,6 +847,7 @@ public:
         ~ToDotHandler() {}
     };
     void bptree_to_dot(std::ostream&, ToDotHandler&) const;
+    void to_dot_parent_edge(std::ostream&) const;
 #endif
 
 protected:
@@ -966,7 +967,6 @@ protected:
     void destroy_children() TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
-    void to_dot_parent_edge(std::ostream&) const;
     std::pair<ref_type, std::size_t>
     get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
 #endif
@@ -1954,7 +1954,7 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
         elem_ndx_in_child = 0;
     }
     else {
-        // There is a choise to be made when the element is to be
+        // There is a choice to be made when the element is to be
         // inserted between two subtrees. It can either be appended to
         // the first subtree, or it can be prepended to the second
         // one. We currently always append to the first subtree. It is
