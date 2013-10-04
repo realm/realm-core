@@ -829,8 +829,13 @@ TEST(AdaptiveStringColumnIndex)
     asc.add("15");
     asc.add("HEJSA"); // 16
 
-    asc.create_index();
+    const StringIndex& ndx = asc.create_index();
     CHECK(asc.has_index());
+#ifdef TIGHTDB_DEBUG
+    ndx.verify_entries(asc);
+#else
+    static_cast<void>(ndx);
+#endif
 
     const size_t count0 = asc.count("HEJ");
     const size_t count1 = asc.count("HEJSA");
