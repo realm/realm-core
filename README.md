@@ -235,7 +235,7 @@ is named according to the tag.
 
 ### Fedora 18
 
-    sudo yum install pandoc-pdf
+    sudo yum install pandoc-pdf texlive
 
 ## Mac OSX
 
