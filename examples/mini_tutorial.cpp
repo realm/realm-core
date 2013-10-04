@@ -11,33 +11,28 @@ TIGHTDB_TABLE_2(MyTable,
                 age,     Int)
 
 int main() {
-    // Create an in-memory database
+    // create an in-memory database
     SharedGroup db("persons.tightdb", false, SharedGroup::durability_MemOnly);
-
-    // In a write transaction:
-    // - create a table
-    // - add rows
     {
+        // a write transaction
         WriteTransaction tr(db);
+        // create a table
         MyTable::Ref table = tr.get_table<MyTable>("persons");
-
-        table->add("Jill", 40);
+        // add three rows
+        table->add("Mary", 40);
         table->add("Mary", 20);
         table->add("Phil", 43);
-        table->add("Sara", 47);
-
+        // commit changes
         tr.commit();
     }
-
-    // In a read transaction:
-    // - calculate number of rows and total age
-    // - find persons in the forties
     {
+        // a read transaction
         ReadTransaction tr(db);
-
+        // get the table
         MyTable::ConstRef table = tr.get_table<MyTable>("persons");
+        // calculate number of rows and total age
         cout << table->size() << " " << table->column().age.sum() << endl;
-
+        // find persons in the forties
         MyTable::View view = table->where().age.between(40, 49).find_all();
         for(size_t i=0; i<view.size(); ++i) {
             cout << view[i].name << endl;
