@@ -233,6 +233,10 @@ is named according to the tag.
 
     sudo yum install pandoc-markdown2pdf
 
+### Fedora 18
+
+    sudo yum install pandoc-pdf
+
 ## Mac OSX
 
 Install Pandoc and XeLaTeX (aka MacTeX) by following the instructions
