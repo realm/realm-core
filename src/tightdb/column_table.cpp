@@ -1,3 +1,6 @@
+#include <iostream>
+#include <iomanip>
+
 #include <tightdb/column_table.hpp>
 
 using namespace std;
@@ -21,6 +24,17 @@ void ColumnSubtableParent::child_accessor_destroyed(size_t subtable_ndx) TIGHTDB
         m_table->unbind_ref();
 }
 
+#ifdef TIGHTDB_DEBUG
+
+pair<ref_type, size_t> ColumnSubtableParent::get_to_dot_parent(size_t ndx_in_parent) const
+{
+    pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_parent);
+    return make_pair(p.first.m_ref, p.second);
+}
+
+#endif
+
+
 size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     // FIXME: If the table object is cached, it is possible to get the
@@ -32,7 +46,8 @@ size_t ColumnTable::get_subtable_size(size_t ndx) const TIGHTDB_NOEXCEPT
     if (columns_ref == 0)
         return 0;
 
-    ref_type first_col_ref = Array(columns_ref, 0, 0, get_alloc()).get_as_ref(0);
+    const char* columns_header = get_alloc().translate(columns_ref);
+    ref_type first_col_ref = to_ref(Array::get(columns_header, 0));
     return get_size_from_ref(first_col_ref, get_alloc());
 }
 
@@ -53,9 +68,9 @@ void ColumnTable::insert(size_t ndx, const Table* subtable)
 
     ref_type columns_ref = 0;
     if (subtable)
-        columns_ref = clone_table_columns(subtable);
+        columns_ref = clone_table_columns(subtable); // Throws
 
-    Column::insert(ndx, columns_ref);
+    Column::insert(ndx, columns_ref); // Throws
 }
 
 void ColumnTable::set(size_t ndx, const Table* subtable)
@@ -79,16 +94,17 @@ void ColumnTable::fill(size_t n)
     // TODO: this is a very naive approach
     // we could speedup by creating full nodes directly
     for (size_t i = 0; i < n; ++i) {
-        add(0); // zero-ref indicates empty table
+        Table* t = 0; // Null for empty table
+        add(t); // Throws
     }
 }
 
-void ColumnTable::erase(size_t ndx)
+void ColumnTable::erase(size_t ndx, bool is_last)
 {
     TIGHTDB_ASSERT(ndx < size());
     detach_subtable_accessors();
     destroy_subtable(ndx);
-    Column::erase(ndx);
+    Column::erase(ndx, is_last);
 }
 
 void ColumnTable::clear()
@@ -106,21 +122,23 @@ void ColumnTable::move_last_over(size_t ndx)
     detach_subtable_accessors();
     destroy_subtable(ndx);
 
-    size_t ndx_last = size()-1;
-    int64_t v = get(ndx_last);
+    size_t last_ndx = size() - 1;
+    int_fast64_t v = get(last_ndx);
     Column::set(ndx, v);
-    Column::erase(ndx_last);
+
+    bool is_last = true;
+    Column::erase(last_ndx, is_last);
 }
 
 void ColumnTable::destroy_subtable(size_t ndx)
 {
-    ref_type ref_columns = get_as_ref(ndx);
-    if (ref_columns == 0)
+    ref_type columns_ref = get_as_ref(ndx);
+    if (columns_ref == 0)
         return; // It was never created
 
     // Delete sub-tree
     Allocator& alloc = get_alloc();
-    Array columns(ref_columns, 0, 0, alloc);
+    Array columns(columns_ref, 0, 0, alloc);
     columns.destroy();
 }
 
@@ -129,13 +147,18 @@ bool ColumnTable::compare_table(const ColumnTable& c) const
     size_t n = size();
     if (c.size() != n)
         return false;
-    for (size_t i=0; i<n; ++i) {
+    for (size_t i = 0; i != n; ++i) {
         ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
         ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();
         if (!compare_subtable_rows(*t1, *t2))
             return false;
     }
     return true;
+}
+
+void ColumnTable::do_detach_subtable_accessors() TIGHTDB_NOEXCEPT
+{
+    detach_subtable_accessors();
 }
 
 
@@ -148,24 +171,47 @@ void ColumnTable::Verify() const
     // Verify each sub-table
     size_t n = size();
     for (size_t i = 0; i < n; ++i) {
-        // We want to verify any cached table instance so we do not
+        // We want to verify any cached table accessors so we do not
         // want to skip null refs here.
         ConstTableRef subtable = get_subtable(i, m_spec_ref);
         subtable->Verify();
     }
 }
 
-void ColumnTable::leaf_to_dot(ostream& out, const Array& array) const
+void ColumnTable::to_dot(ostream& out, StringData title) const
 {
-    array.to_dot(out);
+    ref_type ref = m_array->get_ref();
+    out << "subgraph cluster_subtable_column" << ref << " {" << endl;
+    out << " label = \"Subtable column";
+    if (title.size() != 0)
+        out << "\\n'" << title << "'";
+    out << "\";" << endl;
+    tree_to_dot(out);
+    out << "}" << endl;
 
-    size_t n = array.size();
-    for (size_t i = 0; i < n; ++i) {
-        if (array.get_as_ref(i) == 0)
+    size_t n = size();
+    for (size_t i = 0; i != n; ++i) {
+        if (get_as_ref(i) == 0)
             continue;
         ConstTableRef subtable = get_subtable(i, m_spec_ref);
         subtable->to_dot(out);
     }
+}
+
+namespace {
+
+void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
+{
+    Array leaf(mem, 0, 0, alloc);
+    int indent = level * 2;
+    out << setw(indent) << "" << "Subtable leaf (size: "<<leaf.size()<<")\n";
+}
+
+} // anonymous namespace
+
+void ColumnTable::dump_node_structure(ostream& out, int level) const
+{
+    m_array->dump_bptree_structure(out, level, &leaf_dumper);
 }
 
 #endif // TIGHTDB_DEBUG

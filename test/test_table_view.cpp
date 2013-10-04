@@ -11,6 +11,7 @@ using namespace std;
 using namespace tightdb;
 
 namespace {
+
 TIGHTDB_TABLE_1(TestTableInt,
                 first, Int)
 
@@ -19,10 +20,11 @@ TIGHTDB_TABLE_2(TestTableInt2,
                 second, Int)
 
 TIGHTDB_TABLE_2(TestTableDate,
-                first, Date,
+                first, DateTime,
                 second, Int)
 
-}
+} // anonymous namespace
+
 
 TEST(TableViewJSON)
 {
@@ -49,15 +51,15 @@ TEST(TableViewDateMaxMin)
 {
     TestTableDate ttd;
 
-    ttd.add(Date(2014, 7, 10), 1);
-    ttd.add(Date(2013, 7, 10), 1);
-    ttd.add(Date(2015, 8, 10), 1);
-    ttd.add(Date(2015, 7, 10), 1);
+    ttd.add(DateTime(2014, 7, 10), 1);
+    ttd.add(DateTime(2013, 7, 10), 1);
+    ttd.add(DateTime(2015, 8, 10), 1);
+    ttd.add(DateTime(2015, 7, 10), 1);
 
     TestTableDate::View v = ttd.column().second.find_all(1);
 
-    CHECK_EQUAL(Date(2015, 8, 10), v.column().first.maximum());
-    CHECK_EQUAL(Date(2013, 7, 10), v.column().first.minimum());
+    CHECK_EQUAL(DateTime(2015, 8, 10), v.column().first.maximum());
+    CHECK_EQUAL(DateTime(2013, 7, 10), v.column().first.minimum());
 }
 
 TEST(GetSetInteger)
@@ -652,6 +654,7 @@ TEST(TableView_to_string)
     CHECK_EQUAL(s+s1, ss3.str());
 }
 
+
 TEST(TableView_ref_counting)
 {
     TableView tv, tv2;
@@ -672,7 +675,7 @@ TEST(TableView_ref_counting)
     }
 
     // Now try to access TableView and see that the Table is still alive
-    size_t i = tv.get_int(0, 0);
+    size_t i = tv.get_int(0, 0);//FIXME:VS2012 warning  warning C4244: 'initializing' : conversion from 'int64_t' to 'size_t', possible loss of data
     CHECK_EQUAL(i, 12);
     string s = tv2.get_string(0, 0);
     CHECK_EQUAL(s, "just a test string");

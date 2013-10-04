@@ -323,17 +323,16 @@ TEST(Table_HighLevelCopy)
     CHECK(*table3 == table);
 }
 
+
 namespace {
 
-void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows); // pre-declaration
-
-void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
+void setup_multi_table(Table& table, size_t rows, size_t sub_rows)
 {
     // Create table with all column types
     Spec& s = table.get_spec();
     s.add_column(type_Int,    "int");
     s.add_column(type_Bool,   "bool");
-    s.add_column(type_Date,   "date");
+    s.add_column(type_DateTime,"date");
     s.add_column(type_Float,  "float");
     s.add_column(type_Double, "double");
     s.add_column(type_String, "string");
@@ -351,7 +350,7 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
         int64_t sign = (i%2 == 0) ? 1 : -1;
         table.insert_int(0, i, int64_t(i*sign));
         table.insert_bool(1, i, (i % 2 ? true : false));
-        table.insert_date(2, i, 12345);
+        table.insert_datetime(2, i, 12345);
         table.insert_float(3, i, 123.456f*sign);
         table.insert_double(4, i, 9876.54321*sign);
 
@@ -387,7 +386,7 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
                 table.insert_mixed(9, i, "string");
                 break;
             case 3:
-                table.insert_mixed(9, i, Date(123456789));
+                table.insert_mixed(9, i, DateTime(123456789));
                 break;
             case 4:
                 table.insert_mixed(9, i, BinaryData("binary", 7));
@@ -424,7 +423,7 @@ void setup_multi_table(Table& table, const size_t rows, const size_t sub_rows)
         }
 
         // Add sub-tables to table column
-        for (size_t j=0; j<sub_rows+i; j++) {
+        for (size_t j = 0; j != sub_rows+i; ++j) {
             TableRef subtable = table.get_subtable(10, i);
             int64_t val = -123+i*j*1234*sign;
             subtable->insert_int(0, j, val);
@@ -471,8 +470,8 @@ TEST(Table_Move_All_Types)
     table.set_index(6);
 
     while (table.size() > 1) {
-        const size_t len = table.size();
-        const size_t ndx = size_t(rand()) % (len-1);
+        size_t size = table.size();
+        size_t ndx = size_t(rand()) % (size-1);
 
         table.move_last_over(ndx);
 
@@ -491,13 +490,13 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
         Spec child_spec = parent_spec.add_subtable_column("child");
 
         // Add all column types
-        child_spec.add_column(type_Int,    "int");    // 0
-        child_spec.add_column(type_Bool,   "bool");   // 1
-        child_spec.add_column(type_Float,  "float");  // 2
-        child_spec.add_column(type_Double, "double"); // 3
-        child_spec.add_column(type_Date,   "date");   // 4
-        child_spec.add_column(type_String, "string"); // 5
-        child_spec.add_column(type_Binary, "binary"); // 6
+        child_spec.add_column(type_Int,      "int");    // 0
+        child_spec.add_column(type_Bool,     "bool");   // 1
+        child_spec.add_column(type_Float,    "float");  // 2
+        child_spec.add_column(type_Double,   "double"); // 3
+        child_spec.add_column(type_DateTime, "date");   // 4
+        child_spec.add_column(type_String,   "string"); // 5
+        child_spec.add_column(type_Binary,   "binary"); // 6
         {
             Spec subspec = child_spec.add_subtable_column("table"); // 7
             subspec.add_column(type_Int, "i");
@@ -523,7 +522,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(not_found, degen_child->find_first_bool(1, false));
     CHECK_EQUAL(not_found, degen_child->find_first_float(2, 0));
     CHECK_EQUAL(not_found, degen_child->find_first_double(3, 0));
-    CHECK_EQUAL(not_found, degen_child->find_first_date(4, Date()));
+    CHECK_EQUAL(not_found, degen_child->find_first_datetime(4, DateTime()));
     CHECK_EQUAL(not_found, degen_child->find_first_string(5, StringData()));
 //    CHECK_EQUAL(not_found, degen_child->find_first_binary(6, BinaryData())); // Exists but not yet implemented
 //    CHECK_EQUAL(not_found, degen_child->find_first_subtable(7, subtab)); // Not yet implemented
@@ -533,7 +532,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, degen_child->find_all_bool(1, false).size());
     CHECK_EQUAL(0, degen_child->find_all_float(2, 0).size());
     CHECK_EQUAL(0, degen_child->find_all_double(3, 0).size());
-    CHECK_EQUAL(0, degen_child->find_all_date(4, Date()).size());
+    CHECK_EQUAL(0, degen_child->find_all_datetime(4, DateTime()).size());
     CHECK_EQUAL(0, degen_child->find_all_string(5, StringData()).size());
 //    CHECK_EQUAL(0, degen_child->find_all_binary(6, BinaryData()).size()); // Exists but not yet implemented
 //    CHECK_EQUAL(0, degen_child->find_all_subtable(7, subtab).size()); // Not yet implemented
@@ -572,21 +571,21 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
 //    CHECK_EQUAL(0, degen_child->count_subtable(7, subtab)); // Not yet implemented
 //    CHECK_EQUAL(0, degen_child->count_mixed(8, Mixed())); // Not yet implemented
 
-    CHECK_EQUAL(0, degen_child->minimum(0));
+    CHECK_EQUAL(0, degen_child->minimum_int(0));
     CHECK_EQUAL(0, degen_child->minimum_float(2));
     CHECK_EQUAL(0, degen_child->minimum_double(3));
 //    CHECK_EQUAL(Date(), degen_child->minimum_date(4, Date())); // Not yet implemented
 
-    CHECK_EQUAL(0, degen_child->maximum(0));
+    CHECK_EQUAL(0, degen_child->maximum_int(0));
     CHECK_EQUAL(0, degen_child->maximum_float(2));
     CHECK_EQUAL(0, degen_child->maximum_double(3));
 //    CHECK_EQUAL(Date(), degen_child->maximum_date(4, Date())); // Not yet implemented
 
-    CHECK_EQUAL(0, degen_child->sum(0));
+    CHECK_EQUAL(0, degen_child->sum_int(0));
     CHECK_EQUAL(0, degen_child->sum_float(2));
     CHECK_EQUAL(0, degen_child->sum_double(3));
 
-    CHECK_EQUAL(0, degen_child->average(0));
+    CHECK_EQUAL(0, degen_child->average_int(0));
     CHECK_EQUAL(0, degen_child->average_float(2));
     CHECK_EQUAL(0, degen_child->average_double(3));
 
@@ -596,7 +595,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(not_found, degen_child->where().equal(1, false).find());
     CHECK_EQUAL(not_found, degen_child->where().equal(2, float()).find());
     CHECK_EQUAL(not_found, degen_child->where().equal(3, double()).find());
-    CHECK_EQUAL(not_found, degen_child->where().equal_date(4, Date()).find());
+    CHECK_EQUAL(not_found, degen_child->where().equal_datetime(4, DateTime()).find());
     CHECK_EQUAL(not_found, degen_child->where().equal(5, StringData()).find());
     CHECK_EQUAL(not_found, degen_child->where().equal(6, BinaryData()).find());
 //    CHECK_EQUAL(not_found, degen_child->where().equal(7, subtab).find()); // Not yet implemented
@@ -605,7 +604,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(not_found, degen_child->where().not_equal(0, int64_t()).find());
     CHECK_EQUAL(not_found, degen_child->where().not_equal(2, float()).find());
     CHECK_EQUAL(not_found, degen_child->where().not_equal(3, double()).find());
-    CHECK_EQUAL(not_found, degen_child->where().not_equal_date(4, Date()).find());
+    CHECK_EQUAL(not_found, degen_child->where().not_equal_datetime(4, DateTime()).find());
     CHECK_EQUAL(not_found, degen_child->where().not_equal(5, StringData()).find());
     CHECK_EQUAL(not_found, degen_child->where().not_equal(6, BinaryData()).find());
 //    CHECK_EQUAL(not_found, degen_child->where().not_equal(7, subtab).find()); // Not yet implemented
@@ -624,7 +623,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, r);
 
     size_t res;
-    degen_child->where().equal(5, "hello").average(0, &res);
+    degen_child->where().equal(5, "hello").average_int(0, &res);
     CHECK_EQUAL(0, res);
 }
 
@@ -1000,7 +999,7 @@ TEST(Table_Distinct)
     table.column().second.set_index();
     CHECK(table.column().second.has_index());
 
-    TestTableEnum::View view = table.column().second.distinct();
+    TestTableEnum::View view = table.column().second.get_distinct_view();
 
     CHECK_EQUAL(4, view.size());
     CHECK_EQUAL(0, view.get_source_ndx(0));
@@ -1182,6 +1181,56 @@ TEST(TableAutoEnumerationFindFindAll)
     CHECK_EQUAL("eftg", tv[2].second);
     CHECK_EQUAL("eftg", tv[3].second);
     CHECK_EQUAL("eftg", tv[4].second);
+}
+
+namespace {
+TIGHTDB_TABLE_4(TestTableEnum4,
+                col1, String,
+                col2, String,
+                col3, String,
+                col4, String)
+} // anonymous namespace
+
+TEST(TableAutoEnumerationOptimize)
+{
+    TestTableEnum4 t;
+
+    // Insert non-optimzable strings
+    string s;
+    for (size_t i = 0; i < 10; ++i) {
+        t.add(s.c_str(), s.c_str(), s.c_str(), s.c_str());
+        s += "x";
+    }
+    t.optimize();
+
+    // AutoEnumerate in reverse order
+    for (size_t i = 0; i < 10; ++i) {
+        t[i].col4 = "test";
+    }
+    t.optimize();
+    for (size_t i = 0; i < 10; ++i) {
+        t[i].col3 = "test";
+    }
+    t.optimize();
+    for (size_t i = 0; i < 10; ++i) {
+        t[i].col2 = "test";
+    }
+    t.optimize();
+    for (size_t i = 0; i < 10; ++i) {
+        t[i].col1 = "test";
+    }
+    t.optimize();
+
+    for (size_t i = 0; i < 10; ++i) {
+        CHECK_EQUAL("test", t[i].col1);
+        CHECK_EQUAL("test", t[i].col2);
+        CHECK_EQUAL("test", t[i].col3);
+        CHECK_EQUAL("test", t[i].col4);
+    }
+
+#ifdef TIGHTDB_DEBUG
+    t.Verify();
+#endif
 }
 
 namespace {
@@ -1498,6 +1547,7 @@ TEST(Table_Spec_DeleteColumns)
 #endif
 }
 
+
 TEST(Table_Spec_AddColumns)
 {
     Group group;
@@ -1746,20 +1796,20 @@ TEST(Table_Mixed)
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
 
     table.insert_int(0, 3, 0);
-    table.insert_mixed(1, 3, Date(324234));
+    table.insert_mixed(1, 3, DateTime(324234));
     table.insert_done();
 
     CHECK_EQUAL(0,  table.get_int(0, 0));
     CHECK_EQUAL(43, table.get_int(0, 1));
     CHECK_EQUAL(0,  table.get_int(0, 3));
-    CHECK_EQUAL(type_Bool,   table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(type_Int,    table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_Date,   table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_Bool,    table.get_mixed(1, 0).get_type());
+    CHECK_EQUAL(type_Int,     table.get_mixed(1, 1).get_type());
+    CHECK_EQUAL(type_String,  table.get_mixed(1, 2).get_type());
+    CHECK_EQUAL(type_DateTime,table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
 
     table.insert_int(0, 4, 43);
     table.insert_mixed(1, 4, Mixed(BinaryData("binary", 7)));
@@ -1769,15 +1819,15 @@ TEST(Table_Mixed)
     CHECK_EQUAL(43, table.get_int(0, 1));
     CHECK_EQUAL(0,  table.get_int(0, 3));
     CHECK_EQUAL(43, table.get_int(0, 4));
-    CHECK_EQUAL(type_Bool,   table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(type_Int,    table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_Date,   table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_Bool,     table.get_mixed(1, 0).get_type());
+    CHECK_EQUAL(type_Int,      table.get_mixed(1, 1).get_type());
+    CHECK_EQUAL(type_String,   table.get_mixed(1, 2).get_type());
+    CHECK_EQUAL(type_DateTime, table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(type_Binary, table.get_mixed(1, 4).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
     CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
 
@@ -1790,16 +1840,16 @@ TEST(Table_Mixed)
     CHECK_EQUAL(0,  table.get_int(0, 3));
     CHECK_EQUAL(43, table.get_int(0, 4));
     CHECK_EQUAL(0,  table.get_int(0, 5));
-    CHECK_EQUAL(type_Bool,   table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(type_Int,    table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_Date,   table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_Bool,     table.get_mixed(1, 0).get_type());
+    CHECK_EQUAL(type_Int,      table.get_mixed(1, 1).get_type());
+    CHECK_EQUAL(type_String,   table.get_mixed(1, 2).get_type());
+    CHECK_EQUAL(type_DateTime, table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(type_Binary, table.get_mixed(1, 4).get_type());
     CHECK_EQUAL(type_Table,  table.get_mixed(1, 5).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
     CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
 
@@ -1833,10 +1883,10 @@ TEST(Table_Mixed)
     CHECK_EQUAL(0,  table.get_int(0, 5));
     CHECK_EQUAL(31, table.get_int(0, 6));
     CHECK_EQUAL(0,  table.get_int(0, 7));
-    CHECK_EQUAL(type_Bool,   table.get_mixed(1, 0).get_type());
-    CHECK_EQUAL(type_Int,    table.get_mixed(1, 1).get_type());
-    CHECK_EQUAL(type_String, table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_Date,   table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_Bool,     table.get_mixed(1, 0).get_type());
+    CHECK_EQUAL(type_Int,      table.get_mixed(1, 1).get_type());
+    CHECK_EQUAL(type_String,   table.get_mixed(1, 2).get_type());
+    CHECK_EQUAL(type_DateTime, table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(type_Binary, table.get_mixed(1, 4).get_type());
     CHECK_EQUAL(type_Table,  table.get_mixed(1, 5).get_type());
     CHECK_EQUAL(type_Float,  table.get_mixed(1, 6).get_type());
@@ -1844,7 +1894,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
-    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_date());
+    CHECK_EQUAL(324234, table.get_mixed(1, 3).get_datetime());
     CHECK_EQUAL("binary", table.get_mixed(1, 4).get_binary().data());
     CHECK_EQUAL(7,      table.get_mixed(1, 4).get_binary().size());
     CHECK_EQUAL(float(1.123),  table.get_mixed(1, 6).get_float());
@@ -1867,17 +1917,17 @@ TEST(Table_Mixed2)
 
     table.add(int64_t(1));
     table.add(true);
-    table.add(Date(1234));
+    table.add(DateTime(1234));
     table.add("test");
 
-    CHECK_EQUAL(type_Int,    table[0].first.get_type());
-    CHECK_EQUAL(type_Bool,   table[1].first.get_type());
-    CHECK_EQUAL(type_Date,   table[2].first.get_type());
-    CHECK_EQUAL(type_String, table[3].first.get_type());
+    CHECK_EQUAL(type_Int,      table[0].first.get_type());
+    CHECK_EQUAL(type_Bool,     table[1].first.get_type());
+    CHECK_EQUAL(type_DateTime, table[2].first.get_type());
+    CHECK_EQUAL(type_String,   table[3].first.get_type());
 
     CHECK_EQUAL(1,            table[0].first.get_int());
     CHECK_EQUAL(true,         table[1].first.get_bool());
-    CHECK_EQUAL(time_t(1234), table[2].first.get_date());
+    CHECK_EQUAL(time_t(1234), table[2].first.get_datetime());
     CHECK_EQUAL("test",       table[3].first.get_string());
 }
 
@@ -2122,7 +2172,7 @@ TEST(Table_SubtableCopyOnSetAndInsert)
 
 namespace {
 TIGHTDB_TABLE_2(TableDateAndBinary,
-                date, Date,
+                date, DateTime,
                 bin, Binary)
 } // anonymous namespace
 
@@ -2363,7 +2413,7 @@ TIGHTDB_TABLE_3(TableAgg,
                 c_float, Float,
                 c_double, Double)
 
-                // TODO: Bool? Date
+                // TODO: Bool? DateTime
 } // anonymous namespace
 
 #if TEST_DURATION > 0

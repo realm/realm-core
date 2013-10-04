@@ -38,6 +38,11 @@ namespace {
 /// remain zero.
 class DefaultAllocator: public tightdb::Allocator {
 public:
+    DefaultAllocator()
+    {
+        m_baseline = 1; // Zero is not available
+    }
+
     MemRef alloc(size_t size) TIGHTDB_OVERRIDE
     {
         char* addr = static_cast<char*>(malloc(size));
@@ -74,11 +79,6 @@ public:
     char* translate(ref_type ref) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         return reinterpret_cast<char*>(ref);
-    }
-
-    bool is_read_only(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
-    {
-        return false;
     }
 
 #ifdef TIGHTDB_DEBUG

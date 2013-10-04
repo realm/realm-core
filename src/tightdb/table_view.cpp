@@ -11,7 +11,7 @@ TableView::TableView(ConstTableView tv): TableViewBase(&tv) {}
 
 // Searching
 
-// find_*_integer() methods are used for all "kinds" of integer values (bool, int, Date)
+// find_*_integer() methods are used for all "kinds" of integer values (bool, int, DateTime)
 
 size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
 {
@@ -124,7 +124,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t)
 
 // sum
 
-int64_t TableViewBase::sum(size_t column_ndx) const
+int64_t TableViewBase::sum_int(size_t column_ndx) const
 {
     return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, 0);
 }
@@ -139,7 +139,7 @@ double TableViewBase::sum_double(size_t column_ndx) const
 
 // Maximum
 
-int64_t TableViewBase::maximum(size_t column_ndx) const
+int64_t TableViewBase::maximum_int(size_t column_ndx) const
 {
     return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0);
 }
@@ -151,14 +151,14 @@ double TableViewBase::maximum_double(size_t column_ndx) const
 {
     return aggregate<act_Max, double>(&ColumnDouble::maximum, column_ndx, 0.0);
 }
-Date TableViewBase::maximum_date(size_t column_ndx) const
+DateTime TableViewBase::maximum_datetime(size_t column_ndx) const
 {
     return aggregate<act_Max, int64_t>(&Column::maximum, column_ndx, 0);
 }
 
 // Minimum
 
-int64_t TableViewBase::minimum(size_t column_ndx) const
+int64_t TableViewBase::minimum_int(size_t column_ndx) const
 {
     return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0);
 }
@@ -170,14 +170,14 @@ double TableViewBase::minimum_double(size_t column_ndx) const
 {
     return aggregate<act_Min, double>(&ColumnDouble::minimum, column_ndx, 0.0);
 }
-Date TableViewBase::minimum_date(size_t column_ndx) const
+DateTime TableViewBase::minimum_datetime(size_t column_ndx) const
 {
     return aggregate<act_Min, int64_t>(&Column::minimum, column_ndx, 0);
 }
 
 // Average
 
-double TableViewBase::average(size_t column_ndx) const
+double TableViewBase::average_int(size_t column_ndx) const
 {
     return aggregate<act_Sum, int64_t>(&Column::sum, column_ndx, 0) / static_cast<double>(size());
 }
@@ -208,7 +208,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
 {
     TIGHTDB_ASSERT(m_table);
     TIGHTDB_ASSERT(m_table->get_column_type(column) == type_Int  ||
-                   m_table->get_column_type(column) == type_Date ||
+                   m_table->get_column_type(column) == type_DateTime ||
                    m_table->get_column_type(column) == type_Bool);
 
     if (m_refs.size() == 0)
@@ -230,10 +230,10 @@ void TableViewBase::sort(size_t column, bool Ascending)
             vals.add(v);
         }
     }
-    else if (m_table->get_column_type(column) == type_Date) {
+    else if (m_table->get_column_type(column) == type_DateTime) {
         for (size_t t = 0; t < m_refs.size(); t++) {
             size_t idx = size_t(m_refs.get(t));
-            int64_t v = int64_t(m_table->get_date(column, idx).get_date());
+            int64_t v = int64_t(m_table->get_datetime(column, idx).get_datetime());
             vals.add(v);
         }
     }
@@ -335,7 +335,13 @@ void TableView::remove(size_t ndx)
 
     // Update refs
     m_refs.erase(ndx);
-    m_refs.IncrementIf(ndx, -1);
+
+    // Decrement row indexes greater than or equal to ndx
+    //
+    // FIXME: I believe this should have been 'real_ndx', not 'ndx'
+    //
+    // FIXME: Dangerous cast below: unsigned -> signed
+    m_refs.adjust_ge(int_fast64_t(ndx), -1);
 }
 
 

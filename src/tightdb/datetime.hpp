@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_DATE_HPP
-#define TIGHTDB_DATE_HPP
+#ifndef TIGHTDB_DATETIME_HPP
+#define TIGHTDB_DATETIME_HPP
 
 #include <ctime>
 #include <ostream>
@@ -26,22 +26,22 @@
 namespace tightdb {
 
 
-class Date {
+class DateTime {
 public:
-    Date() TIGHTDB_NOEXCEPT: m_time(0) {}
+    DateTime() TIGHTDB_NOEXCEPT: m_time(0) {}
 
     /// Construct from the number of seconds since Jan 1 00:00:00 UTC
     /// 1970.
-    Date(std::time_t d) TIGHTDB_NOEXCEPT: m_time(d) {}
+    DateTime(std::time_t d) TIGHTDB_NOEXCEPT: m_time(d) {}
 
-    ~Date() TIGHTDB_NOEXCEPT {}
+    ~DateTime() TIGHTDB_NOEXCEPT {}
 
     /// Return the time as seconds since Jan 1 00:00:00 UTC 1970.
-    std::time_t get_date() const TIGHTDB_NOEXCEPT { return m_time; }
+    std::time_t get_datetime() const TIGHTDB_NOEXCEPT { return m_time; }
 
-    friend bool operator==(const Date&, const Date&) TIGHTDB_NOEXCEPT;
-    friend bool operator!=(const Date&, const Date&) TIGHTDB_NOEXCEPT;
-    friend bool operator< (const Date&, const Date&) TIGHTDB_NOEXCEPT;
+    friend bool operator==(const DateTime&, const DateTime&) TIGHTDB_NOEXCEPT;
+    friend bool operator!=(const DateTime&, const DateTime&) TIGHTDB_NOEXCEPT;
+    friend bool operator< (const DateTime&, const DateTime&) TIGHTDB_NOEXCEPT;
 
     /// Construct from broken down local time.
     ///
@@ -62,10 +62,10 @@ public:
     ///
     /// \param seconds Seconds after the minute in the range [0,
     /// 60]. Note that the range allows for leap seconds.
-    Date(int year, int month, int day, int hours = 0, int minutes = 0, int seconds = 0);
+    DateTime(int year, int month, int day, int hours = 0, int minutes = 0, int seconds = 0);
 
     template<class Ch, class Tr>
-    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Date&);
+    friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const DateTime&);
 
 private:
     std::time_t m_time; // Seconds since Jan 1 00:00:00 UTC 1970.
@@ -78,32 +78,32 @@ private:
 
 // Implementation:
 
-inline bool operator==(const Date& a, const Date& b) TIGHTDB_NOEXCEPT
+inline bool operator==(const DateTime& a, const DateTime& b) TIGHTDB_NOEXCEPT
 {
     return a.m_time == b.m_time;
 }
 
-inline bool operator!=(const Date& a, const Date& b) TIGHTDB_NOEXCEPT
+inline bool operator!=(const DateTime& a, const DateTime& b) TIGHTDB_NOEXCEPT
 {
     return a.m_time != b.m_time;
 }
 
-inline bool operator<(const Date& a, const Date& b) TIGHTDB_NOEXCEPT
+inline bool operator<(const DateTime& a, const DateTime& b) TIGHTDB_NOEXCEPT
 {
     return a.m_time < b.m_time;
 }
 
-inline Date::Date(int year, int month, int day, int hours, int minutes, int seconds):
+inline DateTime::DateTime(int year, int month, int day, int hours, int minutes, int seconds):
     m_time(assemble(year, month, day, hours, minutes, seconds)) {}
 
 template<class Ch, class Tr>
-inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Date& d)
+inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const DateTime& d)
 {
-    out << "Date("<<d.m_time<<")";
+    out << "DateTime("<<d.m_time<<")";
     return out;
 }
 
-inline std::time_t Date::assemble(int year, int month, int day, int hours, int minutes, int seconds)
+inline std::time_t DateTime::assemble(int year, int month, int day, int hours, int minutes, int seconds)
 {
     std::tm local_time;
     local_time.tm_year  = year  - 1900;
@@ -119,5 +119,5 @@ inline std::time_t Date::assemble(int year, int month, int day, int hours, int m
 
 } // namespace tightdb
 
-#endif // TIGHTDB_DATE_HPP
+#endif // TIGHTDB_DATETIME_HPP
 

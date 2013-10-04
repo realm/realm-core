@@ -1,10 +1,24 @@
 #include "testsettings.hpp"
 #ifdef TEST_ARRAY_BLOB
 
+#include <cstring>
+
 #include <UnitTest++.h>
+
 #include <tightdb/array_blob.hpp>
 
+using namespace std;
 using namespace tightdb;
+
+TEST(ArrayBlob_AddEmpty)
+{
+    ArrayBlob blob;
+
+    blob.add("", 0);
+
+    // Cleanup
+    blob.destroy();
+}
 
 TEST(ArrayBlob)
 {

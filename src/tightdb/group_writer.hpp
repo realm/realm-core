@@ -53,10 +53,14 @@ public:
     std::size_t get_file_size() const TIGHTDB_NOEXCEPT;
 
     /// Write the specified chunk into free space.
+    void write(const char* data, std::size_t size);
+
+    /// Write the specified array data and its checksum into free
+    /// space.
     ///
     /// Returns the position in the file where the first byte was
     /// written.
-    std::size_t write(const char* data, std::size_t size);
+    std::size_t write_array(const char* data, std::size_t size, uint_fast32_t checksum);
 
 #ifdef TIGHTDB_DEBUG
     void dump();
@@ -102,7 +106,7 @@ private:
     /// size, and `chunk_size` is the size of that chunk.
     std::pair<std::size_t, std::size_t> extend_free_space(std::size_t requested_size);
 
-    void write_at(std::size_t pos, const char* data, std::size_t size);
+    void write_array_at(std::size_t pos, const char* data, std::size_t size);
 };
 
 
@@ -113,6 +117,13 @@ private:
 inline std::size_t GroupWriter::get_file_size() const TIGHTDB_NOEXCEPT
 {
     return m_file_map.get_size();
+}
+
+inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock)
+{
+    TIGHTDB_ASSERT(read_lock <= current);
+    m_current_version  = current;
+    m_readlock_version = read_lock;
 }
 
 } // namespace tightdb

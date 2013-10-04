@@ -4,6 +4,7 @@ benchmark-insert-add benchmark-insert-get-set benchmark-prealloc experiments
 test_tightdb_DEPS = util
 test_sqlite3_DEPS = util
 test_stl_DEPS     = util
+experiments_DEPS  = util
 
 TEST_PROGRAMS = tightdb-tests
 
@@ -17,7 +18,6 @@ tightdb_tests_CFLAGS  = -Wno-sign-compare $(shell pkg-config unittest++ --cflags
 tightdb_tests_LDFLAGS = $(shell pkg-config unittest++ --libs)
 else
 PASSIVE_SUBDIRS   += UnitTest++
-experiments_DEPS  += UnitTest++
 tightdb_tests_CFLAGS  = -IUnitTest++/src
 tightdb_tests_LDFLAGS = -LUnitTest++ -lUnitTest++
 tightdb_tests_DEPS    = UnitTest++
@@ -63,7 +63,7 @@ benchmark-prealloc:
 
 # Build and run whatever is in experiements/testcase.cpp
 .PHONY: testcase testcase-debug
-testcase:
+testcase: subdir/util/minimal
 	@$(MAKE) -C experiments test
-testcase-debug:
+testcase-debug: subdir/util/debug
 	@$(MAKE) -C experiments test-debug

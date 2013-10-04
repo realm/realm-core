@@ -9,8 +9,8 @@ using namespace std;
 using namespace tightdb;
 
 
-ArrayBinary::ArrayBinary(ArrayParent* parent, size_t pndx, Allocator& alloc):
-    Array(type_HasRefs, parent, pndx, alloc),
+ArrayBinary::ArrayBinary(ArrayParent* parent, size_t ndx_in_parent, Allocator& alloc):
+    Array(type_HasRefs, parent, ndx_in_parent, alloc),
     m_offsets(type_Normal, 0, 0, alloc), m_blob(0, 0, alloc)
 {
     // Add subarrays for long string
@@ -20,9 +20,9 @@ ArrayBinary::ArrayBinary(ArrayParent* parent, size_t pndx, Allocator& alloc):
     m_blob.set_parent(this, 1);
 }
 
-ArrayBinary::ArrayBinary(MemRef mem, ArrayParent* parent, size_t pndx,
+ArrayBinary::ArrayBinary(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
                          Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(mem, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
+    Array(mem, parent, ndx_in_parent, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
     m_blob(Array::get_as_ref(1), 0, 0, alloc)
 {
     TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
@@ -33,9 +33,9 @@ ArrayBinary::ArrayBinary(MemRef mem, ArrayParent* parent, size_t pndx,
     m_blob.set_parent(this, 1);
 }
 
-ArrayBinary::ArrayBinary(ref_type ref, ArrayParent* parent, size_t pndx,
+ArrayBinary::ArrayBinary(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
                          Allocator& alloc) TIGHTDB_NOEXCEPT:
-    Array(ref, parent, pndx, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
+    Array(ref, parent, ndx_in_parent, alloc), m_offsets(Array::get_as_ref(0), 0, 0, alloc),
     m_blob(Array::get_as_ref(1), 0, 0, alloc)
 {
     TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
@@ -67,7 +67,7 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
     if (add_zero_term) ++stored_size;
     ssize_t diff =  (start + stored_size) - current_end;
     m_blob.replace(start, current_end, value.data(), value.size(), add_zero_term);
-    m_offsets.adjust(ndx, diff);
+    m_offsets.adjust(ndx, m_offsets.size(), diff);
 }
 
 void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
@@ -81,7 +81,7 @@ void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
     size_t stored_size = value.size();
     if (add_zero_term) ++stored_size;
     m_offsets.insert(ndx, pos + stored_size);
-    m_offsets.adjust(ndx+1, stored_size);
+    m_offsets.adjust(ndx+1, m_offsets.size(), stored_size);
 }
 
 void ArrayBinary::erase(size_t ndx)
@@ -93,7 +93,7 @@ void ArrayBinary::erase(size_t ndx)
 
     m_blob.erase(start, end);
     m_offsets.erase(ndx);
-    m_offsets.adjust(ndx, int64_t(start) - end);
+    m_offsets.adjust(ndx, m_offsets.size(), int64_t(start) - end);
 }
 
 void ArrayBinary::resize(size_t ndx)
@@ -130,12 +130,13 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) TI
     return BinaryData(ArrayBlob::get(blob_header, begin), end-begin);
 }
 
-ref_type ArrayBinary::btree_leaf_insert(size_t ndx, BinaryData value, bool add_zero_term,
-                                        TreeInsertBase& state)
+ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_zero_term,
+                                         TreeInsertBase& state)
 {
     size_t leaf_size = size();
     TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_LIST_SIZE);
-    if (leaf_size < ndx) ndx = leaf_size;
+    if (leaf_size < ndx)
+        ndx = leaf_size;
     if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_LIST_SIZE)) {
         insert(ndx, value, add_zero_term);
         return 0; // Leaf was not split
@@ -148,9 +149,8 @@ ref_type ArrayBinary::btree_leaf_insert(size_t ndx, BinaryData value, bool add_z
         state.m_split_offset = ndx;
     }
     else {
-        for (size_t i = ndx; i != leaf_size; ++i) {
+        for (size_t i = ndx; i != leaf_size; ++i)
             new_leaf.add(get(i));
-        }
         resize(ndx);
         add(value, add_zero_term);
         state.m_split_offset = ndx + 1;
@@ -162,13 +162,14 @@ ref_type ArrayBinary::btree_leaf_insert(size_t ndx, BinaryData value, bool add_z
 
 #ifdef TIGHTDB_DEBUG
 
-void ArrayBinary::to_dot(ostream& out, const char* title) const
+void ArrayBinary::to_dot(ostream& out, bool, StringData title) const
 {
     ref_type ref = get_ref();
 
     out << "subgraph cluster_binary" << ref << " {" << endl;
     out << " label = \"ArrayBinary";
-    if (title) out << "\\n'" << title << "'";
+    if (title.size() != 0)
+        out << "\\n'" << title << "'";
     out << "\";" << endl;
 
     Array::to_dot(out, "binary_top");

@@ -242,6 +242,7 @@ public:
 #ifdef TIGHTDB_DEBUG
     using Table::Verify;
     using Table::print;
+    using Table::dump_node_structure;
 #endif
 
 private:
@@ -428,8 +429,8 @@ namespace _impl
     template<> struct GetColumnTypeId<BinaryData> {
         static const DataType id = type_Binary;
     };
-    template<> struct GetColumnTypeId<Date> {
-        static const DataType id = type_Date;
+    template<> struct GetColumnTypeId<DateTime> {
+        static const DataType id = type_DateTime;
     };
     template<> struct GetColumnTypeId<Mixed> {
         static const DataType id = type_Mixed;
@@ -530,10 +531,10 @@ namespace _impl
     };
 
     // InsertIntoCol specialization for dates
-    template<int col_idx> struct InsertIntoCol<Date, col_idx> {
+    template<int col_idx> struct InsertIntoCol<DateTime, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
-            t->insert_date(col_idx, row_idx, at<col_idx>(tuple));
+            t->insert_datetime(col_idx, row_idx, at<col_idx>(tuple));
         }
     };
 
@@ -612,10 +613,10 @@ namespace _impl
     };
 
     // AssignIntoCol specialization for dates
-    template<int col_idx> struct AssignIntoCol<Date, col_idx> {
+    template<int col_idx> struct AssignIntoCol<DateTime, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
-            t->set_date(col_idx, row_idx, at<col_idx>(tuple));
+            t->set_datetime(col_idx, row_idx, at<col_idx>(tuple));
         }
     };
 

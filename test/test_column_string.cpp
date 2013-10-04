@@ -205,7 +205,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringInsert1)
 TEST_FIXTURE(db_setup_column_string, ColumnStringDelete1)
 {
     // Delete from end
-    c.erase(9);
+    c.erase(9, 9 == c.size()-1);
 
     CHECK_EQUAL(9, c.size());
 
@@ -223,7 +223,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete1)
 TEST_FIXTURE(db_setup_column_string, ColumnStringDelete2)
 {
     // Delete from top
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
 
     CHECK_EQUAL(8, c.size());
 
@@ -240,7 +240,7 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete2)
 TEST_FIXTURE(db_setup_column_string, ColumnStringDelete3)
 {
     // Delete from middle
-    c.erase(3);
+    c.erase(3, 3 == c.size()-1);
 
     CHECK_EQUAL(7, c.size());
 
@@ -256,19 +256,19 @@ TEST_FIXTURE(db_setup_column_string, ColumnStringDelete3)
 TEST_FIXTURE(db_setup_column_string, ColumnStringDeleteAll)
 {
     // Delete all items one at a time
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(6, c.size());
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(5, c.size());
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(4, c.size());
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(3, c.size());
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(2, c.size());
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(1, c.size());
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
     CHECK_EQUAL(0, c.size());
 
     CHECK(c.is_empty());
@@ -401,6 +401,9 @@ TEST(ColumnStringAutoEnumerate)
     e.destroy();
 }
 
+
+#if !defined DISABLE_INDEX
+
 TEST(ColumnStringAutoEnumerateIndex)
 {
     AdaptiveStringColumn c;
@@ -465,8 +468,8 @@ TEST(ColumnStringAutoEnumerateIndex)
     CHECK_EQUAL(2, res6);
 
     // Delete values
-    e.erase(1);
-    e.erase(0);
+    e.erase(1, 1 == e.size()-1);
+    e.erase(0, 0 == e.size()-1);
     size_t res7 = e.count("a");
     size_t res8 = e.count("newval");
     CHECK_EQUAL(4, res7);
@@ -525,8 +528,32 @@ TEST(ColumnStringAutoEnumerateIndexReuse)
     e.destroy();
 }
 
+#endif // !defined DISABLE_INDEX
+
+
 // Test "Replace string array with long string array" when doing it through LeafSet()
-TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2)
+TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong)
+{
+    c.clear();
+    Column col;
+
+    c.add("foobar");
+    c.add("bar abc");
+    c.add("baz");
+
+    c.set(1, "40 chars  40 chars  40 chars  40 chars  ");
+
+    CHECK_EQUAL(c.size(), c.size());
+    CHECK_EQUAL("foobar", c.get(0));
+    CHECK_EQUAL("40 chars  40 chars  40 chars  40 chars  ", c.get(1));
+    CHECK_EQUAL("baz", c.get(2));
+
+    // Cleanup
+    col.destroy();
+}
+
+// Test "Replace string array with long string array" when doing it through LeafSet()
+TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToBig)
 {
     c.clear();
     Column col;
@@ -548,6 +575,24 @@ TEST_FIXTURE(db_setup_column_string, ArrayStringSetLeafToLong2)
 
 // Test against a bug where FindWithLen() would fail finding ajacent hits
 TEST_FIXTURE(db_setup_column_string, ArrayStringLongFindAjacent)
+{
+    c.clear();
+    Array col;
+
+    c.add("40 chars  40 chars  40 chars  40 chars  ");
+    c.add("baz");
+    c.add("baz");
+    c.add("foo");
+
+    c.find_all(col, "baz");
+
+    CHECK_EQUAL(2, col.size());
+
+    // Cleanup
+    col.destroy();
+}
+
+TEST_FIXTURE(db_setup_column_string, ArrayStringBigFindAjacent)
 {
     c.clear();
     Array col;
@@ -758,6 +803,9 @@ TEST(AdaptiveStringColumnCount)
     e.destroy();
 }
 
+
+#if !defined DISABLE_INDEX
+
 TEST(AdaptiveStringColumnIndex)
 {
     AdaptiveStringColumn asc;
@@ -781,8 +829,13 @@ TEST(AdaptiveStringColumnIndex)
     asc.add("15");
     asc.add("HEJSA"); // 16
 
-    asc.create_index();
+    const StringIndex& ndx = asc.create_index();
     CHECK(asc.has_index());
+#ifdef TIGHTDB_DEBUG
+    ndx.verify_entries(asc);
+#else
+    static_cast<void>(ndx);
+#endif
 
     const size_t count0 = asc.count("HEJ");
     const size_t count1 = asc.count("HEJSA");
@@ -826,9 +879,9 @@ TEST(AdaptiveStringColumnIndex)
     CHECK_EQUAL(19, ins3);
 
     // Delete some values
-    asc.erase(0);  // top
-    asc.erase(7);  // middle
-    asc.erase(17); // bottom
+    asc.erase(0,  0  == asc.size()-1);  // top
+    asc.erase(7,  7  == asc.size()-1);  // middle
+    asc.erase(17, 17 == asc.size()-1); // bottom
     const size_t del1 = asc.find_first("top");
     const size_t del2 = asc.find_first("middle");
     const size_t del3 = asc.find_first("bottom");
@@ -850,6 +903,9 @@ TEST(AdaptiveStringColumnIndex)
     // Clean-up
     asc.destroy();
 }
+
+#endif // !defined DISABLE_INDEX
+
 
 TEST_FIXTURE(db_setup_column_string, ColumnString_Destroy)
 {
