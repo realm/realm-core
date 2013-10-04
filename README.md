@@ -239,7 +239,7 @@ Install Pandoc and XeLaTeX (aka MacTeX) by following the instructions
 on http://johnmacfarlane.net/pandoc/installing.html. This boils down
 to installing the following two packages:
 
-- http://pandoc.googlecode.com/files/pandoc-1.12.0.2.dmg
-- http://mirror.ctan.org/systems/mac/mactex/mactex-basic.pkg
+ - http://pandoc.googlecode.com/files/pandoc-1.12.0.2.dmg
+ - http://mirror.ctan.org/systems/mac/mactex/mactex-basic.pkg
 
 When done, you need to restart the terminal session.
