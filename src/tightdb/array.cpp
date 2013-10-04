@@ -2588,7 +2588,6 @@ top:
     for (;;) {
         // Get subnode table
         ref_type offsets_ref = to_ref(get_direct(data, width, 0));
-        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
         const char* offsets_header = m_alloc.translate(offsets_ref);
@@ -2601,10 +2600,8 @@ top:
             return not_found;
 
         // Get entry under key
-        const char* refs_header = m_alloc.translate(refs_ref);
-        const char* refs_data = get_data_from_header(refs_header);
-        size_t refs_width  = get_width_from_header(refs_header);
-        int64_t ref = get_direct(refs_data, refs_width, pos);
+        size_t pos_refs = pos + 1; // first entry in refs points to offsets
+        int64_t ref = get_direct(data, width, pos_refs);
 
         if (!is_leaf) {
             // Set vars for next iteration
@@ -2640,9 +2637,9 @@ top:
 
         // List of matching row indexes
         if (!sub_isindex) {
-            const char* sub_data = get_data_from_header(sub_header);
+            const char*  sub_data   = get_data_from_header(sub_header);
             const size_t sub_width  = get_width_from_header(sub_header);
-            const bool sub_isleaf = get_isleaf_from_header(sub_header);
+            const bool   sub_isleaf = get_isleaf_from_header(sub_header);
 
             // In most cases the row list will just be an array but
             // there might be so many matches that it has branched
@@ -2670,7 +2667,7 @@ top:
         }
 
         // Recurse into sub-index;
-        header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
+        header  = sub_header;
         data    = get_data_from_header(header);
         width   = get_width_from_header(header);
         is_leaf = get_isleaf_from_header(header);
@@ -2702,7 +2699,6 @@ top:
     for (;;) {
         // Get subnode table
         ref_type offsets_ref = to_ref(get_direct(data, width, 0));
-        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
         const char* offsets_header = m_alloc.translate(offsets_ref);
@@ -2715,10 +2711,8 @@ top:
             return; // not_found
 
         // Get entry under key
-        const char* refs_header = m_alloc.translate(refs_ref);
-        const char* refs_data = get_data_from_header(refs_header);
-        size_t refs_width  = get_width_from_header(refs_header);
-        int64_t ref = get_direct(refs_data, refs_width, pos);
+        size_t pos_refs = pos + 1; // first entry in refs points to offsets
+        int64_t ref = get_direct(data, width, pos_refs);
 
         if (!is_leaf) {
             // Set vars for next iteration
@@ -2805,7 +2799,7 @@ top:
         }
 
         // Recurse into sub-index;
-        header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
+        header  = sub_header;
         data    = get_data_from_header(header);
         width   = get_width_from_header(header);
         is_leaf = get_isleaf_from_header(header);
@@ -2837,7 +2831,6 @@ top:
     for (;;) {
         // Get subnode table
         ref_type offsets_ref = to_ref(get_direct(data, width, 0));
-        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
         const char* offsets_header = m_alloc.translate(offsets_ref);
@@ -2850,10 +2843,8 @@ top:
             return FindRes_not_found;
 
         // Get entry under key
-        const char* refs_header = m_alloc.translate(refs_ref);
-        const char* refs_data   = get_data_from_header(refs_header);
-        size_t refs_width  = get_width_from_header(refs_header);
-        int64_t ref = get_direct(refs_data, refs_width, pos);
+        size_t pos_refs = pos + 1; // first entry in refs points to offsets
+        int64_t ref = get_direct(data, width, pos_refs);
 
         if (!is_leaf) {
             // Set vars for next iteration
@@ -2929,7 +2920,7 @@ top:
         }
 
         // Recurse into sub-index;
-        header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
+        header  = sub_header;
         data    = get_data_from_header(header);
         width   = get_width_from_header(header);
         is_leaf = get_isleaf_from_header(header);
@@ -2962,7 +2953,6 @@ top:
     for (;;) {
         // Get subnode table
         ref_type offsets_ref = to_ref(get_direct(data, width, 0));
-        ref_type refs_ref    = to_ref(get_direct(data, width, 1));
 
         // Find the position matching the key
         const char* offsets_header = m_alloc.translate(offsets_ref);
@@ -2975,10 +2965,8 @@ top:
             return 0;
 
         // Get entry under key
-        const char* refs_header = m_alloc.translate(refs_ref);
-        const char* refs_data = get_data_from_header(refs_header);
-        size_t refs_width  = get_width_from_header(refs_header);
-        int64_t ref = get_direct(refs_data, refs_width, pos);
+        size_t pos_refs = pos + 1; // first entry in refs points to offsets
+        int64_t ref = get_direct(data, width, pos_refs);
 
         if (!is_leaf) {
             // Set vars for next iteration
@@ -3054,7 +3042,7 @@ top:
         }
 
         // Recurse into sub-index;
-        header  = m_alloc.translate(to_ref(ref)); // FIXME: This is wastefull since sub_header already contains this result
+        header  = sub_header;
         data    = get_data_from_header(header);
         width   = get_width_from_header(header);
         is_leaf = get_isleaf_from_header(header);
