@@ -121,7 +121,7 @@ inline std::size_t to_size_t(int64_t v) TIGHTDB_NOEXCEPT
 
 
 template<typename ReturnType, typename OriginalType>
-ReturnType type_punning( OriginalType variable ) TIGHTDB_NOEXCEPT
+ReturnType type_punning(OriginalType variable) TIGHTDB_NOEXCEPT
 {
     union Both {
         OriginalType in;

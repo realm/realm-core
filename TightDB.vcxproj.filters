@@ -187,6 +187,12 @@
     <ClCompile Include="test\test_utilities.cpp">
       <Filter>test\util</Filter>
     </ClCompile>
+    <ClCompile Include="src\tightdb\array_blobs_big.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_array_blobs_big.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">
@@ -309,7 +315,7 @@
     <ClInclude Include="src\tightdb\config.h">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\date.hpp">
+    <ClInclude Include="src\tightdb\datetime.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\group.hpp">
@@ -380,6 +386,9 @@
     </ClInclude>
     <ClInclude Include="test\test_utilities.hpp">
       <Filter>test\util</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\array_blobs_big.hpp">
+      <Filter>src\include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

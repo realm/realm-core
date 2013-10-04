@@ -389,6 +389,7 @@
     <ClCompile Include="src\tightdb\array.cpp" />
     <ClCompile Include="src\tightdb\array_binary.cpp" />
     <ClCompile Include="src\tightdb\array_blob.cpp" />
+    <ClCompile Include="src\tightdb\array_blobs_big.cpp" />
     <ClCompile Include="src\tightdb\array_string.cpp" />
     <ClCompile Include="src\tightdb\array_string_long.cpp" />
     <ClCompile Include="src\tightdb\column.cpp" />
@@ -468,6 +469,12 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="test\test_array_blobs_big.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="test\test_array_float.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
@@ -614,9 +621,10 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="test\test_utilities.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -630,6 +638,7 @@
     <ClInclude Include="src\tightdb\array_basic_tpl.hpp">
       <FileType>CppHeader</FileType>
     </ClInclude>
+    <ClInclude Include="src\tightdb\array_blobs_big.hpp" />
     <ClInclude Include="src\tightdb\array_string.hpp" />
     <ClInclude Include="src\tightdb\array_string_long.hpp" />
     <ClInclude Include="src\tightdb\binary_data.hpp" />
@@ -650,7 +659,7 @@
     <ClInclude Include="src\tightdb\data_type.hpp" />
     <ClInclude Include="src\tightdb\column_type.hpp" />
     <ClInclude Include="src\tightdb\config.h" />
-    <ClInclude Include="src\tightdb\date.hpp" />
+    <ClInclude Include="src\tightdb\datetime.hpp" />
     <ClInclude Include="src\tightdb\group.hpp" />
     <ClInclude Include="src\tightdb\group_shared.hpp" />
     <ClInclude Include="src\tightdb\group_writer.hpp" />
@@ -704,9 +713,10 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="test\test_utilities.hpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

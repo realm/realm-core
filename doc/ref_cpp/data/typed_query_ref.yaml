@@ -52,7 +52,7 @@ CATEGORIES :
                  Query& equal(int64_t value);
                  Query& equal(float value);
                  Query& equal(double value);
-                 Query& equal_date(Date value);
+                 Query& equal_datetime(DateTime value);
                  Query& equal(StringData value, bool case_sensitive=true);
                  Query& equal(BinaryData value);
       SUMMARY  : &g_typed_query_equals_summary
@@ -61,7 +61,7 @@ CATEGORIES :
                  Queries for column values equals to a certain value.
       PARAMS:
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData]
+        TYPES  : [bool, int64_t, float, double, DateTime, StringData, BinaryData]
         DESCR  : &g_typed_query_value_descr
                  The value.
       - NAME   : case_sensitive
@@ -92,7 +92,7 @@ CATEGORIES :
                  Query& not_equal(int64_t value);
                  Query& not_equal(float value);
                  Query& not_equal(double value);
-                 Query& not_equal_date(Date value);
+                 Query& not_equal_datetime(DateTime value);
                  Query& not_equal(StringData value, bool case_sensitive=true);
                  Query& not_equal(BinaryData value);
       SUMMARY  : &g_typed_query_notEquals_summary
@@ -101,7 +101,7 @@ CATEGORIES :
                  Queries for column values not equals to a certain value.
       PARAMS:
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData]
+        TYPES  : [bool, int64_t, float, double, DateTime, StringData, BinaryData]
         DESCR  : *g_typed_query_value_descr
       - NAME   : case_sensitive
         TYPES  : bool
@@ -122,14 +122,14 @@ CATEGORIES :
                  Query& greater(int64_t value);
                  Query& greater(float value);
                  Query& greater(double value);
-                 Query& greater(Date value);
+                 Query& greater(DateTime value);
       SUMMARY  : &g_typed_query_greaterThan_summary
                  Greater than.
       DESCR    : &g_typed_query_greaterThan_descr
                  Queries for column values greater than a certain value.
       PARAMS:
       - NAME   : value
-        TYPES  : [int64_t, float, double, Date]
+        TYPES  : [int64_t, float, double, DateTime]
         DESCR  : *g_typed_query_value_descr
       RETURN:
         TYPES  : Query&
@@ -147,14 +147,14 @@ CATEGORIES :
                  Query& greater_equal(int64_t value);
                  Query& greater_equal(float value);
                  Query& greater_equal(double value);
-                 Query& greater_equal(Date value);
+                 Query& greater_equal(DateTime value);
       SUMMARY  : &g_typed_query_greaterThanOrEqual_summary
                  Greater than or equal to.
       DESCR    : &g_typed_query_greaterThanOrEqual_descr
                  Queries for column values greater than or equal to a specified value.
       PARAMS:
       - NAME   : value
-        TYPES  : [int64_t, float, double, Date]
+        TYPES  : [int64_t, float, double, DateTime]
         DESCR  : *g_typed_query_value_descr
       RETURN:
         TYPES  : Query&
@@ -172,14 +172,14 @@ CATEGORIES :
                  Query& less(int64_t value);
                  Query& less(float value);
                  Query& less(double value);
-                 Query& less(Date value);
+                 Query& less(DateTime value);
       SUMMARY  : &g_typed_query_lessThan_summary
                  Less than.
       DESCR    : &g_typed_query_lessThan_descr
                  Queries for column values less than a specified value.
       PARAMS:
       - NAME   : value
-        TYPES  : [int64_t, float, double, Date]
+        TYPES  : [int64_t, float, double, DateTime]
         DESCR  : *g_typed_query_value_descr
       RETURN:
         TYPES  : Query&
@@ -197,14 +197,14 @@ CATEGORIES :
                  Query& less_equal(int64_t value);
                  Query& less_equal(float value);
                  Query& less_equal(double value);
-                 Query& less_equal(Date value);
+                 Query& less_equal(DateTime value);
       SUMMARY  : &g_typed_query_lessThanOrEqual_summary
                  Less than or equal to.
       DESCR    : &g_typed_query_lessThanOrEqual_descr
                  Queries for column values less than or equal to a certain value.
       PARAMS:
       - NAME   : value
-        TYPES  : [int64_t, float, double, Date]
+        TYPES  : [int64_t, float, double, DateTime]
         DESCR  : *g_typed_query_value_descr
       RETURN:
         TYPES  : Query&
@@ -219,21 +219,21 @@ CATEGORIES :
   - g_typed_query_between_date:
       NAMES    : [between, between, between, between]
       SIGNATURE: |
-                 Query& between(int64_t from, int64_t to);
-                 Query& between(float   from, float   to);
-                 Query& between(double  from, double  to);
-                 Query& between(Date    from, Date    to);
+                 Query& between(int64_t  from, int64_t  to);
+                 Query& between(float    from, float    to);
+                 Query& between(double   from, double   to);
+                 Query& between(DateTime from, DateTime to);
       DESCR    : &g_typed_query_between_descr
                  Queries for column values in ranges.
       SUMMARY  : &g_typed_query_between_summary
                  Belongs to an interval.
       PARAMS:
       - NAME   : from
-        TYPES  : [int64_t, float, double, Date]
+        TYPES  : [int64_t, float, double, DateTime]
         DESCR  : &g_typed_query_between_parm1_descr
                  Lower bound of range.
       - NAME   : to
-        TYPES  : [int64_t, Date]
+        TYPES  : [int64_t, DateTime]
         DESCR  : &g_typed_query_between_parm2_descr
                  Upper bound of range.
       RETURN:
@@ -594,7 +594,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
-        TYPES  : [int64_t, float, double, Date]
+        TYPES  : [int64_t, float, double, DateTime]
         DESCR  : &g_typed_query_minimum_return1_descr
                  The lowest value.
       EXAMPLES:

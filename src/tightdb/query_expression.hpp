@@ -114,7 +114,7 @@ Caveats, notes and todos
     // FIXME, this needs to exist elsewhere
     typedef int64_t             Int;
     typedef bool                Bool;
-    typedef tightdb::Date       Date;
+    typedef tightdb::DateTime   DateTime;
     typedef float               Float;
     typedef double              Double;
     typedef tightdb::StringData String;

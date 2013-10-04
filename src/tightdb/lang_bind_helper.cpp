@@ -25,7 +25,7 @@ const char* LangBindHelper::get_data_type_name(DataType type) TIGHTDB_NOEXCEPT
         case type_Double: return "double";
         case type_String: return "string";
         case type_Binary: return "binary";
-        case type_Date:   return "date";
+        case type_DateTime:   return "date";
         case type_Table:  return "table";
         case type_Mixed:  return "mixed";
     }

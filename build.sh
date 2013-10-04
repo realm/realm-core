@@ -8,7 +8,7 @@ MODE="$1"
 [ $# -gt 0 ] && shift
 
 # Extensions corresponding with additional GIT repositories
-EXTENSIONS="java python objc node php c gui"
+EXTENSIONS="java python objc node php c gui ruby"
 if [ "$TIGHTDB_ENABLE_REPLICATION" ]; then
     EXTENSIONS="$EXTENSIONS replication"
 fi

@@ -494,6 +494,8 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
 
 #if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
 
+    TIGHTDB_ASSERT(is_prealloc_supported());
+
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
         throw runtime_error("File size overflow");
@@ -519,6 +521,18 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
     static_cast<void>(offset);
     static_cast<void>(size);
 
+    TIGHTDB_ASSERT(!is_prealloc_supported());
+
+#endif
+}
+
+
+bool File::is_prealloc_supported()
+{
+#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+    return true;
+#else
+    return false;
 #endif
 }
 
@@ -816,7 +830,7 @@ bool File::try_remove(const string& path)
     if (::unlink(path.c_str()) == 0) return true;
 #endif
     int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("open() failed: ", err);
+    string msg = get_errno_msg("unlink() failed: ", err);
     switch (err) {
         case EACCES:
         case EROFS:

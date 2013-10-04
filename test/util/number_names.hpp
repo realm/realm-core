@@ -26,6 +26,7 @@
 namespace tightdb {
 namespace test_util {
 
+std::string number_name(std::size_t n);
 
 std::string number_name(std::size_t n)
 {
