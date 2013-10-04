@@ -80,7 +80,7 @@ Building, testing, and installing
     sh build.sh test
     sh build.sh test-debug
     sudo sh build.sh install
-    sh build.sh test-intalled
+    sh build.sh test-installed
 
 Headers are installed in:
 
