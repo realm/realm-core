@@ -240,4 +240,4 @@ to installing the following two packages:
 - http://pandoc.googlecode.com/files/pandoc-1.12.0.2.dmg
 - http://mirror.ctan.org/systems/mac/mactex/mactex-basic.pkg
 
-
+When done, you need to restart the terminal session.
