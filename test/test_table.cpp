@@ -2458,9 +2458,7 @@ TEST(Table_Aggregates)
     // average
     CHECK_EQUAL(double(i_sum)/size, table.column().c_int.average());
     CHECK_EQUAL(double(f_sum)/size, table.column().c_float.average());
-
-// Failing on 32-bit Ubuntu
-//    CHECK_EQUAL(double(d_sum)/size, table.column().c_double.average());
+    CHECK_EQUAL(double(d_sum)/size, table.column().c_double.average());
 }
 
 namespace {
