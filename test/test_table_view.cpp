@@ -3,12 +3,14 @@
 
 #include <UnitTest++.h>
 #include <tightdb/table_macros.hpp>
+#include "test_utilities.hpp"
 #include <string>
 #include <sstream>
 #include <ostream>
 
 using namespace std;
 using namespace tightdb;
+using namespace test_util;
 
 namespace {
 
@@ -165,7 +167,7 @@ TEST(TableView_Floats_Find_and_Aggregations)
     // TODO: add for float as well
 
     // Test sum
-    CHECK_EQUAL(sum_d, v_all.column().col_double.sum());
+    CHECK(almost_equal(sum_d, v_all.column().col_double.sum())); // almost_equal because of double/float imprecision
     CHECK_EQUAL(sum_f, v_all.column().col_float.sum());
     CHECK_EQUAL(-1.2 -1.2, v_some.column().col_double.sum());
     CHECK_EQUAL(1.2f -1.1f, v_some.column().col_float.sum());
@@ -183,7 +185,7 @@ TEST(TableView_Floats_Find_and_Aggregations)
     CHECK_EQUAL(-1.1f, v_some.column().col_float.minimum());
 
     // Test avg
-    CHECK_EQUAL(sum_d / 6.0, v_all.column().col_double.average());
+    CHECK(almost_equal(sum_d / 6.0, v_all.column().col_double.average())); // almost_equal because of double/float imprecision
     CHECK_EQUAL((-1.2 + -1.2) / 2.0, v_some.column().col_double.average());
     CHECK_EQUAL(sum_f / 6.0, v_all.column().col_float.average());
 
