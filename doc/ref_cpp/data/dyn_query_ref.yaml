@@ -489,7 +489,7 @@ CATEGORIES :
                  "Table row to start search from (inclusive). Default is 0 (start from beginning)."
       RETURN:
         TYPES  : size_t
-        DESCR  : &g_dyn_query_find
+        DESCR  : &g_dyn_query_find_return_descr
                  Table row index that matches the query (or -1 if none).
       EXAMPLES:
       - DESCR  :
