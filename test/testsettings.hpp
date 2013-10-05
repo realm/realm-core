@@ -52,9 +52,6 @@
 //#define TEST_TRANSACTIONS_LASSE // Takes a long time
 //#define TEST_INDEX // not implemented yet
 
-// Bypass an overflow bug in BinaryData. Todo/fixme
-#define TIGHTDB_BYPASS_BINARYDATA_BUG
-
 // Bypass as crash when doing optimize+set_index+clear+add. Todo/fixme
 #define TIGHTDB_BYPASS_OPTIMIZE_CRASH_BUG
 
