@@ -181,6 +181,9 @@
     <ClCompile Include="test\test_string_data.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="test\test_binary_data.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
     <ClCompile Include="test\test_lang_bind_helper.cpp">
       <Filter>test</Filter>
     </ClCompile>
