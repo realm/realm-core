@@ -10,7 +10,8 @@
     //#define TEST_DURATION 3
 #endif
 
-// Robustness tests are not enable by default, because they interfere badly with Valgrind.
+// Some robustness tests are not enable by default, because they
+// interfere badly with Valgrind.
 // #define TEST_ROBUSTNESS
 
 // Wrap pthread function calls with the pthread bug finding tool (program execution will be slower) by
@@ -51,8 +52,5 @@
 #define TEST_UTF8
 //#define TEST_TRANSACTIONS_LASSE // Takes a long time
 //#define TEST_INDEX // not implemented yet
-
-// Bypass as crash when doing optimize+set_index+clear+add. Todo/fixme
-#define TIGHTDB_BYPASS_OPTIMIZE_CRASH_BUG
 
 #endif

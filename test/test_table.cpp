@@ -24,7 +24,6 @@ TIGHTDB_TABLE_2(TupleTableType,
                 second, String)
 }
 
-#ifndef TIGHTDB_BYPASS_OPTIMIZE_CRASH_BUG
 TEST(TestOptimizeCrash)
 {
     // This will crash at the .add() method
@@ -34,7 +33,6 @@ TEST(TestOptimizeCrash)
     ttt.clear();
     ttt.add(1, "AA");
 }
-#endif
 
 TEST(Table1)
 {
