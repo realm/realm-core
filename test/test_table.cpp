@@ -17,6 +17,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace test_util;
 
 namespace {
 TIGHTDB_TABLE_2(TupleTableType,
@@ -2456,9 +2457,8 @@ TEST(Table_Aggregates)
     // average
     CHECK_EQUAL(double(i_sum)/size, table.column().c_int.average());
     CHECK_EQUAL(double(f_sum)/size, table.column().c_float.average());
-
-// Failing on 32-bit Ubuntu
-//    CHECK_EQUAL(double(d_sum)/size, table.column().c_double.average());
+    // almost_equal because of double/float imprecision
+    CHECK(almost_equal(double(d_sum)/size, table.column().c_double.average()));     
 }
 
 namespace {
