@@ -269,17 +269,6 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
 }
 
 
-void Column::create()
-{
-    // Add subcolumns for nodes
-    if (!root_is_leaf()) {
-        Array offsets(Array::type_Normal, 0, 0, m_array->get_alloc());
-        Array refs(Array::type_HasRefs, 0, 0, m_array->get_alloc());
-        m_array->add(offsets.get_ref());
-        m_array->add(refs.get_ref());
-    }
-}
-
 void Column::clear()
 {
     m_array->clear();
