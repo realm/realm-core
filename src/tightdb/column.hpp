@@ -268,7 +268,6 @@ public:
 
 protected:
     Column(Array* root);
-    void create();
 
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
 
@@ -409,20 +408,19 @@ inline void ColumnBase::EraseHandlerBase::replace_root(UniquePtr<Array>& leaf)
 inline Column::Column(Allocator& alloc):
     ColumnBase(new Array(Array::type_Normal, 0, 0, alloc))
 {
-    create();
 }
 
 inline Column::Column(Array::Type type, Allocator& alloc):
     ColumnBase(new Array(type, 0, 0, alloc))
 {
-    create();
+    TIGHTDB_ASSERT(root_is_leaf());
 }
 
 inline Column::Column(Array::Type type, ArrayParent* parent, std::size_t ndx_in_parent,
                       Allocator& alloc):
     ColumnBase(new Array(type, parent, ndx_in_parent, alloc))
 {
-    create();
+    TIGHTDB_ASSERT(root_is_leaf());
 }
 
 inline Column::Column(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
