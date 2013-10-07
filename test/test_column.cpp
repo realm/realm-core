@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_COLUMN
+
 #include <vector>
 #include <algorithm>
 #include <UnitTest++.h>
@@ -16,107 +19,108 @@ Column db_setup::c;
 
 TEST_FIXTURE(db_setup, Column_IsEmpty)
 {
+    CHECK_EQUAL(0U, c.size());
     CHECK(c.is_empty());
-    CHECK_EQUAL(c.size(), size_t(0));
 }
 
 TEST_FIXTURE(db_setup, Column_Add0)
 {
     c.add(0);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.size(), size_t(1));
+    CHECK_EQUAL(0, c.get(0));
+    CHECK_EQUAL(1U, c.size());
+    CHECK(!c.is_empty());
 }
 
 TEST_FIXTURE(db_setup, Column_Add1)
 {
     c.add(1);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.size(), 2);
+    CHECK_EQUAL(0, c.get(0));
+    CHECK_EQUAL(1, c.get(1));
+    CHECK_EQUAL(2U, c.size());
 }
 
 TEST_FIXTURE(db_setup, Column_Add2)
 {
     c.add(2);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.size(), 3);
+    CHECK_EQUAL(0, c.get(0));
+    CHECK_EQUAL(1, c.get(1));
+    CHECK_EQUAL(2, c.get(2));
+    CHECK_EQUAL(3U, c.size());
 }
 
 TEST_FIXTURE(db_setup, Column_Add3)
 {
     c.add(3);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.get(3), 3);
-    CHECK_EQUAL(c.size(), 4);
+    CHECK_EQUAL(0, c.get(0));
+    CHECK_EQUAL(1, c.get(1));
+    CHECK_EQUAL(2, c.get(2));
+    CHECK_EQUAL(3, c.get(3));
+    CHECK_EQUAL(4U, c.size());
 }
 
 TEST_FIXTURE(db_setup, Column_Add4)
 {
     c.add(4);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.get(3), 3);
-    CHECK_EQUAL(c.get(4), 4);
-    CHECK_EQUAL(c.size(), 5);
+    CHECK_EQUAL(0, c.get(0));
+    CHECK_EQUAL(1, c.get(1));
+    CHECK_EQUAL(2, c.get(2));
+    CHECK_EQUAL(3, c.get(3));
+    CHECK_EQUAL(4, c.get(4));
+    CHECK_EQUAL(5U, c.size());
 }
 
 TEST_FIXTURE(db_setup, Column_Add5)
 {
     c.add(16);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.get(3), 3);
-    CHECK_EQUAL(c.get(4), 4);
-    CHECK_EQUAL(c.get(5), 16);
-    CHECK_EQUAL(c.size(), 6);
+    CHECK_EQUAL(0,  c.get(0));
+    CHECK_EQUAL(1,  c.get(1));
+    CHECK_EQUAL(2,  c.get(2));
+    CHECK_EQUAL(3,  c.get(3));
+    CHECK_EQUAL(4,  c.get(4));
+    CHECK_EQUAL(16, c.get(5));
+    CHECK_EQUAL(6U, c.size());
 }
 
 TEST_FIXTURE(db_setup, Column_Add6)
 {
     c.add(256);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.get(3), 3);
-    CHECK_EQUAL(c.get(4), 4);
-    CHECK_EQUAL(c.get(5), 16);
-    CHECK_EQUAL(c.get(6), 256);
-    CHECK_EQUAL(c.size(), 7);
+    CHECK_EQUAL(0,   c.get(0));
+    CHECK_EQUAL(1,   c.get(1));
+    CHECK_EQUAL(2,   c.get(2));
+    CHECK_EQUAL(3,   c.get(3));
+    CHECK_EQUAL(4,   c.get(4));
+    CHECK_EQUAL(16,  c.get(5));
+    CHECK_EQUAL(256, c.get(6));
+    CHECK_EQUAL(7U, c.size());
 }
 
 TEST_FIXTURE(db_setup, Column_Add7)
 {
     c.add(65536);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.get(3), 3);
-    CHECK_EQUAL(c.get(4), 4);
-    CHECK_EQUAL(c.get(5), 16);
-    CHECK_EQUAL(c.get(6), 256);
-    CHECK_EQUAL(c.get(7), 65536);
-    CHECK_EQUAL(c.size(), 8);
+    CHECK_EQUAL(0,     c.get(0));
+    CHECK_EQUAL(1,     c.get(1));
+    CHECK_EQUAL(2,     c.get(2));
+    CHECK_EQUAL(3,     c.get(3));
+    CHECK_EQUAL(4,     c.get(4));
+    CHECK_EQUAL(16,    c.get(5));
+    CHECK_EQUAL(256,   c.get(6));
+    CHECK_EQUAL(65536, c.get(7));
+    CHECK_EQUAL(8U, c.size());
 }
 
 TEST_FIXTURE(db_setup, Column_Add8)
 {
     c.add(4294967296LL);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.get(3), 3);
-    CHECK_EQUAL(c.get(4), 4);
-    CHECK_EQUAL(c.get(5), 16);
-    CHECK_EQUAL(c.get(6), 256);
-    CHECK_EQUAL(c.get(7), 65536);
-    CHECK_EQUAL(c.get(8), 4294967296LL);
-    CHECK_EQUAL(c.size(), 9);
+    CHECK_EQUAL(0,            c.get(0));
+    CHECK_EQUAL(1,            c.get(1));
+    CHECK_EQUAL(2,            c.get(2));
+    CHECK_EQUAL(3,            c.get(3));
+    CHECK_EQUAL(4,            c.get(4));
+    CHECK_EQUAL(16,           c.get(5));
+    CHECK_EQUAL(256,          c.get(6));
+    CHECK_EQUAL(65536,        c.get(7));
+    CHECK_EQUAL(4294967296LL, c.get(8));
+    CHECK_EQUAL(9U, c.size());
 }
 
 TEST_FIXTURE(db_setup, Column_AddNeg1)
@@ -124,38 +128,38 @@ TEST_FIXTURE(db_setup, Column_AddNeg1)
     c.clear();
     c.add(-1);
 
-    CHECK_EQUAL(c.size(), 1);
-    CHECK_EQUAL(c.get(0), -1);
+    CHECK_EQUAL(1U, c.size());
+    CHECK_EQUAL(-1, c.get(0));
 }
 
 TEST_FIXTURE(db_setup, Column_AddNeg2)
 {
     c.add(-256);
 
-    CHECK_EQUAL(c.size(), 2);
-    CHECK_EQUAL(c.get(0), -1);
-    CHECK_EQUAL(c.get(1), -256);
+    CHECK_EQUAL(2U, c.size());
+    CHECK_EQUAL(-1,   c.get(0));
+    CHECK_EQUAL(-256, c.get(1));
 }
 
 TEST_FIXTURE(db_setup, Column_AddNeg3)
 {
     c.add(-65536);
 
-    CHECK_EQUAL(c.size(), 3);
-    CHECK_EQUAL(c.get(0), -1);
-    CHECK_EQUAL(c.get(1), -256);
-    CHECK_EQUAL(c.get(2), -65536);
+    CHECK_EQUAL(3U, c.size());
+    CHECK_EQUAL(-1,     c.get(0));
+    CHECK_EQUAL(-256,   c.get(1));
+    CHECK_EQUAL(-65536, c.get(2));
 }
 
 TEST_FIXTURE(db_setup, Column_AddNeg4)
 {
     c.add(-4294967296LL);
 
-    CHECK_EQUAL(c.size(), 4);
-    CHECK_EQUAL(c.get(0), -1);
-    CHECK_EQUAL(c.get(1), -256);
-    CHECK_EQUAL(c.get(2), -65536);
-    CHECK_EQUAL(c.get(3), -4294967296LL);
+    CHECK_EQUAL(4U, c.size());
+    CHECK_EQUAL(-1,            c.get(0));
+    CHECK_EQUAL(-256,          c.get(1));
+    CHECK_EQUAL(-65536,        c.get(2));
+    CHECK_EQUAL(-4294967296LL, c.get(3));
 }
 
 TEST_FIXTURE(db_setup, Column_Set)
@@ -165,11 +169,11 @@ TEST_FIXTURE(db_setup, Column_Set)
     c.set(2, 1);
     c.set(3, 0);
 
-    CHECK_EQUAL(c.size(), 4);
-    CHECK_EQUAL(c.get(0), 3);
-    CHECK_EQUAL(c.get(1), 2);
-    CHECK_EQUAL(c.get(2), 1);
-    CHECK_EQUAL(c.get(3), 0);
+    CHECK_EQUAL(4U, c.size());
+    CHECK_EQUAL(3, c.get(0));
+    CHECK_EQUAL(2, c.get(1));
+    CHECK_EQUAL(1, c.get(2));
+    CHECK_EQUAL(0, c.get(3));
 }
 
 TEST_FIXTURE(db_setup, Column_Insert1)
@@ -184,12 +188,12 @@ TEST_FIXTURE(db_setup, Column_Insert1)
     // Insert in middle
     c.insert(2, 16);
 
-    CHECK_EQUAL(c.size(), 5);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 16);
-    CHECK_EQUAL(c.get(3), 2);
-    CHECK_EQUAL(c.get(4), 3);
+    CHECK_EQUAL(5U, c.size());
+    CHECK_EQUAL(0,  c.get(0));
+    CHECK_EQUAL(1,  c.get(1));
+    CHECK_EQUAL(16, c.get(2));
+    CHECK_EQUAL(2,  c.get(3));
+    CHECK_EQUAL(3,  c.get(4));
 }
 
 TEST_FIXTURE(db_setup, Column_Insert2)
@@ -197,13 +201,13 @@ TEST_FIXTURE(db_setup, Column_Insert2)
     // Insert at top
     c.insert(0, 256);
 
-    CHECK_EQUAL(c.size(), 6);
-    CHECK_EQUAL(c.get(0), 256);
-    CHECK_EQUAL(c.get(1), 0);
-    CHECK_EQUAL(c.get(2), 1);
-    CHECK_EQUAL(c.get(3), 16);
-    CHECK_EQUAL(c.get(4), 2);
-    CHECK_EQUAL(c.get(5), 3);
+    CHECK_EQUAL(6U, c.size());
+    CHECK_EQUAL(256, c.get(0));
+    CHECK_EQUAL(0,   c.get(1));
+    CHECK_EQUAL(1,   c.get(2));
+    CHECK_EQUAL(16,  c.get(3));
+    CHECK_EQUAL(2,   c.get(4));
+    CHECK_EQUAL(3,   c.get(5));
 }
 
 TEST_FIXTURE(db_setup, Column_Insert3)
@@ -211,14 +215,14 @@ TEST_FIXTURE(db_setup, Column_Insert3)
     // Insert at bottom
     c.insert(6, 65536);
 
-    CHECK_EQUAL(c.size(), 7);
-    CHECK_EQUAL(c.get(0), 256);
-    CHECK_EQUAL(c.get(1), 0);
-    CHECK_EQUAL(c.get(2), 1);
-    CHECK_EQUAL(c.get(3), 16);
-    CHECK_EQUAL(c.get(4), 2);
-    CHECK_EQUAL(c.get(5), 3);
-    CHECK_EQUAL(c.get(6), 65536);
+    CHECK_EQUAL(7U,    c.size());
+    CHECK_EQUAL(256,   c.get(0));
+    CHECK_EQUAL(0,     c.get(1));
+    CHECK_EQUAL(1,     c.get(2));
+    CHECK_EQUAL(16,    c.get(3));
+    CHECK_EQUAL(2,     c.get(4));
+    CHECK_EQUAL(3,     c.get(5));
+    CHECK_EQUAL(65536, c.get(6));
 }
 
 /*
@@ -243,52 +247,52 @@ TEST_FIXTURE(db_setup, Column_Index1)
 TEST_FIXTURE(db_setup, Column_Delete1)
 {
     // Delete from middle
-    c.erase(3);
+    c.erase(3, 3 == c.size()-1);
 
-    CHECK_EQUAL(c.size(), 6);
-    CHECK_EQUAL(c.get(0), 256);
-    CHECK_EQUAL(c.get(1), 0);
-    CHECK_EQUAL(c.get(2), 1);
-    CHECK_EQUAL(c.get(3), 2);
-    CHECK_EQUAL(c.get(4), 3);
-    CHECK_EQUAL(c.get(5), 65536);
+    CHECK_EQUAL(6U, c.size());
+    CHECK_EQUAL(256,   c.get(0));
+    CHECK_EQUAL(0,     c.get(1));
+    CHECK_EQUAL(1,     c.get(2));
+    CHECK_EQUAL(2,     c.get(3));
+    CHECK_EQUAL(3,     c.get(4));
+    CHECK_EQUAL(65536, c.get(5));
 }
 
 TEST_FIXTURE(db_setup, Column_Delete2)
 {
     // Delete from top
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
 
-    CHECK_EQUAL(c.size(), 5);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.get(3), 3);
-    CHECK_EQUAL(c.get(4), 65536);
+    CHECK_EQUAL(5U, c.size());
+    CHECK_EQUAL(0,     c.get(0));
+    CHECK_EQUAL(1,     c.get(1));
+    CHECK_EQUAL(2,     c.get(2));
+    CHECK_EQUAL(3,     c.get(3));
+    CHECK_EQUAL(65536, c.get(4));
 }
 
 TEST_FIXTURE(db_setup, Column_Delete3)
 {
     // Delete from bottom
-    c.erase(4);
+    c.erase(4, 4 == c.size()-1);
 
-    CHECK_EQUAL(c.size(), 4);
-    CHECK_EQUAL(c.get(0), 0);
-    CHECK_EQUAL(c.get(1), 1);
-    CHECK_EQUAL(c.get(2), 2);
-    CHECK_EQUAL(c.get(3), 3);
+    CHECK_EQUAL(4U, c.size());
+    CHECK_EQUAL(0, c.get(0));
+    CHECK_EQUAL(1, c.get(1));
+    CHECK_EQUAL(2, c.get(2));
+    CHECK_EQUAL(3, c.get(3));
 }
 
 TEST_FIXTURE(db_setup, Column_DeleteAll)
 {
     // Delete all items one at a time
-    c.erase(0);
-    c.erase(0);
-    c.erase(0);
-    c.erase(0);
+    c.erase(0, 0 == c.size()-1);
+    c.erase(0, 0 == c.size()-1);
+    c.erase(0, 0 == c.size()-1);
+    c.erase(0, 0 == c.size()-1);
 
     CHECK(c.is_empty());
-    CHECK_EQUAL(0, c.size());
+    CHECK_EQUAL(0U, c.size());
 }
 
 
@@ -297,7 +301,7 @@ TEST_FIXTURE(db_setup, Column_Find1)
     // Look for a non-existing value
     size_t res = c.find_first(10);
 
-    CHECK_EQUAL(res, -1);
+    CHECK_EQUAL(-1, res);
 }
 
 TEST_FIXTURE(db_setup, Column_Find2)
@@ -308,7 +312,7 @@ TEST_FIXTURE(db_setup, Column_Find2)
     c.add(0);
 
     size_t res = c.find_first(0);
-    CHECK_EQUAL(res, 0);
+    CHECK_EQUAL(0, res);
 }
 
 TEST_FIXTURE(db_setup, Column_Find3)
@@ -317,7 +321,7 @@ TEST_FIXTURE(db_setup, Column_Find3)
     c.add(1);
 
     size_t res = c.find_first(1);
-    CHECK_EQUAL(res, 2);
+    CHECK_EQUAL(2, res);
 }
 
 TEST_FIXTURE(db_setup, Column_Find4)
@@ -326,7 +330,7 @@ TEST_FIXTURE(db_setup, Column_Find4)
     c.add(2);
 
     size_t res = c.find_first(2);
-    CHECK_EQUAL(res, 3);
+    CHECK_EQUAL(3, res);
 }
 
 TEST_FIXTURE(db_setup, Column_Find5)
@@ -335,7 +339,7 @@ TEST_FIXTURE(db_setup, Column_Find5)
     c.add(4);
 
     size_t res = c.find_first(4);
-    CHECK_EQUAL(res, 4);
+    CHECK_EQUAL(4, res);
 }
 
 TEST_FIXTURE(db_setup, Column_Find6)
@@ -386,9 +390,8 @@ TEST_FIXTURE(db_setup, Column_FindLeafs)
     // Create values that span multible leafs
     // we use 5 to ensure that we get two levels
     // when testing with TIGHTDB_MAX_LIST_SIZE=4
-    for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE*5; ++i) {
+    for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE*5; ++i)
         a.add(0);
-    }
 
     // Set sentinel values at before and after each break
     a.set(0, 1);
@@ -433,9 +436,8 @@ TEST_FIXTURE(db_setup, Column_PartialFind1)
 {
     c.clear();
 
-    for (size_t i = 0; i < PARTIAL_COUNT; ++i) {
+    for (size_t i = 0; i < PARTIAL_COUNT; ++i)
         c.add(i);
-    }
 
     CHECK_EQUAL(-1, c.find_first(PARTIAL_COUNT+1, 0, PARTIAL_COUNT));
     CHECK_EQUAL(-1, c.find_first(0, 1, PARTIAL_COUNT));
@@ -500,18 +502,17 @@ TEST(Column_FindAll_IntMin)
     Array r;
 
     const int value = 0;
-    const int vReps = 5;
+    const int reps = 5;
 
-    for (int i = 0; i < vReps; i++){
+    for (int i = 0; i < reps; i++)
         c.add(0);
-    }
 
     c.find_all(r, value);
-    CHECK_EQUAL(vReps, r.size());
+    CHECK_EQUAL(reps, r.size());
 
     size_t i = 0;
     size_t j = 0;
-    while (i < c.size()){
+    while (i < c.size()) {
         if (c.get(i) == value)
             CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
@@ -528,9 +529,9 @@ TEST(Column_FindAll_IntMax)
     Array r;
 
     const int64_t value = 4300000003ULL;
-    const int vReps = 5;
+    const int reps = 5;
 
-    for (int i = 0; i < vReps; i++){
+    for (int i = 0; i < reps; i++) {
         // 64 bitwidth
         c.add(4300000000ULL);
         c.add(4300000001ULL);
@@ -539,11 +540,11 @@ TEST(Column_FindAll_IntMax)
     }
 
     c.find_all(r, value);
-    CHECK_EQUAL(vReps, r.size());
+    CHECK_EQUAL(reps, r.size());
 
     size_t i = 0;
     size_t j = 0;
-    while (i < c.size()){
+    while (i < c.size()) {
         if (c.get(i) == value)
             CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
@@ -560,9 +561,8 @@ TEST(Column_LowerUpperBound)
     // Create column with sorted members
     Column col;
     col.add(5);
-    for (size_t i = 5; i < 100; i += 5) {
+    for (size_t i = 5; i < 100; i += 5)
         col.add(i);
-    }
 
     // before first entry
     CHECK_EQUAL(0, col.lower_bound_int(0));
@@ -625,47 +625,41 @@ TEST(Column_Sum_Average)
 
     c.clear();
 
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 100; i++)
         c.add(i);
-    }
 
     // Sum of entire range, using default args
     sum = 0;
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 100; i++)
         sum += c.get(i);
-    }
     CHECK_EQUAL(sum, c.sum());
     CHECK_EQUAL(sum/100.0, c.average());
 
     // Sum of entire range, given explicit range
     sum = 0;
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 100; i++)
         sum += c.get(i);
-    }
     CHECK_EQUAL(sum, c.sum(0, 100));
     CHECK_EQUAL(sum/100.0, c.average(0,100));
 
     // Start to N
     sum = 0;
-    for (int i = 0; i < 63; i++) {
+    for (int i = 0; i < 63; i++)
         sum += c.get(i);
-    }
     CHECK_EQUAL(sum, c.sum(0, 63));
     CHECK_EQUAL(sum/63.0, c.average(0, 63));
 
     // N to end
     sum = 0;
-    for (int i = 47; i < 100; i++) {
+    for (int i = 47; i < 100; i++)
         sum += c.get(i);
-    }
     CHECK_EQUAL(sum, c.sum(47, 100));
     CHECK_EQUAL(sum/(100.0-47.0), c.average(47, 100));
 
     // N to M
     sum = 0;
-    for (int i = 55; i < 79; i++) {
+    for (int i = 55; i < 79; i++)
         sum += c.get(i);
-    }
     CHECK_EQUAL(sum, c.sum(55, 79));
     CHECK_EQUAL(sum/(79.0-55.0), c.average(55, 79));
 
@@ -691,9 +685,8 @@ TEST(Column_Max2)
 {
     Column c;
 
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 100; i++)
         c.add(10);
-    }
     c.set(20, 20);
     c.set(50, 11); // Max must select *first* occurence of largest value
     c.set(51, 11);
@@ -723,9 +716,8 @@ TEST(Column_Min2)
 {
     Column c;
 
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 100; i++)
         c.add(10);
-    }
     c.set(20, 20);
     c.set(50, 9); // Max must select *first* occurence of lowest value
     c.set(51, 9);
@@ -747,9 +739,8 @@ TEST(Column_Sort2)
 
     c.sort();
 
-    for (size_t t = 1; t < 9*TIGHTDB_MAX_LIST_SIZE; t++) {
+    for (size_t t = 1; t < 9*TIGHTDB_MAX_LIST_SIZE; t++)
         CHECK(c.get(t) >= c.get(t - 1));
-    }
 
     c.destroy();
 }
@@ -765,12 +756,13 @@ TEST(Column_prepend_many)
 
     for (size_t items = 0; items < 3000; ++items) {
         a.clear();
-        for (size_t j = 0; j < items + 1; ++j) {
+        for (size_t j = 0; j < items + 1; ++j)
             a.insert(0, j);
-        }
         a.insert(items, 444);
     }
     a.destroy();
 }
 
 #endif
+
+#endif // TEST_COLUMN

@@ -59,7 +59,7 @@ public:
     template<class C, class T>
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const BinaryData&);
 
-private:
+protected:
     const char* m_data;
     std::size_t m_size;
 };

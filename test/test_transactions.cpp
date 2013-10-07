@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_TRANSACTIONS
+
 #include <cstdio>
 #include <vector>
 #include <sstream>
@@ -36,7 +39,7 @@ TIGHTDB_TABLE_8(MyTable,
                 alpha,   Int,
                 beta,    Bool,
                 gamma,   Enum<MyEnum>,
-                delta,   Date,
+                delta,   DateTime,
                 epsilon, String,
                 zeta,    Binary,
                 eta,     Subtable<MySubtable>,
@@ -46,17 +49,8 @@ TIGHTDB_TABLE_8(MyTable,
 const int num_threads = 23;
 const int num_rounds  = 2;
 
-// FIXME: TightDB currently imposes a limitation on the number of
-// elements in any array node. It must not exceed 2**24. Because a
-// single array is used to hold all the strings (or blobs) of a leaf
-// in the B+-tree, the maximum size of a stored string (and of a
-// stored blob) can be calculated as (2**24 /
-// TIGHTDB_MAX_LIST_SIZE). It is extremely unfortunate that the string
-// size limitation is a function of TIGHTDB_MAX_LIST_SIZE. The
-// limitation should be entirely removed, but that requires a
-// non-trivial change that will also break the file format.
-const size_t max_blob_size = 0x1000000 / TIGHTDB_MAX_LIST_SIZE / 2; // Dividing by two to be on the safe side.
-const size_t max_string_size = max_blob_size - 1; // Discount the mandatory null-terminator.
+const size_t max_blob_size   = 32*1024; // 32 KiB
+const size_t max_string_size = 32*1024; // 32 KiB
 
 
 void round(SharedGroup& db, int index)
@@ -79,7 +73,10 @@ void round(SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #2
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        if (table->size() < 100) for (int i=0; i<10; ++i) table->add();
+        if (table->size() < 100) {
+            for (int i=0; i<10; ++i)
+                table->add();
+        }
         ++table[0].alpha;
         wt.commit();
     }
@@ -112,9 +109,8 @@ void round(SharedGroup& db, int index)
         MySubtable::Ref subtable = table[0].eta;
         ++subtable[0].foo;
         MySubsubtable::Ref subsubtable = subtable[0].bar;
-        for (int i=int(subsubtable->size()); i<=index; ++i) {
+        for (int i=int(subsubtable->size()); i<=index; ++i)
             subsubtable->add();
-        }
         ++table[0].alpha;
         wt.commit();
     }
@@ -124,8 +120,12 @@ void round(SharedGroup& db, int index)
         WriteTransaction wt(db); // Write transaction #6
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         if (3 <= table->size()) {
-            if (table[2].alpha == 749321) table->remove(1);
-            else table->remove(2);
+            if (table[2].alpha == 749321) {
+                table->remove(1);
+            }
+            else {
+                table->remove(2);
+            }
         }
         MySubtable::Ref subtable = table[0].eta;
         ++subtable[0].foo;
@@ -282,7 +282,7 @@ void round(SharedGroup& db, int index)
         BinaryData bin(data.get(), size);
         subsubtable->add(0, false, nne,  0, "", bin, 0, Mixed(int64_t(index*13)));
         subsubtable->add(1, false, tano, 0, "", bin, 0, Mixed(index%2==0?false:true));
-        subsubtable->add(2, false, sita, 0, "", bin, 0, Mixed(Date(index*13)));
+        subsubtable->add(2, false, sita, 0, "", bin, 0, Mixed(DateTime(index*13)));
         subsubtable->add(3, false, saba, 0, "", bin, 0, Mixed("click"));
         subsubtable->add(4, false, nane, 0, "", bin, 0, Mixed(bin));
         wt.commit();
@@ -301,13 +301,11 @@ void round(SharedGroup& db, int index)
             subsubtable = subtable[1].theta.set_subtable<MySubtable>();
         }
         int num = 8;
-        for (int i=0; i<num; ++i) {
+        for (int i=0; i<num; ++i)
             subsubtable->add(i, 0);
-        }
         vector<MySubsubtable::Ref> subsubsubtables;
-        for (int i=0; i<num; ++i) {
+        for (int i=0; i<num; ++i)
             subsubsubtables.push_back(subsubtable[i].bar);
-        }
         for (int i=0; i<3; ++i) {
             for (int j=0; j<num; j+=2) {
                 BinaryData bin(0,0);
@@ -339,9 +337,8 @@ void round(SharedGroup& db, int index)
             subsubtable = subtable[2].theta.set_subtable<MySubsubtable>();
         }
         int num = 9;
-        for (int i=0; i<num; ++i) {
+        for (int i=0; i<num; ++i)
             subsubtable->add(i, BinaryData(0,0));
-        }
         subsubtable->column().value += 31;
         wt.commit();
     }
@@ -361,9 +358,8 @@ void round(SharedGroup& db, int index)
 //            subsubtable->column().value.set_index();
         }
         int num = 9;
-        for (int i=0; i<num; ++i) {
+        for (int i=0; i<num; ++i)
             subsubtable->add(i, BinaryData(0,0));
-        }
         wt.commit();
     }
 }
@@ -391,9 +387,8 @@ TEST(Transactions)
         test_util::ThreadWrapper threads[num_threads];
 
         // Start threads
-        for (int i=0; i<num_threads; ++i) {
+        for (int i=0; i<num_threads; ++i)
             threads[i].start(util::bind(&thread, i, database_path));
-        }
 
         // Wait for threads to finish
         for (int i=0; i<num_threads; ++i) {
@@ -409,7 +404,8 @@ TEST(Transactions)
 
     // Verify database contents
     size_t table1_theta_size = 0;
-    for (int i=0; i<num_threads; ++i) table1_theta_size += (1 + 13 / (1+i)) * 8;
+    for (int i=0; i<num_threads; ++i)
+        table1_theta_size += (1 + 13 / (1+i)) * 8;
     table1_theta_size *= num_rounds;
     table1_theta_size += 2;
 
@@ -461,9 +457,8 @@ TEST(Transactions)
             CHECK_EQUAL(0,               subtable[i].delta);
             CHECK_EQUAL(BinaryData(0,0), subtable[i].zeta);
             CHECK_EQUAL(0u,              subtable[i].eta->size());
-            if (4 <= i) {
+            if (4 <= i)
                 CHECK_EQUAL(type_Int, subtable[i].theta.get_type());
-            }
         }
         CHECK_EQUAL(size_t(num_threads*num_rounds*5),
                     subtable[0].theta.get_subtable_size());
@@ -514,3 +509,5 @@ TEST(Transactions)
     }
     // End of read transaction
 }
+
+#endif

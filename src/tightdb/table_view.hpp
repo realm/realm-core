@@ -45,7 +45,7 @@ public:
     // Getting values
     int64_t     get_int(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     bool        get_bool(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    Date        get_date(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    DateTime    get_datetime(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     float       get_float(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     double      get_double(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
     StringData  get_string(size_t column_ndx, size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -59,7 +59,7 @@ public:
     // Searching (Int and String)
     size_t find_first_int(size_t column_ndx, int64_t value) const;
     size_t find_first_bool(size_t column_ndx, bool value) const;
-    size_t find_first_date(size_t column_ndx, Date value) const;
+    size_t find_first_datetime(size_t column_ndx, DateTime value) const;
     size_t find_first_float(size_t column_ndx, float value) const;
     size_t find_first_double(size_t column_ndx, double value) const;
     size_t find_first_string(size_t column_ndx, StringData value) const;
@@ -68,14 +68,12 @@ public:
     // Aggregate functions. count_target is ignored by all <int function> except Count. Hack because of bug in optional
     // arguments in clang and vs2010 (fixed in 2012)
     template <int function, typename T, typename R, class ColType>
-    R aggregate(R (ColType::*aggregateMethod)(size_t, size_t) const, size_t column_ndx, T count_target) const;
+    R aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t) const, size_t column_ndx, T count_target) const;
 
-
-    // TODO, FIXME: rename int versions
-    int64_t sum(size_t column_ndx) const;
-    int64_t maximum(size_t column_ndx) const;
-    int64_t minimum(size_t column_ndx) const;
-    double average(size_t column_ndx) const;
+    int64_t sum_int(size_t column_ndx) const;
+    int64_t maximum_int(size_t column_ndx) const;
+    int64_t minimum_int(size_t column_ndx) const;
+    double average_int(size_t column_ndx) const;
     size_t count_int(size_t column_ndx, int64_t target) const;
 
     double sum_float(size_t column_ndx) const;
@@ -90,12 +88,12 @@ public:
     double average_double(size_t column_ndx) const;
     size_t count_double(size_t column_ndx, double target) const;
 
-    Date maximum_date(size_t column_ndx) const;
-    Date minimum_date(size_t column_ndx) const;
+    DateTime maximum_datetime(size_t column_ndx) const;
+    DateTime minimum_datetime(size_t column_ndx) const;
 
     // Sort the view according to the specified column and the
     // specified direction.
-    void sort(size_t column, bool ascending = true);
+    void sort(size_t column_ndx, bool ascending = true);
 
     // Get row index in the source table this view is "looking" at.
     size_t get_source_ndx(size_t row_ndx) const TIGHTDB_NOEXCEPT
@@ -106,16 +104,19 @@ public:
     // Conversion
     void to_json(std::ostream& out) const;
     void to_string(std::ostream& out, size_t limit=500) const;
+    void row_to_string(std::size_t row_ndx, std::ostream& out) const;
 
 protected:
-    Table* m_table;
+    TableRef m_table;
     Array m_refs;
 
+
+/// Copy constructor.
     /// Construct null view (no memory allocated).
-    TableViewBase(): m_table(0), m_refs(Allocator::get_default()) {}
+    TableViewBase(): m_refs(Allocator::get_default()) {}
 
     /// Construct empty view, ready for addition of row indices.
-    TableViewBase(Table* parent): m_table(parent) {}
+    TableViewBase(Table* parent): m_table(parent->get_table_ref()) {}
 
     /// Copy constructor.
     TableViewBase(const TableViewBase& tv):
@@ -124,7 +125,7 @@ protected:
     /// Moving constructor.
     TableViewBase(TableViewBase*) TIGHTDB_NOEXCEPT;
 
-    ~TableViewBase() TIGHTDB_NOEXCEPT { m_refs.destroy(); }
+    ~TableViewBase() TIGHTDB_NOEXCEPT;
 
     void move_assign(TableViewBase*) TIGHTDB_NOEXCEPT;
 
@@ -192,7 +193,7 @@ public:
     // Setting values
     void set_int(size_t column_ndx, size_t row_ndx, int64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value);
-    void set_date(size_t column_ndx, size_t row_ndx, Date value);
+    void set_datetime(size_t column_ndx, size_t row_ndx, DateTime value);
     template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value);
     void set_double(size_t column_ndx, size_t row_ndx, double value);
@@ -212,8 +213,8 @@ public:
     ConstTableView  find_all_int(size_t column_ndx, int64_t value) const;
     TableView       find_all_bool(size_t column_ndx, bool value);
     ConstTableView  find_all_bool(size_t column_ndx, bool value) const;
-    TableView       find_all_date(size_t column_ndx, Date value);
-    ConstTableView  find_all_date(size_t column_ndx, Date value) const;
+    TableView       find_all_datetime(size_t column_ndx, DateTime value);
+    ConstTableView  find_all_datetime(size_t column_ndx, DateTime value) const;
     TableView       find_all_float(size_t column_ndx, float value);
     ConstTableView  find_all_float(size_t column_ndx, float value) const;
     TableView       find_all_double(size_t column_ndx, double value);
@@ -229,6 +230,7 @@ public:
 private:
     TableView(Table& parent): TableViewBase(&parent) {}
     TableView(TableView* tv) TIGHTDB_NOEXCEPT: TableViewBase(tv) {}
+    TableView(ConstTableView tv);
 
     TableView find_all_integer(size_t column_ndx, int64_t value);
     ConstTableView find_all_integer(size_t column_ndx, int64_t value) const;
@@ -268,7 +270,7 @@ public:
     // Searching (Int and String)
     ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
     ConstTableView find_all_bool(size_t column_ndx, bool value) const;
-    ConstTableView find_all_date(size_t column_ndx, Date value) const;
+    ConstTableView find_all_datetime(size_t column_ndx, DateTime value) const;
     ConstTableView find_all_float(size_t column_ndx, float value) const;
     ConstTableView find_all_double(size_t column_ndx, double value) const;
     ConstTableView find_all_string(size_t column_ndx, StringData value) const;
@@ -293,6 +295,29 @@ private:
 // ================================================================================================
 // TableViewBase Implementation:
 
+
+inline TableViewBase::~TableViewBase() TIGHTDB_NOEXCEPT
+{
+    m_refs.destroy();
+}
+ 
+inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
+    m_table(tv->m_table),
+    m_refs(tv->m_refs) // Note: This is a moving copy
+{
+    tv->m_table = TableRef();
+    tv->m_refs.detach();
+}
+
+inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
+{
+    m_table = tv->m_table;
+    tv->m_table = TableRef();
+    m_refs.move_assign(tv->m_refs);
+}
+
+
+
 #define TIGHTDB_ASSERT_COLUMN(column_ndx)                                   \
     TIGHTDB_ASSERT(m_table);                                                \
     TIGHTDB_ASSERT(column_ndx < m_table->get_column_count());
@@ -300,7 +325,7 @@ private:
 #define TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type)             \
     TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \
     TIGHTDB_ASSERT(m_table->get_column_type(column_ndx) == column_type ||   \
-                  (m_table->get_column_type(column_ndx) == type_Date && column_type == type_Int));
+                  (m_table->get_column_type(column_ndx) == type_DateTime && column_type == type_Int));
 
 #define TIGHTDB_ASSERT_INDEX(column_ndx, row_ndx)                           \
     TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \
@@ -309,21 +334,6 @@ private:
 #define TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, column_type)     \
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type)                 \
     TIGHTDB_ASSERT(row_ndx < m_refs.size());
-
-
-inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
-    m_table(tv->m_table),
-    m_refs(tv->m_refs) // Note: This is a moving copy
-{
-    tv->m_table = 0;
-}
-
-inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
-{
-    m_table = tv->m_table;
-    tv->m_table = 0;
-    m_refs.move_assign(tv->m_refs);
-}
 
 
 // Column information
@@ -375,13 +385,13 @@ inline bool TableViewBase::get_bool(size_t column_ndx, size_t row_ndx) const
     return m_table->get_bool(column_ndx, real_ndx);
 }
 
-inline Date TableViewBase::get_date(size_t column_ndx, size_t row_ndx) const
+inline DateTime TableViewBase::get_datetime(size_t column_ndx, size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Date);
+    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_DateTime);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
-    return m_table->get_date(column_ndx, real_ndx);
+    return m_table->get_datetime(column_ndx, real_ndx);
 }
 
 inline float TableViewBase::get_float(size_t column_ndx, size_t row_ndx) const
@@ -463,10 +473,10 @@ inline size_t TableViewBase::find_first_bool(size_t column_ndx, bool value) cons
     return find_first_integer(column_ndx, value ? 1 : 0);
 }
 
-inline size_t TableViewBase::find_first_date(size_t column_ndx, Date value) const
+inline size_t TableViewBase::find_first_datetime(size_t column_ndx, DateTime value) const
 {
-    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Date);
-    return find_first_integer(column_ndx, int64_t(value.get_date()));
+    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_DateTime);
+    return find_first_integer(column_ndx, int64_t(value.get_datetime()));
 }
 
 
@@ -599,10 +609,10 @@ inline TableView TableView::find_all_bool(size_t column_ndx, bool value)
     return find_all_integer(column_ndx, value ? 1 : 0);
 }
 
-inline TableView TableView::find_all_date(size_t column_ndx, Date value)
+inline TableView TableView::find_all_datetime(size_t column_ndx, DateTime value)
 {
-    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Date);
-    return find_all_integer(column_ndx, int64_t(value.get_date()));
+    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_DateTime);
+    return find_all_integer(column_ndx, int64_t(value.get_datetime()));
 }
 
 
@@ -618,10 +628,10 @@ inline ConstTableView TableView::find_all_bool(size_t column_ndx, bool value) co
     return find_all_integer(column_ndx, value ? 1 : 0);
 }
 
-inline ConstTableView TableView::find_all_date(size_t column_ndx, Date value) const
+inline ConstTableView TableView::find_all_datetime(size_t column_ndx, DateTime value) const
 {
-    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Date);
-    return find_all_integer(column_ndx, int64_t(value.get_date()));
+    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_DateTime);
+    return find_all_integer(column_ndx, int64_t(value.get_datetime()));
 }
 
 
@@ -637,10 +647,10 @@ inline ConstTableView ConstTableView::find_all_bool(size_t column_ndx, bool valu
     return find_all_integer(column_ndx, value ? 1 : 0);
 }
 
-inline ConstTableView ConstTableView::find_all_date(size_t column_ndx, Date value) const
+inline ConstTableView ConstTableView::find_all_datetime(size_t column_ndx, DateTime value) const
 {
-    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Date);
-    return find_all_integer(column_ndx, int64_t(value.get_date()));
+    TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, type_DateTime);
+    return find_all_integer(column_ndx, int64_t(value.get_datetime()));
 }
 
 
@@ -699,12 +709,12 @@ inline void TableView::set_bool(size_t column_ndx, size_t row_ndx, bool value)
     m_table->set_bool(column_ndx, real_ndx, value);
 }
 
-inline void TableView::set_date(size_t column_ndx, size_t row_ndx, Date value)
+inline void TableView::set_datetime(size_t column_ndx, size_t row_ndx, DateTime value)
 {
-    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Date);
+    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_DateTime);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
-    m_table->set_date(column_ndx, real_ndx, value);
+    m_table->set_datetime(column_ndx, real_ndx, value);
 }
 
 inline void TableView::set_float(size_t column_ndx, size_t row_ndx, float value)

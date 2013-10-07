@@ -61,7 +61,7 @@ public:
     /// slower.
     static T get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
 
-    ref_type btree_leaf_insert(std::size_t ndx, T, TreeInsertBase& state);
+    ref_type bptree_leaf_insert(std::size_t ndx, T, TreeInsertBase& state);
 
     std::size_t lower_bound(T value) const TIGHTDB_NOEXCEPT;
     std::size_t upper_bound(T value) const TIGHTDB_NOEXCEPT;
@@ -75,6 +75,10 @@ public:
 
     void foreach(ForEachOp<T>*) const TIGHTDB_NOEXCEPT;
     static void foreach(const Array*, ForEachOp<T>*) TIGHTDB_NOEXCEPT;
+
+#ifdef TIGHTDB_DEBUG
+    void to_dot(std::ostream&, StringData title = StringData()) const;
+#endif
 
 private:
     std::size_t find(T target, std::size_t begin, std::size_t end) const;

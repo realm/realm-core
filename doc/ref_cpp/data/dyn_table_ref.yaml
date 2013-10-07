@@ -25,8 +25,8 @@ DESCR      : &g_dyn_table_intro_descr
              timestamps and strings are supported. It is also possible to use a TightDB table class
              as column type. This means that you can have tables of tables structure.
 
-             Moreover, TightDB introduces a column type called {@link class_mixed}. A value of the
-             Mixed type can be any supported value of TightDB. This implies - as the name
+             Moreover, TightDB introduces a column type called mixed. A value of the
+             mixed type can be any supported value of TightDB. This implies - as the name
              indicates - that you can mix the type of values in the column. In one row the
              value could be an integer, in another row the value could be a string or even a table.
 
@@ -195,33 +195,36 @@ CATEGORIES :
       NAME     : add_column
       SUMMARY  : &g_dyn_table_add_column_summary
                  Add a column.
-      DESCR    : &g_dyn_table_add_column_descr
+      DESCR    :
+      - TEXT   : &g_dyn_table_add_column_descr
                  >
                  This method appends a column of the specified type and name to the table.
                  If it's used in a table which already has rows, the new column will just get
                  default values in those rows.
-
+      - TEXT   : &g_dyn_table_add_column_support
+                 >
                  Currently, the following types are supported:
+      - TEXT   : >
                  <ul>
-                   <li><code>type_Bool</code> (default false)</li>
-                   <li><code>type_Int</code> (default 0)</li>
-                   <li><code>type_Float</code> (default 0.0)</li>
-                   <li><code>type_Double</code> (default 0.0)</li>
-                   <li><code>type_String</code> (default "")</li>
-                   <li><code>type_Binary</code> (default ("")</li>
-                   <li><code>type_Date</code> (default 0 - 1970-01-01 00:00:00)</li>
-                   <li><code>type_Table</code> (default NULL)</li>
-                   <li><code>type_Mixed</code> (default NULL)</li>
+                   <li><code>type_Bool</code> (default: false)</li>
+                   <li><code>type_Int</code> (default: 0)</li>
+                   <li><code>type_Float</code> (default: 0.0)</li>
+                   <li><code>type_Double</code> (default: 0.0)</li>
+                   <li><code>type_String</code> (default: "")</li>
+                   <li><code>type_Binary</code> (default: "")</li>
+                   <li><code>type_DateTime</code> (default: 1970-01-01 00:00:00)</li>
+                   <li><code>type_Table</code> (default: NULL)</li>
+                   <li><code>type_Mixed</code> (default: NULL)</li>
                  </ul>
       PARAMS:
       - NAME   : type
         TYPES  : DataType
         DESCR  : &g_dyn_table_add_column_param1_descr
-                 Type of data in the new column.
+                 Type of data to store in the new column.
       - NAME   : name
         TYPES  : StringData
         DESCR  : &g_dyn_table_add_column_param2_descr
-                 Name of the new column.
+                 Name for the new column.
       RETURN:
         TYPES  : size_t
         DESCR  : &g_dyn_table_add_column_return_descr
@@ -327,8 +330,13 @@ CATEGORIES :
                  The name of the column to find.
       RETURN:
         TYPES  : size_t
-        DESCR  : &g_dyn_table_column_index_return_descr
-                 The column index or <code>std::size_t(-1)</code> if there is no column with the specified name.
+        DESCR  :
+        - TEXT : &g_dyn_table_column_index_descr_1
+                 The column index or
+        - TEXT : &g_dyn_table_column_index_descr_2
+                 <code>std::size_t(-1)</code>
+        - TEXT : &g_dyn_table_column_descr_3
+                 if there is no column with the specified name.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_column_index
         DESCR  :
@@ -337,10 +345,13 @@ CATEGORIES :
       NAME     : get_column_type
       SUMMARY  : &g_dyn_table_get_column_type_summary
                  Get the type of a column.
-      DESCR    : &g_dyn_table_get_column_type_descr
+      DESCR    :
+      - TEXT   : &g_dyn_table_get_column_type_descr1
                  >
                  This method gets the type of a column using the column index. Currently,
                  the following types are supported:
+      - TEXT   : &g_dyn_table_get_column_type_descr2
+                 >
                  <ul>
                    <li><code>type_Bool</code></li>
                    <li><code>type_Int</code></li>
@@ -348,7 +359,7 @@ CATEGORIES :
                    <li><code>type_Double</code></li>
                    <li><code>type_String</code></li>
                    <li><code>type_Binary</code></li>
-                   <li><code>type_Date</code></li>
+                   <li><code>type_DateTime</code></li>
                    <li><code>type_Table</code></li>
                    <li><code>type_Mixed</code></li>
                  </ul>
@@ -369,7 +380,7 @@ CATEGORIES :
   - g_dyn_table_add_int:
       NAME     : add_int
       SUMMARY  : &g_dyn_table_add_int_summary
-                 Add value to all cells in a column.
+                 Add a value to all cells in a column.
       DESCR    : &g_dyn_table_add_int_descr
                  Add an integer value to all the cells in the specified column.
                  There is no overflow or underflow protection.
@@ -453,7 +464,7 @@ CATEGORIES :
                  template<class E>void insert_enum(size_t column_ndx, size_t row_ndx, E value)
                  void insert_float(size_t column_ndx, size_t row_ndx, float value)
                  void insert_double(size_t column_ndx, size_t row_ndx, double value)
-                 void insert_date(size_t column_ndx, size_t row_ndx, Date value)
+                 void insert_datetime(size_t column_ndx, size_t row_ndx, DateTime value)
                  void insert_string(size_t column_ndx, size_t row_ndx, StringData value)
                  void insert_binary(size_t column_ndx, size_t row_ndx, BinaryData value)
                  void insert_mixed(size_t column_ndx, size_t row_ndx, Mixed value)
@@ -469,7 +480,7 @@ CATEGORIES :
         DESCR  : &g_dyn_table_insert_parm2_descr
                  The row index.
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed]
+        TYPES  : [bool, int64_t, float, double, DateTime, StringData, BinaryData, Mixed]
         DESCR  : &g_dyn_table_insert_parm3_descr
                  The value to insert.
       EXAMPLES:
@@ -489,7 +500,7 @@ CATEGORIES :
       - NAME   : row_ndx
         TYPES  : size_t
         DESCR  : &g_dyn_table_remove_row_param1_descr
-                 Position of the row to delete (first row index is 0).
+                 Position of the row to delete. First row index is 0.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_remove
         DESCR  :
@@ -539,7 +550,7 @@ CATEGORIES :
       SIGNATURE: |
                  bool          get_bool(size_t column_ndx, size_t row_ndx) const;
                  int64_t       get_int(size_t column_ndx, size_t row_ndx) const;
-                 Date          get_date(size_t column_ndx, size_t row_ndx) const;
+                 DateTime      get_datetime(size_t column_ndx, size_t row_ndx) const;
                  float         get_float(size_t column_ndx, size_t row_ndx) const;
                  double        get_double(size_t column_ndx, size_t row_ndx) const;
                  StringData    get_string(size_t column_ndx, size_t row_ndx) const;
@@ -560,7 +571,7 @@ CATEGORIES :
         DESCR  : &g_dyn_table_get_xxx_parm2_descr
                  The row index (starting from 0).
       RETURN:
-        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed, DataType]
+        TYPES  : [bool, int64_t, float, double, DateTime, StringData, BinaryData, Mixed, DataType]
         DESCR  : &g_dyn_table_get_xxx_return_descr
                  The value at the given cell.
       EXAMPLES:
@@ -601,7 +612,7 @@ CATEGORIES :
                  void set_float(size_t column_ndx, size_t row_ndx, float value)
                  void set_double(size_t column_ndx, size_t row_ndx, double value)
                  template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value)
-                 void set_date(size_t column_ndx, size_t row_ndx, Date value)
+                 void set_datetime(size_t column_ndx, size_t row_ndx, DateTime value)
                  void set_string(size_t column_ndx, size_t row_ndx, StringData value)
                  void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value)
                  void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value)
@@ -614,7 +625,7 @@ CATEGORIES :
         TYPES  : size_t
         DESCR  : *g_dyn_table_get_xxx_parm2_descr
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData, Mixed, const Table*]
+        TYPES  : [bool, int64_t, float, double, DateTime, StringData, BinaryData, Mixed, const Table*]
         DESCR  : &g_dyn_table_set_xxx_parm3_descr
                  The value to assign to the specified cell.
       EXAMPLES:
@@ -754,7 +765,7 @@ CATEGORIES :
                  size_t find_first_int(size_t column_ndx, int64_t value) const;
                  size_t find_first_float(size_t column_ndx, float value) const;
                  size_t find_first_double(size_t column_ndx, double value) const;
-                 size_t find_first_date(size_t column_ndx, Date value) const;
+                 size_t find_first_datetime(size_t column_ndx, DateTime value) const;
                  size_t find_first_string(size_t column_ndx, StringData value) const;
                  size_t find_first_binary(size_t column_ndx, BinaryData value) const;
       CONST    : True
@@ -764,7 +775,7 @@ CATEGORIES :
         DESCR  : &g_dyn_table_find_first_xxx_parm1_descr
                  The column index (starting from 0) to search in.
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData]
+        TYPES  : [bool, int64_t, float, double, DateTime, StringData, BinaryData]
         DESCR  : &g_dyn_table_find_first_xxx_parm2_descr
                  The value to search for.
       RETURN:
@@ -804,7 +815,7 @@ CATEGORIES :
                  TableView      find_all_int(size_t column_ndx, int64_t value);
                  TableView      find_all_float(size_t column_ndx, float value);
                  TableView      find_all_double(size_t column_ndx, double value);
-                 TableView      find_all_date(size_t column_ndx, Date value);
+                 TableView      find_all_datetime(size_t column_ndx, DateTime value);
                  TableView      find_all_string(size_t column_ndx, StringData value);
                  TableView      find_all_binary(size_t column_ndx, BinaryData value);
 
@@ -812,7 +823,7 @@ CATEGORIES :
                  ConstTableView find_all_int(size_t column_ndx, int64_t value) const;
                  ConstTableView find_all_float(size_t column_ndx, float value) const;
                  ConstTableView find_all_double(size_t column_ndx, double value) const;
-                 ConstTableView find_all_date(size_t column_ndx, Date value) const;
+                 ConstTableView find_all_datetime(size_t column_ndx, DateTime value) const;
                  ConstTableView find_all_string(size_t column_ndx, StringData value) const;
                  ConstTableView find_all_binary(size_t column_ndx, BinaryData value) const;
 
@@ -822,7 +833,7 @@ CATEGORIES :
         DESCR  : &g_dyn_table_find_all_xxx_parm1_descr
                  The column index (starting from 0).
       - NAME   : value
-        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData]
+        TYPES  : [bool, int64_t, float, double, DateTime, StringData, BinaryData]
         DESCR  : &g_dyn_table_find_all_xxx_parm2_descr
                  The value to find in the column.
       RETURN:
@@ -1035,7 +1046,7 @@ CATEGORIES :
   - g_dyn_table_sum_float:
   - g_dyn_table_sum_double:
       TITLE    : sum_*
-      NAMES    : [sum, sum_float, sum_double]
+      NAMES    : [sum_int, sum_float, sum_double]
       SUMMARY  : &g_dyn_table_sum_summary
                  Calculates the sum.
       DESCR    :
@@ -1046,7 +1057,7 @@ CATEGORIES :
                  values can be greater than the maximum value of the type, a <code>double</code>
                  is returned.
       SIGNATURE: |
-                 int64_t sum(size_t column_ndx) const;
+                 int64_t sum_int(size_t column_ndx) const;
                  double  sum_float(size_t column_ndx) const;
                  double  sum_double(size_t column_ndx) const;
       CONST    : True
@@ -1067,13 +1078,13 @@ CATEGORIES :
   - g_dyn_table_maximum_float:
   - g_dyn_table_maximum_double:
       TITLE    : maximum_*
-      NAMES    : [maximum, maximum_float, maximum_double]
+      NAMES    : [maximum_int, maximum_float, maximum_double]
       SUMMARY  : &g_dyn_table_maximum_summary
                  Find highest value.
       DESCR    : &g_dyn_table_maximum_descr
                  The method finds the highest value in the specified column.
       SIGNATURE: |
-                 int64_t maximum(size_t column_ndx) const;
+                 int64_t maximum_int(size_t column_ndx) const;
                  float   maximum_float(size_t column_ndx) const;
                  double  maximum_double(size_t column_ndx) const;
       CONST    : True
@@ -1094,14 +1105,14 @@ CATEGORIES :
   - g_dyn_table_minimum_float:
   - g_dyn_table_minimum_double:
       TITLE    : minimum_*
-      NAMES    : [minimum, minimum_float, minimum_double]
+      NAMES    : [minimum_int, minimum_float, minimum_double]
       SUMMARY  : &g_dyn_table_minimum_summary
                  Find lowest value.
       DESCR    : &g_dyn_table_minimum_descr
                  The method finds the lowest value in the specified column.
       CONST    : True
       SIGNATURE: |
-                 int64_t minimum(size_t column_ndx) const;
+                 int64_t minimum_int(size_t column_ndx) const;
                  float   minimum_float(size_t column_ndx) const;
                  double  minimum_double(size_t column_ndx) const;
       PARAMS:
@@ -1120,14 +1131,14 @@ CATEGORIES :
   - g_dyn_table_average_float:
   - g_dyn_table_average_double:
       TITLE    : average_*
-      NAMES    : [average, average_float, average_double]
+      NAMES    : [average_int, average_float, average_double]
       SUMMARY  : &g_dyn_table_average_summary
                  Calculates the average.
       DESCR    : &g_dyn_table_average_descr
                  This method calculates the average value in the specified column.
       CONST    : True
       SIGNATURE: |
-                 double  average(size_t column_ndx) const;
+                 double  average_int(size_t column_ndx) const;
                  double  average_float(size_t column_ndx) const;
                  double  average_double(size_t column_ndx) const;
       PARAMS:
@@ -1154,8 +1165,8 @@ CATEGORIES :
                  The JavaScript Object Notation (<a href="http://json.org">JSON</a>)
                  is useful for web/mobile applications and serialization.
 
-                 A table (and subtables) will be formatted as a array of rows, and row will
-                 be formatted as an object.
+                 A table (and subtables) will be formatted as an array of rows,
+                 and a row will be formatted as an object.
       CONST    : true
       PARAMS:
       - NAME   : out
@@ -1165,14 +1176,16 @@ CATEGORIES :
       - CODE   : ex_cpp_dyn_table_to_json
         DESCR  :
 
+  - g_dyn_table_to_string_2:
+      IGNORE   : ""
   - g_dyn_table_to_string:
       NAME     : to_string
       SUMMARY  : &g_dyn_table_to_string_summary
                  Convert table to a string.
       DESCR    : &g_dyn_table_to_string_descr
-                 >
-                 This method will convert a table and its columns and rows to a format
-                 which is easily read by humans.
+                 This method will convert a table and its columns and rows to a
+                 human readable format.
+      SIGNATURE: void to_string(std::ostream& out, std::size_t limit = 500) const
       CONST    : true
       PARAMS:
       - NAME   : out
@@ -1180,7 +1193,7 @@ CATEGORIES :
         DESCR  : &g_dyn_table_to_string_parm1_descr
                  Output stream.
       - NAME   : limit
-        TYPES  : size_t
+        TYPES  : std::size_t
         DESCR  : &g_dyn_table_to_string_parm2_descr
                  "The number of rows to convert. Default: 500."
       EXAMPLES:
@@ -1189,19 +1202,18 @@ CATEGORIES :
       SEE      : See also {@link g_dyn_table_row_to_string} which do the same for a specific row.
 
   - g_dyn_table_row_to_string:
-      NAME     : to_string
+      NAME     : row_to_string
       SUMMARY  : &g_dyn_table_row_to_string_summary
                  Convert a row to a string.
       DESCR    : &g_dyn_table_row_to_string_descr
-                 >
-                 This method will convert a row to a format
-                 which is easily read by humans.
+                 This method will convert a specified row to a
+                 human readable format.
       CONST    : true
       PARAMS:
       - NAME   : row_ndx
-        TYPES  : size_t
+        TYPES  : std::size_t
         DESCR  : &g_dyn_table_row_to_string_parm1_descr
-                 The row index.
+                 The index of the row to convert.
       - NAME   : out
         TYPES  : std::ostream&
         DESCR  : &g_dyn_table_row_to_string_parm2_descr

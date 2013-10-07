@@ -10,7 +10,24 @@ Format:
 - Removed/deprecated feature/method .... (user visible removed feature - passed on to release notes)
 . Any other notes .... 				     (internal changes)
 
-==================
+2013-09-26 (Brian Munkholm)
++/- Renamed Table::distinct() to Table::get_distinct_view()
++/- Renamed class Date to DateTime. Renamed DataType::type_Date to type_DateTime
++/- Renamed suffix of all methods operating on DateTime from '_date' to '_datetime'.
+
+2013-09-26 (Kristian Spangsege)
++ File format support for streaming of output from Group::write() (not yet suported by API.)
++ Support for internal null characters in strings. This applies to table and column names as well.
+
+2013-09-19 (Kristian Spangsege)
+. CRUD performance has been greatly improved for large tables, as long as they are kept on the "compact" form. A table is kept on the compact form when every row insertion and removal, since the creation of that table, has occured, and continues to occur at the end (i.e., insert after last row, and remove last row).
+
+2013-10-02 (Lasse Reinhold)
+- Renamed find_next(lastmatch) into find(begin_at_table_row) for queries and typed tables.
+
+2013-09-12 (Brian Munkholm)
++ Added TableView::row_to_string() and testcases for to_string() and row_to_string()
++ Added row_to_string(), to_string() and to_json() in typed TableView.
 
 
 2013-08-31 (Kristian Spangsege)
@@ -22,15 +39,15 @@ Format:
 
 
 2013-08-23 (Kristian Spangsege)
-+ Stop throwing from destructors (all), and from SharedGroup::rollback() and SharedGRoup::end_read().
-+ General stability and eror checking improvements.
++ Stop throwing from destructors (all), and from SharedGroup::rollback() and SharedGroup::end_read().
++ General stability and error checking improvements.
 ! Fixed many bugs relating to Group::commit().
 ! Fixed some bugs relating to SharedGroup::commit().
 ! Fixed bug in TableViewBase::sort().
 
 
 2013-08-18 (Kenneth Geisshirt)
-! Group::to_string formatting was incorrect. See https://app.asana.com/0/1441391972580/5659532773181.
+! Group::to_string() formatting was incorrect. See https://app.asana.com/0/1441391972580/5659532773181.
 
 
 2013-08-03 (Kristian Spangsege)
@@ -57,6 +74,10 @@ Format:
 
 2013-06-05 (Kristian Spangsege)
 . Group::write(path) now throws File::Exists if 'path' already exists in the file system.
+
+
+2013-05-16 (Kristian Spangsege)
++ New SharedGroup::reserve() method added.
 
 
 2013-05-13 (Kenneth Geisshirt)

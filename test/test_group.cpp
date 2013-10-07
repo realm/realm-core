@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_GROUP
+
 #include <algorithm>
 #include <fstream>
 
@@ -8,6 +11,7 @@
 
 using namespace std;
 using namespace tightdb;
+
 
 namespace {
 
@@ -20,6 +24,7 @@ TIGHTDB_TABLE_4(TestTableGroup,
                 fourth, Enum<Days>)
 
 } // Anonymous namespace
+
 
 TEST(Group_Unattached)
 {
@@ -123,7 +128,6 @@ TEST(Group_OpenBuffer)
     }
 }
 
-
 TEST(Group_BadBuffer)
 {
     File::try_remove("test.tightdb");
@@ -179,6 +183,29 @@ TEST(Group_GetTable)
     TestTableGroup::Ref t3 = g.get_table<TestTableGroup>("beta");
     TestTableGroup::ConstRef t4 = cg.get_table<TestTableGroup>("beta");
     CHECK_EQUAL(t3, t4);
+}
+
+namespace {
+void setupTable(TestTableGroup::Ref t)
+{
+    t->add("a",  1, true, Wed);
+    t->add("b", 15, true, Wed);
+    t->add("ccc", 10, true, Wed);
+    t->add("dddd", 20, true, Wed);
+}
+}
+
+TEST(Group_Equal)
+{
+    Group g1, g2;
+    TestTableGroup::Ref t1 = g1.get_table<TestTableGroup>("TABLE1");
+    setupTable(t1);
+    TestTableGroup::Ref t2 = g2.get_table<TestTableGroup>("TABLE1");
+    setupTable(t2);
+    CHECK_EQUAL(true, g1 == g2);
+
+    t2->add("hey", 2, false, Thu);
+    CHECK_EQUAL(true, g1 != g2);
 }
 
 TEST(Group_TableAccessorLeftBehind)
@@ -270,6 +297,7 @@ TEST(Group_Read0)
     Group g("table_test.tightdb");
 }
 
+
 TEST(Group_Serialize1)
 {
     // Create group with one table
@@ -321,6 +349,7 @@ TEST(Group_Serialize1)
     from_disk.Verify();
 #endif
 }
+
 
 TEST(Group_Read1)
 {
@@ -503,14 +532,14 @@ TEST(Group_Serialize_All)
 
     table->add_column(type_Int,    "int");
     table->add_column(type_Bool,   "bool");
-    table->add_column(type_Date,   "date");
+    table->add_column(type_DateTime,   "date");
     table->add_column(type_String, "string");
     table->add_column(type_Binary, "binary");
     table->add_column(type_Mixed,  "mixed");
 
     table->insert_int(0, 0, 12);
     table->insert_bool(1, 0, true);
-    table->insert_date(2, 0, 12345);
+    table->insert_datetime(2, 0, 12345);
     table->insert_string(3, 0, "test");
     table->insert_binary(4, 0, BinaryData("binary", 7));
     table->insert_mixed(5, 0, false);
@@ -527,7 +556,7 @@ TEST(Group_Serialize_All)
     CHECK_EQUAL(1, t->size());
     CHECK_EQUAL(12, t->get_int(0, 0));
     CHECK_EQUAL(true, t->get_bool(1, 0));
-    CHECK_EQUAL(time_t(12345), t->get_date(2, 0));
+    CHECK_EQUAL(time_t(12345), t->get_datetime(2, 0));
     CHECK_EQUAL("test", t->get_string(3, 0));
     CHECK_EQUAL(7, t->get_binary(4, 0).size());
     CHECK_EQUAL("binary", t->get_binary(4, 0).data());
@@ -547,13 +576,13 @@ TEST(Group_Persist)
     TableRef table = db.get_table("test");
     table->add_column(type_Int,    "int");
     table->add_column(type_Bool,   "bool");
-    table->add_column(type_Date,   "date");
+    table->add_column(type_DateTime,   "date");
     table->add_column(type_String, "string");
     table->add_column(type_Binary, "binary");
     table->add_column(type_Mixed,  "mixed");
     table->insert_int(0, 0, 12);
     table->insert_bool(1, 0, true);
-    table->insert_date(2, 0, 12345);
+    table->insert_datetime(2, 0, 12345);
     table->insert_string(3, 0, "test");
     table->insert_binary(4, 0, BinaryData("binary", 7));
     table->insert_mixed(5, 0, false);
@@ -570,7 +599,7 @@ TEST(Group_Persist)
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL(time_t(12345), table->get_date(2, 0));
+    CHECK_EQUAL(time_t(12345), table->get_datetime(2, 0));
     CHECK_EQUAL("test", table->get_string(3, 0));
     CHECK_EQUAL(7, table->get_binary(4, 0).size());
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
@@ -591,7 +620,7 @@ TEST(Group_Persist)
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL(time_t(12345), table->get_date(2, 0));
+    CHECK_EQUAL(time_t(12345), table->get_datetime(2, 0));
     CHECK_EQUAL("Changed!", table->get_string(3, 0));
     CHECK_EQUAL(7, table->get_binary(4, 0).size());
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
@@ -1028,12 +1057,11 @@ TEST(Group_toJSON)
     Group g;
     TestTableGroup::Ref table = g.get_table<TestTableGroup>("test");
 
-    table->add("jeff",     1, true, Wed);
-    table->add("jim",      1, true, Wed);
-    std::ostringstream ss;
-    ss.sync_with_stdio(false); // for performance
-    g.to_json(ss);
-    const std::string str = ss.str();
+    table->add("jeff", 1, true, Wed);
+    table->add("jim",  1, true, Wed);
+    ostringstream out;
+    g.to_json(out);
+    string str = out.str();
     CHECK(str.length() > 0);
     CHECK_EQUAL("{\"test\":[{\"first\":\"jeff\",\"second\":1,\"third\":true,\"fourth\":2},{\"first\":\"jim\",\"second\":1,\"third\":true,\"fourth\":2}]}", str);
 }
@@ -1043,12 +1071,11 @@ TEST(Group_toString)
     Group g;
     TestTableGroup::Ref table = g.get_table<TestTableGroup>("test");
 
-    table->add("jeff",     1, true, Wed);
-    table->add("jim",      1, true, Wed);
-    std::ostringstream ss;
-    ss.sync_with_stdio(false); // for performance
-    g.to_string(ss);
-    const std::string str = ss.str();
+    table->add("jeff", 1, true, Wed);
+    table->add("jim",  1, true, Wed);
+    ostringstream out;
+    g.to_string(out);
+    string str = out.str();
     CHECK(str.length() > 0);
     CHECK_EQUAL("     tables     rows  \n   0 test       2     \n", str.c_str());
 }
@@ -1070,19 +1097,19 @@ TEST(Group_Index_String)
     table->column().first.set_index();
     CHECK(table->column().first.has_index());
 
-    const size_t r1 = table->column().first.find_first("jimmi");
+    size_t r1 = table->column().first.find_first("jimmi");
     CHECK_EQUAL(not_found, r1);
 
-    const size_t r2 = table->column().first.find_first("jeff");
-    const size_t r3 = table->column().first.find_first("jim");
-    const size_t r4 = table->column().first.find_first("jimbo");
-    const size_t r5 = table->column().first.find_first("johnny");
+    size_t r2 = table->column().first.find_first("jeff");
+    size_t r3 = table->column().first.find_first("jim");
+    size_t r4 = table->column().first.find_first("jimbo");
+     size_t r5 = table->column().first.find_first("johnny");
     CHECK_EQUAL(0, r2);
     CHECK_EQUAL(1, r3);
     CHECK_EQUAL(5, r4);
     CHECK_EQUAL(6, r5);
 
-    const size_t c1 = table->column().first.count("jennifer");
+    size_t c1 = table->column().first.count("jennifer");
     CHECK_EQUAL(2, c1);
 
     // Serialize to memory (we now own the buffer)
@@ -1096,19 +1123,19 @@ TEST(Group_Index_String)
 
     CHECK(t->column().first.has_index());
 
-    const size_t m1 = table->column().first.find_first("jimmi");
+    size_t m1 = table->column().first.find_first("jimmi");
     CHECK_EQUAL(not_found, m1);
 
-    const size_t m2 = t->column().first.find_first("jeff");
-    const size_t m3 = t->column().first.find_first("jim");
-    const size_t m4 = t->column().first.find_first("jimbo");
-    const size_t m5 = t->column().first.find_first("johnny");
+    size_t m2 = t->column().first.find_first("jeff");
+    size_t m3 = t->column().first.find_first("jim");
+    size_t m4 = t->column().first.find_first("jimbo");
+    size_t m5 = t->column().first.find_first("johnny");
     CHECK_EQUAL(0, m2);
     CHECK_EQUAL(1, m3);
     CHECK_EQUAL(5, m4);
     CHECK_EQUAL(6, m5);
 
-    const size_t m6 = t->column().first.count("jennifer");
+    size_t m6 = t->column().first.count("jennifer");
     CHECK_EQUAL(2, m6);
 }
 
@@ -1125,7 +1152,7 @@ TEST(Group_ToDot)
     Spec s = table->get_spec();
     s.add_column(type_Int,    "int");
     s.add_column(type_Bool,   "bool");
-    s.add_column(type_Date,   "date");
+    s.add_column(type_DateTime,   "date");
     s.add_column(type_String, "string");
     s.add_column(type_String, "string_long");
     s.add_column(type_String, "string_enum"); // becomes ColumnStringEnum
@@ -1134,15 +1161,15 @@ TEST(Group_ToDot)
     Spec sub = s.add_subtable_column("tables");
     sub.add_column(type_Int,  "sub_first");
     sub.add_column(type_String, "sub_second");
-    table->UpdateFromSpec(s.GetRef());
+    table->UpdateFromSpec(s.get_ref());
 
     // Add some rows
     for (size_t i = 0; i < 15; ++i) {
         table->insert_int(0, i, i);
         table->insert_bool(1, i, (i % 2 ? true : false));
-        table->insert_date(2, i, 12345);
+        table->insert_datetime(2, i, 12345);
 
-        std::stringstream ss;
+        stringstream ss;
         ss << "string" << i;
         table->insert_string(3, i, ss.str().c_str());
 
@@ -1187,7 +1214,7 @@ TEST(Group_ToDot)
             Spec s = subtable->get_spec();
             s.add_column(type_Int,    "first");
             s.add_column(type_String, "second");
-            subtable->UpdateFromSpec(s.GetRef());
+            subtable->UpdateFromSpec(s.get_ref());
 
             subtable->insert_int(0, 0, 42);
             subtable->insert_string(1, 0, "meaning");
@@ -1206,17 +1233,20 @@ TEST(Group_ToDot)
 
 #if 1
     // Write array graph to cout
-    std::stringstream ss;
+    stringstream ss;
     mygroup.ToDot(ss);
     cout << ss.str() << endl;
 #endif
 
     // Write array graph to file in dot format
-    std::ofstream fs("tightdb_graph.dot", ios::out | ios::binary);
-    if (!fs.is_open()) cout << "file open error " << strerror << endl;
+    ofstream fs("tightdb_graph.dot", ios::out | ios::binary);
+    if (!fs.is_open())
+        cout << "file open error " << strerror << endl;
     mygroup.to_dot(fs);
     fs.close();
 }
 
 #endif // TIGHTDB_TO_DOT
 #endif // TIGHTDB_DEBUG
+
+#endif // TEST_GROUP

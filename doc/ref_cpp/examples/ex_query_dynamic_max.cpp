@@ -18,11 +18,8 @@ int main()
 // @@EndShow@@
     Group group;
     TableRef table = group.get_table("test");
-
-    Spec& s = table->get_spec();
-    s.add_column(type_String, "Name");
-    s.add_column(type_Int,    "Age");
-    table->update_from_spec();
+    table->add_column(type_String, "Name");
+    table->add_column(type_Int,    "Age");
 
     table->add_empty_row();
     table->set_string(0, 0, "Alice");
@@ -38,12 +35,12 @@ int main()
 
 // @@Show@@
     // Find the maximum Age (column 1) of entire table (no criteria)
-    int64_t max = table->where().maximum(1);
+    int64_t max = table->where().maximum_int(1);
     assert(max == 50);
 
     // Find the maximum Age (column 1) where Name (column 0) contains "e"
     Query q = table->where().contains(0, "e");
-    max = q.maximum(1);
+    max = q.maximum_int(1);
     assert(max == 44);
 // @@EndShow@@
 }

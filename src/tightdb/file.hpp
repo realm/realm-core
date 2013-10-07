@@ -208,7 +208,8 @@ public:
     /// increased as necessary.
     ///
     /// On systems that do not support this operation, this method has
-    /// no effect.
+    /// no effect. You may call is_prealloc_supported() to determine
+    /// if it is supported on your system.
     ///
     /// Calling this method on an instance that is not attached to an
     /// open file has undefined behavior. Calling this method on a
@@ -219,7 +220,11 @@ public:
     /// concurrent invocations.
     ///
     /// \sa prealloc()
+    /// \sa is_prealloc_supported()
     void prealloc_if_supported(SizeType offset, std::size_t size);
+
+    /// See prealloc_if_supported().
+    static bool is_prealloc_supported();
 
     /// Reposition the read/write offset of this File
     /// instance. Distinct File instances have separate independent
@@ -332,6 +337,10 @@ public:
     /// Remove the specified file path from the file system. If the
     /// specified path is not a directory, this function is equivalent
     /// to std::remove(const char*).
+    ///
+    /// The specified file must not be open by the calling process. If
+    /// it is, this function has undefined behaviour. Note that an
+    /// open memory map of the file counts as "the file being open".
     ///
     /// \throw AccessError If the file could not be removed. If the
     /// reason corresponds to one of the exception types that are

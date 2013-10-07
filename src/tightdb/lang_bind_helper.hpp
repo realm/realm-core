@@ -94,7 +94,7 @@ public:
     /// modification is only done through it when it is not shared.
     static Spec& get_spec(Table&) TIGHTDB_NOEXCEPT;
 
-    /// Returns the name of the spaceified data type as follows:
+    /// Returns the name of the specified data type as follows:
     ///
     /// <pre>
     ///
@@ -104,7 +104,7 @@ public:
     ///   type_Double  ->  "double"
     ///   type_String  ->  "string"
     ///   type_Binary  ->  "binary"
-    ///   type_Date    ->  "date"
+    ///   type_DateTime    ->  "date"
     ///   type_Table   ->  "table"
     ///   type_Mixed   ->  "mixed"
     ///

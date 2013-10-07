@@ -25,6 +25,12 @@
 /tightdb-config-dbg
 /tightdb-config-cov
 
+/tightdbd
+/tightdbd-dbg
+/tightdbd-noinst
+/tightdbd-dbg-noinst
+/tightdbd-cov
+
 # iPhone
 /libtightdb-iPhoneOS.a
 /libtightdb-iPhoneOS-dbg.a

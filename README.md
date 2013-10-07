@@ -80,7 +80,7 @@ Building, testing, and installing
     sh build.sh test
     sh build.sh test-debug
     sudo sh build.sh install
-    sh build.sh test-intalled
+    sh build.sh test-installed
 
 Headers are installed in:
 
@@ -100,13 +100,17 @@ Note: '.so' is replaced by '.dylib' on OS X.
 
 The following programs are installed:
 
+    /usr/local/bin/tightdbd
+    /usr/local/bin/tightdbd-dbg
     /usr/local/bin/tightdb-config
     /usr/local/bin/tightdb-config-dbg
 
-These programs provide the necessary compiler flags for an application
-that needs to link against TightDB. They work with GCC and other
-compilers, such as Clang, that are mostly command line compatible with
-GCC. Here is an example:
+The first two are used transparently by the TightDB library when
+`async` transactions are enabled. The two `config` programs provide
+the necessary compiler flags for an application that needs to link
+against TightDB. They work with GCC and other compilers, such as
+Clang, that are mostly command line compatible with GCC. Here is an
+example:
 
     g++  my_app.cpp  `tightdb-config --cflags --libs`
 
@@ -177,12 +181,15 @@ replication. For example:
 Packaging
 ---------
 
-It is possible to create Debian packages (`.deb`) by running the
+It is possible to create Debian/Ubuntu packages (`.deb`) by running the
 following command:
 
     dpkg-buildpackage -rfakeroot
 
-The packages will be signed by the maintainer's signature.
+The packages will be signed by the maintainer's signature. It is also
+possible to create packages without signature:
+
+    dpkg-buildpackage -rfakeroot -us -uc
 
 
 
@@ -216,11 +223,25 @@ is named according to the tag.
 
 `Pandoc` is required to build a distribution package.
 
-On Ubuntu, install Pandoc and XeLaTeX with the following commands:
+### Ubuntu 10.04, 12.04, and 13.04
 
-    sudo apt-get install texlive-latex-base
-    sudo apt-get install pandoc 
+    sudo apt-get install texlive-latex-base texlive-latex-extra pandoc
 
-On Mac OSX, install Pandoc and XeLaTeX (aka MacTeX) via the following link:
+### Fedora 17
 
-    http://www.texts.io/support
+    sudo yum install pandoc-markdown2pdf
+
+### Fedora 18
+
+    sudo yum install pandoc-pdf texlive
+
+## Mac OSX
+
+Install Pandoc and XeLaTeX (aka MacTeX) by following the instructions
+on http://johnmacfarlane.net/pandoc/installing.html. This boils down
+to installing the following two packages:
+
+ - http://pandoc.googlecode.com/files/pandoc-1.12.0.2.dmg
+ - http://mirror.ctan.org/systems/mac/mactex/mactex-basic.pkg
+
+When done, you need to restart the terminal session.

@@ -31,8 +31,9 @@ class ColumnStringEnum: public Column {
 public:
     typedef StringData value_type;
 
-    ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* = 0,
-                     std::size_t ndx_in_parent = 0, Allocator& = Allocator::get_default());
+    ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* column_parent = NULL,
+                     size_t column_ndx_in_parent = 0, ArrayParent* keys_parent = NULL,
+                     size_t keys_ndx_in_parent = 0, Allocator& = Allocator::get_default());
     ~ColumnStringEnum() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void destroy() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -40,7 +41,7 @@ public:
     void add(StringData value);
     void set(std::size_t ndx, StringData value);
     void insert(std::size_t ndx, StringData value);
-    void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
+    void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
 
     using Column::move_last_over;
@@ -48,8 +49,9 @@ public:
     using Column::insert;
 
     std::size_t count(StringData value) const;
-    size_t find_first(StringData value, std::size_t begin=0, std::size_t end=-1) const;
-    void find_all(Array& res, StringData value, std::size_t begin=0, std::size_t end=-1) const;
+    size_t find_first(StringData value, std::size_t begin = 0, std::size_t end = npos) const;
+    void find_all(Array& res, StringData value,
+                  std::size_t begin = 0, std::size_t end = npos) const;
     FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
     std::size_t count(std::size_t key_index) const;
@@ -65,6 +67,7 @@ public:
     std::size_t upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
     //@{
 
+    void adjust_keys_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT;
     void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -86,6 +89,8 @@ public:
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
+    void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
+    using Column::dump_node_structure;
 #endif
 
     std::size_t GetKeyNdx(StringData value) const;

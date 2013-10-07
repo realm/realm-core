@@ -41,7 +41,8 @@ inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* table, std::size_
 inline ref_type ColumnMixed::get_subtable_ref(std::size_t row_idx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(row_idx < m_types->size());
-    if (m_types->get(row_idx) != type_Table) return 0;
+    if (m_types->get(row_idx) != type_Table)
+        return 0;
     return m_refs->get_as_ref(row_idx);
 }
 
@@ -51,10 +52,12 @@ inline std::size_t ColumnMixed::get_subtable_size(std::size_t row_idx) const TIG
     // size from it. Maybe it is faster in general to check for the
     // the presence of the cached object and use it when available.
     ref_type top_ref = get_subtable_ref(row_idx);
-    if (!top_ref) return 0;
+    if (!top_ref)
+        return 0;
     ref_type columns_ref = Array(top_ref, 0, 0, m_refs->get_alloc()).get_as_ref(1);
     Array columns(columns_ref, 0, 0, m_refs->get_alloc());
-    if (columns.is_empty()) return 0;
+    if (columns.is_empty())
+        return 0;
     ref_type first_col_ref = columns.get_as_ref(0);
     return get_size_from_ref(first_col_ref, m_refs->get_alloc());
 }
@@ -72,11 +75,6 @@ inline void ColumnMixed::detach_subtable_accessors() TIGHTDB_NOEXCEPT
     m_refs->detach_subtable_accessors();
 }
 
-inline void ColumnMixed::detach_subtable_accessors_virtual() TIGHTDB_NOEXCEPT
-{
-    detach_subtable_accessors();
-}
-
 inline ref_type ColumnMixed::create(std::size_t size, Allocator& alloc)
 {
     ColumnMixed c(alloc, 0, 0);
@@ -89,7 +87,7 @@ inline ref_type ColumnMixed::create(std::size_t size, Allocator& alloc)
 // Getters
 //
 
-#define TIGHTDB_BIT63 0x8000000000000000
+#define TIGHTDB_BIT63 0x8000000000000000ULL
 
 inline int64_t ColumnMixed::get_value(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
@@ -108,8 +106,10 @@ inline int64_t ColumnMixed::get_int(std::size_t ndx) const TIGHTDB_NOEXCEPT
 
     // restore 'sign'-bit from the column-type
     MixedColType col_type = MixedColType(m_types->get(ndx));
-    if (col_type == mixcol_IntNeg)
+    if (col_type == mixcol_IntNeg) {
+        // FIXME: Bad cast of result of '|' from unsigned to signed
         value |= TIGHTDB_BIT63; // set sign bit (63)
+    }
     else {
         TIGHTDB_ASSERT(col_type == mixcol_Int);
     }
@@ -123,11 +123,11 @@ inline bool ColumnMixed::get_bool(std::size_t ndx) const TIGHTDB_NOEXCEPT
     return (get_value(ndx) != 0);
 }
 
-inline Date ColumnMixed::get_date(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline DateTime ColumnMixed::get_datetime(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_types->get(ndx) == mixcol_Date);
 
-    return Date(std::time_t(get_value(ndx)));
+    return DateTime(std::time_t(get_value(ndx)));
 }
 
 inline float ColumnMixed::get_float(std::size_t ndx) const TIGHTDB_NOEXCEPT
@@ -236,10 +236,10 @@ inline void ColumnMixed::set_bool(std::size_t ndx, bool value)
     set_value(ndx, (value ? 1 : 0), mixcol_Bool);
 }
 
-inline void ColumnMixed::set_date(std::size_t ndx, Date value)
+inline void ColumnMixed::set_datetime(std::size_t ndx, DateTime value)
 {
     detach_subtable_accessors();
-    set_value(ndx, int64_t(value.get_date()), mixcol_Date);
+    set_value(ndx, int64_t(value.get_datetime()), mixcol_Date);
 }
 
 inline void ColumnMixed::set_subtable(std::size_t ndx, const Table* t)
@@ -319,13 +319,13 @@ inline void ColumnMixed::insert_bool(std::size_t ndx, bool value)
     m_refs->insert(ndx, v);
 }
 
-inline void ColumnMixed::insert_date(std::size_t ndx, Date value)
+inline void ColumnMixed::insert_datetime(std::size_t ndx, DateTime value)
 {
     TIGHTDB_ASSERT(ndx <= m_types->size());
     detach_subtable_accessors();
 
     // Shift value one bit and set lowest bit to indicate that this is not a ref
-    int64_t v = (int64_t(value.get_date()) << 1) + 1;
+    int64_t v = (int64_t(value.get_datetime()) << 1) + 1;
 
     m_types->insert(ndx, mixcol_Date);
     m_refs->insert(ndx, v);

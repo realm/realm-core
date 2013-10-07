@@ -58,7 +58,7 @@ public:
     void create();
 
 #ifdef TIGHTDB_DEBUG
-    void to_dot(std::ostream&, const char* title = 0) const;
+    void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
 private:

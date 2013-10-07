@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_FILE
+
 #include <sstream>
 #include <ostream>
 
@@ -56,3 +59,5 @@ TEST(File_Streambuf)
     }
     File::try_remove("test_file");
 }
+
+#endif // TEST_FILE

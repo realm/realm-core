@@ -1,3 +1,6 @@
+#include <iostream>
+#include <iomanip>
+
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/index_string.hpp>
 
@@ -16,10 +19,11 @@ StringData get_string(void* column, size_t ndx)
 } // anonymous namespace
 
 
-ColumnStringEnum::ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* parent,
-                                   size_t ndx_in_parent, Allocator& alloc):
-    Column(values, parent, ndx_in_parent+1, alloc), // Throws
-    m_keys(keys,   parent, ndx_in_parent,   alloc), // Throws
+ColumnStringEnum::ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* column_parent,
+                                   size_t column_ndx_in_parent, ArrayParent* keys_parent,
+                                   size_t keys_ndx_in_parent, Allocator& alloc):
+    Column(values, column_parent, column_ndx_in_parent, alloc), // Throws
+    m_keys(keys,   keys_parent,   keys_ndx_in_parent,   alloc), // Throws
     m_index(0)
 {
 }
@@ -37,9 +41,13 @@ void ColumnStringEnum::destroy() TIGHTDB_NOEXCEPT
         m_index->destroy();
 }
 
-void ColumnStringEnum::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
+void ColumnStringEnum::adjust_keys_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
 {
     m_keys.adjust_ndx_in_parent(diff);
+}
+
+void ColumnStringEnum::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
+{
     Column::adjust_ndx_in_parent(diff);
 }
 
@@ -84,7 +92,7 @@ void ColumnStringEnum::insert(size_t ndx, StringData value)
     }
 }
 
-void ColumnStringEnum::erase(size_t ndx)
+void ColumnStringEnum::erase(size_t ndx, bool is_last)
 {
     TIGHTDB_ASSERT(ndx < Column::size());
 
@@ -94,11 +102,10 @@ void ColumnStringEnum::erase(size_t ndx)
     //  position to update (as it looks for the old value))
     if (m_index) {
         StringData old_val = get(ndx);
-        const bool is_last = ndx == size();
         m_index->erase(ndx, old_val, is_last);
     }
 
-    Column::erase(ndx);
+    Column::erase(ndx, is_last);
 }
 
 void ColumnStringEnum::clear()
@@ -132,14 +139,14 @@ void ColumnStringEnum::find_all(Array& res, StringData value, size_t begin, size
 
     size_t key_ndx = m_keys.find_first(value);
     if (key_ndx == size_t(-1)) return;
-    Column::find_all(res, key_ndx, 0, begin, end);
+    Column::find_all(res, key_ndx, begin, end);
     return;
 }
 
 void ColumnStringEnum::find_all(Array& res, size_t key_ndx, size_t begin, size_t end) const
 {
     if (key_ndx == size_t(-1)) return;
-    Column::find_all(res, key_ndx, 0, begin, end);
+    Column::find_all(res, key_ndx, begin, end);
     return;
 }
 
@@ -270,16 +277,32 @@ void ColumnStringEnum::Verify() const
 void ColumnStringEnum::to_dot(ostream& out, StringData title) const
 {
     ref_type ref = m_keys.get_ref();
-
-    out << "subgraph cluster_columnstringenum" << ref << " {" << endl;
-    out << " label = \"ColumnStringEnum";
-    if (0 < title.size()) out << "\\n'" << title << "'";
+    out << "subgraph cluster_string_enum_column" << ref << " {" << endl;
+    out << " label = \"String enum column";
+    if (title.size() != 0)
+        out << "\\n'" << title << "'";
     out << "\";" << endl;
 
     m_keys.to_dot(out, "keys");
     Column::to_dot(out, "values");
 
     out << "}" << endl;
+}
+
+namespace {
+
+void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
+{
+    Array leaf(mem, 0, 0, alloc);
+    int indent = level * 2;
+    out << setw(indent) << "" << "String enumeration leaf (size: "<<leaf.size()<<")\n";
+}
+
+} // anonymous namespace
+
+void ColumnStringEnum::dump_node_structure(ostream& out, int level) const
+{
+    m_array->dump_bptree_structure(out, level, &leaf_dumper);
 }
 
 #endif // TIGHTDB_DEBUG

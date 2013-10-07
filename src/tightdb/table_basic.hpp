@@ -201,7 +201,7 @@ public:
 
     class Query;
     Query       where() {return Query(*this);}
-    const Query where() const {return Query(*this);}
+    Query where() const {return Query(*this);}
 
     /// Compare two tables for equality. Two tables are equal if, and
     /// only if, they contain the same rows in the same order, that
@@ -242,6 +242,7 @@ public:
 #ifdef TIGHTDB_DEBUG
     using Table::Verify;
     using Table::print;
+    using Table::dump_node_structure;
 #endif
 
 private:
@@ -341,11 +342,13 @@ public:
 
     Query& end_subtable() { m_impl.end_subtable(); return *this; }
 
+    Query& expression(Expression* exp) { m_impl.expression(exp); return *this; }
+
     Query& Or() { m_impl.Or(); return *this; }
 
-    std::size_t find_next(std::size_t lastmatch = std::size_t(-1))
+    std::size_t find(std::size_t begin_at_table_row = 0)
     {
-        return m_impl.find_next(lastmatch);
+        return m_impl.find(begin_at_table_row);
     }
 
     typename BasicTable<Spec>::View find_all(std::size_t start = 0,
@@ -426,8 +429,8 @@ namespace _impl
     template<> struct GetColumnTypeId<BinaryData> {
         static const DataType id = type_Binary;
     };
-    template<> struct GetColumnTypeId<Date> {
-        static const DataType id = type_Date;
+    template<> struct GetColumnTypeId<DateTime> {
+        static const DataType id = type_DateTime;
     };
     template<> struct GetColumnTypeId<Mixed> {
         static const DataType id = type_Mixed;
@@ -528,10 +531,10 @@ namespace _impl
     };
 
     // InsertIntoCol specialization for dates
-    template<int col_idx> struct InsertIntoCol<Date, col_idx> {
+    template<int col_idx> struct InsertIntoCol<DateTime, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
-            t->insert_date(col_idx, row_idx, at<col_idx>(tuple));
+            t->insert_datetime(col_idx, row_idx, at<col_idx>(tuple));
         }
     };
 
@@ -610,10 +613,10 @@ namespace _impl
     };
 
     // AssignIntoCol specialization for dates
-    template<int col_idx> struct AssignIntoCol<Date, col_idx> {
+    template<int col_idx> struct AssignIntoCol<DateTime, col_idx> {
         template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
         {
-            t->set_date(col_idx, row_idx, at<col_idx>(tuple));
+            t->set_datetime(col_idx, row_idx, at<col_idx>(tuple));
         }
     };
 

@@ -101,6 +101,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/array_basic.hpp>
+#include <tightdb/array_string.hpp>
 
 
 namespace tightdb {
@@ -125,35 +126,53 @@ typedef bool (*CallbackDummy)(int64_t);
 template<class T> struct ColumnTypeTraits;
 
 template<> struct ColumnTypeTraits<int64_t> {
+    const static ColumnType ct_id = col_type_Int;
+    const static ColumnType ct_id_real = col_type_Int;
     typedef Column column_type;
     typedef Array array_type;
     typedef int64_t sum_type;
     static const DataType id = type_Int;
 };
 template<> struct ColumnTypeTraits<bool> {
+    const static ColumnType ct_id = col_type_Bool;
+    const static ColumnType ct_id_real = col_type_Bool;
     typedef Column column_type;
     typedef Array array_type;
     typedef int64_t sum_type;
     static const DataType id = type_Bool;
 };
 template<> struct ColumnTypeTraits<float> {
+    const static ColumnType ct_id = col_type_Float;
+    const static ColumnType ct_id_real = col_type_Float;
     typedef ColumnFloat column_type;
     typedef ArrayFloat array_type;
     typedef double sum_type;
     static const DataType id = type_Float;
 };
 template<> struct ColumnTypeTraits<double> {
+    const static ColumnType ct_id = col_type_Double;
+    const static ColumnType ct_id_real = col_type_Double;
     typedef ColumnDouble column_type;
     typedef ArrayDouble array_type;
     typedef double sum_type;
     static const DataType id = type_Double;
 };
-template<> struct ColumnTypeTraits<Date> {
+template<> struct ColumnTypeTraits<DateTime> {
+    const static ColumnType ct_id = col_type_DateTime;
+    const static ColumnType ct_id_real = col_type_Int;
     typedef Column column_type;
     typedef Array array_type;
     typedef int64_t sum_type;
     static const DataType id = type_Int;
 };
+
+template<> struct ColumnTypeTraits<StringData> {
+    typedef Column column_type;
+    typedef Array array_type;
+    typedef int64_t sum_type;
+    static const DataType id = type_String;
+};
+
 // Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
 template<class T, Action A> struct ColumnTypeTraitsSum {
     typedef T sum_type;
@@ -163,7 +182,7 @@ template<> struct ColumnTypeTraitsSum<float, act_Sum> {
     typedef double sum_type;
 };
 
-// Lets you access elements of an integer column in increasing order in a fast way where leafs are cached
+
 struct SequentialGetterBase {
     virtual ~SequentialGetterBase() TIGHTDB_NOEXCEPT {}
 };
@@ -198,7 +217,7 @@ public:
     TIGHTDB_FORCEINLINE bool cache_next(size_t index)
     {
         // Return wether or not leaf array has changed (could be useful to know for caller)
-        if (index >= m_leaf_end) {
+        if (index >= m_leaf_end || index < m_leaf_start) {
             // GetBlock() does following: If m_column contains only a leaf, then just return pointer to that leaf and
             // leave m_array untouched. Else call init_from_header() on m_array (more time consuming) and return pointer to m_array.
             m_array_ptr = static_cast<const ArrayType*>(m_column->GetBlock(index, m_array, m_leaf_start, true));
@@ -235,6 +254,7 @@ private:
     ArrayType m_array;
 };
 
+
 class ParentNode {
 public:
     ParentNode(): m_is_integer_node(false), m_table(0) {}
@@ -268,7 +288,7 @@ public:
 
     size_t find_first(size_t start, size_t end)
     {
-        size_t m = 0;
+        size_t m = start;
         size_t next_cond = 0;
         size_t first_cond = 0;
 
@@ -299,6 +319,11 @@ public:
         m_table = &table;
         if (m_child)
             m_child->init(table);
+    }
+
+    virtual bool is_initialized() const
+    {
+        return m_table != NULL;
     }
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
@@ -826,7 +851,7 @@ public:
         m_condition_column_idx = column;
         m_child = 0;
         m_dT = 10.0;
-        m_long = false; m_leaf = NULL;
+        m_leaf = NULL;
 
         // FIXME: Store these in std::string instead.
         // FIXME: Why are these sizes 6 times the required size?
@@ -850,13 +875,14 @@ public:
         delete[] m_value.data();
         delete[] m_ucase;
         delete[] m_lcase;
-        m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
+
+        clear_leaf_state();
     }
 
     void init(const Table& table)
     {
-        m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
-        m_leaf = NULL;
+        clear_leaf_state();
+
         m_dD = 100.0;
         m_probes = 0;
         m_matches = 0;
@@ -867,6 +893,28 @@ public:
 
         if (m_child)
             m_child->init(table);
+    }
+
+    void clear_leaf_state()
+    {
+        if (!m_leaf)
+            return;
+
+        switch (m_leaf_type) {
+            case AdaptiveStringColumn::leaf_type_Small:
+                delete static_cast<ArrayString*>(m_leaf);
+                goto delete_done;
+            case AdaptiveStringColumn::leaf_type_Medium:
+                delete static_cast<ArrayStringLong*>(m_leaf);
+                goto delete_done;
+            case AdaptiveStringColumn::leaf_type_Big:
+                delete static_cast<ArrayBigBlobs*>(m_leaf);
+                goto delete_done;
+        }
+        TIGHTDB_ASSERT(false);
+
+      delete_done:
+        m_leaf = 0;
     }
 
     size_t find_first_local(size_t start, size_t end)
@@ -885,14 +933,23 @@ public:
                 const AdaptiveStringColumn* asc = static_cast<const AdaptiveStringColumn*>(m_condition_column);
                 if (s >= m_end_s) {
                     // we exceeded current leaf's range
+                    clear_leaf_state();
 
-                    m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
-
-                    m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
-                    m_end_s = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
+                    m_leaf_type = asc->GetBlock(s, &m_leaf, m_leaf_start);
+                    if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
+                        m_end_s = m_leaf_start + static_cast<ArrayString*>(m_leaf)->size();
+                    else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
+                        m_end_s = m_leaf_start + static_cast<ArrayStringLong*>(m_leaf)->size();
+                    else
+                        m_end_s = m_leaf_start + static_cast<ArrayBigBlobs*>(m_leaf)->size();
                 }
 
-                t = (m_long ? static_cast<ArrayStringLong*>(m_leaf)->get(s - m_leaf_start) : static_cast<ArrayString*>(m_leaf)->get(s - m_leaf_start));
+                if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
+                    t = static_cast<ArrayString*>(m_leaf)->get(s - m_leaf_start);
+                else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
+                    t = static_cast<ArrayStringLong*>(m_leaf)->get(s - m_leaf_start);
+                else
+                    t = static_cast<ArrayBigBlobs*>(m_leaf)->get_string(s - m_leaf_start);
             }
             if (cond(m_value, m_ucase, m_lcase, t))
                 return s;
@@ -900,18 +957,18 @@ public:
         return end;
     }
 
-protected:
 private:
     StringData m_value;
     const char* m_lcase;
     const char* m_ucase;
+
 protected:
     const ColumnBase* m_condition_column;
     ColumnType m_column_type;
 
     ArrayParent *m_leaf;
 
-    bool m_long;
+    AdaptiveStringColumn::LeafType m_leaf_type;
     size_t m_end_s;
 //    size_t m_first_s;
     size_t m_leaf_start;
@@ -1041,7 +1098,7 @@ public:
         char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
         std::copy(v.data(), v.data()+v.size(), data);
         m_value = StringData(data, v.size());
-        m_long = false; m_leaf = NULL;
+        m_leaf = NULL;
         m_index_getter = 0;
         m_index_matches = 0;
         m_index_matches_destroy = false;
@@ -1050,16 +1107,37 @@ public:
     {
         deallocate();
         delete[] m_value.data();
-        m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
+        clear_leaf_state();
         m_index.destroy();
+    }
+
+    void clear_leaf_state()
+    {
+        if (!m_leaf)
+            return;
+
+        switch (m_leaf_type) {
+            case AdaptiveStringColumn::leaf_type_Small:
+                delete static_cast<ArrayString*>(m_leaf);
+                goto delete_done;
+            case AdaptiveStringColumn::leaf_type_Medium:
+                delete static_cast<ArrayStringLong*>(m_leaf);
+                goto delete_done;
+            case AdaptiveStringColumn::leaf_type_Big:
+                delete static_cast<ArrayBigBlobs*>(m_leaf);
+                goto delete_done;
+        }
+        TIGHTDB_ASSERT(false);
+
+      delete_done:
+        m_leaf = 0;
     }
 
     void deallocate() TIGHTDB_NOEXCEPT
     {
         // Must be called after each query execution too free temporary resources used by the execution. Run in
         // destructor, but also in Init because a user could define a query once and execute it multiple times.
-        m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
-        m_leaf = NULL;
+        clear_leaf_state();
 
         if (m_index_matches_destroy)
             m_index_matches->destroy();
@@ -1192,13 +1270,24 @@ public:
                     // Normal string column, with long or short leaf
                     AdaptiveStringColumn* asc = (AdaptiveStringColumn*)m_condition_column;
                     if (s >= m_leaf_end) {
-                        m_long ? delete(static_cast<ArrayStringLong*>(m_leaf)) : delete(static_cast<ArrayString*>(m_leaf));
-                        m_long = asc->GetBlock(s, &m_leaf, m_leaf_start);
-                        m_leaf_end = m_leaf_start + (m_long ? static_cast<ArrayStringLong*>(m_leaf)->size() : static_cast<ArrayString*>(m_leaf)->size());
+                        clear_leaf_state();
+                        m_leaf_type = asc->GetBlock(s, &m_leaf, m_leaf_start);
+                        if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
+                            m_leaf_end = m_leaf_start + static_cast<ArrayString*>(m_leaf)->size();
+                        else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
+                            m_leaf_end = m_leaf_start + static_cast<ArrayStringLong*>(m_leaf)->size();
+                        else
+                            m_leaf_end = m_leaf_start + static_cast<ArrayBigBlobs*>(m_leaf)->size();
                     }
-
                     size_t end2 = (end > m_leaf_end ? m_leaf_end - m_leaf_start : end - m_leaf_start);
-                    s = (m_long ? static_cast<ArrayStringLong*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2) : static_cast<ArrayString*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2));
+
+                    if (m_leaf_type == AdaptiveStringColumn::leaf_type_Small)
+                        s = static_cast<ArrayString*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2);
+                    else if (m_leaf_type ==  AdaptiveStringColumn::leaf_type_Medium)
+                        s = static_cast<ArrayStringLong*>(m_leaf)->find_first(m_value, s - m_leaf_start, end2);
+                    else
+                        s = static_cast<ArrayBigBlobs*>(m_leaf)->find_first(str_to_bin(m_value), true, s - m_leaf_start, end2);
+
                     if (s == not_found)
                         s = m_leaf_end - 1;
                     else
@@ -1210,6 +1299,11 @@ public:
     }
 
 private:
+    inline BinaryData str_to_bin(const StringData& s) TIGHTDB_NOEXCEPT
+    {
+        return BinaryData(s.data(), s.size());
+    }
+
     StringData m_value;
     const ColumnBase* m_condition_column;
     ColumnType m_column_type;
@@ -1221,8 +1315,8 @@ private:
     SequentialGetter<int64_t> m_cse;
 
     // Used for linear scan through short/long-string
-    ArrayParent *m_leaf;
-    bool m_long;
+    ArrayParent* m_leaf;
+    AdaptiveStringColumn::LeafType m_leaf_type;
     size_t m_leaf_end;
 //    size_t m_first_s;
     size_t m_leaf_start;
@@ -1402,7 +1496,48 @@ protected:
     SequentialGetter<TConditionValue> m_getter2;
 };
 
+// todo, fixme: move this up! There are just some annoying compiler errors that need to be resolved when doing this
+#include "query_expression.hpp"
+
+
+// For expressions like col1 / col2 + 123 > col4 * 100
+class ExpressionNode: public ParentNode {
+
+public:
+    ~ExpressionNode() TIGHTDB_NOEXCEPT
+    {
+        if(m_auto_delete)
+            delete m_compare, m_compare = NULL;
+    }
+
+    ExpressionNode(Expression* compare, bool auto_delete) 
+    {
+        m_auto_delete = auto_delete;
+        m_child = 0;
+        m_compare = compare;
+    }
+
+    void init(const Table& table) 
+    {
+        m_compare->set_table(&table);
+        if (m_child)
+            m_child->init(table);
+    }
+
+    size_t find_first_local(size_t start, size_t end)
+    {
+        size_t res = m_compare->find_first(start, end);
+        return res;
+    }
+    
+    bool m_auto_delete;
+    Expression* m_compare;
+};
 
 } // namespace tightdb
+
+
+
+
 
 #endif // TIGHTDB_QUERY_ENGINE_HPP

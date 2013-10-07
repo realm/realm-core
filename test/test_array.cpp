@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_ARRAY
+
 #include <map>
 #include <string>
 #include <vector>
@@ -1324,7 +1327,7 @@ TEST(ArraySort2)
     Array a;
 
     for (size_t t = 0; t < 400; t++)
-        a.add((int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand());
+        a.add(int64_t(rand()) * int64_t(rand()) * int64_t(rand()) * int64_t(rand()) * int64_t(rand()) * int64_t(rand()) * int64_t(rand()) * int64_t(rand()));
 
     size_t orig_size = a.size();
     a.sort();
@@ -1408,7 +1411,8 @@ TEST(ArrayCopy)
     CHECK(d.has_refs());
     CHECK_EQUAL(1, d.size());
 
-    const Array e = d.GetSubArray(0);
+    Array e(d.get_alloc());
+    e.init_from_ref(to_ref(d.get(0)));
     CHECK_EQUAL(5, e.size());
     CHECK_EQUAL(0, e.get(0));
     CHECK_EQUAL(1, e.get(1));
@@ -1428,9 +1432,8 @@ TEST(ArrayCount)
     Array a;
 
     // 0 bit width
-    for (size_t i = 0; i < 150; ++i) {
+    for (size_t i = 0; i < 150; ++i)
         a.add(0);
-    }
     const size_t c1 = a.count(0);
     const size_t c2 = a.count(1);
     CHECK_EQUAL(150, c1);
@@ -1510,3 +1513,5 @@ TEST(ArrayCount)
     // Clean-up
     a.destroy();
 }
+
+#endif // TEST_ARRAY
