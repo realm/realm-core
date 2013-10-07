@@ -72,22 +72,25 @@ template<class> class BasicTable;
 /// accessor is *not*, and cannot be managed by reference
 /// counting. This is true regardless of the way the accessor is
 /// created (i.e., regardless of whether it is an automatic variable
-/// on the stack, or created on the heap using `new`).
-///
-/// However, for convenience, and with one important caveat, it is
-/// still possible to use smart pointers to refer to such
-/// accessors. The caveat is that no smart pointers are allowed to
-/// refer to the accessor at the time when its destructor is
-/// called. It is entirely the responsibility of the application to
-/// ensure that this condition is met. Failing to do so, will result
-/// in undefined behavior.
+/// on the stack, or created on the heap using `new`). However, for
+/// convenience, but with one important caveat, it is still possible
+/// to use smart pointers to refer to such accessors. The caveat is
+/// that no smart pointers are allowed to refer to the accessor at the
+/// point in time when its destructor is called. It is entirely the
+/// responsibility of the application to ensure that this requirement
+/// is met. Failing to do so, will result in undefined
+/// behavior. Finally, please note that an application is always free
+/// to use Table::create() as an alternative to creating free-standing
+/// top-level tables on the stack, and that this is indeed neccessary
+/// when fully reference counted lifetimes are required.
 ///
 /// So, at any time, and for any table accessor, an application can
 /// call Table::get_table_ref() to obtain a smart pointer that refers
 /// to that table, however, while that is always possible and safe, it
 /// is not always possible to extend the lifetime of an accessor by
-/// holding on to a smart pointer. Whether that is possible, depends
-/// directly on the way the accessor was created.
+/// holding on to a smart pointer. The question of whether that is
+/// possible, depends directly on the way the accessor was created.
+///
 ///
 /// Apart from keeping track of the number of references, these smart
 /// pointers behaves almost exactly like regular pointers. In
