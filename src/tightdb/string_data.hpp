@@ -138,7 +138,8 @@ inline bool operator==(const StringData& a, const StringData& b) TIGHTDB_NOEXCEP
     // standard. For details, see
     // http://stackoverflow.com/questions/19120779/is-char-p-0-stdequalp-p-p-well-defined-according-to-the-c-standard.
     // Below check 'a.m_size==0' is to prevent failure in debug mode.
-    return a.m_size == b.m_size && (a.m_size == 0 || std::equal(a.m_data, a.m_data + a.m_size, b.m_data));
+    return a.m_size == b.m_size &&
+        (a.m_size == 0 || std::equal(a.m_data, a.m_data + a.m_size, b.m_data));
 #else
     return a.m_size == b.m_size && std::equal(a.m_data, a.m_data + a.m_size, b.m_data);
 #endif
@@ -182,7 +183,8 @@ inline bool StringData::ends_with(StringData d) const TIGHTDB_NOEXCEPT
 
 inline bool StringData::contains(StringData d) const TIGHTDB_NOEXCEPT
 {
-    return std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
+    return d.m_size == 0 ||
+        std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
 
 inline StringData StringData::prefix(std::size_t n) const TIGHTDB_NOEXCEPT
