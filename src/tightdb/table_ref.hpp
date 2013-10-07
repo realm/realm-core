@@ -47,7 +47,7 @@ template<class> class BasicTable;
 /// attachment of the accessor has nothing to do with the function of
 /// the smart pointer. Also, in the rest of the documentation of this
 /// class, whenever you see `Table::foo`, you are supposed to read it
-/// as `Table::foo` or `BasicTable<Spec>::foo`.
+/// as, `Table::foo` or `BasicTable<Spec>::foo`.
 ///
 ///
 /// Table accessors are either created directly by an application via
@@ -63,7 +63,7 @@ template<class> class BasicTable;
 /// to at least one smart pointer, but note that the guarantee of the
 /// continued existence of the accessor, does not imply that the
 /// accessor remains attached to the underlying table (see
-/// Table::is_attached() for details). Accessors whose lifetime is
+/// Table::is_attached() for details). Accessors whose lifetime are
 /// controlled by reference counting are destroyed exactly when the
 /// reference count drops to zero.
 ///
@@ -87,19 +87,18 @@ template<class> class BasicTable;
 /// to that table, however, while that is always possible and safe, it
 /// is not always possible to extend the lifetime of an accessor by
 /// holding on to a smart pointer. Whether that is possible, depends
-/// on the way the accessor was created.
-///
+/// directly on the way the accessor was created.
 ///
 /// Apart from keeping track of the number of references, these smart
 /// pointers behaves almost exactly like regular pointers. In
 /// particular, it is possible to dereference a TableRef and get a
 /// `Table&` out of it, however, if you are not careful, this can
-/// easily lead to a dangling reference:
+/// easily lead to dangling references:
 ///
 /// \code{.cpp}
 ///
 ///   Table& sub_1 = *(table.get_subtable(0,0));
-///   sub_1.add_empty_row(); // Oops, sub_1 may be dangling.
+///   sub_1.add_empty_row(); // Oops, sub_1 may be dangling!
 ///
 /// \endcode
 ///
@@ -111,10 +110,10 @@ template<class> class BasicTable;
 /// \code{.cpp}
 ///
 ///   TableRef sub_2 = table.get_subtable(0,0);
-///    sub_2.add_empty_row(); // Safe!
+///   sub_2.add_empty_row(); // Safe!
 ///
-//    void do_something(Table&);
-///   do_something(*table.get_subtable(0,0)); // Also safe
+///   void do_something(Table&);
+///   do_something(*(table.get_subtable(0,0))); // Also safe!
 ///
 /// \endcode
 ///
@@ -126,6 +125,9 @@ template<class> class BasicTable;
 /// call a special function that is a friend of this class. The
 /// effectiveness of this form of move semantics relies on 'return
 /// value optimization' being enabled in the compiler.
+///
+/// \sa Table
+/// \sa TableRef
 template<class T> class BasicTableRef: bind_ptr<T> {
 public:
 #ifdef TIGHTDB_HAVE_CXX11_CONSTEXPR
