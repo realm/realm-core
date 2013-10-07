@@ -1780,7 +1780,7 @@ TEST(GroupShared_ReserveDiskSpace)
         // that the new size is at least as big as the requested size.
         size_t reserve_size_3 = orig_file_size + 1;
         sg.reserve(reserve_size_3);
-        size_t new_file_size_3 = File("test.tightdb").get_size();
+        size_t new_file_size_3 = size_t(File("test.tightdb").get_size());
         CHECK(new_file_size_3 >= reserve_size_3);
 
         // Check that disk space reservation is independent of transactions
