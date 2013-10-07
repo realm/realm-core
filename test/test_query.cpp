@@ -1112,6 +1112,15 @@ TEST(LimitUntyped2)
     sumd = q.average_float(1, NULL, 0, 2, 3);
     CHECK_EQUAL((10000. + 30000.) / 2., sumd);
 
+    // count
+    size_t cnt = q.count(0, -1, 1);
+    CHECK_EQUAL(1, cnt);
+    cnt = q.count(0, -1, 2);
+    CHECK_EQUAL(2, cnt);
+
+    // count, limited by 'end', but still having 'limit' specified
+    cnt = q.count(0, 1, 3);
+    CHECK_EQUAL(1, cnt);
 }
 
 
