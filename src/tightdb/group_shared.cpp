@@ -232,13 +232,19 @@ void SharedGroup::open(const string& path, bool no_create_file,
         size_t info_size = 0;
         must_retry = false;
 
-        // Open shared coordination buffer
+        // Open/Create shared coordination buffer
         try {
 
             m_file.open(m_file_path, 
                         File::access_ReadWrite, File::create_Must, 0);
             info_size = sizeof (SharedInfo);
-            m_file.prealloc(0, info_size);
+            // Make sure to initialize the file in such a way, that when it reaches the
+            // size of SharedInfo, it contains just zeroes.
+            char empty_buf[sizeof (SharedInfo)];
+            for (unsigned int i=0; i<info_size; i++) {
+                empty_buf[i] = 0;
+            }
+            m_file.write(empty_buf, info_size);
             need_init = true;
 
         } 
@@ -249,11 +255,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
                         File::access_ReadWrite, File::create_Never, 0);
         }
 
-        // file locks are used solely to detect if/when all clients
-        // are done accessing the database. We grab them here and hold
-        // them until the destructor is called, where we try to promote
-        // them to exclusive to detect if we can shutdown.
-        m_file.lock_shared();
         File::CloseGuard fcg(m_file);
         int time_left = MAX_WAIT_FOR_OK_FILESIZE;
         while (1) {
@@ -272,6 +273,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
             else
                 break;
         }
+        // File is now guaranteed to be large enough that we can map it and access all fields
+        // of the SharedInfo structure.
 
         // Map to memory
         m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
@@ -287,7 +290,16 @@ void SharedGroup::open(const string& path, bool no_create_file,
         SharedInfo* info = m_file_map.get_addr();
         SlabAlloc& alloc = m_group.m_alloc;
 
+        // If we are the process that *Created* the coordination buffer, we are obliged to
+        // initialize it. All other processer will wait for os to signal completion of the
+        // initialization.
         if (need_init) {
+            // file locks are used solely to detect if/when all clients
+            // are done accessing the database. We grab them here and hold
+            // them until the destructor is called, where we try to promote
+            // them to exclusive to detect if we can shutdown.
+            m_file.lock_shared();
+
             // If we are the first we may have to create the database file
             // but we invalidate the internals right after to avoid conflicting
             // with old state when starting transactions
@@ -321,10 +333,45 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 wait_count--;
                 micro_sleep(1000);
             }
+
+            // If we exceed our wait without even seeing init complete, then it is most likely
+            // that the initializing process has crashed. HOWEVER - it may just be delayed so
+            // far, that it hasn't taken the initial shared lock yet. So, we dare not declare
+            // the .lock file stale, although it is very likely.
             if (info->init_complete.load_acquire() == 0)
                 throw PresumablyStaleLockFile(m_file_path);
-            if (info->version != 0)
-                throw runtime_error("Unsupported version");
+
+            // use file locking in an attempt to determine if we have exclusive access to the file.
+            // We need to wait for init_complete to be signalled, before we can safely manipulate
+            // the file contents - among others, the shutdown_started flag cannot be trusted and
+            // cannot be modified earlier.
+            if (m_file.try_lock_exclusive()) {
+
+                // At this point no other process can be trying to initialize the file.
+                // Somebody else may be executing in the destructor and probing to see if they are
+                // alone - they can get a false success (because they don't see "us"). Because of this
+                // possibility of false successes, the only allowed action is to close and TRY to remove the
+                // file - even if multiple processes does this in parallel, the end result is the same.
+                //
+                // Poison the file. As we have exclusive access, no other will examine or change
+                // the shutdown_started field.
+                info->shutdown_started.store_release(1);
+                fug_2.release(); // we need to unmap manually
+                fug_1.release(); // - do -
+                fcg.release();   // we need to close manually
+                m_file.unlock();
+                // <- from this point another thread/process may open the file, BUT it will encounter
+                // a set shutdown_started field, back out and retry
+                m_file.close();
+                m_file_map.unmap();
+                m_reader_map.unmap();
+                File::try_remove(m_file_path.c_str());
+                must_retry = true;
+                continue; // retry, now with stale file removed
+            } else {
+
+                m_file.lock_shared();
+            }
             if (info->shutdown_started.load_acquire()) {
                 retry_count--;
                 if (retry_count == 0)
@@ -334,6 +381,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 continue;
                 // this will unmap and close the lock file. Then we retry
             }
+            if (info->version != 0)
+                throw runtime_error("Unsupported version");
 
             // Durability level cannot be changed at runtime
             if (info->flags != dlevel)
@@ -346,7 +395,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             bool skip_validate = true; // To avoid race conditions
             alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
 
-        }
+            }
 
         fug_2.release(); // Do not unmap
         fug_1.release(); // Do not unmap
