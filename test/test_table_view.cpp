@@ -677,7 +677,7 @@ TEST(TableView_ref_counting)
     }
 
     // Now try to access TableView and see that the Table is still alive
-    size_t i = tv.get_int(0, 0);//FIXME:VS2012 warning  warning C4244: 'initializing' : conversion from 'int64_t' to 'size_t', possible loss of data
+    int64_t i = tv.get_int(0, 0);
     CHECK_EQUAL(i, 12);
     string s = tv2.get_string(0, 0);
     CHECK_EQUAL(s, "just a test string");
