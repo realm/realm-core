@@ -33,7 +33,7 @@ const char* DataTypeToText(DataType t) {
         return "String";
     else if(t == type_Binary)
         return "Binary";
-    else if(t == type_Date)
+    else if(t == type_DateTime)
         return "Date";
     else if(t == type_Table)
         return "Table";
