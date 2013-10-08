@@ -1993,6 +1993,109 @@ TEST(Table_SubtableSizeAndClear)
 }
 
 
+TEST(Table_LowLevelSubtables)
+{
+    Table table;
+    vector<size_t> column_path;
+    table.add_column(type_Table, "subtab");
+    table.add_column(type_Mixed, "mixed");
+    column_path.push_back(0);
+    table.add_subcolumn(column_path, type_Table, "subtab");
+    table.add_subcolumn(column_path, type_Mixed, "mixed");
+    column_path.push_back(0);
+    table.add_subcolumn(column_path, type_Table, "subtab");
+    table.add_subcolumn(column_path, type_Mixed, "mixed");
+
+    table.add_empty_row(2);
+    CHECK_EQUAL(2, table.size());
+    for (int i_1 = 0; i_1 != 2; ++i_1) {
+        TableRef subtab = table.get_subtable(0, i_1);
+        subtab->add_empty_row(2 + i_1);
+        CHECK_EQUAL(2 + i_1, subtab->size());
+        {
+            TableRef subsubtab = subtab->get_subtable(0, 0 + i_1);
+            subsubtab->add_empty_row(3 + i_1);
+            CHECK_EQUAL(3 + i_1, subsubtab->size());
+
+            for (int i_3 = 0; i_3 != 3 + i_1; ++i_3) {
+                CHECK_EQUAL(true,  bool(subsubtab->get_subtable(0, i_3)));
+                CHECK_EQUAL(false, bool(subsubtab->get_subtable(1, i_3))); // Mixed
+                CHECK_EQUAL(0, subsubtab->get_subtable_size(0, i_3));
+                CHECK_EQUAL(0, subsubtab->get_subtable_size(1, i_3)); // Mixed
+            }
+
+            subtab->clear_subtable(1, 1 + i_1); // Mixed
+            TableRef subsubtab_mix = subtab->get_subtable(1, 1 + i_1);
+            subsubtab_mix->add_column(type_Table, "subtab");
+            subsubtab_mix->add_column(type_Mixed, "mixed");
+            subsubtab_mix->add_empty_row(1 + i_1);
+            CHECK_EQUAL(1 + i_1, subsubtab_mix->size());
+
+            for (int i_3 = 0; i_3 != 1 + i_1; ++i_3) {
+                CHECK_EQUAL(true,  bool(subsubtab_mix->get_subtable(0, i_3)));
+                CHECK_EQUAL(false, bool(subsubtab_mix->get_subtable(1, i_3))); // Mixed
+                CHECK_EQUAL(0, subsubtab_mix->get_subtable_size(0, i_3));
+                CHECK_EQUAL(0, subsubtab_mix->get_subtable_size(1, i_3)); // Mixed
+            }
+        }
+        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
+            CHECK_EQUAL(true,           bool(subtab->get_subtable(0, i_2)));
+            CHECK_EQUAL(i_2 == 1 + i_1, bool(subtab->get_subtable(1, i_2))); // Mixed
+            CHECK_EQUAL(i_2 == 0 + i_1 ? 3 + i_1 : 0, subtab->get_subtable_size(0, i_2));
+            CHECK_EQUAL(i_2 == 1 + i_1 ? 1 + i_1 : 0, subtab->get_subtable_size(1, i_2)); // Mixed
+        }
+
+        table.clear_subtable(1, i_1); // Mixed
+        TableRef subtab_mix = table.get_subtable(1, i_1);
+        vector<size_t> subcol_path;
+        subtab_mix->add_column(type_Table, "subtab");
+        subtab_mix->add_column(type_Mixed, "mixed");
+        subcol_path.push_back(0);
+        subtab_mix->add_subcolumn(subcol_path, type_Table, "subtab");
+        subtab_mix->add_subcolumn(subcol_path, type_Mixed, "mixed");
+        subtab_mix->add_empty_row(3 + i_1);
+        CHECK_EQUAL(3 + i_1, subtab_mix->size());
+        {
+            TableRef subsubtab = subtab_mix->get_subtable(0, 1 + i_1);
+            subsubtab->add_empty_row(7 + i_1);
+            CHECK_EQUAL(7 + i_1, subsubtab->size());
+
+            for (int i_3 = 0; i_3 != 7 + i_1; ++i_3) {
+                CHECK_EQUAL(true,  bool(subsubtab->get_subtable(0, i_3)));
+                CHECK_EQUAL(false, bool(subsubtab->get_subtable(1, i_3))); // Mixed
+                CHECK_EQUAL(0, subsubtab->get_subtable_size(0, i_3));
+                CHECK_EQUAL(0, subsubtab->get_subtable_size(1, i_3)); // Mixed
+            }
+
+            subtab_mix->clear_subtable(1, 2 + i_1); // Mixed
+            TableRef subsubtab_mix = subtab_mix->get_subtable(1, 2 + i_1);
+            subsubtab_mix->add_column(type_Table, "subtab");
+            subsubtab_mix->add_column(type_Mixed, "mixed");
+            subsubtab_mix->add_empty_row(5 + i_1);
+            CHECK_EQUAL(5 + i_1, subsubtab_mix->size());
+
+            for (int i_3 = 0; i_3 != 5 + i_1; ++i_3) {
+                CHECK_EQUAL(true,  bool(subsubtab_mix->get_subtable(0, i_3)));
+                CHECK_EQUAL(false, bool(subsubtab_mix->get_subtable(1, i_3))); // Mixed
+                CHECK_EQUAL(0, subsubtab_mix->get_subtable_size(0, i_3));
+                CHECK_EQUAL(0, subsubtab_mix->get_subtable_size(1, i_3)); // Mixed
+            }
+        }
+        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
+            CHECK_EQUAL(true,           bool(subtab_mix->get_subtable(0, i_2)));
+            CHECK_EQUAL(i_2 == 2 + i_1, bool(subtab_mix->get_subtable(1, i_2))); // Mixed
+            CHECK_EQUAL(i_2 == 1 + i_1 ? 7 + i_1 : 0, subtab_mix->get_subtable_size(0, i_2));
+            CHECK_EQUAL(i_2 == 2 + i_1 ? 5 + i_1 : 0, subtab_mix->get_subtable_size(1, i_2)); // Mixed
+        }
+
+        CHECK_EQUAL(true, bool(table.get_subtable(0, i_1)));
+        CHECK_EQUAL(true, bool(table.get_subtable(1, i_1))); // Mixed
+        CHECK_EQUAL(2 + i_1, table.get_subtable_size(0, i_1));
+        CHECK_EQUAL(3 + i_1, table.get_subtable_size(1, i_1)); // Mixed
+    }
+}
+
+
 namespace {
 TIGHTDB_TABLE_2(MyTable1,
                 val, Int,
@@ -2008,18 +2111,6 @@ TIGHTDB_TABLE_1(MyTable3,
 TIGHTDB_TABLE_1(MyTable4,
                 mix, Mixed)
 } // anonymous namespace
-
-
-TEST(Table_SetMethod)
-{
-    MyTable1 t;
-    t.add(8, 9);
-    CHECK_EQUAL(t[0].val,  8);
-    CHECK_EQUAL(t[0].val2, 9);
-    t.set(0, 2, 4);
-    CHECK_EQUAL(t[0].val,  2);
-    CHECK_EQUAL(t[0].val2, 4);
-}
 
 
 TEST(Table_HighLevelSubtables)
@@ -2166,6 +2257,18 @@ TEST(Table_SubtableCopyOnSetAndInsert)
     t4[0].mix.set_subtable(t2);
     MyTable2::Ref r2 = unchecked_cast<MyTable2>(t4[0].mix.get_subtable());
     CHECK(t2 == *r2);
+}
+
+
+TEST(Table_SetMethod)
+{
+    MyTable1 t;
+    t.add(8, 9);
+    CHECK_EQUAL(t[0].val,  8);
+    CHECK_EQUAL(t[0].val2, 9);
+    t.set(0, 2, 4);
+    CHECK_EQUAL(t[0].val,  2);
+    CHECK_EQUAL(t[0].val2, 4);
 }
 
 
