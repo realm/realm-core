@@ -2476,6 +2476,16 @@ TEST(TestQuerySubtable)
 }
 
 
+TEST(Query_SubtableViewSizeBug)
+{
+    Table table;
+    table.add_column(type_Table, "subtab");
+    table.add_empty_row(1);
+    TableRef subtab = table.get_subtable(0,0);
+    subtab->add_empty_row(1);
+    TableView subview = subtab->where().find_all();
+    CHECK_EQUAL(1, subview.size());
+}
 
 
 TEST(TestQuerySort1)
