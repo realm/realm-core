@@ -350,7 +350,7 @@ CATEGORIES  :
                  template parameter, it returns true if the group contains a
                  table with the specified name, and the type of that
                  table is compatible with the specified type.
-                 See {@link concepts_table_type_compatibility} for details.
+# TODO:                 See {@link concepts_table_type_compatibility} for details.
       CONST    : true
       PARAMS:
       - NAME   : name

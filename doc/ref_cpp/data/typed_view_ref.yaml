@@ -8,13 +8,16 @@ SUMMARY    : &g_typed_view_intro_summary
              The TableView class.
 DESCR      : &g_typed_view_intro_descr
              >
+             NOTE: The current documentation of Typed TableView is under construction, 
+             and not completely correct yet.
+
              Queries and searches can return <code>TableView</code>
              objects, which works as virtual tables containing just
              the matched rows. You can interact with a
              <code>TableView</code> just like a regular table.
 
              A {@link class_typed_tableview} is implicitely linked to a
-             {@link class_typed_table}.  All changes to the view will
+             {@link class_typed_table}. All changes to the view will
              propagate to the original (or source) table. This includes
              operations like updating values and deleting rows.
 
