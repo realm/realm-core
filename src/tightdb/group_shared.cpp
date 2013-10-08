@@ -241,9 +241,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // Make sure to initialize the file in such a way, that when it reaches the
             // size of SharedInfo, it contains just zeroes.
             char empty_buf[sizeof (SharedInfo)];
-            for (unsigned int i=0; i<info_size; i++) {
-                empty_buf[i] = 0;
-            }
+            std::fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
             m_file.write(empty_buf, info_size);
             need_init = true;
 
@@ -372,7 +370,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
                 File::try_remove(m_file_path.c_str());
                 must_retry = true;
                 continue; // retry, now with stale file removed
-            } else {
+            }
+            else {
 
                 m_file.lock_shared();
             }

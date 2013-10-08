@@ -76,20 +76,6 @@ void copy_file(const char* from, const char* to)
     dst << src.rdbuf();
 }
 
-void print_hex_file(const char* from)
-{
-    std::ifstream  src(from, std::ios::binary);
-    int v = 0;
-    while (src) {
-        char k;
-        src.read(&k,1);
-        if (src)
-            cerr << dec << v << " " << hex << (unsigned int) k << endl;
-        v++;
-    }
-    cerr << dec << endl;
-}
-
 TEST(Shared_Stale_Lock_File_Faked)
 {
     // Delete old files if there
