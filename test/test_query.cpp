@@ -2475,7 +2475,8 @@ TEST(TestQuerySubtable)
     CHECK_EQUAL(3, t4.get_source_ndx(2));
 }
 
-
+/*
+// Disabled because assert has now been added to disallow adding rows when no columns exist
 TEST(Query_SubtableViewSizeBug)
 {
     Table table;
@@ -2486,7 +2487,7 @@ TEST(Query_SubtableViewSizeBug)
     TableView subview = subtab->where().find_all();
     CHECK_EQUAL(1, subview.size());
 }
-
+*/
 
 TEST(TestQuerySort1)
 {
