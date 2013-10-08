@@ -104,11 +104,11 @@ public:
     /// group accessor is destroyed. This is also true for any
     /// subtable accessor that is obtained indirectly from a group. A
     /// subtable accessor will generally become detached if its parent
-    /// table is modified. Calling a const member function on a parent
-    /// table accessor, will never detach its subtable accessors,
-    /// though. An accessor for a freestanding table will never become
-    /// detached. An accessor for a subtable of a freestanding table
-    /// may become detached.
+    /// table is modified. On the other hand, calling a const member
+    /// function on a parent table accessor will never detach its
+    /// subtable accessors. An accessor for a freestanding table will
+    /// never become detached. An accessor for a subtable of a
+    /// freestanding table may become detached.
     ///
     /// FIXME: High level language bindings will probably want to be
     /// able to explicitely detach a group and all tables of that
