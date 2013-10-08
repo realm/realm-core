@@ -313,6 +313,10 @@ void SharedGroup::open(const string& path, bool no_create_file,
             size_t file_size = alloc.get_baseline();
             new (info) SharedInfo(top_ref, file_size, info_size, dlevel); // Throws
 
+            // sync initial state to backing store - should we crash, anyone picking up the
+            // file later will see that initialization was complete.
+            m_file_map.sync();
+
             // Set initial version so we can track if other instances
             // change the db
             m_version = info->current_version.load_relaxed();
@@ -457,6 +461,7 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
         return;
     }
     info->shutdown_started.store_release(1);
+    m_file_map.sync();
     // If the db file is just backing for a transient data structure,
     // we can delete it when done.
     if (info->flags == durability_MemOnly) {
@@ -528,6 +533,7 @@ void SharedGroup::do_async_commits()
 
             file_already_removed = true; // don't remove what is already gone
             info->shutdown_started.store_release(1);
+            m_file_map.sync();
             shutdown = true;
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Lock file removed, initiating shutdown" << endl;
@@ -542,6 +548,7 @@ void SharedGroup::do_async_commits()
         m_file.unlock();
         if (m_file.try_lock_exclusive()) {
             info->shutdown_started.store_release(1);
+            m_file_map.sync();
             shutdown = true;
         }
         // if try_lock_exclusive fails, we loose our read lock, so
