@@ -39,6 +39,7 @@
 #define TEST_QUERY
 #define TEST_SHARED
 #define TEST_STRING_DATA
+#define TEST_BINARY_DATA
 #define TEST_TABLE
 #define TEST_TABLE_VIEW
 #define TEST_THREAD
