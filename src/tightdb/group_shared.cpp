@@ -398,7 +398,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             bool skip_validate = true; // To avoid race conditions
             alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
 
-            }
+        }
 
         fug_2.release(); // Do not unmap
         fug_1.release(); // Do not unmap
