@@ -232,21 +232,19 @@ void SharedGroup::open(const string& path, bool no_create_file,
         size_t info_size = 0;
         must_retry = false;
 
-        // Open shared coordination buffer
-        try {
+        // Open shared coordination buffer - non-excepting approach
+        File::OpenStatus open_status;
 
-            m_file.open(m_file_path, 
-                        File::access_ReadWrite, File::create_Must, 0);
+        m_file.open(m_file_path, File::access_ReadWrite, File::create_Must, 0, &open_status);
+        if (open_status == File::OpenOk) {
             info_size = sizeof (SharedInfo);
             m_file.prealloc(0, info_size);
             need_init = true;
-
-        } 
-        catch (File::Exists&) {
+        }
+        else {
 
             // if this one throws, just propagate it:
-            m_file.open(m_file_path, 
-                        File::access_ReadWrite, File::create_Never, 0);
+            m_file.open(m_file_path, File::access_ReadWrite, File::create_Never, 0);
         }
 
         // file locks are used solely to detect if/when all clients

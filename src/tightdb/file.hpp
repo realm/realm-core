@@ -134,13 +134,24 @@ public:
         flag_Append = 2  ///< Move to end of file before each write.
     };
 
+    // Possible results from open
+    enum OpenStatus {
+        OpenOk,
+        OpenAccessError,
+        OpenResourceAllocError,
+        OpenPermissionDenied,
+        OpenNotFound,
+        OpenExists,
+        OpenOtherError
+    };
+
     /// See open(const std::string&, Mode).
     ///
     /// Specifying access_ReadOnly together with a create mode that is
     /// not create_Never, or together with a non-zero \a flags
     /// argument, results in undefined behavior. Specifying flag_Trunc
     /// together with create_Must results in undefined behavior.
-    void open(const std::string& path, AccessMode, CreateMode, int flags);
+    void open(const std::string& path, AccessMode, CreateMode, int flags, OpenStatus* report_status = NULL);
 
     /// Read data into the specified buffer and return the number of
     /// bytes read. If the returned number of bytes is less than \a
