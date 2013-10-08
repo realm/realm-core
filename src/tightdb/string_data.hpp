@@ -31,13 +31,22 @@ namespace tightdb {
 
 /// A reference to a chunk of character data.
 ///
-/// An instance of this class does not own the referenced memory, nor
-/// does it in any other way attempt to manage the lifetime of it.
+/// An instance of this class can be thought of as a type tag on a
+/// region of memory. It does not own the referenced memory, nor does
+/// it in any other way attempt to manage the lifetime of it.
 ///
-/// For compatibility with C style strings, when a string is stored in
+/// A null character inside the referenced region is considered a part
+/// of the string by TightDB.
+///
+/// For compatibility with C-style strings, when a string is stored in
 /// a TightDB database, it is always followed by a terminating null
-/// character. This means that all of the following forms are
-/// guaranteed to return a pointer to a null-terminated string:
+/// character, regardless of whether the string itself has internal
+/// null characters. This means that when a StringData object is
+/// extracted from TightDB, the referenced region is guaranteed to be
+/// followed immediately by an extra null character, but that null
+/// character is not inside the referenced region. Therefore, all of
+/// the following forms are guaranteed to return a pointer to a
+/// null-terminated string:
 ///
 /// \code{.cpp}
 ///
@@ -48,10 +57,11 @@ namespace tightdb {
 ///
 /// \endcode
 ///
-/// Note that this assumption does not hold in general for strings
-/// referenced by instances of StringData. Indeed there is nothing
-/// stopping you from constructing a new StringData instance that
-/// refers to a string without a terminating null character.
+/// Note that in general, no assumptions can be made about what
+/// follows a StringData object, or whether anything follows it at
+/// all. In particular, the receiver of a StringData object cannot
+/// assume that the referenced string is followed by a null character
+/// unless there is an externally provided guarantee.
 ///
 /// \sa BinaryData
 /// \sa Mixed
@@ -65,6 +75,7 @@ public:
 
     /// Initialize from a zero terminated C style string.
     StringData(const char* c_str) TIGHTDB_NOEXCEPT;
+    ~StringData() TIGHTDB_NOEXCEPT {}
 
     char operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
 
@@ -118,14 +129,25 @@ template<class T, class A> inline StringData::operator std::basic_string<char, T
 inline StringData::StringData(const char* c_str) TIGHTDB_NOEXCEPT:
     m_data(c_str), m_size(std::char_traits<char>::length(c_str)) {}
 
+
 inline bool operator==(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
 {
+#if defined(_MSC_VER) && defined(_DEBUG)
+    // Windows has a special check in debug mode against passing null
+    // pointer to std::equal(). This conflicts with the C++
+    // standard. For details, see
+    // http://stackoverflow.com/questions/19120779/is-char-p-0-stdequalp-p-p-well-defined-according-to-the-c-standard.
+    // Below check 'a.m_size==0' is to prevent failure in debug mode.
+    return a.m_size == b.m_size &&
+        (a.m_size == 0 || std::equal(a.m_data, a.m_data + a.m_size, b.m_data));
+#else
     return a.m_size == b.m_size && std::equal(a.m_data, a.m_data + a.m_size, b.m_data);
+#endif
 }
 
 inline bool operator!=(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
 {
-    return a.m_size != b.m_size || !std::equal(a.m_data, a.m_data + a.m_size, b.m_data);
+    return !(a == b);
 }
 
 inline bool operator<(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
@@ -161,7 +183,8 @@ inline bool StringData::ends_with(StringData d) const TIGHTDB_NOEXCEPT
 
 inline bool StringData::contains(StringData d) const TIGHTDB_NOEXCEPT
 {
-    return std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
+    return d.m_size == 0 ||
+        std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
 
 inline StringData StringData::prefix(std::size_t n) const TIGHTDB_NOEXCEPT

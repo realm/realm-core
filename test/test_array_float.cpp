@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_ARRAY_FLOAT
+
 #include <UnitTest++.h>
 #include <tightdb/array_basic.hpp>
 #include <tightdb/column.hpp>
@@ -403,3 +406,4 @@ void BasicArray_Compare()
 TEST(ArrayFloat_Compare) { BasicArray_Compare<ArrayFloat, float>(); }
 TEST(ArrayDouble_Compare){ BasicArray_Compare<ArrayDouble, double>(); }
 
+#endif // TEST_ARRAY_FLOAT

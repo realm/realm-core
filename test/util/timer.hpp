@@ -53,6 +53,9 @@ public:
     template<class Ch, class Tr>
     friend std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>&, const Timer&);
 
+    template<class Ch, class Tr>
+    static void format(double seconds, std::basic_ostream<Ch, Tr>&);
+
 private:
     const Type m_type;
     uint_fast64_t m_start;
@@ -68,9 +71,15 @@ private:
 // Implementation:
 
 template<class Ch, class Tr>
-std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Timer& timer)
+inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Timer& timer)
 {
-    double seconds_float = timer;
+    Timer::format(timer, out);
+    return out;
+}
+
+template<class Ch, class Tr>
+void Timer::format(double seconds_float, std::basic_ostream<Ch, Tr>& out)
+{
     uint_fast64_t rounded_minutes = uint_fast64_t(std::floor(seconds_float/60 + 0.5));
     if (60 <= rounded_minutes) {
         // 1h0m -> inf
@@ -120,7 +129,6 @@ std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Ti
             }
         }
     }
-    return out;
 }
 
 

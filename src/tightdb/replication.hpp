@@ -20,18 +20,14 @@
 #ifndef TIGHTDB_REPLICATION_HPP
 #define TIGHTDB_REPLICATION_HPP
 
-#include <cstddef>
-#include <cstring>
-#include <new>
 #include <algorithm>
 #include <limits>
-#include <stdexcept>
-
-#include <stdint.h> // <cstdint> is not available in C++03
+#include <exception>
+#include <string>
 
 #include <tightdb/meta.hpp>
 #include <tightdb/tuple.hpp>
-#include <tightdb/unique_ptr.hpp>
+#include <tightdb/buffer.hpp>
 #include <tightdb/file.hpp>
 #include <tightdb/mixed.hpp>
 
@@ -54,21 +50,17 @@ class SharedGroup;
 
 
 
-/// Replication is enabled by passing an instance of this class to the
-/// SharedGroup constructor.
+/// Replication is enabled by passing an instance of an implementation
+/// of this class to the SharedGroup constructor.
 class Replication {
 public:
-    class Provider {
-    public:
-        /// Caller receives ownership and must `delete` when done.
-        virtual Replication* new_instance() = 0;
-    };
-
     // Be sure to keep this type aligned with what is actually used in
     // SharedGroup.
-    typedef uint_fast32_t database_version_type;
+    typedef uint_fast32_t version_type;
 
     std::string get_database_path();
+
+    class Interrupted; // Exception
 
     /// Acquire permision to start a new 'write' transaction. This
     /// function must be called by a client before it requests a
@@ -96,7 +88,7 @@ public:
     ///
     /// FIXME: In general the transaction will be considered complete
     /// even if this operation is interrupted. Is that ok?
-    database_version_type commit_write_transact(SharedGroup&);
+    version_type commit_write_transact(SharedGroup&, version_type orig_version);
 
     /// Called by a client to discard the accumulated transaction
     /// log. This function must be called if a write transaction was
@@ -122,7 +114,7 @@ public:
     /// rollback_write_transact() and the destructor. If a client,
     /// after having received an interruption indication, calls
     /// rollback_write_transact() and then clear_interrupt(), it may
-    /// then resume normal operation on this object.
+    /// resume normal operation through this Replication instance.
     void interrupt() TIGHTDB_NOEXCEPT;
 
     /// May be called by a client to reset this replication instance
@@ -130,10 +122,6 @@ public:
     /// this function in a situation where no interruption has
     /// occured.
     void clear_interrupt() TIGHTDB_NOEXCEPT;
-
-    struct Interrupted: std::runtime_error {
-        Interrupted(): std::runtime_error("Interrupted") {}
-    };
 
     // Transaction log instruction encoding:
     //
@@ -183,18 +171,9 @@ public:
     void on_spec_destroyed(const Spec*) TIGHTDB_NOEXCEPT;
 
 
-    struct InputStream {
-        /// \return The number of extracted bytes. This will always be
-        /// less than or equal to \a size. A value of zero indicates
-        /// end-of-input unless \a size was zero.
-        virtual std::size_t read(char* buffer, std::size_t size) = 0;
+    class InputStream;
 
-        virtual ~InputStream() {}
-    };
-
-    struct BadTransactLog: std::runtime_error {
-        BadTransactLog(): std::runtime_error("Bad transaction log") {}
-    };
+    class BadTransactLog; // Exception
 
     /// Called by the local coordinator to apply a transaction log
     /// received from another local coordinator.
@@ -212,7 +191,7 @@ public:
     static void apply_transact_log(InputStream& transact_log, Group& target);
 #endif
 
-    virtual ~Replication() {}
+    virtual ~Replication() TIGHTDB_NOEXCEPT {}
 
 protected:
     // These two delimit a contiguous region of free space in a
@@ -231,7 +210,9 @@ protected:
     /// empty) chunk of free space.
     virtual void do_begin_write_transact(SharedGroup&) = 0;
 
-    virtual database_version_type do_commit_write_transact(SharedGroup&) = 0;
+    /// The caller guarantees that `m_transact_log_free_begin` marks
+    /// the end of payload data in the transaction log.
+    virtual version_type do_commit_write_transact(SharedGroup&, version_type orig_version) = 0;
 
     virtual void do_rollback_write_transact(SharedGroup&) TIGHTDB_NOEXCEPT = 0;
 
@@ -264,29 +245,15 @@ protected:
 
     /// Must be called only from do_begin_write_transact(),
     /// do_commit_write_transact(), or do_rollback_write_transact().
-    static database_version_type get_current_version(SharedGroup&) TIGHTDB_NOEXCEPT;
+    static version_type get_current_version(SharedGroup&) TIGHTDB_NOEXCEPT;
 
     /// Must be called only from do_begin_write_transact().
-    static void commit_foreign_transact_log(SharedGroup&, database_version_type new_version);
+    static void commit_foreign_transact_log(SharedGroup&, version_type new_version);
 
 private:
     struct TransactLogApplier;
 
-    template<class T> struct Buffer {
-        UniquePtr<T[]> m_data;
-        std::size_t m_size;
-        T& operator[](std::size_t i) TIGHTDB_NOEXCEPT { return m_data[i]; }
-        const T& operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
-        Buffer() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
-        void set_size(std::size_t);
-        friend void swap(Buffer&a, Buffer&b)
-        {
-            using std::swap;
-            swap(a.m_data, b.m_data);
-            swap(a.m_size, b.m_size);
-        }
-    };
-    Buffer<std::size_t> m_subtab_path_buf;
+    util::Buffer<std::size_t> m_subtab_path_buf;
 
     const Table* m_selected_table;
     const Spec*  m_selected_spec;
@@ -328,6 +295,63 @@ private:
 };
 
 
+class Replication::InputStream {
+public:
+    /// \return The number of extracted bytes. This will always be
+    /// less than or equal to \a size. A value of zero indicates
+    /// end-of-input unless \a size was zero.
+    virtual std::size_t read(char* buffer, std::size_t size) = 0;
+
+    virtual ~InputStream() {}
+};
+
+
+class Replication::Interrupted: public std::exception {
+public:
+    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
+    {
+        return "Interrupted";
+    }
+};
+
+class Replication::BadTransactLog: public std::exception {
+public:
+    const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
+    {
+        return "Bad transaction log";
+    }
+};
+
+
+
+class TrivialReplication: public Replication {
+public:
+    ~TrivialReplication() TIGHTDB_NOEXCEPT {}
+
+protected:
+    TrivialReplication(const std::string& database_file);
+
+    virtual void handle_transact_log(const char* data, std::size_t size) = 0;
+
+    static void apply_transact_log(const char* data, std::size_t size, SharedGroup& target);
+
+private:
+    const std::string m_database_file;
+    util::Buffer<char> m_transact_log_buffer;
+
+    std::string do_get_database_path() TIGHTDB_OVERRIDE;
+    void do_begin_write_transact(SharedGroup&) TIGHTDB_OVERRIDE;
+    version_type do_commit_write_transact(SharedGroup&, version_type orig_version) TIGHTDB_OVERRIDE;
+    void do_rollback_write_transact(SharedGroup&) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void do_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void do_clear_interrupt() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void do_transact_log_reserve(std::size_t n) TIGHTDB_OVERRIDE;
+    void do_transact_log_append(const char* data, std::size_t size) TIGHTDB_OVERRIDE;
+
+    void transact_log_reserve(std::size_t);
+};
+
+
 
 
 
@@ -346,9 +370,10 @@ inline void Replication::begin_write_transact(SharedGroup& sg)
     m_selected_spec  = 0;
 }
 
-inline Replication::database_version_type Replication::commit_write_transact(SharedGroup& sg)
+inline Replication::version_type
+Replication::commit_write_transact(SharedGroup& sg, version_type orig_version)
 {
-    return do_commit_write_transact(sg);
+    return do_commit_write_transact(sg, orig_version);
 }
 
 inline void Replication::rollback_write_transact(SharedGroup& sg) TIGHTDB_NOEXCEPT
@@ -567,8 +592,8 @@ inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
         buf = encode_double(buf, value.get_double());
         transact_log_advance(buf);
         break;
-    case type_Date:
-        buf = encode_int(buf, value.get_date().get_date());
+    case type_DateTime:
+        buf = encode_int(buf, value.get_datetime().get_datetime());
         transact_log_advance(buf);
         break;
     case type_String:
@@ -748,10 +773,19 @@ inline void Replication::on_spec_destroyed(const Spec* s) TIGHTDB_NOEXCEPT
 }
 
 
-template<class T> void Replication::Buffer<T>::set_size(std::size_t size)
+inline TrivialReplication::TrivialReplication(const std::string& database_file):
+    m_database_file(database_file)
 {
-    m_data.reset(new T[size]);
-    m_size = size;
+}
+
+inline void TrivialReplication::transact_log_reserve(std::size_t n)
+{
+    char* data = m_transact_log_buffer.data();
+    std::size_t size = m_transact_log_free_begin - data;
+    m_transact_log_buffer.reserve_extra(size, n);
+    data = m_transact_log_buffer.data(); // May have changed
+    m_transact_log_free_begin = data + size;
+    m_transact_log_free_end = data + m_transact_log_buffer.size();
 }
 
 

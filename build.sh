@@ -26,8 +26,7 @@ map_ext_name_to_dir()
     local ext_name
     ext_name="$1"
     case $ext_name in
-        "java") echo "tightdb_java2";;
-        *)      echo "tightdb_$ext_name";;
+        *) echo "tightdb_$ext_name";;
     esac
     return 0
 }
@@ -924,12 +923,16 @@ EOF
                 grep -v -f "$TEMP_DIR/transfer/exclude.bre" "$TEMP_DIR/transfer/files2" >"$TEMP_DIR/transfer/files3" || exit 1
                 tar czf "$TEMP_DIR/transfer/core.tar.gz" -T "$TEMP_DIR/transfer/files3" || exit 1
                 (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/transfer/core.tar.gz") || exit 1
-                (cd "$PKG_DIR/tightdb" && pandoc README.md -o README.pdf) || exit 1
+                if [ -z "$(which pandoc)" ]; then
+                    echo "pandoc is not installed - not generating README.pdf"
+                else
+                    (cd "$PKG_DIR/tightdb" && pandoc README.md -o README.pdf) || exit 1
+                fi
                 printf "\nNO_BUILD_ON_INSTALL = 1\n" >> "$PKG_DIR/tightdb/config.mk"
                 INST_HEADERS="$(cd src/tightdb && make get-inst-headers)" || exit 1
-                INST_LIBRARIES="$(cd src/tightdb && make get-inst-libraries)" || exit 1
-                (cd "src/tightdb" && cp -R -P $INST_HEADERS $INST_LIBRARIES "$PKG_DIR/tightdb/src/tightdb/") || exit 1
-                cp "src/tightdb/tightdb-config" "src/tightdb/tightdb-config-dbg" "$PKG_DIR/tightdb/src/tightdb/" || exit 1
+                INST_LIBS="$(cd src/tightdb && make get-inst-libraries)" || exit 1
+                INST_PROGS="$(cd src/tightdb && make get-inst-programs)" || exit 1
+                (cd "src/tightdb" && cp -R -P $INST_HEADERS $INST_LIBS $INST_PROGS "$PKG_DIR/tightdb/src/tightdb/") || exit 1
                 if [ "$INCLUDE_IPHONE" ]; then
                     cp -R "$IPHONE_DIR" "$PKG_DIR/tightdb/" || exit 1
                 fi

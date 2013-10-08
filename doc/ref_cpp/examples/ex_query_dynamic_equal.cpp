@@ -15,7 +15,7 @@ int main()
     s.add_column(type_String, "name");
     s.add_column(type_Int,    "age");
     s.add_column(type_Bool,   "male");
-    s.add_column(type_Date,   "hired");
+    s.add_column(type_DateTime,   "hired");
     s.add_column(type_Binary, "photo");
     table->update_from_spec();
 
@@ -25,13 +25,13 @@ int main()
     table->set_string(0, 0, "Mary");
     table->set_int(1, 0, 28);
     table->set_bool(2, 0, false);
-    table->set_date(3, 0, 50000);
+    table->set_datetime(3, 0, 50000);
     table->set_binary(4, 0, BinaryData("bin \0 data 1"));
 
     table->set_string(0, 1, "Frank");
     table->set_int(1, 1, 56);
     table->set_bool(2, 1, true);
-    table->set_date(3, 1, 60000);
+    table->set_datetime(3, 1, 60000);
     table->set_binary(4, 1, BinaryData("bin \0 data 2"));
 
     // Find rows where name (column 0) == "Frank"
@@ -47,7 +47,7 @@ int main()
     assert(view3.size() == 1 && view3.get_string(0,0) == "Frank");
 
     // Find people where hired (column 3) == 50000
-    TableView view4 = table->where().equal(3, tightdb::Date(50000).get_date()).find_all();
+    TableView view4 = table->where().equal(3, tightdb::DateTime(50000).get_datetime()).find_all();
     assert(view4.size() == 1 && view4.get_string(0,0) == "Mary");
 
     // Find people where photo (column 4) equals the binary data "bin \0\n data 1"

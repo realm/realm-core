@@ -25,8 +25,9 @@
  * nondefault value is in effect. */
 #define TIGHTDB_DEFAULT_MAX_LIST_SIZE 1000
 
-/* The maximum number of elements in a B-tree node. Allow this value
- * to be overridden on the command-line. */
+/* The maximum number of elements in a B+-tree node. You may override
+ * this on the compiler command line. The minimum allowable value is
+ * 2. */
 #ifndef TIGHTDB_MAX_LIST_SIZE
 #  define TIGHTDB_MAX_LIST_SIZE TIGHTDB_DEFAULT_MAX_LIST_SIZE
 #endif
@@ -54,6 +55,12 @@
 #endif
 #if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 8
 #  define TIGHTDB_HAVE_GCC_GE_4_8 1
+#endif
+
+
+/* Support for C++11 type traits. */
+#if TIGHTDB_HAVE_CXX11
+#  define TIGHTDB_HAVE_CXX11_TYPE_TRAITS 1
 #endif
 
 
@@ -87,11 +94,14 @@
 #  define TIGHTDB_HAVE_CXX11_INITIALIZER_LISTS 1
 #endif
 
-
+//fixme:somehow vs2012 doesn't build well when atomic is included in thread.cpp
+//so for now, disable on windows
 /* Support for C++11 atomics. */
-#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_4 || \
+#ifndef _MSC_VER
+#  if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_4 || \
     _MSC_VER >= 1700
-#  define TIGHTDB_HAVE_CXX11_ATOMIC 1
+#    define TIGHTDB_HAVE_CXX11_ATOMIC 1
+#  endif
 #endif
 
 
@@ -119,6 +129,16 @@
 #  define TIGHTDB_NOEXCEPT throw()
 #else
 #  define TIGHTDB_NOEXCEPT
+#endif
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_6
+#  define TIGHTDB_NOEXCEPT_IF(cond) noexcept(cond)
+#else
+#  define TIGHTDB_NOEXCEPT_IF(cond)
+#endif
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_6
+#  define TIGHTDB_NOEXCEPT_OR_NOTHROW noexcept
+#else
+#  define TIGHTDB_NOEXCEPT_OR_NOTHROW throw()
 #endif
 
 

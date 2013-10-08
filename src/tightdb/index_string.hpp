@@ -34,6 +34,7 @@ public:
     StringIndex(void* target_column, StringGetter get_func, Allocator&);
     StringIndex(ref_type, ArrayParent*, std::size_t ndx_in_parent, void* target_column,
                 StringGetter get_func, Allocator&);
+    ~StringIndex() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
     void set_target(void* target_column, StringGetter get_func) TIGHTDB_NOEXCEPT;
 
     bool is_empty() const;
@@ -103,8 +104,8 @@ private:
 
 #ifdef TIGHTDB_DEBUG
     void to_dot_2(std::ostream&, StringData title = StringData()) const;
-    void array_to_dot(std::ostream&, const Array&) const;
-    void keys_to_dot(std::ostream&, const Array&, StringData title = StringData()) const;
+    static void array_to_dot(std::ostream&, const Array&);
+    static void keys_to_dot(std::ostream&, const Array&, StringData title = StringData());
 #endif
 };
 

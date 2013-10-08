@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_TRANSACTIONS
+
 #include <cstdio>
 #include <vector>
 #include <sstream>
@@ -5,29 +8,20 @@
 #include <iostream>
 #include <iomanip>
 
-#include <pthread.h>
-
 #include <UnitTest++.h>
 
-#include <tightdb/file.hpp>
 #include <tightdb/group_shared.hpp>
+#include <tightdb/file.hpp>
+#include <tightdb/bind.hpp>
+
+#include "util/thread_wrapper.hpp"
+
 #include "testsettings.hpp"
 
 using namespace std;
 using namespace tightdb;
 
 namespace {
-
-template<class T> struct mem_buf {
-    mem_buf(std::size_t size): m_ptr(new T[size]) {}
-    ~mem_buf() { delete[] m_ptr; }
-    T* get()             { return m_ptr; }
-    const T* get() const { return m_ptr; }
-    T& operator[](std::size_t i)             { return m_ptr[i]; }
-    const T& operator[](std::size_t i) const { return m_ptr[i]; }
-private:
-    T* m_ptr;
-};
 
 
 enum MyEnum { moja, mbili, tatu, nne, tano, sita, saba, nane, tisa, kumi,
@@ -45,7 +39,7 @@ TIGHTDB_TABLE_8(MyTable,
                 alpha,   Int,
                 beta,    Bool,
                 gamma,   Enum<MyEnum>,
-                delta,   Date,
+                delta,   DateTime,
                 epsilon, String,
                 zeta,    Binary,
                 eta,     Subtable<MySubtable>,
@@ -55,17 +49,8 @@ TIGHTDB_TABLE_8(MyTable,
 const int num_threads = 23;
 const int num_rounds  = 2;
 
-// FIXME: TightDB currently imposes a limitation on the number of
-// elements in any array node. It must not exceed 2**24. Because a
-// single array is used to hold all the strings (or blobs) of a leaf
-// in the B+-tree, the maximum size of a stored string (and of a
-// stored blob) can be calculated as (2**24 /
-// TIGHTDB_MAX_LIST_SIZE). It is extremely unfortunate that the string
-// size limitation is a function of TIGHTDB_MAX_LIST_SIZE. The
-// limitation should be entirely removed, but that requires a
-// non-trivial change that will also break the file format.
-const size_t max_blob_size = 0x1000000 / TIGHTDB_MAX_LIST_SIZE / 2; // Dividing by two to be on the safe side.
-const size_t max_string_size = max_blob_size - 1; // Discount the mandatory null-terminator.
+const size_t max_blob_size   = 32*1024; // 32 KiB
+const size_t max_string_size = 32*1024; // 32 KiB
 
 
 void round(SharedGroup& db, int index)
@@ -88,7 +73,10 @@ void round(SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #2
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        if (table->size() < 100) for (int i=0; i<10; ++i) table->add();
+        if (table->size() < 100) {
+            for (int i=0; i<10; ++i)
+                table->add();
+        }
         ++table[0].alpha;
         wt.commit();
     }
@@ -121,9 +109,8 @@ void round(SharedGroup& db, int index)
         MySubtable::Ref subtable = table[0].eta;
         ++subtable[0].foo;
         MySubsubtable::Ref subsubtable = subtable[0].bar;
-        for (int i=int(subsubtable->size()); i<=index; ++i) {
+        for (int i=int(subsubtable->size()); i<=index; ++i)
             subsubtable->add();
-        }
         ++table[0].alpha;
         wt.commit();
     }
@@ -133,8 +120,12 @@ void round(SharedGroup& db, int index)
         WriteTransaction wt(db); // Write transaction #6
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         if (3 <= table->size()) {
-            if (table[2].alpha == 749321) table->remove(1);
-            else table->remove(2);
+            if (table[2].alpha == 749321) {
+                table->remove(1);
+            }
+            else {
+                table->remove(2);
+            }
         }
         MySubtable::Ref subtable = table[0].eta;
         ++subtable[0].foo;
@@ -182,8 +173,8 @@ void round(SharedGroup& db, int index)
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MySubtable::Ref subtable = table[0].eta;
         MySubsubtable::Ref subsubtable = subtable[0].bar;
-        const size_t size = ((512 + index%1024) * 1024) % max_blob_size;
-        mem_buf<char> data(size);
+        size_t size = ((512 + index%1024) * 1024) % max_blob_size;
+        UniquePtr<char[]> data(new char[size]);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index) * 677 % 256);
         subsubtable[index].binary = BinaryData(data.get(), size);
@@ -201,8 +192,8 @@ void round(SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #11
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        const size_t size = ((512 + (333 + 677*index) % 1024) * 1024) % max_blob_size;
-        mem_buf<char> data(size);
+        size_t size = ((512 + (333 + 677*index) % 1024) * 1024) % max_blob_size;
+        UniquePtr<char[]> data(new char[size]);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index+73) * 677 % 256);
         table[index%2].zeta = BinaryData(data.get(), size);
@@ -225,8 +216,8 @@ void round(SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #13
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        const size_t size = (512 + (333 + 677*index) % 1024) * 327;
-        mem_buf<char> data(size);
+        size_t size = (512 + (333 + 677*index) % 1024) * 327;
+        UniquePtr<char[]> data(new char[size]);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index+73) * 677 % 256);
         table[(index+1)%2].zeta = BinaryData(data.get(), size);
@@ -246,10 +237,10 @@ void round(SharedGroup& db, int index)
             subtable->add();
             subtable->add();
         }
-        const int n = 1 + 13 / (1+index);
+        int n = 1 + 13 / (1+index);
         for (int i=0; i<n; ++i) {
-            const BinaryData bin(0,0);
-            const Mixed mix = int64_t(i);
+            BinaryData bin(0,0);
+            Mixed mix = int64_t(i);
             subtable->add(0, false, moja,  time_t(), "alpha",   bin, 0, mix);
             subtable->add(1, false, mbili, time_t(), "beta",    bin, 0, mix);
             subtable->add(2, false, tatu,  time_t(), "gamma",   bin, 0, mix);
@@ -284,14 +275,14 @@ void round(SharedGroup& db, int index)
         else {
             subsubtable = subtable[0].theta.set_subtable<MyTable>();
         }
-        const size_t size = (17 + 233*index) % 523;
-        mem_buf<char> data(size);
+        size_t size = (17 + 233*index) % 523;
+        UniquePtr<char[]> data(new char[size]);
         for (size_t i=0; i<size; ++i)
             data[i] = static_cast<unsigned char>((i+index+79) * 677 % 256);
-        const BinaryData bin(data.get(), size);
+        BinaryData bin(data.get(), size);
         subsubtable->add(0, false, nne,  0, "", bin, 0, Mixed(int64_t(index*13)));
         subsubtable->add(1, false, tano, 0, "", bin, 0, Mixed(index%2==0?false:true));
-        subsubtable->add(2, false, sita, 0, "", bin, 0, Mixed(Date(index*13)));
+        subsubtable->add(2, false, sita, 0, "", bin, 0, Mixed(DateTime(index*13)));
         subsubtable->add(3, false, saba, 0, "", bin, 0, Mixed("click"));
         subsubtable->add(4, false, nane, 0, "", bin, 0, Mixed(bin));
         wt.commit();
@@ -309,17 +300,15 @@ void round(SharedGroup& db, int index)
         else {
             subsubtable = subtable[1].theta.set_subtable<MySubtable>();
         }
-        const int num = 8;
-        for (int i=0; i<num; ++i) {
+        int num = 8;
+        for (int i=0; i<num; ++i)
             subsubtable->add(i, 0);
-        }
         vector<MySubsubtable::Ref> subsubsubtables;
-        for (int i=0; i<num; ++i) {
+        for (int i=0; i<num; ++i)
             subsubsubtables.push_back(subsubtable[i].bar);
-        }
         for (int i=0; i<3; ++i) {
             for (int j=0; j<num; j+=2) {
-                const BinaryData bin(0,0);
+                BinaryData bin(0,0);
                 subsubsubtables[j]->add((i-j)*index-19, bin);
             }
         }
@@ -347,10 +336,9 @@ void round(SharedGroup& db, int index)
         else {
             subsubtable = subtable[2].theta.set_subtable<MySubsubtable>();
         }
-        const int num = 9;
-        for (int i=0; i<num; ++i) {
+        int num = 9;
+        for (int i=0; i<num; ++i)
             subsubtable->add(i, BinaryData(0,0));
-        }
         subsubtable->column().value += 31;
         wt.commit();
     }
@@ -369,10 +357,9 @@ void round(SharedGroup& db, int index)
             // FIXME: Reenable this when it works!!!
 //            subsubtable->column().value.set_index();
         }
-        const int num = 9;
-        for (int i=0; i<num; ++i) {
+        int num = 9;
+        for (int i=0; i<num; ++i)
             subsubtable->add(i, BinaryData(0,0));
-        }
         wt.commit();
     }
 }
@@ -386,51 +373,6 @@ void thread(int index, string database_path)
     }
 }
 
-
-struct ThreadWrapper {
-    void run(int index, string database_path)
-    {
-        m_index         = index;
-        m_database_path = database_path;
-        m_error         = false;
-        const int rc = pthread_create(&m_pthread, 0, &ThreadWrapper::run, this);
-        if (rc != 0) throw runtime_error("pthread_create() failed");
-    }
-
-    // Returns 'true' on error
-    bool join()
-    {
-        const int rc = pthread_join(m_pthread, 0);
-        if (rc != 0) throw runtime_error("pthread_join() failed");
-        return m_error;
-    }
-
-private:
-    pthread_t m_pthread;
-    int m_index;
-    string m_database_path;
-    bool m_error;
-
-    static void* run(void* arg)
-    {
-        ThreadWrapper& e = *static_cast<ThreadWrapper*>(arg);
-        try {
-            thread(e.m_index, e.m_database_path);
-        }
-        catch (exception& ex) {
-            e.m_error = true;
-            cerr << "Exception thrown in thread "<<e.m_index<<": "<<ex.what()<<"\n";
-        }
-
-        catch (...) {
-            e.m_error = true;
-            cerr << "Unknown exception thrown in thread "<<e.m_index<<"\n";
-        }
-
-        return 0;
-    }
-};
-
 } // anonymous namespace
 
 
@@ -442,22 +384,28 @@ TEST(Transactions)
 
     // Run N rounds in each thread
     {
-        ThreadWrapper threads[num_threads];
+        test_util::ThreadWrapper threads[num_threads];
 
         // Start threads
-        for (int i=0; i<num_threads; ++i) {
-            threads[i].run(i, database_path);
-        }
+        for (int i=0; i<num_threads; ++i)
+            threads[i].start(util::bind(&thread, i, database_path));
 
         // Wait for threads to finish
         for (int i=0; i<num_threads; ++i) {
-            CHECK(!threads[i].join());
+            bool thread_has_thrown = false;
+            string except_msg;
+            if (threads[i].join(except_msg)) {
+                cerr << "Exception thrown in thread "<<i<<": "<<except_msg<<"\n";
+                thread_has_thrown = true;
+            }
+            CHECK(!thread_has_thrown);
         }
     }
 
     // Verify database contents
     size_t table1_theta_size = 0;
-    for (int i=0; i<num_threads; ++i) table1_theta_size += (1 + 13 / (1+i)) * 8;
+    for (int i=0; i<num_threads; ++i)
+        table1_theta_size += (1 + 13 / (1+i)) * 8;
     table1_theta_size *= num_rounds;
     table1_theta_size += 2;
 
@@ -494,8 +442,8 @@ TEST(Transactions)
         MySubsubtable::ConstRef subsubtable = subtable[0].bar;
         for (int i=0; i<num_threads; ++i) {
             CHECK_EQUAL(1000+i, subsubtable[i].value);
-            const size_t size = ((512 + i%1024) * 1024) % max_blob_size;
-            mem_buf<char> data(size);
+            size_t size = ((512 + i%1024) * 1024) % max_blob_size;
+            UniquePtr<char[]> data(new char[size]);
             for (size_t j=0; j<size; ++j)
                 data[j] = static_cast<unsigned char>((j+i) * 677 % 256);
             CHECK_EQUAL(BinaryData(data.get(), size), subsubtable[i].binary);
@@ -509,9 +457,8 @@ TEST(Transactions)
             CHECK_EQUAL(0,               subtable[i].delta);
             CHECK_EQUAL(BinaryData(0,0), subtable[i].zeta);
             CHECK_EQUAL(0u,              subtable[i].eta->size());
-            if (4 <= i) {
+            if (4 <= i)
                 CHECK_EQUAL(type_Int, subtable[i].theta.get_type());
-            }
         }
         CHECK_EQUAL(size_t(num_threads*num_rounds*5),
                     subtable[0].theta.get_subtable_size());
@@ -562,3 +509,5 @@ TEST(Transactions)
     }
     // End of read transaction
 }
+
+#endif

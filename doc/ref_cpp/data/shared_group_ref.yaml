@@ -189,6 +189,33 @@ CATEGORIES:
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_shared_group_is_attached
+  - g_shared_group_reserve:
+      NAMES    : reserve
+      SUMMARY  : &g_shared_group_reserve_summary
+                 Reserve disk space now.
+      DESCR    : &g_shared_group_reserve_descr
+                 Reserve disk space now to avoid allocation errors at
+                 a later point in time, and to minimize on-disk
+                 fragmentation. In some cases, less fragmentation
+                 translates into improved performance.
+
+                 A call to this method will make the database file at
+                 least as big as the specified size, and, if the
+                 platform supports it, disk space will be allocated
+                 for the entire file.
+
+                 If the database file is already as big as the
+                 specified size, or bigger, this method will not
+                 affect the size of the file, but, if the platform
+                 supports it, it will still cause previously
+                 unallocated disk space to be allocated.
+      PARAMS:
+      - NAME   : size_in_bytes
+        TYPES  : std::size_t
+        DESCR  : The total number of bytes to reserve on disk for this database.
+      EXAMPLES:
+      - DESCR  :
+        CODE   : ex_cpp_shared_group_reserve
   - g_shared_group_has_changed:
       NAMES    : has_changed
       SUMMARY  : &g_shared_group_has_changed_summary
@@ -235,7 +262,9 @@ CATEGORIES:
       SUMMARY  : &g_shared_group_rollback_summary
                  Rollback a transaction.
       DESCR    : &g_shared_group_rollback_descr
-                 This method closes a transaction and discards all changes done to the shared group.
+                 This method closes a transaction and discards all changes done to the shared group,
+                 unless a commit has already been done. It is ok to call rollback multiple times. 
+                 Any additional calls to rollback following a commit or rollback are treated as no-ops.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_rollback
         DESCR  :
@@ -297,7 +326,9 @@ CATEGORIES:
   - g_shared_group_end_read:
       NAMES    : end_read
       SUMMARY  : &g_shared_group_end_read_summary
-                 Terminate read transaction.
+                 Terminate read transaction. It is ok to call end_read multiple times, the
+                 first call will terminate the transaction. Any additional calls are treated
+                 as no-ops
       DESCR    : &g_shared_group_end_read_descr
                  This method terminates the read transaction.
       EXAMPLES:

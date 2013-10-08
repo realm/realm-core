@@ -1,3 +1,5 @@
+#ifdef TEST_LANG_BIND_HELPER
+
 #include <UnitTest++.h>
 
 #include <tightdb/lang_bind_helper.hpp>
@@ -65,3 +67,5 @@ TEST(SetSubtable)
     CHECK_EQUAL(t2.size(), sub->size());
     CHECK(t2 == *sub);
 }
+
+#endif

@@ -32,6 +32,7 @@ public:
     ArrayBlob(ref_type, ArrayParent*, std::size_t ndx_in_parent,
               Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
     explicit ArrayBlob(Allocator&) TIGHTDB_NOEXCEPT;
+    ~ArrayBlob() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     const char* get(std::size_t pos) const TIGHTDB_NOEXCEPT;
 
@@ -57,7 +58,7 @@ public:
     void create();
 
 #ifdef TIGHTDB_DEBUG
-    void to_dot(std::ostream&, const char* title = 0) const;
+    void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
 private:

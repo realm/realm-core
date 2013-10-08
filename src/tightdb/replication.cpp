@@ -1,3 +1,4 @@
+#include <stdexcept>
 #include <utility>
 #include <ostream>
 #include <iomanip>
@@ -21,9 +22,6 @@ const size_t init_subtab_path_buf_size = 2*init_subtab_path_buf_levels - 1;
 } // anonymous namespace
 
 
-namespace tightdb {
-
-
 Replication::Replication(): m_selected_table(0), m_selected_spec(0)
 {
     m_subtab_path_buf.set_size(init_subtab_path_buf_size); // Throws
@@ -36,14 +34,13 @@ Group& Replication::get_group(SharedGroup& sg) TIGHTDB_NOEXCEPT
 }
 
 
-Replication::database_version_type
-Replication::get_current_version(SharedGroup& sg) TIGHTDB_NOEXCEPT
+Replication::version_type Replication::get_current_version(SharedGroup& sg) TIGHTDB_NOEXCEPT
 {
     return sg.get_current_version();
 }
 
 
-void Replication::commit_foreign_transact_log(SharedGroup& sg, database_version_type new_version)
+void Replication::commit_foreign_transact_log(SharedGroup& sg, version_type new_version)
 {
     sg.low_level_commit(new_version);
 }
@@ -54,11 +51,11 @@ void Replication::select_table(const Table* table)
     size_t* begin;
     size_t* end;
     for (;;) {
-        begin = m_subtab_path_buf.m_data.get();
-        end = table->record_subtable_path(begin, begin+m_subtab_path_buf.m_size);
+        begin = m_subtab_path_buf.data();
+        end = table->record_subtable_path(begin, begin+m_subtab_path_buf.size());
         if (end)
             break;
-        size_t new_size = m_subtab_path_buf.m_size;
+        size_t new_size = m_subtab_path_buf.size();
         if (int_multiply_with_overflow_detect(new_size, 2))
             throw runtime_error("To many subtable nesting levels");
         m_subtab_path_buf.set_size(new_size); // Throws
@@ -93,10 +90,11 @@ void Replication::select_spec(const Table* table, const Spec* spec)
     size_t* begin;
     size_t* end;
     for (;;) {
-        begin = m_subtab_path_buf.m_data.get();
-        end = table->record_subspec_path(spec, begin, begin+m_subtab_path_buf.m_size);
-        if (end) break;
-        size_t new_size = m_subtab_path_buf.m_size;
+        begin = m_subtab_path_buf.data();
+        end = table->record_subspec_path(spec, begin, begin+m_subtab_path_buf.size());
+        if (end)
+            break;
+        size_t new_size = m_subtab_path_buf.size();
         if (int_multiply_with_overflow_detect(new_size, 2))
             throw runtime_error("To many subspec nesting levels");
         m_subtab_path_buf.set_size(new_size); // Throws
@@ -137,7 +135,12 @@ struct Replication::TransactLogApplier {
     }
 
 #ifdef TIGHTDB_DEBUG
-    void set_apply_log(ostream* log) { m_log = log; if (m_log) *m_log << boolalpha; }
+    void set_apply_log(ostream* log)
+    {
+        m_log = log;
+        if (m_log)
+            *m_log << boolalpha;
+    }
 #endif
 
     void apply();
@@ -150,7 +153,7 @@ private:
     const char* m_input_begin;
     const char* m_input_end;
     TableRef m_table;
-    Buffer<Spec*> m_subspecs;
+    util::Buffer<Spec*> m_subspecs;
     size_t m_num_subspecs;
     bool m_dirty_spec;
     StringBuffer m_string_buffer;
@@ -204,7 +207,8 @@ private:
         TIGHTDB_ASSERT(m_table);
         m_table->update_from_spec();
 #ifdef TIGHTDB_DEBUG
-        if (m_log) *m_log << "table->update_from_spec()\n";
+        if (m_log)
+            *m_log << "table->update_from_spec()\n";
 #endif
         m_dirty_spec = false;
     }
@@ -214,7 +218,7 @@ private:
         switch (type) {
             case type_Int:
             case type_Bool:
-            case type_Date:
+            case type_DateTime:
             case type_String:
             case type_Binary:
             case type_Table:
@@ -286,7 +290,7 @@ inline void Replication::TransactLogApplier::read_bytes(char* data, size_t size)
 float Replication::TransactLogApplier::read_float()
 {
     TIGHTDB_STATIC_ASSERT(numeric_limits<float>::is_iec559 &&
-                          sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
+                          sizeof (float) * numeric_limits<unsigned char>::digits == 32,
                           "Unsupported 'float' representation");
     float value;
     read_bytes(reinterpret_cast<char*>(&value), sizeof value); // Throws
@@ -297,7 +301,7 @@ float Replication::TransactLogApplier::read_float()
 double Replication::TransactLogApplier::read_double()
 {
     TIGHTDB_STATIC_ASSERT(numeric_limits<double>::is_iec559 &&
-                          sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
+                          sizeof (double) * numeric_limits<unsigned char>::digits == 64,
                           "Unsupported 'double' representation");
     double value;
     read_bytes(reinterpret_cast<char*>(&value), sizeof value); // Throws
@@ -316,19 +320,23 @@ void Replication::TransactLogApplier::read_string(StringBuffer& buf)
 
 void Replication::TransactLogApplier::add_subspec(Spec* spec)
 {
-    if (m_num_subspecs == m_subspecs.m_size) {
-        Buffer<Spec*> new_subspecs;
-        size_t new_size = m_subspecs.m_size;
+    if (m_num_subspecs == m_subspecs.size()) {
+        util::Buffer<Spec*> new_subspecs;
+        size_t new_size = m_subspecs.size();
         if (new_size == 0) {
-            new_size = 16; // FIXME: Use a small value (1) when compiling in debug mode
+#ifdef TIGHTDB_DEBUG
+            new_size = 1;
+#else
+            new_size = 16;
+#endif
         }
         else {
             if (int_multiply_with_overflow_detect(new_size, 2))
                 throw runtime_error("To many subspec nesting levels");
         }
         new_subspecs.set_size(new_size); // Throws
-        copy(m_subspecs.m_data.get(), m_subspecs.m_data.get()+m_num_subspecs,
-             new_subspecs.m_data.get());
+        copy(m_subspecs.data(), m_subspecs.data()+m_num_subspecs,
+             new_subspecs.data());
         swap(m_subspecs, new_subspecs);
     }
     m_subspecs[m_num_subspecs++] = spec;
@@ -403,18 +411,18 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
 #endif
             return;
         }
-        case type_Date: {
+        case type_DateTime: {
             time_t value = read_int<time_t>(); // Throws
             if (insert)
-                m_table->insert_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                m_table->insert_datetime(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
             else
-                m_table->set_date(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                m_table->set_datetime(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
             if (m_log) {
                 if (insert)
-                    *m_log << "table->insert_date("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                    *m_log << "table->insert_datetime("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
                 else
-                    *m_log << "table->set_date("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                    *m_log << "table->set_datetime("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
             }
 #endif
             return;
@@ -503,18 +511,18 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
 #endif
                     return;
                 }
-                case type_Date: {
+                case type_DateTime: {
                     time_t value = read_int<time_t>(); // Throws
                     if (insert)
-                        m_table->insert_mixed(column_ndx, ndx, Date(value)); // FIXME: Memory allocation failure!!!
+                        m_table->insert_mixed(column_ndx, ndx, DateTime(value)); // FIXME: Memory allocation failure!!!
                     else
-                        m_table->set_mixed(column_ndx, ndx, Date(value)); // FIXME: Memory allocation failure!!!
+                        m_table->set_mixed(column_ndx, ndx, DateTime(value)); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
                     if (m_log) {
                         if (insert)
-                            *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", Date("<<value<<"))\n";
+                            *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", DateTime("<<value<<"))\n";
                         else
-                            *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", Date("<<value<<"))\n";
+                            *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", DateTime("<<value<<"))\n";
                     }
 #endif
                     return;
@@ -675,7 +683,8 @@ void Replication::TransactLogApplier::apply()
                 int64_t value = read_int<int64_t>(); // Throws
                 m_table->add_int(column_ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
-                if (m_log) *m_log << "table->add_int("<<column_ndx<<", "<<value<<")\n";
+                if (m_log)
+                    *m_log << "table->add_int("<<column_ndx<<", "<<value<<")\n";
 #endif
                 break;
             }
@@ -687,7 +696,7 @@ void Replication::TransactLogApplier::apply()
                 size_t ndx = read_int<size_t>(); // Throws
                 if (m_group.size() <= ndx)
                     goto bad_transact_log;
-                m_table = m_group.get_table_ptr(ndx)->get_table_ref();
+                m_table = m_group.get_table_by_ndx(ndx)->get_table_ref();
 #ifdef TIGHTDB_DEBUG
                 if (m_log)
                     *m_log << "table = group->get_table_by_ndx("<<ndx<<")\n";
@@ -734,7 +743,8 @@ void Replication::TransactLogApplier::apply()
             }
 
             case 'x': { // Add index to column
-                if (m_dirty_spec) finalize_spec();
+                if (m_dirty_spec)
+                    finalize_spec();
                 int column_ndx = read_int<int>(); // Throws
                 if (!m_table)
                     goto bad_transact_log;
@@ -849,4 +859,78 @@ void Replication::apply_transact_log(InputStream& transact_log, Group& group)
 #endif
 
 
-} // namespace tightdb
+namespace {
+
+class InputStreamImpl: public Replication::InputStream {
+public:
+    InputStreamImpl(const char* data, size_t size) TIGHTDB_NOEXCEPT:
+        m_begin(data), m_end(data+size) {}
+
+    ~InputStreamImpl() TIGHTDB_NOEXCEPT {}
+
+    size_t read(char* buffer, size_t size)
+    {
+        size_t n = min<size_t>(size, m_end-m_begin);
+        const char* end = m_begin + n;
+        copy(m_begin, end, buffer);
+        m_begin = end;
+        return n;
+    }
+    const char* m_begin;
+    const char* const m_end;
+};
+
+} // anonymous namespace
+
+void TrivialReplication::apply_transact_log(const char* data, size_t size, SharedGroup& target)
+{
+    InputStreamImpl in(data, size);
+    WriteTransaction wt(target); // Throws
+    Replication::apply_transact_log(in, wt.get_group()); // Throws
+    wt.commit(); // Throws
+}
+
+string TrivialReplication::do_get_database_path()
+{
+    return m_database_file;
+}
+
+void TrivialReplication::do_begin_write_transact(SharedGroup&)
+{
+    char* data = m_transact_log_buffer.data();
+    size_t size = m_transact_log_buffer.size();
+    m_transact_log_free_begin = data;
+    m_transact_log_free_end = data + size;
+}
+
+Replication::version_type
+TrivialReplication::do_commit_write_transact(SharedGroup&, version_type orig_version)
+{
+    char* data = m_transact_log_buffer.data();
+    size_t size = m_transact_log_free_begin - data;
+    handle_transact_log(data, size); // Throws
+    return orig_version + 1;
+}
+
+void TrivialReplication::do_rollback_write_transact(SharedGroup&) TIGHTDB_NOEXCEPT
+{
+}
+
+void TrivialReplication::do_interrupt() TIGHTDB_NOEXCEPT
+{
+}
+
+void TrivialReplication::do_clear_interrupt() TIGHTDB_NOEXCEPT
+{
+}
+
+void TrivialReplication::do_transact_log_reserve(size_t n)
+{
+    transact_log_reserve(n);
+}
+
+void TrivialReplication::do_transact_log_append(const char* data, size_t size)
+{
+    transact_log_reserve(size);
+    m_transact_log_free_begin = copy(data, data+size, m_transact_log_free_begin);
+}

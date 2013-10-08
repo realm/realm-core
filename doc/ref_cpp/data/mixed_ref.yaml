@@ -54,13 +54,13 @@ CATEGORIES:
                  Mixed(int64_t v)
                  Mixed(float v)
                  Mixed(double v)
-                 Mixed(Date v)
+                 Mixed(DateTime v)
                  Mixed(StringData v)
                  Mixed(BinaryData v)
                  Mixed(subtable_tag)
       PARAMS:
       - NAME   : v
-        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData]
+        TYPES  : [bool, int64_t, float, double, DateTime, StringData, BinaryData]
         DESCR  : &g_mixed_constructor_parm1_descr
                  The value.
       EXAMPLES:
@@ -108,12 +108,12 @@ CATEGORIES:
                  int64_t     get_int()    const;
                  float       get_float()  const;
                  double      get_double() const;                 
-                 Date        get_date()   const;
+                 DateTime    get_datetime()   const;
                  StringData  get_string() const;
                  BinaryData  get_binary() const;
       CONST    : True
       RETURN:
-        TYPES  : [bool, int64_t, float, double, Date, StringData, BinaryData]
+        TYPES  : [bool, int64_t, float, double, DateTime, StringData, BinaryData]
         DESCR  : &g_mixed_get_return1_descr
                  The value.
       EXAMPLES:

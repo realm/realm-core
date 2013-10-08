@@ -2,8 +2,7 @@
 #include <tightdb/lang_bind_helper.hpp>
 
 using namespace std;
-
-namespace tightdb {
+using namespace tightdb;
 
 
 Table* LangBindHelper::get_subtable_ptr_during_insert(Table* t, size_t col_ndx, size_t row_ndx)
@@ -26,13 +25,10 @@ const char* LangBindHelper::get_data_type_name(DataType type) TIGHTDB_NOEXCEPT
         case type_Double: return "double";
         case type_String: return "string";
         case type_Binary: return "binary";
-        case type_Date:   return "date";
+        case type_DateTime:   return "date";
         case type_Table:  return "table";
         case type_Mixed:  return "mixed";
     }
     TIGHTDB_ASSERT(false);
     return "int";
 }
-
-
-} // namespace tightdb

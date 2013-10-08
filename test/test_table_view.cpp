@@ -1,11 +1,19 @@
+#include "testsettings.hpp"
+#ifdef TEST_TABLE_VIEW
+
 #include <UnitTest++.h>
 #include <tightdb/table_macros.hpp>
+#include "test_utilities.hpp"
 #include <string>
 #include <sstream>
+#include <ostream>
 
+using namespace std;
 using namespace tightdb;
+using namespace test_util;
 
 namespace {
+
 TIGHTDB_TABLE_1(TestTableInt,
                 first, Int)
 
@@ -14,10 +22,11 @@ TIGHTDB_TABLE_2(TestTableInt2,
                 second, Int)
 
 TIGHTDB_TABLE_2(TestTableDate,
-                first, Date,
+                first, DateTime,
                 second, Int)
 
-}
+} // anonymous namespace
+
 
 TEST(TableViewJSON)
 {
@@ -44,15 +53,15 @@ TEST(TableViewDateMaxMin)
 {
     TestTableDate ttd;
 
-    ttd.add(Date(2014, 7, 10), 1);
-    ttd.add(Date(2013, 7, 10), 1);
-    ttd.add(Date(2015, 8, 10), 1);
-    ttd.add(Date(2015, 7, 10), 1);
+    ttd.add(DateTime(2014, 7, 10), 1);
+    ttd.add(DateTime(2013, 7, 10), 1);
+    ttd.add(DateTime(2015, 8, 10), 1);
+    ttd.add(DateTime(2015, 7, 10), 1);
 
     TestTableDate::View v = ttd.column().second.find_all(1);
 
-    CHECK_EQUAL(Date(2015, 8, 10), v.column().first.maximum());
-    CHECK_EQUAL(Date(2013, 7, 10), v.column().first.minimum());
+    CHECK_EQUAL(DateTime(2015, 8, 10), v.column().first.maximum());
+    CHECK_EQUAL(DateTime(2013, 7, 10), v.column().first.minimum());
 }
 
 TEST(GetSetInteger)
@@ -158,7 +167,7 @@ TEST(TableView_Floats_Find_and_Aggregations)
     // TODO: add for float as well
 
     // Test sum
-    CHECK_EQUAL(sum_d, v_all.column().col_double.sum());
+    CHECK(almost_equal(sum_d, v_all.column().col_double.sum())); // almost_equal because of double/float imprecision
     CHECK_EQUAL(sum_f, v_all.column().col_float.sum());
     CHECK_EQUAL(-1.2 -1.2, v_some.column().col_double.sum());
     CHECK_EQUAL(1.2f -1.1f, v_some.column().col_float.sum());
@@ -176,7 +185,7 @@ TEST(TableView_Floats_Find_and_Aggregations)
     CHECK_EQUAL(-1.1f, v_some.column().col_float.minimum());
 
     // Test avg
-    CHECK_EQUAL(sum_d / 6.0, v_all.column().col_double.average());
+    CHECK(almost_equal(sum_d / 6.0, v_all.column().col_double.average())); // almost_equal because of double/float imprecision
     CHECK_EQUAL((-1.2 + -1.2) / 2.0, v_some.column().col_double.average());
     CHECK_EQUAL(sum_f / 6.0, v_all.column().col_float.average());
 
@@ -612,3 +621,66 @@ TEST(TableView_HighLevelSubtables)
     CHECK_EQUAL(cv[0].subtab[0].subtab[0].val,                              6);
     CHECK_EQUAL(cv.column().subtab[0]->column().subtab[0]->column().val[0], 6);
 }
+
+
+TEST(TableView_to_string)
+{
+    TestTableInt2 tbl;
+
+    tbl.add(2, 123456);
+    tbl.add(4, 1234567);
+    tbl.add(6, 12345678);
+    tbl.add(4, 12345678);
+
+    string s  = "    first    second\n";
+    string s0 = "0:      2    123456\n";
+    string s1 = "1:      4   1234567\n";
+    string s2 = "2:      6  12345678\n";
+    string s3 = "3:      4  12345678\n";
+
+    // Test full view
+    stringstream ss;
+    TestTableInt2::View tv = tbl.where().find_all();
+    tv.to_string(ss);
+    CHECK_EQUAL(s+s0+s1+s2+s3, ss.str());
+
+    // Find partial view: row 1+3
+    stringstream ss2;
+    tv = tbl.where().first.equal(4).find_all();
+    tv.to_string(ss2);
+    CHECK_EQUAL(s+s1+s3, ss2.str());
+
+    // test row_to_string. get row 0 of previous view - i.e. row 1 in tbl
+    stringstream ss3;
+    tv.row_to_string(0,ss3);
+    CHECK_EQUAL(s+s1, ss3.str());
+}
+
+
+TEST(TableView_ref_counting)
+{
+    TableView tv, tv2;
+    {
+        TableRef t = Table::create();
+        t->add_column(type_Int, "myint");
+        t->insert_int(0, 0, 12);
+        t->insert_done();
+        tv = t->where().find_all();
+    }
+
+    {
+        TableRef t2 = Table::create();
+        t2->add_column(type_String, "mystr");
+        t2->insert_string(0, 0, "just a test string");
+        t2->insert_done();
+        tv2 = t2->where().find_all();
+    }
+
+    // Now try to access TableView and see that the Table is still alive
+    int64_t i = tv.get_int(0, 0);
+    CHECK_EQUAL(i, 12);
+    string s = tv2.get_string(0, 0);
+    CHECK_EQUAL(s, "just a test string");
+}
+
+#endif // TEST_TABLE_VIEW

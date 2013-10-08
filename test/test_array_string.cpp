@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_ARRAY_STRING
+
 #include <UnitTest++.h>
 #include <tightdb/array_string.hpp>
 #include <tightdb/column.hpp>
@@ -444,9 +447,6 @@ TEST_FIXTURE(db_setup_string, ArrayStringCount)
     CHECK_EQUAL(3, count);
 }
 
-// FIXME: The following unit test has ben temporarily commented
-// out. See https://github.com/Tightdb/tightdb/pull/84
-/*
 TEST_FIXTURE(db_setup_string, ArrayStringWithZeroBytes)
 {
     c.clear();
@@ -467,7 +467,6 @@ TEST_FIXTURE(db_setup_string, ArrayStringWithZeroBytes)
     CHECK_EQUAL(StringData(buf_2, sizeof buf_2), c.get(1));
     CHECK_EQUAL(StringData(buf_3, sizeof buf_3), c.get(2));
 }
-*/
 
 TEST_FIXTURE(db_setup_string, ArrayStringDestroy)
 {
@@ -490,3 +489,5 @@ TEST(ArrayStringCompare)
     a.destroy();
     b.destroy();
 }
+
+#endif // TEST_ARRAY_STRING

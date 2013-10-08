@@ -3,8 +3,8 @@
 #include <tightdb/array_blob.hpp>
 
 using namespace std;
+using namespace tightdb;
 
-namespace tightdb {
 
 void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size, bool add_zero_term)
 {
@@ -51,11 +51,11 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
 
 #ifdef TIGHTDB_DEBUG
 
-void ArrayBlob::to_dot(ostream& out, const char* title) const
+void ArrayBlob::to_dot(ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
 
-    if (title) {
+    if (title.size() != 0) {
         out << "subgraph cluster_" << ref << " {" << endl;
         out << " label = \"" << title << "\";" << endl;
         out << " color = white;" << endl;
@@ -75,11 +75,11 @@ void ArrayBlob::to_dot(ostream& out, const char* title) const
     out << "</TD>" << endl;
 
     out << "</TR></TABLE>>];" << endl;
-    if (title) out << "}" << endl;
 
-    out << endl;
+    if (title.size() != 0)
+        out << "}" << endl;
+
+    to_dot_parent_edge(out);
 }
 
 #endif // TIGHTDB_DEBUG
-
-}

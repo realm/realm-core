@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_GROUP
+
 #include <algorithm>
 #include <fstream>
 
@@ -8,6 +11,7 @@
 
 using namespace std;
 using namespace tightdb;
+
 
 namespace {
 
@@ -21,18 +25,151 @@ TIGHTDB_TABLE_4(TestTableGroup,
 
 } // Anonymous namespace
 
+
+TEST(Group_Unattached)
+{
+    Group group((Group::unattached_tag()));
+    CHECK(!group.is_attached());
+}
+
+
+TEST(Group_OpenFile)
+{
+    File::try_remove("test.tightdb");
+
+    {
+        Group group((Group::unattached_tag()));
+        group.open("test.tightdb", Group::mode_ReadWrite);
+        CHECK(group.is_attached());
+    }
+
+    {
+        Group group((Group::unattached_tag()));
+        group.open("test.tightdb", Group::mode_ReadWriteNoCreate);
+        CHECK(group.is_attached());
+    }
+
+    {
+        Group group((Group::unattached_tag()));
+        group.open("test.tightdb", Group::mode_ReadOnly);
+        CHECK(group.is_attached());
+    }
+
+    File::remove("test.tightdb");
+}
+
+
+TEST(Group_BadFile)
+{
+    File::try_remove("test.tightdb");
+    File::try_remove("test2.tightdb");
+
+    {
+        File file("test.tightdb", File::mode_Append);
+        file.write("foo");
+    }
+
+    {
+        Group group((Group::unattached_tag()));
+        CHECK_THROW(group.open("test.tightdb", Group::mode_ReadOnly), InvalidDatabase);
+        CHECK(!group.is_attached());
+        CHECK_THROW(group.open("test.tightdb", Group::mode_ReadOnly), InvalidDatabase); // Again
+        CHECK(!group.is_attached());
+        CHECK_THROW(group.open("test.tightdb", Group::mode_ReadWrite), InvalidDatabase);
+        CHECK(!group.is_attached());
+        CHECK_THROW(group.open("test.tightdb", Group::mode_ReadWriteNoCreate), InvalidDatabase);
+        CHECK(!group.is_attached());
+        group.open("test2.tightdb", Group::mode_ReadWrite); // This one must work
+        CHECK(group.is_attached());
+    }
+
+    File::remove("test.tightdb");
+    File::remove("test2.tightdb");
+}
+
+
+TEST(Group_OpenBuffer)
+{
+    // Produce a valid buffer
+    UniquePtr<char[]> buffer;
+    size_t buffer_size;
+    {
+        File::try_remove("test.tightdb");
+        {
+            Group group;
+            group.write("test.tightdb");
+        }
+        {
+            File file("test.tightdb");
+            buffer_size = size_t(file.get_size());
+            buffer.reset(static_cast<char*>(malloc(buffer_size)));
+            CHECK(bool(buffer));
+            file.read(buffer.get(), buffer_size);
+        }
+        File::remove("test.tightdb");
+    }
+
+
+    // Keep ownership of buffer
+    {
+        Group group((Group::unattached_tag()));
+        bool take_ownership = false;
+        group.open(BinaryData(buffer.get(), buffer_size), take_ownership);
+        CHECK(group.is_attached());
+    }
+
+    // Pass ownership of buffer
+    {
+        Group group((Group::unattached_tag()));
+        bool take_ownership = true;
+        group.open(BinaryData(buffer.get(), buffer_size), take_ownership);
+        CHECK(group.is_attached());
+        buffer.release();
+    }
+}
+
+TEST(Group_BadBuffer)
+{
+    File::try_remove("test.tightdb");
+
+    // Produce an invalid buffer
+    char buffer[32];
+    for (size_t i=0; i<sizeof buffer; ++i)
+        buffer[i] = char((i+192)%128);
+
+    {
+        Group group((Group::unattached_tag()));
+        bool take_ownership = false;
+        CHECK_THROW(group.open(BinaryData(buffer), take_ownership), InvalidDatabase);
+        CHECK(!group.is_attached());
+        // Check that ownership is not passed on failure during
+        // open. If it was, we would get a bad delete on stack
+        // allocated memory wich would at least be caught by Valgrind.
+        take_ownership = true;
+        CHECK_THROW(group.open(BinaryData(buffer), take_ownership), InvalidDatabase);
+        CHECK(!group.is_attached());
+        // Check that the group is still able to attach to a file,
+        // even after failures.
+        group.open("test.tightdb", Group::mode_ReadWrite);
+        CHECK(group.is_attached());
+    }
+
+    File::remove("test.tightdb");
+}
+
+
 TEST(Group_Size)
 {
     Group g;
-
-    CHECK_EQUAL(true, g.is_empty());
+    CHECK(g.is_attached());
+    CHECK(g.is_empty());
 
     TableRef t = g.get_table("a");
-    CHECK_EQUAL(false, g.is_empty());
+    CHECK(!g.is_empty());
     CHECK_EQUAL(1, g.size());
 
     TableRef t1 = g.get_table("b");
-    CHECK_EQUAL(false, g.is_empty());
+    CHECK(!g.is_empty());
     CHECK_EQUAL(2, g.size());
 }
 
@@ -46,6 +183,46 @@ TEST(Group_GetTable)
     TestTableGroup::Ref t3 = g.get_table<TestTableGroup>("beta");
     TestTableGroup::ConstRef t4 = cg.get_table<TestTableGroup>("beta");
     CHECK_EQUAL(t3, t4);
+}
+
+namespace {
+void setupTable(TestTableGroup::Ref t)
+{
+    t->add("a",  1, true, Wed);
+    t->add("b", 15, true, Wed);
+    t->add("ccc", 10, true, Wed);
+    t->add("dddd", 20, true, Wed);
+}
+}
+
+TEST(Group_Equal)
+{
+    Group g1, g2;
+    TestTableGroup::Ref t1 = g1.get_table<TestTableGroup>("TABLE1");
+    setupTable(t1);
+    TestTableGroup::Ref t2 = g2.get_table<TestTableGroup>("TABLE1");
+    setupTable(t2);
+    CHECK_EQUAL(true, g1 == g2);
+
+    t2->add("hey", 2, false, Thu);
+    CHECK_EQUAL(true, g1 != g2);
+}
+
+TEST(Group_TableAccessorLeftBehind)
+{
+    TableRef table;
+    TableRef subtable;
+    {
+        Group group;
+        table = group.get_table("test");
+        CHECK(table->is_attached());
+        table->add_column(type_Table, "sub");
+        table->add_empty_row();
+        subtable = table->get_subtable(0,0);
+        CHECK(subtable->is_attached());
+    }
+    CHECK(!table->is_attached());
+    CHECK(!subtable->is_attached());
 }
 
 TEST(Group_Invalid1)
@@ -120,6 +297,7 @@ TEST(Group_Read0)
     Group g("table_test.tightdb");
 }
 
+
 TEST(Group_Serialize1)
 {
     // Create group with one table
@@ -138,7 +316,7 @@ TEST(Group_Serialize1)
 
 #ifdef TIGHTDB_DEBUG
     to_disk.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Delete old file if there
     File::try_remove("table_test.tightdb");
@@ -153,10 +331,8 @@ TEST(Group_Serialize1)
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(10, t->size());
 
-#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
     CHECK(*table == *t);
-#endif
 
     // Modify both tables
     table[0].first = "test";
@@ -166,13 +342,14 @@ TEST(Group_Serialize1)
     table->remove(1);
     t->remove(1);
 
-#ifdef TIGHTDB_DEBUG
     // Verify that both changed correctly
     CHECK(*table == *t);
+#ifdef TIGHTDB_DEBUG
     to_disk.Verify();
     from_disk.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
+
 
 TEST(Group_Read1)
 {
@@ -196,7 +373,7 @@ TEST(Group_Serialize2)
 
 #ifdef TIGHTDB_DEBUG
     to_disk.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Delete old file if there
     File::try_remove("table_test.tightdb");
@@ -211,13 +388,14 @@ TEST(Group_Serialize2)
     static_cast<void>(t2);
     static_cast<void>(t1);
 
-#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
     CHECK(*table1 == *t1);
     CHECK(*table2 == *t2);
+
+#ifdef TIGHTDB_DEBUG
     to_disk.Verify();
     from_disk.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Group_Serialize3)
@@ -230,7 +408,7 @@ TEST(Group_Serialize3)
 
 #ifdef TIGHTDB_DEBUG
     to_disk.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Delete old file if there
     File::try_remove("table_test.tightdb");
@@ -243,13 +421,12 @@ TEST(Group_Serialize3)
     TestTableGroup::Ref t = from_disk.get_table<TestTableGroup>("test");
     static_cast<void>(t);
 
-
-#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
     CHECK(*table == *t);
+#ifdef TIGHTDB_DEBUG
     to_disk.Verify();
     from_disk.Verify();
-#endif // TIGHTDB_DEBUG}
+#endif
 }
 
 TEST(Group_Serialize_Mem)
@@ -270,7 +447,7 @@ TEST(Group_Serialize_Mem)
 
 #ifdef TIGHTDB_DEBUG
     to_mem.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Serialize to memory (we now own the buffer)
     BinaryData buffer = to_mem.write_to_mem();
@@ -282,27 +459,25 @@ TEST(Group_Serialize_Mem)
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(10, t->size());
 
-#ifdef TIGHTDB_DEBUG
     // Verify that original values are there
     CHECK(*table == *t);
+#ifdef TIGHTDB_DEBUG
     to_mem.Verify();
     from_mem.Verify();
-#endif //_DEBUG
+#endif
 }
 
 TEST(Group_Close)
 {
-    Group* to_mem = new Group();
-    TestTableGroup::Ref table = to_mem->get_table<TestTableGroup>("test");
+    Group to_mem;
+    TestTableGroup::Ref table = to_mem.get_table<TestTableGroup>("test");
     table->add("",  1, true, Wed);
     table->add("",  2, true, Wed);
 
     // Serialize to memory (we now own the buffer)
-    BinaryData buffer = to_mem->write_to_mem();
+    BinaryData buffer = to_mem.write_to_mem();
 
-    Group* from_mem = new Group(buffer);
-    delete to_mem;
-    delete from_mem;
+    Group from_mem(buffer);
 }
 
 TEST(Group_Serialize_Optimized)
@@ -323,7 +498,7 @@ TEST(Group_Serialize_Optimized)
 
 #ifdef TIGHTDB_DEBUG
     to_mem.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     // Serialize to memory (we now own the buffer)
     BinaryData buffer = to_mem.write_to_mem();
@@ -335,9 +510,7 @@ TEST(Group_Serialize_Optimized)
     CHECK_EQUAL(4, t->get_column_count());
 
     // Verify that original values are there
-#ifdef TIGHTDB_DEBUG
     CHECK(*table == *t);
-#endif
 
     // Add a row with a known (but unique) value
     table->add("search_target", 9, true, Fri);
@@ -348,7 +521,7 @@ TEST(Group_Serialize_Optimized)
 #ifdef TIGHTDB_DEBUG
     to_mem.Verify();
     from_mem.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 }
 
 TEST(Group_Serialize_All)
@@ -359,14 +532,14 @@ TEST(Group_Serialize_All)
 
     table->add_column(type_Int,    "int");
     table->add_column(type_Bool,   "bool");
-    table->add_column(type_Date,   "date");
+    table->add_column(type_DateTime,   "date");
     table->add_column(type_String, "string");
     table->add_column(type_Binary, "binary");
     table->add_column(type_Mixed,  "mixed");
 
     table->insert_int(0, 0, 12);
     table->insert_bool(1, 0, true);
-    table->insert_date(2, 0, 12345);
+    table->insert_datetime(2, 0, 12345);
     table->insert_string(3, 0, "test");
     table->insert_binary(4, 0, BinaryData("binary", 7));
     table->insert_mixed(5, 0, false);
@@ -383,7 +556,7 @@ TEST(Group_Serialize_All)
     CHECK_EQUAL(1, t->size());
     CHECK_EQUAL(12, t->get_int(0, 0));
     CHECK_EQUAL(true, t->get_bool(1, 0));
-    CHECK_EQUAL(time_t(12345), t->get_date(2, 0));
+    CHECK_EQUAL(time_t(12345), t->get_datetime(2, 0));
     CHECK_EQUAL("test", t->get_string(3, 0));
     CHECK_EQUAL(7, t->get_binary(4, 0).size());
     CHECK_EQUAL("binary", t->get_binary(4, 0).data());
@@ -403,13 +576,13 @@ TEST(Group_Persist)
     TableRef table = db.get_table("test");
     table->add_column(type_Int,    "int");
     table->add_column(type_Bool,   "bool");
-    table->add_column(type_Date,   "date");
+    table->add_column(type_DateTime,   "date");
     table->add_column(type_String, "string");
     table->add_column(type_Binary, "binary");
     table->add_column(type_Mixed,  "mixed");
     table->insert_int(0, 0, 12);
     table->insert_bool(1, 0, true);
-    table->insert_date(2, 0, 12345);
+    table->insert_datetime(2, 0, 12345);
     table->insert_string(3, 0, "test");
     table->insert_binary(4, 0, BinaryData("binary", 7));
     table->insert_mixed(5, 0, false);
@@ -420,13 +593,13 @@ TEST(Group_Persist)
 
 #ifdef TIGHTDB_DEBUG
     db.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     CHECK_EQUAL(6, table->get_column_count());
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL(time_t(12345), table->get_date(2, 0));
+    CHECK_EQUAL(time_t(12345), table->get_datetime(2, 0));
     CHECK_EQUAL("test", table->get_string(3, 0));
     CHECK_EQUAL(7, table->get_binary(4, 0).size());
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
@@ -441,13 +614,13 @@ TEST(Group_Persist)
 
 #ifdef TIGHTDB_DEBUG
     db.Verify();
-#endif // TIGHTDB_DEBUG
+#endif
 
     CHECK_EQUAL(6, table->get_column_count());
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(12, table->get_int(0, 0));
     CHECK_EQUAL(true, table->get_bool(1, 0));
-    CHECK_EQUAL(time_t(12345), table->get_date(2, 0));
+    CHECK_EQUAL(time_t(12345), table->get_datetime(2, 0));
     CHECK_EQUAL("Changed!", table->get_string(3, 0));
     CHECK_EQUAL(7, table->get_binary(4, 0).size());
     CHECK_EQUAL("binary", table->get_binary(4, 0).data());
@@ -848,35 +1021,35 @@ TEST(Group_InvalidateTables)
     {
         Group group;
         table = group.get_table<TestTableGroup2>("foo");
-        CHECK(table->is_valid());
+        CHECK(table->is_attached());
         table->add(Mixed::subtable_tag(), 0, 0);
-        CHECK(table->is_valid());
+        CHECK(table->is_attached());
         subtable1 = table[0].first.get_subtable();
-        CHECK(table->is_valid());
+        CHECK(table->is_attached());
         CHECK(subtable1);
-        CHECK(subtable1->is_valid());
+        CHECK(subtable1->is_attached());
         subtable2 = table[0].second;
-        CHECK(table->is_valid());
-        CHECK(subtable1->is_valid());
+        CHECK(table->is_attached());
+        CHECK(subtable1->is_attached());
         CHECK(subtable2);
-        CHECK(subtable2->is_valid());
+        CHECK(subtable2->is_attached());
         subtable3 = table[0].third;
-        CHECK(table->is_valid());
-        CHECK(subtable1->is_valid());
-        CHECK(subtable2->is_valid());
+        CHECK(table->is_attached());
+        CHECK(subtable1->is_attached());
+        CHECK(subtable2->is_attached());
         CHECK(subtable3);
-        CHECK(subtable3->is_valid());
+        CHECK(subtable3->is_attached());
         subtable3->add("alpha", 79542, true,  Wed);
         subtable3->add("beta",     97, false, Mon);
-        CHECK(table->is_valid());
-        CHECK(subtable1->is_valid());
-        CHECK(subtable2->is_valid());
-        CHECK(subtable3->is_valid());
+        CHECK(table->is_attached());
+        CHECK(subtable1->is_attached());
+        CHECK(subtable2->is_attached());
+        CHECK(subtable3->is_attached());
     }
-    CHECK(!table->is_valid());
-    CHECK(!subtable1->is_valid());
-    CHECK(!subtable2->is_valid());
-    CHECK(!subtable3->is_valid());
+    CHECK(!table->is_attached());
+    CHECK(!subtable1->is_attached());
+    CHECK(!subtable2->is_attached());
+    CHECK(!subtable3->is_attached());
 }
 
 TEST(Group_toJSON)
@@ -884,12 +1057,11 @@ TEST(Group_toJSON)
     Group g;
     TestTableGroup::Ref table = g.get_table<TestTableGroup>("test");
 
-    table->add("jeff",     1, true, Wed);
-    table->add("jim",      1, true, Wed);
-    std::ostringstream ss;
-    ss.sync_with_stdio(false); // for performance
-    g.to_json(ss);
-    const std::string str = ss.str();
+    table->add("jeff", 1, true, Wed);
+    table->add("jim",  1, true, Wed);
+    ostringstream out;
+    g.to_json(out);
+    string str = out.str();
     CHECK(str.length() > 0);
     CHECK_EQUAL("{\"test\":[{\"first\":\"jeff\",\"second\":1,\"third\":true,\"fourth\":2},{\"first\":\"jim\",\"second\":1,\"third\":true,\"fourth\":2}]}", str);
 }
@@ -899,12 +1071,11 @@ TEST(Group_toString)
     Group g;
     TestTableGroup::Ref table = g.get_table<TestTableGroup>("test");
 
-    table->add("jeff",     1, true, Wed);
-    table->add("jim",      1, true, Wed);
-    std::ostringstream ss;
-    ss.sync_with_stdio(false); // for performance
-    g.to_string(ss);
-    const std::string str = ss.str();
+    table->add("jeff", 1, true, Wed);
+    table->add("jim",  1, true, Wed);
+    ostringstream out;
+    g.to_string(out);
+    string str = out.str();
     CHECK(str.length() > 0);
     CHECK_EQUAL("     tables     rows  \n   0 test       2     \n", str.c_str());
 }
@@ -926,19 +1097,19 @@ TEST(Group_Index_String)
     table->column().first.set_index();
     CHECK(table->column().first.has_index());
 
-    const size_t r1 = table->column().first.find_first("jimmi");
+    size_t r1 = table->column().first.find_first("jimmi");
     CHECK_EQUAL(not_found, r1);
 
-    const size_t r2 = table->column().first.find_first("jeff");
-    const size_t r3 = table->column().first.find_first("jim");
-    const size_t r4 = table->column().first.find_first("jimbo");
-    const size_t r5 = table->column().first.find_first("johnny");
+    size_t r2 = table->column().first.find_first("jeff");
+    size_t r3 = table->column().first.find_first("jim");
+    size_t r4 = table->column().first.find_first("jimbo");
+     size_t r5 = table->column().first.find_first("johnny");
     CHECK_EQUAL(0, r2);
     CHECK_EQUAL(1, r3);
     CHECK_EQUAL(5, r4);
     CHECK_EQUAL(6, r5);
 
-    const size_t c1 = table->column().first.count("jennifer");
+    size_t c1 = table->column().first.count("jennifer");
     CHECK_EQUAL(2, c1);
 
     // Serialize to memory (we now own the buffer)
@@ -952,19 +1123,19 @@ TEST(Group_Index_String)
 
     CHECK(t->column().first.has_index());
 
-    const size_t m1 = table->column().first.find_first("jimmi");
+    size_t m1 = table->column().first.find_first("jimmi");
     CHECK_EQUAL(not_found, m1);
 
-    const size_t m2 = t->column().first.find_first("jeff");
-    const size_t m3 = t->column().first.find_first("jim");
-    const size_t m4 = t->column().first.find_first("jimbo");
-    const size_t m5 = t->column().first.find_first("johnny");
+    size_t m2 = t->column().first.find_first("jeff");
+    size_t m3 = t->column().first.find_first("jim");
+    size_t m4 = t->column().first.find_first("jimbo");
+    size_t m5 = t->column().first.find_first("johnny");
     CHECK_EQUAL(0, m2);
     CHECK_EQUAL(1, m3);
     CHECK_EQUAL(5, m4);
     CHECK_EQUAL(6, m5);
 
-    const size_t m6 = t->column().first.count("jennifer");
+    size_t m6 = t->column().first.count("jennifer");
     CHECK_EQUAL(2, m6);
 }
 
@@ -981,7 +1152,7 @@ TEST(Group_ToDot)
     Spec s = table->get_spec();
     s.add_column(type_Int,    "int");
     s.add_column(type_Bool,   "bool");
-    s.add_column(type_Date,   "date");
+    s.add_column(type_DateTime,   "date");
     s.add_column(type_String, "string");
     s.add_column(type_String, "string_long");
     s.add_column(type_String, "string_enum"); // becomes ColumnStringEnum
@@ -990,15 +1161,15 @@ TEST(Group_ToDot)
     Spec sub = s.add_subtable_column("tables");
     sub.add_column(type_Int,  "sub_first");
     sub.add_column(type_String, "sub_second");
-    table->UpdateFromSpec(s.GetRef());
+    table->UpdateFromSpec(s.get_ref());
 
     // Add some rows
     for (size_t i = 0; i < 15; ++i) {
         table->insert_int(0, i, i);
         table->insert_bool(1, i, (i % 2 ? true : false));
-        table->insert_date(2, i, 12345);
+        table->insert_datetime(2, i, 12345);
 
-        std::stringstream ss;
+        stringstream ss;
         ss << "string" << i;
         table->insert_string(3, i, ss.str().c_str());
 
@@ -1043,7 +1214,7 @@ TEST(Group_ToDot)
             Spec s = subtable->get_spec();
             s.add_column(type_Int,    "first");
             s.add_column(type_String, "second");
-            subtable->UpdateFromSpec(s.GetRef());
+            subtable->UpdateFromSpec(s.get_ref());
 
             subtable->insert_int(0, 0, 42);
             subtable->insert_string(1, 0, "meaning");
@@ -1062,17 +1233,20 @@ TEST(Group_ToDot)
 
 #if 1
     // Write array graph to cout
-    std::stringstream ss;
+    stringstream ss;
     mygroup.ToDot(ss);
     cout << ss.str() << endl;
 #endif
 
     // Write array graph to file in dot format
-    std::ofstream fs("tightdb_graph.dot", ios::out | ios::binary);
-    if (!fs.is_open()) cout << "file open error " << strerror << endl;
+    ofstream fs("tightdb_graph.dot", ios::out | ios::binary);
+    if (!fs.is_open())
+        cout << "file open error " << strerror << endl;
     mygroup.to_dot(fs);
     fs.close();
 }
 
-#endif //TIGHTDB_TO_DOT
+#endif // TIGHTDB_TO_DOT
 #endif // TIGHTDB_DEBUG
+
+#endif // TEST_GROUP

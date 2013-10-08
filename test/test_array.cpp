@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_ARRAY
+
 #include <map>
 #include <string>
 #include <vector>
@@ -21,7 +24,7 @@ struct db_setup_array {
 
 Array db_setup_array::c;
 
-void hasZeroByte(int64_t value, size_t reps)
+void has_zero_byte(int64_t value, size_t reps)
 {
     Array a;
     Array r;
@@ -795,18 +798,18 @@ TEST(findallint7)
     r.destroy();
 }
 
-// Tests the case where a value does *not* exist in one entire 64-bit chunk (triggers the 'if (hasZeroByte) break;' condition)
-TEST(FindhasZeroByte)
+// Tests the case where a value does *not* exist in one entire 64-bit chunk (triggers the 'if (has_zero_byte()) break;' condition)
+TEST(FindHasZeroByte)
 {
     // we want at least 1 entire 64-bit chunk-test, and we also want a remainder-test, so we chose n to be a prime > 64
     size_t n = 73;
-    hasZeroByte(1, n); // width = 1
-    hasZeroByte(3, n); // width = 2
-    hasZeroByte(13, n); // width = 4
-    hasZeroByte(100, n); // 8
-    hasZeroByte(10000, n); // 16
-    hasZeroByte(100000, n); // 32
-    hasZeroByte(8000000000LL, n); // 64
+    has_zero_byte(1, n); // width = 1
+    has_zero_byte(3, n); // width = 2
+    has_zero_byte(13, n); // width = 4
+    has_zero_byte(100, n); // 8
+    has_zero_byte(10000, n); // 16
+    has_zero_byte(100000, n); // 32
+    has_zero_byte(8000000000LL, n); // 64
 }
 
 // New find test for SSE search, to trigger partial finds (see FindSSE()) before and after the aligned data area
@@ -1324,7 +1327,7 @@ TEST(ArraySort2)
     Array a;
 
     for (size_t t = 0; t < 400; t++)
-        a.add((int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand() * (int64_t)rand());
+        a.add(int64_t(rand()) * int64_t(rand()) * int64_t(rand()) * int64_t(rand()) * int64_t(rand()) * int64_t(rand()) * int64_t(rand()) * int64_t(rand()));
 
     size_t orig_size = a.size();
     a.sort();
@@ -1408,7 +1411,8 @@ TEST(ArrayCopy)
     CHECK(d.has_refs());
     CHECK_EQUAL(1, d.size());
 
-    const Array e = d.GetSubArray(0);
+    Array e(d.get_alloc());
+    e.init_from_ref(to_ref(d.get(0)));
     CHECK_EQUAL(5, e.size());
     CHECK_EQUAL(0, e.get(0));
     CHECK_EQUAL(1, e.get(1));
@@ -1428,9 +1432,8 @@ TEST(ArrayCount)
     Array a;
 
     // 0 bit width
-    for (size_t i = 0; i < 150; ++i) {
+    for (size_t i = 0; i < 150; ++i)
         a.add(0);
-    }
     const size_t c1 = a.count(0);
     const size_t c2 = a.count(1);
     CHECK_EQUAL(150, c1);
@@ -1510,3 +1513,5 @@ TEST(ArrayCount)
     // Clean-up
     a.destroy();
 }
+
+#endif // TEST_ARRAY

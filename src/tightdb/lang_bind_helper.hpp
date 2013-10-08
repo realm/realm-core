@@ -94,7 +94,7 @@ public:
     /// modification is only done through it when it is not shared.
     static Spec& get_spec(Table&) TIGHTDB_NOEXCEPT;
 
-    /// Returns the name of the spaceified data type as follows:
+    /// Returns the name of the specified data type as follows:
     ///
     /// <pre>
     ///
@@ -104,7 +104,7 @@ public:
     ///   type_Double  ->  "double"
     ///   type_String  ->  "string"
     ///   type_Binary  ->  "binary"
-    ///   type_Date    ->  "date"
+    ///   type_DateTime    ->  "date"
     ///   type_Table   ->  "table"
     ///   type_Mixed   ->  "mixed"
     ///
@@ -119,7 +119,7 @@ inline Table* LangBindHelper::new_table()
 {
     Allocator& alloc = Allocator::get_default();
     std::size_t ref = Table::create_empty_table(alloc); // Throws
-    Table* const table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
+    Table* const table = new Table(Table::ref_count_tag(), alloc, ref, 0, 0); // Throws
     table->bind_ref();
     return table;
 }
@@ -128,7 +128,7 @@ inline Table* LangBindHelper::copy_table(const Table& t)
 {
     Allocator& alloc = Allocator::get_default();
     std::size_t ref = t.clone(alloc); // Throws
-    Table* const table = new Table(Table::RefCountTag(), alloc, ref, 0, 0); // Throws
+    Table* const table = new Table(Table::ref_count_tag(), alloc, ref, 0, 0); // Throws
     table->bind_ref();
     return table;
 }
@@ -176,7 +176,8 @@ inline Table* LangBindHelper::get_table_ptr(Group* grp, StringData name)
 
 inline Table* LangBindHelper::get_table_ptr(Group* grp, StringData name, bool& was_created)
 {
-    Table* subtab = grp->get_table_ptr(name, was_created);
+    Group::SpecSetter spec_setter = 0; // Do not add any columns
+    Table* subtab = grp->get_table_ptr(name, spec_setter, was_created);
     subtab->bind_ref();
     return subtab;
 }
@@ -219,7 +220,7 @@ inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_nd
 
 inline Spec& LangBindHelper::get_spec(Table& t) TIGHTDB_NOEXCEPT
 {
-    return t.m_spec_set;
+    return t.m_spec;
 }
 
 

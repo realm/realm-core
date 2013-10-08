@@ -34,6 +34,7 @@ public:
                 Allocator&) TIGHTDB_NOEXCEPT;
     ArrayBinary(ref_type, ArrayParent*, std::size_t ndx_in_parent,
                 Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
+    ~ArrayBinary() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     bool is_empty() const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT;
@@ -53,11 +54,11 @@ public:
     /// slower.
     static BinaryData get(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
 
-    ref_type btree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term,
-                               TreeInsertBase& state);
+    ref_type bptree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term,
+                                TreeInsertBase& state);
 
 #ifdef TIGHTDB_DEBUG
-    void to_dot(std::ostream&, const char* title = 0) const;
+    void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
 #endif
 
 private:

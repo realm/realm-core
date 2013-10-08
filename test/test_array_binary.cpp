@@ -1,3 +1,6 @@
+#include "testsettings.hpp"
+#ifdef TEST_ARRAY_BINARY
+
 #include <UnitTest++.h>
 #include <tightdb/array_binary.hpp>
 
@@ -193,3 +196,5 @@ TEST_FIXTURE(db_setup_binary, ArrayBinary_Destroy)
     // clean up (ALWAYS PUT THIS LAST)
     c.destroy();
 }
+
+#endif // TEST_ARRAY_BINARY

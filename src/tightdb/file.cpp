@@ -182,6 +182,9 @@ string make_temp_dir()
 }
 
 
+} // namespace tightdb
+
+
 void File::open(const string& path, AccessMode a, CreateMode c, int flags)
 {
     TIGHTDB_ASSERT(!is_attached());
@@ -467,11 +470,31 @@ void File::resize(SizeType size)
 }
 
 
-void File::alloc(SizeType offset, size_t size)
+void File::prealloc(SizeType offset, size_t size)
 {
     TIGHTDB_ASSERT(is_attached());
 
 #if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+
+    prealloc_if_supported(offset, size);
+
+#else // Non-atomic fallback
+
+    if (int_add_with_overflow_detect(offset, size))
+        throw runtime_error("File size overflow");
+    if (get_size() < offset) resize(offset);
+
+#endif
+}
+
+
+void File::prealloc_if_supported(SizeType offset, size_t size)
+{
+    TIGHTDB_ASSERT(is_attached());
+
+#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+
+    TIGHTDB_ASSERT(is_prealloc_supported());
 
     off_t size2;
     if (int_cast_with_overflow_detect(size, size2))
@@ -485,8 +508,6 @@ void File::alloc(SizeType offset, size_t size)
         default:     throw runtime_error(msg);
     }
 
-#else // Fallback
-
     // FIXME: OS X does not have any version of fallocate, but see
     // http://stackoverflow.com/questions/11497567/fallocate-command-equivalent-in-os-x
 
@@ -495,10 +516,23 @@ void File::alloc(SizeType offset, size_t size)
     // just like posix_fallocate(). The advantage would be that it
     // then becomes an atomic operation (probably).
 
-    if (int_add_with_overflow_detect(offset, size))
-        throw runtime_error("File size overflow");
-    if (get_size() < offset) resize(offset);
+#else
 
+    static_cast<void>(offset);
+    static_cast<void>(size);
+
+    TIGHTDB_ASSERT(!is_prealloc_supported());
+
+#endif
+}
+
+
+bool File::is_prealloc_supported()
+{
+#if _POSIX_C_SOURCE >= 200112L // POSIX.1-2001 version
+    return true;
+#else
+    return false;
 #endif
 }
 
@@ -796,7 +830,7 @@ bool File::try_remove(const string& path)
     if (::unlink(path.c_str()) == 0) return true;
 #endif
     int err = errno; // Eliminate any risk of clobbering
-    string msg = get_errno_msg("open() failed: ", err);
+    string msg = get_errno_msg("unlink() failed: ", err);
     switch (err) {
         case EACCES:
         case EROFS:
@@ -886,6 +920,3 @@ bool File::is_removed() const
 
 #endif
 }
-
-
-} // namespace tightdb

@@ -1,10 +1,13 @@
+#include <iostream>
+#include <iomanip>
+
 #include <tightdb/column_mixed.hpp>
 
 using namespace std;
+using namespace tightdb;
 
-namespace tightdb {
 
-ColumnMixed::~ColumnMixed()
+ColumnMixed::~ColumnMixed() TIGHTDB_NOEXCEPT
 {
     delete m_types;
     delete m_refs;
@@ -12,21 +15,16 @@ ColumnMixed::~ColumnMixed()
     delete m_array;
 }
 
-void ColumnMixed::destroy()
-{
-    if (m_array != 0)
-        m_array->destroy();
-}
 
-void ColumnMixed::update_from_parent() TIGHTDB_NOEXCEPT
+void ColumnMixed::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
-    if (!m_array->update_from_parent())
+    if (!m_array->update_from_parent(old_baseline))
         return;
 
-    m_types->update_from_parent();
-    m_refs->update_from_parent();
+    m_types->update_from_parent(old_baseline);
+    m_refs->update_from_parent(old_baseline);
     if (m_data)
-        m_data->update_from_parent();
+        m_data->update_from_parent(old_baseline);
 }
 
 
@@ -100,13 +98,16 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType new_type)
                 // it to avoid having to adjust refs to following items
                 // FIXME: this is a leak. We should adjust
                 size_t data_ndx = size_t(uint64_t(m_refs->get(ndx)) >> 1);
-                if (data_ndx == m_data->size()-1)
-                    m_data->erase(data_ndx);
-                else
+                if (data_ndx == m_data->size()-1) {
+                    bool is_last = true;
+                    m_data->erase(data_ndx, is_last);
+                }
+                else {
                     // FIXME: But this will lead to unbounded in-file
                     // leaking in for(;;) { insert_binary(i, ...);
                     // erase(i); }
                     m_data->set(data_ndx, BinaryData());
+                }
                 break;
             }
             case mixcol_Table: {
@@ -125,22 +126,23 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType new_type)
     m_refs->set(ndx, 0);
 }
 
-void ColumnMixed::erase(size_t ndx)
+void ColumnMixed::erase(size_t ndx, bool is_last)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
-    invalidate_subtables();
+
+    detach_subtable_accessors();
 
     // Remove refs or binary data
     clear_value(ndx, mixcol_Int);
 
-    m_types->erase(ndx);
-    m_refs->erase(ndx);
+    m_types->erase(ndx, is_last);
+    m_refs->erase(ndx, is_last);
 }
 
 void ColumnMixed::move_last_over(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx+1 < size());
-    invalidate_subtables();
+    detach_subtable_accessors();
 
     // Remove refs or binary data
     clear_value(ndx, mixcol_Int);
@@ -151,7 +153,7 @@ void ColumnMixed::move_last_over(size_t ndx)
 
 void ColumnMixed::clear()
 {
-    invalidate_subtables();
+    detach_subtable_accessors();
     m_types->clear();
     m_refs->clear();
     if (m_data)
@@ -176,12 +178,10 @@ void ColumnMixed::fill(size_t count)
     // Fill column with default values
     // TODO: this is a very naive approach
     // we could speedup by creating full nodes directly
-    for (size_t i = 0; i < count; ++i) {
+    for (size_t i = 0; i < count; ++i)
         m_types->insert(i, mixcol_Int);
-    }
-    for (size_t i = 0; i < count; ++i) {
+    for (size_t i = 0; i < count; ++i)
         m_refs->insert(i, 1); // 1 is zero shifted one and low bit set;
-    }
 
 #ifdef TIGHTDB_DEBUG
     Verify();
@@ -192,7 +192,7 @@ void ColumnMixed::fill(size_t count)
 void ColumnMixed::set_string(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
-    invalidate_subtables();
+    detach_subtable_accessors();
     init_data_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
@@ -226,7 +226,7 @@ void ColumnMixed::set_string(size_t ndx, StringData value)
 void ColumnMixed::set_binary(size_t ndx, BinaryData value)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
-    invalidate_subtables();
+    detach_subtable_accessors();
     init_data_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
@@ -268,40 +268,45 @@ bool ColumnMixed::compare_mixed(const ColumnMixed& c) const
         if (c.get_type(i) != type)
             return false;
         switch (type) {
-        case type_Int:
-            if (get_int(i) != c.get_int(i)) return false;
-            break;
-        case type_Bool:
-            if (get_bool(i) != c.get_bool(i)) return false;
-            break;
-        case type_Date:
-            if (get_date(i) != c.get_date(i)) return false;
-            break;
-        case type_Float:
-            if (get_float(i) != c.get_float(i)) return false;
-            break;
-        case type_Double:
-            if (get_double(i) != c.get_double(i)) return false;
-            break;
-        case type_String:
-            if (get_string(i) != c.get_string(i)) return false;
-            break;
-        case type_Binary:
-            if (get_binary(i) != c.get_binary(i)) return false;
-            break;
-        case type_Table: {
+            case type_Int:
+                if (get_int(i) != c.get_int(i)) return false;
+                break;
+            case type_Bool:
+                if (get_bool(i) != c.get_bool(i)) return false;
+                break;
+            case type_DateTime:
+                if (get_datetime(i) != c.get_datetime(i)) return false;
+                break;
+            case type_Float:
+                if (get_float(i) != c.get_float(i)) return false;
+                break;
+            case type_Double:
+                if (get_double(i) != c.get_double(i)) return false;
+                break;
+            case type_String:
+                if (get_string(i) != c.get_string(i)) return false;
+                break;
+            case type_Binary:
+                if (get_binary(i) != c.get_binary(i)) return false;
+                break;
+            case type_Table: {
                 ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
                 ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref();
                 if (*t1 != *t2)
                     return false;
+                break;
             }
-            break;
-        case type_Mixed:
-            TIGHTDB_ASSERT(false);
-            break;
+            case type_Mixed:
+                TIGHTDB_ASSERT(false);
+                break;
         }
     }
     return true;
+}
+
+void ColumnMixed::do_detach_subtable_accessors() TIGHTDB_NOEXCEPT
+{
+    detach_subtable_accessors();
 }
 
 
@@ -334,18 +339,21 @@ void ColumnMixed::Verify() const
 void ColumnMixed::to_dot(ostream& out, StringData title) const
 {
     ref_type ref = get_ref();
-
-    out << "subgraph cluster_columnmixed" << ref << " {" << endl;
-    out << " label = \"ColumnMixed";
-    if (0 < title.size())
+    out << "subgraph cluster_mixed_column" << ref << " {" << endl;
+    out << " label = \"Mixed column";
+    if (title.size() != 0)
         out << "\\n'" << title << "'";
     out << "\";" << endl;
 
     m_array->to_dot(out, "mixed_top");
+    m_types->to_dot(out, "types");
+    m_refs->to_dot(out, "refs");
+    if (m_array->size() > 2)
+        m_data->to_dot(out, "data");
 
     // Write sub-tables
-    size_t count = size();
-    for (size_t i = 0; i < count; ++i) {
+    size_t n = size();
+    for (size_t i = 0; i != n; ++i) {
         MixedColType type = MixedColType(m_types->get(i));
         if (type != mixcol_Table)
             continue;
@@ -353,16 +361,12 @@ void ColumnMixed::to_dot(ostream& out, StringData title) const
         subtable->to_dot(out);
     }
 
-    m_types->to_dot(out, "types");
-    m_refs->to_dot(out, "refs");
-
-    if (m_array->size() > 2) {
-        m_data->to_dot(out, "data");
-    }
-
     out << "}" << endl;
 }
 
-#endif // TIGHTDB_DEBUG
+void ColumnMixed::dump_node_structure(ostream& out, int level) const
+{
+    m_types->dump_node_structure(out, level); // FIXME: How to do this?
+}
 
-} // namespace tightdb
+#endif // TIGHTDB_DEBUG
