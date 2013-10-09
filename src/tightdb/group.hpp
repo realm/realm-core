@@ -234,6 +234,8 @@ public:
     ///
     /// \tparam T An instance of the BasicTable<> class template.
     TableRef      get_table(StringData name);
+    TableRef      get_table(StringData name, bool& was_created);
+
     ConstTableRef get_table(StringData name) const;
     template<class T> typename T::Ref      get_table(StringData name);
     template<class T> typename T::ConstRef get_table(StringData name) const;
@@ -551,6 +553,12 @@ inline TableRef Group::get_table(StringData name)
     return get_table_ptr(name)->get_table_ref();
 }
 
+inline TableRef Group::get_table(StringData name, bool& was_created)
+{
+    SpecSetter spec_setter = 0;
+    return get_table_ptr(name, spec_setter, was_created)->get_table_ref();
+}
+
 inline ConstTableRef Group::get_table(StringData name) const
 {
     TIGHTDB_ASSERT(has_table(name));
@@ -586,7 +594,7 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
     // not be included, as it is not needed in the streamed format.
     std::size_t names_pos  = m_table_names.write(out); // Throws
     std::size_t tables_pos = m_tables.write(out); // Throws
-    uint64_t top_pos = out.get_pos();
+    std::size_t top_pos = out.get_pos();
 
     // Produce a preliminary version of the top array whose
     // representation is guaranteed to be able to hold the final file
@@ -606,7 +614,7 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
     // Finalize the top array by adding the projected final file size
     // to it
     std::size_t top_byte_size = top.get_byte_size();
-    std::size_t final_file_size = top_pos + top_byte_size;//FIXME: VS2012  warning C4244: 'initializing' : conversion from 'uint64_t' to 'size_t', possible loss of data
+    std::size_t final_file_size = top_pos + top_byte_size;
     // FIXME: Dangerous cast: unsigned -> signed
     top.set(2, 1 + 2*final_file_size);
 

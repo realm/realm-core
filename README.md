@@ -104,6 +104,7 @@ The following programs are installed:
     /usr/local/bin/tightdbd-dbg
     /usr/local/bin/tightdb-config
     /usr/local/bin/tightdb-config-dbg
+    /usr/local/bin/tightdb-import
 
 The first two are used transparently by the TightDB library when
 `async` transactions are enabled. The two `config` programs provide
@@ -113,6 +114,9 @@ Clang, that are mostly command line compatible with GCC. Here is an
 example:
 
     g++  my_app.cpp  `tightdb-config --cflags --libs`
+
+The tightdb-import tool is a CSV-file importer that lets you convert
+comma separated value-files to TightDB format. 
 
 After building, you might want to see exactly what will be installed,
 without actually installing anything. This can be done as follows:

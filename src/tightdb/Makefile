@@ -1,7 +1,3 @@
-lib_LIBRARIES = libtightdb.a
-DEV_PROGRAMS = tightdb-config
-bin_PROGRAMS = tightdb-import
-
 # Temporary hack due to public dependency on query_engine.hpp in
 # Lasses new "query expressions" implementation.
 INST_HEADERS = $(wildcard *.h *.hpp)
@@ -15,7 +11,7 @@ INST_HEADERS = $(wildcard *.h *.hpp)
 #query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h replication.hpp
 
 lib_LIBRARIES = libtightdb.a
-bin_PROGRAMS  = tightdbd
+bin_PROGRAMS  = tightdbd tightdb-import
 DEV_PROGRAMS = tightdb-config
 
 libtightdb_a_SOURCES = terminate.cpp string_buffer.cpp file.cpp thread.cpp utf8.cpp \
