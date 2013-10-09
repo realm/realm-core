@@ -8,6 +8,9 @@ SUMMARY    : &g_typed_query_intro_summary
              Query your TightDB table.
 DESCR      : &g_typed_query_intro_descr
              >
+             NOTE: The current documentation of Typed Query is under construction, 
+             and not completely correct yet.
+
              Query objects are used to build up queries. A query is tied to a
              {@link class_typed_table}. The typed query class is used in conjunction with
              {@link class_typed_table}.

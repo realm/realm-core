@@ -33,7 +33,7 @@ DESCR      : &g_dyn_query_intro_descr
              Alternatively, a query can result in a {@link class_dyn_tableview} which can be further
              queried.
 SEE        : &g_dyn_query_intro_see
-             See also the {@link g_typed_query_class} class which is used with typed tables.
+             See also the {@link class_typed_query} class which is used with typed tables.
 EXAMPLES   :
 - DESCR:
   CODE: ex_cpp_dyn_query_intro
@@ -264,7 +264,7 @@ CATEGORIES :
       - NAME   : to
         TYPES  : [int64_t, float, double, DateTime]
         DESCR  : &g_dyn_query_between_parm2_descr
-                 Highest value of range (inclusive)
+                 Highest value of range (inclusive).
       RETURN:
         TYPES  : Query&
         DESCR  : *g_dyn_query_return_query_object_descr
@@ -350,7 +350,7 @@ CATEGORIES :
         DESCR  : *g_dyn_query_column_index_descr
       - NAME   : value
         TYPES  : [StringData, BinaryData]
-        DESCR  : The value
+        DESCR  : The value.
       - NAME   : case_sensitive
         TYPES  : bool
         DESCR  : *g_dyn_query_case_sensitive_descr

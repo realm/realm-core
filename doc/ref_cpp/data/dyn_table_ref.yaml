@@ -41,7 +41,6 @@ DESCR      : &g_dyn_table_intro_descr
              with a column index which is of Boolean type - it must be of 'String'
              type and so forth.
 
-
 SEE        : &g_dyn_table_intro_see
              >
              Besides the dynamic table described here, {@link class_typed_table} are preferred
@@ -401,8 +400,9 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_add_empty_row_summary
                  Append empty rows.
       DESCR    : &g_dyn_table_add_empty_row_descr
-                 This method adds one or more empty rows at the end of the table.
+                 This method adds one or more empty rows at the end of the table. 
                  The default cell values are 0, null, or "", as appropriate to the column types.
+                 The table is required to have at least one column.
       SIGNATURE: |
                  void add_empty_row(size_t num_rows = 1)
       PARAMS:
@@ -419,6 +419,7 @@ CATEGORIES :
                  This method inserts one or more empty rows with default values at a given position.
                  The old rows will be shifted downwards i.e., the row numbers will be incremented.
                  The default cell values are 0, 0.0, null, or "", as appropriate to the column types.
+                 The table is required to have at least one column.
       SIGNATURE: |
                  void insert_empty_row(size_t row_ndx, size_t num_rows = 1)
       PARAMS:
