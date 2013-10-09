@@ -886,6 +886,9 @@ const ColumnMixed& Table::get_column_mixed(size_t ndx) const TIGHTDB_NOEXCEPT
 size_t Table::add_empty_row(size_t num_rows)
 {
     size_t n = get_column_count();
+
+    TIGHTDB_ASSERT(n > 0);
+
     for (size_t i = 0; i != n; ++i) {
         ColumnBase& column = get_column_base(i);
         for (size_t j=0; j<num_rows; ++j) {
