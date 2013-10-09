@@ -142,6 +142,11 @@ public:
     /// together with create_Must results in undefined behavior.
     void open(const std::string& path, AccessMode, CreateMode, int flags);
 
+    // Same as open(path, access_ReadWrite, create_Auto, 0), 
+    // except that it returns an indication of whether the file was
+    // created, or an existing file was opened.
+    void open(const std::string& path, bool& was_created);
+
     /// Read data into the specified buffer and return the number of
     /// bytes read. If the returned number of bytes is less than \a
     /// size, then the end of the file has been reached.
@@ -412,6 +417,7 @@ private:
 #endif
 
     bool lock(bool exclusive, bool non_blocking);
+    void open_internal(const std::string& path, AccessMode, CreateMode, int flags, bool* success);
 
     struct MapBase {
         void* m_addr;
@@ -625,6 +631,29 @@ inline void File::open(const std::string& path, Mode m)
         case mode_Append: flags = flag_Append;                   break;
     }
     open(path, a, c, flags);
+}
+
+inline void File::open(const std::string& path, AccessMode am, CreateMode cm, int flags)
+{
+    open_internal(path, am, cm, flags, NULL);
+}
+
+
+inline void File::open(const std::string& path, bool& was_created)
+{
+    while (1) {
+        bool success;
+        open_internal(path, access_ReadWrite, create_Must, 0, &success);
+        if (success) {
+            was_created = true;
+            return;
+        }
+        open_internal(path, access_ReadWrite, create_Never, 0, &success);
+        if (success) {
+            was_created = false;
+            return;
+        }
+    }
 }
 
 inline bool File::is_attached() const TIGHTDB_NOEXCEPT
