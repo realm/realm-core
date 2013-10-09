@@ -233,10 +233,9 @@ void SharedGroup::open(const string& path, bool no_create_file,
         must_retry = false;
 
         // Open shared coordination buffer - non-excepting approach
-        File::OpenStatus open_status;
 
-        m_file.open(m_file_path, File::access_ReadWrite, File::create_Must, 0, &open_status);
-        if (open_status == File::OpenOk) {
+        m_file.open(m_file_path, need_init);
+        if (need_init) {
             info_size = sizeof (SharedInfo);
             // Make sure to initialize the file in such a way, that when it reaches the
             // size of SharedInfo, it contains just zeroes.
@@ -244,11 +243,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
             std::fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
             m_file.write(empty_buf, info_size);
             need_init = true;
-        }
-        else {
-
-            // if this one throws, just propagate it:
-            m_file.open(m_file_path, File::access_ReadWrite, File::create_Never, 0);
         }
 
         File::CloseGuard fcg(m_file);

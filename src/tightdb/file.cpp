@@ -185,7 +185,7 @@ string make_temp_dir()
 } // namespace tightdb
 
 
-void File::open(const string& path, AccessMode a, CreateMode c, int flags, OpenStatus* report_status)
+void File::open_internal(const string& path, AccessMode a, CreateMode c, int flags, bool* was_created)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -222,20 +222,14 @@ void File::open(const string& path, AccessMode a, CreateMode c, int flags, OpenS
     if (handle != INVALID_HANDLE_VALUE) {
         m_handle    = handle;
         m_have_lock = false;
-        if (report_status != NULL) *report_status = OpenOk;
+        if (was_created != NULL) *was_created = true;
         return;
     }
 
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    if (report_status != NULL) {
-        switch (err) {
-            case ERROR_SHARING_VIOLATION:
-            case ERROR_ACCESS_DENIED:       *report_status = OpenPermissionDenied; break;
-            case ERROR_FILE_NOT_FOUND:      *report_status = OpenNotFound; break;
-            case ERROR_FILE_EXISTS:         *report_status = OpenExists; break;
-            case ERROR_TOO_MANY_OPEN_FILES: *report_status = OpenResourceAllocError; break;
-            default:                        *report_status = OpenOtherError; break;
-        }
+    if ((was_created != NULL) && (err == ERROR_FILE_EXISTS)) {
+        *was_created = false;
+        return;
     }
     else {
         string msg = get_last_error_msg("CreateFile() failed: ", err);
@@ -266,30 +260,14 @@ void File::open(const string& path, AccessMode a, CreateMode c, int flags, OpenS
     int fd = ::open(path.c_str(), flags2, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     if (0 <= fd) {
         m_fd = fd;
-        if (report_status != NULL) *report_status = OpenOk;
+        if (was_created != NULL) *was_created = true;
         return;
     }
 
     int err = errno; // Eliminate any risk of clobbering
-    if (report_status != NULL) {
-        switch (err) {
-            case EACCES:
-            case EROFS:
-            case ETXTBSY:       *report_status = OpenPermissionDenied; break;
-            case ENOENT:        *report_status = OpenNotFound; break;
-            case EEXIST:        *report_status = OpenExists; break;
-            case EISDIR:
-            case ELOOP:
-            case ENAMETOOLONG:
-            case ENOTDIR:
-            case ENXIO:         *report_status = OpenAccessError; break;
-            case EMFILE:
-            case ENFILE:
-            case ENOSR:
-            case ENOSPC:
-            case ENOMEM:        *report_status = OpenResourceAllocError; break;
-            default:            *report_status = OpenOtherError; break;
-        }
+    if ((was_created != NULL) && (err == EEXIST)) {
+        *was_created = false;
+        return;
     }
     else {
         string msg = get_errno_msg("open() failed: ", err);
