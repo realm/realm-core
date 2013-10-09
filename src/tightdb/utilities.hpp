@@ -139,6 +139,24 @@ enum FindRes {
     FindRes_column
 };
 
+
+// Use safe_equal() instead of std::equal() when comparing sequences which can have a 0 elements.
+template <class InputIterator1, class InputIterator2>
+bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 first2)
+{
+#if defined(_MSC_VER) && defined(_DEBUG)
+
+    // Windows has a special check in debug mode against passing null
+    // pointer to std::equal(). This conflicts with the C++
+    // standard. For details, see
+    // http://stackoverflow.com/questions/19120779/is-char-p-0-stdequalp-p-p-well-defined-according-to-the-c-standard.
+    // Below check 'first1==last1' is to prevent failure in debug mode.
+    return (first1 == last1 || std::equal(first1, last1, first2));
+#else
+    return std::equal(first1, last1, first2);
+#endif
+}
+
 } // namespace tightdb
 
 #endif // TIGHTDB_UTILITIES_HPP
