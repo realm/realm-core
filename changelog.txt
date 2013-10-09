@@ -10,6 +10,9 @@ Format:
 - Removed/deprecated feature/method .... (user visible removed feature - passed on to release notes)
 . Any other notes .... 				     (internal changes)
 
+2013-10-09 (Kenneth Geisshirt) 
+. Adding dist-deb target in build.sh for building debian/ubuntu/mint packages. Moreover, the ubuntu/mint version is part of package name so maintaining repositories is easier.
+
 2013-09-26 (Brian Munkholm)
 +/- Renamed Table::distinct() to Table::get_distinct_view()
 +/- Renamed class Date to DateTime. Renamed DataType::type_Date to type_DateTime

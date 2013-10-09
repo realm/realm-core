@@ -1682,13 +1682,19 @@ EOF
         exit 0
         ;;
 
+    "dist-deb")
+        codename=$(lsb_release -s -c)
+        (cd debian && sed -e "s/@CODENAME@/$codename/g" changelog.in > changelog) || exit 1
+        dpkg-buildpackage -rfakeroot -us -uc || exit 1
+        exit 0
+        ;;
+
     *)
         echo "Unspecified or bad mode '$MODE'" 1>&2
         echo "Available modes are: config clean build build-iphone test test-debug install uninstall test-installed wipe-installed" 1>&2
         echo "As well as: install-shared install-devel uninstall-shared uninstall-devel dist-copy" 1>&2
-        echo "As well as: src-dist bin-dist dist-status dist-pull dist-checkout" 1>&2
+        echo "As well as: src-dist bin-dist dist-deb dist-status dist-pull dist-checkout" 1>&2
         echo "As well as: dist-config dist-clean dist-build dist-build-iphone dist-install dist-uninstall dist-test-installed" 1>&2
         exit 1
         ;;
-
 esac
