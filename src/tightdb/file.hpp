@@ -417,7 +417,7 @@ private:
 #endif
 
     bool lock(bool exclusive, bool non_blocking);
-    void open_internal(const std::string& path, AccessMode, CreateMode, int flags, bool* was_created);
+    void open_internal(const std::string& path, AccessMode, CreateMode, int flags, bool* success);
 
     struct MapBase {
         void* m_addr;
@@ -641,9 +641,19 @@ inline void File::open(const std::string& path, AccessMode am, CreateMode cm, in
 
 inline void File::open(const std::string& path, bool& was_created)
 {
-    open_internal(path, access_ReadWrite, create_Must, 0, &was_created);
-    if (!was_created)
-        open(path, access_ReadWrite, create_Never, 0);
+    while (1) {
+        bool success;
+        open_internal(path, access_ReadWrite, create_Must, 0, &success);
+        if (success) {
+            was_created = true;
+            return;
+        }
+        open_internal(path, access_ReadWrite, create_Never, 0, &success);
+        if (success) {
+            was_created = false;
+            return;
+        }
+    }
 }
 
 inline bool File::is_attached() const TIGHTDB_NOEXCEPT

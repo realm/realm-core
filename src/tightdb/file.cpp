@@ -185,7 +185,7 @@ string make_temp_dir()
 } // namespace tightdb
 
 
-void File::open_internal(const string& path, AccessMode a, CreateMode c, int flags, bool* was_created)
+void File::open_internal(const string& path, AccessMode a, CreateMode c, int flags, bool* success)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -222,25 +222,27 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
     if (handle != INVALID_HANDLE_VALUE) {
         m_handle    = handle;
         m_have_lock = false;
-        if (was_created != NULL) *was_created = true;
+        if (success != NULL) *success = true;
         return;
     }
 
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    if ((was_created != NULL) && (err == ERROR_FILE_EXISTS)) {
-        *was_created = false;
+    if ((success != NULL) && (err == ERROR_FILE_EXISTS) && (c == create_Must)) {
+        *success = false;
         return;
     }
-    else {
-        string msg = get_last_error_msg("CreateFile() failed: ", err);
-        switch (err) {
-            case ERROR_SHARING_VIOLATION:
-            case ERROR_ACCESS_DENIED:       throw PermissionDenied(msg);
-            case ERROR_FILE_NOT_FOUND:      throw NotFound(msg);
-            case ERROR_FILE_EXISTS:         throw Exists(msg);
-            case ERROR_TOO_MANY_OPEN_FILES: throw ResourceAllocError(msg);
-            default:                        throw runtime_error(msg);
-        }
+    if ((success != NULL) && (err == ERROR_FILE_NOT_FOUND) && (c == create_Never)) {
+        *success = false;
+        return;
+    }
+    string msg = get_last_error_msg("CreateFile() failed: ", err);
+    switch (err) {
+        case ERROR_SHARING_VIOLATION:
+        case ERROR_ACCESS_DENIED:       throw PermissionDenied(msg);
+        case ERROR_FILE_NOT_FOUND:      throw NotFound(msg);
+        case ERROR_FILE_EXISTS:         throw Exists(msg);
+        case ERROR_TOO_MANY_OPEN_FILES: throw ResourceAllocError(msg);
+        default:                        throw runtime_error(msg);
     }
 
 #else // POSIX version
@@ -260,35 +262,37 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
     int fd = ::open(path.c_str(), flags2, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     if (0 <= fd) {
         m_fd = fd;
-        if (was_created != NULL) *was_created = true;
+        if (success != NULL) *success = true;
         return;
     }
 
     int err = errno; // Eliminate any risk of clobbering
-    if ((was_created != NULL) && (err == EEXIST)) {
-        *was_created = false;
+    if ((success != NULL) && (err == EEXIST) && (c == create_Must)) {
+        *success = false;
         return;
     }
-    else {
-        string msg = get_errno_msg("open() failed: ", err);
-        switch (err) {
-            case EACCES:
-            case EROFS:
-            case ETXTBSY:       throw PermissionDenied(msg);
-            case ENOENT:        throw NotFound(msg);
-            case EEXIST:        throw Exists(msg);
-            case EISDIR:
-            case ELOOP:
-            case ENAMETOOLONG:
-            case ENOTDIR:
-            case ENXIO:         throw AccessError(msg);
-            case EMFILE:
-            case ENFILE:
-            case ENOSR:
-            case ENOSPC:
-            case ENOMEM:        throw ResourceAllocError(msg);
-            default:            throw runtime_error(msg);
-        }
+    if ((success != NULL) && (err == ENOENT) && (c == create_Never)) {
+        *success = false;
+        return;
+    }
+    string msg = get_errno_msg("open() failed: ", err);
+    switch (err) {
+        case EACCES:
+        case EROFS:
+        case ETXTBSY:       throw PermissionDenied(msg);
+        case ENOENT:        throw NotFound(msg);
+        case EEXIST:        throw Exists(msg);
+        case EISDIR:
+        case ELOOP:
+        case ENAMETOOLONG:
+        case ENOTDIR:
+        case ENXIO:         throw AccessError(msg);
+        case EMFILE:
+        case ENFILE:
+        case ENOSR:
+        case ENOSPC:
+        case ENOMEM:        throw ResourceAllocError(msg);
+        default:            throw runtime_error(msg);
     }
 
 #endif
