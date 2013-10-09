@@ -665,13 +665,20 @@ void Query::end_subtable()
     subtables.pop_back();
 }
 
-
+// todo, add size_t end? could be useful
 size_t Query::find(size_t begin_at_table_row)
 {
     if(m_table->is_degenerate())
         return not_found;
 
+    TIGHTDB_ASSERT(begin_at_table_row <= m_table->size());
+
     Init(*m_table);
+
+    // User created query with no criteria; return first
+    if (first.size() == 0 || first[0] == 0) {
+        return m_table->size() == 0 ? not_found : begin_at_table_row;
+    }
 
     const size_t end = m_table->size();
     const size_t res = first[0]->find_first(begin_at_table_row, end);
@@ -683,6 +690,8 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 {
     if(m_table->is_degenerate())
         return TableView(*m_table);
+
+    TIGHTDB_ASSERT(start <= m_table->size());
 
     Init(*m_table);
 
