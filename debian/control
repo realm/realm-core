@@ -1,6 +1,6 @@
 Source: libtightdb
-Section: unknown
-Priority: extra
+Section: devel
+Priority: optional
 Maintainer: Kenneth Geisshirt <kg@tightdb.com>
 Build-Depends: debhelper (>=7)
 Standards-Version: 3.9.4
