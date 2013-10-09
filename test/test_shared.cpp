@@ -162,9 +162,9 @@ TEST(Shared_Stale_Lock_File_Renamed)
         // create lock file
         SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
 #ifdef _WIN32
-        LPCTSTR a = L"test_shared.tightdb.lock.backup";
-        LPCTSTR b = L"test_shared.tightdb.lock";
-        if (!CreateHardLink(a, b, NULL)) {  // requires ntfs to work
+        LPCTSTR a = "test_shared.tightdb.lock.backup";
+        LPCTSTR b = "test_shared.tightdb.lock";
+        if (!CreateHardLinkA(a, b, NULL)) {  // requires ntfs to work
             cerr << "Creating a hard link failed, test abandoned" << endl;
             return;
         }
@@ -504,6 +504,7 @@ TEST(Shared_Writes)
     CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
+#if TEST_DURATION > 0
 
 TEST(Shared_ManyReaders)
 {
@@ -733,7 +734,7 @@ TEST(Shared_ManyReaders)
         }
     }
 }
-
+#endif
 
 namespace {
 
@@ -1244,6 +1245,7 @@ TEST(Shared_FromSerialized)
     }
 }
 
+#if TEST_DURATION > 2
 TEST(StringIndex_Bug1)
 {
     File::try_remove("test.tightdb");
@@ -1269,6 +1271,7 @@ TEST(StringIndex_Bug1)
         db.commit();
     }
 }
+#endif
 
 TEST(StringIndex_Bug2)
 {
