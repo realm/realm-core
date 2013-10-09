@@ -185,7 +185,7 @@ string make_temp_dir()
 } // namespace tightdb
 
 
-void File::open(const string& path, AccessMode a, CreateMode c, int flags)
+void File::open_internal(const string& path, AccessMode a, CreateMode c, int flags, bool* success)
 {
     TIGHTDB_ASSERT(!is_attached());
 
@@ -222,10 +222,19 @@ void File::open(const string& path, AccessMode a, CreateMode c, int flags)
     if (handle != INVALID_HANDLE_VALUE) {
         m_handle    = handle;
         m_have_lock = false;
+        if (success != NULL) *success = true;
         return;
     }
 
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
+    if ((success != NULL) && (err == ERROR_FILE_EXISTS) && (c == create_Must)) {
+        *success = false;
+        return;
+    }
+    if ((success != NULL) && (err == ERROR_FILE_NOT_FOUND) && (c == create_Never)) {
+        *success = false;
+        return;
+    }
     string msg = get_last_error_msg("CreateFile() failed: ", err);
     switch (err) {
         case ERROR_SHARING_VIOLATION:
@@ -253,10 +262,19 @@ void File::open(const string& path, AccessMode a, CreateMode c, int flags)
     int fd = ::open(path.c_str(), flags2, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     if (0 <= fd) {
         m_fd = fd;
+        if (success != NULL) *success = true;
         return;
     }
 
     int err = errno; // Eliminate any risk of clobbering
+    if ((success != NULL) && (err == EEXIST) && (c == create_Must)) {
+        *success = false;
+        return;
+    }
+    if ((success != NULL) && (err == ENOENT) && (c == create_Never)) {
+        *success = false;
+        return;
+    }
     string msg = get_errno_msg("open() failed: ", err);
     switch (err) {
         case EACCES:

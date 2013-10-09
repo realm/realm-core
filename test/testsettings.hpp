@@ -10,7 +10,8 @@
     //#define TEST_DURATION 3
 #endif
 
-// Robustness tests are not enable by default, because they interfere badly with Valgrind.
+// Some robustness tests are not enable by default, because they
+// interfere badly with Valgrind.
 // #define TEST_ROBUSTNESS
 
 // Wrap pthread function calls with the pthread bug finding tool (program execution will be slower) by
@@ -38,24 +39,16 @@
 #define TEST_QUERY
 #define TEST_SHARED
 #define TEST_STRING_DATA
+#define TEST_BINARY_DATA
 #define TEST_TABLE
 #define TEST_TABLE_VIEW
 #define TEST_THREAD
-
-// TEST_TRANSACTIONS temporarily disabled because it fails on Windows. Fixme. Keywords: winbug
-#ifndef _WIN32
 #define TEST_TRANSACTIONS
-#endif
 
 #define TEST_REPLICATION
 #define TEST_UTF8
+
 //#define TEST_TRANSACTIONS_LASSE // Takes a long time
 //#define TEST_INDEX // not implemented yet
-
-// Bypass an overflow bug in BinaryData. Todo/fixme
-#define TIGHTDB_BYPASS_BINARYDATA_BUG
-
-// Bypass as crash when doing optimize+set_index+clear+add. Todo/fixme
-#define TIGHTDB_BYPASS_OPTIMIZE_CRASH_BUG
 
 #endif

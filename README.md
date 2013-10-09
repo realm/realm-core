@@ -104,6 +104,7 @@ The following programs are installed:
     /usr/local/bin/tightdbd-dbg
     /usr/local/bin/tightdb-config
     /usr/local/bin/tightdb-config-dbg
+    /usr/local/bin/tightdb-import
 
 The first two are used transparently by the TightDB library when
 `async` transactions are enabled. The two `config` programs provide
@@ -113,6 +114,9 @@ Clang, that are mostly command line compatible with GCC. Here is an
 example:
 
     g++  my_app.cpp  `tightdb-config --cflags --libs`
+
+The tightdb-import tool is a CSV-file importer that lets you convert
+comma separated value-files to TightDB format. 
 
 After building, you might want to see exactly what will be installed,
 without actually installing anything. This can be done as follows:
@@ -225,13 +229,15 @@ is named according to the tag.
 
 ### Ubuntu 10.04, 12.04, and 13.04
 
-    sudo apt-get install texlive-latex-base
-    sudo apt-get install pandoc
-
+    sudo apt-get install texlive-latex-base texlive-latex-extra pandoc
 
 ### Fedora 17
 
     sudo yum install pandoc-markdown2pdf
+
+### Fedora 18
+
+    sudo yum install pandoc-pdf texlive
 
 ## Mac OSX
 

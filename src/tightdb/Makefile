@@ -1,5 +1,3 @@
-GENERATED_SOURCES = table_macros.hpp
-
 # Temporary hack due to public dependency on query_engine.hpp in
 # Lasses new "query expressions" implementation.
 INST_HEADERS = $(wildcard *.h *.hpp)
@@ -13,14 +11,14 @@ INST_HEADERS = $(wildcard *.h *.hpp)
 #query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h replication.hpp
 
 lib_LIBRARIES = libtightdb.a
-bin_PROGRAMS  = tightdbd
+bin_PROGRAMS  = tightdbd tightdb-import
 DEV_PROGRAMS = tightdb-config
 
 libtightdb_a_SOURCES = terminate.cpp string_buffer.cpp file.cpp thread.cpp utf8.cpp \
 utilities.cpp alloc.cpp alloc_slab.cpp array.cpp array_string.cpp array_string_long.cpp \
 array_binary.cpp array_blob.cpp array_blobs_big.cpp column.cpp column_string.cpp column_string_enum.cpp \
 column_binary.cpp column_table.cpp column_mixed.cpp spec.cpp table.cpp table_view.cpp group.cpp \
-group_writer.cpp group_shared.cpp index_string.cpp query.cpp lang_bind_helper.cpp
+group_writer.cpp group_shared.cpp index_string.cpp query.cpp lang_bind_helper.cpp importer.cpp
 
 ifneq ($(TIGHTDB_ENABLE_REPLICATION),)
 libtightdb_a_SOURCES += replication.cpp
@@ -50,6 +48,11 @@ libtightdb_a_VERSION = 4:0:0
 tightdb_config_SOURCES = config.cpp
 tightdbd_SOURCES = tightdbd.cpp
 tightdbd_LIBS = libtightdb.a
+
+tightdb_import_SOURCES = importer_tool.cpp
+tightdb_import_LIBS    = libtightdb.a
+
+GENERATED_SOURCES = table_macros.hpp
 
 include ../../generic.mk
 

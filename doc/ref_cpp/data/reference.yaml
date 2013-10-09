@@ -3,6 +3,13 @@
 #
 ID        : cpp
 TITLE     : 'C++'
+STATUS:
+  CODE    : Beta
+  DESCR   : All the features of TightDB are fully functional and tested and used in production.
+            It is however to be considered beta software, and changes to the API based on user feedback
+            should still be expected.
+            The latest feature "Asynchroneous" durability in SharedGroup, should still be considered 
+            "experiemental", due to the limited test hours performed for such a new feature.
 DESCR     : &g_introduction_descr
             >
             The goal of TightDB is to provide a high performance
@@ -42,7 +49,7 @@ DESCR     : &g_introduction_descr
 
             For multi-threaded or multi-process applications, you can use the {@link class_shared_group}.
             As the {@link class_group} class, the {@link class_shared_group} lets you serialize
-            your tables to disk. Moreover, the {@link_class_shared_group} class provides a transaction
+            your tables to disk. Moreover, the {@link class_shared_group} class provides a transaction
             interface to your group.
 
 IMPORT    : []

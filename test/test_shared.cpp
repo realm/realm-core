@@ -16,6 +16,9 @@
 #  include <unistd.h>
 #  include <sys/wait.h>
 #  define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
+#else
+#  define NOMINMAX
+#  include <windows.h>
 #endif
 
 using namespace std;
@@ -82,7 +85,8 @@ TEST(Shared_Stale_Lock_File_Faked)
     {
         // create fake lock file
         std::ofstream dst("test_shared.tightdb.lock", std::ios::binary);
-        dst << 0ULL;
+        const char buf[] = { 0, 0, 0, 0 };
+        dst.write(buf, 4);
     }
     try {
         SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
@@ -93,10 +97,9 @@ TEST(Shared_Stale_Lock_File_Faked)
     CHECK(ok);
 }
 
-// The following 3 tests are different ways of creating stale lock files.
-// Unfortunately the resulting behavior differs, depending on platform, and
-// possibly even depending on timing. All three cases are allowed to throw
-// an exception, but also allowed to work without doing so.
+// The following 2 tests are different ways of creating stale lock files.
+// On both windows and Linux, the shared group should be able to detect
+// that the lock files are stale and re-initialize them without errors.
 TEST(Shared_Stale_Lock_File_CopiedInFlight)
 {
     // Delete old files if there
@@ -112,9 +115,8 @@ TEST(Shared_Stale_Lock_File_CopiedInFlight)
     try {
         SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
     }
-    catch (SharedGroup::PresumablyStaleLockFile& ) {
-        // cerr << "Detected a Presumably Stale lock file (1): " << e.what() << endl;
-        File::try_remove("test_shared.tightdb.lock"); // also the info file
+    catch (SharedGroup::PresumablyStaleLockFile&) {
+        CHECK(false);
     }
     // lock file should be gone when we get here:
     CHECK(File::exists("test_shared.tightdb.lock") == false);
@@ -141,14 +143,15 @@ TEST(Shared_Stale_Lock_File_CopiedAtCommit)
     try {
         SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
     }
-    catch (SharedGroup::PresumablyStaleLockFile& ) {
-        // cerr << "Detected a Presumably Stale lock file (2): " << e.what() << endl;
-        File::try_remove("test_shared.tightdb.lock"); // also the info file
+    catch (SharedGroup::PresumablyStaleLockFile&) {
+        CHECK(false);
     }
     // lock file should be gone when we get here:
     CHECK(File::exists("test_shared.tightdb.lock") == false);
 }
 
+// FIXME:
+// At the moment this test does not work on windows when run as a virtual machine.
 TEST(Shared_Stale_Lock_File_Renamed)
 {
     // Delete old files if there
@@ -158,15 +161,26 @@ TEST(Shared_Stale_Lock_File_Renamed)
     {
         // create lock file
         SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
-        rename("test_shared.tightdb.lock","test_shared.tightdb.lock.backup");
+#ifdef _WIN32
+        const char* a = "test_shared.tightdb.lock.backup";
+        const char* b = "test_shared.tightdb.lock";
+        if (!CreateHardLinkA(a, b, NULL)) {  // requires ntfs to work
+            cerr << "Creating a hard link failed, test abandoned" << endl;
+            return;
+        }
+#else
+        if (link("test_shared.tightdb.lock","test_shared.tightdb.lock.backup")) {
+            cerr << "Creating a hard link failed, test abandoned" << endl;
+            return;
+        };
+#endif
     }
     rename("test_shared.tightdb.lock.backup","test_shared.tightdb.lock");
     try {
         SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
     }
-    catch (SharedGroup::PresumablyStaleLockFile& ) {
-        // cerr << "Detected a Presumably Stale lock file (3): " << e.what() << endl;
-        File::try_remove("test_shared.tightdb.lock"); // also the info file
+    catch (SharedGroup::PresumablyStaleLockFile&) {
+        CHECK(false);
     }
     // lock file should be gone when we get here:
     CHECK(File::exists("test_shared.tightdb.lock") == false);
@@ -490,6 +504,7 @@ TEST(Shared_Writes)
     CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
+#if TEST_DURATION > 0
 
 TEST(Shared_ManyReaders)
 {
@@ -719,7 +734,7 @@ TEST(Shared_ManyReaders)
         }
     }
 }
-
+#endif
 
 namespace {
 
@@ -1230,6 +1245,7 @@ TEST(Shared_FromSerialized)
     }
 }
 
+#if TEST_DURATION > 2
 TEST(StringIndex_Bug1)
 {
     File::try_remove("test.tightdb");
@@ -1255,6 +1271,7 @@ TEST(StringIndex_Bug1)
         db.commit();
     }
 }
+#endif
 
 TEST(StringIndex_Bug2)
 {
@@ -1780,7 +1797,7 @@ TEST(GroupShared_ReserveDiskSpace)
         // that the new size is at least as big as the requested size.
         size_t reserve_size_3 = orig_file_size + 1;
         sg.reserve(reserve_size_3);
-        size_t new_file_size_3 = File("test.tightdb").get_size();
+        size_t new_file_size_3 = size_t(File("test.tightdb").get_size());
         CHECK(new_file_size_3 >= reserve_size_3);
 
         // Check that disk space reservation is independent of transactions

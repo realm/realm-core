@@ -142,7 +142,7 @@ public:
     struct subtable_tag {};
 
     void new_top_level_table(StringData name);
-    void add_column(const Table*, const Spec*, DataType, StringData name);
+    void add_column (const Table*, const Spec*, DataType, StringData name);
 
     template<class T>
     void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);

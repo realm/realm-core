@@ -65,8 +65,6 @@ public:
         return pos;
     }
 
-    void seek(size_t pos) { m_pos = pos; }
-
     char* release_buffer() TIGHTDB_NOEXCEPT
     {
         char* const buffer = m_buffer;
@@ -131,14 +129,6 @@ public:
 
         write(data_1, size_1);
         return pos;
-    }
-
-    void seek(size_t pos)
-    {
-        streamsize pos2 = 0;
-        if (int_cast_with_overflow_detect(pos, pos2))
-            throw std::runtime_error("Seek position overflow");
-        m_out.seekp(pos2);
     }
 
 private:

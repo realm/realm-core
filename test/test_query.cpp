@@ -99,6 +99,31 @@ TIGHTDB_TABLE_3(Books,
 } // anonymous namespace
 
 
+
+TEST(Query_NoConditions)
+{
+    Table table;
+    table.add_column(type_Int, "i");
+    {
+        Query query(table.where());
+        CHECK_EQUAL(not_found, query.find());
+    }
+    {
+        Query query = table.where();
+        CHECK_EQUAL(not_found, query.find());
+    }
+    table.add_empty_row();
+    {
+        Query query(table.where());
+        CHECK_EQUAL(0, query.find());
+    }
+    {
+        Query query = table.where();
+        CHECK_EQUAL(0, query.find());
+    }
+}
+
+
 TEST(NextGenSyntaxTypedString) 
 {
     Books books;
@@ -1112,6 +1137,15 @@ TEST(LimitUntyped2)
     sumd = q.average_float(1, NULL, 0, 2, 3);
     CHECK_EQUAL((10000. + 30000.) / 2., sumd);
 
+    // count
+    size_t cnt = q.count(0, -1, 1);
+    CHECK_EQUAL(1, cnt);
+    cnt = q.count(0, -1, 2);
+    CHECK_EQUAL(2, cnt);
+
+    // count, limited by 'end', but still having 'limit' specified
+    cnt = q.count(0, 1, 3);
+    CHECK_EQUAL(1, cnt);
 }
 
 
@@ -1722,7 +1756,7 @@ TEST(Group_GameAnalytics)
 {
     {
         Group g;
-        GATable::Ref t = g.get_table<GATable>("firstevents");
+		GATable::Ref t = g.get_table<GATable>("firstevents");
 
         for (size_t i = 0; i < 100; ++i) {
             const int64_t r1 = rand() % 100;
@@ -2466,8 +2500,19 @@ TEST(TestQuerySubtable)
     CHECK_EQUAL(3, t4.get_source_ndx(2));
 }
 
-
-
+/*
+// Disabled because assert has now been added to disallow adding rows when no columns exist
+TEST(Query_SubtableViewSizeBug)
+{
+    Table table;
+    table.add_column(type_Table, "subtab");
+    table.add_empty_row(1);
+    TableRef subtab = table.get_subtable(0,0);
+    subtab->add_empty_row(1);
+    TableView subview = subtab->where().find_all();
+    CHECK_EQUAL(1, subview.size());
+}
+*/
 
 TEST(TestQuerySort1)
 {
@@ -3187,6 +3232,7 @@ TEST(TestQueryFindAll_Begins)
 
 TEST(TestQueryFindAll_Ends)
 {
+
     TupleTableType ttt;
 
     ttt.add(0, "barfo");

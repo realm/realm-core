@@ -26,6 +26,7 @@
 #include <ostream>
 
 #include <tightdb/config.h>
+#include <tightdb/utilities.hpp>
 
 namespace tightdb {
 
@@ -132,16 +133,7 @@ inline StringData::StringData(const char* c_str) TIGHTDB_NOEXCEPT:
 
 inline bool operator==(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
 {
-#if defined(_MSC_VER) && defined(_DEBUG)
-    // Windows has a special check in debug mode against passing null
-    // pointer to std::equal(). This conflicts with the C++
-    // standard. For details, see
-    // http://stackoverflow.com/questions/19120779/is-char-p-0-stdequalp-p-p-well-defined-according-to-the-c-standard.
-    // Below check 'a.m_size==0' is to prevent failure in debug mode.
-    return a.m_size == b.m_size && (a.m_size == 0 || std::equal(a.m_data, a.m_data + a.m_size, b.m_data));
-#else
-    return a.m_size == b.m_size && std::equal(a.m_data, a.m_data + a.m_size, b.m_data);
-#endif
+    return a.m_size == b.m_size && safe_equal(a.m_data, a.m_data + a.m_size, b.m_data);
 }
 
 inline bool operator!=(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
@@ -172,17 +164,18 @@ inline bool operator>=(const StringData& a, const StringData& b) TIGHTDB_NOEXCEP
 
 inline bool StringData::begins_with(StringData d) const TIGHTDB_NOEXCEPT
 {
-    return d.m_size <= m_size && std::equal(m_data, m_data + d.m_size, d.m_data);
+    return d.m_size <= m_size && safe_equal(m_data, m_data + d.m_size, d.m_data);
 }
 
 inline bool StringData::ends_with(StringData d) const TIGHTDB_NOEXCEPT
 {
-    return d.m_size <= m_size && std::equal(m_data + m_size - d.m_size, m_data + m_size, d.m_data);
+    return d.m_size <= m_size && safe_equal(m_data + m_size - d.m_size, m_data + m_size, d.m_data);
 }
 
 inline bool StringData::contains(StringData d) const TIGHTDB_NOEXCEPT
 {
-    return std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
+    return d.m_size == 0 ||
+        std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
 
 inline StringData StringData::prefix(std::size_t n) const TIGHTDB_NOEXCEPT

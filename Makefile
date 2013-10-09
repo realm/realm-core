@@ -3,12 +3,12 @@ test_DEPS = src
 
 include generic.mk
 
-# Run and run the benchmarking programs
+# Build and run the benchmarking programs
 .PHONY: benchmark
 benchmark: minimal
 	@$(MAKE) -C test benchmark
 
-# Run and run the performance matrix benchmarking program
+# Build and run the performance matrix benchmarking program
 .PHONY: performance
 performance: minimal
 	@$(MAKE) -C test performance

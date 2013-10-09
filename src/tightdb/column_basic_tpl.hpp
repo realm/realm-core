@@ -20,12 +20,10 @@
 #ifndef TIGHTDB_COLUMN_BASIC_TPL_HPP
 #define TIGHTDB_COLUMN_BASIC_TPL_HPP
 
-// It's bad design (headers are entangled) that a Column uses query_engine.hpp which again uses Column.
-#define TIGHTDB_DEPEND_ON_QUERYENGINE
-
-#ifdef TIGHTDB_DEPEND_ON_QUERYENGINE
-    #include <tightdb/query_engine.hpp>
-#endif
+// Todo: It's bad design (headers are entangled) that a Column uses query_engine.hpp which again uses Column.
+// It's the aggregate() method that calls query_engine, and a quick fix (still not optimal) could be to create 
+// the call and include inside float and double's .cpp files.
+#include <tightdb/query_engine.hpp>
 
 namespace tightdb {
 
@@ -389,45 +387,28 @@ void BasicColumn<T>::find_all(Array &result, T value, std::size_t begin, std::si
     }
 }
 
-template<class T>
-std::size_t BasicColumn<T>::count(T target) const
+template<class T> std::size_t BasicColumn<T>::count(T target) const
 {
-#ifdef TIGHTDB_DEPEND_ON_QUERYENGINE
-    // Slow method that doesn't depend on query_engine
-    size_t cnt = 0;
-    for(std::size_t i = 0; i < size(); i++)
-        if(get(i) == target)
-            cnt++;
-
-    return cnt;
-#else
     return std::size_t(ColumnBase::aggregate<T, int64_t, act_Count, Equal>(target, 0, size(), 0));
-#endif
 }
 
 template<class T>
 typename BasicColumn<T>::SumType BasicColumn<T>::sum(std::size_t begin, std::size_t end,
                                                      std::size_t limit) const
 {
-#ifdef TIGHTDB_DEPEND_ON_QUERYENGINE
-    if (end == npos)
-        end = size();
-
-    if(limit != npos && begin + limit < end)
-        end = begin + limit;
-
-    typename BasicColumn<T>::SumType sum(0);
-    for(std::size_t i = begin; i < end; ++i)
-        sum += get(i);
-
-    return sum;
-#else
-    return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, begin, end, 0);
-#endif
+    return ColumnBase::aggregate<T, SumType, act_Sum, None>(0, begin, end, NULL, limit);
+}
+template<class T> T BasicColumn<T>::minimum(std::size_t begin, std::size_t end, std::size_t limit) const
+{
+    return ColumnBase::aggregate<T, T, act_Min, None>(0, begin, end, NULL, limit);
 }
 
-template<class T>
-double BasicColumn<T>::average(std::size_t begin, std::size_t end, std::size_t limit) const
+template<class T> T BasicColumn<T>::maximum(std::size_t begin, std::size_t end, std::size_t limit) const
+{
+    return ColumnBase::aggregate<T, T, act_Max, None>(0, begin, end, NULL, limit);
+}
+
+template<class T> double BasicColumn<T>::average(std::size_t begin, std::size_t end, std::size_t limit) const
 {
     if (end == npos)
         end = size();
@@ -440,49 +421,6 @@ double BasicColumn<T>::average(std::size_t begin, std::size_t end, std::size_t l
     double avg = sum1 / ( size == 0 ? 1 : size );
     return avg;
 }
-
-template<class T>
-T BasicColumn<T>::minimum(std::size_t begin, std::size_t end, std::size_t limit) const
-{
-#ifdef TIGHTDB_DEPEND_ON_QUERYENGINE
-    if (end == npos)
-        end = size();
-
-    if (limit != npos && begin + limit < end)
-        end = begin + limit;
-
-    T min = std::numeric_limits<T>::max();
-    for(std::size_t i = begin; i < end; ++i)
-        if (get(i) < min)
-            min = get(i);
-
-    return min;
-#else
-    return ColumnBase::aggregate<T, T, act_Min, None>(0, ebgin, end, 0);
-#endif
-}
-
-template<class T>
-T BasicColumn<T>::maximum(std::size_t begin, std::size_t end, std::size_t limit) const
-{
-#ifdef TIGHTDB_DEPEND_ON_QUERYENGINE
-    if (end == npos)
-        end = size();
-
-    if (limit != npos && begin + limit < end)
-        end = begin + limit;
-
-    T max = std::numeric_limits<T>::min();
-    for(std::size_t i = begin; i < end; i++)
-        if (get(i) > max)
-            max = get(i);
-
-    return max;
-#else
-    return ColumnBase::aggregate<T, T, act_Max, None>(0, begin, end, 0);
-#endif
-}
-
 
 template<class T> inline void BasicColumn<T>::do_insert(std::size_t ndx, T value)
 {

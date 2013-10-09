@@ -157,7 +157,7 @@ CATEGORIES :
       - NAME   : row_ndx
         TYPES  : size_t
         DESCR  : &g_dyn_view_get_source_ndx_parm1_descr
-                 The row index in the view
+                 The row index in the view.
       RETURN:
         TYPES  : size_t
         DESCR  : &g_dyn_view_get_source_ndx_return1_descr

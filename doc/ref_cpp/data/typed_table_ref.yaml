@@ -8,6 +8,9 @@ SUMMARY    : &g_typed_table_summary
              Typed table.
 DESCR      : &g_typed_table_descr
              >
+             NOTE: The current documentation of Typed Table is under construction, 
+             and not completely correct yet.
+
              The Table class is the core class of the TightDB framework. It allows you
              to efficiently work with data in terms of rows and columns. The value of
              a cell (specific column, specific row) is compacted in order to keep the
