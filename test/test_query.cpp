@@ -99,6 +99,31 @@ TIGHTDB_TABLE_3(Books,
 } // anonymous namespace
 
 
+
+TEST(Query_NoConditions)
+{
+    Table table;
+    table.add_column(type_Int, "i");
+    {
+        Query query(table.where());
+        CHECK_EQUAL(not_found, query.find());
+    }
+    {
+        Query query = table.where();
+        CHECK_EQUAL(not_found, query.find());
+    }
+    table.add_empty_row();
+    {
+        Query query(table.where());
+        CHECK_EQUAL(0, query.find());
+    }
+    {
+        Query query = table.where();
+        CHECK_EQUAL(0, query.find());
+    }
+}
+
+
 TEST(NextGenSyntaxTypedString) 
 {
     Books books;
