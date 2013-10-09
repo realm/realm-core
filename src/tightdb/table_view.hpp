@@ -335,6 +335,11 @@ inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type)                 \
     TIGHTDB_ASSERT(row_ndx < m_refs.size());
 
+#define TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx)   \
+    TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \
+    TIGHTDB_ASSERT(m_table->get_column_type(column_ndx) == type_Table ||    \
+                   (m_table->get_column_type(column_ndx) == type_Mixed));   \
+    TIGHTDB_ASSERT(row_ndx < m_refs.size());
 
 // Column information
 
@@ -451,7 +456,7 @@ inline DataType TableViewBase::get_mixed_type(size_t column_ndx, size_t row_ndx)
 inline size_t TableViewBase::get_subtable_size(size_t column_ndx, size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Table);
+    TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     return m_table->get_subtable_size(column_ndx, real_ndx);
@@ -659,7 +664,7 @@ inline ConstTableView ConstTableView::find_all_datetime(size_t column_ndx, DateT
 
 inline TableRef TableView::get_subtable(size_t column_ndx, size_t row_ndx)
 {
-    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Table);
+    TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     return m_table->get_subtable(column_ndx, real_ndx);
@@ -667,7 +672,7 @@ inline TableRef TableView::get_subtable(size_t column_ndx, size_t row_ndx)
 
 inline ConstTableRef TableView::get_subtable(size_t column_ndx, size_t row_ndx) const
 {
-    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Table);
+    TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     return m_table->get_subtable(column_ndx, real_ndx);
@@ -675,7 +680,7 @@ inline ConstTableRef TableView::get_subtable(size_t column_ndx, size_t row_ndx) 
 
 inline ConstTableRef ConstTableView::get_subtable(size_t column_ndx, size_t row_ndx) const
 {
-    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Table);
+    TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     return m_table->get_subtable(column_ndx, real_ndx);
@@ -683,7 +688,7 @@ inline ConstTableRef ConstTableView::get_subtable(size_t column_ndx, size_t row_
 
 inline void TableView::clear_subtable(size_t column_ndx, size_t row_ndx)
 {
-    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Table);
+    TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     return m_table->clear_subtable(column_ndx, real_ndx);
@@ -763,10 +768,9 @@ inline void TableView::set_mixed(size_t column_ndx, size_t row_ndx, Mixed value)
     m_table->set_mixed(column_ndx, real_ndx, value);
 }
 
-//this will not work if the column type is mixed
 inline void TableView::set_subtable(size_t column_ndx, size_t row_ndx, const Table* value)
 {
-    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Table);
+    TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     m_table->set_subtable(column_ndx, real_ndx, value);
 }
