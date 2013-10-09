@@ -162,8 +162,8 @@ TEST(Shared_Stale_Lock_File_Renamed)
         // create lock file
         SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
 #ifdef _WIN32
-        LPCTSTR a = "test_shared.tightdb.lock.backup";
-        LPCTSTR b = "test_shared.tightdb.lock";
+        const char* a = "test_shared.tightdb.lock.backup";
+        const char* b = "test_shared.tightdb.lock";
         if (!CreateHardLinkA(a, b, NULL)) {  // requires ntfs to work
             cerr << "Creating a hard link failed, test abandoned" << endl;
             return;
