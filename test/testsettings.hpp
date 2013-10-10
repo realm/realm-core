@@ -43,14 +43,11 @@
 #define TEST_TABLE
 #define TEST_TABLE_VIEW
 #define TEST_THREAD
-
-// TEST_TRANSACTIONS temporarily disabled because it fails on Windows. Fixme. Keywords: winbug
-#ifndef _WIN32
 #define TEST_TRANSACTIONS
-#endif
 
 #define TEST_REPLICATION
 #define TEST_UTF8
+
 //#define TEST_TRANSACTIONS_LASSE // Takes a long time
 //#define TEST_INDEX // not implemented yet
 

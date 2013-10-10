@@ -46,11 +46,11 @@ int main()
     assert(match == 0); // Alice
 
     // Find next match
-    match = query.find_next(match + 1);
+    match = query.find(match + 1);
     assert(match == 2); // Alice
 
     // No more matches
-    match = query.find_next(match + 1);
+    match = query.find(match + 1);
     assert(match == size_t(-1));
 // @@EndShow@@
 }
