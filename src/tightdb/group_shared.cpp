@@ -18,6 +18,13 @@
 #include <windows.h>
 #endif
 
+#ifdef TIGHTDB_HAVE_CONFIG
+#include <tightdb/build_config.h>
+#endif
+#ifndef TIGHTDB_INSTALLATION_BIN_PATH
+#define TIGHTDB_INSTALLATION_BIN_PATH "/usr/local/bin/"
+#endif
+
 // #define TIGHTDB_ENABLE_LOGFILE
 
 using namespace std;
@@ -150,9 +157,9 @@ void spawn_daemon(const string& file)
         const char* exe = getenv("TIGHTDBD_PATH");
         if (exe == NULL)
 #ifndef TIGTHDB_DEBUG
-            exe = "/usr/local/bin/tightdbd";
+            exe = TIGHTDB_INSTALLATION_BIN_PATH "tightdbd";
 #else
-            exe = "/usr/local/bin/tightdbd-dbg";
+            exe = TIGHTDB_INSTALLATION_BIN_PATH "tightdbd-dbg";
 #endif
         execl(exe, exe, file.c_str(), (char*) NULL);
 
