@@ -300,6 +300,8 @@ public:
     void to_dot() const; // To std::cerr (for GDB)
     void to_dot(const char* file_path) const;
     void zero_free_space(std::size_t file_size, std::size_t readlock_version);
+#else
+    void Verify() const {}
 #endif
 
 private:

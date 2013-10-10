@@ -683,10 +683,6 @@ const Group& SharedGroup::begin_read()
         throw;
     }
 
-#ifdef TIGHTDB_DEBUG
-    m_group.Verify();
-#endif
-
     return m_group;
 }
 
@@ -772,7 +768,6 @@ Group& SharedGroup::begin_write()
     m_group.update_from_shared(new_top_ref, new_file_size); // Throws
 
 #ifdef TIGHTDB_DEBUG
-    m_group.Verify();
     m_transact_stage = transact_Writing;
 #endif
 
