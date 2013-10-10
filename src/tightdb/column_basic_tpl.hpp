@@ -183,10 +183,6 @@ void BasicColumn<T>::fill(std::size_t count)
     // we could speedup by creating full nodes directly
     for (std::size_t i = 0; i < count; ++i)
         add(T());
-
-#ifdef TIGHTDB_DEBUG
-    Verify();
-#endif
 }
 
 template<class T>

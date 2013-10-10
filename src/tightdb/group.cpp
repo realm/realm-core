@@ -557,10 +557,6 @@ void Group::commit()
 
     // Recusively update refs in all active tables (columns, arrays..)
     update_refs(top_ref, old_baseline);
-
-#ifdef TIGHTDB_DEBUG
-    Verify();
-#endif
 }
 
 
