@@ -6,7 +6,8 @@ ID         : class_next_gen_query
 TITLE      : Next-Generation Query Syntax
 SUMMARY    : none
 DESCR      : >
-            <p>This syntax is <b>experimental and must be considered unstable</b>. It lets you write expressions like:</p>
+            <p>This particular feature is <b>experimental</b> and must be considered unstable.<p>
+            <p>The Next-Generation Query Syntax lets you write expressions like:</p>
             <tt>&nbsp;&nbsp;&nbsp;Query q = books.column().pages >= 200 && books.column().author == "Griffiths";
             <br>
             &nbsp;&nbsp;&nbsp;size_t match = q.find();
@@ -22,7 +23,7 @@ DESCR      : >
             columns must belong to the same table and joins or self joins are not supported. </p>
             <div>
             <table class="table table-bordered" border="1">
-            <thead><tr><td colspan="2"><h3> <span lang="da">Relevant classes</span></h3>
+            <thead><tr><td colspan="2"><h3>Relevant classes</h3>
             </td>
             </tr>
             </thead>
@@ -31,105 +32,105 @@ DESCR      : >
             </td>
             <td>Returned by compare operators, logical operators and parantheses. 
             You can perform methods like <code>find()</code>, <code>find_all()</code>, <code>maximum()</code>, etc, 
-            on <span lang="da">it</span>.</td>
+            on it.</td>
             </tr>
             <tr><td valign="top"><tt>
             
-            <span lang="da">Columns&lt;<em>T</em>&gt;</span></tt></td>
+            Columns&lt;<em>T</em>&gt;</tt></td>
             <td>Returned by <code>table.column().<em>name</em>
             </a></code> for typed tables and <code>table.column&lt;T&gt;(<em>column 
             number</em>)</code> for untyped tables. <br />
             <br />
             You can declare freestanding column objects from both typed and untyped 
-            tables<span lang="da">. Specify the type T that matches the column type:</span><br />
+            tables. Specify the type T that matches the column type:<br />
             <br />
-            <tt>&nbsp;&nbsp;&nbsp;Columns&lt;Int&gt; <span lang="da">pages</span> = typed.column().<span lang="da">pages</span>;<br />
-            &nbsp;&nbsp;&nbsp;Columns&lt;<span lang="da">String</span>&gt; <span lang="da">author</span> = untyped.column&lt;<span lang="da">String</span>&gt;(2);<br />
+            <tt>&nbsp;&nbsp;&nbsp;Columns&lt;Int&gt; pages = typed.column().pages;<br />
+            &nbsp;&nbsp;&nbsp;Columns&lt;String&gt; author = untyped.column&lt;String&gt;(2);<br />
             </tt><br />
-            <span lang="da">These free standing column objects have no methods 
-            available and are only meant to be used as shorthand references in queries.</span></td>
+            These free standing column objects have no methods 
+            available and are only meant to be used as shorthand references in queries.</td>
             </tr>
             </tbody>
             </table>
             </div>
             <div>
             <table class="table table-bordered" border="1">
-            <thead><tr><td colspan="6"><h3> <span lang="da">Column types</span></h3>
+            <thead><tr><td colspan="6"><h3>Column types</h3>
             </td>
             </tr>
             </thead>
             <tbody>
             <tr>
-            <td colspan="6"><span lang="da">Not all column types are currently 
-            supported. Supported types are:</span></td>
+            <td colspan="6">Not all column types are currently 
+            supported. Supported types are:</td>
             </tr>
-            <tr><td><span lang="da">Int</span></td>
-            <td><span lang="da">Bool</span></td>
-            <td><span lang="da">String</span></td>
-            <td><span lang="da">Float</span></td>
-            <td><span lang="da">Double</span></td>
-            <td><span lang="da">Date</span></td>
+            <tr><td>Int</td>
+            <td>Bool</td>
+            <td>String</td>
+            <td>Float</td>
+            <td>Double</td>
+            <td>Date</td>
             </tr>
             </tbody>
             </table>
             <table class="table table-bordered" border="1">
-            <thead><tr><td><h3> <span lang="da">Compare operator</span></h3>
+            <thead><tr><td><h3>Compare operator</h3>
             </td>
             <td>
-            <h3><span lang="da">Return type</span></h3>
+            <h3>Return type</h3>
             </td>
             <td>
-            <h3><span lang="da">Remarks</span></h3>
+            <h3>Remarks</h3>
             </td>
             </tr>
             </thead>
             <tbody>
             <tr>
-            <td><span lang="da">==</span></td>
-            <td><span lang="da">Query</span></td>
+            <td>==</td>
+            <td>Query</td>
             <td>&nbsp;</td>
             </tr>
             <tr>
-            <td><span lang="da">!=</span></td>
-            <td><span lang="da">Query</span></td>
+            <td>!=</td>
+            <td>Query</td>
             <td>&nbsp;</td>
             </tr>
             <tr>
-            <td><span lang="da">&gt;</span></td>
-            <td><span lang="da">Query</span></td>
-            <td><span lang="da">Strings not supported</span></td>
+            <td>&gt;</td>
+            <td>Query</td>
+            <td>Strings not supported</td>
             </tr>
             <tr>
-            <td><span lang="da">&lt;</span></td>
-            <td><span lang="da">Query</span></td>
-            <td><span lang="da">Strings not supported</span></td>
+            <td>&lt;</td>
+            <td>Query</span></td>
+            <td>Strings not supported</td>
             </tr>
             <tr>
-            <td><span lang="da">&gt;=</span></td>
-            <td><span lang="da">Query</span></td>
-            <td><span lang="da">Strings not supported</span></td>
+            <td>&gt;=</td>
+            <td>Query</td>
+            <td>Strings not supported</td>
             </tr>
-            <tr><td><span lang="da">&lt;=</span></td>
-            <td><span lang="da">Query</span></td>
-            <td><span lang="da">Strings not supported</span></td>
+            <tr><td>&lt;=</td>
+            <td>Query</td>
+            <td>Strings not supported</td>
             </tr>
             </tbody>
             </table>
             <table class="table table-bordered" border="1">
-            <thead><tr><td colspan="4"><h3> <span lang="da">Arithmetic operators</span></h3>
+            <thead><tr><td colspan="4"><h3>Arithmetic operators</h3>
             </td>
             </tr>
             </thead>
             <tbody>
             <tr>
-            <td colspan="4"><span lang="da">Arithmetic operators only apply to 
+            <td colspan="4">Arithmetic operators only apply to 
             columns of type Int, Float and Double. Currently four operators are 
-            available (more will be introduced in future releases):</span></td>
+            available (more will be introduced in future releases):</td>
             </tr>
-            <tr><td><span lang="da">+ (plus)</span></td>
-            <td><span lang="da">- (minus)</span></td>
-            <td><span lang="da">* (multiply)</span></td>
-            <td><span lang="da">/ (division)</span></td>
+            <tr><td>+ (plus)</td>
+            <td>- (minus)</td>
+            <td>* (multiply)</td>
+            <td>/ (division)</td>
             </tr>
             </tbody>
             </table>
@@ -158,11 +159,8 @@ DESCR      : >
             </tr>
             </table>
 
-
-            
-            
             <h3>Type conversion/promotion</h3>
-                
+
             <p>If the operands of a compare or arithmetic operator 
             are of different types, then conversion/promotion mimicks that of the C++ 
             standard. Take following example:</p>
