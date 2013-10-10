@@ -25,6 +25,30 @@ TIGHTDB_TABLE_2(TupleTableType,
                 second, String)
 }
 
+TEST(DeleteCrash)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    table->add_column(type_String, "name");
+    table->add_column(type_Int,    "age");
+
+    table->add_empty_row(3);
+    table->set_string(0, 0, "Alice");
+    table->set_int(1, 0, 27);
+
+    table->set_string(0, 1, "Bob");
+    table->set_int(1, 1, 50);
+
+    table->set_string(0, 2, "Peter");
+    table->set_int(1, 2, 44);
+
+    table->remove(0);
+
+    table->remove(1);
+}
+
+
 TEST(TestOptimizeCrash)
 {
     // This will crash at the .add() method
