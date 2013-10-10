@@ -18,21 +18,28 @@
 #include <windows.h>
 #endif
 
+#ifdef TIGHTDB_HAVE_CONFIG
+#include <tightdb/build_config.h>
+#endif
+#ifndef TIGHTDB_INSTALLATION_BIN_PATH
+#define TIGHTDB_INSTALLATION_BIN_PATH "/usr/local/bin/"
+#endif
+
 // #define TIGHTDB_ENABLE_LOGFILE
 
 using namespace std;
 using namespace tightdb;
 
 // Constants controlling the amount of uncommited writes in flight:
-static const uint16_t MAX_WRITE_SLOTS = 100;
-static const uint16_t RELAXED_SYNC_THRESHOLD = 50;
+static const uint16_t max_write_slots = 100;
+static const uint16_t relaxed_sync_threshold = 50;
 
 // Constants controlling timeout behaviour during opening of a shared group
-static const int MAX_RETRIES_AWAITING_SHUTDOWN = 5;
+static const int max_retries_awaiting_shutdown = 5;
 // rough limits, milliseconds:
-static const int MAX_WAIT_FOR_OK_FILESIZE = 100;
-static const int MAX_WAIT_FOR_SHAREDINFO_VALID = 100;
-static const int MAX_WAIT_FOR_DAEMON_START = 100;
+static const int max_wait_for_ok_filesize = 100;
+static const int max_wait_for_sharedinfo_valid = 100;
+static const int max_wait_for_daemon_start = 100;
 
 struct SharedGroup::ReadCount {
     uint64_t version;
@@ -150,9 +157,9 @@ void spawn_daemon(const string& file)
         const char* exe = getenv("TIGHTDBD_PATH");
         if (exe == NULL)
 #ifndef TIGTHDB_DEBUG
-            exe = "/usr/local/bin/tightdbd";
+            exe = TIGHTDB_INSTALLATION_BIN_PATH "tightdbd";
 #else
-            exe = "/usr/local/bin/tightdbd-dbg";
+            exe = TIGHTDB_INSTALLATION_BIN_PATH "tightdbd-dbg";
 #endif
         execl(exe, exe, file.c_str(), (char*) NULL);
 
@@ -226,7 +233,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
     m_file_path = path + ".lock";
     bool must_retry;
-    int retry_count = MAX_RETRIES_AWAITING_SHUTDOWN;
+    int retry_count = max_retries_awaiting_shutdown;
     do {
         bool need_init = false;
         size_t info_size = 0;
@@ -246,7 +253,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
         }
 
         File::CloseGuard fcg(m_file);
-        int time_left = MAX_WAIT_FOR_OK_FILESIZE;
+        int time_left = max_wait_for_ok_filesize;
         while (1) {
             time_left--;
             // need to validate the size of the file before trying to map it
@@ -322,7 +329,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
         }
         else {
             // wait for init complete:
-            int wait_count = MAX_WAIT_FOR_SHAREDINFO_VALID;
+            int wait_count = max_wait_for_sharedinfo_valid;
             while (wait_count && (info->init_complete.load_acquire() == 0)) {
                 wait_count--;
                 micro_sleep(1000);
@@ -408,7 +415,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
         else {
             // In async mode we need to wait for the commit process to get ready
             SharedInfo* const info = m_file_map.get_addr();
-            int maxwait = MAX_WAIT_FOR_DAEMON_START;
+            int maxwait = max_wait_for_daemon_start;
             while (maxwait--) {
                 if (info->init_complete.load_acquire() == 2) {
                     return;
@@ -514,7 +521,7 @@ void SharedGroup::do_async_commits()
     // processes that that they can start commiting to the db.
     begin_read();
     uint64_t last_version = m_version;
-    info->free_write_slots = MAX_WRITE_SLOTS;
+    info->free_write_slots = max_write_slots;
     info->init_complete.store_release(2); // allow waiting clients to proceed
     m_group.detach();
 
@@ -602,13 +609,13 @@ void SharedGroup::do_async_commits()
         // We have caught up with the writers, let them know that there are
         // now free write slots, wakeup any that has been suspended.
         uint16_t free_write_slots = info->free_write_slots;
-        info->free_write_slots = MAX_WRITE_SLOTS;
+        info->free_write_slots = max_write_slots;
         if (free_write_slots <= 0) {
             info->room_to_write.notify_all();
         }
 
         // If we have plenty of write slots available, relax and wait a bit before syncing
-        if (free_write_slots > RELAXED_SYNC_THRESHOLD) {
+        if (free_write_slots > relaxed_sync_threshold) {
             timespec ts;
             timeval tv;
             // clock_gettime(CLOCK_REALTIME, &ts); <- would like to use this, but not there on mac
@@ -749,7 +756,7 @@ Group& SharedGroup::begin_write()
         info->balancemutex.lock(&recover_from_dead_write_transact); // Throws
 
         // if we are running low on write slots, kick the sync daemon
-        if (info->free_write_slots < RELAXED_SYNC_THRESHOLD)
+        if (info->free_write_slots < relaxed_sync_threshold)
             info->work_to_do.notify();
 
         // if we are out of write slots, wait for the sync daemon to catch up
