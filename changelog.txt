@@ -10,6 +10,9 @@ Format:
 - Removed/deprecated feature/method .... (user visible removed feature - passed on to release notes)
 . Any other notes .... 				     (internal changes)
 
+2013-10-10 (Kenneth Geisshirt)
+. Adding INTERACTIVE mode for the dist-config target in build.sh
+
 2013-10-09 (Kenneth Geisshirt) 
 . Adding dist-deb target in build.sh for building debian/ubuntu/mint packages. Moreover, the ubuntu/mint version is part of package name so maintaining repositories is easier.
 
