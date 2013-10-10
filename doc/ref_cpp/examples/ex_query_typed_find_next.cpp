@@ -25,14 +25,14 @@ int main()
     assert(m == 0);
 
     // Find successive matches
-    m = query.find_next(m + 1);
+    m = query.find(m + 1);
     assert(m == 1);
 
-    m = query.find_next(m + 1);
+    m = query.find(m + 1);
     assert(m == 3);
 
     // No more matches
-    m = query.find_next(m + 1);
+    m = query.find(m + 1);
     assert(m == size_t(-1));
 // @@Fold@@
 }

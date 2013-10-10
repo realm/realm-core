@@ -60,7 +60,7 @@ void VerifiedString::set(size_t ndx, StringData value)
 void VerifiedString::erase(size_t ndx)
 {
     v.erase(v.begin() + ndx);
-    u.erase(ndx, ndx == u.size());
+    u.erase(ndx, ndx + 1 == u.size());
     TIGHTDB_ASSERT(v.size() == u.size());
     verify_neighbours(ndx);
     TIGHTDB_ASSERT(conditional_verify());

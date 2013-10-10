@@ -1130,11 +1130,20 @@ EOF
         ERROR=""
         echo "CONFIGURING Core library" | tee -a "$LOG_FILE"
         rm -f ".DIST_WAS_CONFIGURED" || exit 1
-        if sh "build.sh" config >>"$LOG_FILE" 2>&1; then
-            touch ".DIST_WAS_CONFIGURED" || exit 1
+        if [ -z "$INTERACTIVE" ]; then
+            if sh "build.sh" config >>"$LOG_FILE" 2>&1; then
+                touch ".DIST_WAS_CONFIGURED" || exit 1
+            else
+                echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                ERROR="1"
+            fi
         else
-            echo "Failed!" | tee -a "$LOG_FILE" 1>&2
-            ERROR="1"
+            if INTERACTIVE=1 sh "build.sh" config 2>&1 | tee -a "$LOG_FILE"; then
+                touch ".DIST_WAS_CONFIGURED" || exit 1
+            else
+                echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                ERROR="1"
+            fi
         fi
         if [ -z "$ERROR" ]; then
             mkdir "$TEMP_DIR/select" || exit 1
@@ -1151,11 +1160,18 @@ EOF
                 rm -f "$EXT_HOME/.DIST_WAS_CONFIGURED" || exit 1
                 if [ -e "$TEMP_DIR/select/$x" ]; then
                     echo "CONFIGURING Extension '$x'" | tee -a "$LOG_FILE"
-                    if sh "$EXT_HOME/build.sh" config >>"$LOG_FILE" 2>&1; then
-                        touch "$EXT_HOME/.DIST_WAS_CONFIGURED" || exit 1
+                    if [ -z "$INTERACTIVE" ]; then
+                        if sh "$EXT_HOME/build.sh" config >>"$LOG_FILE" 2>&1; then
+                            touch "$EXT_HOME/.DIST_WAS_CONFIGURED" || exit 1
+                        else
+                            echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                            ERROR="1"
+                        fi
                     else
-                        echo "Failed!" | tee -a "$LOG_FILE" 1>&2
-                        ERROR="1"
+                        if INTERACTIVE=1 sh "$EXT_HOME/build.sh" config 2>&1 | tee -a "$LOG_FILE"; then
+                            touch "$EXT_HOME/.DIST_WAS_CONFIGURED" || exit 1
+                            ERROR="1"
+                        fi
                     fi
                 fi
             done
@@ -1169,7 +1185,9 @@ more dependencies. Check the README file for details. If this does not
 help, check the log file.
 The log file is here: $LOG_FILE
 EOF
-            exit 1
+            if [ -z "$INTERACTIVE" ]; then
+                exit 1
+            fi
         fi
         exit 0
         ;;
@@ -1682,13 +1700,19 @@ EOF
         exit 0
         ;;
 
+    "dist-deb")
+        codename=$(lsb_release -s -c)
+        (cd debian && sed -e "s/@CODENAME@/$codename/g" changelog.in > changelog) || exit 1
+        dpkg-buildpackage -rfakeroot -us -uc || exit 1
+        exit 0
+        ;;
+
     *)
         echo "Unspecified or bad mode '$MODE'" 1>&2
         echo "Available modes are: config clean build build-iphone test test-debug install uninstall test-installed wipe-installed" 1>&2
         echo "As well as: install-shared install-devel uninstall-shared uninstall-devel dist-copy" 1>&2
-        echo "As well as: src-dist bin-dist dist-status dist-pull dist-checkout" 1>&2
+        echo "As well as: src-dist bin-dist dist-deb dist-status dist-pull dist-checkout" 1>&2
         echo "As well as: dist-config dist-clean dist-build dist-build-iphone dist-install dist-uninstall dist-test-installed" 1>&2
         exit 1
         ;;
-
 esac

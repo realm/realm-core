@@ -235,7 +235,6 @@ public:
     /// \tparam T An instance of the BasicTable<> class template.
     TableRef      get_table(StringData name);
     TableRef      get_table(StringData name, bool& was_created);
-
     ConstTableRef get_table(StringData name) const;
     template<class T> typename T::Ref      get_table(StringData name);
     template<class T> typename T::ConstRef get_table(StringData name) const;
