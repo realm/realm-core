@@ -25,6 +25,36 @@ TIGHTDB_TABLE_2(TupleTableType,
                 second, String)
 }
 
+TEST(DeleteCrash)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    Spec& s = table->get_spec();
+    s.add_column(type_String, "name");
+    s.add_column(type_Int,    "age");
+    table->update_from_spec();
+
+    table->add_empty_row();
+    table->set_string(0, 0, "Alice");
+    table->insert_int(1, 0, 27);
+
+    table->add_empty_row();
+    table->set_string(0, 1, "Bob");
+    table->insert_int(1, 1, 50);
+
+    table->add_empty_row();
+    table->set_string(0, 2, "Peter");
+    table->insert_int(1, 2, 44);
+
+    // Here it thinks second column has 6 rows?!
+    table->remove(0);
+
+    // This crashes. It thinks that the second column has 5 rows now
+    table->remove(1);
+}
+
+
 TEST(TestOptimizeCrash)
 {
     // This will crash at the .add() method
