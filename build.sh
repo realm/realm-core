@@ -242,6 +242,22 @@ get_compiler_info()
     fi
 }
 
+new_dist_log_path()
+{
+    local stem temp_dir dir files
+    stem="$1"
+    temp_dir="$2"
+    if [ "$TIGHTDB_DIST_HOME" ]; then
+        dir="$TIGHTDB_DIST_HOME/log"
+    else
+        dir="$temp_dir/log"
+    fi
+    mkdir -p "$dir" || return 1
+    files="$(cd "$dir" && (ls *.log 2>/dev/null || true))" || return 1
+    max="$(printf "%s\n" "$files" | grep '^[0-9][0-9]*_' | cut -d_ -f1 | sort -n | tail -n1)"
+    next="$((max+1))" || return 1
+    printf "%s\n" "$dir/$(printf "%03d" "$next")_$stem.log"
+}
 
 
 case "$MODE" in
@@ -586,7 +602,7 @@ EOF
 
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist.XXXX)" || exit 1
 
-        LOG_FILE="$TEMP_DIR/build.log"
+        LOG_FILE="$TEMP_DIR/build-dist.log"
         log_message()
         {
             local msg
@@ -707,6 +723,7 @@ EOF
             # Setup package directory
             PKG_DIR="$TEMP_DIR/$NAME"
             mkdir "$PKG_DIR" || exit 1
+            mkdir "$PKG_DIR/log" || exit 1
             INSTALL_ROOT="$TEMP_DIR/install"
             mkdir "$INSTALL_ROOT" || exit 1
 
@@ -737,6 +754,9 @@ EOF
 
             cat >"$PKG_DIR/build" <<EOF
 #!/bin/sh
+
+TIGHTDB_DIST_HOME="\$(cd "\$(dirname "\$0")" && pwd)" || exit 1
+export TIGHTDB_DIST_HOME
 
 EXTENSIONS="$AUGMENTED_EXTENSIONS"
 
@@ -853,8 +873,8 @@ EOF
 
             cat >>"$PKG_DIR/README" <<EOF
 
-For information on prerequisites when building each extension, see the
-README.md file in the corresponding subdirectory.
+For information on prerequisites of the each individual extension, see
+the README.md file in the corresponding subdirectory.
 EOF
 
             if [ "$INCLUDE_IPHONE" ]; then
@@ -870,6 +890,15 @@ Files produced for extension EXT will be placed in a subdirectory
 named "iphone-EXT".
 EOF
             fi
+
+
+            cat >>"$PKG_DIR/README" <<EOF
+
+Note that each build step creates a new log file in the subdirectory
+called "log". When contacting TightDB at <support@tightdb.com> because
+of a problem in the installation process, we recommend that you attach
+all these log files as a bundle to your mail.
+EOF
 
             for x in $AVAIL_EXTENSIONS; do
                 EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
@@ -1116,7 +1145,7 @@ EOF
 
     "dist-config")
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-config.XXXX)" || exit 1
-        LOG_FILE="$TEMP_DIR/config.log"
+        LOG_FILE="$(new_dist_log_path "config" "$TEMP_DIR")" || exit 1
         (
             echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
@@ -1206,7 +1235,7 @@ EOF
             exit 1
         fi
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-clean.XXXX)" || exit 1
-        LOG_FILE="$TEMP_DIR/clean.log"
+        LOG_FILE="$(new_dist_log_path "clean" "$TEMP_DIR")" || exit 1
         ERROR=""
         rm -f ".DIST_WAS_BUILT" || exit 1
         if [ "$1" = "bin-core" ]; then
@@ -1247,7 +1276,7 @@ EOF
             exit 1
         fi
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-build.XXXX)" || exit 1
-        LOG_FILE="$TEMP_DIR/build.log"
+        LOG_FILE="$(new_dist_log_path "build" "$TEMP_DIR")" || exit 1
         (
             echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
@@ -1335,7 +1364,7 @@ EOF
             exit 1
         fi
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-build-iphone.XXXX)" || exit 1
-        LOG_FILE="$TEMP_DIR/build.log"
+        LOG_FILE="$(new_dist_log_path "build-iphone" "$TEMP_DIR")" || exit 1
         (
             echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
@@ -1420,7 +1449,7 @@ EOF
         fi
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-install.XXXX)" || exit 1
         chmod a+rx "$TEMP_DIR" || exit 1
-        LOG_FILE="$TEMP_DIR/install.log"
+        LOG_FILE="$(new_dist_log_path "install" "$TEMP_DIR")" || exit 1
         (
             echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
@@ -1515,7 +1544,7 @@ EOF
         fi
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-uninstall.XXXX)" || exit 1
         chmod a+rx "$TEMP_DIR" || exit 1
-        LOG_FILE="$TEMP_DIR/uninstall.log"
+        LOG_FILE="$(new_dist_log_path "uninstall" "$TEMP_DIR")" || exit 1
         (
             echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
@@ -1572,7 +1601,7 @@ EOF
             exit 1
         fi
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-test-installed.XXXX)" || exit 1
-        LOG_FILE="$TEMP_DIR/test.log"
+        LOG_FILE="$(new_dist_log_path "test-installed" "$TEMP_DIR")" || exit 1
         (
             echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
