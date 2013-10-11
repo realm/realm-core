@@ -182,10 +182,6 @@ void ColumnMixed::fill(size_t count)
         m_types->insert(i, mixcol_Int);
     for (size_t i = 0; i < count; ++i)
         m_refs->insert(i, 1); // 1 is zero shifted one and low bit set;
-
-#ifdef TIGHTDB_DEBUG
-    Verify();
-#endif
 }
 
 

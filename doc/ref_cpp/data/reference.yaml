@@ -5,14 +5,16 @@ ID        : cpp
 TITLE     : 'C++'
 STATUS:
   CODE    : Beta
-  DESCR   : All the features of TightDB are fully functional and tested and used in production.
-            It is however to be considered beta software, and changes to the API based on user feedback
-            should still be expected.
-            The latest feature "Asynchroneous" durability in SharedGroup, should still be considered 
-            "experiemental", due to the limited test hours performed for such a new feature.
+  DESCR   : All the features of TightDB are fully functional and tested and used 
+            by some companies in production.
+            It is however to be considered beta software, and changes to the API
+            based on user feedback should still be expected.
+            The latest feature "Asynchroneous" durability in SharedGroup, should
+            still be considered "experimental", due to the limited exposure to 
+            customer usage for such a new feature.
 DESCR     : &g_introduction_descr
             >
-            The goal of TightDB is to provide a high performance
+            The goal of TightDB is to provide high performance
             data storage for your applications.
 
             TightDB integrates seamless in your programming language, making it
@@ -69,6 +71,8 @@ CATEGORIES:                       # list global class-id in order of appearence
 - Helpers:
   - mixed
 #  - cursor
+- Experimental:
+  - next_gen_query
 
 EXAMPLES  :
 - DESCR   :
