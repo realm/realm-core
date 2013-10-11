@@ -44,3 +44,5 @@
 /libtightdb-iPhoneSimulator-dbg.a
 /tightdb-config-ios
 /tightdb-config-ios-dbg
+
+/build_config.h
