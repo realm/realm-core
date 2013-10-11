@@ -299,7 +299,8 @@ CATEGORIES:
       PARAMS:
       - NAME   : size_in_bytes
         TYPES  : std::size_t
-        DESCR  : The total number of bytes to reserve on disk for this database.
+        DESCR  : &g_shared_group_reserve_parm1
+                 The total number of bytes to reserve on disk for this database.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_shared_group_reserve
@@ -317,7 +318,8 @@ CATEGORIES:
                  ok to call it at regular intervals (like in the idle handler of an application).
       RETURN:
         TYPES  : bool
-        DESCR  : <code>true</code> if it has changed, <code>false</code> otherwise.
+        DESCR  : &g_shared_group_has_changed_return
+                 <code>true</code> if it has changed, <code>false</code> otherwise.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_has_changed
         DESCR  :

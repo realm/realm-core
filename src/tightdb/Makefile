@@ -1,14 +1,20 @@
-# Temporary hack due to public dependency on query_engine.hpp in
-# Lasses new "query expressions" implementation.
-INST_HEADERS = $(wildcard *.h *.hpp)
+INST_HEADERS = config.h meta.hpp assert.hpp exceptions.hpp terminate.hpp type_list.hpp tuple.hpp \
+bind.hpp safe_int_ops.hpp unique_ptr.hpp bind_ptr.hpp buffer.hpp string_buffer.hpp file.hpp \
+thread.hpp utf8.hpp utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp \
+data_type.hpp column_type.hpp column_fwd.hpp spec.hpp datetime.hpp string_data.hpp binary_data.hpp \
+mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp table_accessors.hpp table_basic.hpp \
+table_view.hpp table_view_basic.hpp table_macros.hpp group.hpp group_shared.hpp query.hpp \
+query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h replication.hpp importer.hpp
 
-#INST_HEADERS = config.h meta.hpp assert.hpp exceptions.hpp terminate.hpp type_list.hpp tuple.hpp \
-#bind.hpp safe_int_ops.hpp unique_ptr.hpp bind_ptr.hpp buffer.hpp string_buffer.hpp file.hpp \
-#thread.hpp utf8.hpp utilities.hpp alloc.hpp alloc_slab.hpp array.hpp array_string.hpp \
-#data_type.hpp column_type.hpp column_fwd.hpp spec.hpp datetime.hpp string_data.hpp binary_data.hpp \
-#mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp table_accessors.hpp table_basic.hpp \
-#table_view.hpp table_view_basic.hpp table_macros.hpp group.hpp group_shared.hpp query.hpp \
-#query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h replication.hpp
+# Temporary hack due to public dependency on query_engine.hpp in
+# Lasses new "query expressions" implementation. None of these should
+# really be installed.
+INST_HEADERS += array_basic.hpp array_basic_tpl.hpp array_binary.hpp array_blob.hpp \
+array_blobs_big.hpp array_string_long.hpp column_basic.hpp column_basic_tpl.hpp column_binary.hpp \
+column.hpp column_mixed.hpp column_mixed_tpl.hpp column_string_enum.hpp column_string.hpp \
+column_table.hpp column_tpl.hpp group_writer.hpp index_string.hpp query_engine.hpp \
+query_expression.hpp
+
 
 lib_LIBRARIES = libtightdb.a
 bin_PROGRAMS  = tightdbd tightdb-import
@@ -52,20 +58,37 @@ tightdbd_LIBS = libtightdb.a
 tightdb_import_SOURCES = importer_tool.cpp
 tightdb_import_LIBS    = libtightdb.a
 
-GENERATED_SOURCES = table_macros.hpp
+ifneq ($(TIGHTDB_HAVE_CONFIG),)
+INST_HEADERS += build_config.h
+GENERATED_SOURCES += build_config.h
+endif
+
+ifeq ($(DISABLE_CHEETAH_CODE_GEN),)
+GENERATED_SOURCES += table_macros.hpp
+endif
+
 
 include ../../generic.mk
 
+
 # Code generation
+
+ifneq ($(TIGHTDB_HAVE_CONFIG),)
+build_config.h: ../../config config.sh
+	$(SHELL) config.sh $< $@
+endif
+
 ifeq ($(DISABLE_CHEETAH_CODE_GEN),)
-table_macros.hpp: table_macros.hpp.cheetah
+table_macros.hpp: table_macros.hpp.cheetah cheetah.sh
 	$(SHELL) cheetah.sh $< $@
 endif
+
 
 uninstall/extra:
 	$(RM) $(DESTDIR)$(includedir)/tightdb/*.hpp
 	$(RM) $(DESTDIR)$(includedir)/tightdb/*.h
 	-rmdir $(DESTDIR)$(includedir)/tightdb
+
 
 # Used by ../../build.sh
 .PHONY: get-inst-headers get-inst-libraries get-inst-programs
