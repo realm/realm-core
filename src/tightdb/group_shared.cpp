@@ -813,7 +813,7 @@ void SharedGroup::commit()
         // fails, then the transaction is not completed. A subsequent call
         // to rollback() must roll it back.
         if (Replication* repl = m_group.get_replication()) {
-            new_version = repl->commit_write_transact(*this, info->current_version); // Throws
+            new_version = repl->commit_write_transact(*this, info->current_version.load_relaxed()); // Throws
         }
         else {
             new_version = info->current_version.load_relaxed() + 1; 
