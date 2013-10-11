@@ -8,6 +8,8 @@
 
 using namespace tightdb;
 
+// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
+// will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
 namespace {
 
@@ -23,7 +25,7 @@ void set_capacity(char* header, size_t value)
 } // anonymous namespace
 
 
-TEST(Alloc1)
+ONLY(Alloc1)
 {
     SlabAlloc alloc;
     CHECK(!alloc.is_attached());
