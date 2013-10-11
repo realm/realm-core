@@ -2,12 +2,14 @@
 # C++ reference documentation for the Next-generation syntax.
 #
 
+# TODO: Move to two seperate sections in Query (typed) and Query (dynamic)
+
 ID         : class_next_gen_query
-TITLE      : Next-Generation Query Syntax
-SUMMARY    : none
+TITLE      : Query Expressions
+SUMMARY    : New experimental query expression interface.
 DESCR      : >
             <p>This particular feature is <b>experimental</b> and must be considered unstable.<p>
-            <p>The Next-Generation Query Syntax lets you write expressions like:</p>
+            <p>The New Query expression syntax lets you write expressions like:</p>
             <tt>&nbsp;&nbsp;&nbsp;Query q = books.column().pages >= 200 && books.column().author == "Griffiths";
             <br>
             &nbsp;&nbsp;&nbsp;size_t match = q.find();
@@ -16,7 +18,7 @@ DESCR      : >
             <p>If books is a <em>dynamic </em>table you need to specify column types as template arguments and 
             give their column number in parentheses:</p>
             
-            <tt>&nbsp;&nbsp;&nbsp;Query q = books.column<Int>(0) >= 200 && books.column<String>(1).author == "Griffiths";
+            <tt>&nbsp;&nbsp;&nbsp;Query q = books.column&lt;Int&gt;(0).pages &gt;= 200 && books.column&lt;String&gt;(1).author == "Griffiths";
             <br>&nbsp;&nbsp;&nbsp;size_t match = q.find();         
             </tt>
             <p>Queries can only perform simple searches on a single table - all 
@@ -31,7 +33,7 @@ DESCR      : >
             <tr><td>{@link class_dyn_query}
             </td>
             <td>Returned by compare operators, logical operators and parantheses. 
-            You can perform methods like <code>find()</code>, <code>find_all()</code>, <code>maximum()</code>, etc, 
+            You can perform methods like <code>find()</code>, <code>find_all()</code>, <code>maximum*()</code>, etc, 
             on it.</td>
             </tr>
             <tr><td valign="top"><tt>
@@ -48,7 +50,8 @@ DESCR      : >
             &nbsp;&nbsp;&nbsp;Columns&lt;String&gt; author = untyped.column&lt;String&gt;(2);<br />
             </tt><br />
             These free standing column objects have no methods 
-            available and are only meant to be used as shorthand references in queries.</td>
+            available and are only meant to be used as shorthand references in queries.
+            See the examples at the end of this page.</td>
             </tr>
             </tbody>
             </table>
@@ -167,21 +170,22 @@ DESCR      : >
 
             <tt>&nbsp;&nbsp;&nbsp;table.columns().float_column + 123 > table.columns().double_column;</tt>
 
-            <p>This behaves like when type casting as follows:</p>
+            <p>This behaves similar to type casting as follows:</p>
 
             <tt>&nbsp;&nbsp;&nbsp;double(table.columns().float_column + float(123)) > table.columns().double_column;</tt>
 
             <p>As for regular C++ expressions, be aware of caveats. For example 
-            <tt>float(100000005) == 100000008</tt> because of the gap between values that can be 
-            represented by a float. This can lead to errorneous arithmetic and comparisons.</p>
-EXAMPLES:                          # Optional
+            <tt>float(100000005) == 100000008</tt> because there is a gap between
+            values which can be represented by a float. This can lead to errorneous
+            arithmetic and comparisons.</p>
+EXAMPLES:
 - CODE     : ex_cpp_ng_query_typed
-  DESCR    : Typed table
+  DESCR    : Typed table.
 - CODE     : ex_cpp_ng_query_untyped
-  DESCR    : Untyped table
+  DESCR    : Dynamic table.
 CATEGORIES:
-- none:
+- None:
   METHODS:
   #-------------------------------
   - g_method_will_be_made_later:
-      TODO     : later            # Method is marked for later implementation
+      TODO     : later
