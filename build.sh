@@ -20,6 +20,8 @@ IPHONE_EXTENSIONS="objc"
 IPHONE_PLATFORMS="iPhoneOS iPhoneSimulator"
 IPHONE_DIR="iphone-lib"
 
+# Used by Makefiles
+export TIGHTDB_HAVE_CONFIG="1"
 
 map_ext_name_to_dir()
 {
@@ -250,6 +252,7 @@ case "$MODE" in
             install_prefix="/usr/local"
         fi
         install_libdir="$(make prefix="$install_prefix" get-libdir)" || exit 1
+        install_bindir="$install_prefix/bin" || exit 1
 
         xcode_home="none"
         if [ "$OS" = "Darwin" ]; then
@@ -298,6 +301,7 @@ case "$MODE" in
         cat >"config" <<EOF
 install-prefix:    $install_prefix
 install-libdir:    $install_libdir
+install-bindir:    $install_bindir
 xcode-home:        $xcode_home
 iphone-sdks:       ${iphone_sdks:-none}
 iphone-sdks-avail: $iphone_sdks_avail

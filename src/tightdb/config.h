@@ -23,7 +23,11 @@
 
 /* This one is needed to allow tightdb-config to know whether a
  * nondefault value is in effect. */
-#define TIGHTDB_DEFAULT_MAX_LIST_SIZE 1000
+#ifdef TIGHTDB_DEBUG
+#  define TIGHTDB_DEFAULT_MAX_LIST_SIZE 4
+#else
+#  define TIGHTDB_DEFAULT_MAX_LIST_SIZE 1000
+#endif
 
 /* The maximum number of elements in a B+-tree node. You may override
  * this on the compiler command line. The minimum allowable value is

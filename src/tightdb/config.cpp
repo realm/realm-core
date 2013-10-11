@@ -88,6 +88,10 @@ int main(int argc, char* argv[])
 
 
     if (emit_cflags) {
+#ifdef TIGHTDB_HAVE_CONFIG
+        emit_flags("-DTIGHTDB_HAVE_CONFIG");
+#endif
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
         emit_flags("-DTIGHTDB_ENABLE_REPLICATION");
 #endif
