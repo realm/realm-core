@@ -12,10 +12,11 @@
 
 #include "testsettings.hpp"
 
-
 using namespace std;
 using namespace tightdb;
 
+// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
+// will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
 namespace {
 
