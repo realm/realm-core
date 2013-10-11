@@ -889,8 +889,8 @@ EOF
                 message "Building core library"
                 (sh build.sh clean && sh build.sh build) >>"$LOG_FILE" 2>&1 || exit 1
 
-                message "Running test suite for core library"
-                if ! sh build.sh test >>"$LOG_FILE" 2>&1; then
+                message "Running test suite for core library in debug mode"
+                if ! sh build.sh test-debug >>"$LOG_FILE" 2>&1; then
                     warning "Test suite failed for core library"
                 fi
 
@@ -973,8 +973,8 @@ EOF
                 message "Building core library"
                 sh "$TEST_PKG_DIR/tightdb/build.sh" build >>"$LOG_FILE" 2>&1 || exit 1
 
-                message "Running test suite for core library"
-                if ! sh "$TEST_PKG_DIR/tightdb/build.sh" test >>"$LOG_FILE" 2>&1; then
+                message "Running test suite for core library in debug mode"
+                if ! sh "$TEST_PKG_DIR/tightdb/build.sh" test-debug >>"$LOG_FILE" 2>&1; then
                     warning "Test suite failed for core library"
                 fi
             fi
@@ -993,10 +993,10 @@ EOF
             # to CPATH above.
             path_list_prepend LIBRARY_PATH "$TEST_PKG_DIR/tightdb/src/tightdb" || exit 1
 
-            # FIXME: The problem with this one that it partially
-            # destroys the value of the build test. We should instead
-            # transfer the iOS target files to a special temporary
-            # proforma directory, and add that diretory to
+            # FIXME: The problem with this one is that it partially
+            # destroys the reliability of the build test. We should
+            # instead transfer the iOS target files to a special
+            # temporary proforma directory, and add that diretory to
             # LIBRARY_PATH and PATH above.
 
             message "Testing state of core library installation"
@@ -1015,8 +1015,8 @@ EOF
                     if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" build >>"$LOG_FILE" 2>&1; then
                         warning "Failed to build extension '$x'"
                     else
-                        log_message "Running test suite for extension '$x'"
-                        if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" test >>"$LOG_FILE" 2>&1; then
+                        log_message "Running test suite for extension '$x' in debug mode"
+                        if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" test-debug >>"$LOG_FILE" 2>&1; then
                             warning "Test suite failed for extension '$x'"
                         fi
                         log_message "Installing extension '$x' to test location"
