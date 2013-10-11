@@ -25,7 +25,7 @@ void set_capacity(char* header, size_t value)
 } // anonymous namespace
 
 
-ONLY(Alloc1)
+TEST(Alloc1)
 {
     SlabAlloc alloc;
     CHECK(!alloc.is_attached());
