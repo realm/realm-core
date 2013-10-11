@@ -43,18 +43,26 @@ template<class T> class IPMFile
 
 public:
     // Intro
+
     // An IPMFile can be in one of the following states:
+    //
     // - nonexisting: the file does not exist.
+    //
     // - stale: the file exists, but noone is accessing it.
-    // - exclusive: the file exists, has been initialized and mapped
-    //              and a single thread has access to the file.
-
-    // WHAT ABOUT LOCKED??
-
+    //
     // - shared: the file exists, has been initialized and mapped
     //           and multiple threads have access to the file.
+    //
+    // - exclusive: the file exists, has been initialized and mapped
+    //              and a single thread has access to the file. Further
+    //              more, no other thread can complete the 'open' call
+    //              and transition the file to shared state, until the thread
+    //              with exclusive access explicitly chooses to share the file
+    //              or crashes.
+    //
     // - indeterminate: the file exists, but it cannot be determined that
-    //                  noone is accessing it.
+    //                  noone is accessing it. Such files are NEVER automatically
+    //                  deleted or reinitialized.
 
     // The tasks of the IPMFile abstraction is as follows:
     // 1) To minimize the occurence of indeterminate IPMFiles, to properly
@@ -83,13 +91,11 @@ public:
     // unmap memory and close the file.
     void close();
 
-    // Try to obtain exclusive access. Returns true if the file is in exclusive
-    // state, false otherwise.
+    // Try to obtain exclusive access. Returns true if the caller is guaranteed to
+    // be the only accessor of the file. If succesfull, other threads trying to open
+    // the file will wait for this thread to share() the file again (or die).
     bool got_exclusive_access();
 
-    // Other state changes:
-    // The following state changes occur autonomously as a result of other system
-    // activities.
 }
 
 }
