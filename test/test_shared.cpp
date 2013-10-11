@@ -133,6 +133,7 @@ TEST(Shared_Stale_Lock_File_CopiedAtCommit)
         SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
         {
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1->add(1, 2, false, "test");
             wt.commit();
@@ -239,6 +240,7 @@ TEST(Shared_Initial2)
             // Add a new table
             {
                 WriteTransaction wt(sg2);
+                wt.get_group().Verify();
                 TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
                 t1->add(1, 2, false, "test");
                 wt.commit();
@@ -248,6 +250,7 @@ TEST(Shared_Initial2)
         // Verify that the new table has been added
         {
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
             CHECK_EQUAL(1, t1->size());
             CHECK_EQUAL(1, t1[0].first);
@@ -285,6 +288,7 @@ TEST(Shared_Initial2_Mem)
             // Add a new table
             {
                 WriteTransaction wt(sg2);
+                wt.get_group().Verify();
                 TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
                 t1->add(1, 2, false, "test");
                 wt.commit();
@@ -294,6 +298,7 @@ TEST(Shared_Initial2_Mem)
         // Verify that the new table has been added
         {
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
             CHECK_EQUAL(1, t1->size());
             CHECK_EQUAL(1, t1[0].first);
@@ -321,6 +326,7 @@ TEST(Shared1)
         // Create first table in group
         {
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1->add(1, 2, false, "test");
             wt.commit();
@@ -330,6 +336,7 @@ TEST(Shared1)
         SharedGroup sg2("test_shared.tightdb");
         {
             ReadTransaction rt(sg2);
+            rt.get_group().Verify();
 
             // Verify that last set of changes are commited
             TestTableShared::ConstRef t2 = rt.get_table<TestTableShared>("test");
@@ -342,6 +349,7 @@ TEST(Shared1)
             // Do a new change while stil having current read transaction open
             {
                 WriteTransaction wt(sg);
+                wt.get_group().Verify();
                 TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
                 t1->add(2, 3, true, "more test");
                 wt.commit();
@@ -359,6 +367,7 @@ TEST(Shared1)
             // so we know that it does not overwrite data held by
             {
                 WriteTransaction wt(sg);
+                wt.get_group().Verify();
                 TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
                 t1->add(0, 1, false, "even more test");
                 wt.commit();
@@ -376,6 +385,7 @@ TEST(Shared1)
         // Start a new read transaction and verify that it can now see the changes
         {
             ReadTransaction rt(sg2);
+            rt.get_group().Verify();
             TestTableShared::ConstRef t3 = rt.get_table<TestTableShared>("test");
 
             CHECK(t3->size() == 3);
@@ -411,6 +421,7 @@ TEST(Shared_rollback)
         // Create first table in group (but rollback)
         {
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1->add(1, 2, false, "test");
             // Note: Implicit rollback
@@ -419,12 +430,14 @@ TEST(Shared_rollback)
         // Verify that no changes were made
         {
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             CHECK_EQUAL(false, rt.get_group().has_table("test"));
         }
 
         // Really create first table in group
         {
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1->add(1, 2, false, "test");
             wt.commit();
@@ -433,6 +446,7 @@ TEST(Shared_rollback)
         // Verify that the changes were made
         {
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
             CHECK(t->size() == 1);
             CHECK_EQUAL(1, t[0].first);
@@ -444,6 +458,7 @@ TEST(Shared_rollback)
         // Greate more changes (but rollback)
         {
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1->add(0, 0, true, "more test");
             // Note: Implicit rollback
@@ -452,6 +467,7 @@ TEST(Shared_rollback)
         // Verify that no changes were made
         {
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
             CHECK(t->size() == 1);
             CHECK_EQUAL(1, t[0].first);
@@ -478,6 +494,7 @@ TEST(Shared_Writes)
         // Create first table in group
         {
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1->add(0, 2, false, "test");
             wt.commit();
@@ -486,6 +503,7 @@ TEST(Shared_Writes)
         // Do a lot of repeated write transactions
         for (size_t i = 0; i < 100; ++i) {
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1[0].first += 1;
             wt.commit();
@@ -494,6 +512,7 @@ TEST(Shared_Writes)
         // Verify that the changes were made
         {
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
             const int64_t v = t[0].first;
             CHECK_EQUAL(100, v);
@@ -545,6 +564,7 @@ TEST(Shared_ManyReaders)
         // Add two tables
         {
             WriteTransaction wt(root_sg);
+            wt.get_group().Verify();
             TableRef test_1 = wt.get_table("test_1");
             test_1->add_column(type_Int, "i");
             test_1->insert_int(0,0,0);
@@ -562,6 +582,7 @@ TEST(Shared_ManyReaders)
         // Initiate 2*N read transactions with progressive changes
         for (int i = 0; i < 2*N; ++i) {
             read_transactions[i].reset(new ReadTransaction(*shared_groups[i]));
+            read_transactions[i]->get_group().Verify();
             {
                 ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
                 CHECK_EQUAL(1u, test_1->size());
@@ -577,6 +598,7 @@ TEST(Shared_ManyReaders)
             }
             {
                 WriteTransaction wt(root_sg);
+                wt.get_group().Verify();
                 TableRef test_1 = wt.get_table("test_1");
                 test_1->add_int(0,1);
                 TableRef test_2 = wt.get_table("test_2");
@@ -586,6 +608,7 @@ TEST(Shared_ManyReaders)
             }
             {
                 WriteTransaction wt(root_sg);
+                wt.get_group().Verify();
                 TableRef test_2 = wt.get_table("test_2");
                 for (int j = 0; j < 18; ++j) {
                     test_2->insert_binary(0, test_2->size(), BinaryData(chunk_2));
@@ -615,6 +638,7 @@ TEST(Shared_ManyReaders)
         for (int i = N-1; i >= 0; --i) {
             {
                 WriteTransaction wt(root_sg);
+                wt.get_group().Verify();
                 TableRef test_1 = wt.get_table("test_1");
                 test_1->add_int(0,2);
                 wt.commit();
@@ -638,6 +662,7 @@ TEST(Shared_ManyReaders)
         // Initiate 6*N extra read transactionss with further progressive changes
         for (int i = 2*N; i < 8*N; ++i) {
             read_transactions[i].reset(new ReadTransaction(*shared_groups[i]));
+            read_transactions[i]->get_group().Verify();
             {
                 ConstTableRef test_1 = read_transactions[i]->get_table("test_1");
                 CHECK_EQUAL(1u, test_1->size());
@@ -654,6 +679,7 @@ TEST(Shared_ManyReaders)
             }
             {
                 WriteTransaction wt(root_sg);
+                wt.get_group().Verify();
                 TableRef test_1 = wt.get_table("test_1");
                 test_1->add_int(0,1);
                 TableRef test_2 = wt.get_table("test_2");
@@ -663,6 +689,7 @@ TEST(Shared_ManyReaders)
             }
             {
                 WriteTransaction wt(root_sg);
+                wt.get_group().Verify();
                 TableRef test_2 = wt.get_table("test_2");
                 for (int j = 0; j < 18; ++j) {
                     test_2->insert_binary(0, test_2->size(), BinaryData(chunk_2));
@@ -676,6 +703,7 @@ TEST(Shared_ManyReaders)
         for (int i = 1*N; i < 8*N; ++i) {
             {
                 WriteTransaction wt(root_sg);
+                wt.get_group().Verify();
                 TableRef test_1 = wt.get_table("test_1");
                 test_1->add_int(0,2);
                 wt.commit();
@@ -701,6 +729,7 @@ TEST(Shared_ManyReaders)
         for (int i=0; i<8*N; ++i) {
             {
                 ReadTransaction rt(*shared_groups[i]);
+                rt.get_group().Verify();
                 ConstTableRef test_1 = rt.get_table("test_1");
                 CHECK_EQUAL(1, test_1->size());
                 CHECK_EQUAL(3*8*N, test_1->get_int(0,0));
@@ -720,6 +749,7 @@ TEST(Shared_ManyReaders)
         {
             SharedGroup sg("test.tightdb", false, SharedGroup::durability_MemOnly);
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             ConstTableRef test_1 = rt.get_table("test_1");
             CHECK_EQUAL(1, test_1->size());
             CHECK_EQUAL(3*8*N, test_1->get_int(0,0));
@@ -754,6 +784,7 @@ TEST(Shared_Writes_SpecialOrder)
 
     {
         WriteTransaction wt(sg);
+        wt.get_group().Verify();
         MyTable_SpecialOrder::Ref table = wt.get_table<MyTable_SpecialOrder>("test");
         for (int i=0; i<num_rows; ++i) {
             table->add(0);
@@ -765,6 +796,7 @@ TEST(Shared_Writes_SpecialOrder)
         for (int j=0; j<num_reps; ++j) {
             {
                 WriteTransaction wt(sg);
+                wt.get_group().Verify();
                 MyTable_SpecialOrder::Ref table = wt.get_table<MyTable_SpecialOrder>("test");
                 CHECK_EQUAL(j, table[i].first);
                 ++table[i].first;
@@ -775,6 +807,7 @@ TEST(Shared_Writes_SpecialOrder)
 
     {
         ReadTransaction rt(sg);
+        rt.get_group().Verify();
         MyTable_SpecialOrder::ConstRef table = rt.get_table<MyTable_SpecialOrder>("test");
         for (int i=0; i<num_rows; ++i) {
             CHECK_EQUAL(num_reps, table[i].first);
@@ -793,6 +826,7 @@ void increment_entry_thread(size_t row_ndx)
         // Increment cell
         {
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1[row_ndx].first += 1;
             // FIXME: For some reason this takes ages when running
@@ -808,6 +842,7 @@ void increment_entry_thread(size_t row_ndx)
         // read and write transactions
         {
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
             int64_t v = t[row_ndx].first;
@@ -834,6 +869,7 @@ TEST(Shared_WriterThreads)
         // Create first table in group
         {
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             for (size_t i = 0; i < thread_count; ++i) {
                 t1->add(0, 2, false, "test");
@@ -856,6 +892,7 @@ TEST(Shared_WriterThreads)
         // Verify that the changes were made
         {
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
             for (size_t i = 0; i < thread_count; ++i) {
@@ -892,6 +929,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
             // Child
             SharedGroup sg("test.tightdb");
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             TableRef table = wt.get_table("alpha");
             _exit(0); // Die with an active write transaction
         }
@@ -912,6 +950,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
         {
             SharedGroup sg("test.tightdb");
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             TableRef table = wt.get_table("beta");
             if (table->is_empty()) {
                 table->add_column(type_Int, "i");
@@ -926,6 +965,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
     {
         SharedGroup sg("test.tightdb");
         ReadTransaction rt(sg);
+        rt.get_group().Verify();
         CHECK(!rt.has_table("alpha"));
         CHECK(rt.has_table("beta"));
         ConstTableRef table = rt.get_table("beta");
@@ -945,6 +985,7 @@ TEST(Shared_FormerErrorCase1)
     SharedGroup sg("test_shared.tightdb");
     {
         WriteTransaction wt(sg);
+        wt.get_group().Verify();
         TableRef table = wt.get_table("my_table");
         {
             Spec& spec = table->get_spec();
@@ -971,11 +1012,13 @@ TEST(Shared_FormerErrorCase1)
 
     {
         WriteTransaction wt(sg);
+        wt.get_group().Verify();
         wt.commit();
     }
 
     {
         WriteTransaction wt(sg);
+        wt.get_group().Verify();
         {
             TableRef table = wt.get_table("my_table");
             table->set_int(0, 0, 1);
@@ -985,6 +1028,7 @@ TEST(Shared_FormerErrorCase1)
 
     {
         WriteTransaction wt(sg);
+        wt.get_group().Verify();
         {
             TableRef table = wt.get_table("my_table");
             table->set_int(0, 0, 2);
@@ -994,6 +1038,7 @@ TEST(Shared_FormerErrorCase1)
 
     {
         WriteTransaction wt(sg);
+        wt.get_group().Verify();
         {
             TableRef table = wt.get_table("my_table");
             TableRef table2 = table->get_subtable(6, 0);
@@ -1010,6 +1055,7 @@ TEST(Shared_FormerErrorCase1)
 
     {
         WriteTransaction wt(sg);
+        wt.get_group().Verify();
         {
             TableRef table = wt.get_table("my_table");
             table->set_int(0, 0, 4);
@@ -1019,6 +1065,7 @@ TEST(Shared_FormerErrorCase1)
 
     {
         WriteTransaction wt(sg);
+        wt.get_group().Verify();
         {
             TableRef table = wt.get_table("my_table");
             TableRef table2 = table->get_subtable(6, 0);
@@ -1030,6 +1077,7 @@ TEST(Shared_FormerErrorCase1)
 
     {
         WriteTransaction wt(sg);
+        wt.get_group().Verify();
         {
             TableRef table = wt.get_table("my_table");
             TableRef table2 = table->get_subtable(6, 0);
@@ -1041,6 +1089,7 @@ TEST(Shared_FormerErrorCase1)
 
     {
         WriteTransaction wt(sg);
+        wt.get_group().Verify();
         {
             TableRef table = wt.get_table("my_table");
             TableRef table2 = table->get_subtable(6, 0);
@@ -1061,6 +1110,7 @@ TEST(Shared_FormerErrorCase1)
 
     {
         WriteTransaction wt(sg);
+        wt.get_group().Verify();
         TableRef table = wt.get_table("my_table");
         table = table->get_subtable(6, 0);
         table = table->get_subtable(1, 0);
@@ -1095,6 +1145,7 @@ TEST(Shared_FormerErrorCase2)
         SharedGroup sg("test_shared.tightdb");
         {
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             FormerErrorCase2_Table::Ref table = wt.get_table<FormerErrorCase2_Table>("table");
             table->add();
             table->add();
@@ -1135,6 +1186,7 @@ TEST(Shared_SpaceOveruse)
         // Do a lot of sequential transactions
         for (int i = 0; i < n_outer; ++i) {
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             OverAllocTable::Ref table = wt.get_table<OverAllocTable>("my_table");
             for (int j = 0; j < n_inner; ++j) {
                 table->add("x");
@@ -1145,6 +1197,7 @@ TEST(Shared_SpaceOveruse)
         // Verify that all was added correctly
         {
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             OverAllocTable::ConstRef table = rt.get_table<OverAllocTable>("my_table");
 
             const size_t count = table->size();
@@ -1154,9 +1207,7 @@ TEST(Shared_SpaceOveruse)
                 CHECK_EQUAL("x", table[i].text);
             }
 
-#ifdef TIGHTDB_DEBUG
             table->Verify();
-#endif
         }
     }
 }
@@ -1191,6 +1242,7 @@ TEST(Shared_Notifications)
             // Add a new table
             {
                 WriteTransaction wt(sg2);
+                wt.get_group().Verify();
                 TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
                 t1->add(1, 2, false, "test");
                 wt.commit();
@@ -1203,6 +1255,7 @@ TEST(Shared_Notifications)
         // Verify that the new table has been added
         {
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
             CHECK_EQUAL(1, t1->size());
             CHECK_EQUAL(1, t1[0].first);
@@ -1236,6 +1289,7 @@ TEST(Shared_FromSerialized)
     // Verify that contents is there when shared
     {
         ReadTransaction rt(sg);
+        rt.get_group().Verify();
         TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
         CHECK_EQUAL(1, t1->size());
         CHECK_EQUAL(1, t1[0].first);
@@ -1281,6 +1335,7 @@ TEST(StringIndex_Bug2)
 
     {
         WriteTransaction wt(sg);
+        wt.get_group().Verify();
         TableRef table = wt.get_table("a");
         table->add_column(type_String, "b");
         table->set_index(0);  // Not adding index makes it work
@@ -1290,6 +1345,7 @@ TEST(StringIndex_Bug2)
 
     {
         ReadTransaction rt(sg);
+        rt.get_group().Verify();
     }
 }
 
@@ -1331,9 +1387,7 @@ TEST(StringIndex_Bug3)
                 size_t del = rand() % table->size();
                 //cerr << "-" << del << ": " << table->get_string(0, del) << endl;
                 table->remove(del);
-#ifdef TIGHTDB_DEBUG
                 table->Verify();
-#endif
             }
             db.commit();
         }
@@ -1347,9 +1401,7 @@ TEST(StringIndex_Bug3)
             txt[8] = 0;
             //cerr << "+" << txt << endl;
             table->set_string(0, table->size() - 1, txt);
-#ifdef TIGHTDB_DEBUG
             table->Verify();
-#endif
             db.commit();
         }
     }
@@ -1372,6 +1424,7 @@ TEST(Shared_Async)
         for (size_t n = 0; n < 100; ++n) {
             //printf("t %d\n", (int)n);
             WriteTransaction wt(db);
+            wt.get_group().Verify();
             TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
             t1->add(1, n, false, "test");
             wt.commit();
@@ -1389,6 +1442,7 @@ TEST(Shared_Async)
 
         for (size_t n = 0; n < 100; ++n) {
             ReadTransaction rt(db);
+            rt.get_group().Verify();
             TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
             CHECK(t1->size() == 100);
         }
@@ -1416,6 +1470,7 @@ void* IncrementEntry(void* arg)
             {
 
                 WriteTransaction wt(sg);
+                wt.get_group().Verify();
                 TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
                 t1[row_ndx].first += 1;
                 // FIXME: For some reason this takes ages when running
@@ -1431,6 +1486,7 @@ void* IncrementEntry(void* arg)
 
             {
                 ReadTransaction rt(sg);
+                rt.get_group().Verify();
                 TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
                 const int64_t v = t[row_ndx].first;
@@ -1550,6 +1606,7 @@ void multi_threaded(size_t thread_count, size_t base)
             SharedGroup sg("test_shared.tightdb",
                            false, SharedGroup::durability_Async);
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
 
             for (size_t i = 0; i < thread_count; ++i) {
@@ -1570,6 +1627,7 @@ void validate_and_clear(size_t rows, int result)
     {
         SharedGroup sg("test_shared.tightdb");
         WriteTransaction wt(sg);
+        wt.get_group().Verify();
         TestTableShared::Ref t = wt.get_table<TestTableShared>("test");
 
         for (size_t i = 0; i < rows; ++i) {
@@ -1668,10 +1726,12 @@ TEST(Shared_MixedWithNonShared)
         SharedGroup sg("test.tightdb");
         {
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             CHECK(!rt.has_table("foo"));
         }
         {
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             wt.get_table("foo"); // Add table "foo"
             wt.commit();
         }
@@ -1689,10 +1749,12 @@ TEST(Shared_MixedWithNonShared)
         SharedGroup sg("test.tightdb");
         {
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             CHECK(!rt.has_table("foo"));
         }
         {
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             wt.get_table("foo"); // Add table "foo"
             wt.commit();
         }
@@ -1701,6 +1763,7 @@ TEST(Shared_MixedWithNonShared)
         SharedGroup sg("test.tightdb");
         {
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             CHECK(rt.has_table("foo"));
         }
     }
@@ -1720,12 +1783,14 @@ TEST(Shared_MixedWithNonShared)
         SharedGroup sg("test.tightdb");
         {
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             CHECK(rt.has_table("foo"));
             CHECK(rt.has_table("bar"));
             CHECK(!rt.has_table("baz"));
         }
         {
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             wt.get_table("baz"); // Add table "baz"
             wt.commit();
         }
@@ -1734,6 +1799,7 @@ TEST(Shared_MixedWithNonShared)
         SharedGroup sg("test.tightdb");
         {
             ReadTransaction rt(sg);
+            rt.get_group().Verify();
             CHECK(rt.has_table("baz"));
         }
     }
@@ -1803,6 +1869,7 @@ TEST(GroupShared_ReserveDiskSpace)
         // Check that disk space reservation is independent of transactions
         {
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             wt.get_table<TestTableShared>("table_1")->add_empty_row(2000);
             wt.commit();
         }
@@ -1812,6 +1879,7 @@ TEST(GroupShared_ReserveDiskSpace)
         size_t new_file_size_4 = size_t(File("test.tightdb").get_size());
         CHECK(new_file_size_4 >= reserve_size_4);
         WriteTransaction wt(sg);
+        wt.get_group().Verify();
         wt.get_table<TestTableShared>("table_2")->add_empty_row(2000);
         orig_file_size = size_t(File("test.tightdb").get_size());
         size_t reserve_size_5 = orig_file_size + 333;
@@ -1827,6 +1895,7 @@ TEST(GroupShared_ReserveDiskSpace)
         CHECK(new_file_size_6 >= reserve_size_6);
         {
             WriteTransaction wt(sg);
+            wt.get_group().Verify();
             wt.commit();
         }
     }

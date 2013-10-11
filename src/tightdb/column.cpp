@@ -318,10 +318,6 @@ void Column::fill(size_t count)
     // creating full nodes directly
     for (size_t i = 0; i < count; ++i)
         add(0);
-
-#ifdef TIGHTDB_DEBUG
-    Verify();
-#endif
 }
 
 // int64_t specific:
@@ -615,10 +611,6 @@ void Column::do_insert(size_t ndx, int64_t value)
         bool is_append = ndx == npos;
         introduce_new_root(new_sibling_ref, state, is_append);
     }
-
-#ifdef TIGHTDB_DEBUG
-    Verify();
-#endif
 }
 
 

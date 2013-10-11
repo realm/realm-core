@@ -22,7 +22,7 @@
 #include <tightdb/build_config.h>
 #endif
 #ifndef TIGHTDB_INSTALLATION_BIN_PATH
-#define TIGHTDB_INSTALLATION_BIN_PATH "/usr/local/bin/"
+#define TIGHTDB_INSTALLATION_BIN_PATH "/usr/local/bin"
 #endif
 
 // #define TIGHTDB_ENABLE_LOGFILE
@@ -157,9 +157,9 @@ void spawn_daemon(const string& file)
         const char* exe = getenv("TIGHTDBD_PATH");
         if (exe == NULL)
 #ifndef TIGTHDB_DEBUG
-            exe = TIGHTDB_INSTALLATION_BIN_PATH "tightdbd";
+            exe = TIGHTDB_INSTALLATION_BIN_PATH "/tightdbd";
 #else
-            exe = TIGHTDB_INSTALLATION_BIN_PATH "tightdbd-dbg";
+            exe = TIGHTDB_INSTALLATION_BIN_PATH "/tightdbd-dbg";
 #endif
         execl(exe, exe, file.c_str(), (char*) NULL);
 
@@ -690,10 +690,6 @@ const Group& SharedGroup::begin_read()
         throw;
     }
 
-#ifdef TIGHTDB_DEBUG
-    m_group.Verify();
-#endif
-
     return m_group;
 }
 
@@ -779,7 +775,6 @@ Group& SharedGroup::begin_write()
     m_group.update_from_shared(new_top_ref, new_file_size); // Throws
 
 #ifdef TIGHTDB_DEBUG
-    m_group.Verify();
     m_transact_stage = transact_Writing;
 #endif
 
