@@ -318,7 +318,7 @@ CATEGORIES:
                  ok to call it at regular intervals (like in the idle handler of an application).
       RETURN:
         TYPES  : bool
-        DESCR  : *g_shared_group_has_changed_return
+        DESCR  : &g_shared_group_has_changed_return
                  <code>true</code> if it has changed, <code>false</code> otherwise.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_has_changed
