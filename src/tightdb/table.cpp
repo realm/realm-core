@@ -1515,10 +1515,6 @@ void Table::insert_done()
 {
     ++m_size;
 
-#ifdef TIGHTDB_DEBUG
-    Verify();
-#endif
-
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().row_insert_complete(); // Throws
 #endif
