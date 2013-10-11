@@ -1170,6 +1170,7 @@ EOF
                     else
                         if INTERACTIVE=1 sh "$EXT_HOME/build.sh" config 2>&1 | tee -a "$LOG_FILE"; then
                             touch "$EXT_HOME/.DIST_WAS_CONFIGURED" || exit 1
+                        else
                             ERROR="1"
                         fi
                     fi
@@ -1461,8 +1462,9 @@ EOF
                 fi
             done
             if [ "$NEED_USR_LOCAL_LIB_NOTE" ]; then
-                LIBDIR="$(make get-libdir)" || exit 1
-                cat <<EOF
+                if [ -z "$INTERACTIVE" ]; then
+                    LIBDIR="$(make get-libdir)" || exit 1
+                    cat <<EOF
 
 NOTE: Shared libraries have been installed in '$LIBDIR'.
 
@@ -1481,6 +1483,7 @@ or Objective-C application:
    /etc/ld.so.conf.
 
 EOF
+                fi
             fi
             echo "DONE INSTALLING" | tee -a "$LOG_FILE"
         else
@@ -1491,12 +1494,24 @@ EOF
             echo "Log file is here: $LOG_FILE" 1>&2
             exit 1
         fi
-        cat <<EOF
+        if [ -z "$INTERACTIVE" ]; then
+            cat <<EOF
 
 NOTE: At this point you should run './build test-installed' to check
 that all installed parts are working properly. If any parts failed to
 install, they will be skipped in this test.
 EOF
+        else
+            echo
+            echo "Installation summary"
+            echo "===================="
+            for x in $EXTENSIONS; do
+                EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
+                if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" -a -e "$EXT_HOME/.DIST_WAS_BUILT" -a -e "$EXT_HOME/.DIST_WAS_INSTALLED "]; then
+                    sh "$EXT_HOME/build.sh" install-report
+                fi
+            done
+        fi
         exit 0
         ;;
 
