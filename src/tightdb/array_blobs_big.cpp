@@ -122,8 +122,10 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
         state.m_split_offset = ndx;
     }
     else {
-        for (size_t i = ndx; i != leaf_size; ++i)
-            new_leaf.add(get(i));
+        for (size_t i = ndx; i != leaf_size; ++i) {
+            ref_type blob_ref = Array::get_as_ref(i);
+            new_leaf.Array::add(blob_ref);
+        }
         resize(ndx);
         add(value, add_zero_term);
         state.m_split_offset = ndx + 1;
