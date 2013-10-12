@@ -32,7 +32,7 @@
 #include <tightdb/unique_ptr.hpp>
 
 #ifdef TIGHTDB_HAVE_CXX11_ATOMIC
-#include <atomic>
+#  include <atomic>
 #endif
 
 

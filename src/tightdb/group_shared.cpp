@@ -445,11 +445,6 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication())
-        delete repl;
-#endif
-
     SharedInfo* info = m_file_map.get_addr();
 
 #ifndef _WIN32
@@ -824,7 +819,8 @@ void SharedGroup::commit()
         // fails, then the transaction is not completed. A subsequent call
         // to rollback() must roll it back.
         if (Replication* repl = m_group.get_replication()) {
-            new_version = repl->commit_write_transact(*this, info->current_version.load_relaxed()); // Throws
+            uint_fast64_t current_version = info->current_version.load_relaxed();
+            new_version = repl->commit_write_transact(*this, current_version); // Throws
         }
         else {
             new_version = info->current_version.load_relaxed() + 1;
