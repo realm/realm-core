@@ -8,7 +8,10 @@ get_config_param()
     local name line value
     name="$1"
     if ! line="$(grep "^$name:" "$source")"; then
-        echo "ERROR: Failed to read configuration parameter '$name'" 1>&2
+        cat 1>&2 <<EOF
+ERROR: Failed to read configuration parameter '$name'.
+Maybe you need to rerun 'sh build.sh config [PREFIX]'.
+EOF
         return 1
     fi
     value="$(printf "%s\n" "$line" | cut -d: -f2-)" || return 1
@@ -25,8 +28,23 @@ cstring_escape()
 
 }
 
+tightdb_version="$(get_config_param "tightdb-version")" || exit 1
+tigthdb_version_escaped="$(cstring_escape "$tightdb_version")" || exit 1
+
+install_prefix="$(get_config_param "install-prefix")" || exit 1
+install_prefix_escaped="$(cstring_escape "$install_prefix")" || exit 1
+
+install_exec_prefix="$(get_config_param "install-exec-prefix")" || exit 1
+install_exec_prefix_escaped="$(cstring_escape "$install_exec_prefix")" || exit 1
+
+install_includedir="$(get_config_param "install-includedir")" || exit 1
+install_includedir_escaped="$(cstring_escape "$install_includedir")" || exit 1
+
 install_bindir="$(get_config_param "install-bindir")" || exit 1
 install_bindir_escaped="$(cstring_escape "$install_bindir")" || exit 1
+
+install_libdir="$(get_config_param "install-libdir")" || exit 1
+install_libdir_escaped="$(cstring_escape "$install_libdir")" || exit 1
 
 cat >"$target" <<EOF
 /*************************************************************************
@@ -37,5 +55,11 @@ cat >"$target" <<EOF
  *
  *************************************************************************/
 
-#define TIGHTDB_INSTALLATION_BIN_PATH "$install_bindir_escaped"
+#define TIGHTDB_VERSION "$tigthdb_version_escaped"
+
+#define TIGHTDB_INSTALL_PREFIX      "$install_prefix_escaped"
+#define TIGHTDB_INSTALL_EXEC_PREFIX "$install_exec_prefix_escaped"
+#define TIGHTDB_INSTALL_INCLUDEDIR  "$install_includedir_escaped"
+#define TIGHTDB_INSTALL_BINDIR      "$install_bindir_escaped"
+#define TIGHTDB_INSTALL_LIBDIR      "$install_libdir_escaped"
 EOF
