@@ -16,9 +16,23 @@
  * is strictly forbidden unless prior written permission is obtained
  * from TightDB Incorporated.
  *
- **************************************************************************/
+ *************************************************************************/
 #ifndef TIGHTDB_CONFIG_H
 #define TIGHTDB_CONFIG_H
+
+
+#ifdef TIGHTDB_HAVE_CONFIG
+#  include <tightdb/build_config.h>
+#else
+#  define TIGHTDB_VERSION "unknown"
+#  ifndef _WIN32
+#    define TIGHTDB_INSTALL_PREFIX      "/usr/local"
+#    define TIGHTDB_INSTALL_EXEC_PREFIX TIGHTDB_INSTALL_PREFIX
+#    define TIGHTDB_INSTALL_INCLUDEDIR  TIGHTDB_INSTALL_PREFIX "/include"
+#    define TIGHTDB_INSTALL_BINDIR      TIGHTDB_INSTALL_EXEC_PREFIX "/bin"
+#    define TIGHTDB_INSTALL_LIBDIR      TIGHTDB_INSTALL_PREFIX "/lib"
+#  endif
+#endif
 
 
 /* This one is needed to allow tightdb-config to know whether a

@@ -166,6 +166,13 @@ following command before building and installing:
 Here, `PREFIX` is the installation prefix. If it is not specified, it
 defaults to `/usr/local`.
 
+Normally the TightDB version is taken to be what is returned by `git
+describe`. To override this, set `TIGHTDB_VERSION` as in the following
+examples:
+
+    TIGHTDB_VERSION=x.y.z sh build.sh config
+    TIGHTDB_VERSION=x.y.z sh build.sh bin-dist all
+
 To use a nondefault compiler, or a compiler in a nondefault location,
 set the environment variable `CC` before calling `sh build.sh build`
 or `sh build.sh bin-dist`, as in the following example:

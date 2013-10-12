@@ -198,7 +198,10 @@ EOF
         return 1
     fi
     if ! line="$(grep "^$name:" "config")"; then
-        echo "ERROR: Failed to read configuration parameter '$name'" 1>&2
+        cat 1>&2 <<EOF
+ERROR: Failed to read configuration parameter '$name'.
+Maybe you need to rerun 'sh build.sh config [PREFIX]'.
+EOF
         return 1
     fi
     value="$(printf "%s\n" "$line" | cut -d: -f2-)" || return 1
@@ -267,8 +270,17 @@ case "$MODE" in
         if [ -z "$install_prefix" ]; then
             install_prefix="/usr/local"
         fi
+        install_exec_prefix="$install_prefix"
+        install_includedir="$install_prefix/include"
+        install_bindir="$install_exec_prefix/bin"
         install_libdir="$(make prefix="$install_prefix" get-libdir)" || exit 1
-        install_bindir="$install_prefix/bin" || exit 1
+
+        tightdb_version="unknown"
+        if [ "$TIGHTDB_VERSION" ]; then
+            tightdb_version="$TIGHTDB_VERSION"
+        elif value="$(git describe 2>/dev/null)"; then
+            tightdb_version="$value"
+        fi
 
         xcode_home="none"
         if [ "$OS" = "Darwin" ]; then
@@ -315,12 +327,15 @@ case "$MODE" in
         fi
 
         cat >"config" <<EOF
-install-prefix:    $install_prefix
-install-libdir:    $install_libdir
-install-bindir:    $install_bindir
-xcode-home:        $xcode_home
-iphone-sdks:       ${iphone_sdks:-none}
-iphone-sdks-avail: $iphone_sdks_avail
+tightdb-version:     $tightdb_version
+install-prefix:      $install_prefix
+install-exec-prefix: $install_exec_prefix
+install-includedir:  $install_includedir
+install-bindir:      $install_bindir
+install-libdir:      $install_libdir
+xcode-home:          $xcode_home
+iphone-sdks:         ${iphone_sdks:-none}
+iphone-sdks-avail:   $iphone_sdks_avail
 EOF
         echo "New configuration:"
         cat "config" | sed 's/^/    /' || exit 1
@@ -598,7 +613,10 @@ EOF
         fi
 
         VERSION="$(git describe)" || exit 1
-        NAME="tightdb-$VERSION"
+        if [ -z "$TIGHTDB_VERSION" ]; then
+            TIGHTDB_VERSION="$VERSION"
+        fi
+        NAME="tightdb-$TIGHTDB_VERSION"
 
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist.XXXX)" || exit 1
 
@@ -760,7 +778,7 @@ export TIGHTDB_DIST_HOME
 
 EXTENSIONS="$AUGMENTED_EXTENSIONS"
 
-export TIGHTDB_VERSION="$VERSION"
+export TIGHTDB_VERSION="$TIGHTDB_VERSION"
 
 if [ \$# -eq 1 -a "\$1" = "clean" ]; then
     sh tightdb/build.sh dist-clean$BIN_CORE_ARG || exit 1
@@ -832,6 +850,8 @@ EOF
             chmod +x "$PKG_DIR/build"
 
             cat >"$PKG_DIR/README" <<EOF
+TightDB version $TIGHTDB_VERSION
+
 Configure specific extensions:    ./build  config  EXT1  [EXT2]...
 Configure all extensions:         ./build  config  all
 Configure only the core library:  ./build  config  none
@@ -916,7 +936,7 @@ EOF
             mkdir "$PKG_DIR/tightdb" || exit 1
             if [ "$PREBUILT_CORE" ]; then
                 message "Building core library"
-                (sh build.sh clean && sh build.sh build) >>"$LOG_FILE" 2>&1 || exit 1
+                (sh build.sh config && sh build.sh clean && sh build.sh build) >>"$LOG_FILE" 2>&1 || exit 1
 
                 message "Running test suite for core library in debug mode"
                 if ! sh build.sh test-debug >>"$LOG_FILE" 2>&1; then
@@ -1215,13 +1235,21 @@ EOF
             cat 1>&2 <<EOF
 
 Note: Some parts could not be configured. You may be missing one or
-more dependencies. Check the README file for details. If this does not
+more dependencies. Check the README file for details. If that does not
 help, check the log file.
 The log file is here: $LOG_FILE
 EOF
-            if [ -z "$INTERACTIVE" ]; then
-                exit 1
-            fi
+        fi
+        cat <<EOF
+
+Run the following command to build the parts that were successfully
+configured:
+
+    ./build build
+
+EOF
+        if [ "$ERROR" -a -z "$INTERACTIVE" ]; then
+            exit 1
         fi
         exit 0
         ;;
@@ -1302,8 +1330,9 @@ EOF
                 echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                 cat 1>&2 <<EOF
 
-Note: You may be missing one or more dependencies. Check the README
-file for details. If this does not help, check the log file.
+Note: The core library could not be built. You may be missing one or
+more dependencies. Check the README file for details. If this does not
+help, check the log file.
 The log file is here: $LOG_FILE
 EOF
                 exit 1
@@ -1337,21 +1366,19 @@ dependencies. Check the README file for details. If this does not
 help, check the log file.
 The log file is here: $LOG_FILE
 
+EOF
+        fi
+        cat <<EOF
+
 Run the following command to install the parts that were successfully
 built:
 
     sudo ./build install
 
 EOF
+        if [ "$ERROR" ]; then
             exit 1
         fi
-        cat <<EOF
-
-Run the following command to install the parts that were built:
-
-    sudo ./build install
-
-EOF
         exit 0
         ;;
 
@@ -1530,9 +1557,12 @@ EOF
         if [ -z "$INTERACTIVE" ]; then
             cat <<EOF
 
-NOTE: At this point you should run './build test-installed' to check
-that all installed parts are working properly. If any parts failed to
-install, they will be skipped in this test.
+At this point you should run the following command to check that all
+installed parts are working properly. If any parts failed to install,
+they will be skipped during this test:
+
+    ./build test-installed
+
 EOF
         else
             echo
