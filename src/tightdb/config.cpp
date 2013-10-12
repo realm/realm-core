@@ -171,7 +171,7 @@ int main(int argc, char* argv[])
                 "  --cflags      Output all pre-processor and compiler flags\n"
                 "  --libs        Output all linker flags\n"
                 "  --prefix      Show the TightDB installation prefix\n"
-                "  --exec-prefix Show the TightDB installation prefix for executable\n"
+                "  --exec-prefix Show the TightDB installation prefix for executables\n"
                 "  --includedir  Show the directory containing the TightDB header files\n"
                 "  --bindir      Show the directory containing the TightDB executables\n"
                 "  --libdir      Show the directory containing the TightDB libraries\n";
