@@ -99,8 +99,8 @@ public:
 
     ~File() TIGHTDB_NOEXCEPT;
 
-    /// Calling this method on an instance that is already attached to
-    /// an open file has undefined behavior.
+    /// Calling this function on an instance that is already attached
+    /// to an open file has undefined behavior.
     ///
     /// \throw AccessError If the file could not be opened. If the
     /// reason corresponds to one of the exception types that are
@@ -109,7 +109,7 @@ public:
     /// unambiguously distinguish that particular reason).
     void open(const std::string& path, Mode = mode_Read);
 
-    /// This method is idempotent, that is, it is valid to call it
+    /// This function is idempotent, that is, it is valid to call it
     /// regardless of whether this instance currently is attached to
     /// an open file.
     void close() TIGHTDB_NOEXCEPT;
@@ -142,25 +142,25 @@ public:
     /// together with create_Must results in undefined behavior.
     void open(const std::string& path, AccessMode, CreateMode, int flags);
 
-    // Same as open(path, access_ReadWrite, create_Auto, 0), 
-    // except that it returns an indication of whether the file was
-    // created, or an existing file was opened.
+    /// Same as open(path, access_ReadWrite, create_Auto, 0), except
+    /// that this one returns an indication of whether a new file was
+    /// created, or an existing file was opened.
     void open(const std::string& path, bool& was_created);
 
     /// Read data into the specified buffer and return the number of
     /// bytes read. If the returned number of bytes is less than \a
     /// size, then the end of the file has been reached.
     ///
-    /// Calling this method on an instance, that is not currently
+    /// Calling this function on an instance, that is not currently
     /// attached to an open file, has undefined behavior.
     std::size_t read(char* data, std::size_t size);
 
     /// Write the specified data to this file.
     ///
-    /// Calling this method on an instance, that is not currently
+    /// Calling this function on an instance, that is not currently
     /// attached to an open file, has undefined behavior.
     ///
-    /// Calling this method on an instance, that was opened in
+    /// Calling this function on an instance, that was opened in
     /// read-only mode, has undefined behavior.
     void write(const char* data, std::size_t size);
 
@@ -173,36 +173,36 @@ public:
     /// Calls write(data(), N).
     template<std::size_t N> void write(const char (&data)[N]) { write(data, N); }
 
-    // Plays the same role as off_t in POSIX
+    /// Plays the same role as off_t in POSIX
     typedef int_fast64_t SizeType;
 
-    /// Calling this method on an instance that is not attached to an
-    /// open file has undefined behavior.
+    /// Calling this function on an instance that is not attached to
+    /// an open file has undefined behavior.
     SizeType get_size() const;
 
     /// If this causes the file to grow, then the new section will
-    /// have undefined contents. Setting the size with this method
+    /// have undefined contents. Setting the size with this function
     /// does not necessarily allocate space on the target device. If
     /// you want to ensure allocation, call alloc(). Calling this
-    /// method will generally affect the read/write offset associated
-    /// with this File instance.
+    /// function will generally affect the read/write offset
+    /// associated with this File instance.
     ///
-    /// Calling this method on an instance that is not attached to an
-    /// open file has undefined behavior. Calling this method on a
-    /// file that is opened in read-only mode, is an error.
+    /// Calling this function on an instance that is not attached to
+    /// an open file has undefined behavior. Calling this function on
+    /// a file that is opened in read-only mode, is an error.
     void resize(SizeType);
 
     /// The same as prealloc_if_supported() but when the operation is
-    /// not supported by the system, this method will still increase
+    /// not supported by the system, this function will still increase
     /// the file size when the specified region extends beyond the
     /// current end of the file. This allows you to both extend and
     /// allocate in one operation.
     ///
-    /// The downside is that this method is not guaranteed to have
+    /// The downside is that this function is not guaranteed to have
     /// atomic behaviour on all systems, that is, two processes, or
-    /// two threads should never call this method concurrently for the
-    /// same underlying file even though they access the file through
-    /// distinct File instances.
+    /// two threads should never call this function concurrently for
+    /// the same underlying file even though they access the file
+    /// through distinct File instances.
     ///
     /// \sa prealloc_if_supported()
     void prealloc(SizeType offset, std::size_t size);
@@ -212,17 +212,17 @@ public:
     /// extends beyond the current end of the file, the file size is
     /// increased as necessary.
     ///
-    /// On systems that do not support this operation, this method has
-    /// no effect. You may call is_prealloc_supported() to determine
-    /// if it is supported on your system.
+    /// On systems that do not support this operation, this function
+    /// has no effect. You may call is_prealloc_supported() to
+    /// determine if it is supported on your system.
     ///
-    /// Calling this method on an instance that is not attached to an
-    /// open file has undefined behavior. Calling this method on a
-    /// file that is opened in read-only mode, is an error.
+    /// Calling this function on an instance, that is not attached to
+    /// an open file, has undefined behavior. Calling this function on
+    /// a file, that is opened in read-only mode, is an error.
     ///
-    /// This method is guaranteed to have atomic behaviour, that is,
-    /// there is never any risk of the file size being reduced due to
-    /// concurrent invocations.
+    /// This function is guaranteed to have atomic behaviour, that is,
+    /// there is never any risk of the file size being reduced even
+    /// with concurrently executing invocations.
     ///
     /// \sa prealloc()
     /// \sa is_prealloc_supported()
@@ -247,8 +247,8 @@ public:
     /// behavior, even if they are acquired in the same process (or
     /// thread) and are attached to the same underlying file.
     ///
-    /// Calling this method on an instance that is not attached to an
-    /// open file, or on an instance that is already locked has
+    /// Calling this function on an instance that is not attached to
+    /// an open file, or on an instance that is already locked has
     /// undefined behavior.
     void lock_exclusive();
 
@@ -259,8 +259,8 @@ public:
     /// behavior, even if they are acquired in the same process (or
     /// thread) and are attached to the same underlying file.
     ///
-    /// Calling this method on an instance that is not attached to an
-    /// open file, or on an instance that is already locked has
+    /// Calling this function on an instance that is not attached to
+    /// an open file, or on an instance that is already locked has
     /// undefined behavior.
     void lock_shared();
 
@@ -272,7 +272,7 @@ public:
     /// succeeds.
     bool try_lock_shared();
 
-    /// Release a previously acquired lock on this file. This method
+    /// Release a previously acquired lock on this file. This function
     /// is idempotent.
     void unlock() TIGHTDB_NOEXCEPT;
 
@@ -300,12 +300,12 @@ public:
     /// Specifying access_ReadWrite for a file that is opened in
     /// read-only mode, is an error.
     ///
-    /// Calling this method on an instance that is not attached to an
-    /// open file, or one that is attached to an empty file has
+    /// Calling this function on an instance that is not attached to
+    /// an open file, or one that is attached to an empty file has
     /// undefined behavior.
     ///
-    /// Calling this method with a size that is greater than the size
-    /// of the file has undefined behavior.
+    /// Calling this function with a size that is greater than the
+    /// size of the file has undefined behavior.
     void* map(AccessMode, std::size_t size, int map_flags = 0) const;
 
     /// The same as unmap(old_addr, old_size) followed by map(a,
@@ -318,7 +318,7 @@ public:
     /// in the meantime. Failing to adhere to these rules will result
     /// in undefined behavior.
     ///
-    /// If this method throws, the old address range will remain
+    /// If this function throws, the old address range will remain
     /// mapped.
     void* remap(void* old_addr, std::size_t old_size, AccessMode a, std::size_t new_size,
                 int map_flags = 0) const;
@@ -366,7 +366,7 @@ public:
     /// comparing inode numbers.
     ///
     /// Both instances have to be attached to open files. If they are
-    /// not, this method has undefined behavior.
+    /// not, this function has undefined behavior.
     bool is_same_file(const File&) const;
 
     // FIXME: Can we get rid of this one please!!!
@@ -482,21 +482,21 @@ public:
 
     /// See File::map().
     ///
-    /// Calling this method on a Map instance that is already attached
-    /// to a memory mapped file has undefined behavior. The returned
-    /// pointer is the same as what will subsequently be returned by
-    /// get_addr().
+    /// Calling this function on a Map instance that is already
+    /// attached to a memory mapped file has undefined behavior. The
+    /// returned pointer is the same as what will subsequently be
+    /// returned by get_addr().
     T* map(const File&, AccessMode = access_ReadOnly, std::size_t size = sizeof (T),
            int map_flags = 0);
 
-    /// See File::unmap(). This method is idempotent, that is, it is
+    /// See File::unmap(). This function is idempotent, that is, it is
     /// valid to call it regardless of whether this instance is
     /// currently attached to a memory mapped file.
     void unmap() TIGHTDB_NOEXCEPT;
 
     /// See File::remap().
     ///
-    /// Calling this method on a Map instance that is not currently
+    /// Calling this function on a Map instance that is not currently
     /// attached to a memory mapped file has undefined behavior. The
     /// returned pointer is the same as what will subsequently be
     /// returned by get_addr().
@@ -505,7 +505,7 @@ public:
 
     /// See File::sync_map().
     ///
-    /// Calling this method on an instance that is not currently
+    /// Calling this function on an instance that is not currently
     /// attached to a memory mapped file, has undefined behavior.
     void sync();
 

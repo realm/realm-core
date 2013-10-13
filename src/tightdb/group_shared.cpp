@@ -1190,7 +1190,7 @@ void SharedGroup::reserve(size_t size)
     TIGHTDB_ASSERT(is_attached());
     // FIXME: There is currently no synchronization between this and
     // concurrent commits in progress. This is so because it is
-    // believed that the OS guarantees race free behaviour when
+    // believed that the OS guarantees race free behavior when
     // File::prealloc_if_supported() (posix_fallocate() on Linux) runs
     // concurrently with modfications via a memory map of the
     // file. This assumption must be verified though.
