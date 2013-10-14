@@ -1075,6 +1075,8 @@ public:
             m_state = 0;
         else if (action == act_FindAll)
             m_state = reinterpret_cast<int64_t>(akku);
+        else if (action == act_CallbackIdx) {
+        }
         else
             TIGHTDB_ASSERT(false);
     }
@@ -2211,32 +2213,34 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     if (end == std::size_t(-1))
         end = m_size;
 
-    // Return immediately if no items in array can match (such as if cond2 == Greater and value == 100 and m_ubound == 15).
+    // Return immediately if no items in array can match (such as if cond2 == Greater && value == 100 && m_ubound == 15)
     if (!c.can_match(value, m_lbound, m_ubound))
         return true;
 
-    // call find_action() on all items in array if all items are guaranteed to match (such as cond2 == NotEqual and
-    // value == 100 and m_ubound == 15)
+    // optimization if all items are guaranteed to match (such as cond2 == NotEqual && value == 100 && m_ubound == 15)
     if (c.will_match(value, m_lbound, m_ubound)) {
-        // todo, this optimization has been disabled because it won't work when user has specified a 'limit' argument.
-        // We could easily read the 'limit' argument from 'state' and take it in count, but that's bad design because 
-        // it violates encapsulation principle.
-/*        if (action == act_Sum || action == act_Max || action == act_Min) {
+        TIGHTDB_ASSERT(state->m_match_count < state->m_limit);
+        size_t process = state->m_limit - state->m_match_count;
+        size_t end2 = end - start > process ? start + process : end;
+
+        if (action == act_Sum || action == act_Max || action == act_Min) {
             int64_t res;
             if (action == act_Sum)
-                res = Array::sum(start, end);
+                res = Array::sum(start, end2);
             if (action == act_Max)
-                Array::maximum(res, start, end);
+                Array::maximum(res, start, end2);
             if (action == act_Min)
-                Array::minimum(res, start, end);
+                Array::minimum(res, start, end2);
 
             find_action<action, Callback>(start + baseindex, res, state, callback);
+            state->m_match_count += end2 - start;
+
         }
         else if (action == act_Count) {
-            state->m_state += end - start;
+            state->m_state += end2 - start;
         }
-        else */ {
-            for (; start < end; start++)
+        else {
+            for (; start < end2; start++)
                 if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
                     return false;
         }
@@ -3073,7 +3077,7 @@ template<class cond> size_t Array::find_first(int64_t value, size_t start, size_
     cond c;
     TIGHTDB_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
     QueryState<int64_t> state;
-    state.m_state = not_found;
+    state.init(act_ReturnFirst, NULL, 1); // todo, would be nice to avoid this in order to speed up find_first loops
     Finder finder = m_finder[c.condition()];
     (this->*finder)(value, start, end, 0, &state);
 
