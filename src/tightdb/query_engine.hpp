@@ -760,6 +760,7 @@ public:
             }
             else {
                 QueryState<int64_t> jumpstate; // todo optimize by moving outside for loop
+                jumpstate.init(act_CallbackIdx, NULL, size_t(-1));
                 m_source_column = source_column;
                 bool cont = m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, &jumpstate,
                              std::bind1st(std::mem_fun(&IntegerNode::template match_callback<TAction, TSourceColumn>), this));
