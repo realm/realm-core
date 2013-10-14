@@ -311,8 +311,33 @@ void SharedGroup::open(const string& path, bool no_create_file,
             bool is_shared = true;
             bool read_only = false;
             bool skip_validate = false;
-            ref_type top_ref = alloc.attach_file(path, is_shared, read_only, no_create_file,
-                                                 skip_validate); // Throws
+            ref_type top_ref;
+            try {
+                top_ref = alloc.attach_file(path, is_shared, read_only, no_create_file,
+                                                     skip_validate); // Throws
+            } catch (...) {
+
+                // something went wrong. We need to clean up the .lock file carefully to prevent
+                // other processes from getting to it and waiting for us to complete initialization
+                // We bypass normal initialization
+                info->shutdown_started.store_relaxed(1);
+                info->init_complete.store_relaxed(1);
+                // make sure it can be seen:
+                m_file_map.sync();
+
+                // remove the file - due to windows file semantics, we have to manually close it
+                fug_2.release(); // we need to unmap manually
+                fug_1.release(); // - do -
+                fcg.release();   // we need to close manually
+                m_file_map.unmap();
+                m_reader_map.unmap();
+                m_file.unlock();
+                m_file.close();
+                File::try_remove(m_file_path.c_str());
+
+                // rethrow whatever went wrong
+                throw;
+            }
 
             // Call SharedInfo::SharedInfo() (placement new)
             size_t file_size = alloc.get_baseline();

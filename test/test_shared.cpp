@@ -43,6 +43,57 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 } // anonymous namespace
 
+TEST(Shared_no_create_cleanup_lock_file_after_failure)
+{
+    // Delete old files if there
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    bool ok = false;
+    try {
+        SharedGroup sg("test_shared.tightdb", true, SharedGroup::durability_Full);
+        // Expect exception here (due to no_create=true above)
+        CHECK(false);
+    }
+    catch (runtime_error &) {
+        ok = true; 
+    }
+    CHECK(ok);
+
+    // Verify no .lock file is left.
+    CHECK( !File::exists("test_shared.tightdb") );
+    CHECK( !File::exists("test_shared.tightdb.lock") );    //     <========= FAILS
+}
+
+TEST(Shared_no_create_cleanup_lock_file_after_failure_2)
+{
+    // Delete old files if there
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    bool ok = false;
+    try {
+        SharedGroup sg("test_shared.tightdb", true, SharedGroup::durability_Full);
+        // Expect exception here (due to no_create=true above)
+        CHECK(false);
+    }
+    catch (runtime_error &) {
+        ok = true; 
+    }
+    CHECK(ok);
+
+    CHECK( !File::exists("test_shared.tightdb") );
+    if (File::exists("test_shared.tightdb.lock") )
+    {
+        try {
+            // Let's see if any leftover .lock file is correctly removed or reinitialized
+            SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+        }
+        catch (runtime_error &) {
+            CHECK(false); 
+        }
+    }
+    CHECK( !File::exists("test_shared.tightdb.lock") );
+
+}
 
 TEST(Shared_Initial)
 {
