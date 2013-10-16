@@ -93,6 +93,10 @@ public:
     //   timeout will limit the wait. If the timeout expires without beeing able
     //   to enter either the shared or the exclusive state, open will throw.
     // - If the file is already in the shared state, open will return.
+    // - Further: If the file is already in the exclusive state and is closed
+    //   by the process with exclusive access, without first beeing shared,
+    //   exactly one of any waiting calls to open will complete with exclusive
+    //   access.
     T* open(std::string file_path, bool& is_exclusive, int msec_timeout = 0);
 
     // Reopen a file which has been opened earlier, then closed again. Similar to
@@ -112,7 +116,12 @@ public:
     void share();
 
     // unmap memory and close the file. May also initiate cleanup, removal of the
-    // file if no one else uses it, etc.
+    // file if no one else uses it, etc. If close is called by a thread having the
+    // file in exclusive state, the file transitions to either 'stale' og 'nonexistant'
+    // atomically.
+    // the atomicity ensures that any threads waiting in 'open' will see an initialized
+    // file and that exactly one of those waiting threads will get exclusive access
+    // to the file.
     void close();
     ~IPMFile();
 
@@ -124,14 +133,6 @@ public:
     // option to WAIT for exclusive access. In case of contention, NO thread gets
     // exclusive access, all requests just returns false.
     bool got_exclusive_access();
-
-    // invalidate the file. This unmaps memory and closes the file, and also ensures
-    // that
-    // - is_valid() will return false for any thread already having opened the file.
-    // - open() will re-initialize the file before using it again, or create and work on a
-    //   different file with the same name - whichever matches the underlying system best.
-    void invalidate();
-    bool is_valid();
 
     // true if the file has been removed since it was opened. On some systems (UNIX),
     // it is possible to remove a file even though it is open. This call also returns
