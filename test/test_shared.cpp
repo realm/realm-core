@@ -43,6 +43,57 @@ TIGHTDB_TABLE_4(TestTableShared,
 
 } // anonymous namespace
 
+TEST(Shared_no_create_cleanup_lock_file_after_failure)
+{
+    // Delete old files if there
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    bool ok = false;
+    try {
+        SharedGroup sg("test_shared.tightdb", true, SharedGroup::durability_Full);
+        // Expect exception here (due to no_create=true above)
+        CHECK(false);
+    }
+    catch (runtime_error &) {
+        ok = true; 
+    }
+    CHECK(ok);
+
+    // Verify no .lock file is left.
+    CHECK( !File::exists("test_shared.tightdb") );
+    CHECK( !File::exists("test_shared.tightdb.lock") );    //     <========= FAILS
+}
+
+TEST(Shared_no_create_cleanup_lock_file_after_failure_2)
+{
+    // Delete old files if there
+    File::try_remove("test_shared.tightdb");
+    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    bool ok = false;
+    try {
+        SharedGroup sg("test_shared.tightdb", true, SharedGroup::durability_Full);
+        // Expect exception here (due to no_create=true above)
+        CHECK(false);
+    }
+    catch (runtime_error &) {
+        ok = true; 
+    }
+    CHECK(ok);
+
+    CHECK( !File::exists("test_shared.tightdb") );
+    if (File::exists("test_shared.tightdb.lock") )
+    {
+        try {
+            // Let's see if any leftover .lock file is correctly removed or reinitialized
+            SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
+        }
+        catch (runtime_error &) {
+            CHECK(false); 
+        }
+    }
+    CHECK( !File::exists("test_shared.tightdb.lock") );
+
+}
 
 TEST(Shared_Initial)
 {
@@ -99,59 +150,6 @@ TEST(Shared_Stale_Lock_File_Faked)
     CHECK(ok);
 }
 
-// The following 2 tests are different ways of creating stale lock files.
-// On both windows and Linux, the shared group should be able to detect
-// that the lock files are stale and re-initialize them without errors.
-TEST(Shared_Stale_Lock_File_CopiedInFlight)
-{
-    // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
-
-    {
-        // create lock file
-        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
-        copy_file("test_shared.tightdb.lock", "test_shared.tightdb.lock.backup");
-    }
-    rename("test_shared.tightdb.lock.backup","test_shared.tightdb.lock");
-    try {
-        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
-    }
-    catch (SharedGroup::PresumablyStaleLockFile&) {
-        CHECK(false);
-    }
-    // lock file should be gone when we get here:
-    CHECK(File::exists("test_shared.tightdb.lock") == false);
-}
-
-TEST(Shared_Stale_Lock_File_CopiedAtCommit)
-{
-    // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
-
-    {
-        // create lock file
-        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
-        {
-            WriteTransaction wt(sg);
-            wt.get_group().Verify();
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            t1->add(1, 2, false, "test");
-            wt.commit();
-        }
-        copy_file("test_shared.tightdb.lock", "test_shared.tightdb.lock.backup");
-    }
-    rename("test_shared.tightdb.lock.backup","test_shared.tightdb.lock");
-    try {
-        SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
-    }
-    catch (SharedGroup::PresumablyStaleLockFile&) {
-        CHECK(false);
-    }
-    // lock file should be gone when we get here:
-    CHECK(File::exists("test_shared.tightdb.lock") == false);
-}
 
 // FIXME:
 // At the moment this test does not work on windows when run as a virtual machine.
