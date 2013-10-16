@@ -263,6 +263,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
         File::CloseGuard fcg(m_file);
         int time_left = max_wait_for_ok_filesize;
         while (1) {
+
             time_left--;
             // need to validate the size of the file before trying to map it
             // possibly waiting a little for size to go nonzero, if another
