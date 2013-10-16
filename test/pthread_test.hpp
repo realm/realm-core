@@ -12,7 +12,12 @@ Use by #including this file in the file(s) that call pthreads functions. If you 
 #ifndef TIGHTDB_PTHREAD_TEST_HPP
 #define TIGHTDB_PTHREAD_TEST_HPP
 
-unsigned int ptf_fastrand()
+#ifdef _WIN32
+#define NOMINMAX
+#include <Windows.h>
+#endif
+
+inline unsigned int ptf_fastrand()
 {
     // Must be fast because important edge case is 0 delay. Not thread safe, but that just adds randomnes.
     static unsigned int u = 1;
@@ -22,7 +27,7 @@ unsigned int ptf_fastrand()
     return (v << 16) + u;
 }
 
-void ptf_randsleep(void)
+inline void ptf_randsleep(void)
 {
     unsigned int r = ptf_fastrand() % 1000;
     unsigned long long ms = 500000; // on 2 ghz
@@ -48,15 +53,23 @@ void ptf_randsleep(void)
     }
     else if (r < 999) {
         // Wake up in time slice according to normal OS scheduling
-        usleep(0);
+#ifdef _WIN32
+    Sleep(0);
+#else
+    usleep(0);
+#endif
     }
     else {
         size_t w = ptf_fastrand() % 100;
-        usleep(w);
+#ifdef _WIN32
+        Sleep(w);
+#else
+        usleep(w * 1000);
+#endif
     }
 }
 
-int ptf_pthread_mutex_trylock(pthread_mutex_t * mutex)
+inline int ptf_pthread_mutex_trylock(pthread_mutex_t * mutex)
 {
     ptf_randsleep();
     int i = pthread_mutex_trylock(mutex);
@@ -64,7 +77,7 @@ int ptf_pthread_mutex_trylock(pthread_mutex_t * mutex)
     return i;
 }
 
-int ptf_pthread_barrier_wait(pthread_barrier_t *barrier)
+inline int ptf_pthread_barrier_wait(pthread_barrier_t *barrier)
 {
     ptf_randsleep();
     int i = pthread_barrier_wait(barrier);
@@ -72,16 +85,53 @@ int ptf_pthread_barrier_wait(pthread_barrier_t *barrier)
     return i;
 }
 
+inline int ptf_pthread_mutex_lock(pthread_mutex_t * mutex)
+{
+    ptf_randsleep();
+    int i = pthread_mutex_lock(mutex);
+    ptf_randsleep();
+    return i;
+}
+
+inline int ptf_pthread_mutex_unlock(pthread_mutex_t * mutex)
+{
+    ptf_randsleep();
+    int i = pthread_mutex_unlock(mutex);
+    ptf_randsleep();
+    return i;
+}
+
+inline int ptf_pthread_cond_wait(pthread_cond_t* cond, pthread_mutex_t* mutex)
+{
+    ptf_randsleep();
+    return pthread_cond_wait(cond, mutex);
+    ptf_randsleep();
+}
+
+inline int ptf_pthread_cond_signal(pthread_cond_t* cond)
+{
+    ptf_randsleep();
+    return pthread_cond_signal(cond);
+    ptf_randsleep();
+}
+
+inline int ptf_pthread_cond_broadcast(pthread_cond_t* cond)
+{
+    ptf_randsleep();
+    return pthread_cond_broadcast(cond);
+    ptf_randsleep();
+}
+
 #define ptf_surround(arg) \
     ptf_randsleep(); \
     arg; \
     ptf_randsleep();
 
-#define pthread_mutex_lock(mutex) ptf_surround(pthread_mutex_lock(mutex))
-#define pthread_mutex_unlock(mutex) ptf_surround(pthread_mutex_unlock(mutex))
-#define pthread_cond_wait(mutex, cond) ptf_surround(pthread_cond_wait(mutex, cond))
-#define pthread_cond_broadcast(cond) ptf_surround(pthread_cond_broadcast(cond))
-#define pthread_cond_signal(cond) ptf_surround(pthread_cond_signal(cond))
+#define pthread_mutex_lock ptf_pthread_mutex_lock
+#define pthread_mutex_unlock ptf_pthread_mutex_unlock
+#define pthread_cond_wait ptf_pthread_cond_wait
+#define pthread_cond_broadcast ptf_pthread_cond_broadcast
+#define pthread_cond_signal ptf_pthread_cond_signal
 #define pthread_mutex_trylock ptf_pthread_mutex_trylock
 #define pthread_barrier_wait ptf_pthread_barrier_wait
 
