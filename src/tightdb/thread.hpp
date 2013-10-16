@@ -23,6 +23,9 @@
 #include <exception>
 
 #include <pthread.h>
+#ifdef TIGHTDB_PTHREADS_TEST
+#include <../test/pthread_test.hpp>
+#endif
 #include <errno.h>
 #include <cstddef>
 
