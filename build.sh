@@ -948,7 +948,7 @@ EOF
                     sh build.sh build-iphone >>"$LOG_FILE" 2>&1 || exit 1
                 fi
 
-                message "Transfering prebuilt core library to package"
+                message "Transferring prebuilt core library to package"
                 mkdir "$TEMP_DIR/transfer" || exit 1
                 cat >"$TEMP_DIR/transfer/include" <<EOF
 /README.md
@@ -991,12 +991,12 @@ EOF
                 fi
                 get_host_info >"$PKG_DIR/tightdb/.PREBUILD_INFO" || exit 1
             else
-                message "Transfering core library to package"
+                message "Transferring core library to package"
                 sh "$TIGHTDB_HOME/build.sh" dist-copy "$PKG_DIR/tightdb" >>"$LOG_FILE" 2>&1 || exit 1
             fi
 
             for x in $AVAIL_EXTENSIONS; do
-                message "Transfering extension '$x' to package"
+                message "Transferring extension '$x' to package"
                 EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
                 EXT_HOME="../$EXT_DIR"
                 mkdir "$PKG_DIR/$EXT_DIR" || exit 1
