@@ -10,7 +10,7 @@ VS2010 cannot read them correctly.
 
 1. open tightDB.sln in VS2010
 2. select Build->Batch Build. Unmark all , mark the 4 called tightDB static libraray click clean
-3. select Build->Batch build. Click Rebuild
+3. select Build->Batch build. Click Rebuild (wait until the build has finished)
 4. Run winrelease2010.cmd (located in <checkout directory>windows\)
 5. close VS2010
 6. open tightDB.sln in VS2012
@@ -19,7 +19,7 @@ VS2010 cannot read them correctly.
 9. in the popup "Update VC++ Compiler and Libraries" click Update
 10. wait while VS2012 updates the projects.
 11. select Build->Batch Build. Unmark all , mark the 4 called tightDB static libraray click clean
-12. build->batch build - click build all
+12. build->batch build - click Rebuild (wait until the build has finished)
 13. run winrelease2012.cmd (located in <checkout directory>windows\)
 
 The release files can now be found in the directories Windows\release\vs2010 and Windows\release\vs2012
