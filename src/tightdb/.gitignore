@@ -21,9 +21,6 @@
 /libtightdb-cov.dylib
 /libtightdb-cov.*.dylib
 
-/tightdb-config
-/tightdb-config-dbg
-
 /tightdb-import
 /tightdb-import-noinst
 /tightdb-import-dbg
@@ -32,10 +29,14 @@
 /tightdb-import-cov-noinst
 
 /tightdbd
-/tightdbd-dbg
 /tightdbd-noinst
+/tightdbd-dbg
 /tightdbd-dbg-noinst
 /tightdbd-cov
+/tightdbd-cov-noinst
+
+/tightdb-config
+/tightdb-config-dbg
 
 # iPhone
 /libtightdb-iPhoneOS.a
