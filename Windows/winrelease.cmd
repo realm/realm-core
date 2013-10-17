@@ -1,24 +1,13 @@
 if .%1==. goto error
 @echo off
 echo Tightdb core c++ binding Windows Release.
-Echo beta 0.1
+Echo beta 0.11
 echo ----------------------------------------------------------
-echo In general, relase.cmd will create release directories
-echo with release versions of the already built solution in the
-echo same directory as where the solution file is.
-echo The release version will be placed in a directory called
-echo release, in two sub directories files\ and release\
-echo files\ will be an uncompressed release of all needed files
-echo laid out in a logical way, and release\ will contain
-echo a zipped version of the files\directory - named according
-echo to the time the winrelease.cmd file was run
-echo the zipfile will also contain the username from the
-echo computer that generated the zipfile
-echo only the release\files directory is needed by c++ binding 
-echo developers (on windows)
-echo the zip file in release\vs2012\release can be shipped to
-echo c++ binding users and coders of bindings to other languages
-echo on the windows platform.
+echo This cmd file will collect the result of a visual studio
+echo Version %1 build of TightDb and create a release archive 
+echo with all the files that should be distributed 
+echo to c++ binding users.
+echo The release will be located in Windows\Release\vs%1
 echo ----------------------------------------------------------
 echo parameters (%0)
 echo where this file is located (%~dp0)
@@ -54,9 +43,14 @@ md %location%release\vs%vsversion%\files\src
 md %location%release\vs%vsversion%\release
 echo copying release files to release directory
 :copy library files to the files directory
-copy %location%lib\*.lib %location%\release\vs%vsversion%\files
+copy %location%..\lib\*.lib %location%\release\vs%vsversion%\files
 :copy the header files to the files directory
-xcopy %location%src\*.h* %location%\release\vs%vsversion%\files\src /S /y
+xcopy %location%..\src\*.h* %location%\release\vs%vsversion%\files\src /S /y
+:copy release notes
+copy %location%..\releasenotes.html %location%\relase\vs%vsversion%\files
+copy %location%release_Readme.txt %location%\release\vs%vsversion%\files
+
+
 :archive the files directory and put it in the release directory
 echo creating release archive
 set releasefilename=%location%\release\vs%vsversion%\release\tightdb_cpp_VS%vsversion%_%reldate%_%reltime%_%reldeveloper%
@@ -76,6 +70,7 @@ echo %location%7z.exe a -tzip -r %location%release\vs%vsversion%\release\%releas
 :0.04 Added time and date and username to the filename
 :0.05 changed comments, reoved debug pause commands
 :0.10 added support for VS2010 as well as VS2012
+:0.11 Adapted to run in Windows\ folder under solution folder
 echo Finished!
 pause
 goto end
