@@ -13,7 +13,7 @@ INST_HEADERS += array_basic.hpp array_basic_tpl.hpp array_binary.hpp array_blob.
 array_blobs_big.hpp array_string_long.hpp column_basic.hpp column_basic_tpl.hpp column_binary.hpp \
 column.hpp column_mixed.hpp column_mixed_tpl.hpp column_string_enum.hpp column_string.hpp \
 column_table.hpp column_tpl.hpp group_writer.hpp index_string.hpp query_engine.hpp \
-query_expression.hpp
+query_expression.hpp file_interprocess_managed.hpp
 
 
 lib_LIBRARIES = libtightdb.a
@@ -24,7 +24,8 @@ libtightdb_a_SOURCES = terminate.cpp string_buffer.cpp file.cpp thread.cpp utf8.
 utilities.cpp alloc.cpp alloc_slab.cpp array.cpp array_string.cpp array_string_long.cpp \
 array_binary.cpp array_blob.cpp array_blobs_big.cpp column.cpp column_string.cpp column_string_enum.cpp \
 column_binary.cpp column_table.cpp column_mixed.cpp spec.cpp table.cpp table_view.cpp group.cpp \
-group_writer.cpp group_shared.cpp index_string.cpp query.cpp lang_bind_helper.cpp importer.cpp
+group_writer.cpp group_shared.cpp index_string.cpp query.cpp lang_bind_helper.cpp importer.cpp \
+file_interprocess_managed.cpp
 
 ifneq ($(TIGHTDB_ENABLE_REPLICATION),)
 libtightdb_a_SOURCES += replication.cpp

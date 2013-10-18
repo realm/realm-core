@@ -34,7 +34,7 @@
 namespace tightdb {
 
 
-template<class T> class IPMFile
+class IPMFile
 {
 
 public:
@@ -46,8 +46,13 @@ public:
     //
     // - stale: the file exists, but noone is accessing it.
     //
+    //          Note: from the applications point of view, there is no operational
+    //          difference between stale and nonexisting. The difference is only visible
+    //          to an observer searching for the file outside the IPMFile abstraction.
+    //
     // - shared: the file exists, has been initialized and mapped
-    //           and multiple threads have access to the file.
+    //           and multiple threads have completed 'open' (but not 'close')
+    //           and may access the file.
     //
     // - exclusive: the file exists, has been initialized and mapped
     //              and a single thread has access to the file. Further
@@ -79,7 +84,12 @@ public:
 
     // Operations:
 
-    // Open file with a given name, map it into memory and superimpose a structure
+    // Associate an IPMFile object with a file name.
+    IPMFile(std::string file_path);
+    IPMFile();
+    void associate(std::string file_path); // throws if already open
+
+    // Open the associated file, map it into memory and superimpose a structure
     // of type T on top of it. NOTE: the IPMFile abstraction may add additional state
     // to the file, so you cannot assume that the returned pointer points to the start
     // of the file.
@@ -94,21 +104,24 @@ public:
     //   to enter either the shared or the exclusive state, open will throw.
     // - If the file is already in the shared state, open will return.
     // - Further: If the file is already in the exclusive state and is closed
-    //   by the process with exclusive access, without first beeing shared,
+    //   by a process with exclusive access, without first beeing shared,
     //   exactly one of any waiting calls to open will complete with exclusive
     //   access.
-    T* open(std::string file_path, bool& is_exclusive, int msec_timeout = 0);
-
-    // Reopen a file which has been opened earlier, then closed again. Similar to
-    // open, just reusing the parameters provided in an earlier call to open.
-    T* reopen(int msec_timeout = 0);
+    template<class T> 
+    T* open(bool& is_exclusive, int msec_timeout = 0);
+    void* open(bool& is_exclusive, size_t size, int msec_timeout = 0);
 
     // obtain an additional mapping of the file at a new address. Such mappings must
     // be explicitly removed by the user by calling remove_map. It is not possible
     // to remove or remap the initial mapping (returned by open), except through call
     // to close, but additional mappings can be added and removed.
+    template<class T> 
     T* add_map();
+    template<class T> 
     void remove_map(T*);
+    // untyped:
+    void* add_map(size_t size);
+    void remove_map(void*);
 
     // release exclusive access if you have it, ignored otherwise. Transitioning
     // to shared state is atomic, i.e. no other process can gain exclusive access
@@ -116,9 +129,9 @@ public:
     void share();
 
     // unmap memory and close the file. May also initiate cleanup, removal of the
-    // file if no one else uses it, etc. If close is called by a thread having the
-    // file in exclusive state, the file transitions to either 'stale' og 'nonexistant'
-    // atomically.
+    // file if no one else uses it, etc.
+    // If close is called by a thread having the file in exclusive state, the file
+    // transitions to either 'stale' og 'nonexistant' atomically.
     // the atomicity ensures that any threads waiting in 'open' will see an initialized
     // file and that exactly one of those waiting threads will get exclusive access
     // to the file.
@@ -132,12 +145,46 @@ public:
     // gain exclusive access before this process gets it. Note, that there is no
     // option to WAIT for exclusive access. In case of contention, NO thread gets
     // exclusive access, all requests just returns false.
-    bool got_exclusive_access();
+    bool try_get_exclusive_access();
 
     // true if the file has been removed since it was opened. On some systems (UNIX),
     // it is possible to remove a file even though it is open. This call also returns
     // true if the file has been replaced by another file with the same name.
     bool is_removed();
+    // NOTE: On systems where an open file can be deleted (UNIX derivatives), doing so
+    // whithout going through the IPMFile interface can violate basic assumptions in
+    // the implementation. The IPMFile implementation may assume that files are only
+    // removed under its own control. Hence, if is_removed() returns true, it should
+    // most likely be treated as a potentially serious malfunction.
+
+private:
+    struct IPMFileImplementation;
+    IPMFileImplementation* m_impl;
+
+};
+
+
+template<class T> 
+T* IPMFile::open(bool& is_exclusive, int msec_timeout)
+{
+    return reinterpret_cast<T*>( open(is_exclusive, sizeof(T), msec_timeout) );
 }
 
+template<class T> 
+T* IPMFile::add_map()
+{
+    return reinterpret_cast<T*>( add_map(sizeof(T)) );
 }
+
+template<class T> 
+void IPMFile::remove_map(T* info)
+{
+    remove_map(reinterpret_cast<void*>( info ));
+}
+
+
+
+
+}
+
+#endif
