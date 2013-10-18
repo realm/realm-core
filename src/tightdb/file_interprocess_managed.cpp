@@ -20,10 +20,11 @@
 
 #include "file_interprocess_managed.hpp"
 #include "thread.hpp"
+#include "file.hpp"
 
 namespace tightdb {
 
-struct IPMFileImplementation {
+struct IPMFile::IPMFileImplementation {
     std::string m_path;
     bool m_is_open;
     File m_file;
@@ -31,15 +32,17 @@ struct IPMFileImplementation {
 
 struct IPMFileMap {
     // IPMFile specific fields:
-    Enum State { Uninit, Initialized, Stale };
+    enum State { Uninit, Initialized, Stale };
     Atomic<State> m_state;
-    Atomic<uint32> m_transition_count;
+    Atomic<uint32_t> m_transition_count;
     // Client space:
-    char m_client[0];
+    char m_client[1];
 };
 
-IPMFile::IPMFile(std::string file_path) : IPMFile()
+IPMFile::IPMFile(std::string file_path)
 {
+    m_impl = new IPMFileImplementation;
+    m_impl->m_is_open = false;
     m_impl->m_path = file_path;
 }
 
@@ -47,30 +50,34 @@ IPMFile::IPMFile(std::string file_path) : IPMFile()
 IPMFile::IPMFile()
 {
     m_impl = new IPMFileImplementation;
+    m_impl->m_is_open = false;
     m_impl->m_path = "";
-    m_is_open = false;
 }
 
 
 void IPMFile::associate(std::string file_path)
 {
     if (m_impl->m_is_open)
-        throw runtime_error("New association cannot be established while file is open");
+        throw std::runtime_error("New association cannot be established while file is open");
 
     m_impl->m_path = file_path;
 }
 
 
-void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout = 0)
+void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
 {
-    if (m_impl->is_open)
-        throw runtime_error("Cannot open already opened file");
+    if (m_impl->m_is_open)
+        throw std::runtime_error("Cannot open already opened file");
+
+    // FIXME
+
+    return NULL;
 }
 
 
 void* IPMFile::add_map(size_t size)
 {
-    return NULL
+    return NULL;
 }
 
 
