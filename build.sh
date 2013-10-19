@@ -614,7 +614,7 @@ EOF
 
         VERSION="$(git describe)" || exit 1
         if [ -z "$TIGHTDB_VERSION" ]; then
-            TIGHTDB_VERSION="$VERSION"
+            export TIGHTDB_VERSION="$VERSION"
         fi
         NAME="tightdb-$TIGHTDB_VERSION"
 
@@ -936,16 +936,19 @@ EOF
             mkdir "$PKG_DIR/tightdb" || exit 1
             if [ "$PREBUILT_CORE" ]; then
                 message "Building core library"
-                (sh build.sh config && sh build.sh clean && sh build.sh build) >>"$LOG_FILE" 2>&1 || exit 1
+                PREBUILD_DIR="$TEMP_DIR/prebuild"
+                mkdir "$PREBUILD_DIR" || exit 1
+                sh "$TIGHTDB_HOME/build.sh" dist-copy "$PREBUILD_DIR" >>"$LOG_FILE" 2>&1 || exit 1
+                (cd "$PREBUILD_DIR" && sh build.sh config && sh build.sh build) >>"$LOG_FILE" 2>&1 || exit 1
 
                 message "Running test suite for core library in debug mode"
-                if ! sh build.sh test-debug >>"$LOG_FILE" 2>&1; then
+                if ! (cd "$PREBUILD_DIR" && sh build.sh test-debug) >>"$LOG_FILE" 2>&1; then
                     warning "Test suite failed for core library"
                 fi
 
                 if [ "$INCLUDE_IPHONE" ]; then
                     message "Building core library for 'iphone'"
-                    sh build.sh build-iphone >>"$LOG_FILE" 2>&1 || exit 1
+                    (cd "$PREBUILD_DIR" && sh build.sh build-iphone) >>"$LOG_FILE" 2>&1 || exit 1
                 fi
 
                 message "Transferring prebuilt core library to package"
@@ -974,7 +977,7 @@ EOF
                 git ls-files >"$TEMP_DIR/transfer/files1" || exit 1
                 grep -f "$TEMP_DIR/transfer/include.bre" "$TEMP_DIR/transfer/files1" >"$TEMP_DIR/transfer/files2" || exit 1
                 grep -v -f "$TEMP_DIR/transfer/exclude.bre" "$TEMP_DIR/transfer/files2" >"$TEMP_DIR/transfer/files3" || exit 1
-                tar czf "$TEMP_DIR/transfer/core.tar.gz" -T "$TEMP_DIR/transfer/files3" || exit 1
+                (cd "$PREBUILD_DIR" && tar czf "$TEMP_DIR/transfer/core.tar.gz" -T "$TEMP_DIR/transfer/files3") || exit 1
                 (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/transfer/core.tar.gz") || exit 1
                 if [ -z "$(which pandoc)" ]; then
                     echo "pandoc is not installed - not generating README.pdf"
@@ -982,12 +985,12 @@ EOF
                     (cd "$PKG_DIR/tightdb" && pandoc README.md -o README.pdf) || exit 1
                 fi
                 printf "\nNO_BUILD_ON_INSTALL = 1\n" >> "$PKG_DIR/tightdb/config.mk"
-                INST_HEADERS="$(cd src/tightdb && make get-inst-headers)" || exit 1
-                INST_LIBS="$(cd src/tightdb && make get-inst-libraries)" || exit 1
-                INST_PROGS="$(cd src/tightdb && make get-inst-programs)" || exit 1
-                (cd "src/tightdb" && cp -R -P $INST_HEADERS $INST_LIBS $INST_PROGS "$PKG_DIR/tightdb/src/tightdb/") || exit 1
+                INST_HEADERS="$(cd "$PREBUILD_DIR/src/tightdb" && make get-inst-headers)" || exit 1
+                INST_LIBS="$(cd "$PREBUILD_DIR/src/tightdb" && make get-inst-libraries)" || exit 1
+                INST_PROGS="$(cd "$PREBUILD_DIR/src/tightdb" && make get-inst-programs)" || exit 1
+                (cd "$PREBUILD_DIR/src/tightdb" && cp -R -P $INST_HEADERS $INST_LIBS $INST_PROGS "$PKG_DIR/tightdb/src/tightdb/") || exit 1
                 if [ "$INCLUDE_IPHONE" ]; then
-                    cp -R "$IPHONE_DIR" "$PKG_DIR/tightdb/" || exit 1
+                    cp -R "$PREBUILD_DIR/$IPHONE_DIR" "$PKG_DIR/tightdb/" || exit 1
                 fi
                 get_host_info >"$PKG_DIR/tightdb/.PREBUILD_INFO" || exit 1
             else
