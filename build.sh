@@ -849,7 +849,8 @@ exit 1
 EOF
             chmod +x "$PKG_DIR/build"
 
-            cat >"$PKG_DIR/README" <<EOF
+            if [ -z "$INTERACTIVE" ]; then
+                cat >"$PKG_DIR/README" <<EOF
 TightDB version $TIGHTDB_VERSION
 
 Configure specific extensions:    ./build  config  EXT1  [EXT2]...
@@ -870,16 +871,16 @@ The following steps should generally suffice:
 Available extensions are: ${AUGMENTED_EXTENSIONS:-None}
 
 EOF
-            if [ "$PREBUILT_CORE" ]; then
-                cat >>"$PKG_DIR/README" <<EOF
+                if [ "$PREBUILT_CORE" ]; then
+                    cat >>"$PKG_DIR/README" <<EOF
 During installation, the prebuilt core library will be installed along
 with all the extensions that were successfully built. The C++
 extension is part of the core library, so the effect of including
 'c++' in the 'config' step is simply to request that the C++ header
 files (and other files needed for development) are to be installed.
 EOF
-            else
-                cat >>"$PKG_DIR/README" <<EOF
+                else
+                    cat >>"$PKG_DIR/README" <<EOF
 When building is requested, the core library will be built along with
 all the extensions that you have configured. The C++ extension is part
 of the core library, so the effect of including 'c++' in the 'config'
@@ -889,16 +890,16 @@ needed for development) are to be installed.
 For information on prerequisites when building the core library, see
 tightdb/README.md.
 EOF
-            fi
+                fi
 
-            cat >>"$PKG_DIR/README" <<EOF
+                cat >>"$PKG_DIR/README" <<EOF
 
 For information on prerequisites of the each individual extension, see
 the README.md file in the corresponding subdirectory.
 EOF
 
-            if [ "$INCLUDE_IPHONE" ]; then
-                cat >>"$PKG_DIR/README" <<EOF
+                if [ "$INCLUDE_IPHONE" ]; then
+                    cat >>"$PKG_DIR/README" <<EOF
 
 To build TightDB for iPhone, run the following command:
 
@@ -909,10 +910,9 @@ The following iPhone extensions are availble: ${AUGMENTED_EXTENSIONS_IPHONE:-Non
 Files produced for extension EXT will be placed in a subdirectory
 named "iphone-EXT".
 EOF
-            fi
+                fi
 
-
-            cat >>"$PKG_DIR/README" <<EOF
+                cat >>"$PKG_DIR/README" <<EOF
 
 Note that each build step creates a new log file in the subdirectory
 called "log". When contacting TightDB at <support@tightdb.com> because
@@ -920,18 +920,19 @@ of a problem in the installation process, we recommend that you attach
 all these log files as a bundle to your mail.
 EOF
 
-            for x in $AVAIL_EXTENSIONS; do
-                EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
-                EXT_HOME="../$EXT_DIR"
-                if REMARKS="$(sh "$EXT_HOME/build.sh" dist-remarks 2>&1)"; then
-                    cat >>"$PKG_DIR/README" <<EOF
+                for x in $AVAIL_EXTENSIONS; do
+                    EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
+                    EXT_HOME="../$EXT_DIR"
+                    if REMARKS="$(sh "$EXT_HOME/build.sh" dist-remarks 2>&1)"; then
+                        cat >>"$PKG_DIR/README" <<EOF
 
 Remarks for '$x':
 
 $REMARKS
 EOF
-                fi
-            done
+                    fi
+                done
+            fi
 
             mkdir "$PKG_DIR/tightdb" || exit 1
             if [ "$PREBUILT_CORE" ]; then
@@ -1243,7 +1244,8 @@ help, check the log file.
 The log file is here: $LOG_FILE
 EOF
         fi
-        cat <<EOF
+        if [ -z "$INTERACTIVE" ]; then
+            cat <<EOF
 
 Run the following command to build the parts that were successfully
 configured:
@@ -1251,6 +1253,7 @@ configured:
     ./build build
 
 EOF
+        fi
         if [ "$ERROR" -a -z "$INTERACTIVE" ]; then
             exit 1
         fi
