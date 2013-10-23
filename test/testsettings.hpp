@@ -50,5 +50,6 @@
 
 //#define TEST_TRANSACTIONS_LASSE // Takes a long time
 //#define TEST_INDEX // not implemented yet
+//#define TEST_COLUMN_LARGE // Takes ~5 min in release mode with maxlistsize=1000
 
 #endif

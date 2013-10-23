@@ -2440,7 +2440,10 @@ void Array::find_all(Array& result, int64_t value, size_t col_offset, size_t beg
 bool Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state) const
 {
     if (cond == cond_Equal) {
-        if (action == act_Sum) {
+        if (action == act_ReturnFirst) {
+            TIGHTDB_TEMPEX3(return find, Equal, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Sum) {
             TIGHTDB_TEMPEX3(return find, Equal, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
@@ -2460,7 +2463,10 @@ bool Array::find(int cond, Action action, int64_t value, size_t start, size_t en
         }
     }
     if (cond == cond_NotEqual) {
-        if (action == act_Sum) {
+        if (action == act_ReturnFirst) {
+            TIGHTDB_TEMPEX3(return find, NotEqual, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Sum) {
             TIGHTDB_TEMPEX3(return find, NotEqual, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
@@ -2480,7 +2486,10 @@ bool Array::find(int cond, Action action, int64_t value, size_t start, size_t en
         }
     }
     if (cond == cond_Greater) {
-        if (action == act_Sum) {
+        if (action == act_ReturnFirst) {
+            TIGHTDB_TEMPEX3(return find, Greater, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Sum) {
             TIGHTDB_TEMPEX3(return find, Greater, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
@@ -2500,7 +2509,10 @@ bool Array::find(int cond, Action action, int64_t value, size_t start, size_t en
         }
     }
     if (cond == cond_Less) {
-        if (action == act_Sum) {
+        if (action == act_ReturnFirst) {
+            TIGHTDB_TEMPEX3(return find, Less, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Sum) {
             TIGHTDB_TEMPEX3(return find, Less, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
@@ -2520,7 +2532,10 @@ bool Array::find(int cond, Action action, int64_t value, size_t start, size_t en
         }
     }
     if (cond == cond_None) {
-        if (action == act_Sum) {
+        if (action == act_ReturnFirst) {
+            TIGHTDB_TEMPEX3(return find, None, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Sum) {
             TIGHTDB_TEMPEX3(return find, None, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {

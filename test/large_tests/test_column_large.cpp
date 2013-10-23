@@ -1,6 +1,6 @@
 #include "../testsettings.hpp"
 
-#if TEST_DURATION > 0
+#ifdef TEST_COLUMN_LARGE
 
 #include "tightdb/column.hpp"
 #include <UnitTest++.h>
@@ -29,7 +29,6 @@ uint64_t rand2(int bitwidth = 64)
 
 }
 
-#if 0
 
 TEST(LESS)
 {
@@ -43,24 +42,26 @@ TEST(LESS)
                      -30, -31, -32, -33, -62, -63, -64, -65, -126, -127, -128, -129, -254, -255,
                      -256, -257, -32766, -32767, -32768, -32769, -65535, -65536, -65537, -2147483648LL,
                      -2147483647LL, -2147483646LL, -2147483649LL, -4294967296LL, -4294967295LL,
-                     4294967297LL, -4294967294LL, -9223372036854775807LL, -9223372036854775808LL, -9223372036854775806LL,
-
+                     4294967297LL, -4294967294LL, -9223372036854775807LL, (-9223372036854775807LL - 1), -9223372036854775806LL,
+                     /* (-9223372036854775807LL - 1) because -9223372036854775808LL is buggy; it's seen as a minus token and then a right-hand-side
+                     exceeding long long's range. Furthermore, std::numeric_limits<int64_t>::min is typedef'ed to 'long long' which cannot be used in 
+                     initializer list for int64_t */
     };
 
-    for (size_t w = 5; w < sizeof(v) / sizeof(*v); w++) {
-       printf("%d ", w);
+    
 
+    for (size_t w = 0; w < sizeof(v) / sizeof(*v); w++) {
         const size_t LEN = 64 * 20 + 1000;
         Array a;
         for (size_t t = 0; t < LEN; t++)
             a.add(v[w]);
 
         // to create at least 64 bytes of data (2 * 128-bit SSE chunks + 64 bit chunk before and after + some unaligned data before and after)
-        size_t LEN2 = 64 * 8 / (a.GetBitWidth() == 0 ? 1 : a.GetBitWidth());
+        size_t LEN2 = 64 * 8 / (a.get_width() == 0 ? 1 : a.get_width());
 
         Array akku;
-        QueryState state;
-        state.state = int64_t(&akku);
+        QueryState<int64_t> state;
+        state.m_state = int64_t(&akku);
 
         for (size_t from = 0; from < LEN2; from++) {
             for (size_t to = from + 1; to <= LEN2; to++) {
@@ -68,103 +69,108 @@ TEST(LESS)
 
                     if (v[w] != LL_MIN) {
                         // LESS
-                        a.Set(match, v[w] - 1);
-                        size_t f = a.find_first<LESS>(v[w], from, to);
-                        a.Set(match, v[w]);
+                        a.set(match, v[w] - 1);
+                        state.init(act_ReturnFirst, &akku, size_t(-1));
+                        a.find(cond_Less, act_ReturnFirst, v[w], from, to, 0, &state);
+                        size_t f = state.m_state;
+                        a.set(match, v[w]);
                         if (match >= from && match < to) {
-                            TIGHTDB_ASSERT(match == f);
+                            CHECK(match == f);
                         }
                         else {
-                            TIGHTDB_ASSERT(f == size_t(-1));
+                            CHECK(f == size_t(-1));
                         }
                     }
 
                     if (v[w] != LL_MAX) {
                         // GREATER
-                        a.Set(match, v[w] + 1);
-                        size_t f = a.find_first<GREATER>(v[w], from, to);
-                        a.Set(match, v[w]);
+                        a.set(match, v[w] + 1);
+                        state.init(act_ReturnFirst, &akku, size_t(-1));
+                        a.find(cond_Greater, act_ReturnFirst, v[w], from, to, 0, &state);
+                        size_t f = state.m_state;
+                        a.set(match, v[w]);
                         if (match >= from && match < to) {
-                            TIGHTDB_ASSERT(match == f);
+                            CHECK(match == f);
                         }
                         else {
-                            TIGHTDB_ASSERT(f == size_t(-1));
+                            CHECK(f == size_t(-1));
                         }
                     }
 
                     // FIND
-                    a.Set(match, v[w]-1);
+                    a.set(match, v[w]-1);
                     size_t f = a.find_first(v[w]-1, from, to);
-                    a.Set(match, v[w]);
+                    a.set(match, v[w]);
                     if (match >= from && match < to) {
-                        TIGHTDB_ASSERT(match == f);
+                        CHECK(match == f);
                     }
                     else {
-                        TIGHTDB_ASSERT(f == size_t(-1));
+                        CHECK(f == size_t(-1));
                     }
 
                     if (v[w] != LL_MIN) {
                         // MIN
                         int64_t val = 0;
-                        a.Set(match, v[w]-1);
+                        a.set(match, v[w]-1);
                         bool b = a.minimum(val, from, to);
-                        a.Set(match, v[w]);
+                        a.set(match, v[w]);
                         CHECK_EQUAL(true, b);
                         if (match >= from && match < to)
-                            TIGHTDB_ASSERT(val == v[w]-1);
+                            CHECK(val == v[w]-1);
                         else
-                            TIGHTDB_ASSERT(val == v[w]);
+                            CHECK(val == v[w]);
                     }
 
                     // MAX
                     if (v[w] != LL_MAX) {
                         int64_t val = 0;
-                        a.Set(match, v[w]+1);
+                        a.set(match, v[w]+1);
                         bool b = a.maximum(val, from, to);
-                        a.Set(match, v[w]);
+                        a.set(match, v[w]);
                         CHECK_EQUAL(true, b);
                         if (match >= from && match < to)
-                            TIGHTDB_ASSERT(val == v[w]+1);
+                            CHECK(val == v[w]+1);
                         else
-                            TIGHTDB_ASSERT(val == v[w]);
+                            CHECK(val == v[w]);
                     }
 
                     // SUM
                     int64_t val = 0;
-                    a.Set(match, v[w]+1);
+                    a.set(match, v[w]+1);
                     val = a.sum(from, to);
-                    a.Set(match, v[w]);
+                    a.set(match, v[w]);
                     int64_t intended;
                     if (match >= from && match < to)
                         intended = (to - from - 1) * v[w] + v[w] + 1;
                     else
                         intended = (to - from) * v[w];
 
-                    TIGHTDB_ASSERT(intended == val);
+                    CHECK(intended == val);
 
 
                     // Find all, LESS
                     if (v[w] != LL_MIN) {
                         for (size_t off = 1; off < 8; off++) {
 
-                            a.Set(match, v[w] - 1);
-                            a.Set(match + off, v[w] - 1);
+                            a.set(match, v[w] - 1);
+                            a.set(match + off, v[w] - 1);
 
-                            akku.Clear();
+                            akku.clear();
+                            state.init(act_FindAll, &akku, size_t(-1));
                             a.find(cond_Less, act_FindAll, v[w], from, to, 0, &state);
-
-                            a.Set(match, v[w]);
-                            a.Set(match + off, v[w]);
+                    
+                            a.set(match, v[w]);
+                            a.set(match + off, v[w]);
 
                             if (match >= from && match < to) {
-                                TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match);
+                                CHECK(size_t(akku.get(0)) == match);
                             }
                             if (match + off >= from && match + off < to) {
-                                TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match + off || akku.GetAsSizeT(1) == match + off);
+                                CHECK(size_t(akku.get(0)) == match + off || size_t(akku.get(1)) == match + off);
                             }
 
-                            a.Set(match, v[w]);
-                            a.Set(match + off, v[w]);
+                            a.set(match, v[w]);
+                            a.set(match + off, v[w]);
 
                         }
                     }
@@ -174,24 +180,25 @@ TEST(LESS)
                     if (v[w] != LL_MAX) {
                         for (size_t off = 1; off < 8; off++) {
 
-                            a.Set(match, v[w] + 1);
-                            a.Set(match + off, v[w] + 1);
+                            a.set(match, v[w] + 1);
+                            a.set(match + off, v[w] + 1);
 
-                            akku.Clear();
+                            akku.clear();
+                            state.init(act_FindAll, &akku, size_t(-1));
                             a.find(cond_Greater, act_FindAll, v[w], from, to, 0, &state);
 
-                            a.Set(match, v[w]);
-                            a.Set(match + off, v[w]);
+                            a.set(match, v[w]);
+                            a.set(match + off, v[w]);
 
                             if (match >= from && match < to) {
-                                TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match);
+                                CHECK(size_t(akku.get(0)) == match);
                             }
                             if (match + off >= from && match + off < to) {
-                                TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match + off || akku.GetAsSizeT(1) == match + off);
+                                CHECK(size_t(akku.get(0)) == match + off || size_t(akku.get(1)) == match + off);
                             }
 
-                            a.Set(match, v[w]);
-                            a.Set(match + off, v[w]);
+                            a.set(match, v[w]);
+                            a.set(match + off, v[w]);
                         }
                     }
 
@@ -199,40 +206,39 @@ TEST(LESS)
                     // Find all, EQUAL
                     if (v[w] != LL_MAX) {
                         for (size_t off = 1; off < 8; off++) {
-                            a.Set(match, v[w] + 1);
-                            a.Set(match + off, v[w] + 1);
+                            a.set(match, v[w] + 1);
+                            a.set(match + off, v[w] + 1);
 
-                            akku.Clear();
+                            akku.clear();
+                            state.init(act_FindAll, &akku, size_t(-1));
                             a.find(cond_Equal, act_FindAll, v[w] + 1, from, to, 0, &state);
 
-                            a.Set(match, v[w]);
-                            a.Set(match + off, v[w]);
+                            a.set(match, v[w]);
+                            a.set(match + off, v[w]);
 
                             if (match >= from && match < to) {
-                                TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match);
+                                CHECK(size_t(akku.get(0)) == match);
                             }
                             if (match + off >= from && match + off < to) {
-                                TIGHTDB_ASSERT(akku.GetAsSizeT(0) == match + off || akku.GetAsSizeT(1) == match + off);
+                                CHECK(size_t(akku.get(0)) == match + off || size_t(akku.get(1)) == match + off);
                             }
 
-                            a.Set(match, v[w]);
-                            a.Set(match + off, v[w]);
+                            a.set(match, v[w]);
+                            a.set(match + off, v[w]);
                         }
                     }
                 }
             }
 
         }
-        a.Destroy();
+        a.destroy();
     }
 }
 
 
-#endif
-
-TEST(Column_monkeytest2)
+ONLY(Column_monkeytest2)
 {
-    const uint64_t ITER_PER_BITWIDTH = 16 * 1000 * TEST_DURATION * TEST_DURATION;
+    const uint64_t ITER_PER_BITWIDTH = 16 * 1000 * 20;
     const uint64_t SEED = 123;
 
     VerifiedInteger a;
