@@ -1374,7 +1374,8 @@ The log file is here: $LOG_FILE
 
 EOF
         fi
-        cat <<EOF
+        if [ -z "$INTERACTIVE" ]; then
+            cat <<EOF
 
 Run the following command to install the parts that were successfully
 built:
@@ -1382,6 +1383,7 @@ built:
     sudo ./build install
 
 EOF
+        fi
         if [ "$ERROR" ]; then
             exit 1
         fi
