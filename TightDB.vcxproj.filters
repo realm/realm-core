@@ -202,6 +202,12 @@
     <ClCompile Include="test\performance\matrix.cpp">
       <Filter>test\performance matrix</Filter>
     </ClCompile>
+    <ClCompile Include="src\tightdb\importer_tool.cpp">
+      <Filter>csv importer</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\importer.cpp">
+      <Filter>csv importer</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">
@@ -402,6 +408,9 @@
     <ClInclude Include="test\util\timer.hpp">
       <Filter>test\util</Filter>
     </ClInclude>
+    <ClInclude Include="src\tightdb\importer.hpp">
+      <Filter>csv importer</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="pthreads">
@@ -424,6 +433,9 @@
     </Filter>
     <Filter Include="test\performance matrix">
       <UniqueIdentifier>{fe85526a-4963-4276-add7-926266b909ce}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="csv importer">
+      <UniqueIdentifier>{f62cfbc2-b809-4874-9946-55406a286d4a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
