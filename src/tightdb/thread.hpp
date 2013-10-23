@@ -23,6 +23,9 @@
 #include <exception>
 
 #include <pthread.h>
+#ifdef TIGHTDB_PTHREADS_TEST
+#include <../test/pthread_test.hpp>
+#endif
 #include <errno.h>
 #include <cstddef>
 
@@ -32,7 +35,7 @@
 #include <tightdb/unique_ptr.hpp>
 
 #ifdef TIGHTDB_HAVE_CXX11_ATOMIC
-#include <atomic>
+#  include <atomic>
 #endif
 
 

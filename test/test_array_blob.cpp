@@ -6,9 +6,13 @@
 #include <UnitTest++.h>
 
 #include <tightdb/array_blob.hpp>
+#include <tightdb/column_string.hpp>
 
 using namespace std;
 using namespace tightdb;
+
+// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
+// will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
 TEST(ArrayBlob_AddEmpty)
 {
@@ -77,6 +81,15 @@ TEST(ArrayBlob)
 
     // Cleanup
     blob.destroy();
+}
+
+TEST(AdaptiveStringLeak)
+{
+    AdaptiveStringColumn asc;
+    for(size_t t = 0; t < 2 * TIGHTDB_MAX_LIST_SIZE; t++)
+        asc.insert(0, std::string(100, 'a'));  // use constant larger than 'medium_string_max_size'
+
+    asc.destroy();
 }
 
 #endif // TEST_ARRAY_BLOB

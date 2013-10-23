@@ -239,8 +239,9 @@ public:
     template<class T> friend BasicTableRef<const T> checked_cast(ConstTableRef) TIGHTDB_NOEXCEPT;
     //@}
 
-#ifdef TIGHTDB_DEBUG
     using Table::Verify;
+
+#ifdef TIGHTDB_DEBUG
     using Table::print;
     using Table::dump_node_structure;
 #endif

@@ -41,7 +41,7 @@ each of our major platforms:
     sudo apt-get install libunittest++-dev
     sudo apt-get install libprocps0-dev
 
-### Fedora 17 and 18, Amazon Linux 2012.09
+### Fedora 17, 18, 19, Amazon Linux 2012.09
 
     sudo yum install gcc gcc-c++
     sudo yum install python-cheetah
@@ -100,23 +100,21 @@ Note: '.so' is replaced by '.dylib' on OS X.
 
 The following programs are installed:
 
+    /usr/local/bin/tightdb-import
     /usr/local/bin/tightdbd
     /usr/local/bin/tightdbd-dbg
     /usr/local/bin/tightdb-config
     /usr/local/bin/tightdb-config-dbg
-    /usr/local/bin/tightdb-import
 
-The first two are used transparently by the TightDB library when
-`async` transactions are enabled. The two `config` programs provide
-the necessary compiler flags for an application that needs to link
-against TightDB. They work with GCC and other compilers, such as
-Clang, that are mostly command line compatible with GCC. Here is an
-example:
+The `tightdb-import` tool lets you load files containing
+comma-separated values into TightDB. The next two are used
+transparently by the TightDB library when `async` transactions are
+enabled. The two `config` programs provide the necessary compiler
+flags for an application that needs to link against TightDB. They work
+with GCC and other compilers, such as Clang, that are mostly command
+line compatible with GCC. Here is an example:
 
     g++  my_app.cpp  `tightdb-config --cflags --libs`
-
-The tightdb-import tool is a CSV-file importer that lets you convert
-comma separated value-files to TightDB format. 
 
 After building, you might want to see exactly what will be installed,
 without actually installing anything. This can be done as follows:
@@ -165,6 +163,13 @@ following command before building and installing:
 
 Here, `PREFIX` is the installation prefix. If it is not specified, it
 defaults to `/usr/local`.
+
+Normally the TightDB version is taken to be what is returned by `git
+describe`. To override this, set `TIGHTDB_VERSION` as in the following
+examples:
+
+    TIGHTDB_VERSION=x.y.z sh build.sh config
+    TIGHTDB_VERSION=x.y.z sh build.sh bin-dist all
 
 To use a nondefault compiler, or a compiler in a nondefault location,
 set the environment variable `CC` before calling `sh build.sh build`
@@ -235,7 +240,7 @@ is named according to the tag.
 
     sudo yum install pandoc-markdown2pdf
 
-### Fedora 18
+### Fedora 18, 19
 
     sudo yum install pandoc-pdf texlive
 

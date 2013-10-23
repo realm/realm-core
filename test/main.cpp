@@ -12,7 +12,7 @@
 #include "util/timer.hpp"
 
 
-//#define USE_VLD
+#define USE_VLD
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
     #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
@@ -102,21 +102,25 @@ int main(int argc, char* argv[])
     // look for the daemon there
     const char* xcode_env = getenv("__XCODE_BUILT_PRODUCTS_DIR_PATHS");
     if (xcode_env) {
-#ifdef TIGHTDB_DEBUG
+#  ifdef TIGHTDB_DEBUG
         tightdbd_path = "tightdbd-dbg-noinst";
-#else
+#  else
         tightdbd_path = "tightdbd-noinst";
-#endif
+#  endif
     }
     else {
-#ifdef TIGHTDB_DEBUG
+#  ifdef TIGHTDB_COVER
+        tightdbd_path = "../src/tightdb/tightdbd-cov-noinst";
+#  else
+#    ifdef TIGHTDB_DEBUG
         tightdbd_path = "../src/tightdb/tightdbd-dbg-noinst";
-#else
+#    else
         tightdbd_path = "../src/tightdb/tightdbd-noinst";
-#endif
+#    endif
+#  endif
     }
     setenv("TIGHTDBD_PATH", tightdbd_path.c_str(), 0);
-#endif
+#endif // ! _WIN32
     bool const no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
 #ifdef TIGHTDB_DEBUG

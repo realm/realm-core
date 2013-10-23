@@ -56,7 +56,7 @@ class Replication {
 public:
     // Be sure to keep this type aligned with what is actually used in
     // SharedGroup.
-    typedef uint_fast32_t version_type;
+    typedef uint_fast64_t version_type;
 
     std::string get_database_path();
 

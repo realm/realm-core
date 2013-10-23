@@ -115,6 +115,9 @@ int main() {
     t->add("Phil", 43, false);
     t->add("Anni", 54, true);
 
+    // Remove database file if already existing
+    remove("employees.tightdb");
+
     // Write to disk
     group.write("employees.tightdb");
 
