@@ -196,6 +196,12 @@
     <ClCompile Include="test\test_array_blobs_big.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="test\util\timer.cpp">
+      <Filter>test\util</Filter>
+    </ClCompile>
+    <ClCompile Include="test\performance\matrix.cpp">
+      <Filter>test\performance matrix</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">
@@ -393,6 +399,9 @@
     <ClInclude Include="src\tightdb\array_blobs_big.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
+    <ClInclude Include="test\util\timer.hpp">
+      <Filter>test\util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="pthreads">
@@ -412,6 +421,9 @@
     </Filter>
     <Filter Include="test\util">
       <UniqueIdentifier>{b58f9a8c-f069-420b-a04d-a090821a51eb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="test\performance matrix">
+      <UniqueIdentifier>{fe85526a-4963-4276-add7-926266b909ce}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
