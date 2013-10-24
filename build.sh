@@ -780,6 +780,34 @@ EXTENSIONS="$AUGMENTED_EXTENSIONS"
 
 export TIGHTDB_VERSION="$TIGHTDB_VERSION"
 
+if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
+    shift
+    EXT=""
+    while [ \$# -gt 0 ]; do
+        e=\$1
+        if [ \$(echo \$EXTENSIONS | tr " " "\n" | grep -c \$e) -eq 0 ]; then
+            echo "\$e is not an available extension."
+            echo "Available extensions: \$EXTENSIONS"
+            exit 1
+        fi
+        EXT="\$EXT \$e"
+        shift
+    done
+    INTERACTIVE=1 sh build config \$EXT || exit 1
+    INTERACTIVE=1 sh build build || exit 1
+    INTERACTIVE=1 sudo sh build install || exit 1
+    echo "Do you wish to copy examples to your home directory (y/n)?"
+    read answer
+    if [ \$(echo \$answer | grep -c ^[yY]) -eq 1 ]; then
+        mkdir -p \$HOME/tightdb_examples
+        for x in \$EXT; do
+            cp -a tightdb_\$x/examples \$HOME/tightdb_examples/\$x
+        done
+        echo "Examples can be found in \$HOME/tightdb_examples."
+        echo "Please consult the README files for further information."
+    fi
+fi
+
 if [ \$# -eq 1 -a "\$1" = "clean" ]; then
     sh tightdb/build.sh dist-clean$BIN_CORE_ARG || exit 1
     exit 0
