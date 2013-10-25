@@ -65,6 +65,8 @@ public:
 
     void join();
 
+    static void cleanup();
+
 private:
     pthread_t m_id;
     bool m_joinable;

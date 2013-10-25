@@ -41,6 +41,18 @@
 #include <process.h>
 #endif
 
+void
+pthread_cleanup(void)
+{
+    // Free fixed size thread recycle pool to avoid still-reachable leak messages from leak detectors. Should
+    // be invoked as the last thing on process termination
+    pthread_t t = ptw32_threadReusePop();
+    while(t.p != NULL) {
+        free (t.p);
+        t = ptw32_threadReusePop();
+    }
+}
+
 int
 pthread_create (pthread_t * tid,
 		const pthread_attr_t * attr,

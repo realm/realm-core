@@ -64,6 +64,17 @@ TIGHTDB_NORETURN void Thread::join_failed(int)
     throw runtime_error("pthread_join() failed.");
 }
 
+void Thread::cleanup()
+{
+    // Valgrind can show still-reachable leaks for pthread_create() on many systems (AIX, Debian, etc) because
+    // glibc declares a static memory pool for threads which are free'd by the OS on process termination. See
+    // http://www.network-theory.co.uk/docs/valgrind/valgrind_20.html under --run-libc-freeres=<yes|no>. 
+    // This can give false positives because of missing suppression, etc (not real leaks!). It's also a problem 
+    // on Windows, so we have written our own clean-up method for the Windows port.
+#ifdef _WIN32
+    pthread_cleanup();
+#endif 
+}
 
 void Mutex::init_as_process_shared(bool robust_if_available)
 {

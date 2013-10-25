@@ -9,6 +9,8 @@
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
 #include <tightdb/utilities.hpp>
+#include <tightdb/thread.hpp>
+#include <pthread.h>
 
 using namespace std;
 using namespace tightdb;
@@ -21,6 +23,11 @@ public:
     Initialization()
     {
         tightdb::cpuid_init();
+    }
+    ~Initialization()
+    {
+//        http://www.unix.com/aix/132867-valgrind-pthread-memory-leaks-aix.html
+        tightdb::Thread::cleanup();
     }
 };
 
