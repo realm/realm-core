@@ -2787,7 +2787,7 @@ TEST(TestQuerySimple2)
     CHECK_EQUAL(7, tv1.get_source_ndx(2));
 }
 
-/*
+
 TEST(TestQueryLimit)
 {
     TupleTableType ttt;
@@ -2833,7 +2833,7 @@ TEST(TestQueryLimit)
     TupleTableType::View tv5 = q3.find_all(0, 3, 5);
     CHECK_EQUAL(3, tv5.size());
 }
-*/
+
 
 TEST(TestQueryFindNext)
 {
