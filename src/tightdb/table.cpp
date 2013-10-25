@@ -1973,7 +1973,7 @@ ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
         // Sort the refs based on the given column
         tv.sort(column_ndx, ascending);
     }
-    return move(tv);
+    return tv;
 }
 
 
