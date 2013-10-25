@@ -1,3 +1,4 @@
+#include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
 
 #include <UnitTest++.h>
