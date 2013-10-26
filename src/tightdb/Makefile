@@ -84,6 +84,9 @@ table_macros.hpp: table_macros.hpp.cheetah cheetah.sh
 endif
 
 
+clean/extra:
+	$(RM) build_config.h
+
 uninstall/extra:
 	$(RM) $(DESTDIR)$(includedir)/tightdb/*.hpp
 	$(RM) $(DESTDIR)$(includedir)/tightdb/*.h

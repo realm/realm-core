@@ -1,6 +1,5 @@
 # NOTE: THIS SCRIPT IS SUPPOSED TO RUN IN A POSIX SHELL
 
-ORIG_CWD="$(pwd)"
 cd "$(dirname "$0")"
 TIGHTDB_HOME="$(pwd)"
 
@@ -245,21 +244,27 @@ get_compiler_info()
     fi
 }
 
-new_dist_log_path()
+get_dist_log_path()
 {
-    local stem temp_dir dir files
+    local stem temp_dir path dir files max next
     stem="$1"
     temp_dir="$2"
-    if [ "$TIGHTDB_DIST_HOME" ]; then
-        dir="$TIGHTDB_DIST_HOME/log"
+    if [ "$TIGHTDB_DIST_LOG_FILE" ]; then
+        path="$TIGHTDB_DIST_LOG_FILE"
     else
-        dir="$temp_dir/log"
+        if [ "$TIGHTDB_DIST_HOME" ]; then
+            dir="$TIGHTDB_DIST_HOME/log"
+        else
+            dir="$temp_dir/log"
+        fi
+        mkdir -p "$dir" || return 1
+        files="$(cd "$dir" && (ls *.log 2>/dev/null || true))" || return 1
+        max="$(printf "%s\n" "$files" | grep '^[0-9][0-9]*_' | cut -d_ -f1 | sort -n | tail -n1)"
+        max="$(printf "%s\n" "$max" | sed 's/^0*//')"
+        next="$((max+1))" || return 1
+        path="$dir/$(printf "%03d" "$next")_$stem.log"
     fi
-    mkdir -p "$dir" || return 1
-    files="$(cd "$dir" && (ls *.log 2>/dev/null || true))" || return 1
-    max="$(printf "%s\n" "$files" | grep '^[0-9][0-9]*_' | cut -d_ -f1 | sort -n | tail -n1)"
-    next="$((max+1))" || return 1
-    printf "%s\n" "$dir/$(printf "%03d" "$next")_$stem.log"
+    printf "%s\n" "$path"
 }
 
 
@@ -267,7 +272,7 @@ case "$MODE" in
 
     "config")
         install_prefix="$1"
-        if [ -z "$install_prefix" ]; then
+        if ! [ "$install_prefix" ]; then
             install_prefix="/usr/local"
         fi
         install_exec_prefix="$install_prefix"
@@ -301,7 +306,7 @@ case "$MODE" in
                     iphone_sdks_avail="no"
                 else
                     sdk="$(find_iphone_sdk "$platform_home")" || exit 1
-                    if [ -z "$sdk" ]; then
+                    if ! [ "$sdk" ]; then
                         echo "Found no SDKs in '$platform_home'"
                         iphone_sdks_avail="no"
                     else
@@ -367,6 +372,13 @@ EOF
         auto_configure || exit 1
         TIGHTDB_ENABLE_FAT_BINARIES="1" make || exit 1
         echo "Done building"
+        exit 0
+        ;;
+
+    "build-config-progs")
+        auto_configure || exit 1
+        TIGHTDB_ENABLE_FAT_BINARIES="1" make -C "src/tightdb" "tightdb-config" "tightdb-config-dbg" || exit 1
+        echo "Done building config programs"
         exit 0
         ;;
 
@@ -529,7 +541,7 @@ EOF
                         break
                     fi
                 done
-                if [ -z "$found" ]; then
+                if ! [ "$found" ]; then
                     echo "Bad extension name '$x'" 1>&2
                     exit 1
                 fi
@@ -567,7 +579,7 @@ EOF
                         break
                     fi
                 done
-                if [ -z "$found" ]; then
+                if ! [ "$found" ]; then
                     echo "Bad extension name '$x'" 1>&2
                     exit 1
                 fi
@@ -581,7 +593,7 @@ EOF
                         break
                     fi
                 done
-                if [ -z "$found" ]; then
+                if ! [ "$found" ]; then
                     word_list_append INCLUDE_EXTENSIONS "$x" || exit 1
                 fi
             done
@@ -594,7 +606,7 @@ EOF
                         break
                     fi
                 done
-                if [ -z "$found" ]; then
+                if ! [ "$found" ]; then
                     word_list_append INCLUDE_PLATFORMS "$x" || exit 1
                 fi
             done
@@ -613,7 +625,7 @@ EOF
         fi
 
         VERSION="$(git describe)" || exit 1
-        if [ -z "$TIGHTDB_VERSION" ]; then
+        if ! [ "$TIGHTDB_VERSION" ]; then
             export TIGHTDB_VERSION="$VERSION"
         fi
         NAME="tightdb-$TIGHTDB_VERSION"
@@ -742,16 +754,6 @@ EOF
             PKG_DIR="$TEMP_DIR/$NAME"
             mkdir "$PKG_DIR" || exit 1
             mkdir "$PKG_DIR/log" || exit 1
-            INSTALL_ROOT="$TEMP_DIR/install"
-            mkdir "$INSTALL_ROOT" || exit 1
-
-            path_list_prepend CPATH                   "$INSTALL_ROOT/include"     || exit 1
-            path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib"         || exit 1
-            path_list_prepend LIBRARY_PATH            "$INSTALL_ROOT/lib64"       || exit 1
-            path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib"         || exit 1
-            path_list_prepend "$LD_LIBRARY_PATH_NAME" "$INSTALL_ROOT/lib64"       || exit 1
-            path_list_prepend PATH                    "$INSTALL_ROOT/bin"         || exit 1
-            export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME" PATH
 
             AUGMENTED_EXTENSIONS="$AVAIL_EXTENSIONS"
             word_list_prepend AUGMENTED_EXTENSIONS "c++" || exit 1
@@ -765,38 +767,46 @@ EOF
                 done
             done
 
-            BIN_CORE_ARG=""
-            if [ "$PREBUILT_CORE" ]; then
-                BIN_CORE_ARG=" bin-core"
-            fi
-
             cat >"$PKG_DIR/build" <<EOF
 #!/bin/sh
 
-TIGHTDB_DIST_HOME="\$(cd "\$(dirname "\$0")" && pwd)" || exit 1
+cd "\$(dirname "\$0")" || exit 1
+TIGHTDB_DIST_HOME="\$(pwd)" || exit 1
 export TIGHTDB_DIST_HOME
+
+export TIGHTDB_VERSION="$TIGHTDB_VERSION"
+export PREBUILT_CORE="$PREBUILT_CORE"
+export DISABLE_CHEETAH_CODE_GEN="1"
 
 EXTENSIONS="$AUGMENTED_EXTENSIONS"
 
-export TIGHTDB_VERSION="$TIGHTDB_VERSION"
-
 if [ \$# -eq 1 -a "\$1" = "clean" ]; then
-    sh tightdb/build.sh dist-clean$BIN_CORE_ARG || exit 1
+    sh tightdb/build.sh dist-clean || exit 1
     exit 0
 fi
 
 if [ \$# -eq 1 -a "\$1" = "build" ]; then
-    sh tightdb/build.sh dist-build$BIN_CORE_ARG || exit 1
+    sh tightdb/build.sh dist-build || exit 1
     exit 0
 fi
 
 if [ \$# -eq 1 -a "\$1" = "build-iphone" -a "$INCLUDE_IPHONE" ]; then
-    sh tightdb/build.sh dist-build-iphone$BIN_CORE_ARG || exit 1
+    sh tightdb/build.sh dist-build-iphone || exit 1
+    exit 0
+fi
+
+if [ \$# -eq 1 -a "\$1" = "test" ]; then
+    sh tightdb/build.sh dist-test || exit 1
+    exit 0
+fi
+
+if [ \$# -eq 1 -a "\$1" = "test-debug" ]; then
+    sh tightdb/build.sh dist-test-debug || exit 1
     exit 0
 fi
 
 if [ \$# -eq 1 -a "\$1" = "install" ]; then
-    sh tightdb/build.sh dist-install$BIN_CORE_ARG || exit 1
+    sh tightdb/build.sh dist-install || exit 1
     exit 0
 fi
 
@@ -941,9 +951,14 @@ EOF
                 sh "$TIGHTDB_HOME/build.sh" dist-copy "$PREBUILD_DIR" >>"$LOG_FILE" 2>&1 || exit 1
                 (cd "$PREBUILD_DIR" && sh build.sh config && sh build.sh build) >>"$LOG_FILE" 2>&1 || exit 1
 
+                message "Running test suite for core library"
+                if ! (cd "$PREBUILD_DIR" && sh build.sh test) >>"$LOG_FILE" 2>&1; then
+                    warning "Test suite failed for core library"
+                fi
+
                 message "Running test suite for core library in debug mode"
                 if ! (cd "$PREBUILD_DIR" && sh build.sh test-debug) >>"$LOG_FILE" 2>&1; then
-                    warning "Test suite failed for core library"
+                    warning "Test suite failed for core library in debug mode"
                 fi
 
                 if [ "$INCLUDE_IPHONE" ]; then
@@ -958,28 +973,24 @@ EOF
 /build.sh
 /generic.mk
 /config.mk
+/config
 /Makefile
 /src/Makefile
 /src/tightdb.hpp
 /src/tightdb/Makefile
+/src/tightdb/config.sh
+/src/tightdb/config.cpp
 /test/Makefile
 /test-installed
 /doc
 EOF
-                cat >"$TEMP_DIR/transfer/exclude" <<EOF
-.gitignore
-/doc/development
-EOF
                 grep -E -v '^(#.*)?$' "$TEMP_DIR/transfer/include" >"$TEMP_DIR/transfer/include2" || exit 1
-                grep -E -v '^(#.*)?$' "$TEMP_DIR/transfer/exclude" >"$TEMP_DIR/transfer/exclude2" || exit 1
                 sed -e 's/\([.\[^$]\)/\\\1/g' -e 's|\*|[^/]*|g' -e 's|^\([^/]\)|^\\(.*/\\)\\{0,1\\}\1|' -e 's|^/|^|' -e 's|$|\\(/.*\\)\\{0,1\\}$|' "$TEMP_DIR/transfer/include2" >"$TEMP_DIR/transfer/include.bre" || exit 1
-                sed -e 's/\([.\[^$]\)/\\\1/g' -e 's|\*|[^/]*|g' -e 's|^\([^/]\)|^\\(.*/\\)\\{0,1\\}\1|' -e 's|^/|^|' -e 's|$|\\(/.*\\)\\{0,1\\}$|' "$TEMP_DIR/transfer/exclude2" >"$TEMP_DIR/transfer/exclude.bre" || exit 1
-                git ls-files >"$TEMP_DIR/transfer/files1" || exit 1
+                (cd "$PREBUILD_DIR" && find -L * -type f) >"$TEMP_DIR/transfer/files1" || exit 1
                 grep -f "$TEMP_DIR/transfer/include.bre" "$TEMP_DIR/transfer/files1" >"$TEMP_DIR/transfer/files2" || exit 1
-                grep -v -f "$TEMP_DIR/transfer/exclude.bre" "$TEMP_DIR/transfer/files2" >"$TEMP_DIR/transfer/files3" || exit 1
-                (cd "$PREBUILD_DIR" && tar czf "$TEMP_DIR/transfer/core.tar.gz" -T "$TEMP_DIR/transfer/files3") || exit 1
+                (cd "$PREBUILD_DIR" && tar czf "$TEMP_DIR/transfer/core.tar.gz" -T "$TEMP_DIR/transfer/files2") || exit 1
                 (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/transfer/core.tar.gz") || exit 1
-                if [ -z "$(which pandoc)" ]; then
+                if ! [ "$(which pandoc)" ]; then
                     echo "pandoc is not installed - not generating README.pdf"
                 else
                     (cd "$PKG_DIR/tightdb" && pandoc README.md -o README.pdf) || exit 1
@@ -1014,123 +1025,79 @@ EOF
             mkdir "$TEST_DIR" || exit 1
             (cd "$TEST_DIR" && tar xzf "$TEMP_DIR/$NAME.tar.gz") || exit 1
             TEST_PKG_DIR="$TEST_DIR/$NAME"
-            cd "$TEST_PKG_DIR" || exit 1
 
-            export DISABLE_CHEETAH_CODE_GEN="1"
+            export TIGHTDB_DIST_LOG_FILE="$LOG_FILE"
+            export TIGHTDB_DIST_NONINTERACTIVE="1"
+            export TIGHTDB_TEST_INSTALL_PREFIX="$TEMP_DIR/test-install"
+            mkdir "$TIGHTDB_TEST_INSTALL_PREFIX" || exit 1
 
-            message "Configuring core library"
-            sh "$TEST_PKG_DIR/tightdb/build.sh" config "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1 || exit 1
-
-            if [ -z "$PREBUILT_CORE" ]; then
-                message "Building core library"
-                sh "$TEST_PKG_DIR/tightdb/build.sh" build >>"$LOG_FILE" 2>&1 || exit 1
-
-                message "Running test suite for core library in debug mode"
-                if ! sh "$TEST_PKG_DIR/tightdb/build.sh" test-debug >>"$LOG_FILE" 2>&1; then
-                    warning "Test suite failed for core library"
-                fi
+            error=""
+            log_message "Testing './build config all'"
+            if ! "$TEST_PKG_DIR/build" config all; then
+                [ -e "$TEST_PKG_DIR/tightdb/.DIST_CORE_WAS_CONFIGURED" ] || exit 1
+                error="1"
             fi
 
-            message "Installing core library to test location"
-            sh "$TEST_PKG_DIR/tightdb/build.sh" install >>"$LOG_FILE" 2>&1 || exit 1
+            log_message "Testing './build clean'"
+            if ! "$TEST_PKG_DIR/build" clean; then
+                error="1"
+            fi
 
-            # This one was added because when building for iOS on
-            # Darwin, the libraries libtightdb-ios.a and
-            # libtightdb-ios-dbg.a are not installed, and the
-            # Objective-C binding needs to be able to find them. Also,
-            # when building for iOS, the default search path for
-            # header files is not used, so installed headers will not
-            # be found. This problem is eliminated by the explicit
-            # addition of the temporary header installation directory
-            # to CPATH above.
-            path_list_prepend LIBRARY_PATH "$TEST_PKG_DIR/tightdb/src/tightdb" || exit 1
+            log_message "Testing './build build'"
+            if ! "$TEST_PKG_DIR/build" build; then
+                [ -e "$TEST_PKG_DIR/tightdb/.DIST_CORE_WAS_BUILT" ] || exit 1
+                error="1"
+            fi
 
-            # FIXME: The problem with this one is that it partially
-            # destroys the reliability of the build test. We should
-            # instead transfer the iOS target files to a special
-            # temporary proforma directory, and add that diretory to
-            # LIBRARY_PATH and PATH above.
+            log_message "Testing './build test'"
+            if ! "$TEST_PKG_DIR/build" test; then
+                error="1"
+            fi
 
-            message "Testing state of core library installation"
-            sh "$TEST_PKG_DIR/tightdb/build.sh" test-installed >>"$LOG_FILE" 2>&1 || exit 1
+            log_message "Testing './build test-debug'"
+            if ! "$TEST_PKG_DIR/build" test-debug; then
+                error="1"
+            fi
 
-            CONFIGURED_EXTENSIONS=""
-            for x in $AVAIL_EXTENSIONS; do
-                message "Testing extension '$x'"
-                log_message "Configuring extension '$x'"
-                EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
-                if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" config "$INSTALL_ROOT" >>"$LOG_FILE" 2>&1; then
-                    warning "Failed to configure extension '$x'"
-                else
-                    word_list_append CONFIGURED_EXTENSIONS "$x" || exit 1
-                    log_message "Building extension '$x'"
-                    if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" build >>"$LOG_FILE" 2>&1; then
-                        warning "Failed to build extension '$x'"
-                    else
-                        log_message "Running test suite for extension '$x' in debug mode"
-                        if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" test-debug >>"$LOG_FILE" 2>&1; then
-                            warning "Test suite failed for extension '$x'"
-                        fi
-                        log_message "Installing extension '$x' to test location"
-                        if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" install >>"$LOG_FILE" 2>&1; then
-                            warning "Installation test failed for extension '$x'"
-                        else
-                            log_message "Testing state of test installation of extension '$x'"
-                            if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" test-installed >>"$LOG_FILE" 2>&1; then
-                                warning "Post installation test failed for extension '$x'"
-                            fi
-                        fi
-                    fi
-                fi
-            done
+            log_message "Testing './build install'"
+            if ! "$TEST_PKG_DIR/build" install; then
+                [ -e "$TEST_PKG_DIR/tightdb/.DIST_CORE_WAS_INSTALLED" ] || exit 1
+                error="1"
+            fi
+
+            log_message "Testing './build test-installed'"
+            if ! "$TEST_PKG_DIR/build" test-installed; then
+                error="1"
+            fi
 
             # Copy the installation test directory to allow later inspection
-            INSTALL_COPY="$TEMP_DIR/install_copy"
-            cp -R "$INSTALL_ROOT" "$INSTALL_COPY" || exit 1
+            INSTALL_COPY="$TEMP_DIR/test-install-copy"
+            cp -R "$TIGHTDB_TEST_INSTALL_PREFIX" "$INSTALL_COPY" || exit 1
 
-            message "Testing uninstallation"
-            for x in $(word_list_reverse $CONFIGURED_EXTENSIONS); do
-                log_message "Uninstalling extension '$x' from test location"
-                EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
-                if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" uninstall >>"$LOG_FILE" 2>&1; then
-                    warning "Failed to uninstall extension '$x'"
-                fi
-            done
-            log_message "Uninstalling core library from test location"
-            if ! sh "$TEST_PKG_DIR/tightdb/build.sh" uninstall >>"$LOG_FILE" 2>&1; then
-                warning "Failed to uninstall core library"
+            log_message "Testing './build uninstall'"
+            if ! "$TEST_PKG_DIR/build" uninstall; then
+                error="1"
             fi
-            REMAINING_PATHS="$(cd "$INSTALL_ROOT" && find * -ipath '*tightdb*')" || exit 1
+
+            message "Checking that './build uninstall' leaves nothing behind"
+            REMAINING_PATHS="$(cd "$TIGHTDB_TEST_INSTALL_PREFIX" && find * \! -type d -o -ipath '*tightdb*')" || exit 1
             if [ "$REMAINING_PATHS" ]; then
-                warning "Files and/or directories remain after uninstallation"
-                printf "%s" "$REMAINING_PATHS" >>"$LOG_FILE" || exit 1
+                fatal "Files and/or directories remain after uninstallation"
+                printf "%s" "$REMAINING_PATHS" >>"$LOG_FILE"
+                exit 1
             fi
 
             if [ "$INCLUDE_IPHONE" ]; then
                 message "Testing platform 'iphone'"
-                fail=""
-                if [ -z "$PREBUILT_CORE" ]; then
-                    log_message "Building core library for 'iphone'"
-                    if ! sh "$TEST_PKG_DIR/tightdb/build.sh" build-iphone >>"$LOG_FILE" 2>&1; then
-                        warning "Failed to build core library for 'iphone'"
-                        fail="1"
-                    fi
-                fi
-                if [ -z "$fail" ]; then
-                    for x in $CONFIGURED_EXTENSIONS; do
-                        for y in $IPHONE_EXTENSIONS; do
-                            if [ "$x" = "$y" ]; then
-                                log_message "Building extension '$x' for 'iphone'"
-                                EXT_DIR="$(map_ext_name_to_dir "$x")" || exit 1
-                                if ! sh "$TEST_PKG_DIR/$EXT_DIR/build.sh" build-iphone >>"$LOG_FILE" 2>&1; then
-                                    warning "Failed to build extension '$x' for 'iphone'"
-                                fi
-                                break
-                            fi
-                        done
-                    done
+                log_message "Testing './build build-iphone'"
+                if ! "$TEST_PKG_DIR/build" build-iphone; then
+                    error="1"
                 fi
             fi
+
+#            if [ "$error" ]; then
+#                exit 1
+#            fi
 
             exit 0
 
@@ -1168,7 +1135,7 @@ EOF
 
     "dist-config")
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-config.XXXX)" || exit 1
-        LOG_FILE="$(new_dist_log_path "config" "$TEMP_DIR")" || exit 1
+        LOG_FILE="$(get_dist_log_path "config" "$TEMP_DIR")" || exit 1
         (
             echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
@@ -1184,49 +1151,80 @@ EOF
             echo
         ) >>"$LOG_FILE"
         ERROR=""
-        echo "CONFIGURING Core library" | tee -a "$LOG_FILE"
-        rm -f ".DIST_WAS_CONFIGURED" || exit 1
-        if [ -z "$INTERACTIVE" ]; then
-            if sh "build.sh" config >>"$LOG_FILE" 2>&1; then
-                touch ".DIST_WAS_CONFIGURED" || exit 1
-            else
-                echo "Failed!" | tee -a "$LOG_FILE" 1>&2
-                ERROR="1"
-            fi
+        rm -f ".DIST_CORE_WAS_CONFIGURED" || exit 1
+        # When configuration is tested in the context of building a
+        # distribution package, we have to reconfigure the core
+        # library such that it will install into the temporary
+        # directory (an unfortunate and ugly kludge).
+        if [ "$PREBUILT_CORE" ] && ! [ "$TIGHTDB_TEST_INSTALL_PREFIX" ]; then
+            touch ".DIST_CORE_WAS_CONFIGURED" || exit 1
         else
-            if INTERACTIVE=1 sh "build.sh" config 2>&1 | tee -a "$LOG_FILE"; then
-                touch ".DIST_WAS_CONFIGURED" || exit 1
+            if [ "$PREBUILT_CORE" ]; then
+                echo "RECONFIGURING Prebuilt core library (only for testing)" | tee -a "$LOG_FILE"
             else
+                echo "CONFIGURING Core library" | tee -a "$LOG_FILE"
+            fi
+            if [ "$INTERACTIVE" ]; then
+                if ! sh "build.sh" config $TIGHTDB_TEST_INSTALL_PREFIX 2>&1 | tee -a "$LOG_FILE"; then
+                    ERROR="1"
+                fi
+            else
+                if ! sh "build.sh" config $TIGHTDB_TEST_INSTALL_PREFIX >>"$LOG_FILE" 2>&1; then
+                    ERROR="1"
+                fi
+            fi
+            if ! [ "$ERROR" ]; then
+                # At this point we have to build the config commands
+                # `tightdb-config` and `tightdb-config-dbg` such that
+                # they are available during configuration and building
+                # of extensions, just as if the core library has been
+                # previously installed.
+                if ! sh "build.sh" build-config-progs >>"$LOG_FILE" 2>&1; then
+                    ERROR="1"
+                fi
+            fi
+            if [ "$ERROR" ]; then
                 echo "Failed!" | tee -a "$LOG_FILE" 1>&2
-                ERROR="1"
+            else
+                touch ".DIST_CORE_WAS_CONFIGURED" || exit 1
             fi
         fi
-        if [ -z "$ERROR" ]; then
+        # Copy the core library config programs into a dedicated
+        # directory such that they are retained across 'clean'
+        # operations.
+        mkdir -p "config-progs" || exit 1
+        for x in "tightdb-config" "tightdb-config-dbg"; do
+            rm -f "config-progs/$x" || exit 1
+            cp "src/tightdb/$x" "config-progs/" || exit 1
+        done
+        if ! [ "$ERROR" ]; then
             mkdir "$TEMP_DIR/select" || exit 1
             for x in "$@"; do
                 touch "$TEMP_DIR/select/$x" || exit 1
             done
-            rm -f ".DIST_DEVEL_WAS_CONFIGURED" || exit 1
+            rm -f ".DIST_CXX_WAS_CONFIGURED" || exit 1
             if [ -e "$TEMP_DIR/select/c++" ]; then
                 echo "CONFIGURING Extension 'c++'" | tee -a "$LOG_FILE"
-                touch ".DIST_DEVEL_WAS_CONFIGURED" || exit 1
+                touch ".DIST_CXX_WAS_CONFIGURED" || exit 1
             fi
+            path_list_prepend PATH "$TIGHTDB_HOME/config-progs" || exit 1
+            export PATH
             for x in $EXTENSIONS; do
                 EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
                 rm -f "$EXT_HOME/.DIST_WAS_CONFIGURED" || exit 1
                 if [ -e "$TEMP_DIR/select/$x" ]; then
                     echo "CONFIGURING Extension '$x'" | tee -a "$LOG_FILE"
-                    if [ -z "$INTERACTIVE" ]; then
-                        if sh "$EXT_HOME/build.sh" config >>"$LOG_FILE" 2>&1; then
+                    if [ "$INTERACTIVE" ]; then
+                        if sh "$EXT_HOME/build.sh" config $TIGHTDB_TEST_INSTALL_PREFIX 2>&1 | tee -a "$LOG_FILE"; then
                             touch "$EXT_HOME/.DIST_WAS_CONFIGURED" || exit 1
                         else
-                            echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                             ERROR="1"
                         fi
                     else
-                        if INTERACTIVE=1 sh "$EXT_HOME/build.sh" config 2>&1 | tee -a "$LOG_FILE"; then
+                        if sh "$EXT_HOME/build.sh" config $TIGHTDB_TEST_INSTALL_PREFIX >>"$LOG_FILE" 2>&1; then
                             touch "$EXT_HOME/.DIST_WAS_CONFIGURED" || exit 1
                         else
+                            echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                             ERROR="1"
                         fi
                     fi
@@ -1234,16 +1232,17 @@ EOF
             done
             echo "DONE CONFIGURING" | tee -a "$LOG_FILE"
         fi
-        if [ "$ERROR" ]; then
-            cat 1>&2 <<EOF
+        if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+            if [ "$ERROR" ]; then
+                cat 1>&2 <<EOF
 
 Note: Some parts could not be configured. You may be missing one or
 more dependencies. Check the README file for details. If that does not
 help, check the log file.
 The log file is here: $LOG_FILE
 EOF
-        fi
-        cat <<EOF
+            fi
+            cat <<EOF
 
 Run the following command to build the parts that were successfully
 configured:
@@ -1251,7 +1250,8 @@ configured:
     ./build build
 
 EOF
-        if [ "$ERROR" -a -z "$INTERACTIVE" ]; then
+        fi
+        if [ "$ERROR" ] && ! [ "$INTERACTIVE" ]; then
             exit 1
         fi
         exit 0
@@ -1259,7 +1259,7 @@ EOF
 
 
     "dist-clean")
-        if ! [ -e ".DIST_WAS_CONFIGURED" ]; then
+        if ! [ -e ".DIST_CORE_WAS_CONFIGURED" ]; then
             cat 1>&2 <<EOF
 ERROR: Nothing was configured.
 You need to run './build config' first.
@@ -1267,18 +1267,18 @@ EOF
             exit 1
         fi
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-clean.XXXX)" || exit 1
-        LOG_FILE="$(new_dist_log_path "clean" "$TEMP_DIR")" || exit 1
+        LOG_FILE="$(get_dist_log_path "clean" "$TEMP_DIR")" || exit 1
         ERROR=""
-        rm -f ".DIST_WAS_BUILT" || exit 1
-        if [ "$1" = "bin-core" ]; then
-            shift
-        else
+        rm -f ".DIST_CORE_WAS_BUILT" || exit 1
+        if ! [ "$PREBUILT_CORE" ]; then
             echo "CLEANING Core library" | tee -a "$LOG_FILE"
             if ! sh "build.sh" clean >>"$LOG_FILE" 2>&1; then
                 echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                 ERROR="1"
             fi
         fi
+        path_list_prepend PATH "$TIGHTDB_HOME/config-progs" || exit 1
+        export PATH
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" ]; then
@@ -1291,8 +1291,10 @@ EOF
             fi
         done
         echo "DONE CLEANING" | tee -a "$LOG_FILE"
-        if [ "$ERROR" ]; then
+        if [ "$ERROR" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
             echo "Log file is here: $LOG_FILE" 1>&2
+        fi
+        if [ "$ERROR" ]; then
             exit 1
         fi
         exit 0
@@ -1300,7 +1302,7 @@ EOF
 
 
     "dist-build")
-        if ! [ -e ".DIST_WAS_CONFIGURED" ]; then
+        if ! [ -e ".DIST_CORE_WAS_CONFIGURED" ]; then
             cat 1>&2 <<EOF
 ERROR: Nothing was configured.
 You need to run './build config' first.
@@ -1308,7 +1310,7 @@ EOF
             exit 1
         fi
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-build.XXXX)" || exit 1
-        LOG_FILE="$(new_dist_log_path "build" "$TEMP_DIR")" || exit 1
+        LOG_FILE="$(get_dist_log_path "build" "$TEMP_DIR")" || exit 1
         (
             echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
@@ -1323,30 +1325,34 @@ EOF
             get_compiler_info || exit 1
             echo
         ) >>"$LOG_FILE"
-        export DISABLE_CHEETAH_CODE_GEN="1"
-        if [ "$1" != "bin-core" ]; then
+        rm -f ".DIST_CORE_WAS_BUILT" || exit 1
+        if [ "$PREBUILT_CORE" ]; then
+            touch ".DIST_CORE_WAS_BUILT" || exit 1
+        else
             echo "BUILDING Core library" | tee -a "$LOG_FILE"
-            rm -f ".DIST_WAS_BUILT" || exit 1
             if sh "build.sh" build >>"$LOG_FILE" 2>&1; then
-                touch ".DIST_WAS_BUILT" || exit 1
+                touch ".DIST_CORE_WAS_BUILT" || exit 1
             else
                 echo "Failed!" | tee -a "$LOG_FILE" 1>&2
-                cat 1>&2 <<EOF
+                if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+                    cat 1>&2 <<EOF
 
 Note: The core library could not be built. You may be missing one or
 more dependencies. Check the README file for details. If this does not
 help, check the log file.
 The log file is here: $LOG_FILE
 EOF
+                fi
                 exit 1
             fi
         fi
-        LIBDIR="$(make get-libdir)" || exit 1
-        path_list_prepend CPATH        "$TIGHTDB_HOME/src"         || exit 1
-        path_list_prepend LIBRARY_PATH "$TIGHTDB_HOME/src/tightdb" || exit 1
-        path_list_prepend PATH         "$TIGHTDB_HOME/src/tightdb" || exit 1
-        path_list_prepend LD_RUN_PATH  "$LIBDIR"                   || exit 1
-        export CPATH LIBRARY_PATH PATH LD_RUN_PATH
+        path_list_prepend PATH "$TIGHTDB_HOME/config-progs" || exit 1
+        export PATH
+        libdir="$(tightdb-config --libdir)" || exit 1
+        path_list_prepend CPATH        "$TIGHTDB_HOME/src"          || exit 1
+        path_list_prepend LIBRARY_PATH "$TIGHTDB_HOME/src/tightdb"  || exit 1
+        path_list_prepend LD_RUN_PATH  "$libdir"                    || exit 1
+        export CPATH LIBRARY_PATH LD_RUN_PATH
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" ]; then
@@ -1361,8 +1367,9 @@ EOF
             fi
         done
         echo "DONE BUILDING" | tee -a "$LOG_FILE"
-        if [ "$ERROR" ]; then
-            cat 1>&2 <<EOF
+        if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+            if [ "$ERROR" ]; then
+                cat 1>&2 <<EOF
 
 Note: Some parts failed to build. You may be missing one or more
 dependencies. Check the README file for details. If this does not
@@ -1370,8 +1377,8 @@ help, check the log file.
 The log file is here: $LOG_FILE
 
 EOF
-        fi
-        cat <<EOF
+            fi
+            cat <<EOF
 
 Run the following command to install the parts that were successfully
 built:
@@ -1379,6 +1386,7 @@ built:
     sudo ./build install
 
 EOF
+        fi
         if [ "$ERROR" ]; then
             exit 1
         fi
@@ -1387,15 +1395,19 @@ EOF
 
 
     "dist-build-iphone")
-        if ! [ -e ".DIST_WAS_CONFIGURED" ]; then
+        if ! [ -e ".DIST_CORE_WAS_CONFIGURED" ]; then
             cat 1>&2 <<EOF
 ERROR: Nothing was configured.
 You need to run './build config' first.
 EOF
             exit 1
         fi
+        dist_home="$TIGHTDB_HOME"
+        if [ "$TIGHTDB_DIST_HOME" ]; then
+            dist_home="$TIGHTDB_DIST_HOME"
+        fi
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-build-iphone.XXXX)" || exit 1
-        LOG_FILE="$(new_dist_log_path "build-iphone" "$TEMP_DIR")" || exit 1
+        LOG_FILE="$(get_dist_log_path "build-iphone" "$TEMP_DIR")" || exit 1
         (
             echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
@@ -1410,31 +1422,39 @@ EOF
             get_compiler_info || exit 1
             echo
         ) >>"$LOG_FILE"
-        export DISABLE_CHEETAH_CODE_GEN="1"
-        if [ "$1" != "bin-core" ]; then
+        rm -f ".DIST_CORE_WAS_BUILT_FOR_IPHONE" || exit 1
+        if [ "$PREBUILT_CORE" ]; then
+            touch ".DIST_CORE_WAS_BUILT_FOR_IPHONE" || exit 1
+        else
             echo "BUILDING Core library for iPhone" | tee -a "$LOG_FILE"
-            if ! sh "build.sh" build-iphone >>"$LOG_FILE" 2>&1; then
+            if sh "build.sh" build-iphone >>"$LOG_FILE" 2>&1; then
+                touch ".DIST_CORE_WAS_BUILT_FOR_IPHONE" || exit 1
+            else
                 echo "Failed!" | tee -a "$LOG_FILE" 1>&2
-                cat 1>&2 <<EOF
+                if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+                    cat 1>&2 <<EOF
 
 Note: You may be missing one or more dependencies. Check the README
 file for details. If this does not help, check the log file.
 The log file is here: $LOG_FILE
 EOF
+                fi
                 exit 1
             fi
         fi
-        if [ -e ".DIST_DEVEL_WAS_CONFIGURED" ]; then
-            mkdir -p "$ORIG_CWD/iphone-c++" || exit 1
-            cp -R "$IPHONE_DIR"/* "$ORIG_CWD/iphone-c++/" || exit 1
+        if [ -e ".DIST_CXX_WAS_CONFIGURED" ]; then
+            mkdir -p "$dist_home/iphone-c++" || exit 1
+            cp -R "$IPHONE_DIR"/* "$dist_home/iphone-c++/" || exit 1
         fi
         for x in $IPHONE_EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" ]; then
                 echo "BUILDING Extension '$x' for iPhone" | tee -a "$LOG_FILE"
+                rm -f "$EXT_HOME/.DIST_WAS_BUILT_FOR_IPHONE" || exit 1
                 if sh "$EXT_HOME/build.sh" build-iphone >>"$LOG_FILE" 2>&1; then
-                    mkdir -p "$ORIG_CWD/iphone-$x" || exit 1
-                    cp -R "$EXT_HOME/$IPHONE_DIR"/* "$ORIG_CWD/iphone-$x/" || exit 1
+                    mkdir -p "$dist_home/iphone-$x" || exit 1
+                    cp -R "$EXT_HOME/$IPHONE_DIR"/* "$dist_home/iphone-$x/" || exit 1
+                    touch "$EXT_HOME/.DIST_WAS_BUILT_FOR_IPHONE" || exit 1
                 else
                     echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                     ERROR="1"
@@ -1442,8 +1462,9 @@ EOF
             fi
         done
         echo "DONE BUILDING" | tee -a "$LOG_FILE"
-        if [ "$ERROR" ]; then
-            cat 1>&2 <<EOF
+        if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+            if [ "$ERROR" ]; then
+                cat 1>&2 <<EOF
 
 Note: Some parts failed to build. You may be missing one or more
 dependencies. Check the README file for details. If this does not
@@ -1453,34 +1474,37 @@ The log file is here: $LOG_FILE
 Files produced for a successfully built extension EXT have been placed
 in a subdirectory named "iphone-EXT".
 EOF
-            exit 1
-        fi
-        cat <<EOF
+            else
+                cat <<EOF
 
 Files produced for extension EXT have been placed in a subdirectory
 named "iphone-EXT".
 EOF
+            fi
+        fi
+        if [ "ERROR" ]; then
+            exit 1
+        fi
         exit 0
         ;;
 
 
-    "dist-install")
-        NOTHING_TO_INSTALL=""
-        if ! [ -e ".DIST_WAS_CONFIGURED" ]; then
-            NOTHING_TO_INSTALL="1"
-        elif ! [ "$1" = "bin-core" -o -e ".DIST_WAS_BUILT" ]; then
-            NOTHING_TO_INSTALL="1"
+    "dist-test"|"dist-test-debug")
+        test_mode="test"
+        test_msg="TESTING %s"
+        if [ "$MODE" = "dist-test-debug" ]; then
+            test_mode="test-debug"
+            test_msg="TESTING %s in debug mode"
         fi
-        if [ "$NOTHING_TO_INSTALL" ]; then
+        if ! [ -e ".DIST_CORE_WAS_BUILT" ]; then
             cat 1>&2 <<EOF
-ERROR: Nothing to install.
+ERROR: Nothing to test.
 You need to run './build build' first.
 EOF
             exit 1
         fi
-        TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-install.XXXX)" || exit 1
-        chmod a+rx "$TEMP_DIR" || exit 1
-        LOG_FILE="$(new_dist_log_path "install" "$TEMP_DIR")" || exit 1
+        TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-$test_mode.XXXX)" || exit 1
+        LOG_FILE="$(get_dist_log_path "$test_mode" "$TEMP_DIR")" || exit 1
         (
             echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
@@ -1493,16 +1517,78 @@ EOF
             get_host_info || exit 1
             echo
         ) >>"$LOG_FILE"
-        export DISABLE_CHEETAH_CODE_GEN="1"
+        ERROR=""
+        if ! [ "$PREBUILT_CORE" ]; then
+            printf "$test_msg\n" "Core library" | tee -a "$LOG_FILE"
+            if ! sh "build.sh" "$test_mode" >>"$LOG_FILE" 2>&1; then
+                echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                ERROR="1"
+            fi
+        fi
+        path_list_prepend PATH "$TIGHTDB_HOME/config-progs" || exit 1
+        export PATH
+        libdir="$(tightdb-config --libdir)" || exit 1
+        path_list_prepend CPATH        "$TIGHTDB_HOME/src"          || exit 1
+        path_list_prepend LIBRARY_PATH "$TIGHTDB_HOME/src/tightdb"  || exit 1
+        path_list_prepend LD_RUN_PATH  "$libdir"                    || exit 1
+        path_list_prepend "$LD_LIBRARY_PATH_NAME" "$TIGHTDB_HOME/src/tightdb"  || exit 1
+        export CPATH LIBRARY_PATH LD_RUN_PATH "$LD_LIBRARY_PATH_NAME"
+        for x in $EXTENSIONS; do
+            EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
+            if [ -e "$EXT_HOME/.DIST_WAS_BUILT" ]; then
+                printf "$test_msg\n" "Extension '$x'" | tee -a "$LOG_FILE"
+                if ! sh "$EXT_HOME/build.sh" "$test_mode" >>"$LOG_FILE" 2>&1; then
+                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                    ERROR="1"
+                fi
+            fi
+        done
+        echo "DONE TESTING" | tee -a "$LOG_FILE"
+        if [ "$ERROR" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+            echo "Log file is here: $LOG_FILE" 1>&2
+        fi
+        if [ "$ERROR" ]; then
+            exit 1
+        fi
+        exit 0
+        ;;
+
+    "dist-install")
+        if ! [ -e ".DIST_CORE_WAS_BUILT" ]; then
+            cat 1>&2 <<EOF
+ERROR: Nothing to install.
+You need to run './build build' first.
+EOF
+            exit 1
+        fi
+        TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-install.XXXX)" || exit 1
+        chmod a+rx "$TEMP_DIR" || exit 1
+        LOG_FILE="$(get_dist_log_path "install" "$TEMP_DIR")" || exit 1
+        touch "$LOG_FILE" || exit 1
+        chmod a+r "$LOG_FILE" || exit 1
+        (
+            echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
+            if [ -e ".PREBUILD_INFO" ]; then
+                echo
+                echo "PREBUILD HOST INFO:"
+                cat ".PREBUILD_INFO"
+            fi
+            echo
+            echo "BUILD HOST INFO:"
+            get_host_info || exit 1
+            echo
+        ) >>"$LOG_FILE"
+        path_list_prepend PATH "$TIGHTDB_HOME/config-progs" || exit 1
+        export PATH
         ERROR=""
         NEED_USR_LOCAL_LIB_NOTE=""
         echo "INSTALLING Core library" | tee -a "$LOG_FILE"
         if sh build.sh install-shared >>"$LOG_FILE" 2>&1; then
-            touch ".DIST_WAS_INSTALLED" || exit 1
-            if [ -e ".DIST_DEVEL_WAS_CONFIGURED" ]; then
+            touch ".DIST_CORE_WAS_INSTALLED" || exit 1
+            if [ -e ".DIST_CXX_WAS_CONFIGURED" ]; then
                 echo "INSTALLING Extension 'c++'" | tee -a "$LOG_FILE"
                 if sh build.sh install-devel >>"$LOG_FILE" 2>&1; then
-                    touch ".DIST_DEVEL_WAS_INSTALLED" || exit 1
+                    touch ".DIST_CXX_WAS_INSTALLED" || exit 1
                     NEED_USR_LOCAL_LIB_NOTE="$PLATFORM_HAS_LIBRARY_PATH_ISSUE"
                 else
                     echo "Failed!" | tee -a "$LOG_FILE" 1>&2
@@ -1524,41 +1610,51 @@ EOF
                     fi
                 fi
             done
-            if [ "$NEED_USR_LOCAL_LIB_NOTE" ]; then
-                if [ -z "$INTERACTIVE" ]; then
-                    LIBDIR="$(make get-libdir)" || exit 1
-                    cat <<EOF
+            if [ "$NEED_USR_LOCAL_LIB_NOTE" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+                path_list_prepend PATH "$TIGHTDB_HOME/config-progs" || exit 1
+                export PATH
+                libdir="$(tightdb-config --libdir)" || exit 1
+                cat <<EOF
 
-NOTE: Shared libraries have been installed in '$LIBDIR'.
+NOTE: Shared libraries have been installed in '$libdir'.
 
 We believe that on your system this directory is not part of the
 default library search path. If this is true, you probably have to do
 one of the following things to successfully use TightDB in a C, C++,
 or Objective-C application:
 
- - Either run 'export LD_RUN_PATH=$LIBDIR' before building your
+ - Either run 'export LD_RUN_PATH=$libdir' before building your
    application.
 
- - Or run 'export LD_LIBRARY_PATH=$LIBDIR' before launching your
+ - Or run 'export LD_LIBRARY_PATH=$libdir' before launching your
    application.
 
- - Or add '$LIBDIR' to the system-wide library search path by editing
+ - Or add '$libdir' to the system-wide library search path by editing
    /etc/ld.so.conf.
 
 EOF
-                fi
             fi
             echo "DONE INSTALLING" | tee -a "$LOG_FILE"
         else
             echo "Failed!" | tee -a "$LOG_FILE" 1>&2
             ERROR="1"
         fi
-        if [ "$ERROR" ]; then
-            echo "Log file is here: $LOG_FILE" 1>&2
-            exit 1
-        fi
-        if [ -z "$INTERACTIVE" ]; then
-            cat <<EOF
+        if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
+            if [ "$ERROR" ]; then
+                echo "Log file is here: $LOG_FILE" 1>&2
+            else
+                if [ "$INTERACTIVE" ]; then
+                    echo
+                    echo "Installation summary"
+                    echo "===================="
+                    for x in $EXTENSIONS; do
+                        EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
+                        if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" -a -e "$EXT_HOME/.DIST_WAS_BUILT" -a -e "$EXT_HOME/.DIST_WAS_INSTALLED "]; then
+                            sh "$EXT_HOME/build.sh" install-report
+                        fi
+                    done
+                else
+                    cat <<EOF
 
 At this point you should run the following command to check that all
 installed parts are working properly. If any parts failed to install,
@@ -1567,23 +1663,18 @@ they will be skipped during this test:
     ./build test-installed
 
 EOF
-        else
-            echo
-            echo "Installation summary"
-            echo "===================="
-            for x in $EXTENSIONS; do
-                EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-                if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" -a -e "$EXT_HOME/.DIST_WAS_BUILT" -a -e "$EXT_HOME/.DIST_WAS_INSTALLED "]; then
-                    sh "$EXT_HOME/build.sh" install-report
                 fi
-            done
+            fi
+        fi
+        if [ "$ERROR" ]; then
+            exit 1
         fi
         exit 0
         ;;
 
 
     "dist-uninstall")
-        if ! [ -e ".DIST_WAS_CONFIGURED" ]; then
+        if ! [ -e ".DIST_CORE_WAS_CONFIGURED" ]; then
             cat 1>&2 <<EOF
 ERROR: Nothing was configured.
 You need to run './build config' first.
@@ -1592,7 +1683,9 @@ EOF
         fi
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-uninstall.XXXX)" || exit 1
         chmod a+rx "$TEMP_DIR" || exit 1
-        LOG_FILE="$(new_dist_log_path "uninstall" "$TEMP_DIR")" || exit 1
+        LOG_FILE="$(get_dist_log_path "uninstall" "$TEMP_DIR")" || exit 1
+        touch "$LOG_FILE" || exit 1
+        chmod a+r "$LOG_FILE" || exit 1
         (
             echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
@@ -1605,6 +1698,8 @@ EOF
             get_host_info || exit 1
             echo
         ) >>"$LOG_FILE"
+        path_list_prepend PATH "$TIGHTDB_HOME/config-progs" || exit 1
+        export PATH
         ERROR=""
         for x in $(word_list_reverse $EXTENSIONS); do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
@@ -1617,31 +1712,33 @@ EOF
                 rm -f "$EXT_HOME/.DIST_WAS_INSTALLED" || exit 1
             fi
         done
-        if [ -e ".DIST_DEVEL_WAS_CONFIGURED" ]; then
+        if [ -e ".DIST_CXX_WAS_CONFIGURED" ]; then
             echo "UNINSTALLING Extension 'c++'" | tee -a "$LOG_FILE"
             if ! sh build.sh uninstall-devel >>"$LOG_FILE" 2>&1; then
                 echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                 ERROR="1"
             fi
-            rm -f ".DIST_DEVEL_WAS_INSTALLED" || exit 1
+            rm -f ".DIST_CXX_WAS_INSTALLED" || exit 1
         fi
         echo "UNINSTALLING Core library" | tee -a "$LOG_FILE"
         if ! sh build.sh uninstall-shared >>"$LOG_FILE" 2>&1; then
             echo "Failed!" | tee -a "$LOG_FILE" 1>&2
             ERROR="1"
         fi
-        rm -f ".DIST_WAS_INSTALLED" || exit 1
+        rm -f ".DIST_CORE_WAS_INSTALLED" || exit 1
         echo "DONE UNINSTALLING" | tee -a "$LOG_FILE"
-        if [ "$ERROR" ]; then
+        if [ "$ERROR" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
             echo "Log file is here: $LOG_FILE" 1>&2
-            exit 1
+        fi
+        if [ "$ERROR" ]; then
+             exit 1
         fi
         exit 0
         ;;
 
 
     "dist-test-installed")
-        if ! [ -e ".DIST_WAS_INSTALLED" ]; then
+        if ! [ -e ".DIST_CORE_WAS_INSTALLED" ]; then
             cat 1>&2 <<EOF
 ERROR: Nothing was installed.
 You need to run 'sudo ./build install' first.
@@ -1649,7 +1746,7 @@ EOF
             exit 1
         fi
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-test-installed.XXXX)" || exit 1
-        LOG_FILE="$(new_dist_log_path "test-installed" "$TEMP_DIR")" || exit 1
+        LOG_FILE="$(get_dist_log_path "test-installed" "$TEMP_DIR")" || exit 1
         (
             echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
             if [ -e ".PREBUILD_INFO" ]; then
@@ -1664,8 +1761,18 @@ EOF
             get_compiler_info || exit 1
             echo
         ) >>"$LOG_FILE"
+        if [ "$TIGHTDB_TEST_INSTALL_PREFIX" ]; then
+            path_list_prepend PATH "$TIGHTDB_TEST_INSTALL_PREFIX/bin" || exit 1
+            export PATH
+            includedir="$(tightdb-config --includedir)" || exit 1
+            libdir="$(tightdb-config --libdir)"         || exit 1
+            path_list_prepend CPATH                   "$includedir" || exit 1
+            path_list_prepend LIBRARY_PATH            "$libdir"     || exit 1
+            path_list_prepend "$LD_LIBRARY_PATH_NAME" "$libdir"     || exit 1
+            export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME"
+        fi
         ERROR=""
-        if [ -e ".DIST_DEVEL_WAS_INSTALLED" ]; then
+        if [ -e ".DIST_CXX_WAS_INSTALLED" ]; then
             echo "TESTING Installed extension 'c++'" | tee -a "$LOG_FILE"
             if sh build.sh test-installed >>"$LOG_FILE" 2>&1; then
                 echo "Success!" | tee -a "$LOG_FILE"
@@ -1687,8 +1794,10 @@ EOF
             fi
         done
         echo "DONE TESTING" | tee -a "$LOG_FILE"
-        if [ "$ERROR" ]; then
+        if [ "$ERROR" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
             echo "Log file is here: $LOG_FILE" 1>&2
+        fi
+        if [ "$ERROR" ]; then
             exit 1
         fi
         exit 0
@@ -1790,10 +1899,10 @@ EOF
 
     *)
         echo "Unspecified or bad mode '$MODE'" 1>&2
-        echo "Available modes are: config clean build build-iphone test test-debug install uninstall test-installed wipe-installed" 1>&2
+        echo "Available modes are: config clean build build-config-progs build-iphone test test-debug install uninstall test-installed wipe-installed" 1>&2
         echo "As well as: install-shared install-devel uninstall-shared uninstall-devel dist-copy" 1>&2
         echo "As well as: src-dist bin-dist dist-deb dist-status dist-pull dist-checkout" 1>&2
-        echo "As well as: dist-config dist-clean dist-build dist-build-iphone dist-install dist-uninstall dist-test-installed" 1>&2
+        echo "As well as: dist-config dist-clean dist-build dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall dist-test-installed" 1>&2
         exit 1
         ;;
 esac
