@@ -1547,8 +1547,4 @@ public:
 
 } // namespace tightdb
 
-
-
-
-
 #endif // TIGHTDB_QUERY_ENGINE_HPP
