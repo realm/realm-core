@@ -3089,8 +3089,6 @@ template<class cond> size_t Array::find_first(int64_t value, size_t start, size_
 //*************************************************************************************
 
 
-
-
 } // namespace tightdb
 
 #endif // TIGHTDB_ARRAY_HPP
