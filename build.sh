@@ -802,10 +802,14 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
         mkdir -p \$HOME/tightdb_examples
         for x in \$EXT; do
             cp -a tightdb_\$x/examples \$HOME/tightdb_examples/\$x
+            if [ "$x" = "java" ]; then
+                cd tightdb_java/intro-examples && sed -i 's/value="\.\.\/\.\.\/lib"/value="\/usr\/local\/share\/java"/' build.xml
+            fi
         done
         echo "Examples can be found in \$HOME/tightdb_examples."
         echo "Please consult the README files for further information."
     fi
+    exit 0
 fi
 
 if [ \$# -eq 1 -a "\$1" = "clean" ]; then
