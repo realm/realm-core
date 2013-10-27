@@ -90,6 +90,7 @@ word_list_reverse()
 # Setup OS specific stuff
 OS="$(uname)" || exit 1
 ARCH="$(uname -m)" || exit 1
+MAKE="make"
 LD_LIBRARY_PATH_NAME="LD_LIBRARY_PATH"
 if [ "$OS" = "Darwin" ]; then
     LD_LIBRARY_PATH_NAME="DYLD_LIBRARY_PATH"
@@ -224,9 +225,9 @@ get_host_info()
 get_compiler_info()
 {
     local CC_CMD CXX_CMD LD_CMD
-    CC_CMD="$(make get-cc)" || return 1
-    CXX_CMD="$(make get-cxx)" || return 1
-    LD_CMD="$(make get-ld)" || return 1
+    CC_CMD="$($MAKE get-cc)" || return 1
+    CXX_CMD="$($MAKE get-cxx)" || return 1
+    LD_CMD="$($MAKE get-ld)" || return 1
     echo "C compiler is '$CC_CMD' ($(which "$CC_CMD" 2>/dev/null))"
     echo "C++ compiler is '$CXX_CMD' ($(which "$CXX_CMD" 2>/dev/null))"
     echo "Linker is '$LD_CMD' ($(which "$LD_CMD" 2>/dev/null))"
@@ -278,7 +279,7 @@ case "$MODE" in
         install_exec_prefix="$install_prefix"
         install_includedir="$install_prefix/include"
         install_bindir="$install_exec_prefix/bin"
-        install_libdir="$(make prefix="$install_prefix" get-libdir)" || exit 1
+        install_libdir="$($MAKE prefix="$install_prefix" get-libdir)" || exit 1
 
         tightdb_version="unknown"
         if [ "$TIGHTDB_VERSION" ]; then
@@ -350,12 +351,12 @@ EOF
 
     "clean")
         auto_configure || exit 1
-        make clean || exit 1
+        $MAKE clean || exit 1
         if [ "$OS" = "Darwin" ]; then
             for x in $IPHONE_PLATFORMS; do
-                make -C "src/tightdb" BASE_DENOM="$x" clean || exit 1
+                $MAKE -C "src/tightdb" BASE_DENOM="$x" clean || exit 1
             done
-            make -C "src/tightdb" BASE_DENOM="ios" clean || exit 1
+            $MAKE -C "src/tightdb" BASE_DENOM="ios" clean || exit 1
             if [ -e "$IPHONE_DIR" ]; then
                 echo "Removing '$IPHONE_DIR'"
                 rm -fr "$IPHONE_DIR/include" || exit 1
@@ -370,14 +371,14 @@ EOF
 
     "build")
         auto_configure || exit 1
-        TIGHTDB_ENABLE_FAT_BINARIES="1" make || exit 1
+        TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE || exit 1
         echo "Done building"
         exit 0
         ;;
 
     "build-config-progs")
         auto_configure || exit 1
-        TIGHTDB_ENABLE_FAT_BINARIES="1" make -C "src/tightdb" "tightdb-config" "tightdb-config-dbg" || exit 1
+        TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE -C "src/tightdb" "tightdb-config" "tightdb-config-dbg" || exit 1
         echo "Done building config programs"
         exit 0
         ;;
@@ -397,12 +398,12 @@ EOF
             sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
             arch="$(printf "%s\n" "$x" | cut -d: -f3)" || exit 1
             sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
-            make -C "src/tightdb" "libtightdb-$platform.a" "libtightdb-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="-arch $arch -isysroot $sdk_root" || exit 1
+            $MAKE -C "src/tightdb" "libtightdb-$platform.a" "libtightdb-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="-arch $arch -isysroot $sdk_root" || exit 1
             mkdir "$temp_dir/$platform" || exit 1
             cp "src/tightdb/libtightdb-$platform.a"     "$temp_dir/$platform/libtightdb.a"     || exit 1
             cp "src/tightdb/libtightdb-$platform-dbg.a" "$temp_dir/$platform/libtightdb-dbg.a" || exit 1
         done
-        TIGHTDB_ENABLE_FAT_BINARIES="1" make -C "src/tightdb" "tightdb-config-ios" "tightdb-config-ios-dbg" BASE_DENOM="ios" CFLAGS_ARCH="-DTIGHTDB_CONFIG_IOS" || exit 1
+        TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE -C "src/tightdb" "tightdb-config-ios" "tightdb-config-ios-dbg" BASE_DENOM="ios" CFLAGS_ARCH="-DTIGHTDB_CONFIG_IOS" || exit 1
         mkdir -p "$IPHONE_DIR" || exit 1
         echo "Creating '$IPHONE_DIR/libtightdb-ios.a'"
         lipo "$temp_dir"/*/"libtightdb.a"     -create -output "$IPHONE_DIR/libtightdb-ios.a"     || exit 1
@@ -412,7 +413,7 @@ EOF
         mkdir -p "$IPHONE_DIR/include" || exit 1
         cp "src/tightdb.hpp" "$IPHONE_DIR/include/" || exit 1
         mkdir -p "$IPHONE_DIR/include/tightdb" || exit 1
-        inst_headers="$(cd src/tightdb && make get-inst-headers)" || exit 1
+        inst_headers="$(cd src/tightdb && $MAKE get-inst-headers)" || exit 1
         (cd "src/tightdb" && cp $inst_headers "$TIGHTDB_HOME/$IPHONE_DIR/include/tightdb/") || exit 1
         for x in "tightdb-config" "tightdb-config-dbg"; do
             echo "Creating '$IPHONE_DIR/$x'"
@@ -425,14 +426,14 @@ EOF
 
     "test")
         require_config || exit 1
-        make test || exit 1
+        $MAKE test || exit 1
         echo "Test passed"
         exit 0
         ;;
 
     "test-debug")
         require_config || exit 1
-        make test-debug || exit 1
+        $MAKE test-debug || exit 1
         echo "Test passed"
         exit 0
         ;;
@@ -440,7 +441,7 @@ EOF
     "install")
         require_config || exit 1
         install_prefix="$(get_config_param "install-prefix")" || exit 1
-        make install DESTDIR="$DESTDIR" prefix="$install_prefix" || exit 1
+        $MAKE install DESTDIR="$DESTDIR" prefix="$install_prefix" || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
@@ -451,7 +452,7 @@ EOF
     "install-shared")
         require_config || exit 1
         install_prefix="$(get_config_param "install-prefix")" || exit 1
-        make install DESTDIR="$DESTDIR" prefix="$install_prefix" INSTALL_FILTER=shared-libs,progs || exit 1
+        $MAKE install DESTDIR="$DESTDIR" prefix="$install_prefix" INSTALL_FILTER=shared-libs,progs || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
@@ -462,7 +463,7 @@ EOF
     "install-devel")
         require_config || exit 1
         install_prefix="$(get_config_param "install-prefix")" || exit 1
-        make install DESTDIR="$DESTDIR" prefix="$install_prefix" INSTALL_FILTER=static-libs,dev-progs,headers || exit 1
+        $MAKE install DESTDIR="$DESTDIR" prefix="$install_prefix" INSTALL_FILTER=static-libs,dev-progs,headers || exit 1
         echo "Done installing"
         exit 0
         ;;
@@ -470,7 +471,7 @@ EOF
     "uninstall")
         require_config || exit 1
         install_prefix="$(get_config_param "install-prefix")" || exit 1
-        make uninstall prefix="$install_prefix" || exit 1
+        $MAKE uninstall prefix="$install_prefix" || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
@@ -481,7 +482,7 @@ EOF
     "uninstall-shared")
         require_config || exit 1
         install_prefix="$(get_config_param "install-prefix")" || exit 1
-        make uninstall prefix="$install_prefix" INSTALL_FILTER=shared-libs,progs || exit 1
+        $MAKE uninstall prefix="$install_prefix" INSTALL_FILTER=shared-libs,progs || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
@@ -492,7 +493,7 @@ EOF
     "uninstall-devel")
         require_config || exit 1
         install_prefix="$(get_config_param "install-prefix")" || exit 1
-        make uninstall prefix="$install_prefix" INSTALL_FILTER=static-libs,dev-progs,extra || exit 1
+        $MAKE uninstall prefix="$install_prefix" INSTALL_FILTER=static-libs,dev-progs,extra || exit 1
         echo "Done uninstalling"
         exit 0
         ;;
@@ -501,8 +502,8 @@ EOF
         require_config || exit 1
         install_libdir="$(get_config_param "install-libdir")" || exit 1
         export LD_RUN_PATH="$install_libdir"
-        make -C "test-installed" clean || exit 1
-        make -C "test-installed" test  || exit 1
+        $MAKE -C "test-installed" clean || exit 1
+        $MAKE -C "test-installed" test  || exit 1
         echo "Test passed"
         exit 0
         ;;
@@ -991,9 +992,9 @@ EOF
                 (cd "$PREBUILD_DIR" && tar czf "$TEMP_DIR/transfer/core.tar.gz" -T "$TEMP_DIR/transfer/files2") || exit 1
                 (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/transfer/core.tar.gz") || exit 1
                 printf "\nNO_BUILD_ON_INSTALL = 1\n" >> "$PKG_DIR/tightdb/config.mk"
-                INST_HEADERS="$(cd "$PREBUILD_DIR/src/tightdb" && make get-inst-headers)" || exit 1
-                INST_LIBS="$(cd "$PREBUILD_DIR/src/tightdb" && make get-inst-libraries)" || exit 1
-                INST_PROGS="$(cd "$PREBUILD_DIR/src/tightdb" && make get-inst-programs)" || exit 1
+                INST_HEADERS="$(cd "$PREBUILD_DIR/src/tightdb" && $MAKE get-inst-headers)" || exit 1
+                INST_LIBS="$(cd "$PREBUILD_DIR/src/tightdb" && $MAKE get-inst-libraries)" || exit 1
+                INST_PROGS="$(cd "$PREBUILD_DIR/src/tightdb" && $MAKE get-inst-programs)" || exit 1
                 (cd "$PREBUILD_DIR/src/tightdb" && cp -R -P $INST_HEADERS $INST_LIBS $INST_PROGS "$PKG_DIR/tightdb/src/tightdb/") || exit 1
                 if [ "$INCLUDE_IPHONE" ]; then
                     cp -R "$PREBUILD_DIR/$IPHONE_DIR" "$PKG_DIR/tightdb/" || exit 1
