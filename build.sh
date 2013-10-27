@@ -969,7 +969,7 @@ EOF
                 message "Transferring prebuilt core library to package"
                 mkdir "$TEMP_DIR/transfer" || exit 1
                 cat >"$TEMP_DIR/transfer/include" <<EOF
-/README.md
+/README.*
 /build.sh
 /generic.mk
 /config.mk
@@ -990,11 +990,6 @@ EOF
                 grep -f "$TEMP_DIR/transfer/include.bre" "$TEMP_DIR/transfer/files1" >"$TEMP_DIR/transfer/files2" || exit 1
                 (cd "$PREBUILD_DIR" && tar czf "$TEMP_DIR/transfer/core.tar.gz" -T "$TEMP_DIR/transfer/files2") || exit 1
                 (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/transfer/core.tar.gz") || exit 1
-                if ! [ "$(which pandoc)" ]; then
-                    echo "pandoc is not installed - not generating README.pdf"
-                else
-                    (cd "$PKG_DIR/tightdb" && pandoc README.md -o README.pdf) || exit 1
-                fi
                 printf "\nNO_BUILD_ON_INSTALL = 1\n" >> "$PKG_DIR/tightdb/config.mk"
                 INST_HEADERS="$(cd "$PREBUILD_DIR/src/tightdb" && make get-inst-headers)" || exit 1
                 INST_LIBS="$(cd "$PREBUILD_DIR/src/tightdb" && make get-inst-libraries)" || exit 1
@@ -1886,7 +1881,9 @@ EOF
         grep -v -f "$TEMP_DIR/exclude.bre" "$TEMP_DIR/files2" >"$TEMP_DIR/files3" || exit 1
         tar czf "$TEMP_DIR/archive.tar.gz" -T "$TEMP_DIR/files3" || exit 1
         (cd "$TARGET_DIR" && tar xzf "$TEMP_DIR/archive.tar.gz") || exit 1
-        (cd "$TARGET_DIR" && pandoc README.md -o README.pdf) || exit 1
+        if ! [ "$TIGHTDB_DISABLE_MARKDOWN_TO_PDF" ]; then
+            (cd "$TARGET_DIR" && pandoc README.md -o README.pdf) || exit 1
+        fi
         exit 0
         ;;
 
