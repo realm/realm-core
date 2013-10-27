@@ -230,7 +230,12 @@ package:
 This will produce a package whose name, and whose top-level directory
 is named according to the tag.
 
-`Pandoc` is required to build a distribution package.
+During the building of a distribution package, some Markdown documents
+are converted to PDF format, and this is done using the Pandoc
+utility. See below for instructions on how to install Pandoc. On some
+platforms, however, Pandoc installation is unfeasible (e.g. Amazon
+Linux). In those cases you may set `TIGHTDB_DISABLE_MARKDOWN_TO_PDF`
+to a nonempty value to disable the conversion to PDF.
 
 ### Ubuntu 10.04, 12.04, and 13.04
 
