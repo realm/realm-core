@@ -331,7 +331,8 @@ case "$MODE" in
             done
         fi
 
-        cat >"config" <<EOF
+        if [ -z "$INTERACTIVE" ]; then
+            cat >"config" <<EOF
 tightdb-version:     $tightdb_version
 install-prefix:      $install_prefix
 install-exec-prefix: $install_exec_prefix
@@ -342,9 +343,10 @@ xcode-home:          $xcode_home
 iphone-sdks:         ${iphone_sdks:-none}
 iphone-sdks-avail:   $iphone_sdks_avail
 EOF
-        echo "New configuration:"
-        cat "config" | sed 's/^/    /' || exit 1
-        echo "Done configuring"
+            echo "New configuration:"
+            cat "config" | sed 's/^/    /' || exit 1
+            echo "Done configuring"
+        fi
         exit 0
         ;;
 
@@ -796,18 +798,28 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
     INTERACTIVE=1 sh build config \$EXT || exit 1
     INTERACTIVE=1 sh build build || exit 1
     INTERACTIVE=1 sudo sh build install || exit 1
+    echo
+    echo "Installation report"
+    echo "-------------------"
+    sh tightdb/build.sh install-report
+    for x in \$EXT; do
+        sh tightdb_\$x/build.sh install-report
+    done
+
+    echo
     echo "Do you wish to copy examples to your home directory (y/n)?"
     read answer
     if [ \$(echo \$answer | grep -c ^[yY]) -eq 1 ]; then
         mkdir -p \$HOME/tightdb_examples
         for x in \$EXT; do
             cp -a tightdb_\$x/examples \$HOME/tightdb_examples/\$x
-            if [ "$x" = "java" ]; then
-                cd tightdb_java/intro-examples && sed -i 's/value="\.\.\/\.\.\/lib"/value="\/usr\/local\/share\/java"/' build.xml
-            fi
         done
+        if [ \$(echo \$EXT | grep -c java) -eq 1 ]; then
+            find tightdb_java/intro-examples -name build.xml -exec sed -i 's/value="\.\.\/\.\.\/lib"/value="\/usr\/local\/share\/java"/' \{\} \\;
+        fi
+
         echo "Examples can be found in \$HOME/tightdb_examples."
-        echo "Please consult the README files for further information."
+        echo "Please consult the README.md files for further information."
     fi
     exit 0
 fi
