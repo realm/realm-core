@@ -331,8 +331,7 @@ case "$MODE" in
             done
         fi
 
-        if [ -z "$INTERACTIVE" ]; then
-            cat >"config" <<EOF
+        cat >"config" <<EOF
 tightdb-version:     $tightdb_version
 install-prefix:      $install_prefix
 install-exec-prefix: $install_exec_prefix
@@ -343,6 +342,7 @@ xcode-home:          $xcode_home
 iphone-sdks:         ${iphone_sdks:-none}
 iphone-sdks-avail:   $iphone_sdks_avail
 EOF
+        if [ -z "$INTERACTIVE" ]; then
             echo "New configuration:"
             cat "config" | sed 's/^/    /' || exit 1
             echo "Done configuring"
