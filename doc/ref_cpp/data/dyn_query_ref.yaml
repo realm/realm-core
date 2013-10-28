@@ -467,7 +467,7 @@ CATEGORIES :
                  "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : [TableView, ConstTableView]
-        DESCR  : &g_dyn_query_find_all_return_desc
+        DESCR  : &g_dyn_query_find_all_return_descr
                  A TableView object containing all matches.
       EXAMPLES:
       - DESCR  :
