@@ -801,7 +801,6 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
     echo
     echo "Installation report"
     echo "-------------------"
-    sh tightdb/build.sh install-report
     for x in \$EXT; do
         sh tightdb_\$x/build.sh install-report
     done
@@ -815,7 +814,7 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
             cp -a tightdb_\$x/examples \$HOME/tightdb_examples/\$x
         done
         if [ \$(echo \$EXT | grep -c java) -eq 1 ]; then
-            find tightdb_java/intro-examples -name build.xml -exec sed -i 's/value="\.\.\/\.\.\/lib"/value="\/usr\/local\/share\/java"/' \{\} \\;
+            find \$HOME/tightdb_examples/tightdb_java/intro-examples -name build.xml -exec sed -i 's/value="\.\.\/\.\.\/lib"/value="\/usr\/local\/share\/java"/' \{\} \\;
         fi
 
         echo "Examples can be found in \$HOME/tightdb_examples."
