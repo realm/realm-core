@@ -1081,8 +1081,8 @@ public:
             TIGHTDB_ASSERT(false);
     }
 
-    template <Action action, bool pattern, class Callback>
-    inline bool match(size_t index, uint64_t indexpattern, int64_t value, Callback callback)
+    template <Action action, bool pattern>
+    inline bool match(size_t index, uint64_t indexpattern, int64_t value)
     {
         if (pattern) {
             if (action == act_Count) {
@@ -1101,9 +1101,7 @@ public:
 
         ++m_match_count;
 
-        if (action == act_CallbackIdx)
-            return callback(index);
-        else if (action == act_Max) {
+        if (action == act_Max) {
             if (value > m_state)
                 m_state = value;
         }
@@ -1158,8 +1156,8 @@ public:
             TIGHTDB_ASSERT(false);
     }
 
-    template<Action action, bool pattern, class Callback, typename resulttype>
-    inline bool match(size_t /*index*/, uint64_t /*indexpattern*/, resulttype value, Callback /*callback*/)
+    template<Action action, bool pattern, typename resulttype>
+    inline bool match(size_t /*index*/, uint64_t /*indexpattern*/, resulttype value)
     {
         if (pattern)
             return false;
@@ -2060,12 +2058,15 @@ computations for the given search criteria makes it feasible to construct such a
 template<Action action, class Callback>
 bool Array::find_action(size_t index, int64_t value, QueryState<int64_t>* state, Callback callback) const
 {
-    return state->match<action, false, Callback>(index, 0, value, callback);
+    if (action == act_CallbackIdx)
+        return callback(index);
+    else
+       return state->match<action, false>(index, 0, value);
 }
 template<Action action, class Callback>
 bool Array::find_action_pattern(size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const
 {
-    return state->match<action, true, Callback>(index, pattern, 0, callback);
+    return state->match<action, true>(index, pattern, 0);
 }
 
 
@@ -2219,10 +2220,16 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
 
     // optimization if all items are guaranteed to match (such as cond2 == NotEqual && value == 100 && m_ubound == 15)
     if (c.will_match(value, m_lbound, m_ubound)) {
-        TIGHTDB_ASSERT(state->m_match_count < state->m_limit);
-        size_t process = state->m_limit - state->m_match_count;
-        size_t end2 = end - start > process ? start + process : end;
+        size_t end2;
+        size_t process;
 
+        if(action == act_CallbackIdx)
+            end2 = end;
+        else {
+            TIGHTDB_ASSERT(state->m_match_count < state->m_limit);
+            process = state->m_limit - state->m_match_count;
+            end2 = end - start > process ? start + process : end;        
+        }
         if (action == act_Sum || action == act_Max || action == act_Min) {
             int64_t res;
             if (action == act_Sum)
