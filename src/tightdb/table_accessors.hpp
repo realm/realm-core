@@ -731,7 +731,7 @@ public:
     {
         BasicTableRef<T> t = unchecked_cast<T>(set_subtable());
         T::set_dynamic_spec(*t);
-        return move(t);
+        return t;
     }
 
     /// Overwrites the current value with a copy of the specified

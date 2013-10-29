@@ -159,20 +159,23 @@ class ConstTableView;
 /// makes a proper copy. Copying a temporary TableView is optimized
 /// away on all modern compilers due to such things as 'return value
 /// optimization'. Move semantics is accessed using the move()
-/// function. For example, to efficiently return a non-temporary
-/// TableView from a function, you would have to do something like
-/// this:
+/// function. 
 ///
-/// \code{.cpp}
+/// You should use 'return tv' whenever the type of 'tv' matches the
+/// return type in the function signature exactly, such as
+/// T fun() { return T(...); } or T fun() { T tv; return tv } to enable
+/// return-value-optimization and named-return-value-optimization
+/// respectively.
 ///
-///   tightdb::TableView func()
-///   {
-///      tightdb::TableView tv;
-///      return move(tv);
-///   }
+/// You should use 'return move(tv)' whenever the type of 'tv' mismatch
+/// the signature (where 'tv' needs conversion to return type), such as 
+/// ConstTableView fun() {TableView tv; return move(tv);} to enable
+/// move-semantics.
 ///
-/// \endcode
-///
+/// Avoid explicit move semantics whenever possible because it inhibits
+/// rvo and nrvo. 'return tv' has been benchmarked to be slower than
+/// 'return move(tv)' for both VC2012 and GCC 4.7.
+//
 /// Note that move(tv) removes the contents from 'tv' and leaves it
 /// truncated.
 ///
@@ -492,7 +495,7 @@ R TableViewBase::find_all_integer(V* view, size_t column_ndx, int64_t value)
     for (size_t i = 0; i < view->m_refs.size(); i++)
         if (view->get_int(column_ndx, i) == value)
             tv.get_ref_column().add(view->get_source_ndx(i));
-    return move(tv);
+    return tv;
 }
 
 template <class R, class V>
@@ -502,7 +505,7 @@ R TableViewBase::find_all_float(V* view, size_t column_ndx, float value)
     for (size_t i = 0; i < view->m_refs.size(); i++)
         if (view->get_float(column_ndx, i) == value)
             tv.get_ref_column().add(view->get_source_ndx(i));
-    return move(tv);
+    return tv;
 }
 
 template <class R, class V>
@@ -512,7 +515,7 @@ R TableViewBase::find_all_double(V* view, size_t column_ndx, double value)
     for (size_t i = 0; i < view->m_refs.size(); i++)
         if (view->get_double(column_ndx, i) == value)
             tv.get_ref_column().add(view->get_source_ndx(i));
-    return move(tv);
+    return tv;
 }
 
 template <class R, class V>
@@ -527,7 +530,7 @@ R TableViewBase::find_all_string(V* view, size_t column_ndx, StringData value)
         if (view->get_string(column_ndx, i) == value)
             tv.get_ref_column().add(view->get_source_ndx(i));
     }
-    return move(tv);
+    return tv;
 }
 
 
