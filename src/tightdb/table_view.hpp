@@ -163,20 +163,20 @@ class ConstTableView;
 ///
 /// You should use 'return tv' whenever the type of 'tv' matches the
 /// return type in the function signature exactly, such as
-/// T fun() { return T(...); } or T fun() { T tv; return tv } to enable
-/// return-value-optimization and named-return-value-optimization
+/// ´T fun() { return T(...); }´ or ´T fun() { T tv; return tv }´ to
+/// enable return-value-optimization and named-return-value-optimization
 /// respectively.
 ///
 /// You should use 'return move(tv)' whenever the type of 'tv' mismatch
 /// the signature (where 'tv' needs conversion to return type), such as 
-/// ConstTableView fun() {TableView tv; return move(tv);} to enable
+/// ´ConstTableView fun() {TableView tv; return move(tv);}´ to enable
 /// move-semantics.
 ///
-/// Avoid explicit move semantics whenever possible because it inhibits
-/// rvo and nrvo. 'return tv' has been benchmarked to be slower than
-/// 'return move(tv)' for both VC2012 and GCC 4.7.
+/// Avoid return(tv) whenever possible because it inhibits rvo and nrvo. 
+/// ´return tv´ has been benchmarked to be slower than ´return move(tv)´ 
+/// for both VC2012 and GCC 4.7 in many cases but never the opposite.
 //
-/// Note that move(tv) removes the contents from 'tv' and leaves it
+/// Note that move(tv) removes the contents from tv and leaves it
 /// truncated.
 ///
 /// FIXME: Add general documentation about move semantics, and refer
