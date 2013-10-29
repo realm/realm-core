@@ -795,9 +795,10 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
         EXT="\$EXT \$e"
         shift
     done
-    INTERACTIVE=1 sh build config \$EXT || exit 1
-    INTERACTIVE=1 sh build build || exit 1
-    INTERACTIVE=1 sudo sh build install || exit 1
+    export INTERACTIVE=1
+    sh build dist-config \$EXT || exit 1
+    sh build dist-build || exit 1
+    sudo sh build dist-install || exit 1
     echo
     echo "Installation report"
     echo "-------------------"
@@ -814,7 +815,7 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
             cp -a tightdb_\$x/examples \$HOME/tightdb_examples/\$x
         done
         if [ \$(echo \$EXT | grep -c java) -eq 1 ]; then
-            find \$HOME/tightdb_examples/java/intro-examples -name build.xml -exec sed -i 's/value="\.\.\/\.\.\/lib"/value="\/usr\/local\/share\/java"/' \{\} \\;
+            find \$HOME/tightdb_examples/java/intro-examples -name build.xml -exec sed -i -e 's/value="\.\.\/\.\.\/lib"/value="\/usr\/local\/share\/java"/' \{\} \\;
         fi
 
         echo "Examples can be found in \$HOME/tightdb_examples."
@@ -1281,7 +1282,8 @@ help, check the log file.
 The log file is here: $LOG_FILE
 EOF
             fi
-            cat <<EOF
+            if [ -z "$INTERACTIVE" ]; then
+                cat <<EOF
 
 Run the following command to build the parts that were successfully
 configured:
@@ -1289,6 +1291,7 @@ configured:
     ./build build
 
 EOF
+            fi
         fi
         if [ "$ERROR" ] && ! [ "$INTERACTIVE" ]; then
             exit 1
@@ -1417,7 +1420,8 @@ The log file is here: $LOG_FILE
 
 EOF
             fi
-            cat <<EOF
+            if [ -z "$INTERACTIVE" ]; then
+                cat <<EOF
 
 Run the following command to install the parts that were successfully
 built:
@@ -1425,6 +1429,7 @@ built:
     sudo ./build install
 
 EOF
+            fi
         fi
         if [ "$ERROR" ]; then
             exit 1
@@ -1682,17 +1687,7 @@ EOF
             if [ "$ERROR" ]; then
                 echo "Log file is here: $LOG_FILE" 1>&2
             else
-                if [ "$INTERACTIVE" ]; then
-                    echo
-                    echo "Installation summary"
-                    echo "===================="
-                    for x in $EXTENSIONS; do
-                        EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-                        if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" -a -e "$EXT_HOME/.DIST_WAS_BUILT" -a -e "$EXT_HOME/.DIST_WAS_INSTALLED "]; then
-                            sh "$EXT_HOME/build.sh" install-report
-                        fi
-                    done
-                else
+                if [ -z "$INTERACTIVE" ]; then
                     cat <<EOF
 
 At this point you should run the following command to check that all
