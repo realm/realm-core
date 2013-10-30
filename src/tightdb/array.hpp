@@ -2066,6 +2066,9 @@ bool Array::find_action(size_t index, int64_t value, QueryState<int64_t>* state,
 template<Action action, class Callback>
 bool Array::find_action_pattern(size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const
 {
+    static_cast<void>(callback);
+    // Optimization not yet supported: For each set bit in pattern, call callback(index) like in above find_action().
+    TIGHTDB_ASSERT(action != act_CallbackIdx); 
     return state->match<action, true>(index, pattern, 0);
 }
 
@@ -2221,13 +2224,12 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     // optimization if all items are guaranteed to match (such as cond2 == NotEqual && value == 100 && m_ubound == 15)
     if (c.will_match(value, m_lbound, m_ubound)) {
         size_t end2;
-        size_t process;
 
         if(action == act_CallbackIdx)
             end2 = end;
         else {
             TIGHTDB_ASSERT(state->m_match_count < state->m_limit);
-            process = state->m_limit - state->m_match_count;
+            size_t process = state->m_limit - state->m_match_count;
             end2 = end - start > process ? start + process : end;        
         }
         if (action == act_Sum || action == act_Max || action == act_Min) {
