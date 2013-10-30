@@ -59,9 +59,10 @@ template<class cond> struct ColumnTypeTraits2<cond, double> {
 
 
 template <class T, class R, Action action, class condition>
-R ColumnBase::aggregate(T target, std::size_t start, std::size_t end, std::size_t* matchcount,
+R ColumnBase::aggregate(T target, std::size_t start, std::size_t end,
                         std::size_t limit) const
 {
+
     condition cond;
     int c = condition::condition;
     typedef typename ColumnTypeTraits2<condition, T>::column_type ColType;
@@ -94,9 +95,6 @@ R ColumnBase::aggregate(T target, std::size_t start, std::size_t end, std::size_
         }
         s = end2 + sg.m_leaf_start;
     }        
-
-    if(matchcount != NULL) // fixme, make unit test for this
-        *matchcount = state.m_match_count;
 
     return state.m_state;
 }
