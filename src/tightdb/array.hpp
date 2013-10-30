@@ -2676,7 +2676,7 @@ TIGHTDB_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* da
                                                QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
     cond2 c;
-    int cond = c.condition();
+    int cond = c.condition;
     size_t i = 0;
     __m128i compare = {0};
     unsigned int resmask;
@@ -2976,7 +2976,7 @@ bool Array::Compare(int64_t value, size_t start, size_t end, size_t baseindex, Q
                     Callback callback) const
 {
     cond2 c;
-    int cond = c.condition();
+    int cond = c.condition;
     bool ret = false;
 
     if (cond == cond_Equal)
@@ -3078,7 +3078,7 @@ template<class cond> size_t Array::find_first(int64_t value, size_t start, size_
     TIGHTDB_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
     QueryState<int64_t> state;
     state.init(act_ReturnFirst, NULL, 1); // todo, would be nice to avoid this in order to speed up find_first loops
-    Finder finder = m_finder[c.condition()];
+    Finder finder = m_finder[c.condition];
     (this->*finder)(value, start, end, 0, &state);
 
     return static_cast<size_t>(state.m_state);

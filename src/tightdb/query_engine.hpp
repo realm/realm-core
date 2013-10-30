@@ -620,17 +620,6 @@ public:
     }
     ~IntegerNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
-    // Only purpose of this function is to let you quickly create a IntegerNode object and call aggregate_local() on it to aggregate
-    // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
-    // be merged with Init somehow to simplify
-    void QuickInit(Column *column, int64_t value)
-    {
-        m_condition_column = column;
-        m_leaf_end = 0;
-        m_value = value;
-        m_conds = 0;
-    }
-
     void init(const Table& table)
     {
         m_dD = 100.0;
@@ -730,7 +719,7 @@ public:
         TIGHTDB_ASSERT(dynamic_cast<QueryState<QueryStateType>*>(st) != NULL);
 
         TConditionFunction f;
-        int c = f.condition();
+        int c = f.condition;
         m_local_matches = 0;
         m_local_limit = local_limit;
         m_last_local_match = start - 1;
@@ -998,17 +987,6 @@ public:
         m_dT = 1.0;
     }
     ~BasicNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
-
-    // Only purpose of this function is to let you quickly create a IntegerNode object and call aggregate_local() on it to aggregate
-    // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
-    // be merged with Init somehow to simplify
-    void QuickInit(BasicColumn<TConditionValue> *column, TConditionValue value)
-    {
-        m_condition_column.m_column = (ColType*)column;
-        m_condition_column.m_leaf_end = 0;
-        m_value = value;
-        m_conds = 0;
-    }
 
     void init(const Table& table)
     {

@@ -57,22 +57,38 @@ template <class T, class R, Action action, class condition>
 R ColumnBase::aggregate(T target, std::size_t start, std::size_t end, std::size_t* matchcount,
                         std::size_t limit) const
 {
+    condition cond;
+    int c = condition::condition;
     typedef typename ColumnTypeTraits2<condition,T>::column_type ColType;
-    typedef typename ColumnTypeTraits2<condition,T>::node_type NodeType;
+    typedef typename ColumnTypeTraits<T>::array_type ArrType;
 
     if (end == std::size_t(-1))
         end = size();
 
-    NodeType node(target, 0);
-
-    node.QuickInit(const_cast<ColType*>(static_cast<const ColType*>(this)), target);
     QueryState<R> state;
-    state.init(action, 0, limit);
+    state.init(action, NULL, limit);
 
     ColType* column = const_cast<ColType*>(static_cast<const ColType*>(this));
     SequentialGetter<T> sg(column);
-    node.template aggregate_local<action, R, T>(&state, start, end, std::size_t(-1),
-                                                &sg, matchcount);
+
+    bool cont = true;     
+    for (size_t s = start; cont && s < end; ) {
+        sg.cache_next(s);
+        size_t end2 = sg.local_end(end);
+
+        if(SameType<T, int64_t>::value) {
+            cont = ((Array*)(sg.m_array_ptr))->find(c, action, (int64_t)target, s - sg.m_leaf_start, end2, sg.m_leaf_start, (QueryState<int64_t>*)&state);
+        }
+        else {
+            for(size_t local_index = s - sg.m_leaf_start; cont && local_index < end2; local_index++) {
+                T v = ((ArrType*)(sg.m_array_ptr))->get(local_index);
+                if(cond(v, target)) {
+                    cont = ((QueryState<R>*)&state)->match<action, false>(0, 0, v);
+                }
+            }
+        }
+        s = end2 + sg.m_leaf_start;
+    }        
 
     return state.m_state;
 }
