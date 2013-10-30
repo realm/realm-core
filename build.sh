@@ -795,10 +795,9 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
         EXT="\$EXT \$e"
         shift
     done
-    export INTERACTIVE=1
-    sh build dist-config \$EXT || exit 1
-    sh build dist-build || exit 1
-    sudo sh build dist-install || exit 1
+    INTERACTIVE=1 sh build config \$EXT || exit 1
+    INTERACTIVE=1 sh build build || exit 1
+    sudo INTERACTIVE=1 sh build install || exit 1
     echo
     echo "Installation report"
     echo "-------------------"
