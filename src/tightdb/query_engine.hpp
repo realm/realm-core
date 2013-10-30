@@ -466,7 +466,7 @@ public:
                     av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
                 }
                 TIGHTDB_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != NULL);
-                bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av), CallbackDummy());
+                bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av));
                 if(!cont)
                     return static_cast<size_t>(-1);
              }
@@ -632,6 +632,7 @@ public:
 
     // This function is called from Array::find() for each search result if TAction == act_CallbackIdx
     // in the IntegerNode::aggregate_local() call. Used if aggregate source column is different from search criteria column
+    // Return value: false means that the query-state (which consumes matches) has signalled to stop searching, perhaps
     template <Action TAction, class TSourceColumn> bool match_callback(int64_t v)
     {
         size_t i = to_size_t(v);
@@ -647,16 +648,16 @@ public:
             m_children[c]->m_probes++;
             size_t m = m_children[c]->find_first_local(i, i + 1);
             if (m != i)
-                return true; //(m_local_matches != m_local_limit);
+                return true;
         }
 
         bool b;
         if (state->template uses_val<TAction>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded
             TSourceColumn av = source_column->get_next(i);
-            b = state->template match<TAction, false>(i, 0, av, CallbackDummy());
+            b = state->template match<TAction, false>(i, 0, av);
         }
         else {
-            b = state->template match<TAction, false>(i, 0, TSourceColumn(0), CallbackDummy());
+            b = state->template match<TAction, false>(i, 0, TSourceColumn(0));
         }
 
         return b;
@@ -740,6 +741,9 @@ public:
             else
                 end2 = end - m_leaf_start;
 
+            // If there are no other nodes than us (m_conds <= 1) AND the column used for our condition is
+            // the same as the column used for the aggregate action, then the entire query can run within scope of that 
+            // column only, with no references to other columns:
             if (m_conds <= 1 && (source_column == NULL ||
                 (SameType<TSourceColumn, int64_t>::value
                  && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))) {
@@ -747,11 +751,11 @@ public:
                 if(!cont)
                     return static_cast<size_t>(-1);
             }
+            // Else, for each match in this node, call our IntegerNode::match_callback to test remaining nodes and/or extract
+            // aggregate payload from aggregate column:
             else {
-                QueryState<int64_t> jumpstate; // todo optimize by moving outside for loop
-                jumpstate.init(act_CallbackIdx, NULL, size_t(-1));
                 m_source_column = source_column;
-                bool cont = m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, &jumpstate,
+                bool cont = m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, NULL,
                              std::bind1st(std::mem_fun(&IntegerNode::template match_callback<TAction, TSourceColumn>), this));
                 if(!cont)
                     return static_cast<size_t>(-1);
