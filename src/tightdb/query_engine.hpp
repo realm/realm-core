@@ -719,8 +719,7 @@ public:
         TIGHTDB_ASSERT(source_column == NULL || dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != NULL);
         TIGHTDB_ASSERT(dynamic_cast<QueryState<QueryStateType>*>(st) != NULL);
 
-        TConditionFunction f;
-        int c = f.condition;
+        int c = TConditionFunction::condition;
         m_local_matches = 0;
         m_local_limit = local_limit;
         m_last_local_match = start - 1;

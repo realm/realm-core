@@ -24,6 +24,7 @@
 
 #include <tightdb/config.h>
 #include <tightdb/array.hpp>
+#include <tightdb/array_basic.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/column_fwd.hpp>
 
@@ -38,18 +39,22 @@ template<class cond, class T> struct ColumnTypeTraits2;
 template<class cond> struct ColumnTypeTraits2<cond, int64_t> {
     typedef Column column_type;
     typedef IntegerNode<int64_t,cond> node_type;
+    typedef Array array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, bool> {
     typedef Column column_type;
     typedef IntegerNode<bool,cond> node_type;
+    typedef Array array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, float> {
     typedef ColumnFloat column_type;
     typedef BasicNode<float,cond> node_type;
+    typedef ArrayFloat array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, double> {
     typedef ColumnDouble column_type;
     typedef BasicNode<double,cond> node_type;
+    typedef ArrayDouble array_type;
 };
 
 
@@ -59,8 +64,8 @@ R ColumnBase::aggregate(T target, std::size_t start, std::size_t end, std::size_
 {
     condition cond;
     int c = condition::condition;
-    typedef typename ColumnTypeTraits2<condition,T>::column_type ColType;
-    typedef typename ColumnTypeTraits<T>::array_type ArrType;
+    typedef typename ColumnTypeTraits2<condition, T>::column_type ColType;
+    typedef typename ColumnTypeTraits2<condition, T>::array_type ArrType;
 
     if (end == std::size_t(-1))
         end = size();
@@ -77,18 +82,21 @@ R ColumnBase::aggregate(T target, std::size_t start, std::size_t end, std::size_
         size_t end2 = sg.local_end(end);
 
         if(SameType<T, int64_t>::value) {
-            cont = ((Array*)(sg.m_array_ptr))->find(c, action, (int64_t)target, s - sg.m_leaf_start, end2, sg.m_leaf_start, (QueryState<int64_t>*)&state);
+            cont = (static_cast<const Array*>(sg.m_array_ptr))->find(c, action, int64_t(target), s - sg.m_leaf_start, end2, sg.m_leaf_start, reinterpret_cast<QueryState<int64_t>*>(&state));
         }
         else {
             for(size_t local_index = s - sg.m_leaf_start; cont && local_index < end2; local_index++) {
                 T v = ((ArrType*)(sg.m_array_ptr))->get(local_index);
                 if(cond(v, target)) {
-                    cont = ((QueryState<R>*)&state)->match<action, false>(0, 0, v);
+                    cont = (static_cast<QueryState<R>*>(&state))->template match<action, false>(0, 0, static_cast<R>(v));
                 }
             }
         }
         s = end2 + sg.m_leaf_start;
     }        
+
+    if(matchcount != NULL) // fixme, make unit test for this
+        *matchcount = state.m_match_count;
 
     return state.m_state;
 }
