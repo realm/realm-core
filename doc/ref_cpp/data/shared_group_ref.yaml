@@ -10,14 +10,12 @@ DESCR      : &g_shared_group_descr
              >
              Database files can be shared between running applications.
 
-             When two threads or processes want to access the same
-             database file, they must each create their own
+             When multiple threads or processes want to access the same
+             database file, they must each do so through their own
              instance of SharedGroup.
 
              If the database file does not already exist, it will
-             be created. When multiple threads are involved, it is
-             safe to let the first thread, that gets to it, create
-             the file.
+             be created.
 
              While at least one instance of SharedGroup exists for
              a specific database file, a lock file will exist
@@ -36,6 +34,9 @@ DESCR      : &g_shared_group_descr
              transactions do. This division is important to remember
              as derived objects (tables, views, etc.) are either
              writable or not.
+
+             Read transactions are significantly faster than write
+             transactions.
 SEE        :
 EXAMPLES:
 - DESCR    :
@@ -51,13 +52,17 @@ CATEGORIES:
       DESCR    :
       - TEXT   : &g_shared_group_constructor_descr
                  >
-                 Open a shared group (will be created if it does not already exist).
+                 Open a shared group (database will be created if it does not already exist).
+                 Opening a shared group also creates a lock file in the same
+                 directory as the database file. The lock file is used for cross-process
+                 coordination of database access. The lock file is removed when
+                 the last shared group is removed (but see below).
 
                  By default the shared group will be fully durable, so that
                  each commit writes its changes to disk in an atomic manner
                  that guarantees that the file is always consistent.
                  The transaction will complete when the write has been done 
-                 to disk (depending on your disk, it might return when the 
+                 to disk (depending on your disk, it might return when the
                  disk has received the data to it's cache).
 
                  You can also set the durability level to Asynchroneous.
@@ -73,8 +78,25 @@ CATEGORIES:
                  just be used for identification and backing; it will be removed
                  when there are no more processes using it.
 
-                 Note that a shared group can only be opened in the mode it was 
-                 created in.
+                 When multiple threads or processes access the same database file
+                 through shared groups, each shared group must be opened in the same
+                 mode.
+
+                 When used with asynchronous durability level, a process running
+                 in the background (the "commit daemon") may continue to update
+                 the database after the application has terminated. The lock file will 
+                 be removed and the commit daemon will terminate once the update is
+                 complete. As long as the lock file is present, new shared
+                 groups can only be created with asynchronous durability level.
+
+                 In case of abnormal termination or a machine crash, the lock file
+                 may be left in an inconsistent state. Shared group tries to detect
+                 and remedy this problem when it is opened, but it is not possible
+                 to safely handle all scenarios. If safety cannot be ensured, shared
+                 group will give up and throw a PresumablyStateLockFile exception. 
+                 In this case, the stale lock file must be removed manually. In all
+                 cases the database file itself will be in a consistent state, even though
+                 updates still pending at the time of crash will be lost.
 
       - TEXT   : &g_shared_group_constructor_descr_unattached
                  >
@@ -123,6 +145,11 @@ CATEGORIES:
                  File::AccessError
         DESCR  : &g_access_error_descr
                  For some reason, we can't access the database.
+      - EXCEPT : &cpp_stale_lockfile_except
+                 SharedGroup::PresumablyStaleLockFile
+        DESCR  : &g_stale_lockfile_descr
+                 A lock file exist, but it cannot be decided whether it is safe to use it or not.
+                 Verify that the lock file is not in use, then delete it and try again.
       - EXCEPT : &cpp_runtime_error_except
                  std::runtime_error
         DESCR  : &g_runtime_error_descr
