@@ -35,6 +35,8 @@ DESCR      : &g_shared_group_descr
              as derived objects (tables, views, etc.) are either
              writable or not.
 
+             Nested transactions are not supported.
+
              Read transactions are significantly faster than write
              transactions.
 SEE        :
@@ -163,9 +165,11 @@ CATEGORIES:
   - g_shared_group_begin_write:
       NAMES    : begin_write
       SUMMARY  : &g_shared_group_begin_write_summary
-                 Initiate a transaction.
+                 Open a write transaction.
       DESCR    : &g_shared_group_begin_write_descr
-                 Begin writing to a shared group.
+                 Initiate a write transaction. Write transactions are serialized - only one write
+                 transaction can progress at a time. Write transactions must be terminated by either
+                 {@link g_shared_group_commit} or {@link g_shared_group_rollback}.
       RETURN:
         TYPES  : Group&
         DESCR  : &g_shared_group_begin_write_return1_descr
@@ -179,7 +183,10 @@ CATEGORIES:
       SUMMARY  : &g_shared_group_commit_summary
                  Commit a transaction.
       DESCR    : &g_shared_group_commit_descr
-                 This method closes a transaction and all changes are written to the shared group.
+                 This method closes a transaction and all changes become visible to subsequent
+                 transactions. If opened in full durability mode, commit only returns when the
+                 changes have been committed to the database file. If opened in asynchronous
+                 mode, the actual synchronization of the database file is delayed.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_commit
         DESCR  :
@@ -190,7 +197,7 @@ CATEGORIES:
                  Rollback a transaction.
       DESCR    : &g_shared_group_rollback_descr
                  This method closes a transaction and discards all changes done to the shared group,
-                 unless a commit has already been done. It is ok to call rollback multiple times. 
+                 unless a commit has already been done. It is ok to call rollback multiple times.
                  Any additional calls to rollback following a commit or rollback are treated as no-ops.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_rollback
@@ -220,7 +227,8 @@ CATEGORIES:
       SUMMARY  : &g_shared_group_end_read_summary
                  Terminate read transaction.
       DESCR    : &g_shared_group_end_read_descr
-                 This method terminates a read transaction which was started with {@link g_shared_group_begin_read}.
+                 This method terminates a read transaction which was started with 
+                 {@link g_shared_group_begin_read}.
                  It is ok to call end_read multiple times, the first call will terminate the transaction.
                  Any additional calls are treated as no-ops.
       EXAMPLES:
@@ -237,25 +245,16 @@ CATEGORIES:
       SIGNATURE: >
                  open(const std::string& file, bool no_create = false, DurabilityLevel dlevel = durability_Full)
       DESCR    : &g_shared_group_open_descr
+                 >
                  Attach this SharedGroup instance to the specified
                  database file.
 
                  If the database file does not already exist, it will
                  be created (unless <tt>no_create</tt> is set to
-                 true.) When multiple threads are involved, it is safe
-                 to let the first thread, that gets to it, create the
-                 file.
+                 true.) 
 
-                 While at least one instance of SharedGroup exists for
-                 a specific database file, a "lock" file will be
-                 present too. The lock file will be placed in the same
-                 directory as the database file, and its name will be
-                 derived by appending ".lock" to the name of the
-                 database file.
-
-                 When multiple SharedGroup instances refer to the same
-                 file, they must specify the same durability level,
-                 otherwise an exception will be thrown.
+                 See {@link g_shared_group_constructor} for further explanation
+                 of durability modes and the use of lock files.
 
                  Calling open() on a SharedGroup instance that is
                  already in the attached state has undefined behavior.
@@ -280,6 +279,8 @@ CATEGORIES:
                  derived from File::AccessError, the derived exception
                  type is thrown. Note that InvalidDatabase is among
                  these derived exception types.
+      - EXCEPT : *cpp_stale_lockfile_except
+        DESCR  : *g_stale_lockfile_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_shared_group_open
