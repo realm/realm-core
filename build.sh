@@ -815,7 +815,7 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
             cp -a tightdb_\$x/examples \$HOME/tightdb_examples/\$x
         done
         if [ \$(echo \$EXT | grep -c java) -eq 1 ]; then
-            find \$HOME/tightdb_examples/java/intro-examples -name build.xml -exec sed -i -e 's/value="\.\.\/\.\.\/lib"/value="\/usr\/local\/share\/java"/' \{\} \\;
+            find \$HOME/tightdb_examples/java -name build.xml -exec sed -i -e 's/value="\.\.\/\.\.\/lib"/value="\/usr\/local\/share\/java"/' \{\} \\;
         fi
 
         echo "Examples can be found in \$HOME/tightdb_examples."
@@ -1199,10 +1199,12 @@ EOF
         if [ "$PREBUILT_CORE" ] && ! [ "$TIGHTDB_TEST_INSTALL_PREFIX" ]; then
             touch ".DIST_CORE_WAS_CONFIGURED" || exit 1
         else
-            if [ "$PREBUILT_CORE" ]; then
-                echo "RECONFIGURING Prebuilt core library (only for testing)" | tee -a "$LOG_FILE"
-            else
-                echo "CONFIGURING Core library" | tee -a "$LOG_FILE"
+            if [ -z "$INTERACTIVE" ]; then
+                if [ "$PREBUILT_CORE" ]; then
+                    echo "RECONFIGURING Prebuilt core library (only for testing)" | tee -a "$LOG_FILE"
+                else
+                    echo "CONFIGURING Core library" | tee -a "$LOG_FILE"
+                fi
             fi
             if [ "$INTERACTIVE" ]; then
                 if ! sh "build.sh" config $TIGHTDB_TEST_INSTALL_PREFIX 2>&1 | tee -a "$LOG_FILE"; then
@@ -1270,7 +1272,9 @@ EOF
                     fi
                 fi
             done
-            echo "DONE CONFIGURING" | tee -a "$LOG_FILE"
+            if [ -z "$INTERACTIVE" ]; then
+                echo "DONE CONFIGURING" | tee -a "$LOG_FILE"
+            fi
         fi
         if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
             if [ "$ERROR" ]; then
@@ -1332,7 +1336,9 @@ EOF
                 fi
             fi
         done
-        echo "DONE CLEANING" | tee -a "$LOG_FILE"
+        if [ -z "$INTERACTIVE" ]; then
+            echo "DONE CLEANING" | tee -a "$LOG_FILE"
+        fi
         if [ "$ERROR" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
             echo "Log file is here: $LOG_FILE" 1>&2
         fi
@@ -1371,7 +1377,9 @@ EOF
         if [ "$PREBUILT_CORE" ]; then
             touch ".DIST_CORE_WAS_BUILT" || exit 1
         else
-            echo "BUILDING Core library" | tee -a "$LOG_FILE"
+            if [ -z "$INTERACTIVE" ]; then
+                echo "BUILDING Core library" | tee -a "$LOG_FILE"
+            fi
             if sh "build.sh" build >>"$LOG_FILE" 2>&1; then
                 touch ".DIST_CORE_WAS_BUILT" || exit 1
             else
@@ -1408,7 +1416,9 @@ EOF
                 fi
             fi
         done
-        echo "DONE BUILDING" | tee -a "$LOG_FILE"
+        if [ -z "$INTERACTIVE" ]; then
+            echo "DONE BUILDING" | tee -a "$LOG_FILE"
+        fi
         if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
             if [ "$ERROR" ]; then
                 cat 1>&2 <<EOF
@@ -1505,7 +1515,9 @@ EOF
                 fi
             fi
         done
-        echo "DONE BUILDING" | tee -a "$LOG_FILE"
+        if [ -z "$INTERACTIVE" ]; then
+            echo "DONE BUILDING" | tee -a "$LOG_FILE"
+        fi
         if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
             if [ "$ERROR" ]; then
                 cat 1>&2 <<EOF
@@ -1587,7 +1599,9 @@ EOF
                 fi
             fi
         done
-        echo "DONE TESTING" | tee -a "$LOG_FILE"
+        if [ -z "$INTERACTIVE" ]; then
+            echo "DONE TESTING" | tee -a "$LOG_FILE"
+        fi
         if [ "$ERROR" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
             echo "Log file is here: $LOG_FILE" 1>&2
         fi
@@ -1626,11 +1640,15 @@ EOF
         export PATH
         ERROR=""
         NEED_USR_LOCAL_LIB_NOTE=""
-        echo "INSTALLING Core library" | tee -a "$LOG_FILE"
+        if [ -z "$INTERACTIVE" ]; then
+            echo "INSTALLING Core library" | tee -a "$LOG_FILE"
+        fi
         if sh build.sh install-shared >>"$LOG_FILE" 2>&1; then
             touch ".DIST_CORE_WAS_INSTALLED" || exit 1
             if [ -e ".DIST_CXX_WAS_CONFIGURED" ]; then
-                echo "INSTALLING Extension 'c++'" | tee -a "$LOG_FILE"
+                if [ -z "$INTERACTIVE" ]; then
+                    echo "INSTALLING Extension 'c++'" | tee -a "$LOG_FILE"
+                fi
                 if sh build.sh install-devel >>"$LOG_FILE" 2>&1; then
                     touch ".DIST_CXX_WAS_INSTALLED" || exit 1
                     NEED_USR_LOCAL_LIB_NOTE="$PLATFORM_HAS_LIBRARY_PATH_ISSUE"
@@ -1642,7 +1660,9 @@ EOF
             for x in $EXTENSIONS; do
                 EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
                 if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" -a -e "$EXT_HOME/.DIST_WAS_BUILT" ]; then
-                    echo "INSTALLING Extension '$x'" | tee -a "$LOG_FILE"
+                    if [ -z "$INTERACTIVE" ]; then
+                        echo "INSTALLING Extension '$x'" | tee -a "$LOG_FILE"
+                    fi
                     if sh "$EXT_HOME/build.sh" install >>"$LOG_FILE" 2>&1; then
                         touch "$EXT_HOME/.DIST_WAS_INSTALLED" || exit 1
                         if [ "$x" = "c" -o "$x" = "objc" ]; then
@@ -1678,7 +1698,9 @@ or Objective-C application:
 
 EOF
             fi
-            echo "DONE INSTALLING" | tee -a "$LOG_FILE"
+            if [ -z "$INTERACTIVE" ]; then
+                echo "DONE INSTALLING" | tee -a "$LOG_FILE"
+            fi
         else
             echo "Failed!" | tee -a "$LOG_FILE" 1>&2
             ERROR="1"
@@ -1827,7 +1849,9 @@ EOF
                 fi
             fi
         done
-        echo "DONE TESTING" | tee -a "$LOG_FILE"
+        if [ -z "$INTERACTIVE" ]; then
+            echo "DONE TESTING" | tee -a "$LOG_FILE"
+        fi
         if [ "$ERROR" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
             echo "Log file is here: $LOG_FILE" 1>&2
         fi
