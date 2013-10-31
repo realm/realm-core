@@ -357,3 +357,90 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_has_changed
         DESCR  :
+
+- Scoped Write transaction Objects (Stupid Unicorns):
+  METHODS:
+  - g_write_trans_begin_write:
+      NAMES    : WriteTransaction
+      SUMMARY  : &g_write_trans_begin_write_summary
+                 Create a write transaction.
+      DESCR    : &g_write_trans_begin_write_descr
+                 >
+                 Create an object of type WriteTransaction. These objects provide RAII for write
+                 transactions. Write transactions are committed by calling
+                 {@link g_write_trans_commit}. If a write transaction goes out of scope without
+                 calling commit, it is aborted.
+      SIGNATURE: WriteTransaction(SharedGroup& sg)
+      PARAMS:
+      - NAME   : sg
+        TYPES  : SharedGroup&
+        DESCR  : The shared group with wich the transaction belongs.
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_begin_write
+        DESCR  :
+
+  - g_write_trans_commit:
+      NAMES    : commit
+      SUMMARY  : *g_shared_group_commit_summary
+      DESCR    : *g_shared_group_commit_descr
+      EXAMPLES:
+      - CODE   : ex_cpp_write_trans_commit
+        DESCR  :
+
+  - g_write_trans_get_table:
+      NAMES    : get_table
+      SUMMARY  : get table from name.
+      DESCR    : given a name, find and returxn a reference to a table with that name.
+      PARAMS:
+      - NAME   : name
+        TYPES  : StringData
+        DESCR  : Name of a table.
+      RETURN:
+        TYPES  : TableRef
+        DESCR  : A reference to a table.
+
+  - g_write_trans_get_group:
+      NAMES    : get_group
+      SUMMARY  : get the group.
+      DESCR    : return the group used by the transaction.
+      RETURN:
+        TYPES  : Group&
+        DESCR  : A group.
+
+- Scoped Read transaction Objects (Green Fuzzballs):
+  METHODS:
+  - g_read_trans_begin_write:
+      NAMES    : ReadTransaction
+      SUMMARY  : &g_read_trans_begin_write_summary
+                 Create a read transaction.
+      DESCR    : &g_read_trans_begin_write_descr
+                 Create an object of type ReadTransaction. These objects provide RAII for write
+                 transactions.
+      SIGNATURE: ReadTransaction(SharedGroup& sg)
+      PARAMS:
+      - NAME   : sg
+        TYPES  : SharedGroup&
+        DESCR  : The shared group with wich the transaction belongs.
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_begin_write
+        DESCR  :
+
+  - g_read_trans_get_table:
+      NAMES    : get_table
+      SUMMARY  : get table from name.
+      DESCR    : given a name, find and return a reference to a table with that name.
+      PARAMS:
+      - NAME   : name
+        TYPES  : StringData
+        DESCR  : Name of a table
+      RETURN:
+        TYPES  : TableRef
+        DESCR  : A reference to a table.
+
+  - g_read_trans_get_group:
+      NAMES    : get_group
+      SUMMARY  : get group.
+      DESCR    : return the group used by the transaction.
+      RETURN:
+        TYPES  : Group&
+        DESCR  : A group.
