@@ -376,21 +376,18 @@ CATEGORIES:
         TYPES  : SharedGroup&
         DESCR  : The shared group with wich the transaction belongs.
       EXAMPLES:
-      - CODE   : ex_cpp_shared_group_begin_write
+      - CODE   : ex_cpp_shared_group_writetrans
         DESCR  :
 
   - g_write_trans_commit:
       NAMES    : commit
       SUMMARY  : *g_shared_group_commit_summary
       DESCR    : *g_shared_group_commit_descr
-      EXAMPLES:
-      - CODE   : ex_cpp_write_trans_commit
-        DESCR  :
 
   - g_write_trans_get_table:
       NAMES    : get_table
       SUMMARY  : get table from name.
-      DESCR    : given a name, find and returxn a reference to a table with that name.
+      DESCR    : given a name, find and return a reference to a table with that name.
       PARAMS:
       - NAME   : name
         TYPES  : StringData
@@ -407,7 +404,7 @@ CATEGORIES:
         TYPES  : Group&
         DESCR  : A group.
 
-- Scoped Read transaction Objects (Green Fuzzballs):
+- Scoped Read Transaction Objects (Green Fuzzballs):
   METHODS:
   - g_read_trans_begin_write:
       NAMES    : ReadTransaction
@@ -422,7 +419,7 @@ CATEGORIES:
         TYPES  : SharedGroup&
         DESCR  : The shared group with wich the transaction belongs.
       EXAMPLES:
-      - CODE   : ex_cpp_shared_group_begin_write
+      - CODE   : ex_cpp_shared_group_readtrans
         DESCR  :
 
   - g_read_trans_get_table:
@@ -432,7 +429,7 @@ CATEGORIES:
       PARAMS:
       - NAME   : name
         TYPES  : StringData
-        DESCR  : Name of a table
+        DESCR  : Name of a table.
       RETURN:
         TYPES  : TableRef
         DESCR  : A reference to a table.
