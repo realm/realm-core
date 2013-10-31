@@ -93,7 +93,7 @@ CATEGORIES:
                  may be left in an inconsistent state. Shared group tries to detect
                  and remedy this problem when it is opened, but it is not possible
                  to safely handle all scenarios. If safety cannot be ensured, shared
-                 group will give up and throw a PresumablyStateLockFile exception. 
+                 group will give up and throw a PresumablyStaleLockFile exception. 
                  In this case, the stale lock file must be removed manually. In all
                  cases the database file itself will be in a consistent state, even though
                  updates still pending at the time of crash will be lost.
@@ -155,7 +155,7 @@ CATEGORIES:
         DESCR  : &g_runtime_error_descr
                  A serious error occurred.
       EXAMPLES:
-      - CODE   : ex_cpp_shared_group_constructor
+      - CODE   : ex_cpp_sharedgroup_constructor
         DESCR  :
 
 - Write transactions:
