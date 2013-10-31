@@ -41,7 +41,7 @@ Grammar:
               
     Compare<Cond, T>:   ==, !=, >=, <=, >, <
 
-    T:                  int, int64_t, float, double
+    T:                  bool, int, int64_t, float, double, StringData
 
 
 Class diagram
@@ -140,7 +140,7 @@ template<class T>struct Mul {
     typedef T type;
 };
 
-// Unary not supported yet
+// Unary not fully supported yet
 template<class T>struct Pow { 
     T operator()(T v) const {return v * v;} 
     typedef T type;
@@ -216,6 +216,7 @@ template <class T> class Columns;
 template <class T> class Value;
 template <class T> class Subexpr2;
 template <class oper, class TLeft = Subexpr, class TRight = Subexpr> class Operator;
+template <class oper, class TLeft = Subexpr> class UnaryOperator;
 template <class TCond, class T, class TLeft = Subexpr, class TRight = Subexpr> class Compare;
 
 // Stores 8 values of type T. Can also exchange data with other ValueBase of different types
@@ -236,6 +237,12 @@ public:
         TOperator o;
         for(size_t t = 0; t < ValueBase::elements; t++)
             m_v[t] = o(left->m_v[t], right->m_v[t]);
+    }
+
+    template <class TOperator> TIGHTDB_FORCEINLINE void fun(const Value* value) {
+        TOperator o;
+        for(size_t t = 0; t < ValueBase::elements; t++)
+            m_v[t] = o(value->m_v[t]);
     }
 
     // Below import and export methods are for type conversion between float, double, int64_t, etc.
@@ -327,6 +334,8 @@ template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>&
     // Purpose of below code is to intercept the creation of a condition and test if it's supported by the old
     // query_engine.hpp which is faster. If it's supported, create a query_engine.hpp node, otherwise create a 
     // query_expression.hpp node.
+    //
+    // This method intercepts only Value <cond> Subexpr2. Interception of Subexpr2 <cond> Subexpr is elsewhere. 
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
     if(column && (std::numeric_limits<L>::is_integer) && (std::numeric_limits<R>::is_integer)) {
         const Table* t = (const_cast<Columns<R>*>(column))->get_table();
@@ -355,8 +364,6 @@ template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>&
         return *new Compare<Cond, typename Common<R, float>::type>(*new Value<L>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
 }
-
-
 
 
 // All overloads where left-hand-side is Subexpr2<L>:
@@ -422,11 +429,15 @@ public:
     // Purpose of this method is to intercept the creation of a condition and test if it's supported by the old
     // query_engine.hpp which is faster. If it's supported, create a query_engine.hpp node, otherwise create a 
     // query_expression.hpp node.
+    //
+    // This method intercepts Subexpr2 <cond> Subexpr2 only. Value <cond> Subexpr2 is intercepted elsewhere.
     template <class Cond> Query create2 (const Subexpr2<R>& right) 
     {
-        const Columns<R>* left_col = dynamic_cast<const Columns<R>*>(      static_cast<Subexpr2<L>*>(this)    );
+        // Test if expressions are of type Columns. Other possibilities are Value and Operator. 
+        const Columns<R>* left_col = dynamic_cast<const Columns<R>*>(static_cast<Subexpr2<L>*>(this));
         const Columns<R>* right_col = dynamic_cast<const Columns<R>*>(&right);
 
+        // query_engine.hpp supports 'Columns<T> operator Columns<T>' with great speed
         if(left_col && right_col && SameType<L, R>::value) {
             const Table* t = (const_cast<Columns<R>*>(left_col))->get_table();
             Query q = Query(*t);
@@ -489,7 +500,8 @@ public:
             return q;
         }
         else {
-            return *new Compare<Cond, typename Common<R, float>::type>(static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
+            return *new Compare<Cond, typename Common<R, float>::type>
+                        (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
         }
     }
 
@@ -533,9 +545,6 @@ public:
 // L                    +, -, *, /, <, >, ==, !=, <=, >=      Subexpr2<R>
 // 
 // For L = R = {int, int64_t, float, double}:
-
-
-
 // Compare numeric values
 template <class R> Query operator > (double left, const Subexpr2<R>& right) {
     return create<double, Greater, R>(left, right);
@@ -660,6 +669,12 @@ template <class R> Operator<Div<typename Common<R, int64_t>::type> >& operator /
     return *new Operator<Div<typename Common<R, int64_t>::type> >(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 
+// Unary operators
+template <class T> UnaryOperator<Pow<T> >& power (Subexpr2<T>& left) { 
+    return *new UnaryOperator<Pow<T> >(left.clone(), true);
+}
+
+
 
 template <> class Columns<StringData> : public Subexpr
 {
@@ -724,6 +739,7 @@ template <class T> Query operator != (const Columns<StringData>& left, T right) 
 }
 
 
+
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
@@ -735,10 +751,7 @@ public:
 
     explicit Columns() : m_table(NULL), sg(NULL) { }
 
-    explicit Columns(size_t column) : m_table(NULL), sg(NULL)
-    {
-        m_column = column;
-    }
+    explicit Columns(size_t column) : m_table(NULL), m_column(column), sg(NULL) { }
 
     ~Columns()
     {
@@ -798,6 +811,46 @@ private:
 };
 
 
+template <class oper, class TLeft> class UnaryOperator : public Subexpr2<typename oper::type>
+{
+public:
+    UnaryOperator(TLeft& left, bool auto_delete = false) : m_auto_delete(auto_delete), m_left(left) {}
+
+    ~UnaryOperator() 
+    {   
+        if(m_auto_delete)
+            delete &m_left;
+    }
+
+    // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
+    void set_table(const Table* table)
+    {
+        m_left.set_table(table);
+    }
+
+    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and 
+    // binds it to a Query at a later time
+    virtual const Table* get_table()
+    {
+        const Table* l = m_left.get_table();
+        return l;
+    }
+
+    void evaluate(size_t index, ValueBase& destination) {
+        Value<T> result;
+        Value<T> left;
+        m_left.evaluate(index, left);
+        result.template fun<oper>(&left);
+        destination.import(result);
+    }
+
+private:
+    typedef typename oper::type T;
+    bool m_auto_delete;
+    TLeft& m_left;
+};
+
+
 template <class oper, class TLeft, class TRight> class Operator : public Subexpr2<typename oper::type>
 {
 public:
@@ -833,30 +886,9 @@ public:
         Value<T> result;
         Value<T> left;
         Value<T> right;
-/*
-        // Optimize for Constant <operator> Column and Column <operator> Constant cases
-        if(SameType<TLeft, Value<T> >::value && SameType<TRight, Columns<T> >::value) {
-            m_right->evaluate(i, &right);
-            result.template fun<oper>(static_cast<Value<T>*>(static_cast<Subexpr*>(m_left)), &right);
-        }
-        else if(SameType<TRight, Value<T> >::value && SameType<TLeft, Columns<T> >::value) {
-            m_left->evaluate(i, &left);
-            result.template fun<oper>(static_cast<Value<T>*>(static_cast<Subexpr*>(m_right)), &left);
-        }
-        else {
-            // Avoid vtable lookups. Qualifying is required even with 'final' keyword in C++11 (664 ms vs 734)
-            if(!SameType<TLeft, Subexpr>::value)
-                m_left->TLeft::evaluate(i, &left);
-            else */
-                m_left.evaluate(index, left);
-    /*
-            if(!SameType<TRight, Subexpr>::value)
-                m_right->TRight::evaluate(i, &right);
-            else*/
-                m_right.evaluate(index, right);
-
-            result.template fun<oper>(&left, &right);
-//        }
+        m_left.evaluate(index, left);
+        m_right.evaluate(index, right);
+        result.template fun<oper>(&left, &right);
         destination.import(result);
     }
 
@@ -915,32 +947,9 @@ public:
         Value<T> left;
 
         for(; start < end; start += ValueBase::elements) {
-
-/*
-            // Save time by avoid calling evaluate() for constants of the same type as compare object
-            if(SameType<TLeft, Value<T> >::value) {
-                m_right->evaluate(start, &right);
-                match = Value<T>::template compare<TCond>(static_cast<Value<T>*>(static_cast<Subexpr*>(m_left)), &right); 
-            }
-            else if(SameType<TRight, Value<T> >::value) {
-                m_left->evaluate(start, &left);
-                match = Value<T>::template compare<TCond>(&left, static_cast<Value<T>*>(static_cast<Subexpr*>(m_right))); 
-            }
-            else {
-                // General case. Again avoid vtable lookup when possible
-                if(!SameType<TLeft, Subexpr>::value)               
-                    static_cast<TLeft*>(m_left).TLeft::evaluate(start, &left);
-                else */
-                    m_left.evaluate(start, left);
-                /*
-                if(!SameType<TRight, Subexpr>::value)               
-                    m_right.TRight::evaluate(start, &right);
-                else
-                    */
-                    m_right.evaluate(start, right);
-
-                match = Value<T>::template compare<TCond>(&left, &right);
- //           }
+            m_left.evaluate(start, left);
+            m_right.evaluate(start, right);
+            match = Value<T>::template compare<TCond>(&left, &right);
 
             // Note the second condition that tests if match position in chunk exceeds column length
             if(match != ValueBase::elements && start + match < end)
