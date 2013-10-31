@@ -140,7 +140,7 @@ template<class T>struct Mul {
     typedef T type;
 };
 
-// Unary not fully supported yet
+// Unary operator
 template<class T>struct Pow { 
     T operator()(T v) const {return v * v;} 
     typedef T type;
