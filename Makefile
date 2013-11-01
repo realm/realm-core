@@ -5,27 +5,27 @@ include generic.mk
 
 # Build and run the benchmarking programs
 .PHONY: benchmark
-benchmark: minimal
+benchmark: test-norun/subdir/src
 	@$(MAKE) -C test benchmark
 
 # Build and run the performance matrix benchmarking program
 .PHONY: performance
-performance: minimal
+performance: test-norun/subdir/src
 	@$(MAKE) -C test performance
 
 # Build the add/insert benchmarking program
 .PHONY: benchmark-insert-add
-benchmark-insert-add: minimal
+benchmark-insert-add: test-norun/subdir/src
 	@$(MAKE) -C test benchmark-insert-add
 
 # Build and run the insert/get/set benchmarking program
 .PHONY: benchmark-insert-get-set
-benchmark-insert-get-set: minimal
+benchmark-insert-get-set: test-norun/subdir/src
 	@$(MAKE) -C test benchmark-insert-get-set
 
 # Build and run the prealloc benchmarking program
 .PHONY: benchmark-prealloc
-benchmark-prealloc: minimal
+benchmark-prealloc: test-norun/subdir/src
 	@$(MAKE) -C test benchmark-prealloc
 
 # Run coverage analysis after building everything, this time using LCOV
@@ -43,14 +43,14 @@ gcovr: test-cover
 
 # Build and run whatever is in test/experiements/testcase.cpp
 .PHONY: testcase testcase-debug
-testcase: minimal
+testcase: test-norun/subdir/src
 	@$(MAKE) -C test testcase
-testcase-debug: debug
+testcase-debug: test-debug-norun/subdir/src
 	@$(MAKE) -C test testcase-debug
 
 # Check documentation examples
 .PHONY: check-doc-ex clean-doc-ex
-check-doc-ex: debug
+check-doc-ex: test-debug-norun/subdir/src
 	@$(MAKE) -C doc/ref_cpp/examples test-debug
 clean-doc-ex:
 	@$(MAKE) -C doc/ref_cpp/examples clean

@@ -8,12 +8,14 @@
 
 
 #include <UnitTest++.h>
-#include "testsettings.hpp"
-#include "test_utilities.hpp"
+
 #include <tightdb/table_macros.hpp>
 #include <tightdb/lang_bind_helper.hpp>
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/group.hpp>
+
+#include "testsettings.hpp"
+#include "util/misc.hpp"
 
 using namespace std;
 using namespace tightdb;

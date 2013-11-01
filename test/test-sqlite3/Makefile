@@ -1,4 +1,4 @@
-NOINST_PROGRAMS = test-sqlite3
+TEST_PROGRAMS = test-sqlite3
 
 test_sqlite3_SOURCES = sqlite3.c test-sqlite3.cpp
 test_sqlite3_LIBS  = ../util/test-util.a
