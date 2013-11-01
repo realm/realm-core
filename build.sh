@@ -785,6 +785,11 @@ EXTENSIONS="$AUGMENTED_EXTENSIONS"
 
 if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
     shift
+    if [ \$# -eq 0 ]; then
+        echo "At least one extension must be specified."
+        echo "Available extensions: \$EXTENSIONS"
+        exit 1
+    fi
     EXT=""
     while [ \$# -gt 0 ]; do
         e=\$1
@@ -1246,7 +1251,11 @@ EOF
             done
             rm -f ".DIST_CXX_WAS_CONFIGURED" || exit 1
             if [ -e "$TEMP_DIR/select/c++" ]; then
-                echo "CONFIGURING Extension 'c++'" | tee -a "$LOG_FILE"
+                if [ -z "$INTERACTIVE" ]; then
+                    echo "CONFIGURING Extension 'c++'" | tee -a "$LOG_FILE"
+                else
+                    echo "Configuring extension 'c++'" | tee -a "$LOG_FILE"
+                fi
                 touch ".DIST_CXX_WAS_CONFIGURED" || exit 1
             fi
             path_list_prepend PATH "$TIGHTDB_HOME/config-progs" || exit 1
@@ -1255,7 +1264,11 @@ EOF
                 EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
                 rm -f "$EXT_HOME/.DIST_WAS_CONFIGURED" || exit 1
                 if [ -e "$TEMP_DIR/select/$x" ]; then
-                    echo "CONFIGURING Extension '$x'" | tee -a "$LOG_FILE"
+                    if [ -z "$INTERACTIVE" ]; then
+                        echo "CONFIGURING Extension '$x'" | tee -a "$LOG_FILE"
+                    else
+                        echo "Configuring extension '$x'" | tee -a "$LOG_FILE"
+                    fi
                     if [ "$INTERACTIVE" ]; then
                         if sh "$EXT_HOME/build.sh" config $TIGHTDB_TEST_INSTALL_PREFIX 2>&1 | tee -a "$LOG_FILE"; then
                             touch "$EXT_HOME/.DIST_WAS_CONFIGURED" || exit 1
@@ -1379,6 +1392,8 @@ EOF
         else
             if [ -z "$INTERACTIVE" ]; then
                 echo "BUILDING Core library" | tee -a "$LOG_FILE"
+            else
+                echo "Building core library" | tee -a "$LOG_FILE"
             fi
             if sh "build.sh" build >>"$LOG_FILE" 2>&1; then
                 touch ".DIST_CORE_WAS_BUILT" || exit 1
@@ -1406,7 +1421,11 @@ EOF
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" ]; then
-                echo "BUILDING Extension '$x'" | tee -a "$LOG_FILE"
+                if [ -z "$INTERACTIVE" ]; then
+                    echo "BUILDING Extension '$x'" | tee -a "$LOG_FILE"
+                else
+                    echo "Building extension '$x'" | tee -a "$LOG_FILE"
+                fi
                 rm -f "$EXT_HOME/.DIST_WAS_BUILT" || exit 1
                 if sh "$EXT_HOME/build.sh" build >>"$LOG_FILE" 2>&1; then
                     touch "$EXT_HOME/.DIST_WAS_BUILT" || exit 1
@@ -1418,6 +1437,8 @@ EOF
         done
         if [ -z "$INTERACTIVE" ]; then
             echo "DONE BUILDING" | tee -a "$LOG_FILE"
+        else
+            echo "Done building" | tee -a "$LOG_FILE"
         fi
         if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
             if [ "$ERROR" ]; then
