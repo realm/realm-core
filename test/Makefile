@@ -17,7 +17,7 @@ ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)
 tightdb_tests_CFLAGS  = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
 tightdb_tests_LDFLAGS = $(shell pkg-config unittest++ --libs)
 else
-PASSIVE_SUBDIRS   += UnitTest++
+PASSIVE_SUBDIRS += UnitTest++
 tightdb_tests_CFLAGS  = -IUnitTest++/src
 tightdb_tests_LDFLAGS = -LUnitTest++ -lUnitTest++
 tightdb_tests_DEPS    = UnitTest++
@@ -26,7 +26,7 @@ endif
 include ../generic.mk
 
 .PHONY: benchmark
-benchmark: subdir/test-tightdb/minimal subdir/test-sqlite3/minimal subdir/test-stl/minimal
+benchmark: minimal/subdir/test-tightdb minimal/subdir/test-sqlite3 minimal/subdir/test-stl
 	@echo ""
 	@echo ".:: TightDB ::."
 	test-tightdb/test-tightdb
@@ -43,17 +43,17 @@ UnitTest++:
 
 # Build and run the performance matrix benchmarking program
 .PHONY: performance
-performance: subdir/util/minimal
+performance: minimal/subdir/util
 	@$(MAKE) -C performance test
 
 # Build the add/insert benchmark
 .PHONY: benchmark-insert-add
-benchmark-insert-add: subdir/util/minimal
+benchmark-insert-add: minimal/subdir/util
 	@$(MAKE) -C benchmark-insert-add
 
 # Build and run the insert/get/set benchmark
 .PHONY: benchmark-insert-get-set
-benchmark-insert-get-set: subdir/util/minimal
+benchmark-insert-get-set: minimal/subdir/util
 	@$(MAKE) -C benchmark-insert-get-set test
 
 # Build and run the prealloc benchmark
@@ -63,7 +63,7 @@ benchmark-prealloc:
 
 # Build and run whatever is in experiements/testcase.cpp
 .PHONY: testcase testcase-debug
-testcase: subdir/util/minimal
+testcase: minimal/subdir/util
 	@$(MAKE) -C experiments test
-testcase-debug: subdir/util/debug
+testcase-debug: debug/subdir/util
 	@$(MAKE) -C experiments test-debug
