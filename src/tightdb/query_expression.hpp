@@ -879,6 +879,11 @@ public:
     {
         const Table* l = m_left.get_table();
         const Table* r = m_right.get_table();
+
+        // Queries do not support multiple different tables; all tables must be the same. 
+        TIGHTDB_ASSERT(l == NULL || r == NULL || l == r);
+
+        // NULL pointer means expression which isn't yet associated with any table, or is a Value<T>
         return l ? l : r;
     }
 
@@ -938,6 +943,11 @@ public:
     {
         const Table* l = m_left.get_table();
         const Table* r = m_right.get_table();
+
+        // Queries do not support multiple different tables; all tables must be the same. 
+        TIGHTDB_ASSERT(l == NULL || r == NULL || l == r);
+
+        // NULL pointer means expression which isn't yet associated with any table, or is a Value<T>
         return l ? l : r;
     }
 
