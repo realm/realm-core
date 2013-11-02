@@ -1026,6 +1026,7 @@ EOF
 /src/tightdb/config.sh
 /src/tightdb/config.cpp
 /test/Makefile
+/test/util/Makefile
 /test-installed
 /doc
 EOF
