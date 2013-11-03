@@ -21,21 +21,21 @@ namespace {
 
 template<class Int> struct IntChar {
     typedef Int int_type;
-    IntChar(): m_value(Int()) {}
-    explicit IntChar(Int v): m_value(v) {}
-    Int value() { return m_value; }
-    bool operator==(IntChar c) const { return m_value == c.m_value; }
-    bool operator< (IntChar c) const { return m_value <  c.m_value; }
-private:
     Int m_value;
 };
+
+template<class Int> bool operator<(IntChar<Int> a, IntChar<Int> b)
+{
+    return a.m_value < b.m_value;
+}
+
 template<class Char, class Int> struct IntCharTraits: private char_traits<Char> {
     typedef Char char_type;
     typedef Int  int_type;
     typedef typename char_traits<Char>::off_type off_type;
     typedef typename char_traits<Char>::pos_type pos_type;
-    static Int to_int_type(Char c)  { return c.value(); }
-    static Char to_char_type(Int i) { return Char(int(i)); }
+    static Int to_int_type(Char c)  { return c.m_value; }
+    static Char to_char_type(Int i) { Char c; c.m_value = typename Char::int_type(i); return c; }
     static bool eq_int_type(Int i1, Int i2) { return i1 == i2; }
     static Int eof() { return numeric_limits<Int>::max(); }
     static Int not_eof(Int i) { return i != eof() ? i : Int(); }

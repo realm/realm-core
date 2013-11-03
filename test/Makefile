@@ -41,7 +41,7 @@ benchmark: test-norun/subdir/test-tightdb test-norun/subdir/test-sqlite3 test-no
 
 .PHONY: UnitTest++
 UnitTest++:
-	$(MAKE) -C UnitTest++ CXXFLAGS="-g -Wall -W -ansi" LDFLAGS= >/dev/null
+	$(MAKE) -C UnitTest++ CXXFLAGS="-g -Wall -W -ansi" LDFLAGS="" >/dev/null
 
 # Build and run the performance matrix benchmarking program
 .PHONY: performance
