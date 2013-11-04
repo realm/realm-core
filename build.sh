@@ -1041,7 +1041,7 @@ EOF
                 (cd "$PREBUILD_DIR" && find -L * -type f) >"$TEMP_DIR/transfer/files1" || exit 1
                 grep -f "$TEMP_DIR/transfer/include.bre" "$TEMP_DIR/transfer/files1" >"$TEMP_DIR/transfer/files2" || exit 1
                 (cd "$PREBUILD_DIR" && tar czf "$TEMP_DIR/transfer/core.tar.gz" -T "$TEMP_DIR/transfer/files2") || exit 1
-                (cd "$PKG_DIR/tightdb" && tar xf "$TEMP_DIR/transfer/core.tar.gz") || exit 1
+                (cd "$PKG_DIR/tightdb" && tar xzmf "$TEMP_DIR/transfer/core.tar.gz") || exit 1
                 INST_HEADERS="$(cd "$PREBUILD_DIR/src/tightdb" && $MAKE get-inst-headers)" || exit 1
                 INST_LIBS="$(cd "$PREBUILD_DIR/src/tightdb" && $MAKE get-inst-libraries)" || exit 1
                 INST_PROGS="$(cd "$PREBUILD_DIR/src/tightdb" && $MAKE get-inst-programs)" || exit 1
@@ -1069,7 +1069,7 @@ EOF
             message "Extracting the package for test"
             TEST_DIR="$TEMP_DIR/test"
             mkdir "$TEST_DIR" || exit 1
-            (cd "$TEST_DIR" && tar xzf "$TEMP_DIR/$NAME.tar.gz") || exit 1
+            (cd "$TEST_DIR" && tar xzmf "$TEMP_DIR/$NAME.tar.gz") || exit 1
             TEST_PKG_DIR="$TEST_DIR/$NAME"
 
             install_prefix="$TEMP_DIR/test-install"
@@ -1952,7 +1952,7 @@ EOF
         grep -f "$TEMP_DIR/include.bre" "$TEMP_DIR/files1" >"$TEMP_DIR/files2" || exit 1
         grep -v -f "$TEMP_DIR/exclude.bre" "$TEMP_DIR/files2" >"$TEMP_DIR/files3" || exit 1
         tar czf "$TEMP_DIR/archive.tar.gz" -T "$TEMP_DIR/files3" || exit 1
-        (cd "$TARGET_DIR" && tar xzf "$TEMP_DIR/archive.tar.gz") || exit 1
+        (cd "$TARGET_DIR" && tar xzmf "$TEMP_DIR/archive.tar.gz") || exit 1
         if ! [ "$TIGHTDB_DISABLE_MARKDOWN_TO_PDF" ]; then
             (cd "$TARGET_DIR" && pandoc README.md -o README.pdf) || exit 1
         fi
