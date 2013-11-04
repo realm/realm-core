@@ -1,12 +1,15 @@
 #include "testsettings.hpp"
 #ifdef TEST_TABLE_VIEW
 
-#include <UnitTest++.h>
-#include <tightdb/table_macros.hpp>
-#include "test_utilities.hpp"
 #include <string>
 #include <sstream>
 #include <ostream>
+
+#include <tightdb/table_macros.hpp>
+
+#include "util/misc.hpp"
+
+#include <UnitTest++.h>
 
 using namespace std;
 using namespace tightdb;

@@ -64,9 +64,6 @@ public:
     bool joinable() TIGHTDB_NOEXCEPT;
 
     void join();
-
-    static void cleanup();
-
 private:
     pthread_t m_id;
     bool m_joinable;

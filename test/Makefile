@@ -1,6 +1,8 @@
-PASSIVE_SUBDIRS = util test-tightdb test-sqlite3 test-stl performance \
+SUBDIRS = util
+PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl performance \
 benchmark-insert-add benchmark-insert-get-set benchmark-prealloc experiments
 
+DIR_DEPS          = util
 test_tightdb_DEPS = util
 test_sqlite3_DEPS = util
 test_stl_DEPS     = util
@@ -9,7 +11,7 @@ experiments_DEPS  = util
 TEST_PROGRAMS = tightdb-tests
 
 tightdb_tests_SOURCES = $(wildcard *.c *.cpp large_tests/*.cpp)
-tightdb_tests_LIBS    = ../src/tightdb/libtightdb.a
+tightdb_tests_LIBS    = util/test-util.a
 
 EXTRA_CLEAN_DIRS = large_tests
 
@@ -17,7 +19,7 @@ ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)
 tightdb_tests_CFLAGS  = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
 tightdb_tests_LDFLAGS = $(shell pkg-config unittest++ --libs)
 else
-PASSIVE_SUBDIRS   += UnitTest++
+PASSIVE_SUBDIRS += UnitTest++
 tightdb_tests_CFLAGS  = -IUnitTest++/src
 tightdb_tests_LDFLAGS = -LUnitTest++ -lUnitTest++
 tightdb_tests_DEPS    = UnitTest++
@@ -26,7 +28,7 @@ endif
 include ../generic.mk
 
 .PHONY: benchmark
-benchmark: subdir/test-tightdb/minimal subdir/test-sqlite3/minimal subdir/test-stl/minimal
+benchmark: test-norun/subdir/test-tightdb test-norun/subdir/test-sqlite3 test-norun/subdir/test-stl
 	@echo ""
 	@echo ".:: TightDB ::."
 	test-tightdb/test-tightdb
@@ -39,31 +41,31 @@ benchmark: subdir/test-tightdb/minimal subdir/test-sqlite3/minimal subdir/test-s
 
 .PHONY: UnitTest++
 UnitTest++:
-	$(MAKE) -C UnitTest++ CXXFLAGS="-g -Wall -W -ansi" LDFLAGS= >/dev/null
+	$(MAKE) -C UnitTest++ CXXFLAGS="-g -Wall -W -ansi" LDFLAGS="" >/dev/null
 
 # Build and run the performance matrix benchmarking program
 .PHONY: performance
-performance: subdir/util/minimal
+performance: test-norun/subdir/util
 	@$(MAKE) -C performance test
 
 # Build the add/insert benchmark
 .PHONY: benchmark-insert-add
-benchmark-insert-add: subdir/util/minimal
-	@$(MAKE) -C benchmark-insert-add
+benchmark-insert-add: test-norun/subdir/util
+	@$(MAKE) -C benchmark-insert-add test-norun
 
 # Build and run the insert/get/set benchmark
 .PHONY: benchmark-insert-get-set
-benchmark-insert-get-set: subdir/util/minimal
+benchmark-insert-get-set: test-norun/subdir/util
 	@$(MAKE) -C benchmark-insert-get-set test
 
 # Build and run the prealloc benchmark
 .PHONY: benchmark-prealloc
-benchmark-prealloc:
+benchmark-prealloc: test-norun/subdir/util
 	@$(MAKE) -C benchmark-prealloc test
 
 # Build and run whatever is in experiements/testcase.cpp
 .PHONY: testcase testcase-debug
-testcase: subdir/util/minimal
+testcase: test-norun/subdir/util
 	@$(MAKE) -C experiments test
-testcase-debug: subdir/util/debug
+testcase-debug: test-debug-norun/subdir/util
 	@$(MAKE) -C experiments test-debug
