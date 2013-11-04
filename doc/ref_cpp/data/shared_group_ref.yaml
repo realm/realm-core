@@ -42,7 +42,7 @@ DESCR      : &g_shared_group_descr
 SEE        :
 EXAMPLES:
 - DESCR    :
-  CODE     : ex_sharedgroup_intro
+  CODE     : ex_shared_group_intro
 IGNORE     : []
 CATEGORIES:
 - Constructor:
@@ -60,6 +60,12 @@ CATEGORIES:
                  coordination of database access. The lock file is removed when
                  the last shared group is removed (but see below).
 
+                 When multiple threads or processes access the same database file
+                 through shared groups, each shared group must be opened in the same
+                 mode.
+
+      - TEXT   : &g_shared_group_durability_modes
+                 >
                  By default the shared group will be fully durable, so that
                  each commit writes its changes to disk in an atomic manner
                  that guarantees that the file is always consistent.
@@ -79,10 +85,6 @@ CATEGORIES:
                  open the shared group in memory-only mode. Then the file will 
                  just be used for identification and backing; it will be removed
                  when there are no more processes using it.
-
-                 When multiple threads or processes access the same database file
-                 through shared groups, each shared group must be opened in the same
-                 mode.
 
                  When used with asynchronous durability level, a process running
                  in the background (the "commit daemon") may continue to update
@@ -157,7 +159,7 @@ CATEGORIES:
         DESCR  : &g_runtime_error_descr
                  A serious error occurred.
       EXAMPLES:
-      - CODE   : ex_cpp_sharedgroup_constructor
+      - CODE   : ex_cpp_shared_group_constructor
         DESCR  :
 
 - Write transactions:
@@ -245,6 +247,7 @@ CATEGORIES:
       SIGNATURE: >
                  open(const std::string& file, bool no_create = false, DurabilityLevel dlevel = durability_Full)
       DESCR    : &g_shared_group_open_descr
+       - TEXT  :
                  >
                  Attach this SharedGroup instance to the specified
                  database file.
@@ -253,10 +256,9 @@ CATEGORIES:
                  be created (unless <tt>no_create</tt> is set to
                  true.) 
 
-                 See {@link g_shared_group_constructor} for further explanation
-                 of durability modes and the use of lock files.
+       - TEXT  : *g_shared_group_durability_modes
 
-                 Calling open() on a SharedGroup instance that is
+       - TEXT  : Calling open() on a SharedGroup instance that is
                  already in the attached state has undefined behavior.
       PARAMS:
       - NAME   : path
@@ -358,7 +360,7 @@ CATEGORIES:
       - CODE   : ex_cpp_shared_group_has_changed
         DESCR  :
 
-- Scoped Write transaction Objects (Stupid Unicorns):
+- Scoped Write transaction Objects:
   METHODS:
   - g_write_trans_begin_write:
       NAMES    : WriteTransaction
@@ -366,15 +368,16 @@ CATEGORIES:
                  Create a write transaction.
       DESCR    : &g_write_trans_begin_write_descr
                  >
-                 Create an object of type WriteTransaction. These objects provide RAII for write
+                 Create an object of type WriteTransaction. These objects provide 
+                 <a href="http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization">
+                 RAII</a> for write
                  transactions. Write transactions are committed by calling
                  {@link g_write_trans_commit}. If a write transaction goes out of scope without
-                 calling commit, it is aborted.
-      SIGNATURE: WriteTransaction(SharedGroup& sg)
+                 calling commit, it is rolled back.
       PARAMS:
       - NAME   : sg
         TYPES  : SharedGroup&
-        DESCR  : The shared group with wich the transaction belongs.
+        DESCR  : The shared group with which the transaction belongs.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_writetrans
         DESCR  :
@@ -386,8 +389,8 @@ CATEGORIES:
 
   - g_write_trans_get_table:
       NAMES    : get_table
-      SUMMARY  : get table from name.
-      DESCR    : given a name, find and return a reference to a table with that name.
+      SUMMARY  : Get table from name.
+      DESCR    : Given a name, find and return a reference to a table with that name.
       PARAMS:
       - NAME   : name
         TYPES  : StringData
@@ -398,34 +401,35 @@ CATEGORIES:
 
   - g_write_trans_get_group:
       NAMES    : get_group
-      SUMMARY  : get the group.
-      DESCR    : return the group used by the transaction.
+      SUMMARY  : Get the group.
+      DESCR    : Return the group used by the transaction.
       RETURN:
         TYPES  : Group&
         DESCR  : A group.
 
-- Scoped Read Transaction Objects (Green Fuzzballs):
+- Scoped Read Transaction Objects:
   METHODS:
   - g_read_trans_begin_write:
       NAMES    : ReadTransaction
       SUMMARY  : &g_read_trans_begin_write_summary
                  Create a read transaction.
       DESCR    : &g_read_trans_begin_write_descr
-                 Create an object of type ReadTransaction. These objects provide RAII for write
-                 transactions.
+                 Create an object of type ReadTransaction. These objects provide
+                 <a href="http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization">
+                 RAII</a> for write transactions.
       SIGNATURE: ReadTransaction(SharedGroup& sg)
       PARAMS:
       - NAME   : sg
         TYPES  : SharedGroup&
-        DESCR  : The shared group with wich the transaction belongs.
+        DESCR  : The shared group with which the transaction belongs.
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_readtrans
         DESCR  :
 
   - g_read_trans_get_table:
       NAMES    : get_table
-      SUMMARY  : get table from name.
-      DESCR    : given a name, find and return a reference to a table with that name.
+      SUMMARY  : Get table from name.
+      DESCR    : Given a name, find and return a reference to a table with that name.
       PARAMS:
       - NAME   : name
         TYPES  : StringData
@@ -436,8 +440,8 @@ CATEGORIES:
 
   - g_read_trans_get_group:
       NAMES    : get_group
-      SUMMARY  : get group.
-      DESCR    : return the group used by the transaction.
+      SUMMARY  : Get group.
+      DESCR    : Return the group used by the transaction.
       RETURN:
         TYPES  : Group&
         DESCR  : A group.
