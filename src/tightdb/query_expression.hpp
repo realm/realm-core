@@ -427,6 +427,7 @@ public:
         const Columns<R>* left_col = dynamic_cast<const Columns<R>*>(      static_cast<Subexpr2<L>*>(this)    );
         const Columns<R>* right_col = dynamic_cast<const Columns<R>*>(&right);
 
+        // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=, >=}
         if(left_col && right_col && SameType<L, R>::value) {
             const Table* t = (const_cast<Columns<R>*>(left_col))->get_table();
             Query q = Query(*t);
