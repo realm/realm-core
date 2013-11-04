@@ -25,7 +25,11 @@ DESCR      : &g_shared_group_descr
              the database file.
 
              Processes that share a database file must reside on
-             the same host.
+             the same host. Sharing also has a storage overhead, so
+             database files created through SharedGroup are often
+             a bit larger than database files created through Group.
+             The minimal size of a database file created through
+             SharedGroup is 4Kb.
 
              Moreover, the class also provides a transactional
              interface to TightDB. Transactions are divided into
