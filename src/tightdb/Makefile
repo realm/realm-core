@@ -15,16 +15,17 @@ column.hpp column_mixed.hpp column_mixed_tpl.hpp column_string_enum.hpp column_s
 column_table.hpp column_tpl.hpp group_writer.hpp index_string.hpp query_engine.hpp \
 query_expression.hpp
 
-
-lib_LIBRARIES = libtightdb.a
-bin_PROGRAMS  = tightdbd tightdb-import
-DEV_PROGRAMS = tightdb-config
+lib_LIBRARIES    = libtightdb.a
+libexec_PROGRAMS = tightdbd
+bin_PROGRAMS     = tightdb-import
+DEV_PROGRAMS     = tightdb-config
 
 libtightdb_a_SOURCES = terminate.cpp string_buffer.cpp file.cpp thread.cpp utf8.cpp \
 utilities.cpp alloc.cpp alloc_slab.cpp array.cpp array_string.cpp array_string_long.cpp \
-array_binary.cpp array_blob.cpp array_blobs_big.cpp column.cpp column_string.cpp column_string_enum.cpp \
-column_binary.cpp column_table.cpp column_mixed.cpp spec.cpp table.cpp table_view.cpp group.cpp \
-group_writer.cpp group_shared.cpp index_string.cpp query.cpp lang_bind_helper.cpp importer.cpp
+array_binary.cpp array_blob.cpp array_blobs_big.cpp column.cpp column_string.cpp \
+column_string_enum.cpp column_binary.cpp column_table.cpp column_mixed.cpp spec.cpp table.cpp \
+table_view.cpp group.cpp group_writer.cpp group_shared.cpp index_string.cpp query.cpp \
+lang_bind_helper.cpp importer.cpp
 
 ifneq ($(TIGHTDB_ENABLE_REPLICATION),)
 libtightdb_a_SOURCES += replication.cpp
@@ -51,7 +52,8 @@ endif
 # http://www.gnu.org/software/libtool/manual/libtool.html#Libtool-versioning
 libtightdb_a_VERSION = 4:0:0
 
-tightdb_config_SOURCES = config.cpp
+tightdb_config_SOURCES = config_tool.cpp
+
 tightdbd_SOURCES = tightdbd.cpp
 tightdbd_LIBS = libtightdb.a
 

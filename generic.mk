@@ -82,16 +82,29 @@
 #   lib_LIBRARIES = libfoo.a libbar.a
 #   libbar_a_LIBS = libfoo.a
 #
-# You can install a program or a library into a non-default directory
-# by defining a custom 'primary prefix' (note, `PROGRAMS` and
-# `LIBRARIES` are primaries). This is usefull when you want (for other
-# purposes) to maintain the default value of `bindir` or `libdir`
-# respectively. Here is an example:
+# The installation directory for programs and libraries is determined
+# by the primary prefix being used. Note that `PROGRAMS` and
+# `LIBRARIES` are primaries, and that `bin` is a primary prefix in
+# `bin_PROGRAMS`, for example. The following primary prefixes are
+# supported directly by `generic.mk`:
 #
-#   EXTRA_PRIMARY_PREFIXES = libexec
-#   libexec_DIR = /usr/libexec
-#   libexec_PROGRAMS = mydaemon
-#   mydaemon_SOURCES = daemon.cpp
+#   Prefix    Variable     Default value
+#   ------------------------------------------------------------------
+#   bin       bindir       $(exec_prefix)/bin     (/usr/local/bin)
+#   sbin      sbindir      $(exec_prefix)/sbin    (/usr/local/sbin)
+#   lib       libdir       $(exec_prefix)/lib (*) (/usr/local/lib)
+#   libexec   libexecdir   $(exec_prefix)/libexec (/usr/local/libexec)
+#
+#   (*) The actual default value depends on the platform.
+#
+# You can also install a program or a library into a non-default
+# directory by defining a custom primary prefix. This is usefull when
+# you want (for other purposes) to maintain the default values of the
+# standard prefixes. Here is an example:
+#
+#   EXTRA_PRIMARY_PREFIXES = lib_home
+#   lib_home_INSTALL_DIR = /usr/lib/mydeamon/bin
+#   lib_home_PROGRAMS = mydaemon
 #
 # When doing 'filtered installs' (using `make install
 # INSTALL_FILTER=...`) there is a distinction between two categories
@@ -109,6 +122,9 @@
 #
 #   DEV_PROGRAMS = mylib-config
 #   mylib_config_SOURCES = ...
+#
+# These programs are installed into the same directory as
+# `bin_PROGRAMS`.
 #
 #
 # Convenience libraries
@@ -431,7 +447,9 @@ prefix          = /usr/local
 exec_prefix     = $(prefix)
 includedir      = $(prefix)/include
 bindir          = $(exec_prefix)/bin
+sbindir         = $(exec_prefix)/sbin
 libdir          = $(if $(USE_LIB64),$(exec_prefix)/lib64,$(exec_prefix)/lib)
+libexecdir      = $(exec_prefix)/libexec
 INSTALL         = install
 INSTALL_DIR     = $(INSTALL) -d
 INSTALL_DATA    = $(INSTALL) -m 644
@@ -764,6 +782,13 @@ INC_FLAGS        += -I$(ROOT)/$(SOURCE_ROOT)
 INC_FLAGS_ABS    += -I$(ABS_ROOT)/$(SOURCE_ROOT)
 endif
 
+PRIMARY_PREFIXES = bin sbin lib libexec $(EXTRA_PRIMARY_PREFIXES)
+
+bin_INSTALL_DIR     = $(DESTDIR)$(bindir)
+sbin_INSTALL_DIR    = $(DESTDIR)$(sbindir)
+lib_INSTALL_DIR     = $(DESTDIR)$(libdir)
+libexec_INSTALL_DIR = $(DESTDIR)$(libexecdir)
+
 # ARGS: primary_prefix, install_dir
 define RECORD_LIB_INSTALL_DIR
 $(foreach x,$($(1)_LIBRARIES),GMK_$(call FOLD_TARGET,$(x))_INSTALL_DIR = $(2)
@@ -771,21 +796,20 @@ $(foreach x,$($(1)_LIBRARIES),GMK_$(call FOLD_TARGET,$(x))_INSTALL_DIR = $(2)
 endef
 
 # ARGS: primary_prefix
-GET_INSTALL_LIBDIR = $(if $($(1)_DIR),$($(1)_DIR),$(DESTDIR)$(libdir))
-GET_INSTALL_BINDIR = $(if $($(1)_DIR),$($(1)_DIR),$(DESTDIR)$(bindir))
+GET_INSTALL_DIR = $(if $(strip $($(1)_INSTALL_DIR)),$(strip $($(1)_INSTALL_DIR)),$(error No INSTALL_DIR defined for primary prefix '$(1)'))
 
 define RECORD_LIB_INSTALL_DIRS
-$(foreach x,lib $(EXTRA_PRIMARY_PREFIXES),$(call RECORD_LIB_INSTALL_DIR,$(x),$(call GET_INSTALL_LIBDIR,$(x)))
+$(foreach x,$(PRIMARY_PREFIXES),$(call RECORD_LIB_INSTALL_DIR,$(x),$(call GET_INSTALL_DIR,$(x)))
 )
 endef
 
 $(eval $(RECORD_LIB_INSTALL_DIRS))
 
 # ARGS: installable_target
-GET_INSTALL_DIR = $(GMK_$(call FOLD_TARGET,$(1))_INSTALL_DIR)
+GET_INSTALL_DIR_FOR_TARGET = $(GMK_$(call FOLD_TARGET,$(1))_INSTALL_DIR)
 
-REGULAR_LIBRARIES = $(foreach x,lib $(EXTRA_PRIMARY_PREFIXES),$($(x)_LIBRARIES))
-REGULAR_PROGRAMS  = $(foreach x,bin $(EXTRA_PRIMARY_PREFIXES),$($(x)_PROGRAMS))
+REGULAR_LIBRARIES = $(strip $(foreach x,$(PRIMARY_PREFIXES),$($(x)_LIBRARIES)))
+REGULAR_PROGRAMS  = $(strip $(foreach x,$(PRIMARY_PREFIXES),$($(x)_PROGRAMS)))
 
 LIBRARIES = $(REGULAR_LIBRARIES) $(NOINST_LIBRARIES) $(TEST_LIBRARIES)
 PROGRAMS  = $(REGULAR_PROGRAMS) $(DEV_PROGRAMS) $(NOINST_PROGRAMS) $(TEST_PROGRAMS)
@@ -1063,10 +1087,10 @@ endif
 endif
 
 INSTALL_RECIPE_DIRS    = $(if $(1),$(NEW_RECIPE)$(INSTALL_DIR) $(1))
-INSTALL_RECIPE_LIBS    = $(if $(2),$(NEW_RECIPE)$(INSTALL_LIBRARY) $(2) $(call GET_INSTALL_LIBDIR,$(1)))
-INSTALL_RECIPE_PROGS   = $(if $(2),$(NEW_RECIPE)$(INSTALL_PROGRAM) $(2) $(call GET_INSTALL_BINDIR,$(1)))
-UNINSTALL_RECIPE_LIBS  = $(if $(2),$(NEW_RECIPE)$(RM) $(foreach x,$(2),$(call GET_INSTALL_LIBDIR,$(1))/$(x)))
-UNINSTALL_RECIPE_PROGS = $(if $(2),$(NEW_RECIPE)$(RM) $(foreach x,$(2),$(call GET_INSTALL_BINDIR,$(1))/$(x)))
+INSTALL_RECIPE_LIBS    = $(if $(2),$(NEW_RECIPE)$(INSTALL_LIBRARY) $(2) $(call GET_INSTALL_DIR,$(1)))
+INSTALL_RECIPE_PROGS   = $(if $(2),$(NEW_RECIPE)$(INSTALL_PROGRAM) $(2) $(call GET_INSTALL_DIR,$(1)))
+UNINSTALL_RECIPE_LIBS  = $(if $(2),$(NEW_RECIPE)$(RM) $(foreach x,$(2),$(call GET_INSTALL_DIR,$(1))/$(x)))
+UNINSTALL_RECIPE_PROGS = $(if $(2),$(NEW_RECIPE)$(RM) $(foreach x,$(2),$(call GET_INSTALL_DIR,$(1))/$(x)))
 
 # ARGS: install_prefix, qual_name, version
 INSTALL_RECIPE_LIB_SHARED   = $(INSTALL_RECIPE_LIBS)
@@ -1075,7 +1099,7 @@ UNINSTALL_RECIPE_LIB_SHARED = $(UNINSTALL_RECIPE_LIBS)
 ifeq ($(OS),Linux)
 INSTALL_RECIPE_LIB_SHARED     = $(if $(3),$(call INSTALL_RECIPE_LIB_SHARED_2,$(1),$(2),$(call MAP_SHARED_LIB_VERSION,$(3))),$(INSTALL_RECIPE_LIBS))
 INSTALL_RECIPE_LIB_SHARED_2   = $(call INSTALL_RECIPE_LIB_SHARED_3,$(1),$(2),$(2).$(word 1,$(3)),$(2).$(word 2,$(3)))
-INSTALL_RECIPE_LIB_SHARED_3   = $(call INSTALL_RECIPE_LIBS,$(1),$(4))$(NEW_RECIPE)cd $(call GET_INSTALL_LIBDIR,$(1)) && ln -s -f $(4) $(3) && ln -s -f $(3) $(2)
+INSTALL_RECIPE_LIB_SHARED_3   = $(call INSTALL_RECIPE_LIBS,$(1),$(4))$(NEW_RECIPE)cd $(call GET_INSTALL_DIR,$(1)) && ln -s -f $(4) $(3) && ln -s -f $(3) $(2)
 UNINSTALL_RECIPE_LIB_SHARED   = $(if $(3),$(call UNINSTALL_RECIPE_LIB_SHARED_2,$(1),$(2),$(call MAP_SHARED_LIB_VERSION,$(3))),$(UNINSTALL_RECIPE_LIBS))
 UNINSTALL_RECIPE_LIB_SHARED_2 = $(call UNINSTALL_RECIPE_LIB_SHARED_3,$(1),$(2),$(2).$(word 1,$(3)),$(2).$(word 2,$(3)))
 UNINSTALL_RECIPE_LIB_SHARED_3 = $(call UNINSTALL_RECIPE_LIBS,$(1),$(2) $(3) $(4))
@@ -1083,7 +1107,7 @@ endif
 
 ifeq ($(OS),Darwin)
 INSTALL_RECIPE_LIB_SHARED     = $(if $(3),$(call INSTALL_RECIPE_LIB_SHARED_2,$(1),$(2),$(word 1,$(call MAP_SHARED_LIB_VERSION,$(2),$(3)))),$(INSTALL_RECIPE_LIBS))
-INSTALL_RECIPE_LIB_SHARED_2   = $(call INSTALL_RECIPE_LIBS,$(1),$(3))$(NEW_RECIPE)cd $(call GET_INSTALL_LIBDIR,$(1)) && ln -s -f $(3) $(2)
+INSTALL_RECIPE_LIB_SHARED_2   = $(call INSTALL_RECIPE_LIBS,$(1),$(3))$(NEW_RECIPE)cd $(call GET_INSTALL_DIR,$(1)) && ln -s -f $(3) $(2)
 UNINSTALL_RECIPE_LIB_SHARED   = $(if $(3),$(call UNINSTALL_RECIPE_LIB_SHARED_2,$(1),$(2),$(word 1,$(call MAP_SHARED_LIB_VERSION,$(2),$(3)))),$(UNINSTALL_RECIPE_LIBS))
 UNINSTALL_RECIPE_LIB_SHARED_2 = $(call UNINSTALL_RECIPE_LIBS,$(1),$(2) $(3))
 endif
@@ -1116,22 +1140,22 @@ install-header-dir:
 endif
 
 install-static-libs: install-lib-dirs
-$(foreach x,lib $(EXTRA_PRIMARY_PREFIXES),$(call INSTALL_RECIPE_LIBS,$(x),$(strip $(call GET_STATIC_LIB_INST_NAMES,$(x)))))
+$(foreach x,$(PRIMARY_PREFIXES),$(call INSTALL_RECIPE_LIBS,$(x),$(strip $(call GET_STATIC_LIB_INST_NAMES,$(x)))))
 
 install-shared-libs: install-lib-dirs
-$(foreach x,lib $(EXTRA_PRIMARY_PREFIXES),$(foreach y,$($(x)_LIBRARIES),$(foreach z,$(INST_SHARED_LIB_SUFFICES),$(call INSTALL_RECIPE_LIB_SHARED,$(x),$(call GET_LIBRARY_NAME,$(y))$(patsubst +%,%,$(z)),$(call GET_VERSION_FOR_TARGET,$(y))))))
+$(foreach x,$(PRIMARY_PREFIXES),$(foreach y,$($(x)_LIBRARIES),$(foreach z,$(INST_SHARED_LIB_SUFFICES),$(call INSTALL_RECIPE_LIB_SHARED,$(x),$(call GET_LIBRARY_NAME,$(y))$(patsubst +%,%,$(z)),$(call GET_VERSION_FOR_TARGET,$(y))))))
 
 uninstall-static-libs:
-$(foreach x,lib $(EXTRA_PRIMARY_PREFIXES),$(call UNINSTALL_RECIPE_LIBS,$(x),$(strip $(call GET_STATIC_LIB_INST_NAMES,$(x)))))
+$(foreach x,$(PRIMARY_PREFIXES),$(call UNINSTALL_RECIPE_LIBS,$(x),$(strip $(call GET_STATIC_LIB_INST_NAMES,$(x)))))
 
 uninstall-shared-libs:
-$(foreach x,lib $(EXTRA_PRIMARY_PREFIXES),$(foreach y,$($(x)_LIBRARIES),$(foreach z,$(INST_SHARED_LIB_SUFFICES),$(call UNINSTALL_RECIPE_LIB_SHARED,$(x),$(call GET_LIBRARY_NAME,$(y))$(patsubst +%,%,$(z)),$(call GET_VERSION_FOR_TARGET,$(y))))))
+$(foreach x,$(PRIMARY_PREFIXES),$(foreach y,$($(x)_LIBRARIES),$(foreach z,$(INST_SHARED_LIB_SUFFICES),$(call UNINSTALL_RECIPE_LIB_SHARED,$(x),$(call GET_LIBRARY_NAME,$(y))$(patsubst +%,%,$(z)),$(call GET_VERSION_FOR_TARGET,$(y))))))
 
 install-progs: install-prog-dirs
-$(foreach x,bin $(EXTRA_PRIMARY_PREFIXES),$(call INSTALL_RECIPE_PROGS,$(x),$(strip $(call GET_PROG_INST_NAMES,$(x)))))
+$(foreach x,$(PRIMARY_PREFIXES),$(call INSTALL_RECIPE_PROGS,$(x),$(strip $(call GET_PROG_INST_NAMES,$(x)))))
 
 uninstall-progs:
-$(foreach x,bin $(EXTRA_PRIMARY_PREFIXES),$(call UNINSTALL_RECIPE_PROGS,$(x),$(strip $(call GET_PROG_INST_NAMES,$(x)))))
+$(foreach x,$(PRIMARY_PREFIXES),$(call UNINSTALL_RECIPE_PROGS,$(x),$(strip $(call GET_PROG_INST_NAMES,$(x)))))
 
 install-dev-progs: install-dev-prog-dirs
 $(call INSTALL_RECIPE_PROGS,bin,$(strip $(TARGETS_DEV_PROG_OPTIM) $(TARGETS_DEV_PROG_DEBUG)))
@@ -1140,13 +1164,13 @@ uninstall-dev-progs:
 $(call UNINSTALL_RECIPE_PROGS,bin,$(strip $(TARGETS_DEV_PROG_OPTIM) $(TARGETS_DEV_PROG_DEBUG)))
 
 install-lib-dirs:
-$(call INSTALL_RECIPE_DIRS,$(strip $(foreach x,lib $(EXTRA_PRIMARY_PREFIXES),$(if $($(x)_LIBRARIES),$(call GET_INSTALL_LIBDIR,$(x))))))
+$(call INSTALL_RECIPE_DIRS,$(strip $(foreach x,$(PRIMARY_PREFIXES),$(if $($(x)_LIBRARIES),$(call GET_INSTALL_DIR,$(x))))))
 
 install-prog-dirs:
-$(call INSTALL_RECIPE_DIRS,$(strip $(foreach x,bin $(EXTRA_PRIMARY_PREFIXES),$(if $($(x)_PROGRAMS),$(call GET_INSTALL_BINDIR,$(x))))))
+$(call INSTALL_RECIPE_DIRS,$(strip $(foreach x,$(PRIMARY_PREFIXES),$(if $($(x)_PROGRAMS),$(call GET_INSTALL_DIR,$(x))))))
 
 install-dev-prog-dirs:
-$(call INSTALL_RECIPE_DIRS,$(strip $(if $(DEV_PROGRAMS),$(call GET_INSTALL_BINDIR,bin))))
+$(call INSTALL_RECIPE_DIRS,$(strip $(if $(DEV_PROGRAMS),$(call GET_INSTALL_DIR,bin))))
 
 endef
 
@@ -1217,7 +1241,7 @@ PATTERN_UNPACK_MAP_2 = $(filter $(1),$(2))
 # ARGS: prog_target
 EXPAND_PROG_LIBS = $(call FOLD_LEFT,EXPAND_LIB_DEP,,$(strip $($(call FOLD_TARGET,$(1))_LIBS)))
 # ARGS: inst_lib_target
-EXPAND_INST_LIB_LIBS = $(call FOLD_LEFT,EXPAND_LIB_DEP,rpath:$(call GET_INSTALL_DIR,$(1)) noinst-rpath:.,$(strip $($(call FOLD_TARGET,$(1))_LIBS)))
+EXPAND_INST_LIB_LIBS = $(call FOLD_LEFT,EXPAND_LIB_DEP,rpath:$(call GET_INSTALL_DIR_FOR_TARGET,$(1)) noinst-rpath:.,$(strip $($(call FOLD_TARGET,$(1))_LIBS)))
 
 # ARGS: accum, dependency_lib
 EXPAND_LIB_DEP = $(call EXPAND_LIB_DEP_2,$(1),$(2),$(call READ_LIB_LIBDEPS,$(2)))

@@ -46,6 +46,9 @@ install_bindir_escaped="$(cstring_escape "$install_bindir")" || exit 1
 install_libdir="$(get_config_param "install-libdir")" || exit 1
 install_libdir_escaped="$(cstring_escape "$install_libdir")" || exit 1
 
+install_libexecdir="$(get_config_param "install-libexecdir")" || exit 1
+install_libexecdir_escaped="$(cstring_escape "$install_libexecdir")" || exit 1
+
 cat >"$target" <<EOF
 /*************************************************************************
  *
@@ -62,4 +65,5 @@ cat >"$target" <<EOF
 #define TIGHTDB_INSTALL_INCLUDEDIR  "$install_includedir_escaped"
 #define TIGHTDB_INSTALL_BINDIR      "$install_bindir_escaped"
 #define TIGHTDB_INSTALL_LIBDIR      "$install_libdir_escaped"
+#define TIGHTDB_INSTALL_LIBEXECDIR  "$install_libexecdir_escaped"
 EOF

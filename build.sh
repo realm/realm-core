@@ -187,9 +187,13 @@ auto_configure()
 
 get_config_param()
 {
-    local name line value
-    cd "$TIGHTDB_HOME" || return 1
+    local name home line value
     name="$1"
+    home="$2"
+    if ! [ "$home" ]; then
+        home="$TIGHTDB_HOME"
+    fi
+    cd "$home" || return 1
     if ! [ -e "config" ]; then
         cat 1>&2 <<EOF
 ERROR: Found no configuration!
@@ -276,10 +280,11 @@ case "$MODE" in
         if ! [ "$install_prefix" ]; then
             install_prefix="/usr/local"
         fi
-        install_exec_prefix="$install_prefix"
-        install_includedir="$install_prefix/include"
-        install_bindir="$install_exec_prefix/bin"
+        install_exec_prefix="$($MAKE prefix="$install_prefix" get-exec-prefix)" || exit 1
+        install_includedir="$($MAKE prefix="$install_prefix" get-includedir)" || exit 1
+        install_bindir="$($MAKE prefix="$install_prefix" get-bindir)" || exit 1
         install_libdir="$($MAKE prefix="$install_prefix" get-libdir)" || exit 1
+        install_libexecdir="$($MAKE prefix="$install_prefix" get-libexecdir)" || exit 1
 
         tightdb_version="unknown"
         if [ "$TIGHTDB_VERSION" ]; then
@@ -339,6 +344,7 @@ install-exec-prefix: $install_exec_prefix
 install-includedir:  $install_includedir
 install-bindir:      $install_bindir
 install-libdir:      $install_libdir
+install-libexecdir:  $install_libexecdir
 xcode-home:          $xcode_home
 iphone-sdks:         ${iphone_sdks:-none}
 iphone-sdks-avail:   $iphone_sdks_avail
@@ -502,8 +508,8 @@ EOF
 
     "test-installed")
         require_config || exit 1
-        install_libdir="$(get_config_param "install-libdir")" || exit 1
-        export LD_RUN_PATH="$install_libdir"
+        install_bindir="$(get_config_param "install-bindir")" || exit 1
+        path_list_prepend PATH "$install_bindir" || exit 1
         $MAKE -C "test-installed" clean || exit 1
         $MAKE -C "test-installed" test  || exit 1
         echo "Test passed"
@@ -1024,7 +1030,7 @@ EOF
 /src/tightdb.hpp
 /src/tightdb/Makefile
 /src/tightdb/config.sh
-/src/tightdb/config.cpp
+/src/tightdb/config_tool.cpp
 /test/Makefile
 /test/util/Makefile
 /test-installed
@@ -1066,16 +1072,34 @@ EOF
             (cd "$TEST_DIR" && tar xzf "$TEMP_DIR/$NAME.tar.gz") || exit 1
             TEST_PKG_DIR="$TEST_DIR/$NAME"
 
+            install_prefix="$TEMP_DIR/test-install"
+            mkdir "$install_prefix" || exit 1
+
             export TIGHTDB_DIST_LOG_FILE="$LOG_FILE"
             export TIGHTDB_DIST_NONINTERACTIVE="1"
-            export TIGHTDB_TEST_INSTALL_PREFIX="$TEMP_DIR/test-install"
-            mkdir "$TIGHTDB_TEST_INSTALL_PREFIX" || exit 1
+            export TIGHTDB_TEST_INSTALL_PREFIX="$install_prefix"
 
             error=""
             log_message "Testing './build config all'"
             if ! "$TEST_PKG_DIR/build" config all; then
                 [ -e "$TEST_PKG_DIR/tightdb/.DIST_CORE_WAS_CONFIGURED" ] || exit 1
                 error="1"
+            fi
+
+            # When testing against a prebuilt core library, we have to
+            # work around the fact that it is not going to be
+            # installed in the usual place. While the config programs
+            # are rebuilt to reflect the unusual installation
+            # directories, other programs (such as `tightdbd`) that
+            # use the shared core library are not, so we have to set
+            # the runtime library path. Also, the core library will
+            # look for `tightdbd` in the wrong place, so we have to
+            # set `TIGHTDBD_PATH` too.
+            if [ "$PREBUILT_CORE" ]; then
+                install_libdir="$(get_config_param "install-libdir" "$TEST_PKG_DIR/tightdb")" || exit 1
+                install_libexecdir="$(get_config_param "install-libexecdir" "$TEST_PKG_DIR/tightdb")" || exit 1
+                path_list_prepend "$LD_LIBRARY_PATH_NAME" "$install_libdir"  || exit 1
+                export "$LD_LIBRARY_PATH_NAME"
             fi
 
             log_message "Testing './build clean'"
@@ -1090,11 +1114,17 @@ EOF
             fi
 
             log_message "Testing './build test'"
+            if [ "$PREBUILT_CORE" ]; then
+                export TIGHTDBD_PATH="$install_libexecdir/tightdbd"
+            fi
             if ! "$TEST_PKG_DIR/build" test; then
                 error="1"
             fi
 
             log_message "Testing './build test-debug'"
+            if [ "$PREBUILT_CORE" ]; then
+                export TIGHTDBD_PATH="$install_libexecdir/tightdbd-dbg"
+            fi
             if ! "$TEST_PKG_DIR/build" test-debug; then
                 error="1"
             fi
@@ -1106,6 +1136,9 @@ EOF
             fi
 
             log_message "Testing './build test-installed'"
+            if [ "$PREBUILT_CORE" ]; then
+                export TIGHTDBD_PATH="$install_libexecdir/tightdbd"
+            fi
             if ! "$TEST_PKG_DIR/build" test-installed; then
                 error="1"
             fi

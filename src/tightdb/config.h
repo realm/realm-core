@@ -30,9 +30,11 @@
 #    define TIGHTDB_INSTALL_EXEC_PREFIX TIGHTDB_INSTALL_PREFIX
 #    define TIGHTDB_INSTALL_INCLUDEDIR  TIGHTDB_INSTALL_PREFIX "/include"
 #    define TIGHTDB_INSTALL_BINDIR      TIGHTDB_INSTALL_EXEC_PREFIX "/bin"
-#    define TIGHTDB_INSTALL_LIBDIR      TIGHTDB_INSTALL_PREFIX "/lib"
+#    define TIGHTDB_INSTALL_LIBDIR      TIGHTDB_INSTALL_EXEC_PREFIX "/lib"
+#    define TIGHTDB_INSTALL_LIBEXECDIR  TIGHTDB_INSTALL_EXEC_PREFIX "/libexec"
 #  endif
 #endif
+
 
 
 /* This one is needed to allow tightdb-config to know whether a
