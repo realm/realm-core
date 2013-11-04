@@ -19,8 +19,6 @@
  **************************************************************************/
 
 /*
-Todo: describe strings
-
 This file lets you write queries in C++ syntax like: Expression* e = (first + 1 / second >= third + 12.3);
 
 Type conversion/promotion semantics is the same as in the C++ expressions, e.g float + int > double == float + 
@@ -34,6 +32,7 @@ Grammar:
     Subexpr2<T>:        Value<T>
                         Columns<T>
                         Subexpr2<T>  Operator<Oper<T>  Subexpr2<T>
+                        power(Subexpr2<T>) // power(x) = x * x, as example of unary operator
               
     Value<T>:           T
 
@@ -57,26 +56,39 @@ Compare: public Subexpr2
     Subexpr2& m_right;                              // right expression subtree
 
 Operator: public Subexpr2
+    void evaluate(size_t i, ValueBase* destination)
     bool m_auto_delete
     Subexpr2& m_left;                               // left expression subtree 
     Subexpr2& m_right;                              // right expression subtree
 
 Value<T>: public Subexpr2
+    void evaluate(size_t i, ValueBase* destination)
     T m_v[8];
 
 Columns<T>: public Subexpr2
+    void evaluate(size_t i, ValueBase* destination)
     SequentialGetter<T> sg;                         // class bound to a column, lets you read values in a fast way
     Table* m_table;
 
 class ColumnAccessor<>: public Columns<double>
 
 
-Flow chart:
+Call diagram:
 -----------------------------------------------------------------------------------------------------------------------
-Compare, Operator, Value and Columns have an evaluate() method which returns a Value<T> representing the value for 
-table row i. 
+Example of 'table.first > 34.6 + table.second':
 
-Value<T> actually contains 8 concecutive values and all operations are based on these chunks. This is
+size_t Compare<Greater>::find_first()-------------+
+         |                                        |
+         |                                        | 
+         |                                        |
+         +--> Columns<float>::evaluate()          +--------> Operator<Plus>::evaluate()
+                                                                |               |
+                                               Value<float>::evaluate()    Columns<float>::evaluate()
+            
+Operator, Value and Columns have an evaluate(size_t i, ValueBase* destination) method which returns a Value<T> 
+containing 8 values representing table rows i...i + 7. 
+
+So Value<T> contains 8 concecutive values and all operations are based on these chunks. This is
 to save overhead by virtual calls needed for evaluating a query that has been dynamically constructed at runtime.
 
 
@@ -92,7 +104,6 @@ by query system.
 Caveats, notes and todos
 -----------------------------------------------------------------------------------------------------------------------
     * Perhaps disallow columns from two different tables in same expression
-    * Support unary operators like power and sqrt
     * The name Columns (with s) an be confusing because we also have Column (without s)
     * Memory allocation: Maybe clone Compare and Operator to get rid of m_auto_delete. However, this might become
       bloated, with non-trivial copy constructors instead of defaults
@@ -111,13 +122,13 @@ Caveats, notes and todos
 
 // namespace tightdb {
 
-    // FIXME, this needs to exist elsewhere
-    typedef int64_t             Int;
-    typedef bool                Bool;
-    typedef tightdb::DateTime   DateTime;
-    typedef float               Float;
-    typedef double              Double;
-    typedef tightdb::StringData String;
+// FIXME, this needs to exist elsewhere
+typedef int64_t             Int;
+typedef bool                Bool;
+typedef tightdb::DateTime   DateTime;
+typedef float               Float;
+typedef double              Double;
+typedef tightdb::StringData String;
 
 
 template<class T>struct Plus { 
@@ -173,7 +184,6 @@ public:
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_table(const Table* table) = 0;
     virtual ~Expression() {}
-
 };
 
 class ValueBase 
@@ -358,9 +368,11 @@ template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>&
             // fallback to using use 'return *new Compare<>' instead.
             TIGHTDB_ASSERT(false); 
         }
+        // Return query_engine.hpp node
         return q;
     }
     else {
+        // Return query_expression.hpp node
         return *new Compare<Cond, typename Common<R, float>::type>(*new Value<L>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
 }
@@ -424,7 +436,6 @@ public:
     Query operator != (R right) {
         return create<R, NotEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
-
 
     // Purpose of this method is to intercept the creation of a condition and test if it's supported by the old
     // query_engine.hpp which is faster. If it's supported, create a query_engine.hpp node, otherwise create a 
@@ -496,10 +507,11 @@ public:
             else {
                 TIGHTDB_ASSERT(false); 
             }
-
+            // Return query_engine.hpp node
             return q;
         }
         else {
+            // Return query_expression.hpp node
             return *new Compare<Cond, typename Common<R, float>::type>
                         (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
         }
@@ -526,7 +538,8 @@ public:
     }
 };
 
-// With this wrapper class we can define just 20 overloads inside Overloads<L, R> instead of 4 * 20 = 80.
+// With this wrapper class we can define just 20 overloads inside Overloads<L, R> instead of 4 * 20 = 80. Todo: We can 
+// consider if it's simpler/better to remove this class completely and just list all 80 overloads manually anyway.
 template <class T> class Subexpr2 : public Subexpr, public Overloads<T, const char*>, public Overloads<T, int>, public
                                     Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t> 
 {
@@ -675,7 +688,7 @@ template <class T> UnaryOperator<Pow<T> >& power (Subexpr2<T>& left) {
 }
 
 
-
+// Handling of String columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
 template <> class Columns<StringData> : public Subexpr
 {
 public:
@@ -715,15 +728,17 @@ public:
     size_t m_column;
 };
 
-
+// String == Columns<String>
 template <class T> Query operator == (T left, const Columns<StringData>& right) {
     return operator==(right, left);
 }
 
+// String != Columns<String>
 template <class T> Query operator != (T left, const Columns<StringData>& right) {
     return operator!=(right, left);
 }
 
+// Columns<String> == String
 template <class T> Query operator == (const Columns<StringData>& left, T right) {
     const Table* t = const_cast<Columns<StringData>*>(&left)->get_table();
     Query q = Query(*t);
@@ -731,13 +746,13 @@ template <class T> Query operator == (const Columns<StringData>& left, T right) 
     return q;
 }
 
+// Columns<String> != String
 template <class T> Query operator != (const Columns<StringData>& left, T right) {
     const Table* t = const_cast<Columns<StringData>*>(&left)->get_table();
     Query q = Query(*t);
     q.not_equal(left.m_column, right);
     return q;
 }
-
 
 
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
@@ -785,6 +800,7 @@ public:
         return m_table;
     }
 
+    // Load 8 elements from Column into destination
     void evaluate(size_t index, ValueBase& destination) {  
         Value<T> v;          
         sg->cache_next(index);
@@ -836,6 +852,7 @@ public:
         return l;
     }
 
+    // destination = operator(left)
     void evaluate(size_t index, ValueBase& destination) {
         Value<T> result;
         Value<T> left;
@@ -887,6 +904,7 @@ public:
         return l ? l : r;
     }
 
+    // destination = operator(left, right)
     void evaluate(size_t index, ValueBase& destination) {
         Value<T> result;
         Value<T> left;
