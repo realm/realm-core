@@ -167,11 +167,15 @@ CATEGORIES:
   - g_shared_group_begin_write:
       NAMES    : begin_write
       SUMMARY  : &g_shared_group_begin_write_summary
-                 Open a write transaction.
+                 Initiate write transaction.
       DESCR    : &g_shared_group_begin_write_descr
-                 Initiate a write transaction. Write transactions are serialized - only one write
+                 >
+                 Initiate write transaction. Write transactions are serialized - only one write
                  transaction can progress at a time. Write transactions must be terminated by either
                  {@link g_shared_group_commit} or {@link g_shared_group_rollback}.
+
+                 Creating a scoped write transaction should be preferred over direct use of
+                 begin_write.
       RETURN:
         TYPES  : Group&
         DESCR  : &g_shared_group_begin_write_return1_descr
@@ -213,9 +217,12 @@ CATEGORIES:
                  Initiate read transaction.
       DESCR    : &g_shared_group_begin_read_descr
                  >
-                 Begin reading from a shared group. During the read transaction,
+                 Initiate read transaction. During the read transaction,
                  you have a fully consistent immutable view of the group.
                  You must call {@link g_shared_group_end_read} to terminate the transaction.
+
+                 Creating a scoped read transaction should be preferred over direct use of
+                 begin_read.
       CONST    : True
       RETURN:
         TYPES  : Group&
