@@ -105,7 +105,7 @@ private:
                                 Array::TreeInsert<BasicColumn<T> >&);
 
     template <typename R, Action action, class cond>
-    R aggregate(T target, std::size_t start, std::size_t end, std::size_t *matchcount = 0) const;
+    R aggregate(T target, std::size_t start, std::size_t end) const;
 
     class SetLeafElem;
     class EraseLeafElem;
