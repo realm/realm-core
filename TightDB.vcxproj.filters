@@ -187,7 +187,7 @@
     <ClCompile Include="test\test_lang_bind_helper.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="test\test_utilities.cpp">
+    <ClCompile Include="test\util\misc.cpp">
       <Filter>test\util</Filter>
     </ClCompile>
     <ClCompile Include="src\tightdb\array_blobs_big.cpp">
@@ -399,7 +399,7 @@
     <ClInclude Include="src\tightdb\query_expression.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="test\test_utilities.hpp">
+    <ClInclude Include="test\util\misc.hpp">
       <Filter>test\util</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\array_blobs_big.hpp">

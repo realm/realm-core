@@ -1,6 +1,6 @@
 TEST_PROGRAMS = testcase
 
 testcase_SOURCES = unit_test.cpp testcase.cpp
-testcase_LIBS = ../../src/tightdb/libtightdb.a ../util/test-util.a
+testcase_LIBS = ../util/test-util.a
 
-include ../../generic.mk
+include ../../src/generic.mk
