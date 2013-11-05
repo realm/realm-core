@@ -1,5 +1,13 @@
 # NOTE: THIS SCRIPT IS SUPPOSED TO RUN IN A POSIX SHELL
 
+# Enable tracing if DEBUG is set
+if [ -z "$DEBUG" ]; then
+    set +x
+else
+    set -x
+fi
+
+
 cd "$(dirname "$0")"
 TIGHTDB_HOME="$(pwd)"
 
@@ -791,6 +799,7 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
         exit 1
     fi
     EXT=""
+    DEBUG=""
     while [ \$# -gt 0 ]; do
         e=\$1
         if [ \$(echo \$EXTENSIONS | tr " " "\n" | grep -c \$e) -eq 0 ]; then
@@ -808,7 +817,7 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
     echo "Installation report"
     echo "-------------------"
     for x in \$EXT; do
-        sh tightdb_\$x/build.sh install-report
+        sh $debug tightdb_\$x/build.sh install-report
     done
 
     echo
@@ -1180,6 +1189,16 @@ EOF
 
     "dist-config")
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-config.XXXX)" || exit 1
+        make_cmd="$(which make)"
+        if [ -z "$make_cmd" ]; then
+            echo "ERROR: GNU make must be installed."
+            if [ "$OS" = "Darwin" ]; then
+                echo "Please install xcode and command-line tools and try again."
+                echo "You can download them at https://developer.apple.com/downloads/index.action"
+                echo "or consider to use https://github.com/kennethreitz/osx-gcc-installer"
+            fi
+            exit 1
+        fi
         LOG_FILE="$(get_dist_log_path "config" "$TEMP_DIR")" || exit 1
         (
             echo "TightDB version: ${TIGHTDB_VERSION:-Unknown}"
