@@ -481,7 +481,7 @@ CATEGORIES  :
       THROWS:
       - EXCEPT : File::AccessError
         DESCR  : &g_group_write_to_file_throws_descr
-                 If the file could not be opened. If the reason
+                 Thrown if the file could not be opened. If the reason
                  corresponds to one of the exception types that are
                  derived from File::AccessError, the derived exception
                  type is thrown. In particular, File::Exists will be

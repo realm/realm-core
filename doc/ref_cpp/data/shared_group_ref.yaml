@@ -158,7 +158,83 @@ CATEGORIES:
       - CODE   : ex_cpp_shared_group_constructor
         DESCR  :
 
-- Write transactions:
+
+
+- Scoped Transactions:
+  METHODS:
+  - g_write_trans_begin_write:
+      NAMES    : WriteTransaction
+      SUMMARY  : &g_write_trans_begin_write_summary
+                 Create a write transaction.
+      DESCR    : &g_write_trans_begin_write_descr
+                 >
+                 Create an object of type WriteTransaction. These objects provide 
+                 <a href="http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization">
+                 RAII</a> for write
+                 transactions. Write transactions are committed by calling
+                 {@link g_write_trans_commit}. If a write transaction goes out of scope without
+                 calling commit, it is rolled back.
+      PARAMS:
+      - NAME   : sg
+        TYPES  : SharedGroup&
+        DESCR  : The shared group with which the transaction belongs.
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_writetrans
+        DESCR  :
+
+  - g_read_trans_begin_read:
+      NAMES    : ReadTransaction
+      SUMMARY  : &g_read_trans_begin_read_summary
+                 Create a read transaction.
+      DESCR    : &g_read_trans_begin_read_descr
+                 Create an object of type ReadTransaction. These objects provide
+                 <a href="http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization">
+                 RAII</a> for read transactions.
+      SIGNATURE: ReadTransaction(SharedGroup& sg)
+      PARAMS:
+      - NAME   : sg
+        TYPES  : SharedGroup&
+        DESCR  : The shared group with which the transaction belongs.
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_readtrans
+        DESCR  :
+
+  - g_write_trans_commit:
+      NAMES    : commit
+      SUMMARY  : &g_shared_group_commit_summary
+                 Commit a write transaction.
+      DESCR    : &g_shared_group_commit_descr
+                 This method closes a write transaction and all changes become visible to subsequent
+                 transactions. If opened in full durability mode, commit only returns when the
+                 changes have been committed to the database file. If opened in asynchronous
+                 mode, the actual synchronization of the database file is delayed.
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_writetrans
+        DESCR  :
+
+  - g_trans_get_table:
+      NAMES    : get_table
+      SUMMARY  : Get table from name.
+      DESCR    : Given a name, find and return a reference to a table with that name.
+      PARAMS:
+      - NAME   : name
+        TYPES  : StringData
+        DESCR  : Name of a table.
+      RETURN:
+        TYPES  : TableRef
+        DESCR  : A reference to a table.
+
+  - g_trans_get_group:
+      NAMES    : get_group
+      SUMMARY  : Get the group.
+      DESCR    : Return the group used by the transaction.
+      RETURN:
+        TYPES  : Group&
+        DESCR  : A group.
+
+
+
+- Transactions:
   METHODS:
   - g_shared_group_begin_write:
       NAMES    : begin_write
@@ -170,43 +246,36 @@ CATEGORIES:
                  transaction can progress at a time. Write transactions must be terminated by either
                  {@link g_shared_group_commit} or {@link g_shared_group_rollback}.
 
-                 Creating a scoped write transaction should be preferred over direct use of
-                 begin_write.
+                 Using a scoped write transaction and the RAII pattern should be preferred over direct use of
+                 begin_write whenever possible.
       RETURN:
         TYPES  : Group&
         DESCR  : &g_shared_group_begin_write_return1_descr
                  A group.
       EXAMPLES:
-      - CODE   : ex_cpp_shared_group_begin_write
+      - CODE   : ex_cpp_shared_group_write
         DESCR  :
 
   - g_shared_group_commit:
       NAMES    : commit
-      SUMMARY  : &g_shared_group_commit_summary
-                 Commit a transaction.
-      DESCR    : &g_shared_group_commit_descr
-                 This method closes a transaction and all changes become visible to subsequent
-                 transactions. If opened in full durability mode, commit only returns when the
-                 changes have been committed to the database file. If opened in asynchronous
-                 mode, the actual synchronization of the database file is delayed.
+      SUMMARY  : *g_shared_group_commit_summary
+      DESCR    : *g_shared_group_commit_descr
       EXAMPLES:
-      - CODE   : ex_cpp_shared_group_commit
+      - CODE   : ex_cpp_shared_group_write
         DESCR  :
 
   - g_shared_group_rollback:
       NAMES    : rollback
       SUMMARY  : &g_shared_group_rollback_summary
-                 Rollback a transaction.
+                 Rollback a write transaction.
       DESCR    : &g_shared_group_rollback_descr
                  This method closes a transaction and discards all changes done to the shared group,
                  unless a commit has already been done. It is ok to call rollback multiple times.
                  Any additional calls to rollback following a commit or rollback are treated as no-ops.
       EXAMPLES:
-      - CODE   : ex_cpp_shared_group_rollback
+      - CODE   : ex_cpp_shared_group_write
         DESCR  :
 
-- Read transactions:
-  METHODS:
   - g_shared_group_begin_read:
       NAMES    : begin_read
       SUMMARY  : &g_shared_group_begin_read_summary
@@ -224,7 +293,7 @@ CATEGORIES:
         TYPES  : Group&
         DESCR  : A group.
       EXAMPLES:
-      - CODE   : ex_cpp_shared_group_begin_read
+      - CODE   : ex_cpp_shared_group_read
         DESCR  :
 
   - g_shared_group_end_read:
@@ -237,7 +306,7 @@ CATEGORIES:
                  It is ok to call end_read multiple times, the first call will terminate the transaction.
                  Any additional calls are treated as no-ops.
       EXAMPLES:
-      - CODE   : ex_cpp_shared_group_end_read
+      - CODE   : ex_cpp_shared_group_read
         DESCR  :
 
 
@@ -366,88 +435,5 @@ CATEGORIES:
       - CODE   : ex_cpp_shared_group_has_changed
         DESCR  :
 
-- Scoped Write transaction Objects:
-  METHODS:
-  - g_write_trans_begin_write:
-      NAMES    : WriteTransaction
-      SUMMARY  : &g_write_trans_begin_write_summary
-                 Create a write transaction.
-      DESCR    : &g_write_trans_begin_write_descr
-                 >
-                 Create an object of type WriteTransaction. These objects provide 
-                 <a href="http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization">
-                 RAII</a> for write
-                 transactions. Write transactions are committed by calling
-                 {@link g_write_trans_commit}. If a write transaction goes out of scope without
-                 calling commit, it is rolled back.
-      PARAMS:
-      - NAME   : sg
-        TYPES  : SharedGroup&
-        DESCR  : The shared group with which the transaction belongs.
-      EXAMPLES:
-      - CODE   : ex_cpp_shared_group_writetrans
-        DESCR  :
 
-  - g_write_trans_commit:
-      NAMES    : commit
-      SUMMARY  : *g_shared_group_commit_summary
-      DESCR    : *g_shared_group_commit_descr
 
-  - g_write_trans_get_table:
-      NAMES    : get_table
-      SUMMARY  : Get table from name.
-      DESCR    : Given a name, find and return a reference to a table with that name.
-      PARAMS:
-      - NAME   : name
-        TYPES  : StringData
-        DESCR  : Name of a table.
-      RETURN:
-        TYPES  : TableRef
-        DESCR  : A reference to a table.
-
-  - g_write_trans_get_group:
-      NAMES    : get_group
-      SUMMARY  : Get the group.
-      DESCR    : Return the group used by the transaction.
-      RETURN:
-        TYPES  : Group&
-        DESCR  : A group.
-
-- Scoped Read Transaction Objects:
-  METHODS:
-  - g_read_trans_begin_write:
-      NAMES    : ReadTransaction
-      SUMMARY  : &g_read_trans_begin_write_summary
-                 Create a read transaction.
-      DESCR    : &g_read_trans_begin_write_descr
-                 Create an object of type ReadTransaction. These objects provide
-                 <a href="http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization">
-                 RAII</a> for write transactions.
-      SIGNATURE: ReadTransaction(SharedGroup& sg)
-      PARAMS:
-      - NAME   : sg
-        TYPES  : SharedGroup&
-        DESCR  : The shared group with which the transaction belongs.
-      EXAMPLES:
-      - CODE   : ex_cpp_shared_group_readtrans
-        DESCR  :
-
-  - g_read_trans_get_table:
-      NAMES    : get_table
-      SUMMARY  : Get table from name.
-      DESCR    : Given a name, find and return a reference to a table with that name.
-      PARAMS:
-      - NAME   : name
-        TYPES  : StringData
-        DESCR  : Name of a table.
-      RETURN:
-        TYPES  : TableRef
-        DESCR  : A reference to a table.
-
-  - g_read_trans_get_group:
-      NAMES    : get_group
-      SUMMARY  : Get group.
-      DESCR    : Return the group used by the transaction.
-      RETURN:
-        TYPES  : Group&
-        DESCR  : A group.
