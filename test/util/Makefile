@@ -18,4 +18,4 @@ mem_o_CFLAGS = -DTIGHTDB_HAVE_LIBPROCPS
 
 endif
 
-include ../../generic.mk
+include ../../src/generic.mk

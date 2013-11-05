@@ -10,8 +10,8 @@
 # Building installable programs and libraries
 # -------------------------------------------
 #
-# Here is an example of a complete Makefile that uses `generic.mk` to
-# build a program called `myprog` out of two source files called
+# Here is an example of a complete `Makefile` that uses `generic.mk`
+# to build a program called `myprog` out of two source files called
 # `foo.cpp` and `bar.cpp`:
 #
 #   bin_PROGRAMS = myprog
@@ -22,6 +22,11 @@
 # installed in the directory specified by the `bindir` variable which
 # is set to `/usr/local/bin` by default. This can be overridden by
 # setting `prefix`, `exec_prefix`, or `bindir`.
+#
+# Note: You can place `generic.mk` anywhere you like inside your
+# project, but you must always refer to it by a relative path, and if
+# you have multiple `Makefile`s in multiple directories, they must all
+# refer to the same `generic.mk`.
 #
 # Here is how to build a library:
 #
@@ -182,8 +187,9 @@
 #
 # In larger projects it is desirable to organize the source files into
 # multiple subdirectories. This can be done in two ways, using a
-# single Makefile or using multiple Makefiles. When using a single
-# Makefile, refer to the source files using relative paths as follows:
+# single `Makefile` or using multiple `Makefile`s. When using a single
+# `Makefile`, refer to the source files using relative paths as
+# follows:
 #
 #   EXTRA_CLEAN_DIRS = foo bar
 #   myprog_SOURCES = foo/alpha.cpp bar/beta.cpp
@@ -192,12 +198,12 @@
 # necessary and tells `generic.mk` to remove temporary files in those
 # directories during `make clean`.
 #
-# The alternative is to use multiple Makefiles. This requires one or
-# more subdirectories each one with an extra subordinate Makefile. The
-# top-level Makefile must then use the `SUBDIRS` variable to list each
-# of the involved subdirectories. When there is a dependency between
-# two subdirectories, the top-level Makefile must declare this. Here
-# is an example:
+# The alternative is to use multiple `Makefile`s. This requires one or
+# more subdirectories each one with an extra subordinate
+# `Makefile`. The top-level `Makefile` must then use the `SUBDIRS`
+# variable to list each of the involved subdirectories. When there is
+# a dependency between two subdirectories, the top-level `Makefile`
+# must declare this. Here is an example:
 #
 #   Makefile:
 #     SUBDIRS = foo bar
@@ -233,9 +239,6 @@
 #     util_a_SOURCES = ...
 #     include ../generic.mk
 #
-# FIXME: Mention `SOURCE_ROOT` for managing the hierarchical header
-# access and installation scheme.
-#
 # FIXME: Mention `PASSIVE_SUBDIRS` (such directories are cleaned but
 # not otherwise included during recursive `make` invocations).
 #
@@ -257,13 +260,13 @@
 #   foo_o_CFLAGS = -I/opt/parser-1.5/include
 #
 # Compiler and linker flags can be specified for all targets in a
-# directory (the directory containing the Makefile) as follows:
+# directory (the directory containing the `Makefile`) as follows:
 #
 #   DIR_CFLAGS = ...
 #   DIR_LDFLAGS = ...
 #
 # In a project that consists of multiple subprojects (each one in its
-# own subdirectory and with its own Makefile,) compiler and linker
+# own subdirectory and with its own `Makefile`,) compiler and linker
 # flags can be specified for all targets in the project by setting
 # `PROJECT_CFLAGS` and `PROJECT_LDFLAGS` in `config.mk`:
 #
@@ -359,12 +362,12 @@
 # CONFIG VARIABLES
 
 # Relative path to root of source tree. If specified, a corresponding
-# include option (-I) is added to the compiler command
+# include option (`-I`) is added to the compiler command
 # line. Specifying it, also permits installation of headers. Headers
 # will be installed under the same relative path as they have with
 # respect to the directory specified here. Headers are marked for
-# installation by adding them to the INST_HEADERS variable in the
-# local Makefile.
+# installation by adding them to the `INST_HEADERS` variable in the
+# local `Makefile`.
 SOURCE_ROOT =
 
 CFLAGS_OPTIM          = -DNDEBUG
@@ -399,6 +402,7 @@ PROJECT_LDFLAGS_COVER =
 
 LIB_SUFFIX_STATIC     = .a
 LIB_SUFFIX_SHARED     = .so
+LIB_SUFFIX_LIBDEPS    = .libdeps
 
 BASE_DENOM            =
 OBJ_DENOM_SHARED      = .pic
@@ -658,6 +662,8 @@ ifneq ($(LD_IS_GCC_LIKE),)
 LDFLAGS_SHARED = -shared
 endif
 
+LDFLAGS_LIBRARY_PATH =
+
 # Work-around for CLANG < v3.2 ignoring LIBRARY_PATH
 LD_IS_CLANG = $(or $(call MATCH_CMD,clang,$(LD)),$(call MATCH_CMD,clang++,$(LD)))
 ifneq ($(LD_IS_CLANG),)
@@ -666,7 +672,7 @@ ifneq ($(CLANG_VERSION),)
 CLANG_MAJOR = $(word 1,$(CLANG_VERSION))
 CLANG_MINOR = $(word 2,$(CLANG_VERSION))
 ifeq ($(shell echo $$(($(CLANG_MAJOR) < 3 || ($(CLANG_MAJOR) == 3 && $(CLANG_MINOR) < 2)))),1)
-LDFLAGS_LIBRARY_PATH = $(foreach x,$(subst :, ,$(LIBRARY_PATH)),-L$(x))
+LDFLAGS_LIBRARY_PATH = $(foreach x,$(subst :,$(SPACE),$(LIBRARY_PATH)),-L$(x))
 endif
 endif
 endif
@@ -680,15 +686,18 @@ CC_CXX_AND_LD_ARE_1 = $(and $(call MATCH_CMD,$(1),$(CC)),$(strip $(foreach x,$(1
 CC_CXX_AND_LD_ARE_GCC_LIKE = $(strip $(foreach x,$(GCC_LIKE_COMPILERS),$(call CC_CXX_AND_LD_ARE,$(x))))
 
 GENERIC_MK := $(lastword $(MAKEFILE_LIST))
-ROOT = $(patsubst %/,%,$(dir $(GENERIC_MK)))
-ABS_ROOT = $(abspath $(ROOT))
-CONFIG_MK = $(ROOT)/config.mk
+GENERIC_MK_ABS_DIR = $(abspath $(patsubst %/,%,$(dir $(GENERIC_MK))))
+CONFIG_MK = $(call MAKE_REL_PATH,$(GENERIC_MK_ABS_DIR)/config.mk)
 DEP_MAKEFILES = Makefile $(GENERIC_MK)
 ifneq ($(wildcard $(CONFIG_MK)),)
 DEP_MAKEFILES += $(CONFIG_MK)
 endif
 -include $(CONFIG_MK)
 
+ifneq ($(SOURCE_ROOT),)
+ABS_SOURCE_ROOT = $(abspath $(GENERIC_MK_ABS_DIR)/$(SOURCE_ROOT))
+REL_SOURCE_ROOT = $(call MAKE_REL_PATH,$(ABS_SOURCE_ROOT))
+endif
 
 
 # SETUP BUILD COMMANDS
@@ -778,8 +787,8 @@ GET_VERSION_FOR_TARGET_2 = $(if $(1),$(wordlist 1,3,$(subst :, ,$(1):0:0)))
 INC_FLAGS         = $(CFLAGS_INCLUDE)
 INC_FLAGS_ABS     = $(CFLAGS_INCLUDE)
 ifneq ($(SOURCE_ROOT),)
-INC_FLAGS        += -I$(ROOT)/$(SOURCE_ROOT)
-INC_FLAGS_ABS    += -I$(ABS_ROOT)/$(SOURCE_ROOT)
+INC_FLAGS        += -I$(REL_SOURCE_ROOT)
+INC_FLAGS_ABS    += -I$(ABS_SOURCE_ROOT)
 endif
 
 PRIMARY_PREFIXES = bin sbin lib libexec $(EXTRA_PRIMARY_PREFIXES)
@@ -808,11 +817,11 @@ $(eval $(RECORD_LIB_INSTALL_DIRS))
 # ARGS: installable_target
 GET_INSTALL_DIR_FOR_TARGET = $(GMK_$(call FOLD_TARGET,$(1))_INSTALL_DIR)
 
-REGULAR_LIBRARIES = $(strip $(foreach x,$(PRIMARY_PREFIXES),$($(x)_LIBRARIES)))
-REGULAR_PROGRAMS  = $(strip $(foreach x,$(PRIMARY_PREFIXES),$($(x)_PROGRAMS)))
+INST_LIBRARIES = $(strip $(foreach x,$(PRIMARY_PREFIXES),$($(x)_LIBRARIES)))
+INST_PROGRAMS  = $(strip $(foreach x,$(PRIMARY_PREFIXES),$($(x)_PROGRAMS)))
 
-LIBRARIES = $(REGULAR_LIBRARIES) $(NOINST_LIBRARIES) $(TEST_LIBRARIES)
-PROGRAMS  = $(REGULAR_PROGRAMS) $(DEV_PROGRAMS) $(NOINST_PROGRAMS) $(TEST_PROGRAMS)
+LIBRARIES = $(INST_LIBRARIES) $(NOINST_LIBRARIES) $(TEST_LIBRARIES)
+PROGRAMS  = $(INST_PROGRAMS) $(DEV_PROGRAMS) $(NOINST_PROGRAMS) $(TEST_PROGRAMS)
 
 OBJECTS_STATIC_OPTIM = $(foreach x,$(LIBRARIES) $(PROGRAMS),$(call GET_OBJECTS_FOR_TARGET,$(x),$(SUFFIX_OBJ_STATIC_OPTIM)))
 OBJECTS_SHARED_OPTIM = $(foreach x,$(LIBRARIES),$(call GET_OBJECTS_FOR_TARGET,$(x),$(SUFFIX_OBJ_SHARED_OPTIM)))
@@ -822,29 +831,32 @@ OBJECTS_STATIC_COVER = $(foreach x,$(LIBRARIES) $(PROGRAMS),$(call GET_OBJECTS_F
 OBJECTS_SHARED_COVER = $(foreach x,$(LIBRARIES),$(call GET_OBJECTS_FOR_TARGET,$(x),$(SUFFIX_OBJ_SHARED_COVER)))
 OBJECTS = $(sort $(OBJECTS_STATIC_OPTIM) $(OBJECTS_SHARED_OPTIM) $(OBJECTS_STATIC_DEBUG) $(OBJECTS_SHARED_DEBUG) $(OBJECTS_STATIC_COVER) $(OBJECTS_SHARED_COVER))
 
-TARGETS_LIB_STATIC_OPTIM  = $(foreach x,$(REGULAR_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_OPTIM))
-TARGETS_LIB_SHARED_OPTIM  = $(foreach x,$(REGULAR_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_SHARED_OPTIM))
-TARGETS_LIB_STATIC_DEBUG  = $(foreach x,$(REGULAR_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_DEBUG))
-TARGETS_LIB_SHARED_DEBUG  = $(foreach x,$(REGULAR_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_SHARED_DEBUG))
-TARGETS_LIB_STATIC_COVER  = $(foreach x,$(REGULAR_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_COVER))
-TARGETS_LIB_SHARED_COVER  = $(foreach x,$(REGULAR_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_SHARED_COVER))
-TARGETS_NOINST_LIB_OPTIM  = $(foreach x,$(NOINST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_OPTIM))
-TARGETS_NOINST_LIB_DEBUG  = $(foreach x,$(NOINST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_DEBUG))
-TARGETS_NOINST_LIB_COVER  = $(foreach x,$(NOINST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_COVER))
-TARGETS_TEST_LIB_OPTIM    = $(foreach x,$(TEST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_OPTIM))
-TARGETS_TEST_LIB_DEBUG    = $(foreach x,$(TEST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_DEBUG))
-TARGETS_TEST_LIB_COVER    = $(foreach x,$(TEST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_COVER))
-TARGETS_PROG_OPTIM        = $(foreach x,$(REGULAR_PROGRAMS),$(x)$(SUFFIX_PROG_OPTIM))
-TARGETS_PROG_DEBUG        = $(foreach x,$(REGULAR_PROGRAMS),$(x)$(SUFFIX_PROG_DEBUG))
-TARGETS_PROG_COVER        = $(foreach x,$(REGULAR_PROGRAMS),$(x)$(SUFFIX_PROG_COVER))
-TARGETS_DEV_PROG_OPTIM    = $(foreach x,$(DEV_PROGRAMS),$(x)$(SUFFIX_PROG_OPTIM))
-TARGETS_DEV_PROG_DEBUG    = $(foreach x,$(DEV_PROGRAMS),$(x)$(SUFFIX_PROG_DEBUG))
-TARGETS_NOINST_PROG_OPTIM = $(foreach x,$(NOINST_PROGRAMS),$(x)$(SUFFIX_PROG_OPTIM))
-TARGETS_NOINST_PROG_DEBUG = $(foreach x,$(NOINST_PROGRAMS),$(x)$(SUFFIX_PROG_DEBUG))
-TARGETS_NOINST_PROG_COVER = $(foreach x,$(NOINST_PROGRAMS),$(x)$(SUFFIX_PROG_COVER))
-TARGETS_TEST_PROG_OPTIM   = $(foreach x,$(TEST_PROGRAMS),$(x)$(SUFFIX_PROG_OPTIM))
-TARGETS_TEST_PROG_DEBUG   = $(foreach x,$(TEST_PROGRAMS),$(x)$(SUFFIX_PROG_DEBUG))
-TARGETS_TEST_PROG_COVER   = $(foreach x,$(TEST_PROGRAMS),$(x)$(SUFFIX_PROG_COVER))
+TARGETS_LIB_STATIC_OPTIM   = $(foreach x,$(INST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_OPTIM))
+TARGETS_LIB_SHARED_OPTIM   = $(foreach x,$(INST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_SHARED_OPTIM))
+TARGETS_LIB_STATIC_DEBUG   = $(foreach x,$(INST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_DEBUG))
+TARGETS_LIB_SHARED_DEBUG   = $(foreach x,$(INST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_SHARED_DEBUG))
+TARGETS_LIB_STATIC_COVER   = $(foreach x,$(INST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_COVER))
+TARGETS_LIB_SHARED_COVER   = $(foreach x,$(INST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_SHARED_COVER))
+TARGETS_INST_LIB_LIBDEPS   = $(foreach x,$(INST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(LIB_SUFFIX_LIBDEPS))
+TARGETS_NOINST_LIB_OPTIM   = $(foreach x,$(NOINST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_OPTIM))
+TARGETS_NOINST_LIB_DEBUG   = $(foreach x,$(NOINST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_DEBUG))
+TARGETS_NOINST_LIB_COVER   = $(foreach x,$(NOINST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_COVER))
+TARGETS_NOINST_LIB_LIBDEPS = $(foreach x,$(NOINST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(LIB_SUFFIX_LIBDEPS))
+TARGETS_TEST_LIB_OPTIM     = $(foreach x,$(TEST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_OPTIM))
+TARGETS_TEST_LIB_DEBUG     = $(foreach x,$(TEST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_DEBUG))
+TARGETS_TEST_LIB_COVER     = $(foreach x,$(TEST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(SUFFIX_LIB_STATIC_COVER))
+TARGETS_TEST_LIB_LIBDEPS   = $(foreach x,$(TEST_LIBRARIES),$(call GET_LIBRARY_NAME,$(x))$(LIB_SUFFIX_LIBDEPS))
+TARGETS_PROG_OPTIM         = $(foreach x,$(INST_PROGRAMS),$(x)$(SUFFIX_PROG_OPTIM))
+TARGETS_PROG_DEBUG         = $(foreach x,$(INST_PROGRAMS),$(x)$(SUFFIX_PROG_DEBUG))
+TARGETS_PROG_COVER         = $(foreach x,$(INST_PROGRAMS),$(x)$(SUFFIX_PROG_COVER))
+TARGETS_DEV_PROG_OPTIM     = $(foreach x,$(DEV_PROGRAMS),$(x)$(SUFFIX_PROG_OPTIM))
+TARGETS_DEV_PROG_DEBUG     = $(foreach x,$(DEV_PROGRAMS),$(x)$(SUFFIX_PROG_DEBUG))
+TARGETS_NOINST_PROG_OPTIM  = $(foreach x,$(NOINST_PROGRAMS),$(x)$(SUFFIX_PROG_OPTIM))
+TARGETS_NOINST_PROG_DEBUG  = $(foreach x,$(NOINST_PROGRAMS),$(x)$(SUFFIX_PROG_DEBUG))
+TARGETS_NOINST_PROG_COVER  = $(foreach x,$(NOINST_PROGRAMS),$(x)$(SUFFIX_PROG_COVER))
+TARGETS_TEST_PROG_OPTIM    = $(foreach x,$(TEST_PROGRAMS),$(x)$(SUFFIX_PROG_OPTIM))
+TARGETS_TEST_PROG_DEBUG    = $(foreach x,$(TEST_PROGRAMS),$(x)$(SUFFIX_PROG_DEBUG))
+TARGETS_TEST_PROG_COVER    = $(foreach x,$(TEST_PROGRAMS),$(x)$(SUFFIX_PROG_COVER))
 
 TARGETS_DEFAULT     =
 ifneq ($(ENABLE_INSTALL_STATIC_LIBS),)
@@ -854,27 +866,51 @@ TARGETS_DEFAULT    += $(TARGETS_LIB_SHARED_OPTIM)
 ifneq ($(or $(ENABLE_INSTALL_DEBUG_LIBS),$(ENABLE_INSTALL_DEBUG_PROGS)),)
 TARGETS_DEFAULT    += $(TARGETS_LIB_SHARED_DEBUG)
 endif
+TARGETS_DEFAULT    += $(TARGETS_INST_LIB_LIBDEPS)
 TARGETS_DEFAULT    += $(TARGETS_NOINST_LIB_OPTIM)
 ifneq ($(ENABLE_INSTALL_DEBUG_PROGS),)
 TARGETS_DEFAULT    += $(TARGETS_NOINST_LIB_DEBUG)
 endif
+TARGETS_DEFAULT    += $(TARGETS_NOINST_LIB_LIBDEPS)
 TARGETS_DEFAULT    += $(TARGETS_PROG_OPTIM)
 ifneq ($(ENABLE_INSTALL_DEBUG_PROGS),)
 TARGETS_DEFAULT    += $(TARGETS_PROG_DEBUG)
 endif
 TARGETS_DEFAULT    += $(TARGETS_DEV_PROG_OPTIM) $(TARGETS_DEV_PROG_DEBUG) $(TARGETS_NOINST_PROG_OPTIM)
 
-TARGETS_MINIMAL     = $(TARGETS_LIB_SHARED_OPTIM) $(TARGETS_NOINST_LIB_OPTIM) $(TARGETS_PROG_OPTIM) $(TARGETS_DEV_PROG_OPTIM) $(TARGETS_NOINST_PROG_OPTIM)
-TARGETS_NODEBUG     = $(TARGETS_LIB_STATIC_OPTIM) $(TARGETS_LIB_SHARED_OPTIM) $(TARGETS_NOINST_LIB_OPTIM) $(TARGETS_PROG_OPTIM) $(TARGETS_DEV_PROG_OPTIM) $(TARGETS_NOINST_PROG_OPTIM)
-TARGETS_DEBUG       = $(TARGETS_LIB_SHARED_DEBUG) $(TARGETS_NOINST_LIB_DEBUG) $(TARGETS_PROG_DEBUG) $(TARGETS_DEV_PROG_DEBUG) $(TARGETS_NOINST_PROG_DEBUG)
-TARGETS_COVER       = $(TARGETS_LIB_SHARED_COVER) $(TARGETS_NOINST_LIB_COVER) $(TARGETS_PROG_COVER) $(TARGETS_NOINST_PROG_COVER)
-TARGETS_EVERYTHING  = $(TARGETS_LIB_STATIC_OPTIM) $(TARGETS_LIB_SHARED_OPTIM) $(TARGETS_LIB_SHARED_DEBUG)
-TARGETS_EVERYTHING += $(TARGETS_NOINST_LIB_OPTIM) $(TARGETS_NOINST_LIB_DEBUG) $(TARGETS_TEST_LIB_OPTIM) $(TARGETS_TEST_LIB_DEBUG)
-TARGETS_EVERYTHING += $(TARGETS_PROG_OPTIM) $(TARGETS_PROG_DEBUG) $(TARGETS_DEV_PROG_OPTIM) $(TARGETS_DEV_PROG_DEBUG)
-TARGETS_EVERYTHING += $(TARGETS_NOINST_PROG_OPTIM) $(TARGETS_NOINST_PROG_DEBUG) $(TARGETS_TEST_PROG_OPTIM) $(TARGETS_TEST_PROG_DEBUG)
-TARGETS_TEST        = $(TARGETS_LIB_SHARED_OPTIM) $(TARGETS_NOINST_LIB_OPTIM) $(TARGETS_TEST_LIB_OPTIM) $(TARGETS_PROG_OPTIM) $(TARGETS_TEST_PROG_OPTIM)
-TARGETS_TEST_DEBUG  = $(TARGETS_LIB_SHARED_DEBUG) $(TARGETS_NOINST_LIB_DEBUG) $(TARGETS_TEST_LIB_DEBUG) $(TARGETS_PROG_DEBUG) $(TARGETS_TEST_PROG_DEBUG)
-TARGETS_TEST_COVER  = $(TARGETS_LIB_SHARED_COVER) $(TARGETS_NOINST_LIB_COVER) $(TARGETS_TEST_LIB_COVER) $(TARGETS_PROG_COVER) $(TARGETS_TEST_PROG_COVER)
+TARGETS_MINIMAL     = $(TARGETS_LIB_SHARED_OPTIM) $(TARGETS_INST_LIB_LIBDEPS)
+TARGETS_MINIMAL    += $(TARGETS_NOINST_LIB_OPTIM) $(TARGETS_NOINST_LIB_LIBDEPS)
+TARGETS_MINIMAL    += $(TARGETS_PROG_OPTIM) $(TARGETS_DEV_PROG_OPTIM) $(TARGETS_NOINST_PROG_OPTIM)
+TARGETS_NODEBUG     = $(TARGETS_LIB_STATIC_OPTIM) $(TARGETS_LIB_SHARED_OPTIM) $(TARGETS_INST_LIB_LIBDEPS)
+TARGETS_NODEBUG    += $(TARGETS_NOINST_LIB_OPTIM) $(TARGETS_NOINST_LIB_LIBDEPS)
+TARGETS_NODEBUG    += $(TARGETS_PROG_OPTIM) $(TARGETS_DEV_PROG_OPTIM) $(TARGETS_NOINST_PROG_OPTIM)
+TARGETS_DEBUG       = $(TARGETS_LIB_SHARED_DEBUG) $(TARGETS_INST_LIB_LIBDEPS)
+TARGETS_DEBUG      += $(TARGETS_NOINST_LIB_DEBUG) $(TARGETS_NOINST_LIB_LIBDEPS)
+TARGETS_DEBUG      += $(TARGETS_PROG_DEBUG) $(TARGETS_DEV_PROG_DEBUG) $(TARGETS_NOINST_PROG_DEBUG)
+TARGETS_COVER       = $(TARGETS_LIB_SHARED_COVER) $(TARGETS_INST_LIB_LIBDEPS)
+TARGETS_COVER      += $(TARGETS_NOINST_LIB_COVER) $(TARGETS_NOINST_LIB_LIBDEPS)
+TARGETS_COVER      += $(TARGETS_PROG_COVER) $(TARGETS_NOINST_PROG_COVER)
+TARGETS_TEST        = $(TARGETS_LIB_SHARED_OPTIM) $(TARGETS_INST_LIB_LIBDEPS)
+TARGETS_TEST       += $(TARGETS_NOINST_LIB_OPTIM) $(TARGETS_NOINST_LIB_LIBDEPS)
+TARGETS_TEST       += $(TARGETS_TEST_LIB_OPTIM) $(TARGETS_TEST_LIB_LIBDEPS)
+TARGETS_TEST       += $(TARGETS_PROG_OPTIM) $(TARGETS_TEST_PROG_OPTIM)
+TARGETS_TEST_DEBUG  = $(TARGETS_LIB_SHARED_DEBUG) $(TARGETS_INST_LIB_LIBDEPS)
+TARGETS_TEST_DEBUG += $(TARGETS_NOINST_LIB_DEBUG) $(TARGETS_NOINST_LIB_LIBDEPS)
+TARGETS_TEST_DEBUG += $(TARGETS_TEST_LIB_DEBUG) $(TARGETS_TEST_LIB_LIBDEPS)
+TARGETS_TEST_DEBUG += $(TARGETS_PROG_DEBUG) $(TARGETS_TEST_PROG_DEBUG)
+TARGETS_TEST_COVER  = $(TARGETS_LIB_SHARED_COVER) $(TARGETS_INST_LIB_LIBDEPS)
+TARGETS_TEST_COVER += $(TARGETS_NOINST_LIB_COVER) $(TARGETS_NOINST_LIB_LIBDEPS)
+TARGETS_TEST_COVER += $(TARGETS_TEST_LIB_COVER) $(TARGETS_TEST_LIB_LIBDEPS)
+TARGETS_TEST_COVER += $(TARGETS_PROG_COVER) $(TARGETS_TEST_PROG_COVER)
+
+TARGETS_EVERYTHING  = $(TARGETS_LIB_STATIC_OPTIM) $(TARGETS_LIB_SHARED_OPTIM)
+TARGETS_EVERYTHING += $(TARGETS_LIB_SHARED_DEBUG) $(TARGETS_INST_LIB_LIBDEPS)
+TARGETS_EVERYTHING += $(TARGETS_NOINST_LIB_OPTIM) $(TARGETS_NOINST_LIB_DEBUG) $(TARGETS_NOINST_LIB_LIBDEPS)
+TARGETS_EVERYTHING += $(TARGETS_TEST_LIB_OPTIM) $(TARGETS_TEST_LIB_DEBUG) $(TARGETS_TEST_LIB_LIBDEPS)
+TARGETS_EVERYTHING += $(TARGETS_PROG_OPTIM) $(TARGETS_PROG_DEBUG)
+TARGETS_EVERYTHING += $(TARGETS_DEV_PROG_OPTIM) $(TARGETS_DEV_PROG_DEBUG)
+TARGETS_EVERYTHING += $(TARGETS_NOINST_PROG_OPTIM) $(TARGETS_NOINST_PROG_DEBUG)
+TARGETS_EVERYTHING += $(TARGETS_TEST_PROG_OPTIM) $(TARGETS_TEST_PROG_DEBUG)
 
 TARGETS_LIB_STATIC  = $(TARGETS_LIB_STATIC_OPTIM) $(TARGETS_LIB_STATIC_DEBUG) $(TARGETS_LIB_STATIC_COVER)
 TARGETS_LIB_SHARED  = $(TARGETS_LIB_SHARED_OPTIM) $(TARGETS_LIB_SHARED_DEBUG) $(TARGETS_LIB_SHARED_COVER)
@@ -886,10 +922,12 @@ TARGETS_NOINST_PROG = $(TARGETS_NOINST_PROG_OPTIM) $(TARGETS_NOINST_PROG_DEBUG) 
 TARGETS_TEST_PROG   = $(TARGETS_TEST_PROG_OPTIM) $(TARGETS_TEST_PROG_DEBUG) $(TARGETS_TEST_PROG_COVER)
 TARGETS_PROG_ALL    = $(foreach x,$(TARGETS_PROG) $(TARGETS_DEV_PROG),$(x) $(x)-noinst) $(TARGETS_NOINST_PROG) $(TARGETS_TEST_PROG)
 
-TARGETS = $(TARGETS_LIB_STATIC) $(TARGETS_LIB_SHARED) $(TARGETS_NOINST_LIB) $(TARGETS_TEST_LIB) $(TARGETS_PROG_ALL)
-
-TARGETS_LIB_SHARED_ALIASES   = $(foreach x,$(REGULAR_LIBRARIES),$(foreach y,OPTIM DEBUG COVER,$(call TARGETS_LIB_SHARED_ALIASES_2,$(x),$(SUFFIX_LIB_SHARED_$(y)))))
+TARGETS_LIB_SHARED_ALIASES   = $(foreach x,$(INST_LIBRARIES),$(foreach y,OPTIM DEBUG COVER,$(call TARGETS_LIB_SHARED_ALIASES_2,$(x),$(SUFFIX_LIB_SHARED_$(y)))))
 TARGETS_LIB_SHARED_ALIASES_2 = $(call GET_SHARED_LIB_ALIASES,$(call GET_LIBRARY_NAME,$(1))$(2),$(call GET_VERSION_FOR_TARGET,$(1)))
+
+TARGETS  = $(TARGETS_LIB_STATIC) $(TARGETS_LIB_SHARED_ALIASES) $(TARGETS_INST_LIB_LIBDEPS)
+TARGETS += $(TARGETS_NOINST_LIB) $(TARGETS_NOINST_LIB_LIBDEPS)
+TARGETS += $(TARGETS_TEST_LIB) $(TARGETS_TEST_LIB_LIBDEPS) $(TARGETS_PROG_ALL)
 
 # ARGS: qual_name, version
 GET_SHARED_LIB_ALIASES = $(1)
@@ -920,14 +958,14 @@ RECURSIVE_MODES = default minimal nodebug debug cover everything clean install-o
 .PHONY: all
 all: default
 
-default/local:          $(TARGETS_DEFAULT) update-libdeps-files
-minimal/local:          $(TARGETS_MINIMAL) update-libdeps-files
-nodebug/local:          $(TARGETS_NODEBUG) update-libdeps-files
-debug/local:            $(TARGETS_DEBUG) update-libdeps-files
-cover/local:            $(TARGETS_COVER) update-libdeps-files
-everything/local:       $(TARGETS_EVERYTHING) update-libdeps-files
-test-norun/local:       $(TARGETS_TEST) update-libdeps-files
-test-debug-norun/local: $(TARGETS_TEST_DEBUG) update-libdeps-files
+default/local:          $(TARGETS_DEFAULT)
+minimal/local:          $(TARGETS_MINIMAL)
+nodebug/local:          $(TARGETS_NODEBUG)
+debug/local:            $(TARGETS_DEBUG)
+cover/local:            $(TARGETS_COVER)
+everything/local:       $(TARGETS_EVERYTHING)
+test-norun/local:       $(TARGETS_TEST)
+test-debug-norun/local: $(TARGETS_TEST_DEBUG)
 
 
 # Update everything if any makefile or any generated source has changed
@@ -1010,15 +1048,13 @@ $(eval $(SUBDIR_RULES))
 
 # CLEANING
 
-CLEAN_TARGETS = $(TARGETS_LIB_STATIC) $(TARGETS_LIB_SHARED_ALIASES) $(TARGETS_NOINST_LIB) $(TARGETS_TEST_LIB) $(TARGETS_PROG_ALL)
-
-ifneq ($(strip $(CLEAN_TARGETS)),)
+ifneq ($(strip $(TARGETS)),)
 define CLEANING_RULES
 
 .PHONY: clean/extra
 clean/local: clean/extra
-	$(RM) $(strip *.d *.o *.libdeps *.gcno *.gcda $(CLEAN_TARGETS))
-$(foreach x,$(EXTRA_CLEAN_DIRS),$(NEW_RECIPE)$(RM) $(x)/*.d $(x)/*.o $(x)/*.libdeps $(x)/*.gcno $(x)/*.gcda)
+	$(RM) $(strip *.d *.o *.gcno *.gcda $(TARGETS))
+$(foreach x,$(EXTRA_CLEAN_DIRS),$(NEW_RECIPE)$(RM) $(x)/*.d $(x)/*.o $(x)/*.gcno $(x)/*.gcda)
 
 endef
 $(eval $(CLEANING_RULES))
@@ -1075,9 +1111,8 @@ ifneq ($(INST_HEADERS),)
 ifeq ($(SOURCE_ROOT),)
 $(warning Cannot install headers without a value for SOURCE_ROOT)
 else
-HEADER_REL_PATH = $(call PATH_DIFF,.,$(ROOT)/$(SOURCE_ROOT))
-SOURCE_ABS_ROOT = $(ABS_ROOT)/$(SOURCE_ROOT)
-INSIDE_SOURCE = $(call EQUALS,$(SOURCE_ABS_ROOT)$(call COND_PREPEND,/,$(HEADER_REL_PATH)),$(abspath .))
+HEADER_REL_PATH = $(call PATH_DIFF,.,$(ABS_SOURCE_ROOT))
+INSIDE_SOURCE = $(call EQUALS,$(ABS_SOURCE_ROOT)$(call COND_PREPEND,/,$(HEADER_REL_PATH)),$(abspath .))
 ifeq ($(INSIDE_SOURCE),)
 $(warning Cannot install headers outside SOURCE_ROOT)
 else
@@ -1182,16 +1217,16 @@ $(eval $(INSTALL_RULES))
 
 define TEST_RULES
 
-test/local: $(TARGETS_TEST) update-libdeps-files
+test/local: $(TARGETS_TEST)
 $(foreach x,$(TARGETS_TEST_PROG_OPTIM),$(NEW_RECIPE)./$(x))
 
-test-debug/local: $(TARGETS_TEST_DEBUG) update-libdeps-files
+test-debug/local: $(TARGETS_TEST_DEBUG)
 $(foreach x,$(TARGETS_TEST_PROG_DEBUG),$(NEW_RECIPE)./$(x))
 
-memtest/local: $(TARGETS_TEST) update-libdeps-files
+memtest/local: $(TARGETS_TEST)
 $(foreach x,$(TARGETS_TEST_PROG_OPTIM),$(NEW_RECIPE)valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=yes --leak-resolution=low ./$(x) --no-error-exitcode)
 
-memtest-debug/local: $(TARGETS_TEST_DEBUG) update-libdeps-files
+memtest-debug/local: $(TARGETS_TEST_DEBUG)
 $(foreach x,$(TARGETS_TEST_PROG_DEBUG),$(NEW_RECIPE)valgrind --quiet --error-exitcode=1 --track-origins=yes --leak-check=yes --leak-resolution=low ./$(x) --no-error-exitcode)
 
 ifneq ($(strip $(TARGETS_TEST_COVER)),)
@@ -1200,7 +1235,6 @@ test-cover/local: $(TARGETS_TEST_COVER)
 $(foreach x,$(EXTRA_CLEAN_DIRS),$(NEW_RECIPE)$(RM) $(x)/*.gcda)
 $(foreach x,$(TARGETS_TEST_PROG_COVER),$(NEW_RECIPE)-./$(x))
 endif
-test-cover/local: update-libdeps-files
 
 endef
 
@@ -1244,25 +1278,25 @@ EXPAND_PROG_LIBS = $(call FOLD_LEFT,EXPAND_LIB_DEP,,$(strip $($(call FOLD_TARGET
 EXPAND_INST_LIB_LIBS = $(call FOLD_LEFT,EXPAND_LIB_DEP,rpath:$(call GET_INSTALL_DIR_FOR_TARGET,$(1)) noinst-rpath:.,$(strip $($(call FOLD_TARGET,$(1))_LIBS)))
 
 # ARGS: accum, dependency_lib
-EXPAND_LIB_DEP = $(call EXPAND_LIB_DEP_2,$(1),$(2),$(call READ_LIB_LIBDEPS,$(2)))
+EXPAND_LIB_DEP = $(call EXPAND_LIB_DEP_2,$(1),$(call GET_LIBRARY_NAME,$(2)),$(call READ_LIB_LIBDEPS,$(2)))
 # ARGS: accum, dependency_lib, contents_of_libdeps_for_dependency_lib
 EXPAND_LIB_DEP_2 = $(if $(filter noinst,$(3)),$(call EXPAND_NOINST_LIB_REF,$(1),$(2),$(3)),$(call EXPAND_INST_LIB_REF,$(1),$(2),$(3)))
-EXPAND_NOINST_LIB_REF = $(call EXPAND_LIB_DEP_3,$(1),noinst:$(call GET_LIBRARY_NAME,$(2)) $(filter-out noinst,$(3)))
-EXPAND_INST_LIB_REF   = $(call EXPAND_LIB_DEP_3,$(1),inst:$(call GET_LIBRARY_NAME,$(2)) lib:$(2) $(3))
+EXPAND_NOINST_LIB_REF = $(call EXPAND_LIB_DEP_3,$(1),noinst:$(2) libdeps:$(2)$(LIB_SUFFIX_LIBDEPS) $(filter-out noinst,$(3)))
+EXPAND_INST_LIB_REF   = $(call EXPAND_LIB_DEP_3,$(1),lib:$(2).a libdeps:$(2)$(LIB_SUFFIX_LIBDEPS) $(3))
 # ARGS: accum, partially_expanded_libdeps
 EXPAND_LIB_DEP_3 = $(call UNION,$(1),$(call PATTERN_UNPACK_MAP,MAKE_ABS_PATH,noinst-rpath:%,$(call EXPAND_LIB_DEP_4,$(2))))
 # ARGS: partially_expanded_libdeps
-EXPAND_LIB_DEP_4 = $(foreach x,$(1),$(if $(filter lib:%,$(x)),$(call EXPAND_LIB_DEP_5,$(patsubst lib:%,%,$(x))),$(x)))
-# ARGS: value_of_lib_entry_of_partially_expanded_libdeps
+EXPAND_LIB_DEP_4 = $(foreach x,$(1),$(if $(filter lib:%,$(x)),$(call EXPAND_LIB_DEP_5,$(call GET_LIBRARY_NAME,$(patsubst lib:%,%,$(x)))),$(x)))
+# ARGS: library_reference_without_suffix
 EXPAND_LIB_DEP_5 = $(call EXPAND_LIB_DEP_6,$(notdir $(1)),$(patsubst %/,%,$(dir $(1))))
-# ARGS: nondir_part_of_value_of_lib_entry_of_partially_expanded_libdeps, dir_part
-EXPAND_LIB_DEP_6 = lib:$(patsubst lib%,%,$(call GET_LIBRARY_NAME,$(1))) dir:$(2)
+# ARGS: nondir_part_of_library_reference, dir_part
+EXPAND_LIB_DEP_6 = inst:$(2)/$(1) $(patsubst lib%,lib:%,$(1)) dir:$(2)
 
 # Read the contents of the .libdeps file for the specified library and translate relative paths.
 # For libraries in the local directory, the contents needs to be computed "on the fly" because the file may not be up to date.
 READ_LIB_LIBDEPS   = $(if $(call IN_THIS_DIR,$(1)),$(call READ_LIB_LIBDEPS_1,$(notdir $(1))),$(call READ_LIB_LIBDEPS_2,$(1)))
 READ_LIB_LIBDEPS_1 = $(if $(call IS_NOINST_LIB,$(1)),$(call MAKE_NOINST_LIB_LIBDEPS,$(1)),$(call MAKE_INST_LIB_LIBDEPS,$(1)))
-READ_LIB_LIBDEPS_2 = $(call PATTERN_UNPACK_MAP,READ_LIB_LIBDEPS_3,lib:% noinst-rpath:%,$(call CAT_OPT_FILE,$(call GET_LIBRARY_NAME,$(1)).libdeps),$(1))
+READ_LIB_LIBDEPS_2 = $(call PATTERN_UNPACK_MAP,READ_LIB_LIBDEPS_3,lib:% noinst-rpath:%,$(call CAT_OPT_FILE,$(call GET_LIBRARY_NAME,$(1))$(LIB_SUFFIX_LIBDEPS)),$(1))
 READ_LIB_LIBDEPS_3 = $(call MAKE_REL_PATH,$(dir $(2))$(1))
 
 IS_NOINST_LIB   = $(call FIND,IS_NOINST_LIB_1,$(NOINST_LIBRARIES) $(TEST_LIBRARIES),$(1))
@@ -1313,17 +1347,17 @@ GET_NOINST_RPATHS_FROM_LIB_REFS = $(foreach x,$(call FILTER_UNPACK,noinst-rpath:
 
 # ARGS: qual_prog_name, objects, qual_expanded_target_libs, deps, link_cmd, ldflags
 define NOINST_PROG_RULE
-$(1): $(2) $(call FILTER_UNPACK,noinst:% inst:%,$(3)) $(4)
+$(1): $(2) $(call FILTER_UNPACK,noinst:% inst:% libdeps:%,$(3)) $(4)
 	$(strip $(5) $(2) $(call UNPACK_LIB_REFS,$(3)) $(call GET_NOINST_RPATHS_FROM_LIB_REFS,$(3)) $(6) $(LDFLAGS_ARCH) $(LDFLAGS_LIBRARY_PATH)) -o $(1)
 endef
 
 # ARGS: qual_prog_name, objects, qual_expanded_target_libs, deps, link_cmd, ldflags
 define INST_PROG_RULE
 ifeq ($(filter noinst-rpath:%,$(3)),)
-$(1): $(2) $(call FILTER_UNPACK,noinst:% inst:%,$(3)) $(4)
+$(1): $(2) $(call FILTER_UNPACK,noinst:% inst:% libdeps:%,$(3)) $(4)
 	$(strip $(5) $(2) $(call UNPACK_LIB_REFS,$(3)) $(call GET_RPATHS_FROM_LIB_REFS,$(3)) $(6) $(LDFLAGS_ARCH) $(LDFLAGS_LIBRARY_PATH)) -o $(1)
 else
-$(1) $(1)-noinst: $(2) $(call FILTER_UNPACK,noinst:% inst:%,$(3)) $(4)
+$(1) $(1)-noinst: $(2) $(call FILTER_UNPACK,noinst:% inst:% libdeps:%,$(3)) $(4)
 	$(strip $(5) $(2) $(call UNPACK_LIB_REFS,$(3)) $(call GET_RPATHS_FROM_LIB_REFS,$(3)) $(6) $(LDFLAGS_ARCH) $(LDFLAGS_LIBRARY_PATH)) -o $(1)
 	$(strip $(5) $(2) $(call UNPACK_LIB_REFS,$(3)) $(call GET_NOINST_RPATHS_FROM_LIB_REFS,$(3)) $(6) $(LDFLAGS_ARCH) $(LDFLAGS_LIBRARY_PATH)) -o $(1)-noinst
 endif
@@ -1351,7 +1385,7 @@ $(foreach x,$(call GET_OBJECTS_FOR_TARGET,$(1),.o),$(call RECORD_TARGETS_FOR_OBJ
 endef
 
 $(foreach x,$(NOINST_PROGRAMS) $(TEST_PROGRAMS),$(eval $(call NOINST_PROG_RULES,$(x),$(call EXPAND_PROG_LIBS,$(x)),$(call GET_DEPS_FOR_TARGET,$(x)))))
-$(foreach x,$(REGULAR_PROGRAMS) $(DEV_PROGRAMS),$(eval $(call INST_PROG_RULES,$(x),$(call EXPAND_PROG_LIBS,$(x)),$(call GET_DEPS_FOR_TARGET,$(x)))))
+$(foreach x,$(INST_PROGRAMS) $(DEV_PROGRAMS),$(eval $(call INST_PROG_RULES,$(x),$(call EXPAND_PROG_LIBS,$(x)),$(call GET_DEPS_FOR_TARGET,$(x)))))
 
 
 
@@ -1386,7 +1420,7 @@ $(1): $(2) $(3)
 endef
 
 # ARGS: qual_lib_name, objects, qual_expanded_target_libs, extra_deps, link_cmd, ldflags, lib_version
-SHARED_LIBRARY_RULE_HELPER = $(call SHARED_LIBRARY_RULE,$(1),$(2) $(call FILTER_UNPACK,inst:%,$(3)) $(4),$(5) $(2) $(call UNPACK_LIB_REFS,$(3)) $(6) $(LDFLAGS_ARCH) $(LDFLAGS_LIBRARY_PATH),$(7))
+SHARED_LIBRARY_RULE_HELPER = $(call SHARED_LIBRARY_RULE,$(1),$(2) $(call FILTER_UNPACK,inst:% libdeps:%,$(3)) $(4),$(5) $(2) $(call UNPACK_LIB_REFS,$(3)) $(6) $(LDFLAGS_ARCH) $(LDFLAGS_LIBRARY_PATH),$(7))
 
 # ARGS: qual_lib_name, deps, cmd, version
 SHARED_LIBRARY_RULE = $(SHARED_LIBRARY_RULE_DEFAULT)
@@ -1432,13 +1466,10 @@ endef
 
 endif
 
-.PHONY: update-libdeps-files
-
-# ARGS: lib_name, libdeps
+# ARGS: lib_name, contents, deps
 define LIBDEPS_RULE
-$(1).libdeps: $(DEP_MAKEFILES)
-	echo $(2) >$(1).libdeps
-update-libdeps-files: $(1).libdeps
+$(1)$(LIB_SUFFIX_LIBDEPS): $(3) $(DEP_MAKEFILES)
+	echo $(2) >$(1)$(LIB_SUFFIX_LIBDEPS)
 endef
 
 # ARGS: unqual_lib_name, extra_deps
@@ -1446,7 +1477,7 @@ define NOINST_LIB_RULES
 $(call STATIC_LIBRARY_RULE,$(call GET_LIBRARY_NAME,$(1))$(SUFFIX_LIB_STATIC_OPTIM),$(call GET_OBJECTS_FOR_TARGET,$(1),$(SUFFIX_OBJ_STATIC_OPTIM)),$(3))
 $(call STATIC_LIBRARY_RULE,$(call GET_LIBRARY_NAME,$(1))$(SUFFIX_LIB_STATIC_DEBUG),$(call GET_OBJECTS_FOR_TARGET,$(1),$(SUFFIX_OBJ_STATIC_DEBUG)),$(3))
 $(call STATIC_LIBRARY_RULE,$(call GET_LIBRARY_NAME,$(1))$(SUFFIX_LIB_STATIC_COVER),$(call GET_OBJECTS_FOR_TARGET,$(1),$(SUFFIX_OBJ_STATIC_COVER)),$(3))
-$(call LIBDEPS_RULE,$(call GET_LIBRARY_NAME,$(1)),$(call MAKE_NOINST_LIB_LIBDEPS,$(1)))
+$(call LIBDEPS_RULE,$(call GET_LIBRARY_NAME,$(1)),$(call MAKE_NOINST_LIB_LIBDEPS,$(1)),$(foreach x,$($(call FOLD_TARGET,$(1))_LIBS),$(call GET_LIBRARY_NAME,$(x))$(LIB_SUFFIX_LIBDEPS)))
 $(foreach x,$(call GET_OBJECTS_FOR_TARGET,$(1),.o),$(call RECORD_TARGETS_FOR_OBJECT,$(x),$(1)))
 endef
 
@@ -1458,12 +1489,12 @@ $(call STATIC_LIBRARY_RULE,$(call GET_LIBRARY_NAME,$(1))$(SUFFIX_LIB_STATIC_COVE
 $(call SHARED_LIBRARY_RULE_HELPER,$(call GET_LIBRARY_NAME,$(1))$(SUFFIX_LIB_SHARED_OPTIM),$(call GET_OBJECTS_FOR_TARGET,$(1),$(SUFFIX_OBJ_SHARED_OPTIM)),$(call QUALIFY_LIB_REFS,$(2),_OPTIM),$(3),$(LD_LIB_OPTIM),$(call GET_LDFLAGS_FOR_TARGET,$(1),_OPTIM),$(call GET_VERSION_FOR_TARGET,$(1)))
 $(call SHARED_LIBRARY_RULE_HELPER,$(call GET_LIBRARY_NAME,$(1))$(SUFFIX_LIB_SHARED_DEBUG),$(call GET_OBJECTS_FOR_TARGET,$(1),$(SUFFIX_OBJ_SHARED_DEBUG)),$(call QUALIFY_LIB_REFS,$(2),_DEBUG),$(3),$(LD_LIB_DEBUG),$(call GET_LDFLAGS_FOR_TARGET,$(1),_DEBUG),$(call GET_VERSION_FOR_TARGET,$(1)))
 $(call SHARED_LIBRARY_RULE_HELPER,$(call GET_LIBRARY_NAME,$(1))$(SUFFIX_LIB_SHARED_COVER),$(call GET_OBJECTS_FOR_TARGET,$(1),$(SUFFIX_OBJ_SHARED_COVER)),$(call QUALIFY_LIB_REFS,$(2),_COVER),$(3),$(LD_LIB_COVER),$(call GET_LDFLAGS_FOR_TARGET,$(1),_COVER),$(call GET_VERSION_FOR_TARGET,$(1)))
-$(call LIBDEPS_RULE,$(call GET_LIBRARY_NAME,$(1)),$(call EXTRACT_INST_LIB_LIBDEPS,$(2)))
+$(call LIBDEPS_RULE,$(call GET_LIBRARY_NAME,$(1)),$(call EXTRACT_INST_LIB_LIBDEPS,$(2)),$(call FILTER_UNPACK,libdeps:%,$(2)))
 $(foreach x,$(call GET_OBJECTS_FOR_TARGET,$(1),.o),$(call RECORD_TARGETS_FOR_OBJECT,$(x),$(1)))
 endef
 
 $(foreach x,$(NOINST_LIBRARIES) $(TEST_LIBRARIES),$(eval $(call NOINST_LIB_RULES,$(x),$(call GET_DEPS_FOR_TARGET,$(x)))))
-$(foreach x,$(REGULAR_LIBRARIES),$(eval $(call INST_LIB_RULES,$(x),$(call EXPAND_INST_LIB_LIBS,$(x)),$(call GET_DEPS_FOR_TARGET,$(x)))))
+$(foreach x,$(INST_LIBRARIES),$(eval $(call INST_LIB_RULES,$(x),$(call EXPAND_INST_LIB_LIBS,$(x)),$(call GET_DEPS_FOR_TARGET,$(x)))))
 
 
 

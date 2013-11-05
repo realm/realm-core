@@ -70,7 +70,7 @@ GENERATED_SOURCES += table_macros.hpp
 endif
 
 
-include ../../generic.mk
+include ../generic.mk
 
 
 # Code generation
