@@ -135,24 +135,16 @@ CATEGORIES:
         DESCR  : &g_shared_group_constructor_return1_descr
                  A shared group.
       THROWS:
-      - EXCEPT : &cpp_permission_denied_except
-                 File::PermissionDenied
-        DESCR  : &g_permission_denied_descr
-                 >
-                 The user has insufficient permissions to perform the IO
-                 operation.
-      - EXCEPT : &cpp_not_found_except
-                 File::NotFound
-        DESCR  : &g_not_found_descr
-                 A part of the path was not found.
-      - EXCEPT : &cpp_invalid_database_except
-                 InvalidDatabase
-        DESCR  : &g_shared_group_invalid_database_descr
-                 The file does not appear to contain a valid TightDB database.
-      - EXCEPT : &cpp_access_error_except
-                 File::AccessError
-        DESCR  : &g_access_error_descr
-                 For some reason, we can't access the database.
+      - EXCEPT : File::AccessError
+        DESCR  : *g_group_constructor_memory_throws_descr
+      - EXCEPT : File::PermissionDenied
+        DESCR  : *g_group_exc_perm
+      - EXCEPT : File::NotFound
+        DESCR  : *g_group_exc_notfound
+      - EXCEPT : File::Exists
+        DESCR  : *g_group_exc_exists
+      - EXCEPT : InvalidDatabase
+        DESCR  : *g_group_exc_invalid_db
       - EXCEPT : &cpp_stale_lockfile_except
                  SharedGroup::PresumablyStaleLockFile
         DESCR  : &g_stale_lockfile_descr
@@ -286,12 +278,15 @@ CATEGORIES:
                  Durability Level (durability_Full or durability_MemOnly).
       THROWS:
       - EXCEPT : File::AccessError
-        DESCR  : &g_shared_group_open_throws_descr
-                 If the file could not be opened. If the reason
-                 corresponds to one of the exception types that are
-                 derived from File::AccessError, the derived exception
-                 type is thrown. Note that InvalidDatabase is among
-                 these derived exception types.
+        DESCR  : *g_group_constructor_memory_throws_descr
+      - EXCEPT : File::PermissionDenied
+        DESCR  : *g_group_exc_perm
+      - EXCEPT : File::NotFound
+        DESCR  : *g_group_exc_notfound
+      - EXCEPT : File::Exists
+        DESCR  : *g_group_exc_exists
+      - EXCEPT : InvalidDatabase
+        DESCR  : *g_group_exc_invalid_db
       - EXCEPT : *cpp_stale_lockfile_except
         DESCR  : *g_stale_lockfile_descr
       EXAMPLES:

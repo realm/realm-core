@@ -132,19 +132,23 @@ CATEGORIES  :
       - EXCEPT : File::AccessError
         DESCR  : &g_group_constructor_memory_throws_descr
                  Thrown if the file (or buffer) could not be opened. If the reason
-                 corresponds to one of the exception types that are
+                 corresponds to one of the following exception types which are
                  derived from File::AccessError, the derived exception
                  type is thrown. Note that InvalidDatabase is among
                  these derived exception types.
       - EXCEPT : File::PermissionDenied
-        DESCR  : Thrown if the user haven't got sufficient permissions
+        DESCR  : &g_group_exc_perm
+                 Thrown if the user haven't got sufficient permissions
                  to open the database file in the desired mode.
       - EXCEPT : File::NotFound
-        DESCR  : Thrown if the database file cannot be found.
+        DESCR  : &g_group_exc_notfound
+                 Thrown if the database file cannot be found.
       - EXCEPT : File::Exists
-        DESCR  : Thrown if create_Never was specified and the database file exists.
+        DESCR  : &g_group_exc_exists
+                 Thrown if create_Never was specified and the database file exists.
       - EXCEPT : InvalidDatabase
-        DESCR  : Thrown if the specified database file does not contain a valid database
+        DESCR  : &g_group_exc_invalid_db
+                 Thrown if the specified database file does not contain a valid database
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_constructor_plain
@@ -248,12 +252,15 @@ CATEGORIES  :
         DESCR  : *g_group_take_ownership_desc
       THROWS:
       - EXCEPT : File::AccessError
-        DESCR  : &g_group_open_memory_throws_descr
-                 If the file (or buffer) could not be opened. If the reason
-                 corresponds to one of the exception types that are
-                 derived from File::AccessError, the derived exception
-                 type is thrown. Note that InvalidDatabase is among
-                 these derived exception types.
+        DESCR  : *g_group_constructor_memory_throws_descr
+      - EXCEPT : File::PermissionDenied
+        DESCR  : *g_group_exc_perm
+      - EXCEPT : File::NotFound
+        DESCR  : *g_group_exc_notfound
+      - EXCEPT : File::Exists
+        DESCR  : *g_group_exc_exists
+      - EXCEPT : InvalidDatabase
+        DESCR  : *g_group_exc_invalid_db
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_open_file
