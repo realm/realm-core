@@ -10,8 +10,8 @@
 # Building installable programs and libraries
 # -------------------------------------------
 #
-# Here is an example of a complete Makefile that uses `generic.mk` to
-# build a program called `myprog` out of two source files called
+# Here is an example of a complete `Makefile` that uses `generic.mk`
+# to build a program called `myprog` out of two source files called
 # `foo.cpp` and `bar.cpp`:
 #
 #   bin_PROGRAMS = myprog
@@ -22,6 +22,11 @@
 # installed in the directory specified by the `bindir` variable which
 # is set to `/usr/local/bin` by default. This can be overridden by
 # setting `prefix`, `exec_prefix`, or `bindir`.
+#
+# Note: You can place `generic.mk` anywhere you like inside your
+# project, but you must always refer to it by a relative path, and if
+# you have multiple `Makefile`s in multiple directories, they must all
+# refer to the same `generic.mk`.
 #
 # Here is how to build a library:
 #
@@ -182,8 +187,9 @@
 #
 # In larger projects it is desirable to organize the source files into
 # multiple subdirectories. This can be done in two ways, using a
-# single Makefile or using multiple Makefiles. When using a single
-# Makefile, refer to the source files using relative paths as follows:
+# single `Makefile` or using multiple `Makefile`s. When using a single
+# `Makefile`, refer to the source files using relative paths as
+# follows:
 #
 #   EXTRA_CLEAN_DIRS = foo bar
 #   myprog_SOURCES = foo/alpha.cpp bar/beta.cpp
@@ -192,12 +198,12 @@
 # necessary and tells `generic.mk` to remove temporary files in those
 # directories during `make clean`.
 #
-# The alternative is to use multiple Makefiles. This requires one or
-# more subdirectories each one with an extra subordinate Makefile. The
-# top-level Makefile must then use the `SUBDIRS` variable to list each
-# of the involved subdirectories. When there is a dependency between
-# two subdirectories, the top-level Makefile must declare this. Here
-# is an example:
+# The alternative is to use multiple `Makefile`s. This requires one or
+# more subdirectories each one with an extra subordinate
+# `Makefile`. The top-level `Makefile` must then use the `SUBDIRS`
+# variable to list each of the involved subdirectories. When there is
+# a dependency between two subdirectories, the top-level `Makefile`
+# must declare this. Here is an example:
 #
 #   Makefile:
 #     SUBDIRS = foo bar
@@ -233,9 +239,6 @@
 #     util_a_SOURCES = ...
 #     include ../generic.mk
 #
-# FIXME: Mention `SOURCE_ROOT` for managing the hierarchical header
-# access and installation scheme.
-#
 # FIXME: Mention `PASSIVE_SUBDIRS` (such directories are cleaned but
 # not otherwise included during recursive `make` invocations).
 #
@@ -257,13 +260,13 @@
 #   foo_o_CFLAGS = -I/opt/parser-1.5/include
 #
 # Compiler and linker flags can be specified for all targets in a
-# directory (the directory containing the Makefile) as follows:
+# directory (the directory containing the `Makefile`) as follows:
 #
 #   DIR_CFLAGS = ...
 #   DIR_LDFLAGS = ...
 #
 # In a project that consists of multiple subprojects (each one in its
-# own subdirectory and with its own Makefile,) compiler and linker
+# own subdirectory and with its own `Makefile`,) compiler and linker
 # flags can be specified for all targets in the project by setting
 # `PROJECT_CFLAGS` and `PROJECT_LDFLAGS` in `config.mk`:
 #
@@ -359,12 +362,12 @@
 # CONFIG VARIABLES
 
 # Relative path to root of source tree. If specified, a corresponding
-# include option (-I) is added to the compiler command
+# include option (`-I`) is added to the compiler command
 # line. Specifying it, also permits installation of headers. Headers
 # will be installed under the same relative path as they have with
 # respect to the directory specified here. Headers are marked for
-# installation by adding them to the INST_HEADERS variable in the
-# local Makefile.
+# installation by adding them to the `INST_HEADERS` variable in the
+# local `Makefile`.
 SOURCE_ROOT =
 
 CFLAGS_OPTIM          = -DNDEBUG
@@ -683,15 +686,18 @@ CC_CXX_AND_LD_ARE_1 = $(and $(call MATCH_CMD,$(1),$(CC)),$(strip $(foreach x,$(1
 CC_CXX_AND_LD_ARE_GCC_LIKE = $(strip $(foreach x,$(GCC_LIKE_COMPILERS),$(call CC_CXX_AND_LD_ARE,$(x))))
 
 GENERIC_MK := $(lastword $(MAKEFILE_LIST))
-ROOT = $(patsubst %/,%,$(dir $(GENERIC_MK)))
-ABS_ROOT = $(abspath $(ROOT))
-CONFIG_MK = $(ROOT)/config.mk
+GENERIC_MK_ABS_DIR = $(abspath $(patsubst %/,%,$(dir $(GENERIC_MK))))
+CONFIG_MK = $(call MAKE_REL_PATH,$(GENERIC_MK_ABS_DIR)/config.mk)
 DEP_MAKEFILES = Makefile $(GENERIC_MK)
 ifneq ($(wildcard $(CONFIG_MK)),)
 DEP_MAKEFILES += $(CONFIG_MK)
 endif
 -include $(CONFIG_MK)
 
+ifneq ($(SOURCE_ROOT),)
+ABS_SOURCE_ROOT = $(abspath $(GENERIC_MK_ABS_DIR)/$(SOURCE_ROOT))
+REL_SOURCE_ROOT = $(call MAKE_REL_PATH,$(ABS_SOURCE_ROOT))
+endif
 
 
 # SETUP BUILD COMMANDS
@@ -781,8 +787,8 @@ GET_VERSION_FOR_TARGET_2 = $(if $(1),$(wordlist 1,3,$(subst :, ,$(1):0:0)))
 INC_FLAGS         = $(CFLAGS_INCLUDE)
 INC_FLAGS_ABS     = $(CFLAGS_INCLUDE)
 ifneq ($(SOURCE_ROOT),)
-INC_FLAGS        += -I$(ROOT)/$(SOURCE_ROOT)
-INC_FLAGS_ABS    += -I$(ABS_ROOT)/$(SOURCE_ROOT)
+INC_FLAGS        += -I$(REL_SOURCE_ROOT)
+INC_FLAGS_ABS    += -I$(ABS_SOURCE_ROOT)
 endif
 
 PRIMARY_PREFIXES = bin sbin lib libexec $(EXTRA_PRIMARY_PREFIXES)
@@ -1105,9 +1111,8 @@ ifneq ($(INST_HEADERS),)
 ifeq ($(SOURCE_ROOT),)
 $(warning Cannot install headers without a value for SOURCE_ROOT)
 else
-HEADER_REL_PATH = $(call PATH_DIFF,.,$(ROOT)/$(SOURCE_ROOT))
-SOURCE_ABS_ROOT = $(ABS_ROOT)/$(SOURCE_ROOT)
-INSIDE_SOURCE = $(call EQUALS,$(SOURCE_ABS_ROOT)$(call COND_PREPEND,/,$(HEADER_REL_PATH)),$(abspath .))
+HEADER_REL_PATH = $(call PATH_DIFF,.,$(ABS_SOURCE_ROOT))
+INSIDE_SOURCE = $(call EQUALS,$(ABS_SOURCE_ROOT)$(call COND_PREPEND,/,$(HEADER_REL_PATH)),$(abspath .))
 ifeq ($(INSIDE_SOURCE),)
 $(warning Cannot install headers outside SOURCE_ROOT)
 else

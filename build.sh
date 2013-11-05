@@ -1022,10 +1022,10 @@ EOF
                 cat >"$TEMP_DIR/transfer/include" <<EOF
 /README.*
 /build.sh
-/generic.mk
-/config.mk
 /config
 /Makefile
+/src/generic.mk
+/src/config.mk
 /src/Makefile
 /src/tightdb.hpp
 /src/tightdb/Makefile
@@ -1928,8 +1928,6 @@ EOF
         cat >"$TEMP_DIR/include" <<EOF
 /README.md
 /build.sh
-/generic.mk
-/config.mk
 /Makefile
 /src
 /test

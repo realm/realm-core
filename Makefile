@@ -1,7 +1,7 @@
 SUBDIRS = src test
 test_DEPS = src
 
-include generic.mk
+include src/generic.mk
 
 # Build and run the benchmarking programs
 .PHONY: benchmark
@@ -27,6 +27,16 @@ benchmark-insert-get-set: test-norun/subdir/src
 .PHONY: benchmark-prealloc
 benchmark-prealloc: test-norun/subdir/src
 	@$(MAKE) -C test benchmark-prealloc
+
+# Build the index benchmarking program
+.PHONY: benchmark-index
+benchmark-index: test-norun/subdir/src
+	@$(MAKE) -C test benchmark-index
+
+# Build the transaction benchmarking program
+.PHONY: benchmark-transaction
+benchmark-transaction: test-norun/subdir/src
+	@$(MAKE) -C test benchmark-transaction
 
 # Run coverage analysis after building everything, this time using LCOV
 .PHONY: lcov

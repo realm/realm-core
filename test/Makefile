@@ -1,12 +1,12 @@
 SUBDIRS = util
 PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl performance \
-benchmark-insert-add benchmark-insert-get-set benchmark-prealloc experiments
+benchmark-insert-add benchmark-insert-get-set benchmark-prealloc \
+benchmark-index benchmark-transaction experiments
 
 DIR_DEPS          = util
 test_tightdb_DEPS = util
 test_sqlite3_DEPS = util
 test_stl_DEPS     = util
-experiments_DEPS  = util
 
 TEST_PROGRAMS = tightdb-tests
 
@@ -25,7 +25,7 @@ tightdb_tests_LDFLAGS = -LUnitTest++ -lUnitTest++
 tightdb_tests_DEPS    = UnitTest++
 endif
 
-include ../generic.mk
+include ../src/generic.mk
 
 .PHONY: benchmark
 benchmark: test-norun/subdir/test-tightdb test-norun/subdir/test-sqlite3 test-norun/subdir/test-stl
@@ -62,6 +62,16 @@ benchmark-insert-get-set: test-norun/subdir/util
 .PHONY: benchmark-prealloc
 benchmark-prealloc: test-norun/subdir/util
 	@$(MAKE) -C benchmark-prealloc test
+
+# Build the index benchmark
+.PHONY: benchmark-index
+benchmark-index: test-norun/subdir/util
+	@$(MAKE) -C benchmark-index test-norun
+
+# Build the transaction benchmark
+.PHONY: benchmark-transaction
+benchmark-transaction: test-norun/subdir/util
+	@$(MAKE) -C benchmark-transaction test-norun
 
 # Build and run whatever is in experiements/testcase.cpp
 .PHONY: testcase testcase-debug
