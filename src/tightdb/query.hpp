@@ -210,9 +210,7 @@ public:
 
     TableRef& get_table() {return m_table;}
 
-#ifdef TIGHTDB_DEBUG
-    std::string Verify(); // Must be upper case to avoid conflict with macro in ObjC
-#endif
+    std::string validate();
    
     mutable bool do_delete;
 

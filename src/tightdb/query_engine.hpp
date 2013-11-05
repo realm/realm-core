@@ -474,14 +474,14 @@ public:
     }
 
 
-    virtual std::string Verify()
+    virtual std::string validate()
     {
         if (error_code != "")
             return error_code;
         if (m_child == 0)
             return "";
         else
-            return m_child->Verify();
+            return m_child->validate();
     }
 
     ParentNode* m_child;
@@ -1377,7 +1377,7 @@ public:
         return end;
     }
 
-    virtual std::string Verify()
+    virtual std::string validate()
     {
         if (error_code != "")
             return error_code;
@@ -1387,13 +1387,13 @@ public:
             return "Missing right-hand side of OR";
         std::string s;
         if (m_child != 0)
-            s = m_child->Verify();
+            s = m_child->validate();
         if (s != "")
             return s;
-        s = m_cond[0]->Verify();
+        s = m_cond[0]->validate();
         if (s != "")
             return s;
-        s = m_cond[1]->Verify();
+        s = m_cond[1]->validate();
         if (s != "")
             return s;
         return "";
