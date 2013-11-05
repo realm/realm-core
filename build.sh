@@ -1,12 +1,14 @@
 # NOTE: THIS SCRIPT IS SUPPOSED TO RUN IN A POSIX SHELL
 
 # Enable tracing if DEBUG is set
+if [ -e $HOME/.tightdb ]; then
+    . $HOME/.tightdb
+fi
 if [ -z "$DEBUG" ]; then
     set +x
 else
     set -x
 fi
-
 
 cd "$(dirname "$0")"
 TIGHTDB_HOME="$(pwd)"
@@ -830,6 +832,7 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
         done
         if [ \$(echo \$EXT | grep -c java) -eq 1 ]; then
             find \$HOME/tightdb_examples/java -name build.xml -exec sed -i -e 's/value="\.\.\/\.\.\/lib"/value="\/usr\/local\/share\/java"/' \{\} \\;
+            find \$HOME/tightdb_examples/java -name build.xml -exec sed -i -e 's/"jnipath" value=".*" \/>"jnipath" value="\/Library\/Java\/Extensions" \/>/' \{\} \\;
         fi
 
         echo "Examples can be found in \$HOME/tightdb_examples."
