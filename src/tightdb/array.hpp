@@ -2061,7 +2061,7 @@ bool Array::find_action(size_t index, int64_t value, QueryState<int64_t>* state,
     if (action == act_CallbackIdx)
         return callback(index);
     else
-       return state->match<action, false>(index, 0, value);
+        return state->match<action, false>(index, 0, value);
 }
 template<Action action, class Callback>
 bool Array::find_action_pattern(size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const
