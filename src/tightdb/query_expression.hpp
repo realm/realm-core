@@ -19,8 +19,6 @@
  **************************************************************************/
 
 /*
-Todo: describe strings
-
 This file lets you write queries in C++ syntax like: Expression* e = (first + 1 / second >= third + 12.3);
 
 Type conversion/promotion semantics is the same as in the C++ expressions, e.g float + int > double == float + 
@@ -34,6 +32,7 @@ Grammar:
     Subexpr2<T>:        Value<T>
                         Columns<T>
                         Subexpr2<T>  Operator<Oper<T>  Subexpr2<T>
+                        power(Subexpr2<T>) // power(x) = x * x, as example of unary operator
               
     Value<T>:           T
 
@@ -41,7 +40,7 @@ Grammar:
               
     Compare<Cond, T>:   ==, !=, >=, <=, >, <
 
-    T:                  int, int64_t, float, double
+    T:                  bool, int, int64_t, float, double, StringData
 
 
 Class diagram
@@ -57,26 +56,39 @@ Compare: public Subexpr2
     Subexpr2& m_right;                              // right expression subtree
 
 Operator: public Subexpr2
+    void evaluate(size_t i, ValueBase* destination)
     bool m_auto_delete
     Subexpr2& m_left;                               // left expression subtree 
     Subexpr2& m_right;                              // right expression subtree
 
 Value<T>: public Subexpr2
+    void evaluate(size_t i, ValueBase* destination)
     T m_v[8];
 
 Columns<T>: public Subexpr2
+    void evaluate(size_t i, ValueBase* destination)
     SequentialGetter<T> sg;                         // class bound to a column, lets you read values in a fast way
     Table* m_table;
 
 class ColumnAccessor<>: public Columns<double>
 
 
-Flow chart:
+Call diagram:
 -----------------------------------------------------------------------------------------------------------------------
-Compare, Operator, Value and Columns have an evaluate() method which returns a Value<T> representing the value for 
-table row i. 
+Example of 'table.first > 34.6 + table.second':
 
-Value<T> actually contains 8 concecutive values and all operations are based on these chunks. This is
+size_t Compare<Greater>::find_first()-------------+
+         |                                        |
+         |                                        | 
+         |                                        |
+         +--> Columns<float>::evaluate()          +--------> Operator<Plus>::evaluate()
+                                                                |               |
+                                               Value<float>::evaluate()    Columns<float>::evaluate()
+            
+Operator, Value and Columns have an evaluate(size_t i, ValueBase* destination) method which returns a Value<T> 
+containing 8 values representing table rows i...i + 7. 
+
+So Value<T> contains 8 concecutive values and all operations are based on these chunks. This is
 to save overhead by virtual calls needed for evaluating a query that has been dynamically constructed at runtime.
 
 
@@ -92,7 +104,6 @@ by query system.
 Caveats, notes and todos
 -----------------------------------------------------------------------------------------------------------------------
     * Perhaps disallow columns from two different tables in same expression
-    * Support unary operators like power and sqrt
     * The name Columns (with s) an be confusing because we also have Column (without s)
     * Memory allocation: Maybe clone Compare and Operator to get rid of m_auto_delete. However, this might become
       bloated, with non-trivial copy constructors instead of defaults
@@ -111,13 +122,13 @@ Caveats, notes and todos
 
 // namespace tightdb {
 
-    // FIXME, this needs to exist elsewhere
-    typedef int64_t             Int;
-    typedef bool                Bool;
-    typedef tightdb::DateTime   DateTime;
-    typedef float               Float;
-    typedef double              Double;
-    typedef tightdb::StringData String;
+// FIXME, this needs to exist elsewhere
+typedef int64_t             Int;
+typedef bool                Bool;
+typedef tightdb::DateTime   DateTime;
+typedef float               Float;
+typedef double              Double;
+typedef tightdb::StringData String;
 
 
 template<class T>struct Plus { 
@@ -140,7 +151,7 @@ template<class T>struct Mul {
     typedef T type;
 };
 
-// Unary not supported yet
+// Unary operator
 template<class T>struct Pow { 
     T operator()(T v) const {return v * v;} 
     typedef T type;
@@ -173,7 +184,6 @@ public:
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_table(const Table* table) = 0;
     virtual ~Expression() {}
-
 };
 
 class ValueBase 
@@ -216,6 +226,7 @@ template <class T> class Columns;
 template <class T> class Value;
 template <class T> class Subexpr2;
 template <class oper, class TLeft = Subexpr, class TRight = Subexpr> class Operator;
+template <class oper, class TLeft = Subexpr> class UnaryOperator;
 template <class TCond, class T, class TLeft = Subexpr, class TRight = Subexpr> class Compare;
 
 // Stores 8 values of type T. Can also exchange data with other ValueBase of different types
@@ -236,6 +247,12 @@ public:
         TOperator o;
         for(size_t t = 0; t < ValueBase::elements; t++)
             m_v[t] = o(left->m_v[t], right->m_v[t]);
+    }
+
+    template <class TOperator> TIGHTDB_FORCEINLINE void fun(const Value* value) {
+        TOperator o;
+        for(size_t t = 0; t < ValueBase::elements; t++)
+            m_v[t] = o(value->m_v[t]);
     }
 
     // Below import and export methods are for type conversion between float, double, int64_t, etc.
@@ -327,6 +344,8 @@ template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>&
     // Purpose of below code is to intercept the creation of a condition and test if it's supported by the old
     // query_engine.hpp which is faster. If it's supported, create a query_engine.hpp node, otherwise create a 
     // query_expression.hpp node.
+    //
+    // This method intercepts only Value <cond> Subexpr2. Interception of Subexpr2 <cond> Subexpr is elsewhere. 
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
     if(column && (std::numeric_limits<L>::is_integer) && (std::numeric_limits<R>::is_integer)) {
         const Table* t = (const_cast<Columns<R>*>(column))->get_table();
@@ -349,14 +368,14 @@ template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>&
             // fallback to using use 'return *new Compare<>' instead.
             TIGHTDB_ASSERT(false); 
         }
+        // Return query_engine.hpp node
         return q;
     }
     else {
+        // Return query_expression.hpp node
         return *new Compare<Cond, typename Common<R, float>::type>(*new Value<L>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
 }
-
-
 
 
 // All overloads where left-hand-side is Subexpr2<L>:
@@ -418,13 +437,15 @@ public:
         return create<R, NotEqual, L>(right, static_cast<Subexpr2<L>&>(*this));
     }
 
-
     // Purpose of this method is to intercept the creation of a condition and test if it's supported by the old
     // query_engine.hpp which is faster. If it's supported, create a query_engine.hpp node, otherwise create a 
     // query_expression.hpp node.
+    //
+    // This method intercepts Subexpr2 <cond> Subexpr2 only. Value <cond> Subexpr2 is intercepted elsewhere.
     template <class Cond> Query create2 (const Subexpr2<R>& right) 
     {
-        const Columns<R>* left_col = dynamic_cast<const Columns<R>*>(      static_cast<Subexpr2<L>*>(this)    );
+        // Test if expressions are of type Columns. Other possibilities are Value and Operator. 
+        const Columns<R>* left_col = dynamic_cast<const Columns<R>*>(static_cast<Subexpr2<L>*>(this));
         const Columns<R>* right_col = dynamic_cast<const Columns<R>*>(&right);
 
         // query_engine supports 'T-column <op> <T-column>' for T = {int64_t, float, double}, op = {<, >, ==, !=, <=, >=}
@@ -486,11 +507,13 @@ public:
             else {
                 TIGHTDB_ASSERT(false); 
             }
-
+            // Return query_engine.hpp node
             return q;
         }
         else {
-            return *new Compare<Cond, typename Common<R, float>::type>(static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
+            // Return query_expression.hpp node
+            return *new Compare<Cond, typename Common<R, float>::type>
+                        (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
         }
     }
 
@@ -515,7 +538,8 @@ public:
     }
 };
 
-// With this wrapper class we can define just 20 overloads inside Overloads<L, R> instead of 4 * 20 = 80.
+// With this wrapper class we can define just 20 overloads inside Overloads<L, R> instead of 4 * 20 = 80. Todo: We can 
+// consider if it's simpler/better to remove this class completely and just list all 80 overloads manually anyway.
 template <class T> class Subexpr2 : public Subexpr, public Overloads<T, const char*>, public Overloads<T, int>, public
                                     Overloads<T, float>, public Overloads<T, double>, public Overloads<T, int64_t> 
 {
@@ -534,9 +558,6 @@ public:
 // L                    +, -, *, /, <, >, ==, !=, <=, >=      Subexpr2<R>
 // 
 // For L = R = {int, int64_t, float, double}:
-
-
-
 // Compare numeric values
 template <class R> Query operator > (double left, const Subexpr2<R>& right) {
     return create<double, Greater, R>(left, right);
@@ -661,7 +682,13 @@ template <class R> Operator<Div<typename Common<R, int64_t>::type> >& operator /
     return *new Operator<Div<typename Common<R, int64_t>::type> >(*new Value<int64_t>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
 }
 
+// Unary operators
+template <class T> UnaryOperator<Pow<T> >& power (Subexpr2<T>& left) { 
+    return *new UnaryOperator<Pow<T> >(left.clone(), true);
+}
 
+
+// Handling of String columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
 template <> class Columns<StringData> : public Subexpr
 {
 public:
@@ -701,15 +728,17 @@ public:
     size_t m_column;
 };
 
-
+// String == Columns<String>
 template <class T> Query operator == (T left, const Columns<StringData>& right) {
     return operator==(right, left);
 }
 
+// String != Columns<String>
 template <class T> Query operator != (T left, const Columns<StringData>& right) {
     return operator!=(right, left);
 }
 
+// Columns<String> == String
 template <class T> Query operator == (const Columns<StringData>& left, T right) {
     const Table* t = const_cast<Columns<StringData>*>(&left)->get_table();
     Query q = Query(*t);
@@ -717,6 +746,7 @@ template <class T> Query operator == (const Columns<StringData>& left, T right) 
     return q;
 }
 
+// Columns<String> != String
 template <class T> Query operator != (const Columns<StringData>& left, T right) {
     const Table* t = const_cast<Columns<StringData>*>(&left)->get_table();
     Query q = Query(*t);
@@ -736,10 +766,7 @@ public:
 
     explicit Columns() : m_table(NULL), sg(NULL) { }
 
-    explicit Columns(size_t column) : m_table(NULL), sg(NULL)
-    {
-        m_column = column;
-    }
+    explicit Columns(size_t column) : m_table(NULL), m_column(column), sg(NULL) { }
 
     ~Columns()
     {
@@ -773,6 +800,7 @@ public:
         return m_table;
     }
 
+    // Load 8 elements from Column into destination
     void evaluate(size_t index, ValueBase& destination) {  
         Value<T> v;          
         sg->cache_next(index);
@@ -796,6 +824,47 @@ public:
     size_t m_column;
 private:
     SequentialGetter<T>* sg;
+};
+
+
+template <class oper, class TLeft> class UnaryOperator : public Subexpr2<typename oper::type>
+{
+public:
+    UnaryOperator(TLeft& left, bool auto_delete = false) : m_auto_delete(auto_delete), m_left(left) {}
+
+    ~UnaryOperator() 
+    {   
+        if(m_auto_delete)
+            delete &m_left;
+    }
+
+    // Recursively set table pointers for all Columns object in the expression tree. Used for late binding of table
+    void set_table(const Table* table)
+    {
+        m_left.set_table(table);
+    }
+
+    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression and 
+    // binds it to a Query at a later time
+    virtual const Table* get_table()
+    {
+        const Table* l = m_left.get_table();
+        return l;
+    }
+
+    // destination = operator(left)
+    void evaluate(size_t index, ValueBase& destination) {
+        Value<T> result;
+        Value<T> left;
+        m_left.evaluate(index, left);
+        result.template fun<oper>(&left);
+        destination.import(result);
+    }
+
+private:
+    typedef typename oper::type T;
+    bool m_auto_delete;
+    TLeft& m_left;
 };
 
 
@@ -827,37 +896,22 @@ public:
     {
         const Table* l = m_left.get_table();
         const Table* r = m_right.get_table();
+
+        // Queries do not support multiple different tables; all tables must be the same. 
+        TIGHTDB_ASSERT(l == NULL || r == NULL || l == r);
+
+        // NULL pointer means expression which isn't yet associated with any table, or is a Value<T>
         return l ? l : r;
     }
 
+    // destination = operator(left, right)
     void evaluate(size_t index, ValueBase& destination) {
         Value<T> result;
         Value<T> left;
         Value<T> right;
-/*
-        // Optimize for Constant <operator> Column and Column <operator> Constant cases
-        if(SameType<TLeft, Value<T> >::value && SameType<TRight, Columns<T> >::value) {
-            m_right->evaluate(i, &right);
-            result.template fun<oper>(static_cast<Value<T>*>(static_cast<Subexpr*>(m_left)), &right);
-        }
-        else if(SameType<TRight, Value<T> >::value && SameType<TLeft, Columns<T> >::value) {
-            m_left->evaluate(i, &left);
-            result.template fun<oper>(static_cast<Value<T>*>(static_cast<Subexpr*>(m_right)), &left);
-        }
-        else {
-            // Avoid vtable lookups. Qualifying is required even with 'final' keyword in C++11 (664 ms vs 734)
-            if(!SameType<TLeft, Subexpr>::value)
-                m_left->TLeft::evaluate(i, &left);
-            else */
-                m_left.evaluate(index, left);
-    /*
-            if(!SameType<TRight, Subexpr>::value)
-                m_right->TRight::evaluate(i, &right);
-            else*/
-                m_right.evaluate(index, right);
-
-            result.template fun<oper>(&left, &right);
-//        }
+        m_left.evaluate(index, left);
+        m_right.evaluate(index, right);
+        result.template fun<oper>(&left, &right);
         destination.import(result);
     }
 
@@ -907,6 +961,11 @@ public:
     {
         const Table* l = m_left.get_table();
         const Table* r = m_right.get_table();
+
+        // Queries do not support multiple different tables; all tables must be the same. 
+        TIGHTDB_ASSERT(l == NULL || r == NULL || l == r);
+
+        // NULL pointer means expression which isn't yet associated with any table, or is a Value<T>
         return l ? l : r;
     }
 
@@ -916,32 +975,9 @@ public:
         Value<T> left;
 
         for(; start < end; start += ValueBase::elements) {
-
-/*
-            // Save time by avoid calling evaluate() for constants of the same type as compare object
-            if(SameType<TLeft, Value<T> >::value) {
-                m_right->evaluate(start, &right);
-                match = Value<T>::template compare<TCond>(static_cast<Value<T>*>(static_cast<Subexpr*>(m_left)), &right); 
-            }
-            else if(SameType<TRight, Value<T> >::value) {
-                m_left->evaluate(start, &left);
-                match = Value<T>::template compare<TCond>(&left, static_cast<Value<T>*>(static_cast<Subexpr*>(m_right))); 
-            }
-            else {
-                // General case. Again avoid vtable lookup when possible
-                if(!SameType<TLeft, Subexpr>::value)               
-                    static_cast<TLeft*>(m_left).TLeft::evaluate(start, &left);
-                else */
-                    m_left.evaluate(start, left);
-                /*
-                if(!SameType<TRight, Subexpr>::value)               
-                    m_right.TRight::evaluate(start, &right);
-                else
-                    */
-                    m_right.evaluate(start, right);
-
-                match = Value<T>::template compare<TCond>(&left, &right);
- //           }
+            m_left.evaluate(start, left);
+            m_right.evaluate(start, right);
+            match = Value<T>::template compare<TCond>(&left, &right);
 
             // Note the second condition that tests if match position in chunk exceeds column length
             if(match != ValueBase::elements && start + match < end)
