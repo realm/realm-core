@@ -486,6 +486,10 @@ CATEGORIES  :
                  derived from File::AccessError, the derived exception
                  type is thrown. In particular, File::Exists will be
                  thrown if the file exists already.
+      - EXCEPT : File::PermissionDenied
+        DESCR  : *g_group_exc_perm
+      - EXCEPT : File::Exists
+        DESCR  : *g_group_exc_exists
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_write_to_file
