@@ -20,7 +20,8 @@ enum Func {
     func_ShowExecPrefix,
     func_ShowIncludedir,
     func_ShowBindir,
-    func_ShowLibdir
+    func_ShowLibdir,
+    func_ShowLibexecdir
 };
 
 bool emit_cflags  = false;
@@ -155,6 +156,11 @@ int main(int argc, char* argv[])
                 clear_emit_flags();
                 continue;
             }
+            if (strcmp(arg, "--libexecdir") == 0) {
+                func = func_ShowLibexecdir;
+                clear_emit_flags();
+                continue;
+            }
             error = true;
             break;
         }
@@ -167,14 +173,17 @@ int main(int argc, char* argv[])
             string msg =
                 "Synopsis: "+string(prog)+"\n\n"
                 "Options:\n"
-                "  --version     Show the version of TightDB that this command was installed as part of\n"
+                "  --version     Show the version of TightDB that this command was installed\n"
+                "                as part of\n"
                 "  --cflags      Output all pre-processor and compiler flags\n"
                 "  --libs        Output all linker flags\n"
                 "  --prefix      Show the TightDB installation prefix\n"
                 "  --exec-prefix Show the TightDB installation prefix for executables\n"
-                "  --includedir  Show the directory containing the TightDB header files\n"
-                "  --bindir      Show the directory containing the TightDB executables\n"
-                "  --libdir      Show the directory containing the TightDB libraries\n";
+                "  --includedir  Show the directory holding the TightDB header files\n"
+                "  --bindir      Show the directory holding the TightDB executables\n"
+                "  --libdir      Show the directory holding the TightDB libraries\n"
+                "  --libexecdir  Show the directory holding the TightDB executables to be run\n"
+                "                by programs rather than by users\n";
             if (error) {
                 cerr << "ERROR: Bad command line.\n\n" << msg;
                 return 1;
@@ -206,6 +215,9 @@ int main(int argc, char* argv[])
             break;
         case func_ShowLibdir:
             cout << TIGHTDB_INSTALL_LIBDIR "\n";
+            break;
+        case func_ShowLibexecdir:
+            cout << TIGHTDB_INSTALL_LIBEXECDIR "\n";
             break;
     }
 }

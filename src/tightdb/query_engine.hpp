@@ -466,7 +466,7 @@ public:
                     av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
                 }
                 TIGHTDB_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != NULL);
-                bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av), CallbackDummy());
+                bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av));
                 if(!cont)
                     return static_cast<size_t>(-1);
              }
@@ -474,14 +474,14 @@ public:
     }
 
 
-    virtual std::string Verify()
+    virtual std::string validate()
     {
         if (error_code != "")
             return error_code;
         if (m_child == 0)
             return "";
         else
-            return m_child->Verify();
+            return m_child->validate();
     }
 
     ParentNode* m_child;
@@ -620,17 +620,6 @@ public:
     }
     ~IntegerNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
-    // Only purpose of this function is to let you quickly create a IntegerNode object and call aggregate_local() on it to aggregate
-    // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
-    // be merged with Init somehow to simplify
-    void QuickInit(Column *column, int64_t value)
-    {
-        m_condition_column = column;
-        m_leaf_end = 0;
-        m_value = value;
-        m_conds = 0;
-    }
-
     void init(const Table& table)
     {
         m_dD = 100.0;
@@ -643,6 +632,7 @@ public:
 
     // This function is called from Array::find() for each search result if TAction == act_CallbackIdx
     // in the IntegerNode::aggregate_local() call. Used if aggregate source column is different from search criteria column
+    // Return value: false means that the query-state (which consumes matches) has signalled to stop searching, perhaps
     template <Action TAction, class TSourceColumn> bool match_callback(int64_t v)
     {
         size_t i = to_size_t(v);
@@ -658,16 +648,16 @@ public:
             m_children[c]->m_probes++;
             size_t m = m_children[c]->find_first_local(i, i + 1);
             if (m != i)
-                return true; //(m_local_matches != m_local_limit);
+                return true;
         }
 
         bool b;
         if (state->template uses_val<TAction>())    { // Compiler cannot see that Column::Get has no side effect and result is discarded
             TSourceColumn av = source_column->get_next(i);
-            b = state->template match<TAction, false>(i, 0, av, CallbackDummy());
+            b = state->template match<TAction, false>(i, 0, av);
         }
         else {
-            b = state->template match<TAction, false>(i, 0, TSourceColumn(0), CallbackDummy());
+            b = state->template match<TAction, false>(i, 0, TSourceColumn(0));
         }
 
         return b;
@@ -728,9 +718,9 @@ public:
         typedef typename ColumnTypeTraitsSum<TSourceColumn, TAction>::sum_type QueryStateType;
         TIGHTDB_ASSERT(source_column == NULL || dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != NULL);
         TIGHTDB_ASSERT(dynamic_cast<QueryState<QueryStateType>*>(st) != NULL);
+        TIGHTDB_ASSERT(m_conds > 0);
 
-        TConditionFunction f;
-        int c = f.condition();
+        int c = TConditionFunction::condition;
         m_local_matches = 0;
         m_local_limit = local_limit;
         m_last_local_match = start - 1;
@@ -751,18 +741,21 @@ public:
             else
                 end2 = end - m_leaf_start;
 
-            if (m_conds <= 1 && (source_column == NULL ||
+            // If there are no other nodes than us (m_conds == 1) AND the column used for our condition is
+            // the same as the column used for the aggregate action, then the entire query can run within scope of that 
+            // column only, with no references to other columns:
+            if (m_conds == 1 && (source_column == NULL ||
                 (SameType<TSourceColumn, int64_t>::value
                  && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))) {
                 bool cont = m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
                 if(!cont)
                     return static_cast<size_t>(-1);
             }
+            // Else, for each match in this node, call our IntegerNode::match_callback to test remaining nodes and/or extract
+            // aggregate payload from aggregate column:
             else {
-                QueryState<int64_t> jumpstate; // todo optimize by moving outside for loop
-                jumpstate.init(act_CallbackIdx, NULL, size_t(-1));
                 m_source_column = source_column;
-                bool cont = m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, &jumpstate,
+                bool cont = m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, NULL,
                              std::bind1st(std::mem_fun(&IntegerNode::template match_callback<TAction, TSourceColumn>), this));
                 if(!cont)
                     return static_cast<size_t>(-1);
@@ -773,8 +766,6 @@ public:
 
             s = end2 + m_leaf_start;
         }
-
-
 
         if (matchcount)
             *matchcount = int64_t(static_cast< QueryState<QueryStateType>* >(st)->m_match_count);
@@ -998,17 +989,6 @@ public:
         m_dT = 1.0;
     }
     ~BasicNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
-
-    // Only purpose of this function is to let you quickly create a IntegerNode object and call aggregate_local() on it to aggregate
-    // on a single stand-alone column, with 1 or 0 search criterias, without involving any tables, etc. Todo, could
-    // be merged with Init somehow to simplify
-    void QuickInit(BasicColumn<TConditionValue> *column, TConditionValue value)
-    {
-        m_condition_column.m_column = (ColType*)column;
-        m_condition_column.m_leaf_end = 0;
-        m_value = value;
-        m_conds = 0;
-    }
 
     void init(const Table& table)
     {
@@ -1397,7 +1377,7 @@ public:
         return end;
     }
 
-    virtual std::string Verify()
+    virtual std::string validate()
     {
         if (error_code != "")
             return error_code;
@@ -1407,13 +1387,13 @@ public:
             return "Missing right-hand side of OR";
         std::string s;
         if (m_child != 0)
-            s = m_child->Verify();
+            s = m_child->validate();
         if (s != "")
             return s;
-        s = m_cond[0]->Verify();
+        s = m_cond[0]->validate();
         if (s != "")
             return s;
-        s = m_cond[1]->Verify();
+        s = m_cond[1]->validate();
         if (s != "")
             return s;
         return "";

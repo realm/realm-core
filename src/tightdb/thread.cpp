@@ -42,7 +42,7 @@ using namespace tightdb;
 // http://www.network-theory.co.uk/docs/valgrind/valgrind_20.html under --run-libc-freeres=<yes|no>. 
 // This can give false positives because of missing suppression, etc (not real leaks!). It's also a problem 
 // on Windows, so we have written our own clean-up method for the Windows port.
-#ifdef _WIN32 && defined(TIGHTDB_DEBUG)
+#if defined(_WIN32) && defined(TIGHTDB_DEBUG)
 void free_threadpool();
 
 class Initialization 

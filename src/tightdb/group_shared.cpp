@@ -157,9 +157,9 @@ void spawn_daemon(const string& file)
         const char* exe = getenv("TIGHTDBD_PATH");
         if (!exe) {
 #ifndef TIGTHDB_DEBUG
-            exe = TIGHTDB_INSTALL_BINDIR "/tightdbd";
+            exe = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd";
 #else
-            exe = TIGHTDB_INSTALL_BINDIR "/tightdbd-dbg";
+            exe = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd-dbg";
 #endif
         }
         execl(exe, exe, file.c_str(), 0);

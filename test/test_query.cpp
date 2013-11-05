@@ -3554,40 +3554,28 @@ TEST(TestQuerySyntaxCheck)
     ttt.add(3, "X");
 
     TupleTableType::Query q1 = ttt.where().first.equal(2).end_group();
-#ifdef TIGHTDB_DEBUG
-    s = q1.Verify();
+    s = q1.validate();
     CHECK(s != "");
-#endif
 
     TupleTableType::Query q2 = ttt.where().group().group().first.equal(2).end_group();
-#ifdef TIGHTDB_DEBUG
-    s = q2.Verify();
+    s = q2.validate();
     CHECK(s != "");
-#endif
 
     TupleTableType::Query q3 = ttt.where().first.equal(2).Or();
-#ifdef TIGHTDB_DEBUG
-    s = q3.Verify();
+    s = q3.validate();
     CHECK(s != "");
-#endif
 
     TupleTableType::Query q4 = ttt.where().Or().first.equal(2);
-#ifdef TIGHTDB_DEBUG
-    s = q4.Verify();
+    s = q4.validate();
     CHECK(s != "");
-#endif
 
     TupleTableType::Query q5 = ttt.where().first.equal(2);
-#ifdef TIGHTDB_DEBUG
-    s = q5.Verify();
+    s = q5.validate();
     CHECK(s == "");
-#endif
 
     TupleTableType::Query q6 = ttt.where().group().first.equal(2);
-#ifdef TIGHTDB_DEBUG
-    s = q6.Verify();
+    s = q6.validate();
     CHECK(s != "");
-#endif
 
 // FIXME: Work is currently underway to fully support locale
 // indenepdent case folding as defined by Unicode. Reenable this test
