@@ -1,3 +1,4 @@
 *.d
 *.o
 *-dbg
+*.tightdb
