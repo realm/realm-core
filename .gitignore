@@ -66,3 +66,9 @@ debian/libtightdb-dev/*
 debian/libtightdb-dev.substvars
 debian/libtightdb.substvars
 debian/tightdb.substvars
+
+src/tightdb/objc/include/*
+
+src/objc/include/tightdb.hpp
+
+src/tightdb/objc/lib/*
