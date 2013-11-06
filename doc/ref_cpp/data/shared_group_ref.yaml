@@ -98,10 +98,10 @@ CATEGORIES:
                  groups can only be created with asynchronous durability level.
 
                  In case of abnormal termination or a machine crash, the lock file
-                 may be left in an inconsistent state. Shared group tries to detect
+                 may be left in an inconsistent state. SharedGroup tries to detect
                  and remedy this problem when it is opened, but it is not possible
-                 to safely handle all scenarios. If safety cannot be ensured, shared
-                 group will give up and throw a PresumablyStaleLockFile exception. 
+                 to safely handle all scenarios. If safety cannot be ensured, 
+                 SharedGroup will give up and throw a PresumablyStaleLockFile exception. 
                  In this case, the stale lock file must be removed manually. In all
                  cases the database file itself will be in a consistent state, even though
                  updates still pending at the time of crash will be lost.
@@ -150,6 +150,12 @@ CATEGORIES:
         DESCR  : &g_stale_lockfile_descr
                  A lock file exist, but it cannot be decided whether it is safe to use it or not.
                  Verify that the lock file is not in use, then delete it and try again.
+      - EXCEPT : &cpp_lockfile_but_no_data_except
+                 SharedGroup::LockFileButNoData
+        DESCR  : &g_lockfile_but_no_data_descr
+                 An active sharing scheme has been established with at least one other SharedGroup,
+                 but for some reason the database file does not exist. It would be unsafe to create
+                 a new database in this situation, so an exception is thrown instead.
       - EXCEPT : &cpp_runtime_error_except
                  std::runtime_error
         DESCR  : &g_runtime_error_descr
@@ -358,6 +364,8 @@ CATEGORIES:
         DESCR  : *g_group_exc_invalid_db
       - EXCEPT : *cpp_stale_lockfile_except
         DESCR  : *g_stale_lockfile_descr
+      - EXCEPT : *cpp_lockfile_but_no_data_except
+        DESCR  : *g_lockfile_but_no_data_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_shared_group_open
