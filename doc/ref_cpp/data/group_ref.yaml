@@ -492,7 +492,7 @@ CATEGORIES  :
         DESCR  : *g_group_exc_exists
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_group_write_to_file
+        CODE   : ex_cpp_group_open_file
 
   - g_group_write_to_mem:
       NAME     : write_to_mem
