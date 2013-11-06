@@ -76,7 +76,7 @@ include ../generic.mk
 # Code generation
 
 ifneq ($(TIGHTDB_HAVE_CONFIG),)
-build_config.h: ../../config config.sh
+build_config.h: ../config-dyn.mk config.sh
 	$(SHELL) config.sh $< $@
 endif
 

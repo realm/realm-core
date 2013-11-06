@@ -824,7 +824,7 @@ TEST(QueryExpressions0)
     We have following variables to vary in the tests:
 
     left        right
-    +           -           *           /
+    +           -           *           /          pow
     Subexpr    Column       Value    
     >           <           ==          !=          >=          <=
     float       int         double      int64_t
@@ -852,6 +852,10 @@ TEST(QueryExpressions0)
     table.set_float(1, 1, 20.1f);
     table.set_double(2, 1, 4.0);
    
+    /**
+    Conversion / promotion
+    **/
+
     // 20 must convert to float    
     match = (second + 0.2f > 20).find();
     CHECK(match == 0);
@@ -878,6 +882,10 @@ TEST(QueryExpressions0)
     // 20 must convert to float
     match = (0.2f + second > 20).find();
     CHECK(match == 0);
+
+    /**
+    Permutations of types (Subexpr, Value, Column) of left/right side
+    **/
 
     // Compare, left = Subexpr, right = Value
     match = (second + first >= 40).find();
@@ -1007,9 +1015,22 @@ TEST(QueryExpressions0)
     match = (1 / third == 1 / third).find();
     CHECK(match == 0);
 
-    // Compare operator must preserve precision of each side, hence no match
+    // Nifty test: Compare operator must preserve precision of each side, hence NO match; if double accidentially
+    // was truncated to float, or float was rounded to nearest double, then this test would fail.
     match = (1 / second == 1 / third).find();
     CHECK(match == not_found);
+
+    // power operator (power(x) = x^2)
+    match = (power(first) == 400).find();
+    CHECK_EQUAL(0, match);
+
+    match = (power(first) == 401).find();
+    CHECK_EQUAL(not_found, match);
+
+    // power of floats. Using a range check because of float arithmetic imprecisions
+    match = (power(second) < 9.001 && power(second) > 8.999).find();
+    CHECK_EQUAL(0, match);
+
 }
 
 TEST(LimitUntyped2)
@@ -3533,40 +3554,28 @@ TEST(TestQuerySyntaxCheck)
     ttt.add(3, "X");
 
     TupleTableType::Query q1 = ttt.where().first.equal(2).end_group();
-#ifdef TIGHTDB_DEBUG
-    s = q1.Verify();
+    s = q1.validate();
     CHECK(s != "");
-#endif
 
     TupleTableType::Query q2 = ttt.where().group().group().first.equal(2).end_group();
-#ifdef TIGHTDB_DEBUG
-    s = q2.Verify();
+    s = q2.validate();
     CHECK(s != "");
-#endif
 
     TupleTableType::Query q3 = ttt.where().first.equal(2).Or();
-#ifdef TIGHTDB_DEBUG
-    s = q3.Verify();
+    s = q3.validate();
     CHECK(s != "");
-#endif
 
     TupleTableType::Query q4 = ttt.where().Or().first.equal(2);
-#ifdef TIGHTDB_DEBUG
-    s = q4.Verify();
+    s = q4.validate();
     CHECK(s != "");
-#endif
 
     TupleTableType::Query q5 = ttt.where().first.equal(2);
-#ifdef TIGHTDB_DEBUG
-    s = q5.Verify();
+    s = q5.validate();
     CHECK(s == "");
-#endif
 
     TupleTableType::Query q6 = ttt.where().group().first.equal(2);
-#ifdef TIGHTDB_DEBUG
-    s = q6.Verify();
+    s = q6.validate();
     CHECK(s != "");
-#endif
 
 // FIXME: Work is currently underway to fully support locale
 // indenepdent case folding as defined by Unicode. Reenable this test

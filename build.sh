@@ -19,9 +19,6 @@ IPHONE_EXTENSIONS="objc"
 IPHONE_PLATFORMS="iPhoneOS iPhoneSimulator"
 IPHONE_DIR="iphone-lib"
 
-# Used by Makefiles
-export TIGHTDB_HAVE_CONFIG="1"
-
 map_ext_name_to_dir()
 {
     local ext_name
@@ -160,27 +157,29 @@ find_iphone_sdk()
 }
 
 
+CONFIG_MK="src/config-dyn.mk"
+
 require_config()
 {
     cd "$TIGHTDB_HOME" || return 1
-    if ! [ -e "config" ]; then
+    if ! [ -e "$CONFIG_MK" ]; then
         cat 1>&2 <<EOF
 ERROR: Found no configuration!
 You need to run 'sh build.sh config [PREFIX]'.
 EOF
         return 1
     fi
-    echo "Using existing configuration:"
-    cat "config" | sed 's/^/    /' || return 1
+    echo "Using existing configuration in $CONFIG_MK:"
+    cat "$CONFIG_MK" | sed 's/^/    /' || return 1
 }
 
 auto_configure()
 {
     cd "$TIGHTDB_HOME" || return 1
-    if [ -e "config" ]; then
+    if [ -e "$CONFIG_MK" ]; then
         require_config || return 1
     else
-        echo "No configuration found. Running 'sh build.sh config'"
+        echo "No configuration found. Running 'sh build.sh config' for you."
         sh build.sh config || return 1
     fi
 }
@@ -194,21 +193,21 @@ get_config_param()
         home="$TIGHTDB_HOME"
     fi
     cd "$home" || return 1
-    if ! [ -e "config" ]; then
+    if ! [ -e "$CONFIG_MK" ]; then
         cat 1>&2 <<EOF
 ERROR: Found no configuration!
 You need to run 'sh build.sh config [PREFIX]'.
 EOF
         return 1
     fi
-    if ! line="$(grep "^$name:" "config")"; then
+    if ! line="$(grep "^$name *=" "$CONFIG_MK")"; then
         cat 1>&2 <<EOF
 ERROR: Failed to read configuration parameter '$name'.
 Maybe you need to rerun 'sh build.sh config [PREFIX]'.
 EOF
         return 1
     fi
-    value="$(printf "%s\n" "$line" | cut -d: -f2-)" || return 1
+    value="$(printf "%s\n" "$line" | cut -d= -f2-)" || return 1
     value="$(printf "%s\n" "$value" | sed 's/^ *//')" || return 1
     printf "%s\n" "$value"
 }
@@ -337,21 +336,21 @@ case "$MODE" in
             done
         fi
 
-        cat >"config" <<EOF
-tightdb-version:     $tightdb_version
-install-prefix:      $install_prefix
-install-exec-prefix: $install_exec_prefix
-install-includedir:  $install_includedir
-install-bindir:      $install_bindir
-install-libdir:      $install_libdir
-install-libexecdir:  $install_libexecdir
-xcode-home:          $xcode_home
-iphone-sdks:         ${iphone_sdks:-none}
-iphone-sdks-avail:   $iphone_sdks_avail
+        cat >"$CONFIG_MK" <<EOF
+TIGHTDB_VERSION     = $tightdb_version
+INSTALL_PREFIX      = $install_prefix
+INSTALL_EXEC_PREFIX = $install_exec_prefix
+INSTALL_INCLUDEDIR  = $install_includedir
+INSTALL_BINDIR      = $install_bindir
+INSTALL_LIBDIR      = $install_libdir
+INSTALL_LIBEXECDIR  = $install_libexecdir
+XCODE_HOME          = $xcode_home
+IPHONE_SDKS         = ${iphone_sdks:-none}
+IPHONE_SDKS_AVAIL   = $iphone_sdks_avail
 EOF
         if [ -z "$INTERACTIVE" ]; then
-            echo "New configuration:"
-            cat "config" | sed 's/^/    /' || exit 1
+            echo "New configuration in $CONFIG_MK:"
+            cat "$CONFIG_MK" | sed 's/^/    /' || exit 1
             echo "Done configuring"
         fi
         exit 0
@@ -359,6 +358,7 @@ EOF
 
     "clean")
         auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
         $MAKE clean || exit 1
         if [ "$OS" = "Darwin" ]; then
             for x in $IPHONE_PLATFORMS; do
@@ -379,6 +379,7 @@ EOF
 
     "build")
         auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
         TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE || exit 1
         echo "Done building"
         exit 0
@@ -386,6 +387,7 @@ EOF
 
     "build-config-progs")
         auto_configure || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
         TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE -C "src/tightdb" "tightdb-config" "tightdb-config-dbg" || exit 1
         echo "Done building config programs"
         exit 0
@@ -393,14 +395,15 @@ EOF
 
     "build-iphone")
         auto_configure || exit 1
-        iphone_sdks_avail="$(get_config_param "iphone-sdks-avail")" || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        iphone_sdks_avail="$(get_config_param "IPHONE_SDKS_AVAIL")" || exit 1
         if [ "$iphone_sdks_avail" != "yes" ]; then
             echo "ERROR: Required iPhone SDKs are not available!" 1>&2
             exit 1
         fi
         temp_dir="$(mktemp -d /tmp/tightdb.build-iphone.XXXX)" || exit 1
-        xcode_home="$(get_config_param "xcode-home")" || exit 1
-        iphone_sdks="$(get_config_param "iphone-sdks")" || exit 1
+        xcode_home="$(get_config_param "XCODE_HOME")" || exit 1
+        iphone_sdks="$(get_config_param "IPHONE_SDKS")" || exit 1
         for x in $iphone_sdks; do
             platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
             sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
@@ -434,6 +437,7 @@ EOF
 
     "test")
         require_config || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
         $MAKE test || exit 1
         echo "Test passed"
         exit 0
@@ -441,6 +445,7 @@ EOF
 
     "test-debug")
         require_config || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
         $MAKE test-debug || exit 1
         echo "Test passed"
         exit 0
@@ -448,8 +453,8 @@ EOF
 
     "install")
         require_config || exit 1
-        install_prefix="$(get_config_param "install-prefix")" || exit 1
-        $MAKE install-only DESTDIR="$DESTDIR" prefix="$install_prefix" || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE install-only DESTDIR="$DESTDIR" || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
@@ -459,8 +464,8 @@ EOF
 
     "install-shared")
         require_config || exit 1
-        install_prefix="$(get_config_param "install-prefix")" || exit 1
-        $MAKE install-only DESTDIR="$DESTDIR" prefix="$install_prefix" INSTALL_FILTER=shared-libs,progs || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE install-only DESTDIR="$DESTDIR" INSTALL_FILTER=shared-libs,progs || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
@@ -470,16 +475,16 @@ EOF
 
     "install-devel")
         require_config || exit 1
-        install_prefix="$(get_config_param "install-prefix")" || exit 1
-        $MAKE install-only DESTDIR="$DESTDIR" prefix="$install_prefix" INSTALL_FILTER=static-libs,dev-progs,headers || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE install-only DESTDIR="$DESTDIR" INSTALL_FILTER=static-libs,dev-progs,headers || exit 1
         echo "Done installing"
         exit 0
         ;;
 
     "uninstall")
         require_config || exit 1
-        install_prefix="$(get_config_param "install-prefix")" || exit 1
-        $MAKE uninstall prefix="$install_prefix" || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE uninstall || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
@@ -489,8 +494,8 @@ EOF
 
     "uninstall-shared")
         require_config || exit 1
-        install_prefix="$(get_config_param "install-prefix")" || exit 1
-        $MAKE uninstall prefix="$install_prefix" INSTALL_FILTER=shared-libs,progs || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE uninstall INSTALL_FILTER=shared-libs,progs || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
@@ -500,15 +505,16 @@ EOF
 
     "uninstall-devel")
         require_config || exit 1
-        install_prefix="$(get_config_param "install-prefix")" || exit 1
-        $MAKE uninstall prefix="$install_prefix" INSTALL_FILTER=static-libs,dev-progs,extra || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE uninstall INSTALL_FILTER=static-libs,dev-progs,extra || exit 1
         echo "Done uninstalling"
         exit 0
         ;;
 
     "test-installed")
         require_config || exit 1
-        install_bindir="$(get_config_param "install-bindir")" || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        install_bindir="$(get_config_param "INSTALL_BINDIR")" || exit 1
         path_list_prepend PATH "$install_bindir" || exit 1
         $MAKE -C "test-installed" clean || exit 1
         $MAKE -C "test-installed" test  || exit 1
@@ -1042,9 +1048,9 @@ EOF
                 grep -f "$TEMP_DIR/transfer/include.bre" "$TEMP_DIR/transfer/files1" >"$TEMP_DIR/transfer/files2" || exit 1
                 (cd "$PREBUILD_DIR" && tar czf "$TEMP_DIR/transfer/core.tar.gz" -T "$TEMP_DIR/transfer/files2") || exit 1
                 (cd "$PKG_DIR/tightdb" && tar xzmf "$TEMP_DIR/transfer/core.tar.gz") || exit 1
-                INST_HEADERS="$(cd "$PREBUILD_DIR/src/tightdb" && $MAKE get-inst-headers)" || exit 1
-                INST_LIBS="$(cd "$PREBUILD_DIR/src/tightdb" && $MAKE get-inst-libraries)" || exit 1
-                INST_PROGS="$(cd "$PREBUILD_DIR/src/tightdb" && $MAKE get-inst-programs)" || exit 1
+                INST_HEADERS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE get-inst-headers)" || exit 1
+                INST_LIBS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE get-inst-libraries)" || exit 1
+                INST_PROGS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE get-inst-programs)" || exit 1
                 (cd "$PREBUILD_DIR/src/tightdb" && cp -R -P $INST_HEADERS $INST_LIBS $INST_PROGS "$PKG_DIR/tightdb/src/tightdb/") || exit 1
                 if [ "$INCLUDE_IPHONE" ]; then
                     cp -R "$PREBUILD_DIR/$IPHONE_DIR" "$PKG_DIR/tightdb/" || exit 1
@@ -1096,8 +1102,8 @@ EOF
             # look for `tightdbd` in the wrong place, so we have to
             # set `TIGHTDBD_PATH` too.
             if [ "$PREBUILT_CORE" ]; then
-                install_libdir="$(get_config_param "install-libdir" "$TEST_PKG_DIR/tightdb")" || exit 1
-                install_libexecdir="$(get_config_param "install-libexecdir" "$TEST_PKG_DIR/tightdb")" || exit 1
+                install_libdir="$(get_config_param "INSTALL_LIBDIR" "$TEST_PKG_DIR/tightdb")" || exit 1
+                install_libexecdir="$(get_config_param "INSTALL_LIBEXECDIR" "$TEST_PKG_DIR/tightdb")" || exit 1
                 path_list_prepend "$LD_LIBRARY_PATH_NAME" "$install_libdir"  || exit 1
                 export "$LD_LIBRARY_PATH_NAME"
             fi
