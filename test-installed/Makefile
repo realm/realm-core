@@ -1,10 +1,10 @@
 TEST_PROGRAMS = test-installed
 
-TIGHTDB_INCLUDEDIR    = $(shell tightdb-config --includedir)
-TIGHTDB_CFLAGS        = $(shell tightdb-config --cflags)
+TIGHTDB_INCLUDEDIR    = $(shell tightdb-config     --includedir)
+TIGHTDB_CFLAGS        = $(shell tightdb-config     --cflags)
 TIGHTDB_CFLAGS_DEBUG  = $(shell tightdb-config-dbg --cflags)
-TIGHTDB_LIBDIR        = $(shell tightdb-config --libdir)
-TIGHTDB_LDFLAGS       = $(shell tightdb-config --libs)
+TIGHTDB_LIBDIR        = $(shell tightdb-config     --libdir)
+TIGHTDB_LDFLAGS       = $(shell tightdb-config     --libs)
 TIGHTDB_LDFLAGS_DEBUG = $(shell tightdb-config-dbg --libs)
 
 test_installed_SOURCES       = test.cpp

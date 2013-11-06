@@ -3,8 +3,8 @@
 #
 # Author: Kristian Spangsege
 #
-# This makefile requires GNU Make, it has been tested with version
-# 3.81.
+# This makefile requires GNU Make. It has been tested with version
+# 3.81, and it is known to work well on both Linux and OS X.
 #
 #
 # Building installable programs and libraries
@@ -697,8 +697,8 @@ CC_CXX_AND_LD_ARE_1 = $(and $(call MATCH_CMD,$(1),$(CC)),$(strip $(foreach x,$(1
 CC_CXX_AND_LD_ARE_GCC_LIKE = $(strip $(foreach x,$(GCC_LIKE_COMPILERS),$(call CC_CXX_AND_LD_ARE,$(x))))
 
 GENERIC_MK := $(lastword $(MAKEFILE_LIST))
-GENERIC_MK_ABS_DIR = $(abspath $(patsubst %/,%,$(dir $(GENERIC_MK))))
-CONFIG_MK = $(call MAKE_REL_PATH,$(GENERIC_MK_ABS_DIR)/config.mk)
+GENERIC_MK_DIR = $(abspath $(patsubst %/,%,$(dir $(GENERIC_MK))))
+CONFIG_MK = $(call MAKE_REL_PATH,$(GENERIC_MK_DIR)/config.mk)
 DEP_MAKEFILES = Makefile $(GENERIC_MK)
 ifneq ($(wildcard $(CONFIG_MK)),)
 DEP_MAKEFILES += $(CONFIG_MK)
@@ -706,7 +706,7 @@ endif
 -include $(CONFIG_MK)
 
 ifneq ($(SOURCE_ROOT),)
-ABS_SOURCE_ROOT = $(abspath $(GENERIC_MK_ABS_DIR)/$(SOURCE_ROOT))
+ABS_SOURCE_ROOT = $(abspath $(GENERIC_MK_DIR)/$(SOURCE_ROOT))
 REL_SOURCE_ROOT = $(call MAKE_REL_PATH,$(ABS_SOURCE_ROOT))
 endif
 
