@@ -392,6 +392,86 @@ TEST(NextGenSyntax)
     delete first2;
 }
 
+TEST(NextGenSyntaxMonkey)
+{
+    for(int iter = 1; iter < 20; iter++)
+    {
+        // Keep at least '* 20' else some tests will give 0 matches and bad coverage
+        const size_t rows = TIGHTDB_MAX_LIST_SIZE * 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1);
+        Table table;
+        table.add_column(type_Int, "first");
+        table.add_column(type_Int, "second");
+        table.add_column(type_Int, "third");
+
+        for(size_t r = 0; r < rows; r++) {
+            table.add_empty_row();
+            // using '% iter' tests different bitwidths
+            table.set_int(0, r, rand() % iter);
+            table.set_int(1, r, rand() % iter);        
+            table.set_int(2, r, rand() % iter);        
+        }
+
+        size_t tvpos;
+
+        // second == 1
+        tightdb::Query q1_0 = table.where().equal(1, 1);
+        tightdb::Query q2_0 = table.column<int64_t>(1) == 1;
+        tightdb::TableView tv_0 = q2_0.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(1, r) == 1) {
+                CHECK_EQUAL(r, tv_0.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+
+        // (first == 0 || first == 1) && second == 1
+        tightdb::Query q2_1 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 1) && table.column<int64_t>(1) == 1;
+        tightdb::TableView tv_1 = q2_1.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
+                CHECK_EQUAL(r, tv_1.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+
+        // first == 0 || (first == 1 && second == 1) 
+        tightdb::Query q2_2 = table.column<int64_t>(0) == 0 || (table.column<int64_t>(0) == 1 && table.column<int64_t>(1) == 1);
+        tightdb::TableView tv_2 = q2_2.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
+                CHECK_EQUAL(r, tv_2.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+
+        // second == 0 && (first == 0 || first == 2)
+        tightdb::Query q4_8 = table.column<int64_t>(1) == 0 && (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2);
+        tightdb::TableView tv_8 = q4_8.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(1, r) == 0 && ((table.get_int(0, r) == 0) || table.get_int(0, r) == 2)) {
+                CHECK_EQUAL(r, tv_8.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+
+        // (first == 0 || first == 2) && (first == 1 || second == 1) 
+        tightdb::Query q3_7 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2) && (table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1);
+        tightdb::TableView tv_7 = q3_7.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) && (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
+                CHECK_EQUAL(r, tv_7.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+    }
+}
+
+
 TEST(LimitUntyped)
 {
     Table table;
