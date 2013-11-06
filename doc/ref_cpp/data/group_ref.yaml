@@ -316,7 +316,7 @@ CATEGORIES  :
                  <code>true</code> if group is empty, <code>false</code> otherwise.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_group_is_empty
+        CODE   : ex_cpp_group_traverse
 
   - g_group_operator_equal:
       NAME     : operator==
