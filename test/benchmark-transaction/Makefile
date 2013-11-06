@@ -1,7 +1,7 @@
-NOINST_PROGRAMS = transact
+TEST_PROGRAMS = transact
 
 transact_SOURCES = transact.cpp
 transact_LDFLAGS = -lsqlite3 -lmysqlclient -lrt
-transact_LIBS = ../../src/tightdb/libtightdb.a
+transact_LIBS = ../util/test-util.a
 
-include ../../generic.mk
+include ../../src/generic.mk

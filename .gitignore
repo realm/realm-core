@@ -1,5 +1,3 @@
-*.tightdb
-*.tightdb.lock
 *.ncb
 *.suo
 *.swp
@@ -52,7 +50,7 @@ Static library*/
 /doc/ref_cpp/html/*
 
 # sh build.sh config
-/config
+/src/config-dyn.mk
 
 # sh build.sh build-iphone
 /iphone-lib/include
@@ -62,9 +60,9 @@ Static library*/
 /iphone-lib/tightdb-config-dbg
 
 # debian/ubuntu builds
-debian/tightdb/*
-debian/libtightdb/*
-debian/libtightdb-dev/*
-debian/libtightdb-dev.substvars
-debian/libtightdb.substvars
-debian/tightdb.substvars
+/debian/tightdb/*
+/debian/libtightdb/*
+/debian/libtightdb-dev/*
+/debian/libtightdb-dev.substvars
+/debian/libtightdb.substvars
+/debian/tightdb.substvars
