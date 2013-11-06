@@ -832,7 +832,7 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
         done
         if [ \$(echo \$EXT | grep -c java) -eq 1 ]; then
             find \$HOME/tightdb_examples/java -name build.xml -exec sed -i -e 's/value="\.\.\/\.\.\/lib"/value="\/usr\/local\/share\/java"/' \{\} \\;
-            find \$HOME/tightdb_examples/java -name build.xml -exec sed -i -e 's/"jnipath" value=".*" \/>"jnipath" value="\/Library\/Java\/Extensions" \/>/' \{\} \\;
+            find \$HOME/tightdb_examples/java -name build.xml -exec sed -i -e 's/"jnipath" value=".*" \/>/"jnipath" value="\/Library\/Java\/Extensions" \/>/' \{\} \\;
         fi
 
         echo "Examples can be found in \$HOME/tightdb_examples."
@@ -1312,16 +1312,16 @@ EOF
             fi
         fi
         if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
-            if [ "$ERROR" ]; then
-                cat 1>&2 <<EOF
+            if [ -z "$INTERACTIVE" ]; then
+                if [ "$ERROR" ]; then
+                    cat 1>&2 <<EOF
 
 Note: Some parts could not be configured. You may be missing one or
 more dependencies. Check the README file for details. If that does not
 help, check the log file.
 The log file is here: $LOG_FILE
 EOF
-            fi
-            if [ -z "$INTERACTIVE" ]; then
+                fi
                 cat <<EOF
 
 Run the following command to build the parts that were successfully
