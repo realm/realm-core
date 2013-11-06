@@ -2061,14 +2061,16 @@ bool Array::find_action(size_t index, int64_t value, QueryState<int64_t>* state,
     if (action == act_CallbackIdx)
         return callback(index);
     else
-       return state->match<action, false>(index, 0, value);
+        return state->match<action, false>(index, 0, value);
 }
 template<Action action, class Callback>
 bool Array::find_action_pattern(size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const
 {
     static_cast<void>(callback);
-    // Optimization not yet supported: For each set bit in pattern, call callback(index) like in above find_action().
-    TIGHTDB_ASSERT(action != act_CallbackIdx); 
+    if(action == act_CallbackIdx) {
+        // Possible future optimization: call callback(index) like in above find_action(), in a loop for each bit set in 'pattern'
+        return false;
+    }
     return state->match<action, true>(index, pattern, 0);
 }
 

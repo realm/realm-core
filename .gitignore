@@ -50,7 +50,7 @@ Static library*/
 /doc/ref_cpp/html/*
 
 # sh build.sh config
-/config
+/src/config-dyn.mk
 
 # sh build.sh build-iphone
 /iphone-lib/include
@@ -72,3 +72,4 @@ src/tightdb/objc/include/*
 src/objc/include/tightdb.hpp
 
 src/tightdb/objc/lib/*
+

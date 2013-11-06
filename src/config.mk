@@ -30,3 +30,16 @@ endif
 
 PROJECT_CFLAGS_DEBUG = -DTIGHTDB_DEBUG
 PROJECT_CFLAGS_COVER = -DTIGHTDB_DEBUG -DTIGHTDB_COVER
+
+# Load dynamic configuration
+ifneq ($(TIGHTDB_HAVE_CONFIG),)
+CONFIG_DYN_MK = $(GENERIC_MK_DIR)/config-dyn.mk
+DEP_MAKEFILES += $(CONFIG_DYN_MK)
+include $(CONFIG_DYN_MK)
+prefix      = $(INSTALL_PREFIX)
+exec_prefix = $(INSTALL_EXEC_PREFIX)
+includedir  = $(INSTALL_INCLUDEDIR)
+bindir      = $(INSTALL_BINDIR)
+libdir      = $(INSTALL_LIBDIR)
+libexecdir  = $(INSTALL_LIBEXECDIR)
+endif

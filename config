@@ -1,0 +1,10 @@
+tightdb-version:     b28-1141-ga96183a
+install-prefix:      /usr/local
+install-exec-prefix: /usr/local
+install-includedir:  /usr/local/include
+install-bindir:      /usr/local/bin
+install-libdir:      /usr/local/lib
+install-libexecdir:  /usr/local/libexec
+xcode-home:          /Applications/Xcode.app/Contents/Developer
+iphone-sdks:         iPhoneOS:iPhoneOS7.0.sdk:armv7 iPhoneSimulator:iPhoneSimulator7.0.sdk:i386
+iphone-sdks-avail:   yes

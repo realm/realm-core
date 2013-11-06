@@ -162,6 +162,15 @@ public:
         PresumablyStaleLockFile(const std::string& msg): std::runtime_error(msg) {}
     };
 
+    // If the database file is deleted while there are open shared groups,
+    // subsequent attempts to open shared groups will try to join an already
+    // active sharing scheme, but fail due to the missing database file.
+    // This causes the following exception to be thrown from Open or the constructor.
+    class LockFileButNoData : public std::runtime_error {
+    public:
+        LockFileButNoData(const std::string& msg) : std::runtime_error(msg) {}
+    };
+
 private:
     struct SharedInfo;
 
