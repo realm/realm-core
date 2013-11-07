@@ -16,9 +16,9 @@ TIGHTDB_TABLE_3(PeopleTable,
 void some_function_making_it_impossible_to_use_RAII(SharedGroup& g, bool should_commit)
 {
     if (should_commit)
-        db.commit();
+        g.commit();
     else
-        db.rollback();
+        g.rollback();
 }
 
 void func()

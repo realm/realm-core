@@ -15,8 +15,9 @@ TIGHTDB_TABLE_3(PeopleTable,
 // @@EndFold@@
 void func()
 {
-    // Create a new shared group
-    SharedGroup db;
+    // Create a new shared group in unattached state
+    SharedGroup::unattached_tag tag;
+    SharedGroup db(tag);
     db.open("shared_db.tightdb");
 
     // @@Fold@@
