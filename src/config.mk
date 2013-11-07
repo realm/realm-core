@@ -6,7 +6,7 @@ ENABLE_INSTALL_DEBUG_PROGS = 1
 # Construct fat binaries on Darwin when using Clang
 ifneq ($(TIGHTDB_ENABLE_FAT_BINARIES),)
 ifneq ($(call CC_CXX_AND_LD_ARE,clang),)
-ifeq ($(shell uname),Darwin)
+ifeq ($(OS),Darwin)
 CFLAGS_ARCH += -arch i386 -arch x86_64
 endif
 endif

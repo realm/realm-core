@@ -10,14 +10,17 @@ test_stl_DEPS     = util
 
 TEST_PROGRAMS = tightdb-tests
 
-tightdb_tests_SOURCES = $(wildcard *.c *.cpp large_tests/*.cpp)
+TEST_SOURCES := $(wildcard *.c *.cpp large_tests/*.cpp)
+tightdb_tests_SOURCES = $(TEST_SOURCES)
 tightdb_tests_LIBS    = util/test-util.a
 
 EXTRA_CLEAN_DIRS = large_tests
 
 ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)
-tightdb_tests_CFLAGS  = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
-tightdb_tests_LDFLAGS = $(shell pkg-config unittest++ --libs)
+UNITTESTPP_CFLAGS  := $(shell pkg-config unittest++ --cflags)
+UNITTESTPP_LDFLAGS := $(shell pkg-config unittest++ --libs)
+tightdb_tests_CFLAGS  = -Wno-sign-compare $(UNITTESTPP_CFLAGS)
+tightdb_tests_LDFLAGS = $(UNITTESTPP_LDFLAGS)
 else
 PASSIVE_SUBDIRS += UnitTest++
 tightdb_tests_CFLAGS  = -IUnitTest++/src

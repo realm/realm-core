@@ -1,4 +1,4 @@
-EXAMPLES = $(wildcard *.cpp)
+EXAMPLES := $(wildcard *.cpp)
 
 TEST_PROGRAMS = $(patsubst %.cpp,%,$(EXAMPLES))
 
