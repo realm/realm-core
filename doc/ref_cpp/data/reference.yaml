@@ -76,7 +76,7 @@ CATEGORIES:                       # list global class-id in order of appearence
 
 EXAMPLES  :
 - DESCR   :
-  CODE    : ex_sharedgroup_intro           # id to example code
+  CODE    : ex_shared_group_intro           # id to example code
 
 
 IGNORE    : []

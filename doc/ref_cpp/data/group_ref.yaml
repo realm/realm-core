@@ -29,6 +29,35 @@ DESCR       : &g_group_descr
               operating system, and on any supported hardware platform. This
               implies that TightDB is truly a polyglot framework which you can
               use to share data between applications.
+
+              Note that changes made to the database via a Group
+              instance are not automatically committed to the
+              specified file. You may, however, at any time,
+              explicitly commit your changes by calling the
+              commit() method, provided that the specified
+              open-mode is not mode_ReadOnly. Alternatively, you
+              may call write() to write the entire database to a
+              new file. Writing the database to a new file does not
+              end, or in any other way change the association
+              between the Group instance and the file that was
+              specified in the call to open().
+
+              Accessing a TightDB database file through manual
+              construction of a Group object does not offer any
+              level of thread safety or transaction safety. When
+              any of those kinds of safety are a concern, consider
+              using a SharedGroup instead. When accessing a
+              database file in read/write mode through a manually
+              constructed Group object, it is entirely the
+              responsibility of the application that the file is
+              not accessed in any way by a third party during the
+              life-time of that group object. It is, on the other
+              hand, safe to concurrently access a database file by
+              multiple manually created Group objects, as long as
+              all of them are opened in read-only mode, and there
+              is no other party that modifies the file
+              concurrently.
+
 SEE         :
 EXAMPLES    :
 - DESCR     :
@@ -47,8 +76,8 @@ CATEGORIES  :
                  Group objects can be created in various ways
                  depending on use pattern.
 
-                 You can either just create a new (empty) group, or load an
-                 existing group either from a file or memory buffer.
+                 You can either just create a new (empty) group (1), or load an
+                 existing group either from a file (2) or a memory buffer (3).
 
                  A group may also be constructed in an unattached
                  state (4). See open() and is_attached() for more on
@@ -56,11 +85,11 @@ CATEGORIES  :
 
       SUMMARY  : &g_group_constructor_summary
                  Creates a table group.
-      SIGNATURE: |
-                 Group();
-                 Group(const std::string& file, OpenMode mode = mode_ReadOnly);
-                 Group(BinaryData buffer, bool take_ownership = true);
-                 Group(unattached_tag) noexcept;
+      ENUM_SIG:
+      - SIG    : Group();
+      - SIG    : Group(const std::string& file, OpenMode mode = mode_ReadOnly);
+      - SIG    : Group(BinaryData buffer, bool take_ownership = true);
+      - SIG    : Group(unattached_tag) noexcept;
       PARAMS:
       - NAME   : file
         TYPES  : const std::string&
@@ -76,6 +105,25 @@ CATEGORIES  :
         TYPES  : BinaryData
         DESCR  : &g_group_constructor_memory_parm3_descr
                  In-memory binary encoded representation of a group.
+      - NAME   : take_ownership
+        TYPES  : bool
+        DESCR  : &g_group_take_ownership_desc
+                 >
+                 If <tt>take_ownership</tt> is <tt>true</tt>, you will
+                 pass the ownership of the specified buffer to the
+                 Group instance. In this case the buffer will
+                 eventually be freed using std::free(), so the buffer
+                 you pass, must have been allocated using
+                 std::malloc().
+
+                 On the other hand, if <tt>take_ownership</tt> is set
+                 to <tt>false</tt>, it is your responsibility to keep
+                 the memory buffer alive during the lifetime of the
+                 group, and in case the buffer needs to be deallocated
+                 afterwards, that is your responsibility too.
+
+                 If an exception is signalled, the caller retains ownership 
+                 and must free the buffer, even if <tt>take_ownership</tt> was true.
       RETURN:
         TYPES  : Group
         DESCR  : &g_group_constructor_memory_return1_descr
@@ -83,11 +131,24 @@ CATEGORIES  :
       THROWS:
       - EXCEPT : File::AccessError
         DESCR  : &g_group_constructor_memory_throws_descr
-                 If the file (or buffer) could not be opened. If the reason
-                 corresponds to one of the exception types that are
+                 Thrown if the file (or buffer) could not be opened. If the reason
+                 corresponds to one of the following exception types which are
                  derived from File::AccessError, the derived exception
                  type is thrown. Note that InvalidDatabase is among
                  these derived exception types.
+      - EXCEPT : File::PermissionDenied
+        DESCR  : &g_group_exc_perm
+                 Thrown if the user haven't got sufficient permissions
+                 to open the database file in the desired mode.
+      - EXCEPT : File::NotFound
+        DESCR  : &g_group_exc_notfound
+                 Thrown if the database file cannot be found.
+      - EXCEPT : File::Exists
+        DESCR  : &g_group_exc_exists
+                 Thrown if create_Never was specified and the database file exists.
+      - EXCEPT : InvalidDatabase
+        DESCR  : &g_group_exc_invalid_db
+                 Thrown if the specified database file does not contain a valid database
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_constructor_plain
@@ -95,6 +156,8 @@ CATEGORIES  :
         CODE   : ex_cpp_group_constructor_file
       - DESCR  :
         CODE   : ex_cpp_group_constructor_memory
+      - DESCR  :
+        CODE   : ex_cpp_group_unattached
 
 - Group:
   METHODS:
@@ -149,18 +212,6 @@ CATEGORIES  :
                  InvalidDatabase exception to be thrown, but you
                  should not rely on it.
 
-                 Note that changes made to the database via a Group
-                 instance are not automatically committed to the
-                 specified file. You may, however, at any time,
-                 explicitly commit your changes by calling the
-                 commit() method, provided that the specified
-                 open-mode is not mode_ReadOnly. Alternatively, you
-                 may call write() to write the entire database to a
-                 new file. Writing the database to a new file does not
-                 end, or in any other way change the association
-                 between the Group instance and the file that was
-                 specified in the call to open().
-
                  A file that is passed to Group::open(), may not be
                  modified by a third party until after the Group
                  object is destroyed. Behavior is undefined if a file
@@ -169,23 +220,6 @@ CATEGORIES  :
 
                  Calling open() on a Group instance that is already in
                  the attached state has undefined behavior.
-
-                 Accessing a TightDB database file through manual
-                 construction of a Group object does not offer any
-                 level of thread safety or transaction safety. When
-                 any of those kinds of safety are a concern, consider
-                 using a SharedGroup instead. When accessing a
-                 database file in read/write mode through a manually
-                 constructed Group object, it is entirely the
-                 responsibility of the application that the file is
-                 not accessed in any way by a third party during the
-                 life-time of that group object. It is, on the other
-                 hand, safe to concurrently access a database file by
-                 multiple manually created Group objects, as long as
-                 all of them are opened in read-only mode, and there
-                 is no other party that modifies the file
-                 concurrently.
-
 
                  Specifying a memory buffer is equivalent to
                  specifying a file except that in this case the
@@ -217,26 +251,18 @@ CATEGORIES  :
                  In-memory binary encoded representation of a group.
       - NAME   : take_ownership
         TYPES  : bool
-        DESCR  : If <tt>take_ownership</tt> is <tt>true</tt>, you will
-                 pass the ownership of the specified buffer to the
-                 Group instance. In this case the buffer will
-                 eventually be freed using std::free(), so the buffer
-                 you pass, must have been allocated using
-                 std::malloc().
-
-                 On the other hand, if <tt>take_ownership</tt> is set
-                 to <tt>false</tt>, it is your responsibility to keep
-                 the memory buffer alive during the lifetime of the
-                 group, and in case the buffer needs to be deallocated
-                 afterwards, that is your responsibility too.
+        DESCR  : *g_group_take_ownership_desc
       THROWS:
       - EXCEPT : File::AccessError
-        DESCR  : &g_group_open_memory_throws_descr
-                 If the file (or buffer) could not be opened. If the reason
-                 corresponds to one of the exception types that are
-                 derived from File::AccessError, the derived exception
-                 type is thrown. Note that InvalidDatabase is among
-                 these derived exception types.
+        DESCR  : *g_group_constructor_memory_throws_descr
+      - EXCEPT : File::PermissionDenied
+        DESCR  : *g_group_exc_perm
+      - EXCEPT : File::NotFound
+        DESCR  : *g_group_exc_notfound
+      - EXCEPT : File::Exists
+        DESCR  : *g_group_exc_exists
+      - EXCEPT : InvalidDatabase
+        DESCR  : *g_group_exc_invalid_db
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_open_file
@@ -292,7 +318,7 @@ CATEGORIES  :
                  <code>true</code> if group is empty, <code>false</code> otherwise.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_group_is_empty
+        CODE   : ex_cpp_group_traverse
 
   - g_group_operator_equal:
       NAME     : operator==
@@ -457,14 +483,18 @@ CATEGORIES  :
       THROWS:
       - EXCEPT : File::AccessError
         DESCR  : &g_group_write_to_file_throws_descr
-                 If the file could not be opened. If the reason
+                 Thrown if the file could not be opened. If the reason
                  corresponds to one of the exception types that are
                  derived from File::AccessError, the derived exception
                  type is thrown. In particular, File::Exists will be
                  thrown if the file exists already.
+      - EXCEPT : File::PermissionDenied
+        DESCR  : *g_group_exc_perm
+      - EXCEPT : File::Exists
+        DESCR  : *g_group_exc_exists
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_group_write_to_file
+        CODE   : ex_cpp_group_open_file
 
   - g_group_write_to_mem:
       NAME     : write_to_mem
