@@ -1,10 +1,10 @@
 # NOTE: THIS SCRIPT IS SUPPOSED TO RUN IN A POSIX SHELL
 
-# Enable tracing if DEBUG is set
+# Enable tracing if TIGHTDB_SCRIPT_DEBUG is set
 if [ -e $HOME/.tightdb ]; then
     . $HOME/.tightdb
 fi
-if [ -z "$DEBUG" ]; then
+if [ -z "$TIGHTDB_SCRIPT_DEBUG" ]; then
     set +x
 else
     set -x
@@ -238,9 +238,9 @@ get_host_info()
 get_compiler_info()
 {
     local CC_CMD CXX_CMD LD_CMD
-    CC_CMD="$($MAKE get-cc)" || return 1
-    CXX_CMD="$($MAKE get-cxx)" || return 1
-    LD_CMD="$($MAKE get-ld)" || return 1
+    CC_CMD="$($MAKE --no-print-directory get-cc)" || return 1
+    CXX_CMD="$($MAKE --no-print-directory get-cxx)" || return 1
+    LD_CMD="$($MAKE --no-print-directory get-ld)" || return 1
     echo "C compiler is '$CC_CMD' ($(which "$CC_CMD" 2>/dev/null))"
     echo "C++ compiler is '$CXX_CMD' ($(which "$CXX_CMD" 2>/dev/null))"
     echo "Linker is '$LD_CMD' ($(which "$LD_CMD" 2>/dev/null))"
@@ -289,11 +289,11 @@ case "$MODE" in
         if ! [ "$install_prefix" ]; then
             install_prefix="/usr/local"
         fi
-        install_exec_prefix="$($MAKE prefix="$install_prefix" get-exec-prefix)" || exit 1
-        install_includedir="$($MAKE prefix="$install_prefix" get-includedir)" || exit 1
-        install_bindir="$($MAKE prefix="$install_prefix" get-bindir)" || exit 1
-        install_libdir="$($MAKE prefix="$install_prefix" get-libdir)" || exit 1
-        install_libexecdir="$($MAKE prefix="$install_prefix" get-libexecdir)" || exit 1
+        install_exec_prefix="$($MAKE --no-print-directory prefix="$install_prefix" get-exec-prefix)" || exit 1
+        install_includedir="$($MAKE --no-print-directory prefix="$install_prefix" get-includedir)" || exit 1
+        install_bindir="$($MAKE --no-print-directory prefix="$install_prefix" get-bindir)" || exit 1
+        install_libdir="$($MAKE --no-print-directory prefix="$install_prefix" get-libdir)" || exit 1
+        install_libexecdir="$($MAKE --no-print-d0irectory prefix="$install_prefix" get-libexecdir)" || exit 1
 
         tightdb_version="unknown"
         if [ "$TIGHTDB_VERSION" ]; then
@@ -434,7 +434,7 @@ EOF
         mkdir -p "$IPHONE_DIR/include" || exit 1
         cp "src/tightdb.hpp" "$IPHONE_DIR/include/" || exit 1
         mkdir -p "$IPHONE_DIR/include/tightdb" || exit 1
-        inst_headers="$(cd src/tightdb && $MAKE get-inst-headers)" || exit 1
+        inst_headers="$(cd src/tightdb && $MAKE --no-print-directory get-inst-headers)" || exit 1
         (cd "src/tightdb" && cp $inst_headers "$TIGHTDB_HOME/$IPHONE_DIR/include/tightdb/") || exit 1
         for x in "tightdb-config" "tightdb-config-dbg"; do
             echo "Creating '$IPHONE_DIR/$x'"
@@ -830,11 +830,17 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
     echo
     echo "Installation report"
     echo "-------------------"
+    echo "The following files have been 
     for x in \$EXT; do
+        echo "$x:"
         sh $debug tightdb_\$x/build.sh install-report
+        if [ $? -eq 1 ]; then
+            echo " no files has been installed."
+        fi
     done
 
     echo
+    echo "Examples can be copied to the folder tightdb_examples in your home directory (\$HOME)."
     echo "Do you wish to copy examples to your home directory (y/n)?"
     read answer
     if [ \$(echo \$answer | grep -c ^[yY]) -eq 1 ]; then
@@ -848,7 +854,8 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
         fi
 
         echo "Examples can be found in \$HOME/tightdb_examples."
-        echo "Please consult the README.md files for further information."
+        echo "Please consult the README.md files in each subdirectory for information"
+        echo "on how to build and run the examples."
     fi
     exit 0
 fi
@@ -1065,9 +1072,9 @@ EOF
                 grep -f "$TEMP_DIR/transfer/include.bre" "$TEMP_DIR/transfer/files1" >"$TEMP_DIR/transfer/files2" || exit 1
                 (cd "$PREBUILD_DIR" && tar czf "$TEMP_DIR/transfer/core.tar.gz" -T "$TEMP_DIR/transfer/files2") || exit 1
                 (cd "$PKG_DIR/tightdb" && tar xzmf "$TEMP_DIR/transfer/core.tar.gz") || exit 1
-                INST_HEADERS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE get-inst-headers)" || exit 1
-                INST_LIBS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE get-inst-libraries)" || exit 1
-                INST_PROGS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE get-inst-programs)" || exit 1
+                INST_HEADERS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE --no-print-directory get-inst-headers)" || exit 1
+                INST_LIBS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE --no-print-directory get-inst-libraries)" || exit 1
+                INST_PROGS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE --no-print-directory get-inst-programs)" || exit 1
                 (cd "$PREBUILD_DIR/src/tightdb" && cp -R -P $INST_HEADERS $INST_LIBS $INST_PROGS "$PKG_DIR/tightdb/src/tightdb/") || exit 1
                 if [ "$INCLUDE_IPHONE" ]; then
                     cp -R "$PREBUILD_DIR/$IPHONE_DIR" "$PKG_DIR/tightdb/" || exit 1
