@@ -19,7 +19,7 @@ using namespace tightdb;
 namespace {
 
 // Limited to 8 bits (max 255).
-const int current_file_format_version = 1;
+const int current_file_format_version = 2;
 
 #ifdef TIGHTDB_SLAB_ALLOC_DEBUG
 map<ref_type, void*> malloc_debug_map;

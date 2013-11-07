@@ -10,6 +10,9 @@ Format:
 - Removed/deprecated feature/method .... (user visible removed feature - passed on to release notes)
 . Any other notes .... 				     (internal changes)
 
+2013-11-07 (Alexander Stigsen)
+. BREAKING CHANGE: Schema now handles attributes separately for better performance when there are many colummns.
+
 2013-11-07 (Lasse Reinhold)
 ! Fixed bug: ng-queries could segfault to bug in Array::get_chunk(). Normal queries and everything else not affected.
 
