@@ -1092,22 +1092,6 @@ EOF
                 error="1"
             fi
 
-            # When testing against a prebuilt core library, we have to
-            # work around the fact that it is not going to be
-            # installed in the usual place. While the config programs
-            # are rebuilt to reflect the unusual installation
-            # directories, other programs (such as `tightdbd`) that
-            # use the shared core library are not, so we have to set
-            # the runtime library path. Also, the core library will
-            # look for `tightdbd` in the wrong place, so we have to
-            # set `TIGHTDBD_PATH` too.
-            if [ "$PREBUILT_CORE" ]; then
-                install_libdir="$(get_config_param "INSTALL_LIBDIR" "$TEST_PKG_DIR/tightdb")" || exit 1
-                install_libexecdir="$(get_config_param "INSTALL_LIBEXECDIR" "$TEST_PKG_DIR/tightdb")" || exit 1
-                path_list_prepend "$LD_LIBRARY_PATH_NAME" "$install_libdir"  || exit 1
-                export "$LD_LIBRARY_PATH_NAME"
-            fi
-
             log_message "Testing './build clean'"
             if ! "$TEST_PKG_DIR/build" clean; then
                 error="1"
@@ -1120,17 +1104,11 @@ EOF
             fi
 
             log_message "Testing './build test'"
-            if [ "$PREBUILT_CORE" ]; then
-                export TIGHTDBD_PATH="$install_libexecdir/tightdbd"
-            fi
             if ! "$TEST_PKG_DIR/build" test; then
                 error="1"
             fi
 
             log_message "Testing './build test-debug'"
-            if [ "$PREBUILT_CORE" ]; then
-                export TIGHTDBD_PATH="$install_libexecdir/tightdbd-dbg"
-            fi
             if ! "$TEST_PKG_DIR/build" test-debug; then
                 error="1"
             fi
@@ -1141,10 +1119,24 @@ EOF
                 error="1"
             fi
 
-            log_message "Testing './build test-installed'"
+            # When testing against a prebuilt core library, we have to
+            # work around the fact that it is not going to be
+            # installed in the usual place. While the config programs
+            # are rebuilt to reflect the unusual installation
+            # directories, other programs (such as `tightdbd`) that
+            # use the shared core library, are not, so we have to set
+            # the runtime library path. Also, the core library will
+            # look for `tightdbd` in the wrong place, so we have to
+            # set `TIGHTDBD_PATH` too.
             if [ "$PREBUILT_CORE" ]; then
+                install_libdir="$(get_config_param "INSTALL_LIBDIR" "$TEST_PKG_DIR/tightdb")" || exit 1
+                path_list_prepend "$LD_LIBRARY_PATH_NAME" "$install_libdir"  || exit 1
+                export "$LD_LIBRARY_PATH_NAME"
+                install_libexecdir="$(get_config_param "INSTALL_LIBEXECDIR" "$TEST_PKG_DIR/tightdb")" || exit 1
                 export TIGHTDBD_PATH="$install_libexecdir/tightdbd"
             fi
+
+            log_message "Testing './build test-installed'"
             if ! "$TEST_PKG_DIR/build" test-installed; then
                 error="1"
             fi
@@ -1575,9 +1567,11 @@ EOF
     "dist-test"|"dist-test-debug")
         test_mode="test"
         test_msg="TESTING %s"
+        async_daemon="tightdbd"
         if [ "$MODE" = "dist-test-debug" ]; then
             test_mode="test-debug"
             test_msg="TESTING %s in debug mode"
+            async_daemon="tightdbd-dbg"
         fi
         if ! [ -e ".DIST_CORE_WAS_BUILT" ]; then
             cat 1>&2 <<EOF
@@ -1616,6 +1610,7 @@ EOF
         path_list_prepend LD_RUN_PATH  "$libdir"                    || exit 1
         path_list_prepend "$LD_LIBRARY_PATH_NAME" "$TIGHTDB_HOME/src/tightdb"  || exit 1
         export CPATH LIBRARY_PATH LD_RUN_PATH "$LD_LIBRARY_PATH_NAME"
+        export TIGHTDBD_PATH="$TIGHTDB_HOME/src/tightdb/$async_daemon"
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -e "$EXT_HOME/.DIST_WAS_BUILT" ]; then
