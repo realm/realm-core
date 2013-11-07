@@ -36,7 +36,7 @@ enum ColumnType {
     col_type_Reserved1   =  8, // new date
     col_type_Float       =  9,
     col_type_Double      = 10,
-    col_type_Reserved4   = 11, // Decimal
+    col_type_Reserved4   = 11  // Decimal
 };
 
 // Attributes are bitmasks
@@ -44,7 +44,7 @@ enum ColumnAttr {
     col_attr_None        = 0,
     col_attr_Indexed     = 1,
     col_attr_Unique      = 2,
-    col_attr_Sorted      = 4,
+    col_attr_Sorted      = 4
 };
 
 
