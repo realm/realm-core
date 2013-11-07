@@ -293,7 +293,7 @@ case "$MODE" in
         install_includedir="$($MAKE --no-print-directory prefix="$install_prefix" get-includedir)" || exit 1
         install_bindir="$($MAKE --no-print-directory prefix="$install_prefix" get-bindir)" || exit 1
         install_libdir="$($MAKE --no-print-directory prefix="$install_prefix" get-libdir)" || exit 1
-        install_libexecdir="$($MAKE --no-print-d0irectory prefix="$install_prefix" get-libexecdir)" || exit 1
+        install_libexecdir="$($MAKE --no-print-directory prefix="$install_prefix" get-libexecdir)" || exit 1
 
         tightdb_version="unknown"
         if [ "$TIGHTDB_VERSION" ]; then
