@@ -15,8 +15,7 @@ TIGHTDB_TABLE_2(PeopleTable,
 
 void func(BinaryData buffer)
 {
-    bool take_ownership = false;
-    Group g(buffer, take_ownership);
+    Group g(buffer, /* take_ownership: */ false);
     PeopleTable::Ref table = g.get_table<PeopleTable>("people");
 
     table->add("Mary", 14);

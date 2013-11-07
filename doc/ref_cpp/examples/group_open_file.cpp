@@ -12,8 +12,9 @@ TIGHTDB_TABLE_2(PeopleTable,
 
 void func()
 {
-    Group g;
-    g.open("people.tightdb");
+    Group::unattached_tag tag;
+    Group g(tag);
+    g.open("people.tightdb", Group::mode_ReadWrite);
     PeopleTable::Ref table = g.get_table<PeopleTable>("people");
 
     table->add("Mary", 14);

@@ -27,9 +27,15 @@ void func(Group& g)
 
 int main()
 {
+    // Create a group with storage implicitly attached
     Group g;
+    // Serialize to a file
     g.write("people.tightdb");
-    func(g);
+
+    // Create a new group without attaced storage
+    Group::unattached_tag tag;
+    Group g2(tag);
+    func(g2);
     File::remove("people.tightdb");
     File::remove("people_new.tightdb");
 }
