@@ -472,7 +472,7 @@ EOF
         exit 0
         ;;
 
-    "install-shared")
+    "install-prod")
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
         $MAKE install-only DESTDIR="$DESTDIR" INSTALL_FILTER=shared-libs,progs || exit 1
@@ -502,7 +502,7 @@ EOF
         exit 0
         ;;
 
-    "uninstall-shared")
+    "uninstall-prod")
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
         $MAKE uninstall INSTALL_FILTER=shared-libs,progs || exit 1
@@ -1728,7 +1728,7 @@ EOF
         if [ -z "$INTERACTIVE" ]; then
             echo "INSTALLING Core library" | tee -a "$LOG_FILE"
         fi
-        if sh build.sh install-shared >>"$LOG_FILE" 2>&1; then
+        if sh build.sh install-prod >>"$LOG_FILE" 2>&1; then
             touch ".DIST_CORE_WAS_INSTALLED" || exit 1
             if [ -e ".DIST_CXX_WAS_CONFIGURED" ]; then
                 if [ -z "$INTERACTIVE" ]; then
@@ -1862,7 +1862,7 @@ EOF
             rm -f ".DIST_CXX_WAS_INSTALLED" || exit 1
         fi
         echo "UNINSTALLING Core library" | tee -a "$LOG_FILE"
-        if ! sh build.sh uninstall-shared >>"$LOG_FILE" 2>&1; then
+        if ! sh build.sh uninstall-prod >>"$LOG_FILE" 2>&1; then
             echo "Failed!" | tee -a "$LOG_FILE" 1>&2
             ERROR="1"
         fi
@@ -2043,7 +2043,7 @@ EOF
     *)
         echo "Unspecified or bad mode '$MODE'" 1>&2
         echo "Available modes are: config clean build build-config-progs build-iphone test test-debug install uninstall test-installed wipe-installed" 1>&2
-        echo "As well as: install-shared install-devel uninstall-shared uninstall-devel dist-copy" 1>&2
+        echo "As well as: install-prod install-devel uninstall-prod uninstall-devel dist-copy" 1>&2
         echo "As well as: src-dist bin-dist dist-deb dist-status dist-pull dist-checkout" 1>&2
         echo "As well as: dist-config dist-clean dist-build dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall dist-test-installed" 1>&2
         exit 1
