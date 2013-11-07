@@ -1,4 +1,4 @@
-// @@Example: ex_shared_group_intro @@
+// @@Example: ex_cpp_shared_group_writetrans @@
 // @@Fold@@
 #include <cassert>
 #include <tightdb.hpp>
@@ -6,13 +6,13 @@
 
 using namespace tightdb;
 
-// @@EndFold@@
 // Define schema for main table
 TIGHTDB_TABLE_3(PeopleTable,
                   name,   String,
                   age,    Int,
                   hired,  Bool)
 
+// @@EndFold@@
 void func()
 {
     // Create a new shared group
@@ -31,9 +31,13 @@ void func()
             employees->add("jessica", 22, true);
         }
 
+        // End transaction here by commiting it. Any exception prior to this point
+        // will cause the transaction to be rolled back instead of being committed.
+        // So will exiting the scope of the transaction object without calling commit.
         trx.commit();
     }
 
+// @@Fold@@
     // Verify changes in read-only transaction
     {
         ReadTransaction trx(db);
@@ -46,9 +50,10 @@ void func()
         // Verify result
         assert(view.size() == 1 && view[0].name == "jessica");
     }
+// @@EndFold@@
 }
-// @@Fold@@
 
+// @@Fold@@
 int main()
 {
     func();

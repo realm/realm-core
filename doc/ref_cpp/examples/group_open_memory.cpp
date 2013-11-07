@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_group_constructor_memory @@
+// @@Example: ex_cpp_group_open_memory @@
 // @@Fold@@
 #include <cstddef>
 #include <cstdlib>
@@ -15,7 +15,9 @@ TIGHTDB_TABLE_2(PeopleTable,
 
 void func(BinaryData buffer)
 {
-    Group g(buffer, /* take_ownership: */ false);
+    Group::unattached_tag tag;
+    Group g(tag);
+    g.open(buffer, /* take_ownership: */ false);
     PeopleTable::Ref table = g.get_table<PeopleTable>("people");
 
     table->add("Mary", 14);
