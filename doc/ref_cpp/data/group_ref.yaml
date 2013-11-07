@@ -156,6 +156,8 @@ CATEGORIES  :
         CODE   : ex_cpp_group_constructor_file
       - DESCR  :
         CODE   : ex_cpp_group_constructor_memory
+      - DESCR  :
+        CODE   : ex_cpp_group_unattached
 
 - Group:
   METHODS:
