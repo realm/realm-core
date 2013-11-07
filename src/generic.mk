@@ -3,8 +3,8 @@
 #
 # Author: Kristian Spangsege
 #
-# This makefile requires GNU Make, it has been tested with version
-# 3.81.
+# This makefile requires GNU Make. It has been tested with version
+# 3.81, and it is known to work well on both Linux and OS X.
 #
 #
 # Building installable programs and libraries
@@ -158,6 +158,17 @@
 # another convenience library or as a dependency of an installed
 # library. Only programs can be declared to depend on convenience
 # libraries.
+#
+# A convenience library such as `util.a` can be made to depend on
+# project-local installed libraries by listing them in the
+# `util_a_LIBS` variable. This can be done because code in `util.a`
+# depends on those other libraries, or it can be done simply to avoid
+# specifying them repeatedly for multiple programs. On top of that, it
+# is possible to attach a set of extra linker flags to a convenience
+# library, to be used when linking programs against it. Such flags are
+# listed in `util_a_LDFLAGS`. This can be used, for example, to
+# specify linking against system libraries or other separately
+# installed libraries.
 #
 #
 # Programs that should not be installed
@@ -557,8 +568,8 @@ INT_65536 := $(foreach a,$(INT_16),$(foreach b,$(INT_16),$(foreach c,$(INT_16),$
 
 # PLATFORM SPECIFICS
 
-OS   = $(shell uname)
-ARCH = $(shell uname -m)
+OS   := $(shell uname)
+ARCH := $(shell uname -m)
 
 ifeq ($(OS),Darwin)
 LIB_SUFFIX_SHARED = .dylib
@@ -667,7 +678,7 @@ LDFLAGS_LIBRARY_PATH =
 # Work-around for CLANG < v3.2 ignoring LIBRARY_PATH
 LD_IS_CLANG = $(or $(call MATCH_CMD,clang,$(LD)),$(call MATCH_CMD,clang++,$(LD)))
 ifneq ($(LD_IS_CLANG),)
-CLANG_VERSION = $(shell printf '\#ifdef __clang__\n\#if defined __clang_major__ && defined __clang_minor__\n__clang_major__ __clang_minor__\n\#else\n0 0\n\#endif\n\#endif' | $(LD) -E - | grep -v -e '^\#' -e '^$$')
+CLANG_VERSION := $(shell printf '\#ifdef __clang__\n\#if defined __clang_major__ && defined __clang_minor__\n__clang_major__ __clang_minor__\n\#else\n0 0\n\#endif\n\#endif' | $(LD) -E - | grep -v -e '^\#' -e '^$$')
 ifneq ($(CLANG_VERSION),)
 CLANG_MAJOR = $(word 1,$(CLANG_VERSION))
 CLANG_MINOR = $(word 2,$(CLANG_VERSION))
@@ -686,8 +697,8 @@ CC_CXX_AND_LD_ARE_1 = $(and $(call MATCH_CMD,$(1),$(CC)),$(strip $(foreach x,$(1
 CC_CXX_AND_LD_ARE_GCC_LIKE = $(strip $(foreach x,$(GCC_LIKE_COMPILERS),$(call CC_CXX_AND_LD_ARE,$(x))))
 
 GENERIC_MK := $(lastword $(MAKEFILE_LIST))
-GENERIC_MK_ABS_DIR = $(abspath $(patsubst %/,%,$(dir $(GENERIC_MK))))
-CONFIG_MK = $(call MAKE_REL_PATH,$(GENERIC_MK_ABS_DIR)/config.mk)
+GENERIC_MK_DIR = $(abspath $(patsubst %/,%,$(dir $(GENERIC_MK))))
+CONFIG_MK = $(call MAKE_REL_PATH,$(GENERIC_MK_DIR)/config.mk)
 DEP_MAKEFILES = Makefile $(GENERIC_MK)
 ifneq ($(wildcard $(CONFIG_MK)),)
 DEP_MAKEFILES += $(CONFIG_MK)
@@ -695,7 +706,7 @@ endif
 -include $(CONFIG_MK)
 
 ifneq ($(SOURCE_ROOT),)
-ABS_SOURCE_ROOT = $(abspath $(GENERIC_MK_ABS_DIR)/$(SOURCE_ROOT))
+ABS_SOURCE_ROOT = $(abspath $(GENERIC_MK_DIR)/$(SOURCE_ROOT))
 REL_SOURCE_ROOT = $(call MAKE_REL_PATH,$(ABS_SOURCE_ROOT))
 endif
 
@@ -1258,20 +1269,8 @@ PATTERN_UNPACK_MAP   = $(foreach x,$(3),$(call PATTERN_UNPACK_MAP_1,$(1),$(call 
 PATTERN_UNPACK_MAP_1 = $(if $(2),$(patsubst %,$(2),$(call $(1),$(patsubst $(2),%,$(3)),$(4))),$(3))
 PATTERN_UNPACK_MAP_2 = $(filter $(1),$(2))
 
-# neither inst nor noinst libs can have noinst lib dependencies
-# noinst libs can have associated LDFLAGS
-# mynoinstlib.libdeps = noinst lib:../libfoo.a lib:libbar.a noinst-rpath:. noinst-rpath:../dir1 ldflag-opt:-lhest ldflag-opt:-L../dir2 ldflag-dbg:-lhest ldflag-dbg:-L../dir2 ldflag-cov:-lhest ldflag-cov:-L../dir2
-# libmyinst.libdeps = noinst-rpath:../dir1 noinst-rpath:../dir2
-# noinst-rpaths in inst lib are the the project-local paths of all installed libraries that it depends on (transitively closed)
-# noinst-rpaths in noinst lib are the union of the noinst-rpaths in .libdeps of all the installed libraries that it depends on (transitively closed)
-# in lib dep expansion, the list of noinst libs are precisely those specified in _LIBS
-# in lib dep expansion, the list of inst libs are those which the noinst libs depend on plus those specified in _LIBS
-# in lib dep expansion, noinst libs must precede inst libs
-# in lib dep expansion, duplicates must be removed
-
-# Expand the contents of the target_LIBS variable for the specified target. The target must be either a program or an installed (i.e. a shared) library.
-# Output example for program: noinst:../foo/bar inst:../beta/libalpha lib:alpha dir:../beta noinst-rpath:/abs/path/beta ldflag-opt:-ldelta ldflag-dbg:-ldelta ldflag-cov:-ldelta
-# Output example for installed library: inst:../beta/libalpha lib:alpha dir:../beta noinst-rpath:/abs/path/beta
+# Expand the contents of the target_LIBS variable for the specified
+# target. The target must either be a program or an installed library.
 # ARGS: prog_target
 EXPAND_PROG_LIBS = $(call FOLD_LEFT,EXPAND_LIB_DEP,,$(strip $($(call FOLD_TARGET,$(1))_LIBS)))
 # ARGS: inst_lib_target
@@ -1302,7 +1301,6 @@ READ_LIB_LIBDEPS_3 = $(call MAKE_REL_PATH,$(dir $(2))$(1))
 IS_NOINST_LIB   = $(call FIND,IS_NOINST_LIB_1,$(NOINST_LIBRARIES) $(TEST_LIBRARIES),$(1))
 IS_NOINST_LIB_1 = $(and $(call IN_THIS_DIR,$(1)),$(call EQUALS,$(notdir $(1)),$(2)))
 
-# Example: noinst lib:../libfoo.a lib:libbar.a noinst-rpath:. noinst-rpath:../dir1 ldflag-opt:-lhest ldflag-opt:-L../dir2 ldflag-dbg:-lhest ldflag-dbg:-L../dir2 ldflag-cov:-lhest ldflag-cov:-L../dir2
 # ARGS: noinst_lib_target
 MAKE_NOINST_LIB_LIBDEPS   = $(strip noinst $(call MAKE_NOINST_LIB_LIBDEPS_1,$(1)) $(call MAKE_NOINST_LIB_LIBDEPS_2,$(1)))
 MAKE_NOINST_LIB_LIBDEPS_1 = $(foreach x,$($(call FOLD_TARGET,$(1))_LIBS),lib:$(x) $(call READ_LIB_LIBDEPS,$(x)))
@@ -1311,7 +1309,6 @@ MAKE_NOINST_LIB_LIBDEPS_3 = $(foreach x,$(call GET_FLAGS,$(call FOLD_TARGET,$(1)
 MAKE_NOINST_LIB_LIBDEPS_4 = $(foreach x,$(call GET_FLAGS,$(call FOLD_TARGET,$(1))_LDFLAGS,_DEBUG),ldflag-dbg:$(x))
 MAKE_NOINST_LIB_LIBDEPS_5 = $(foreach x,$(call GET_FLAGS,$(call FOLD_TARGET,$(1))_LDFLAGS,_COVER),ldflag-cov:$(x))
 
-# Example: noinst-rpath:../dir1 noinst-rpath:../dir2
 # ARGS: inst_lib_target
 MAKE_INST_LIB_LIBDEPS = $(call EXTRACT_INST_LIB_LIBDEPS,$(call EXPAND_INST_LIB_LIBS,$(1)))
 
@@ -1320,15 +1317,6 @@ MAKE_INST_LIB_LIBDEPS = $(call EXTRACT_INST_LIB_LIBDEPS,$(call EXPAND_INST_LIB_L
 # to the directory holding the executing Makefile.
 # ARGS: expanded_target_libs
 EXTRACT_INST_LIB_LIBDEPS = $(call PATTERN_UNPACK_MAP,MAKE_REL_PATH,noinst-rpath:%,$(filter rpath:% noinst-rpath:%,$(1)))
-
-# Same handling of noinst and inst libs:
-# Noinst lib case can be mapped to: $(call HANDLE,$(1),$(2),noinst:$(2) $(filter-out noinst,$(4)))
-# The inst lib case can be mapped to: $(call HANDLE,$(1),$(2),lib:$(notdir $(2)) $(4))
-# Each input lib: produces an output lib:, dir:, noinst-rpath:
-# Each input noinst-rpath: must be made absolute
-# Each input LDFLAGS is passed through unmodified
-
-# FIXME: REMEMBER TO WRITE DOC ON x_LIBS VARIBALE.
 
 # ARGS: expanded_target_libs, qual_type
 QUALIFY_LIB_REFS   = $(call SELECT_LDFLAGS$(2),$(call QUALIFY_LIB_REFS_1,$(1),$(2)))
@@ -1391,26 +1379,79 @@ $(foreach x,$(INST_PROGRAMS) $(DEV_PROGRAMS),$(eval $(call INST_PROG_RULES,$(x),
 
 # CREATING/LINKING LIBRARIES
 
-# FIXME: When a program or library depends on another library, make explicit dependency on the 'libdeps' file.
-
 # For each library `libfoo.a` (installed or uninstalled) a 'libdeps'
 # file called `libfoo.libdeps` is also created. This file contains a
-# space-separated list of entries of various different kinds.
+# space-separated list of entries of various different kinds needed
+# when linking project-local targets against the library. The order of
+# entries is immaterial.
 #
-# For each installed library `libxxx.a`, that `libfoo.a` depends on
-# (and which is part of this project,) `libfoo.libdeps` contains an
-# entry mentioning the directory (within the project) containing
-# `libxxx.a`. This is true regardless of whether `libxxx.a` is a
-# direct or an indirect dependency of `libfoo.a` (transitivity). For
-# example, if `libxxx.a` is an dependency of `libyyy.a` and `libyyy.a`
-# is a dependency of `libfoo.a`, then `libxxx.a` is an indirect
-# dependency of `libfoo.a`. These entries are on the form
-# `noinst-rpath:<dir>` where `<dir>` is expressed relative to the
-# directory containing `libfoo.libdeps`. For example, if `libfoo.a` is
-# in a subdirectory called `foo` and `libxxx.a` is in a subdirectory
-# called `xxx`, then `libfoo.libdeps` contains `noinst-rpath:../xxx`,
-# or if both are in the same directory, `libfoo.libdeps` contains
-# `noinst-rpath:.`.
+#
+# If `libinst.a` is an installed library, then `libinst.libdeps`
+# contains a number of `rpath:` and `noninst-rpath:` entries. The
+# `rpath:` entries are used in `-rpath` flags when linking installed
+# programs against `libinst.a`. The `noinst-rpath:` entries are
+# similar, but they are used when linking programs that are not
+# installed (i.e., those that can be executed before `libinst.a` is
+# installed). While the paths specified by the `rpath:` entries are
+# absolute, the paths specified by the `noninst-rpath:` entries are
+# always relative to the directory containing the 'libdeps' file.
+#
+# First of all, `libinst.libdeps` contains an `rpath:` and a
+# `noinst-rpath:` entry for itself. For instance:
+#
+#   rpath:/usr/local/lib noinst-rpath:.
+#
+# Further more, `libinst.libdeps` contains an `rpath:` and a
+# `noinst-rpath:` entry for each installed library `libxxx.a`, that
+# `libinst.a` depends on, and which is also part of this project,
+# unless those entries would lead to duplicates. This is true even
+# when `libxxx.a` is an indirect dependency of `libinst.a`
+# (transitivity). For example, if `libxxx.a` is an dependency of
+# `libyyy.a` and `libyyy.a` is a dependency of `libinst.a`, then
+# `libxxx.a` is an indirect dependency of `libinst.a`. Let us assume
+# that `libinst.a`, `libxxx.a`, and `libyyy.a` are located in
+# subdirectories `inst`, `xxx`, and `yyy` respectively, and all are
+# installed in `/usr/local/lib`, then `libinst.libdeps` will contain
+#
+#   rpath:/usr/local/lib noinst-rpath:. noinst-rpath:../xxx
+#   noinst-rpath:../yyy
+#
+# Had they all been located in the same directory, `libinst.libdeps`
+# would instead contain
+#
+#   rpath:/usr/local/lib noinst-rpath:.
+#
+#
+# If `libconv.a` is a convenience library (not installed), then
+# `libconv.libdeps` contains a `noinst` entry that identifies it as a
+# convenience library to `Makefile`s in other subdirectories. Apart
+# from that, it contains a `lib:` entry for each installed
+# project-local library that `libconv.a` directly depends on, and it
+# contains the union of the contents of the 'libdeps' files associated
+# with each of those `lib:` entries with relative paths transformed as
+# necessary. For example, if `libconv.a` depends on `libinst.a`, and
+# `libconv.a` is located in the root directory of the project, and the
+# installed libraries are located in distinct subdirectories as
+# described in an example above, then `libconv.libdeps` will contain
+#
+#   noinst lib:inst/libinst.a rpath:/usr/local/lib noinst-rpath:inst
+#   noinst-rpath:xxx noinst-rpath:yyy
+#
+# Note how the relative paths in the `noinst-rpath:` entries have been
+# transformed such that they are now relative to the root directory.
+#
+# When extra linker flags are attached to a convenience library, those
+# flags will also be carried in the 'libdeps' file. For example,
+# `libconv.libdeps` might contain
+#
+#   ldflag-opt:-lmagic ldflag-opt:-L/opt/magic/lib
+#   ldflag-dbg:-lmagic ldflag-dbg:-L/opt/magic-debug/lib
+#   ldflag-cov:-lmagic ldflag-cov:-L/opt/magic-debug/lib
+#
+# The `ldflag-opt:` entries are used when compiling in optimized
+# (default) mode, while the `ldflag-dbg:` and the `ldflag-cov:`
+# entries are used when compiling in debug and coverage modes
+# respectively.
 
 # ARGS: target, objects, extra_deps
 define STATIC_LIBRARY_RULE

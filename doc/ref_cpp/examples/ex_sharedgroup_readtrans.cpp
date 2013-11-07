@@ -1,4 +1,4 @@
-// @@Example: ex_shared_group_intro @@
+// @@Example: ex_cpp_shared_group_readtrans @@
 // @@Fold@@
 #include <cassert>
 #include <tightdb.hpp>
@@ -6,18 +6,19 @@
 
 using namespace tightdb;
 
-// @@EndFold@@
 // Define schema for main table
 TIGHTDB_TABLE_3(PeopleTable,
                   name,   String,
                   age,    Int,
                   hired,  Bool)
 
+// @@EndFold@@
 void func()
 {
     // Create a new shared group
     SharedGroup db("shared_db.tightdb");
 
+    // @@Fold@@
     // Do a write transaction
     {
         WriteTransaction trx(db);
@@ -35,6 +36,7 @@ void func()
     }
 
     // Verify changes in read-only transaction
+    // @@EndFold@@
     {
         ReadTransaction trx(db);
         PeopleTable::ConstRef employees = trx.get_table<PeopleTable>("employees");
@@ -45,6 +47,8 @@ void func()
 
         // Verify result
         assert(view.size() == 1 && view[0].name == "jessica");
+
+        // Transaction ends here when the transaction object goes out of scope
     }
 }
 // @@Fold@@

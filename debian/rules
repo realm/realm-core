@@ -14,10 +14,10 @@ override_dh_usrlocal:
 clean:
 	dh_testdir
 	dh_clean
-	sh build.sh clean
 
 build: clean
 	sh build.sh config /usr
+	sh build.sh clean
 	sh build.sh build
 
 
