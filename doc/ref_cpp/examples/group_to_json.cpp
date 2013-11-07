@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_group_tostring @@
+// @@Example: ex_cpp_group_to_json @@
 // @@Fold@@
 #include <iostream>
 #include <sstream>
@@ -23,11 +23,11 @@ int main()
 // @@EndFold@@
 
     ostringstream ss;
-    group.to_string(ss);
+    group.to_json(ss);
     cout << ss.str() << endl;
 
     // or using less memory:
-    group.to_string(cout);
+    group.to_json(cout);
     cout << endl;
 
 // @@Fold@@

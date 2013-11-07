@@ -8,8 +8,10 @@ ifeq ($(shell uname),Linux)
 test_util_a_LDFLAGS = -lrt
 
 ifeq ($(shell pkg-config libprocps --exists 2>/dev/null && echo yes),yes)
-test_util_a_CFLAGS  += $(shell pkg-config libprocps --cflags)
-test_util_a_LDFLAGS += $(shell pkg-config libprocps --libs)
+PROCPS_CFLAGS  := $(shell pkg-config libprocps --cflags)
+PROCPS_LDFLAGS := $(shell pkg-config libprocps --libs)
+test_util_a_CFLAGS  += $(PROCPS_CFLAGS)
+test_util_a_LDFLAGS += $(PROCPS_LDFLAGS)
 else
 test_util_a_LDFLAGS += -lproc
 endif

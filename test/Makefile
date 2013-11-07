@@ -10,19 +10,22 @@ test_stl_DEPS     = util
 
 TEST_PROGRAMS = tightdb-tests
 
-tightdb_tests_SOURCES = $(wildcard *.c *.cpp large_tests/*.cpp)
+TEST_SOURCES := $(wildcard *.c *.cpp large_tests/*.cpp)
+tightdb_tests_SOURCES = $(TEST_SOURCES)
 tightdb_tests_LIBS    = util/test-util.a
 
 EXTRA_CLEAN_DIRS = large_tests
 
 ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)
-tightdb_tests_CFLAGS  = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
-tightdb_tests_LDFLAGS = $(shell pkg-config unittest++ --libs)
+UNITTESTPP_CFLAGS  := $(shell pkg-config unittest++ --cflags)
+UNITTESTPP_LDFLAGS := $(shell pkg-config unittest++ --libs)
+tightdb_tests_CFLAGS  = -Wno-sign-compare $(UNITTESTPP_CFLAGS)
+tightdb_tests_LDFLAGS = $(UNITTESTPP_LDFLAGS)
 else
 PASSIVE_SUBDIRS += UnitTest++
 tightdb_tests_CFLAGS  = -IUnitTest++/src
 tightdb_tests_LDFLAGS = -LUnitTest++ -lUnitTest++
-tightdb_tests_DEPS    = UnitTest++
+tightdb_tests_DEPS    = fallback-UnitTest++
 endif
 
 include ../src/generic.mk
@@ -39,9 +42,16 @@ benchmark: test-norun/subdir/test-tightdb test-norun/subdir/test-sqlite3 test-no
 	@echo ".:: STL Vector ::."
 	test-stl/test-stl
 
-.PHONY: UnitTest++
-UnitTest++:
-	$(MAKE) -C UnitTest++ CXXFLAGS="-g -Wall -W -ansi" LDFLAGS="" >/dev/null
+FALLBACK_UNITTESTPP_CFLAGS = -g -Wall -W -ansi $(CFLAGS_ARCH)
+FALLBACK_UNITTESTPP_LDFLAGS = $(LDFLAGS_ARCH)
+
+# FIXME: The fallback version of UnitTest++ is used on Darwin, but
+# when compiling with Clang (the only option on OS X 10.9) the
+# self-test test suite of UnitTest++ fails, so we have to ignore
+# errors from the build command below, hence the leading '-'
+.PHONY: fallback-UnitTest++
+fallback-UnitTest++:
+	-$(MAKE) -C UnitTest++ CXX="$(CXX)" CXXFLAGS="$(FALLBACK_UNITTESTPP_CFLAGS)" LDFLAGS="$(FALLBACK_UNITTESTPP_LDFLAGS)" >/dev/null
 
 # Build and run the performance matrix benchmarking program
 .PHONY: performance

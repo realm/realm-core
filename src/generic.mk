@@ -568,8 +568,8 @@ INT_65536 := $(foreach a,$(INT_16),$(foreach b,$(INT_16),$(foreach c,$(INT_16),$
 
 # PLATFORM SPECIFICS
 
-OS   = $(shell uname)
-ARCH = $(shell uname -m)
+OS   := $(shell uname)
+ARCH := $(shell uname -m)
 
 ifeq ($(OS),Darwin)
 LIB_SUFFIX_SHARED = .dylib
@@ -678,7 +678,7 @@ LDFLAGS_LIBRARY_PATH =
 # Work-around for CLANG < v3.2 ignoring LIBRARY_PATH
 LD_IS_CLANG = $(or $(call MATCH_CMD,clang,$(LD)),$(call MATCH_CMD,clang++,$(LD)))
 ifneq ($(LD_IS_CLANG),)
-CLANG_VERSION = $(shell printf '\#ifdef __clang__\n\#if defined __clang_major__ && defined __clang_minor__\n__clang_major__ __clang_minor__\n\#else\n0 0\n\#endif\n\#endif' | $(LD) -E - | grep -v -e '^\#' -e '^$$')
+CLANG_VERSION := $(shell printf '\#ifdef __clang__\n\#if defined __clang_major__ && defined __clang_minor__\n__clang_major__ __clang_minor__\n\#else\n0 0\n\#endif\n\#endif' | $(LD) -E - | grep -v -e '^\#' -e '^$$')
 ifneq ($(CLANG_VERSION),)
 CLANG_MAJOR = $(word 1,$(CLANG_VERSION))
 CLANG_MINOR = $(word 2,$(CLANG_VERSION))
