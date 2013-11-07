@@ -392,7 +392,6 @@ size_t Table::add_column(DataType type, StringData name)
 
 size_t Table::add_subcolumn(const vector<size_t>& column_path, DataType type, StringData name)
 {
-    TIGHTDB_ASSERT(!column_path.empty());
     TIGHTDB_ASSERT(!has_shared_spec());
     detach_subtable_accessors();
 
@@ -488,7 +487,11 @@ size_t Table::do_add_column(DataType type)
 void Table::do_add_subcolumn(const vector<size_t>& column_path, size_t column_path_ndx,
                              DataType type)
 {
-    TIGHTDB_ASSERT(1 <= column_path.size());
+    if (column_path.empty()) {
+        do_add_column(type);
+        return;
+    }
+
     TIGHTDB_ASSERT(column_path_ndx <= column_path.size() - 1);
 
     size_t column_ndx = column_path[column_path_ndx];

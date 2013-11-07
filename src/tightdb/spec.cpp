@@ -122,8 +122,10 @@ size_t Spec::add_column(DataType type, StringData name, ColumnAttr attr)
 
 size_t Spec::add_subcolumn(const vector<size_t>& column_path, DataType type, StringData name)
 {
-    TIGHTDB_ASSERT(!column_path.empty());
-    return do_add_subcolumn(column_path, 0, type, name);
+    if (column_path.empty())
+        return add_column(type, name);
+    else
+        return do_add_subcolumn(column_path, 0, type, name);
 }
 
 size_t Spec::do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, DataType type, StringData name)
