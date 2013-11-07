@@ -830,7 +830,7 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
     echo
     echo "Installation report"
     echo "-------------------"
-    echo "The following files have been 
+    echo "The following files have been"
     for x in \$EXT; do
         echo "$x:"
         sh $debug tightdb_\$x/build.sh install-report
