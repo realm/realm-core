@@ -1056,6 +1056,7 @@ EOF
 /Makefile
 /src/generic.mk
 /src/config.mk
+/src/config-dyn.mk
 /src/Makefile
 /src/tightdb.hpp
 /src/tightdb/Makefile
