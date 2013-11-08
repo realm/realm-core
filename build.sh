@@ -1285,6 +1285,18 @@ EOF
                 # they are available during configuration and building
                 # of extensions, just as if the core library has been
                 # previously installed.
+
+                # FIXME: Aparently, there are fluke cases where
+                # timestamps are such that
+                # src/tightdb/build_config.h is not recreated
+                # automatically be src/tightdb/Makfile. The following
+                # is a workaround:
+                if [ "$PREBUILT_CORE" ]; then
+                    rm "src/tightdb/build_config.h" || exit 1
+                    rm "src/tightdb/tightdb-config" || exit 1
+                    rm "src/tightdb/tightdb-config-dbg" || exit 1
+                fi
+
                 if ! sh "build.sh" build-config-progs >>"$LOG_FILE" 2>&1; then
                     ERROR="1"
                 fi
