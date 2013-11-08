@@ -120,20 +120,21 @@ DESCR      : >
             </tbody>
             </table>
             <table class="table table-bordered" border="1">
-            <thead><tr><td colspan="4"><h3>Arithmetic operators</h3>
+            <thead><tr><td colspan="5"><h3>Arithmetic operators</h3>
             </td>
             </tr>
             </thead>
             <tbody>
             <tr>
-            <td colspan="4">Arithmetic operators only apply to 
-            columns of type Int, Float and Double. Currently four operators are 
+            <td colspan="5">Arithmetic operators only apply to 
+            columns of type Int, Float and Double. Currently five operators are 
             available (more will be introduced in future releases):</td>
             </tr>
             <tr><td>+ (plus)</td>
             <td>- (minus)</td>
             <td>* (multiply)</td>
             <td>/ (division)</td>
+            <td>power(x) (power(x) = x^2)</td>
             </tr>
             </tbody>
             </table>
