@@ -4,9 +4,7 @@
 if [ -e $HOME/.tightdb ]; then
     . $HOME/.tightdb
 fi
-if [ -z "$TIGHTDB_SCRIPT_DEBUG" ]; then
-    set +x
-else
+if [ "$TIGHTDB_SCRIPT_DEBUG" ]; then
     set -x
 fi
 
@@ -2004,6 +2002,7 @@ EOF
         cat >"$TEMP_DIR/include" <<EOF
 /README.md
 /build.sh
+/common_funcs.sh
 /Makefile
 /src
 /test
