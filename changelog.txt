@@ -14,6 +14,9 @@ Format:
 . BREAKING CHANGE: Schema now handles attributes separately for better performance when there are many colummns.
 
 2013-11-07 (Lasse Reinhold)
++ Added power() operator for next-generation-queries
+
+2013-11-07 (Lasse Reinhold)
 ! Fixed bug: ng-queries could segfault to bug in Array::get_chunk(). Normal queries and everything else not affected.
 
 2013-10-10 (Kenneth Geisshirt)
