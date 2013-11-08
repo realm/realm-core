@@ -15,5 +15,5 @@ Description: Fast, embedded database
 Package: libtightdb-dev
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, g++
-Description: Fast, emdded database.
+Description: Fast, embedded database.
  TightDB is a fast, embedded database: Development and header files.
