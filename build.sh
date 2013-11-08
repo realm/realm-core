@@ -4,9 +4,7 @@
 if [ -e $HOME/.tightdb ]; then
     . $HOME/.tightdb
 fi
-if [ -z "$TIGHTDB_SCRIPT_DEBUG" ]; then
-    set +x
-else
+if [ "$TIGHTDB_SCRIPT_DEBUG" ]; then
     set -x
 fi
 
