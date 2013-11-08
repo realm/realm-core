@@ -2002,7 +2002,6 @@ EOF
         cat >"$TEMP_DIR/include" <<EOF
 /README.md
 /build.sh
-/common_funcs.sh
 /Makefile
 /src
 /test
