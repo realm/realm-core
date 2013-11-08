@@ -40,7 +40,7 @@
 /* This one is needed to allow tightdb-config to know whether a
  * nondefault value is in effect. */
 #ifdef TIGHTDB_DEBUG
-#  define TIGHTDB_DEFAULT_MAX_LIST_SIZE 1000
+#  define TIGHTDB_DEFAULT_MAX_LIST_SIZE 4
 #else
 #  define TIGHTDB_DEFAULT_MAX_LIST_SIZE 1000
 #endif
