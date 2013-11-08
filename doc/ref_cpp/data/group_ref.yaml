@@ -10,11 +10,6 @@ SUMMARY     : &g_group_summary
               Container for tables.
 DESCR       : &g_group_descr
               >
-              In order to store tables on disk or transfer tables over network,
-              they must be serialized. The TightDB framework provides various
-              methods including <a href="http://www.json.org">JSON</a> for
-              single tables.
-
               The Group is a container for tables and it allows the tables to
               be serialized to disk and memory. The serialization format is
               highly optimized for TightDB tables, which implies that the
@@ -94,13 +89,11 @@ CATEGORIES  :
       - NAME   : file
         TYPES  : const std::string&
         DESCR  : &g_open_filesystem_path_descr
-                 Filesystem path of the TightDB database file to be opened.
+                 Filesystem path of the TightDB database file to be opened. Only ASCII characters are allowed.
       - NAME   : mode
         TYPES  : Group::OpenMode
         DESCR  : |
-                 Group::mode_ReadOnly:          Open in read-only mode. Fail if the file does not already exist.
-                 Group::mode_ReadWrite:         Open in read/write mode. Create the file if it does not already exist.
-                 Group::mode_ReadWriteNoCreate: Open in read/write mode. Fail if the file does not already exist.
+                 <tt>Group::mode_ReadOnly</tt>: Open in read-only mode. Fail if the file does not already exist. <br><br><tt>Group::mode_ReadWrite</tt>: Open in read/write mode. Create the file if it does not already exist. <br><br><tt>Group::mode_ReadWriteNoCreate</tt>: Open in read/write mode. Fail if the file does not already exist.
       - NAME   : buffer
         TYPES  : BinaryData
         DESCR  : &g_group_constructor_memory_parm3_descr
@@ -148,7 +141,7 @@ CATEGORIES  :
                  Thrown if create_Never was specified and the database file exists.
       - EXCEPT : InvalidDatabase
         DESCR  : &g_group_exc_invalid_db
-                 Thrown if the specified database file does not contain a valid database
+                 Thrown if the specified database file does not contain a valid database.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_group_constructor_plain
