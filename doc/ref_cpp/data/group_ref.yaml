@@ -10,32 +10,36 @@ SUMMARY     : &g_group_summary
               Container for tables.
 DESCR       : &g_group_descr
               >
-              The Group is a container for tables and it allows the tables to
-              be serialized to disk and memory. The serialization format is
-              highly optimized for TightDB tables, which implies that the
-              consumed resources are low.
+              The Group is a container for tables. The group can be attached
+              to three different forms of storage: (1) internal, (2) a user
+              provided buffer or (3) a file on disk. A group may also be created
+              without attached storage (4).
+
+              When a group is attached to a buffer in memory (2), changes to tables
+              in the group does not cause changes to the buffer. Regardless, the
+              buffer must remain allocated as long as the group exist. A parameter
+              controls whether the group assumes responsibility for deallocation or
+              not.
+
+              When a group is attached to a writable file (3), changes to tables in the group
+              are kept buffered until commit() is called. The call to commit
+              will update the file.
+
+              When a group is attached to a read-only file (3), changes to tables in the group
+              cannot be committed to the file, but the entire group can be serialized to
+              (another) file.
+
+              A group can be serialized into a memory buffer or a file in
+              TightDB's highly efficient binary format, or it can be serialized
+              to a stream in either ascii or json format.
+
+              The result of serializing in Tightdb's own binary format (whether as a file
+              or a memory buffer) can later be attached to a group. This makes it easy
+              to exchange data between applications written in any supported programming language.
 
               A group can hold one or more tables. If a table is going to be
               serialized, you must create the table using the group. It is not
               possible to dynamically add a table to a group.
-
-              Once a group has been serialized, it is possible to deserialize
-              it using any supported programming language, on any supported
-              operating system, and on any supported hardware platform. This
-              implies that TightDB is truly a polyglot framework which you can
-              use to share data between applications.
-
-              Note that changes made to the database via a Group
-              instance are not automatically committed to the
-              specified file. You may, however, at any time,
-              explicitly commit your changes by calling the
-              commit() method, provided that the specified
-              open-mode is not mode_ReadOnly. Alternatively, you
-              may call write() to write the entire database to a
-              new file. Writing the database to a new file does not
-              end, or in any other way change the association
-              between the Group instance and the file that was
-              specified in the call to open().
 
               Accessing a TightDB database file through manual
               construction of a Group object does not offer any
@@ -215,11 +219,12 @@ CATEGORIES  :
                  the attached state has undefined behavior.
 
                  Specifying a memory buffer is equivalent to
-                 specifying a file except that in this case the
-                 database is assumed to be stored in that buffer.
-
-                 Calling open() on a Group instance that is already in
-                 the attached state has undefined behavior.
+                 specifying a file except that (a) in this case the
+                 database is assumed to be stored in that buffer instead 
+                 of a file and (b) it is not possible to use commit or in 
+                 other ways change the buffer. If you change the contents
+                 of the group and want to persist your changes you must
+                 use one of the functions for serialization.
 
       SUMMARY  : &g_group_open_summary
                  Attach to a file or a memory buffer.
@@ -508,7 +513,7 @@ CATEGORIES  :
   - g_group_tostring:
       NAME     : to_string
       SUMMARY  : &g_group_to_string_summary
-                 Get a string representation of the group.
+                 Serialize a string representation of the group onto an output stream.
       DESCR    : &g_group_to_string_descr
                  This methods adds a string representation of information about the group to an
                  output stream.
@@ -525,7 +530,7 @@ CATEGORIES  :
   - g_group_to_json:
       NAME     : to_json
       SUMMARY  : &g_group_to_json_summary
-                 Get a JSON representation of the group.
+                 Serialize a JSON representation of the group onto an output stream.
       SIGNATURE: template<class S> void to_json(S& out) const
       DESCR    : &g_group_to_json_descr
                  This methods adds a JSON representation of information about the group to an
