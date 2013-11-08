@@ -50,7 +50,12 @@ DESCR      : &g_shared_group_descr
              Nested transactions are not supported.
 
              Read transactions are significantly faster than write
-             transactions.
+             transactions. Multiple read transactions may occur concurrently
+             with each other or with write transactions, while write transactions 
+             are serialized with respect to each other.
+             Transactions are fully isolated: throughout a read transaction it will see 
+             the state of the data as it was when the read transactions started, 
+             regardless of any concurrent commits from write transactions.
 SEE        :
 EXAMPLES:
 - DESCR    :
@@ -74,7 +79,7 @@ CATEGORIES:
 
                  When multiple threads or processes access the same database file
                  through shared groups, each shared group must be opened in the same
-                 mode.
+                 durability mode.
 
       - TEXT   : &g_shared_group_durability_modes
                  >
@@ -237,14 +242,21 @@ CATEGORIES:
       RETURN:
         TYPES  : TableRef
         DESCR  : A reference to a table.
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_get_table
+        DESCR  :
 
   - g_trans_get_group:
       NAMES    : get_group
       SUMMARY  : Get the group.
-      DESCR    : Return the group used by the transaction.
+      DESCR    : Return the group used by the transaction. Take care not to call commit()
+                 on the group.
       RETURN:
         TYPES  : Group&
         DESCR  : A group.
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_get_group
+        DESCR  :
 
 
 
