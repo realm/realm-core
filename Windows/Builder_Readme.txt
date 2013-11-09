@@ -107,7 +107,7 @@ otherwise a c++ developer will have to evaluate the warning and fix the problem 
 
 ***Visual studio 2012 build 
 
-21. OPen TightDb.sln with visual studio 2012 . right click "Solution 'TightDB' (8 projects) in Solution Explorer
+21. Open TightDb.sln with visual studio 2012 . right click "Solution 'TightDB' (8 projects) in Solution Explorer
 
 22. select Update VC++ Projects
 
@@ -125,16 +125,16 @@ click clean
 
 26. select Build->Batch Build, click Rebuild. Wait for the build process to finish.
 
-4. Look at the bottom of Output. Verify that all 8 projects built, and that 0 failed
+27. Look at the bottom of Output. Verify that all 8 projects built, and that 0 failed
 
-5. Look through Output, look for warnings.
+28. Look through Output, look for warnings.
 
-6. For each warning, click on it to view the source. The source should have a note about the specific warning, 
+29. For each warning, click on it to view the source. The source should have a note about the specific warning, 
 otherwise a c++ developer will have to evaluate the warning and fix the problem or write a note
 
-7. Assuming all warnigs are noted in the source, and all 8 projects build, continue..
+30. Assuming all warnigs are noted in the source, and all 8 projects build, continue..
 
-8.
+31.
 Select Debug in Solution Configurations drop down
 Select Win32 in solution platform drops down
 Click the green run arrow. after a while,
@@ -143,7 +143,7 @@ Press ENTER. A VLD info will flash by and the console
 window will close. Inspect the output window inside VS2010, make sure
 no leaks reported from Visual Leak Detector
 
-9.
+32.
 Select Debug in Solution Configurations drop down
 Select x64 in solution platform drops down
 Click the green run arrow. after a while,
@@ -152,14 +152,14 @@ Press ENTER. A VLD info will flash by and the console
 window will close. Inspect the output window inside VS2010, make sure
 no leaks reported from Visual Leak Detector
 
-10.
+33.
 Select Release in Solution Configurations drop down
 Select x64 in solution platform drops down
 Click the green run arrow. after a while,
 top5 timings will be shown. No unit tests should be listed as failed.
 Press ENTER. 
 
-11.
+34.
 Select Release in Solution Configurations drop down
 Select win32 in solution platform drops down
 Click the green run arrow. after a while,
@@ -167,7 +167,7 @@ top5 timings will be shown. No unit tests should be listed as failed.
 Press ENTER. 
 
 
-12. select Build->Batch Build. Unmark *all* , mark the 4 called 
+35. select Build->Batch Build. Unmark *all* , mark the 4 called 
 project:  configuration: Platform
 TightDB   Static library, debug    Win32
 TightDB   Static library, debug    x64
@@ -175,53 +175,24 @@ TightDB   Static library, release  Win32
 TightDB   Static library, release  x64
 click clean
 
-13. select Build->Batch build. Click Rebuild (wait until the build has finished)
+36. select Build->Batch build. Click Rebuild (wait until the build has finished)
 
-14. Look at the bottom of Output. Verify that all 8 projects built, and that 0 failed
+37. Look at the bottom of Output. Verify that all 8 projects built, and that 0 failed
 
-15. Look through Output, look for warnings.
+38. Look through Output, look for warnings.
 
-16. For each warning, click on it to view the source. The source should have a note about the specific warning, 
+39. For each warning, click on it to view the source. The source should have a note about the specific warning, 
 otherwise a c++ developer will have to evaluate the warning and fix the problem or write a note
-6. Assuming all warnigs are noted in the source, and all 8 projects build, continue..
 
-17. right click "Solution 'TightDB' (8 projects) in Solution Explorer
+40. Assuming all warnigs are noted in the source, and all 8 projects build, continue..
 
-18. Select 'open folder in windows explorer'
+41. right click "Solution 'TightDB' (8 projects) in Solution Explorer
 
-19. in the opened folder, go to the windows directory
+42. Select 'open folder in windows explorer'
 
-20. in the windows folder, double click on winrelease2010.cmd
+43. in the opened folder, go to the windows directory
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+44. in the windows folder, double click on winrelease2012.cmd
 
 
 
