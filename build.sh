@@ -828,12 +828,14 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
     echo
     echo "Installation report"
     echo "-------------------"
-    echo "The following files have been"
+    echo "The following files have been installed:"
     for x in \$EXT; do
-        echo "$x:"
-        sh $debug tightdb_\$x/build.sh install-report
-        if [ $? -eq 1 ]; then
-            echo " no files has been installed."
+        if [ "\$x" != "c++" -a "\$x" != "c" ]; then
+            echo "\$x:"
+            sh $debug tightdb_\$x/build.sh install-report
+            if [ $? -eq 1 ]; then
+                echo " no files has been installed."
+            fi
         fi
     done
 
@@ -844,7 +846,9 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
     if [ \$(echo \$answer | grep -c ^[yY]) -eq 1 ]; then
         mkdir -p \$HOME/tightdb_examples
         for x in \$EXT; do
-            cp -a tightdb_\$x/examples \$HOME/tightdb_examples/\$x
+            if [ "\$x" != "c++" -a "\$x" != "c" ]; then
+                cp -a tightdb_\$x/examples \$HOME/tightdb_examples/\$x
+            fi
         done
         if [ \$(echo \$EXT | grep -c java) -eq 1 ]; then
             find \$HOME/tightdb_examples/java -name build.xml -exec sed -i -e 's/value="\.\.\/\.\.\/lib"/value="\/usr\/local\/share\/java"/' \{\} \\;
@@ -1500,8 +1504,9 @@ EOF
             echo "Done building" | tee -a "$LOG_FILE"
         fi
         if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
-            if [ "$ERROR" ]; then
-                cat 1>&2 <<EOF
+            if [ -z "$INTERACTIVE" ]; then
+                if [ "$ERROR" ]; then
+                    cat 1>&2 <<EOF
 
 Note: Some parts failed to build. You may be missing one or more
 dependencies. Check the README file for details. If this does not
@@ -1509,8 +1514,7 @@ help, check the log file.
 The log file is here: $LOG_FILE
 
 EOF
-            fi
-            if [ -z "$INTERACTIVE" ]; then
+                fi
                 cat <<EOF
 
 Run the following command to install the parts that were successfully
