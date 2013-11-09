@@ -105,7 +105,9 @@ otherwise a c++ developer will have to evaluate the warning and fix the problem 
 20. in the windows folder, double click on winrelease2010.cmd
 
 
-21. right click "Solution 'TightDB' (8 projects) in Solution Explorer
+***Visual studio 2012 build 
+
+21. OPen TightDb.sln with visual studio 2012 . right click "Solution 'TightDB' (8 projects) in Solution Explorer
 
 22. select Update VC++ Projects
 
