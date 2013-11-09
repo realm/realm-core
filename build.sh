@@ -811,7 +811,6 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
         exit 1
     fi
     EXT=""
-    DEBUG=""
     while [ \$# -gt 0 ]; do
         e=\$1
         if [ \$(echo \$EXTENSIONS | tr " " "\n" | grep -c \$e) -eq 0 ]; then
@@ -1329,6 +1328,8 @@ EOF
                 fi
                 touch ".DIST_CXX_WAS_CONFIGURED" || exit 1
             fi
+            export TIGHTDB_DIST_INCLUDEDIR="$TIGHTDB_HOME/src"
+            export TIGHTDB_DIST_LIBDIR="$TIGHTDB_HOME/src/tightdb"
             path_list_prepend PATH "$TIGHTDB_HOME/config-progs" || exit 1
             export PATH
             for x in $EXTENSIONS; do
