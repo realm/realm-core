@@ -1029,16 +1029,6 @@ EOF
                 sh "$TIGHTDB_HOME/build.sh" dist-copy "$PREBUILD_DIR" >>"$LOG_FILE" 2>&1 || exit 1
                 (cd "$PREBUILD_DIR" && sh build.sh config && sh build.sh build) >>"$LOG_FILE" 2>&1 || exit 1
 
-                message "Running test suite for core library"
-                if ! (cd "$PREBUILD_DIR" && sh build.sh test) >>"$LOG_FILE" 2>&1; then
-                    warning "Test suite failed for core library"
-                fi
-
-                message "Running test suite for core library in debug mode"
-                if ! (cd "$PREBUILD_DIR" && sh build.sh test-debug) >>"$LOG_FILE" 2>&1; then
-                    warning "Test suite failed for core library in debug mode"
-                fi
-
                 if [ "$INCLUDE_IPHONE" ]; then
                     message "Building core library for 'iphone'"
                     (cd "$PREBUILD_DIR" && sh build.sh build-iphone) >>"$LOG_FILE" 2>&1 || exit 1
@@ -1078,6 +1068,16 @@ EOF
                     cp -R "$PREBUILD_DIR/$IPHONE_DIR" "$PKG_DIR/tightdb/" || exit 1
                 fi
                 get_host_info >"$PKG_DIR/tightdb/.PREBUILD_INFO" || exit 1
+
+                message "Running test suite for core library"
+                if ! (cd "$PREBUILD_DIR" && sh build.sh test) >>"$LOG_FILE" 2>&1; then
+                    warning "Test suite failed for core library"
+                fi
+
+                message "Running test suite for core library in debug mode"
+                if ! (cd "$PREBUILD_DIR" && sh build.sh test-debug) >>"$LOG_FILE" 2>&1; then
+                    warning "Test suite failed for core library in debug mode"
+                fi
             else
                 message "Transferring core library to package"
                 sh "$TIGHTDB_HOME/build.sh" dist-copy "$PKG_DIR/tightdb" >>"$LOG_FILE" 2>&1 || exit 1
