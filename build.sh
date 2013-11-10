@@ -9,7 +9,8 @@ if [ "$TIGHTDB_SCRIPT_DEBUG" ]; then
 fi
 
 cd "$(dirname "$0")"
-TIGHTDB_HOME="$(pwd)"
+TIGHTDB_HOME="$(pwd)" || exit 1
+export TIGHTDB_HOME
 
 MODE="$1"
 [ $# -gt 0 ] && shift
@@ -1292,7 +1293,7 @@ EOF
                 # FIXME: Aparently, there are fluke cases where
                 # timestamps are such that
                 # src/tightdb/build_config.h is not recreated
-                # automatically be src/tightdb/Makfile. The following
+                # automatically by src/tightdb/Makfile. The following
                 # is a workaround:
                 if [ "$PREBUILT_CORE" ]; then
                     rm "src/tightdb/build_config.h" || exit 1
@@ -1487,13 +1488,6 @@ EOF
                 exit 1
             fi
         fi
-        path_list_prepend PATH "$TIGHTDB_HOME/config-progs" || exit 1
-        export PATH
-        libdir="$(tightdb-config --libdir)" || exit 1
-        path_list_prepend CPATH        "$TIGHTDB_HOME/src"          || exit 1
-        path_list_prepend LIBRARY_PATH "$TIGHTDB_HOME/src/tightdb"  || exit 1
-        path_list_prepend LD_RUN_PATH  "$libdir"                    || exit 1
-        export CPATH LIBRARY_PATH LD_RUN_PATH
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" ]; then
@@ -1680,14 +1674,10 @@ EOF
                 ERROR="1"
             fi
         fi
-        path_list_prepend PATH "$TIGHTDB_HOME/config-progs" || exit 1
-        export PATH
-        libdir="$(tightdb-config --libdir)" || exit 1
-        path_list_prepend CPATH        "$TIGHTDB_HOME/src"          || exit 1
-        path_list_prepend LIBRARY_PATH "$TIGHTDB_HOME/src/tightdb"  || exit 1
-        path_list_prepend LD_RUN_PATH  "$libdir"                    || exit 1
+        # We set `LD_LIBRARY_PATH` and `TIGHTDBD_PATH` here to be able
+        # to test extensions before installation of the core library.
         path_list_prepend "$LD_LIBRARY_PATH_NAME" "$TIGHTDB_HOME/src/tightdb"  || exit 1
-        export CPATH LIBRARY_PATH LD_RUN_PATH "$LD_LIBRARY_PATH_NAME"
+        export "$LD_LIBRARY_PATH_NAME"
         export TIGHTDBD_PATH="$TIGHTDB_HOME/src/tightdb/$async_daemon"
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
@@ -1917,16 +1907,6 @@ EOF
             get_compiler_info || exit 1
             echo
         ) >>"$LOG_FILE"
-        if [ "$TIGHTDB_TEST_INSTALL_PREFIX" ]; then
-            path_list_prepend PATH "$TIGHTDB_TEST_INSTALL_PREFIX/bin" || exit 1
-            export PATH
-            includedir="$(tightdb-config --includedir)" || exit 1
-            libdir="$(tightdb-config --libdir)"         || exit 1
-            path_list_prepend CPATH                   "$includedir" || exit 1
-            path_list_prepend LIBRARY_PATH            "$libdir"     || exit 1
-            path_list_prepend "$LD_LIBRARY_PATH_NAME" "$libdir"     || exit 1
-            export CPATH LIBRARY_PATH "$LD_LIBRARY_PATH_NAME"
-        fi
         ERROR=""
         if [ -e ".DIST_CXX_WAS_INSTALLED" ]; then
             echo "TESTING Installed extension 'c++'" | tee -a "$LOG_FILE"
