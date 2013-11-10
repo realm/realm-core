@@ -850,6 +850,9 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
                 cp -a tightdb_\$x/examples/* \$HOME/tightdb_examples/\$x
             fi
         done
+        if [ \$(echo \$EXT | grep -c c++) -eq 1]; then
+            cp -a tightdb/examples/* \$HOME/tightdb_examples/c++
+        fi
         if [ \$(echo \$EXT | grep -c java) -eq 1 ]; then
             find \$HOME/tightdb_examples/java -name build.xml -exec sed -i -e 's/value="\.\.\/\.\.\/lib"/value="\/usr\/local\/share\/java"/' \{\} \\;
             find \$HOME/tightdb_examples/java -name build.xml -exec sed -i -e 's/"jnipath" value=".*" \/>/"jnipath" value="\/Library\/Java\/Extensions" \/>/' \{\} \\;
