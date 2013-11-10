@@ -824,7 +824,7 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
     done
     INTERACTIVE=1 sh build config \$EXT || exit 1
     INTERACTIVE=1 sh build build || exit 1
-    sudo INTERACTIVE=1 sh build install || exit 1
+    sudo -p "Password for installation: " INTERACTIVE=1 sh build install || exit 1
     echo
     echo "Installation report"
     echo "-------------------"
