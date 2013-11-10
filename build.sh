@@ -847,7 +847,7 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
         mkdir -p \$HOME/tightdb_examples
         for x in \$EXT; do
             if [ "\$x" != "c++" -a "\$x" != "c" ]; then
-                cp -a tightdb_\$x/examples \$HOME/tightdb_examples/\$x
+                cp -a tightdb_\$x/examples/* \$HOME/tightdb_examples/\$x
             fi
         done
         if [ \$(echo \$EXT | grep -c java) -eq 1 ]; then
