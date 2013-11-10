@@ -387,7 +387,8 @@ size_t Spec::get_column_index(StringData name) const
     return m_names.find_first(name);
 }
 
-size_t Spec::get_column_pos(size_t column_ndx) const {
+size_t Spec::get_column_pos(size_t column_ndx) const
+{
     // If there are indexed columns, the indexes also takes
     // up space in the list of columns refs (m_columns in table)
     // so we need to be able to get the adjusted position
