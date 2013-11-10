@@ -1,5 +1,6 @@
 # NOTE: THIS SCRIPT IS SUPPOSED TO RUN IN A POSIX SHELL
 
+
 # Enable tracing if TIGHTDB_SCRIPT_DEBUG is set
 if [ -e $HOME/.tightdb ]; then
     . $HOME/.tightdb
@@ -8,12 +9,14 @@ if [ "$TIGHTDB_SCRIPT_DEBUG" ]; then
     set -x
 fi
 
-cd "$(dirname "$0")"
+
+cd "$(dirname "$0")" || exit 1
 TIGHTDB_HOME="$(pwd)" || exit 1
 export TIGHTDB_HOME
 
 MODE="$1"
 [ $# -gt 0 ] && shift
+
 
 # Extensions corresponding with additional GIT repositories
 EXTENSIONS="java python ruby objc node php c gui"
@@ -106,14 +109,14 @@ if ! printf "%s\n" "$MODE" | grep -q '^\(src-\|bin-\)\?dist'; then
     if [ "$OS" = "Darwin" ]; then
         NUM_PROCESSORS="$(sysctl -n hw.ncpu)" || exit 1
     else
-        if [ -r /proc/cpuinfo ]; then
+        if [ -r "/proc/cpuinfo" ]; then
             NUM_PROCESSORS="$(cat /proc/cpuinfo | grep -E 'processor[[:space:]]*:' | wc -l)" || exit 1
         fi
     fi
     if [ "$NUM_PROCESSORS" ]; then
         word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS" || exit 1
+        export MAKEFLAGS
     fi
-    export MAKEFLAGS
 fi
 IS_REDHAT_DERIVATIVE=""
 if [ -e /etc/redhat-release ] || grep -q "Amazon" /etc/system-release 2>/dev/null; then
