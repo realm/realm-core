@@ -76,18 +76,17 @@ then:
 
 
 
-Building, testing, and installing
----------------------------------
+Configure, build, install
+-------------------------
+
+Run the following commands to configure, build, and install the
+language binding:
 
     sh build.sh config
-    sh build.sh clean
     sh build.sh build
-    sh build.sh test
-    sh build.sh test-debug
     sudo sh build.sh install
-    sh build.sh test-installed
 
-Headers are installed in:
+Headers will be installed in:
 
     /usr/local/include/tightdb/
 
@@ -106,6 +105,7 @@ Note: '.so' is replaced by '.dylib' on OS X.
 The following programs are installed:
 
     /usr/local/bin/tightdb-import
+    /usr/local/bin/tightdb-import-dbg
     /usr/local/bin/tightdbd
     /usr/local/bin/tightdbd-dbg
     /usr/local/bin/tightdb-config
@@ -121,10 +121,17 @@ line compatible with GCC. Here is an example:
 
     g++  my_app.cpp  `tightdb-config --cflags --libs`
 
-After building, you might want to see exactly what will be installed,
-without actually installing anything. This can be done as follows:
+Here is a more comple set of build-related commands:
 
-    DESTDIR=/tmp/check sh build.sh install && find /tmp/check -type f
+    sh build.sh config
+    sh build.sh clean
+    sh build.sh build
+    sh build.sh test
+    sh build.sh test-debug
+    sh build.sh show-install
+    sudo sh build.sh install
+    sh build.sh test-intalled
+    sudo sh build.sh uninstall
 
 
 

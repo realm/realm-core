@@ -460,6 +460,18 @@ EOF
         exit 0
         ;;
 
+    "show-install")
+        temp_dir="$(mktemp -d /tmp/tightdb.show-install.XXXX)" || exit 1
+        mkdir "$temp_dir/fake-root" || exit 1
+        DESTDIR="$temp_dir/fake-root" sh build.sh install >/dev/null || exit 1
+        (cd "$temp_dir/fake-root" && find * \! -type d >"$temp_dir/list") || exit 1
+        sed 's|^|/|' <"$temp_dir/list" || exit 1
+        rm -fr "$temp_dir/fake-root" || exit 1
+        rm "$temp_dir/list" || exit 1
+        rmdir "$temp_dir" || exit 1
+        exit 0
+        ;;
+
     "install")
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
@@ -2037,7 +2049,7 @@ EOF
 
     *)
         echo "Unspecified or bad mode '$MODE'" 1>&2
-        echo "Available modes are: config clean build build-config-progs build-iphone test test-debug install uninstall test-installed wipe-installed" 1>&2
+        echo "Available modes are: config clean build build-config-progs build-iphone test test-debug show-install install uninstall test-installed wipe-installed" 1>&2
         echo "As well as: install-prod install-devel uninstall-prod uninstall-devel dist-copy" 1>&2
         echo "As well as: src-dist bin-dist dist-deb dist-status dist-pull dist-checkout" 1>&2
         echo "As well as: dist-config dist-clean dist-build dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall dist-test-installed" 1>&2
