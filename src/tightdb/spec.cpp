@@ -191,6 +191,15 @@ void Spec::remove_column(size_t column_ndx)
         subspec_top.destroy(); // recursively delete entire subspec
         m_subspecs.erase(subspec_ndx);
     }
+    else if (type == col_type_StringEnum) {
+        // Enum columns do also have a separate key list
+        size_t keys_ndx = get_enumkeys_ndx(column_ndx);
+        ref_type keys_ref = m_enumkeys.get_as_ref(keys_ndx);
+
+        Array keys_top(keys_ref, 0, 0, m_top.get_alloc());
+        keys_top.destroy();
+        m_enumkeys.erase(keys_ndx);
+    }
 
     // Delete the actual name and type entries
     m_names.erase(column_ndx);
@@ -378,10 +387,24 @@ size_t Spec::get_column_index(StringData name) const
     return m_names.find_first(name);
 }
 
+size_t Spec::get_column_pos(size_t column_ndx) const {
+    // If there are indexed columns, the indexes also takes
+    // up space in the list of columns refs (m_columns in table)
+    // so we need to be able to get the adjusted position
+
+    size_t offset = 0;
+    for (size_t i = 0; i < column_ndx; ++i) {
+        if (m_attr.get(i) == col_attr_Indexed) {
+            ++offset;
+        }
+    }
+    return column_ndx + offset;
+}
+
 
 void Spec::get_column_info(size_t column_ndx, ColumnInfo& info) const
 {
-    info.m_column_ref_ndx = column_ndx;
+    info.m_column_ref_ndx = get_column_pos(column_ndx);
     info.m_has_index = (get_column_attr(column_ndx) & col_attr_Indexed) != 0;
 }
 
