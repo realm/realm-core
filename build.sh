@@ -537,7 +537,6 @@ EOF
 
     "test-installed")
         require_config || exit 1
-        export TIGHTDB_HAVE_CONFIG="1"
         install_bindir="$(get_config_param "INSTALL_BINDIR")" || exit 1
         path_list_prepend PATH "$install_bindir" || exit 1
         $MAKE -C "test-installed" clean || exit 1
