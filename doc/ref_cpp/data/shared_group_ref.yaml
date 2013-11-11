@@ -6,7 +6,8 @@ ID         : class_shared_group
 TITLE      : SharedGroup
 SUMMARY    : &g_shared_group_summary
              Sharing groups between processes.
-DESCR      : &g_shared_group_descr
+DESCR      :
+- TEXT     : &g_shared_group_descr
              >
              Database files can be shared between running applications.
 
@@ -39,14 +40,6 @@ DESCR      : &g_shared_group_descr
              as derived objects (tables, views, etc.) are either
              writable or not.
 
-             The scoped transaction objects {@link g_write_trans_begin_write}
-             and {@link g_read_trans_begin_read}
-             are provided to facilitate use of the
-             <a href="http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization">
-             RAII</a> pattern. For cases where RAII is not applicable, methods on SharedGroup
-             allow for explicitly beginning and ending transactions, see
-             {@link g_shared_group_begin_write} and {@link g_shared_group_begin_read}.
-
              Nested transactions are not supported.
 
              Read transactions are significantly faster than write
@@ -56,6 +49,15 @@ DESCR      : &g_shared_group_descr
              Transactions are fully isolated: throughout a read transaction it will see 
              the state of the data as it was when the read transactions started, 
              regardless of any concurrent commits from write transactions.
+
+- TEXT     : The scoped transaction objects {@link g_write_trans_begin_write}
+             and {@link g_read_trans_begin_read}
+             are provided to facilitate use of the
+             <a href="http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization">
+             RAII</a> pattern. For cases where RAII is not applicable, methods on SharedGroup
+             allow for explicitly beginning and ending transactions, see
+             {@link g_shared_group_begin_write} and {@link g_shared_group_begin_read}.
+
 SEE        :
 EXAMPLES:
 - DESCR    :

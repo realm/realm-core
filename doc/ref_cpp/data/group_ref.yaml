@@ -8,12 +8,12 @@ ID          : class_group
 TITLE       : Group
 SUMMARY     : &g_group_summary
               Container for tables.
-DESCR       : &g_group_descr
+DESCR       :
+- TEXT      : &g_group_descr
               >
               The Group is a container for tables. The group can be attached
               to three different forms of storage: (1) internal, (2) a user
-              provided buffer or (3) a file on disk. A group may also be created
-              without attached storage (4).
+              provided buffer or (3) a file on disk.
 
               When a group is attached to a buffer in memory (2), changes to tables
               in the group does not cause changes to the buffer. Regardless, the
@@ -56,6 +56,8 @@ DESCR       : &g_group_descr
               all of them are opened in read-only mode, and there
               is no other party that modifies the file
               concurrently.
+
+- TEXT      : Finally, A group may also be created without attached storage (4).
 
 SEE         :
 EXAMPLES    :
@@ -513,10 +515,11 @@ CATEGORIES  :
   - g_group_tostring:
       NAME     : to_string
       SUMMARY  : &g_group_to_string_summary
-                 Serialize a string representation of the group onto an output stream.
-      DESCR    : &g_group_to_string_descr
-                 This methods adds a string representation of information about the group to an
-                 output stream.
+                 Get a string representation of the group.
+      DESCR:    
+      - TEXT   : &g_group_to_string_descr
+                 This method provides a string representation of the group. 
+      - TEXT   : The string representation is added to an output stream.
       CONST    : true
       PARAMS:
       - NAME   : out
@@ -530,12 +533,14 @@ CATEGORIES  :
   - g_group_to_json:
       NAME     : to_json
       SUMMARY  : &g_group_to_json_summary
-                 Serialize a JSON representation of the group onto an output stream.
+                 Get a JSON representation of the group.
       SIGNATURE: template<class S> void to_json(S& out) const
-      DESCR    : &g_group_to_json_descr
-                 This methods adds a JSON representation of information about the group to an
-                 output stream. The group is represented as an JSON object where the tables are
+      DESCR    : 
+      - TEXT   : &g_group_to_json_descr
+                 This methods provides a JSON representation of the group.
+                 The group is represented as an JSON object where the tables are
                  elements/attributes.
+      - TEXT   : The JSON representation is added to an output stream.
       CONST    : true
       PARAMS:
       - NAME   : out
