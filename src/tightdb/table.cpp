@@ -2088,10 +2088,13 @@ void Table::optimize()
                 }
             }
 
+            // Indexes are also in m_columns, so we need adjusted pos
+            size_t pos_in_mcolumns = m_spec.get_column_pos(i);
+
             // Replace column
             ColumnStringEnum* e =
-                new ColumnStringEnum(keys_ref, values_ref, &m_columns, i, keys_parent, keys_ndx, alloc);
-            m_columns.set(i, values_ref);
+                new ColumnStringEnum(keys_ref, values_ref, &m_columns, pos_in_mcolumns, keys_parent, keys_ndx, alloc);
+            m_columns.set(pos_in_mcolumns, values_ref);
             m_cols.set(i, intptr_t(e));
 
             // Inherit any existing index

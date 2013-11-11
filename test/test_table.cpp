@@ -1631,6 +1631,7 @@ TEST(Table_Spec_DeleteColumns)
     table->add_column(type_Int,    "first");
     table->add_column(type_String, "second");
     table->add_column(type_Table,  "third");
+    table->add_column(type_String, "fourth"); // will be auto-enumerated
 
     // Create path to sub-table column
     vector<size_t> column_path;
@@ -1642,13 +1643,29 @@ TEST(Table_Spec_DeleteColumns)
     // Put in an index as well
     table->set_index(1);
 
-    CHECK_EQUAL(3, table->get_column_count());
+    CHECK_EQUAL(4, table->get_column_count());
 
-    // Add a row
+    // Add a few rows
     table->insert_int(0, 0, 4);
     table->insert_string(1, 0, "Hello");
     table->insert_subtable(2, 0);
+    table->insert_string(3, 0, "X");
     table->insert_done();
+
+    table->insert_int(0, 1, 4);
+    table->insert_string(1, 1, "World");
+    table->insert_subtable(2, 1);
+    table->insert_string(3, 1, "X");
+    table->insert_done();
+
+    table->insert_int(0, 2, 4);
+    table->insert_string(1, 2, "Goodbye");
+    table->insert_subtable(2, 2);
+    table->insert_string(3, 2, "X");
+    table->insert_done();
+
+    // We want the last column to be StringEnum column
+    table->optimize();
 
     CHECK_EQUAL(0, table->get_subtable_size(2, 0));
 
@@ -1669,7 +1686,9 @@ TEST(Table_Spec_DeleteColumns)
 
     // Remove the first column
     table->remove_column(0);
-    CHECK_EQUAL(2, table->get_column_count());
+    CHECK_EQUAL(3, table->get_column_count());
+    CHECK_EQUAL("Hello", table->get_string(0, 0));
+    CHECK_EQUAL("X", table->get_string(2, 0));
 
     // Get the sub-table again and see if the values
     // still match.
@@ -1701,6 +1720,12 @@ TEST(Table_Spec_DeleteColumns)
     }
 
     // Remove sub-table column (with all members)
+    table->remove_column(1);
+    CHECK_EQUAL(2, table->get_column_count());
+    CHECK_EQUAL("Hello", table->get_string(0, 0));
+    CHECK_EQUAL("X", table->get_string(1, 0));
+
+    // Remove optimized string column
     table->remove_column(1);
     CHECK_EQUAL(1, table->get_column_count());
     CHECK_EQUAL("Hello", table->get_string(0, 0));
@@ -1847,7 +1872,7 @@ TEST(Table_Spec_AddColumns)
     table->Verify();
 #endif
 }
-/*
+
 
 TEST(Table_Spec_DeleteColumnsBug)
 {
@@ -1918,7 +1943,7 @@ TEST(Table_Spec_DeleteColumnsBug)
     table->Verify();
 #endif
 }
-*/
+
 
 TEST(Table_Mixed)
 {
