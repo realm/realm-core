@@ -2375,42 +2375,30 @@ inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t width,
 template<int width>
 inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
-    size_t i = 0;
-    size_t size_2 = size;
-    while (0 < size_2) {
-        size_t half = size_2 / 2;
-        size_t mid = i + half;
+    size_t lower = 0;
+    size_t upper = size;
+    while (lower < upper) {
+        size_t mid = lower + ((upper-lower) / 2);
         int64_t probe = get_direct<width>(data, mid);
-        if (probe < value) {
-            i = mid + 1;
-            size_2 -= half + 1;
-        }
-        else {
-            size_2 = half;
-        }
+        lower = (probe < value) ? (mid+1) : lower;
+        upper = (probe < value) ? upper   : mid;
     }
-    return i;
+    return lower;
 }
 
 // See lower_bound()
 template<int width>
 inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
-    size_t i = 0;
-    size_t size_2 = size;
-    while (0 < size_2) {
-        size_t half = size_2 / 2;
-        size_t mid = i + half;
+    size_t lower = 0;
+    size_t upper = size;
+    while (lower < upper) {
+        size_t mid = lower + ((upper-lower) / 2);
         int64_t probe = get_direct<width>(data, mid);
-        if (!(value < probe)) {
-            i = mid + 1;
-            size_2 -= half + 1;
-        }
-        else {
-            size_2 = half;
-        }
+        lower = (!(value < probe)) ? (mid+1) : lower;
+        upper = (!(value < probe)) ? upper   : mid;
     }
-    return i;
+    return lower;
 }
 
 } // anonymous namespace
