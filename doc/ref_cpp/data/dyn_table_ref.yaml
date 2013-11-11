@@ -734,7 +734,7 @@ CATEGORIES :
                  a given string value. Defining the first column as a string with unique values,
                  it is possible to combine such a table with this method to emulate a hash
                  array using TightDB.
-                 For optimal performance set an index on the string column, using set_index.
+                 For optimal performance set an index on the string column, using {@link g_dyn_table_set_index}.
       CONST    : True
       PARAMS:
       - NAME   : value
