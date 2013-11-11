@@ -120,6 +120,13 @@ Caveats, notes and todos
 #ifndef TIGHTDB_QUERY_EXPRESSION_HPP
 #define TIGHTDB_QUERY_EXPRESSION_HPP
 
+// Normally, if a next-generation-syntax condition is supported by the old query_engine.hpp, a query_engine node is
+// created because it's faster (by a factor of 5 - 10). Because many of our existing next-generation-syntax unit 
+// unit tests are indeed simple enough to fallback to old query_engine, query_expression gets low test coverage. Define
+// flag to get higher query_expression test coverage. This is a good idea to try out each time you develop on/modify
+// query_expression.
+//#define TIGHTDB_NGQUERY_NO_FALLBACK
+
 // namespace tightdb {
 
 // FIXME, this needs to exist elsewhere
@@ -346,6 +353,8 @@ template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>&
     // query_expression.hpp node.
     //
     // This method intercepts only Value <cond> Subexpr2. Interception of Subexpr2 <cond> Subexpr is elsewhere. 
+
+#ifndef TIGHTDB_NGQUERY_NO_FALLBACK // never fallback to useing query_engine.hpp; always use query_expression.hpp
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
     if(column && (std::numeric_limits<L>::is_integer) && (std::numeric_limits<R>::is_integer)) {
         const Table* t = (const_cast<Columns<R>*>(column))->get_table();
@@ -371,7 +380,9 @@ template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>&
         // Return query_engine.hpp node
         return q;
     }
-    else {
+    else
+#endif
+    {
         // Return query_expression.hpp node
         return *new Compare<Cond, typename Common<R, float>::type>(*new Value<L>(left), const_cast<Subexpr2<R>&>(right).clone(), true);
     }
@@ -444,6 +455,7 @@ public:
     // This method intercepts Subexpr2 <cond> Subexpr2 only. Value <cond> Subexpr2 is intercepted elsewhere.
     template <class Cond> Query create2 (const Subexpr2<R>& right) 
     {
+#ifndef TIGHTDB_NGQUERY_NO_FALLBACK // never fallback to useing query_engine.hpp; always use query_expression.hpp
         // Test if expressions are of type Columns. Other possibilities are Value and Operator. 
         const Columns<R>* left_col = dynamic_cast<const Columns<R>*>(static_cast<Subexpr2<L>*>(this));
         const Columns<R>* right_col = dynamic_cast<const Columns<R>*>(&right);
@@ -510,7 +522,9 @@ public:
             // Return query_engine.hpp node
             return q;
         }
-        else {
+        else 
+#endif
+        {
             // Return query_expression.hpp node
             return *new Compare<Cond, typename Common<R, float>::type>
                         (static_cast<Subexpr2<L>&>(*this).clone(), const_cast<Subexpr2<R>&>(right).clone(), true);
@@ -804,6 +818,8 @@ public:
     void evaluate(size_t index, ValueBase& destination) {  
         Value<T> v;          
         sg->cache_next(index);
+        size_t colsize = sg->m_column->size();
+
         if(SameType<T, int64_t>::value && index + ValueBase::elements < sg->m_leaf_end) {
             // int64_t leafs have a get_chunk optimization that returns 8 int64_t values at once
             sg->m_array_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
@@ -813,7 +829,7 @@ public:
             // if an unconditional zero out is faster
             if(index + ValueBase::elements >= sg->m_leaf_end)
                 v = Value<T>(static_cast<T>(0));              
-            for(size_t t = 0; t < ValueBase::elements && index + t < sg->m_leaf_end; t++)
+            for(size_t t = 0; t < ValueBase::elements && index + t < colsize; t++)
                 v.m_v[t] = sg->get_next(index + t);
         }
         destination.import(v);
@@ -984,7 +1000,7 @@ public:
                 return start + match;
         }
 
-        return not_found; // no match
+        return end; // no match
     }
     
 private: 

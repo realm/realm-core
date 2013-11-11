@@ -1533,6 +1533,44 @@ TEST(Table_Spec)
     }
 }
 
+TEST(Table_Spec_ColumnPath)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    // Create path to sub-table column (starting with root)
+    vector<size_t> column_path;
+
+    // Create specification with sub-table
+    table->add_subcolumn(column_path, type_Int,    "first");
+    table->add_subcolumn(column_path, type_String, "second");
+    table->add_subcolumn(column_path, type_Table,  "third");
+
+    column_path.push_back(2); // third column (which is a sub-table col)
+
+    table->add_subcolumn(column_path, type_Int,    "sub_first");
+    table->add_subcolumn(column_path, type_String, "sub_second");
+
+    // Add a row
+    table->insert_int(0, 0, 4);
+    table->insert_string(1, 0, "Hello");
+    table->insert_subtable(2, 0);
+    table->insert_done();
+
+    // Get the sub-table
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+        CHECK(subtable->is_empty());
+
+        subtable->insert_int(0, 0, 42);
+        subtable->insert_string(1, 0, "test");
+        subtable->insert_done();
+
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+    }
+}
+
 TEST(Table_Spec_RenameColumns)
 {
     Group group;

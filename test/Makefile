@@ -25,7 +25,7 @@ else
 PASSIVE_SUBDIRS += UnitTest++
 tightdb_tests_CFLAGS  = -IUnitTest++/src
 tightdb_tests_LDFLAGS = -LUnitTest++ -lUnitTest++
-tightdb_tests_DEPS    = UnitTest++
+tightdb_tests_DEPS    = fallback-UnitTest++
 endif
 
 include ../src/generic.mk
@@ -42,9 +42,16 @@ benchmark: test-norun/subdir/test-tightdb test-norun/subdir/test-sqlite3 test-no
 	@echo ".:: STL Vector ::."
 	test-stl/test-stl
 
-.PHONY: UnitTest++
-UnitTest++:
-	$(MAKE) -C UnitTest++ CXXFLAGS="-g -Wall -W -ansi" LDFLAGS="" >/dev/null
+FALLBACK_UNITTESTPP_CFLAGS = -g -Wall -W -ansi $(CFLAGS_ARCH)
+FALLBACK_UNITTESTPP_LDFLAGS = $(LDFLAGS_ARCH)
+
+# FIXME: The fallback version of UnitTest++ is used on Darwin, but
+# when compiling with Clang (the only option on OS X 10.9) the
+# self-test test suite of UnitTest++ fails, so we have to ignore
+# errors from the build command below, hence the leading '-'
+.PHONY: fallback-UnitTest++
+fallback-UnitTest++:
+	-$(MAKE) -C UnitTest++ CXX="$(CXX)" CXXFLAGS="$(FALLBACK_UNITTESTPP_CFLAGS)" LDFLAGS="$(FALLBACK_UNITTESTPP_LDFLAGS)" >/dev/null
 
 # Build and run the performance matrix benchmarking program
 .PHONY: performance
