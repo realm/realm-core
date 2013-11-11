@@ -500,9 +500,11 @@ CATEGORIES  :
       NAME     : write_to_mem
       SUMMARY  : &g_group_write_to_mem_summary
                  Write a group to an in-memory buffer.
-      DESCR    : &g_group_write_to_mem_descr
+      DESCR    : 
+      - TEXT   : &g_group_write_to_mem_descr
                  This method will write the group to an in-memory buffer. This may be useful if you
-                 want to transfer a group over a network connection. The returned buffer will have been
+                 want to transfer a group over a network connection. 
+      - TEXT   : The returned buffer will have been
                  allocated using std::malloc(). The ownership of the buffer is passed to the caller.
       CONST    : true
       RETURN:

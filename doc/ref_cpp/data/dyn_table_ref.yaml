@@ -957,7 +957,7 @@ CATEGORIES :
                  The column index (starting from 0).
       - NAME   : ascending
         TYPES  : bool
-        DESCR  : &cpp_dyn_table_get_sorted_view_parm2_descr
+        DESCR  : &g_dyn_table_get_sorted_view_parm2_descr
                  "If <code>true</code>, rows are sorted ascending, otherwise descending. Default: <code>true</code>."
       RETURN:
         TYPES  : TableView
