@@ -610,12 +610,10 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     orig_high = high;
 
     while (high - start > 1) {
-        size_t probe = (start + high) / 2; // FIXME: Prone to overflow - see lower_bound() for a solution
+        size_t probe = start + (high - start) / 2;
         int64_t v = get(probe);
-        if (v < target)
-            start = probe;
-        else
-            high = probe;
+        start = (v < target) ? probe : start;
+        high  = (v < target) ? high  : probe;
     }
     if (high == orig_high)
         ret = not_found;
