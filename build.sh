@@ -1476,18 +1476,15 @@ EOF
             if [ -z "$INTERACTIVE" ]; then
                 echo "BUILDING Core library" | tee -a "$LOG_FILE"
             else
-                echo -n "Building c++ library" | tee -a "$LOG_FILE"
+                echo "Building c++ library" | tee -a "$LOG_FILE"
             fi
             if sh "build.sh" build >>"$LOG_FILE" 2>&1; then
                 touch ".DIST_CORE_WAS_BUILT" || exit 1
-                if [ "$INTERACTIVE" ]; then
-                    echo | tee -a "$LOG_FILE"
-                fi
             else
                 if [ -z "$INTERACTIVE" ]; then
                     echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                 else
-                    echo " Failed!" | tee -a "$LOG_FILE"
+                    echo "  > Failed!" | tee -a "$LOG_FILE"
                 fi
                 if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
                     cat 1>&2 <<EOF
@@ -1507,16 +1504,17 @@ EOF
                 if [ -z "$INTERACTIVE" ]; then
                     echo "BUILDING Extension '$x'" | tee -a "$LOG_FILE"
                 else
-                    echo -n "Building extension '$x'" | tee -a "$LOG_FILE"
+                    echo "Building extension '$x'" | tee -a "$LOG_FILE"
                 fi
                 rm -f "$EXT_HOME/.DIST_WAS_BUILT" || exit 1
                 if sh "$EXT_HOME/build.sh" build >>"$LOG_FILE" 2>&1; then
                     touch "$EXT_HOME/.DIST_WAS_BUILT" || exit 1
-                    if [ "$INTERACTIVE" ]; then
-                        echo | tee -a "$LOG_FILE"
-                    fi
                 else
-                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                    if [ -z "$INTERACTIVE" ]; then
+                        echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                    else
+                        echo "  > Failed!" | tee -a "$LOG_FILE"
+                    fi
                     ERROR="1"
                 fi
             else
@@ -1759,7 +1757,7 @@ EOF
                 if [ -z "$INTERACTIVE" ]; then
                     echo "INSTALLING Extension 'c++'" | tee -a "$LOG_FILE"
                 else
-                    echo -n "Installing 'c++' (core)" | tee -a "$LOG_FILE"
+                    echo "Installing 'c++' (core)" | tee -a "$LOG_FILE"
                 fi
                 if sh build.sh install-devel >>"$LOG_FILE" 2>&1; then
                     touch ".DIST_CXX_WAS_INSTALLED" || exit 1
@@ -1768,7 +1766,7 @@ EOF
                     if [ -z "$INTERACTIVE" ]; then
                         echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                     else
-                        echo " Failed!" | tee -a "$LOG_FILE"
+                        echo "  > Failed!" | tee -a "$LOG_FILE"
                     fi
                     ERROR="1"
                 fi
@@ -1780,7 +1778,7 @@ EOF
                         if [ -z "$INTERACTIVE" ]; then
                             echo "INSTALLING Extension '$x'" | tee -a "$LOG_FILE"
                         else
-                            echo -n "Installing extension '$x'" | tee -a "$LOG_FILE"
+                            echo "Installing extension '$x'" | tee -a "$LOG_FILE"
                         fi
                         if sh "$EXT_HOME/build.sh" install >>"$LOG_FILE" 2>&1; then
                             touch "$EXT_HOME/.DIST_WAS_INSTALLED" || exit 1
@@ -1791,7 +1789,7 @@ EOF
                             if [ -z "$INTERACTIVE" ]; then
                                 echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                             else
-                                echo " Failed!" | tee -a "$LOG_FILE"
+                                echo "  > Failed!" | tee -a "$LOG_FILE"
                             fi
                             ERROR="1"
                         fi
