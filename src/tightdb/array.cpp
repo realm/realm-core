@@ -612,6 +612,8 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     while (high - start > 1) {
         size_t probe = start + (high - start) / 2;
         int64_t v = get(probe);
+        // assuming the condition is difficult-to-predict, conditional assignment should
+        // yield better performance than if-then-else on machines with speculative execution.
         start = (v < target) ? probe : start;
         high  = (v < target) ? high  : probe;
     }
@@ -2378,6 +2380,8 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_
     while (lower < upper) {
         size_t mid = lower + ((upper-lower) / 2);
         int64_t probe = get_direct<width>(data, mid);
+        // assuming the condition is difficult-to-predict, conditional assignment should
+        // yield better performance than if-then-else on machines with speculative execution.
         lower = (probe < value) ? (mid+1) : lower;
         upper = (probe < value) ? upper   : mid;
     }
@@ -2393,6 +2397,8 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_
     while (lower < upper) {
         size_t mid = lower + ((upper-lower) / 2);
         int64_t probe = get_direct<width>(data, mid);
+        // assuming the condition is difficult-to-predict, conditional assignment should
+        // yield better performance than if-then-else on machines with speculative execution.
         lower = (!(value < probe)) ? (mid+1) : lower;
         upper = (!(value < probe)) ? upper   : mid;
     }
