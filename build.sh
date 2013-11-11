@@ -1430,8 +1430,6 @@ EOF
                 ERROR="1"
             fi
         fi
-        path_list_prepend PATH "$TIGHTDB_HOME/config-progs" || exit 1
-        export PATH
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" ]; then
@@ -1743,8 +1741,6 @@ EOF
             get_host_info || exit 1
             echo
         ) >>"$LOG_FILE"
-        path_list_prepend PATH "$TIGHTDB_HOME/config-progs" || exit 1
-        export PATH
         ERROR=""
         NEED_USR_LOCAL_LIB_NOTE=""
         if [ -z "$INTERACTIVE" ]; then
@@ -1782,9 +1778,7 @@ EOF
                 fi
             done
             if [ "$NEED_USR_LOCAL_LIB_NOTE" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
-                path_list_prepend PATH "$TIGHTDB_HOME/config-progs" || exit 1
-                export PATH
-                libdir="$(tightdb-config --libdir)" || exit 1
+                libdir="$(get_config_param "INSTALL_LIBDIR")" || exit 1
                 cat <<EOF
 
 NOTE: Shared libraries have been installed in '$libdir'.
