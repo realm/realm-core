@@ -1517,10 +1517,6 @@ EOF
                     fi
                     ERROR="1"
                 fi
-            else
-                if [ "$INTERACTIVE" ]; then
-                    echo "Skipping extension '$x'" | tee -a "$LOG_FILE"
-                fi
             fi
         done
         if [ -z "$INTERACTIVE" ]; then
@@ -1773,30 +1769,24 @@ EOF
             fi
             for x in $EXTENSIONS; do
                 EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
-                if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" ]; then
-                    if [-e "$EXT_HOME/.DIST_WAS_BUILT" ]; then
-                        if [ -z "$INTERACTIVE" ]; then
-                            echo "INSTALLING Extension '$x'" | tee -a "$LOG_FILE"
-                        else
-                            echo "Installing extension '$x'" | tee -a "$LOG_FILE"
-                        fi
-                        if sh "$EXT_HOME/build.sh" install >>"$LOG_FILE" 2>&1; then
-                            touch "$EXT_HOME/.DIST_WAS_INSTALLED" || exit 1
-                            if [ "$x" = "c" -o "$x" = "objc" ]; then
-                                NEED_USR_LOCAL_LIB_NOTE="$PLATFORM_HAS_LIBRARY_PATH_ISSUE"
-                            fi
-                        else
-                            if [ -z "$INTERACTIVE" ]; then
-                                echo "Failed!" | tee -a "$LOG_FILE" 1>&2
-                            else
-                                echo "  > Failed!" | tee -a "$LOG_FILE"
-                            fi
-                            ERROR="1"
+                if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" -a -e "$EXT_HOME/.DIST_WAS_BUILT" ]; then
+                    if [ -z "$INTERACTIVE" ]; then
+                        echo "INSTALLING Extension '$x'" | tee -a "$LOG_FILE"
+                    else
+                        echo "Installing extension '$x'" | tee -a "$LOG_FILE"
+                    fi
+                    if sh "$EXT_HOME/build.sh" install >>"$LOG_FILE" 2>&1; then
+                        touch "$EXT_HOME/.DIST_WAS_INSTALLED" || exit 1
+                        if [ "$x" = "c" -o "$x" = "objc" ]; then
+                            NEED_USR_LOCAL_LIB_NOTE="$PLATFORM_HAS_LIBRARY_PATH_ISSUE"
                         fi
                     else
-                        if [ "$INTERACTIVE" ]; then
-                            echo "Skipping extension '$x'" | tee -a "$LOG_FILE"
+                        if [ -z "$INTERACTIVE" ]; then
+                            echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                        else
+                            echo "  > Failed!" | tee -a "$LOG_FILE"
                         fi
+                        ERROR="1"
                     fi
                 fi
             done
