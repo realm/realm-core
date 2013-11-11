@@ -1481,16 +1481,23 @@ EOF
         rm -f ".DIST_CORE_WAS_BUILT" || exit 1
         if [ "$PREBUILT_CORE" ]; then
             touch ".DIST_CORE_WAS_BUILT" || exit 1
+            if [ "$INTERACTIVE" ]; then
+                echo "Building core library"
+            fi
         else
             if [ -z "$INTERACTIVE" ]; then
                 echo "BUILDING Core library" | tee -a "$LOG_FILE"
             else
-                echo "Building core library" | tee -a "$LOG_FILE"
+                echo "Building c++ library" | tee -a "$LOG_FILE"
             fi
             if sh "build.sh" build >>"$LOG_FILE" 2>&1; then
                 touch ".DIST_CORE_WAS_BUILT" || exit 1
             else
-                echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                if [ -z "$INTERACTIVE" ]; then
+                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                else
+                    echo "  > Failed!" | tee -a "$LOG_FILE"
+                fi
                 if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
                     cat 1>&2 <<EOF
 
@@ -1515,7 +1522,11 @@ EOF
                 if sh "$EXT_HOME/build.sh" build >>"$LOG_FILE" 2>&1; then
                     touch "$EXT_HOME/.DIST_WAS_BUILT" || exit 1
                 else
-                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                    if [ -z "$INTERACTIVE" ]; then
+                        echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                    else
+                        echo "  > Failed!" | tee -a "$LOG_FILE"
+                    fi
                     ERROR="1"
                 fi
             fi
@@ -1751,12 +1762,18 @@ EOF
             if [ -e ".DIST_CXX_WAS_CONFIGURED" ]; then
                 if [ -z "$INTERACTIVE" ]; then
                     echo "INSTALLING Extension 'c++'" | tee -a "$LOG_FILE"
+                else
+                    echo "Installing 'c++' (core)" | tee -a "$LOG_FILE"
                 fi
                 if sh build.sh install-devel >>"$LOG_FILE" 2>&1; then
                     touch ".DIST_CXX_WAS_INSTALLED" || exit 1
                     NEED_USR_LOCAL_LIB_NOTE="$PLATFORM_HAS_LIBRARY_PATH_ISSUE"
                 else
-                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                    if [ -z "$INTERACTIVE" ]; then
+                        echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                    else
+                        echo "  > Failed!" | tee -a "$LOG_FILE"
+                    fi
                     ERROR="1"
                 fi
             fi
@@ -1765,6 +1782,8 @@ EOF
                 if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" -a -e "$EXT_HOME/.DIST_WAS_BUILT" ]; then
                     if [ -z "$INTERACTIVE" ]; then
                         echo "INSTALLING Extension '$x'" | tee -a "$LOG_FILE"
+                    else
+                        echo "Installing extension '$x'" | tee -a "$LOG_FILE"
                     fi
                     if sh "$EXT_HOME/build.sh" install >>"$LOG_FILE" 2>&1; then
                         touch "$EXT_HOME/.DIST_WAS_INSTALLED" || exit 1
@@ -1772,7 +1791,11 @@ EOF
                             NEED_USR_LOCAL_LIB_NOTE="$PLATFORM_HAS_LIBRARY_PATH_ISSUE"
                         fi
                     else
-                        echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                        if [ -z "$INTERACTIVE" ]; then
+                            echo "Failed!" | tee -a "$LOG_FILE" 1>&2
+                        else
+                            echo "  > Failed!" | tee -a "$LOG_FILE"
+                        fi
                         ERROR="1"
                     fi
                 fi
