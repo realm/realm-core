@@ -1855,8 +1855,6 @@ EOF
             get_host_info || exit 1
             echo
         ) >>"$LOG_FILE"
-        path_list_prepend PATH "$TIGHTDB_HOME/config-progs" || exit 1
-        export PATH
         ERROR=""
         for x in $(word_list_reverse $EXTENSIONS); do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
