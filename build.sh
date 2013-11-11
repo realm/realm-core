@@ -1469,6 +1469,9 @@ EOF
         rm -f ".DIST_CORE_WAS_BUILT" || exit 1
         if [ "$PREBUILT_CORE" ]; then
             touch ".DIST_CORE_WAS_BUILT" || exit 1
+            if [ "$INTERACTIVE" ]; then
+                echo "Building core library"
+            fi
         else
             if [ -z "$INTERACTIVE" ]; then
                 echo "BUILDING Core library" | tee -a "$LOG_FILE"
@@ -1505,6 +1508,10 @@ EOF
                 else
                     echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                     ERROR="1"
+                fi
+            else
+                if [ "$INTERACTIVE" ]; then
+                    echo "Skipping extension '$x'" | tee -a "$LOG_FILE"
                 fi
             fi
         done
@@ -1764,6 +1771,10 @@ EOF
                     else
                         echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                         ERROR="1"
+                    fi
+                else
+                    if [ "$INTERACTIVE" ]; then
+                        echo "Skipping extension '$x'" | tee -a "$LOG_FILE"
                     fi
                 fi
             done
