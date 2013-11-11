@@ -94,7 +94,74 @@ public:
 
 int main(int argc, char* argv[])
 {
-// Define OLD, FINN or CURRENT to benchmark different versions
+
+
+/*
+lower = better
+
+current:
+---------------------------------------------------
+VC2010:
+byte array, average direction:          1.766
+byte array, always go left:             1.734
+byte array, always go right:            1.766
+32-bit array, average direction:        1.187
+32-bit array, always go left:           1.812
+32-bit array, always go right:          2.031
+sum: 9.109
+
+gcc47:
+byte array, average direction:  	1.46292
+byte array, always go left:     	1.2532
+byte array, always go right:    	2.07292
+32-bit array, average direction:	0.992568
+32-bit array, always go left:   	1.1024
+32-bit array, always go right:  	1.85952
+sum: 7.75095
+
+
+old:
+---------------------------------------------------
+VC2010:
+byte array, average direction:          1.843
+byte array, always go left:             1.75
+byte array, always go right:            2.015
+32-bit array, average direction:        1.094
+32-bit array, always go left:           1.781
+32-bit array, always go right:          1.546
+sum: 8.935
+
+gcc47:
+byte array, average direction:  	1.95876
+byte array, always go left:     	1.47498
+byte array, always go right:    	1.87065
+32-bit array, average direction:	0.901498
+32-bit array, always go left:   	2.62416
+32-bit array, always go right:  	2.96418
+sum: 10.8927
+
+finns:
+---------------------------------------------------
+VC2010:
+byte array, average direction:          1.594
+byte array, always go left:             1.875
+byte array, always go right:            1.343
+32-bit array, average direction:        1.454
+32-bit array, always go left:           2.203
+32-bit array, always go right:          2.109
+sum: 9.124
+
+gcc47:
+byte array, average direction:  	1.63972
+byte array, always go left:     	1.91009
+byte array, always go right:    	1.50329
+32-bit array, average direction:	0.941885
+32-bit array, always go left:   	3.01376
+32-bit array, always go right:  	2.58277
+sum: 10.6496
+*/
+    
+// Define OLD, FINN or CURRENT inside the upper_count_int method in Array to benchmark different versions
     double score = 0;
 
     {
