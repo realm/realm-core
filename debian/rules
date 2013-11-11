@@ -22,7 +22,7 @@ build: clean
 
 
 libtightdb: build
-	DESTDIR=$$(pwd)/debian/libtightdb sh build.sh install-shared
+	DESTDIR=$$(pwd)/debian/libtightdb sh build.sh install-prod
 	dh_testdir -a
 	dh_testroot -a
 	dh_installdocs -a

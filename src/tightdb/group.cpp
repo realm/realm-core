@@ -317,8 +317,15 @@ Group::~Group() TIGHTDB_NOEXCEPT
 
     detach_table_accessors();
 
-    // Recursively deletes entire tree
+#ifdef TIGHTDB_DEBUG
+    // Recursively deletes entire tree. The destructor in
+    // the allocator will verify that all has been deleted.
     m_top.destroy();
+#else
+    // Just allow the allocator to release all mem in one chunk
+    // without having to traverse the entire tree first
+    m_alloc.detach();
+#endif
 }
 
 

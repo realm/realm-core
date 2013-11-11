@@ -39,6 +39,14 @@ DESCR      : &g_shared_group_descr
              as derived objects (tables, views, etc.) are either
              writable or not.
 
+             The scoped transaction objects {@link g_write_trans_begin_write}
+             and {@link g_read_trans_begin_read}
+             are provided to facilitate use of the
+             <a href="http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization">
+             RAII</a> pattern. For cases where RAII is not applicable, methods on SharedGroup
+             allow for explicitly beginning and ending transactions, see
+             {@link g_shared_group_begin_write} and {@link g_shared_group_begin_read}.
+
              Nested transactions are not supported.
 
              Read transactions are significantly faster than write
@@ -253,7 +261,8 @@ CATEGORIES:
                  {@link g_shared_group_commit} or {@link g_shared_group_rollback}.
 
                  Using a scoped write transaction and the RAII pattern should be preferred over direct use of
-                 begin_write whenever possible.
+                 begin_write whenever possible, as it leads to cleaner code. See {@link g_write_trans_begin_write}
+                 for an example.
       RETURN:
         TYPES  : Group&
         DESCR  : &g_shared_group_begin_write_return1_descr
@@ -293,7 +302,8 @@ CATEGORIES:
                  You must call {@link g_shared_group_end_read} to terminate the transaction.
 
                  Creating a scoped read transaction should be preferred over direct use of
-                 begin_read.
+                 begin_read whenever possible, as it leads to cleaner code. See {@link g_read_trans_begin_read}
+                 for an example
       CONST    : True
       RETURN:
         TYPES  : Group&

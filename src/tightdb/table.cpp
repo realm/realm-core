@@ -67,13 +67,13 @@ void Table::create_columns()
     }
 
     size_t subtable_count = 0;
-    ColumnType attr = col_attr_None;
     Allocator& alloc = m_columns.get_alloc();
 
     // Add the newly defined columns
-    size_t n = m_spec.get_type_attr_count();
+    size_t n = m_spec.get_column_count();
     for (size_t i=0; i<n; ++i) {
-        ColumnType type = m_spec.get_type_attr(i);
+        ColumnType type = m_spec.get_real_column_type(i);
+        ColumnAttr attr = m_spec.get_column_attr(i);
         size_t ref_pos =  m_columns.size();
         ColumnBase* new_col = 0;
 
@@ -134,12 +134,6 @@ void Table::create_columns()
                 break;
             }
 
-            // Attributes
-            case col_attr_Indexed:
-            case col_attr_Unique:
-                attr = type;
-                continue; // attr prefix column types)
-
             default:
                 TIGHTDB_ASSERT(false);
         }
@@ -149,6 +143,7 @@ void Table::create_columns()
 
         // Atributes on columns may define that they come with an index
         if (attr != col_attr_None) {
+            TIGHTDB_ASSERT(attr == col_attr_Indexed); // only supported attr so far
             size_t column_ndx = m_cols.size()-1;
             set_index(column_ndx, false);
 
@@ -194,15 +189,15 @@ void Table::cache_columns()
     TIGHTDB_ASSERT(m_cols.is_empty()); // only done on creation
 
     Allocator& alloc = m_columns.get_alloc();
-    ColumnType attr = col_attr_None;
     size_t num_rows = size_t(-1);
     size_t ndx_in_parent = 0;
     size_t subtable_count = 0;
 
     // Cache columns
-    size_t num_entries_in_spec = m_spec.get_type_attr_count();
+    size_t num_entries_in_spec = m_spec.get_column_count();
     for (size_t i = 0; i < num_entries_in_spec; ++i) {
-        ColumnType type = m_spec.get_type_attr(i);
+        ColumnType type = m_spec.get_real_column_type(i);
+        ColumnAttr attr = m_spec.get_column_attr(i);
         ref_type ref = m_columns.get_as_ref(ndx_in_parent);
 
         ColumnBase* new_col = 0;
@@ -273,18 +268,11 @@ void Table::cache_columns()
                 break;
             }
 
-            case col_attr_Indexed:
-                // Attributes (prefixing column types)
-                attr = type;
-                continue;
-
             case col_type_Reserved1:
             case col_type_Reserved4:
-            case col_attr_Unique:
-            case col_attr_Sorted:
-            case col_attr_None:
                 // These have no function yet and are therefore
                 // unexpected.
+                TIGHTDB_ASSERT(false);
                 break;
         }
 
@@ -404,7 +392,6 @@ size_t Table::add_column(DataType type, StringData name)
 
 size_t Table::add_subcolumn(const vector<size_t>& column_path, DataType type, StringData name)
 {
-    TIGHTDB_ASSERT(!column_path.empty());
     TIGHTDB_ASSERT(!has_shared_spec());
     detach_subtable_accessors();
 
@@ -500,7 +487,11 @@ size_t Table::do_add_column(DataType type)
 void Table::do_add_subcolumn(const vector<size_t>& column_path, size_t column_path_ndx,
                              DataType type)
 {
-    TIGHTDB_ASSERT(1 <= column_path.size());
+    if (column_path.empty()) {
+        do_add_column(type);
+        return;
+    }
+
     TIGHTDB_ASSERT(column_path_ndx <= column_path.size() - 1);
 
     size_t column_ndx = column_path[column_path_ndx];
@@ -2097,10 +2088,13 @@ void Table::optimize()
                 }
             }
 
+            // Indexes are also in m_columns, so we need adjusted pos
+            size_t pos_in_mcolumns = m_spec.get_column_pos(i);
+
             // Replace column
             ColumnStringEnum* e =
-                new ColumnStringEnum(keys_ref, values_ref, &m_columns, i, keys_parent, keys_ndx, alloc);
-            m_columns.set(i, values_ref);
+                new ColumnStringEnum(keys_ref, values_ref, &m_columns, pos_in_mcolumns, keys_parent, keys_ndx, alloc);
+            m_columns.set(pos_in_mcolumns, values_ref);
             m_cols.set(i, intptr_t(e));
 
             // Inherit any existing index
