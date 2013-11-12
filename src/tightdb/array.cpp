@@ -2390,7 +2390,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_
 
 // See lower_bound()
 template<int width>
-inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
+size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
 
 #define LASSE
@@ -2401,12 +2401,13 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_
 #ifdef LASSE
         size_t low = 0;
         while (size > 0) {
-            size_t adjustment = size & 1;
+            size_t old_size = size;
             size /= 2;
             const size_t probe = (low + size);
-                const int64_t v = get_direct<width>(data, probe);
+            size_t pbadj = probe + old_size - size;
+            const int64_t v = get_direct<width>(data, probe);
 
-                    low = (!(value < v)) ? probe+adjustment : low;
+            low = (!(value < v)) ? pbadj : low;
 
         }
         return low;
