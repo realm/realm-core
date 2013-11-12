@@ -2389,12 +2389,39 @@ template<int width>
 inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
 
-#define FINN
+#define LASSE
+//#define FINN
 //#define OLD
 //#define CURRENT
 
+#ifdef LASSE
+        size_t low = 0;
+        while (size >= 2) {
+                size /= 2;
+                const size_t probe = (low + size);
+                const int64_t v = get_direct<width>(data, probe);
 
-#if defined(OLD)
+                if (v < value) 
+                    low += size;
+
+        }
+        return low;
+
+/*
+        size_t low = 0;
+        do  {
+                size /= 2;
+                const size_t probe = (low + size);
+                const int64_t v = get_direct<width>(data, probe);
+
+                if (v < value) 
+                    low += size;
+
+        } while (size > 1);
+        return low;
+*/
+
+#elif defined(OLD)
 
         size_t low = -1;
         size_t high = size;
@@ -2406,12 +2433,22 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_
         while (high - low > 1) {
                 const size_t probe = (low + high) >> 1;
                 const int64_t v = get_direct<width>(data, probe);
+                
+                if (v > value) 
+                    high = probe;
+                else            
+                    low = probe;
 
-                if (v > value) high = probe;
-                else            low = probe;
+/*
+                low = (v <= value) ? probe : low; // SLOW - emits 2 cond movs, but slow
+                high = (v > value) ? probe : high;
+*/
+
         }
-        if (high == size) return (size_t)-1;
-        else return high;
+        if (high == size) 
+            return (size_t)-1;
+        else 
+            return high;
 
 
 

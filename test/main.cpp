@@ -99,6 +99,28 @@ int main(int argc, char* argv[])
 /*
 lower = better
 
+lasses new:
+---------------------------------------------------
+VC2010:
+byte array, average direction:          1.421
+byte array, always go left:             1.625
+byte array, always go right:            1.25
+32-bit array, average direction:        0.375
+32-bit array, always go left:           1.265
+32-bit array, always go right:          1.281
+sum: 6.842
+
+gcc47:
+byte array, average direction:  	0.9933
+byte array, always go left:     	1.02804
+byte array, always go right:    	0.992615
+32-bit array, average direction:	0.402451
+32-bit array, always go left:   	1.34998
+32-bit array, always go right:  	1.35718
+sum: 5.72111
+
+
+
 current:
 ---------------------------------------------------
 VC2010:
