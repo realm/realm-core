@@ -3,7 +3,7 @@
 #include <vector>
 #include <iostream>
 #include <iomanip>
-
+#include <limits>       // std::numeric_limits
 #include <UnitTest++.h>
 #include <TestReporter.h> // Part of UnitTest++
 #include <tightdb.hpp>
@@ -20,7 +20,6 @@
 using namespace std;
 using namespace UnitTest;
 using namespace tightdb;
-
 
 namespace {
 
@@ -95,57 +94,215 @@ public:
 
 int main(int argc, char* argv[])
 {
-#ifndef _WIN32
-    string tightdbd_path;
-    // When running the unit-tests in Xcode, it runs them
-    // in its own temporary directory. So we have to make sure we
-    // look for the daemon there
-    const char* xcode_env = getenv("__XCODE_BUILT_PRODUCTS_DIR_PATHS");
-    if (xcode_env) {
-#  ifdef TIGHTDB_DEBUG
-        tightdbd_path = "tightdbd-dbg-noinst";
-#  else
-        tightdbd_path = "tightdbd-noinst";
-#  endif
+
+
+/*
+lower = better
+
+lasses new:
+---------------------------------------------------
+VC2010:
+byte array, average direction:          1.421
+byte array, always go left:             1.625
+byte array, always go right:            1.25
+32-bit array, average direction:        0.375
+32-bit array, always go left:           1.265
+32-bit array, always go right:          1.281
+sum: 6.842
+
+gcc47:
+byte array, average direction:  	0.9933
+byte array, always go left:     	1.02804
+byte array, always go right:    	0.992615
+32-bit array, average direction:	0.402451
+32-bit array, always go left:   	1.34998
+32-bit array, always go right:  	1.35718
+sum: 5.72111
+
+
+
+current:
+---------------------------------------------------
+VC2010:
+byte array, average direction:          1.766
+byte array, always go left:             1.734
+byte array, always go right:            1.766
+32-bit array, average direction:        1.187
+32-bit array, always go left:           1.812
+32-bit array, always go right:          2.031
+sum: 9.109
+
+gcc47:
+byte array, average direction:  	1.46292
+byte array, always go left:     	1.2532
+byte array, always go right:    	2.07292
+32-bit array, average direction:	0.992568
+32-bit array, always go left:   	1.1024
+32-bit array, always go right:  	1.85952
+sum: 7.75095
+
+
+old:
+---------------------------------------------------
+VC2010:
+byte array, average direction:          1.843
+byte array, always go left:             1.75
+byte array, always go right:            2.015
+32-bit array, average direction:        1.094
+32-bit array, always go left:           1.781
+32-bit array, always go right:          1.546
+sum: 8.935
+
+gcc47:
+byte array, average direction:  	1.95876
+byte array, always go left:     	1.47498
+byte array, always go right:    	1.87065
+32-bit array, average direction:	0.901498
+32-bit array, always go left:   	2.62416
+32-bit array, always go right:  	2.96418
+sum: 10.8927
+
+finns:
+---------------------------------------------------
+VC2010:
+byte array, average direction:          1.594
+byte array, always go left:             1.875
+byte array, always go right:            1.343
+32-bit array, average direction:        1.454
+32-bit array, always go left:           2.203
+32-bit array, always go right:          2.109
+sum: 9.124
+
+gcc47:
+byte array, average direction:  	1.63972
+byte array, always go left:     	1.91009
+byte array, always go right:    	1.50329
+32-bit array, average direction:	0.941885
+32-bit array, always go left:   	3.01376
+32-bit array, always go right:  	2.58277
+sum: 10.6496
+*/
+    
+// Define OLD, FINN or CURRENT inside the upper_count_int method in Array to benchmark different versions
+    double score = 0;
+
+    {
+        // BYTE sized array
+        test_util::Timer t;
+        double best;
+
+        tightdb::Array a;
+        int64_t val = 0;
+        volatile size_t tt = 40;
+
+        for(int i = 0; i < tt; i++) {
+            val += rand() % 5;
+            a.add(val);
+        }
+
+        best = 9999; //std::numeric_limits<double>::max();    
+        for(int iter = 0; iter < 30; iter++) {
+            t.reset();
+            for(int j = 0; j < 300000; j++) {
+                for(int i = 0; i < val; i += val / 30) {
+                    volatile size_t t = a.upper_bound_int(i); // average
+                }
+            }
+            if(t < best)
+                best = t;
+        }
+        cerr << "byte array, average direction:  \t" << best << "\n";
+        score += best;
+
+        best = 9999; //std::numeric_limits<double>::max();    
+        for(int iter = 0; iter < 30; iter++) {
+            t.reset();
+            for(int j = 0; j < 300000; j++) {
+                for(int i = 0; i < val; i += val / 30) {
+                    volatile size_t t = a.upper_bound_int(0); // always go left
+                }
+            }
+            if(t < best)
+                best = t;
+        }
+        cerr << "byte array, always go left:     \t" << best << "\n";
+        score += best;
+
+        best = 9999; //std::numeric_limits<double>::max();         
+        for(int iter = 0; iter < 30; iter++) {
+            t.reset();
+            for(int j = 0; j < 300000; j++) {
+                for(int i = 0; i < val; i += val / 30) {
+                    volatile size_t t = a.upper_bound_int(val); // always go right
+                }
+            }
+            if(t < best)
+                best = t;
+        }
+        cerr << "byte array, always go right:    \t" << best << "\n";
+        score += best;
     }
-    else {
-#  ifdef TIGHTDB_COVER
-        tightdbd_path = "../src/tightdb/tightdbd-cov-noinst";
-#  else
-#    ifdef TIGHTDB_DEBUG
-        tightdbd_path = "../src/tightdb/tightdbd-dbg-noinst";
-#    else
-        tightdbd_path = "../src/tightdb/tightdbd-noinst";
-#    endif
-#  endif
+
+
+    {
+        // 32 bit int array
+        test_util::Timer t;
+        double best;
+
+        tightdb::Array a;
+        int64_t val = 0;
+
+        for(int i = 0; i < 1000; i++) {
+            val += rand() % 1000;
+            a.add(val);
+        }
+
+        best = 9999; //std::numeric_limits<double>::max();      
+        for(int iter = 0; iter < 30; iter++) {
+            t.reset();
+            for(int j = 0; j < 10000; j++) {
+                for(int i = 0; i < val; i += val / 1000) {
+                    volatile size_t t = a.upper_bound_int(i); // average direction
+                }
+            }
+            if(t < best)
+                best = t;
+        }
+        cerr << "32-bit array, average direction:\t" << best << "\n";
+
+        best = 9999; //std::numeric_limits<double>::max();         
+        for(int iter = 0; iter < 30; iter++) {
+            t.reset();
+            for(int j = 0; j < 10000; j++) {
+                for(int i = 0; i < val; i += val / 1000) {
+                    volatile size_t t = a.upper_bound_int(0); // always go left
+                }
+            }
+            if(t < best)
+                best = t;
+        }
+        cerr << "32-bit array, always go left:   \t" << best << "\n";
+        score += best;
+
+        best = 9999; //std::numeric_limits<double>::max();        
+        for(int iter = 0; iter < 30; iter++) {
+            t.reset();
+            for(int j = 0; j < 10000; j++) {
+                for(int i = 0; i < val; i += val / 1000) {
+                    volatile size_t t = a.upper_bound_int(val);  // always go right
+                }
+            }
+            if(t < best)
+                best = t;
+        }
+        cerr << "32-bit array, always go right:  \t" << best << "\n";
+        score += best;
     }
-    setenv("TIGHTDBD_PATH", tightdbd_path.c_str(), 0);
-#endif // ! _WIN32
-    bool const no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
-#ifdef TIGHTDB_DEBUG
-    cerr << "Running Debug unit tests\n";
-#else
-    cerr << "Running Release unit tests\n";
-#endif
 
-    cerr << "TIGHTDB_MAX_LIST_SIZE = " << TIGHTDB_MAX_LIST_SIZE << "\n";
 
-#ifdef TIGHTDB_COMPILER_SSE
-    cerr << "Compiler supported SSE (auto detect): Yes\n";
-#else
-    cerr << "Compiler supported SSE (auto detect): No\n";
-#endif
 
-    cerr << "This CPU supports SSE (auto detect):  " << (tightdb::cpuid_sse<42>() ? "4.2" : (tightdb::cpuid_sse<30>() ? "3.0" : "None"));
-    cerr << "\n\n";
+    cerr << "sum: " << score;
 
-    CustomTestReporter reporter;
-    TestRunner runner(reporter);
-    const int res = runner.RunTestsIf(Test::GetTestList(), 0, True(), 0);
-
-#ifdef _MSC_VER
-    getchar(); // wait for key
-#endif
-    return no_error_exit_staus ? 0 : res;
+    return 0;
 }

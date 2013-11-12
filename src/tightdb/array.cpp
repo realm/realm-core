@@ -2392,6 +2392,73 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_
 template<int width>
 inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
+
+#define LASSE
+//#define FINN
+//#define OLD
+//#define CURRENT
+
+#ifdef LASSE
+        size_t low = 0;
+        while (size > 0) {
+            size_t adjustment = size & 1;
+            size /= 2;
+            const size_t probe = (low + size);
+                const int64_t v = get_direct<width>(data, probe);
+
+                    low = (!(value < v)) ? probe+adjustment : low;
+
+        }
+        return low;
+
+/*
+        size_t low = 0;
+        do  {
+                size /= 2;
+                const size_t probe = (low + size);
+                const int64_t v = get_direct<width>(data, probe);
+
+                if (v < value) 
+                    low += size;
+
+        } while (size > 1);
+        return low;
+*/
+
+#elif defined(OLD)
+
+        size_t low = -1;
+        size_t high = size;
+
+        // Binary search based on:
+        // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+        // Finds position of largest value SMALLER than the target (for lookups in
+        // nodes)
+        while (high - low > 1) {
+                const size_t probe = (low + high) >> 1;
+                const int64_t v = get_direct<width>(data, probe);
+                
+                if (v > value) 
+                    high = probe;
+                else            
+                    low = probe;
+
+/*
+                low = (v <= value) ? probe : low; // SLOW - emits 2 cond movs, but slow
+                high = (v > value) ? probe : high;
+*/
+
+        }
+        if (high == size) 
+            return (size_t)-1;
+        else 
+            return high;
+
+
+
+
+#elif defined(FINN)
+
     size_t lower = 0;
     size_t upper = size;
     while (lower < upper) {
@@ -2403,6 +2470,27 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_
         upper = (!(value < probe)) ? upper   : mid;
     }
     return lower;
+
+#elif defined(CURRENT)
+
+    size_t i = 0;
+    size_t size_2 = size;
+    while (0 < size_2) {
+        size_t half = size_2 / 2;
+        size_t mid = i + half;
+        int64_t probe = get_direct<width>(data, mid);
+        if (!(value < probe)) {
+            i = mid + 1;
+            size_2 -= half + 1;
+        }
+        else {
+            size_2 = half;
+        }
+    }
+    return i;
+
+#endif
+
 }
 
 } // anonymous namespace
