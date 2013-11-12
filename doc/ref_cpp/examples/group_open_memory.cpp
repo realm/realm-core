@@ -8,16 +8,19 @@
 using namespace std;
 using namespace tightdb;
 
-// @@EndFold@@
 TIGHTDB_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 
 void func(BinaryData buffer)
 {
+// @@EndFold@@
+    // Create a group from a buffer:
     Group::unattached_tag tag;
     Group g(tag);
     g.open(buffer, /* take_ownership: */ false);
+// @@Fold@@
+
     PeopleTable::Ref table = g.get_table<PeopleTable>("people");
 
     table->add("Mary", 14);
@@ -26,7 +29,6 @@ void func(BinaryData buffer)
 
     g.write("people.tightdb");
 }
-// @@Fold@@
 
 int main()
 {
