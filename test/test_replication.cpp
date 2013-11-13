@@ -1,14 +1,16 @@
-#ifdef TIGHTDB_ENABLE_REPLICATION
-#include "testsettings.hpp"
-#ifdef TEST_REPLICATION
-
 #include <algorithm>
 
 #include <UnitTest++.h>
 
+#include <tightdb/config.h>
 #include <tightdb.hpp>
 #include <tightdb/unique_ptr.hpp>
 #include <tightdb/file.hpp>
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+#include "testsettings.hpp"
+#ifdef TEST_REPLICATION
 
 using namespace std;
 using namespace tightdb;
