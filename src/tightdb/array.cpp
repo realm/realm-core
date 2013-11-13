@@ -610,12 +610,12 @@ size_t Array::FindGTE(int64_t target, size_t start) const
     orig_high = high;
 
     while (high - start > 1) {
-        size_t probe = (start + high) / 2; // FIXME: Prone to overflow - see lower_bound() for a solution
+        size_t probe = start + (high - start) / 2;
         int64_t v = get(probe);
-        if (v < target)
-            start = probe;
-        else
-            high = probe;
+        // assuming the condition is difficult-to-predict, conditional assignment should
+        // yield better performance than if-then-else on machines with speculative execution.
+        start = (v < target) ? probe : start;
+        high  = (v < target) ? high  : probe;
     }
     if (high == orig_high)
         ret = not_found;
@@ -2375,27 +2375,105 @@ inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t width,
 template<int width>
 inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
-    size_t i = 0;
-    size_t size_2 = size;
-    while (0 < size_2) {
-        size_t half = size_2 / 2;
-        size_t mid = i + half;
+    size_t lower = 0;
+    size_t upper = size;
+    while (lower < upper) {
+        size_t mid = lower + ((upper-lower) / 2);
         int64_t probe = get_direct<width>(data, mid);
-        if (probe < value) {
-            i = mid + 1;
-            size_2 -= half + 1;
-        }
-        else {
-            size_2 = half;
-        }
+        // assuming the condition is difficult-to-predict, conditional assignment should
+        // yield better performance than if-then-else on machines with speculative execution.
+        lower = (probe < value) ? (mid+1) : lower;
+        upper = (probe < value) ? upper   : mid;
     }
-    return i;
+    return lower;
 }
 
 // See lower_bound()
 template<int width>
-inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
+size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
+
+//#define LASSE
+#define FINN
+//#define OLD
+//#define CURRENT
+
+#ifdef LASSE
+        size_t low = 0;
+        while (size > 0) {
+            size_t old_size = size;
+            size /= 2;
+            const size_t probe = (low + size);
+            size_t pbadj = probe + old_size - size;
+            const int64_t v = get_direct<width>(data, probe);
+
+            low = (!(value < v)) ? pbadj : low;
+
+        }
+        return low;
+
+/*
+        size_t low = 0;
+        do  {
+                size /= 2;
+                const size_t probe = (low + size);
+                const int64_t v = get_direct<width>(data, probe);
+
+                if (v < value) 
+                    low += size;
+
+        } while (size > 1);
+        return low;
+*/
+
+#elif defined(OLD)
+
+        size_t low = -1;
+        size_t high = size;
+
+        // Binary search based on:
+        // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary
+        // Finds position of largest value SMALLER than the target (for lookups in
+        // nodes)
+        while (high - low > 1) {
+                const size_t probe = (low + high) >> 1;
+                const int64_t v = get_direct<width>(data, probe);
+                
+                if (v > value) 
+                    high = probe;
+                else            
+                    low = probe;
+
+/*
+                low = (v <= value) ? probe : low; // SLOW - emits 2 cond movs, but slow
+                high = (v > value) ? probe : high;
+*/
+
+        }
+        if (high == size) 
+            return (size_t)-1;
+        else 
+            return high;
+
+
+
+
+#elif defined(FINN)
+
+    size_t lower = 0;
+    size_t upper = size;
+    while (lower < upper) {
+        size_t mid = lower + ((upper-lower) / 2);
+        int64_t probe = get_direct<width>(data, mid);
+        // assuming the condition is difficult-to-predict, conditional assignment should
+        // yield better performance than if-then-else on machines with speculative execution.
+        lower = (!(value < probe)) ? (mid+1) : lower;
+        upper = (!(value < probe)) ? upper   : mid;
+    }
+    return lower;
+
+#elif defined(CURRENT)
+
     size_t i = 0;
     size_t size_2 = size;
     while (0 < size_2) {
@@ -2411,6 +2489,9 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_
         }
     }
     return i;
+
+#endif
+
 }
 
 } // anonymous namespace
