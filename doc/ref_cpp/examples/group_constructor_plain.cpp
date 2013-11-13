@@ -5,15 +5,19 @@
 
 using namespace tightdb;
 
-// @@EndFold@@
 TIGHTDB_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 
 void func()
 {
+// @@EndFold@@
+    // Create an empty group
     Group g;
+
+    // Create a table in the group
     PeopleTable::Ref table = g.get_table<PeopleTable>("people");
+// @@Fold@@
 
     table->add("Mary", 14);
     table->add("Joe", 17);
@@ -21,7 +25,6 @@ void func()
 
     g.write("people.tightdb");
 }
-// @@Fold@@
 
 int main()
 {

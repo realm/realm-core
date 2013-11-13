@@ -734,6 +734,7 @@ CATEGORIES :
                  a given string value. Defining the first column as a string with unique values,
                  it is possible to combine such a table with this method to emulate a hash
                  array using TightDB.
+                 For optimal performance set an index on the string column, using {@link g_dyn_table_set_index}.
       CONST    : True
       PARAMS:
       - NAME   : value
@@ -947,6 +948,7 @@ CATEGORIES :
       DESCR    : &g_dyn_table_get_sorted_view_desc
                  This method will sort the rows by using values of a given column.
                  The rows are returned as a {@link class_dyn_tableview} object.
+                 Currently sort is only supported on Integer, Boolean and Date ColumnTypes.
       SIGNATURE: |
                  TableView      get_sorted_view(size_t column_ndx, bool ascending=true);
                  ConstTableView get_sorted_view(size_t column_ndx, bool ascending=true) const;
@@ -957,7 +959,7 @@ CATEGORIES :
                  The column index (starting from 0).
       - NAME   : ascending
         TYPES  : bool
-        DESCR  : &cpp_dyn_table_get_sorted_view_parm2_descr
+        DESCR  : &g_dyn_table_get_sorted_view_parm2_descr
                  "If <code>true</code>, rows are sorted ascending, otherwise descending. Default: <code>true</code>."
       RETURN:
         TYPES  : TableView
