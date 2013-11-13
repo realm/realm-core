@@ -2391,6 +2391,92 @@ template<int width>
 inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
     size_t low = 0;
+    size_t half;
+    size_t probe;
+    size_t pbadj;
+    int64_t v;
+
+#define UNROLL_BOUNDS
+#ifdef UNROLL_BOUNDS
+    //if(size > 512)
+    {
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+    }
+#endif   
+    while (size > 0) {
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+    }
+    return low;
+
+    /*
+
+    size_t low = 0;
     while (size > 0) {
         size_t half = size / 2;
         size_t probe = (low + half);
@@ -2400,6 +2486,8 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_
         low = (value >= v) ? pbadj : low;
     }
     return low;
+
+    */
 }
 
 } // anonymous namespace
