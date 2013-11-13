@@ -2394,9 +2394,9 @@ size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEP
 {
 
 //#define LASSE
-//#define FINN
+#define FINN
 //#define OLD
-#define CURRENT
+//#define CURRENT
 
 #ifdef LASSE
         size_t low = 0;

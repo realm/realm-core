@@ -111,6 +111,19 @@ byte array, random indexing:     	0.617178
 32-bit array, always go right:  	0.183802
 sum: 1.75601
 
+VC:
+byte array, random indexing:            1.156
+byte array, average direction:          0.453
+byte array, always go left:             0.453
+byte array, always go right:            0.438
+byte array, random indexing:            1.781
+32-bit array, average direction:        0.531
+32-bit array, always go left:           0.531
+32-bit array, always go right:          0.547
+sum: 5.359
+
+
+
 finns:
 ---------------------------------------------------
 byte array, random indexing:     	0.710238
@@ -135,6 +148,18 @@ byte array, random indexing:     	1.05141
 32-bit array, always go right:  	0.31265
 sum: 3.01998
 
+VC:
+byte array, random indexing:            2.703
+byte array, average direction:          0.609
+byte array, always go left:             0.578
+byte array, always go right:            0.672
+byte array, random indexing:            3.422
+32-bit array, average direction:        1.171
+32-bit array, always go left:           0.516
+32-bit array, always go right:          0.547
+sum: 9.047
+
+
 current:
 ---------------------------------------------------
 byte array, random indexing:     	0.596216
@@ -146,6 +171,17 @@ byte array, random indexing:     	1.59705
 32-bit array, always go left:   	0.141033
 32-bit array, always go right:  	0.225017
 sum: 3.13134
+
+VC:
+byte array, random indexing:            2.718
+byte array, average direction:          0.562
+byte array, always go left:             0.563
+byte array, always go right:            0.579
+byte array, random indexing:            3.328
+32-bit array, average direction:        1.171
+32-bit array, always go left:           0.532
+32-bit array, always go right:          0.594
+sum: 8.876
 
 
 */
@@ -174,7 +210,7 @@ sum: 3.13134
         best = 9999; //std::numeric_limits<double>::max();    
         for(int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 10000; j++) {
+            for(int j = 0; j < 100000; j++) {
                 for(int i = 0; i < 1000; i++) {
                     volatile size_t t = a.upper_bound_int(index_table[i]); // average
                 }
@@ -188,7 +224,7 @@ sum: 3.13134
         best = 9999; //std::numeric_limits<double>::max();    
         for(int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 100000; j++) {
+            for(int j = 0; j < 1000000; j++) {
                 for(int i = 0; i < val; i += val / 30) {
                     volatile size_t t = a.upper_bound_int(i); // average
                 }
@@ -202,7 +238,7 @@ sum: 3.13134
         best = 9999; //std::numeric_limits<double>::max();    
         for(int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 100000; j++) {
+            for(int j = 0; j < 1000000; j++) {
                 for(int i = 0; i < val; i += val / 30) {
                     volatile size_t t = a.upper_bound_int(0); // always go left
                 }
@@ -216,7 +252,7 @@ sum: 3.13134
         best = 9999; //std::numeric_limits<double>::max();         
         for(int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 100000; j++) {
+            for(int j = 0; j < 1000000; j++) {
                 for(int i = 0; i < val; i += val / 30) {
                     volatile size_t t = a.upper_bound_int(val); // always go right
                 }
@@ -249,7 +285,7 @@ sum: 3.13134
         best = 9999; //std::numeric_limits<double>::max();    
         for(int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 10000; j++) {
+            for(int j = 0; j < 100000; j++) {
                 for(int i = 0; i < 1000; i++) {
                     volatile size_t t = a.upper_bound_int(index_table[i]); // average
                 }
@@ -263,7 +299,7 @@ sum: 3.13134
         best = 9999; //std::numeric_limits<double>::max();      
         for(int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 3000; j++) {
+            for(int j = 0; j < 30000; j++) {
                 for(int i = 0; i < val; i += val / 1000) {
                     volatile size_t t = a.upper_bound_int(i); // average direction
                 }
@@ -276,7 +312,7 @@ sum: 3.13134
         best = 9999; //std::numeric_limits<double>::max();         
         for(int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 3000; j++) {
+            for(int j = 0; j < 30000; j++) {
                 for(int i = 0; i < val; i += val / 1000) {
                     volatile size_t t = a.upper_bound_int(0); // always go left
                 }
@@ -290,7 +326,7 @@ sum: 3.13134
         best = 9999; //std::numeric_limits<double>::max();        
         for(int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 3000; j++) {
+            for(int j = 0; j < 30000; j++) {
                 for(int i = 0; i < val; i += val / 1000) {
                     volatile size_t t = a.upper_bound_int(val);  // always go right
                 }
