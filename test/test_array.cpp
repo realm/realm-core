@@ -52,6 +52,42 @@ void has_zero_byte(int64_t value, size_t reps)
 
 } // anonymous namespace
 
+TEST(UPPERLOWERBOUND)
+{
+    // Tests Array::upper_bound() and Array::lower_bound()
+    // This test is independent of TIGHTDB_MAX_LIST_SIZE
+    Array a;
+    std::vector<int> v;
+
+    // we use 4 as constant in order to make border case sequences of v, v, v and v, v+1, v+2, etc, probable
+    for(int iter = 0; iter < 2000; iter++) {
+        int elements = rand() % 10;
+        int val = rand() % 4; // random start value
+
+        a.clear();
+        v.clear();
+
+        for(int e = 0; e < elements; e++) {
+            a.add(val);
+            v.push_back(val);
+            val += rand() % 4;
+        }
+
+        int searches = val; // val exceeds last value by rand() % 4
+        for(int s = 0; s < searches; s++) {
+            int uarr = a.upper_bound_int(s);
+            int larr = a.lower_bound_int(s);
+            int uvec = std::upper_bound(v.begin(), v.end(), s) - v.begin();
+            int lvec = std::lower_bound(v.begin(), v.end(), s) - v.begin();
+
+            CHECK_EQUAL(uvec, uarr);
+            CHECK_EQUAL(lvec, larr);
+        }
+    }
+
+
+}
+
 
 TEST_FIXTURE(db_setup_array, Array_Add0)
 {
