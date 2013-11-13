@@ -101,86 +101,53 @@ lower = better
 
 lasses new:
 ---------------------------------------------------
-VC2010:
-byte array, average direction:          1.421
-byte array, always go left:             1.625
-byte array, always go right:            1.25
-32-bit array, average direction:        0.375
-32-bit array, always go left:           1.265
-32-bit array, always go right:          1.281
-sum: 6.842
-
-gcc47:
-byte array, average direction:  	0.9933
-byte array, always go left:     	1.02804
-byte array, always go right:    	0.992615
-32-bit array, average direction:	0.402451
-32-bit array, always go left:   	1.34998
-32-bit array, always go right:  	1.35718
-sum: 5.72111
-
-
-
-current:
----------------------------------------------------
-VC2010:
-byte array, average direction:          1.766
-byte array, always go left:             1.734
-byte array, always go right:            1.766
-32-bit array, average direction:        1.187
-32-bit array, always go left:           1.812
-32-bit array, always go right:          2.031
-sum: 9.109
-
-gcc47:
-byte array, average direction:  	1.46292
-byte array, always go left:     	1.2532
-byte array, always go right:    	2.07292
-32-bit array, average direction:	0.992568
-32-bit array, always go left:   	1.1024
-32-bit array, always go right:  	1.85952
-sum: 7.75095
-
-
-old:
----------------------------------------------------
-VC2010:
-byte array, average direction:          1.843
-byte array, always go left:             1.75
-byte array, always go right:            2.015
-32-bit array, average direction:        1.094
-32-bit array, always go left:           1.781
-32-bit array, always go right:          1.546
-sum: 8.935
-
-gcc47:
-byte array, average direction:  	1.95876
-byte array, always go left:     	1.47498
-byte array, always go right:    	1.87065
-32-bit array, average direction:	0.901498
-32-bit array, always go left:   	2.62416
-32-bit array, always go right:  	2.96418
-sum: 10.8927
+byte array, random indexing:     	0.359155
+byte array, average direction:  	0.137718
+byte array, always go left:     	0.136732
+byte array, always go right:    	0.138683
+byte array, random indexing:     	0.617178
+32-bit array, average direction:	0.183052
+32-bit array, always go left:   	0.18274
+32-bit array, always go right:  	0.183802
+sum: 1.75601
 
 finns:
 ---------------------------------------------------
-VC2010:
-byte array, average direction:          1.594
-byte array, always go left:             1.875
-byte array, always go right:            1.343
-32-bit array, average direction:        1.454
-32-bit array, always go left:           2.203
-32-bit array, always go right:          2.109
-sum: 9.124
+byte array, random indexing:     	0.710238
+byte array, average direction:  	0.189716
+byte array, always go left:     	0.220833
+byte array, always go right:    	0.174699
+byte array, random indexing:     	1.11801
+32-bit array, average direction:	0.325976
+32-bit array, always go left:   	0.322789
+32-bit array, always go right:  	0.282974
+sum: 3.01925
 
-gcc47:
-byte array, average direction:  	1.63972
-byte array, always go left:     	1.91009
-byte array, always go right:    	1.50329
-32-bit array, average direction:	0.941885
-32-bit array, always go left:   	3.01376
-32-bit array, always go right:  	2.58277
-sum: 10.6496
+old:
+---------------------------------------------------
+byte array, random indexing:     	0.775043
+byte array, average direction:  	0.219906
+byte array, always go left:     	0.171949
+byte array, always go right:    	0.217915
+byte array, random indexing:     	1.05141
+32-bit array, average direction:	0.312408
+32-bit array, always go left:   	0.271111
+32-bit array, always go right:  	0.31265
+sum: 3.01998
+
+current:
+---------------------------------------------------
+byte array, random indexing:     	0.596216
+byte array, average direction:  	0.168881
+byte array, always go left:     	0.142262
+byte array, always go right:    	0.260875
+byte array, random indexing:     	1.59705
+32-bit array, average direction:	0.354992
+32-bit array, always go left:   	0.141033
+32-bit array, always go right:  	0.225017
+sum: 3.13134
+
+
 */
     
 // Define OLD, FINN or CURRENT inside the upper_count_int method in Array to benchmark different versions
@@ -199,11 +166,29 @@ sum: 10.6496
             val += rand() % 5;
             a.add(val);
         }
+        int64_t limit = val + rand() % 5;
+        int index_table[1000];
+        for (int i=0; i<1000; i++)
+            index_table[i] = rand() % limit;
+        
+        best = 9999; //std::numeric_limits<double>::max();    
+        for(int iter = 0; iter < 10; iter++) {
+            t.reset();
+            for(int j = 0; j < 10000; j++) {
+                for(int i = 0; i < 1000; i++) {
+                    volatile size_t t = a.upper_bound_int(index_table[i]); // average
+                }
+            }
+            if(t < best)
+                best = t;
+        }
+        cerr << "byte array, random indexing:     \t" << best << "\n";
+        score += best;
 
         best = 9999; //std::numeric_limits<double>::max();    
-        for(int iter = 0; iter < 30; iter++) {
+        for(int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 300000; j++) {
+            for(int j = 0; j < 100000; j++) {
                 for(int i = 0; i < val; i += val / 30) {
                     volatile size_t t = a.upper_bound_int(i); // average
                 }
@@ -215,9 +200,9 @@ sum: 10.6496
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();    
-        for(int iter = 0; iter < 30; iter++) {
+        for(int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 300000; j++) {
+            for(int j = 0; j < 100000; j++) {
                 for(int i = 0; i < val; i += val / 30) {
                     volatile size_t t = a.upper_bound_int(0); // always go left
                 }
@@ -229,9 +214,9 @@ sum: 10.6496
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();         
-        for(int iter = 0; iter < 30; iter++) {
+        for(int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 300000; j++) {
+            for(int j = 0; j < 100000; j++) {
                 for(int i = 0; i < val; i += val / 30) {
                     volatile size_t t = a.upper_bound_int(val); // always go right
                 }
@@ -256,11 +241,29 @@ sum: 10.6496
             val += rand() % 1000;
             a.add(val);
         }
+        int64_t limit = val + rand() % 5;
+        int index_table[1000];
+        for (int i=0; i<1000; i++)
+            index_table[i] = rand() % limit;
 
-        best = 9999; //std::numeric_limits<double>::max();      
-        for(int iter = 0; iter < 30; iter++) {
+        best = 9999; //std::numeric_limits<double>::max();    
+        for(int iter = 0; iter < 10; iter++) {
             t.reset();
             for(int j = 0; j < 10000; j++) {
+                for(int i = 0; i < 1000; i++) {
+                    volatile size_t t = a.upper_bound_int(index_table[i]); // average
+                }
+            }
+            if(t < best)
+                best = t;
+        }
+        cerr << "byte array, random indexing:     \t" << best << "\n";
+        score += best;
+
+        best = 9999; //std::numeric_limits<double>::max();      
+        for(int iter = 0; iter < 10; iter++) {
+            t.reset();
+            for(int j = 0; j < 3000; j++) {
                 for(int i = 0; i < val; i += val / 1000) {
                     volatile size_t t = a.upper_bound_int(i); // average direction
                 }
@@ -271,9 +274,9 @@ sum: 10.6496
         cerr << "32-bit array, average direction:\t" << best << "\n";
 
         best = 9999; //std::numeric_limits<double>::max();         
-        for(int iter = 0; iter < 30; iter++) {
+        for(int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 10000; j++) {
+            for(int j = 0; j < 3000; j++) {
                 for(int i = 0; i < val; i += val / 1000) {
                     volatile size_t t = a.upper_bound_int(0); // always go left
                 }
@@ -285,9 +288,9 @@ sum: 10.6496
         score += best;
 
         best = 9999; //std::numeric_limits<double>::max();        
-        for(int iter = 0; iter < 30; iter++) {
+        for(int iter = 0; iter < 10; iter++) {
             t.reset();
-            for(int j = 0; j < 10000; j++) {
+            for(int j = 0; j < 3000; j++) {
                 for(int i = 0; i < val; i += val / 1000) {
                     volatile size_t t = a.upper_bound_int(val);  // always go right
                 }

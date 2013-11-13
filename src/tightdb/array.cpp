@@ -2393,10 +2393,10 @@ template<int width>
 size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
 
-#define LASSE
+//#define LASSE
 //#define FINN
 //#define OLD
-//#define CURRENT
+#define CURRENT
 
 #ifdef LASSE
         size_t low = 0;
