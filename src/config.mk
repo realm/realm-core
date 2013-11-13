@@ -20,6 +20,7 @@ endif
 #CFLAGS_DEBUG   += -fno-elide-constructors
 CFLAGS_PTHREAD += -pthread
 CFLAGS_GENERAL += -Wextra -ansi -pedantic -Wno-long-long
+# CFLAGS_CXX = -std=c++11
 
 # Note: While CFLAGS (those specified above) can be overwritten by
 # setting the CFLAGS variable on the command line, PROJECT_CFLAGS are
