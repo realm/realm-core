@@ -2403,21 +2403,15 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_
     size = half;
     low = (v < value) ? pbadj : low;
 
-    half = size / 2;
-    probe = (low + half);
-    pbadj = low + size - half;
-    v = get_direct<width>(data, probe);
-    size = half;
-    low = (v < value) ? pbadj : low;
-
-    while (size > 0) {
+    do {
         half = size / 2;
         probe = (low + half);
         pbadj = low + size - half;
         v = get_direct<width>(data, probe);
         size = half;
         low = (v < value) ? pbadj : low;
-    }
+    } while (size > 0);
+
     return low;
 
 /*
@@ -2467,21 +2461,15 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_
     size = half;
     low = (value >= v) ? pbadj : low;
 
-    half = size / 2;
-    probe = (low + half);
-    pbadj = low + size - half;
-    v = get_direct<width>(data, probe);
-    size = half;
-    low = (value >= v) ? pbadj : low;
-
-    while (size > 0) {
+    do {
         half = size / 2;
         probe = (low + half);
         pbadj = low + size - half;
         v = get_direct<width>(data, probe);
         size = half;
         low = (value >= v) ? pbadj : low;
-    }
+    } while (size > 0);
+
     return low;
 
     /*

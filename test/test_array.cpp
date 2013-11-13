@@ -60,8 +60,8 @@ ONLY(UPPERLOWERBOUND)
     std::vector<int> v;
 
     // we use 4 as constant in order to make border case sequences of v, v, v and v, v+1, v+2, etc, probable
-    for(int iter = 0; iter < 100; iter++) {
-        int elements = rand() % 1100;
+    while(true) {
+        int elements = rand() % 64;
         int val = rand() % 4; // random start value
 
         a.clear();
