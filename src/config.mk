@@ -20,6 +20,7 @@ endif
 #CFLAGS_DEBUG   += -fno-elide-constructors
 CFLAGS_PTHREAD += -pthread
 CFLAGS_GENERAL += -Wextra -ansi -pedantic -Wno-long-long
+# CFLAGS_CXX = -std=c++11
 
 # Note: While CFLAGS (those specified above) can be overwritten by
 # setting the CFLAGS variable on the command line, PROJECT_CFLAGS are
@@ -27,9 +28,6 @@ CFLAGS_GENERAL += -Wextra -ansi -pedantic -Wno-long-long
 
 ifneq ($(TIGHTDB_HAVE_CONFIG),)
 PROJECT_CFLAGS += -DTIGHTDB_HAVE_CONFIG
-endif
-ifneq ($(TIGHTDB_ENABLE_REPLICATION),)
-PROJECT_CFLAGS += -DTIGHTDB_ENABLE_REPLICATION
 endif
 
 PROJECT_CFLAGS_DEBUG = -DTIGHTDB_DEBUG

@@ -19,9 +19,6 @@ Format:
 2013-11-07 (Lasse Reinhold)
 ! Fixed bug: ng-queries could segfault to bug in Array::get_chunk(). Normal queries and everything else not affected.
 
-2013-11-07 (Kenneth Geisshirt)
-. Initiating a library of common shell script functions.
-
 2013-10-10 (Kenneth Geisshirt)
 . Adding INTERACTIVE mode for the dist-config target in build.sh
 

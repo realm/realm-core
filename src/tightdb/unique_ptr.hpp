@@ -51,8 +51,6 @@ private:
     bool operator!=(const UniquePtr&); // Hide
 
     T* m_ptr;
-
-    friend class UniquePtr<T[], D>;
 };
 
 
@@ -104,10 +102,14 @@ template<class T> inline void DefaultDelete<T[]>::operator()(T* p) const
     delete[] p;
 }
 
-template<class T, class D> inline UniquePtr<T,D>::UniquePtr(T* p) TIGHTDB_NOEXCEPT: m_ptr(p) {}
+template<class T, class D> inline UniquePtr<T,D>::UniquePtr(T* p) TIGHTDB_NOEXCEPT: m_ptr(p)
+{
+}
 
 template<class T, class D> inline UniquePtr<T[],D>::UniquePtr(T* p) TIGHTDB_NOEXCEPT:
-    UniquePtr<T,D>(p) {}
+    UniquePtr<T,D>(p)
+{
+}
 
 template<class T, class D> inline UniquePtr<T,D>::~UniquePtr()
 {

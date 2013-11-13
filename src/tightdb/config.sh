@@ -31,6 +31,13 @@ cstring_escape()
 tightdb_version="$(get_config_param "TIGHTDB_VERSION")" || exit 1
 tigthdb_version_escaped="$(cstring_escape "$tightdb_version")" || exit 1
 
+enable_replication="$(get_config_param "ENABLE_REPLICATION")" || exit 1
+if [ "$enable_replication" ]; then
+    enable_replication="1"
+else
+    enable_replication="0"
+fi
+
 install_prefix="$(get_config_param "INSTALL_PREFIX")" || exit 1
 install_prefix_escaped="$(cstring_escape "$install_prefix")" || exit 1
 
@@ -59,6 +66,10 @@ cat >"$target" <<EOF
  *************************************************************************/
 
 #define TIGHTDB_VERSION "$tigthdb_version_escaped"
+
+#if $enable_replication
+#  define TIGHTDB_ENABLE_REPLICATION 1
+#endif
 
 #define TIGHTDB_INSTALL_PREFIX      "$install_prefix_escaped"
 #define TIGHTDB_INSTALL_EXEC_PREFIX "$install_exec_prefix_escaped"

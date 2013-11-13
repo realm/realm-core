@@ -20,6 +20,7 @@
 #ifndef TIGHTDB_SPEC_HPP
 #define TIGHTDB_SPEC_HPP
 
+#include <tightdb/config.h>
 #include <tightdb/array.hpp>
 #include <tightdb/array_string.hpp>
 #include <tightdb/data_type.hpp>
@@ -71,6 +72,11 @@ public:
                                 ArrayParent*& keys_parent, size_t& keys_ndx);
     ref_type get_enumkeys_ref(size_t column_ndx,
                               ArrayParent** keys_parent=NULL, size_t* keys_ndx=NULL);
+
+    // Get position in column list adjusted for indexes
+    // (since index refs are stored alongside column refs in
+    //  m_columns, this may differ from the logical position)
+    size_t get_column_pos(size_t column_ndx) const;
 
     /// Compare two table specs for equality.
     bool operator==(const Spec&) const;
