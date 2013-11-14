@@ -1,4 +1,4 @@
-EXAMPLES = $(wildcard *.cpp)
+EXAMPLES := $(wildcard *.cpp)
 
 TEST_PROGRAMS = $(patsubst %.cpp,%,$(EXAMPLES))
 
@@ -9,4 +9,4 @@ endef
 
 $(foreach x,$(EXAMPLES),$(eval $(call EXAMPLE_PROPS,$(subst -,_,$(patsubst %.cpp,%,$(x))),$(x))))
 
-include ../../../generic.mk
+include ../../../src/generic.mk

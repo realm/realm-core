@@ -6,18 +6,17 @@ ID         : class_shared_group
 TITLE      : SharedGroup
 SUMMARY    : &g_shared_group_summary
              Sharing groups between processes.
-DESCR      : &g_shared_group_descr
+DESCR      :
+- TEXT     : &g_shared_group_descr
              >
              Database files can be shared between running applications.
 
-             When two threads or processes want to access the same
-             database file, they must each create their own
+             When multiple threads or processes want to access the same
+             database file, they must each do so through their own
              instance of SharedGroup.
 
              If the database file does not already exist, it will
-             be created. When multiple threads are involved, it is
-             safe to let the first thread, that gets to it, create
-             the file.
+             be created.
 
              While at least one instance of SharedGroup exists for
              a specific database file, a lock file will exist
@@ -27,7 +26,11 @@ DESCR      : &g_shared_group_descr
              the database file.
 
              Processes that share a database file must reside on
-             the same host.
+             the same host. Sharing also has a storage overhead, so
+             database files created through SharedGroup are often
+             a bit larger than database files created through Group.
+             The minimal size of a database file created through
+             SharedGroup is 4Kb.
 
              Moreover, the class also provides a transactional
              interface to TightDB. Transactions are divided into
@@ -36,10 +39,29 @@ DESCR      : &g_shared_group_descr
              transactions do. This division is important to remember
              as derived objects (tables, views, etc.) are either
              writable or not.
+
+             Nested transactions are not supported.
+
+             Read transactions are significantly faster than write
+             transactions. Multiple read transactions may occur concurrently
+             with each other or with write transactions, while write transactions 
+             are serialized with respect to each other.
+             Transactions are fully isolated: throughout a read transaction it will see 
+             the state of the data as it was when the read transactions started, 
+             regardless of any concurrent commits from write transactions.
+
+- TEXT     : The scoped transaction objects {@link g_write_trans_begin_write}
+             and {@link g_read_trans_begin_read}
+             are provided to facilitate use of the
+             <a href="http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization">
+             RAII</a> pattern. For cases where RAII is not applicable, methods on SharedGroup
+             allow for explicitly beginning and ending transactions, see
+             {@link g_shared_group_begin_write} and {@link g_shared_group_begin_read}.
+
 SEE        :
 EXAMPLES:
 - DESCR    :
-  CODE     : ex_sharedgroup_intro
+  CODE     : ex_shared_group_intro
 IGNORE     : []
 CATEGORIES:
 - Constructor:
@@ -51,13 +73,23 @@ CATEGORIES:
       DESCR    :
       - TEXT   : &g_shared_group_constructor_descr
                  >
-                 Open a shared group (will be created if it does not already exist).
+                 Open a shared group (database will be created if it does not already exist).
+                 Opening a shared group also creates a lock file in the same
+                 directory as the database file. The lock file is used for cross-process
+                 coordination of database access. The lock file is removed when
+                 the last shared group is removed (but see below).
 
+                 When multiple threads or processes access the same database file
+                 through shared groups, each shared group must be opened in the same
+                 durability mode.
+
+      - TEXT   : &g_shared_group_durability_modes
+                 >
                  By default the shared group will be fully durable, so that
                  each commit writes its changes to disk in an atomic manner
                  that guarantees that the file is always consistent.
                  The transaction will complete when the write has been done 
-                 to disk (depending on your disk, it might return when the 
+                 to disk (depending on your disk, it might return when the
                  disk has received the data to it's cache).
 
                  You can also set the durability level to Asynchroneous.
@@ -73,8 +105,21 @@ CATEGORIES:
                  just be used for identification and backing; it will be removed
                  when there are no more processes using it.
 
-                 Note that a shared group can only be opened in the mode it was 
-                 created in.
+                 When used with asynchronous durability level, a process running
+                 in the background (the "commit daemon") may continue to update
+                 the database after the application has terminated. The lock file will 
+                 be removed and the commit daemon will terminate once the update is
+                 complete. As long as the lock file is present, new shared
+                 groups can only be created with asynchronous durability level.
+
+                 In case of abnormal termination or a machine crash, the lock file
+                 may be left in an inconsistent state. SharedGroup tries to detect
+                 and remedy this problem when it is opened, but it is not possible
+                 to safely handle all scenarios. If safety cannot be ensured, 
+                 SharedGroup will give up and throw a PresumablyStaleLockFile exception. 
+                 In this case, the stale lock file must be removed manually. In all
+                 cases the database file itself will be in a consistent state, even though
+                 updates still pending at the time of crash will be lost.
 
       - TEXT   : &g_shared_group_constructor_descr_unattached
                  >
@@ -105,24 +150,27 @@ CATEGORIES:
         DESCR  : &g_shared_group_constructor_return1_descr
                  A shared group.
       THROWS:
-      - EXCEPT : &cpp_permission_denied_except
-                 File::PermissionDenied
-        DESCR  : &g_permission_denied_descr
-                 >
-                 The user has insufficient permissions to perform the IO
-                 operation.
-      - EXCEPT : &cpp_not_found_except
-                 File::NotFound
-        DESCR  : &g_not_found_descr
-                 A part of the path was not found.
-      - EXCEPT : &cpp_invalid_database_except
-                 InvalidDatabase
-        DESCR  : &g_shared_group_invalid_database_descr
-                 The file does not appear to contain a valid TightDB database.
-      - EXCEPT : &cpp_access_error_except
-                 File::AccessError
-        DESCR  : &g_access_error_descr
-                 For some reason, we can't access the database.
+      - EXCEPT : File::AccessError
+        DESCR  : *g_group_constructor_memory_throws_descr
+      - EXCEPT : File::PermissionDenied
+        DESCR  : *g_group_exc_perm
+      - EXCEPT : File::NotFound
+        DESCR  : *g_group_exc_notfound
+      - EXCEPT : File::Exists
+        DESCR  : *g_group_exc_exists
+      - EXCEPT : InvalidDatabase
+        DESCR  : *g_group_exc_invalid_db
+      - EXCEPT : &cpp_stale_lockfile_except
+                 SharedGroup::PresumablyStaleLockFile
+        DESCR  : &g_stale_lockfile_descr
+                 A lock file exist, but it cannot be decided whether it is safe to use it or not.
+                 Verify that the lock file is not in use, then delete it and try again.
+      - EXCEPT : &cpp_lockfile_but_no_data_except
+                 SharedGroup::LockFileButNoData
+        DESCR  : &g_lockfile_but_no_data_descr
+                 An active sharing scheme has been established with at least one other SharedGroup,
+                 but for some reason the database file does not exist. It would be unsafe to create
+                 a new database in this situation, so an exception is thrown instead.
       - EXCEPT : &cpp_runtime_error_except
                  std::runtime_error
         DESCR  : &g_runtime_error_descr
@@ -131,61 +179,151 @@ CATEGORIES:
       - CODE   : ex_cpp_shared_group_constructor
         DESCR  :
 
-- Write transactions:
+
+
+- Scoped Transactions:
+  METHODS:
+  - g_write_trans_begin_write:
+      NAMES    : WriteTransaction
+      SUMMARY  : &g_write_trans_begin_write_summary
+                 Create a write transaction.
+      DESCR    : &g_write_trans_begin_write_descr
+                 >
+                 Create an object of type WriteTransaction. These objects provide 
+                 <a href="http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization">
+                 RAII</a> for write
+                 transactions. Write transactions are committed by calling
+                 {@link g_write_trans_commit}. If a write transaction goes out of scope without
+                 calling commit, it is rolled back.
+      PARAMS:
+      - NAME   : sg
+        TYPES  : SharedGroup&
+        DESCR  : The shared group with which the transaction belongs.
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_writetrans
+        DESCR  :
+
+  - g_read_trans_begin_read:
+      NAMES    : ReadTransaction
+      SUMMARY  : &g_read_trans_begin_read_summary
+                 Create a read transaction.
+      DESCR    : &g_read_trans_begin_read_descr
+                 Create an object of type ReadTransaction. These objects provide
+                 <a href="http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization">
+                 RAII</a> for read transactions.
+      SIGNATURE: ReadTransaction(SharedGroup& sg)
+      PARAMS:
+      - NAME   : sg
+        TYPES  : SharedGroup&
+        DESCR  : The shared group with which the transaction belongs.
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_readtrans
+        DESCR  :
+
+  - g_write_trans_commit:
+      NAMES    : commit
+      SUMMARY  : &g_shared_group_commit_summary
+                 Commit a write transaction.
+      DESCR    : &g_shared_group_commit_descr
+                 This method closes a write transaction and all changes become visible to subsequent
+                 transactions. If opened in full durability mode, commit only returns when the
+                 changes have been committed to the database file. If opened in asynchronous
+                 mode, the actual synchronization of the database file is delayed.
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_writetrans
+        DESCR  :
+
+  - g_trans_get_table:
+      NAMES    : get_table
+      SUMMARY  : Get table from name.
+      DESCR    : Given a name, find and return a reference to a table with that name.
+      PARAMS:
+      - NAME   : name
+        TYPES  : StringData
+        DESCR  : Name of a table.
+      RETURN:
+        TYPES  : TableRef
+        DESCR  : A reference to a table.
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_get_table
+        DESCR  :
+
+  - g_trans_get_group:
+      NAMES    : get_group
+      SUMMARY  : Get the group.
+      DESCR    : Return the group used by the transaction. Take care not to call commit()
+                 on the group.
+      RETURN:
+        TYPES  : Group&
+        DESCR  : A group.
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_get_group
+        DESCR  :
+
+
+
+- Transactions:
   METHODS:
   - g_shared_group_begin_write:
       NAMES    : begin_write
       SUMMARY  : &g_shared_group_begin_write_summary
-                 Initiate a transaction.
+                 Initiate write transaction.
       DESCR    : &g_shared_group_begin_write_descr
-                 Begin writing to a shared group.
+                 >
+                 Initiate write transaction. Write transactions are serialized - only one write
+                 transaction can progress at a time. Write transactions must be terminated by either
+                 {@link g_shared_group_commit} or {@link g_shared_group_rollback}.
+
+                 Using a scoped write transaction and the RAII pattern should be preferred over direct use of
+                 begin_write whenever possible, as it leads to cleaner code. See {@link g_write_trans_begin_write}
+                 for an example.
       RETURN:
         TYPES  : Group&
         DESCR  : &g_shared_group_begin_write_return1_descr
                  A group.
       EXAMPLES:
-      - CODE   : ex_cpp_shared_group_begin_write
+      - CODE   : ex_cpp_shared_group_write
         DESCR  :
 
   - g_shared_group_commit:
       NAMES    : commit
-      SUMMARY  : &g_shared_group_commit_summary
-                 Commit a transaction.
-      DESCR    : &g_shared_group_commit_descr
-                 This method closes a transaction and all changes are written to the shared group.
+      SUMMARY  : *g_shared_group_commit_summary
+      DESCR    : *g_shared_group_commit_descr
       EXAMPLES:
-      - CODE   : ex_cpp_shared_group_commit
+      - CODE   : ex_cpp_shared_group_write
         DESCR  :
 
   - g_shared_group_rollback:
       NAMES    : rollback
       SUMMARY  : &g_shared_group_rollback_summary
-                 Rollback a transaction.
+                 Rollback a write transaction.
       DESCR    : &g_shared_group_rollback_descr
                  This method closes a transaction and discards all changes done to the shared group,
-                 unless a commit has already been done. It is ok to call rollback multiple times. 
+                 unless a commit has already been done. It is ok to call rollback multiple times.
                  Any additional calls to rollback following a commit or rollback are treated as no-ops.
       EXAMPLES:
-      - CODE   : ex_cpp_shared_group_rollback
+      - CODE   : ex_cpp_shared_group_write
         DESCR  :
 
-- Read transactions:
-  METHODS:
   - g_shared_group_begin_read:
       NAMES    : begin_read
       SUMMARY  : &g_shared_group_begin_read_summary
                  Initiate read transaction.
       DESCR    : &g_shared_group_begin_read_descr
                  >
-                 Begin reading from a shared group. During the read transaction,
+                 Initiate read transaction. During the read transaction,
                  you have a fully consistent immutable view of the group.
                  You must call {@link g_shared_group_end_read} to terminate the transaction.
+
+                 Creating a scoped read transaction should be preferred over direct use of
+                 begin_read whenever possible, as it leads to cleaner code. See {@link g_read_trans_begin_read}
+                 for an example
       CONST    : True
       RETURN:
         TYPES  : Group&
         DESCR  : A group.
       EXAMPLES:
-      - CODE   : ex_cpp_shared_group_begin_read
+      - CODE   : ex_cpp_shared_group_read
         DESCR  :
 
   - g_shared_group_end_read:
@@ -193,11 +331,12 @@ CATEGORIES:
       SUMMARY  : &g_shared_group_end_read_summary
                  Terminate read transaction.
       DESCR    : &g_shared_group_end_read_descr
-                 This method terminates a read transaction which was started with {@link g_shared_group_begin_read}.
+                 This method terminates a read transaction which was started with 
+                 {@link g_shared_group_begin_read}.
                  It is ok to call end_read multiple times, the first call will terminate the transaction.
                  Any additional calls are treated as no-ops.
       EXAMPLES:
-      - CODE   : ex_cpp_shared_group_end_read
+      - CODE   : ex_cpp_shared_group_read
         DESCR  :
 
 
@@ -210,27 +349,18 @@ CATEGORIES:
       SIGNATURE: >
                  open(const std::string& file, bool no_create = false, DurabilityLevel dlevel = durability_Full)
       DESCR    : &g_shared_group_open_descr
+       - TEXT  :
+                 >
                  Attach this SharedGroup instance to the specified
                  database file.
 
                  If the database file does not already exist, it will
                  be created (unless <tt>no_create</tt> is set to
-                 true.) When multiple threads are involved, it is safe
-                 to let the first thread, that gets to it, create the
-                 file.
+                 true.) 
 
-                 While at least one instance of SharedGroup exists for
-                 a specific database file, a "lock" file will be
-                 present too. The lock file will be placed in the same
-                 directory as the database file, and its name will be
-                 derived by appending ".lock" to the name of the
-                 database file.
+       - TEXT  : *g_shared_group_durability_modes
 
-                 When multiple SharedGroup instances refer to the same
-                 file, they must specify the same durability level,
-                 otherwise an exception will be thrown.
-
-                 Calling open() on a SharedGroup instance that is
+       - TEXT  : Calling open() on a SharedGroup instance that is
                  already in the attached state has undefined behavior.
       PARAMS:
       - NAME   : path
@@ -247,12 +377,19 @@ CATEGORIES:
                  Durability Level (durability_Full or durability_MemOnly).
       THROWS:
       - EXCEPT : File::AccessError
-        DESCR  : &g_shared_group_open_throws_descr
-                 If the file could not be opened. If the reason
-                 corresponds to one of the exception types that are
-                 derived from File::AccessError, the derived exception
-                 type is thrown. Note that InvalidDatabase is among
-                 these derived exception types.
+        DESCR  : *g_group_constructor_memory_throws_descr
+      - EXCEPT : File::PermissionDenied
+        DESCR  : *g_group_exc_perm
+      - EXCEPT : File::NotFound
+        DESCR  : *g_group_exc_notfound
+      - EXCEPT : File::Exists
+        DESCR  : *g_group_exc_exists
+      - EXCEPT : InvalidDatabase
+        DESCR  : *g_group_exc_invalid_db
+      - EXCEPT : *cpp_stale_lockfile_except
+        DESCR  : *g_stale_lockfile_descr
+      - EXCEPT : *cpp_lockfile_but_no_data_except
+        DESCR  : *g_lockfile_but_no_data_descr
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_shared_group_open
@@ -329,3 +466,6 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_shared_group_has_changed
         DESCR  :
+
+
+

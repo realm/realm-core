@@ -18,7 +18,8 @@ DESCR      : >
             <p>If books is a <em>dynamic </em>table you need to specify column types as template arguments and 
             give their column number in parentheses:</p>
             
-            <tt>&nbsp;&nbsp;&nbsp;Query q = books.column&lt;Int&gt;(0).pages &gt;= 200 && books.column&lt;String&gt;(1).author == "Griffiths";
+            <tt>&nbsp;&nbsp;&nbsp;Query q = books.column&lt;Int&gt;(0).pages &gt;= 200 && books.column&lt;String&gt;(1).author ==<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"Griffiths";
             <br>&nbsp;&nbsp;&nbsp;size_t match = q.find();         
             </tt>
             <p>Queries can only perform simple searches on a single table - all 
@@ -120,20 +121,21 @@ DESCR      : >
             </tbody>
             </table>
             <table class="table table-bordered" border="1">
-            <thead><tr><td colspan="4"><h3>Arithmetic operators</h3>
+            <thead><tr><td colspan="5"><h3>Arithmetic operators</h3>
             </td>
             </tr>
             </thead>
             <tbody>
             <tr>
-            <td colspan="4">Arithmetic operators only apply to 
-            columns of type Int, Float and Double. Currently four operators are 
+            <td colspan="5">Arithmetic operators only apply to 
+            columns of type Int, Float and Double. Currently five operators are 
             available (more will be introduced in future releases):</td>
             </tr>
             <tr><td>+ (plus)</td>
             <td>- (minus)</td>
             <td>* (multiply)</td>
             <td>/ (division)</td>
+            <td>power(x) (power(x) = x^2)</td>
             </tr>
             </tbody>
             </table>
@@ -168,11 +170,11 @@ DESCR      : >
             are of different types, then conversion/promotion mimicks that of the C++ 
             standard. Take following example:</p>
 
-            <tt>&nbsp;&nbsp;&nbsp;table.columns().float_column + 123 > table.columns().double_column;</tt>
+            <tt>&nbsp;&nbsp;&nbsp;table.columns().float_column + 12 > table.columns().double_column;</tt>
 
             <p>This behaves similar to type casting as follows:</p>
 
-            <tt>&nbsp;&nbsp;&nbsp;double(table.columns().float_column + float(123)) > table.columns().double_column;</tt>
+            <tt>&nbsp;&nbsp;&nbsp;double(table.columns().float_column + float(12)) > table.columns().double_column;</tt>
 
             <p>As for regular C++ expressions, be aware of caveats. For example 
             <tt>float(100000005) == 100000008</tt> because there is a gap between

@@ -1,6 +1,4 @@
-#include <iostream>
-#include <string>
-#include "test_utilities.hpp"
+#include "misc.hpp"
 
 using namespace std;
 
@@ -26,5 +24,5 @@ bool equal_without_cr(string s1, string s2)
     return (s1 == s2);
 }
 
-}
-}
+} // namespace test_util
+} // namespace tightdb

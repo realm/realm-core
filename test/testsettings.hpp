@@ -52,4 +52,8 @@
 //#define TEST_INDEX // not implemented yet
 //#define TEST_COLUMN_LARGE // Takes ~5 min in release mode with maxlistsize=1000
 
+// Takes a long time. Also currently fails to reproduce the Java bug, but once it has been identified, this
+// test could perhaps be modified to trigger it (unless it's a language binding problem).
+//#define JAVA_MANY_COLUMNS_CRASH 
+
 #endif

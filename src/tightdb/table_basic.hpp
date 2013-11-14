@@ -380,9 +380,7 @@ public:
         return m_impl.remove(start, end, limit);
     }
 
-#ifdef TIGHTDB_DEBUG
-    std::string Verify() { return m_impl.Verify(); }
-#endif
+    std::string validate() { return m_impl.validate(); }
 
 protected:
     Query(const BasicTable<Spec>& table):

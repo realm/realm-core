@@ -1,32 +1,37 @@
-PASSIVE_SUBDIRS = util test-tightdb test-sqlite3 test-stl performance \
-benchmark-insert-add benchmark-insert-get-set benchmark-prealloc experiments
+SUBDIRS = util
+PASSIVE_SUBDIRS = test-tightdb test-sqlite3 test-stl performance \
+benchmark-insert-add benchmark-insert-get-set benchmark-prealloc \
+benchmark-index benchmark-transaction experiments
 
+DIR_DEPS          = util
 test_tightdb_DEPS = util
 test_sqlite3_DEPS = util
 test_stl_DEPS     = util
-experiments_DEPS  = util
 
 TEST_PROGRAMS = tightdb-tests
 
-tightdb_tests_SOURCES = $(wildcard *.c *.cpp large_tests/*.cpp)
-tightdb_tests_LIBS    = ../src/tightdb/libtightdb.a
+TEST_SOURCES := $(wildcard *.c *.cpp large_tests/*.cpp)
+tightdb_tests_SOURCES = $(TEST_SOURCES)
+tightdb_tests_LIBS    = util/test-util.a
 
 EXTRA_CLEAN_DIRS = large_tests
 
 ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)
-tightdb_tests_CFLAGS  = -Wno-sign-compare $(shell pkg-config unittest++ --cflags)
-tightdb_tests_LDFLAGS = $(shell pkg-config unittest++ --libs)
+UNITTESTPP_CFLAGS  := $(shell pkg-config unittest++ --cflags)
+UNITTESTPP_LDFLAGS := $(shell pkg-config unittest++ --libs)
+tightdb_tests_CFLAGS  = -Wno-sign-compare $(UNITTESTPP_CFLAGS)
+tightdb_tests_LDFLAGS = $(UNITTESTPP_LDFLAGS)
 else
 PASSIVE_SUBDIRS += UnitTest++
 tightdb_tests_CFLAGS  = -IUnitTest++/src
 tightdb_tests_LDFLAGS = -LUnitTest++ -lUnitTest++
-tightdb_tests_DEPS    = UnitTest++
+tightdb_tests_DEPS    = fallback-UnitTest++
 endif
 
-include ../generic.mk
+include ../src/generic.mk
 
 .PHONY: benchmark
-benchmark: minimal/subdir/test-tightdb minimal/subdir/test-sqlite3 minimal/subdir/test-stl
+benchmark: test-norun/subdir/test-tightdb test-norun/subdir/test-sqlite3 test-norun/subdir/test-stl
 	@echo ""
 	@echo ".:: TightDB ::."
 	test-tightdb/test-tightdb
@@ -37,33 +42,50 @@ benchmark: minimal/subdir/test-tightdb minimal/subdir/test-sqlite3 minimal/subdi
 	@echo ".:: STL Vector ::."
 	test-stl/test-stl
 
-.PHONY: UnitTest++
-UnitTest++:
-	$(MAKE) -C UnitTest++ CXXFLAGS="-g -Wall -W -ansi" LDFLAGS= >/dev/null
+FALLBACK_UNITTESTPP_CFLAGS = -g -Wall -W -ansi $(CFLAGS_ARCH)
+FALLBACK_UNITTESTPP_LDFLAGS = $(LDFLAGS_ARCH)
+
+# FIXME: The fallback version of UnitTest++ is used on Darwin, but
+# when compiling with Clang (the only option on OS X 10.9) the
+# self-test test suite of UnitTest++ fails, so we have to ignore
+# errors from the build command below, hence the leading '-'
+.PHONY: fallback-UnitTest++
+fallback-UnitTest++:
+	-$(MAKE) -C UnitTest++ CXX="$(CXX)" CXXFLAGS="$(FALLBACK_UNITTESTPP_CFLAGS)" LDFLAGS="$(FALLBACK_UNITTESTPP_LDFLAGS)" >/dev/null
 
 # Build and run the performance matrix benchmarking program
 .PHONY: performance
-performance: minimal/subdir/util
+performance: test-norun/subdir/util
 	@$(MAKE) -C performance test
 
 # Build the add/insert benchmark
 .PHONY: benchmark-insert-add
-benchmark-insert-add: minimal/subdir/util
-	@$(MAKE) -C benchmark-insert-add
+benchmark-insert-add: test-norun/subdir/util
+	@$(MAKE) -C benchmark-insert-add test-norun
 
 # Build and run the insert/get/set benchmark
 .PHONY: benchmark-insert-get-set
-benchmark-insert-get-set: minimal/subdir/util
+benchmark-insert-get-set: test-norun/subdir/util
 	@$(MAKE) -C benchmark-insert-get-set test
 
 # Build and run the prealloc benchmark
 .PHONY: benchmark-prealloc
-benchmark-prealloc:
+benchmark-prealloc: test-norun/subdir/util
 	@$(MAKE) -C benchmark-prealloc test
+
+# Build the index benchmark
+.PHONY: benchmark-index
+benchmark-index: test-norun/subdir/util
+	@$(MAKE) -C benchmark-index test-norun
+
+# Build the transaction benchmark
+.PHONY: benchmark-transaction
+benchmark-transaction: test-norun/subdir/util
+	@$(MAKE) -C benchmark-transaction test-norun
 
 # Build and run whatever is in experiements/testcase.cpp
 .PHONY: testcase testcase-debug
-testcase: minimal/subdir/util
+testcase: test-norun/subdir/util
 	@$(MAKE) -C experiments test
-testcase-debug: debug/subdir/util
+testcase-debug: test-debug-norun/subdir/util
 	@$(MAKE) -C experiments test-debug
