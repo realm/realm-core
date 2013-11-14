@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_dyn_query_startsWith @@
+// @@Example: ex_cpp_dyn_query_endsWith @@
 #include <tightdb.hpp>
 #include <assert.h>
 
