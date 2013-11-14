@@ -2023,7 +2023,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
 
     TIGHTDB_ASSERT(node.size() >= 2);
     size_t num_children = node.size() - 2;
-
+
     // Verify invar:bptree-nonempty-inner
     TIGHTDB_ASSERT(num_children >= 1);
 
@@ -2375,57 +2375,41 @@ template<int width>
 inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
     size_t low = 0;
-    size_t half;
-    size_t probe;
-    size_t pbadj;
-    int64_t v;
 
-    // Unrolling makes it a bit slower for size < 16, but faster if longer. Average size is most often longer
-
-    half = size / 2;
-    probe = (low + half);
-    pbadj = low + size - half;
-    v = get_direct<width>(data, probe);
-    size = half;
-    low = (v < value) ? pbadj : low;
-
-    half = size / 2;
-    probe = (low + half);
-    pbadj = low + size - half;
-    v = get_direct<width>(data, probe);
-    size = half;
-    low = (v < value) ? pbadj : low;
-        
-    half = size / 2;
-    probe = (low + half);
-    pbadj = low + size - half;
-    v = get_direct<width>(data, probe);
-    size = half;
-    low = (v < value) ? pbadj : low;
-
-    do {
-        half = size / 2;
-        probe = (low + half);
-        pbadj = low + size - half;
-        v = get_direct<width>(data, probe);
-        size = half;
-        low = (v < value) ? pbadj : low;
-    } while (size > 0);
-
-    return low;
-
-/*
-    size_t low = 0;
-    while (size > 0) {
+    while (size > 8) {
         size_t half = size / 2;
         size_t probe = (low + half);
         size_t pbadj = low + size - half;
         int64_t v = get_direct<width>(data, probe);
         size = half;
         low = (v < value) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (v < value) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (v < value) ? pbadj : low;
     }
+    do {
+        size_t half = size / 2;
+        size_t probe = (low + half);
+        size_t pbadj = low + size - half;
+        int64_t v = get_direct<width>(data, probe);
+        size = half;
+        low = (v < value) ? pbadj : low;
+
+    } while (size > 0);
+
     return low;
-*/
+
 }
 
 // See lower_bound()
@@ -2433,59 +2417,41 @@ template<int width>
 inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
     size_t low = 0;
-    size_t half;
-    size_t probe;
-    size_t pbadj;
-    int64_t v;
-
-    // Unrolling makes it a bit slower for size < 16, but faster if longer. Average size is most often longer
-
-    half = size / 2;
-    probe = (low + half);
-    pbadj = low + size - half;
-    v = get_direct<width>(data, probe);
-    size = half;
-    low = (value >= v) ? pbadj : low;
-
-    half = size / 2;
-    probe = (low + half);
-    pbadj = low + size - half;
-    v = get_direct<width>(data, probe);
-    size = half;
-    low = (value >= v) ? pbadj : low;
-
-    half = size / 2;
-    probe = (low + half);
-    pbadj = low + size - half;
-    v = get_direct<width>(data, probe);
-    size = half;
-    low = (value >= v) ? pbadj : low;
-
-    do {
-        half = size / 2;
-        probe = (low + half);
-        pbadj = low + size - half;
-        v = get_direct<width>(data, probe);
-        size = half;
-        low = (value >= v) ? pbadj : low;
-    } while (size > 0);
-
-    return low;
-
-    /*
-
-    size_t low = 0;
-    while (size > 0) {
+    while (size >= 8) {
         size_t half = size / 2;
         size_t probe = (low + half);
         size_t pbadj = low + size - half;
         int64_t v = get_direct<width>(data, probe);
         size = half;
         low = (value >= v) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
     }
+
+    do {
+        size_t half = size / 2;
+        size_t probe = (low + half);
+        size_t pbadj = low + size - half;
+        int64_t v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+
+    } while (size > 0);
+
     return low;
 
-    */
 }
 
 } // anonymous namespace
