@@ -180,22 +180,20 @@ Normally the TightDB version is taken to be what is returned by `git
 describe`. To override this, set `TIGHTDB_VERSION` as in the following
 examples:
 
-    TIGHTDB_VERSION=x.y.z sh build.sh config
-    TIGHTDB_VERSION=x.y.z sh build.sh bin-dist all
+    TIGHTDB_VERSION=0.1.4 sh build.sh config
+    TIGHTDB_VERSION=0.1.4 sh build.sh bin-dist all
+
+To enable replication in TightDB, set `TIGHTDB_ENABLE_REPLICATION` to
+a nonempty value during configuration as in the following examples:
+
+    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh config
+    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh bin-dist all
 
 To use a nondefault compiler, or a compiler in a nondefault location,
 set the environment variable `CC` before calling `sh build.sh build`
 or `sh build.sh bin-dist`, as in the following example:
 
     CC=clang sh build.sh bin-dist all
-
-There are also a number of environment variables that serve to enable
-or disable special features during building:
-
-Set `TIGHTDB_ENABLE_REPLICATION` to a nonempty value to enable
-replication. For example:
-
-    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh src-dist all
 
 
 

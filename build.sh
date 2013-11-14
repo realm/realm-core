@@ -301,7 +301,12 @@ case "$MODE" in
         if [ "$TIGHTDB_VERSION" ]; then
             tightdb_version="$TIGHTDB_VERSION"
         elif value="$(git describe 2>/dev/null)"; then
-            tightdb_version="$value"
+            tightdb_version="$(printf "%s\n" "$value" | sed 's/^v//')" || exit 1
+        fi
+
+        enable_replication=""
+        if [ "$TIGHTDB_ENABLE_REPLICATION" ]; then
+            enable_replication="yes"
         fi
 
         xcode_home="none"
@@ -356,6 +361,7 @@ INSTALL_INCLUDEDIR  = $install_includedir
 INSTALL_BINDIR      = $install_bindir
 INSTALL_LIBDIR      = $install_libdir
 INSTALL_LIBEXECDIR  = $install_libexecdir
+ENABLE_REPLICATION  = $enable_replication
 XCODE_HOME          = $xcode_home
 IPHONE_SDKS         = ${iphone_sdks:-none}
 IPHONE_SDKS_AVAIL   = $iphone_sdks_avail
@@ -664,7 +670,8 @@ EOF
 
         VERSION="$(git describe)" || exit 1
         if ! [ "$TIGHTDB_VERSION" ]; then
-            export TIGHTDB_VERSION="$VERSION"
+            TIGHTDB_VERSION="$(printf "%s\n" "$VERSION" | sed 's/^v//')" || exit 1
+            export TIGHTDB_VERSION
         fi
         NAME="tightdb-$TIGHTDB_VERSION"
 

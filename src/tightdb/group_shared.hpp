@@ -22,6 +22,7 @@
 
 #include <limits>
 
+#include <tightdb/config.h>
 #include <tightdb/group.hpp>
 
 namespace tightdb {

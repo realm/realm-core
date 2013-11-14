@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_dyn_query_less @@
+// @@Example: ex_cpp_dyn_query_notEquals @@
 #include <tightdb.hpp>
 #include <assert.h>
 

@@ -22,15 +22,13 @@
 
 #include <utility>
 
+#include <tightdb/config.h>
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/table_ref.hpp>
 #include <tightdb/spec.hpp>
 #include <tightdb/mixed.hpp>
 #include <tightdb/query.hpp>
-
 //#include "query_expression.h"
-
-
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #endif
