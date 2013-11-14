@@ -159,21 +159,24 @@ class ConstTableView;
 /// makes a proper copy. Copying a temporary TableView is optimized
 /// away on all modern compilers due to such things as 'return value
 /// optimization'. Move semantics is accessed using the move()
-/// function. For example, to efficiently return a non-temporary
-/// TableView from a function, you would have to do something like
-/// this:
+/// function. 
 ///
-/// \code{.cpp}
+/// You should use 'return tv' whenever the type of 'tv' matches the
+/// return type in the function signature exactly, such as
+/// ´T fun() { return T(...); }´ or ´T fun() { T tv; return tv }´ to
+/// enable return-value-optimization and named-return-value-optimization
+/// respectively.
 ///
-///   tightdb::TableView func()
-///   {
-///      tightdb::TableView tv;
-///      return move(tv);
-///   }
+/// You should use 'return move(tv)' whenever the type of 'tv' mismatch
+/// the signature (where 'tv' needs conversion to return type), such as 
+/// ´ConstTableView fun() {TableView tv; return move(tv);}´ to enable
+/// move-semantics.
 ///
-/// \endcode
-///
-/// Note that move(tv) removes the contents from 'tv' and leaves it
+/// Avoid return(tv) whenever possible because it inhibits rvo and nrvo. 
+/// ´return tv´ has been benchmarked to be slower than ´return move(tv)´ 
+/// for both VC2012 and GCC 4.7 in many cases but never the opposite.
+//
+/// Note that move(tv) removes the contents from tv and leaves it
 /// truncated.
 ///
 /// FIXME: Add general documentation about move semantics, and refer
@@ -335,6 +338,11 @@ inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT_COLUMN_AND_TYPE(column_ndx, column_type)                 \
     TIGHTDB_ASSERT(row_ndx < m_refs.size());
 
+#define TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx)   \
+    TIGHTDB_ASSERT_COLUMN(column_ndx)                                       \
+    TIGHTDB_ASSERT(m_table->get_column_type(column_ndx) == type_Table ||    \
+                   (m_table->get_column_type(column_ndx) == type_Mixed));   \
+    TIGHTDB_ASSERT(row_ndx < m_refs.size());
 
 // Column information
 
@@ -451,7 +459,7 @@ inline DataType TableViewBase::get_mixed_type(size_t column_ndx, size_t row_ndx)
 inline size_t TableViewBase::get_subtable_size(size_t column_ndx, size_t row_ndx) const
     TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Table);
+    TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     return m_table->get_subtable_size(column_ndx, real_ndx);
@@ -487,7 +495,7 @@ R TableViewBase::find_all_integer(V* view, size_t column_ndx, int64_t value)
     for (size_t i = 0; i < view->m_refs.size(); i++)
         if (view->get_int(column_ndx, i) == value)
             tv.get_ref_column().add(view->get_source_ndx(i));
-    return move(tv);
+    return tv;
 }
 
 template <class R, class V>
@@ -497,7 +505,7 @@ R TableViewBase::find_all_float(V* view, size_t column_ndx, float value)
     for (size_t i = 0; i < view->m_refs.size(); i++)
         if (view->get_float(column_ndx, i) == value)
             tv.get_ref_column().add(view->get_source_ndx(i));
-    return move(tv);
+    return tv;
 }
 
 template <class R, class V>
@@ -507,7 +515,7 @@ R TableViewBase::find_all_double(V* view, size_t column_ndx, double value)
     for (size_t i = 0; i < view->m_refs.size(); i++)
         if (view->get_double(column_ndx, i) == value)
             tv.get_ref_column().add(view->get_source_ndx(i));
-    return move(tv);
+    return tv;
 }
 
 template <class R, class V>
@@ -522,7 +530,7 @@ R TableViewBase::find_all_string(V* view, size_t column_ndx, StringData value)
         if (view->get_string(column_ndx, i) == value)
             tv.get_ref_column().add(view->get_source_ndx(i));
     }
-    return move(tv);
+    return tv;
 }
 
 
@@ -659,7 +667,7 @@ inline ConstTableView ConstTableView::find_all_datetime(size_t column_ndx, DateT
 
 inline TableRef TableView::get_subtable(size_t column_ndx, size_t row_ndx)
 {
-    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Table);
+    TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     return m_table->get_subtable(column_ndx, real_ndx);
@@ -667,7 +675,7 @@ inline TableRef TableView::get_subtable(size_t column_ndx, size_t row_ndx)
 
 inline ConstTableRef TableView::get_subtable(size_t column_ndx, size_t row_ndx) const
 {
-    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Table);
+    TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     return m_table->get_subtable(column_ndx, real_ndx);
@@ -675,7 +683,7 @@ inline ConstTableRef TableView::get_subtable(size_t column_ndx, size_t row_ndx) 
 
 inline ConstTableRef ConstTableView::get_subtable(size_t column_ndx, size_t row_ndx) const
 {
-    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Table);
+    TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     return m_table->get_subtable(column_ndx, real_ndx);
@@ -683,7 +691,7 @@ inline ConstTableRef ConstTableView::get_subtable(size_t column_ndx, size_t row_
 
 inline void TableView::clear_subtable(size_t column_ndx, size_t row_ndx)
 {
-    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Table);
+    TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     return m_table->clear_subtable(column_ndx, real_ndx);
@@ -763,10 +771,9 @@ inline void TableView::set_mixed(size_t column_ndx, size_t row_ndx, Mixed value)
     m_table->set_mixed(column_ndx, real_ndx, value);
 }
 
-//this will not work if the column type is mixed
 inline void TableView::set_subtable(size_t column_ndx, size_t row_ndx, const Table* value)
 {
-    TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Table);
+    TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
     m_table->set_subtable(column_ndx, real_ndx, value);
 }

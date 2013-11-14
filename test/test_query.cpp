@@ -17,6 +17,8 @@
 using namespace tightdb;
 using namespace std;
 
+// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
+// will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
 namespace {
 
@@ -97,6 +99,31 @@ TIGHTDB_TABLE_3(Books,
                 pages, Int)
 
 } // anonymous namespace
+
+
+
+TEST(Query_NoConditions)
+{
+    Table table;
+    table.add_column(type_Int, "i");
+    {
+        Query query(table.where());
+        CHECK_EQUAL(not_found, query.find());
+    }
+    {
+        Query query = table.where();
+        CHECK_EQUAL(not_found, query.find());
+    }
+    table.add_empty_row();
+    {
+        Query query(table.where());
+        CHECK_EQUAL(0, query.find());
+    }
+    {
+        Query query = table.where();
+        CHECK_EQUAL(0, query.find());
+    }
+}
 
 
 TEST(NextGenSyntaxTypedString) 
@@ -364,6 +391,86 @@ TEST(NextGenSyntax)
     delete second2;
     delete first2;
 }
+
+TEST(NextGenSyntaxMonkey)
+{
+    for(int iter = 1; iter < 20; iter++)
+    {
+        // Keep at least '* 20' else some tests will give 0 matches and bad coverage
+        const size_t rows = TIGHTDB_MAX_LIST_SIZE * 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1);
+        Table table;
+        table.add_column(type_Int, "first");
+        table.add_column(type_Int, "second");
+        table.add_column(type_Int, "third");
+
+        for(size_t r = 0; r < rows; r++) {
+            table.add_empty_row();
+            // using '% iter' tests different bitwidths
+            table.set_int(0, r, rand() % iter);
+            table.set_int(1, r, rand() % iter);        
+            table.set_int(2, r, rand() % iter);        
+        }
+
+        size_t tvpos;
+
+        // second == 1
+        tightdb::Query q1_0 = table.where().equal(1, 1);
+        tightdb::Query q2_0 = table.column<int64_t>(1) == 1;
+        tightdb::TableView tv_0 = q2_0.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(1, r) == 1) {
+                CHECK_EQUAL(r, tv_0.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+
+        // (first == 0 || first == 1) && second == 1
+        tightdb::Query q2_1 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 1) && table.column<int64_t>(1) == 1;
+        tightdb::TableView tv_1 = q2_1.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
+                CHECK_EQUAL(r, tv_1.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+
+        // first == 0 || (first == 1 && second == 1) 
+        tightdb::Query q2_2 = table.column<int64_t>(0) == 0 || (table.column<int64_t>(0) == 1 && table.column<int64_t>(1) == 1);
+        tightdb::TableView tv_2 = q2_2.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
+                CHECK_EQUAL(r, tv_2.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+
+        // second == 0 && (first == 0 || first == 2)
+        tightdb::Query q4_8 = table.column<int64_t>(1) == 0 && (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2);
+        tightdb::TableView tv_8 = q4_8.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(1, r) == 0 && ((table.get_int(0, r) == 0) || table.get_int(0, r) == 2)) {
+                CHECK_EQUAL(r, tv_8.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+
+        // (first == 0 || first == 2) && (first == 1 || second == 1) 
+        tightdb::Query q3_7 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2) && (table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1);
+        tightdb::TableView tv_7 = q3_7.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) && (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
+                CHECK_EQUAL(r, tv_7.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+    }
+}
+
 
 TEST(LimitUntyped)
 {
@@ -797,7 +904,7 @@ TEST(QueryExpressions0)
     We have following variables to vary in the tests:
 
     left        right
-    +           -           *           /
+    +           -           *           /          pow
     Subexpr    Column       Value    
     >           <           ==          !=          >=          <=
     float       int         double      int64_t
@@ -825,6 +932,10 @@ TEST(QueryExpressions0)
     table.set_float(1, 1, 20.1f);
     table.set_double(2, 1, 4.0);
    
+    /**
+    Conversion / promotion
+    **/
+
     // 20 must convert to float    
     match = (second + 0.2f > 20).find();
     CHECK(match == 0);
@@ -851,6 +962,10 @@ TEST(QueryExpressions0)
     // 20 must convert to float
     match = (0.2f + second > 20).find();
     CHECK(match == 0);
+
+    /**
+    Permutations of types (Subexpr, Value, Column) of left/right side
+    **/
 
     // Compare, left = Subexpr, right = Value
     match = (second + first >= 40).find();
@@ -980,9 +1095,22 @@ TEST(QueryExpressions0)
     match = (1 / third == 1 / third).find();
     CHECK(match == 0);
 
-    // Compare operator must preserve precision of each side, hence no match
+    // Nifty test: Compare operator must preserve precision of each side, hence NO match; if double accidentially
+    // was truncated to float, or float was rounded to nearest double, then this test would fail.
     match = (1 / second == 1 / third).find();
     CHECK(match == not_found);
+
+    // power operator (power(x) = x^2)
+    match = (power(first) == 400).find();
+    CHECK_EQUAL(0, match);
+
+    match = (power(first) == 401).find();
+    CHECK_EQUAL(not_found, match);
+
+    // power of floats. Using a range check because of float arithmetic imprecisions
+    match = (power(second) < 9.001 && power(second) > 8.999).find();
+    CHECK_EQUAL(0, match);
+
 }
 
 TEST(LimitUntyped2)
@@ -1112,6 +1240,15 @@ TEST(LimitUntyped2)
     sumd = q.average_float(1, NULL, 0, 2, 3);
     CHECK_EQUAL((10000. + 30000.) / 2., sumd);
 
+    // count
+    size_t cnt = q.count(0, -1, 1);
+    CHECK_EQUAL(1, cnt);
+    cnt = q.count(0, -1, 2);
+    CHECK_EQUAL(2, cnt);
+
+    // count, limited by 'end', but still having 'limit' specified
+    cnt = q.count(0, 1, 3);
+    CHECK_EQUAL(1, cnt);
 }
 
 
@@ -1722,7 +1859,7 @@ TEST(Group_GameAnalytics)
 {
     {
         Group g;
-        GATable::Ref t = g.get_table<GATable>("firstevents");
+		GATable::Ref t = g.get_table<GATable>("firstevents");
 
         for (size_t i = 0; i < 100; ++i) {
             const int64_t r1 = rand() % 100;
@@ -2466,8 +2603,19 @@ TEST(TestQuerySubtable)
     CHECK_EQUAL(3, t4.get_source_ndx(2));
 }
 
-
-
+/*
+// Disabled because assert has now been added to disallow adding rows when no columns exist
+TEST(Query_SubtableViewSizeBug)
+{
+    Table table;
+    table.add_column(type_Table, "subtab");
+    table.add_empty_row(1);
+    TableRef subtab = table.get_subtable(0,0);
+    subtab->add_empty_row(1);
+    TableView subview = subtab->where().find_all();
+    CHECK_EQUAL(1, subview.size());
+}
+*/
 
 TEST(TestQuerySort1)
 {
@@ -2740,7 +2888,7 @@ TEST(TestQuerySimple2)
     CHECK_EQUAL(7, tv1.get_source_ndx(2));
 }
 
-/*
+
 TEST(TestQueryLimit)
 {
     TupleTableType ttt;
@@ -2786,7 +2934,7 @@ TEST(TestQueryLimit)
     TupleTableType::View tv5 = q3.find_all(0, 3, 5);
     CHECK_EQUAL(3, tv5.size());
 }
-*/
+
 
 TEST(TestQueryFindNext)
 {
@@ -3187,6 +3335,7 @@ TEST(TestQueryFindAll_Begins)
 
 TEST(TestQueryFindAll_Ends)
 {
+
     TupleTableType ttt;
 
     ttt.add(0, "barfo");
@@ -3485,40 +3634,28 @@ TEST(TestQuerySyntaxCheck)
     ttt.add(3, "X");
 
     TupleTableType::Query q1 = ttt.where().first.equal(2).end_group();
-#ifdef TIGHTDB_DEBUG
-    s = q1.Verify();
+    s = q1.validate();
     CHECK(s != "");
-#endif
 
     TupleTableType::Query q2 = ttt.where().group().group().first.equal(2).end_group();
-#ifdef TIGHTDB_DEBUG
-    s = q2.Verify();
+    s = q2.validate();
     CHECK(s != "");
-#endif
 
     TupleTableType::Query q3 = ttt.where().first.equal(2).Or();
-#ifdef TIGHTDB_DEBUG
-    s = q3.Verify();
+    s = q3.validate();
     CHECK(s != "");
-#endif
 
     TupleTableType::Query q4 = ttt.where().Or().first.equal(2);
-#ifdef TIGHTDB_DEBUG
-    s = q4.Verify();
+    s = q4.validate();
     CHECK(s != "");
-#endif
 
     TupleTableType::Query q5 = ttt.where().first.equal(2);
-#ifdef TIGHTDB_DEBUG
-    s = q5.Verify();
+    s = q5.validate();
     CHECK(s == "");
-#endif
 
     TupleTableType::Query q6 = ttt.where().group().first.equal(2);
-#ifdef TIGHTDB_DEBUG
-    s = q6.Verify();
+    s = q6.validate();
     CHECK(s != "");
-#endif
 
 // FIXME: Work is currently underway to fully support locale
 // indenepdent case folding as defined by Unicode. Reenable this test

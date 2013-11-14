@@ -318,22 +318,18 @@ void Column::fill(size_t count)
     // creating full nodes directly
     for (size_t i = 0; i < count; ++i)
         add(0);
-
-#ifdef TIGHTDB_DEBUG
-    Verify();
-#endif
 }
 
 // int64_t specific:
 
 size_t Column::count(int64_t target) const
 {
-    return size_t(aggregate<int64_t, int64_t, act_Count, Equal>(target, 0, size(), NULL));
+    return size_t(aggregate<int64_t, int64_t, act_Count, Equal>(target, 0, size()));
 }
 
 int64_t Column::sum(size_t start, size_t end, size_t limit) const
 {
-    return aggregate<int64_t, int64_t, act_Sum, None>(0, start, end, NULL, limit);
+    return aggregate<int64_t, int64_t, act_Sum, None>(0, start, end, limit);
 }
 
 double Column::average(size_t start, size_t end, size_t limit) const
@@ -343,19 +339,19 @@ double Column::average(size_t start, size_t end, size_t limit) const
     size_t size = end - start;
     if(limit < size)
         size = limit;
-    int64_t sum = aggregate<int64_t, int64_t, act_Sum, None>(0, start, end, NULL, limit);
+    int64_t sum = aggregate<int64_t, int64_t, act_Sum, None>(0, start, end, limit);
     double avg = double(sum) / double(size == 0 ? 1 : size);
     return avg;
 }
 
 int64_t Column::minimum(size_t start, size_t end, size_t limit) const
 {
-    return aggregate<int64_t, int64_t, act_Min, None>(0, start, end, NULL, limit);
+    return aggregate<int64_t, int64_t, act_Min, None>(0, start, end, limit);
 }
 
 int64_t Column::maximum(size_t start, size_t end, size_t limit) const
 {
-    return aggregate<int64_t, int64_t, act_Max, None>(0, start, end, NULL, limit);
+    return aggregate<int64_t, int64_t, act_Max, None>(0, start, end, limit);
 }
 
 
@@ -615,10 +611,6 @@ void Column::do_insert(size_t ndx, int64_t value)
         bool is_append = ndx == npos;
         introduce_new_root(new_sibling_ref, state, is_append);
     }
-
-#ifdef TIGHTDB_DEBUG
-    Verify();
-#endif
 }
 
 

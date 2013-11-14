@@ -363,10 +363,6 @@ void AdaptiveStringColumn::fill(size_t n)
     // we could speedup by creating full nodes directly
     for (size_t i = 0; i != n; ++i)
         add(StringData()); // Throws
-
-#ifdef TIGHTDB_DEBUG
-    Verify();
-#endif
 }
 
 
@@ -967,10 +963,6 @@ void AdaptiveStringColumn::do_insert(size_t ndx, StringData value)
         size_t real_ndx = is_last ? size()-1 : ndx;
         m_index->insert(real_ndx, value, is_last); // Throws
     }
-
-#ifdef TIGHTDB_DEBUG
-    Verify();
-#endif
 }
 
 

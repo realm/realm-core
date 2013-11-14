@@ -8,6 +8,9 @@ SUMMARY    : &g_typed_query_intro_summary
              Query your TightDB table.
 DESCR      : &g_typed_query_intro_descr
              >
+             NOTE: The current documentation of Typed Query is under construction, 
+             and not completely correct yet.
+
              Query objects are used to build up queries. A query is tied to a
              {@link class_typed_table}. The typed query class is used in conjunction with
              {@link class_typed_table}.
@@ -373,7 +376,7 @@ CATEGORIES :
       DESCR    : &g_typed_query_subtable_descr
                  Query a subtable.
       SUMMARY  : &g_typed_query_subtable_summary
-                 Query a subtable.
+                 Query a subtable. Not yet supported for typed queries. Please see dynamic queries instead.
       RETURN:
         TYPES  : Query
         DESCR  : *g_typed_query_query_object_return_descr
@@ -386,7 +389,7 @@ CATEGORIES :
       DESCR    : &g_typed_query_endSubtable_descr
                  End of subtable query.
       SUMMARY  : &g_typed_query_endSubtable_summary
-                 End of subtable query.
+                 End of subtable query. Not yet supported for typed queries. Please see dynamic queries instead.
       RETURN:
         TYPES  : Query
         DESCR  : *g_typed_query_query_object_return_descr
@@ -403,51 +406,61 @@ CATEGORIES :
       NAME     : find_all
   - g_typed_query_find_all_const:
       NAME     : find_all
-      DESCR    : &g_typed_query_find_all_descr
-                 Execute a query. See the {@link class_dyn_tableview} class for further details.
       SUMMARY  : &g_typed_query_find_all_summary
                  Execute query.
+      DESCR    : &g_typed_query_find_all_descr
+                 Execute a query and return all matches in a {@link class_typed_tableview TableView}.
+                 Optional parameters enable to limit the query to a range of rows
+                 and/or limit the number of matches.
       SIGNATURE: |
                  TableView      find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
                  ConstTableView find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
       PARAMS:
       - NAME   : start
         TYPES  : size_t
-        DESCR  : "Row to begin search. Default: 0."
+        DESCR: 
+        - TEXT : &g_typed_query_find_all_parm_1_descr
+                 Table row index to start search from (inclusive).
+        - TEXT : Default is 0 (start from beginning).
       - NAME   : end
         TYPES  : size_t
-        DESCR  : "Row to stop search. Default: -1 (infinity)."
+        DESCR  : "Table row index to stop search (exclusive). Default: -1 (infinity)."
       - NAME   : limit
         TYPES  : size_t
-        DESCR  : "Maximum number of rows to find. Default: -1 (infinity)."
+        DESCR  : "Maximum number of rows to match. Default: -1 (infinity)."
       RETURN:
         TYPES  : [TableView, ConstTableView]
-        DESCR  : &g_typed_query_find_all_return1_descr
-                 The TableView object.
+        DESCR  : &g_typed_query_find_all_return_descr
+                 A {@link class_typed_tableview TableView} object containing the results of the query.
       EXAMPLES:
       - DESCR  :
         CODE   : ex_cpp_typed_query_findall
 
+  - g_typed_query_find_2:
+      IGNORE   : ""
   - g_typed_query_find:
       NAME     : find
-      DESCR    : &g_typed_query_find_descr
-                 This will find the first row that fulfils the query condition.
-                 Use the return value + 1 as parameter for successive calls to iterate through 
-                 matching rows.
       SUMMARY  : &g_typed_query_find_summary
                  Find first matching row.
+      DESCR    : &g_typed_query_find_descr
+                 This method will find the first row that fulfils the query condition.
+                 Use the return value + 1 as parameter for successive calls to iterate through 
+                 matching rows.
+      SIGNATURE: size_t find(size_t begin_at_table_row = 0)
       PARAMS:
-      - NAME   : lastmatch
+      - NAME   : begin_at_table_row
         TYPES  : size_t
-        DESCR  : &g_typed_query_find_parm_lastmatch_descr
-                 "Table row to start search from (inclusive). Default is 0 (start from beginning)."
+        DESCR: 
+        - TEXT : &g_typed_query_find_parm_1_descr
+                 Table row index to start search from (inclusive).
+        - TEXT : Default is 0 (start from beginning).
       RETURN:
         TYPES  : size_t
         DESCR  : &g_typed_query_find_return_descr
                  Row index that matches the query (or -1 if none).
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_typed_query_find
+        CODE   : ex_cpp_typed_query_find_next
 
   - g_typed_query_sum_2:
       IGNORE: ""
@@ -513,7 +526,7 @@ CATEGORIES :
                  The number of rows.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_typed_query_size
+        CODE   : ex_cpp_typed_query_count
 
   - g_typed_query_maximum_2:
       IGNORE   : ""
@@ -557,7 +570,7 @@ CATEGORIES :
                  The highest value.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_typed_query_maximum
+        CODE   : ex_cpp_typed_query_max
 
   - g_typed_query_minimum_2:
       IGNORE   : ""
@@ -599,7 +612,7 @@ CATEGORIES :
                  The lowest value.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_typed_query_manimum
+        CODE   : ex_cpp_typed_query_min
 
   - g_typed_query_average_2:
       IGNORE   : ""
@@ -636,7 +649,7 @@ CATEGORIES :
                  The average.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_typed_query_average
+        CODE   : ex_cpp_typed_query_avg
 
   - g_typed_query_remove:
       NAME     : remove

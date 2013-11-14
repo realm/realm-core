@@ -1,14 +1,16 @@
-#ifdef TIGHTDB_ENABLE_REPLICATION
-#include "testsettings.hpp"
-#ifdef TEST_REPLICATION
-
 #include <algorithm>
 
 #include <UnitTest++.h>
 
+#include <tightdb/config.h>
 #include <tightdb.hpp>
 #include <tightdb/unique_ptr.hpp>
 #include <tightdb/file.hpp>
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+#include "testsettings.hpp"
+#ifdef TEST_REPLICATION
 
 using namespace std;
 using namespace tightdb;
@@ -25,7 +27,7 @@ public:
         typedef TransactLogs::const_iterator iter;
         iter end = m_transact_logs.end();
         for (iter i = m_transact_logs.begin(); i != end; ++i)
-            delete i->data();
+            delete[] i->data();
     }
 
     void replay_transacts(SharedGroup& target)
@@ -62,34 +64,36 @@ TEST(Replication)
     File::try_remove(database_1);
     File::try_remove(database_2);
 
-    MyTrivialReplication repl(database_1);
-    SharedGroup sg_1(repl);
     {
-        WriteTransaction wt(sg_1);
-        MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        table->add();
-        wt.commit();
-    }
-    {
-        WriteTransaction wt(sg_1);
-        MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        table[0].i = 9;
-        wt.commit();
-    }
-    {
-        WriteTransaction wt(sg_1);
-        MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        table[0].i = 10;
-        wt.commit();
-    }
+        MyTrivialReplication repl(database_1);
+        SharedGroup sg_1(repl);
+        {
+            WriteTransaction wt(sg_1);
+            MyTable::Ref table = wt.get_table<MyTable>("my_table");
+            table->add();
+            wt.commit();
+        }
+        {
+            WriteTransaction wt(sg_1);
+            MyTable::Ref table = wt.get_table<MyTable>("my_table");
+            table[0].i = 9;
+            wt.commit();
+        }
+        {
+            WriteTransaction wt(sg_1);
+            MyTable::Ref table = wt.get_table<MyTable>("my_table");
+            table[0].i = 10;
+            wt.commit();
+        }
 
-    SharedGroup sg_2(database_2);
-    repl.replay_transacts(sg_2);
+        SharedGroup sg_2(database_2);
+        repl.replay_transacts(sg_2);
 
-    {
-        ReadTransaction rt_1(sg_1);
-        ReadTransaction rt_2(sg_2);
-        CHECK(rt_1.get_group() == rt_2.get_group());
+        {
+            ReadTransaction rt_1(sg_1);
+            ReadTransaction rt_2(sg_2);
+            CHECK(rt_1.get_group() == rt_2.get_group());
+        }
     }
 
     File::try_remove(database_1);

@@ -154,10 +154,6 @@ void ColumnBinary::fill(size_t n)
     // we could speedup by creating full nodes directly
     for (size_t i = 0; i != n; ++i)
         add(BinaryData());
-
-#ifdef TIGHTDB_DEBUG
-    Verify();
-#endif
 }
 
 

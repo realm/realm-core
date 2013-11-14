@@ -8,22 +8,153 @@
 
 
 #include <UnitTest++.h>
-#include "testsettings.hpp"
-#include "test_utilities.hpp"
+
 #include <tightdb/table_macros.hpp>
 #include <tightdb/lang_bind_helper.hpp>
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/group.hpp>
 
+#include "testsettings.hpp"
+#include "util/misc.hpp"
+
 using namespace std;
 using namespace tightdb;
 using namespace test_util;
+
+// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
+// will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
 namespace {
 TIGHTDB_TABLE_2(TupleTableType,
                 first,  Int,
                 second, String)
 }
+
+#ifdef JAVA_MANY_COLUMNS_CRASH
+
+TIGHTDB_TABLE_3(SubtableType,
+                year,  Int,
+                daysSinceLastVisit, Int,
+                conceptId, String)
+
+TIGHTDB_TABLE_7(MainTableType,
+                patientId, String,
+                gender, Int,
+                ethnicity, Int,
+                yearOfBirth, Int,
+                yearOfDeath, Int,
+                zipCode, String,
+                events, Subtable<SubtableType>)
+                
+TEST(ManyColumnsCrash2) {
+    // Trying to reproduce Java crash. It currently fails to trigger the bug, though.
+    for(int a = 0; a < 10; a++)
+    {
+        Group group;
+
+        MainTableType::Ref mainTable = group.get_table<MainTableType>("PatientTable");
+        TableRef dynPatientTable = group.get_table("PatientTable");
+        dynPatientTable->add_empty_row();
+
+        for (int counter = 0; counter < 20000; counter++)
+        {
+#if 0
+            // Add row to subtable through typed interface
+            SubtableType::Ref subtable = mainTable[0].events->get_table_ref();
+            TIGHTDB_ASSERT(subtable->is_attached());
+            subtable->add(0, 0, "");
+            TIGHTDB_ASSERT(subtable->is_attached());
+
+#else
+            // Add row to subtable through dynamic interface. This mimics Java closest
+            TableRef subtable2 = dynPatientTable->get_subtable(6, 0);
+            TIGHTDB_ASSERT(subtable2->is_attached());
+            size_t subrow = subtable2->add_empty_row();
+            TIGHTDB_ASSERT(subtable2->is_attached());
+
+#endif
+            if((counter % 1000) == 0){
+           //     cerr << counter << "\n";
+            }
+        }
+    }
+}
+
+#if 0
+ONLY(ManyColumnsCrash) {
+    // Trying to reproduce crash in Java code. This test has been disabled because it fails to crash, and because a
+    // much simpler Java snippet also makes it crash (see above test). 
+    for(int a = 0; a < 100; a++)
+    {
+
+        Group* group = new Group("d:/master/pfm.tightdb");
+        TableRef dynPatientTable = group->get_table("PatientTable");
+
+        for (int counter =0;counter<70000;  counter++)
+        {
+
+            int obfuscatedYear = (counter % 5);
+            int daysSinceLastVisit = (counter % 5);
+            char buf[100];
+            sprintf(buf, "CC%d", counter % 1000);
+            StringData conceptId = buf;
+            
+
+            // check if the patient exists
+            size_t patient = counter % 100;
+            size_t t = dynPatientTable->get_column_index(conceptId);
+            if(t == -1)
+            {
+                // create the event
+#if 1        
+                PatientTableType::Ref table = group->get_table<PatientTableType>("events");
+                table->add(obfuscatedYear, daysSinceLastVisit, conceptId);
+#else
+                TableRef subtable = dynPatientTable->get_subtable(6, patient);
+                size_t subrow = subtable->add_empty_row();
+
+                subtable->set_int(0, subrow, obfuscatedYear);
+                subtable->set_int(1, subrow, daysSinceLastVisit);
+                subtable->set_string(2, subrow, conceptId);
+#endif
+            }
+
+            // update the patient bitmap
+            size_t conceptColIndex = dynPatientTable->add_column(type_Bool, conceptId);
+
+            if((counter % 1000) == 0){
+                cerr << counter << "\n";
+            }
+        }
+
+    }
+}
+#endif
+#endif
+
+TEST(DeleteCrash)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    table->add_column(type_String, "name");
+    table->add_column(type_Int,    "age");
+
+    table->add_empty_row(3);
+    table->set_string(0, 0, "Alice");
+    table->set_int(1, 0, 27);
+
+    table->set_string(0, 1, "Bob");
+    table->set_int(1, 1, 50);
+
+    table->set_string(0, 2, "Peter");
+    table->set_int(1, 2, 44);
+
+    table->remove(0);
+
+    table->remove(1);
+}
+
 
 TEST(TestOptimizeCrash)
 {
@@ -1402,6 +1533,44 @@ TEST(Table_Spec)
     }
 }
 
+TEST(Table_Spec_ColumnPath)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    // Create path to sub-table column (starting with root)
+    vector<size_t> column_path;
+
+    // Create specification with sub-table
+    table->add_subcolumn(column_path, type_Int,    "first");
+    table->add_subcolumn(column_path, type_String, "second");
+    table->add_subcolumn(column_path, type_Table,  "third");
+
+    column_path.push_back(2); // third column (which is a sub-table col)
+
+    table->add_subcolumn(column_path, type_Int,    "sub_first");
+    table->add_subcolumn(column_path, type_String, "sub_second");
+
+    // Add a row
+    table->insert_int(0, 0, 4);
+    table->insert_string(1, 0, "Hello");
+    table->insert_subtable(2, 0);
+    table->insert_done();
+
+    // Get the sub-table
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+        CHECK(subtable->is_empty());
+
+        subtable->insert_int(0, 0, 42);
+        subtable->insert_string(1, 0, "test");
+        subtable->insert_done();
+
+        CHECK_EQUAL(42,     subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+    }
+}
+
 TEST(Table_Spec_RenameColumns)
 {
     Group group;
@@ -1462,6 +1631,7 @@ TEST(Table_Spec_DeleteColumns)
     table->add_column(type_Int,    "first");
     table->add_column(type_String, "second");
     table->add_column(type_Table,  "third");
+    table->add_column(type_String, "fourth"); // will be auto-enumerated
 
     // Create path to sub-table column
     vector<size_t> column_path;
@@ -1473,13 +1643,29 @@ TEST(Table_Spec_DeleteColumns)
     // Put in an index as well
     table->set_index(1);
 
-    CHECK_EQUAL(3, table->get_column_count());
+    CHECK_EQUAL(4, table->get_column_count());
 
-    // Add a row
+    // Add a few rows
     table->insert_int(0, 0, 4);
     table->insert_string(1, 0, "Hello");
     table->insert_subtable(2, 0);
+    table->insert_string(3, 0, "X");
     table->insert_done();
+
+    table->insert_int(0, 1, 4);
+    table->insert_string(1, 1, "World");
+    table->insert_subtable(2, 1);
+    table->insert_string(3, 1, "X");
+    table->insert_done();
+
+    table->insert_int(0, 2, 4);
+    table->insert_string(1, 2, "Goodbye");
+    table->insert_subtable(2, 2);
+    table->insert_string(3, 2, "X");
+    table->insert_done();
+
+    // We want the last column to be StringEnum column
+    table->optimize();
 
     CHECK_EQUAL(0, table->get_subtable_size(2, 0));
 
@@ -1500,7 +1686,9 @@ TEST(Table_Spec_DeleteColumns)
 
     // Remove the first column
     table->remove_column(0);
-    CHECK_EQUAL(2, table->get_column_count());
+    CHECK_EQUAL(3, table->get_column_count());
+    CHECK_EQUAL("Hello", table->get_string(0, 0));
+    CHECK_EQUAL("X", table->get_string(2, 0));
 
     // Get the sub-table again and see if the values
     // still match.
@@ -1532,6 +1720,12 @@ TEST(Table_Spec_DeleteColumns)
     }
 
     // Remove sub-table column (with all members)
+    table->remove_column(1);
+    CHECK_EQUAL(2, table->get_column_count());
+    CHECK_EQUAL("Hello", table->get_string(0, 0));
+    CHECK_EQUAL("X", table->get_string(1, 0));
+
+    // Remove optimized string column
     table->remove_column(1);
     CHECK_EQUAL(1, table->get_column_count());
     CHECK_EQUAL("Hello", table->get_string(0, 0));
@@ -1678,7 +1872,7 @@ TEST(Table_Spec_AddColumns)
     table->Verify();
 #endif
 }
-/*
+
 
 TEST(Table_Spec_DeleteColumnsBug)
 {
@@ -1749,7 +1943,7 @@ TEST(Table_Spec_DeleteColumnsBug)
     table->Verify();
 #endif
 }
-*/
+
 
 TEST(Table_Mixed)
 {
@@ -1993,6 +2187,109 @@ TEST(Table_SubtableSizeAndClear)
 }
 
 
+TEST(Table_LowLevelSubtables)
+{
+    Table table;
+    vector<size_t> column_path;
+    table.add_column(type_Table, "subtab");
+    table.add_column(type_Mixed, "mixed");
+    column_path.push_back(0);
+    table.add_subcolumn(column_path, type_Table, "subtab");
+    table.add_subcolumn(column_path, type_Mixed, "mixed");
+    column_path.push_back(0);
+    table.add_subcolumn(column_path, type_Table, "subtab");
+    table.add_subcolumn(column_path, type_Mixed, "mixed");
+
+    table.add_empty_row(2);
+    CHECK_EQUAL(2, table.size());
+    for (int i_1 = 0; i_1 != 2; ++i_1) {
+        TableRef subtab = table.get_subtable(0, i_1);
+        subtab->add_empty_row(2 + i_1);
+        CHECK_EQUAL(2 + i_1, subtab->size());
+        {
+            TableRef subsubtab = subtab->get_subtable(0, 0 + i_1);
+            subsubtab->add_empty_row(3 + i_1);
+            CHECK_EQUAL(3 + i_1, subsubtab->size());
+
+            for (int i_3 = 0; i_3 != 3 + i_1; ++i_3) {
+                CHECK_EQUAL(true,  bool(subsubtab->get_subtable(0, i_3)));
+                CHECK_EQUAL(false, bool(subsubtab->get_subtable(1, i_3))); // Mixed
+                CHECK_EQUAL(0, subsubtab->get_subtable_size(0, i_3));
+                CHECK_EQUAL(0, subsubtab->get_subtable_size(1, i_3)); // Mixed
+            }
+
+            subtab->clear_subtable(1, 1 + i_1); // Mixed
+            TableRef subsubtab_mix = subtab->get_subtable(1, 1 + i_1);
+            subsubtab_mix->add_column(type_Table, "subtab");
+            subsubtab_mix->add_column(type_Mixed, "mixed");
+            subsubtab_mix->add_empty_row(1 + i_1);
+            CHECK_EQUAL(1 + i_1, subsubtab_mix->size());
+
+            for (int i_3 = 0; i_3 != 1 + i_1; ++i_3) {
+                CHECK_EQUAL(true,  bool(subsubtab_mix->get_subtable(0, i_3)));
+                CHECK_EQUAL(false, bool(subsubtab_mix->get_subtable(1, i_3))); // Mixed
+                CHECK_EQUAL(0, subsubtab_mix->get_subtable_size(0, i_3));
+                CHECK_EQUAL(0, subsubtab_mix->get_subtable_size(1, i_3)); // Mixed
+            }
+        }
+        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
+            CHECK_EQUAL(true,           bool(subtab->get_subtable(0, i_2)));
+            CHECK_EQUAL(i_2 == 1 + i_1, bool(subtab->get_subtable(1, i_2))); // Mixed
+            CHECK_EQUAL(i_2 == 0 + i_1 ? 3 + i_1 : 0, subtab->get_subtable_size(0, i_2));
+            CHECK_EQUAL(i_2 == 1 + i_1 ? 1 + i_1 : 0, subtab->get_subtable_size(1, i_2)); // Mixed
+        }
+
+        table.clear_subtable(1, i_1); // Mixed
+        TableRef subtab_mix = table.get_subtable(1, i_1);
+        vector<size_t> subcol_path;
+        subtab_mix->add_column(type_Table, "subtab");
+        subtab_mix->add_column(type_Mixed, "mixed");
+        subcol_path.push_back(0);
+        subtab_mix->add_subcolumn(subcol_path, type_Table, "subtab");
+        subtab_mix->add_subcolumn(subcol_path, type_Mixed, "mixed");
+        subtab_mix->add_empty_row(3 + i_1);
+        CHECK_EQUAL(3 + i_1, subtab_mix->size());
+        {
+            TableRef subsubtab = subtab_mix->get_subtable(0, 1 + i_1);
+            subsubtab->add_empty_row(7 + i_1);
+            CHECK_EQUAL(7 + i_1, subsubtab->size());
+
+            for (int i_3 = 0; i_3 != 7 + i_1; ++i_3) {
+                CHECK_EQUAL(true,  bool(subsubtab->get_subtable(0, i_3)));
+                CHECK_EQUAL(false, bool(subsubtab->get_subtable(1, i_3))); // Mixed
+                CHECK_EQUAL(0, subsubtab->get_subtable_size(0, i_3));
+                CHECK_EQUAL(0, subsubtab->get_subtable_size(1, i_3)); // Mixed
+            }
+
+            subtab_mix->clear_subtable(1, 2 + i_1); // Mixed
+            TableRef subsubtab_mix = subtab_mix->get_subtable(1, 2 + i_1);
+            subsubtab_mix->add_column(type_Table, "subtab");
+            subsubtab_mix->add_column(type_Mixed, "mixed");
+            subsubtab_mix->add_empty_row(5 + i_1);
+            CHECK_EQUAL(5 + i_1, subsubtab_mix->size());
+
+            for (int i_3 = 0; i_3 != 5 + i_1; ++i_3) {
+                CHECK_EQUAL(true,  bool(subsubtab_mix->get_subtable(0, i_3)));
+                CHECK_EQUAL(false, bool(subsubtab_mix->get_subtable(1, i_3))); // Mixed
+                CHECK_EQUAL(0, subsubtab_mix->get_subtable_size(0, i_3));
+                CHECK_EQUAL(0, subsubtab_mix->get_subtable_size(1, i_3)); // Mixed
+            }
+        }
+        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
+            CHECK_EQUAL(true,           bool(subtab_mix->get_subtable(0, i_2)));
+            CHECK_EQUAL(i_2 == 2 + i_1, bool(subtab_mix->get_subtable(1, i_2))); // Mixed
+            CHECK_EQUAL(i_2 == 1 + i_1 ? 7 + i_1 : 0, subtab_mix->get_subtable_size(0, i_2));
+            CHECK_EQUAL(i_2 == 2 + i_1 ? 5 + i_1 : 0, subtab_mix->get_subtable_size(1, i_2)); // Mixed
+        }
+
+        CHECK_EQUAL(true, bool(table.get_subtable(0, i_1)));
+        CHECK_EQUAL(true, bool(table.get_subtable(1, i_1))); // Mixed
+        CHECK_EQUAL(2 + i_1, table.get_subtable_size(0, i_1));
+        CHECK_EQUAL(3 + i_1, table.get_subtable_size(1, i_1)); // Mixed
+    }
+}
+
+
 namespace {
 TIGHTDB_TABLE_2(MyTable1,
                 val, Int,
@@ -2008,18 +2305,6 @@ TIGHTDB_TABLE_1(MyTable3,
 TIGHTDB_TABLE_1(MyTable4,
                 mix, Mixed)
 } // anonymous namespace
-
-
-TEST(Table_SetMethod)
-{
-    MyTable1 t;
-    t.add(8, 9);
-    CHECK_EQUAL(t[0].val,  8);
-    CHECK_EQUAL(t[0].val2, 9);
-    t.set(0, 2, 4);
-    CHECK_EQUAL(t[0].val,  2);
-    CHECK_EQUAL(t[0].val2, 4);
-}
 
 
 TEST(Table_HighLevelSubtables)
@@ -2166,6 +2451,18 @@ TEST(Table_SubtableCopyOnSetAndInsert)
     t4[0].mix.set_subtable(t2);
     MyTable2::Ref r2 = unchecked_cast<MyTable2>(t4[0].mix.get_subtable());
     CHECK(t2 == *r2);
+}
+
+
+TEST(Table_SetMethod)
+{
+    MyTable1 t;
+    t.add(8, 9);
+    CHECK_EQUAL(t[0].val,  8);
+    CHECK_EQUAL(t[0].val2, 9);
+    t.set(0, 2, 4);
+    CHECK_EQUAL(t[0].val,  2);
+    CHECK_EQUAL(t[0].val2, 4);
 }
 
 

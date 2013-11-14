@@ -9,6 +9,8 @@
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
 #include <tightdb/utilities.hpp>
+#include <tightdb/thread.hpp>
+#include <pthread.h>
 
 using namespace std;
 using namespace tightdb;
@@ -64,8 +66,6 @@ public:
         m_pos += size;
         return pos;
     }
-
-    void seek(size_t pos) { m_pos = pos; }
 
     char* release_buffer() TIGHTDB_NOEXCEPT
     {
@@ -131,14 +131,6 @@ public:
 
         write(data_1, size_1);
         return pos;
-    }
-
-    void seek(size_t pos)
-    {
-        streamsize pos2 = 0;
-        if (int_cast_with_overflow_detect(pos, pos2))
-            throw std::runtime_error("Seek position overflow");
-        m_out.seekp(pos2);
     }
 
 private:
@@ -325,8 +317,15 @@ Group::~Group() TIGHTDB_NOEXCEPT
 
     detach_table_accessors();
 
-    // Recursively deletes entire tree
+#ifdef TIGHTDB_DEBUG
+    // Recursively deletes entire tree. The destructor in
+    // the allocator will verify that all has been deleted.
     m_top.destroy();
+#else
+    // Just allow the allocator to release all mem in one chunk
+    // without having to traverse the entire tree first
+    m_alloc.detach();
+#endif
 }
 
 
@@ -567,10 +566,6 @@ void Group::commit()
 
     // Recusively update refs in all active tables (columns, arrays..)
     update_refs(top_ref, old_baseline);
-
-#ifdef TIGHTDB_DEBUG
-    Verify();
-#endif
 }
 
 

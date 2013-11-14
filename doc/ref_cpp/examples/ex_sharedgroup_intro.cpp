@@ -1,4 +1,4 @@
-// @@Example: ex_sharedgroup_intro @@
+// @@Example: ex_shared_group_intro @@
 // @@Fold@@
 #include <cassert>
 #include <tightdb.hpp>
@@ -7,17 +7,11 @@
 using namespace tightdb;
 
 // @@EndFold@@
-// Define schema for sub-table
-TIGHTDB_TABLE_2(PhoneTable,
-                  type,   String,
-                  number, String)
-
 // Define schema for main table
-TIGHTDB_TABLE_4(PeopleTable,
+TIGHTDB_TABLE_3(PeopleTable,
                   name,   String,
                   age,    Int,
-                  hired,  Bool,
-                  phones, Subtable<PhoneTable>)
+                  hired,  Bool)
 
 void func()
 {
@@ -33,13 +27,8 @@ void func()
 
         // Add initial rows (with sub-tables)
         if (employees->is_empty()) {
-            employees->add("joe", 42, false, NULL);
-            employees[0].phones->add("home", "324-323-3214");
-            employees[0].phones->add("work", "321-564-8678");
-
-            employees->add("jessica", 22, true, NULL);
-            employees[1].phones->add("mobile", "434-426-4646");
-            employees[1].phones->add("school", "345-543-5345");
+            employees->add("joe", 42, false);
+            employees->add("jessica", 22, true);
         }
 
         trx.commit();

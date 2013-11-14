@@ -12,6 +12,8 @@
 using namespace std;
 using namespace tightdb;
 
+// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
+// will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
 namespace {
 
@@ -176,7 +178,7 @@ TEST(Group_Size)
 TEST(Group_GetTable)
 {
     Group g;
-    const Group &cg = g;
+    const Group& cg = g;
     TableRef t1 = g.get_table("alpha");
     ConstTableRef t2 = cg.get_table("alpha");
     CHECK_EQUAL(t1, t2);
@@ -185,8 +187,26 @@ TEST(Group_GetTable)
     CHECK_EQUAL(t3, t4);
 }
 
+TEST(Group_GetTableWasCreated)
+{
+    Group group;
+    bool was_created = false;
+    group.get_table("foo", was_created);
+    CHECK(was_created);
+    group.get_table("foo", was_created);
+    CHECK(!was_created);
+    group.get_table("bar", was_created);
+    CHECK(was_created);
+    group.get_table("baz", was_created);
+    CHECK(was_created);
+    group.get_table("bar", was_created);
+    CHECK(!was_created);
+    group.get_table("baz", was_created);
+    CHECK(!was_created);
+}
+
 namespace {
-void setupTable(TestTableGroup::Ref t)
+void setup_table(TestTableGroup::Ref t)
 {
     t->add("a",  1, true, Wed);
     t->add("b", 15, true, Wed);
@@ -199,9 +219,9 @@ TEST(Group_Equal)
 {
     Group g1, g2;
     TestTableGroup::Ref t1 = g1.get_table<TestTableGroup>("TABLE1");
-    setupTable(t1);
+    setup_table(t1);
     TestTableGroup::Ref t2 = g2.get_table<TestTableGroup>("TABLE1");
-    setupTable(t2);
+    setup_table(t2);
     CHECK_EQUAL(true, g1 == g2);
 
     t2->add("hey", 2, false, Thu);

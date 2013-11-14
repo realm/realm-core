@@ -1457,29 +1457,31 @@ template<size_t w> int64_t Array::Get(size_t ndx) const TIGHTDB_NOEXCEPT
     return GetUniversal<w>(m_data, ndx);
 }
 
+// This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
+// exceed array length; in this case, remainder of res[8] will be left untouched.
 template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT
 {
-    memset(res, 0, 8*8);
-    // This method reads 8 concecutive values into res[8], starting from index 'ndx'. It's allowed for the 8 values to
-    // exceed array length; in this case, remainder of res[8] will be left untouched.
-
     TIGHTDB_ASSERT(ndx < m_size);
+
+    // To make Valgrind happy. Todo, I *think* it should work without, now, but if it reappears, add memset again. 
+    // memset(res, 0, 8*8); 
 
     if(TIGHTDB_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
         // This method is *multiple* times faster than performing 8 times Get<w>, even if unrolled. Apparently compilers
         // can't figure out to optimize it.
         uint64_t c;
+        size_t bytealign = ndx / (8 / no0(w));
         if(w == 1) {
-            c = *reinterpret_cast<uint16_t*>(m_data + ndx / 8);
-            c >>= ndx - ndx / 8 * 8;
+            c = *reinterpret_cast<uint16_t*>(m_data + bytealign);
+            c >>= (ndx - bytealign * 8) * w;
         }
         else if(w == 2) {
-            c = *reinterpret_cast<uint32_t*>(m_data + ndx / 4);
-            c >>= ndx - ndx / 4 * 4;
+            c = *reinterpret_cast<uint32_t*>(m_data + bytealign);
+            c >>= (ndx - bytealign * 4) * w;
         }
         else if(w == 4) {
-            c = *reinterpret_cast<uint64_t*>(m_data + ndx / 2);
-            c >>= ndx - ndx / 4 * 2;
+            c = *reinterpret_cast<uint64_t*>(m_data + bytealign);
+            c >>= (ndx - bytealign * 2) * w;
         }
         uint64_t mask = (w == 64 ? ~0ULL : ((1ULL << (w == 64 ? 0 : w)) - 1ULL));
         // The '?' is to avoid warnings about shifting too much
@@ -1500,6 +1502,16 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
         for(; i < 8; i++) 
             res[i] = 0;
     }
+
+#ifdef TIGHTDB_DEBUG
+    for(int j = 0; j + ndx < m_size && j < 8; j++) {
+        int64_t expected = Get<w>(ndx + j);
+        if(res[j] != expected)
+            TIGHTDB_ASSERT(false);
+    }
+#endif
+
+
 }
 
 #ifdef _MSC_VER
@@ -2440,7 +2452,10 @@ void Array::find_all(Array& result, int64_t value, size_t col_offset, size_t beg
 bool Array::find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t> *state) const
 {
     if (cond == cond_Equal) {
-        if (action == act_Sum) {
+        if (action == act_ReturnFirst) {
+            TIGHTDB_TEMPEX3(return find, Equal, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Sum) {
             TIGHTDB_TEMPEX3(return find, Equal, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
@@ -2460,7 +2475,10 @@ bool Array::find(int cond, Action action, int64_t value, size_t start, size_t en
         }
     }
     if (cond == cond_NotEqual) {
-        if (action == act_Sum) {
+        if (action == act_ReturnFirst) {
+            TIGHTDB_TEMPEX3(return find, NotEqual, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Sum) {
             TIGHTDB_TEMPEX3(return find, NotEqual, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
@@ -2480,7 +2498,10 @@ bool Array::find(int cond, Action action, int64_t value, size_t start, size_t en
         }
     }
     if (cond == cond_Greater) {
-        if (action == act_Sum) {
+        if (action == act_ReturnFirst) {
+            TIGHTDB_TEMPEX3(return find, Greater, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Sum) {
             TIGHTDB_TEMPEX3(return find, Greater, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
@@ -2500,7 +2521,10 @@ bool Array::find(int cond, Action action, int64_t value, size_t start, size_t en
         }
     }
     if (cond == cond_Less) {
-        if (action == act_Sum) {
+        if (action == act_ReturnFirst) {
+            TIGHTDB_TEMPEX3(return find, Less, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Sum) {
             TIGHTDB_TEMPEX3(return find, Less, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {
@@ -2520,7 +2544,10 @@ bool Array::find(int cond, Action action, int64_t value, size_t start, size_t en
         }
     }
     if (cond == cond_None) {
-        if (action == act_Sum) {
+        if (action == act_ReturnFirst) {
+            TIGHTDB_TEMPEX3(return find, None, act_ReturnFirst, m_width, (value, start, end, baseindex, state, CallbackDummy()))
+        }
+        else if (action == act_Sum) {
             TIGHTDB_TEMPEX3(return find, None, act_Sum, m_width, (value, start, end, baseindex, state, CallbackDummy()))
         }
         else if (action == act_Min) {

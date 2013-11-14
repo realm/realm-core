@@ -50,6 +50,7 @@
 
 
 #define TEST(Name) TEST_EX(Name, UnitTest::Test::GetTestList())
+#define ONLY(Name) TEST_EX(Name##_ONLY, UnitTest::Test::GetTestList())
 
 
 #define TEST_FIXTURE_EX(Fixture, Name, List)                                         \

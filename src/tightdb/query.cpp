@@ -665,13 +665,20 @@ void Query::end_subtable()
     subtables.pop_back();
 }
 
-
+// todo, add size_t end? could be useful
 size_t Query::find(size_t begin_at_table_row)
 {
     if(m_table->is_degenerate())
         return not_found;
 
+    TIGHTDB_ASSERT(begin_at_table_row <= m_table->size());
+
     Init(*m_table);
+
+    // User created query with no criteria; return first
+    if (first.size() == 0 || first[0] == 0) {
+        return m_table->size() == 0 ? not_found : begin_at_table_row;
+    }
 
     const size_t end = m_table->size();
     const size_t res = first[0]->find_first(begin_at_table_row, end);
@@ -684,6 +691,8 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     if(m_table->is_degenerate())
         return TableView(*m_table);
 
+    TIGHTDB_ASSERT(start <= m_table->size());
+
     Init(*m_table);
 
     if (end == size_t(-1))
@@ -694,7 +703,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
         TableView tv(*m_table);
         for (size_t i = start; i < end && i - start < limit; i++)
             tv.get_ref_column().add(i);
-        return move(tv);
+        return tv;
     }
 
 #if TIGHTDB_MULTITHREAD_QUERY
@@ -709,7 +718,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     QueryState<int64_t> st;
     st.init(act_FindAll, &tv.get_ref_column(), limit);
     first[0]->aggregate<act_FindAll, int64_t, int64_t>(&st, start, end, not_found, NULL);
-    return move(tv);
+    return tv;
 }
 
 
@@ -890,9 +899,7 @@ void* Query::query_thread(void* arg)
 
 #endif // TIGHTDB_MULTITHREADQUERY
 
-
-#ifdef TIGHTDB_DEBUG
-string Query::Verify()
+string Query::validate()
 {
     if (first.size() == 0)
         return "";
@@ -903,9 +910,8 @@ string Query::Verify()
     if (first[0] == 0)
         return "Syntax error";
 
-    return first[0]->Verify(); // errors detected by QueryEngine
+    return first[0]->validate(); // errors detected by QueryEngine
 }
-#endif // TIGHTDB_DEBUG
 
 void Query::Init(const Table& table) const
 {

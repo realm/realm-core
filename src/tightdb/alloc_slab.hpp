@@ -23,6 +23,7 @@
 #include <stdint.h> // unint8_t etc
 #include <string>
 
+#include <tightdb/config.h>
 #include <tightdb/file.hpp>
 #include <tightdb/table_macros.hpp>
 
@@ -115,7 +116,7 @@ public:
     /// completely reset the allocator, you must also call
     /// reset_free_space_tracking().
     ///
-    /// This method has no effect if the allocator is already in the
+    /// This function has no effect if the allocator is already in the
     /// detached state (idempotency).
     void detach() TIGHTDB_NOEXCEPT;
 
@@ -164,14 +165,17 @@ public:
     /// cases, less fragmentation translates into improved
     /// performance.
     ///
-    /// A call to this method will make the database file at least as
-    /// big as the specified size, and, if the platform supports it,
-    /// disk space will be allocated for the entire file.
-    ///
-    /// If the database file is already as big as the specified size,
-    /// or bigger, this method will not affect the size of the file,
-    /// but, if the platform supports it, it will still cause
-    /// previously unallocated disk space to be allocated.
+    /// When supported by the system, a call to this function will
+    /// make the database file at least as big as the specified size,
+    /// and cause space on the target device to be allocated (note
+    /// that on many systems on-disk allocation is done lazily by
+    /// default). If the file is already bigger than the specified
+    /// size, the size will be unchanged, and on-disk allocation will
+    /// occur only for the initial section that corresponds to the
+    /// specified size. On systems that do not support preallocation,
+    /// this function has no effect. To know whether preallocation is
+    /// supported by TightDB on your platform, call
+    /// File::is_prealloc_supported().
     ///
     /// It is an error to call this function on an allocator that is
     /// not attached to a file. Doing so will result in undefined

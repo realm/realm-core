@@ -19,7 +19,7 @@ using namespace tightdb;
 namespace {
 
 // Limited to 8 bits (max 255).
-const int current_file_format_version = 1;
+const int current_file_format_version = 2;
 
 #ifdef TIGHTDB_SLAB_ALLOC_DEBUG
 map<ref_type, void*> malloc_debug_map;
@@ -498,7 +498,7 @@ bool SlabAlloc::validate_buffer(const char* data, size_t size, ref_type& top_ref
     if (ref >= size || ref % 8 != 0 || ref > numeric_limits<ref_type>::max())
         return false; // invalid top_ref
 
-    top_ref = ref;//FIXME:vs2012 warning C4244: '=' : conversion from 'uint_fast64_t' to 'tightdb::ref_type', possible loss of data
+    top_ref = ref_type(ref);
     return true;
 }
 

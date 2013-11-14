@@ -10,6 +10,21 @@ Format:
 - Removed/deprecated feature/method .... (user visible removed feature - passed on to release notes)
 . Any other notes .... 				     (internal changes)
 
+2013-11-07 (Alexander Stigsen)
+. BREAKING CHANGE: Schema now handles attributes separately for better performance when there are many colummns.
+
+2013-11-07 (Lasse Reinhold)
++ Added power() operator for next-generation-queries
+
+2013-11-07 (Lasse Reinhold)
+! Fixed bug: ng-queries could segfault to bug in Array::get_chunk(). Normal queries and everything else not affected.
+
+2013-10-10 (Kenneth Geisshirt)
+. Adding INTERACTIVE mode for the dist-config target in build.sh
+
+2013-10-09 (Kenneth Geisshirt)
+. Adding dist-deb target in build.sh for building debian/ubuntu/mint packages. Moreover, the ubuntu/mint version is part of package name so maintaining repositories is easier.
+
 2013-09-26 (Brian Munkholm)
 +/- Renamed Table::distinct() to Table::get_distinct_view()
 +/- Renamed class Date to DateTime. Renamed DataType::type_Date to type_DateTime

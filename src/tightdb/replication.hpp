@@ -56,7 +56,7 @@ class Replication {
 public:
     // Be sure to keep this type aligned with what is actually used in
     // SharedGroup.
-    typedef uint_fast32_t version_type;
+    typedef uint_fast64_t version_type;
 
     std::string get_database_path();
 
@@ -142,7 +142,7 @@ public:
     struct subtable_tag {};
 
     void new_top_level_table(StringData name);
-    void add_column(const Table*, const Spec*, DataType, StringData name);
+    void add_column (const Table*, const Spec*, DataType, StringData name);
 
     template<class T>
     void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);

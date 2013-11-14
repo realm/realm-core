@@ -22,6 +22,7 @@
 
 #include <limits>
 
+#include <tightdb/config.h>
 #include <tightdb/group.hpp>
 
 namespace tightdb {
@@ -50,11 +51,11 @@ public:
     struct unattached_tag {};
 
     /// Create a SharedGroup instance in its unattached state. It may
-    /// then be attached to a database file later by calling the
-    /// open() method. You may test whether this instance is currently
-    /// in its attached state by calling is_attached(). Calling any
-    /// other method (except the destructor) while in the unattached
-    /// state has undefined behavior.
+    /// then be attached to a database file later by calling
+    /// open(). You may test whether this instance is currently in its
+    /// attached state by calling is_attached(). Calling any other
+    /// function (except the destructor) while in the unattached state
+    /// has undefined behavior.
     SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT;
 
     ~SharedGroup() TIGHTDB_NOEXCEPT;
@@ -108,8 +109,8 @@ public:
 
     /// A SharedGroup may be created in the unattached state, and then
     /// later attached to a file with a call to open(). Calling any
-    /// method other than open(), is_attached(), and ~SharedGroup() on
-    /// an unattached instance results in undefined behavior.
+    /// function other than open(), is_attached(), and ~SharedGroup()
+    /// on an unattached instance results in undefined behavior.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
     /// Reserve disk space now to avoid allocation errors at a later
@@ -117,14 +118,17 @@ public:
     /// cases, less fragmentation translates into improved
     /// performance.
     ///
-    /// A call to this method will make the database file at least as
-    /// big as the specified size, and, if the platform supports it,
-    /// disk space will be allocated for the entire file.
-    ///
-    /// If the database file is already as big as the specified size,
-    /// or bigger, this method will not affect the size of the file,
-    /// but, if the platform supports it, it will still cause
-    /// previously unallocated disk space to be allocated.
+    /// When supported by the system, a call to this function will
+    /// make the database file at least as big as the specified size,
+    /// and cause space on the target device to be allocated (note
+    /// that on many systems on-disk allocation is done lazily by
+    /// default). If the file is already bigger than the specified
+    /// size, the size will be unchanged, and on-disk allocation will
+    /// occur only for the initial section that corresponds to the
+    /// specified size. On systems that do not support preallocation,
+    /// this function has no effect. To know whether preallocation is
+    /// supported by TightDB on your platform, call
+    /// File::is_prealloc_supported().
     ///
     /// It is an error to call this function on an unattached shared
     /// group. Doing so will result in undefined behavior.
@@ -157,6 +161,15 @@ public:
     class PresumablyStaleLockFile : public std::runtime_error {
     public:
         PresumablyStaleLockFile(const std::string& msg): std::runtime_error(msg) {}
+    };
+
+    // If the database file is deleted while there are open shared groups,
+    // subsequent attempts to open shared groups will try to join an already
+    // active sharing scheme, but fail due to the missing database file.
+    // This causes the following exception to be thrown from Open or the constructor.
+    class LockFileButNoData : public std::runtime_error {
+    public:
+        LockFileButNoData(const std::string& msg) : std::runtime_error(msg) {}
     };
 
 private:

@@ -1,32 +1,42 @@
 SUBDIRS = src test
 test_DEPS = src
 
-include generic.mk
+include src/generic.mk
 
-# Run and run the benchmarking programs
+# Build and run the benchmarking programs
 .PHONY: benchmark
-benchmark: minimal
+benchmark: test-norun/subdir/src
 	@$(MAKE) -C test benchmark
 
-# Run and run the performance matrix benchmarking program
+# Build and run the performance matrix benchmarking program
 .PHONY: performance
-performance: minimal
+performance: test-norun/subdir/src
 	@$(MAKE) -C test performance
 
 # Build the add/insert benchmarking program
 .PHONY: benchmark-insert-add
-benchmark-insert-add: minimal
+benchmark-insert-add: test-norun/subdir/src
 	@$(MAKE) -C test benchmark-insert-add
 
 # Build and run the insert/get/set benchmarking program
 .PHONY: benchmark-insert-get-set
-benchmark-insert-get-set: minimal
+benchmark-insert-get-set: test-norun/subdir/src
 	@$(MAKE) -C test benchmark-insert-get-set
 
 # Build and run the prealloc benchmarking program
 .PHONY: benchmark-prealloc
-benchmark-prealloc: minimal
+benchmark-prealloc: test-norun/subdir/src
 	@$(MAKE) -C test benchmark-prealloc
+
+# Build the index benchmarking program
+.PHONY: benchmark-index
+benchmark-index: test-norun/subdir/src
+	@$(MAKE) -C test benchmark-index
+
+# Build the transaction benchmarking program
+.PHONY: benchmark-transaction
+benchmark-transaction: test-norun/subdir/src
+	@$(MAKE) -C test benchmark-transaction
 
 # Run coverage analysis after building everything, this time using LCOV
 .PHONY: lcov
@@ -43,22 +53,31 @@ gcovr: test-cover
 
 # Build and run whatever is in test/experiements/testcase.cpp
 .PHONY: testcase testcase-debug
-testcase: minimal
+testcase: test-norun/subdir/src
 	@$(MAKE) -C test testcase
-testcase-debug: debug
+testcase-debug: test-debug-norun/subdir/src
 	@$(MAKE) -C test testcase-debug
 
 # Check documentation examples
 .PHONY: check-doc-ex clean-doc-ex
-check-doc-ex: debug
+check-doc-ex: test-debug-norun/subdir/src
 	@$(MAKE) -C doc/ref_cpp/examples test-debug
 clean-doc-ex:
 	@$(MAKE) -C doc/ref_cpp/examples clean
 
 # Used by build.sh
-.PHONY: get-libdir get-cc get-cxx get-ld
+.PHONY: get-exec-prefix get-includedir get-bindir get-libdir get-libexecdir
+get-exec-prefix:
+	@echo $(exec_prefix)
+get-includedir:
+	@echo $(includedir)
+get-bindir:
+	@echo $(bindir)
 get-libdir:
 	@echo $(libdir)
+get-libexecdir:
+	@echo $(libexecdir)
+.PHONY: get-cc get-cxx get-ld
 get-cc:
 	@echo $(CC)
 get-cxx:
