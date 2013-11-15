@@ -23,7 +23,7 @@ using namespace tightdb;
 using namespace std;
 
 
-int main()
+TEST(bounds)
 {
 
 
@@ -273,5 +273,4 @@ sum: 8.876
 
 
     cerr << "sum: " << score;
-    return 0;
 }

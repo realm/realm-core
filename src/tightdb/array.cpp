@@ -2023,7 +2023,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
 
     TIGHTDB_ASSERT(node.size() >= 2);
     size_t num_children = node.size() - 2;
-
+
     // Verify invar:bptree-nonempty-inner
     TIGHTDB_ASSERT(num_children >= 1);
 
@@ -2369,8 +2369,14 @@ inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t width,
 // We currently use binary search. See for example
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
 //
-// It may be worth considering if overall efficiency can be improved
-// by doing a linear search for short sequences.
+// The binary search used here is carefully optimized. Key trick is to use a single
+// loop controlling variable (size) instead of high/low pair, and to keep updates
+// to size done inside the loop independent of comparisons. Further key to speed
+// is to avoid branching inside the loop, using conditional moves instead. This
+// provides robust performance for random searches, though predictable searches
+// might be slightly faster if we used branches instead. The loop unrolling yields
+// a final 5-20% speedup depending on circumstances.
+
 template<int width>
 inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
