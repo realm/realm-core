@@ -960,6 +960,8 @@ PTW32_DLLPORT int PTW32_CDECL pthread_create (pthread_t * tid,
                             void *(PTW32_CDECL *start) (void *),
                             void *arg);
 
+PTW32_DLLPORT void PTW32_CDECL pthread_cleanup (void);
+
 PTW32_DLLPORT int PTW32_CDECL pthread_detach (pthread_t tid);
 
 PTW32_DLLPORT int PTW32_CDECL pthread_equal (pthread_t t1,

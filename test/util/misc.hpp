@@ -1,5 +1,7 @@
-#ifndef TEST_UTILITIES_H
-#define TEST_UTILITIES_H
+#ifndef TIGHTDB_TEST_UTIL_MISC_HPP
+#define TIGHTDB_TEST_UTIL_MISC_HPP
+
+#include <string>
 
 namespace tightdb {
 
@@ -12,7 +14,7 @@ template <class T> bool almost_equal(T a, T b, double epsilon = 0.0001)
     return a < b + epsilon && a > b - epsilon;
 }
 
-}
-}
+} // namespace test_util
+} // namespace tightdb
 
-#endif
+#endif // TIGHTDB_TEST_UTIL_MISC_HPP

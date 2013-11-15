@@ -157,9 +157,9 @@ void spawn_daemon(const string& file)
         const char* exe = getenv("TIGHTDBD_PATH");
         if (!exe) {
 #ifndef TIGTHDB_DEBUG
-            exe = TIGHTDB_INSTALL_BINDIR "/tightdbd";
+            exe = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd";
 #else
-            exe = TIGHTDB_INSTALL_BINDIR "/tightdbd-dbg";
+            exe = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd-dbg";
 #endif
         }
         execl(exe, exe, file.c_str(), 0);
@@ -424,7 +424,12 @@ void SharedGroup::open(const string& path, bool no_create_file,
             bool read_only = false;
             bool no_create = true;
             bool skip_validate = true; // To avoid race conditions
-            alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
+            try {
+                alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
+            } 
+            catch (File::NotFound) {
+                throw LockFileButNoData(path);
+            }
 
         }
 

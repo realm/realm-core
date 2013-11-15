@@ -703,7 +703,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
         TableView tv(*m_table);
         for (size_t i = start; i < end && i - start < limit; i++)
             tv.get_ref_column().add(i);
-        return move(tv);
+        return tv;
     }
 
 #if TIGHTDB_MULTITHREAD_QUERY
@@ -718,7 +718,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     QueryState<int64_t> st;
     st.init(act_FindAll, &tv.get_ref_column(), limit);
     first[0]->aggregate<act_FindAll, int64_t, int64_t>(&st, start, end, not_found, NULL);
-    return move(tv);
+    return tv;
 }
 
 
@@ -899,9 +899,7 @@ void* Query::query_thread(void* arg)
 
 #endif // TIGHTDB_MULTITHREADQUERY
 
-
-#ifdef TIGHTDB_DEBUG
-string Query::Verify()
+string Query::validate()
 {
     if (first.size() == 0)
         return "";
@@ -912,9 +910,8 @@ string Query::Verify()
     if (first[0] == 0)
         return "Syntax error";
 
-    return first[0]->Verify(); // errors detected by QueryEngine
+    return first[0]->validate(); // errors detected by QueryEngine
 }
-#endif // TIGHTDB_DEBUG
 
 void Query::Init(const Table& table) const
 {

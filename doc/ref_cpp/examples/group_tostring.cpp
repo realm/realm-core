@@ -26,6 +26,10 @@ int main()
     group.to_string(ss);
     cout << ss.str() << endl;
 
+    // or using less memory:
+    group.to_string(cout);
+    cout << endl;
+
 // @@Fold@@
 }
 // @@EndFold@@

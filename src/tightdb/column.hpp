@@ -165,7 +165,7 @@ protected:
     static bool root_is_leaf_from_ref(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
 
     template <class T, class R, Action action, class condition>
-    R aggregate(T target, std::size_t start, std::size_t end, std::size_t* matchcount, size_t limit = size_t(-1)) const;
+    R aggregate(T target, std::size_t start, std::size_t end, size_t limit = size_t(-1)) const;
 
     /// Introduce a new root node which increments the height of the
     /// tree by one.

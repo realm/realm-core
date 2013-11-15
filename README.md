@@ -47,19 +47,24 @@ each of our major platforms:
     sudo yum install python-cheetah
     sudo yum install procps-devel
 
-### Mac OS X 10.7 and 10.8
+### Mac OS X 10.7, 10.8, and 10.9
 
-On Mac OS X, the build procedure uses Clang as the C/C++
-compiler. Clang comes with Xcode, so install Xcode if it is not
-already installed. If you have a version that preceeds 4.2, we
-recommend that you upgrade. This will ensure that the Clang version is
-at least 3.0. Run the following command in the command prompt to see
-if you have Xcode installed, and, if so, what version it is:
+On Mac OS X, the build procedure uses Clang as the C/C++ compiler by
+default. It needs at least Clang 3.0 which comes with Xcode 4.2. On OS
+X 10.9 (Mavericks) we recommend at least Xcode 5.0, since in some
+cases when a previous version of OS X is upgraded to 10.9, you will be
+left with a malfunctioning set of command line tools (in particular
+the `lipo` command), and this is most easily fixed by upgrading to
+Xcode 5. Run the following command in the command prompt to see if you
+have Xcode installed, and, if so, what version it is:
 
     xcodebuild -version
 
-Make sure you also install "Command line tools" found under the
-preferences pane "Downloads" in Xcode.
+If you have Xcode 5 or later, you will already have the required
+command line tools installed. In Xcode 4, however, the "Command line
+tools" is an optional Xcode add-on that you must install. You can find
+it under the "Downloads" pane of the "Preferences" dialog in the Xcode
+4 menu.
 
 Download the latest version of Python Cheetah
 (https://pypi.python.org/packages/source/C/Cheetah/Cheetah-2.4.4.tar.gz),
@@ -71,18 +76,17 @@ then:
 
 
 
-Building, testing, and installing
----------------------------------
+Configure, build, install
+-------------------------
+
+Run the following commands to configure, build, and install the
+language binding:
 
     sh build.sh config
-    sh build.sh clean
     sh build.sh build
-    sh build.sh test
-    sh build.sh test-debug
     sudo sh build.sh install
-    sh build.sh test-installed
 
-Headers are installed in:
+Headers will be installed in:
 
     /usr/local/include/tightdb/
 
@@ -101,6 +105,7 @@ Note: '.so' is replaced by '.dylib' on OS X.
 The following programs are installed:
 
     /usr/local/bin/tightdb-import
+    /usr/local/bin/tightdb-import-dbg
     /usr/local/bin/tightdbd
     /usr/local/bin/tightdbd-dbg
     /usr/local/bin/tightdb-config
@@ -116,10 +121,17 @@ line compatible with GCC. Here is an example:
 
     g++  my_app.cpp  `tightdb-config --cflags --libs`
 
-After building, you might want to see exactly what will be installed,
-without actually installing anything. This can be done as follows:
+Here is a more comple set of build-related commands:
 
-    DESTDIR=/tmp/check sh build.sh install && find /tmp/check -type f
+    sh build.sh config
+    sh build.sh clean
+    sh build.sh build
+    sh build.sh test
+    sh build.sh test-debug
+    sh build.sh show-install
+    sudo sh build.sh install
+    sh build.sh test-intalled
+    sudo sh build.sh uninstall
 
 
 
@@ -168,22 +180,20 @@ Normally the TightDB version is taken to be what is returned by `git
 describe`. To override this, set `TIGHTDB_VERSION` as in the following
 examples:
 
-    TIGHTDB_VERSION=x.y.z sh build.sh config
-    TIGHTDB_VERSION=x.y.z sh build.sh bin-dist all
+    TIGHTDB_VERSION=0.1.4 sh build.sh config
+    TIGHTDB_VERSION=0.1.4 sh build.sh bin-dist all
+
+To enable replication in TightDB, set `TIGHTDB_ENABLE_REPLICATION` to
+a nonempty value during configuration as in the following examples:
+
+    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh config
+    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh bin-dist all
 
 To use a nondefault compiler, or a compiler in a nondefault location,
 set the environment variable `CC` before calling `sh build.sh build`
 or `sh build.sh bin-dist`, as in the following example:
 
     CC=clang sh build.sh bin-dist all
-
-There are also a number of environment variables that serve to enable
-or disable special features during building:
-
-Set `TIGHTDB_ENABLE_REPLICATION` to a nonempty value to enable
-replication. For example:
-
-    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh src-dist all
 
 
 
@@ -230,7 +240,12 @@ package:
 This will produce a package whose name, and whose top-level directory
 is named according to the tag.
 
-`Pandoc` is required to build a distribution package.
+During the building of a distribution package, some Markdown documents
+are converted to PDF format, and this is done using the Pandoc
+utility. See below for instructions on how to install Pandoc. On some
+platforms, however, Pandoc installation is unfeasible (e.g. Amazon
+Linux). In those cases you may set `TIGHTDB_DISABLE_MARKDOWN_TO_PDF`
+to a nonempty value to disable the conversion to PDF.
 
 ### Ubuntu 10.04, 12.04, and 13.04
 
@@ -244,7 +259,7 @@ is named according to the tag.
 
     sudo yum install pandoc-pdf texlive
 
-## Mac OSX
+## Mac OS X 10.7, 10.8, and 10.9
 
 Install Pandoc and XeLaTeX (aka MacTeX) by following the instructions
 on http://johnmacfarlane.net/pandoc/installing.html. This boils down

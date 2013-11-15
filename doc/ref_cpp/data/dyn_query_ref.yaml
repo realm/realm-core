@@ -153,7 +153,7 @@ CATEGORIES :
         DESCR  : *g_dyn_query_return_query_object_descr
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_dyn_query_greaterThan
+        CODE   : ex_cpp_dyn_query_greater
 
   - g_dyn_query_greaterThanOrEqual_integer:
   - g_dyn_query_greaterThanOrEqual_float:
@@ -209,7 +209,7 @@ CATEGORIES :
         DESCR  : *g_dyn_query_return_query_object_descr
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_dyn_query_lessThan
+        CODE   : ex_cpp_dyn_query_less
 
   - g_dyn_query_lessThanOrEqual_integer:
   - g_dyn_query_lessThanOrEqual_float:
@@ -467,11 +467,11 @@ CATEGORIES :
                  "Maximum number of rows to find. Default: -1 (infinity)."
       RETURN:
         TYPES  : [TableView, ConstTableView]
-        DESCR  : &g_dyn_query_find_all_return_desc
+        DESCR  : &g_dyn_query_find_all_return_descr
                  A TableView object containing all matches.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_dyn_query_findall
+        CODE   : ex_cpp_dyn_query_find_all
 
   - g_dyn_query_find:
       NAME     : find
@@ -493,7 +493,7 @@ CATEGORIES :
                  Table row index that matches the query (or -1 if none).
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_dyn_query_find
+        CODE   : ex_cpp_dyn_query_find_next
 
   - g_dyn_query_count:
       NAME     : count
@@ -524,7 +524,7 @@ CATEGORIES :
                  The number of matching rows.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_dyn_query_size
+        CODE   : ex_cpp_dyn_query_count
 
   - g_dyn_query_remove:
       NAME     : remove
@@ -549,7 +549,7 @@ CATEGORIES :
                  The number of rows removed.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_dyn_query_remove
+        CODE   : ex_cpp_dyn_query_delete
 
   - g_dyn_query_sum_int:
   - g_dyn_query_sum_float:
@@ -636,7 +636,7 @@ CATEGORIES :
                  The highest value.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_dyn_query_maximum
+        CODE   : ex_cpp_dyn_query_max
 
   - g_dyn_query_minimum_int:
   - g_dyn_query_minimum_float:
@@ -677,7 +677,7 @@ CATEGORIES :
                  The lowest value.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_dyn_query_minimum
+        CODE   : ex_cpp_dyn_query_min
 
   - g_dyn_query_average_int:
   - g_dyn_query_average_double:
@@ -720,4 +720,4 @@ CATEGORIES :
                  The average.
       EXAMPLES:
       - DESCR  :
-        CODE   : ex_cpp_dyn_query_average
+        CODE   : ex_cpp_dyn_query_avg

@@ -1081,8 +1081,8 @@ public:
             TIGHTDB_ASSERT(false);
     }
 
-    template <Action action, bool pattern, class Callback>
-    inline bool match(size_t index, uint64_t indexpattern, int64_t value, Callback callback)
+    template <Action action, bool pattern>
+    inline bool match(size_t index, uint64_t indexpattern, int64_t value)
     {
         if (pattern) {
             if (action == act_Count) {
@@ -1101,9 +1101,7 @@ public:
 
         ++m_match_count;
 
-        if (action == act_CallbackIdx)
-            return callback(index);
-        else if (action == act_Max) {
+        if (action == act_Max) {
             if (value > m_state)
                 m_state = value;
         }
@@ -1158,8 +1156,8 @@ public:
             TIGHTDB_ASSERT(false);
     }
 
-    template<Action action, bool pattern, class Callback, typename resulttype>
-    inline bool match(size_t /*index*/, uint64_t /*indexpattern*/, resulttype value, Callback /*callback*/)
+    template<Action action, bool pattern, typename resulttype>
+    inline bool match(size_t /*index*/, uint64_t /*indexpattern*/, resulttype value)
     {
         if (pattern)
             return false;
@@ -2060,12 +2058,20 @@ computations for the given search criteria makes it feasible to construct such a
 template<Action action, class Callback>
 bool Array::find_action(size_t index, int64_t value, QueryState<int64_t>* state, Callback callback) const
 {
-    return state->match<action, false, Callback>(index, 0, value, callback);
+    if (action == act_CallbackIdx)
+        return callback(index);
+    else
+        return state->match<action, false>(index, 0, value);
 }
 template<Action action, class Callback>
 bool Array::find_action_pattern(size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const
 {
-    return state->match<action, true, Callback>(index, pattern, 0, callback);
+    static_cast<void>(callback);
+    if(action == act_CallbackIdx) {
+        // Possible future optimization: call callback(index) like in above find_action(), in a loop for each bit set in 'pattern'
+        return false;
+    }
+    return state->match<action, true>(index, pattern, 0);
 }
 
 
@@ -2219,10 +2225,15 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
 
     // optimization if all items are guaranteed to match (such as cond2 == NotEqual && value == 100 && m_ubound == 15)
     if (c.will_match(value, m_lbound, m_ubound)) {
-        TIGHTDB_ASSERT(state->m_match_count < state->m_limit);
-        size_t process = state->m_limit - state->m_match_count;
-        size_t end2 = end - start > process ? start + process : end;
+        size_t end2;
 
+        if(action == act_CallbackIdx)
+            end2 = end;
+        else {
+            TIGHTDB_ASSERT(state->m_match_count < state->m_limit);
+            size_t process = state->m_limit - state->m_match_count;
+            end2 = end - start > process ? start + process : end;        
+        }
         if (action == act_Sum || action == act_Max || action == act_Min) {
             int64_t res;
             if (action == act_Sum)
@@ -2675,8 +2686,7 @@ template<class cond2, Action action, size_t width, class Callback>
 TIGHTDB_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* data, size_t items,
                                                QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
-    cond2 c;
-    int cond = c.condition();
+    int cond = cond2::condition;
     size_t i = 0;
     __m128i compare = {0};
     unsigned int resmask;
@@ -2975,8 +2985,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback>
 bool Array::Compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                     Callback callback) const
 {
-    cond2 c;
-    int cond = c.condition();
+    int cond = cond2::condition;
     bool ret = false;
 
     if (cond == cond_Equal)
@@ -3074,11 +3083,10 @@ bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t base
 
 template<class cond> size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    cond c;
     TIGHTDB_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
     QueryState<int64_t> state;
     state.init(act_ReturnFirst, NULL, 1); // todo, would be nice to avoid this in order to speed up find_first loops
-    Finder finder = m_finder[c.condition()];
+    Finder finder = m_finder[cond::condition];
     (this->*finder)(value, start, end, 0, &state);
 
     return static_cast<size_t>(state.m_state);
@@ -3087,8 +3095,6 @@ template<class cond> size_t Array::find_first(int64_t value, size_t start, size_
 //*************************************************************************************
 // Finding code ends                                                                  *
 //*************************************************************************************
-
-
 
 
 } // namespace tightdb
