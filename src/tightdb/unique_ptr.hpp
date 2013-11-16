@@ -4,6 +4,7 @@
 #include <algorithm>
 
 #include <tightdb/config.h>
+#include <tightdb/assert.hpp>
 
 
 namespace tightdb {
@@ -11,14 +12,14 @@ namespace tightdb {
 
 template<class T> class DefaultDelete {
 public:
-    void operator()(T* p) const { delete p; }
+    void operator()(T*) const;
 };
 
 
 /// This class is a C++03 compatible replacement for
 /// <tt>std::unique_ptr</tt> (as it exists in C++11). It reproduces
 /// only a small subset of the features of
-/// <tt>std::unique_ptr</tt>. In particular, it neither provides copy
+/// <tt>std::unique_ptr</tt>. In particular, it neither provides copy,
 /// nor move semantics.
 template<class T, class D = DefaultDelete<T> > class UniquePtr {
 public:
@@ -37,7 +38,7 @@ public:
     void reset(T* = 0);
     T* release() TIGHTDB_NOEXCEPT;
 
-private:
+protected:
     typedef T* UniquePtr::*unspecified_bool_type;
 
 public:
@@ -50,15 +51,13 @@ private:
     bool operator!=(const UniquePtr&); // Hide
 
     T* m_ptr;
-
-    friend class UniquePtr<T[], D>;
 };
 
 
 // Specialization for arrays
 template<class T> class DefaultDelete<T[]> {
 public:
-    void operator()(T* p) const { delete[] p; }
+    void operator()(T*) const;
 };
 
 // Specialization for arrays
@@ -88,12 +87,29 @@ template<class T, class D> void swap(UniquePtr<T,D>& p, UniquePtr<T,D>& q) TIGHT
 
 
 
+
 // Implementation:
 
-template<class T, class D> inline UniquePtr<T,D>::UniquePtr(T* p) TIGHTDB_NOEXCEPT: m_ptr(p) {}
+template<class T> inline void DefaultDelete<T>::operator()(T* p) const
+{
+    TIGHTDB_STATIC_ASSERT(0 < sizeof(T), "Can't delete via pointer to incomplete type");
+    delete p;
+}
+
+template<class T> inline void DefaultDelete<T[]>::operator()(T* p) const
+{
+    TIGHTDB_STATIC_ASSERT(0 < sizeof(T), "Can't delete via pointer to incomplete type");
+    delete[] p;
+}
+
+template<class T, class D> inline UniquePtr<T,D>::UniquePtr(T* p) TIGHTDB_NOEXCEPT: m_ptr(p)
+{
+}
 
 template<class T, class D> inline UniquePtr<T[],D>::UniquePtr(T* p) TIGHTDB_NOEXCEPT:
-    UniquePtr<T,D>(p) {}
+    UniquePtr<T,D>(p)
+{
+}
 
 template<class T, class D> inline UniquePtr<T,D>::~UniquePtr()
 {

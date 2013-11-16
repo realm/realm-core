@@ -1,5 +1,6 @@
 #include <iostream>
 #include <tightdb.hpp>
+#include <tightdb/file.hpp>
 #include <tightdb/group_shared.hpp>
 
 using namespace tightdb;
@@ -23,9 +24,9 @@ int main()
 
     // Many transactions
     {
-        remove("over_alloc_1.db");
-        remove("over_alloc_1.db.lock");
-        SharedGroup db("over_alloc_1.db");
+        File::try_remove("over_alloc_1.tightdb");
+        File::try_remove("over_alloc_1.tightdb.lock");
+        SharedGroup db("over_alloc_1.tightdb");
         if (!db.is_valid()) throw runtime_error("Failed to open database 1");
 
         for (int i=0; i<n_outer; ++i) {
@@ -42,9 +43,9 @@ int main()
 
     // One transaction
     {
-        remove("over_alloc_2.db");
-        remove("over_alloc_2.db.lock");
-        SharedGroup db("over_alloc_2.db");
+        File::try_remove("over_alloc_2.tightdb");
+        File::try_remove("over_alloc_2.tightdb.lock");
+        SharedGroup db("over_alloc_2.tightdb");
         if (!db.is_valid()) throw runtime_error("Failed to open database 2");
 
         {

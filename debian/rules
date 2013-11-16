@@ -1,0 +1,65 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# Sample debian/rules that uses debhelper.
+# This file was originally written by Joey Hess and Craig Small.
+# As a special exception, when this file is copied by dh-make into a
+# dh-make output file, you may use that output file without restriction.
+# This special exception was added by Craig Small in version 0.37 of dh-make.
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+override_dh_usrlocal:
+
+clean:
+	dh_testdir
+	dh_clean
+
+build: clean
+	sh build.sh config /usr
+	sh build.sh clean
+	sh build.sh build
+
+
+libtightdb: build
+	DESTDIR=$$(pwd)/debian/libtightdb sh build.sh install-prod
+	dh_testdir -a
+	dh_testroot -a
+	dh_installdocs -a
+	dh_installchangelogs -p$@ -a
+	dh_strip -p$@ .a
+	dh_compress -p$@ -s
+	dh_fixperms -p$@ -a
+	dh_installdeb -p$@ -a
+	dh_shlibdeps -p$@ -a
+	dh_gencontrol -p$@ -a
+	dh_md5sums -p$@ -a
+	dh_builddeb -p$@ -a
+	dh_installdirs
+
+
+libtightdb-dev: build
+	DESTDIR=$$(pwd)/debian/libtightdb-dev sh build.sh install-devel
+	dh_testdir -a
+	dh_testroot -a
+	dh_installdocs -a
+	dh_installchangelogs -p$@ -a
+	dh_installexamples $$(pwd)/examples/tutorial.cpp
+	dh_installexamples $$(pwd)/examples/tutorial.cpp
+	dh_strip -p$@ -a
+	dh_compress -p$@ -s
+	dh_fixperms -p$@ -a
+	dh_installdeb -p$@ -a
+	dh_shlibdeps -p$@ -a
+	dh_gencontrol -p$@ -a
+	dh_md5sums -p$@ -a
+	dh_builddeb -p$@ -a
+
+binary: build binary-indep binary-arch
+
+binary-indep: libtightdb-dev
+
+binary: libtightdb
+
+
+.PHONY: binary binary-arch binary-indep clean checkroot install

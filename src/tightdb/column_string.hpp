@@ -20,9 +20,11 @@
 #ifndef TIGHTDB_COLUMN_STRING_HPP
 #define TIGHTDB_COLUMN_STRING_HPP
 
-#include <tightdb/column.hpp>
+#include <tightdb/unique_ptr.hpp>
 #include <tightdb/array_string.hpp>
 #include <tightdb/array_string_long.hpp>
+#include <tightdb/array_blobs_big.hpp>
+#include <tightdb/column.hpp>
 
 namespace tightdb {
 
@@ -31,117 +33,102 @@ class StringIndex;
 
 class AdaptiveStringColumn: public ColumnBase {
 public:
-    AdaptiveStringColumn(Allocator& = Allocator::get_default());
-    AdaptiveStringColumn(std::size_t ref, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                         Allocator& = Allocator::get_default());
-    ~AdaptiveStringColumn();
+    typedef StringData value_type;
 
-    void Destroy();
+    explicit AdaptiveStringColumn(Allocator& = Allocator::get_default());
+    explicit AdaptiveStringColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                                  Allocator& = Allocator::get_default());
+    ~AdaptiveStringColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    std::size_t Size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    bool is_empty() const TIGHTDB_NOEXCEPT;
+    void destroy() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    std::size_t size() const TIGHTDB_NOEXCEPT;
+    bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
 
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    void add() TIGHTDB_OVERRIDE {return add(StringData());}
+    void add() TIGHTDB_OVERRIDE { return add(StringData()); }
     void add(StringData);
     void set(std::size_t ndx, StringData);
     void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, StringData()); }
     void insert(std::size_t ndx, StringData);
-    void erase(std::size_t ndx) TIGHTDB_OVERRIDE;
-    void Clear() TIGHTDB_OVERRIDE;
-    void Resize(std::size_t ndx);
+    void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
+    void clear() TIGHTDB_OVERRIDE;
+    void resize(std::size_t ndx);
     void fill(std::size_t count);
+    void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
 
     std::size_t count(StringData value) const;
-    std::size_t find_first(StringData value, std::size_t begin = 0 , std::size_t end = -1) const;
-    void find_all(Array& result, StringData value, std::size_t start = 0,
-                  std::size_t end = -1) const;
+    std::size_t find_first(StringData value, std::size_t begin = 0,
+                           std::size_t end = npos) const;
+    void find_all(Array& result, StringData value, std::size_t begin = 0,
+                  std::size_t end = npos) const;
 
-    /// Find the lower bound for the specified value assuming that the
-    /// elements are already sorted according to
-    /// StringData::operator<(). This operation is semantically
-    /// identical to std::lower_bound().
-    std::size_t lower_bound(StringData value) const TIGHTDB_NOEXCEPT;
+    //@{
+
+    /// Find the lower/upper bound for the specified value assuming
+    /// that the elements are already sorted in ascending order
+    /// according to StringData::operator<().
+    std::size_t lower_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
+    std::size_t upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
+    //@{
+
+    FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
     // Index
-    bool HasIndex() const {return m_index != NULL;}
-    const StringIndex& GetIndex() const {return *m_index;}
-    StringIndex& PullIndex() {StringIndex& ndx = *m_index; m_index = NULL; return ndx;}
-    StringIndex& CreateIndex();
-    void SetIndexRef(size_t ref, ArrayParent* parent, size_t pndx);
-    void RemoveIndex() {m_index = NULL;}
-
-    size_t GetRef() const {return m_array->GetRef();}
-    Allocator& GetAllocator() const {return m_array->GetAllocator();}
-    void SetParent(ArrayParent* parent, size_t pndx) {m_array->SetParent(parent, pndx);}
+    bool has_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_index != 0; }
+    void set_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_OVERRIDE;
+    const StringIndex& get_index() const { return *m_index; }
+    StringIndex* release_index() TIGHTDB_NOEXCEPT { StringIndex* i = m_index; m_index = 0; return i;}
+    StringIndex& create_index();
 
     // Optimizing data layout
-    bool AutoEnumerate(size_t& ref_keys, size_t& ref_values) const;
+    bool auto_enumerate(ref_type& keys, ref_type& values) const;
 
     /// Compare two string columns for equality.
-    bool compare(const AdaptiveStringColumn&) const;
+    bool compare_string(const AdaptiveStringColumn&) const;
 
-    bool GetBlock(size_t ndx, ArrayParent** ap, size_t& off) const
-    {
-        if (IsNode()) {
-            std::pair<size_t, size_t> p = m_array->find_leaf_ref(m_array, ndx);
-            bool longstr = m_array->get_hasrefs_from_header(static_cast<const char*>(m_array->GetAllocator().Translate(p.first)));
-            if (longstr) {
-                ArrayStringLong* asl2 = new ArrayStringLong(p.first, NULL, 0, m_array->GetAllocator());
-                *ap = asl2;
-            }
-            else {
-                ArrayString* as2 = new ArrayString(p.first, NULL, 0, m_array->GetAllocator());
-                *ap = as2;
-            }
-            off = ndx - p.second;
-            return longstr;
-        }
-        else {
-            off = 0;
-            if (IsLongStrings()) {
-                ArrayStringLong* asl2 = new ArrayStringLong(m_array->GetRef(), NULL, 0, m_array->GetAllocator());
-                *ap = asl2;
-                return true;
-            }
-            else {
-                ArrayString* as2 = new ArrayString(m_array->GetRef(), NULL, 0, m_array->GetAllocator());
-                *ap = as2;
-                return false;
-            }
-        }
+    enum LeafType {
+        leaf_type_Small,  ///< ArrayString
+        leaf_type_Medium, ///< ArrayStringLong
+        leaf_type_Big     ///< ArrayBigBlobs
+    };
 
-        TIGHTDB_ASSERT(false);
-    }
+    LeafType GetBlock(std::size_t ndx, ArrayParent**, std::size_t& off,
+                      bool use_retval = false) const;
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const; // Must be upper case to avoid conflict with macro in ObjC
-#endif // TIGHTDB_DEBUG
-
-    // Assumes that this column has only a single leaf node, no
-    // internal nodes. In this case HasRefs indicates a long string
-    // array.
-    bool IsLongStrings() const TIGHTDB_NOEXCEPT {return m_array->HasRefs();}
-
-protected:
-    friend class ColumnBase;
-    void UpdateRef(size_t ref);
-
-    StringData LeafGet(size_t ndx) const TIGHTDB_NOEXCEPT;
-    void LeafSet(size_t ndx, StringData value);
-    void LeafInsert(size_t ndx, StringData value);
-    template<class F> size_t LeafFind(StringData value, size_t begin, size_t end) const;
-    void LeafFindAll(Array& result, StringData value, size_t add_offset = 0,
-                     size_t begin = 0, size_t end = -1) const;
-
-    void LeafDelete(size_t ndx);
-
-#ifdef TIGHTDB_DEBUG
-    virtual void LeafToDot(std::ostream& out, const Array& array) const;
-#endif // TIGHTDB_DEBUG
+    void Verify() const TIGHTDB_OVERRIDE;
+    void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
+    void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
+    using ColumnBase::dump_node_structure;
+#endif
 
 private:
     StringIndex* m_index;
+
+    std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
+
+    void do_insert(std::size_t ndx, StringData value);
+
+    // Called by Array::bptree_insert().
+    static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
+                                Allocator&, std::size_t insert_ndx,
+                                Array::TreeInsert<AdaptiveStringColumn>& state);
+
+    class EraseLeafElem;
+
+    /// Root must be a leaf. Upgrades the root leaf as
+    /// necessary. Returns the type of the root leaf as it is upon
+    /// return.
+    LeafType upgrade_root_leaf(std::size_t value_size);
+
+#ifdef TIGHTDB_DEBUG
+    void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
+                     std::ostream&) const TIGHTDB_OVERRIDE;
+#endif
+
+    friend class Array;
+    friend class ColumnBase;
 };
 
 
@@ -150,37 +137,41 @@ private:
 
 // Implementation:
 
-inline StringData AdaptiveStringColumn::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
+inline std::size_t AdaptiveStringColumn::size() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(ndx < Size());
-    return m_array->string_column_get(ndx);
-}
-
-inline void AdaptiveStringColumn::add(StringData str)
-{
-    insert(Size(), str);
-}
-
-inline std::size_t AdaptiveStringColumn::lower_bound(StringData value) const TIGHTDB_NOEXCEPT
-{
-    std::size_t i = 0;
-    std::size_t size = Size();
-
-    while (0 < size) {
-        std::size_t half = size / 2;
-        std::size_t mid = i + half;
-        StringData probe = get(mid);
-        if (probe < value) {
-            i = mid + 1;
-            size -= half + 1;
+    if (root_is_leaf()) {
+        bool long_strings = m_array->has_refs();
+        if (!long_strings) {
+            // Small strings root leaf
+            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            return leaf->size();
         }
-        else {
-            size = half;
+        bool is_big = m_array->context_bit();
+        if (!is_big) {
+            // Medium strings root leaf
+            ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+            return leaf->size();
         }
+        // Big strings root leaf
+        ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+        return leaf->size();
     }
-    return i;
+    // Non-leaf root
+    return m_array->get_bptree_size();
 }
 
+inline void AdaptiveStringColumn::add(StringData value)
+{
+    do_insert(npos, value);
+}
+
+inline void AdaptiveStringColumn::insert(size_t ndx, StringData value)
+{
+    TIGHTDB_ASSERT(ndx <= size());
+    if (size() <= ndx)
+        ndx = npos;
+    do_insert(ndx, value);
+}
 
 } // namespace tightdb
 

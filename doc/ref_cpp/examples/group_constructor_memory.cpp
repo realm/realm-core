@@ -3,20 +3,24 @@
 #include <cstddef>
 #include <cstdlib>
 #include <tightdb.hpp>
+#include <tightdb/file.hpp>
 
 using namespace std;
 using namespace tightdb;
 
-// @@EndFold@@
 TIGHTDB_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 
-void func(Group::BufferSpec buffer)
+void func(BinaryData buffer)
 {
-    bool take_ownership = false;
-    Group g(buffer, take_ownership);
+// @@EndFold@@
+    // Create a group using the buffer as backing store
+    Group g(buffer, /* take_ownership: */ false);
+
+    // Get a table, or create it if it doesn't exist
     PeopleTable::Ref table = g.get_table<PeopleTable>("people");
+// @@Fold@@
 
     table->add("Mary", 14);
     table->add("Joe",  17);
@@ -24,19 +28,20 @@ void func(Group::BufferSpec buffer)
 
     g.write("people.tightdb");
 }
-// @@Fold@@
 
 int main()
 {
-    Group::BufferSpec buffer = g.write_to_mem();
+    Group g;
+    BinaryData buffer = g.write_to_mem();
     try {
         func(buffer);
     }
     catch (...) {
-        free(const_cast<char*>(buffer.m_data));
+        free(const_cast<char*>(buffer.data()));
         throw;
     }
-    free(const_cast<char*>(buffer.m_data));
+    free(const_cast<char*>(buffer.data()));
+    File::remove("people.tightdb");
 }
 // @@EndFold@@
 // @@EndExample@@

@@ -7,7 +7,6 @@
 
 #include <tightdb/config.h>
 #include <tightdb/table.hpp>
-#include <tightdb/index.hpp>
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/column_basic.hpp>
@@ -19,139 +18,124 @@
 #include <tightdb/column_mixed.hpp>
 #include <tightdb/index_string.hpp>
 
+#include "query_engine.hpp"
+
 using namespace std;
-
-namespace tightdb {
-
-struct FakeParent: Table::Parent {
-    void update_child_ref(size_t, size_t) TIGHTDB_OVERRIDE {} // Ignore
-    void child_destroyed(size_t) TIGHTDB_OVERRIDE {} // Ignore
-    size_t get_child_ref(size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return 0; }
-};
+using namespace tightdb;
 
 
 // -- Table ---------------------------------------------------------------------------------
 
-void Table::init_from_ref(size_t top_ref, ArrayParent* parent, size_t ndx_in_parent)
+
+void Table::init_from_ref(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     // Load from allocated memory
-    m_top.UpdateRef(top_ref);
-    m_top.SetParent(parent, ndx_in_parent);
+    m_top.init_from_ref(top_ref);
+    m_top.set_parent(parent, ndx_in_parent);
     TIGHTDB_ASSERT(m_top.size() == 2);
 
-    const size_t spec_ref    = m_top.GetAsRef(0);
-    const size_t columns_ref = m_top.GetAsRef(1);
+    ref_type spec_ref    = m_top.get_as_ref(0);
+    ref_type columns_ref = m_top.get_as_ref(1);
 
     init_from_ref(spec_ref, columns_ref, &m_top, 1);
-    m_spec_set.set_parent(&m_top, 0);
+    m_spec.set_parent(&m_top, 0);
 }
 
-void Table::init_from_ref(size_t spec_ref, size_t columns_ref,
+void Table::init_from_ref(ref_type spec_ref, ref_type columns_ref,
                           ArrayParent* parent, size_t ndx_in_parent)
 {
-    m_spec_set.update_ref(spec_ref);
+    m_spec.init_from_ref(spec_ref, 0, 0);
 
     // A table instatiated with a zero-ref is just an empty table
     // but it will have to create itself on first modification
     if (columns_ref != 0) {
-        m_columns.UpdateRef(columns_ref);
-        CacheColumns(); // Also initializes m_size
+        m_columns.init_from_ref(columns_ref);
+        cache_columns(); // Also initializes m_size
     }
-    m_columns.SetParent(parent, ndx_in_parent);
+    m_columns.set_parent(parent, ndx_in_parent);
 }
 
-void Table::CreateColumns()
+// Create columns as well as column accessors.
+void Table::create_columns()
 {
-    TIGHTDB_ASSERT(!m_columns.IsValid() || m_columns.is_empty()); // only on initial creation
+    TIGHTDB_ASSERT(!m_columns.is_attached() || m_columns.is_empty()); // only on initial creation
 
     // Instantiate first if we have an empty table (from zero-ref)
-    if (!m_columns.IsValid()) {
-        m_columns.SetType(Array::coldef_HasRefs);
+    if (!m_columns.is_attached()) {
+        m_columns.create(Array::type_HasRefs);
+        m_columns.update_parent();
     }
 
     size_t subtable_count = 0;
-    ColumnType attr = col_attr_None;
-    Allocator& alloc = m_columns.GetAllocator();
-    const size_t count = m_spec_set.get_type_attr_count();
+    Allocator& alloc = m_columns.get_alloc();
 
     // Add the newly defined columns
-    for (size_t i=0; i<count; ++i) {
-        const ColumnType type = m_spec_set.get_type_attr(i);
-        const size_t ref_pos =  m_columns.size();
+    size_t n = m_spec.get_column_count();
+    for (size_t i=0; i<n; ++i) {
+        ColumnType type = m_spec.get_real_column_type(i);
+        ColumnAttr attr = m_spec.get_column_attr(i);
+        size_t ref_pos =  m_columns.size();
         ColumnBase* new_col = 0;
 
         switch (type) {
-        case type_Int:
-        case type_Bool:
-        case type_Date:
-            {
-                Column* c = new Column(Array::coldef_Normal, alloc);
-                m_columns.add(c->GetRef());
-                c->SetParent(&m_columns, ref_pos);
+            case type_Int:
+            case type_Bool:
+            case type_DateTime: {
+                Column* c = new Column(Array::type_Normal, alloc);
+                m_columns.add(c->get_ref());
+                c->set_parent(&m_columns, ref_pos);
                 new_col = c;
+                break;
             }
-            break;
-        case type_Float:
-            {
+            case type_Float: {
                 ColumnFloat* c = new ColumnFloat(alloc);
-                m_columns.add(c->GetRef());
-                c->SetParent(&m_columns, ref_pos);
+                m_columns.add(c->get_ref());
+                c->set_parent(&m_columns, ref_pos);
                 new_col = c;
+                break;
             }
-            break;
-        case type_Double:
-            {
+            case type_Double: {
                 ColumnDouble* c = new ColumnDouble(alloc);
-                m_columns.add(c->GetRef());
-                c->SetParent(&m_columns, ref_pos);
+                m_columns.add(c->get_ref());
+                c->set_parent(&m_columns, ref_pos);
                 new_col = c;
+                break;
             }
-            break;
-        case type_String:
-            {
+            case type_String: {
                 AdaptiveStringColumn* c = new AdaptiveStringColumn(alloc);
-                m_columns.add(c->GetRef());
-                c->SetParent(&m_columns, ref_pos);
+                m_columns.add(c->get_ref());
+                c->set_parent(&m_columns, ref_pos);
                 new_col = c;
+                break;
             }
-            break;
-        case type_Binary:
-            {
+            case type_Binary: {
                 ColumnBinary* c = new ColumnBinary(alloc);
-                m_columns.add(c->GetRef());
-                c->SetParent(&m_columns, ref_pos);
+                m_columns.add(c->get_ref());
+                c->set_parent(&m_columns, ref_pos);
                 new_col = c;
+                break;
             }
-            break;
-        case type_Table:
-            {
-                const size_t column_ndx = m_cols.size();
-                const size_t subspec_ref = m_spec_set.get_subspec_ref(subtable_count);
+            case type_Table: {
+                size_t column_ndx = m_cols.size();
+                ref_type subspec_ref = m_spec.get_subspec_ref(subtable_count);
                 ColumnTable* c = new ColumnTable(alloc, this, column_ndx, subspec_ref);
-                m_columns.add(c->GetRef());
-                c->SetParent(&m_columns, ref_pos);
+                m_columns.add(c->get_ref());
+                c->set_parent(&m_columns, ref_pos);
                 new_col = c;
                 ++subtable_count;
+                break;
             }
-            break;
-        case type_Mixed:
-            {
-                const size_t column_ndx = m_cols.size();
+            case type_Mixed: {
+                size_t column_ndx = m_cols.size();
                 ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx);
-                m_columns.add(c->GetRef());
-                c->SetParent(&m_columns, ref_pos);
+                m_columns.add(c->get_ref());
+                c->set_parent(&m_columns, ref_pos);
                 new_col = c;
+                break;
             }
-            break;
 
-            // Attributes
-        case col_attr_Indexed:
-        case col_attr_Unique:
-            attr = type;
-            continue; // attr prefix column types)
-
-        default:
-            TIGHTDB_ASSERT(false);
+            default:
+                TIGHTDB_ASSERT(false);
         }
 
         // Cache Columns
@@ -159,7 +143,8 @@ void Table::CreateColumns()
 
         // Atributes on columns may define that they come with an index
         if (attr != col_attr_None) {
-            const size_t column_ndx = m_cols.size()-1;
+            TIGHTDB_ASSERT(attr == col_attr_Indexed); // only supported attr so far
+            size_t column_ndx = m_cols.size()-1;
             set_index(column_ndx, false);
 
             attr = col_attr_None;
@@ -167,140 +152,131 @@ void Table::CreateColumns()
     }
 }
 
-Spec& Table::get_spec()
-{
-    TIGHTDB_ASSERT(m_top.IsValid()); // you can only change specs on top-level tables
-    return m_spec_set;
-}
 
-const Spec& Table::get_spec() const
-{
-    return m_spec_set;
-}
-
-
-void Table::invalidate()
+void Table::detach() TIGHTDB_NOEXCEPT
 {
     // This prevents the destructor from deallocating the underlying
     // memory structure, and from attempting to notify the parent. It
-    // also causes is_valid() to return false.
-    m_columns.SetParent(0,0);
+    // also causes is_attached() to return false.
+    m_columns.set_parent(0,0);
 
-    // Invalidate all subtables
-    const size_t n = m_cols.size();
-    for (size_t i=0; i<n; ++i) {
-        ColumnBase* const c = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
-        c->invalidate_subtables_virtual();
-    }
+    // Detach all offspring accessors
+    detach_subtable_accessors();
 
-    ClearCachedColumns();
+    destroy_column_accessors();
 }
 
 
-void Table::InstantiateBeforeChange()
+void Table::detach_subtable_accessors() TIGHTDB_NOEXCEPT
+{
+    size_t n = m_cols.size();
+    for (size_t i=0; i<n; ++i) {
+        ColumnBase* c = reinterpret_cast<ColumnBase*>(uintptr_t(m_cols.get(i)));
+        c->detach_subtable_accessors();
+    }
+}
+
+
+void Table::instantiate_before_change()
 {
     // Empty (zero-ref'ed) tables need to be instantiated before first modification
-    if (!m_columns.IsValid())
-        CreateColumns();
+    if (!m_columns.is_attached())
+        create_columns();
 }
 
-void Table::CacheColumns()
+void Table::cache_columns()
 {
     TIGHTDB_ASSERT(m_cols.is_empty()); // only done on creation
 
-    Allocator& alloc = m_columns.GetAllocator();
-    ColumnType attr = col_attr_None;
-    size_t size = size_t(-1);
+    Allocator& alloc = m_columns.get_alloc();
+    size_t num_rows = size_t(-1);
     size_t ndx_in_parent = 0;
-    const size_t count = m_spec_set.get_type_attr_count();
     size_t subtable_count = 0;
 
     // Cache columns
-    for (size_t i = 0; i < count; ++i) {
-        const ColumnType type = m_spec_set.get_type_attr(i);
-        const size_t ref = m_columns.GetAsRef(ndx_in_parent);
+    size_t num_entries_in_spec = m_spec.get_column_count();
+    for (size_t i = 0; i < num_entries_in_spec; ++i) {
+        ColumnType type = m_spec.get_real_column_type(i);
+        ColumnAttr attr = m_spec.get_column_attr(i);
+        ref_type ref = m_columns.get_as_ref(ndx_in_parent);
 
         ColumnBase* new_col = 0;
         size_t colsize = size_t(-1);
         switch (type) {
-        case type_Int:
-        case type_Bool:
-        case type_Date:
-            {
+            case type_Int:
+            case type_Bool:
+            case type_DateTime: {
                 Column* c = new Column(ref, &m_columns, ndx_in_parent, alloc);
-                colsize = c->Size();
+                colsize = c->size();
                 new_col = c;
+                break;
             }
-            break;
-        case type_Float:
-            {
+            case type_Float: {
                 ColumnFloat* c = new ColumnFloat(ref, &m_columns, ndx_in_parent, alloc);
-                colsize = c->Size();
+                colsize = c->size();
                 new_col = c;
             }
-            break;
-        case type_Double:
-            {
+                break;
+            case type_Double: {
                 ColumnDouble* c = new ColumnDouble(ref, &m_columns, ndx_in_parent, alloc);
-                colsize = c->Size();
+                colsize = c->size();
                 new_col = c;
+                break;
             }
-            break;
-        case type_String:
-            {
+            case type_String: {
                 AdaptiveStringColumn* c =
                     new AdaptiveStringColumn(ref, &m_columns, ndx_in_parent, alloc);
-                colsize = c->Size();
+                colsize = c->size();
                 new_col = c;
+                break;
             }
-            break;
-        case type_Binary:
-            {
+            case type_Binary: {
                 ColumnBinary* c = new ColumnBinary(ref, &m_columns, ndx_in_parent, alloc);
-                colsize = c->Size();
+                colsize = c->size();
                 new_col = c;
+                break;
             }
-            break;
-        case col_type_StringEnum:
-            {
-                const size_t values_ref = m_columns.GetAsRef(ndx_in_parent+1);
+            case col_type_StringEnum: {
+                ArrayParent* keys_parent;
+                size_t keys_ndx;
+                ref_type keys_ref = m_spec.get_enumkeys_ref(ndx_in_parent, &keys_parent, &keys_ndx);
+                ref_type values_ref = m_columns.get_as_ref(ndx_in_parent);
+
                 ColumnStringEnum* c =
-                    new ColumnStringEnum(ref, values_ref, &m_columns, ndx_in_parent, alloc);
-                colsize = c->Size();
+                    new ColumnStringEnum(keys_ref, values_ref, &m_columns,
+                                         ndx_in_parent, keys_parent, keys_ndx, alloc);
+                colsize = c->size();
                 new_col = c;
-                ++ndx_in_parent; // advance one matchcount pos to account for keys/values pair
+                break;
             }
-            break;
-        case type_Table:
-            {
-                const size_t column_ndx = m_cols.size();
-                const size_t spec_ref = m_spec_set.get_subspec_ref(subtable_count);
+            case type_Table: {
+                size_t column_ndx = m_cols.size();
+                ref_type spec_ref = m_spec.get_subspec_ref(subtable_count);
                 ColumnTable* c = new ColumnTable(alloc, this, column_ndx, &m_columns, ndx_in_parent,
                                                  spec_ref, ref);
-                colsize = c->Size();
+                colsize = c->size();
                 new_col = c;
                 ++subtable_count;
+                break;
             }
-            break;
-        case type_Mixed:
-            {
-                const size_t column_ndx = m_cols.size();
+            case type_Mixed: {
+                size_t column_ndx = m_cols.size();
                 ColumnMixed* c =
                     new ColumnMixed(alloc, this, column_ndx, &m_columns, ndx_in_parent, ref);
-                colsize = c->Size();
+                colsize = c->size();
                 new_col = c;
+                break;
             }
-            break;
 
-            // Attributes (prefixing column types)
-        case col_attr_Indexed:
-        case col_attr_Unique:
-            attr = type;
-            continue;
-
-        default:
-            TIGHTDB_ASSERT(false);
+            case col_type_Reserved1:
+            case col_type_Reserved4:
+                // These have no function yet and are therefore
+                // unexpected.
+                TIGHTDB_ASSERT(false);
+                break;
         }
+
+        TIGHTDB_ASSERT(new_col);
 
         m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, even in C++11
 
@@ -310,70 +286,70 @@ void Table::CacheColumns()
             TIGHTDB_ASSERT(type == col_type_String ||
                            type == col_type_StringEnum);  // index only for strings
 
-            const size_t pndx = ndx_in_parent+1;
-            const size_t index_ref = m_columns.GetAsRef(pndx);
-            new_col->SetIndexRef(index_ref, &m_columns, pndx);
+            size_t pndx = ndx_in_parent + 1;
+            ref_type index_ref = m_columns.get_as_ref(pndx);
+            new_col->set_index_ref(index_ref, &m_columns, pndx);
 
             ++ndx_in_parent; // advance one matchcount pos to account for index
             attr = col_attr_None;
         }
 
         // Set table size
-        // (and verify that all column are same length)
-        if (size == size_t(-1)) size = colsize;
-        else TIGHTDB_ASSERT(size == colsize);
+        // (and verify that all column are same size)
+        if (num_rows == size_t(-1)) num_rows = colsize;
+        else TIGHTDB_ASSERT(num_rows == colsize);
 
         ++ndx_in_parent;
     }
 
-    if (size != size_t(-1)) m_size = size;
+    if (num_rows != size_t(-1)) m_size = num_rows;
 }
 
-void Table::ClearCachedColumns()
+void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_cols.IsValid());
+    TIGHTDB_ASSERT(m_cols.is_attached());
 
-    const size_t count = m_cols.size();
+    size_t count = m_cols.size();
     for (size_t i = 0; i < count; ++i) {
-        ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
+        ColumnBase* column = reinterpret_cast<ColumnBase*>(m_cols.get(i));
         delete column;
     }
-    m_cols.Destroy();
+    m_cols.destroy();
 }
 
-Table::~Table()
+Table::~Table() TIGHTDB_NOEXCEPT
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().on_table_destroyed();
 #endif
 
-    if (!is_valid()) {
-        // This table has been invalidated.
+    if (!is_attached()) {
+        // This table has been detached.
         TIGHTDB_ASSERT(m_ref_count == 0);
         return;
     }
 
-    if (!m_top.IsValid()) {
+    if (!m_top.is_attached()) {
         // This is a table with a shared spec, and its lifetime is
         // managed by reference counting, so we must let our parent
         // know about our demise.
-        ArrayParent* parent = m_columns.GetParent();
+        ArrayParent* parent = m_columns.get_parent();
         TIGHTDB_ASSERT(parent);
         TIGHTDB_ASSERT(m_ref_count == 0);
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
-        static_cast<Parent*>(parent)->child_destroyed(m_columns.GetParentNdx());
-        ClearCachedColumns();
+        static_cast<Parent*>(parent)->child_accessor_destroyed(m_columns.get_ndx_in_parent());
+        destroy_column_accessors();
         return;
     }
 
     // This is a table with an independent spec.
-    if (ArrayParent* parent = m_top.GetParent()) {
+    if (ArrayParent* parent = m_top.get_parent()) {
         // This is a table whose lifetime is managed by reference
         // counting, so we must let our parent know about our demise.
         TIGHTDB_ASSERT(m_ref_count == 0);
         TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
-        static_cast<Parent*>(parent)->child_destroyed(m_top.GetParentNdx());
-        ClearCachedColumns();
+        static_cast<Parent*>(parent)->child_accessor_destroyed(m_top.get_ndx_in_parent());
+        destroy_column_accessors();
         return;
     }
 
@@ -385,94 +361,27 @@ Table::~Table()
     // LangBindHelper::new_table(), and then the reference count must
     // be zero, because that is what has caused the destructor to be
     // called. In the latter case, there can be no subtables to
-    // invalidate, because they would have kept their parent alive.
-    if (0 < m_ref_count) invalidate();
-    else ClearCachedColumns();
-    m_top.Destroy();
-}
-
-size_t Table::GetColumnRefPos(size_t column_ndx) const
-{
-    size_t pos = 0;
-    size_t current_column = 0;
-    const size_t count = m_spec_set.get_type_attr_count();
-
-    for (size_t i = 0; i < count; ++i) {
-        if (current_column == column_ndx)
-            return pos;
-
-        ++pos;
-        const ColumnType type = (ColumnType)m_spec_set.get_type_attr(i);
-        if (type >= col_attr_Indexed)
-            continue; // ignore attributes
-        if (type == col_type_StringEnum)
-            ++pos; // string enums take up two places in m_columns
-
-        ++current_column;
+    // detach, because attached ones would have kept their parent
+    // alive.
+    if (0 < m_ref_count) {
+        detach();
     }
-
-    TIGHTDB_ASSERT(false);
-    return (size_t)-1;
-}
-
-size_t Table::add_subcolumn(const vector<size_t>& column_path, DataType type, StringData name)
-{
-    TIGHTDB_ASSERT(!column_path.empty());
-
-    // Update existing tables
-    do_add_subcolumn(column_path, 0, type);
-
-    // Update spec
-    const size_t column_ndx = m_spec_set.add_subcolumn(column_path, type, name);
-
-    //TODO: go back over any live instances and set subspec ref
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    // TODO:
-    //transact_log().add_column(type, name); // Throws
-#endif
-
-    return column_ndx;
-}
-
-void Table::do_add_subcolumn(const vector<size_t>& column_path, size_t pos, DataType type)
-{
-    const size_t column_ndx = column_path[pos];
-    const bool   is_last    = (pos == column_path.size()-1);
-
-#ifdef TIGHTDB_DEBUG
-    const ColumnType stype = get_real_column_type(column_ndx);
-    TIGHTDB_ASSERT(stype == col_type_Table);
-#endif // TIGHTDB_DEBUG
-
-    const size_t row_count = size();
-    ColumnTable& subtables = GetColumnTable(column_ndx);
-
-    for (size_t i = 0; i < row_count; ++i) {
-        if (!subtables.has_subtable(i)) continue;
-
-        TableRef subtable = subtables.get_subtable_ptr(i)->get_table_ref();
-        if (is_last)
-            subtable->do_add_column(type);
-        else
-            subtable->do_add_subcolumn(column_path, pos+1, type);
+    else {
+        destroy_column_accessors();
     }
+    m_top.destroy();
 }
 
 size_t Table::add_column(DataType type, StringData name)
 {
-    // Create column and add cached instance
-    const size_t column_ndx = do_add_column(type);
+    TIGHTDB_ASSERT(!has_shared_spec());
+    detach_subtable_accessors();
 
     // Update spec
-    m_spec_set.add_column(type, name);
+    m_spec.add_column(type, name);
 
-    // Since subspec was not set at creation time we have to set it now
-    if (type == type_Table) {
-        const size_t subspec_ref = m_spec_set.get_subspec_ref(m_spec_set.get_num_subspecs()-1);
-        ColumnTable& c = GetColumnTable(column_ndx);
-        c.set_specref(subspec_ref);
-    }
+    // Create column and add cached instance
+    size_t column_ndx = do_add_column(type);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().add_column(type, name); // Throws
@@ -481,82 +390,93 @@ size_t Table::add_column(DataType type, StringData name)
     return column_ndx;
 }
 
+size_t Table::add_subcolumn(const vector<size_t>& column_path, DataType type, StringData name)
+{
+    TIGHTDB_ASSERT(!has_shared_spec());
+    detach_subtable_accessors();
+
+    // Update spec
+    size_t column_ndx = m_spec.add_subcolumn(column_path, type, name);
+
+    // Update existing tables
+    do_add_subcolumn(column_path, 0, type);
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    // FIXME: Implement this!
+    //transact_log().add_column(type, name); // Throws
+#endif
+
+    return column_ndx;
+}
+
 size_t Table::do_add_column(DataType type)
 {
-    const size_t count      = size();
-    const size_t column_ndx = m_cols.size();
+    size_t count      = size();
+    size_t column_ndx = m_cols.size();
 
-    ColumnBase* new_col = NULL;
-    Allocator& alloc = m_columns.GetAllocator();
+    ColumnBase* new_col = 0;
+    Allocator& alloc = m_columns.get_alloc();
 
     switch (type) {
-    case type_Int:
-    case type_Bool:
-    case type_Date:
-        {
-            Column* c = new Column(Array::coldef_Normal, alloc);
-            m_columns.add(c->GetRef());
-            c->SetParent(&m_columns, m_columns.size()-1);
+        case type_Int:
+        case type_Bool:
+        case type_DateTime: {
+            Column* c = new Column(Array::type_Normal, alloc);
+            m_columns.add(c->get_ref());
+            c->set_parent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
+            break;
         }
-        break;
-    case type_Float:
-        {
+        case type_Float: {
             ColumnFloat* c = new ColumnFloat(alloc);
-            m_columns.add(c->GetRef());
-            c->SetParent(&m_columns, m_columns.size()-1);
+            m_columns.add(c->get_ref());
+            c->set_parent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
+            break;
         }
-        break;
-    case type_Double:
-        {
+        case type_Double: {
             ColumnDouble* c = new ColumnDouble(alloc);
-            m_columns.add(c->GetRef());
-            c->SetParent(&m_columns, m_columns.size()-1);
+            m_columns.add(c->get_ref());
+            c->set_parent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
+            break;
         }
-        break;
-    case type_String:
-        {
+        case type_String: {
             AdaptiveStringColumn* c = new AdaptiveStringColumn(alloc);
-            m_columns.add(c->GetRef());
-            c->SetParent(&m_columns, m_columns.size()-1);
+            m_columns.add(c->get_ref());
+            c->set_parent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
+            break;
         }
-        break;
-    case type_Binary:
-        {
+        case type_Binary: {
             ColumnBinary* c = new ColumnBinary(alloc);
-            m_columns.add(c->GetRef());
-            c->SetParent(&m_columns, m_columns.size()-1);
+            m_columns.add(c->get_ref());
+            c->set_parent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
+            break;
         }
-        break;
-
-    case type_Table:
-        {
-            ColumnTable* c = new ColumnTable(alloc, this, column_ndx, -1); // subspec ref will be filled in later
-            m_columns.add(c->GetRef());
-            c->SetParent(&m_columns, m_columns.size()-1);
+        case type_Table: {
+            ref_type spec_ref = m_spec.get_subspec_ref(m_spec.get_num_subspecs()-1);
+            ColumnTable* c = new ColumnTable(alloc, this, column_ndx, spec_ref);
+            m_columns.add(c->get_ref());
+            c->set_parent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
+            break;
         }
-        break;
-
-    case type_Mixed:
-        {
+        case type_Mixed: {
             ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx);
-            m_columns.add(c->GetRef());
-            c->SetParent(&m_columns, m_columns.size()-1);
+            m_columns.add(c->get_ref());
+            c->set_parent(&m_columns, m_columns.size()-1);
             new_col = c;
             c->fill(count);
+            break;
         }
-        break;
     }
 
     m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, even in C++11
@@ -564,97 +484,152 @@ size_t Table::do_add_column(DataType type)
     return column_ndx;
 }
 
-void Table::remove_column(size_t column_ndx)
+void Table::do_add_subcolumn(const vector<size_t>& column_path, size_t column_path_ndx,
+                             DataType type)
 {
-    // Remove from data layer and free all cached instances
-    do_remove_column(column_ndx);
-
-    // Update Spec
-    m_spec_set.remove_column(column_ndx);
-}
-
-void Table::remove_column(const vector<size_t>& column_path)
-{
-    // Remove from data layer and free all cached instances
-    do_remove_column(column_path, 0);
-
-    // Update Spec
-    m_spec_set.remove_column(column_path);
-}
-
-void Table::do_remove_column(size_t column_ndx)
-{
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-
-    // Delete the cached column
-    ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(column_ndx));
-    const bool has_index = column->HasIndex();
-    column->invalidate_subtables_virtual();
-    column->Destroy();
-    delete column;
-    m_cols.Delete(column_ndx);
-
-    // Remove from column list
-    const size_t column_pos = GetColumnRefPos(column_ndx);
-    m_columns.Delete(column_pos);
-    int deleted = 1;
-
-    // If the column had an index we have to remove that as well
-    if (has_index) {
-        m_columns.Delete(column_pos);
-        ++deleted;
+    if (column_path.empty()) {
+        do_add_column(type);
+        return;
     }
 
-    // Update parent refs in following columns
-    UpdateColumnRefs(column_ndx, -deleted);
+    TIGHTDB_ASSERT(column_path_ndx <= column_path.size() - 1);
 
-    // If there are no columns left, mark the table as empty
-    if (get_column_count() == 1) // not deleted in spec yet
-        m_size = 0;
-}
+    size_t column_ndx = column_path[column_path_ndx];
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Table);
 
-void Table::do_remove_column(const vector<size_t>& column_path, size_t pos)
-{
-    const size_t sub_count  = column_path.size();
-    const size_t column_ndx = column_path[pos];
-
-    if (pos == sub_count-1) {
-        do_remove_column(column_ndx);
+    ColumnTable& subtables = get_column_table(column_ndx);
+    size_t num_rows = size();
+    bool modify_level = column_path.size() <= column_path_ndx + 1;
+    if (modify_level) {
+        Allocator& alloc = m_columns.get_alloc();
+        for (size_t i = 0; i < num_rows; ++i) {
+            ref_type subtable_ref = subtables.get_as_ref(i);
+            if (subtable_ref == 0) continue; // Degenerate empty subatble
+            size_t subtable_size = subtables.get_subtable_size(i);
+            ref_type column_ref = create_column(type, subtable_size, alloc);
+            Array subcolumns(subtable_ref, &subtables, i, alloc);
+            subcolumns.add(column_ref);
+        }
     }
     else {
-#ifdef TIGHTDB_DEBUG
-        const ColumnType type = get_real_column_type(column_ndx);
-        TIGHTDB_ASSERT(type == col_type_Table);
-#endif // TIGHTDB_DEBUG
-
-        const size_t row_count = size();
-        ColumnTable& subtables = GetColumnTable(column_ndx);
-
-        for (size_t i = 0; i < row_count; ++i) {
-            if (!subtables.has_subtable(i)) continue;
-
+        for (size_t i = 0; i < num_rows; ++i) {
+            if (subtables.get_as_ref(i) == 0) continue; // Degenerate empty subatble
             TableRef subtable = subtables.get_subtable_ptr(i)->get_table_ref();
-            subtable->do_remove_column(column_path, pos+1);
+            subtable->do_add_subcolumn(column_path, column_path_ndx+1, type);
         }
     }
 }
 
-void Table::rename_column(size_t column_ndx, StringData name)
+void Table::remove_column(size_t column_ndx)
 {
-    m_spec_set.rename_column(column_ndx, name);
+    TIGHTDB_ASSERT(!has_shared_spec());
+    detach_subtable_accessors();
+
+    Spec::ColumnInfo info;
+    m_spec.get_column_info(column_ndx, info);
+
+    // Update Spec
+    m_spec.remove_column(column_ndx);
+
+    // Remove the column from this table
+    do_remove_column(m_columns, info);
+
+    // Delete the cached column
+    delete reinterpret_cast<ColumnBase*>(m_cols.get(column_ndx));
+    m_cols.erase(column_ndx);
+
+    // Update 'indexes in parent' for subsequent columns
+    adjust_column_ndx_in_parent(column_ndx, -(info.m_has_index ? 2 : 1));
+
+    // If there are no columns left, mark the table as empty
+    if (get_column_count() == 0)
+        m_size = 0;
 }
 
-void Table::rename_column(const vector<size_t>& column_path, StringData name)
+void Table::remove_subcolumn(const vector<size_t>& column_path)
 {
-    m_spec_set.rename_column(column_path, name);
+    TIGHTDB_ASSERT(2 <= column_path.size());
+    TIGHTDB_ASSERT(!has_shared_spec());
+    detach_subtable_accessors();
+
+    Spec::ColumnInfo info;
+    m_spec.get_subcolumn_info(column_path, 0, info);
+
+    // Update Spec
+    m_spec.remove_column(column_path);
+
+    // Remove the column from all tables using the affected subspec
+    do_remove_subcolumn(column_path, 0, info);
+}
+
+
+void Table::do_remove_column(Array& column_refs, const Spec::ColumnInfo& info)
+{
+    // Remove from column list
+    ref_type column_ref = column_refs.get_as_ref(info.m_column_ref_ndx);
+    Array::destroy(column_ref, column_refs.get_alloc());
+    column_refs.erase(info.m_column_ref_ndx);
+
+    // If the column had an index we have to remove that as well
+    if (info.m_has_index) {
+        ref_type index_ref = column_refs.get_as_ref(info.m_column_ref_ndx);
+        Array::destroy(index_ref, column_refs.get_alloc());
+        column_refs.erase(info.m_column_ref_ndx);
+    }
+}
+
+void Table::do_remove_subcolumn(const vector<size_t>& column_path, size_t column_path_ndx,
+                                const Spec::ColumnInfo& info)
+{
+    TIGHTDB_ASSERT(2 <= column_path.size());
+    TIGHTDB_ASSERT(column_path_ndx <= column_path.size() - 2);
+
+    size_t column_ndx = column_path[column_path_ndx];
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Table);
+
+    ColumnTable& subtables = get_column_table(column_ndx);
+    size_t num_rows = size();
+    bool modify_level = column_path.size() <= column_path_ndx + 2;
+    if (modify_level) {
+        Allocator& alloc = m_columns.get_alloc();
+        for (size_t i = 0; i < num_rows; ++i) {
+            ref_type subtable_ref = subtables.get_as_ref(i);
+            if (subtable_ref == 0) continue; // Degenerate empty subatble
+            Array subcolumns(subtable_ref, &subtables, i, alloc);
+            do_remove_column(subcolumns, info);
+        }
+    }
+    else {
+        for (size_t i = 0; i < num_rows; ++i) {
+            if (subtables.get_as_ref(i) == 0) continue; // Degenerate empty subatble
+            TableRef subtable = subtables.get_subtable_ptr(i)->get_table_ref();
+            subtable->do_remove_subcolumn(column_path, column_path_ndx+1, info);
+        }
+    }
+}
+
+
+void Table::rename_column(size_t column_ndx, StringData name)
+{
+    TIGHTDB_ASSERT(!has_shared_spec());
+    detach_subtable_accessors();
+    m_spec.rename_column(column_ndx, name);
+}
+
+void Table::rename_subcolumn(const vector<size_t>& column_path, StringData name)
+{
+    TIGHTDB_ASSERT(2 <= column_path.size());
+    TIGHTDB_ASSERT(!has_shared_spec());
+    detach_subtable_accessors();
+    m_spec.rename_column(column_path, name);
 }
 
 
 bool Table::has_index(size_t column_ndx) const
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
-    const ColumnBase& col = GetColumnBase(column_ndx);
-    return col.HasIndex();
+    const ColumnBase& col = get_column_base(column_ndx);
+    return col.has_index();
 }
 
 void Table::set_index(size_t column_ndx, bool update_spec)
@@ -663,25 +638,27 @@ void Table::set_index(size_t column_ndx, bool update_spec)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     if (has_index(column_ndx)) return;
 
-    const ColumnType ct = get_real_column_type(column_ndx);
-    const size_t column_pos = GetColumnRefPos(column_ndx);
-    size_t ndx_ref = -1;
+    ColumnType ct = get_real_column_type(column_ndx);
+    Spec::ColumnInfo info;
+    m_spec.get_column_info(column_ndx, info);
+    size_t column_pos = info.m_column_ref_ndx;
+    ref_type index_ref = 0;
 
     if (ct == col_type_String) {
-        AdaptiveStringColumn& col = GetColumnString(column_ndx);
+        AdaptiveStringColumn& col = get_column_string(column_ndx);
 
         // Create the index
-        StringIndex& ndx = col.CreateIndex();
-        ndx.SetParent(&m_columns, column_pos+1);
-        ndx_ref = ndx.GetRef();
+        StringIndex& index = col.create_index();
+        index.set_parent(&m_columns, column_pos+1);
+        index_ref = index.get_ref();
     }
     else if (ct == col_type_StringEnum) {
-        ColumnStringEnum& col = GetColumnStringEnum(column_ndx);
+        ColumnStringEnum& col = get_column_string_enum(column_ndx);
 
         // Create the index
-        StringIndex& ndx = col.CreateIndex();
-        ndx.SetParent(&m_columns, column_pos+1);
-        ndx_ref = ndx.GetRef();
+        StringIndex& index = col.create_index();
+        index.set_parent(&m_columns, column_pos+1);
+        index_ref = index.get_ref();
     }
     else {
         TIGHTDB_ASSERT(false);
@@ -689,12 +666,12 @@ void Table::set_index(size_t column_ndx, bool update_spec)
     }
 
     // Insert ref into columns list after the owning column
-    m_columns.Insert(column_pos+1, ndx_ref);
-    UpdateColumnRefs(column_ndx+1, 1);
+    m_columns.insert(column_pos+1, index_ref);
+    adjust_column_ndx_in_parent(column_ndx+1, 1);
 
     // Update spec
     if (update_spec)
-        m_spec_set.set_column_attr(column_ndx, col_attr_Indexed);
+        m_spec.set_column_attr(column_ndx, col_attr_Indexed);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().add_index_to_column(column_ndx); // Throws
@@ -703,25 +680,25 @@ void Table::set_index(size_t column_ndx, bool update_spec)
 
 
 
-ColumnBase& Table::GetColumnBase(size_t ndx)
+ColumnBase& Table::get_column_base(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
-    InstantiateBeforeChange();
+    instantiate_before_change();
     TIGHTDB_ASSERT(m_cols.size() == get_column_count());
-    return *reinterpret_cast<ColumnBase*>(m_cols.Get(ndx));
+    return *reinterpret_cast<ColumnBase*>(m_cols.get(ndx));
 }
 
-const ColumnBase& Table::GetColumnBase(size_t ndx) const TIGHTDB_NOEXCEPT
+const ColumnBase& Table::get_column_base(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
     TIGHTDB_ASSERT(m_cols.size() == get_column_count());
-    return *reinterpret_cast<ColumnBase*>(m_cols.Get(ndx));
+    return *reinterpret_cast<ColumnBase*>(m_cols.get(ndx));
 }
 
 
 void Table::validate_column_type(const ColumnBase& column, ColumnType coltype, size_t ndx) const
 {
-    if (coltype == col_type_Int || coltype == col_type_Date || coltype == col_type_Bool) {
+    if (coltype == col_type_Int || coltype == col_type_DateTime || coltype == col_type_Bool) {
         TIGHTDB_ASSERT(column.IsIntColumn());
     }
     else {
@@ -732,92 +709,179 @@ void Table::validate_column_type(const ColumnBase& column, ColumnType coltype, s
 }
 
 
-size_t Table::clone_columns(Allocator& alloc) const
+ref_type Table::create_column(DataType column_type, size_t num_default_values, Allocator& alloc)
 {
-    Array new_columns(Array::coldef_HasRefs, 0, 0, alloc);
+    switch (column_type) {
+        case type_Int:
+        case type_Bool:
+        case type_DateTime: {
+            Column c(Array::type_Normal, alloc);
+            c.fill(num_default_values);
+            return c.get_ref();
+        }
+        case type_Float: {
+            ColumnFloat c(alloc);
+            c.fill(num_default_values);
+            return c.get_ref();
+        }
+        case type_Double: {
+            ColumnDouble c(alloc);
+            c.fill(num_default_values);
+            return c.get_ref();
+        }
+        case type_String: {
+            AdaptiveStringColumn c(alloc);
+            c.fill(num_default_values);
+            return c.get_ref();
+        }
+        case type_Binary: {
+            ColumnBinary c(alloc);
+            c.fill(num_default_values);
+            return c.get_ref();
+        }
+        case type_Table:
+            return ColumnTable::create(num_default_values, alloc);
+        case type_Mixed: {
+            return ColumnMixed::create(num_default_values, alloc);
+        }
+    }
+
+    TIGHTDB_ASSERT(false);
+    return 0;
+}
+
+
+ref_type Table::clone_columns(Allocator& alloc) const
+{
+    Array new_columns(Array::type_HasRefs, 0, 0, alloc);
     size_t n = get_column_count();
     for (size_t i=0; i<n; ++i) {
-        size_t new_col_ref;
-        const ColumnBase* col = &GetColumnBase(i);
+        ref_type new_col_ref;
+        const ColumnBase* col = &get_column_base(i);
         if (const ColumnStringEnum* enum_col = dynamic_cast<const ColumnStringEnum*>(col)) {
             AdaptiveStringColumn new_col(alloc);
             // FIXME: Should be optimized with something like
             // new_col.add(seq_tree_accessor.begin(),
             // seq_tree_accessor.end())
-            size_t n2 = enum_col->Size();
+            size_t n2 = enum_col->size();
             for (size_t i2=0; i2<n2; ++i2)
                 new_col.add(enum_col->get(i));
-            new_col_ref = new_col.GetRef();
+            new_col_ref = new_col.get_ref();
         }
         else {
             const Array& root = *col->get_root_array();
-            Array new_root(alloc);
-            new_root.Copy(root);
-            new_col_ref = new_root.GetRef();
+            new_col_ref = root.clone(alloc); // Throws
         }
         new_columns.add(new_col_ref);
     }
-    return new_columns.GetRef();
+    return new_columns.get_ref();
 }
 
 
-size_t Table::clone(Allocator& alloc) const
+ref_type Table::clone(Allocator& alloc) const
 {
-    if (m_top.IsValid()) {
-        Array new_top(alloc);
-        new_top.Copy(m_top);
-        return new_top.GetRef();
-    }
+    if (m_top.is_attached())
+        return m_top.clone(alloc); // Throws
 
-    Array new_top(Array::coldef_HasRefs, 0, 0, alloc);
-    {
-        Array new_spec(alloc);
-        new_spec.Copy(m_spec_set.m_specSet);
-        new_top.add(new_spec.GetRef());
-    }
-    {
-        Array new_columns(alloc);
-        new_columns.Copy(m_columns);
-        new_top.add(new_columns.GetRef());
-    }
-    return new_top.GetRef();
+    Array new_top(Array::type_HasRefs, 0, 0, alloc); // Throws
+    new_top.add(m_spec.m_top.clone(alloc)); // Throws
+    new_top.add(m_columns.clone(alloc)); // Throws
+    return new_top.get_ref();
 }
 
 
 
 // TODO: get rid of the Column* template parameter
 
-Column& Table::GetColumn(size_t ndx)                              { return GetColumn<Column, col_type_Int>(ndx); }
-const Column& Table::GetColumn(size_t ndx) const TIGHTDB_NOEXCEPT { return GetColumn<Column, col_type_Int>(ndx); }
+Column& Table::get_column(size_t ndx)
+{
+    return get_column<Column, col_type_Int>(ndx);
+}
 
-AdaptiveStringColumn& Table::GetColumnString(size_t ndx)                              { return GetColumn<AdaptiveStringColumn, col_type_String>(ndx); }
-const AdaptiveStringColumn& Table::GetColumnString(size_t ndx) const TIGHTDB_NOEXCEPT { return GetColumn<AdaptiveStringColumn, col_type_String>(ndx); }
+const Column& Table::get_column(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<Column, col_type_Int>(ndx);
+}
 
-ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx)                              { return GetColumn<ColumnStringEnum, col_type_StringEnum>(ndx); }
-const ColumnStringEnum& Table::GetColumnStringEnum(size_t ndx) const TIGHTDB_NOEXCEPT { return GetColumn<ColumnStringEnum, col_type_StringEnum>(ndx); }
+AdaptiveStringColumn& Table::get_column_string(size_t ndx)
+{
+    return get_column<AdaptiveStringColumn, col_type_String>(ndx);
+}
 
-ColumnFloat& Table::GetColumnFloat(size_t ndx)                                { return GetColumn<ColumnFloat, col_type_Float>(ndx); }
-const ColumnFloat& Table::GetColumnFloat(size_t ndx) const   TIGHTDB_NOEXCEPT { return GetColumn<ColumnFloat, col_type_Float>(ndx); }
+const AdaptiveStringColumn& Table::get_column_string(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<AdaptiveStringColumn, col_type_String>(ndx);
+}
 
-ColumnDouble& Table::GetColumnDouble(size_t ndx)                              { return GetColumn<ColumnDouble, col_type_Double>(ndx); }
-const ColumnDouble& Table::GetColumnDouble(size_t ndx) const TIGHTDB_NOEXCEPT { return GetColumn<ColumnDouble, col_type_Double>(ndx); }
+ColumnStringEnum& Table::get_column_string_enum(size_t ndx)
+{
+    return get_column<ColumnStringEnum, col_type_StringEnum>(ndx);
+}
 
-ColumnBinary& Table::GetColumnBinary(size_t ndx)                              { return GetColumn<ColumnBinary, col_type_Binary>(ndx); }
-const ColumnBinary& Table::GetColumnBinary(size_t ndx) const TIGHTDB_NOEXCEPT { return GetColumn<ColumnBinary, col_type_Binary>(ndx); }
+const ColumnStringEnum& Table::get_column_string_enum(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnStringEnum, col_type_StringEnum>(ndx);
+}
 
-ColumnTable &Table::GetColumnTable(size_t ndx)                                { return GetColumn<ColumnTable, col_type_Table>(ndx); }
-const ColumnTable &Table::GetColumnTable(size_t ndx) const   TIGHTDB_NOEXCEPT { return GetColumn<ColumnTable, col_type_Table>(ndx); }
+ColumnFloat& Table::get_column_float(size_t ndx)
+{
+    return get_column<ColumnFloat, col_type_Float>(ndx);
+}
 
-ColumnMixed& Table::GetColumnMixed(size_t ndx)                                { return GetColumn<ColumnMixed, col_type_Mixed>(ndx); }
-const ColumnMixed& Table::GetColumnMixed(size_t ndx) const   TIGHTDB_NOEXCEPT { return GetColumn<ColumnMixed, col_type_Mixed>(ndx); }
+const ColumnFloat& Table::get_column_float(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnFloat, col_type_Float>(ndx);
+}
 
+ColumnDouble& Table::get_column_double(size_t ndx)
+{
+    return get_column<ColumnDouble, col_type_Double>(ndx);
+}
+
+const ColumnDouble& Table::get_column_double(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnDouble, col_type_Double>(ndx);
+}
+
+ColumnBinary& Table::get_column_binary(size_t ndx)
+{
+    return get_column<ColumnBinary, col_type_Binary>(ndx);
+}
+
+const ColumnBinary& Table::get_column_binary(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnBinary, col_type_Binary>(ndx);
+}
+
+ColumnTable &Table::get_column_table(size_t ndx)
+{
+    return get_column<ColumnTable, col_type_Table>(ndx);
+}
+
+const ColumnTable &Table::get_column_table(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnTable, col_type_Table>(ndx);
+}
+
+ColumnMixed& Table::get_column_mixed(size_t ndx)
+{
+    return get_column<ColumnMixed, col_type_Mixed>(ndx);
+}
+
+const ColumnMixed& Table::get_column_mixed(size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    return get_column<ColumnMixed, col_type_Mixed>(ndx);
+}
 
 
 size_t Table::add_empty_row(size_t num_rows)
 {
-    const size_t n = get_column_count();
-    for (size_t i=0; i<n; ++i) {
-        ColumnBase& column = GetColumnBase(i);
+    size_t n = get_column_count();
+
+    TIGHTDB_ASSERT(n > 0);
+
+    for (size_t i = 0; i != n; ++i) {
+        ColumnBase& column = get_column_base(i);
         for (size_t j=0; j<num_rows; ++j) {
             column.add();
         }
@@ -836,10 +900,10 @@ size_t Table::add_empty_row(size_t num_rows)
 
 void Table::insert_empty_row(size_t ndx, size_t num_rows)
 {
-    const size_t ndx2 = ndx + num_rows; // FIXME: Should we check for overflow?
-    const size_t n = get_column_count();
-    for (size_t i=0; i<n; ++i) {
-        ColumnBase& column = GetColumnBase(i);
+    size_t ndx2 = ndx + num_rows; // FIXME: Should we check for overflow?
+    size_t n = get_column_count();
+    for (size_t i = 0; i != n; ++i) {
+        ColumnBase& column = get_column_base(i);
         // FIXME: This could maybe be optimized by passing 'num_rows' to column.insert()
         for (size_t j=ndx; j<ndx2; ++j) {
             column.insert(j);
@@ -855,10 +919,10 @@ void Table::insert_empty_row(size_t ndx, size_t num_rows)
 
 void Table::clear()
 {
-    const size_t count = get_column_count();
-    for (size_t i = 0; i < count; ++i) {
-        ColumnBase& column = GetColumnBase(i);
-        column.Clear();
+    size_t n = get_column_count();
+    for (size_t i = 0; i != n; ++i) {
+        ColumnBase& column = get_column_base(i);
+        column.clear();
     }
     m_size = 0;
 
@@ -871,15 +935,33 @@ void Table::remove(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_size);
 
-    const size_t count = get_column_count();
-    for (size_t i = 0; i < count; ++i) {
-        ColumnBase& column = GetColumnBase(i);
-        column.erase(ndx);
+    bool is_last = ndx == m_size - 1;
+
+    size_t n = get_column_count();
+    for (size_t i = 0; i != n; ++i) {
+        ColumnBase& column = get_column_base(i);
+        column.erase(ndx, is_last);
     }
     --m_size;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().remove_row(ndx); // Throws
+#endif
+}
+
+void Table::move_last_over(size_t ndx)
+{
+    TIGHTDB_ASSERT(ndx+1 < m_size);
+
+    size_t n = get_column_count();
+    for (size_t i = 0; i != n; ++i) {
+        ColumnBase& column = get_column_base(i);
+        column.move_last_over(ndx);
+    }
+    --m_size;
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    //TODO: transact_log().move_last_over(ndx); // Throws
 #endif
 }
 
@@ -890,13 +972,28 @@ void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
     TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Table);
     TIGHTDB_ASSERT(row_ndx <= m_size);
 
-    ColumnTable& subtables = GetColumnTable(col_ndx);
-    subtables.invalidate_subtables();
+    ColumnTable& subtables = get_column_table(col_ndx);
     subtables.insert(row_ndx, table);
 
     // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().insert_value(col_ndx, row_ndx, Replication::subtable_tag()); // Throws
+#endif
+}
+
+
+void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
+{
+    TIGHTDB_ASSERT(col_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Table);
+    TIGHTDB_ASSERT(row_ndx < m_size);
+
+    ColumnTable& subtables = get_column_table(col_ndx);
+    subtables.set(row_ndx, table);
+
+    // FIXME: Replication is not yet able to handle copying insertion of non-empty tables.
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    transact_log().set_value(col_ndx, row_ndx, Replication::subtable_tag()); // Throws
 #endif
 }
 
@@ -907,8 +1004,7 @@ void Table::insert_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t
     TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Mixed);
     TIGHTDB_ASSERT(row_ndx <= m_size);
 
-    ColumnMixed& mixed_col = GetColumnMixed(col_ndx);
-    mixed_col.invalidate_subtables();
+    ColumnMixed& mixed_col = get_column_mixed(col_ndx);
     mixed_col.insert_subtable(row_ndx, t);
 
     // FIXME: Replication is not yet able to handle copuing insertion of non-empty tables.
@@ -924,8 +1020,7 @@ void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
     TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Mixed);
     TIGHTDB_ASSERT(row_ndx < m_size);
 
-    ColumnMixed& mixed_col = GetColumnMixed(col_ndx);
-    mixed_col.invalidate_subtables();
+    ColumnMixed& mixed_col = get_column_mixed(col_ndx);
     mixed_col.set_subtable(row_ndx, t);
 
     // FIXME: Replication is not yet able to handle copying assignment of non-empty tables.
@@ -940,13 +1035,13 @@ Table* Table::get_subtable_ptr(size_t col_idx, size_t row_idx)
     TIGHTDB_ASSERT(col_idx < get_column_count());
     TIGHTDB_ASSERT(row_idx < m_size);
 
-    const ColumnType type = get_real_column_type(col_idx);
+    ColumnType type = get_real_column_type(col_idx);
     if (type == col_type_Table) {
-        ColumnTable& subtables = GetColumnTable(col_idx);
+        ColumnTable& subtables = get_column_table(col_idx);
         return subtables.get_subtable_ptr(row_idx);
     }
     if (type == col_type_Mixed) {
-        ColumnMixed& subtables = GetColumnMixed(col_idx);
+        ColumnMixed& subtables = get_column_mixed(col_idx);
         return subtables.get_subtable_ptr(row_idx);
     }
     TIGHTDB_ASSERT(false);
@@ -958,13 +1053,13 @@ const Table* Table::get_subtable_ptr(size_t col_idx, size_t row_idx) const
     TIGHTDB_ASSERT(col_idx < get_column_count());
     TIGHTDB_ASSERT(row_idx < m_size);
 
-    const ColumnType type = get_real_column_type(col_idx);
+    ColumnType type = get_real_column_type(col_idx);
     if (type == col_type_Table) {
-        const ColumnTable& subtables = GetColumnTable(col_idx);
+        const ColumnTable& subtables = get_column_table(col_idx);
         return subtables.get_subtable_ptr(row_idx);
     }
     if (type == col_type_Mixed) {
-        const ColumnMixed& subtables = GetColumnMixed(col_idx);
+        const ColumnMixed& subtables = get_column_mixed(col_idx);
         return subtables.get_subtable_ptr(row_idx);
     }
     TIGHTDB_ASSERT(false);
@@ -976,13 +1071,13 @@ size_t Table::get_subtable_size(size_t col_idx, size_t row_idx) const TIGHTDB_NO
     TIGHTDB_ASSERT(col_idx < get_column_count());
     TIGHTDB_ASSERT(row_idx < m_size);
 
-    const ColumnType type = get_real_column_type(col_idx);
+    ColumnType type = get_real_column_type(col_idx);
     if (type == col_type_Table) {
-        const ColumnTable& subtables = GetColumnTable(col_idx);
+        const ColumnTable& subtables = get_column_table(col_idx);
         return subtables.get_subtable_size(row_idx);
     }
     if (type == col_type_Mixed) {
-        const ColumnMixed& subtables = GetColumnMixed(col_idx);
+        const ColumnMixed& subtables = get_column_mixed(col_idx);
         return subtables.get_subtable_size(row_idx);
     }
     TIGHTDB_ASSERT(false);
@@ -994,19 +1089,17 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
     TIGHTDB_ASSERT(col_idx < get_column_count());
     TIGHTDB_ASSERT(row_idx <= m_size);
 
-    const ColumnType type = get_real_column_type(col_idx);
+    ColumnType type = get_real_column_type(col_idx);
     if (type == col_type_Table) {
-        ColumnTable& subtables = GetColumnTable(col_idx);
-        subtables.invalidate_subtables();
-        subtables.ClearTable(row_idx);
+        ColumnTable& subtables = get_column_table(col_idx);
+        subtables.set(row_idx, 0);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
         transact_log().set_value(col_idx, row_idx, Replication::subtable_tag()); // Throws
 #endif
     }
     else if (type == col_type_Mixed) {
-        ColumnMixed& subtables = GetColumnMixed(col_idx);
-        subtables.invalidate_subtables();
+        ColumnMixed& subtables = get_column_mixed(col_idx);
         subtables.set_subtable(row_idx, 0);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1024,7 +1117,7 @@ int64_t Table::get_int(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    const Column& column = GetColumn(column_ndx);
+    const Column& column = get_column(column_ndx);
     return column.get(ndx);
 }
 
@@ -1033,7 +1126,7 @@ void Table::set_int(size_t column_ndx, size_t ndx, int64_t value)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    Column& column = GetColumn(column_ndx);
+    Column& column = get_column(column_ndx);
     column.set(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1045,7 +1138,7 @@ void Table::add_int(size_t column_ndx, int64_t value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Int);
-    GetColumn(column_ndx).Increment64(value);
+    get_column(column_ndx).adjust(value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().add_int_to_column(column_ndx, value); // Throws
@@ -1059,7 +1152,7 @@ bool Table::get_bool(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Bool);
     TIGHTDB_ASSERT(ndx < m_size);
 
-    const Column& column = GetColumn(column_ndx);
+    const Column& column = get_column(column_ndx);
     return column.get(ndx) != 0;
 }
 
@@ -1069,7 +1162,7 @@ void Table::set_bool(size_t column_ndx, size_t ndx, bool value)
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Bool);
     TIGHTDB_ASSERT(ndx < m_size);
 
-    Column& column = GetColumn(column_ndx);
+    Column& column = get_column(column_ndx);
     column.set(ndx, value ? 1 : 0);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1077,27 +1170,27 @@ void Table::set_bool(size_t column_ndx, size_t ndx, bool value)
 #endif
 }
 
-Date Table::get_date(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
+DateTime Table::get_datetime(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Date);
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_DateTime);
     TIGHTDB_ASSERT(ndx < m_size);
 
-    const Column& column = GetColumn(column_ndx);
+    const Column& column = get_column(column_ndx);
     return time_t(column.get(ndx));
 }
 
-void Table::set_date(size_t column_ndx, size_t ndx, Date value)
+void Table::set_datetime(size_t column_ndx, size_t ndx, DateTime value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Date);
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_DateTime);
     TIGHTDB_ASSERT(ndx < m_size);
 
-    Column& column = GetColumn(column_ndx);
-    column.set(ndx, int64_t(value.get_date()));
+    Column& column = get_column(column_ndx);
+    column.set(ndx, int64_t(value.get_datetime()));
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().set_value(column_ndx, ndx, value.get_date()); // Throws
+    transact_log().set_value(column_ndx, ndx, value.get_datetime()); // Throws
 #endif
 }
 
@@ -1106,7 +1199,7 @@ void Table::insert_int(size_t column_ndx, size_t ndx, int64_t value)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx <= m_size);
 
-    Column& column = GetColumn(column_ndx);
+    Column& column = get_column(column_ndx);
     column.insert(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1120,7 +1213,7 @@ float Table::get_float(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    const ColumnFloat& column = GetColumnFloat(column_ndx);
+    const ColumnFloat& column = get_column_float(column_ndx);
     return column.get(ndx);
 }
 
@@ -1129,7 +1222,7 @@ void Table::set_float(size_t column_ndx, size_t ndx, float value)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    ColumnFloat& column = GetColumnFloat(column_ndx);
+    ColumnFloat& column = get_column_float(column_ndx);
     column.set(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1142,7 +1235,7 @@ void Table::insert_float(size_t column_ndx, size_t ndx, float value)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx <= m_size);
 
-    ColumnFloat& column = GetColumnFloat(column_ndx);
+    ColumnFloat& column = get_column_float(column_ndx);
     column.insert(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1156,7 +1249,7 @@ double Table::get_double(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    const ColumnDouble& column = GetColumnDouble(column_ndx);
+    const ColumnDouble& column = get_column_double(column_ndx);
     return column.get(ndx);
 }
 
@@ -1165,7 +1258,7 @@ void Table::set_double(size_t column_ndx, size_t ndx, double value)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    ColumnDouble& column = GetColumnDouble(column_ndx);
+    ColumnDouble& column = get_column_double(column_ndx);
     column.set(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1178,7 +1271,7 @@ void Table::insert_double(size_t column_ndx, size_t ndx, double value)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx <= m_size);
 
-    ColumnDouble& column = GetColumnDouble(column_ndx);
+    ColumnDouble& column = get_column_double(column_ndx);
     column.insert(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1192,14 +1285,14 @@ StringData Table::get_string(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCE
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    const ColumnType type = get_real_column_type(column_ndx);
+    ColumnType type = get_real_column_type(column_ndx);
     if (type == col_type_String) {
-        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
+        const AdaptiveStringColumn& column = get_column_string(column_ndx);
         return column.get(ndx);
     }
 
     TIGHTDB_ASSERT(type == col_type_StringEnum);
-    const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
+    const ColumnStringEnum& column = get_column_string_enum(column_ndx);
     return column.get(ndx);
 }
 
@@ -1208,15 +1301,14 @@ void Table::set_string(size_t column_ndx, size_t ndx, StringData value)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    const ColumnType type = get_real_column_type(column_ndx);
-
+    ColumnType type = get_real_column_type(column_ndx);
     if (type == col_type_String) {
-        AdaptiveStringColumn& column = GetColumnString(column_ndx);
+        AdaptiveStringColumn& column = get_column_string(column_ndx);
         column.set(ndx, value);
     }
     else {
         TIGHTDB_ASSERT(type == col_type_StringEnum);
-        ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
+        ColumnStringEnum& column = get_column_string_enum(column_ndx);
         column.set(ndx, value);
     }
 
@@ -1230,15 +1322,14 @@ void Table::insert_string(size_t column_ndx, size_t ndx, StringData value)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx <= m_size);
 
-    const ColumnType type = get_real_column_type(column_ndx);
-
+    ColumnType type = get_real_column_type(column_ndx);
     if (type == col_type_String) {
-        AdaptiveStringColumn& column = GetColumnString(column_ndx);
+        AdaptiveStringColumn& column = get_column_string(column_ndx);
         column.insert(ndx, value);
     }
     else {
         TIGHTDB_ASSERT(type == col_type_StringEnum);
-        ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
+        ColumnStringEnum& column = get_column_string_enum(column_ndx);
         column.insert(ndx, value);
     }
 
@@ -1253,7 +1344,7 @@ BinaryData Table::get_binary(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCE
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    const ColumnBinary& column = GetColumnBinary(column_ndx);
+    const ColumnBinary& column = get_column_binary(column_ndx);
     return column.get(ndx);
 }
 
@@ -1262,7 +1353,7 @@ void Table::set_binary(size_t column_ndx, size_t ndx, BinaryData value)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    ColumnBinary& column = GetColumnBinary(column_ndx);
+    ColumnBinary& column = get_column_binary(column_ndx);
     column.set(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1275,7 +1366,7 @@ void Table::insert_binary(size_t column_ndx, size_t ndx, BinaryData value)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx <= m_size);
 
-    ColumnBinary& column = GetColumnBinary(column_ndx);
+    ColumnBinary& column = get_column_binary(column_ndx);
     column.insert(ndx, value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1284,21 +1375,21 @@ void Table::insert_binary(size_t column_ndx, size_t ndx, BinaryData value)
 }
 
 
-Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const
+Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    const ColumnMixed& column = GetColumnMixed(column_ndx);
-    const DataType     type   = column.get_type(ndx);
+    const ColumnMixed& column = get_column_mixed(column_ndx);
 
+    DataType type = column.get_type(ndx);
     switch (type) {
         case type_Int:
             return Mixed(column.get_int(ndx));
         case type_Bool:
             return Mixed(column.get_bool(ndx));
-        case type_Date:
-            return Mixed(Date(column.get_date(ndx)));
+        case type_DateTime:
+            return Mixed(DateTime(column.get_datetime(ndx)));
         case type_Float:
             return Mixed(column.get_float(ndx));
         case type_Double:
@@ -1313,7 +1404,7 @@ Mixed Table::get_mixed(size_t column_ndx, size_t ndx) const
             break;
     }
     TIGHTDB_ASSERT(false);
-    return Mixed((int64_t)0);
+    return Mixed(int64_t(0));
 }
 
 DataType Table::get_mixed_type(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
@@ -1321,7 +1412,7 @@ DataType Table::get_mixed_type(size_t column_ndx, size_t ndx) const TIGHTDB_NOEX
     TIGHTDB_ASSERT(column_ndx < m_columns.size());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    const ColumnMixed& column = GetColumnMixed(column_ndx);
+    const ColumnMixed& column = get_column_mixed(column_ndx);
     return column.get_type(ndx);
 }
 
@@ -1330,10 +1421,8 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    ColumnMixed& column = GetColumnMixed(column_ndx);
-    const DataType type = value.get_type();
-
-    column.invalidate_subtables();
+    ColumnMixed& column = get_column_mixed(column_ndx);
+    DataType type = value.get_type();
 
     switch (type) {
         case type_Int:
@@ -1342,8 +1431,8 @@ void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
         case type_Bool:
             column.set_bool(ndx, value.get_bool());
             break;
-        case type_Date:
-            column.set_date(ndx, value.get_date());
+        case type_DateTime:
+            column.set_datetime(ndx, value.get_datetime());
             break;
         case type_Float:
             column.set_float(ndx, value.get_float());
@@ -1375,10 +1464,8 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value)
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx <= m_size);
 
-    ColumnMixed& column = GetColumnMixed(column_ndx);
-    const DataType type = value.get_type();
-
-    column.invalidate_subtables();
+    ColumnMixed& column = get_column_mixed(column_ndx);
+    DataType type = value.get_type();
 
     switch (type) {
         case type_Int:
@@ -1387,8 +1474,8 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value)
         case type_Bool:
             column.insert_bool(ndx, value.get_bool());
             break;
-        case type_Date:
-            column.insert_date(ndx, value.get_date());
+        case type_DateTime:
+            column.insert_datetime(ndx, value.get_datetime());
             break;
         case type_Float:
             column.insert_float(ndx, value.get_float());
@@ -1419,10 +1506,6 @@ void Table::insert_done()
 {
     ++m_size;
 
-#ifdef TIGHTDB_DEBUG
-    Verify();
-#endif
-
 #ifdef TIGHTDB_ENABLE_REPLICATION
     transact_log().row_insert_complete(); // Throws
 #endif
@@ -1433,69 +1516,98 @@ void Table::insert_done()
 
 size_t Table::count_int(size_t column_ndx, int64_t value) const
 {
-    const Column& column = GetColumn<Column, col_type_Int>(column_ndx);
+    if(!m_columns.is_attached())
+        return 0;
+
+    const Column& column = get_column<Column, col_type_Int>(column_ndx);
     return column.count(value);
 }
 size_t Table::count_float(size_t column_ndx, float value) const
 {
-    const ColumnFloat& column = GetColumn<ColumnFloat, col_type_Float>(column_ndx);
+    if(!m_columns.is_attached())
+        return 0;
+
+    const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(column_ndx);
     return column.count(value);
 }
 size_t Table::count_double(size_t column_ndx, double value) const
 {
-    const ColumnDouble& column = GetColumn<ColumnDouble, col_type_Double>(column_ndx);
+    if(!m_columns.is_attached())
+        return 0;
+
+    const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(column_ndx);
     return column.count(value);
 }
 size_t Table::count_string(size_t column_ndx, StringData value) const
 {
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < get_column_count());
 
-    const ColumnType type = get_real_column_type(column_ndx);
+    if(!m_columns.is_attached())
+        return 0;
 
+    ColumnType type = get_real_column_type(column_ndx);
     if (type == col_type_String) {
-        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
+        const AdaptiveStringColumn& column = get_column_string(column_ndx);
         return column.count(value);
     }
     else {
         TIGHTDB_ASSERT(type == col_type_StringEnum);
-        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
+        const ColumnStringEnum& column = get_column_string_enum(column_ndx);
         return column.count(value);
     }
 }
 
 // sum ----------------------------------------------
 
-int64_t Table::sum(size_t column_ndx) const
+int64_t Table::sum_int(size_t column_ndx) const
 {
-    const Column& column = GetColumn<Column, col_type_Int>(column_ndx);
+    if(!m_columns.is_attached())
+        return 0;
+
+    const Column& column = get_column<Column, col_type_Int>(column_ndx);
     return column.sum();
 }
 double Table::sum_float(size_t column_ndx) const
 {
-    const ColumnFloat& column = GetColumn<ColumnFloat, col_type_Float>(column_ndx);
+    if(!m_columns.is_attached())
+        return 0.f;
+
+    const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(column_ndx);
     return column.sum();
 }
 double Table::sum_double(size_t column_ndx) const
 {
-    const ColumnDouble& column = GetColumn<ColumnDouble, col_type_Double>(column_ndx);
+    if(!m_columns.is_attached())
+        return 0.;
+
+    const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(column_ndx);
     return column.sum();
 }
 
 // average ----------------------------------------------
 
-double Table::average(size_t column_ndx) const
+double Table::average_int(size_t column_ndx) const
 {
-    const Column& column = GetColumn<Column, col_type_Int>(column_ndx);
+    if(!m_columns.is_attached())
+        return 0;
+
+    const Column& column = get_column<Column, col_type_Int>(column_ndx);
     return column.average();
 }
 double Table::average_float(size_t column_ndx) const
 {
-    const ColumnFloat& column = GetColumn<ColumnFloat, col_type_Float>(column_ndx);
+    if(!m_columns.is_attached())
+        return 0.f;
+
+    const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(column_ndx);
     return column.average();
 }
 double Table::average_double(size_t column_ndx) const
 {
-    const ColumnDouble& column = GetColumn<ColumnDouble, col_type_Double>(column_ndx);
+    if(!m_columns.is_attached())
+        return 0.;
+
+    const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(column_ndx);
     return column.average();
 }
 
@@ -1503,10 +1615,13 @@ double Table::average_double(size_t column_ndx) const
 
 #define USE_COLUMN_AGGREGATE 1
 
-int64_t Table::minimum(size_t column_ndx) const
+int64_t Table::minimum_int(size_t column_ndx) const
 {
+    if(!m_columns.is_attached())
+        return 0;
+
 #if USE_COLUMN_AGGREGATE
-    const Column& column = GetColumn<Column, col_type_Int>(column_ndx);
+    const Column& column = get_column<Column, col_type_Int>(column_ndx);
     return column.minimum();
 #else
     if (is_empty())
@@ -1514,7 +1629,7 @@ int64_t Table::minimum(size_t column_ndx) const
 
     int64_t mv = get_int(column_ndx, 0);
     for (size_t i = 1; i < size(); ++i) {
-        const int64_t v = get_int(column_ndx, i);
+        int64_t v = get_int(column_ndx, i);
         if (v < mv) {
             mv = v;
         }
@@ -1525,21 +1640,30 @@ int64_t Table::minimum(size_t column_ndx) const
 
 float Table::minimum_float(size_t column_ndx) const
 {
-    const ColumnFloat& column = GetColumn<ColumnFloat, col_type_Float>(column_ndx);
+    if(!m_columns.is_attached())
+        return 0.f;
+
+    const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(column_ndx);
     return column.minimum();
 }
 double Table::minimum_double(size_t column_ndx) const
 {
-    const ColumnDouble& column = GetColumn<ColumnDouble, col_type_Double>(column_ndx);
+    if(!m_columns.is_attached())
+        return 0.;
+
+    const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(column_ndx);
     return column.minimum();
 }
 
 // maximum ----------------------------------------------
 
-int64_t Table::maximum(size_t column_ndx) const
+int64_t Table::maximum_int(size_t column_ndx) const
 {
+    if(!m_columns.is_attached())
+        return 0;
+
 #if USE_COLUMN_AGGREGATE
-    const Column& column = GetColumn<Column, col_type_Int>(column_ndx);
+    const Column& column = get_column<Column, col_type_Int>(column_ndx);
     return column.maximum();
 #else
     if (is_empty())
@@ -1547,7 +1671,7 @@ int64_t Table::maximum(size_t column_ndx) const
 
     int64_t mv = get_int(column_ndx, 0);
     for (size_t i = 1; i < size(); ++i) {
-        const int64_t v = get_int(column_ndx, i);
+        int64_t v = get_int(column_ndx, i);
         if (v > mv) {
             mv = v;
         }
@@ -1557,12 +1681,18 @@ int64_t Table::maximum(size_t column_ndx) const
 }
 float Table::maximum_float(size_t column_ndx) const
 {
-    const ColumnFloat& column = GetColumn<ColumnFloat, col_type_Float>(column_ndx);
+    if(!m_columns.is_attached())
+        return 0.f;
+
+    const ColumnFloat& column = get_column<ColumnFloat, col_type_Float>(column_ndx);
     return column.maximum();
 }
 double Table::maximum_double(size_t column_ndx) const
 {
-    const ColumnDouble& column = GetColumn<ColumnDouble, col_type_Double>(column_ndx);
+    if(!m_columns.is_attached())
+        return 0.;
+
+    const ColumnDouble& column = get_column<ColumnDouble, col_type_Double>(column_ndx);
     return column.maximum();
 }
 
@@ -1570,96 +1700,102 @@ double Table::maximum_double(size_t column_ndx) const
 
 size_t Table::lookup(StringData value) const
 {
+    if(!m_columns.is_attached())
+        return not_found;
+
     // First time we do a lookup we check if we can cache the index
     if (!m_lookup_index) {
         if (get_column_count() < 1)
             return not_found; // no column to lookup in
 
-        const ColumnType type = get_real_column_type(0);
-
+        ColumnType type = get_real_column_type(0);
         if (type == col_type_String) {
-            const AdaptiveStringColumn& column = GetColumnString(0);
-            if (!column.HasIndex())
+            const AdaptiveStringColumn& column = get_column_string(0);
+            if (!column.has_index()) {
                 return column.find_first(value);
+            }
             else {
-                m_lookup_index = &column.GetIndex();
+                m_lookup_index = &column.get_index();
             }
         }
         else if (type == col_type_StringEnum) {
-            const ColumnStringEnum& column = GetColumnStringEnum(0);
-            if (!column.HasIndex())
+            const ColumnStringEnum& column = get_column_string_enum(0);
+            if (!column.has_index()) {
                 return column.find_first(value);
+            }
             else {
-                m_lookup_index = &column.GetIndex();
+                m_lookup_index = &column.get_index();
             }
         }
-        else return not_found; // invalid column type
+        else {
+            return not_found; // invalid column type
+        }
     }
 
     // Do lookup directly on cached index
     return m_lookup_index->find_first(value);
 }
 
-size_t Table::find_first_int(size_t column_ndx, int64_t value) const
+template <class T> std::size_t Table::find_first(std::size_t column_ndx, T value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Int);
-    const Column& column = GetColumn(column_ndx);
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == ColumnTypeTraits<T>::ct_id_real);
 
+    if(!m_columns.is_attached())
+        return not_found;
+
+    typedef typename ColumnTypeTraits<T>::column_type ColType;
+    const ColType& column = get_column<ColType, ColumnTypeTraits<T>::ct_id>(column_ndx);
     return column.find_first(value);
+}
+
+size_t Table::find_first_int(size_t column_ndx, int64_t value) const
+{    
+    return find_first<int64_t>(column_ndx, value);
 }
 
 size_t Table::find_first_bool(size_t column_ndx, bool value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Bool);
-    const Column& column = GetColumn(column_ndx);
-
-    return column.find_first(value ? 1 : 0);
+    return find_first<bool>(column_ndx, value);
 }
 
-size_t Table::find_first_date(size_t column_ndx, Date value) const
+size_t Table::find_first_datetime(size_t column_ndx, DateTime value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Date);
-    const Column& column = GetColumn(column_ndx);
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_DateTime);
 
-    return column.find_first(int64_t(value.get_date()));
+    if(!m_columns.is_attached())
+        return not_found;
+
+    const Column& column = get_column(column_ndx);
+
+    return column.find_first(int64_t(value.get_datetime()));
 }
 
 size_t Table::find_first_float(size_t column_ndx, float value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Float);
-    const ColumnFloat& column = GetColumnFloat(column_ndx);
-
-    return column.find_first(value);
+    return find_first<float>(column_ndx, value);
 }
 
 size_t Table::find_first_double(size_t column_ndx, double value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Double);
-    const ColumnDouble& column = GetColumnDouble(column_ndx);
-
-    return column.find_first(value);
+    return find_first<double>(column_ndx, value);
 }
 
 size_t Table::find_first_string(size_t column_ndx, StringData value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
+    if(!m_columns.is_attached())
+        return not_found;
 
-    const ColumnType type = get_real_column_type(column_ndx);
-
+    ColumnType type = get_real_column_type(column_ndx);
     if (type == col_type_String) {
-        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
+        const AdaptiveStringColumn& column = get_column_string(column_ndx);
         return column.find_first(value);
     }
-    else {
-        TIGHTDB_ASSERT(type == col_type_StringEnum);
-        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
-        return column.find_first(value);
-    }
+    TIGHTDB_ASSERT(type == col_type_StringEnum);
+    const ColumnStringEnum& column = get_column_string_enum(column_ndx);
+    return column.find_first(value);
 }
 
 size_t Table::find_first_binary(size_t, BinaryData) const
@@ -1668,158 +1804,97 @@ size_t Table::find_first_binary(size_t, BinaryData) const
     throw runtime_error("Not implemented");
 }
 
-size_t Table::find_pos_int(size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT
+
+template <class T> ConstTableView Table::find_all(size_t column_ndx, T value) const
 {
-    return GetColumn(column_ndx).find_pos(value);
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
+    TableView tv(*this);
+
+    if(m_columns.is_attached()) {
+        typedef typename ColumnTypeTraits<T>::column_type ColType;
+        const ColType& column = get_column<ColType, ColumnTypeTraits<T>::ct_id>(column_ndx);
+        column.find_all(tv.get_ref_column(), value);
+    }
+    return tv;
 }
+
 
 TableView Table::find_all_int(size_t column_ndx, int64_t value)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const Column& column = GetColumn(column_ndx);
-
-    TableView tv(*this);
-    column.find_all(tv.get_ref_column(), value);
-    return move(tv);
+    return const_cast<const Table*>(this)->find_all<int64_t>(column_ndx, value);
 }
 
 ConstTableView Table::find_all_int(size_t column_ndx, int64_t value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const Column& column = GetColumn(column_ndx);
-
-    ConstTableView tv(*this);
-    column.find_all(tv.get_ref_column(), value);
-    return move(tv);
+    return find_all<int64_t>(column_ndx, value);
 }
 
 TableView Table::find_all_bool(size_t column_ndx, bool value)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const Column& column = GetColumn(column_ndx);
-
-    TableView tv(*this);
-    column.find_all(tv.get_ref_column(), value ? 1 :0);
-    return move(tv);
+    return const_cast<const Table*>(this)->find_all<bool>(column_ndx, value);
 }
 
 ConstTableView Table::find_all_bool(size_t column_ndx, bool value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const Column& column = GetColumn(column_ndx);
-
-    ConstTableView tv(*this);
-    column.find_all(tv.get_ref_column(), value ? 1 :0);
-    return move(tv);
+    return find_all<int64_t>(column_ndx, value);
 }
 
 
 TableView Table::find_all_float(size_t column_ndx, float value)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const ColumnFloat& column = GetColumnFloat(column_ndx);
-
-    TableView tv(*this);
-    column.find_all(tv.get_ref_column(), value);
-    return move(tv);
+    return const_cast<const Table*>(this)->find_all<float>(column_ndx, value);
 }
 
 ConstTableView Table::find_all_float(size_t column_ndx, float value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const ColumnFloat& column = GetColumnFloat(column_ndx);
-
-    ConstTableView tv(*this);
-    column.find_all(tv.get_ref_column(), value);
-    return move(tv);
+    return find_all<float>(column_ndx, value);
 }
 
 TableView Table::find_all_double(size_t column_ndx, double value)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const ColumnDouble& column = GetColumnDouble(column_ndx);
-
-    TableView tv(*this);
-    column.find_all(tv.get_ref_column(), value);
-    return move(tv);
+    return const_cast<const Table*>(this)->find_all<double>(column_ndx, value);
 }
 
 ConstTableView Table::find_all_double(size_t column_ndx, double value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const ColumnDouble& column = GetColumnDouble(column_ndx);
-
-    ConstTableView tv(*this);
-    column.find_all(tv.get_ref_column(), value);
-    return move(tv);
+    return find_all<double>(column_ndx, value);
 }
 
-TableView Table::find_all_date(size_t column_ndx, Date value)
+TableView Table::find_all_datetime(size_t column_ndx, DateTime value)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const Column& column = GetColumn(column_ndx);
-
-    TableView tv(*this);
-    column.find_all(tv.get_ref_column(), int64_t(value.get_date()));
-    return move(tv);
+    return const_cast<const Table*>(this)->find_all<int64_t>(column_ndx, static_cast<int64_t>(value.get_datetime()));
 }
 
-ConstTableView Table::find_all_date(size_t column_ndx, Date value) const
+ConstTableView Table::find_all_datetime(size_t column_ndx, DateTime value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const Column& column = GetColumn(column_ndx);
-
-    ConstTableView tv(*this);
-    column.find_all(tv.get_ref_column(), int64_t(value.get_date()));
-    return move(tv);
+    return find_all<int64_t>(column_ndx, static_cast<int64_t>(value.get_datetime()));
 }
 
 TableView Table::find_all_string(size_t column_ndx, StringData value)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const ColumnType type = get_real_column_type(column_ndx);
-
-    TableView tv(*this);
-    if (type == col_type_String) {
-        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
-        column.find_all(tv.get_ref_column(), value);
-    }
-    else {
-        TIGHTDB_ASSERT(type == col_type_StringEnum);
-        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
-        column.find_all(tv.get_ref_column(), value);
-    }
-    return move(tv);
+    ConstTableView ctv = const_cast<const Table*>(this)->find_all_string(column_ndx, value);
+    return ctv;
 }
 
 ConstTableView Table::find_all_string(size_t column_ndx, StringData value) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
 
-    const ColumnType type = get_real_column_type(column_ndx);
-
+    ColumnType type = get_real_column_type(column_ndx);
     ConstTableView tv(*this);
-    if (type == col_type_String) {
-        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
-        column.find_all(tv.get_ref_column(), value);
+    
+    if(m_columns.is_attached()) {
+        if (type == col_type_String) {
+            const AdaptiveStringColumn& column = get_column_string(column_ndx);
+            column.find_all(tv.get_ref_column(), value);
+        }
+        else {
+            TIGHTDB_ASSERT(type == col_type_StringEnum);
+            const ColumnStringEnum& column = get_column_string_enum(column_ndx);
+            column.find_all(tv.get_ref_column(), value);
+        }
     }
-    else {
-        TIGHTDB_ASSERT(type == col_type_StringEnum);
-        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
-        column.find_all(tv.get_ref_column(), value);
-    }
-    return move(tv);
+    return tv;
 }
 
 TableView Table::find_all_binary(size_t, BinaryData)
@@ -1834,112 +1909,143 @@ ConstTableView Table::find_all_binary(size_t, BinaryData) const
     throw runtime_error("Not implemented");
 }
 
-
-TableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t max)
+TableView Table::get_distinct_view(size_t column_ndx)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const Column& column = GetColumn(column_ndx);
-
-    TableView tv(*this);
-    column.find_all_hamming(tv.get_ref_column(), value, max);
-    return move(tv);
+    ConstTableView ctv = const_cast<const Table*>(this)->get_distinct_view(column_ndx);
+    return ctv;
 }
 
-ConstTableView Table::find_all_hamming(size_t column_ndx, uint64_t value, size_t max) const
+ConstTableView Table::get_distinct_view(size_t column_ndx) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    const Column& column = GetColumn(column_ndx);
-
-    ConstTableView tv(*this);
-    column.find_all_hamming(tv.get_ref_column(), value, max);
-    return move(tv);
-}
-
-
-TableView Table::distinct(size_t column_ndx)
-{
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-    TIGHTDB_ASSERT(has_index(column_ndx));
-
-    TableView tv(*this);
-    Array& refs = tv.get_ref_column();
-
-    const ColumnType type = get_real_column_type(column_ndx);
-    if (type == col_type_String) {
-        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
-        const StringIndex& ndx = column.GetIndex();
-        ndx.distinct(refs);
-    }
-    else {
-        TIGHTDB_ASSERT(type == col_type_StringEnum);
-        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
-        const StringIndex& ndx = column.GetIndex();
-        ndx.distinct(refs);
-    }
-    return move(tv);
-}
-
-ConstTableView Table::distinct(size_t column_ndx) const
-{
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
     TIGHTDB_ASSERT(has_index(column_ndx));
 
     ConstTableView tv(*this);
     Array& refs = tv.get_ref_column();
 
-    const ColumnType type = get_real_column_type(column_ndx);
-    if (type == col_type_String) {
-        const AdaptiveStringColumn& column = GetColumnString(column_ndx);
-        const StringIndex& ndx = column.GetIndex();
-        ndx.distinct(refs);
+    if(m_columns.is_attached())
+    {
+        ColumnType type = get_real_column_type(column_ndx);
+        if (type == col_type_String) {
+            const AdaptiveStringColumn& column = get_column_string(column_ndx);
+            const StringIndex& index = column.get_index();
+            index.distinct(refs);
+        }
+        else {
+            TIGHTDB_ASSERT(type == col_type_StringEnum);
+            const ColumnStringEnum& column = get_column_string_enum(column_ndx);
+            const StringIndex& index = column.get_index();
+            index.distinct(refs);
+        }
     }
-    else {
-        TIGHTDB_ASSERT(type == col_type_StringEnum);
-        const ColumnStringEnum& column = GetColumnStringEnum(column_ndx);
-        const StringIndex& ndx = column.GetIndex();
-        ndx.distinct(refs);
-    }
-    return move(tv);
+    return tv;
 }
 
 TableView Table::get_sorted_view(size_t column_ndx, bool ascending)
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
-
-    TableView tv(*this);
-
-    // Insert refs to all rows in table
-    Array& refs = tv.get_ref_column();
-    const size_t count = size();
-    for (size_t i = 0; i < count; ++i) {
-        refs.add(i);
-    }
-
-    // Sort the refs based on the given column
-    tv.sort(column_ndx, ascending);
-
-    return move(tv);
+    ConstTableView ctv = const_cast<const Table*>(this)->get_sorted_view(column_ndx, ascending);
+    return ctv;
 }
 
 ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
 {
-    TIGHTDB_ASSERT(column_ndx < m_columns.size());
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
 
     ConstTableView tv(*this);
 
-    // Insert refs to all rows in table
-    Array& refs = tv.get_ref_column();
-    const size_t count = size();
-    for (size_t i = 0; i < count; ++i) {
-        refs.add(i);
+    if(m_columns.is_attached()) {
+        // Insert refs to all rows in table
+        Array& refs = tv.get_ref_column();
+        size_t count = size();
+        for (size_t i = 0; i < count; ++i) {
+            refs.add(i);
+        }
+
+        // Sort the refs based on the given column
+        tv.sort(column_ndx, ascending);
     }
+    return tv;
+}
 
-    // Sort the refs based on the given column
-    tv.sort(column_ndx, ascending);
 
-    return move(tv);
+size_t Table::lower_bound_int(size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
+    return !m_columns.is_attached() ? 0 : get_column(column_ndx).lower_bound_int(value);
+}
+
+size_t Table::upper_bound_int(size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
+    return !m_columns.is_attached() ? 0 : get_column(column_ndx).upper_bound_int(value);
+}
+
+size_t Table::lower_bound_bool(size_t column_ndx, bool value) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
+    return !m_columns.is_attached() ? 0 : get_column(column_ndx).lower_bound_int(value);
+}
+
+size_t Table::upper_bound_bool(size_t column_ndx, bool value) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
+    return !m_columns.is_attached() ? 0 : get_column(column_ndx).upper_bound_int(value);
+}
+
+size_t Table::lower_bound_float(size_t column_ndx, float value) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
+    return !m_columns.is_attached() ? 0 : get_column_float(column_ndx).lower_bound(value);
+}
+
+size_t Table::upper_bound_float(size_t column_ndx, float value) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
+    return !m_columns.is_attached() ? 0 : get_column_float(column_ndx).upper_bound(value);
+}
+
+size_t Table::lower_bound_double(size_t column_ndx, double value) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
+    return !m_columns.is_attached() ? 0 : get_column_double(column_ndx).lower_bound(value);
+}
+
+size_t Table::upper_bound_double(size_t column_ndx, double value) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
+    return !m_columns.is_attached() ? 0 : get_column_double(column_ndx).upper_bound(value);
+}
+
+size_t Table::lower_bound_string(size_t column_ndx, StringData value) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
+    if(!m_columns.is_attached())
+        return 0;
+
+    ColumnType type = get_real_column_type(column_ndx);
+    if (type == col_type_String) {
+        const AdaptiveStringColumn& column = get_column_string(column_ndx);
+        return column.lower_bound_string(value);
+    }
+    TIGHTDB_ASSERT(type == col_type_StringEnum);
+    const ColumnStringEnum& column = get_column_string_enum(column_ndx);
+    return column.lower_bound_string(value);
+}
+
+size_t Table::upper_bound_string(size_t column_ndx, StringData value) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
+    if(!m_columns.is_attached())
+        return 0;
+
+    ColumnType type = get_real_column_type(column_ndx);
+    if (type == col_type_String) {
+        const AdaptiveStringColumn& column = get_column_string(column_ndx);
+        return column.upper_bound_string(value);
+    }
+    TIGHTDB_ASSERT(type == col_type_StringEnum);
+    const ColumnStringEnum& column = get_column_string_enum(column_ndx);
+    return column.upper_bound_string(value);
 }
 
 void Table::optimize()
@@ -1949,45 +2055,56 @@ void Table::optimize()
     // enumeration column. Since this involves changing the spec of
     // the table, it is not something we can do for a subtable with
     // shared spec.
-    if (has_shared_spec()) return;
+    if (has_shared_spec())
+        return;
 
-    const size_t column_count = get_column_count();
-    Allocator& alloc = m_columns.GetAllocator();
+    Allocator& alloc = m_columns.get_alloc();
 
+    size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
-        const ColumnType type = get_real_column_type(i);
-
+        ColumnType type = get_real_column_type(i);
         if (type == col_type_String) {
-            AdaptiveStringColumn* column = &GetColumnString(i);
+            AdaptiveStringColumn* column = &get_column_string(i);
 
-            size_t ref_keys;
-            size_t ref_values;
-            const bool res = column->AutoEnumerate(ref_keys, ref_values);
-            if (!res) continue;
+            ref_type keys_ref, values_ref;
+            bool res = column->auto_enumerate(keys_ref, values_ref);
+            if (!res)
+                continue;
 
-            // Add to spec and column refs
-            m_spec_set.set_column_type(i, col_type_StringEnum);
-            const size_t column_ndx = GetColumnRefPos(i);
-            m_columns.Set(column_ndx, ref_keys);
-            m_columns.Insert(column_ndx+1, ref_values);
+            Spec::ColumnInfo info;
+            m_spec.get_column_info(i, info);
+            ArrayParent* keys_parent;
+            size_t keys_ndx;
+            m_spec.upgrade_string_to_enum(i, keys_ref, keys_parent, keys_ndx);
 
-            // There are still same number of columns, but since
-            // the enum type takes up two posistions in m_columns
-            // we have to move refs in all following columns
-            UpdateColumnRefs(i+1, 1);
+            // Upgrading the column may have moved the
+            // refs to keylists in other columns so we
+            // have to update their parent info
+            for (size_t c = i+1; c < m_cols.size(); ++c) {
+                ColumnType type = get_real_column_type(c);
+                if (type == col_type_StringEnum) {
+                    ColumnStringEnum& column = get_column_string_enum(c);
+                    column.adjust_keys_ndx_in_parent(1);
+                }
+            }
 
-            // Replace cached column
-            ColumnStringEnum* const e = new ColumnStringEnum(ref_keys, ref_values, &m_columns, column_ndx, alloc);
-            m_cols.Set(i, (intptr_t)e);
+            // Indexes are also in m_columns, so we need adjusted pos
+            size_t pos_in_mcolumns = m_spec.get_column_pos(i);
+
+            // Replace column
+            ColumnStringEnum* e =
+                new ColumnStringEnum(keys_ref, values_ref, &m_columns, pos_in_mcolumns, keys_parent, keys_ndx, alloc);
+            m_columns.set(pos_in_mcolumns, values_ref);
+            m_cols.set(i, intptr_t(e));
 
             // Inherit any existing index
-            if (column->HasIndex()) {
-                StringIndex& ndx = column->PullIndex();
-                e->ReuseIndex(ndx);
+            if (info.m_has_index) {
+                StringIndex* index = column->release_index();
+                e->install_index(index);
             }
 
             // Clean up the old column
-            column->Destroy();
+            column->destroy();
             delete column;
         }
     }
@@ -1997,57 +2114,57 @@ void Table::optimize()
 #endif
 }
 
-void Table::UpdateColumnRefs(size_t column_ndx, int diff)
+void Table::adjust_column_ndx_in_parent(size_t column_ndx_begin, int diff) TIGHTDB_NOEXCEPT
 {
-    for (size_t i = column_ndx; i < m_cols.size(); ++i) {
-        ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
-        column->UpdateParentNdx(diff);
+    for (size_t i = column_ndx_begin; i < m_cols.size(); ++i) {
+        ColumnBase* column = reinterpret_cast<ColumnBase*>(m_cols.get(i));
+        column->adjust_ndx_in_parent(diff);
     }
 }
 
-void Table::UpdateFromParent() {
+void Table::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+
     // There is no top for sub-tables sharing spec
-    if (m_top.IsValid()) {
-        if (!m_top.UpdateFromParent()) return;
+    if (m_top.is_attached()) {
+        if (!m_top.update_from_parent(old_baseline))
+            return;
     }
 
-    m_spec_set.update_from_parent();
-    if (!m_columns.UpdateFromParent()) return;
+    m_spec.update_from_parent(old_baseline);
 
-    // Update cached columns
-    const size_t column_count = get_column_count();
-    for (size_t i = 0; i < column_count; ++i) {
-        ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(i));
-        column->UpdateFromParent();
-    }
+    if (!m_columns.update_from_parent(old_baseline))
+        return;
 
-    // Size may have changed
-    if (column_count == 0) {
-        m_size = 0;
-    }
-    else {
-        const ColumnBase* const column = reinterpret_cast<ColumnBase*>(m_cols.Get(0));
-        m_size = column->Size();
+    // Update column accessors
+    size_t n = m_cols.size();
+    for (size_t i = 0; i < n; ++i) {
+        ColumnBase* column = reinterpret_cast<ColumnBase*>(uintptr_t(m_cols.get(i)));
+        column->update_from_parent(old_baseline);
     }
 }
 
 
 void Table::update_from_spec()
 {
+    TIGHTDB_ASSERT(!has_shared_spec());
     TIGHTDB_ASSERT(m_columns.is_empty() && m_cols.is_empty()); // only on initial creation
 
-    CreateColumns();
+    detach_subtable_accessors();
+
+    create_columns();
 }
 
 
 // to JSON: ------------------------------------------
 
-void Table::to_json(std::ostream& out)
+void Table::to_json(ostream& out) const
 {
     // Represent table as list of objects
     out << "[";
 
-    const size_t row_count = size();
+    size_t row_count = size();
     for (size_t r = 0; r < row_count; ++r) {
         if (r > 0)
             out << ",";
@@ -2057,30 +2174,31 @@ void Table::to_json(std::ostream& out)
     out << "]";
 }
 
+
 namespace {
 
-inline void out_date(std::ostream& out, Date value)
+inline void out_datetime(ostream& out, DateTime value)
 {
-    time_t rawtime = value.get_date();
-    struct tm* const t = gmtime(&rawtime);
+    time_t rawtime = value.get_datetime();
+    struct tm* t = gmtime(&rawtime);
     if (t) {
         // We need a buffer for formatting dates (and binary to hex). Max
         // size is 20 bytes (incl zero byte) "YYYY-MM-DD HH:MM:SS"\0
         char buffer[30];
-        const size_t res = strftime(buffer, 30, "%Y-%m-%d %H:%M:%S", t);
+        size_t res = strftime(buffer, 30, "%Y-%m-%d %H:%M:%S", t);
         if (res)
             out << buffer;
     }
 }
 
-inline void out_binary(std::ostream& out, const BinaryData bin)
+inline void out_binary(ostream& out, const BinaryData bin)
 {
     const char* p = bin.data();
     for (size_t i = 0; i < bin.size(); ++i)
         out << setw(2) << setfill('0') << hex << static_cast<unsigned int>(p[i]) << dec;
 }
 
-template<typename T> void out_floats(std::ostream& out, T value)
+template<class T> void out_floats(ostream& out, T value)
 {
     streamsize old = out.precision();
     out.precision(numeric_limits<T>::digits10 + 1);
@@ -2090,10 +2208,11 @@ template<typename T> void out_floats(std::ostream& out, T value)
 
 } // anonymous namespace
 
-void Table::to_json_row(size_t row_ndx, std::ostream& out)
+
+void Table::to_json_row(size_t row_ndx, ostream& out) const
 {
     out << "{";
-    const size_t column_count = get_column_count();
+    size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
         if (i > 0)
             out << ",";
@@ -2101,7 +2220,7 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out)
         StringData name = get_column_name(i);
         out << "\"" << name << "\":";
 
-        const DataType type = get_column_type(i);
+        DataType type = get_column_type(i);
         switch (type) {
             case type_Int:
                 out << get_int(i, row_ndx);
@@ -2118,8 +2237,8 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out)
             case type_String:
                 out << "\"" << get_string(i, row_ndx) << "\"";
                 break;
-            case type_Date:
-                out << "\""; out_date(out, get_date(i, row_ndx)); out << "\"";
+            case type_DateTime:
+                out << "\""; out_datetime(out, get_datetime(i, row_ndx)); out << "\"";
                 break;
             case type_Binary:
                 out << "\""; out_binary(out, get_binary(i, row_ndx)); out << "\"";
@@ -2129,12 +2248,12 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out)
                 break;
             case type_Mixed:
             {
-                const DataType mtype = get_mixed_type(i, row_ndx);
+                DataType mtype = get_mixed_type(i, row_ndx);
                 if (mtype == type_Table) {
                     get_subtable(i, row_ndx)->to_json(out);
                 }
                 else {
-                    const Mixed m = get_mixed(i, row_ndx);
+                    Mixed m = get_mixed(i, row_ndx);
                     switch (mtype) {
                         case type_Int:
                             out << m.get_int();
@@ -2151,8 +2270,8 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out)
                         case type_String:
                             out << "\"" << m.get_string() << "\"";
                             break;
-                        case type_Date:
-                            out << "\""; out_date(out, m.get_date()); out << "\"";
+                        case type_DateTime:
+                            out << "\""; out_datetime(out, m.get_datetime()); out << "\"";
                             break;
                         case type_Binary:
                             out << "\""; out_binary(out, m.get_binary()); out << "\"";
@@ -2175,6 +2294,7 @@ void Table::to_json_row(size_t row_ndx, std::ostream& out)
 
 
 namespace {
+
 size_t chars_in_int(int64_t v)
 {
     size_t count = 0;
@@ -2182,18 +2302,19 @@ size_t chars_in_int(int64_t v)
         ++count;
     return count+1;
 }
-}
 
-void Table::to_string(std::ostream& out, size_t limit) const
+} // anonymous namespace
+
+
+void Table::to_string(ostream& out, size_t limit) const
 {
     // Print header (will also calculate widths)
-    std::vector<size_t> widths;
+    vector<size_t> widths;
     to_string_header(out, widths);
 
     // Set limit=-1 to print all rows, otherwise only print to limit
-    const size_t row_count = size();
-    const size_t out_count = (limit == size_t(-1)) ? row_count
-                                                   : (row_count < limit) ? row_count : limit;
+    size_t row_count = size();
+    size_t out_count = (limit == size_t(-1)) ? row_count : (row_count < limit) ? row_count : limit;
 
     // Print rows
     for (size_t i = 0; i < out_count; ++i) {
@@ -2201,28 +2322,28 @@ void Table::to_string(std::ostream& out, size_t limit) const
     }
 
     if (out_count < row_count) {
-        const size_t rest = row_count - out_count;
+        size_t rest = row_count - out_count;
         out << "... and " << rest << " more rows (total " << row_count << ")";
     }
 }
 
-void Table::row_to_string(size_t row_ndx, std::ostream& out) const
+void Table::row_to_string(size_t row_ndx, ostream& out) const
 {
     TIGHTDB_ASSERT(row_ndx < size());
 
     // Print header (will also calculate widths)
-    std::vector<size_t> widths;
+    vector<size_t> widths;
     to_string_header(out, widths);
 
     // Print row contents
     to_string_row(row_ndx, out, widths);
 }
 
-void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) const
+void Table::to_string_header(ostream& out, vector<size_t>& widths) const
 {
-    const size_t column_count = get_column_count();
-    const size_t row_count = size();
-    const size_t row_ndx_width = chars_in_int(row_count);
+    size_t column_count = get_column_count();
+    size_t row_count = size();
+    size_t row_ndx_width = chars_in_int(row_count);
     widths.push_back(row_ndx_width);
 
     // Empty space over row numbers
@@ -2232,17 +2353,17 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
     // Write header
     for (size_t col = 0; col < column_count; ++col) {
         StringData name = get_column_name(col);
-        const DataType type = get_column_type(col);
+        DataType type = get_column_type(col);
         size_t width = 0;
         switch (type) {
             case type_Bool:
                 width = 5;
                 break;
-            case type_Date:
+            case type_DateTime:
                 width = 19;
                 break;
             case type_Int:
-                width = chars_in_int(maximum(col));
+                width = chars_in_int(maximum_int(col));
                 break;
             case type_Float:
                 // max chars for scientific notation:
@@ -2253,14 +2374,14 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                 break;
             case type_Table:
                 for (size_t row = 0; row < row_count; ++row) {
-                    size_t len = chars_in_int( get_subtable_size(col, row) );
+                    size_t len = chars_in_int(get_subtable_size(col, row));
                     width = max(width, len+2);
                 }
                 width += 2; // space for "[]"
                 break;
             case type_Binary:
                 for (size_t row = 0; row < row_count; ++row) {
-                    size_t len = chars_in_int( get_binary(col, row).size() ) + 2;
+                    size_t len = chars_in_int(get_binary(col, row).size()) + 2;
                     width = max(width, len);
                 }
                 width += 6; // space for " bytes"
@@ -2279,18 +2400,18 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                 // Find max length of the mixed values
                 width = 0;
                 for (size_t row = 0; row < row_count; ++row) {
-                    const DataType mtype = get_mixed_type(col, row);
+                    DataType mtype = get_mixed_type(col, row);
                     if (mtype == type_Table) {
                         size_t len = chars_in_int( get_subtable_size(col, row) ) + 2;
                         width = max(width, len);
                         continue;
                     }
-                    const Mixed m = get_mixed(col, row);
+                    Mixed m = get_mixed(col, row);
                     switch (mtype) {
                         case type_Bool:
                             width = max(width, size_t(5));
                             break;
-                        case type_Date:
+                        case type_DateTime:
                             width = max(width, size_t(19));
                             break;
                         case type_Int:
@@ -2321,7 +2442,7 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
                 break;
         }
         // Set width to max of column name and the longest value
-        const size_t name_len = name.size();
+        size_t name_len = name.size();
         if (name_len > width)
             width = name_len;
 
@@ -2334,31 +2455,33 @@ void Table::to_string_header(std::ostream& out, std::vector<size_t>& widths) con
     out << "\n";
 }
 
+
 namespace {
 
-inline void out_string(std::ostream& out, const std::string text, const size_t max_len)
+inline void out_string(ostream& out, const string text, const size_t max_len)
 {
-    out.setf(std::ostream::left, std::ostream::adjustfield);
+    out.setf(ostream::left, ostream::adjustfield);
     if (text.size() > max_len)
         out << text.substr(0, max_len) + "...";
     else
         out << text;
-    out.unsetf(std::ostream::adjustfield);
+    out.unsetf(ostream::adjustfield);
 }
 
-inline void out_table(std::ostream& out, const size_t len)
+inline void out_table(ostream& out, const size_t len)
 {
-    const size_t width = out.width() - chars_in_int(len) - 1;
+    streamsize width = out.width() - chars_in_int(len) - 1;
     out.width(width);
     out << "[" << len << "]";
 }
 
-}
+} // anonymous namespace
 
-void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<size_t>& widths) const
+
+void Table::to_string_row(size_t row_ndx, ostream& out, const vector<size_t>& widths) const
 {
-    const size_t column_count  = get_column_count();
-    const size_t row_ndx_width = widths[0];
+    size_t column_count  = get_column_count();
+    size_t row_ndx_width = widths[0];
 
     out << scientific;          // for float/double
     out.width(row_ndx_width);
@@ -2368,7 +2491,7 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
         out << "  "; // spacing
         out.width(widths[col+1]);
 
-        const DataType type = get_column_type(col);
+        DataType type = get_column_type(col);
         switch (type) {
             case type_Bool:
                 out << (get_bool(col, row_ndx) ? "true" : "false");
@@ -2385,8 +2508,8 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
             case type_String:
                 out_string(out, get_string(col, row_ndx), 20);
                 break;
-            case type_Date:
-                out_date(out, get_date(col, row_ndx));
+            case type_DateTime:
+                out_datetime(out, get_datetime(col, row_ndx));
                 break;
             case type_Table:
                 out_table(out, get_subtable_size(col, row_ndx));
@@ -2397,12 +2520,12 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
                 break;
             case type_Mixed:
             {
-                const DataType mtype = get_mixed_type(col, row_ndx);
+                DataType mtype = get_mixed_type(col, row_ndx);
                 if (mtype == type_Table) {
                     out_table(out, get_subtable_size(col, row_ndx));
                 }
                 else {
-                    const Mixed m = get_mixed(col, row_ndx);
+                    Mixed m = get_mixed(col, row_ndx);
                     switch (mtype) {
                         case type_Bool:
                             out << (m.get_bool() ? "true" : "false");
@@ -2419,8 +2542,8 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
                         case type_String:
                             out_string(out, m.get_string(), 20);
                             break;
-                        case type_Date:
-                            out_date(out, m.get_date());
+                        case type_DateTime:
+                            out_datetime(out, m.get_datetime());
                             break;
                         case type_Binary:
                             out.width(widths[col+1]-6); // adjust for " bytes" text
@@ -2440,22 +2563,22 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
 }
 
 
-
 bool Table::compare_rows(const Table& t) const
 {
     // A wrapper for an empty subtable with shared spec may be created
     // with m_data == 0. In this case there are no Column wrappers, so
     // the standard comparison scheme becomes impossible.
-    if (m_size == 0) return t.m_size == 0;
+    if (m_size == 0)
+        return t.m_size == 0;
 
     // FIXME: The current column comparison implementation is very
     // inefficient, we should use sequential tree accessors when they
     // become available.
 
-    const size_t n = get_column_count();
+    size_t n = get_column_count();
     TIGHTDB_ASSERT(t.get_column_count() == n);
     for (size_t i=0; i<n; ++i) {
-        const ColumnType type = get_real_column_type(i);
+        ColumnType type = get_real_column_type(i);
         TIGHTDB_ASSERT(type == col_type_String     ||
                        type == col_type_StringEnum ||
                        type == t.get_real_column_type(i));
@@ -2463,68 +2586,78 @@ bool Table::compare_rows(const Table& t) const
         switch (type) {
             case col_type_Int:
             case col_type_Bool:
-            case col_type_Date: {
-                const Column& c1 = GetColumn(i);
-                const Column& c2 = t.GetColumn(i);
-                if (!c1.compare(c2)) return false;
+            case col_type_DateTime: {
+                const Column& c1 = get_column(i);
+                const Column& c2 = t.get_column(i);
+                if (!c1.compare_int(c2))
+                    return false;
                 break;
             }
             case col_type_Float: {
-                const ColumnFloat& c1 = GetColumnFloat(i);
-                const ColumnFloat& c2 = t.GetColumnFloat(i);
-                if (!c1.compare(c2)) return false;
+                const ColumnFloat& c1 = get_column_float(i);
+                const ColumnFloat& c2 = t.get_column_float(i);
+                if (!c1.compare(c2))
+                    return false;
                 break;
             }
             case col_type_Double: {
-                const ColumnDouble& c1 = GetColumnDouble(i);
-                const ColumnDouble& c2 = t.GetColumnDouble(i);
-                if (!c1.compare(c2)) return false;
+                const ColumnDouble& c1 = get_column_double(i);
+                const ColumnDouble& c2 = t.get_column_double(i);
+                if (!c1.compare(c2))
+                    return false;
                 break;
             }
             case col_type_String: {
-                const AdaptiveStringColumn& c1 = GetColumnString(i);
+                const AdaptiveStringColumn& c1 = get_column_string(i);
                 ColumnType type2 = t.get_real_column_type(i);
                 if (type2 == col_type_String) {
-                    const AdaptiveStringColumn& c2 = t.GetColumnString(i);
-                    if (!c1.compare(c2)) return false;
+                    const AdaptiveStringColumn& c2 = t.get_column_string(i);
+                    if (!c1.compare_string(c2))
+                        return false;
                 }
                 else {
                     TIGHTDB_ASSERT(type2 == col_type_StringEnum);
-                    const ColumnStringEnum& c2 = t.GetColumnStringEnum(i);
-                    if (!c2.compare(c1)) return false;
+                    const ColumnStringEnum& c2 = t.get_column_string_enum(i);
+                    if (!c2.compare_string(c1))
+                        return false;
                 }
                 break;
             }
             case col_type_StringEnum: {
-                const ColumnStringEnum& c1 = GetColumnStringEnum(i);
+                const ColumnStringEnum& c1 = get_column_string_enum(i);
                 ColumnType type2 = t.get_real_column_type(i);
                 if (type2 == col_type_StringEnum) {
-                    const ColumnStringEnum& c2 = t.GetColumnStringEnum(i);
-                    if (!c1.compare(c2)) return false;
+                    const ColumnStringEnum& c2 = t.get_column_string_enum(i);
+                    if (!c1.compare_string(c2))
+                        return false;
                 }
                 else {
                     TIGHTDB_ASSERT(type2 == col_type_String);
-                    const AdaptiveStringColumn& c2 = t.GetColumnString(i);
-                    if (!c1.compare(c2)) return false;
+                    const AdaptiveStringColumn& c2 = t.get_column_string(i);
+                    if (!c1.compare_string(c2))
+                        return false;
                 }
                 break;
             }
             case col_type_Binary: {
-                const ColumnBinary& c1 = GetColumnBinary(i);
-                const ColumnBinary& c2 = t.GetColumnBinary(i);
-                if (!c1.compare(c2)) return false;
+                const ColumnBinary& c1 = get_column_binary(i);
+                const ColumnBinary& c2 = t.get_column_binary(i);
+                if (!c1.compare_binary(c2))
+                    return false;
                 break;
             }
             case col_type_Table: {
-                const ColumnTable& c1 = GetColumnTable(i);
-                const ColumnTable& c2 = t.GetColumnTable(i);
-                if (!c1.compare(c2)) return false;
+                const ColumnTable& c1 = get_column_table(i);
+                const ColumnTable& c2 = t.get_column_table(i);
+                if (!c1.compare_table(c2))
+                    return false;
                 break;
             }
             case col_type_Mixed: {
-                const ColumnMixed& c1 = GetColumnMixed(i);
-                const ColumnMixed& c2 = t.GetColumnMixed(i);
-                if (!c1.compare(c2)) return false;
+                const ColumnMixed& c1 = get_column_mixed(i);
+                const ColumnMixed& c2 = t.get_column_mixed(i);
+                if (!c1.compare_mixed(c2))
+                    return false;
                 break;
             }
             default:
@@ -2538,15 +2671,16 @@ bool Table::compare_rows(const Table& t) const
 const Array* Table::get_column_root(size_t col_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(col_ndx < get_column_count());
-    return reinterpret_cast<ColumnBase*>(m_cols.Get(col_ndx))->get_root_array();
+    return reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx))->get_root_array();
 }
+
 
 pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) const
     TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(col_ndx < get_column_count());
 
-    const ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.Get(col_ndx));
+    const ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx));
 
     const Array* root = col->get_root_array();
     const Array* enum_root = 0;
@@ -2566,140 +2700,100 @@ pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) 
 
 void Table::Verify() const
 {
-    if (m_top.IsValid()) m_top.Verify();
-    m_columns.Verify();
-    if (m_columns.IsValid()) {
-        const size_t column_count = get_column_count();
-        TIGHTDB_ASSERT(column_count == m_cols.size());
+    TIGHTDB_ASSERT(is_attached());
+    if (!m_columns.is_attached())
+        return; // Accessor for degenerate subtable
 
-        for (size_t i = 0; i < column_count; ++i) {
-            const ColumnType type = get_real_column_type(i);
-            switch (type) {
-                case type_Int:
-                case type_Bool:
-                case type_Date: {
-                    const Column& column = GetColumn(i);
-                    TIGHTDB_ASSERT(column.Size() == m_size);
-                    column.Verify();
-                    break;
-                }
-                case type_Float: {
-                    const ColumnFloat& column = GetColumnFloat(i);
-                    TIGHTDB_ASSERT(column.Size() == m_size);
-                    column.Verify();
-                    break;
-                }
-                case type_Double: {
-                    const ColumnDouble& column = GetColumnDouble(i);
-                    TIGHTDB_ASSERT(column.Size() == m_size);
-                    column.Verify();
-                    break;
-                }
-                case type_String: {
-                    const AdaptiveStringColumn& column = GetColumnString(i);
-                    TIGHTDB_ASSERT(column.Size() == m_size);
-                    column.Verify();
-                    break;
-                }
-                case col_type_StringEnum: {
-                    const ColumnStringEnum& column = GetColumnStringEnum(i);
-                    TIGHTDB_ASSERT(column.Size() == m_size);
-                    column.Verify();
-                    break;
-                }
-                case type_Binary: {
-                    const ColumnBinary& column = GetColumnBinary(i);
-                    TIGHTDB_ASSERT(column.Size() == m_size);
-                    column.Verify();
-                    break;
-                }
-                case type_Table: {
-                    const ColumnTable& column = GetColumnTable(i);
-                    TIGHTDB_ASSERT(column.Size() == m_size);
-                    column.Verify();
-                    break;
-                }
-                case type_Mixed: {
-                    const ColumnMixed& column = GetColumnMixed(i);
-                    TIGHTDB_ASSERT(column.Size() == m_size);
-                    column.Verify();
-                    break;
-                }
-                default:
-                    TIGHTDB_ASSERT(false);
-            }
+    if (m_top.is_attached())
+        m_top.Verify();
+    m_columns.Verify();
+    if (m_columns.is_attached()) {
+        size_t n = get_column_count();
+        TIGHTDB_ASSERT(n == m_cols.size());
+
+        for (size_t i = 0; i != n; ++i) {
+            const ColumnBase& column = get_column_base(i);
+            TIGHTDB_ASSERT(column.size() == m_size);
+            column.Verify();
         }
     }
 
-    m_spec_set.Verify();
+    m_spec.Verify();
 
-    Allocator& alloc = m_columns.GetAllocator();
+    // FIXME: It is a waste of time to check the allocator for each
+    // table in a group.
+    Allocator& alloc = m_columns.get_alloc();
     alloc.Verify();
 }
 
-void Table::to_dot(std::ostream& out, StringData title) const
+
+void Table::to_dot(ostream& out, StringData title) const
 {
-    if (m_top.IsValid()) {
-        out << "subgraph cluster_topleveltable" << m_top.GetRef() << " {" << endl;
-        out << " label = \"TopLevelTable";
-        if (0 < title.size()) out << "\\n'" << title << "'";
+    if (m_top.is_attached()) {
+        out << "subgraph cluster_table_with_spec" << m_top.get_ref() << " {" << endl;
+        out << " label = \"Table";
+        if (0 < title.size())
+            out << "\\n'" << title << "'";
         out << "\";" << endl;
-        m_top.ToDot(out, "table_top");
+        m_top.to_dot(out, "table_top");
         const Spec& specset = get_spec();
         specset.to_dot(out);
     }
     else {
-        out << "subgraph cluster_table_"  << m_columns.GetRef() <<  " {" << endl;
+        out << "subgraph cluster_table_"  << m_columns.get_ref() <<  " {" << endl;
         out << " label = \"Table";
-        if (0 < title.size()) out << " " << title;
+        if (0 < title.size())
+            out << " " << title;
         out << "\";" << endl;
     }
 
-    ToDotInternal(out);
+    to_dot_internal(out);
 
     out << "}" << endl;
 }
 
-void Table::ToDotInternal(std::ostream& out) const
+
+void Table::to_dot_internal(ostream& out) const
 {
-    m_columns.ToDot(out, "columns");
+    m_columns.to_dot(out, "columns");
 
     // Columns
-    const size_t column_count = get_column_count();
-    for (size_t i = 0; i < column_count; ++i) {
-        const ColumnBase& column = GetColumnBase(i);
+    size_t n = get_column_count();
+    for (size_t i = 0; i != n; ++i) {
+        const ColumnBase& column = get_column_base(i);
         StringData name = get_column_name(i);
-        column.ToDot(out, name);
+        column.to_dot(out, name);
     }
 }
+
 
 void Table::print() const
 {
     // Table header
     cout << "Table: len(" << m_size << ")\n    ";
-    const size_t column_count = get_column_count();
+    size_t column_count = get_column_count();
     for (size_t i = 0; i < column_count; ++i) {
-        StringData name = m_spec_set.get_column_name(i);
+        StringData name = m_spec.get_column_name(i);
         cout << left << setw(10) << name << right << " ";
     }
 
     // Types
     cout << "\n    ";
     for (size_t i = 0; i < column_count; ++i) {
-        const ColumnType type = get_real_column_type(i);
+        ColumnType type = get_real_column_type(i);
         switch (type) {
-        case type_Int:
-            cout << "Int        "; break;
-        case type_Float:
-            cout << "Float      "; break;
-        case type_Double:
-            cout << "Double     "; break;
-        case type_Bool:
-            cout << "Bool       "; break;
-        case type_String:
-            cout << "String     "; break;
-        default:
-            TIGHTDB_ASSERT(false);
+            case type_Int:
+                cout << "Int        "; break;
+            case type_Float:
+                cout << "Float      "; break;
+            case type_Double:
+                cout << "Double     "; break;
+            case type_Bool:
+                cout << "Bool       "; break;
+            case type_String:
+                cout << "String     "; break;
+            default:
+                TIGHTDB_ASSERT(false);
         }
     }
     cout << "\n";
@@ -2708,40 +2802,35 @@ void Table::print() const
     for (size_t i = 0; i < m_size; ++i) {
         cout << setw(3) << i;
         for (size_t n = 0; n < column_count; ++n) {
-            const ColumnType type = get_real_column_type(n);
+            ColumnType type = get_real_column_type(n);
             switch (type) {
-            case type_Int:
-                {
-                    const Column& column = GetColumn(n);
+                case type_Int: {
+                    const Column& column = get_column(n);
                     cout << setw(10) << column.get(i) << " ";
+                    break;
                 }
-                break;
-            case type_Float:
-                {
-                    const ColumnFloat& column = GetColumnFloat(n);
+                case type_Float: {
+                    const ColumnFloat& column = get_column_float(n);
                     cout << setw(10) << column.get(i) << " ";
+                    break;
                 }
-                break;
-            case type_Double:
-                {
-                    const ColumnDouble& column = GetColumnDouble(n);
+                case type_Double: {
+                    const ColumnDouble& column = get_column_double(n);
                     cout << setw(10) << column.get(i) << " ";
+                    break;
                 }
-                break;
-            case type_Bool:
-                {
-                    const Column& column = GetColumn(n);
+                case type_Bool: {
+                    const Column& column = get_column(n);
                     cout << (column.get(i) == 0 ? "     false " : "      true ");
+                    break;
                 }
-                break;
-            case type_String:
-                {
-                    const AdaptiveStringColumn& column = GetColumnString(n);
+                case type_String: {
+                    const AdaptiveStringColumn& column = get_column_string(n);
                     cout << setw(10) << column.get(i) << " ";
+                    break;
                 }
-                break;
-            default:
-                TIGHTDB_ASSERT(false);
+                default:
+                    TIGHTDB_ASSERT(false);
             }
         }
         cout << "\n";
@@ -2749,15 +2838,30 @@ void Table::print() const
     cout << "\n";
 }
 
+
 MemStats Table::stats() const
 {
     MemStats stats;
-    m_top.Stats(stats);
-
+    m_top.stats(stats);
     return stats;
 }
 
+
+void Table::dump_node_structure() const
+{
+    dump_node_structure(cerr, 0);
+}
+
+void Table::dump_node_structure(ostream& out, int level) const
+{
+    int indent = level * 2;
+    out << setw(indent) << "" << "Table (top_ref: "<<m_top.get_ref()<<")\n";
+    size_t n = get_column_count();
+    for (size_t i = 0; i != n; ++i) {
+        const ColumnBase& column = get_column_base(i);
+        column.dump_node_structure(out, level+1);
+    }
+}
+
+
 #endif // TIGHTDB_DEBUG
-
-
-} // namespace tightdb

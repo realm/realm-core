@@ -30,6 +30,7 @@ namespace tightdb {
 
 
 //@{
+
 /// Compare two integers of the same, or of different type, and
 /// produce the expected result according to the natural
 /// interpretation of the operation.
@@ -63,8 +64,9 @@ template<class A, class B> inline bool int_greater_than_or_equal(A,B);
 
 
 //@{
+
 /// Check for overflow when adding or subtracting two integers of the
-/// same, or of different type.
+/// same, or of different type. Returns true on overflow.
 ///
 /// These functions check for both positive and negative overflow.
 ///
@@ -85,7 +87,7 @@ template<class L, class R> inline bool int_subtract_with_overflow_detect(L& lval
 
 
 /// Check for positive overflow when multiplying two positive integers
-/// of the same, or of different type.
+/// of the same, or of different type. Returns true on overflow.
 ///
 /// \param lval Must not be negative. Both signed and unsigned types
 /// can be used.
@@ -106,7 +108,8 @@ template<class L, class R> inline bool int_multiply_with_overflow_detect(L& lval
 
 
 /// Checks for positive overflow when performing a bitwise shift to
-/// the left on a non-negative value of arbitrary integer type.
+/// the left on a non-negative value of arbitrary integer
+/// type. Returns true on overflow.
 ///
 /// \param lval Must not be negative. Both signed and unsigned types
 /// can be used.
@@ -119,16 +122,24 @@ template<class L, class R> inline bool int_multiply_with_overflow_detect(L& lval
 template<class L> inline bool int_shift_left_with_overflow_detect(L& lval, int i);
 
 
+//@{
+
 /// Check for overflow when casting an integer value from one type to
-/// another.
+/// another. While the first function is a mere check, the second one
+/// also carries out the cast, but only when there is no
+/// overflow. Both return true on overflow.
 ///
-/// This function checks at compile time that both types have valid
+/// These functions check at compile time that both types have valid
 /// specializations of std::numeric_limits<> and that both are indeed
 /// integers.
 ///
-/// This function makes absolutely no assumptions about the platform
+/// These functions make absolutely no assumptions about the platform
 /// except that it complies with at least C++03.
-template<class F, class T> bool int_cast_with_overflow_detect(F from, T& to);
+
+template<class T, class F> bool int_cast_has_overflow(F from);
+template<class T, class F> bool int_cast_with_overflow_detect(F from, T& to);
+
+//@}
 
 
 
@@ -251,12 +262,19 @@ template<class L> inline bool int_shift_left_with_overflow_detect(L& lval, int i
     return false;
 }
 
-template<class F, class T> inline bool int_cast_with_overflow_detect(F from, T& to)
+template<class T, class F> inline bool int_cast_has_overflow(F from)
 {
     typedef std::numeric_limits<T> lim_to;
-    if (int_less_than(from, lim_to::min()) || int_less_than(lim_to::max(), from)) return true;
-    to = T(from);
-    return false;
+    return int_less_than(from, lim_to::min()) || int_less_than(lim_to::max(), from);
+}
+
+template<class T, class F> inline bool int_cast_with_overflow_detect(F from, T& to)
+{
+    if (TIGHTDB_LIKELY(!int_cast_has_overflow<T>(from))) {
+        to = T(from);
+        return false;
+    }
+    return true;
 }
 
 

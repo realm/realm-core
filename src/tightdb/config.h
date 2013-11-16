@@ -16,17 +16,38 @@
  * is strictly forbidden unless prior written permission is obtained
  * from TightDB Incorporated.
  *
- **************************************************************************/
+ *************************************************************************/
 #ifndef TIGHTDB_CONFIG_H
 #define TIGHTDB_CONFIG_H
 
 
+#ifdef TIGHTDB_HAVE_CONFIG
+#  include <tightdb/build_config.h>
+#else
+#  define TIGHTDB_VERSION "unknown"
+#  ifndef _WIN32
+#    define TIGHTDB_INSTALL_PREFIX      "/usr/local"
+#    define TIGHTDB_INSTALL_EXEC_PREFIX TIGHTDB_INSTALL_PREFIX
+#    define TIGHTDB_INSTALL_INCLUDEDIR  TIGHTDB_INSTALL_PREFIX "/include"
+#    define TIGHTDB_INSTALL_BINDIR      TIGHTDB_INSTALL_EXEC_PREFIX "/bin"
+#    define TIGHTDB_INSTALL_LIBDIR      TIGHTDB_INSTALL_EXEC_PREFIX "/lib"
+#    define TIGHTDB_INSTALL_LIBEXECDIR  TIGHTDB_INSTALL_EXEC_PREFIX "/libexec"
+#  endif
+#endif
+
+
+
 /* This one is needed to allow tightdb-config to know whether a
  * nondefault value is in effect. */
-#define TIGHTDB_DEFAULT_MAX_LIST_SIZE 1000
+#ifdef TIGHTDB_DEBUG
+#  define TIGHTDB_DEFAULT_MAX_LIST_SIZE 4
+#else
+#  define TIGHTDB_DEFAULT_MAX_LIST_SIZE 1000
+#endif
 
-/* The maximum number of elements in a B-tree node. Allow this value
- * to be overridden on the command-line. */
+/* The maximum number of elements in a B+-tree node. You may override
+ * this on the compiler command line. The minimum allowable value is
+ * 2. */
 #ifndef TIGHTDB_MAX_LIST_SIZE
 #  define TIGHTDB_MAX_LIST_SIZE TIGHTDB_DEFAULT_MAX_LIST_SIZE
 #endif
@@ -37,94 +58,139 @@
 #endif
 
 
-#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 3
-#  define TIGHTDB_HAVE_GCC_GE_4_3 1
+/* See these links for information about feature check macroes in GCC,
+ * Clang, and MSVC:
+ *
+ * http://gcc.gnu.org/projects/cxx0x.html
+ * http://clang.llvm.org/cxx_status.html
+ * http://clang.llvm.org/docs/LanguageExtensions.html#checks-for-standard-language-features
+ * http://msdn.microsoft.com/en-us/library/vstudio/hh567368.aspx
+ * http://sourceforge.net/p/predef/wiki/Compilers
+ */
+
+
+/* Compiler is GCC and version is greater than or equal to the specified version */
+#define TIGHTDB_HAVE_AT_LEAST_GCC(maj, min) \
+    (__GNUC__ > (maj) || __GNUC__ == (maj) && __GNUC_MINOR__ >= (min))
+
+#if __clang__
+#  define TIGHTDB_HAVE_CLANG_FEATURE(feature) __has_feature(feature)
+#else
+#  define TIGHTDB_HAVE_CLANG_FEATURE(feature) 0
 #endif
-#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 4
-#  define TIGHTDB_HAVE_GCC_GE_4_4 1
+
+/* Compiler is MSVC (Microsoft Visual C++) */
+#if _MSC_VER >= 1600
+#  define TIGHTDB_HAVE_AT_LEAST_MSVC_10_2010 1
 #endif
-#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 5
-#  define TIGHTDB_HAVE_GCC_GE_4_5 1
+#if _MSC_VER >= 1700
+#  define TIGHTDB_HAVE_AT_LEAST_MSVC_11_2012 1
 #endif
-#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 6
-#  define TIGHTDB_HAVE_GCC_GE_4_6 1
+#if _MSC_VER >= 1800
+#  define TIGHTDB_HAVE_AT_LEAST_MSVC_12_2013 1
 #endif
-#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 7
-#  define TIGHTDB_HAVE_GCC_GE_4_7 1
+
+
+/* Support for C++11 <type_traits>. */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_AT_LEAST_GCC(4, 3) || \
+    TIGHTDB_HAVE_CXX11 && _LIBCPP_VERSION >= 1001 || \
+    TIGHTDB_HAVE_AT_LEAST_MSVC_10_2010
+#  define TIGHTDB_HAVE_CXX11_TYPE_TRAITS 1
 #endif
-#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 8
-#  define TIGHTDB_HAVE_GCC_GE_4_8 1
+
+
+/* Support for C++11 <atomic>.
+ *
+ * FIXME: Somehow MSVC 11 (2012) fails when <atomic> is included in thread.cpp. */
+#ifndef _MSC_VER
+#  if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_AT_LEAST_GCC(4, 4) || \
+    TIGHTDB_HAVE_CXX11 && _LIBCPP_VERSION >= 1001 || \
+    TIGHTDB_HAVE_AT_LEAST_MSVC_11_2012
+#    define TIGHTDB_HAVE_CXX11_ATOMIC 1
+#  endif
 #endif
 
 
 /* Support for C++11 static_assert(). */
-#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_3 || \
-    _MSC_VER >= 1600
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_AT_LEAST_GCC(4, 3) || \
+    TIGHTDB_HAVE_CLANG_FEATURE(cxx_static_assert) || \
+    TIGHTDB_HAVE_AT_LEAST_MSVC_10_2010
 #  define TIGHTDB_HAVE_CXX11_STATIC_ASSERT 1
 #endif
 
 
-/* Support for C++11 r-value references.
+/* Support for C++11 r-value references and std::move().
  *
- * NOTE: Not yet fully supported in MSVC++ 11.0. */
-#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_3
+ * NOTE: Not yet fully supported in MSVC++ 12 (2013). */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_AT_LEAST_GCC_4_3 || \
+    TIGHTDB_HAVE_CLANG_FEATURE(cxx_rvalue_references) && _LIBCPP_VERSION >= 1001
 #  define TIGHTDB_HAVE_CXX11_RVALUE_REFERENCE 1
 #endif
 
 
-/* Support for the C++11 'decltype' keyword.
- *
- * NOTE: Not yet fully supported in MSVC++ 11.0. */
-#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_3
+/* Support for the C++11 'decltype' keyword. */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_AT_LEAST_GCC(4, 3) || \
+    TIGHTDB_HAVE_CLANG_FEATURE(cxx_decltype) || \
+    TIGHTDB_HAVE_AT_LEAST_MSVC_12_2013
 #  define TIGHTDB_HAVE_CXX11_DECLTYPE 1
 #endif
 
 
-/* Support for C++11 initializer lists.
- *
- * NOTE: Not yet fully supported in MSVC++ 11.0. */
-#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_4
+/* Support for C++11 initializer lists. */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_AT_LEAST_GCC(4, 4) || \
+    TIGHTDB_HAVE_CLANG_FEATURE(cxx_generalized_initializers) || \
+    TIGHTDB_HAVE_AT_LEAST_MSVC_12_2013
 #  define TIGHTDB_HAVE_CXX11_INITIALIZER_LISTS 1
 #endif
 
 
-/* Support for C++11 atomics. */
-#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_4 || \
-    _MSC_VER >= 1700
-#  define TIGHTDB_HAVE_CXX11_ATOMIC 1
-#endif
-
-
-/* Support for C++11 explicit conversion operators.
- * NOTE: Not yet fully supported in MSVC++ 11.0. */
-#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_5
+/* Support for C++11 explicit conversion operators. */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_AT_LEAST_GCC(4, 5) || \
+    TIGHTDB_HAVE_CLANG_FEATURE(cxx_explicit_conversions) || \
+    TIGHTDB_HAVE_AT_LEAST_MSVC_12_2013
 #  define TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS 1
 #endif
 
 
 /* Support for the C++11 'constexpr' keyword.
  *
- * NOTE: Not yet fully supported in MSVC++ 11.0. */
-#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_6
+ * NOTE: Not yet fully supported in MSVC++ 12 (2013). */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_AT_LEAST_GCC(4, 6) || \
+    TIGHTDB_HAVE_CLANG_FEATURE(cxx_constexpr)
 #  define TIGHTDB_HAVE_CXX11_CONSTEXPR 1
 #endif
 
 
 /* Support for the C++11 'noexcept' specifier.
  *
- * NOTE: Not yet fully supported in MSVC++ 11.0. */
-#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_6
+ * NOTE: Not yet fully supported in MSVC++ 12 (2013). */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_AT_LEAST_GCC(4, 6) || \
+    TIGHTDB_HAVE_CLANG_FEATURE(cxx_noexcept)
+#  define TIGHTDB_HAVE_CXX11_NOEXCEPT 1
+#endif
+#if TIGHTDB_HAVE_CXX11_NOEXCEPT
 #  define TIGHTDB_NOEXCEPT noexcept
 #elif defined TIGHTDB_DEBUG
 #  define TIGHTDB_NOEXCEPT throw()
 #else
 #  define TIGHTDB_NOEXCEPT
 #endif
+#if TIGHTDB_HAVE_CXX11_NOEXCEPT
+#  define TIGHTDB_NOEXCEPT_IF(cond) noexcept(cond)
+#else
+#  define TIGHTDB_NOEXCEPT_IF(cond)
+#endif
+#if TIGHTDB_HAVE_CXX11_NOEXCEPT
+#  define TIGHTDB_NOEXCEPT_OR_NOTHROW noexcept
+#else
+#  define TIGHTDB_NOEXCEPT_OR_NOTHROW throw()
+#endif
 
 
 /* Support for C++11 explicit virtual overrides */
-#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_GCC_GE_4_7 || \
-    _MSC_VER >= 1700
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_AT_LEAST_GCC(4, 7) || \
+    TIGHTDB_HAVE_CLANG_FEATURE(cxx_override_control) || \
+    TIGHTDB_HAVE_AT_LEAST_MSVC_11_2012
 #  define TIGHTDB_OVERRIDE override
 #else
 #  define TIGHTDB_OVERRIDE
@@ -134,8 +200,9 @@
 /* The way to specify that a function never returns.
  *
  * NOTE: C++11 generalized attributes are not yet fully supported in
- * MSVC++ 11.0. */
-#if defined TIGHTDB_HAVE_CXX11 && defined TIGHTDB_HAVE_GCC_GE_4_8
+ * MSVC++ 12 (2013). */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_AT_LEAST_GCC(4, 8) || \
+    TIGHTDB_HAVE_CLANG_FEATURE(cxx_attributes)
 #  define TIGHTDB_NORETURN [[noreturn]]
 #elif __GNUC__
 #  define TIGHTDB_NORETURN __attribute__((noreturn))
@@ -161,6 +228,15 @@
 #else
 #  define TIGHTDB_UNLIKELY(expr) (expr)
 #  define TIGHTDB_LIKELY(expr)   (expr)
+#endif
+
+
+#if defined(__GNUC__) || defined(__HP_aCC)
+    #define TIGHTDB_FORCEINLINE inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+    #define TIGHTDB_FORCEINLINE __forceinline
+#else
+    #define TIGHTDB_FORCEINLINE inline
 #endif
 
 

@@ -1,6 +1,7 @@
-// @@Example: ex_cpp_typed_query_do @@
+// @@Example: ex_cpp_typed_query_findall @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_2(PeopleTable,
                 name, String,

@@ -17,28 +17,29 @@ template<class A> struct Wrap {
     A m_array;
     bool m_must_destroy;
     Wrap(Allocator& alloc): m_array(alloc), m_must_destroy(false) {}
-    ~Wrap() { if (m_must_destroy) m_array.Destroy(); }
+    ~Wrap() { if (m_must_destroy) m_array.destroy(); }
     bool empty() const { return m_array.is_empty(); }
     size_t size() const { return m_array.size(); }
-    size_t get_as_ref(size_t i) const { return m_array.GetAsRef(i); }
+    size_t get_as_ref(size_t i) const { return m_array.get_as_ref(i); }
 };
 
 
 struct Converter {
-    Converter(SlabAlloc& a, int v, Group& g): m_alloc(a), m_version(v), m_new_group(g) {}
+    Converter(SlabAlloc& alloc, ref_type top_ref, int version, Group& group):
+        m_alloc(alloc), m_top_ref(top_ref), m_version(version), m_new_group(group) {}
 
     void convert()
     {
-        size_t top_ref = m_alloc.GetTopRef();
-        if (top_ref) convert_group(top_ref, m_new_group);
+        convert_group(m_top_ref, m_new_group);
     }
 
 private:
     SlabAlloc& m_alloc;
+    ref_type m_top_ref;
     int m_version;
     Group &m_new_group;
 
-    void convert_group(size_t ref, Group& new_group)
+    void convert_group(ref_type ref, Group& new_group)
     {
         Wrap<Array> top(m_alloc);
         init(top, ref);
@@ -48,14 +49,14 @@ private:
         init(table_refs,  top.get_as_ref(1));
         size_t n = table_refs.size();
         for (size_t i=0; i<n; ++i) {
-            string name = table_names.m_array.Get(i); // FIXME: Explicit string length
+            string name = table_names.m_array.get(i); // FIXME: Explicit string length
             cout << "Converting table: '" << name << "'\n";
             TableRef new_table = new_group.get_table(name.c_str()); // FIXME: Explicit string length
-            convert_table_and_spec(table_refs.m_array.Get(i), *new_table);
+            convert_table_and_spec(table_refs.m_array.get(i), *new_table);
         }
     }
 
-    void convert_table_and_spec(size_t ref, Table& new_table)
+    void convert_table_and_spec(ref_type ref, Table& new_table)
     {
         Wrap<Array> top(m_alloc);
         init(top, ref);
@@ -64,7 +65,7 @@ private:
         convert_columns(top.get_as_ref(0), top.get_as_ref(1), new_table);
     }
 
-    void convert_spec(size_t ref, Spec& new_spec)
+    void convert_spec(ref_type ref, Spec& new_spec)
     {
         Wrap<Array> top(m_alloc);
         init(top, ref);
@@ -75,17 +76,18 @@ private:
         Wrap<Array>       column_subspecs(m_alloc);
         init(column_types, top.get_as_ref(0));
         init(column_names, top.get_as_ref(1));
-        if (2 < top.size()) init(column_subspecs, top.get_as_ref(2));
+        if (2 < top.size())
+            init(column_subspecs, top.get_as_ref(2));
         size_t name_ndx    = 0;
         size_t subspec_ndx = 0;
         size_t n = column_types.size();
         for (size_t i=0; i<n; ++i) {
-            ColumnType type = ColumnType(column_types.m_array.Get(i));
+            ColumnType type = ColumnType(column_types.m_array.get(i));
             DataType new_type = DataType();
             switch (type) {
                 case col_type_Int:
                 case col_type_Bool:
-                case col_type_Date:
+                case col_type_DateTime:
                 case col_type_Float:
                 case col_type_Double:
                 case col_type_String:
@@ -97,16 +99,11 @@ private:
                 case col_type_StringEnum:
                     new_type = type_String;
                     break;
-                case col_attr_Indexed:
-                    continue;
                 case col_type_Reserved1:
                 case col_type_Reserved4:
-                case col_attr_Unique:
-                case col_attr_Sorted:
-                case col_attr_None:
                     throw runtime_error("Unexpected column type");
             }
-            string name = column_names.m_array.Get(name_ndx); // FIXME: Explicit string length
+            string name = column_names.m_array.get(name_ndx); // FIXME: Explicit string length
             ++name_ndx;
             cout << "col name: " << name << "\n";
             if (new_type == type_Table) {
@@ -120,18 +117,24 @@ private:
         }
     }
 
-    void convert_columns(size_t spec_ref, size_t columns_ref, Table& new_table)
+    void convert_columns(ref_type spec_ref, ref_type columns_ref, Table& new_table)
     {
         Wrap<Array>       column_types(m_alloc);
         Wrap<ArrayString> column_names(m_alloc);
+        Wrap<Array>       column_attribs(m_alloc);
         Wrap<Array>       column_subspecs(m_alloc);
+        Wrap<Array>       column_enumkeys(m_alloc);
         Wrap<Array>       column_refs(m_alloc);
         {
             Wrap<Array> spec(m_alloc);
             init(spec, spec_ref);
-            init(column_types, spec.get_as_ref(0));
-            init(column_names, spec.get_as_ref(1));
-            if (2 < spec.size()) init(column_subspecs, spec.get_as_ref(2));
+            init(column_types,   spec.get_as_ref(0));
+            init(column_names,   spec.get_as_ref(1));
+            init(column_attribs, spec.get_as_ref(2));
+            if (3 < spec.size())
+                init(column_subspecs, spec.get_as_ref(3));
+            if (4 < spec.size())
+                init(column_enumkeys, spec.get_as_ref(4));
         }
         init(column_refs, columns_ref);
 
@@ -141,30 +144,29 @@ private:
         size_t num_rows = 0;
         if (0 < num_cols) {
             Wrap<Array> column_root(m_alloc);
-            init(column_root, column_refs.m_array.Get(0));
+            init(column_root, column_refs.m_array.get(0));
             if (column_root.m_array.is_leaf()) {
                 num_rows = column_root.size();
             }
             else {
                 Wrap<Array> root_offsets(m_alloc);
                 init(root_offsets, column_root.get_as_ref(0));
-                if (root_offsets.empty()) throw runtime_error("Unexpected empty non-leaf node");
+                if (root_offsets.empty())
+                    throw runtime_error("Unexpected empty non-leaf node");
                 num_rows = size_t(root_offsets.m_array.back());
             }
         }
 
         new_table.add_empty_row(num_rows);
 
+        // FIXME: Handle stuff in `column_enumkeys`
+
         size_t column_ref_ndx     = 0;
-        size_t column_type_ndx    = 0;
         size_t column_subspec_ndx = 0;
         for (size_t i=0; i<num_cols; ++i) {
-            size_t column_ref = column_refs.m_array.Get(column_ref_ndx);
+            ref_type column_ref = column_refs.m_array.get(column_ref_ndx);
             ++column_ref_ndx;
-            ColumnType type;
-            bool indexed = false;
-          again:
-            type = ColumnType(column_types.m_array.Get(column_type_ndx));
+            ColumnType type = ColumnType(column_types.m_array.get(i));
             switch (type) {
                 case col_type_Int:
                     convert_int_column(column_ref, new_table, i);
@@ -172,8 +174,8 @@ private:
                 case col_type_Bool:
                     convert_bool_column(column_ref, new_table, i);
                     break;
-                case col_type_Date:
-                    convert_date_column(column_ref, new_table, i);
+                case col_type_DateTime:
+                    convert_datetime_column(column_ref, new_table, i);
                     break;
                 case col_type_Float:
                     convert_float_column(column_ref, new_table, i);
@@ -185,8 +187,8 @@ private:
                     convert_string_column(column_ref, new_table, i);
                     break;
                 case col_type_StringEnum: {
-                    size_t strings_ref = column_ref;
-                    size_t refs_ref    = column_refs.m_array.Get(column_ref_ndx);;
+                    ref_type strings_ref = column_ref;
+                    ref_type refs_ref    = column_refs.m_array.get(column_ref_ndx);;
                     ++column_ref_ndx;
                     convert_string_enum_column(strings_ref, refs_ref, new_table, i);
                     break;
@@ -195,7 +197,7 @@ private:
                     convert_binary_column(column_ref, new_table, i);
                     break;
                 case col_type_Table: {
-                    size_t subspec_ref = column_subspecs.get_as_ref(column_subspec_ndx);
+                    ref_type subspec_ref = column_subspecs.get_as_ref(column_subspec_ndx);
                     ++column_subspec_ndx;
                     convert_subtable_column(subspec_ref, column_ref, new_table, i);
                     break;
@@ -203,75 +205,77 @@ private:
                 case col_type_Mixed:
                     convert_mixed_column(column_ref, new_table, i);
                     break;
-                case col_attr_Indexed:
-                    indexed = true;
-                    ++column_type_ndx;
-                    goto again;
                 case col_type_Reserved1:
                 case col_type_Reserved4:
-                case col_attr_Unique:
-                case col_attr_Sorted:
-                case col_attr_None:
                     throw runtime_error("Unexpected column type");
             }
-            if (indexed) new_table.set_index(i);
-            ++column_type_ndx;
+            ColumnAttr attr = ColumnAttr(column_attribs.m_array.get(i));
+            switch (attr) {
+                case col_attr_None:
+                    break;
+                case col_attr_Indexed:
+                    new_table.set_index(i);
+                    break;
+                case col_attr_Unique:
+                case col_attr_Sorted:
+                    throw runtime_error("Unexpected column attribute");
+            }
         }
     }
 
-    void convert_int_column(size_t ref, Table& new_table, size_t col_ndx)
+    void convert_int_column(ref_type ref, Table& new_table, size_t col_ndx)
     {
         cout << "column_ref  = " << ref << "\n";
         Column col(ref, 0, 0, m_alloc);
-        size_t n = col.Size();
-        if (n != new_table.size()) throw runtime_error("Unexpected column size");
-        for (size_t i=0; i<n; ++i) {
-            new_table.set_int(col_ndx, i, col.Get(i));
-        }
+        size_t n = col.size();
+        if (n != new_table.size())
+            throw runtime_error("Unexpected column size");
+        for (size_t i=0; i<n; ++i)
+            new_table.set_int(col_ndx, i, col.get(i));
     }
 
-    void convert_bool_column(size_t ref, Table& new_table, size_t col_ndx)
+    void convert_bool_column(ref_type ref, Table& new_table, size_t col_ndx)
     {
         cout << "column_ref  = " << ref << "\n";
         Column col(ref, 0, 0, m_alloc);
-        size_t n = col.Size();
-        if (n != new_table.size()) throw runtime_error("Unexpected column size");
-        for (size_t i=0; i<n; ++i) {
-            new_table.set_bool(col_ndx, i, bool(col.Get(i)));
-        }
+        size_t n = col.size();
+        if (n != new_table.size())
+            throw runtime_error("Unexpected column size");
+        for (size_t i=0; i<n; ++i)
+            new_table.set_bool(col_ndx, i, bool(col.get(i)));
     }
 
-    void convert_date_column(size_t ref, Table& new_table, size_t col_ndx)
+    void convert_datetime_column(ref_type ref, Table& new_table, size_t col_ndx)
     {
         cout << "column_ref  = " << ref << "\n";
         Column col(ref, 0, 0, m_alloc);
-        size_t n = col.Size();
-        if (n != new_table.size()) throw runtime_error("Unexpected column size");
-        for (size_t i=0; i<n; ++i) {
-            new_table.set_date(col_ndx, i, time_t(col.Get(i)));
-        }
+        size_t n = col.size();
+        if (n != new_table.size())
+            throw runtime_error("Unexpected column size");
+        for (size_t i=0; i<n; ++i)
+            new_table.set_datetime(col_ndx, i, time_t(col.get(i)));
     }
 
-    void convert_float_column(size_t ref, Table& new_table, size_t col_ndx)
+    void convert_float_column(ref_type ref, Table& new_table, size_t col_ndx)
     {
         cout << "column_ref  = " << ref << "\n";
         ColumnFloat col(ref, 0, 0, m_alloc);
-        size_t n = col.Size();
-        if (n != new_table.size()) throw runtime_error("Unexpected column size");
-        for (size_t i=0; i<n; ++i) {
-            new_table.set_float(col_ndx, i, col.Get(i));
-        }
+        size_t n = col.size();
+        if (n != new_table.size())
+            throw runtime_error("Unexpected column size");
+        for (size_t i=0; i<n; ++i)
+            new_table.set_float(col_ndx, i, col.get(i));
     }
 
-    void convert_double_column(size_t ref, Table& new_table, size_t col_ndx)
+    void convert_double_column(ref_type ref, Table& new_table, size_t col_ndx)
     {
         cout << "column_ref  = " << ref << "\n";
         ColumnDouble col(ref, 0, 0, m_alloc);
-        size_t n = col.Size();
-        if (n != new_table.size()) throw runtime_error("Unexpected column size");
-        for (size_t i=0; i<n; ++i) {
-            new_table.set_double(col_ndx, i, col.Get(i));
-        }
+        size_t n = col.size();
+        if (n != new_table.size())
+            throw runtime_error("Unexpected column size");
+        for (size_t i=0; i<n; ++i)
+            new_table.set_double(col_ndx, i, col.get(i));
     }
 
 
@@ -279,22 +283,22 @@ private:
         HandleStringsLeaf(const Converter& c, Table& t, size_t i):
             m_conv(c), m_new_table(t), m_col_ndx(i), m_row_ndx(0) {}
 
-        void operator()(size_t ref) const
+        void operator()(ref_type ref) const
         {
-            const char* header = static_cast<char*>(m_conv.m_alloc.Translate(ref));
-            switch (Array::get_coldef_from_header(header)) {
-                case Array::coldef_InnerNode:
+            // FIXME: Handle big_blobs leafs
+            const char* header = static_cast<char*>(m_conv.m_alloc.translate(ref));
+            switch (Array::get_type_from_header(header)) {
+                case Array::type_InnerColumnNode:
                     throw runtime_error("Unexpected leaf type");
-                case Array::coldef_HasRefs: {
+                case Array::type_HasRefs: {
                     Wrap<ArrayStringLong> leaf(m_conv.m_alloc);
-                    m_conv.init(leaf, ref);
+                    m_conv.init(leaf.m_array, ref);
                     size_t n = leaf.size();
-                    for (size_t i=0; i<n; ++i) {
-                        m_new_table.set_string(m_conv.convert_long_string();
-                    }
+                    for (size_t i=0; i<n; ++i)
+                        m_new_table.set_string(m_conv.convert_long_string());
                     break;
                 }
-                case Array::coldef_Normal:
+                case Array::type_Normal:
                     m_array = new ArrayString(ref, parent, pndx, alloc);
                     break;
             }
@@ -307,7 +311,7 @@ private:
         size_t m_row_ndx;
     };
 
-    void convert_string_column(size_t ref, Table& new_table, size_t col_ndx)
+    void convert_string_column(ref_type ref, Table& new_table, size_t col_ndx)
     {
         cout << "string_column_ref = " << ref << "\n";
         HandleStringsLeaf handler(new_table, col_ndx)
@@ -317,7 +321,7 @@ private:
 
     struct HandleEnumStringsLeaf {
         HandleEnumStringsLeaf(vector<string>& s): m_strings(s) {}
-        void operator()(size_t ref) const
+        void operator()(ref_type ref) const
         {
         }
     private:
@@ -326,7 +330,7 @@ private:
 
     struct HandleEnumRefsLeaf {
         HandleEnumRefsLeaf(const vector<string>& s, Table& t, size_t i): m_strings(s), m_new_table(t), m_col_ndx(i) {}
-        void operator()(size_t ref) const
+        void operator()(ref_type ref) const
         {
         }
     private:
@@ -336,7 +340,7 @@ private:
 
     };
 
-    void convert_string_enum_column(size_t strings_ref, size_t refs_ref, Table& new_table, size_t col_ndx)
+    void convert_string_enum_column(ref_type strings_ref, ref_type refs_ref, Table& new_table, size_t col_ndx)
     {
         cout << "string_enum_column_strings_ref = " << strings_ref << "\n";
         cout << "string_enum_column_refs_ref    = " << refs_ref << "\n";
@@ -346,57 +350,60 @@ private:
             for_each_leaf(strings_ref, handler);
         }
         {
-            HandleEnumRefsLeaf handler(strings, new_table, col_ndx)
+            HandleEnumRefsLeaf handler(strings, new_table, col_ndx);
             for_each_leaf(refs_ref, handler);
         }
     }
 
 
-    void convert_binary_column(size_t ref, Table& new_table, size_t col_ndx)
+    void convert_binary_column(ref_type ref, Table& new_table, size_t col_ndx)
     {
         cout << "binary_column_ref = " << ref << "\n";
         ColumnBinary col(ref, 0, 0, m_alloc);
-        size_t n = col.Size();
-        if (n != new_table.size()) throw runtime_error("Unexpected column size");
-        for (size_t i=0; i<n; ++i) {
-            new_table.set_binary(col_ndx, i, col.Get(i));
-        }
+        size_t n = col.size();
+        if (n != new_table.size())
+            throw runtime_error("Unexpected column size");
+        for (size_t i=0; i<n; ++i)
+            new_table.set_binary(col_ndx, i, col.get(i));
     }
 
-    void convert_subtable_column(size_t subspec_ref, size_t column_ref, Table& new_table, size_t col_ndx)
+    void convert_subtable_column(ref_type subspec_ref, size_t column_ref, Table& new_table, size_t col_ndx)
     {
         cout << "subtable_column_subspec_ref = " << subspec_ref << "\n";
         cout << "subtable_column_column_ref  = " << column_ref << "\n";
         Column col(column_ref, 0, 0, m_alloc);
-        size_t n = col.Size();
-        if (n != new_table.size()) throw runtime_error("Unexpected column size");
+        size_t n = col.size();
+        if (n != new_table.size())
+            throw runtime_error("Unexpected column size");
         for (size_t i=0; i<n; ++i) {
-            size_t subtable_ref = col.GetAsRef(i);
-            if (!subtable_ref) continue;
+            ref_type subtable_ref = col.get_as_ref(i);
+            if (!subtable_ref)
+                continue;
             TableRef subtable = new_table.get_subtable(col_ndx, i);
-            convert_columns(subspec_ref, col.Get(i), *subtable);
+            convert_columns(subspec_ref, col.get(i), *subtable);
         }
     }
 
-    void convert_mixed_column(size_t ref, Table& new_table, size_t col_ndx)
+    void convert_mixed_column(ref_type ref, Table& new_table, size_t col_ndx)
     {
         cout << "mixed_column_ref = " << ref << "\n";
         ColumnMixed col(m_alloc, 0, 0, 0, 0, ref);
-        size_t n = col.Size();
-        if (n != new_table.size()) throw runtime_error("Unexpected column size");
+        size_t n = col.size();
+        if (n != new_table.size())
+            throw runtime_error("Unexpected column size");
         for (size_t i=0; i<n; ++i) {
             Mixed m;
             switch (col.get_type(i)) {
-                case type_Int:    m.set_int(col.get_int(i));       break;
-                case type_Bool:   m.set_bool(col.get_bool(i));     break;
-                case type_Date:   m.set_date(col.get_date(i));     break;
-                case type_Float:  m.set_float(col.get_float(i));   break;
-                case type_Double: m.set_double(col.get_double(i)); break;
-                case type_String: m.set_string(col.get_string(i)); break;
-                case type_Binary: m.set_binary(col.get_binary(i)); break;
+                case type_Int:      m.set_int(col.get_int(i));           break;
+                case type_Bool:     m.set_bool(col.get_bool(i));         break;
+                case type_DateTime: m.set_datetime(col.get_datetime(i)); break;
+                case type_Float:    m.set_float(col.get_float(i));       break;
+                case type_Double:   m.set_double(col.get_double(i));     break;
+                case type_String:   m.set_string(col.get_string(i));     break;
+                case type_Binary:   m.set_binary(col.get_binary(i));     break;
                 case type_Table: {
                     new_table.clear_subtable(col_ndx, i);
-                    size_t subtable_ref = col.get_subtable_ref(i);
+                    ref_type subtable_ref = col.get_subtable_ref(i);
                     TableRef subtable = new_table.get_subtable(col_ndx, i);
                     convert_table_and_spec(subtable_ref, *subtable);
                     continue;
@@ -408,22 +415,23 @@ private:
         }
     }
 
-    template<class A> void init(Wrap<A>& array, size_t ref)
+    template<class A> void init(Wrap<A>& array, ref_type ref)
     {
-        if (init(array.m_array, ref)) array.m_must_destroy = true;
+        if (init(array.m_array, ref))
+            array.m_must_destroy = true;
     }
 
-    bool init(Array& array, size_t ref)
+    bool init(Array& array, ref_type ref)
     {
         // If conversion of the array is needed (a decision which may
         // be based on m_version) then that conversion should be done
         // here. When converting, allocate space for a new array, and
         // return true.
-        array.UpdateRef(ref);
+        array.init_from_ref(ref);
         return false;
     }
 
-    template<class H> void for_each_leaf(size_t ref, H& handler)
+    template<class H> void for_each_leaf(ref_type ref, H& handler)
     {
         Wrap<Array> node(m_alloc);
         init(node, ref);
@@ -432,17 +440,18 @@ private:
             return;
         }
 
-        if (node.size() < 2) throw runtime_error("Too few elements in non-leaf node array");
+        if (node.size() < 2)
+            throw runtime_error("Too few elements in non-leaf node array");
         Wrap<Array> children(m_alloc);
         init(children, node.get_as_ref(1));
         size_t n = children.size();
-        for (size_t i=0; i<n; ++i) {
+        for (size_t i=0; i<n; ++i)
             for_each_leaf(children.get_as_ref(i), handler);
-        }
     }
 };
 
 } // Anonymous namespace
+
 
 int main(int argc, char* argv[])
 {
@@ -470,10 +479,12 @@ int main(int argc, char* argv[])
         }
         argc = argc2;
 
-        if (argc != 1) error = true;
+        if (argc != 1)
+            error = true;
 
         if (error || help) {
-            if (error) cerr << "ERROR: Bad command line.\n\n";
+            if (error)
+                cerr << "ERROR: Bad command line.\n\n";
             cerr <<
                 "Synopsis: "<<prog<<"  [DATABASE]\n\n"
                 "Options:\n"
@@ -487,11 +498,13 @@ int main(int argc, char* argv[])
 
     SlabAlloc alloc;
 
-    bool is_shared = false;
-    bool read_only = true;
-    bool no_create = true;
+    bool is_shared     = false;
+    bool read_only     = true;
+    bool no_create     = true;
+    bool skip_validate = false;
     int version;
-    alloc.attach_file(database_file, is_shared, read_only, no_create, &version);
+    ref_type top_ref =
+        alloc.attach_file(database_file, is_shared, read_only, no_create, skip_validate, &version);
 
     cout << "Detected version = " << version << "\n";
 
@@ -501,8 +514,10 @@ int main(int argc, char* argv[])
     else if (version < 1) {
         cout << "Converting to version 1\n";
         Group new_group;
-        Converter cvt(alloc, version, new_group);
-        cvt.convert();
+        if (top_ref) {
+            Converter cvt(alloc, top_ref, version, new_group);
+            cvt.convert();
+        }
         new_group.write(database_file+".new");
     }
 }

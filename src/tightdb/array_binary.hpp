@@ -26,34 +26,40 @@
 namespace tightdb {
 
 
-class ArrayBinary : public Array {
+class ArrayBinary: public Array {
 public:
-    ArrayBinary(ArrayParent* parent=NULL, size_t pndx=0,
-                Allocator& alloc = Allocator::get_default());
-    ArrayBinary(size_t ref, ArrayParent* parent, size_t pndx,
-                Allocator& alloc = Allocator::get_default());
+    explicit ArrayBinary(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                         Allocator& = Allocator::get_default());
+    ArrayBinary(MemRef, ArrayParent*, std::size_t ndx_in_parent,
+                Allocator&) TIGHTDB_NOEXCEPT;
+    ArrayBinary(ref_type, ArrayParent*, std::size_t ndx_in_parent,
+                Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
+    ~ArrayBinary() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     bool is_empty() const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT;
 
     BinaryData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
-    void add(BinaryData value);
-    void set(std::size_t ndx, BinaryData value);
-    void insert(std::size_t ndx, BinaryData value);
-    void Delete(std::size_t ndx);
-    void Resize(std::size_t ndx);
-    void Clear();
+    void add(BinaryData value, bool add_zero_term = false);
+    void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
+    void insert(std::size_t ndx, BinaryData value, bool add_zero_term = false);
+    void erase(std::size_t ndx);
+    void resize(std::size_t ndx);
+    void clear();
 
-    void set_string(std::size_t ndx, StringData value);
-    void insert_string(std::size_t ndx, StringData value);
+    /// Get the specified element without the cost of constructing an
+    /// array instance. If an array instance is already available, or
+    /// you need to get multiple values, then this method will be
+    /// slower.
+    static BinaryData get(const char* header, std::size_t ndx, Allocator&) TIGHTDB_NOEXCEPT;
 
-    static BinaryData column_get(const Array* root, std::size_t ndx) TIGHTDB_NOEXCEPT;
-    static BinaryData get_direct(Allocator&, const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+    ref_type bptree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term,
+                                TreeInsertBase& state);
 
 #ifdef TIGHTDB_DEBUG
-    void ToDot(std::ostream& out, const char* title=NULL) const;
-#endif // TIGHTDB_DEBUG
+    void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
+#endif
 
 private:
     Array m_offsets;
@@ -80,16 +86,9 @@ inline BinaryData ArrayBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_offsets.size());
 
-    std::size_t begin = ndx ? m_offsets.GetAsSizeT(ndx-1) : 0;
-    std::size_t end   = m_offsets.GetAsSizeT(ndx);
+    std::size_t begin = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    std::size_t end   = to_size_t(m_offsets.get(ndx));
     return BinaryData(m_blob.get(begin), end-begin);
-}
-
-inline BinaryData ArrayBinary::column_get(const Array* root, std::size_t ndx) TIGHTDB_NOEXCEPT
-{
-    if (root->is_leaf()) return static_cast<const ArrayBinary*>(root)->get(ndx);
-    std::pair<const char*, std::size_t> p = find_leaf(root, ndx);
-    return get_direct(root->GetAllocator(), p.first, p.second);
 }
 
 

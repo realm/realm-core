@@ -1,6 +1,7 @@
 // @@Example: ex_cpp_typed_query_find_next @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <assert.h>
 
 TIGHTDB_TABLE_2(PeopleTable,
                 name, String,
@@ -20,18 +21,18 @@ int main()
     PeopleTable::Query query = table.where().age.greater_equal(18);
 
     // Find first matching row
-    m = query.find_next(size_t(-1));
+    m = query.find();
     assert(m == 0);
 
     // Find successive matches
-    m = query.find_next(m);
+    m = query.find(m + 1);
     assert(m == 1);
 
-    m = query.find_next(m);
+    m = query.find(m + 1);
     assert(m == 3);
 
     // No more matches
-    m = query.find_next(m);
+    m = query.find(m + 1);
     assert(m == size_t(-1));
 // @@Fold@@
 }

@@ -26,6 +26,8 @@
 #include <tightdb/mixed.hpp>
 #include <tightdb/table.hpp>
 
+#include <tightdb/query_engine.hpp>
+
 namespace tightdb {
 
 
@@ -40,7 +42,7 @@ namespace tightdb {
 struct SpecBase {
     typedef int64_t             Int;
     typedef bool                Bool;
-    typedef tightdb::Date       Date;
+    typedef tightdb::DateTime   DateTime;
     typedef float               Float;
     typedef double              Double;
     typedef tightdb::StringData String;
@@ -50,7 +52,7 @@ struct SpecBase {
     template<class E> class Enum {
     public:
         typedef E enum_type;
-        Enum(E v) : m_value(v) {};
+        Enum(E v): m_value(v) {}
         operator E() const { return m_value; }
     private:
         E m_value;
@@ -59,7 +61,7 @@ struct SpecBase {
     template<class T> class Subtable {
     public:
         typedef T table_type;
-        Subtable(T* t) : m_table(t) {};
+        Subtable(T* t): m_table(t) {}
         operator T*() const { return m_table; }
     private:
         T* m_table;
@@ -93,7 +95,7 @@ struct SpecBase {
 
     /// FIXME: Currently we do not support absence of dynamic column
     /// names.
-    static const StringData* dyn_col_names() { return 0; }
+    static void dyn_col_names(StringData*) TIGHTDB_NOEXCEPT {}
 
     /// This is the fallback class that is used when no convenience
     /// methods are specified in the users Spec class.
@@ -118,16 +120,16 @@ struct SpecBase {
     ///
     /// \endcode
     ///
-    /// FIXME: Note: Users ConvenienceMethods may not contain any
-    /// virtual methods, nor may it contain any data memebers. We
-    /// might want to check this by
-    /// TIGHTDB_STATIC_ASSERT(sizeof(Derivative of ConvenienceMethods)
-    /// == 1)), however, this would not be guaranteed by the standard,
-    /// since even an empty class may add to the size of the derived
-    /// class. Fortunately, as long as ConvenienceMethods is derived
-    /// from, by BasicTable, after deriving from Table, this cannot
-    /// become a problem, nor would it lead to a violation of the
-    /// strict aliasing rule of C++03 or C++11.
+    /// FIXME: ConvenienceMethods may not contain any virtual methods,
+    /// nor may it contain any data memebers. We might want to check
+    /// this by TIGHTDB_STATIC_ASSERT(sizeof(Derivative of
+    /// ConvenienceMethods) == 1)), however, this would not be
+    /// guaranteed by the standard, since even an empty class may add
+    /// to the size of the derived class. Fortunately, as long as
+    /// ConvenienceMethods is derived from, by BasicTable, after
+    /// deriving from Table, this cannot become a problem, nor would
+    /// it lead to a violation of the strict aliasing rule of C++03 or
+    /// C++11.
     struct ConvenienceMethods {};
 };
 
@@ -206,7 +208,6 @@ public:
     {
         Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value);
     }
-
     operator int64_t() const TIGHTDB_NOEXCEPT { return get(); }
     const FieldAccessor& operator=(int64_t value) const { set(value); return *this; }
 
@@ -387,23 +388,23 @@ public:
 
 /// Field accessor specialization for dates.
 template<class Taboid, int col_idx, bool const_tab>
-class FieldAccessor<Taboid, col_idx, Date, const_tab>: public FieldAccessorBase<Taboid> {
+class FieldAccessor<Taboid, col_idx, DateTime, const_tab>: public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    Date get() const TIGHTDB_NOEXCEPT
+    DateTime get() const TIGHTDB_NOEXCEPT
     {
-        return Base::m_table->get_impl()->get_date(col_idx, Base::m_row_idx);
+        return Base::m_table->get_impl()->get_datetime(col_idx, Base::m_row_idx);
     }
 
-    void set(Date value) const
+    void set(DateTime value) const
     {
-        Base::m_table->get_impl()->set_date(col_idx, Base::m_row_idx, value);
+        Base::m_table->get_impl()->set_datetime(col_idx, Base::m_row_idx, value);
     }
 
-    operator Date() const TIGHTDB_NOEXCEPT { return get(); }
-    const FieldAccessor& operator=(Date value) const { set(value); return *this; }
+    operator DateTime() const TIGHTDB_NOEXCEPT { return get(); }
+    const FieldAccessor& operator=(DateTime value) const { set(value); return *this; }
 
 
     explicit FieldAccessor(typename Base::Init i) TIGHTDB_NOEXCEPT: Base(i) {}
@@ -447,7 +448,7 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    BinaryData get() const // FIXME: Should be modified so it never throws
+    BinaryData get() const TIGHTDB_NOEXCEPT
     {
         return Base::m_table->get_impl()->get_binary(col_idx, Base::m_row_idx);
     }
@@ -457,33 +458,11 @@ public:
         Base::m_table->get_impl()->set_binary(col_idx, Base::m_row_idx, value);
     }
 
-    operator BinaryData() const { return get(); } // FIXME: Should be modified so it never throws
+    operator BinaryData() const TIGHTDB_NOEXCEPT { return get(); }
     const FieldAccessor& operator=(const BinaryData& value) const { set(value); return *this; }
 
-/*
-    friend bool operator==(const FieldAccessor& a, const BinaryData& b) // FIXME: Should be modified so it never throws
-    {
-        return a.get() == b;
-    }
-
-    friend bool operator!=(const FieldAccessor& a, const BinaryData& b) // FIXME: Should be modified so it never throws
-    {
-        return a.get() != b;
-    }
-
-    friend bool operator==(const BinaryData& a, const FieldAccessor& b) // FIXME: Should be modified so it never throws
-    {
-        return a == b.get();
-    }
-
-    friend bool operator!=(const BinaryData& a, const FieldAccessor& b) // FIXME: Should be modified so it never throws
-    {
-        return a != b.get();
-    }
-*/
-
-    const char* data() const { return get().data(); } // FIXME: Should be modified so it never throws
-    std::size_t size() const { return get().size(); } // FIXME: Should be modified so it never throws
+    const char* data() const TIGHTDB_NOEXCEPT { return get().data(); }
+    std::size_t size() const TIGHTDB_NOEXCEPT { return get().size(); }
 
 
     explicit FieldAccessor(typename Base::Init i) TIGHTDB_NOEXCEPT: Base(i) {}
@@ -593,7 +572,7 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    Mixed get() const // FIXME: Should be modified so it never throws
+    Mixed get() const TIGHTDB_NOEXCEPT
     {
         return Base::m_table->get_impl()->get_mixed(col_idx, Base::m_row_idx);
     }
@@ -603,7 +582,7 @@ public:
         Base::m_table->get_impl()->set_mixed(col_idx, Base::m_row_idx, value);
     }
 
-    operator Mixed() const { return get(); } // FIXME: Should be modified so it never throws
+    operator Mixed() const TIGHTDB_NOEXCEPT { return get(); }
 
     const FieldAccessor& operator=(const Mixed& value) const
     {
@@ -616,19 +595,19 @@ public:
         return Base::m_table->get_impl()->get_mixed_type(col_idx, Base::m_row_idx);
     }
 
-    int64_t get_int() const { return get().get_int(); } // FIXME: Should be modified so it never throws
+    int64_t get_int() const TIGHTDB_NOEXCEPT { return get().get_int(); }
 
-    bool get_bool() const { return get().get_bool(); } // FIXME: Should be modified so it never throws
+    bool get_bool() const TIGHTDB_NOEXCEPT { return get().get_bool(); }
 
-    Date get_date() const { return get().get_date(); } // FIXME: Should be modified so it never throws
+    DateTime get_datetime() const TIGHTDB_NOEXCEPT { return get().get_datetime(); }
 
-    float get_float() const { return get().get_float(); } // FIXME: Should be modified so it never throws
+    float get_float() const TIGHTDB_NOEXCEPT { return get().get_float(); }
 
-    double get_double() const { return get().get_double(); } // FIXME: Should be modified so it never throws
+    double get_double() const TIGHTDB_NOEXCEPT { return get().get_double(); }
 
-    StringData get_string() const { return get().get_string(); } // FIXME: Should be modified so it never throws
+    StringData get_string() const TIGHTDB_NOEXCEPT { return get().get_string(); }
 
-    BinaryData get_binary() const { return get().get_binary(); } // FIXME: Should be modified so it never throws
+    BinaryData get_binary() const TIGHTDB_NOEXCEPT { return get().get_binary(); }
 
     bool is_subtable() const TIGHTDB_NOEXCEPT { return get_type() == type_Table; }
 
@@ -651,22 +630,22 @@ public:
         return Base::m_table->get_impl()->get_subtable_size(col_idx, Base::m_row_idx);
     }
 
-    template<class T> friend bool operator==(const FieldAccessor& a, const T& b) // FIXME: Should be modified so it never throws
+    template<class T> friend bool operator==(const FieldAccessor& a, const T& b) TIGHTDB_NOEXCEPT
     {
         return a.get() == b;
     }
 
-    template<class T> friend bool operator!=(const FieldAccessor& a, const T& b) // FIXME: Should be modified so it never throws
+    template<class T> friend bool operator!=(const FieldAccessor& a, const T& b) TIGHTDB_NOEXCEPT
     {
         return a.get() != b;
     }
 
-    template<class T> friend bool operator==(const T& a, const FieldAccessor& b) // FIXME: Should be modified so it never throws
+    template<class T> friend bool operator==(const T& a, const FieldAccessor& b) TIGHTDB_NOEXCEPT
     {
         return a == b.get();
     }
 
-    template<class T> friend bool operator!=(const T& a, const FieldAccessor& b) // FIXME: Should be modified so it never throws
+    template<class T> friend bool operator!=(const T& a, const FieldAccessor& b) TIGHTDB_NOEXCEPT
     {
         return a != b.get();
     }
@@ -751,8 +730,8 @@ public:
     template<class T> BasicTableRef<T> set_subtable() const
     {
         BasicTableRef<T> t = unchecked_cast<T>(set_subtable());
-        t->set_dynamic_spec();
-        return move(t);
+        T::set_dynamic_spec(*t);
+        return t;
     }
 
     /// Overwrites the current value with a copy of the specified
@@ -836,22 +815,25 @@ protected:
 /// Column accessor specialization for integers.
 template<class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, int64_t>:
-    public ColumnAccessorBase<Taboid, col_idx, int64_t> {
+    public ColumnAccessorBase<Taboid, col_idx, int64_t>, public Columns<int64_t> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, int64_t> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {
+        // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
+        Columns<int64_t>::m_column = col_idx; 
+        Columns<int64_t>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
+    }
+
+    // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
+    virtual Subexpr& clone() {
+        return *new Columns<int64_t>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
+    }
 
     std::size_t find_first(int64_t value) const
     {
         return Base::m_table->get_impl()->find_first_int(col_idx, value);
-    }
-
-    // FIXME: What does this function do? It is used by SlabAlloc. Table::find_pos_int() is protected. Something is not right!
-    std::size_t find_pos(int64_t value) const TIGHTDB_NOEXCEPT
-    {
-        return Base::m_table->find_pos_int(col_idx, value);
     }
 
     BasicTableView<typename Base::RealTable> find_all(int64_t value) const
@@ -866,22 +848,22 @@ public:
 
     int64_t sum() const
     {
-        return Base::m_table->get_impl()->sum(col_idx);
+        return Base::m_table->get_impl()->sum_int(col_idx);
     }
 
     int64_t maximum() const
     {
-        return Base::m_table->get_impl()->maximum(col_idx);
+        return Base::m_table->get_impl()->maximum_int(col_idx);
     }
 
     int64_t minimum() const
     {
-        return Base::m_table->get_impl()->minimum(col_idx);
+        return Base::m_table->get_impl()->minimum_int(col_idx);
     }
 
     double average() const
     {
-        return Base::m_table->get_impl()->average(col_idx);
+        return Base::m_table->get_impl()->average_int(col_idx);
     }
 
     const ColumnAccessor& operator+=(int64_t value) const
@@ -889,18 +871,37 @@ public:
         Base::m_table->get_impl()->add_int(col_idx, value);
         return *this;
     }
+
+    std::size_t lower_bound(int64_t value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->lower_bound_int(col_idx, value);
+    }
+
+    std::size_t upper_bound(int64_t value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->upper_bound_int(col_idx, value);
+    }
 };
 
 
 /// Column accessor specialization for float
 template<class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, float>:
-    public ColumnAccessorBase<Taboid, col_idx, float> {
+    public ColumnAccessorBase<Taboid, col_idx, float>, public Columns<float> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, float> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {
+        // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
+        Columns<float>::m_column = col_idx; 
+        Columns<float>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
+    }
+
+    // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
+    virtual Subexpr& clone() {
+        return *new Columns<float>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
+    }
 
     std::size_t find_first(float value) const
     {
@@ -942,18 +943,37 @@ public:
         Base::m_table->get_impl()->add_float(col_idx, value);
         return *this;
     }
+
+    std::size_t lower_bound(float value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->lower_bound_float(col_idx, value);
+    }
+
+    std::size_t upper_bound(float value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->upper_bound_float(col_idx, value);
+    }
 };
 
 
 /// Column accessor specialization for double
 template<class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, double>:
-    public ColumnAccessorBase<Taboid, col_idx, double> {
+    public ColumnAccessorBase<Taboid, col_idx, double>, public Columns<double> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, double> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {
+        // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
+        Columns<double>::m_column = col_idx;
+        Columns<double>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
+    }
+
+    // fixme/todo, reinterpret_cast to make it compile with TableView which is not supported yet
+    virtual Subexpr& clone() {
+        return *new Columns<double>(col_idx, reinterpret_cast<const Table*>(Base::m_table->get_impl()));
+    }
 
     std::size_t find_first(double value) const
     {
@@ -995,6 +1015,16 @@ public:
         Base::m_table->get_impl()->add_double(col_idx, value);
         return *this;
     }
+
+    std::size_t lower_bound(float value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->lower_bound_double(col_idx, value);
+    }
+
+    std::size_t upper_bound(float value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->upper_bound_double(col_idx, value);
+    }
 };
 
 
@@ -1015,6 +1045,16 @@ public:
     BasicTableView<typename Base::RealTable> find_all(bool value) const
     {
         return Base::m_table->get_impl()->find_all_bool(col_idx, value);
+    }
+
+    std::size_t lower_bound(bool value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->lower_bound_bool(col_idx, value);
+    }
+
+    std::size_t upper_bound(bool value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->upper_bound_bool(col_idx, value);
     }
 };
 
@@ -1043,21 +1083,31 @@ public:
 
 /// Column accessor specialization for dates.
 template<class Taboid, int col_idx>
-class ColumnAccessor<Taboid, col_idx, Date>: public ColumnAccessorBase<Taboid, col_idx, Date> {
+class ColumnAccessor<Taboid, col_idx, DateTime>: public ColumnAccessorBase<Taboid, col_idx, DateTime> {
 private:
-    typedef ColumnAccessorBase<Taboid, col_idx, Date> Base;
+    typedef ColumnAccessorBase<Taboid, col_idx, DateTime> Base;
 
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
 
-    std::size_t find_first(Date value) const
+    DateTime maximum() const
     {
-        return Base::m_table->get_impl()->find_first_date(col_idx, value);
+        return Base::m_table->get_impl()->maximum_datetime(col_idx);
     }
 
-    BasicTableView<typename Base::RealTable> find_all(Date value) const
+    DateTime minimum() const
     {
-        return Base::m_table->get_impl()->find_all_date(col_idx, value);
+        return Base::m_table->get_impl()->minimum_datetime(col_idx);
+    }
+
+    std::size_t find_first(DateTime value) const
+    {
+        return Base::m_table->get_impl()->find_first_datetime(col_idx, value);
+    }
+
+    BasicTableView<typename Base::RealTable> find_all(DateTime value) const
+    {
+        return Base::m_table->get_impl()->find_all_datetime(col_idx, value);
     }
 };
 
@@ -1065,12 +1115,15 @@ public:
 /// Column accessor specialization for strings.
 template<class Taboid, int col_idx>
 class ColumnAccessor<Taboid, col_idx, StringData>:
-    public ColumnAccessorBase<Taboid, col_idx, StringData> {
+    public ColumnAccessorBase<Taboid, col_idx, StringData>, public Columns<StringData> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, StringData> Base;
-
 public:
-    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {
+        // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
+        Columns<StringData>::m_column = col_idx;
+        Columns<StringData>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
+    }
 
     size_t count(StringData value) const
     {
@@ -1087,9 +1140,19 @@ public:
         return Base::m_table->get_impl()->find_all_string(col_idx, value);
     }
 
-    BasicTableView<typename Base::RealTable> distinct() const
+    BasicTableView<typename Base::RealTable> get_distinct_view() const
     {
-        return Base::m_table->get_impl()->distinct(col_idx);
+        return Base::m_table->get_impl()->get_distinct_view(col_idx);
+    }
+
+    std::size_t lower_bound(StringData value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->lower_bound_string(col_idx, value);
+    }
+
+    std::size_t upper_bound(StringData value) const TIGHTDB_NOEXCEPT
+    {
+        return Base::m_table->upper_bound_string(col_idx, value);
     }
 };
 
@@ -1146,7 +1209,6 @@ public:
 /// \tparam Taboid Matches either 'BasicTable<Spec>' or
 /// 'BasicTableView<Tab>'. Neither may be const-qualified.
 ///
-
 /// FIXME: These do not belong in this file!
 template<class Taboid, int col_idx, class Type> class QueryColumn;
 
@@ -1217,25 +1279,25 @@ public:
     int64_t sum(std::size_t* resultcount=NULL, std::size_t start=0,
                 std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.sum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.sum_int(col_idx, resultcount, start, end, limit);
     }
 
     int64_t maximum(std::size_t* resultcount=NULL, std::size_t start=0,
                     std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.maximum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.maximum_int(col_idx, resultcount, start, end, limit);
     }
 
     int64_t minimum(std::size_t* resultcount=NULL, std::size_t start=0,
                     std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.minimum(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.minimum_int(col_idx, resultcount, start, end, limit);
     }
 
     double average(std::size_t* resultcount=NULL, std::size_t start=0,
                    std::size_t end=std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.average(col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.average_int(col_idx, resultcount, start, end, limit);
     }
 };
 
@@ -1410,66 +1472,66 @@ public:
 
 /// QueryColumn specialization for dates.
 template<class Taboid, int col_idx>
-class QueryColumn<Taboid, col_idx, Date>: public QueryColumnBase<Taboid, col_idx, Date> {
+class QueryColumn<Taboid, col_idx, DateTime>: public QueryColumnBase<Taboid, col_idx, DateTime> {
 private:
-    typedef QueryColumnBase<Taboid, col_idx, Date> Base;
+    typedef QueryColumnBase<Taboid, col_idx, DateTime> Base;
     typedef typename Taboid::Query Query;
 
 public:
     explicit QueryColumn(Query* q) TIGHTDB_NOEXCEPT: Base(q) {}
 
-    Query& equal(Date value) const
+    Query& equal(DateTime value) const
     {
-        Base::m_query->m_impl.equal_date(col_idx, value);
+        Base::m_query->m_impl.equal_datetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& not_equal(Date value) const
+    Query& not_equal(DateTime value) const
     {
-        Base::m_query->m_impl.not_equal_date(col_idx, value);
+        Base::m_query->m_impl.not_equal_datetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& greater(Date value) const
+    Query& greater(DateTime value) const
     {
-        Base::m_query->m_impl.greater_date(col_idx, value);
+        Base::m_query->m_impl.greater_datetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& greater_equal(Date value) const
+    Query& greater_equal(DateTime value) const
     {
-        Base::m_query->m_impl.greater_equal_date(col_idx, value);
+        Base::m_query->m_impl.greater_equal_datetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& less(Date value) const
+    Query& less(DateTime value) const
     {
-        Base::m_query->m_impl.less_date(col_idx, value);
+        Base::m_query->m_impl.less_datetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& less_equal(Date value) const
+    Query& less_equal(DateTime value) const
     {
-        Base::m_query->m_impl.less_equal_date(col_idx, value);
+        Base::m_query->m_impl.less_equal_datetime(col_idx, value);
         return *Base::m_query;
     }
 
-    Query& between(Date from, Date to) const
+    Query& between(DateTime from, DateTime to) const
     {
-        Base::m_query->m_impl.between_date(col_idx, from, to);
+        Base::m_query->m_impl.between_datetime(col_idx, from, to);
         return *Base::m_query;
     };
 
-    Date maximum(const Taboid& tab, std::size_t* resultcount=NULL, std::size_t start=0,
+    DateTime maximum(const Taboid& tab, std::size_t* resultcount=NULL, std::size_t start=0,
                  std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.maximum_date(tab, col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.maximum_datetime(tab, col_idx, resultcount, start, end, limit);
     }
 
-    Date minimum(const Taboid& tab, std::size_t* resultcount=NULL, std::size_t start=0,
+    DateTime minimum(const Taboid& tab, std::size_t* resultcount=NULL, std::size_t start=0,
                  std::size_t end = std::size_t(-1), std::size_t limit=std::size_t(-1)) const
     {
-        return Base::m_query->m_impl.minimum_date(tab, col_idx, resultcount, start, end, limit);
+        return Base::m_query->m_impl.minimum_datetime(tab, col_idx, resultcount, start, end, limit);
     }
 };
 

@@ -13,10 +13,17 @@ TIGHTDB_TABLE_2(PeopleTable,
 void traverse(const Group& group)
 {
 // @@EndFold@@
-    for (size_t i=0; i<group.size(); ++i) {
-        const char* table_name = group.get_table_name(i);
-        ConstTableRef table = group.get_table(table_name);
-        cout << table_name << " " << table->get_column_count() << "\n";
+    if (!group.is_empty()) {
+        cout << "Tables in group and number of columns in them:" << endl;
+        for (size_t i=0; i<group.size(); ++i) {
+            StringData table_name = group.get_table_name(i);
+            ConstTableRef table = group.get_table(table_name);
+            cout << table_name << " " << table->get_column_count() << "\n";
+        }
+        cout << "End of group contents" << endl;
+    }
+    else {
+        cout << "Group is empty" << endl;
     }
 // @@Fold@@
 }

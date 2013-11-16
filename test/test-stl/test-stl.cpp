@@ -1,19 +1,23 @@
-#include <stdio.h>
 #include <vector>
 #include <map>
 #include <string>
 #include <algorithm>
-#include <UnitTest++.h>
-#include "../Support/mem.hpp"
-#include "../Support/number_names.hpp"
+#include <iostream>
 
-#ifndef _MSC_VER
-#include <stdint.h>
-#else
+#include "../util/timer.hpp"
+#include "../util/mem.hpp"
+#include "../util/number_names.hpp"
+
+#ifdef _MSC_VER
 #include "../../src/win32/stdint.h"
+#else
+#include <stdint.h>
 #endif
 
 using namespace std;
+using namespace tightdb;
+
+namespace {
 
 enum Days {
     Mon,
@@ -71,6 +75,9 @@ uint64_t rand2()
     return seed * seed2 + seed2;
 }
 
+} // anonymous namespace
+
+
 int main()
 {
     const size_t ROWS = 250000;
@@ -78,11 +85,11 @@ int main()
 
     vector<TestTable> table;
 
-    printf("Create random content with %d rows.\n\n", ROWS);
+    cout << "Create random content with "<<ROWS<<" rows.\n\n";
     for (size_t i = 0; i < ROWS; ++i) {
         // create random string
         const int n = rand() % 1000;// * 10 + rand();
-        const string s = number_name(n);
+        const string s = test_util::number_name(n);
 
         TestTable t = {n, s, 100, Wed};
         table.push_back(t);
@@ -92,64 +99,60 @@ int main()
     TestTable t = {0, "abcde", 100, Wed};
     table.push_back(t);
 
-    const size_t memUsed = GetMemUsage();
-    printf("Memory usage:\t\t%5lld bytes\n", (long long)memUsed);
+    cout << "Memory usage:\t\t"<<test_util::get_mem_usage()<<" bytes\n";
 
-    UnitTest::Timer timer;
+    test_util::Timer timer;
 
     // Search small integer column
     {
-        timer.Start();
+        timer.reset();
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < TESTS; ++i) {
             vector<TestTable>::const_iterator res = find_if(table.begin(), table.end(), match_fourth(Tue));
             if (res != table.end()) {
-                printf("error");
+                cout << "error\n";
             }
         }
 
-        const int search_time = timer.GetTimeInMs();
-        printf("Search (small integer):\t%5d ms\n", search_time);
+        cout << "Search (small integer):\t"<<timer<<"\n";
     }
 
     // Search byte-sized integer column
     {
-        timer.Start();
+        timer.reset();
 
         // Do a search over entire column (value not found)
         for (size_t i = 0; i < TESTS; ++i) {
             vector<TestTable>::const_iterator res = find_if(table.begin(), table.end(), match_third(50));
             if (res != table.end()) {
-                printf("error");
+                cout << "error\n";
             }
         }
 
-        const int search_time = timer.GetTimeInMs();
-        printf("Search (byte-sized int)\t%5d ms\n", search_time);
+        cout << "Search (byte-sized int)\t"<<timer<<"\n";
     }
 
     // Search string column
     {
-        timer.Start();
+        timer.reset();
 
         // Do a search over entire column (value not found)
         const string target = "abcde";
         for (size_t i = 0; i < TESTS; ++i) {
             vector<TestTable>::const_iterator res = find_if(table.begin(), table.end(), match_second(target));
             if (res == table.end()) {
-                printf("error");
+                cout << "error\n";
             }
         }
 
-        const int search_time = timer.GetTimeInMs();
-        printf("Search (string):\t%5d ms\n", search_time);
+        cout << "Search (string):\t"<<timer<<"\n";
     }
 
     // Add index
     multimap<int, TestTable> mapTable;
     {
-        timer.Start();
+        timer.reset();
 
         // Copy data to map
         for (vector<TestTable>::const_iterator p = table.begin(); p != table.end(); ++p) {
@@ -159,30 +162,29 @@ int main()
         // free memory used by table
         vector<TestTable>().swap(table);
 
-        const int search_time = timer.GetTimeInMs();
-        printf("\nAdd index:\t\t%5d ms\n", search_time);
+        cout << "\nAdd index:\t\t"<<timer<<"\n";
 
-        printf("Memory usage2:\t\t%5lld bytes\n", (long long)GetMemUsage());
+        cout << "Memory usage2:\t\t"<<test_util::get_mem_usage()<<" bytes\n";
     }
 
     // Search with index
     {
-        timer.Start();
+        timer.reset();
 
         for (size_t i = 0; i < TESTS*10; ++i) {
             const size_t n = rand() % 1000;
             multimap<int, TestTable>::const_iterator p = mapTable.find(n);
             if (p->second.fourth == Fri) { // to avoid above find being optimized away
-                printf("error");
+                cout << "error\n";
             }
         }
 
-        const int search_time = timer.GetTimeInMs();
-        printf("Search index:\t\t%5d ms\n", search_time);
+        cout << "Search index:\t\t"<<timer<<"\n";
     }
-    printf("\nDone.");
+    cout << "\nDone.\n";
+
 #ifdef _MSC_VER
-    getchar();
+    cin.get();
 #endif
     return 0;
 }

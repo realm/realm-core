@@ -1,18 +1,23 @@
 // @@Example: ex_cpp_group_constructor_plain @@
 // @@Fold@@
 #include <tightdb.hpp>
+#include <tightdb/file.hpp>
 
 using namespace tightdb;
 
-// @@EndFold@@
 TIGHTDB_TABLE_2(PeopleTable,
                 name, String,
                 age, Int)
 
-int main()
+void func()
 {
+// @@EndFold@@
+    // Create an empty group
     Group g;
+
+    // Create a table in the group
     PeopleTable::Ref table = g.get_table<PeopleTable>("people");
+// @@Fold@@
 
     table->add("Mary", 14);
     table->add("Joe", 17);
@@ -20,4 +25,11 @@ int main()
 
     g.write("people.tightdb");
 }
+
+int main()
+{
+    func();
+    File::remove("people.tightdb");
+}
+// @@EndFold@@
 // @@EndExample@@

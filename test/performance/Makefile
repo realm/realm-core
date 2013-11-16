@@ -1,11 +1,6 @@
-NOINST_PROGRAMS = performance
+TEST_PROGRAMS = performance
 
-performance_SOURCES = matrix.cpp timer.cpp
-performance_LIBS    = ../../src/tightdb/libtightdb.a
-performance_LDFLAGS = -lrt
+performance_SOURCES = matrix.cpp
+performance_LIBS    = ../util/test-util.a
 
-include ../../generic.mk
-
-.PHONY: run
-run: default
-	./performance
+include ../../src/generic.mk
