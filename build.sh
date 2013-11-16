@@ -1178,13 +1178,13 @@ EOF
             # use the shared core library, are not, so we have to set
             # the runtime library path. Also, the core library will
             # look for `tightdbd` in the wrong place, so we have to
-            # set `TIGHTDBD_PATH` too.
+            # set `TIGHTDB_ASYNC_DAEMON` too.
             if [ "$PREBUILT_CORE" ]; then
                 install_libdir="$(get_config_param "INSTALL_LIBDIR" "$TEST_PKG_DIR/tightdb")" || exit 1
                 path_list_prepend "$LD_LIBRARY_PATH_NAME" "$install_libdir"  || exit 1
                 export "$LD_LIBRARY_PATH_NAME"
                 install_libexecdir="$(get_config_param "INSTALL_LIBEXECDIR" "$TEST_PKG_DIR/tightdb")" || exit 1
-                export TIGHTDBD_PATH="$install_libexecdir/tightdbd"
+                export TIGHTDB_ASYNC_DAEMON="$install_libexecdir/tightdbd"
             fi
 
             log_message "Testing './build test-installed'"
@@ -1707,11 +1707,11 @@ EOF
                 ERROR="1"
             fi
         fi
-        # We set `LD_LIBRARY_PATH` and `TIGHTDBD_PATH` here to be able
+        # We set `LD_LIBRARY_PATH` and `TIGHTDB_ASAYNC_DAEMON` here to be able
         # to test extensions before installation of the core library.
         path_list_prepend "$LD_LIBRARY_PATH_NAME" "$TIGHTDB_HOME/src/tightdb"  || exit 1
         export "$LD_LIBRARY_PATH_NAME"
-        export TIGHTDBD_PATH="$TIGHTDB_HOME/src/tightdb/$async_daemon"
+        export TIGHTDB_ASYNC_DAEMON="$TIGHTDB_HOME/src/tightdb/$async_daemon"
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -e "$EXT_HOME/.DIST_WAS_BUILT" ]; then
