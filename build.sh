@@ -169,7 +169,7 @@ find_iphone_sdk()
 }
 
 
-CONFIG_MK="src/config-dyn.mk"
+CONFIG_MK="src/config.mk"
 
 require_config()
 {
@@ -1071,8 +1071,8 @@ EOF
 /config
 /Makefile
 /src/generic.mk
+/src/project.mk
 /src/config.mk
-/src/config-dyn.mk
 /src/Makefile
 /src/tightdb.hpp
 /src/tightdb/Makefile
