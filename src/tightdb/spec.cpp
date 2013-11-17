@@ -1,7 +1,7 @@
 #include <tightdb/spec.hpp>
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-#include <tightdb/replication.hpp>
+#  include <tightdb/replication.hpp>
 #endif
 
 using namespace std;
@@ -20,7 +20,8 @@ void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent
 {
     m_top.init_from_ref(ref);
     m_top.set_parent(parent, ndx_in_parent);
-    TIGHTDB_ASSERT(m_top.size() >= 3 && m_top.size() <= 5);
+    size_t top_size = m_top.size();
+    TIGHTDB_ASSERT(top_size >= 3 && top_size <= 5);
 
     m_spec.init_from_ref(m_top.get_as_ref(0));
     m_spec.set_parent(&m_top, 0);
@@ -31,34 +32,18 @@ void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent
 
     // SubSpecs array is only there and valid when there are subtables
     // if there are enumkey, but no subtables yet it will be a zero-ref
-    if (m_top.size() >= 4) {
-        ref_type ref = m_top.get_as_ref(3);
-        if (ref) {
-            m_subspecs.init_from_ref(m_top.get_as_ref(3));
+    if (top_size >= 4) {
+        if (ref_type ref = m_top.get_as_ref(3)) {
+            m_subspecs.init_from_ref(ref));
             m_subspecs.set_parent(&m_top, 3);
         }
     }
 
     // Enumkeys array is only there when there are StringEnum columns
-    if (m_top.size() == 5) {
+    if (top_size >= 5) {
         m_enumkeys.init_from_ref(m_top.get_as_ref(4));
         m_enumkeys.set_parent(&m_top, 4);
     }
-}
-
-void Spec::destroy() TIGHTDB_NOEXCEPT
-{
-    m_top.destroy();
-}
-
-ref_type Spec::get_ref() const TIGHTDB_NOEXCEPT
-{
-    return m_top.get_ref();
-}
-
-void Spec::set_parent(ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT
-{
-    m_top.set_parent(parent, ndx_in_parent);
 }
 
 void Spec::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
@@ -70,13 +55,11 @@ void Spec::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
     m_names.update_from_parent(old_baseline);
     m_attr.update_from_parent(old_baseline);
 
-    if (m_top.size() > 3) {
+    if (m_top.size() > 3)
         m_subspecs.update_from_parent(old_baseline);
-    }
 
-    if (m_top.size() > 4) {
+    if (m_top.size() > 4)
         m_enumkeys.update_from_parent(old_baseline);
-    }
 }
 
 size_t Spec::add_column(DataType type, StringData name, ColumnAttr attr)
@@ -89,10 +72,12 @@ size_t Spec::add_column(DataType type, StringData name, ColumnAttr attr)
         // SubSpecs array is only there when there are subtables
         if (!m_subspecs.is_attached()) {
             m_subspecs.create(Array::type_HasRefs);
-            if (m_top.size() == 3)
+            if (m_top.size() == 3) {
                 m_top.add(m_subspecs.get_ref());
-            else
+            }
+            else {
                 m_top.set(3, m_subspecs.get_ref());
+            }
             m_subspecs.set_parent(&m_top, 3);
         }
 
@@ -124,8 +109,7 @@ size_t Spec::add_subcolumn(const vector<size_t>& column_path, DataType type, Str
 {
     if (column_path.empty())
         return add_column(type, name);
-    else
-        return do_add_subcolumn(column_path, 0, type, name);
+    return do_add_subcolumn(column_path, 0, type, name);
 }
 
 size_t Spec::do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, DataType type, StringData name)
@@ -133,12 +117,9 @@ size_t Spec::do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, Data
     size_t column_ndx = column_ids[pos];
     Spec subspec = get_subtable_spec(column_ndx);
 
-    if (pos == column_ids.size()-1) {
+    if (pos == column_ids.size() - 1)
         return subspec.add_column(type, name);
-    }
-    else {
-        return subspec.do_add_subcolumn(column_ids, pos+1, type, name);
-    }
+    return subspec.do_add_subcolumn(column_ids, pos+1, type, name);
 }
 
 Spec Spec::add_subtable_column(StringData name)
@@ -147,20 +128,6 @@ Spec Spec::add_subtable_column(StringData name)
     add_column(type_Table, name);
 
     return get_subtable_spec(column_ndx);
-}
-
-void Spec::rename_column(size_t column_ndx, StringData newname)
-{
-    TIGHTDB_ASSERT(column_ndx < m_spec.size());
-
-    //TODO: Verify that new name is valid
-
-    m_names.set(column_ndx, newname);
-}
-
-void Spec::rename_column(const vector<size_t>& column_ids, StringData name)
-{
-    do_rename_column(column_ids, 0, name);
 }
 
 void Spec::do_rename_column(const vector<size_t>& column_ids, size_t pos, StringData name)
@@ -205,11 +172,6 @@ void Spec::remove_column(size_t column_ndx)
     m_names.erase(column_ndx);
     m_spec.erase(column_ndx);
     m_attr.erase(column_ndx);
-}
-
-void Spec::remove_column(const vector<size_t>& column_ids)
-{
-    do_remove_column(column_ids, 0);
 }
 
 void Spec::do_remove_column(const vector<size_t>& column_ids, size_t pos)
@@ -282,10 +244,12 @@ void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
         m_enumkeys.create(Array::type_HasRefs);
         if (m_top.size() == 3)
             m_top.add(0); // no subtables
-        if (m_top.size() == 4)
+        if (m_top.size() == 4) {
             m_top.add(m_enumkeys.get_ref());
-        else
+        }
+        else {
             m_top.set(4, m_enumkeys.get_ref());
+        }
         m_enumkeys.set_parent(&m_top, 4);
     }
 
@@ -325,17 +289,6 @@ ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent, si
     return m_enumkeys.get_as_ref(enumkeys_ndx);
 }
 
-size_t Spec::get_column_count() const TIGHTDB_NOEXCEPT
-{
-    return m_names.size();
-}
-
-ColumnType Spec::get_real_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < get_column_count());
-    return ColumnType(m_spec.get(ndx));
-}
-
 DataType Spec::get_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < get_column_count());
@@ -349,44 +302,6 @@ DataType Spec::get_column_type(size_t ndx) const TIGHTDB_NOEXCEPT
     return DataType(type);
 }
 
-void Spec::set_column_type(size_t column_ndx, ColumnType type)
-{
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-
-    // At this point we only support upgrading to string enum
-    TIGHTDB_ASSERT(ColumnType(m_spec.get(column_ndx)) == col_type_String);
-    TIGHTDB_ASSERT(type == col_type_StringEnum);
-
-    m_spec.set(column_ndx, type);
-}
-
-ColumnAttr Spec::get_column_attr(size_t ndx) const
-{
-    TIGHTDB_ASSERT(ndx < get_column_count());
-    return ColumnAttr(m_attr.get(ndx));
-}
-
-void Spec::set_column_attr(size_t column_ndx, ColumnAttr attr)
-{
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-
-    // At this point we only allow one attr at a time
-    // so setting it will overwrite existing. In the future
-    // we will allow combinations.
-    m_attr.set(column_ndx, attr);
-}
-
-StringData Spec::get_column_name(size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ndx < get_column_count());
-    return m_names.get(ndx);
-}
-
-size_t Spec::get_column_index(StringData name) const
-{
-    return m_names.find_first(name);
-}
-
 size_t Spec::get_column_pos(size_t column_ndx) const
 {
     // If there are indexed columns, the indexes also takes
@@ -395,9 +310,8 @@ size_t Spec::get_column_pos(size_t column_ndx) const
 
     size_t offset = 0;
     for (size_t i = 0; i < column_ndx; ++i) {
-        if (m_attr.get(i) == col_attr_Indexed) {
+        if (m_attr.get(i) == col_attr_Indexed)
             ++offset;
-        }
     }
     return column_ndx + offset;
 }
