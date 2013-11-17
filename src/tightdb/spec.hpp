@@ -20,6 +20,7 @@
 #ifndef TIGHTDB_SPEC_HPP
 #define TIGHTDB_SPEC_HPP
 
+#include <tightdb/config.h>
 #include <tightdb/array.hpp>
 #include <tightdb/array_string.hpp>
 #include <tightdb/data_type.hpp>
@@ -34,7 +35,7 @@ public:
     Spec(const Spec&);
     ~Spec() TIGHTDB_NOEXCEPT;
 
-    std::size_t add_column(DataType type, StringData name, ColumnType attr = col_attr_None);
+    std::size_t add_column(DataType type, StringData name, ColumnAttr attr = col_attr_None);
     std::size_t add_subcolumn(const std::vector<std::size_t>& column_path, DataType type,
                               StringData name);
     Spec add_subtable_column(StringData name);
@@ -54,10 +55,6 @@ public:
     // copy constructor.
     const Spec get_subtable_spec(std::size_t column_ndx) const;
 
-    // Direct access to type and attribute list
-    std::size_t get_type_attr_count() const;
-    ColumnType get_type_attr(std::size_t column_ndx) const;
-
     // Column info
     std::size_t get_column_count() const TIGHTDB_NOEXCEPT;
     DataType get_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
@@ -68,7 +65,18 @@ public:
     std::size_t get_column_index(StringData name) const;
 
     // Column Attributes
-    ColumnType get_column_attr(std::size_t column_ndx) const;
+    ColumnAttr get_column_attr(std::size_t column_ndx) const;
+
+    // Auto Enumerated string columns
+    void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
+                                ArrayParent*& keys_parent, size_t& keys_ndx);
+    ref_type get_enumkeys_ref(size_t column_ndx,
+                              ArrayParent** keys_parent=NULL, size_t* keys_ndx=NULL);
+
+    // Get position in column list adjusted for indexes
+    // (since index refs are stored alongside column refs in
+    //  m_columns, this may differ from the logical position)
+    size_t get_column_pos(size_t column_ndx) const;
 
     /// Compare two table specs for equality.
     bool operator==(const Spec&) const;
@@ -87,7 +95,9 @@ private:
     Array m_top;
     Array m_spec;
     ArrayString m_names;
+    Array m_attr;
     Array m_subspecs;
+    Array m_enumkeys;
 
     Spec(const Table*, Allocator&); // Uninitialized
     Spec(const Table*, Allocator&, ArrayParent*, std::size_t ndx_in_parent);
@@ -108,13 +118,14 @@ private:
     void set_parent(ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
 
     void set_column_type(std::size_t column_ndx, ColumnType type);
-    void set_column_attr(std::size_t column_ndx, ColumnType attr);
+    void set_column_attr(std::size_t column_ndx, ColumnAttr attr);
 
-    std::size_t get_column_type_pos(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_subspec_ndx(std::size_t column_ndx) const;
     std::size_t get_subspec_ref(std::size_t subspec_ndx) const;
     std::size_t get_num_subspecs() const TIGHTDB_NOEXCEPT;
     Spec get_subspec_by_ndx(std::size_t subspec_ndx);
+
+    size_t get_enumkeys_ndx(size_t column_ndx) const;
 
     /// Construct an empty spec and return just the reference to the
     /// underlying memory.
@@ -163,18 +174,19 @@ inline ref_type Spec::create_empty_spec(Allocator& alloc)
     Array spec_set(Array::type_HasRefs, 0, 0, alloc);
     spec_set.add(Array::create_empty_array(Array::type_Normal, alloc)); // One type for each column
     spec_set.add(ArrayString::create_empty_array(alloc)); // One name for each column
+    spec_set.add(ArrayString::create_empty_array(alloc)); // One attr set for each column
     return spec_set.get_ref();
 }
 
 
 // Uninitialized Spec (call init_from_ref() to init)
 inline Spec::Spec(const Table* table, Allocator& alloc):
-    m_table(table), m_top(alloc), m_spec(alloc), m_names(alloc), m_subspecs(alloc) {}
+    m_table(table), m_top(alloc), m_spec(alloc), m_names(alloc), m_attr(alloc), m_subspecs(alloc), m_enumkeys(alloc) {}
 
 // Create a new Spec
 inline Spec::Spec(const Table* table, Allocator& alloc, ArrayParent* parent,
                   std::size_t ndx_in_parent):
-    m_table(table), m_top(alloc), m_spec(alloc), m_names(alloc), m_subspecs(alloc)
+    m_table(table), m_top(alloc), m_spec(alloc), m_names(alloc), m_attr(alloc), m_subspecs(alloc), m_enumkeys(alloc)
 {
     ref_type ref = create_empty_spec(alloc); // Throws
     init_from_ref(ref, parent, ndx_in_parent);
@@ -183,14 +195,14 @@ inline Spec::Spec(const Table* table, Allocator& alloc, ArrayParent* parent,
 // Create Spec from ref
 inline Spec::Spec(const Table* table, Allocator& alloc, ref_type ref, ArrayParent* parent,
                   std::size_t ndx_in_parent):
-    m_table(table), m_top(alloc), m_spec(alloc), m_names(alloc), m_subspecs(alloc)
+    m_table(table), m_top(alloc), m_spec(alloc), m_names(alloc), m_attr(alloc), m_subspecs(alloc), m_enumkeys(alloc)
 {
     init_from_ref(ref, parent, ndx_in_parent);
 }
 
 inline Spec::Spec(const Spec& s):
     m_table(s.m_table), m_top(s.m_top.get_alloc()), m_spec(s.m_top.get_alloc()),
-    m_names(s.m_top.get_alloc()), m_subspecs(s.m_top.get_alloc())
+    m_names(s.m_top.get_alloc()), m_attr(s.m_top.get_alloc()), m_subspecs(s.m_top.get_alloc()), m_enumkeys(s.m_top.get_alloc())
 {
     ref_type ref        = s.m_top.get_ref();
     ArrayParent* parent = s.m_top.get_parent();
@@ -205,6 +217,89 @@ inline Spec Spec::get_subspec_by_ndx(std::size_t subspec_ndx)
     Allocator& alloc = m_top.get_alloc();
     ref_type ref = m_subspecs.get_as_ref(subspec_ndx);
     return Spec(m_table, alloc, ref, &m_subspecs, subspec_ndx);
+}
+
+inline void Spec::destroy() TIGHTDB_NOEXCEPT
+{
+    m_top.destroy();
+}
+
+inline ref_type Spec::get_ref() const TIGHTDB_NOEXCEPT
+{
+    return m_top.get_ref();
+}
+
+inline void Spec::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT
+{
+    m_top.set_parent(parent, ndx_in_parent);
+}
+
+inline void Spec::rename_column(std::size_t column_ndx, StringData new_name)
+{
+    TIGHTDB_ASSERT(column_ndx < m_spec.size());
+
+    //TODO: Verify that new name is valid
+
+    m_names.set(column_ndx, new_name);
+}
+
+inline void Spec::rename_column(const std::vector<std::size_t>& column_ids, StringData name)
+{
+    do_rename_column(column_ids, 0, name);
+}
+
+inline void Spec::remove_column(const std::vector<std::size_t>& column_ids)
+{
+    do_remove_column(column_ids, 0);
+}
+
+inline std::size_t Spec::get_column_count() const TIGHTDB_NOEXCEPT
+{
+    return m_names.size();
+}
+
+inline ColumnType Spec::get_real_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < get_column_count());
+    return ColumnType(m_spec.get(ndx));
+}
+
+inline void Spec::set_column_type(std::size_t column_ndx, ColumnType type)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+
+    // At this point we only support upgrading to string enum
+    TIGHTDB_ASSERT(ColumnType(m_spec.get(column_ndx)) == col_type_String);
+    TIGHTDB_ASSERT(type == col_type_StringEnum);
+
+    m_spec.set(column_ndx, type);
+}
+
+inline ColumnAttr Spec::get_column_attr(std::size_t ndx) const
+{
+    TIGHTDB_ASSERT(ndx < get_column_count());
+    return ColumnAttr(m_attr.get(ndx));
+}
+
+inline void Spec::set_column_attr(std::size_t column_ndx, ColumnAttr attr)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+
+    // At this point we only allow one attr at a time
+    // so setting it will overwrite existing. In the future
+    // we will allow combinations.
+    m_attr.set(column_ndx, attr);
+}
+
+inline StringData Spec::get_column_name(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < get_column_count());
+    return m_names.get(ndx);
+}
+
+inline std::size_t Spec::get_column_index(StringData name) const
+{
+    return m_names.find_first(name);
 }
 
 

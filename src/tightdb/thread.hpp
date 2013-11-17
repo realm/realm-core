@@ -20,14 +20,23 @@
 #ifndef TIGHTDB_THREAD_HPP
 #define TIGHTDB_THREAD_HPP
 
-#include <stdexcept>
+#include <exception>
 
 #include <pthread.h>
+#ifdef TIGHTDB_PTHREADS_TEST
+#include <../test/pthread_test.hpp>
+#endif
+#include <errno.h>
+#include <cstddef>
 
 #include <tightdb/config.h>
 #include <tightdb/assert.hpp>
 #include <tightdb/terminate.hpp>
 #include <tightdb/unique_ptr.hpp>
+
+#ifdef TIGHTDB_HAVE_CXX11_ATOMIC
+#  include <atomic>
+#endif
 
 
 namespace tightdb {
@@ -55,7 +64,6 @@ public:
     bool joinable() TIGHTDB_NOEXCEPT;
 
     void join();
-
 private:
     pthread_t m_id;
     bool m_joinable;
@@ -162,7 +170,7 @@ public:
     /// Low-level locking of robust mutex.
     ///
     /// If the present platform does not support robust mutexes, this
-    /// function always returns true. Otherwise it returns true if,
+    /// function always returns true. Otherwise it returns false if,
     /// and only if a thread has died while holding a lock.
     ///
     /// \note Most application should never call this function
@@ -178,15 +186,17 @@ public:
 
     /// Pull this mutex out of the 'inconsistent' state.
     ///
-    /// Must be called only after robust_lock() has returned false.
+    /// Must be called only after low_level_lock() has returned false.
     ///
     /// \note Most application should never call this function
     /// directly. It is called automatically when using the ordinary
     /// lock() function.
     void mark_as_consistent() TIGHTDB_NOEXCEPT;
+
+    friend class CondVar;
 };
 
-class RobustMutex::NotRecoverable: std::exception {
+class RobustMutex::NotRecoverable: public std::exception {
 public:
     const char* what() const TIGHTDB_NOEXCEPT_OR_NOTHROW TIGHTDB_OVERRIDE
     {
@@ -215,6 +225,8 @@ public:
 
     /// Wait for another thread to call notify() or notify_all().
     void wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT;
+    template<class Func>
+    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = NULL);
 
     /// If any threads are wating for this condition, wake up at least
     /// one.
@@ -403,6 +415,43 @@ inline void CondVar::wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT
         TIGHTDB_TERMINATE("pthread_cond_wait() failed");
 }
 
+template<class Func>
+inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
+{
+    int r;
+    if (tp == NULL) {
+        r = pthread_cond_wait(&m_impl, &m.m_impl);
+    } else {
+        r = pthread_cond_timedwait(&m_impl, &m.m_impl, tp);
+        if (r == ETIMEDOUT)
+            return;
+    }
+    if (TIGHTDB_LIKELY(r == 0))
+        return;
+#ifdef TIGHTDB_HAVE_ROBUST_PTHREAD_MUTEX
+    if (r == ENOTRECOVERABLE)
+        throw NotRecoverable();
+    if (r != EOWNERDEAD) 
+        lock_failed(r); // does not return
+#endif
+    try {
+        recover_func(); // Throws
+        m.mark_as_consistent();
+        // If we get this far, the protected memory has been
+        // brought back into a consistent state, and the mutex has
+        // been notified aboit this. This means that we can safely
+        // enter the applications critical section.
+    }
+    catch (...) {
+        // Unlocking without first calling mark_as_consistent()
+        // means that the mutex enters the "not recoverable"
+        // state, which will cause all future attempts at locking
+        // to fail.
+        m.unlock();
+        throw;
+    }
+}
+
 inline void CondVar::notify() TIGHTDB_NOEXCEPT
 {
     int r = pthread_cond_signal(&m_impl);
@@ -418,6 +467,325 @@ inline void CondVar::notify_all() TIGHTDB_NOEXCEPT
 }
 
 
+// Support for simple atomic variables with release and acquire semantics
+//
+// Useful for non-blocking data structures.
+//
+// These primitives ensure that memory appears consistent around load/store
+// of the variables, and ensures that the compiler will not optimize away
+// relevant instructions.
+//
+// Use it only on naturally aligned and naturally atomic objects,
+// should work on integers and pointers on all machines.
+//
+// Usage: For non blocking data structures, you need to wrap any synchronization
+// variables using the Atomic template. Variables which are not used for
+// synchronization need no special declaration. As long as signaling between threads
+// is done using the store and load methods declared here, memory barriers will
+// ensure a consistent view of the other variables.
+//
+// Technical note: The intent is to provide acquire semantics on load and release
+// semantics on store. This means that things like Petersons algorithm cannot be
+// implemented using these primitive, because it requires sequential consistency.
+//
+// Prior to gcc 4.7 there was no portable ways of providing acquire/release semantics,
+// so for earlier versions we fall back to sequential consistency.
+// As some architectures, most notably x86, provide release and acquire semantics
+// in hardware, this is somewhat annoying, because we will use a full memory barrier
+// where no-one is needed. FIXME: introduce x86 specific optimization to avoid the
+// memory barrier!
+
+template<class T>
+class Atomic
+{
+public:
+    inline Atomic()
+    {
+        state = 0;
+    }
+
+    inline Atomic(T init_value) 
+    { 
+        state = init_value; 
+    }
+
+    T load() const;
+    T load_acquire() const;
+    T load_relaxed() const;
+    void store(T value); 
+    void store_release(T value); 
+    void store_relaxed(T value); 
+    bool compare_and_swap(T oldvalue, T newvalue);
+private:
+    // the following is not supported
+    Atomic(Atomic<T>&);
+    Atomic<T>& operator=(const Atomic<T>&);
+
+    // Assumed to be naturally aligned - if not, hardware might not guarantee atomicity
+#ifdef TIGHTDB_HAVE_CXX11_ATOMIC
+    std::atomic<T> state;
+#else
+#ifdef _MSC_VER
+    volatile T state;
+#else
+#ifdef __GNUC__
+    T state; 
+#else
+#error "Atomic is not support on this compiler"
+#endif
+#endif
+#endif
+};
+
+
+#ifdef TIGHTDB_HAVE_CXX11_ATOMIC
+template<typename T>
+inline T Atomic<T>::load() const
+{
+    return state.load();
+}
+
+template<typename T>
+inline T Atomic<T>::load_acquire() const
+{
+    return state.load(std::memory_order_acquire);
+}
+
+template<typename T>
+inline T Atomic<T>::load_relaxed() const
+{
+    return state.load(std::memory_order_relaxed);
+}
+
+template<typename T>
+inline void Atomic<T>::store(T value) 
+{
+    state.store(value);
+}
+
+template<typename T>
+inline void Atomic<T>::store_release(T value) 
+{
+    state.store(value, std::memory_order_release);
+}
+
+template<typename T>
+inline void Atomic<T>::store_relaxed(T value) 
+{
+    state.store(value, std::memory_order_relaxed);
+}
+
+template<typename T>
+inline bool Atomic<T>::compare_and_swap(T oldvalue, T newvalue) 
+{
+    return state.compare_exchange_weak(oldvalue, newvalue);
+}
+
+#else
+#ifdef _MSC_VER
+template<typename T>
+inline T Atomic<T>::load() const
+{
+    return state;
+}
+
+template<typename T>
+inline T Atomic<T>::load_relaxed() const
+{
+    return state;
+}
+
+template<typename T>
+inline T Atomic<T>::load_acquire() const
+{
+    return state;
+}
+
+template<typename T>
+inline void Atomic<T>::store(T value) 
+{
+    state = value;
+}
+
+template<typename T>
+inline void Atomic<T>::store_relaxed(T value) 
+{
+    state = value;
+
+}
+
+template<typename T>
+inline void Atomic<T>::store_release(T value) 
+{
+    state = value;
+}
+
+#endif
+#ifdef __GNUC__
+// gcc implementation, pre c++11:
+template<typename T>
+inline T Atomic<T>::load_acquire() const
+{
+    T retval;
+#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+    retval = __atomic_load_n(&state, __ATOMIC_ACQUIRE);
+#else
+    __sync_synchronize();
+    retval = load_relaxed();
+#endif
+    return retval;
+}
+
+template<typename T>
+inline T Atomic<T>::load_relaxed() const
+{
+    T retval;
+#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+    retval = __atomic_load_n(&state, __ATOMIC_RELAXED);
+#else
+    if (sizeof(T) >= sizeof(ptrdiff_t)) {
+        // do repeated reads until we've seen the same value twice,
+        // then we know that the reads were done without changes to the value.
+        // under normal circumstances, the loop is never executed
+        retval = state;
+        asm volatile ("" : : : "memory");
+        T val = state;
+        while (retval != val) { 
+            asm volatile ("" : : : "memory");
+            val = retval;
+            retval = state;
+        }
+    } else {
+        asm volatile ("" : : : "memory");
+        retval = state;
+    }
+#endif
+    return retval;
+}
+
+template<typename T>
+inline T Atomic<T>::load() const
+{
+#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+    T retval = __atomic_load_n(&state, __ATOMIC_SEQ_CST);
+#else
+    __sync_synchronize();
+    T retval = load_relaxed();
+#endif
+    return retval;
+}
+
+template<typename T>
+inline void Atomic<T>::store(T value) 
+{
+#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+    __atomic_store_n(&state, value, __ATOMIC_SEQ_CST);
+#else
+    if (sizeof(T) >= sizeof(ptrdiff_t)) {
+        T old_value = state;
+        // Ensure atomic store for type larger than largest native word.
+        // normally, this loop will not be entered.
+        while ( ! __sync_bool_compare_and_swap(&state, old_value, value)) {
+            old_value = state;
+        };
+    } else {
+        __sync_synchronize();
+        state = value;
+    }
+    // prevent registerization of state (this is not really needed, I think)
+    asm volatile ("" : : : "memory");
+#endif
+}
+
+template<typename T>
+inline void Atomic<T>::store_release(T value) 
+{
+#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+    __atomic_store_n(&state, value, __ATOMIC_RELEASE);
+#else
+    // prior to gcc 4.7 we have no portable way of expressing
+    // release semantics, so we do seq_consistent store instead
+    store(value);
+#endif
+}
+
+template<typename T>
+inline void Atomic<T>::store_relaxed(T value) 
+{
+#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+    __atomic_store_n(&state, value, __ATOMIC_RELAXED);
+#else
+    // prior to gcc 4.7 we have no portable way of expressing
+    // relaxed semantics, so we do seq_consistent store instead
+    // FIXME: we did! ordinary stores (with atomicity..)
+    store(value);
+#endif
+}
+
+template<typename T>
+inline bool Atomic<T>::compare_and_swap(T oldvalue, T newvalue) 
+{
+    return __sync_bool_compare_and_swap(&state, oldvalue, newvalue);
+}
+
+
+#endif // GCC
+#endif // C++11 else
+
+// Template Relaxed is used to mark a variable as used for interthread
+// communication with relaxed semantics, i.e. no guarantee of atomicity
+// and no guarantee of ordering. It does guarantee, however, that reads
+// cannot be cached in a register inside a tight loop.
+
+template<class T>
+class Relaxed
+{
+public:
+    inline Relaxed()
+    {
+        state = 0;
+    }
+
+    inline Relaxed(T init_value) 
+    { 
+        state = init_value; 
+    }
+
+    T load_relaxed() const
+    {
+#ifdef __GNUC__
+        asm volatile("" : : : "memory");
+#endif
+        return state;
+    }
+    void store_relaxed(T value)
+    {
+        state = value;
+#ifdef __GNUC__
+        asm volatile("" : : : "memory");
+#endif
+    }
+private:
+    // the following is not supported
+    Relaxed(Relaxed<T>&);
+    Relaxed<T>& operator=(const Relaxed<T>&);
+
+#ifdef _MSC_VER
+    volatile T state;
+#else
+#ifdef __GNUC__
+    T state; 
+#else
+#error "Unsupported use of Relaxed on this compiler"
+#endif
+#endif
+};
+
+
+
+
 } // namespace tightdb
+
+
 
 #endif // TIGHTDB_THREAD_HPP

@@ -21,6 +21,7 @@
 #define TIGHTDB_ARRAY_BASIC_TPL_HPP
 
 #include <algorithm>
+#include <iomanip>
 
 namespace tightdb {
 
@@ -184,7 +185,8 @@ template<class T>
 bool BasicArray<T>::compare(const BasicArray<T>& a) const
 {
     size_t n = size();
-    if (a.size() != n) return false;
+    if (a.size() != n)
+        return false;
     const T* data_1 = reinterpret_cast<const T*>(m_data);
     const T* data_2 = reinterpret_cast<const T*>(a.m_data);
     return std::equal(data_1, data_1+n, data_2);
@@ -215,7 +217,7 @@ std::size_t BasicArray<T>::find(T value, std::size_t begin, std::size_t end) con
     TIGHTDB_ASSERT(begin <= m_size && end <= m_size && begin <= end);
     const T* data = reinterpret_cast<const T*>(m_data);
     const T* i = std::find(data + begin, data + end, value);
-    return i == data + end ? not_found : i - data;
+    return i == data + end ? not_found : std::size_t(i - data);
 }
 
 template<class T>
@@ -231,10 +233,9 @@ void BasicArray<T>::find_all(Array& result, T value, std::size_t add_offset,
     std::size_t first = begin - 1;
     for (;;) {
         first = this->find(value, first + 1, end);
-        if (first != not_found)
-            result.add(first + add_offset);
-        else
+        if (first == not_found)
             break;
+        result.add(first + add_offset);
     }
 }
 
@@ -295,11 +296,12 @@ bool BasicArray<T>::minimum(T& result, std::size_t begin, std::size_t end) const
 
 
 template<class T>
-ref_type BasicArray<T>::btree_leaf_insert(size_t ndx, T value, TreeInsertBase& state)
+ref_type BasicArray<T>::bptree_leaf_insert(size_t ndx, T value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
     TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_LIST_SIZE);
-    if (leaf_size < ndx) ndx = leaf_size;
+    if (leaf_size < ndx)
+        ndx = leaf_size;
     if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_LIST_SIZE)) {
         insert(ndx, value);
         return 0; // Leaf was not split
@@ -314,9 +316,8 @@ ref_type BasicArray<T>::btree_leaf_insert(size_t ndx, T value, TreeInsertBase& s
     else {
         // FIXME: Could be optimized by first resizing the target
         // array, then copy elements with std::copy().
-        for (size_t i = ndx; i != leaf_size; ++i) {
+        for (size_t i = ndx; i != leaf_size; ++i)
             new_leaf.add(get(i));
-        }
         resize(ndx);
         add(value);
         state.m_split_offset = ndx + 1;
@@ -340,6 +341,42 @@ inline std::size_t BasicArray<T>::upper_bound(T value) const TIGHTDB_NOEXCEPT
     const T* end = begin + size();
     return std::upper_bound(begin, end, value) - begin;
 }
+
+
+#ifdef TIGHTDB_DEBUG
+
+template<class T>
+void BasicArray<T>::to_dot(std::ostream& out, StringData title) const
+{
+    ref_type ref = get_ref();
+    if (title.size() != 0) {
+        out << "subgraph cluster_" << ref << " {\n";
+        out << " label = \"" << title << "\";\n";
+        out << " color = white;\n";
+    }
+
+    out << "n" << std::hex << ref << std::dec << "[shape=none,label=<";
+    out << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\" CELLPADDING=\"4\"><TR>\n";
+
+    // Header
+    out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
+    out << "0x" << std::hex << ref << std::dec << "<BR/>";
+    out << "</FONT></TD>\n";
+
+    // Values
+    std::size_t n = m_size;
+    for (std::size_t i = 0; i != n; ++i)
+        out << "<TD>" << get(i) << "</TD>\n";
+
+    out << "</TR></TABLE>>];\n";
+
+    if (title.size() != 0)
+        out << "}\n";
+
+    to_dot_parent_edge(out);
+}
+
+#endif // TIGHTDB_DEBUG
 
 
 } // namespace tightdb

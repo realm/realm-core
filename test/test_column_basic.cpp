@@ -9,13 +9,15 @@
 
 using namespace tightdb;
 
+// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
+// will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
 TEST(ColumnBasic_LowerUpperBound)
 {
     // Create column with sorted members
     BasicColumn<int> col;
     col.add(5);
-    for (size_t i = 5; i < 100; i += 5) {
+    for (int i = 5; i < 100; i += 5) {
         col.add(i);
     }
 

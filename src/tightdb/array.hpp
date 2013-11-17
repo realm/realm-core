@@ -40,7 +40,6 @@ Searching: The main finding function is:
 
 #include <cmath>
 #include <cstdlib> // std::size_t
-#include <cstring> // memmove
 #include <algorithm>
 #include <utility>
 #include <vector>
@@ -188,9 +187,15 @@ public:
     virtual void update_child_ref(std::size_t child_ndx, ref_type new_ref) = 0;
 
 protected:
-    friend class Array;
-
     virtual ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT = 0;
+
+#ifdef TIGHTDB_DEBUG
+    // Used only by Array::to_dot().
+    virtual std::pair<ref_type, std::size_t>
+    get_to_dot_parent(std::size_t ndx_in_parent) const = 0;
+#endif
+
+    friend class Array;
 };
 
 
@@ -227,15 +232,16 @@ protected:
 /// they are consistent with the underlying node hierarchy before
 /// calling any method that modifies the underlying array node.
 ///
-/// FIXME: This class currently has a copy constructor, but it does
-/// not provide valid copy semantics in any sense. It violates
-/// constness by detaching the original. It attempts to do what a
-/// moving constructor could do in C++11, but as it currently is, it
-/// is completely defunct. There are three options for a fix of which
-/// the third is most attractive but hardest to implement: (1) Keep
-/// the copy constructor but stop detaching the original. For this to
-/// work, it is important that the constness of the accessor has
-/// nothing to do with the constness of the underlying memory,
+/// FIXME: This class currently has aspects of ownership, in
+/// particular the constructors that allocate underlying memory. On
+/// the other hand, the destructor never frees the memory. This is a
+/// disastrous situation, because it so easily becomes an obscure
+/// source of leaks. There are three options for a fix of which the
+/// third is most attractive but hardest to implement: (1) Remove all
+/// traces of ownership semantics, that is, remove the constructors
+/// that allocate memory, but keep the trivial copy constructor. For
+/// this to work, it is important that the constness of the accessor
+/// has nothing to do with the constness of the underlying memory,
 /// otherwise constness can be violated simply by copying the
 /// accessor. (2) Disallov copying but associate the constness of the
 /// accessor with the constness of the underlying memory. (3) Provide
@@ -256,14 +262,14 @@ public:
     enum Type {
         type_Normal,
 
-        /// This array is the root of an innner node of a B+-tree as
-        /// used in table columns.
+        /// This array is the main array of an innner node of a
+        /// B+-tree as used in table columns.
         type_InnerColumnNode,
 
-        /// This array may contain refs to subarrays. A element value
-        /// whose least significant bit is zero, is a ref pointing to
-        /// a subarray. An element value whose least significant bit
-        /// is one, is just a value. Is is the responsibility of the
+        /// This array may contain refs to subarrays. An element whose
+        /// least significant bit is zero, is a ref pointing to a
+        /// subarray. An element whose least significant bit is one,
+        /// is just a value. It is the responsibility of the
         /// application to ensure that non-ref values have their least
         /// significant bit set. This will generally be done by
         /// shifting the desired vlue to the left by one bit position,
@@ -304,9 +310,6 @@ public:
     /// Create an array in the unattached state.
     explicit Array(Allocator&) TIGHTDB_NOEXCEPT;
 
-    /// FIXME: This is an attempt at a moving constructor - but it violates constness in an unfortunate way.
-    Array(const Array&) TIGHTDB_NOEXCEPT;
-
     /// Create a new array as a copy of the specified array using the
     /// specified allocator.
     Array(const Array&, Allocator&);
@@ -336,7 +339,7 @@ public:
     /// Update the parents reference to this child. The requires, of
     /// course, that the parent information stored in this child is up
     /// to date. If the parent pointer is set to null, this function
-    /// does nothing.
+    /// has no effect.
     void update_parent();
 
     /// Called in the context of Group::commit() to ensure that
@@ -390,24 +393,34 @@ public:
 
     std::size_t size() const TIGHTDB_NOEXCEPT;
     bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
+    Type get_type() const TIGHTDB_NOEXCEPT;
 
     void insert(std::size_t ndx, int64_t value);
     void add(int64_t value);
+
+    /// This function is guaranteed not to throw if
+    /// ensure_minimum_width(value) has been called and
+    /// get_alloc().is_read_only(get_ref()) returns false
+    /// (noexcept:array-set).
     void set(std::size_t ndx, int64_t value);
+
     template<std::size_t w> void Set(std::size_t ndx, int64_t value);
 
     int64_t get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     template<std::size_t w> int64_t Get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
+    void get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT;
+    template<size_t w> void get_chunk(size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT;
 
     ref_type get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT;
 
     int64_t operator[](std::size_t ndx) const TIGHTDB_NOEXCEPT { return get(ndx); }
+    int64_t front() const TIGHTDB_NOEXCEPT;
     int64_t back() const TIGHTDB_NOEXCEPT;
 
     /// Erase the element at the specified index, and move elements at
     /// succeeding indexes to the next lower index.
     ///
-    /// Is guaranteed not to throw if
+    /// This function is guaranteed not to throw if
     /// get_alloc().is_read_only(get_ref()) returns false.
     ///
     /// FIXME: Carefull with this one. It does not destroy/deallocate
@@ -415,10 +428,14 @@ public:
     /// highly counterintuitive.
     void erase(std::size_t ndx);
 
+    /// Same as erase(std::size_t), but erase all elements in the
+    /// specified range.
+    void erase(std::size_t begin, std::size_t end);
+
     /// Erase every element in this array. Subarrays will be destroyed
     /// recursively, and space allocated for subarrays will be freed.
     ///
-    /// Is guaranteed not to throw if
+    /// This function is guaranteed not to throw if
     /// get_alloc().is_read_only(get_ref()) returns false.
     void clear();
 
@@ -429,7 +446,6 @@ public:
     // Direct access methods
     const Array* GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
                           bool use_retval = false) const TIGHTDB_NOEXCEPT; // FIXME: Constness is not propagated to the sub-array
-    std::size_t ColumnFind(int64_t target, ref_type ref, Array& cache) const;
 
     typedef StringData (*StringGetter)(void*, std::size_t); // Pre-declare getter function from string index
     size_t IndexStringFindFirst(StringData value, void* column, StringGetter get_func) const;
@@ -441,9 +457,27 @@ public:
     /// carefull if you call it after ensure_minimum_width().
     void set_all_to_zero();
 
-    void Increment(int64_t value, std::size_t start=0, std::size_t end=std::size_t(-1));
-    void IncrementIf(int64_t limit, int64_t value);
-    void adjust(std::size_t start, int64_t diff);
+    /// Add \a diff to the element at the specified index.
+    void adjust(std::size_t ndx, int_fast64_t diff);
+
+    /// Add \a diff to all the elements in the specified index range.
+    void adjust(std::size_t begin, std::size_t end, int_fast64_t diff);
+
+    /// Add \a diff to all elements that are greater than, or equal to
+    /// the specified limit.
+    void adjust_ge(int_fast64_t limit, int_fast64_t diff);
+
+    //@{
+    /// These are similar in spirit to std::move() and
+    /// std::move_backward from <algorithm>. \a dest_begin must not be
+    /// in the range [`begin`,`end`), and \a dest_end must not be in
+    /// the range (`begin`,`end`].
+    ///
+    /// These functions are guaranteed not to throw if
+    /// get_alloc().is_read_only(get_ref()) returns false.
+    void move(std::size_t begin, std::size_t end, std::size_t dest_begin);
+    void move_backward(std::size_t begin, std::size_t end, std::size_t dest_end);
+    //@}
 
     //@{
     /// Find the lower/upper bound of the specified value in a
@@ -495,6 +529,10 @@ public:
     // FIXME: Carefull with this one. It handles only shortening
     // operations. Either rename to truncate() or implement expanding
     // case.
+    ///
+    /// FIXME: Carefull with this one. It does not destroy/deallocate
+    /// subarrays as clear() does. This difference is surprising and
+    /// highly counterintuitive.
     void resize(std::size_t count);
 
     /// Returns true if type is not type_InnerColumnNode
@@ -503,15 +541,14 @@ public:
     /// Returns true if type is either type_HasRefs or type_InnerColumnNode
     bool has_refs() const TIGHTDB_NOEXCEPT { return m_hasRefs; }
 
+    // Columns and indexes can use the context bit to diffentiate leaf types
+    bool context_bit() const TIGHTDB_NOEXCEPT { return get_indexflag_from_header(); }
+    void set_context_bit(bool value) { set_header_indexflag(value); }
     bool is_index_node() const  TIGHTDB_NOEXCEPT { return get_indexflag_from_header(); }
     void set_is_index_node(bool value) { set_header_indexflag(value); }
 
-    // FIXME: Constness is not propagated to the sub-array. This
-    // constitutes a real problem, because modifying the returned
-    // array may cause the parent to be modified too.
-    Array GetSubArray(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-
     ref_type get_ref() const TIGHTDB_NOEXCEPT { return m_ref; }
+    MemRef get_mem() const TIGHTDB_NOEXCEPT { return MemRef(get_header_from_data(m_data), m_ref); }
 
     /// Recursively destroy children (as if calling clear()), then
     /// transition to the detached state (as if calling detach()),
@@ -548,6 +585,7 @@ public:
     bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
               Callback callback) const;
 
+    // This is the one installed into the m_finder slots.
     template<class cond, Action action, size_t bitwidth>
     bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const;
 
@@ -571,9 +609,9 @@ public:
     // Wrappers for backwards compatibility and for simple use without setting up state initialization etc
     template<class cond> std::size_t find_first(int64_t value, std::size_t start = 0,
                                                 std::size_t end = std::size_t(-1)) const;
-    void find_all(Array& result, int64_t value, std::size_t col_offset = 0, std::size_t start = 0,
+    void find_all(Array& result, int64_t value, std::size_t col_offset = 0, std::size_t begin = 0,
                   std::size_t end = std::size_t(-1)) const;
-    std::size_t find_first(int64_t value, std::size_t start = 0,
+    std::size_t find_first(int64_t value, std::size_t begin = 0,
                            std::size_t end = size_t(-1)) const;
 
     // Non-SSE find for the four functions Equal/NotEqual/Less/Greater
@@ -639,20 +677,85 @@ public:
                   Callback callback) const;
 
 
+    /// Get the number of elements in the B+-tree rooted at this array
+    /// node. The root must not be a leaf.
+    ///
+    /// Please avoid using this function (consider it deprecated). It
+    /// will have to be removed if we choose to get rid of the last
+    /// element of the main array of an inner B+-tree node that stores
+    /// the total number of elements in the subtree. The motivation
+    /// for removing it, is that it will significantly improve the
+    /// efficiency when inserting after, and erasing the last element.
+    std::size_t get_bptree_size() const TIGHTDB_NOEXCEPT;
+
+
     /// Find the leaf node corresponding to the specified tree-level
-    /// index. This array instance must be the root node of a B+-tree,
-    /// and that root node must not itself be a leaf. This implies, of
-    /// course, that the tree must not be empty.
+    /// index. This function must be called on an inner B+-tree node,
+    /// never a leaf. This implies, of course, that the tree must not
+    /// be empty.
     ///
-    /// Despite the fact that the returned MemRef object appear to
-    /// allow modification of the referenced memory, the caller must
-    /// consider the memory reference as being const-qualified.
+    /// The identified leaf is passed as a memory reference, and this
+    /// function may not instantiate intermediate array accessors
+    /// either. For this reason, this function cannot be used for
+    /// operations that modify the tree, as that requires an unbroken
+    /// chain of parent array accessors between the root and the
+    /// leaf. Thus, despite the fact that the returned MemRef object
+    /// appears to allow modification of the referenced memory, the
+    /// caller must handle the memory reference as if it was
+    /// const-qualified.
     ///
-    /// \return (leaf_header, leaf_ndx) where 'leaf_header' points to
-    /// the the header of the located leaf, and 'leaf_ndx' is the
-    /// local index within that leaf corresponding to the specified
-    /// tree-level index.
-    std::pair<MemRef, std::size_t> find_btree_leaf(std::size_t elem_ndx) const TIGHTDB_NOEXCEPT;
+    /// \return (`leaf_header`, `ndx_in_leaf`) where `leaf_header`
+    /// points to the the header of the located leaf, and
+    /// `ndx_in_leaf` is the local index within that leaf
+    /// corresponding to the specified tree-level index.
+    std::pair<MemRef, std::size_t> get_bptree_leaf(std::size_t elem_ndx) const TIGHTDB_NOEXCEPT;
+
+
+    class UpdateHandler;
+
+    /// Call the handler for every leaf. This function must be called
+    /// on an inner B+-tree node, never a leaf.
+    void update_bptree_leaves(UpdateHandler&);
+
+    /// Call the handler for the leaf that contains the element at the
+    /// specified index. This function must be called on an inner
+    /// B+-tree node, never a leaf.
+    void update_bptree_elem(std::size_t elem_ndx, UpdateHandler&);
+
+
+    class EraseHandler;
+
+    /// Erase the element at the specified index in the B+-tree with
+    /// the specified root. When erasing the last element, you must
+    /// pass npos in place of the index. This function must be called
+    /// with a root that is an inner B+-tree node, never a leaf.
+    ///
+    /// This function is guaranteed to succeed (not throw) if the
+    /// specified element was inserted during the current transaction,
+    /// and no other modifying operation has been carried out since
+    /// then (noexcept:bptree-erase-alt).
+    ///
+    /// FIXME: ExceptionSafety: The exception guarantee explained
+    /// above is not as powerfull as we would like it to be. Here is
+    /// what we would like: This function is guaranteed to succeed
+    /// (not throw) if the specified element was inserted during the
+    /// current transaction (noexcept:bptree-erase). This must be true
+    /// even if the element is modified after insertion, and/or if
+    /// other elements are inserted or erased around it. There are two
+    /// aspects of the current design that stand in the way of this
+    /// guarantee: (A) The fact that the node accessor, that is cached
+    /// in the column accessor, has to be reallocated/reinstantiated
+    /// when the root switches between being a leaf and an inner
+    /// node. This problem would go away if we always cached the last
+    /// used leaf accessor in the column accessor instead. (B) The
+    /// fact that replacing one child ref with another can fail,
+    /// because it may require reallocation of memory to expand the
+    /// bit-width. This can be fixed in two ways: Either have the
+    /// inner B+-tree nodes always have a bit-width of 64, or allow
+    /// the root node to be discarded and the column ref to be set to
+    /// zero in Table::m_columns.
+    static void erase_bptree_elem(Array* root, std::size_t elem_ndx, EraseHandler&);
+
 
     struct TreeInsertBase {
         std::size_t m_split_offset;
@@ -663,15 +766,19 @@ public:
         typename TreeTraits::value_type m_value;
     };
 
-    /// Insert a value into a B+-tree at the specified tree-level
-    /// index. This array instance must be the root node of a B+-tree,
-    /// and that root node must not itself be a leaf. This implies, of
-    /// course, that the tree must not be empty.
+    /// Same as bptree_insert() but insert after the last element.
     template<class TreeTraits>
-    ref_type btree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& state);
+    ref_type bptree_append(TreeInsert<TreeTraits>& state);
 
-    ref_type btree_leaf_insert(std::size_t ndx, int64_t, TreeInsertBase& state);
+    /// Insert an element into the B+-subtree rooted at this array
+    /// node. The element is inserted before the specified element
+    /// index. This function must be called on an inner B+-tree node,
+    /// never a leaf. If this inner node had to be split, this
+    /// function returns the `ref` of the new sibling.
+    template<class TreeTraits>
+    ref_type bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& state);
 
+    ref_type bptree_leaf_insert(std::size_t ndx, int64_t, TreeInsertBase& state);
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
@@ -701,6 +808,7 @@ public:
 
     static bool get_isleaf_from_header(const char*) TIGHTDB_NOEXCEPT;
     static bool get_hasrefs_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static bool get_context_bit_from_header(const char*) TIGHTDB_NOEXCEPT;
     static bool get_indexflag_from_header(const char*) TIGHTDB_NOEXCEPT;
     static WidthType get_wtype_from_header(const char*) TIGHTDB_NOEXCEPT;
     static int get_width_from_header(const char*) TIGHTDB_NOEXCEPT;
@@ -708,11 +816,38 @@ public:
 
     static Type get_type_from_header(const char*) TIGHTDB_NOEXCEPT;
 
+    /// Get the number of bytes currently in use by this array. This
+    /// includes the array header, but it does not include allocated
+    /// bytes corresponding to excess capacity. The result is
+    /// guaranteed to be a multiple of 8 (i.e., 64-bit aligned).
+    ///
+    /// This number is exactly the number of bytes that will be
+    /// written by a non-recursive invocation of write().
+    std::size_t get_byte_size() const TIGHTDB_NOEXCEPT;
+
+    /// Get the maximum number of bytes that can be written by a
+    /// non-recursive invocation of write() on an array with the
+    /// specified number of elements, that is, the maximum value that
+    /// can be returned by get_byte_size().
+    static std::size_t get_max_byte_size(std::size_t num_elems) TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void print() const;
     void Verify() const;
+    typedef std::size_t (*LeafVerifier)(MemRef, Allocator&);
+    void verify_bptree(LeafVerifier) const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
     void stats(MemStats& stats) const;
+    typedef void (*LeafDumper)(MemRef, Allocator&, std::ostream&, int level);
+    void dump_bptree_structure(std::ostream&, int level, LeafDumper) const;
+    class ToDotHandler {
+    public:
+        virtual void to_dot(MemRef leaf_mem, ArrayParent*, std::size_t ndx_in_parent,
+                            std::ostream&) = 0;
+        ~ToDotHandler() {}
+    };
+    void bptree_to_dot(std::ostream&, ToDotHandler&) const;
+    void to_dot_parent_edge(std::ostream&) const;
 #endif
 
 protected:
@@ -734,11 +869,15 @@ private:
 
     template<size_t w> int64_t sum(size_t start, size_t end) const;
 
-    /// Insert new child after original. If the parent has to be
-    /// split, this function returns the \c ref to the new parent
-    /// node.
-    static ref_type insert_btree_child(Array& offsets, Array& refs, std::size_t orig_child_ndx,
-                                       ref_type new_sibling_ref, TreeInsertBase& state);
+    /// Insert a new child after original. If the parent has to be
+    /// split, this function returns the `ref` of the new parent node.
+    ref_type insert_bptree_child(Array& offsets, std::size_t orig_child_ndx,
+                                 ref_type new_sibling_ref, TreeInsertBase& state);
+
+    void ensure_bptree_offsets(Array& offsets);
+    void create_bptree_offsets(Array& offsets, int_fast64_t first_value);
+
+    bool do_erase_bptree_elem(std::size_t elem_ndx, EraseHandler&);
 
 protected:
 //    void AddPositiveLocal(int64_t value);
@@ -755,6 +894,8 @@ protected:
     WidthType get_wtype_from_header() const TIGHTDB_NOEXCEPT;
     int get_width_from_header() const TIGHTDB_NOEXCEPT;
     std::size_t get_size_from_header() const TIGHTDB_NOEXCEPT;
+
+    // Undefined behavior if m_alloc.is_read_only(m_ref) returns true
     std::size_t get_capacity_from_header() const TIGHTDB_NOEXCEPT;
 
     void set_header_isleaf(bool value) TIGHTDB_NOEXCEPT;
@@ -814,40 +955,32 @@ protected:
     /// Get the address of the header of this array.
     char* get_header() TIGHTDB_NOEXCEPT;
 
-    /// Get the number of bytes currently in use by this array. This
-    /// includes the array header, but it does not include allocated
-    /// bytes corresponding to excess capacity. The result is
-    /// guaranteed to be a multiple of 8 (i.e., 64-bit aligned).
-    ///
-    /// This number is exactly the number of bytes that will be
-    /// written by a non-recursive invocation of write().
-    std::size_t get_byte_size() const TIGHTDB_NOEXCEPT;
-
     /// Same as get_byte_size().
     static std::size_t get_byte_size_from_header(const char*) TIGHTDB_NOEXCEPT;
 
+    // Undefined behavior if array is in immutable memory
     static std::size_t get_capacity_from_header(const char*) TIGHTDB_NOEXCEPT;
-
-    /// Get the maximum number of bytes that can be written by a
-    /// non-recursive invocation of write() on an array with the
-    /// specified number of elements, that is, the maxumum value that
-    /// can be returned by get_byte_size().
-    static std::size_t get_max_byte_size(std::size_t num_elems) TIGHTDB_NOEXCEPT;
 
     void update_child_ref(std::size_t child_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
     ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void destroy_children() TIGHTDB_NOEXCEPT;
 
+#ifdef TIGHTDB_DEBUG
+    std::pair<ref_type, std::size_t>
+    get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
+#endif
+
 // FIXME: below should be moved to a specific IntegerArray class
 protected:
     // Getters and Setters for adaptive-packed arrays
     typedef int64_t (Array::*Getter)(std::size_t) const; // Note: getters must not throw
     typedef void (Array::*Setter)(std::size_t, int64_t);
-    typedef bool (Array::*Finder)(int64_t, std::size_t, std::size_t, std::size_t,
-                                  QueryState<int64_t>*) const;
+    typedef bool (Array::*Finder)(int64_t, std::size_t, std::size_t, std::size_t, QueryState<int64_t>*) const;
+    typedef void (Array::*ChunkGetter)(size_t, int64_t res[8]) const; // Note: getters must not throw
 
     Getter m_getter;
+    ChunkGetter m_chunk_getter;
     Setter m_setter;
     Finder m_finder[cond_Count]; // one for each COND_XXX enum
 
@@ -857,6 +990,50 @@ protected:
     friend class SlabAlloc;
     friend class GroupWriter;
     friend class AdaptiveStringColumn;
+};
+
+
+
+class Array::UpdateHandler {
+public:
+    virtual void update(MemRef, ArrayParent*, std::size_t leaf_ndx_in_parent,
+                        std::size_t elem_ndx_in_leaf) = 0;
+    virtual ~UpdateHandler() TIGHTDB_NOEXCEPT {}
+};
+
+
+class Array::EraseHandler {
+public:
+    /// If the specified leaf has more than one element, this function
+    /// must erase the specified element from the leaf and return
+    /// false. Otherwise, when the leaf has a single element, this
+    /// function must return true without modifying the leaf. If \a
+    /// elem_ndx_in_leaf is `npos`, it refers to the last element in
+    /// the leaf. The implementation of this function must be
+    /// exception safe. This function is guaranteed to be called at
+    /// most once during each execution of Array::erase_bptree_elem(),
+    /// and *exactly* once during each *successful* execution of
+    /// Array::erase_bptree_elem().
+    virtual bool erase_leaf_elem(MemRef, ArrayParent*,
+                                 std::size_t leaf_ndx_in_parent,
+                                 std::size_t elem_ndx_in_leaf) = 0;
+
+    virtual void destroy_leaf(MemRef leaf_mem) TIGHTDB_NOEXCEPT = 0;
+
+    /// Must replace the current root with the specified leaf. The
+    /// implementation of this function must not destroy the
+    /// underlying root node, or any of its children, as that will be
+    /// done by Array::erase_bptree_elem(). The implementation of this
+    /// function must be exception safe.
+    virtual void replace_root_by_leaf(MemRef leaf_mem) = 0;
+
+    /// Same as replace_root_by_leaf(), but must replace the root with
+    /// an empty leaf. Also, if this function is called during an
+    /// execution of Array::erase_bptree_elem(), it is guaranteed that
+    /// it will be preceeded by a call to erase_leaf_elem().
+    virtual void replace_root_by_empty_leaf() = 0;
+
+    virtual ~EraseHandler() TIGHTDB_NOEXCEPT {}
 };
 
 
@@ -898,12 +1075,14 @@ public:
             m_state = 0;
         else if (action == act_FindAll)
             m_state = reinterpret_cast<int64_t>(akku);
+        else if (action == act_CallbackIdx) {
+        }
         else
             TIGHTDB_ASSERT(false);
     }
 
-    template <Action action, bool pattern, class Callback>
-    inline bool match(size_t index, uint64_t indexpattern, int64_t value, Callback callback)
+    template <Action action, bool pattern>
+    inline bool match(size_t index, uint64_t indexpattern, int64_t value)
     {
         if (pattern) {
             if (action == act_Count) {
@@ -922,9 +1101,7 @@ public:
 
         ++m_match_count;
 
-        if (action == act_CallbackIdx)
-            return callback(index);
-        else if (action == act_Max) {
+        if (action == act_Max) {
             if (value > m_state)
                 m_state = value;
         }
@@ -979,8 +1156,8 @@ public:
             TIGHTDB_ASSERT(false);
     }
 
-    template<Action action, bool pattern, class Callback, typename resulttype>
-    inline bool match(size_t /*index*/, uint64_t /*indexpattern*/, resulttype value, Callback /*callback*/)
+    template<Action action, bool pattern, typename resulttype>
+    inline bool match(size_t /*index*/, uint64_t /*indexpattern*/, resulttype value)
     {
         if (pattern)
             return false;
@@ -1037,18 +1214,6 @@ inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
     m_data(0), m_ref(0), m_size(0), m_capacity(0), m_width(std::size_t(-1)), m_isNode(false),
     m_parent(0), m_ndx_in_parent(0), m_alloc(alloc) {}
 
-// Copy-constructor
-// Note that this array now own the ref. Should only be used when
-// the source array goes away right after (like return values from functions)
-inline Array::Array(const Array& src) TIGHTDB_NOEXCEPT:
-    ArrayParent(), m_parent(src.m_parent), m_ndx_in_parent(src.m_ndx_in_parent),
-    m_alloc(src.m_alloc)
-{
-    ref_type ref = src.get_ref();
-    init_from_ref(ref);
-    const_cast<Array&>(src).detach(); // FIXME: Const-violation here!!!
-}
-
 inline Array::Array(const Array& array, Allocator& alloc):
     m_data(0), m_size(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
     m_parent(0), m_ndx_in_parent(0), m_alloc(alloc), m_lbound(0), m_ubound(0)
@@ -1077,12 +1242,24 @@ inline std::size_t Array::size() const TIGHTDB_NOEXCEPT
 }
 
 
-inline int64_t Array::back() const TIGHTDB_NOEXCEPT
+inline Array::Type Array::get_type() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(m_size > 0);
-    return get(m_size - 1);
+    if (m_isNode) {
+        TIGHTDB_ASSERT(m_hasRefs);
+        return type_InnerColumnNode;
+    }
+    if (m_hasRefs)
+        return type_HasRefs;
+    return type_Normal;
 }
+
+
+inline void Array::get_chunk(std::size_t ndx, int64_t res[8]) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < m_size);
+    (this->*m_chunk_getter)(ndx, res);
+}
+
 
 inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
@@ -1107,23 +1284,22 @@ inline int64_t Array::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 */
 }
 
+inline int64_t Array::front() const TIGHTDB_NOEXCEPT
+{
+    return get(0);
+}
+
+inline int64_t Array::back() const TIGHTDB_NOEXCEPT
+{
+    return get(m_size - 1);
+}
+
 inline ref_type Array::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_hasRefs);
     int64_t v = get(ndx);
     return to_ref(v);
-}
-
-inline Array Array::GetSubArray(std::size_t ndx) const TIGHTDB_NOEXCEPT
-{
-    ref_type ref = get_as_ref(ndx);
-    TIGHTDB_ASSERT(ref);
-
-    // FIXME: Constness is not propagated to the sub-array. This
-    // constitutes a real problem, because modifying the returned
-    // array genrally causes the parent to be modified too.
-    return Array(ref, const_cast<Array*>(this), ndx, m_alloc);
 }
 
 
@@ -1145,6 +1321,32 @@ inline void Array::destroy() TIGHTDB_NOEXCEPT
     m_alloc.free_(m_ref, header);
     m_data = 0;
 }
+
+
+inline void Array::erase(std::size_t ndx)
+{
+    // This can throw, but only if array is currently in read-only
+    // memory.
+    move(ndx+1, size(), ndx);
+
+    // Update size (also in header)
+    --m_size;
+    set_header_size(m_size);
+}
+
+
+inline void Array::erase(std::size_t begin, std::size_t end)
+{
+    // This can throw, but only if array is currently in read-only
+    // memory.
+    if (begin != end)
+        move(end, size(), begin); // Throws
+
+    // Update size (also in header)
+    m_size -= end - begin;
+    set_header_size(m_size);
+}
+
 
 inline void Array::clear()
 {
@@ -1203,43 +1405,80 @@ private:
 };
 
 
+inline void Array::adjust(std::size_t ndx, int_fast64_t diff)
+{
+    // FIXME: Should be optimized
+    TIGHTDB_ASSERT(ndx <= m_size);
+    int_fast64_t v = get(ndx);
+    set(ndx, int64_t(v + diff)); // Throws
+}
+
+inline void Array::adjust(std::size_t begin, std::size_t end, int_fast64_t diff)
+{
+    // FIXME: Should be optimized
+    for (std::size_t i = begin; i != end; ++i)
+        adjust(i, diff); // Throws
+}
+
+inline void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
+{
+    size_t n = size();
+    for (std::size_t i = 0; i != n; ++i) {
+        int_fast64_t v = get(i);
+        if (v >= limit)
+            set(i, int64_t(v + diff)); // Throws
+    }
+}
+
+
 
 //-------------------------------------------------
 
 inline bool Array::get_isleaf_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
-    return (h[0] & 0x80) == 0;
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return (int(h[4]) & 0x80) == 0;
 }
 inline bool Array::get_hasrefs_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
-    return (h[0] & 0x40) != 0;
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return (int(h[4]) & 0x40) != 0;
 }
 inline bool Array::get_indexflag_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
-    return (h[0] & 0x20) != 0;
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return (int(h[4]) & 0x20) != 0;
+}
+inline bool Array::get_context_bit_from_header(const char* header) TIGHTDB_NOEXCEPT
+{
+    return get_indexflag_from_header(header);
 }
 inline Array::WidthType Array::get_wtype_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
-    return WidthType((h[0] & 0x18) >> 3);
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return WidthType((int(h[4]) & 0x18) >> 3);
 }
 inline int Array::get_width_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
-    return (1 << (h[0] & 0x07)) >> 1;
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return (1 << (int(h[4]) & 0x07)) >> 1;
 }
 inline std::size_t Array::get_size_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
-    return (std::size_t(h[1]) << 16) + (std::size_t(h[2]) << 8) + h[3];
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return (std::size_t(h[5]) << 16) + (std::size_t(h[6]) << 8) + h[7];
 }
 inline std::size_t Array::get_capacity_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    const unsigned char* h = reinterpret_cast<const unsigned char*>(header);
-    return (std::size_t(h[4]) << 16) + (std::size_t(h[5]) << 8) + h[6];
+    typedef unsigned char uchar;
+    const uchar* h = reinterpret_cast<const uchar*>(header);
+    return (std::size_t(h[0]) << 16) + (std::size_t(h[1]) << 8) + h[2];
 }
 
 
@@ -1289,20 +1528,23 @@ inline std::size_t Array::get_capacity_from_header() const TIGHTDB_NOEXCEPT
 
 inline void Array::set_header_isleaf(bool value, char* header) TIGHTDB_NOEXCEPT
 {
-    uint8_t* h = reinterpret_cast<uint8_t*>(header);
-    h[0] = (h[0] & ~0x80) | uint8_t(!value << 7);
+    typedef unsigned char uchar;
+    uchar* h = reinterpret_cast<uchar*>(header);
+    h[4] = uchar((int(h[4]) & ~0x80) | int(!value) << 7);
 }
 
 inline void Array::set_header_hasrefs(bool value, char* header) TIGHTDB_NOEXCEPT
 {
-    uint8_t* h = reinterpret_cast<uint8_t*>(header);
-    h[0] = (h[0] & ~0x40) | uint8_t(value << 6);
+    typedef unsigned char uchar;
+    uchar* h = reinterpret_cast<uchar*>(header);
+    h[4] = uchar((int(h[4]) & ~0x40) | int(value) << 6);
 }
 
 inline void Array::set_header_indexflag(bool value, char* header) TIGHTDB_NOEXCEPT
 {
-    uint8_t* h = reinterpret_cast<uint8_t*>(header);
-    h[0] = (h[0] & ~0x20) | uint8_t(value << 5);
+    typedef unsigned char uchar;
+    uchar* h = reinterpret_cast<uchar*>(header);
+    h[4] = uchar((int(h[4]) & ~0x20) | int(value) << 5);
 }
 
 inline void Array::set_header_wtype(WidthType value, char* header) TIGHTDB_NOEXCEPT
@@ -1311,37 +1553,45 @@ inline void Array::set_header_wtype(WidthType value, char* header) TIGHTDB_NOEXC
     // 0: bits      (width/8) * size
     // 1: multiply  width * size
     // 2: ignore    1 * size
-    uint8_t* h = reinterpret_cast<uint8_t*>(header);
-    h[0] = (h[0] & ~0x18) | uint8_t(value << 3);
+    typedef unsigned char uchar;
+    uchar* h = reinterpret_cast<uchar*>(header);
+    h[4] = uchar((int(h[4]) & ~0x18) | int(value) << 3);
 }
 
 inline void Array::set_header_width(int value, char* header) TIGHTDB_NOEXCEPT
 {
     // Pack width in 3 bits (log2)
     int w = 0;
-    while (value) { ++w; value >>= 1; }
+    while (value) {
+        ++w;
+        value >>= 1;
+    }
     TIGHTDB_ASSERT(w < 8);
 
-    uint8_t* h = reinterpret_cast<uint8_t*>(header);
-    h[0] = (h[0] & ~0x7) | uint8_t(w);
+    typedef unsigned char uchar;
+    uchar* h = reinterpret_cast<uchar*>(header);
+    h[4] = uchar((int(h[4]) & ~0x7) | w);
 }
 
 inline void Array::set_header_size(std::size_t value, char* header) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(value <= 0xFFFFFF);
-    uint8_t* h = reinterpret_cast<uint8_t*>(header);
-    h[1] = (value >> 16) & 0x000000FF;
-    h[2] = (value >>  8) & 0x000000FF;
-    h[3] =  value        & 0x000000FF;
+    TIGHTDB_ASSERT(value <= 0xFFFFFFL);
+    typedef unsigned char uchar;
+    uchar* h = reinterpret_cast<uchar*>(header);
+    h[5] = uchar((value >> 16) & 0x000000FF);
+    h[6] = uchar((value >>  8) & 0x000000FF);
+    h[7] = uchar( value        & 0x000000FF);
 }
 
+// Note: There is a copy of this function is test_alloc.cpp
 inline void Array::set_header_capacity(std::size_t value, char* header) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(value <= 0xFFFFFF);
-    uint8_t* h = reinterpret_cast<uint8_t*>(header);
-    h[4] = (value >> 16) & 0x000000FF;
-    h[5] = (value >>  8) & 0x000000FF;
-    h[6] =  value        & 0x000000FF;
+    TIGHTDB_ASSERT(value <= 0xFFFFFFL);
+    typedef unsigned char uchar;
+    uchar* h = reinterpret_cast<uchar*>(header);
+    h[0] = uchar((value >> 16) & 0x000000FF);
+    h[1] = uchar((value >>  8) & 0x000000FF);
+    h[2] = uchar( value        & 0x000000FF);
 }
 
 
@@ -1430,7 +1680,8 @@ inline std::size_t Array::get_byte_size() const TIGHTDB_NOEXCEPT
 
     num_bytes += header_size;
 
-    TIGHTDB_ASSERT(num_bytes <= get_capacity_from_header(header));
+    TIGHTDB_ASSERT(m_alloc.is_read_only(m_ref) ||
+                   num_bytes <= get_capacity_from_header(header));
 
     return num_bytes;
 }
@@ -1467,8 +1718,6 @@ inline std::size_t Array::get_byte_size_from_header(const char* header) TIGHTDB_
         num_bytes += rest;
 
     num_bytes += header_size;
-
-    TIGHTDB_ASSERT(num_bytes <= get_capacity_from_header(header));
 
     return num_bytes;
 }
@@ -1539,12 +1788,13 @@ template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) c
         return refs_pos; // Return position
     }
 
-    // TODO: replace capacity with checksum
+    // FIXME: Replace capacity with checksum
 
     // Write array
     const char* header = get_header_from_data(m_data);
     std::size_t size = get_byte_size();
-    std::size_t array_pos = out.write(header, size);
+    uint_fast32_t dummy_checksum = 0x01010101UL;
+    std::size_t array_pos = out.write_array(header, size, dummy_checksum);
     TIGHTDB_ASSERT((array_pos & 0x7) == 0); /// 64-bit alignment
 
     return array_pos;
@@ -1599,60 +1849,147 @@ inline ref_type Array::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
     return get_as_ref(child_ndx);
 }
 
-
-template<class TreeTraits>
-ref_type Array::btree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& state)
+inline std::size_t Array::get_bptree_size() const TIGHTDB_NOEXCEPT
 {
-    Allocator& alloc = get_alloc();
-    ref_type offsets_ref = get_as_ref(0);
-    Array offsets(offsets_ref, this, 0, alloc);
-    ref_type refs_ref = get_as_ref(1);
-    Array refs(refs_ref, this, 1, alloc);
-    TIGHTDB_ASSERT(0 < refs.size());
-    TIGHTDB_ASSERT(offsets.size() == refs.size());
-    TIGHTDB_ASSERT(elem_ndx == npos || elem_ndx <= to_size_t(offsets.get(refs.size()-1)));
-    std::size_t child_ndx, child_elem_ndx;
-    if (elem_ndx == npos) {
-        // Optimization for append
-        child_ndx = refs.size() - 1;
-        child_elem_ndx = npos;
-    }
-    else if (elem_ndx == 0) {
-        // Optimization for prepend
-        child_ndx = 0;
-        child_elem_ndx = 0;
+    TIGHTDB_ASSERT(!is_leaf());
+    int_fast64_t v = back();
+    return std::size_t(v / 2); // v = 1 + 2*total_elems_in_tree
+}
+
+inline void Array::ensure_bptree_offsets(Array& offsets)
+{
+    int_fast64_t first_value = get(0);
+    if (first_value % 2 == 0) {
+        offsets.init_from_ref(to_ref(first_value));
     }
     else {
-        // There is a choise to be made when the element is to be
+        create_bptree_offsets(offsets, first_value); // Throws
+    }
+    offsets.set_parent(this, 0);
+}
+
+
+template<class TreeTraits>
+ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
+{
+    // FIXME: Consider exception safety. Especially, how can the split
+    // be carried out in an exception safe manner?
+    //
+    // Can split be done as a separate preparation step, such that if
+    // the actual insert fails, the split will still have occured.
+    //
+    // Unfortunately, it requires a rather significant rearrangement
+    // of the insertion flow. Instead of returning the sibling ref
+    // from insert functions, the leaf-insert functions must instead
+    // call the special bptree_insert() function on the parent, which
+    // will then cascade the split towards the root as required.
+    //
+    // At each level where a split is required (starting at the leaf):
+    //
+    //  1. Create the new sibling.
+    //
+    //  2. Copy relevant entries over such that new sibling is in
+    //     its final state.
+    //
+    //  3. Call Array::bptree_insert() on parent with sibling ref.
+    //
+    //  4. Rearrange entries in original sibling and truncate as
+    //     required (must not throw).
+    //
+    // What about the 'offsets' array? It will always be
+    // present. Consider this carefully.
+
+    TIGHTDB_ASSERT(size() >= 1 + 1 + 1); // At least one child
+
+    ArrayParent& childs_parent = *this;
+    std::size_t child_ref_ndx = size() - 2;
+    ref_type child_ref = get_as_ref(child_ref_ndx), new_sibling_ref;
+    char* child_header = static_cast<char*>(m_alloc.translate(child_ref));
+
+    bool child_is_leaf = get_isleaf_from_header(child_header);
+    if (child_is_leaf) {
+        std::size_t elem_ndx_in_child = npos; // Append
+        new_sibling_ref =
+            TreeTraits::leaf_insert(MemRef(child_header, child_ref), childs_parent,
+                                    child_ref_ndx, m_alloc, elem_ndx_in_child, state); // Throws
+    }
+    else {
+        Array child(MemRef(child_header, child_ref), &childs_parent, child_ref_ndx, m_alloc);
+        new_sibling_ref = child.bptree_append(state); // Throws
+    }
+
+    if (TIGHTDB_LIKELY(!new_sibling_ref)) {
+        // +2 because stored value is 1 + 2*total_elems_in_subtree
+        adjust(size()-1, +2); // Throws
+        return 0; // Child was not split, so parent was not split either
+    }
+
+    Array offsets(m_alloc);
+    int_fast64_t first_value = get(0);
+    if (first_value % 2 == 0) {
+        // Offsets array is present (general form)
+        offsets.init_from_ref(to_ref(first_value));
+        offsets.set_parent(this, 0);
+    }
+    size_t child_ndx = child_ref_ndx - 1;
+    return insert_bptree_child(offsets, child_ndx, new_sibling_ref, state); // Throws
+}
+
+
+template<class TreeTraits>
+ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& state)
+{
+    TIGHTDB_ASSERT(size() >= 1 + 1 + 1); // At least one child
+
+    // Conversion to general form if in compact form. Since this
+    // conversion will occur from root to leaf, it will maintain
+    // invar:bptree-node-form.
+    Array offsets(m_alloc);
+    ensure_bptree_offsets(offsets); // Throws
+
+    std::size_t child_ndx, elem_ndx_in_child;
+    if (elem_ndx == 0) {
+        // Optimization for prepend
+        child_ndx = 0;
+        elem_ndx_in_child = 0;
+    }
+    else {
+        // There is a choice to be made when the element is to be
         // inserted between two subtrees. It can either be appended to
         // the first subtree, or it can be prepended to the second
         // one. We currently always append to the first subtree. It is
         // essentially a matter of using the lower vs. the upper bound
         // when searching through the offsets array.
         child_ndx = offsets.lower_bound_int(elem_ndx);
-        TIGHTDB_ASSERT(child_ndx < refs.size());
+        TIGHTDB_ASSERT(child_ndx < size() - 2);
         std::size_t elem_ndx_offset = child_ndx == 0 ? 0 : to_size_t(offsets.get(child_ndx-1));
-        child_elem_ndx = elem_ndx - elem_ndx_offset;
+        elem_ndx_in_child = elem_ndx - elem_ndx_offset;
     }
-    ref_type child_ref = refs.get_as_ref(child_ndx), new_sibling_ref;
-    char* child_header = static_cast<char*>(alloc.translate(child_ref));
+
+    ArrayParent& childs_parent = *this;
+    std::size_t child_ref_ndx = child_ndx + 1;
+    ref_type child_ref = get_as_ref(child_ref_ndx), new_sibling_ref;
+    char* child_header = static_cast<char*>(m_alloc.translate(child_ref));
     bool child_is_leaf = get_isleaf_from_header(child_header);
     if (child_is_leaf) {
-        TIGHTDB_ASSERT(child_elem_ndx == npos || child_elem_ndx <= TIGHTDB_MAX_LIST_SIZE);
-        new_sibling_ref = TreeTraits::leaf_insert(MemRef(child_header, child_ref), refs,
-                                                  child_ndx, alloc, child_elem_ndx, state);
+        TIGHTDB_ASSERT(elem_ndx_in_child <= TIGHTDB_MAX_LIST_SIZE);
+        new_sibling_ref =
+            TreeTraits::leaf_insert(MemRef(child_header, child_ref), childs_parent,
+                                    child_ref_ndx, m_alloc, elem_ndx_in_child, state); // Throws
     }
     else {
-        Array child(MemRef(child_header, child_ref), &refs, child_ndx, alloc);
-        new_sibling_ref = child.btree_insert(child_elem_ndx, state);
+        Array child(MemRef(child_header, child_ref), &childs_parent, child_ref_ndx, m_alloc);
+        new_sibling_ref = child.bptree_insert(elem_ndx_in_child, state); // Throws
     }
 
     if (TIGHTDB_LIKELY(!new_sibling_ref)) {
-        offsets.adjust(child_ndx, 1);
-        return 0;
+        // +2 because stored value is 1 + 2*total_elems_in_subtree
+        adjust(size()-1, +2); // Throws
+        offsets.adjust(child_ndx, offsets.size(), +1);
+        return 0; // Child was not split, so parent was not split either
     }
 
-    return insert_btree_child(offsets, refs, child_ndx, new_sibling_ref, state);
+    return insert_bptree_child(offsets, child_ndx, new_sibling_ref, state); // Throws
 }
 
 
@@ -1721,12 +2058,20 @@ computations for the given search criteria makes it feasible to construct such a
 template<Action action, class Callback>
 bool Array::find_action(size_t index, int64_t value, QueryState<int64_t>* state, Callback callback) const
 {
-    return state->match<action, false, Callback>(index, 0, value, callback);
+    if (action == act_CallbackIdx)
+        return callback(index);
+    else
+        return state->match<action, false>(index, 0, value);
 }
 template<Action action, class Callback>
 bool Array::find_action_pattern(size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const
 {
-    return state->match<action, true, Callback>(index, pattern, 0, callback);
+    static_cast<void>(callback);
+    if(action == act_CallbackIdx) {
+        // Possible future optimization: call callback(index) like in above find_action(), in a loop for each bit set in 'pattern'
+        return false;
+    }
+    return state->match<action, true>(index, pattern, 0);
 }
 
 
@@ -1840,25 +2185,29 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     // Test first few items with no initial time overhead
     if (start > 0) {
         if (m_size > start && c(Get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return false;
+            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
+                return false;
         }
 
         ++start;
 
         if (m_size > start && c(Get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return false;
+            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
+                return false;
         }
 
         ++start;
 
         if (m_size > start && c(Get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return false;
+            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
+                return false;
         }
 
         ++start;
 
         if (m_size > start && c(Get<bitwidth>(start), value) && start < end) {
-            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback)) return false;
+            if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
+                return false;
         }
 
         ++start;
@@ -1867,31 +2216,42 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     if (!(m_size > start && start < end))
         return true;
 
-    if (end == std::size_t(-1)) end = m_size;
+    if (end == std::size_t(-1))
+        end = m_size;
 
-    // Return immediately if no items in array can match (such as if cond2 == Greater and value == 100 and m_ubound == 15).
+    // Return immediately if no items in array can match (such as if cond2 == Greater && value == 100 && m_ubound == 15)
     if (!c.can_match(value, m_lbound, m_ubound))
         return true;
 
-    // call find_action() on all items in array if all items are guaranteed to match (such as cond2 == NotEqual and
-    // value == 100 and m_ubound == 15)
+    // optimization if all items are guaranteed to match (such as cond2 == NotEqual && value == 100 && m_ubound == 15)
     if (c.will_match(value, m_lbound, m_ubound)) {
+        size_t end2;
+
+        if(action == act_CallbackIdx)
+            end2 = end;
+        else {
+            TIGHTDB_ASSERT(state->m_match_count < state->m_limit);
+            size_t process = state->m_limit - state->m_match_count;
+            end2 = end - start > process ? start + process : end;        
+        }
         if (action == act_Sum || action == act_Max || action == act_Min) {
             int64_t res;
             if (action == act_Sum)
-                res = Array::sum(start, end);
+                res = Array::sum(start, end2);
             if (action == act_Max)
-                Array::maximum(res, start, end);
+                Array::maximum(res, start, end2);
             if (action == act_Min)
-                Array::minimum(res, start, end);
+                Array::minimum(res, start, end2);
 
             find_action<action, Callback>(start + baseindex, res, state, callback);
+            state->m_match_count += end2 - start;
+
         }
         else if (action == act_Count) {
-            state->m_state += end - start;
+            state->m_state += end2 - start;
         }
         else {
-            for (; start < end; start++)
+            for (; start < end2; start++)
                 if (!find_action<action, Callback>(start + baseindex, Get<bitwidth>(start), state, callback))
                     return false;
         }
@@ -2277,6 +2637,7 @@ template<bool eq, Action action, size_t width, class Callback> inline bool Array
 // There exists a couple of find() functions that take more or less template arguments. Always call the one that
 // takes as most as possible to get best performance.
 
+// This is the one installed into the m_finder slots.
 template<class cond, Action action, size_t bitwidth>
 bool Array::find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const
 {
@@ -2325,8 +2686,7 @@ template<class cond2, Action action, size_t width, class Callback>
 TIGHTDB_FORCEINLINE bool Array::FindSSE_intern(__m128i* action_data, __m128i* data, size_t items,
                                                QueryState<int64_t>* state, size_t baseindex, Callback callback) const
 {
-    cond2 c;
-    int cond = c.condition();
+    int cond = cond2::condition;
     size_t i = 0;
     __m128i compare = {0};
     unsigned int resmask;
@@ -2407,7 +2767,9 @@ bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t 
                          Callback callback) const
 {
     cond c;
-    TIGHTDB_ASSERT(start < end);
+    TIGHTDB_ASSERT(start <= end);
+    if(start == end)
+        return true;
 
 
     int64_t v;
@@ -2623,8 +2985,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback>
 bool Array::Compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
                     Callback callback) const
 {
-    cond2 c;
-    int cond = c.condition();
+    int cond = cond2::condition;
     bool ret = false;
 
     if (cond == cond_Equal)
@@ -2722,11 +3083,10 @@ bool Array::CompareRelation(int64_t value, size_t start, size_t end, size_t base
 
 template<class cond> size_t Array::find_first(int64_t value, size_t start, size_t end) const
 {
-    cond c;
     TIGHTDB_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
     QueryState<int64_t> state;
-    state.m_state = not_found;
-    Finder finder = m_finder[c.condition()];
+    state.init(act_ReturnFirst, NULL, 1); // todo, would be nice to avoid this in order to speed up find_first loops
+    Finder finder = m_finder[cond::condition];
     (this->*finder)(value, start, end, 0, &state);
 
     return static_cast<size_t>(state.m_state);
@@ -2735,8 +3095,6 @@ template<class cond> size_t Array::find_first(int64_t value, size_t start, size_
 //*************************************************************************************
 // Finding code ends                                                                  *
 //*************************************************************************************
-
-
 
 
 } // namespace tightdb

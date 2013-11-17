@@ -35,6 +35,9 @@
 // GCC defines __i386__ and __x86_64__
 #if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
     #define TIGHTDB_X86_OR_X64
+    #define TIGHTDB_X86_OR_X64_TRUE true
+#else
+    #define TIGHTDB_X86_OR_X64_TRUE false
 #endif
 
 // GCC defines __arm__
@@ -46,15 +49,6 @@
     #define TIGHTDB_PTR_64
 #endif
 
-
-// On platforms with cache coherence this macro should not do anything
-// on all other platforms it must implement a sync or memory barrier
-// FIXME: It is common to define at least two diffrent levels of cache coherency. Which one do we require? Which ones are guaranteed by Intel and ARM? See http://en.wikipedia.org/wiki/Cache_coherence.
-#if defined(TIGHTDB_X86_OR_X64)
-#  define TIGHTDB_SYNC_IF_NO_CACHE_COHERENCE
-#elif defined (TIGHTDB_ARCH_ARM)
-#  define TIGHTDB_SYNC_IF_NO_CACHE_COHERENCE
-#endif
 
 #if defined(TIGHTDB_PTR_64) && defined(TIGHTDB_X86_OR_X64)
     #define TIGHTDB_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
@@ -127,15 +121,16 @@ inline std::size_t to_size_t(int64_t v) TIGHTDB_NOEXCEPT
 
 
 template<typename ReturnType, typename OriginalType>
-ReturnType type_punning( OriginalType variable ) TIGHTDB_NOEXCEPT
+ReturnType type_punning(OriginalType variable) TIGHTDB_NOEXCEPT
 {
-    union {
+    union Both {
         OriginalType in;
-        ReturnType   out;
+        ReturnType out;
     };
-    out = ReturnType(); // Clear all bits in case ReturnType is larger than OriginalType
-    in = variable;
-    return out;
+    Both both;
+    both.out = ReturnType(); // Clear all bits in case ReturnType is larger than OriginalType
+    both.in = variable;
+    return both.out;
 }
 
 enum FindRes {
@@ -143,6 +138,24 @@ enum FindRes {
     FindRes_single,
     FindRes_column
 };
+
+
+// Use safe_equal() instead of std::equal() when comparing sequences which can have a 0 elements.
+template <class InputIterator1, class InputIterator2>
+bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 first2)
+{
+#if defined(_MSC_VER) && defined(_DEBUG)
+
+    // Windows has a special check in debug mode against passing null
+    // pointer to std::equal(). This conflicts with the C++
+    // standard. For details, see
+    // http://stackoverflow.com/questions/19120779/is-char-p-0-stdequalp-p-p-well-defined-according-to-the-c-standard.
+    // Below check 'first1==last1' is to prevent failure in debug mode.
+    return (first1 == last1 || std::equal(first1, last1, first2));
+#else
+    return std::equal(first1, last1, first2);
+#endif
+}
 
 } // namespace tightdb
 

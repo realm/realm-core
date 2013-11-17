@@ -104,7 +104,7 @@ public:
     ///   type_Double  ->  "double"
     ///   type_String  ->  "string"
     ///   type_Binary  ->  "binary"
-    ///   type_Date    ->  "date"
+    ///   type_DateTime    ->  "date"
     ///   type_Table   ->  "table"
     ///   type_Mixed   ->  "mixed"
     ///

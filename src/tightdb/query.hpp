@@ -37,6 +37,7 @@
 
 #include <tightdb/table_ref.hpp>
 #include <tightdb/binary_data.hpp>
+#include <tightdb/datetime.hpp>
 
 namespace tightdb {
 
@@ -47,12 +48,17 @@ class Table;
 class TableView;
 class ConstTableView;
 class Array;
-
+class Expression;
 
 class Query {
 public:
+    Query(const Table& table);
+    Query();
     Query(const Query& copy); // FIXME: Try to remove this
     ~Query() TIGHTDB_NOEXCEPT;
+
+    Query& expression(Expression* compare, bool auto_delete = false);
+    Expression* get_expression();
 
     // Conditions: Query only rows contained in tv
     Query& tableview(const TableView& tv);
@@ -122,13 +128,13 @@ public:
     Query& equal(size_t column_ndx, bool value);
 
     // Conditions: date
-    Query& equal_date(size_t column_ndx, Date value) { return equal(column_ndx, int64_t(value.get_date())); }
-    Query& not_equal_date(size_t column_ndx, Date value) { return not_equal(column_ndx, int64_t(value.get_date())); }
-    Query& greater_date(size_t column_ndx, Date value) { return greater(column_ndx, int64_t(value.get_date())); }
-    Query& greater_equal_date(size_t column_ndx, Date value) { return greater_equal(column_ndx, int64_t(value.get_date())); }
-    Query& less_date(size_t column_ndx, Date value) { return less(column_ndx, int64_t(value.get_date())); }
-    Query& less_equal_date(size_t column_ndx, Date value) { return less_equal(column_ndx, int64_t(value.get_date())); }
-    Query& between_date(size_t column_ndx, Date from, Date to) { return between(column_ndx, int64_t(from.get_date()), int64_t(to.get_date())); }
+    Query& equal_datetime(size_t column_ndx, DateTime value) { return equal(column_ndx, int64_t(value.get_datetime())); }
+    Query& not_equal_datetime(size_t column_ndx, DateTime value) { return not_equal(column_ndx, int64_t(value.get_datetime())); }
+    Query& greater_datetime(size_t column_ndx, DateTime value) { return greater(column_ndx, int64_t(value.get_datetime())); }
+    Query& greater_equal_datetime(size_t column_ndx, DateTime value) { return greater_equal(column_ndx, int64_t(value.get_datetime())); }
+    Query& less_datetime(size_t column_ndx, DateTime value) { return less(column_ndx, int64_t(value.get_datetime())); }
+    Query& less_equal_datetime(size_t column_ndx, DateTime value) { return less_equal(column_ndx, int64_t(value.get_datetime())); }
+    Query& between_datetime(size_t column_ndx, DateTime from, DateTime to) { return between(column_ndx, int64_t(from.get_datetime()), int64_t(to.get_datetime())); }
 
     // Conditions: strings
 
@@ -158,23 +164,29 @@ public:
     void end_subtable();
     Query& Or();
 
+    Query& and_query(Query q);
+    Query operator||(Query q); 
+    Query operator&&(Query q); 
+
+
+
     // Searching
-    size_t         find_next(size_t lastmatch=size_t(-1));
+    size_t         find(size_t begin_at_table_row=size_t(0));
     TableView      find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1));
     ConstTableView find_all(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
 
     // Aggregates
     size_t count(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
 
-    int64_t sum(    size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    double average( size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    int64_t maximum(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    int64_t minimum(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    int64_t sum_int(    size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double  average_int(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    int64_t maximum_int(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    int64_t minimum_int(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 
-    double sum_float(     size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    double average_float( size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    float maximum_float(  size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    float minimum_float  (size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double sum_float(    size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double average_float(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    float  maximum_float(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    float  minimum_float(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 
     double sum_double(    size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
     double average_double(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
@@ -182,8 +194,8 @@ public:
     double minimum_double(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 
 /*
-  TODO:  time_t maximum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-  TODO:  time_t minimum_date(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+  TODO:  time_t maximum_datetime(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+  TODO:  time_t minimum_datetime(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 */
 
     // Deletion
@@ -198,16 +210,17 @@ public:
 
     TableRef& get_table() {return m_table;}
 
-#ifdef TIGHTDB_DEBUG
-    std::string Verify(); // Must be upper case to avoid conflict with macro in ObjC
-#endif
+    std::string validate();
+   
+    mutable bool do_delete;
 
 protected:
     Query(Table& table);
-    Query(const Table& table); // FIXME: This constructor should not exist. We need a ConstQuery class.
+//    Query(const Table& table); // FIXME: This constructor should not exist. We need a ConstQuery class.
     void Create();
 
     void   Init(const Table& table) const;
+    bool   is_initialized() const;
     size_t FindInternal(size_t start=0, size_t end=size_t(-1)) const;
     void   UpdatePointers(ParentNode* p, ParentNode** newnode);
 
@@ -234,13 +247,14 @@ protected:
     pthread_t threads[max_threads];
 #endif
 
+public:
     TableRef m_table;
     std::vector<ParentNode*> first;
     std::vector<ParentNode**> update;
     std::vector<ParentNode**> update_override;
     std::vector<ParentNode**> subtables;
     std::vector<ParentNode*> all_nodes;
-    mutable bool do_delete;
+
 
 private:
     template <class TColumnType> Query& equal(size_t column_ndx1, size_t column_ndx2);
@@ -260,7 +274,7 @@ private:
     template<typename T>
         double average(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
     template <Action action, typename T, typename R, class ColClass>
-        R aggregate(R (ColClass::*method)(size_t, size_t) const,
+        R aggregate(R (ColClass::*method)(size_t, size_t, size_t) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
 
     friend class Table;

@@ -10,7 +10,8 @@
     //#define TEST_DURATION 3
 #endif
 
-// Robustness tests are not enable by default, because they interfere badly with Valgrind.
+// Some robustness tests are not enable by default, because they
+// interfere badly with Valgrind.
 // #define TEST_ROBUSTNESS
 
 // Wrap pthread function calls with the pthread bug finding tool (program execution will be slower) by
@@ -38,18 +39,21 @@
 #define TEST_QUERY
 #define TEST_SHARED
 #define TEST_STRING_DATA
+#define TEST_BINARY_DATA
 #define TEST_TABLE
 #define TEST_TABLE_VIEW
 #define TEST_THREAD
 #define TEST_TRANSACTIONS
+
+#define TEST_REPLICATION
 #define TEST_UTF8
+
 //#define TEST_TRANSACTIONS_LASSE // Takes a long time
 //#define TEST_INDEX // not implemented yet
+//#define TEST_COLUMN_LARGE // Takes ~5 min in release mode with maxlistsize=1000
 
-// Bypass an overflow bug in BinaryData. Todo/fixme
-#define TIGHTDB_BYPASS_BINARYDATA_BUG
-
-// Bypass as crash when doing optimize+set_index+clear+add. Todo/fixme
-#define TIGHTDB_BYPASS_OPTIMIZE_CRASH_BUG
+// Takes a long time. Also currently fails to reproduce the Java bug, but once it has been identified, this
+// test could perhaps be modified to trigger it (unless it's a language binding problem).
+//#define JAVA_MANY_COLUMNS_CRASH 
 
 #endif

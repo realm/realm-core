@@ -1,4 +1,4 @@
-// @@Example: ex_cpp_typed_query_delete @@
+// @@Example: ex_cpp_typed_query_remove @@
 // @@Fold@@
 #include <tightdb.hpp>
 #include <assert.h>

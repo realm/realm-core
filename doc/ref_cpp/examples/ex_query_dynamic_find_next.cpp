@@ -42,15 +42,15 @@ int main()
     Query query = table->where().less(1, 50);
 
     // Find first match
-    size_t match = query.find_next(size_t(-1));
+    size_t match = query.find();
     assert(match == 0); // Alice
 
     // Find next match
-    match = query.find_next(match);
+    match = query.find(match + 1);
     assert(match == 2); // Alice
 
     // No more matches
-    match = query.find_next(match);
+    match = query.find(match + 1);
     assert(match == size_t(-1));
 // @@EndShow@@
 }

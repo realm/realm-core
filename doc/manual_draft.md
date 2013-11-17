@@ -32,7 +32,7 @@ Matching,” in Section 5.18, Case Mappings of the the Unicode Standard.
 Date/time:
 ----------
 
-TightDB supports only one date/time data type called 'Date'. A Date
+TightDB supports only one date/time data type called 'DateTime'. A DateTime
 value represents an absolute point it time, and is represented as an
 integral non-negative number of seconds since midnight (UTC), 1
 January 1970, not counting leap seconds.

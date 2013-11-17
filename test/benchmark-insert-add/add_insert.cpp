@@ -25,7 +25,7 @@ TIGHTDB_TABLE_5(TestTable,
 
 void usage()
 {
-    cout << "Usage: add_insert [-h] [-s mem|full] [-a]" << endl;
+    cout << "Usage: add_insert [-h] [-s mem|full|async] [-a]" << endl;
     cout << "  -h : this text" << endl;
     cout << "  -s : use shared group (default: no)" << endl;
     cout << "  -i : insert at front (defalut: no - append)" << endl;
@@ -74,8 +74,13 @@ int main(int argc, char *argv[])
                         dlevel = SharedGroup::durability_Full;
                     }
                     else {
-                        cout << "durability must be either mem or full" << endl;
-                        return 1;
+                        if (strcmp(optarg, "async") == 0) {
+                            dlevel = SharedGroup::durability_Async;
+                        }
+                        else {
+                            cout << "durability must be either mem or full" << endl;
+                            return 1;
+                        }
                     }
                 }
                 break;
@@ -134,8 +139,10 @@ int main(int argc, char *argv[])
         srandom(0);
     }
 
+    while (File::exists("test.tightdb.lock")) {
+        usleep(10000);
+    }
     File::try_remove("test.tightdb");
-    File::try_remove("test.tightdb.lock");
     File::try_remove("gtest.tightdb");
 
     SharedGroup sg = SharedGroup("test.tightdb", false, dlevel);
@@ -234,4 +241,6 @@ int main(int argc, char *argv[])
             cout << i*rows_per_commit << ";" << dt << ";" << double(i*rows_per_commit)/dt << ";" << dt/double(i*rows_per_commit) << endl;
         }
     }
+    return 0;
 }
+

@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 
+#include <tightdb/config.h>
 #include <tightdb/exceptions.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/table_basic_fwd.hpp>
@@ -234,6 +235,7 @@ public:
     ///
     /// \tparam T An instance of the BasicTable<> class template.
     TableRef      get_table(StringData name);
+    TableRef      get_table(StringData name, bool& was_created);
     ConstTableRef get_table(StringData name) const;
     template<class T> typename T::Ref      get_table(StringData name);
     template<class T> typename T::ConstRef get_table(StringData name) const;
@@ -296,19 +298,21 @@ public:
     MemStats stats();
     void enable_mem_diagnostics(bool enable = true) { m_alloc.enable_debug(enable); }
     void to_dot(std::ostream&) const;
-    void to_dot() const; // For GDB
+    void to_dot() const; // To std::cerr (for GDB)
     void to_dot(const char* file_path) const;
     void zero_free_space(std::size_t file_size, std::size_t readlock_version);
+#else
+    void Verify() const {}
 #endif
 
 private:
     SlabAlloc m_alloc;
     Array m_top;
-    Array m_tables;
-    ArrayString m_table_names;
-    Array m_free_positions;
-    Array m_free_lengths;
-    Array m_free_versions;
+    Array m_tables;            // Second slot in m_top
+    ArrayString m_table_names; // First slot in m_top
+    Array m_free_positions;    // Fourth slot in m_top
+    Array m_free_lengths;      // Fifth slot in m_top
+    Array m_free_versions;     // Sixth slot in m_top
     typedef std::vector<Table*> table_accessors;
     mutable table_accessors m_table_accessors;
     const bool m_is_shared;
@@ -373,15 +377,20 @@ private:
 
     void detach_table_accessors() TIGHTDB_NOEXCEPT;
 
-    friend class GroupWriter;
-    friend class SharedGroup;
-    friend class LangBindHelper;
+#ifdef TIGHTDB_DEBUG
+    std::pair<ref_type, std::size_t>
+    get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
+#endif
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     friend class Replication;
     Replication* get_replication() const TIGHTDB_NOEXCEPT { return m_alloc.get_replication(); }
     void set_replication(Replication* r) TIGHTDB_NOEXCEPT { m_alloc.set_replication(r); }
 #endif
+
+    friend class GroupWriter;
+    friend class SharedGroup;
+    friend class LangBindHelper;
 };
 
 
@@ -439,9 +448,11 @@ inline void Group::init_array_parents() TIGHTDB_NOEXCEPT
 {
     m_table_names.set_parent(&m_top, 0);
     m_tables.set_parent(&m_top, 1);
-    m_free_positions.set_parent(&m_top, 2);
-    m_free_lengths.set_parent(&m_top, 3);
-    m_free_versions.set_parent(&m_top, 4);
+    // Third slot is "logical file size"
+    m_free_positions.set_parent(&m_top, 3);
+    m_free_lengths.set_parent(&m_top, 4);
+    m_free_versions.set_parent(&m_top, 5);
+    // Seventh slot is "database version" (a.k.a. transaction number)
 }
 
 inline bool Group::is_attached() const TIGHTDB_NOEXCEPT
@@ -544,6 +555,12 @@ inline TableRef Group::get_table(StringData name)
     return get_table_ptr(name)->get_table_ref();
 }
 
+inline TableRef Group::get_table(StringData name, bool& was_created)
+{
+    SpecSetter spec_setter = 0;
+    return get_table_ptr(name, spec_setter, was_created)->get_table_ref();
+}
+
 inline ConstTableRef Group::get_table(StringData name) const
 {
     TIGHTDB_ASSERT(has_table(name));
@@ -561,54 +578,66 @@ template<class T> inline typename T::ConstRef Group::get_table(StringData name) 
     return get_table_ptr<T>(name)->get_table_ref();
 }
 
-inline const Table* Group::get_table_by_ndx(size_t ndx) const
+inline const Table* Group::get_table_by_ndx(std::size_t ndx) const
 {
     return const_cast<Group*>(this)->get_table_by_ndx(ndx);
 }
 
 template<class S> std::size_t Group::write_to_stream(S& out) const
 {
-    // Space for file header
-    out.write(SlabAlloc::default_header, sizeof SlabAlloc::default_header);
+    // Write the file header
+    const char* data = reinterpret_cast<const char*>(&SlabAlloc::streaming_header);
+    out.write(data, sizeof SlabAlloc::streaming_header);
 
-    // When serializing to disk we dont want
-    // to include free space tracking as serialized
-    // files are written without any free space.
-    Array top(Array::type_HasRefs, 0, 0, const_cast<SlabAlloc&>(m_alloc)); // FIXME: Another aspect of the poor constness behavior in Array class. What can we do?
-    top.add(m_top.get(0));
-    top.add(m_top.get(1));
+    // Because we need to include the total logical file size in the
+    // top-array, we have to start by writing everything except the
+    // top-array, and then finally compute and write a correct version
+    // of the top-array. The free-space information of the group will
+    // not be included, as it is not needed in the streamed format.
+    std::size_t names_pos  = m_table_names.write(out); // Throws
+    std::size_t tables_pos = m_tables.write(out); // Throws
+    std::size_t top_pos = out.get_pos();
 
-    // Recursively write all arrays
-    const uint64_t top_pos = top.write(out);
-    const std::size_t byte_size = out.getpos();
+    // Produce a preliminary version of the top array whose
+    // representation is guaranteed to be able to hold the final file
+    // size
+    int top_size = 3;
+    std::size_t max_top_byte_size = Array::get_max_byte_size(top_size);
+    uint64_t max_final_file_size = top_pos + max_top_byte_size;
+    Array top(Array::type_HasRefs); // Throws
+    // FIXME: Dangerous cast: unsigned -> signed
+    top.ensure_minimum_width(1 + 2*max_final_file_size); // Throws
+    // FIXME: We really need to make Array::resize() able to expand the size also.
+    // FIXME: Dangerous cast: unsigned -> signed
+    top.add(names_pos); // Throws
+    top.add(tables_pos); // Throws
+    top.add(0); // Throws
 
-    // Write top ref
-    // (since we initially set the last bit in the file header to
-    //  zero, it is the first ref block that is valid)
-    out.seek(0);
-    out.write(reinterpret_cast<const char*>(&top_pos), 8);
+    // Finalize the top array by adding the projected final file size
+    // to it
+    std::size_t top_byte_size = top.get_byte_size();
+    std::size_t final_file_size = top_pos + top_byte_size;
+    // FIXME: Dangerous cast: unsigned -> signed
+    top.set(2, 1 + 2*final_file_size);
 
-    // FIXME: To be 100% robust with respect to being able to detect
-    // afterwards whether the file was completely written, we would
-    // have to put a sync() here and then proceed to write the T-DB
-    // bytes into the header. Also, if it is possible that the file is
-    // left with random contents if the host looses power before our
-    // call to sync() has completed, then we must initially resize the
-    // file to header_len - 1, fill with zeroes, and call sync(). If
-    // the file is then found later with size header_len - 1, it will
-    // be considered invalid.
+    // Write the top array
+    bool recurse = false;
+    top.write(out, recurse); // Throws
+    TIGHTDB_ASSERT(out.get_pos() == final_file_size);
 
-    // Clean up temporary top
-    top.set(0, 0); // reset to avoid recursive delete
-    top.set(1, 0); // reset to avoid recursive delete
+    top.resize(0); // Avoid recursive destruction
     top.destroy();
 
-    // return bytes written
-    return byte_size;
+    // Write streaming footer
+    SlabAlloc::StreamingFooter footer;
+    footer.m_top_ref = top_pos;
+    footer.m_magic_cookie = SlabAlloc::footer_magic_cookie;
+    out.write(reinterpret_cast<const char*>(&footer), sizeof footer);
+
+    return final_file_size + sizeof footer;
 }
 
-template<class S>
-void Group::to_json(S& out) const
+template<class S> void Group::to_json(S& out) const
 {
     if (!is_attached()) {
         out << "{}";

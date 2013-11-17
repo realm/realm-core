@@ -22,13 +22,13 @@
 
 #include <utility>
 
+#include <tightdb/config.h>
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/table_ref.hpp>
 #include <tightdb/spec.hpp>
 #include <tightdb/mixed.hpp>
 #include <tightdb/query.hpp>
-
-
+//#include "query_expression.h"
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #endif
@@ -39,6 +39,7 @@ class TableView;
 class ConstTableView;
 class StringIndex;
 
+template <class T> class Columns;
 
 /// The Table class is non-polymorphic, that is, it has no virtual
 /// functions. This is important because it ensures that there is no
@@ -101,11 +102,11 @@ public:
     /// group accessor is destroyed. This is also true for any
     /// subtable accessor that is obtained indirectly from a group. A
     /// subtable accessor will generally become detached if its parent
-    /// table is modified. Calling a const member function on a parent
-    /// table accessor, will never detach its subtable accessors,
-    /// though. An accessor for a freestanding table will never become
-    /// detached. An accessor for a subtable of a freestanding table
-    /// may become detached.
+    /// table is modified. On the other hand, calling a const member
+    /// function on a parent table accessor will never detach its
+    /// subtable accessors. An accessor for a freestanding table will
+    /// never become detached. An accessor for a subtable of a
+    /// freestanding table may become detached.
     ///
     /// FIXME: High level language bindings will probably want to be
     /// able to explicitely detach a group and all tables of that
@@ -167,6 +168,10 @@ public:
     void set_index(std::size_t column_ndx);
     //@}
 
+    template <class T> Columns<T> column(size_t column)
+    {
+        return Columns<T>(column, this);
+    }
 
     // Table size and deletion
     bool        is_empty() const TIGHTDB_NOEXCEPT { return m_size == 0; }
@@ -184,13 +189,18 @@ public:
     void        insert_empty_row(std::size_t row_ndx, std::size_t num_rows = 1);
     void        remove(std::size_t row_ndx);
     void        remove_last() { if (!is_empty()) remove(m_size-1); }
-    void        move_last_over(std::size_t ndx);
+
+    /// Move the last row to the specified index. This overwrites the
+    /// target row and reduces the number of rows by one. The
+    /// specified index must be strictly less than `N-1`, where `N` is
+    /// the number of rows in the table.
+    void move_last_over(std::size_t ndx);
 
     // Insert row
     // NOTE: You have to insert values in ALL columns followed by insert_done().
     void insert_int(std::size_t column_ndx, std::size_t row_ndx, int64_t value);
     void insert_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
-    void insert_date(std::size_t column_ndx, std::size_t row_ndx, Date value);
+    void insert_datetime(std::size_t column_ndx, std::size_t row_ndx, DateTime value);
     template<class E> void insert_enum(std::size_t column_ndx, std::size_t row_ndx, E value);
     void insert_float(std::size_t column_ndx, std::size_t row_ndx, float value);
     void insert_double(std::size_t column_ndx, std::size_t row_ndx, double value);
@@ -203,7 +213,7 @@ public:
     // Get cell values
     int64_t     get_int(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     bool        get_bool(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    Date        get_date(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
+    DateTime    get_datetime(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     float       get_float(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     double      get_double(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
     StringData  get_string(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -214,7 +224,7 @@ public:
     // Set cell values
     void set_int(std::size_t column_ndx, std::size_t row_ndx, int64_t value);
     void set_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
-    void set_date(std::size_t column_ndx, std::size_t row_ndx, Date value);
+    void set_datetime(std::size_t column_ndx, std::size_t row_ndx, DateTime value);
     template<class E> void set_enum(std::size_t column_ndx, std::size_t row_ndx, E value);
     void set_float(std::size_t column_ndx, std::size_t row_ndx, float value);
     void set_double(std::size_t column_ndx, std::size_t row_ndx, double value);
@@ -245,17 +255,16 @@ public:
     std::size_t  count_float(std::size_t column_ndx, float value) const;
     std::size_t  count_double(std::size_t column_ndx, double value) const;
 
-    int64_t sum(std::size_t column_ndx) const;
+    int64_t sum_int(std::size_t column_ndx) const;
     double  sum_float(std::size_t column_ndx) const;
     double  sum_double(std::size_t column_ndx) const;
-    // FIXME: What to return for below when table empty? 0?
-    int64_t maximum(std::size_t column_ndx) const;
+    int64_t maximum_int(std::size_t column_ndx) const;
     float   maximum_float(std::size_t column_ndx) const;
     double  maximum_double(std::size_t column_ndx) const;
-    int64_t minimum(std::size_t column_ndx) const;
+    int64_t minimum_int(std::size_t column_ndx) const;
     float   minimum_float(std::size_t column_ndx) const;
     double  minimum_double(std::size_t column_ndx) const;
-    double  average(std::size_t column_ndx) const;
+    double  average_int(std::size_t column_ndx) const;
     double  average_float(std::size_t column_ndx) const;
     double  average_double(std::size_t column_ndx) const;
 
@@ -263,7 +272,7 @@ public:
     std::size_t    lookup(StringData value) const;
     std::size_t    find_first_int(std::size_t column_ndx, int64_t value) const;
     std::size_t    find_first_bool(std::size_t column_ndx, bool value) const;
-    std::size_t    find_first_date(std::size_t column_ndx, Date value) const;
+    std::size_t    find_first_datetime(std::size_t column_ndx, DateTime value) const;
     std::size_t    find_first_float(std::size_t column_ndx, float value) const;
     std::size_t    find_first_double(std::size_t column_ndx, double value) const;
     std::size_t    find_first_string(std::size_t column_ndx, StringData value) const;
@@ -273,8 +282,8 @@ public:
     ConstTableView find_all_int(std::size_t column_ndx, int64_t value) const;
     TableView      find_all_bool(std::size_t column_ndx, bool value);
     ConstTableView find_all_bool(std::size_t column_ndx, bool value) const;
-    TableView      find_all_date(std::size_t column_ndx, Date value);
-    ConstTableView find_all_date(std::size_t column_ndx, Date value) const;
+    TableView      find_all_datetime(std::size_t column_ndx, DateTime value);
+    ConstTableView find_all_datetime(std::size_t column_ndx, DateTime value) const;
     TableView      find_all_float(std::size_t column_ndx, float value);
     ConstTableView find_all_float(std::size_t column_ndx, float value) const;
     TableView      find_all_double(std::size_t column_ndx, double value);
@@ -284,11 +293,17 @@ public:
     TableView      find_all_binary(std::size_t column_ndx, BinaryData value);
     ConstTableView find_all_binary(std::size_t column_ndx, BinaryData value) const;
 
-    TableView      distinct(std::size_t column_ndx);
-    ConstTableView distinct(std::size_t column_ndx) const;
+    TableView      get_distinct_view(std::size_t column_ndx);
+    ConstTableView get_distinct_view(std::size_t column_ndx) const;
 
     TableView      get_sorted_view(std::size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;
+
+private:
+    template <class T> std::size_t find_first(std::size_t column_ndx, T value) const; // called by above methods
+    template <class T> ConstTableView find_all(size_t column_ndx, T value) const;
+public:
+
 
     //@{
     /// Find the lower/upper bound according to a column that is
@@ -332,8 +347,10 @@ public:
     //@}
 
     // Queries
-    Query       where() { return Query(*this); }
-    const Query where() const { return Query(*this); } // FIXME: There is no point in returning a const Query. We need a ConstQuery class.
+    Query       where()       { return Query(*this); }
+
+    // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
+    Query where() const { return Query(*this); } 
 
     // Optimizing
     void optimize();
@@ -364,6 +381,10 @@ public:
     void to_dot(std::ostream&, StringData title = StringData()) const;
     void print() const;
     MemStats stats() const;
+    void dump_node_structure() const; // To std::cerr (for GDB)
+    void dump_node_structure(std::ostream&, int level) const;
+#else
+    void Verify() const {}
 #endif
 
     class Parent;
@@ -449,6 +470,11 @@ private:
     void create_columns();
     void cache_columns();
     void destroy_column_accessors() TIGHTDB_NOEXCEPT;
+
+    // A degenerate table is a subtable which isn't instantiated in the
+    // database file yet because there has not yet been write-access to 
+    // it. Avoiding instantiation is an optimization to save space, etc.
+    bool is_degenerate() const TIGHTDB_NOEXCEPT { return m_columns.m_data == NULL; }
 
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please
@@ -580,6 +606,7 @@ private:
     friend class ColumnSubtableParent;
     friend class LangBindHelper;
     friend class TableViewBase;
+    template<class T> friend class Columns;
     friend class ParentNode;
     template<class> friend class SequentialGetter;
 };
@@ -803,9 +830,9 @@ inline void Table::insert_bool(std::size_t column_ndx, std::size_t row_ndx, bool
     insert_int(column_ndx, row_ndx, value);
 }
 
-inline void Table::insert_date(std::size_t column_ndx, std::size_t row_ndx, Date value)
+inline void Table::insert_datetime(std::size_t column_ndx, std::size_t row_ndx, DateTime value)
 {
-    insert_int(column_ndx, row_ndx, value.get_date());
+    insert_int(column_ndx, row_ndx, value.get_datetime());
 }
 
 template<class E>

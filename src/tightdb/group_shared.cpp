@@ -1,31 +1,71 @@
+#include <fcntl.h>
+#include <errno.h>
 #include <algorithm>
 
+#include <tightdb/config.h>
 #include <tightdb/safe_int_ops.hpp>
 #include <tightdb/terminate.hpp>
 #include <tightdb/thread.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group_shared.hpp>
+#include <tightdb/group_writer.hpp>
+
+#ifndef _WIN32
+#  include <sys/wait.h>
+#  include <sys/time.h>
+#  include <unistd.h>
+#else
+#  define NOMINMAX
+#  include <windows.h>
+#endif
+
+// #define TIGHTDB_ENABLE_LOGFILE
 
 
 using namespace std;
 using namespace tightdb;
 
 
+namespace {
+
+// Constants controlling the amount of uncommited writes in flight:
+const uint16_t max_write_slots = 100;
+const uint16_t relaxed_sync_threshold = 50;
+
+// Constants controlling timeout behaviour during opening of a shared group
+const int max_retries_awaiting_shutdown = 5;
+// rough limits, milliseconds:
+const int max_wait_for_ok_filesize = 100;
+const int max_wait_for_sharedinfo_valid = 100;
+const int max_wait_for_daemon_start = 100;
+
+} // anonymous namespace
+
+
 struct SharedGroup::ReadCount {
-    uint32_t version;
+    uint64_t version;
     uint32_t count;
 };
 
 struct SharedGroup::SharedInfo {
+    Relaxed<uint64_t> current_version;
+    Atomic<uint16_t> init_complete; // indicates lock file has valid content
+    Atomic<uint16_t> shutdown_started; // indicates that shutdown is in progress
     uint16_t version;
     uint16_t flags;
 
     Mutex readmutex;
     RobustMutex writemutex;
+    RobustMutex balancemutex;
+#ifndef _WIN32
+    // FIXME: windows pthread support for condvar not ready
+    CondVar room_to_write;
+    CondVar work_to_do;
+#endif
+    uint16_t free_write_slots;
     uint64_t filesize;
 
     uint64_t current_top;
-    volatile uint32_t current_version;
 
     uint32_t infosize;
     uint32_t capacity_mask; // Must be on the form 2**n - 1
@@ -35,24 +75,37 @@ struct SharedGroup::SharedInfo {
     static const int init_readers_size = 32; // Must be a power of two
     ReadCount readers[init_readers_size];
 
-    SharedInfo(const SlabAlloc&, size_t file_size, DurabilityLevel);
+    SharedInfo(ref_type top_ref, size_t file_size, size_t info_size, DurabilityLevel);
     ~SharedInfo() TIGHTDB_NOEXCEPT {}
 };
 
-SharedGroup::SharedInfo::SharedInfo(const SlabAlloc& alloc, size_t file_size,
+
+SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, size_t info_size,
                                     DurabilityLevel dlevel):
+#ifndef _WIN32
     readmutex(Mutex::process_shared_tag()), // Throws
-    writemutex() // Throws
+    writemutex(), // Throws
+    balancemutex(), // Throws
+    room_to_write(CondVar::process_shared_tag()), // Throws
+    work_to_do(CondVar::process_shared_tag()) // Throws
+#else
+    readmutex(Mutex::process_shared_tag()), // Throws
+    writemutex(), // Throws
+    balancemutex() // Throws
+#endif
 {
     version  = 0;
     flags    = dlevel; // durability level is fixed from creation
-    filesize = alloc.get_baseline();
-    infosize = uint32_t(file_size);
-    current_top     = alloc.get_top_ref();
-    current_version = 0;
-    capacity_mask   = init_readers_size - 1;
+    filesize = file_size;
+    infosize = uint32_t(info_size);
+    current_top = top_ref;
+    current_version.store_relaxed(1);
+    capacity_mask = init_readers_size - 1;
     put_pos = 0;
     get_pos = 0;
+    shutdown_started.store_release(0);
+    free_write_slots = 0;
+    init_complete.store_release(1);
 }
 
 
@@ -61,6 +114,103 @@ namespace {
 void recover_from_dead_write_transact()
 {
     // Nothing needs to be done
+}
+
+#ifndef _WIN32
+
+void spawn_daemon(const string& file)
+{
+    // determine maximum number of open descriptors
+    errno = 0;
+    int m = int(sysconf(_SC_OPEN_MAX));
+    if (m < 0) {
+        if (errno) {
+            // int err = errno; // TODO: include err in exception string
+            throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed ");
+        }
+        throw runtime_error("'sysconf(_SC_OPEN_MAX)' failed with no reason");
+    }
+
+    int pid = fork();
+    if (0 == pid) { // child process:
+
+        // close all descriptors:
+        int i;
+        for (i=m-1;i>=0;--i) close(i);
+        i=::open("/dev/null",O_RDWR);
+#ifdef TIGHTDB_ENABLE_LOGFILE
+        // FIXME: Do we want to always open the log file? Should it be configurable?
+        i=::open((file+".log").c_str(),O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
+#else
+        i = dup(i);
+#endif
+        i = dup(i); static_cast<void>(i);
+#ifdef TIGHTDB_ENABLE_LOGFILE
+        cerr << "Detaching" << endl;
+#endif
+        // detach from current session:
+        setsid();
+
+        // start commit daemon executable
+        // Note that getenv (which is not thread safe) is called in a
+        // single threaded context. This is ensured by the fork above.
+        const char* async_daemon = getenv("TIGHTDB_ASYNC_DAEMON");
+        if (!async_daemon) {
+#ifndef TIGTHDB_DEBUG
+            async_daemon = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd";
+#else
+            async_daemon = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd-dbg";
+#endif
+        }
+        execl(async_daemon, async_daemon, file.c_str(), 0);
+
+        // if we continue here, exec has failed so return error
+        // if exec succeeds, we don't come back here.
+        _Exit(1);
+        // child process ends here
+
+    }
+    else if (pid > 0) { // parent process, fork succeeded:
+
+        // use childs exit code to catch and report any errors:
+        int status;
+        int pid_changed;
+        do {
+            pid_changed = waitpid(pid, &status, 0);
+        }
+        while (pid_changed == -1 && errno == EINTR);
+        if (pid_changed != pid)
+            throw runtime_error("failed to wait for daemon start");
+        if (!WIFEXITED(status))
+            throw runtime_error("failed starting async commit (exit)");
+        if (WEXITSTATUS(status) == 1) {
+            // FIXME: Or `ld` could not find a required shared library
+            throw runtime_error("async commit daemon not found");
+        }
+        if (WEXITSTATUS(status) == 2)
+            throw runtime_error("async commit daemon failed");
+        if (WEXITSTATUS(status) == 3)
+            throw runtime_error("wrong db given to async daemon");
+
+    }
+    else { // Parent process, fork failed!
+
+        throw runtime_error("Failed to spawn async commit");
+    }
+}
+#else
+void spawn_daemon(const string& file) {}
+#endif
+
+
+inline void micro_sleep(uint64_t microsec_delay)
+{
+#ifdef _WIN32
+    // FIXME: this is not optimal, but it should work
+    Sleep(static_cast<DWORD>(microsec_delay/1000+1));
+#else
+    usleep(useconds_t(microsec_delay));
+#endif
 }
 
 } // anonymous namespace
@@ -84,61 +234,53 @@ void recover_from_dead_write_transact()
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
 
-// FIXME: Issues with current implementation:
-//
-// - Possible reinitialization due to temporary unlocking during downgrade of file lock
-
 void SharedGroup::open(const string& path, bool no_create_file,
-                       DurabilityLevel dlevel)
+                       DurabilityLevel dlevel, bool is_backend)
 {
     TIGHTDB_ASSERT(!is_attached());
 
     m_file_path = path + ".lock";
-
-retry:
-    {
-        // Open shared coordination buffer
-        m_file.open(m_file_path, File::access_ReadWrite, File::create_Auto, 0);
-        File::CloseGuard fcg(m_file);
-
-        // FIXME: Handle lock file removal in case of failure below
-
+    bool must_retry;
+    int retry_count = max_retries_awaiting_shutdown;
+    do {
         bool need_init = false;
-        size_t file_size = 0;
+        size_t info_size = 0;
+        must_retry = false;
 
-        // If we can get an exclusive lock we know that the file is
-        // either new (empty) or a leftover from a previously
-        // crashed process (needing re-initialization)
-        if (m_file.try_lock_exclusive()) {
-            // There is a slight window between opening the file and getting the
-            // lock where another process could have deleted the file
-            if (m_file.is_removed()) {
-                goto retry;
-            }
-            // Get size
-            if (int_cast_with_overflow_detect(m_file.get_size(), file_size))
-                throw runtime_error("Lock file too large");
+        // Open shared coordination buffer - non-excepting approach
 
-            // Handle empty files (first user)
-            if (file_size == 0) {
-                // Create new file
-                file_size = sizeof (SharedInfo);
-                m_file.resize(file_size);
-            }
+        m_file.open(m_file_path, need_init);
+        if (need_init) {
+            info_size = sizeof (SharedInfo);
+            // Make sure to initialize the file in such a way, that when it reaches the
+            // size of SharedInfo, it contains just zeroes.
+            char empty_buf[sizeof (SharedInfo)];
+            std::fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
+            m_file.write(empty_buf, info_size);
             need_init = true;
         }
-        else {
-            m_file.lock_shared();
 
-            // Get size
-            if (int_cast_with_overflow_detect(m_file.get_size(), file_size))
+        File::CloseGuard fcg(m_file);
+        int time_left = max_wait_for_ok_filesize;
+        while (1) {
+
+            time_left--;
+            // need to validate the size of the file before trying to map it
+            // possibly waiting a little for size to go nonzero, if another
+            // process is creating the file in parallel.
+            if (int_cast_with_overflow_detect(m_file.get_size(), info_size))
                 throw runtime_error("Lock file too large");
-
-            // There is a slight window between opening the file and getting the
-            // lock where another process could have deleted the file
-            if (file_size == 0 || m_file.is_removed())
-                goto retry;
+            if (time_left <= 0)
+                throw PresumablyStaleLockFile(m_file_path);
+            // wait for file to at least contain the basic shared info block
+            // NB! it might be larger due to expansion of the ring buffer.
+            if (info_size < sizeof (SharedInfo))
+                micro_sleep(1000);
+            else
+                break;
         }
+        // File is now guaranteed to be large enough that we can map it and access all fields
+        // of the SharedInfo structure.
 
         // Map to memory
         m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
@@ -154,30 +296,122 @@ retry:
         SharedInfo* info = m_file_map.get_addr();
         SlabAlloc& alloc = m_group.m_alloc;
 
+        // If we are the process that *Created* the coordination buffer, we are obliged to
+        // initialize it. All other processer will wait for os to signal completion of the
+        // initialization.
         if (need_init) {
+            // file locks are used solely to detect if/when all clients
+            // are done accessing the database. We grab them here and hold
+            // them until the destructor is called, where we try to promote
+            // them to exclusive to detect if we can shutdown.
+            m_file.lock_shared();
+
             // If we are the first we may have to create the database file
             // but we invalidate the internals right after to avoid conflicting
             // with old state when starting transactions
             bool is_shared = true;
             bool read_only = false;
-            alloc.attach_file(path, is_shared, read_only, no_create_file); // Throws
+            bool skip_validate = false;
+            ref_type top_ref;
+            try {
+                top_ref = alloc.attach_file(path, is_shared, read_only, no_create_file,
+                                                     skip_validate); // Throws
+            }
+            catch (...) {
+
+                // something went wrong. We need to clean up the .lock file carefully to prevent
+                // other processes from getting to it and waiting for us to complete initialization
+                // We bypass normal initialization
+                info->shutdown_started.store_relaxed(1);
+                info->init_complete.store_relaxed(1);
+
+                // remove the file - due to windows file semantics, we have to manually close it
+                fug_2.release(); // we need to unmap manually
+                fug_1.release(); // - do -
+                fcg.release();   // we need to close manually
+                m_file_map.unmap();
+                m_reader_map.unmap();
+                m_file.unlock();
+                m_file.close();
+                File::try_remove(m_file_path.c_str());
+
+                // rethrow whatever went wrong
+                throw;
+            }
 
             // Call SharedInfo::SharedInfo() (placement new)
-            new (info) SharedInfo(alloc, file_size, dlevel); // Throws
+            size_t file_size = alloc.get_baseline();
+            new (info) SharedInfo(top_ref, file_size, info_size, dlevel); // Throws
 
             // Set initial version so we can track if other instances
             // change the db
-            m_version = 0;
+            m_version = info->current_version.load_relaxed();
 
-            // FIXME: This downgrading of the lock is not guaranteed to be atomic
+#ifndef _WIN32
+            // In async mode we need a separate process to do the async commits
+            // We start it up here during init so that it only get started once
+            if (dlevel == durability_Async) {
+                spawn_daemon(path);
+            }
+#endif
 
-            // Downgrade lock to shared now that it is initialized,
-            // so other processes can share it as well
-            m_file.unlock();
-            // FIXME: Must detach file from allocator if this fails
-            m_file.lock_shared(); // Throws
         }
         else {
+            // wait for init complete:
+            int wait_count = max_wait_for_sharedinfo_valid;
+            while (wait_count && (info->init_complete.load_acquire() == 0)) {
+                wait_count--;
+                micro_sleep(1000);
+            }
+
+            // If we exceed our wait without even seeing init complete, then it is most likely
+            // that the initializing process has crashed. HOWEVER - it may just be delayed so
+            // far, that it hasn't taken the initial shared lock yet. So, we dare not declare
+            // the .lock file stale, although it is very likely.
+            if (info->init_complete.load_acquire() == 0)
+                throw PresumablyStaleLockFile(m_file_path);
+
+            // use file locking in an attempt to determine if we have exclusive access to the file.
+            // We need to wait for init_complete to be signalled, before we can safely manipulate
+            // the file contents - among others, the shutdown_started flag cannot be trusted and
+            // cannot be modified earlier.
+            if (m_file.try_lock_exclusive()) {
+
+                // At this point no other process can be trying to initialize the file.
+                // Somebody else may be executing in the destructor and probing to see if they are
+                // alone - they can get a false success (because they don't see "us"). Because of this
+                // possibility of false successes, the only allowed action is to close and TRY to remove the
+                // file - even if multiple processes does this in parallel, the end result is the same.
+                //
+                // Poison the file. As we have exclusive access, no other will examine or change
+                // the shutdown_started field.
+                info->shutdown_started.store_release(1);
+                fug_2.release(); // we need to unmap manually
+                fug_1.release(); // - do -
+                fcg.release();   // we need to close manually
+                m_file.unlock();
+                // <- from this point another thread/process may open the file, BUT it will encounter
+                // a set shutdown_started field, back out and retry
+                m_file.close();
+                m_file_map.unmap();
+                m_reader_map.unmap();
+                File::try_remove(m_file_path.c_str());
+                must_retry = true;
+                continue; // retry, now with stale file removed
+            }
+            else {
+
+                m_file.lock_shared();
+            }
+            if (info->shutdown_started.load_acquire()) {
+                retry_count--;
+                if (retry_count == 0)
+                    throw PresumablyStaleLockFile(m_file_path);
+                must_retry = true;
+                micro_sleep(1000);
+                continue;
+                // this will unmap and close the lock file. Then we retry
+            }
             if (info->version != 0)
                 throw runtime_error("Unsupported version");
 
@@ -189,16 +423,43 @@ retry:
             bool is_shared = true;
             bool read_only = false;
             bool no_create = true;
-            alloc.attach_file(path, is_shared, read_only, no_create); // Throws
+            bool skip_validate = true; // To avoid race conditions
+            try {
+                alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
+            } 
+            catch (File::NotFound) {
+                throw LockFileButNoData(path);
+            }
+
         }
 
         fug_2.release(); // Do not unmap
         fug_1.release(); // Do not unmap
         fcg.release(); // Do not close
     }
+    while (must_retry);
 
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
+#endif
+#ifndef _WIN32
+    if (dlevel == durability_Async) {
+        if (is_backend) {
+            do_async_commits();
+        }
+        else {
+            // In async mode we need to wait for the commit process to get ready
+            SharedInfo* const info = m_file_map.get_addr();
+            int maxwait = max_wait_for_daemon_start;
+            while (maxwait--) {
+                if (info->init_complete.load_acquire() == 2) {
+                    return;
+                }
+                micro_sleep(1000);
+            }
+            throw runtime_error("Failed to observe async commit starting");
+        }
+    }
 #endif
 }
 
@@ -210,85 +471,202 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication())
-        delete repl;
+    SharedInfo* info = m_file_map.get_addr();
+
+#ifndef _WIN32
+    if (info->flags == durability_Async) {
+        m_file.unlock();
+        return;
+    }
 #endif
 
-    // If we can get an exclusive lock on the file we know that we are
-    // the only user (since all users take at least shared locks on
-    // the file.  So that means that we have to delete it when done
-    // (to avoid someone later opening a stale file with uinitialized
-    // mutexes)
-
-    // FIXME: This upgrading of the lock is not guaranteed to be atomic
     m_file.unlock();
-
-    // FIXME: File::try_lock_exclusive() can throw. We cannot allow
-    // the exception to escape, because that would terminate the
-    // program (due to 'noexcept' on the destructor).
-    if (!m_file.try_lock_exclusive()) // Throws
+    if (!m_file.try_lock_exclusive())
         return;
 
-    SharedInfo* info = m_file_map.get_addr();
+    if (info->shutdown_started.load_acquire()) {
+        m_file.unlock();
+        return;
+    }
+    info->shutdown_started.store_release(1);
 
     // If the db file is just backing for a transient data structure,
     // we can delete it when done.
     if (info->flags == durability_MemOnly) {
-        size_t path_len = m_file_path.size()-5; // remove ".lock"
-        // FIXME: Find a way to avoid the possible exception from
-        // m_file_path.substr(). Currently, if it throws, the program
-        // will be terminated due to 'noexcept' on ~SharedGroup().
-        string db_path = m_file_path.substr(0, path_len); // Throws
-        remove(db_path.c_str());
+        try {
+            size_t path_len = m_file_path.size()-5; // remove ".lock"
+            string db_path = m_file_path.substr(0, path_len); // Throws
+            m_group.m_alloc.detach();
+            File::remove(db_path.c_str());
+        }
+        catch(...) {} // ignored on purpose.
     }
 
-    info->~SharedInfo(); // Call destructor
+    // info->~SharedInfo(); // DO NOT Call destructor
 
-    remove(m_file_path.c_str());
+    m_file.close();
+    m_file_map.unmap();
+    m_reader_map.unmap();
+    try {
+        File::remove(m_file_path.c_str());
+    }
+    catch (...) {} // ignored on purpose
 }
 
 
 bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 {
-    // FIXME: Due to lack of adequate synchronization, the following
-    // read of 'info->current_version' effectively participates in a
-    // "data race". See also SharedGroup::low_level_commit(). First of
-    // all, portable C++ code must always operate under the assumption
-    // that a data race is an error. The point is that the memory
-    // model defined by, and assumed by the C++ standard does not
-    // allow for data races at all. The purpose is to give harware
-    // designers more freedom to optimize their hardware. This also
-    // means that even if your 'data race' works for you today, it may
-    // malfunction and cause havoc on the next revision of that
-    // platform. According to Hans Boehm (one of the major
-    // contributors to the design of the C++ memory model) we should
-    // think of a data race as something so grave that it could cause
-    // you computer to burst into flames (see
-    // http://channel9.msdn.com/Events/GoingNative/GoingNative-2012/Threads-and-Shared-Variables-in-C-11)
-    // On top of that, if a customer chooses to run a data race
-    // detector on their application, our data race migh show up, and
-    // that may rightfully cause alarm.
-    //
-    // See also
-    // http://stackoverflow.com/questions/12878344/volatile-in-c11
-    //
-    // Please note that the definition of a data race inf C++11 also
-    // effectively applies to C++03. In this regard C++11 is just a
-    // standardization of the existing paradigm.
-
-    // Have we changed since last transaction?
-    // Visibility of changes can be delayed when using has_changed() because m_info->current_version is tested
-    // outside mutexes. However, the delay is finite on architectures that have hardware cache coherency (ARM, x64, x86,
-    // POWER, UltraSPARC, etc) because it guarantees write propagation (writes to m_info->current_version occur on
-    // system bus and make cache controllers invalidate caches of reader). Some excotic architectures may need
-    // explicit synchronization which isn't implemented yet.
-    TIGHTDB_SYNC_IF_NO_CACHE_COHERENCE
     const SharedInfo* info = m_file_map.get_addr();
-    bool changed = m_version != info->current_version;
+    // this variable is changed under lock (the readmutex), but
+    // inspected here without taking a lock. This is intentional.
+    // The variable is only compared for inequality against a value
+    // it is known to have had once, let's call it INIT.
+    // Any change to info->current_version, even if it is
+    // only a partially communicated one, is indicative of a change
+    // in the value away from INIT. info->current_version is only
+    // ever incremented, and it is so large (64 bit) that it does
+    // not wrap around until hell freezes over. The net result is
+    // that even though there is formally a data race on this variable,
+    // the code can still be considered correct.
+    bool changed = m_version != info->current_version.load_relaxed();
     return changed;
 }
 
+#ifndef _WIN32
+
+void SharedGroup::do_async_commits()
+{
+    bool shutdown = false;
+    bool file_already_removed = false;
+    SharedInfo* info = m_file_map.get_addr();
+    // NO client are allowed to proceed and update current_version
+    // until they see the init_complete == 2.
+    // As we haven't set init_complete to 2 yet, it is safe to assert the following:
+    TIGHTDB_ASSERT(info->current_version.load_relaxed() == 0 || info->current_version.load_relaxed() == 1);
+
+    // We always want to keep a read lock on the last version
+    // that was commited to disk, to protect it against being
+    // overwritten by commits being made to memory by others.
+    // Note that taking this lock also signals to the other
+    // processes that that they can start commiting to the db.
+    begin_read();
+    uint64_t last_version = m_version;
+    info->free_write_slots = max_write_slots;
+    info->init_complete.store_release(2); // allow waiting clients to proceed
+    m_group.detach();
+
+    while(true) {
+
+        if (m_file.is_removed()) { // operator removed the lock file. take a hint!
+
+            file_already_removed = true; // don't remove what is already gone
+            info->shutdown_started.store_release(1);
+            shutdown = true;
+#ifdef TIGHTDB_ENABLE_LOGFILE
+            cerr << "Lock file removed, initiating shutdown" << endl;
+#endif
+        }
+
+        // detect if we're the last "client", and if so mark the
+        // lock file invalid. Any client coming along before we
+        // finish syncing will see the lock file, but detect that
+        // the daemon has abandoned it. It can then wait for the
+        // lock file to be removed (with a timeout).
+        m_file.unlock();
+        if (m_file.try_lock_exclusive()) {
+            info->shutdown_started.store_release(1);
+            shutdown = true;
+        }
+        // if try_lock_exclusive fails, we loose our read lock, so
+        // reacquire it! At the moment this is not used for anything,
+        // because ONLY the daemon ever asks for an exclusive lock
+        // when async commits are used.
+        else
+            m_file.lock_shared();
+
+        if (has_changed()) {
+
+#ifdef TIGHTDB_ENABLE_LOGFILE
+            cerr << "Syncing...";
+#endif
+            // Get a read lock on the (current) version that we want
+            // to commit to disk.
+#ifdef TIGHTDB_DEBUG
+            m_transact_stage = transact_Ready;
+#endif
+            begin_read();
+#ifdef TIGHTDB_ENABLE_LOGFILE
+            cerr << "(version " << m_version << " from "
+                 << last_version << "), ringbuf_size = "
+                 << ringbuf_size() << "...";
+#endif
+            uint64_t current_version = m_version;
+            size_t current_top_ref = m_group.m_top.get_ref();
+
+            GroupWriter writer(m_group);
+            writer.commit(current_top_ref);
+
+            // Now we can release the version that was previously commited
+            // to disk and just keep the lock on the latest version.
+            m_version = last_version;
+            end_read();
+            last_version = current_version;
+#ifdef TIGHTDB_ENABLE_LOGFILE
+            cerr << "..and Done" << endl;
+#endif
+        }
+
+        if (shutdown) {
+            // Being the backend process, we own the lock file, so we
+            // have to clean up when we shut down.
+            // info->~SharedInfo(); // DO NOT Call destructor
+            m_file_map.unmap();
+#ifdef TIGHTDB_ENABLE_LOGFILE
+            cerr << "Removing coordination file" << endl;
+#endif
+            if (!file_already_removed)
+                File::remove(m_file_path);
+#ifdef TIGHTDB_ENABLE_LOGFILE
+            cerr << "Daemon exiting nicely" << endl << endl;
+#endif
+            return;
+        }
+
+        info->balancemutex.lock(&recover_from_dead_write_transact);
+
+        // We have caught up with the writers, let them know that there are
+        // now free write slots, wakeup any that has been suspended.
+        uint16_t free_write_slots = info->free_write_slots;
+        info->free_write_slots = max_write_slots;
+        if (free_write_slots <= 0) {
+            info->room_to_write.notify_all();
+        }
+
+        // If we have plenty of write slots available, relax and wait a bit before syncing
+        if (free_write_slots > relaxed_sync_threshold) {
+            timespec ts;
+            timeval tv;
+            // clock_gettime(CLOCK_REALTIME, &ts); <- would like to use this, but not there on mac
+            gettimeofday(&tv, NULL);
+            ts.tv_sec = tv.tv_sec;
+            ts.tv_nsec = tv.tv_usec * 1000;
+            ts.tv_nsec += 10000000; // 10 msec
+            if (ts.tv_nsec >= 1000000000) { // overflow
+                ts.tv_nsec -= 1000000000;
+                ts.tv_sec += 1;
+            }
+
+            // we do a conditional wait instead of a sleep, allowing writers to wake us up
+            // immediately if we run low on write slots.
+            info->work_to_do.wait(info->balancemutex,
+                                  &recover_from_dead_write_transact,
+                                  &ts);
+        }
+        info->balancemutex.unlock();
+
+    }
+}
+#endif // _WIN32
 
 const Group& SharedGroup::begin_read()
 {
@@ -307,20 +685,20 @@ const Group& SharedGroup::begin_read()
         // Get the current top ref
         new_top_ref   = to_size_t(info->current_top);
         new_file_size = to_size_t(info->filesize);
-        m_version     = to_size_t(info->current_version); // fixme, remember to remove to_size_t when m_version becomes 64 bit
+        m_version     = info->current_version.load_relaxed();
 
         // Update reader list
         if (ringbuf_is_empty()) {
-            ReadCount r2 = { info->current_version, 1 };
+            ReadCount r2 = { m_version, 1 };
             ringbuf_put(r2); // Throws
         }
         else {
             ReadCount& r = ringbuf_get_last();
-            if (r.version == info->current_version) {
+            if (r.version == m_version) {
                 ++r.count;
             }
             else {
-                ReadCount r2 = { info->current_version, 1 };
+                ReadCount r2 = { m_version, 1 };
                 ringbuf_put(r2); // Throws
             }
         }
@@ -340,17 +718,13 @@ const Group& SharedGroup::begin_read()
         throw;
     }
 
-#ifdef TIGHTDB_DEBUG
-    m_group.Verify();
-#endif
-
     return m_group;
 }
 
 
 void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
-    if (!m_group.is_attached()) 
+    if (!m_group.is_attached())
         return;
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
@@ -363,14 +737,8 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
 
-        // FIXME: m_version may well be a 64-bit integer so this cast
-        // to uint32_t seems quite dangerous. Should the type of
-        // m_version be changed to uint32_t? The problem with uint32_t
-        // is that it is not part of C++03. It was introduced in C++11
-        // though.
-
         // Find entry for current version
-        size_t ndx = ringbuf_find(uint32_t(m_version));
+        size_t ndx = ringbuf_find(m_version);
         TIGHTDB_ASSERT(ndx != not_found);
         ReadCount& r = ringbuf_get(ndx);
 
@@ -402,8 +770,29 @@ Group& SharedGroup::begin_write()
     SharedInfo* info = m_file_map.get_addr();
 
     // Get write lock
-    // Note that this will not get released until we call end_write().
+    // Note that this will not get released until we call
+    // commit() or rollback()
     info->writemutex.lock(&recover_from_dead_write_transact); // Throws
+
+#ifndef _WIN32
+    if (info->flags == durability_Async) {
+
+        info->balancemutex.lock(&recover_from_dead_write_transact); // Throws
+
+        // if we are running low on write slots, kick the sync daemon
+        if (info->free_write_slots < relaxed_sync_threshold)
+            info->work_to_do.notify();
+
+        // if we are out of write slots, wait for the sync daemon to catch up
+        while (info->free_write_slots <= 0) {
+            info->room_to_write.wait(info->balancemutex,
+                                     recover_from_dead_write_transact);
+        }
+
+        info->free_write_slots--;
+        info->balancemutex.unlock();
+    }
+#endif
 
     // Get the current top ref
     ref_type new_top_ref = to_size_t(info->current_top);
@@ -414,7 +803,6 @@ Group& SharedGroup::begin_write()
     m_group.update_from_shared(new_top_ref, new_file_size); // Throws
 
 #ifdef TIGHTDB_DEBUG
-    m_group.Verify();
     m_transact_stage = transact_Writing;
 #endif
 
@@ -449,20 +837,30 @@ void SharedGroup::commit()
     // rethrown, because the commit was effectively successful.
 
     {
-        size_t new_version;
+        uint64_t new_version;
 #ifdef TIGHTDB_ENABLE_REPLICATION
         // It is essential that if Replicatin::commit_write_transact()
         // fails, then the transaction is not completed. A subsequent call
         // to rollback() must roll it back.
         if (Replication* repl = m_group.get_replication()) {
-            new_version = repl->commit_write_transact(*this); // Throws
+            uint_fast64_t current_version = info->current_version.load_relaxed();
+            new_version = repl->commit_write_transact(*this, current_version); // Throws
         }
         else {
-            new_version = info->current_version + 1; // FIXME: Eventual overflow
+            new_version = info->current_version.load_relaxed() + 1;
         }
 #else
-        new_version = info->current_version + 1; // FIXME: Eventual overflow
+        new_version = info->current_version.load_relaxed() + 1;
 #endif
+        // Reset version tracking in group if we are
+        // starting from a new lock file
+        if (new_version == 2) {
+            // The reason this is not done in begin_write is that a rollback will
+            // leave the versioning unchanged, hence a new begin_write following
+            // a rollback would call init_shared again.
+            m_group.init_shared();
+        }
+
         low_level_commit(new_version); // Throws
     }
 
@@ -629,7 +1027,7 @@ void SharedGroup::ringbuf_expand()
 }
 
 
-size_t SharedGroup::ringbuf_find(uint32_t version) const TIGHTDB_NOEXCEPT
+size_t SharedGroup::ringbuf_find(uint64_t version) const TIGHTDB_NOEXCEPT
 {
     const SharedInfo* info = m_reader_map.get_addr();
     uint32_t pos = info->get_pos;
@@ -731,21 +1129,21 @@ void SharedGroup::zero_free_space()
     SharedInfo* info = m_file_map.get_addr();
 
     // Get version info
-    size_t current_version;
+    uint64_t current_version;
     size_t readlock_version;
     size_t file_size;
 
     {
         Mutex::Lock lock(info->readmutex);
-        current_version = info->current_version + 1;
+        current_version = info->current_version.load_relaxed() + 1;
         file_size = to_size_t(info->filesize);
 
         if (ringbuf_is_empty()) {
-            readlock_version = current_version;
+            readlock_version = current_version;//FIXME:vs2012 warning  warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
         }
         else {
             const ReadCount& r = ringbuf_get_first();
-            readlock_version = r.version;
+            readlock_version = r.version;//FIXME:vs2012 warning C4244: '=' : conversion from 'const uint64_t' to 'size_t', possible loss of data
         }
     }
 
@@ -755,25 +1153,16 @@ void SharedGroup::zero_free_space()
 #endif // TIGHTDB_DEBUG
 
 
-size_t SharedGroup::get_current_version() TIGHTDB_NOEXCEPT
+uint64_t SharedGroup::get_current_version() TIGHTDB_NOEXCEPT
 {
     SharedInfo* info = m_file_map.get_addr();
-    return info->current_version;
+    return info->current_version.load_relaxed();
 }
 
-
-// FIXME: What type is the right type for storing the database
-// version? Somtimes we use size_t, other times we use uint32_t?
-// uint32_t is manifestly a bad choice, since it doesn't always exist,
-// and even if it exists, it may not be efficient on the target
-// platform. If 32 bits are are enough to hold a database version,
-// then the type should be 'unsigned long', 'uint_fast32_t', or
-// 'uint_least32_t'.
-void SharedGroup::low_level_commit(size_t new_version)
+void SharedGroup::low_level_commit(uint64_t new_version)
 {
     SharedInfo* info = m_file_map.get_addr();
-
-    size_t readlock_version;
+    uint64_t readlock_version;
     {
         Mutex::Lock lock(info->readmutex);
 
@@ -789,22 +1178,11 @@ void SharedGroup::low_level_commit(size_t new_version)
         }
     }
 
-    // Reset version tracking in group if we are
-    // starting from a new lock file
-    if (new_version == 1) {
-        // FIXME: Why is this not dealt with in begin_write()? Note
-        // that we can read the value of info->current_version without
-        // a lock on info->readmutex as long as we have a lock on
-        // info->writemutex. This is true (not a data race) becasue
-        // info->current_version is modified only while
-        // info->writemutex is locked.
-        m_group.init_shared(); // Throws
-    }
-
     // Do the actual commit
     TIGHTDB_ASSERT(m_group.m_top.is_attached());
     TIGHTDB_ASSERT(readlock_version <= new_version);
     GroupWriter out(m_group); // Throws
+    //FIXME: VS2012 warning:  src\tightdb\group_shared.cpp(1087): warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
     m_group.m_readlock_version = readlock_version;
     out.set_versions(new_version, readlock_version);
     // Recursively write all changed arrays to end of file
@@ -823,13 +1201,22 @@ void SharedGroup::low_level_commit(size_t new_version)
         Mutex::Lock lock(info->readmutex);
         info->current_top = new_top_ref;
         info->filesize    = new_file_size;
-        // FIXME: Due to lack of adequate synchronization, the
-        // following modification of 'info->current_version'
-        // effectively participates in a "data race". Please see the
-        // 'FIXME' in SharedGroup::has_changed() for more info.
-        info->current_version = new_version;//FIXME src\tightdb\group_shared.cpp(772): warning C4267: '=' : conversion from 'size_t' to 'volatile uint32_t', possible loss of data
+        info->current_version.store_relaxed(new_version);
     }
 
     // Save last version for has_changed()
     m_version = new_version;
+}
+
+
+void SharedGroup::reserve(size_t size)
+{
+    TIGHTDB_ASSERT(is_attached());
+    // FIXME: There is currently no synchronization between this and
+    // concurrent commits in progress. This is so because it is
+    // believed that the OS guarantees race free behavior when
+    // File::prealloc_if_supported() (posix_fallocate() on Linux) runs
+    // concurrently with modfications via a memory map of the
+    // file. This assumption must be verified though.
+    m_group.m_alloc.reserve(size);
 }

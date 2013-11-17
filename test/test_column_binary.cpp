@@ -1,10 +1,15 @@
 #include "testsettings.hpp"
 #ifdef TEST_COLUMN_BINARY
 
+#include <string>
+
 #include <UnitTest++.h>
 #include <tightdb/column_binary.hpp>
 
 using namespace tightdb;
+
+// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
+// will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
 struct db_setup_column_binary {
     static ColumnBinary c;
@@ -173,31 +178,77 @@ TEST_FIXTURE(db_setup_column_binary, ColumnBinaryDelete)
     c.add(BinaryData("ghij", 5));
     c.add(BinaryData("klmno", 6));
 
-    c.erase(0); // first
+    c.erase(0, 0 == c.size()-1); // first
     CHECK_EQUAL("bc", c.get(0).data());
     CHECK_EQUAL("def", c.get(1).data());
     CHECK_EQUAL("ghij", c.get(2).data());
     CHECK_EQUAL("klmno", c.get(3).data());
     CHECK_EQUAL(4, c.size());
 
-    c.erase(3); // last
+    c.erase(3, 3 == c.size()-1); // last
     CHECK_EQUAL("bc", c.get(0).data());
     CHECK_EQUAL("def", c.get(1).data());
     CHECK_EQUAL("ghij", c.get(2).data());
     CHECK_EQUAL(3, c.size());
 
-    c.erase(1); // middle
+    c.erase(1, 1 == c.size()-1); // middle
     CHECK_EQUAL("bc", c.get(0).data());
     CHECK_EQUAL("ghij", c.get(1).data());
     CHECK_EQUAL(2, c.size());
 
-    c.erase(0); // single
+    c.erase(0, 0 == c.size()-1); // single
     CHECK_EQUAL("ghij", c.get(0).data());
     CHECK_EQUAL(1, c.size());
 
-    c.erase(0); // all
+    c.erase(0, 0 == c.size()-1); // all
     CHECK_EQUAL(0, c.size());
     CHECK(c.is_empty());
+}
+
+TEST_FIXTURE(db_setup_column_binary, ColumnBinaryBig)
+{
+    c.clear();
+
+    c.add(BinaryData("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", 71));
+    CHECK_EQUAL("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", c.get(0).data());
+
+    c.clear();
+    c.add(BinaryData("a", 2));
+    c.add(BinaryData("bc", 3));
+    c.add(BinaryData("def", 4));
+    c.add(BinaryData("ghij", 5));
+    c.add(BinaryData("klmno", 6));
+    c.add(BinaryData("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", 71));
+    CHECK_EQUAL("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", c.get(5).data());
+
+    // Insert all sizes
+    c.clear();
+    std::string s;
+    for (int i = 0; i < 100; ++i) {
+        c.add(BinaryData(s.c_str(), s.size()));
+        s += 'x';
+    }
+    s.clear();
+    for (int i = 0; i < 100; ++i) {
+        CHECK_EQUAL(BinaryData(s.c_str(), s.size()), c.get(i));
+        s += 'x';
+    }
+
+    // Set all sizes
+    c.clear();
+    s.clear();
+    for (int i = 0; i < 100; ++i) {
+        c.add();
+    }
+    for (int i = 0; i < 100; ++i) {
+        c.set(i, BinaryData(s.c_str(), s.size()));
+        s += 'x';
+    }
+    s.clear();
+    for (int i = 0; i < 100; ++i) {
+        CHECK_EQUAL(BinaryData(s.c_str(), s.size()), c.get(i));
+        s += 'x';
+    }
 }
 
 TEST_FIXTURE(db_setup_column_binary, ColumnBinary_Destroy)

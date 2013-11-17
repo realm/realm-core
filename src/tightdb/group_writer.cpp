@@ -9,23 +9,21 @@ using namespace std;
 using namespace tightdb;
 
 
-GroupWriter::GroupWriter(Group& group) :
+GroupWriter::GroupWriter(Group& group):
     m_group(group), m_alloc(group.m_alloc), m_current_version(0)
 {
     m_file_map.map(m_alloc.m_file, File::access_ReadWrite, m_alloc.get_baseline()); // Throws
 }
 
 
-void GroupWriter::set_versions(size_t current, size_t read_lock)
-{
-    TIGHTDB_ASSERT(read_lock <= current);
-    m_current_version  = current;
-    m_readlock_version = read_lock;
-}
-
-
 size_t GroupWriter::write_group()
 {
+    // Streamed files have the top-ref specified in a footer but this
+    // form is incompatible with in-place updating of database
+    // files. For this reason we have to convert the file now if it is
+    // the the streamed form.
+    m_group.m_alloc.prepare_for_update(m_file_map.get_addr());
+
     merge_free_space(); // Throws
 
     Array& top        = m_group.m_top;
@@ -75,7 +73,9 @@ size_t GroupWriter::write_group()
     ++max_free_list_size;
 
     int num_free_lists = is_shared ? 3 : 2;
-    int max_top_size = 2 + num_free_lists;
+    int max_top_size = 3 + num_free_lists;
+    if (is_shared)
+        ++max_top_size; // database version (a.k.a. transaction number)
     size_t max_free_space_needed = Array::get_max_byte_size(max_top_size) +
         num_free_lists * Array::get_max_byte_size(max_free_list_size);
 
@@ -138,14 +138,17 @@ size_t GroupWriter::write_group()
     // Update top to point to the calculated positions
     top.set(0, names_pos); // Throws
     top.set(1, tables_pos); // Throws
-    top.set(2, free_positions_pos); // Throws
-    top.set(3, free_sizes_pos); // Throws
-    if (is_shared)
-        top.set(4, free_versions_pos); // Throws
+    // Third slot holds the logical file size
+    top.set(3, free_positions_pos); // Throws
+    top.set(4, free_sizes_pos); // Throws
+    if (is_shared) {
+        top.set(5, free_versions_pos); // Throws
+        // Seventh slot holds the database version (a.k.a. transaction number)
+    }
 
     // Get final sizes
-    size_t top_size = top.get_byte_size();
-    size_t end_pos = top_pos + top_size;
+    size_t top_byte_size = top.get_byte_size();
+    size_t end_pos = top_pos + top_byte_size;
     TIGHTDB_ASSERT(end_pos <= reserve_pos + max_free_space_needed);
 
     // Deduct the used space from the reserved chunk. Note that we
@@ -160,13 +163,13 @@ size_t GroupWriter::write_group()
 
     // The free-list now have their final form, so we can write them
     // to the file
-    write_at(free_positions_pos, fpositions.get_header(), free_positions_size); // Throws
-    write_at(free_sizes_pos, flengths.get_header(), free_sizes_size); // Throws
+    write_array_at(free_positions_pos, fpositions.get_header(), free_positions_size); // Throws
+    write_array_at(free_sizes_pos, flengths.get_header(), free_sizes_size); // Throws
     if (is_shared)
-        write_at(free_versions_pos, fversions.get_header(), free_versions_size); // Throws
+        write_array_at(free_versions_pos, fversions.get_header(), free_versions_size); // Throws
 
     // Write top
-    write_at(top_pos, top.get_header(), top_size); // Throws
+    write_array_at(top_pos, top.get_header(), top_byte_size); // Throws
 
     // Return top_pos so that it can be saved in lock file used
     // for coordination
@@ -220,7 +223,6 @@ void GroupWriter::merge_free_space()
 size_t GroupWriter::get_free_space(size_t size)
 {
     TIGHTDB_ASSERT(size % 8 == 0); // 8-byte alignment
-    TIGHTDB_ASSERT(m_file_map.get_size() % 8 == 0); // 8-byte alignment
 
     pair<size_t, size_t> p = reserve_free_space(size);
 
@@ -300,19 +302,15 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     Array& versions  = m_group.m_free_versions;
     bool is_shared = m_group.m_is_shared;
 
-    // FIXME: What we really need here is the "logical" size of the
-    // file and not the real size. The real size may have changed
-    // without the free space information having been adjusted
-    // accordingly. This can happen, for example, if write_group()
-    // fails before writing the new top-ref, but after having extended
-    // the file size. We currently do not have a concept of a logical
-    // file size, but if provided, it would have to be stored as part
-    // of a database version such that it is updated atomically
-    // together with the rest of the contents of the version.
-    size_t file_size = m_file_map.get_size();
+    // We need to consider the "logical" size of the file here, and
+    // not the real size. The real size may have changed without the
+    // free space information having been adjusted accordingly. This
+    // can happen, for example, if write_group() fails before writing
+    // the new top-ref, but after having extended the file size.
+    size_t logical_file_size = to_size_t(m_group.m_top.get(2) / 2);
 
     bool extend_last_chunk = false;
-    size_t last_chunk_size;
+    size_t last_chunk_size = 0;
     if (!positions.is_empty()) {
         bool in_use = false;
         if (is_shared) {
@@ -324,8 +322,8 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
             size_t last_pos  = to_size_t(positions.back());
             size_t last_size = to_size_t(lengths.back());
             TIGHTDB_ASSERT(last_size < requested_size);
-            TIGHTDB_ASSERT(last_pos + last_size <= file_size);
-            if (last_pos + last_size == file_size) {
+            TIGHTDB_ASSERT(last_pos + last_size <= logical_file_size);
+            if (last_pos + last_size == logical_file_size) {
                 extend_last_chunk = true;
                 last_chunk_size = last_size;
                 requested_size -= last_size;
@@ -333,10 +331,9 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
         }
     }
 
-    size_t min_file_size = file_size;
-    if (int_add_with_overflow_detect(min_file_size, requested_size)) {
+    size_t min_file_size = logical_file_size;
+    if (int_add_with_overflow_detect(min_file_size, requested_size))
         throw runtime_error("File size overflow");
-    }
 
     // We double the size until we reach 'stop_doubling_size'. From
     // then on we increment the size in steps of
@@ -346,7 +343,7 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     size_t stop_doubling_size = 128 * (1024*1024L); // = 128 MiB
     TIGHTDB_ASSERT(stop_doubling_size % 8 == 0);
 
-    size_t new_file_size = file_size;
+    size_t new_file_size = logical_file_size;
     while (new_file_size < min_file_size) {
         if (new_file_size < stop_doubling_size) {
             // The file contains at least a header, so the size can never
@@ -380,7 +377,7 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     m_file_map.remap(m_alloc.m_file, File::access_ReadWrite, new_file_size);
 
     size_t chunk_ndx  = positions.size();
-    size_t chunk_size = new_file_size - file_size;
+    size_t chunk_size = new_file_size - logical_file_size;
     if (extend_last_chunk) {
         --chunk_ndx;
         chunk_size += last_chunk_size;
@@ -389,17 +386,20 @@ pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     }
     else { // Else add new free space
         TIGHTDB_ASSERT(chunk_size % 8 == 0); // 8-byte alignment
-        positions.add(file_size);
+        positions.add(logical_file_size);
         lengths.add(chunk_size);
         if (is_shared)
             versions.add(0); // new space is always free for writing
     }
 
+    // Update the logical file size
+    m_group.m_top.set(2, 1 + 2*new_file_size); // Throws
+
     return make_pair(chunk_ndx, chunk_size);
 }
 
 
-size_t GroupWriter::write(const char* data, size_t size)
+void GroupWriter::write(const char* data, size_t size)
 {
     // Get position of free space to write in (expanding file if needed)
     size_t pos = get_free_space(size);
@@ -408,13 +408,32 @@ size_t GroupWriter::write(const char* data, size_t size)
     // Write the block
     char* dest = m_file_map.get_addr() + pos;
     copy(data, data+size, dest);
+}
+
+
+size_t GroupWriter::write_array(const char* data, size_t size, uint_fast32_t checksum)
+{
+    // Get position of free space to write in (expanding file if needed)
+    size_t pos = get_free_space(size);
+    TIGHTDB_ASSERT((pos & 0x7) == 0); // Write position should always be 64bit aligned
+
+    // Write the block
+    char* dest = m_file_map.get_addr() + pos;
+#ifdef TIGHTDB_DEBUG
+    const char* cksum_bytes = reinterpret_cast<const char*>(&checksum);
+    copy(cksum_bytes, cksum_bytes+4, dest);
+    copy(data+4, data+size, dest+4);
+#else
+    static_cast<void>(checksum);
+    copy(data, data+size, dest);
+#endif
 
     // return the position it was written
     return pos;
 }
 
 
-void GroupWriter::write_at(size_t pos, const char* data, size_t size)
+void GroupWriter::write_array_at(size_t pos, const char* data, size_t size)
 {
     char* dest = m_file_map.get_addr() + pos;
 
@@ -424,7 +443,14 @@ void GroupWriter::write_at(size_t pos, const char* data, size_t size)
     static_cast<void>(mmap_end);
     static_cast<void>(copy_end);
 
+#ifdef TIGHTDB_DEBUG
+    uint_fast32_t dummy_checksum = 0x01010101UL;
+    const char* cksum_bytes = reinterpret_cast<const char*>(&dummy_checksum);
+    copy(cksum_bytes, cksum_bytes+4, dest);
+    copy(data+4, data+size, dest+4);
+#else
     copy(data, data+size, dest);
+#endif
 }
 
 

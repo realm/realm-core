@@ -9,6 +9,12 @@
 #include "../util/timer.hpp"
 
 //#define ONLY_CN_TESTS
+/************************************************************************************
+
+// In Visual Studio, enable this matrix.cpp in compilation and disable test.cpp, else
+// compilation will fail (two main() functions).
+
+***********************************************************************************/
 
 using namespace std;
 using namespace tightdb;

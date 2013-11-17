@@ -4,6 +4,7 @@
 #include "Test.h"
 #include "TestList.h"
 #include "CurrentTest.h"
+#include <iostream>
 
 namespace UnitTest {
 
@@ -31,13 +32,37 @@ public:
 	int RunTestsIf(TestList const& list, char const* suiteName, 
 				   const Predicate& predicate, int maxTestTimeInMs) const
 	{
-	    Test* curTest = list.GetHead();
+
+        bool only = false;
+
+        // See if there are any unit tests whose name ends with _ONLY suffix which means that we must only 
+        // execute that single test and none else
+        {
+    	    Test* curTest = list.GetHead();
+	        while (curTest != 0)
+	        {
+		        if (IsTestInSuite(curTest,suiteName) && predicate(curTest))
+			    {
+                    std::string n = std::string(curTest->m_details.testName);
+                    if(n.size() >= 5 && n.substr(n.size() - 5, 5) == "_ONLY")
+                        only = true;
+			    }
+			    curTest = curTest->next;
+	        }
+        }
+        
+        if(only)
+            std::cerr << "\n *** BE AWARE THAT MULTIPLE UNIT TESTS ARE DISABLED DUE TO USING 'ONLY' MACRO *** \n\n";
+
+        Test* curTest = list.GetHead();
 
 	    while (curTest != 0)
 	    {
 		    if (IsTestInSuite(curTest,suiteName) && predicate(curTest))
 			{
-				RunTest(m_result, curTest, maxTestTimeInMs);
+                std::string n = std::string(curTest->m_details.testName);
+                if(!only || (only && n.size() >= 5 && n.substr(n.size() - 5, 5) == "_ONLY"))
+    				RunTest(m_result, curTest, maxTestTimeInMs);
 			}
 
 			curTest = curTest->next;

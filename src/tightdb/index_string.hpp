@@ -104,8 +104,8 @@ private:
 
 #ifdef TIGHTDB_DEBUG
     void to_dot_2(std::ostream&, StringData title = StringData()) const;
-    void array_to_dot(std::ostream&, const Array&) const;
-    void keys_to_dot(std::ostream&, const Array&, StringData title = StringData()) const;
+    static void array_to_dot(std::ostream&, const Array&);
+    static void keys_to_dot(std::ostream&, const Array&, StringData title = StringData());
 #endif
 };
 

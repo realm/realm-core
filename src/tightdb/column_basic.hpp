@@ -47,31 +47,35 @@ public:
                          Allocator& = Allocator::get_default());
     ~BasicColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    size_t size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    bool is_empty() const TIGHTDB_NOEXCEPT;
+    std::size_t size() const TIGHTDB_NOEXCEPT;
+    bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
 
-    T get(size_t ndx) const TIGHTDB_NOEXCEPT;
+    T get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add() TIGHTDB_OVERRIDE { add(0); }
     void add(T value);
-    void set(size_t ndx, T value);
-    void insert(size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
-    void insert(size_t ndx, T value);
-    void erase(size_t ndx) TIGHTDB_OVERRIDE;
+    void set(std::size_t ndx, T value);
+    void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
+    void insert(std::size_t ndx, T value);
+    void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
-    void resize(size_t ndx);
-    void fill(size_t count);
+    void resize(std::size_t ndx);
+    void fill(std::size_t count);
     // Experimental. Overwrites the row at ndx with the last row and removes the last row. For unordered tables.
-    void move_last_over(size_t ndx) TIGHTDB_OVERRIDE;
+    void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
 
-    size_t count(T value) const;
+    std::size_t count(T value) const;
 
     typedef typename AggReturnType<T>::sum_type SumType;
-    SumType sum(size_t start = 0, size_t end = -1) const;
-    double average(size_t start = 0, size_t end = -1) const;
-    T maximum(size_t start = 0, size_t end = -1) const;
-    T minimum(size_t start = 0, size_t end = -1) const;
-    size_t find_first(T value, size_t start=0 , size_t end=-1) const;
-    void find_all(Array& result, T value, size_t start = 0, size_t end = -1) const;
+    SumType sum(std::size_t begin = 0, std::size_t end = npos,
+                std::size_t limit = std::size_t(-1)) const;
+    double average(std::size_t begin = 0, std::size_t end = npos, 
+                   std::size_t limit = std::size_t(-1)) const;
+    T maximum(std::size_t begin = 0, std::size_t end = npos, 
+              std::size_t limit = std::size_t(-1)) const;
+    T minimum(std::size_t begin = 0, std::size_t end = npos, 
+              std::size_t limit = std::size_t(-1)) const;
+    std::size_t find_first(T value, std::size_t begin = 0 , std::size_t end = npos) const;
+    void find_all(Array& result, T value, std::size_t begin = 0, std::size_t end = npos) const;
 
     //@{
     /// Find the lower/upper bound for the specified value assuming
@@ -84,29 +88,34 @@ public:
     bool compare(const BasicColumn&) const;
 
 #ifdef TIGHTDB_DEBUG
-    void Verify() const TIGHTDB_OVERRIDE {}; // Must be upper case to avoid conflict with macro in ObjC
+    void Verify() const TIGHTDB_OVERRIDE;
+    void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
+    void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
+    using ColumnBase::dump_node_structure;
 #endif
 
 private:
-    void LeafSet(size_t ndx, T value);
-    void LeafDelete(size_t ndx);
-
-    template<class F> size_t LeafFind(T value, size_t start, size_t end) const;
-    void LeafFindAll(Array& result, T value, size_t add_offset = 0, size_t start = 0, size_t end = -1) const;
+    std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
 
     void do_insert(std::size_t ndx, T value);
 
-    // Called by Array::btree_insert().
+    // Called by Array::bptree_insert().
     static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, std::size_t ndx_in_parent,
                                 Allocator&, std::size_t insert_ndx,
                                 Array::TreeInsert<BasicColumn<T> >&);
 
-#ifdef TIGHTDB_DEBUG
-    void leaf_to_dot(std::ostream&, const Array&) const TIGHTDB_OVERRIDE;
-#endif
-
     template <typename R, Action action, class cond>
-    R aggregate(T target, size_t start, size_t end, size_t *matchcount = 0) const;
+    R aggregate(T target, std::size_t start, std::size_t end) const;
+
+    class SetLeafElem;
+    class EraseLeafElem;
+
+#ifdef TIGHTDB_DEBUG
+    static std::size_t verify_leaf(MemRef, Allocator&);
+    void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
+                     std::ostream&) const TIGHTDB_OVERRIDE;
+    static void leaf_dumper(MemRef, Allocator&, std::ostream&, int level);
+#endif
 
     friend class Array;
     friend class ColumnBase;

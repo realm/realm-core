@@ -1,16 +1,25 @@
 #include "testsettings.hpp"
 #ifdef TEST_TABLE_VIEW
 
-#include <UnitTest++.h>
-#include <tightdb/table_macros.hpp>
 #include <string>
 #include <sstream>
 #include <ostream>
 
+#include <tightdb/table_macros.hpp>
+
+#include "util/misc.hpp"
+
+#include <UnitTest++.h>
+
 using namespace std;
 using namespace tightdb;
+using namespace test_util;
+
+// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
+// will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
 namespace {
+
 TIGHTDB_TABLE_1(TestTableInt,
                 first, Int)
 
@@ -19,10 +28,11 @@ TIGHTDB_TABLE_2(TestTableInt2,
                 second, Int)
 
 TIGHTDB_TABLE_2(TestTableDate,
-                first, Date,
+                first, DateTime,
                 second, Int)
 
-}
+} // anonymous namespace
+
 
 TEST(TableViewJSON)
 {
@@ -49,15 +59,15 @@ TEST(TableViewDateMaxMin)
 {
     TestTableDate ttd;
 
-    ttd.add(Date(2014, 7, 10), 1);
-    ttd.add(Date(2013, 7, 10), 1);
-    ttd.add(Date(2015, 8, 10), 1);
-    ttd.add(Date(2015, 7, 10), 1);
+    ttd.add(DateTime(2014, 7, 10), 1);
+    ttd.add(DateTime(2013, 7, 10), 1);
+    ttd.add(DateTime(2015, 8, 10), 1);
+    ttd.add(DateTime(2015, 7, 10), 1);
 
     TestTableDate::View v = ttd.column().second.find_all(1);
 
-    CHECK_EQUAL(Date(2015, 8, 10), v.column().first.maximum());
-    CHECK_EQUAL(Date(2013, 7, 10), v.column().first.minimum());
+    CHECK_EQUAL(DateTime(2015, 8, 10), v.column().first.maximum());
+    CHECK_EQUAL(DateTime(2013, 7, 10), v.column().first.minimum());
 }
 
 TEST(GetSetInteger)
@@ -163,7 +173,7 @@ TEST(TableView_Floats_Find_and_Aggregations)
     // TODO: add for float as well
 
     // Test sum
-    CHECK_EQUAL(sum_d, v_all.column().col_double.sum());
+    CHECK(almost_equal(sum_d, v_all.column().col_double.sum())); // almost_equal because of double/float imprecision
     CHECK_EQUAL(sum_f, v_all.column().col_float.sum());
     CHECK_EQUAL(-1.2 -1.2, v_some.column().col_double.sum());
     CHECK_EQUAL(1.2f -1.1f, v_some.column().col_float.sum());
@@ -181,7 +191,7 @@ TEST(TableView_Floats_Find_and_Aggregations)
     CHECK_EQUAL(-1.1f, v_some.column().col_float.minimum());
 
     // Test avg
-    CHECK_EQUAL(sum_d / 6.0, v_all.column().col_double.average());
+    CHECK(almost_equal(sum_d / 6.0, v_all.column().col_double.average())); // almost_equal because of double/float imprecision
     CHECK_EQUAL((-1.2 + -1.2) / 2.0, v_some.column().col_double.average());
     CHECK_EQUAL(sum_f / 6.0, v_all.column().col_float.average());
 
@@ -480,6 +490,208 @@ TEST(TableViewFindAllStacked)
 }
 
 
+TEST(TableView_LowLevelSubtables)
+{
+    Table table;
+    vector<size_t> column_path;
+    table.add_column(type_Bool,  "enable");
+    table.add_column(type_Table, "subtab");
+    table.add_column(type_Mixed, "mixed");
+    column_path.push_back(1);
+    table.add_subcolumn(column_path, type_Bool,  "enable");
+    table.add_subcolumn(column_path, type_Table, "subtab");
+    table.add_subcolumn(column_path, type_Mixed, "mixed");
+    column_path.push_back(1);
+    table.add_subcolumn(column_path, type_Bool,  "enable");
+    table.add_subcolumn(column_path, type_Table, "subtab");
+    table.add_subcolumn(column_path, type_Mixed, "mixed");
+
+    table.add_empty_row(2 * 2);
+    table.set_bool(0, 1, true);
+    table.set_bool(0, 3, true);
+    TableView view = table.where().equal(0, true).find_all();
+    CHECK_EQUAL(2, view.size());
+    for (int i_1 = 0; i_1 != 2; ++i_1) {
+        TableRef subtab = view.get_subtable(1, i_1);
+        subtab->add_empty_row(2 * (2 + i_1));
+        for (int i_2 = 0; i_2 != 2 * (2 + i_1); ++i_2)
+            subtab->set_bool(0, i_2, i_2 % 2 == 0);
+        TableView subview = subtab->where().equal(0, true).find_all();
+        CHECK_EQUAL(2 + i_1, subview.size());
+        {
+            TableRef subsubtab = subview.get_subtable(1, 0 + i_1);
+            subsubtab->add_empty_row(2 * (3 + i_1));
+            for (int i_3 = 0; i_3 != 2 * (3 + i_1); ++i_3)
+                subsubtab->set_bool(0, i_3, i_3 % 2 == 1);
+            TableView subsubview = subsubtab->where().equal(0, true).find_all();
+            CHECK_EQUAL(3 + i_1, subsubview.size());
+
+            for (int i_3 = 0; i_3 != 3 + i_1; ++i_3) {
+                CHECK_EQUAL(true,  bool(subsubview.get_subtable(1, i_3)));
+                CHECK_EQUAL(false, bool(subsubview.get_subtable(2, i_3))); // Mixed
+                CHECK_EQUAL(0, subsubview.get_subtable_size(1, i_3));
+                CHECK_EQUAL(0, subsubview.get_subtable_size(2, i_3)); // Mixed
+            }
+
+            subview.clear_subtable(2, 1 + i_1); // Mixed
+            TableRef subsubtab_mix = subview.get_subtable(2, 1 + i_1);
+            subsubtab_mix->add_column(type_Bool,  "enable");
+            subsubtab_mix->add_column(type_Table, "subtab");
+            subsubtab_mix->add_column(type_Mixed, "mixed");
+            subsubtab_mix->add_empty_row(2 * (1 + i_1));
+            for (int i_3 = 0; i_3 != 2 * (1 + i_1); ++i_3)
+                subsubtab_mix->set_bool(0, i_3, i_3 % 2 == 0);
+            TableView subsubview_mix = subsubtab_mix->where().equal(0, true).find_all();
+            CHECK_EQUAL(1 + i_1, subsubview_mix.size());
+
+            for (int i_3 = 0; i_3 != 1 + i_1; ++i_3) {
+                CHECK_EQUAL(true,  bool(subsubview_mix.get_subtable(1, i_3)));
+                CHECK_EQUAL(false, bool(subsubview_mix.get_subtable(2, i_3))); // Mixed
+                CHECK_EQUAL(0, subsubview_mix.get_subtable_size(1, i_3));
+                CHECK_EQUAL(0, subsubview_mix.get_subtable_size(2, i_3)); // Mixed
+            }
+        }
+        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
+            CHECK_EQUAL(true,           bool(subview.get_subtable(1, i_2)));
+            CHECK_EQUAL(i_2 == 1 + i_1, bool(subview.get_subtable(2, i_2))); // Mixed
+            CHECK_EQUAL(i_2 == 0 + i_1 ? 2 * (3 + i_1) : 0, subview.get_subtable_size(1, i_2));
+            CHECK_EQUAL(i_2 == 1 + i_1 ? 2 * (1 + i_1) : 0, subview.get_subtable_size(2, i_2)); // Mixed
+        }
+
+        view.clear_subtable(2, i_1); // Mixed
+        TableRef subtab_mix = view.get_subtable(2, i_1);
+        vector<size_t> subcol_path;
+        subtab_mix->add_column(type_Bool,  "enable");
+        subtab_mix->add_column(type_Table, "subtab");
+        subtab_mix->add_column(type_Mixed, "mixed");
+        subcol_path.push_back(1);
+        subtab_mix->add_subcolumn(subcol_path, type_Bool,  "enable");
+        subtab_mix->add_subcolumn(subcol_path, type_Table, "subtab");
+        subtab_mix->add_subcolumn(subcol_path, type_Mixed, "mixed");
+        subtab_mix->add_empty_row(2 * (3 + i_1));
+        for (int i_2 = 0; i_2 != 2 * (3 + i_1); ++i_2)
+            subtab_mix->set_bool(0, i_2, i_2 % 2 == 1);
+        TableView subview_mix = subtab_mix->where().equal(0, true).find_all();
+        CHECK_EQUAL(3 + i_1, subview_mix.size());
+        {
+            TableRef subsubtab = subview_mix.get_subtable(1, 1 + i_1);
+            subsubtab->add_empty_row(2 * (7 + i_1));
+            for (int i_3 = 0; i_3 != 2 * (7 + i_1); ++i_3)
+                subsubtab->set_bool(0, i_3, i_3 % 2 == 1);
+            TableView subsubview = subsubtab->where().equal(0, true).find_all();
+            CHECK_EQUAL(7 + i_1, subsubview.size());
+
+            for (int i_3 = 0; i_3 != 7 + i_1; ++i_3) {
+                CHECK_EQUAL(true,  bool(subsubview.get_subtable(1, i_3)));
+                CHECK_EQUAL(false, bool(subsubview.get_subtable(2, i_3))); // Mixed
+                CHECK_EQUAL(0, subsubview.get_subtable_size(1, i_3));
+                CHECK_EQUAL(0, subsubview.get_subtable_size(2, i_3)); // Mixed
+            }
+
+            subview_mix.clear_subtable(2, 2 + i_1); // Mixed
+            TableRef subsubtab_mix = subview_mix.get_subtable(2, 2 + i_1);
+            subsubtab_mix->add_column(type_Bool,  "enable");
+            subsubtab_mix->add_column(type_Table, "subtab");
+            subsubtab_mix->add_column(type_Mixed, "mixed");
+            subsubtab_mix->add_empty_row(2 * (5 + i_1));
+            for (int i_3 = 0; i_3 != 2 * (5 + i_1); ++i_3)
+                subsubtab_mix->set_bool(0, i_3, i_3 % 2 == 0);
+            TableView subsubview_mix = subsubtab_mix->where().equal(0, true).find_all();
+            CHECK_EQUAL(5 + i_1, subsubview_mix.size());
+
+            for (int i_3 = 0; i_3 != 5 + i_1; ++i_3) {
+                CHECK_EQUAL(true,  bool(subsubview_mix.get_subtable(1, i_3)));
+                CHECK_EQUAL(false, bool(subsubview_mix.get_subtable(2, i_3))); // Mixed
+                CHECK_EQUAL(0, subsubview_mix.get_subtable_size(1, i_3));
+                CHECK_EQUAL(0, subsubview_mix.get_subtable_size(2, i_3)); // Mixed
+            }
+        }
+        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
+            CHECK_EQUAL(true,           bool(subview_mix.get_subtable(1, i_2)));
+            CHECK_EQUAL(i_2 == 2 + i_1, bool(subview_mix.get_subtable(2, i_2))); // Mixed
+            CHECK_EQUAL(i_2 == 1 + i_1 ? 2 * (7 + i_1) : 0, subview_mix.get_subtable_size(1, i_2));
+            CHECK_EQUAL(i_2 == 2 + i_1 ? 2 * (5 + i_1) : 0, subview_mix.get_subtable_size(2, i_2)); // Mixed
+        }
+
+        CHECK_EQUAL(true, bool(view.get_subtable(1, i_1)));
+        CHECK_EQUAL(true, bool(view.get_subtable(2, i_1))); // Mixed
+        CHECK_EQUAL(2 * (2 + i_1), view.get_subtable_size(1, i_1));
+        CHECK_EQUAL(2 * (3 + i_1), view.get_subtable_size(2, i_1)); // Mixed
+    }
+
+
+    ConstTableView const_view = table.where().equal(0, true).find_all();
+    CHECK_EQUAL(2, const_view.size());
+    for (int i_1 = 0; i_1 != 2; ++i_1) {
+        ConstTableRef subtab = const_view.get_subtable(1, i_1);
+        ConstTableView const_subview = subtab->where().equal(0, true).find_all();
+        CHECK_EQUAL(2 + i_1, const_subview.size());
+        {
+            ConstTableRef subsubtab = const_subview.get_subtable(1, 0 + i_1);
+            ConstTableView const_subsubview = subsubtab->where().equal(0, true).find_all();
+            CHECK_EQUAL(3 + i_1, const_subsubview.size());
+            for (int i_3 = 0; i_3 != 3 + i_1; ++i_3) {
+                CHECK_EQUAL(true,  bool(const_subsubview.get_subtable(1, i_3)));
+                CHECK_EQUAL(false, bool(const_subsubview.get_subtable(2, i_3))); // Mixed
+                CHECK_EQUAL(0, const_subsubview.get_subtable_size(1, i_3));
+                CHECK_EQUAL(0, const_subsubview.get_subtable_size(2, i_3)); // Mixed
+            }
+
+            ConstTableRef subsubtab_mix = const_subview.get_subtable(2, 1 + i_1);
+            ConstTableView const_subsubview_mix = subsubtab_mix->where().equal(0, true).find_all();
+            CHECK_EQUAL(1 + i_1, const_subsubview_mix.size());
+            for (int i_3 = 0; i_3 != 1 + i_1; ++i_3) {
+                CHECK_EQUAL(true,  bool(const_subsubview_mix.get_subtable(1, i_3)));
+                CHECK_EQUAL(false, bool(const_subsubview_mix.get_subtable(2, i_3))); // Mixed
+                CHECK_EQUAL(0, const_subsubview_mix.get_subtable_size(1, i_3));
+                CHECK_EQUAL(0, const_subsubview_mix.get_subtable_size(2, i_3)); // Mixed
+            }
+        }
+        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
+            CHECK_EQUAL(true,           bool(const_subview.get_subtable(1, i_2)));
+            CHECK_EQUAL(i_2 == 1 + i_1, bool(const_subview.get_subtable(2, i_2))); // Mixed
+            CHECK_EQUAL(i_2 == 0 + i_1 ? 2 * (3 + i_1) : 0, const_subview.get_subtable_size(1, i_2));
+            CHECK_EQUAL(i_2 == 1 + i_1 ? 2 * (1 + i_1) : 0, const_subview.get_subtable_size(2, i_2)); // Mixed
+        }
+
+        ConstTableRef subtab_mix = const_view.get_subtable(2, i_1);
+        ConstTableView const_subview_mix = subtab_mix->where().equal(0, true).find_all();
+        CHECK_EQUAL(3 + i_1, const_subview_mix.size());
+        {
+            ConstTableRef subsubtab = const_subview_mix.get_subtable(1, 1 + i_1);
+            ConstTableView const_subsubview = subsubtab->where().equal(0, true).find_all();
+            CHECK_EQUAL(7 + i_1, const_subsubview.size());
+            for (int i_3 = 0; i_3 != 7 + i_1; ++i_3) {
+                CHECK_EQUAL(true,  bool(const_subsubview.get_subtable(1, i_3)));
+                CHECK_EQUAL(false, bool(const_subsubview.get_subtable(2, i_3))); // Mixed
+                CHECK_EQUAL(0, const_subsubview.get_subtable_size(1, i_3));
+                CHECK_EQUAL(0, const_subsubview.get_subtable_size(2, i_3)); // Mixed
+            }
+
+            ConstTableRef subsubtab_mix = const_subview_mix.get_subtable(2, 2 + i_1);
+            ConstTableView const_subsubview_mix = subsubtab_mix->where().equal(0, true).find_all();
+            CHECK_EQUAL(5 + i_1, const_subsubview_mix.size());
+            for (int i_3 = 0; i_3 != 5 + i_1; ++i_3) {
+                CHECK_EQUAL(true,  bool(const_subsubview_mix.get_subtable(1, i_3)));
+                CHECK_EQUAL(false, bool(const_subsubview_mix.get_subtable(2, i_3))); // Mixed
+                CHECK_EQUAL(0, const_subsubview_mix.get_subtable_size(1, i_3));
+                CHECK_EQUAL(0, const_subsubview_mix.get_subtable_size(2, i_3)); // Mixed
+            }
+        }
+        for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
+            CHECK_EQUAL(true,           bool(const_subview_mix.get_subtable(1, i_2)));
+            CHECK_EQUAL(i_2 == 2 + i_1, bool(const_subview_mix.get_subtable(2, i_2))); // Mixed
+            CHECK_EQUAL(i_2 == 1 + i_1 ? 2 * (7 + i_1) : 0, const_subview_mix.get_subtable_size(1, i_2));
+            CHECK_EQUAL(i_2 == 2 + i_1 ? 2 * (5 + i_1) : 0, const_subview_mix.get_subtable_size(2, i_2)); // Mixed
+        }
+
+        CHECK_EQUAL(true, bool(const_view.get_subtable(1, i_1)));
+        CHECK_EQUAL(true, bool(const_view.get_subtable(2, i_1))); // Mixed
+        CHECK_EQUAL(2 * (2 + i_1), const_view.get_subtable_size(1, i_1));
+        CHECK_EQUAL(2 * (3 + i_1), const_view.get_subtable_size(2, i_1)); // Mixed
+    }
+}
+
 
 namespace
 {
@@ -652,6 +864,7 @@ TEST(TableView_to_string)
     CHECK_EQUAL(s+s1, ss3.str());
 }
 
+
 TEST(TableView_ref_counting)
 {
     TableView tv, tv2;
@@ -672,7 +885,7 @@ TEST(TableView_ref_counting)
     }
 
     // Now try to access TableView and see that the Table is still alive
-    size_t i = tv.get_int(0, 0);
+    int64_t i = tv.get_int(0, 0);
     CHECK_EQUAL(i, 12);
     string s = tv2.get_string(0, 0);
     CHECK_EQUAL(s, "just a test string");

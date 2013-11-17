@@ -12,10 +12,11 @@
 
 #include "testsettings.hpp"
 
-
 using namespace std;
 using namespace tightdb;
 
+// Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
+// will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
 namespace {
 
@@ -229,7 +230,7 @@ TEST(Thread_CriticalSection2)
 
 
 #ifdef TEST_ROBUSTNESS
-
+// Todo. Not supported on Windows in particular? Keywords: winbug
 TEST(Thread_RobustMutex)
 {
     // Abort if robust mutexes are not supported on the current

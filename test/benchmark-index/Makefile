@@ -1,6 +1,6 @@
-NOINST_PROGRAMS = mkindex
+TEST_PROGRAMS = mkindex
 
 mkindex_SOURCES = mkindex.cpp
-mkindex_LIBS = ../../src/tightdb/libtightdb.a
+mkindex_LIBS = ../util/test-util.a
 
-include ../../generic.mk
+include ../../src/generic.mk

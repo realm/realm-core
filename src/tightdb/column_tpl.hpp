@@ -24,6 +24,7 @@
 
 #include <tightdb/config.h>
 #include <tightdb/array.hpp>
+#include <tightdb/array_basic.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/column_fwd.hpp>
 
@@ -38,269 +39,64 @@ template<class cond, class T> struct ColumnTypeTraits2;
 template<class cond> struct ColumnTypeTraits2<cond, int64_t> {
     typedef Column column_type;
     typedef IntegerNode<int64_t,cond> node_type;
+    typedef Array array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, bool> {
     typedef Column column_type;
     typedef IntegerNode<bool,cond> node_type;
+    typedef Array array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, float> {
     typedef ColumnFloat column_type;
     typedef BasicNode<float,cond> node_type;
+    typedef ArrayFloat array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, double> {
     typedef ColumnDouble column_type;
     typedef BasicNode<double,cond> node_type;
+    typedef ArrayDouble array_type;
 };
 
 
 template <class T, class R, Action action, class condition>
-R ColumnBase::aggregate(T target, size_t start, size_t end, size_t* matchcount) const
+R ColumnBase::aggregate(T target, std::size_t start, std::size_t end,
+                        std::size_t limit) const
 {
-    typedef typename ColumnTypeTraits2<condition,T>::column_type ColType;
-    typedef typename ColumnTypeTraits2<condition,T>::node_type NodeType;
 
-    if (end == size_t(-1))
+    condition cond;
+    int c = condition::condition;
+    typedef typename ColumnTypeTraits2<condition, T>::column_type ColType;
+    typedef typename ColumnTypeTraits2<condition, T>::array_type ArrType;
+
+    if (end == std::size_t(-1))
         end = size();
 
-    NodeType node(target, 0);
-
-    node.QuickInit(const_cast<ColType*>(static_cast<const ColType*>(this)), target);
     QueryState<R> state;
-    state.init(action, NULL, size_t(-1));
+    state.init(action, NULL, limit);
 
     ColType* column = const_cast<ColType*>(static_cast<const ColType*>(this));
     SequentialGetter<T> sg(column);
-    node.template aggregate_local<action, R, T>(&state, start, end, size_t(-1), &sg, matchcount);
+
+    bool cont = true;     
+    for (size_t s = start; cont && s < end; ) {
+        sg.cache_next(s);
+        size_t end2 = sg.local_end(end);
+
+        if(SameType<T, int64_t>::value) {
+            cont = (static_cast<const Array*>(sg.m_array_ptr))->find(c, action, int64_t(target), s - sg.m_leaf_start, end2, sg.m_leaf_start, reinterpret_cast<QueryState<int64_t>*>(&state));
+        }
+        else {
+            for(size_t local_index = s - sg.m_leaf_start; cont && local_index < end2; local_index++) {
+                T v = ((ArrType*)(sg.m_array_ptr))->get(local_index);
+                if(cond(v, target)) {
+                    cont = (static_cast<QueryState<R>*>(&state))->template match<action, false>(0, 0, static_cast<R>(v));
+                }
+            }
+        }
+        s = end2 + sg.m_leaf_start;
+    }        
 
     return state.m_state;
-}
-
-
-template<class T> T GetColumnFromRef(Array& parent, size_t ndx) // Throws
-{
-    //TIGHTDB_ASSERT(parent.has_refs());
-    //TIGHTDB_ASSERT(ndx < parent.size());
-    return T(size_t(parent.get(ndx)), &parent, ndx, parent.get_alloc()); // Throws
-}
-
-template<class T, class C> void ColumnBase::TreeSet(size_t ndx, T value)
-{
-    //const T oldVal = m_index ? get(ndx) : 0; // cache oldval for index
-
-    if (!root_is_leaf()) {
-        // Get subnode table
-        Array offsets = NodeGetOffsets();
-        Array refs = NodeGetRefs();
-
-        // Find the subnode containing the item
-        size_t node_ndx = offsets.upper_bound_int(ndx);
-
-        // Calc index in subnode
-        size_t offset = node_ndx == 0 ? 0 :to_size_t(offsets.get(node_ndx-1));
-        size_t local_ndx = ndx - offset;
-
-        // Set item
-        C target = GetColumnFromRef<C>(refs, node_ndx);
-        target.set(local_ndx, value);
-    }
-    else {
-        static_cast<C*>(this)->LeafSet(ndx, value);
-    }
-
-    // Update index
-    //if (m_index) m_index->set(ndx, oldVal, value);
-}
-
-template<class T, class C> void ColumnBase::TreeDelete(size_t ndx)
-{
-    if (root_is_leaf()) {
-        static_cast<C*>(this)->LeafDelete(ndx);
-    }
-    else {
-        // Get subnode table
-        Array offsets = NodeGetOffsets();
-        Array refs = NodeGetRefs();
-
-        // Find the subnode containing the item
-        size_t node_ndx = offsets.upper_bound_int(ndx);
-        TIGHTDB_ASSERT(node_ndx != offsets.size());
-
-        // Calc index in subnode
-        size_t offset = node_ndx == 0 ? 0 : to_size_t(offsets.get(node_ndx-1));
-        size_t local_ndx = ndx - offset;
-
-        // Get sublist
-        C target = GetColumnFromRef<C>(refs, node_ndx);
-        target.template TreeDelete<T,C>(local_ndx);
-
-        // Remove ref in node
-        if (target.is_empty()) {
-            offsets.erase(node_ndx);
-            refs.erase(node_ndx);
-            target.destroy();
-        }
-
-        if (offsets.is_empty()) {
-            // All items deleted, we can revert to being array
-            static_cast<C*>(this)->clear();
-        }
-        else {
-            // Update lower offsets
-            if (node_ndx < offsets.size()) offsets.Increment(-1, node_ndx);
-        }
-    }
-}
-
-
-template<class T, class C, class F>
-size_t ColumnBase::TreeFind(T value, size_t start, size_t end) const
-{
-    // Use index if possible
-    /*if (m_index && start == 0 && end == -1) {
-     return FindWithIndex(value);
-     }*/
-//  F function;
-    if (root_is_leaf()) {
-        const C* c = static_cast<const C*>(this);
-        return c->template LeafFind<F>(value, start, end);
-    }
-    else {
-        // Get subnode table
-        const Array offsets = NodeGetOffsets();
-        const Array refs = NodeGetRefs();
-        const size_t count = refs.size();
-
-        if (start == 0 && end == size_t(-1)) {
-            for (size_t i = 0; i < count; ++i) {
-                C col(size_t(refs.get(i)), 0, 0, m_array->get_alloc());
-                size_t ndx = col.template TreeFind<T,C,F>(value, 0, size_t(-1));
-                if (ndx != size_t(-1)) {
-                    size_t offset = i ? to_size_t(offsets.get(i-1)) : 0;
-                    return offset + ndx;
-                }
-            }
-        }
-        else {
-            // partial search
-            size_t i = offsets.upper_bound_int(start);
-            size_t offset = i == 0 ? 0 : to_size_t(offsets.get(i-1));
-            size_t s = start - offset;
-            size_t e = (end == size_t(-1) || int(end) >= offsets.get(i)) ? size_t(-1) : end - offset;
-
-            for (;;) {
-                C col(size_t(refs.get(i)), 0, 0, m_array->get_alloc());
-
-                size_t ndx = col.template TreeFind<T,C,F>(value, s, e);
-                if (ndx != not_found) {
-                    size_t offset = i ? to_size_t(offsets.get(i-1)) : 0;
-                    return offset + ndx;
-                }
-
-                ++i;
-                if (i >= count) break;
-
-                s = 0;
-                if (end != size_t(-1)) {
-                    if (end >= to_size_t(offsets.get(i)))
-                        e = size_t(-1);
-                    else {
-                        offset = to_size_t(offsets.get(i-1));
-                        if (offset >= end)
-                            break;
-                        e = end - offset;
-                    }
-                }
-            }
-        }
-
-        return size_t(-1); // not found
-    }
-}
-
-template<class T, class C> void ColumnBase::TreeFindAll(Array &result, T value, size_t add_offset, size_t start, size_t end) const
-{
-    if (root_is_leaf()) {
-        return static_cast<const C*>(this)->LeafFindAll(result, value, add_offset, start, end);
-    }
-    else {
-        // Get subnode table
-        const Array offsets = NodeGetOffsets();
-        const Array refs = NodeGetRefs();
-        const size_t count = refs.size();
-        size_t i = offsets.upper_bound_int(start);
-        size_t offset = i == 0 ? 0 : to_size_t(offsets.get(i-1));
-        size_t s = start - offset;
-        size_t e = (end == size_t(-1) || int(end) >= offsets.get(i)) ? size_t(-1) : end - offset;
-
-        for (;;) {
-            const size_t ref = refs.get_as_ref(i);
-            const C col(ref, 0, 0, m_array->get_alloc());
-
-            size_t add = i ? to_size_t(offsets.get(i-1)) : 0;
-            add += add_offset;
-            col.template TreeFindAll<T, C>(result, value, add, s, e);
-            ++i;
-            if (i >= count) break;
-
-            s = 0;
-            if (end != size_t(-1)) {
-                if (end >= to_size_t(offsets.get(i))) e = size_t(-1);
-                else {
-                    offset = to_size_t(offsets.get(i-1));
-                    if (offset >= end)
-                        return;
-                    e = end - offset;
-                }
-            }
-        }
-    }
-}
-
-
-
-template<class T, class C>
-void ColumnBase::TreeVisitLeafs(size_t start, size_t end, size_t caller_offset,
-                                bool (*call)(T *arr, size_t start, size_t end,
-                                             size_t caller_offset, void *state),
-                                void *state) const
-{
-    if (root_is_leaf()) {
-        if (end == size_t(-1))
-            end = m_array->size();
-        if (m_array->size() > 0)
-            call(m_array, start, end, caller_offset, state);
-    }
-    else {
-        const Array offsets = NodeGetOffsets();
-        const Array refs = NodeGetRefs();
-        const size_t count = refs.size();
-        size_t i = offsets.upper_bound_int(start);
-        size_t offset = i == 0 ? 0 : to_size_t(offsets.get(i-1));
-        size_t s = start - offset;
-        size_t e = (end == size_t(-1) || int(end) >= offsets.get(i)) ? size_t(-1) : end - offset;
-
-        for (;;) {
-            const size_t ref = refs.get_as_ref(i);
-            const C col(ref, 0, 0, m_array->get_alloc());
-
-            size_t add = i ? to_size_t(offsets.get(i-1)) : 0;
-            add += caller_offset;
-            col.template TreeVisitLeafs<T, C>(s, e, add, call, state);
-            ++i;
-            if (i >= count) break;
-
-            s = 0;
-            if (end != size_t(-1)) {
-                if (end >= to_size_t(offsets.get(i))) e = size_t(-1);
-                else {
-                    offset = to_size_t(offsets.get(i-1));
-                    if (offset >= end)
-                        return;
-                    e = end - offset;
-                }
-            }
-        }
-    }
 }
 
 

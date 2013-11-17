@@ -59,7 +59,7 @@ struct Equal {
     bool operator()(BinaryData v1, BinaryData v2) const { return v1 == v2; }
 
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 == v2;}
-    int condition() {return cond_Equal;}
+    static const int condition = cond_Equal;
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return (v >= lbound && v <= ubound); }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { return (v == 0 && ubound == 0 && lbound == 0); }
 };
@@ -68,7 +68,7 @@ struct NotEqual {
     bool operator()(StringData v1, const char*, const char*, StringData v2) const { return v1 != v2; }
     bool operator()(BinaryData v1, BinaryData v2) const { return v1 != v2; }
     template<class T> bool operator()(const T& v1, const T& v2) const { return v1 != v2; }
-    int condition() {return cond_NotEqual;}
+    static const int condition = cond_NotEqual;
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return !(v == 0 && ubound == 0 && lbound == 0); }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { return (v > ubound || v < lbound); }
 };
@@ -79,7 +79,7 @@ struct ContainsIns {
     {
         return search_case_fold(v2, v1_upper, v1_lower, v1.size()) != v2.size();
     }
-    int condition() {return -1;}
+    static const int condition = -1;
 };
 
 // Does v2 begin with v1?
@@ -88,7 +88,7 @@ struct BeginsWithIns {
     {
         return v1.size() <= v2.size() && equal_case_fold(v2.prefix(v1.size()), v1_upper, v1_lower);
     }
-    int condition() {return -1;}
+    static const int condition = -1;
 };
 
 // Does v2 end with v1?
@@ -97,7 +97,7 @@ struct EndsWithIns {
     {
         return v1.size() <= v2.size() && equal_case_fold(v2.suffix(v1.size()), v1_upper, v1_lower);
     }
-    int condition() {return -1;}
+    static const int condition = -1;
 };
 
 struct EqualIns {
@@ -105,7 +105,7 @@ struct EqualIns {
     {
         return v1.size() == v2.size() && equal_case_fold(v2, v1_upper, v1_lower);
     }
-    int condition() {return -1;}
+    static const int condition = -1;
 };
 
 struct NotEqualIns {
@@ -113,19 +113,19 @@ struct NotEqualIns {
     {
         return v1.size() != v2.size() || !equal_case_fold(v2, v1_upper, v1_lower);
     }
-    int condition() {return -1;}
+    static const int condition = -1;
 };
 
 struct Greater {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 > v2;}
-    int condition() {return cond_Greater;}
+    static const int condition = cond_Greater;
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(lbound); return ubound > v; }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(ubound); return lbound > v; }
 };
 
 struct None {
     template<class T> bool operator()(const T& v1, const T& v2) const {static_cast<void>(v1); static_cast<void>(v2); return true;}
-    int condition() {return cond_None;}
+    static const int condition = cond_None;
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) {static_cast<void>(lbound); static_cast<void>(ubound); static_cast<void>(v); return true; }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) {static_cast<void>(lbound); static_cast<void>(ubound); static_cast<void>(v); return true; }
 
@@ -133,22 +133,20 @@ struct None {
 
 struct Less {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 < v2;}
-    int condition() {return cond_Less;}
+    static const int condition = cond_Less;
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(ubound); return lbound < v; }
     bool will_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(lbound); return ubound < v; }
 };
 
 struct LessEqual {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 <= v2;}
-    int condition() {return cond_LessEqual;}
+    static const int condition = cond_LessEqual;
 };
 
 struct GreaterEqual {
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 >= v2;}
-    int condition() {return cond_GreaterEqual;}
+    static const int condition = cond_GreaterEqual;
 };
-
-
 } // namespace tightdb
 
 #endif // TIGHTDB_QUERY_CONDITIONS_HPP
