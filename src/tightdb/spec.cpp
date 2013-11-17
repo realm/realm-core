@@ -34,7 +34,7 @@ void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent
     // if there are enumkey, but no subtables yet it will be a zero-ref
     if (top_size >= 4) {
         if (ref_type ref = m_top.get_as_ref(3)) {
-            m_subspecs.init_from_ref(ref));
+            m_subspecs.init_from_ref(ref);
             m_subspecs.set_parent(&m_top, 3);
         }
     }
