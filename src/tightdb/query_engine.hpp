@@ -856,9 +856,9 @@ public:
         m_leaf = NULL;
 
         // FIXME: Store these in std::string instead.
-        // FIXME: Why are these sizes 6 times the required size?
+        // '*6' because case converted strings can take up more space. Todo, investigate
         char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
-        std::copy(v.data(), v.data()+v.size(), data);
+        memcpy(data, v.data(), v.size());
         m_value = StringData(data, v.size());
         char* upper = new char[6 * v.size()];
         char* lower = new char[6 * v.size()];
@@ -1031,7 +1031,7 @@ public:
 
         // FIXME: Store this in std::string instead.
         char* data = new char[v.size()];
-        std::copy(v.data(), v.data()+v.size(), data);
+        memcpy(data, v.data(), v.size());
         m_value = BinaryData(data, v.size());
     }
 
@@ -1087,7 +1087,7 @@ public:
         // FIXME: Store this in std::string instead.
         // FIXME: Why are the sizes 6 times the required size?
         char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
-        std::copy(v.data(), v.data()+v.size(), data);
+        memcpy(data, v.data(), v.size());
         m_value = StringData(data, v.size());
         m_leaf = NULL;
         m_index_getter = 0;
