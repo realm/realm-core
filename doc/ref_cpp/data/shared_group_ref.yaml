@@ -6,7 +6,8 @@ ID         : class_shared_group
 TITLE      : SharedGroup
 SUMMARY    : &g_shared_group_summary
              Sharing groups between processes.
-DESCR      : &g_shared_group_descr
+DESCR      :
+- TEXT     : &g_shared_group_descr
              >
              Database files can be shared between running applications.
 
@@ -39,7 +40,17 @@ DESCR      : &g_shared_group_descr
              as derived objects (tables, views, etc.) are either
              writable or not.
 
-             The scoped transaction objects {@link g_write_trans_begin_write}
+             Nested transactions are not supported.
+
+             Read transactions are significantly faster than write
+             transactions. Multiple read transactions may occur concurrently
+             with each other or with write transactions, while write transactions 
+             are serialized with respect to each other.
+             Transactions are fully isolated: throughout a read transaction it will see 
+             the state of the data as it was when the read transactions started, 
+             regardless of any concurrent commits from write transactions.
+
+- TEXT     : The scoped transaction objects {@link g_write_trans_begin_write}
              and {@link g_read_trans_begin_read}
              are provided to facilitate use of the
              <a href="http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization">
@@ -47,10 +58,6 @@ DESCR      : &g_shared_group_descr
              allow for explicitly beginning and ending transactions, see
              {@link g_shared_group_begin_write} and {@link g_shared_group_begin_read}.
 
-             Nested transactions are not supported.
-
-             Read transactions are significantly faster than write
-             transactions.
 SEE        :
 EXAMPLES:
 - DESCR    :
@@ -74,7 +81,7 @@ CATEGORIES:
 
                  When multiple threads or processes access the same database file
                  through shared groups, each shared group must be opened in the same
-                 mode.
+                 durability mode.
 
       - TEXT   : &g_shared_group_durability_modes
                  >
@@ -237,14 +244,21 @@ CATEGORIES:
       RETURN:
         TYPES  : TableRef
         DESCR  : A reference to a table.
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_get_table
+        DESCR  :
 
   - g_trans_get_group:
       NAMES    : get_group
       SUMMARY  : Get the group.
-      DESCR    : Return the group used by the transaction.
+      DESCR    : Return the group used by the transaction. Take care not to call commit()
+                 on the group.
       RETURN:
         TYPES  : Group&
         DESCR  : A group.
+      EXAMPLES:
+      - CODE   : ex_cpp_shared_group_get_group
+        DESCR  :
 
 
 

@@ -20,6 +20,7 @@
 #ifndef TIGHTDB_SPEC_HPP
 #define TIGHTDB_SPEC_HPP
 
+#include <tightdb/config.h>
 #include <tightdb/array.hpp>
 #include <tightdb/array_string.hpp>
 #include <tightdb/data_type.hpp>
@@ -216,6 +217,89 @@ inline Spec Spec::get_subspec_by_ndx(std::size_t subspec_ndx)
     Allocator& alloc = m_top.get_alloc();
     ref_type ref = m_subspecs.get_as_ref(subspec_ndx);
     return Spec(m_table, alloc, ref, &m_subspecs, subspec_ndx);
+}
+
+inline void Spec::destroy() TIGHTDB_NOEXCEPT
+{
+    m_top.destroy();
+}
+
+inline ref_type Spec::get_ref() const TIGHTDB_NOEXCEPT
+{
+    return m_top.get_ref();
+}
+
+inline void Spec::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT
+{
+    m_top.set_parent(parent, ndx_in_parent);
+}
+
+inline void Spec::rename_column(std::size_t column_ndx, StringData new_name)
+{
+    TIGHTDB_ASSERT(column_ndx < m_spec.size());
+
+    //TODO: Verify that new name is valid
+
+    m_names.set(column_ndx, new_name);
+}
+
+inline void Spec::rename_column(const std::vector<std::size_t>& column_ids, StringData name)
+{
+    do_rename_column(column_ids, 0, name);
+}
+
+inline void Spec::remove_column(const std::vector<std::size_t>& column_ids)
+{
+    do_remove_column(column_ids, 0);
+}
+
+inline std::size_t Spec::get_column_count() const TIGHTDB_NOEXCEPT
+{
+    return m_names.size();
+}
+
+inline ColumnType Spec::get_real_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < get_column_count());
+    return ColumnType(m_spec.get(ndx));
+}
+
+inline void Spec::set_column_type(std::size_t column_ndx, ColumnType type)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+
+    // At this point we only support upgrading to string enum
+    TIGHTDB_ASSERT(ColumnType(m_spec.get(column_ndx)) == col_type_String);
+    TIGHTDB_ASSERT(type == col_type_StringEnum);
+
+    m_spec.set(column_ndx, type);
+}
+
+inline ColumnAttr Spec::get_column_attr(std::size_t ndx) const
+{
+    TIGHTDB_ASSERT(ndx < get_column_count());
+    return ColumnAttr(m_attr.get(ndx));
+}
+
+inline void Spec::set_column_attr(std::size_t column_ndx, ColumnAttr attr)
+{
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+
+    // At this point we only allow one attr at a time
+    // so setting it will overwrite existing. In the future
+    // we will allow combinations.
+    m_attr.set(column_ndx, attr);
+}
+
+inline StringData Spec::get_column_name(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ndx < get_column_count());
+    return m_names.get(ndx);
+}
+
+inline std::size_t Spec::get_column_index(StringData name) const
+{
+    return m_names.find_first(name);
 }
 
 

@@ -22,6 +22,7 @@
 
 #include <vector>
 
+#include <tightdb/config.h>
 #include <tightdb/column.hpp>
 #include <tightdb/table.hpp>
 

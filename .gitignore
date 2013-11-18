@@ -50,7 +50,7 @@ Static library*/
 /doc/ref_cpp/html/*
 
 # sh build.sh config
-/src/config-dyn.mk
+/src/config.mk
 
 # sh build.sh build-iphone
 /iphone-lib/include
@@ -76,5 +76,3 @@ debian/tightdb.substvars
 /debian/debhelper.log
 /debian/libtightdb.debhelper.lo
 /debian/libtightdb-dev.debhelper.log
-
-

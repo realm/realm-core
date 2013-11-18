@@ -24,6 +24,7 @@
 #include <string>
 #include <vector>
 
+#include <tightdb/config.h>
 #include <tightdb/exceptions.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/table_basic_fwd.hpp>

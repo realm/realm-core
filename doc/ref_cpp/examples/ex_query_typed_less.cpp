@@ -1,4 +1,4 @@
-// @@Example: ex_php_query_lessThan @@
+// @@Example: ex_cpp_typed_query_lessThan @@
 // @@Fold@@
 #include <tightdb.hpp>
 #include <assert.h>
