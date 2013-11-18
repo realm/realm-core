@@ -438,6 +438,8 @@ public:
             }
 
             // Find first match in this condition node
+            if(r == 2185)
+                r = r;
             r = find_first_local(r + 1, end);
             if (r == not_found) {
                 m_dD = double(r - start) / (local_matches + 1.1);
@@ -1226,12 +1228,12 @@ public:
                     m_index_getter->cache_next(last_indexed);
                     f = m_index_getter->m_array_ptr->FindGTE(s, last_indexed - m_index_getter->m_leaf_start);
 
-                    if (f == not_found) {
+                    if (f >= end || f == not_found) {
                         last_indexed = m_index_getter->m_leaf_end;
                     }
                     else {
                         s = to_size_t(m_index_getter->m_array_ptr->get(f));
-                        if (s > end)
+                        if (s >= end)
                             return not_found;
                         else {
                             last_indexed = f + m_index_getter->m_leaf_start;
