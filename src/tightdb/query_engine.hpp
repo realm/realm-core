@@ -365,7 +365,7 @@ public:
                                                  start, end, local_limit, source_column, matchcount);
         else
              // call method in ParentNode
-            r = aggregate_local<TAction, TResult, TSourceColumn>(st, start, end, local_limit, source_column, matchcount);
+            r = node->aggregate_local<TAction, TResult, TSourceColumn>(st, start, end, local_limit, source_column, matchcount);
         return r;
     }
 
