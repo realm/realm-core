@@ -82,6 +82,26 @@ public:
     // files using primitives not offered through the IPMFile abstraction causes undefined
     // behavior.
 
+    // Helper declarations:
+    class PresumablyStaleFile : public std::runtime_error {
+    public:
+        PresumablyStaleFile(const std::string& s) : std::runtime_error(s) {};
+    };
+
+    struct IPMFileSharedInfo {
+        // IPMFile specific fields:
+        enum State { Unitialized = 0, Ready, Stale };
+        Atomic<State> m_state;
+        Atomic<uint32_t> m_transition_count;
+        Atomic<uint32_t> m_activity_count;
+    };
+
+    template<T>
+    struct IPMFileWrapper {
+        IPMFileSharedInfo info;
+        T user_data;
+    }
+
     // Operations:
 
     // Associate an IPMFile object with a file name.
@@ -107,21 +127,15 @@ public:
     //   by a process with exclusive access, without first beeing shared,
     //   exactly one of any waiting calls to open will complete with exclusive
     //   access.
+    template<T> class Map;
+
     template<class T> 
     T* open(bool& is_exclusive, int msec_timeout = 0);
+    // untyped:
     void* open(bool& is_exclusive, size_t size, int msec_timeout = 0);
 
-    // obtain an additional mapping of the file at a new address. Such mappings must
-    // be explicitly removed by the user by calling remove_map. It is not possible
-    // to remove or remap the initial mapping (returned by open), except through call
-    // to close, but additional mappings can be added and removed.
-    template<class T> 
-    T* add_map();
-    template<class T> 
-    void remove_map(T*);
-    // untyped:
-    void* add_map(size_t size);
-    void remove_map(void*);
+    // Get the file. Useful for manipulating additional mappings of the file.
+    File& get_file();
 
     // release exclusive access if you have it, ignored otherwise. Transitioning
     // to shared state is atomic, i.e. no other process can gain exclusive access
@@ -169,19 +183,6 @@ T* IPMFile::open(bool& is_exclusive, int msec_timeout)
 {
     return reinterpret_cast<T*>( open(is_exclusive, sizeof(T), msec_timeout) );
 }
-
-template<class T> 
-T* IPMFile::add_map()
-{
-    return reinterpret_cast<T*>( add_map(sizeof(T)) );
-}
-
-template<class T> 
-void IPMFile::remove_map(T* info)
-{
-    remove_map(reinterpret_cast<void*>( info ));
-}
-
 
 
 

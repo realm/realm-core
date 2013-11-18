@@ -20,29 +20,18 @@
 
 #include "file_interprocess_managed.hpp"
 #include "thread.hpp"
+#include "utilities.hpp"
 #include "file.hpp"
 #include <limits>
 
 namespace tightdb {
 
-// The contents of the shared file is ONLY EVER changed by threads holding a lock
-// (either shared or exclusive). The file may be removed/deleted without holding a
-// lock, but ONLY if it is in the Stale state.
-
-struct IPMFileSharedInfo {
-    // IPMFile specific fields:
-    enum State { Unitialized = 0, Ready, Stale };
-    Atomic<State> m_state;
-    Atomic<uint32_t> m_transition_count;
-    Atomic<uint32_t> m_activity_count;
-};
-
 struct IPMFile::IPMFileImplementation {
     std::string m_path;
     bool m_is_open;
     File m_file;
-    File::Map<IMPFileSharedInfo> m_file_map;
-    IPMFileMap* m_info;
+    File::Map<IPMFileSharedInfo> m_file_map;
+    IPMFileSharedInfo* m_info;
     void init(std::string);
 };
 
@@ -50,7 +39,6 @@ void IPMFile::IPMFileImplementation::init(std::string path)
 {
     m_path = path;
     m_is_open = false;
-    m_map = NULL;
 }
 
 
@@ -85,7 +73,6 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
         throw std::runtime_error("Cannot open already opened file");
     if (msec_timeout == 0) msec_timeout = std::numeric_limits<int>::max();
 
-    bool timeleft = true;
     while (msec_timeout >= 0) {
 
         size_t file_size = 0;
@@ -124,12 +111,12 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
             // don't remove it, require operator intervention:
             throw std::runtime_error("Lock file too large");
         }
-        if (file_size < size+sizeof(IPMFileMap)) {
+        if (file_size < size+sizeof(IPMFileSharedInfo)) {
 
             if (got_exclusive) {
 
                 // initialize the file. zero transition count, zero activity count:
-                file_size = sizeof (IPMFileMap) + size;
+                file_size = sizeof (IPMFileSharedInfo) + size;
                 char* empty_buf = new char[file_size];
                 std::fill(empty_buf, empty_buf+file_size, 0);
                 m_impl->m_file.write(empty_buf, file_size);
@@ -149,7 +136,7 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
         // The file has proper size and we can map it!
         File::CloseGuard fcg(m_impl->m_file);
         m_impl->m_file_map.map(m_impl->m_file, File::access_ReadWrite, 
-                               sizeof (IPMFileSharedInfo), File::map_NoSync);
+                               sizeof (IPMFileSharedInfo) + size, File::map_NoSync);
         File::UnmapGuard fug_1(m_impl->m_file_map);
 
         // for files of proper size, having an exclusive lock does not alone guarantee exclusivity.

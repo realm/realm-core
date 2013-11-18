@@ -24,6 +24,16 @@
 #include <cstdlib>
 #include <cstdlib> // size_t
 
+
+#ifndef _WIN32
+#  include <sys/wait.h>
+#  include <sys/time.h>
+#  include <unistd.h>
+#else
+#  define NOMINMAX
+#  include <windows.h>
+#endif
+
 #ifdef _MSC_VER
 #  include <win32/types.h>
 #  include <intrin.h>
@@ -156,6 +166,19 @@ bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 firs
     return std::equal(first1, last1, first2);
 #endif
 }
+
+
+
+inline void micro_sleep(uint64_t microsec_delay)
+{
+#ifdef _WIN32
+    // FIXME: this is not optimal, but it should work
+    Sleep(static_cast<DWORD>(microsec_delay/1000+1));
+#else
+    usleep(useconds_t(microsec_delay));
+#endif
+}
+
 
 } // namespace tightdb
 

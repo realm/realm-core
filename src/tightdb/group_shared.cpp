@@ -10,15 +10,6 @@
 #include <tightdb/group_shared.hpp>
 #include <tightdb/group_writer.hpp>
 
-#ifndef _WIN32
-#  include <sys/wait.h>
-#  include <sys/time.h>
-#  include <unistd.h>
-#else
-#  define NOMINMAX
-#  include <windows.h>
-#endif
-
 // #define TIGHTDB_ENABLE_LOGFILE
 
 
@@ -202,16 +193,6 @@ void spawn_daemon(const string& file)
 void spawn_daemon(const string& file) {}
 #endif
 
-
-inline void micro_sleep(uint64_t microsec_delay)
-{
-#ifdef _WIN32
-    // FIXME: this is not optimal, but it should work
-    Sleep(static_cast<DWORD>(microsec_delay/1000+1));
-#else
-    usleep(useconds_t(microsec_delay));
-#endif
-}
 
 } // anonymous namespace
 
