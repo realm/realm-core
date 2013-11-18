@@ -489,7 +489,7 @@ template <Action action, typename T, typename R, class ColType>
 R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_t limit) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    if(m_table->is_degenerate()) {
+    if(limit == 0 || m_table->is_degenerate()) {
         if (resultcount)
             *resultcount = 0;
         return static_cast<R>(0);
@@ -571,7 +571,7 @@ double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t star
 template <typename T>
 double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    if(m_table->is_degenerate()) {
+    if(limit == 0 || m_table->is_degenerate()) {
         if (resultcount)
             *resultcount = 0;
         return 0.;
@@ -688,7 +688,7 @@ size_t Query::find(size_t begin_at_table_row)
 
 TableView Query::find_all(size_t start, size_t end, size_t limit)
 {
-    if(m_table->is_degenerate())
+    if(limit == 0 || m_table->is_degenerate())
         return TableView(*m_table);
 
     TIGHTDB_ASSERT(start <= m_table->size());
@@ -724,7 +724,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 
 size_t Query::count(size_t start, size_t end, size_t limit) const
 {
-    if(m_table->is_degenerate())
+    if(limit == 0 || m_table->is_degenerate())
         return 0;
 
     if (end == size_t(-1))
@@ -746,7 +746,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 // todo, not sure if start, end and limit could be useful for delete.
 size_t Query::remove(size_t start, size_t end, size_t limit)
 {
-    if(m_table->is_degenerate())
+    if(limit == 0 || m_table->is_degenerate())
         return 0;
 
     if (end == not_found)
