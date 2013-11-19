@@ -1976,35 +1976,53 @@ void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result)
     TIGHTDB_ASSERT(get_column_type(col1_ndx) == type_String);
     TIGHTDB_ASSERT(get_column_type(col2_ndx) == type_Int);
 
+    // Add columns to result table
     result.add_column(type_String, get_column_name(col1_ndx));
     result.add_column(type_Int, get_column_name(col2_ndx));
     result.set_index(0);
 
-    if (op == pivot_avg) {
-        result.add_column(type_Int, "count"); // temp
-    }
+    // Cache columms
+    const Column& src_column = get_column(col2_ndx);
+    Column& dst_column = result.get_column(1);
+    const StringIndex& dst_index = result.get_column_string(0).get_index();
 
     const size_t count = size();
-    for (size_t i = 0; i < count; ++i) {
-        StringData str = get_string(col1_ndx, i);
-        size_t ndx = result.lookup(str);
-        if (ndx == not_found) {
-            ndx = result.add_empty_row();
-            result.set_string(col1_ndx, i, str);
-        }
 
-        // SUM
-        int64_t value = get_int(col2_ndx, i);
-        int64_t aggr  = result.get_int(1, ndx);
-        result.set_int(1, ndx, aggr + value);
+    if (op == pivot_sum) {
+        for (size_t i = 0; i < count; ++i) {
+            StringData str = get_string(col1_ndx, i);
+            size_t ndx = dst_index.find_first(str);
+            if (ndx == not_found) {
+                ndx = result.add_empty_row();
+                result.set_string(col1_ndx, ndx, str);
+            }
 
-        if (op == pivot_avg) {
-            int64_t count = result.get_int(2, ndx);
-            result.set_int(2, ndx, count + 1);
+            // SUM
+            int64_t value = src_column.get(i);
+            dst_column.adjust(ndx, value);
         }
     }
+    else if (op == pivot_avg) {
+        // Add temporary column for counts
+        result.add_column(type_Int, "count");
+        Column& cnt_column = result.get_column(2);
 
-    if (op == pivot_avg) {
+        for (size_t i = 0; i < count; ++i) {
+            StringData str = get_string(col1_ndx, i);
+            size_t ndx = dst_index.find_first(str);
+            if (ndx == not_found) {
+                ndx = result.add_empty_row();
+                result.set_string(col1_ndx, ndx, str);
+            }
+
+            // SUM
+            int64_t value = src_column.get(i);
+            dst_column.adjust(ndx, value);
+
+            // Increment count
+            cnt_column.adjust(ndx, 1);
+        }
+
         // Calculate averages
         const size_t res_count = result.size();
         for (size_t i = 0; i < res_count; ++i) {
