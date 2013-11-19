@@ -30,6 +30,8 @@
 #include <tightdb/assert.hpp>
 #include <tightdb/unique_ptr.hpp>
 #include <tightdb/safe_int_ops.hpp>
+#include <tightdb/file.hpp>
+#include <tightdb/thread.hpp>
 
 namespace tightdb {
 
@@ -96,11 +98,11 @@ public:
         Atomic<uint32_t> m_activity_count;
     };
 
-    template<T>
+    template<typename T>
     struct IPMFileWrapper {
         IPMFileSharedInfo info;
         T user_data;
-    }
+    };
 
     // Operations:
 
@@ -127,7 +129,6 @@ public:
     //   by a process with exclusive access, without first beeing shared,
     //   exactly one of any waiting calls to open will complete with exclusive
     //   access.
-    template<T> class Map;
 
     template<class T> 
     T* open(bool& is_exclusive, int msec_timeout = 0);
@@ -135,6 +136,10 @@ public:
     void* open(bool& is_exclusive, size_t size, int msec_timeout = 0);
 
     // Get the file. Useful for manipulating additional mappings of the file.
+    // Remember: map it to Map<IPMFileWrapper<T>>, and access pointer->user_data
+    // subfields.
+    // FIXME: find more elegant api for this form of mapping, so that IPMFileWrapper 
+    // isn't exposed here.
     File& get_file();
 
     // release exclusive access if you have it, ignored otherwise. Transitioning
@@ -170,6 +175,8 @@ public:
     // the implementation. The IPMFile implementation may assume that files are only
     // removed under its own control. Hence, if is_removed() returns true, it should
     // most likely be treated as a potentially serious malfunction.
+    //
+    // FIXME: Not sure if this method is needed .. or dangerous
 
 private:
     struct IPMFileImplementation;

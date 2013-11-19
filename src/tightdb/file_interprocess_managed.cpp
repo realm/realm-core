@@ -29,9 +29,9 @@ namespace tightdb {
 struct IPMFile::IPMFileImplementation {
     std::string m_path;
     bool m_is_open;
+    bool m_is_exclusive;
     File m_file;
-    File::Map<IPMFileSharedInfo> m_file_map;
-    IPMFileSharedInfo* m_info;
+    File::Map<IPMFileWrapper<uint64_t> > m_file_map;
     void init(std::string);
 };
 
@@ -39,6 +39,7 @@ void IPMFile::IPMFileImplementation::init(std::string path)
 {
     m_path = path;
     m_is_open = false;
+    m_is_exclusive = false;
 }
 
 
@@ -95,6 +96,7 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
         if (!got_exclusive && !got_shared) {
 
             // someone else has exclusive access, backout and retry
+            m_impl->m_file.unlock();
             m_impl->m_file.close();
             msec_timeout--;
             micro_sleep(1000);
@@ -126,6 +128,7 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
             if (got_shared) {
 
                 // we need exclusive access to init the file, so back out and retry:
+                m_impl->m_file.unlock();
                 m_impl->m_file.close();
                 msec_timeout--;
                 micro_sleep(1000);
@@ -137,7 +140,7 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
         File::CloseGuard fcg(m_impl->m_file);
         m_impl->m_file_map.map(m_impl->m_file, File::access_ReadWrite, 
                                sizeof (IPMFileSharedInfo) + size, File::map_NoSync);
-        File::UnmapGuard fug_1(m_impl->m_file_map);
+        File::UnmapGuard fug(m_impl->m_file_map);
 
         // for files of proper size, having an exclusive lock does not alone guarantee exclusivity.
         // - other threads may have held the exclusive lock and are now asking to enter shared state,
@@ -156,36 +159,70 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
         // sense that no one can obtain exclusive access until the lock file is removed. The state
         // transitions are implemented such that they minimize the frequency.
         //
+        // FIXME: scheme outlined below does not work! Find something better.
+        //
         // As long as programs are mid-transition, they must increment an activity counter within
         // a very short time frame. When a file with non-zero transition count is encountered, the
         // activity counter can be sampled and if it doesn't change within a short time frame, the
         // file may be considered to be in indeterminate state, and an exception is thrown to
         // indicate that operator intervention is required.
 
-        // TODO: Look for transition changes
+        IPMFileWrapper<uint64_t>* wrapped_data = m_impl->m_file_map.get_addr();
+        IPMFileSharedInfo* info = & wrapped_data->info;
+        if (info->m_transition_count.load_acquire()) {
+            // conflict or stale file...
+            m_impl->m_file.unlock();
+            micro_sleep(1000);
+            continue;
+        }
+
+        // lock is now considered valid
+        is_exclusive = m_impl->m_is_exclusive = got_exclusive;
+        fug.release();
+        fcg.release();
+        return static_cast<void*>( & wrapped_data->user_data );
     };
     throw PresumablyStaleFile(m_impl->m_path);
 }
 
 
-void* IPMFile::add_map(size_t size)
-{
-    return NULL;
-}
-
-
-void IPMFile::remove_map(void*)
-{
-}
-
-
 void IPMFile::share()
 {
+    if (m_impl->m_is_exclusive) {
+        // transition to shared state:
+        IPMFileWrapper<uint64_t>* wrapped_data = m_impl->m_file_map.get_addr();
+        IPMFileSharedInfo* info = & wrapped_data->info;
+        info->m_transition_count.inc();
+        m_impl->m_file.unlock();
+        m_impl->m_file.lock_shared();
+        info->m_transition_count.dec();
+        m_impl->m_is_exclusive = false;
+    }
 }
 
 
 void IPMFile::close()
 {
+    if (m_impl->m_is_open) {
+        bool is_exclusive = try_get_exclusive_access();
+        if (is_exclusive) {
+
+            // we now poison the file by incrementing the transition count. This
+            // prevents anybody from reusing the file. It is a necessary precaution
+            // as we are going to delete the file in a moment. If someone else started
+            // reusing the file after we unlock it but before it is deleted, the world
+            // might see a general increase in unhappiness. We don't want that, do we?
+            IPMFileWrapper<uint64_t>* wrapped_data = m_impl->m_file_map.get_addr();
+            IPMFileSharedInfo* info = & wrapped_data->info;
+            info->m_transition_count.inc();
+        }
+        m_impl->m_file_map.unmap();
+        m_impl->m_file.unlock();
+        m_impl->m_file.close();
+        if (is_exclusive) {
+            File::try_remove(m_impl->m_path);
+        }
+    }
 }
 
 
@@ -197,14 +234,43 @@ IPMFile::~IPMFile()
 
 bool IPMFile::try_get_exclusive_access()
 {
-    // FIXME
+    if (m_impl->m_is_exclusive)
+        return true;
+
+    // try to transition to exclusive state:
+    IPMFileWrapper<uint64_t>* wrapped_data = m_impl->m_file_map.get_addr();
+    IPMFileSharedInfo* info = & wrapped_data->info;
+    if (info->m_transition_count.load_acquire()) {
+        // conflict, even before lifting the shared lock, so just give up
+        return false;
+    }
+
+    // indicate to other lock contenders, that we are here even though we 
+    // will now operate without locks for a brief moment
+    info->m_transition_count.inc();
+    m_impl->m_file.unlock();
+    if (m_impl->m_file.try_lock_exclusive()) {
+        // we got the exclusive lock! look for conflicts:
+        if (info->m_transition_count.load_relaxed() == 1) {
+            // no conflicts
+            info->m_transition_count.dec();
+            m_impl->m_is_exclusive = true;
+            return true;
+        }
+    }    
+    // coming here, either because we couldn't get the exclusive lock, or because
+    // a conflict was detected. Re-acquire shared lock and indicate that we did
+    // not get the exclusive access.
+    m_impl->m_file.lock_shared();
+    info->m_transition_count.dec();
     return false;
 }
 
 
 bool IPMFile::is_removed()
 {
-    // FIXME
+    // TODO:
+    // to implement this, we need to rely on inode info, timestampts and other stuff...
     return false;
 }
 
