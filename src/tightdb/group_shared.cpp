@@ -40,8 +40,7 @@ struct SharedGroup::ReadCount {
 
 struct SharedGroup::SharedInfo {
     Relaxed<uint64_t> current_version;
-    Atomic<uint16_t> init_complete; // indicates lock file has valid content
-    Atomic<uint16_t> shutdown_started; // indicates that shutdown is in progress
+    Atomic<bool> daemon_running;
     uint16_t version;
     uint16_t flags;
 
@@ -94,9 +93,8 @@ SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, size_t i
     capacity_mask = init_readers_size - 1;
     put_pos = 0;
     get_pos = 0;
-    shutdown_started.store_release(0);
+    daemon_running.store_release(true);
     free_write_slots = 0;
-    init_complete.store_release(1);
 }
 
 
@@ -221,204 +219,92 @@ void SharedGroup::open(const string& path, bool no_create_file,
     TIGHTDB_ASSERT(!is_attached());
 
     m_file_path = path + ".lock";
-    bool must_retry;
-    int retry_count = max_retries_awaiting_shutdown;
-    do {
-        bool need_init = false;
-        size_t info_size = 0;
-        must_retry = false;
+    m_file.associate(m_file_path);
+    bool is_exclusive;
+    SharedInfo* info;
+    try {
+        info = m_file.open<SharedInfo>(is_exclusive, );
+    } 
+    catch (IPMFile::PresumablyStaleFile&) {
+        throw PresumablyStaleLockFile(m_file_path);
+    }
+    // FIXME: need a close guard for m_file
 
-        // Open shared coordination buffer - non-excepting approach
+    // We need to map the info file once more for the readers part
+    // since that part can be resized and as such remapped which
+    // could move our mutexes (which we don't want to risk moving while
+    // they are locked)
+    m_reader_map.map(m_file, File::access_ReadWrite, 
+                     sizeof (IPMFile::IPMFileWrapper<SharedInfo>), File::map_NoSync);
+    File::UnmapGuard fug(m_reader_map);
 
-        m_file.open(m_file_path, need_init);
-        if (need_init) {
-            info_size = sizeof (SharedInfo);
-            // Make sure to initialize the file in such a way, that when it reaches the
-            // size of SharedInfo, it contains just zeroes.
-            char empty_buf[sizeof (SharedInfo)];
-            std::fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
-            m_file.write(empty_buf, info_size);
-            need_init = true;
+    SlabAlloc& alloc = m_group.m_alloc;
+
+    // If we are the process that *Created* the coordination buffer, we are obliged to
+    // initialize it. All other processer will wait for us to enter shared state
+    if (is_exclusive) {
+
+        // If we are the first we may have to create the database file
+        // but we invalidate the internals right after to avoid conflicting
+        // with old state when starting transactions
+        bool is_shared = true;
+        bool read_only = false;
+        bool skip_validate = false;
+        ref_type top_ref;
+        try {
+            top_ref = alloc.attach_file(path, is_shared, read_only, no_create_file,
+                                        skip_validate); // Throws
+        }
+        catch (...) {
+            
+            m_file.close();
+
+            // rethrow whatever went wrong
+            throw;
         }
 
-        File::CloseGuard fcg(m_file);
-        int time_left = max_wait_for_ok_filesize;
-        while (1) {
+        // Call SharedInfo::SharedInfo() (placement new)
+        size_t file_size = alloc.get_baseline();
+        new (info) SharedInfo(top_ref, file_size, info_size, dlevel); // Throws
 
-            time_left--;
-            // need to validate the size of the file before trying to map it
-            // possibly waiting a little for size to go nonzero, if another
-            // process is creating the file in parallel.
-            if (int_cast_with_overflow_detect(m_file.get_size(), info_size))
-                throw runtime_error("Lock file too large");
-            if (time_left <= 0)
-                throw PresumablyStaleLockFile(m_file_path);
-            // wait for file to at least contain the basic shared info block
-            // NB! it might be larger due to expansion of the ring buffer.
-            if (info_size < sizeof (SharedInfo))
-                micro_sleep(1000);
-            else
-                break;
-        }
-        // File is now guaranteed to be large enough that we can map it and access all fields
-        // of the SharedInfo structure.
-
-        // Map to memory
-        m_file_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
-        File::UnmapGuard fug_1(m_file_map);
-
-        // We need to map the info file once more for the readers part
-        // since that part can be resized and as such remapped which
-        // could move our mutexes (which we don't want to risk moving while
-        // they are locked)
-        m_reader_map.map(m_file, File::access_ReadWrite, sizeof (SharedInfo), File::map_NoSync);
-        File::UnmapGuard fug_2(m_reader_map);
-
-        SharedInfo* info = m_file_map.get_addr();
-        SlabAlloc& alloc = m_group.m_alloc;
-
-        // If we are the process that *Created* the coordination buffer, we are obliged to
-        // initialize it. All other processer will wait for os to signal completion of the
-        // initialization.
-        if (need_init) {
-            // file locks are used solely to detect if/when all clients
-            // are done accessing the database. We grab them here and hold
-            // them until the destructor is called, where we try to promote
-            // them to exclusive to detect if we can shutdown.
-            m_file.lock_shared();
-
-            // If we are the first we may have to create the database file
-            // but we invalidate the internals right after to avoid conflicting
-            // with old state when starting transactions
-            bool is_shared = true;
-            bool read_only = false;
-            bool skip_validate = false;
-            ref_type top_ref;
-            try {
-                top_ref = alloc.attach_file(path, is_shared, read_only, no_create_file,
-                                                     skip_validate); // Throws
-            }
-            catch (...) {
-
-                // something went wrong. We need to clean up the .lock file carefully to prevent
-                // other processes from getting to it and waiting for us to complete initialization
-                // We bypass normal initialization
-                info->shutdown_started.store_relaxed(1);
-                info->init_complete.store_relaxed(1);
-
-                // remove the file - due to windows file semantics, we have to manually close it
-                fug_2.release(); // we need to unmap manually
-                fug_1.release(); // - do -
-                fcg.release();   // we need to close manually
-                m_file_map.unmap();
-                m_reader_map.unmap();
-                m_file.unlock();
-                m_file.close();
-                File::try_remove(m_file_path.c_str());
-
-                // rethrow whatever went wrong
-                throw;
-            }
-
-            // Call SharedInfo::SharedInfo() (placement new)
-            size_t file_size = alloc.get_baseline();
-            new (info) SharedInfo(top_ref, file_size, info_size, dlevel); // Throws
-
-            // Set initial version so we can track if other instances
-            // change the db
-            m_version = info->current_version.load_relaxed();
+        // Set initial version so we can track if other instances
+        // change the db
+        m_version = info->current_version.load_relaxed();
 
 #ifndef _WIN32
-            // In async mode we need a separate process to do the async commits
-            // We start it up here during init so that it only get started once
-            if (dlevel == durability_Async) {
-                spawn_daemon(path);
-            }
+        // In async mode we need a separate process to do the async commits
+        // We start it up here during init so that it only get started once
+        if (dlevel == durability_Async) {
+            spawn_daemon(path);
+        }
 #endif
-
-        }
-        else {
-            // wait for init complete:
-            int wait_count = max_wait_for_sharedinfo_valid;
-            while (wait_count && (info->init_complete.load_acquire() == 0)) {
-                wait_count--;
-                micro_sleep(1000);
-            }
-
-            // If we exceed our wait without even seeing init complete, then it is most likely
-            // that the initializing process has crashed. HOWEVER - it may just be delayed so
-            // far, that it hasn't taken the initial shared lock yet. So, we dare not declare
-            // the .lock file stale, although it is very likely.
-            if (info->init_complete.load_acquire() == 0)
-                throw PresumablyStaleLockFile(m_file_path);
-
-            // use file locking in an attempt to determine if we have exclusive access to the file.
-            // We need to wait for init_complete to be signalled, before we can safely manipulate
-            // the file contents - among others, the shutdown_started flag cannot be trusted and
-            // cannot be modified earlier.
-            if (m_file.try_lock_exclusive()) {
-
-                // At this point no other process can be trying to initialize the file.
-                // Somebody else may be executing in the destructor and probing to see if they are
-                // alone - they can get a false success (because they don't see "us"). Because of this
-                // possibility of false successes, the only allowed action is to close and TRY to remove the
-                // file - even if multiple processes does this in parallel, the end result is the same.
-                //
-                // Poison the file. As we have exclusive access, no other will examine or change
-                // the shutdown_started field.
-                info->shutdown_started.store_release(1);
-                fug_2.release(); // we need to unmap manually
-                fug_1.release(); // - do -
-                fcg.release();   // we need to close manually
-                m_file.unlock();
-                // <- from this point another thread/process may open the file, BUT it will encounter
-                // a set shutdown_started field, back out and retry
-                m_file.close();
-                m_file_map.unmap();
-                m_reader_map.unmap();
-                File::try_remove(m_file_path.c_str());
-                must_retry = true;
-                continue; // retry, now with stale file removed
-            }
-            else {
-
-                m_file.lock_shared();
-            }
-            if (info->shutdown_started.load_acquire()) {
-                retry_count--;
-                if (retry_count == 0)
-                    throw PresumablyStaleLockFile(m_file_path);
-                must_retry = true;
-                micro_sleep(1000);
-                continue;
-                // this will unmap and close the lock file. Then we retry
-            }
-            if (info->version != 0)
-                throw runtime_error("Unsupported version");
-
-            // Durability level cannot be changed at runtime
-            if (info->flags != dlevel)
-                throw runtime_error("Inconsistent durability level");
-
-            // Setup the group, but leave it in invalid state
-            bool is_shared = true;
-            bool read_only = false;
-            bool no_create = true;
-            bool skip_validate = true; // To avoid race conditions
-            try {
-                alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
-            } 
-            catch (File::NotFound) {
-                throw LockFileButNoData(path);
-            }
-
-        }
-
-        fug_2.release(); // Do not unmap
-        fug_1.release(); // Do not unmap
-        fcg.release(); // Do not close
+        
     }
-    while (must_retry);
+    else { // shared access
+
+        if (info->version != 0)
+            throw runtime_error("Unsupported version");
+
+        // Durability level cannot be changed at runtime
+        if (info->flags != dlevel)
+            throw runtime_error("Inconsistent durability level");
+
+        // Setup the group, but leave it in invalid state
+        bool is_shared = true;
+        bool read_only = false;
+        bool no_create = true;
+        bool skip_validate = true; // To avoid race conditions
+        try {
+            alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
+        } 
+        catch (File::NotFound) {
+            throw LockFileButNoData(path);
+        }
+
+    }
+
+    fug.release(); // Do not unmap
+    fcg.release(); // Do not close
 
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
@@ -433,7 +319,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             SharedInfo* const info = m_file_map.get_addr();
             int maxwait = max_wait_for_daemon_start;
             while (maxwait--) {
-                if (info->init_complete.load_acquire() == 2) {
+                if (info->daemon_running.load_acquire()) {
                     return;
                 }
                 micro_sleep(1000);
