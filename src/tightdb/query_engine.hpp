@@ -438,8 +438,6 @@ public:
             }
 
             // Find first match in this condition node
-            if(r == 2185)
-                r = r;
             r = find_first_local(r + 1, end);
             if (r == not_found) {
                 m_dD = double(r - start) / (local_matches + 1.1);
