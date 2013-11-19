@@ -1988,7 +1988,20 @@ void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result)
 
     const size_t count = size();
 
-    if (op == pivot_sum) {
+    if (op == pivot_count) {
+        for (size_t i = 0; i < count; ++i) {
+            StringData str = get_string(col1_ndx, i);
+            size_t ndx = dst_index.find_first(str);
+            if (ndx == not_found) {
+                ndx = result.add_empty_row();
+                result.set_string(col1_ndx, ndx, str);
+            }
+
+            // Count
+            dst_column.adjust(ndx, 1);
+        }
+    }
+    else if (op == pivot_sum) {
         for (size_t i = 0; i < count; ++i) {
             StringData str = get_string(col1_ndx, i);
             size_t ndx = dst_index.find_first(str);

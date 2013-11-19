@@ -300,6 +300,7 @@ public:
     ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;
 
     enum PivotType {
+        pivot_count,
         pivot_sum,
         pivot_avg
     };
