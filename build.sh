@@ -10,7 +10,13 @@ if [ "$TIGHTDB_SCRIPT_DEBUG" ]; then
 fi
 
 
-cd "$(dirname "$0")" || exit 1
+if ! [ "$TIGHTDB_ORIG_CWD" ]; then
+    TIGHTDB_ORIG_CWD="$(pwd)" || exit 1
+    export ORIG_CWD
+fi
+
+dir="$(dirname "$0")" || exit 1
+cd "$dir" || exit 1
 TIGHTDB_HOME="$(pwd)" || exit 1
 export TIGHTDB_HOME
 
@@ -819,7 +825,11 @@ EOF
             cat >"$PKG_DIR/build" <<EOF
 #!/bin/sh
 
-cd "\$(dirname "\$0")" || exit 1
+TIGHTDB_ORIG_CWD="\$(pwd)" || exit 1
+export ORIG_CWD
+
+dir="\$(dirname "\$0")" || exit 1
+cd "\$dir" || exit 1
 TIGHTDB_DIST_HOME="\$(pwd)" || exit 1
 export TIGHTDB_DIST_HOME
 
