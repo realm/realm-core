@@ -2825,4 +2825,32 @@ TEST(Table_FormerLeakCase)
     root.set_subtable(0, 0, 0);
 }
 
+TIGHTDB_TABLE_3(TablePivotAgg,
+                sex,   String,
+                age,   Int,
+                hired, Bool)
+
+TEST(Table_pivot)
+{
+    TablePivotAgg table;
+    for (size_t i = 0; i < 1000; ++i) {
+        StringData sex = i % 2 ? "Male" : "Female";
+        table.add(sex, 20 + (i%20), true);
+    }
+
+    Table result_sum;
+    table.pivot(0, 1, Table::pivot_sum, result_sum);
+
+    stringstream ss;
+    result_sum.to_string(ss);
+    cout << ss.str();
+
+    Table result_avg;
+    table.pivot(0, 1, Table::pivot_avg, result_avg);
+
+    ss.str("");
+    result_avg.to_string(ss);
+    cout << ss.str();
+}
+
 #endif // TEST_TABLE

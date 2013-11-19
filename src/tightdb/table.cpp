@@ -1967,6 +1967,58 @@ ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
     return tv;
 }
 
+void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result) const
+{
+    TIGHTDB_ASSERT(result.is_empty() && result.get_column_count() == 0);
+    TIGHTDB_ASSERT(col1_ndx < m_columns.size());
+    TIGHTDB_ASSERT(col2_ndx < m_columns.size());
+
+    TIGHTDB_ASSERT(get_column_type(col1_ndx) == type_String);
+    TIGHTDB_ASSERT(get_column_type(col2_ndx) == type_Int);
+
+    result.add_column(type_String, get_column_name(col1_ndx));
+    result.add_column(type_Int, get_column_name(col2_ndx));
+    result.set_index(0);
+
+    if (op == pivot_avg) {
+        result.add_column(type_Int, "count"); // temp
+    }
+
+    const size_t count = size();
+    for (size_t i = 0; i < count; ++i) {
+        StringData str = get_string(col1_ndx, i);
+        size_t ndx = result.lookup(str);
+        if (ndx == not_found) {
+            ndx = result.add_empty_row();
+            result.set_string(col1_ndx, i, str);
+        }
+
+        // SUM
+        int64_t value = get_int(col2_ndx, i);
+        int64_t aggr  = result.get_int(1, ndx);
+        result.set_int(1, ndx, aggr + value);
+
+        if (op == pivot_avg) {
+            int64_t count = result.get_int(2, ndx);
+            result.set_int(2, ndx, count + 1);
+        }
+    }
+
+    if (op == pivot_avg) {
+        // Calculate averages
+        const size_t res_count = result.size();
+        for (size_t i = 0; i < res_count; ++i) {
+            int64_t sum   = result.get_int(1, i);
+            int64_t count = result.get_int(2, i);
+            int64_t res   = sum / count;
+            result.set_int(1, i, res);
+        }
+
+        // Remove temp column
+        result.remove_column(2);
+    }
+}
+
 
 size_t Table::lower_bound_int(size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT
 {
