@@ -2792,6 +2792,8 @@ void Table::print() const
                 cout << "Bool       "; break;
             case type_String:
                 cout << "String     "; break;
+            case col_type_StringEnum:
+                cout << "String     "; break;
             default:
                 TIGHTDB_ASSERT(false);
         }
@@ -2826,6 +2828,11 @@ void Table::print() const
                 }
                 case type_String: {
                     const AdaptiveStringColumn& column = get_column_string(n);
+                    cout << setw(10) << column.get(i) << " ";
+                    break;
+                }
+                case col_type_StringEnum: {
+                    const ColumnStringEnum& column = get_column_string_enum(n);
                     cout << setw(10) << column.get(i) << " ";
                     break;
                 }

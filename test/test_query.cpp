@@ -1659,6 +1659,43 @@ TEST(TestQueryHuge)
     }
 }
 
+TEST(TestQueryOnTableView)
+{
+    // Mostly intended to test the Array::FindGTE method 
+    for(int iter = 0; iter < 100 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION); iter++) {
+        srand(164);
+        OneIntTable oti;
+        size_t cnt1 = 0;
+        size_t cnt0 = 0;
+        size_t limit = rand() % (TIGHTDB_MAX_LIST_SIZE * 10 + 1);
+
+        size_t lbound = rand() % (TIGHTDB_MAX_LIST_SIZE * 10);
+        size_t ubound = lbound + rand() % (TIGHTDB_MAX_LIST_SIZE * 10 - lbound);
+
+        for(int i = 0; i < TIGHTDB_MAX_LIST_SIZE * 10; i++) {
+            int v = rand() % 3;
+
+            if(v == 1 && i >= lbound && i < ubound && cnt0 < limit)
+                cnt1++;
+
+            if(v != 0 && i >= lbound && i < ubound )
+                cnt0++;
+
+            oti.add(v);
+        }
+
+        OneIntTable::View v = oti.where().first.not_equal(0).find_all(lbound, ubound, limit);
+        size_t cnt2 = oti.where().tableview(v).first.equal(1).count();
+
+        if(cnt1 != cnt2)
+            cerr << iter << " ";
+
+        CHECK_EQUAL(cnt1, cnt2);
+
+
+    }
+
+}
 
 TEST(TestQueryStrIndex3)
 {

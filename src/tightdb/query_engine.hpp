@@ -318,7 +318,7 @@ public:
                 start = m;
             }
         }
-        return end;
+        return not_found;
     }
 
 
@@ -365,7 +365,7 @@ public:
                                                  start, end, local_limit, source_column, matchcount);
         else
              // call method in ParentNode
-            r = aggregate_local<TAction, TResult, TSourceColumn>(st, start, end, local_limit, source_column, matchcount);
+            r = node->aggregate_local<TAction, TResult, TSourceColumn>(st, start, end, local_limit, source_column, matchcount);
         return r;
     }
 
@@ -438,8 +438,10 @@ public:
             }
 
             // Find first match in this condition node
+            if(r == 2185)
+                r = r;
             r = find_first_local(r + 1, end);
-            if (r == end) {
+            if (r == not_found) {
                 m_dD = double(r - start) / (local_matches + 1.1);
                 return end;
             }
@@ -536,8 +538,8 @@ public:
     size_t find_first_local(size_t start, size_t end)
     {
         size_t r = m_arr.FindGTE(start, m_next);
-        if (r == not_found)
-            return end;
+        if (r >= end)
+            return not_found;
 
         m_next = r;
         return to_size_t(m_arr.get(r));
@@ -586,10 +588,10 @@ public:
             const size_t subsize = subtable->size();
             const size_t sub = m_child->find_first(0, subsize);
 
-            if (sub != subsize)
+            if (sub != not_found)
                 return s;
         }
-        return end;
+        return not_found;
     }
 
     ParentNode* child_criteria()
@@ -749,7 +751,7 @@ public:
                  && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))) {
                 bool cont = m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
                 if(!cont)
-                    return static_cast<size_t>(-1);
+                    return not_found;
             }
             // Else, for each match in this node, call our IntegerNode::match_callback to test remaining nodes and/or extract
             // aggregate payload from aggregate column:
@@ -758,7 +760,7 @@ public:
                 bool cont = m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, NULL,
                              std::bind1st(std::mem_fun(&IntegerNode::template match_callback<TAction, TSourceColumn>), this));
                 if(!cont)
-                    return static_cast<size_t>(-1);
+                    return not_found;
             }
 
             if (m_local_matches == m_local_limit)
@@ -798,7 +800,7 @@ public:
                 if (condition(m_array.get(start - m_leaf_start), m_value))
                     return start;
                 else
-                    return end;
+                    return not_found;
             }
 
             size_t end2;
@@ -817,7 +819,7 @@ public:
                 return s + m_leaf_start;
         }
 
-        return end;
+        return not_found;
     }
 
     TConditionValue m_value;
@@ -856,9 +858,9 @@ public:
         m_leaf = NULL;
 
         // FIXME: Store these in std::string instead.
-        // FIXME: Why are these sizes 6 times the required size?
+        // '*6' because case converted strings can take up more space. Todo, investigate
         char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
-        std::copy(v.data(), v.data()+v.size(), data);
+        memcpy(data, v.data(), v.size());
         m_value = StringData(data, v.size());
         char* upper = new char[6 * v.size()];
         char* lower = new char[6 * v.size()];
@@ -956,7 +958,7 @@ public:
             if (cond(m_value, m_ucase, m_lcase, t))
                 return s;
         }
-        return end;
+        return not_found;
     }
 
 private:
@@ -1010,7 +1012,7 @@ public:
             if (cond(v, m_value))
                 return s;
         }
-        return end;
+        return not_found;
     }
 
 protected:
@@ -1031,7 +1033,7 @@ public:
 
         // FIXME: Store this in std::string instead.
         char* data = new char[v.size()];
-        std::copy(v.data(), v.data()+v.size(), data);
+        memcpy(data, v.data(), v.size());
         m_value = BinaryData(data, v.size());
     }
 
@@ -1059,7 +1061,7 @@ public:
             if (condition(m_value, value))
                 return s;
         }
-        return end;
+        return not_found;
     }
 
 protected:
@@ -1087,7 +1089,7 @@ public:
         // FIXME: Store this in std::string instead.
         // FIXME: Why are the sizes 6 times the required size?
         char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
-        std::copy(v.data(), v.data()+v.size(), data);
+        memcpy(data, v.data(), v.size());
         m_value = StringData(data, v.size());
         m_leaf = NULL;
         m_index_getter = 0;
@@ -1226,20 +1228,20 @@ public:
                     m_index_getter->cache_next(last_indexed);
                     f = m_index_getter->m_array_ptr->FindGTE(s, last_indexed - m_index_getter->m_leaf_start);
 
-                    if (f == not_found) {
+                    if (f >= end || f == not_found) {
                         last_indexed = m_index_getter->m_leaf_end;
                     }
                     else {
                         s = to_size_t(m_index_getter->m_array_ptr->get(f));
-                        if (s > end)
-                            return end;
+                        if (s >= end)
+                            return not_found;
                         else {
                             last_indexed = f + m_index_getter->m_leaf_start;
                             return s;
                         }
                     }
                 }
-                return end;
+                return not_found;
             }
             else {
                 if (m_column_type != col_type_String) {
@@ -1286,7 +1288,7 @@ public:
                 }
             }
         }
-        return end;
+        return not_found;
     }
 
 private:
@@ -1364,17 +1366,17 @@ public:
                 else {
                     size_t fmax = m_last[c] > s ? m_last[c] : s;
                     f[c] = m_cond[c]->find_first(fmax, end);
-                    m_was_match[c] = (f[c] != end);
-                    m_last[c] = f[c];
+                    m_was_match[c] = (f[c] != not_found);
+                    m_last[c] = f[c] == not_found ? end : f[c];
                 }
             }
 
             s = f[0] < f[1] ? f[0] : f[1];
-            s = s > end ? end : s;
+            s = s >= end ? not_found : s;
 
             return s;
         }
-        return end;
+        return not_found;
     }
 
     virtual std::string validate()
@@ -1458,7 +1460,7 @@ public:
                 if (resume)
                     s = m_getter1.m_leaf_end;
                 else
-                return to_size_t(qs.m_state) + m_getter1.m_leaf_start;
+                    return to_size_t(qs.m_state) + m_getter1.m_leaf_start;
             }
             else {
                 // This is for float and double.
@@ -1472,7 +1474,7 @@ public:
                     s++;
             }
         }
-        return end;
+        return not_found;
     }
 
 protected:

@@ -154,15 +154,15 @@ void spawn_daemon(const string& file)
         // start commit daemon executable
         // Note that getenv (which is not thread safe) is called in a
         // single threaded context. This is ensured by the fork above.
-        const char* exe = getenv("TIGHTDBD_PATH");
-        if (!exe) {
+        const char* async_daemon = getenv("TIGHTDB_ASYNC_DAEMON");
+        if (!async_daemon) {
 #ifndef TIGTHDB_DEBUG
-            exe = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd";
+            async_daemon = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd";
 #else
-            exe = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd-dbg";
+            async_daemon = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd-dbg";
 #endif
         }
-        execl(exe, exe, file.c_str(), 0);
+        execl(async_daemon, async_daemon, file.c_str(), 0);
 
         // if we continue here, exec has failed so return error
         // if exec succeeds, we don't come back here.

@@ -183,17 +183,24 @@ examples:
     TIGHTDB_VERSION=0.1.4 sh build.sh config
     TIGHTDB_VERSION=0.1.4 sh build.sh bin-dist all
 
-To enable replication in TightDB, set `TIGHTDB_ENABLE_REPLICATION` to
-a nonempty value during configuration as in the following examples:
-
-    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh config
-    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh bin-dist all
-
 To use a nondefault compiler, or a compiler in a nondefault location,
 set the environment variable `CC` before calling `sh build.sh build`
 or `sh build.sh bin-dist`, as in the following example:
 
     CC=clang sh build.sh bin-dist all
+
+### Replication
+
+To enable replication in TightDB, set `TIGHTDB_ENABLE_REPLICATION` to
+a nonempty value during configuration as in the following example:
+
+    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh config
+
+When set during preparation of a distribution package, it will have
+the extra effect of including "replication" as an optional extension
+available for installation to the end-user:
+
+    TIGHTDB_ENABLE_REPLICATION=1 sh build.sh bin-dist all
 
 
 

@@ -38,7 +38,7 @@ public:
     void reset(T* = 0);
     T* release() TIGHTDB_NOEXCEPT;
 
-private:
+protected:
     typedef T* UniquePtr::*unspecified_bool_type;
 
 public:
