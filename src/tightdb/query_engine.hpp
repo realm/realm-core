@@ -528,7 +528,9 @@ protected:
     }
 };
 
-
+// Used for performing queries on a Tableview. This is done by simply passing the TableView to this query condition
+// actually it's the Array of the TableView which is passed). TableView must be sorted for Array::FindGTE to work 
+// correctly.
 class ListviewNode: public ParentNode {
 public:
     ListviewNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.size()) {m_child = 0; m_dT = 0.0;}
@@ -550,6 +552,7 @@ public:
 
     size_t find_first_local(size_t start, size_t end)
     {
+        // Simply return next TableView item which is >= start
         size_t r = m_arr.FindGTE(start, m_next);
         if (r >= end)
             return not_found;
@@ -565,7 +568,8 @@ protected:
     size_t m_size;
 };
 
-
+// For conditions on a subtable (encapsulated in subtable()...end_subtable()). These return the parent row as match if and
+// only if one or more subtable rows match the condition.
 class SubtableNode: public ParentNode {
 public:
     SubtableNode(size_t column): m_column(column) {m_child = 0; m_child2 = 0; m_dT = 100.0;}
@@ -1335,7 +1339,22 @@ private:
     size_t m_index_size;
 };
 
-
+// OR node contains 3 Node pointers; m_cond[0], m_cond[1] and m_child
+//
+// For 'second.equal(23).begin_group().first.equal(111).Or().first.equal(222).end_group().third().equal(555)', this
+// will first set m_cond[0] = left-hand-side through constructor, and then later, when .first.equal(222) is invoked, 
+// invocation will set m_cond[1] = right-hand-side through Query& Query::Or() (see query.cpp). In there, m_child is 
+// also set to next AND condition (if any exists) following the OR. So we have following pointers:
+//
+//                        Equal(23)
+//                           |
+//                           |
+// OR node: m_cond[0]     m_child     m_cond[1]
+//             |             |           |
+//      Equal(111) node      |    Equal(222) node
+//                           |
+//                       Equal(555)
+//
 class OrNode: public ParentNode {
 public:
     template <Action TAction> int64_t find_all(Array*, size_t, size_t, size_t, size_t)
@@ -1422,7 +1441,7 @@ private:
 };
 
 
-// Compare two columns with eachother
+// Compare two columns with eachother row-by-row
 template <class TConditionValue, class TConditionFunction> class TwoColumnsNode: public ParentNode {
 public:
     template <Action TAction> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}
@@ -1506,7 +1525,7 @@ protected:
 #include "query_expression.hpp"
 
 
-// For expressions like col1 / col2 + 123 > col4 * 100
+// For Nexgt-Generation expressions like col1 / col2 + 123 > col4 * 100
 class ExpressionNode: public ParentNode {
 
 public:
