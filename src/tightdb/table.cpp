@@ -1994,7 +1994,7 @@ void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result)
             size_t ndx = dst_index.find_first(str);
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
-                result.set_string(col1_ndx, ndx, str);
+                result.set_string(0, ndx, str);
             }
 
             // Count
@@ -2007,7 +2007,7 @@ void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result)
             size_t ndx = dst_index.find_first(str);
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
-                result.set_string(col1_ndx, ndx, str);
+                result.set_string(0, ndx, str);
             }
 
             // SUM
@@ -2025,7 +2025,7 @@ void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result)
             size_t ndx = dst_index.find_first(str);
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
-                result.set_string(col1_ndx, ndx, str);
+                result.set_string(0, ndx, str);
             }
 
             // SUM
@@ -2039,10 +2039,10 @@ void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result)
         // Calculate averages
         const size_t res_count = result.size();
         for (size_t i = 0; i < res_count; ++i) {
-            int64_t sum   = result.get_int(1, i);
-            int64_t count = result.get_int(2, i);
+            int64_t sum   = dst_column.get(i);
+            int64_t count = cnt_column.get(i);
             int64_t res   = sum / count;
-            result.set_int(1, i, res);
+            dst_column.set(i, res);
         }
 
         // Remove temp column
