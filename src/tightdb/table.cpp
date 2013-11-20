@@ -1975,6 +1975,12 @@ void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result)
 
     TIGHTDB_ASSERT(get_column_type(col1_ndx) == type_String);
     TIGHTDB_ASSERT(get_column_type(col2_ndx) == type_Int);
+    
+    // Clear result table and remove all columns
+    result.clear();
+    while ( result.get_column_count() > 0 ) {
+        result.remove_column(0);
+    }
 
     // Add columns to result table
     result.add_column(type_String, get_column_name(col1_ndx));
