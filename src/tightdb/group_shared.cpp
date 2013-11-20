@@ -93,7 +93,7 @@ SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, size_t i
     capacity_mask = init_readers_size - 1;
     put_pos = 0;
     get_pos = 0;
-    daemon_running.store_release(true);
+    daemon_running.store_release(false);
     free_write_slots = 0;
 }
 
@@ -223,42 +223,34 @@ void SharedGroup::open(const string& path, bool no_create_file,
     bool is_exclusive;
     SharedInfo* info;
     try {
-        info = m_file.open<SharedInfo>(is_exclusive, );
+        info = m_info = m_file.open<SharedInfo>(is_exclusive, max_wait_for_sharedinfo_valid);
     } 
     catch (IPMFile::PresumablyStaleFile&) {
         throw PresumablyStaleLockFile(m_file_path);
     }
     // FIXME: need a close guard for m_file
 
-    // We need to map the info file once more for the readers part
-    // since that part can be resized and as such remapped which
-    // could move our mutexes (which we don't want to risk moving while
-    // they are locked)
-    m_reader_map.map(m_file, File::access_ReadWrite, 
-                     sizeof (IPMFile::IPMFileWrapper<SharedInfo>), File::map_NoSync);
-    File::UnmapGuard fug(m_reader_map);
-
+    size_t info_size = sizeof (IPMFile::IPMFileWrapper<SharedInfo>);
     SlabAlloc& alloc = m_group.m_alloc;
 
-    // If we are the process that *Created* the coordination buffer, we are obliged to
+    // If we are the process that got exclusive access, we are obliged to
     // initialize it. All other processer will wait for us to enter shared state
     if (is_exclusive) {
 
         // If we are the first we may have to create the database file
         // but we invalidate the internals right after to avoid conflicting
         // with old state when starting transactions
-        bool is_shared = true;
-        bool read_only = false;
-        bool skip_validate = false;
         ref_type top_ref;
         try {
-            top_ref = alloc.attach_file(path, is_shared, read_only, no_create_file,
-                                        skip_validate); // Throws
+            top_ref = alloc.attach_file(path, 
+                                        /* is_shared: */ true, 
+                                        /* read_only: */ false,
+                                        no_create_file,
+                                        /* skip_validate: */ false); // Throws
         }
         catch (...) {
             
             m_file.close();
-
             // rethrow whatever went wrong
             throw;
         }
@@ -282,29 +274,38 @@ void SharedGroup::open(const string& path, bool no_create_file,
     }
     else { // shared access
 
-        if (info->version != 0)
+        if (info->version != 0) {
+            m_file.close();
             throw runtime_error("Unsupported version");
+        }
 
         // Durability level cannot be changed at runtime
-        if (info->flags != dlevel)
+        if (info->flags != dlevel) {
+            m_file.close();
             throw runtime_error("Inconsistent durability level");
-
+        }
         // Setup the group, but leave it in invalid state
-        bool is_shared = true;
-        bool read_only = false;
-        bool no_create = true;
-        bool skip_validate = true; // To avoid race conditions
         try {
-            alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
+            alloc.attach_file(path, 
+                              /* is_shared: */ true, 
+                              /* read_only: */ false, 
+                              /* no_create: */ false, 
+                              /* skip_validate: */ true); // Throws
         } 
         catch (File::NotFound) {
+            m_file.close();
             throw LockFileButNoData(path);
         }
 
     }
 
-    fug.release(); // Do not unmap
-    fcg.release(); // Do not close
+    // We need to map the info file once more for the readers part
+    // since that part can be resized and as such remapped which
+    // could move our mutexes (which we don't want to risk moving while
+    // they are locked)
+    m_reader_map.map(m_file.get_file(), File::access_ReadWrite, 
+                     info_size, File::map_NoSync);
+
 
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
@@ -316,7 +317,6 @@ void SharedGroup::open(const string& path, bool no_create_file,
         }
         else {
             // In async mode we need to wait for the commit process to get ready
-            SharedInfo* const info = m_file_map.get_addr();
             int maxwait = max_wait_for_daemon_start;
             while (maxwait--) {
                 if (info->daemon_running.load_acquire()) {
@@ -338,24 +338,16 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
-    SharedInfo* info = m_file_map.get_addr();
+    SharedInfo* info = m_info;
 
 #ifndef _WIN32
     if (info->flags == durability_Async) {
-        m_file.unlock();
         return;
     }
 #endif
 
-    m_file.unlock();
-    if (!m_file.try_lock_exclusive())
+    if (!m_file.try_get_exclusive_access())
         return;
-
-    if (info->shutdown_started.load_acquire()) {
-        m_file.unlock();
-        return;
-    }
-    info->shutdown_started.store_release(1);
 
     // If the db file is just backing for a transient data structure,
     // we can delete it when done.
@@ -369,21 +361,13 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
         catch(...) {} // ignored on purpose.
     }
 
-    // info->~SharedInfo(); // DO NOT Call destructor
-
-    m_file.close();
-    m_file_map.unmap();
     m_reader_map.unmap();
-    try {
-        File::remove(m_file_path.c_str());
-    }
-    catch (...) {} // ignored on purpose
 }
 
 
 bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 {
-    const SharedInfo* info = m_file_map.get_addr();
+    const SharedInfo* info = m_info;
     // this variable is changed under lock (the readmutex), but
     // inspected here without taking a lock. This is intentional.
     // The variable is only compared for inequality against a value
@@ -404,11 +388,9 @@ bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 void SharedGroup::do_async_commits()
 {
     bool shutdown = false;
-    bool file_already_removed = false;
-    SharedInfo* info = m_file_map.get_addr();
-    // NO client are allowed to proceed and update current_version
-    // until they see the init_complete == 2.
-    // As we haven't set init_complete to 2 yet, it is safe to assert the following:
+    SharedInfo* info = m_info;
+    // NO client are allowed to proceed and update current_version until they see 
+    // daemon_running go through. As we haven't set it yet, it is safe to assert the following:
     TIGHTDB_ASSERT(info->current_version.load_relaxed() == 0 || info->current_version.load_relaxed() == 1);
 
     // We always want to keep a read lock on the last version
@@ -419,37 +401,25 @@ void SharedGroup::do_async_commits()
     begin_read();
     uint64_t last_version = m_version;
     info->free_write_slots = max_write_slots;
-    info->init_complete.store_release(2); // allow waiting clients to proceed
+    info->daemon_running.store_release(true); // allow waiting clients to proceed
     m_group.detach();
 
     while(true) {
 
         if (m_file.is_removed()) { // operator removed the lock file. take a hint!
 
-            file_already_removed = true; // don't remove what is already gone
-            info->shutdown_started.store_release(1);
-            shutdown = true;
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Lock file removed, initiating shutdown" << endl;
 #endif
+            // FIXME: in this case, we should prevent the destructor from deleting the file.
+            // currently, there is no API for this.
+            return;
         }
 
-        // detect if we're the last "client", and if so mark the
-        // lock file invalid. Any client coming along before we
-        // finish syncing will see the lock file, but detect that
-        // the daemon has abandoned it. It can then wait for the
-        // lock file to be removed (with a timeout).
-        m_file.unlock();
-        if (m_file.try_lock_exclusive()) {
-            info->shutdown_started.store_release(1);
+        // detect if we're the last "client", and if so initiate shutdown
+        if (m_file.try_get_exclusive_access()) {
             shutdown = true;
         }
-        // if try_lock_exclusive fails, we loose our read lock, so
-        // reacquire it! At the moment this is not used for anything,
-        // because ONLY the daemon ever asks for an exclusive lock
-        // when async commits are used.
-        else
-            m_file.lock_shared();
 
         if (has_changed()) {
 
@@ -484,15 +454,6 @@ void SharedGroup::do_async_commits()
         }
 
         if (shutdown) {
-            // Being the backend process, we own the lock file, so we
-            // have to clean up when we shut down.
-            // info->~SharedInfo(); // DO NOT Call destructor
-            m_file_map.unmap();
-#ifdef TIGHTDB_ENABLE_LOGFILE
-            cerr << "Removing coordination file" << endl;
-#endif
-            if (!file_already_removed)
-                File::remove(m_file_path);
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Daemon exiting nicely" << endl << endl;
 #endif
@@ -543,11 +504,11 @@ const Group& SharedGroup::begin_read()
     size_t new_file_size = 0;
 
     {
-        SharedInfo* info = m_file_map.get_addr();
+        SharedInfo* info = m_info;
         Mutex::Lock lock(info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
-            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize); // Throws
+            m_reader_map.remap(m_file.get_file(), File::access_ReadWrite, info->infosize); // Throws
 
         // Get the current top ref
         new_top_ref   = to_size_t(info->current_top);
@@ -598,11 +559,11 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
     {
-        SharedInfo* info = m_file_map.get_addr();
+        SharedInfo* info = m_info;
         Mutex::Lock lock(info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
-            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
+            m_reader_map.remap(m_file.get_file(), File::access_ReadWrite, info->infosize);
 
         // Find entry for current version
         size_t ndx = ringbuf_find(m_version);
@@ -634,7 +595,7 @@ Group& SharedGroup::begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
-    SharedInfo* info = m_file_map.get_addr();
+    SharedInfo* info = m_info;
 
     // Get write lock
     // Note that this will not get released until we call
@@ -693,7 +654,7 @@ void SharedGroup::commit()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
-    SharedInfo* info = m_file_map.get_addr();
+    SharedInfo* info = m_info;
 
     // FIXME: ExceptionSafety: Corruption has happened if
     // low_level_commit() throws, because we have already told the
@@ -756,7 +717,7 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
             repl->rollback_write_transact(*this);
 #endif
 
-        SharedInfo* info = m_file_map.get_addr();
+        SharedInfo* info = m_info;
 
         // Release write lock
         info->writemutex.unlock();
@@ -779,42 +740,42 @@ bool SharedGroup::ringbuf_is_empty() const TIGHTDB_NOEXCEPT
 
 size_t SharedGroup::ringbuf_size() const TIGHTDB_NOEXCEPT
 {
-    SharedInfo* info = m_reader_map.get_addr();
+    SharedInfo* info = & m_reader_map.get_addr()->user_data;
     return (info->put_pos - info->get_pos) & info->capacity_mask;
 }
 
 
 size_t SharedGroup::ringbuf_capacity() const TIGHTDB_NOEXCEPT
 {
-    SharedInfo* info = m_reader_map.get_addr();
+    SharedInfo* info = & m_reader_map.get_addr()->user_data;
     return info->capacity_mask;
 }
 
 
 bool SharedGroup::ringbuf_is_first(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    SharedInfo* info = m_reader_map.get_addr();
+    SharedInfo* info = & m_reader_map.get_addr()->user_data;
     return ndx == info->get_pos;
 }
 
 
 SharedGroup::ReadCount& SharedGroup::ringbuf_get(size_t ndx) TIGHTDB_NOEXCEPT
 {
-    SharedInfo* info = m_reader_map.get_addr();
+    SharedInfo* info = & m_reader_map.get_addr()->user_data;
     return info->readers[ndx];
 }
 
 
 SharedGroup::ReadCount& SharedGroup::ringbuf_get_first() TIGHTDB_NOEXCEPT
 {
-    SharedInfo* info = m_reader_map.get_addr();
+    SharedInfo* info = & m_reader_map.get_addr()->user_data;
     return info->readers[info->get_pos];
 }
 
 
 SharedGroup::ReadCount& SharedGroup::ringbuf_get_last() TIGHTDB_NOEXCEPT
 {
-    SharedInfo* info = m_reader_map.get_addr();
+    SharedInfo* info = & m_reader_map.get_addr()->user_data;
     uint32_t lastPos = (info->put_pos - 1) & info->capacity_mask;
     return info->readers[lastPos];
 }
@@ -822,14 +783,14 @@ SharedGroup::ReadCount& SharedGroup::ringbuf_get_last() TIGHTDB_NOEXCEPT
 
 void SharedGroup::ringbuf_remove_first() TIGHTDB_NOEXCEPT
 {
-    SharedInfo* info = m_reader_map.get_addr();
+    SharedInfo* info = & m_reader_map.get_addr()->user_data;
     info->get_pos = (info->get_pos + 1) & info->capacity_mask;
 }
 
 
 void SharedGroup::ringbuf_put(const ReadCount& v)
 {
-    SharedInfo* info = m_reader_map.get_addr();
+    SharedInfo* info = & m_reader_map.get_addr()->user_data;
 
     // Check if the ringbuf is full
     // (there should always be one empty entry)
@@ -838,7 +799,7 @@ void SharedGroup::ringbuf_put(const ReadCount& v)
 
     if (TIGHTDB_UNLIKELY(is_full)) {
         ringbuf_expand(); // Throws
-        info = m_reader_map.get_addr();
+        info = & m_reader_map.get_addr()->user_data;
     }
 
     info->readers[info->put_pos] = v;
@@ -848,7 +809,7 @@ void SharedGroup::ringbuf_put(const ReadCount& v)
 
 void SharedGroup::ringbuf_expand()
 {
-    SharedInfo* info = m_reader_map.get_addr();
+    SharedInfo* info = & m_reader_map.get_addr()->user_data;
     size_t old_buffer_size = info->capacity_mask + 1; // FIXME: Why size_t and not uint32 as capacity?
     size_t base_file_size = sizeof (SharedInfo) - sizeof (ReadCount[SharedInfo::init_readers_size]);
 
@@ -870,9 +831,9 @@ void SharedGroup::ringbuf_expand()
     size_t new_file_size = base_file_size + (sizeof (ReadCount) * new_buffer_size);
 
     // Extend lock file
-    m_file.prealloc(0, new_file_size); // Throws
-    m_reader_map.remap(m_file, File::access_ReadWrite, new_file_size); // Throws
-    info = m_reader_map.get_addr();
+    m_file.get_file().prealloc(0, new_file_size); // Throws
+    m_reader_map.remap(m_file.get_file(), File::access_ReadWrite, new_file_size); // Throws
+    info = & m_reader_map.get_addr()->user_data;
 
     // If the contents of the ring buffer crosses the end of the
     // containing linear buffer (continuing at the beginning) then the
@@ -896,7 +857,7 @@ void SharedGroup::ringbuf_expand()
 
 size_t SharedGroup::ringbuf_find(uint64_t version) const TIGHTDB_NOEXCEPT
 {
-    const SharedInfo* info = m_reader_map.get_addr();
+    const SharedInfo* info = & m_reader_map.get_addr()->user_data;
     uint32_t pos = info->get_pos;
     while (pos != info->put_pos) {
         const ReadCount& r = info->readers[pos];
@@ -993,7 +954,7 @@ void SharedGroup::test_ringbuf()
 
 void SharedGroup::zero_free_space()
 {
-    SharedInfo* info = m_file_map.get_addr();
+    SharedInfo* info = m_info;
 
     // Get version info
     uint64_t current_version;
@@ -1022,19 +983,19 @@ void SharedGroup::zero_free_space()
 
 uint64_t SharedGroup::get_current_version() TIGHTDB_NOEXCEPT
 {
-    SharedInfo* info = m_file_map.get_addr();
+    SharedInfo* info = m_info;
     return info->current_version.load_relaxed();
 }
 
 void SharedGroup::low_level_commit(uint64_t new_version)
 {
-    SharedInfo* info = m_file_map.get_addr();
+    SharedInfo* info = m_info;
     uint64_t readlock_version;
     {
         Mutex::Lock lock(info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
-            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize); // Throws
+            m_reader_map.remap(m_file.get_file(), File::access_ReadWrite, info->infosize); // Throws
 
         if (ringbuf_is_empty()) {
             readlock_version = new_version;

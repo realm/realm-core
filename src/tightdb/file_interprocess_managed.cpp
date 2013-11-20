@@ -225,6 +225,10 @@ void IPMFile::close()
     }
 }
 
+File& IPMFile::get_file()
+{
+    return m_impl->m_file;
+}
 
 IPMFile::~IPMFile()
 {
