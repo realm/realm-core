@@ -1994,7 +1994,7 @@ void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result)
             size_t ndx = dst_index.find_first(str);
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
-                result.set_string(col1_ndx, ndx, str);
+                result.set_string(0, ndx, str);
             }
 
             // Count
@@ -2007,7 +2007,7 @@ void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result)
             size_t ndx = dst_index.find_first(str);
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
-                result.set_string(col1_ndx, ndx, str);
+                result.set_string(0, ndx, str);
             }
 
             // SUM
@@ -2025,7 +2025,7 @@ void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result)
             size_t ndx = dst_index.find_first(str);
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
-                result.set_string(col1_ndx, ndx, str);
+                result.set_string(0, ndx, str);
             }
 
             // SUM
