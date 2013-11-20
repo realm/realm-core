@@ -369,6 +369,13 @@ public:
         return r;
     }
 
+    /***************************************************************************************************************
+    /*                                                                                                             *
+    /* Main entry point of a query. Can be called on any of the nodes; yields same result. Schedules calls to      *
+    /* aggregate_local.                                                                                            *
+    /* Return value is the result of the query, or Array pointer for FindAll.                                      *
+    /*                                                                                                             *
+    /***************************************************************************************************************/
 
     template<Action TAction, class TResult, class TSourceColumn>
     TResult aggregate(QueryState<TResult>* st, size_t start, size_t end, size_t agg_col, size_t* matchcount)
@@ -389,6 +396,10 @@ public:
             // Find a large amount of local matches in best condition
             td = m_children[best]->m_dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
 
+            // Executes start...end range of a query and will stay inside the condition loop of the node it was called
+            // on. Can be called on any node; yields same result, but different performance. Returns prematurely if
+            // condition of called node has evaluated to true local_matches number of times. 
+            // Return value is the next row for resuming aggregating (next row that caller must call aggregate_local on)
             start = aggregate_local_selector<TAction, TResult, TSourceColumn>(m_children[best], st, start, td, findlocals, source_column, matchcount);
 
             // Make remaining conditions compute their m_dD (statistics)
@@ -438,8 +449,6 @@ public:
             }
 
             // Find first match in this condition node
-            if(r == 2185)
-                r = r;
             r = find_first_local(r + 1, end);
             if (r == not_found) {
                 m_dD = double(r - start) / (local_matches + 1.1);
@@ -458,11 +467,15 @@ public:
                 }
             }
 
+            // Sum of float column must accumulate in double
             TIGHTDB_STATIC_ASSERT( !(TAction == act_Sum && (SameType<TSourceColumn, float>::value && !SameType<TResult, double>::value)), "");
 
             // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
             if (m == r) {
-                TSourceColumn av = (TSourceColumn)0;
+                // TResult: type of query result
+                // TSourceColumn: type of aggregate source
+                TSourceColumn av = (TSourceColumn)0; 
+                // uses_val test becuase compiler cannot see that Column::Get has no side effect and result is discarded
                 if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != NULL) {
                     TIGHTDB_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != NULL);
                     av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
@@ -516,10 +529,10 @@ protected:
 };
 
 
-class ArrayNode: public ParentNode {
+class ListviewNode: public ParentNode {
 public:
-    ArrayNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.size()) {m_child = 0; m_dT = 0.0;}
-    ~ArrayNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ListviewNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.size()) {m_child = 0; m_dT = 0.0;}
+    ~ListviewNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     void init(const Table& table)
     {
@@ -840,7 +853,7 @@ protected:
     SequentialGetterBase* m_source_column; // Column of values used in aggregate (act_FindAll, act_ReturnFirst, act_Sum, etc)
 };
 
-
+// Conditions for strings. Note that Equal is specialized later in this file!
 template <class TConditionFunction> class StringNode: public ParentNode {
 public:
     template <Action TAction>
@@ -979,18 +992,18 @@ protected:
 };
 
 
-// Can be used for simple types (currently float and double)
-template <class TConditionValue, class TConditionFunction> class BasicNode: public ParentNode {
+// This node is currently used for floats and doubles only
+template <class TConditionValue, class TConditionFunction> class FloatDoubleNode: public ParentNode {
 public:
     typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
 
-    BasicNode(TConditionValue v, size_t column_ndx) : m_value(v)
+    FloatDoubleNode(TConditionValue v, size_t column_ndx) : m_value(v)
     {
         m_condition_column_idx = column_ndx;
         m_child = 0;
         m_dT = 1.0;
     }
-    ~BasicNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ~FloatDoubleNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     void init(const Table& table)
     {
@@ -1072,7 +1085,8 @@ protected:
     ColumnType m_column_type;
 };
 
-
+// Specialization for Equal condition on Strings - we specialize because we can utilize indexes (if they exist) for Equal.
+// Future optimization: make specialization for greater, notequal, etc
 template<> class StringNode<Equal>: public ParentNode {
 public:
     template <Action TAction>
@@ -1408,8 +1422,7 @@ private:
 };
 
 
-
-
+// Compare two columns with eachother
 template <class TConditionValue, class TConditionFunction> class TwoColumnsNode: public ParentNode {
 public:
     template <Action TAction> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}

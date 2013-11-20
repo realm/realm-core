@@ -29,7 +29,7 @@ namespace tightdb {
 
 // Predeclarations from query_engine.hpp
 class ParentNode;
-template<class T, class F> class BasicNode;
+template<class T, class F> class FloatDoubleNode;
 template<class T> class SequentialGetter;
 
 
