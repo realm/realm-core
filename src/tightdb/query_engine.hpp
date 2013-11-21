@@ -369,13 +369,13 @@ public:
         return r;
     }
 
-    /***************************************************************************************************************
-    /*                                                                                                             *
-    /* Main entry point of a query. Can be called on any of the nodes; yields same result. Schedules calls to      *
-    /* aggregate_local.                                                                                            *
-    /* Return value is the result of the query, or Array pointer for FindAll.                                      *
-    /*                                                                                                             *
-    /***************************************************************************************************************/
+    /**************************************************************************************************************
+    *                                                                                                             *
+    * Main entry point of a query. Can be called on any of the nodes; yields same result. Schedules calls to      *
+    * aggregate_local.                                                                                            *
+    * Return value is the result of the query, or Array pointer for FindAll.                                      *
+    *                                                                                                             *
+    **************************************************************************************************************/
 
     template<Action TAction, class TResult, class TSourceColumn>
     TResult aggregate(QueryState<TResult>* st, size_t start, size_t end, size_t agg_col, size_t* matchcount)
@@ -620,7 +620,11 @@ public:
     size_t m_column;
 };
 
-// IntegerNode is for conditions for types stored as integers in a tightdb::Array (int, date, bool)
+
+// IntegerNode is for conditions for types stored as integers in a tightdb::Array (int, date, bool).
+//
+// We don't yet have any integer indexes (only for strings), but when we get one, we should specialize it
+// like: template <class TConditionValue, class Equal> class IntegerNode: public ParentNode
 template <class TConditionValue, class TConditionFunction> class IntegerNode: public ParentNode {
 public:
     typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
@@ -857,6 +861,104 @@ protected:
     SequentialGetterBase* m_source_column; // Column of values used in aggregate (act_FindAll, act_ReturnFirst, act_Sum, etc)
 };
 
+
+
+
+// This node is currently used for floats and doubles only
+template <class TConditionValue, class TConditionFunction> class FloatDoubleNode: public ParentNode {
+public:
+    typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
+
+    FloatDoubleNode(TConditionValue v, size_t column_ndx) : m_value(v)
+    {
+        m_condition_column_idx = column_ndx;
+        m_child = 0;
+        m_dT = 1.0;
+    }
+    ~FloatDoubleNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+
+    void init(const Table& table)
+    {
+        m_dD = 100.0;
+        m_table = &table;
+        m_condition_column.m_column = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx));
+        m_condition_column.m_leaf_end = 0;
+
+        if (m_child)
+            m_child->init(table);
+    }
+
+    size_t find_first_local(size_t start, size_t end)
+    {
+        TConditionFunction cond;
+
+        for (size_t s = start; s < end; ++s) {
+            TConditionValue v = m_condition_column.get_next(s);
+            if (cond(v, m_value))
+                return s;
+        }
+        return not_found;
+    }
+
+protected:
+    TConditionValue m_value;
+    SequentialGetter<TConditionValue> m_condition_column;
+};
+
+
+template <class TConditionFunction> class BinaryNode: public ParentNode {
+public:
+    template <Action TAction> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}
+
+    BinaryNode(BinaryData v, size_t column)
+    {
+        m_dT = 100.0;
+        m_condition_column_idx = column;
+        m_child = 0;
+
+        // FIXME: Store this in std::string instead.
+        char* data = new char[v.size()];
+        memcpy(data, v.data(), v.size());
+        m_value = BinaryData(data, v.size());
+    }
+
+    ~BinaryNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    {
+        delete[] m_value.data();
+    }
+
+    void init(const Table& table)
+    {
+        m_dD = 100.0;
+        m_table = &table;
+        m_condition_column = static_cast<const ColumnBinary*>(&get_column_base(table, m_condition_column_idx));
+        m_column_type = get_real_column_type(table, m_condition_column_idx);
+
+        if (m_child)
+            m_child->init(table);
+    }
+
+    size_t find_first_local(size_t start, size_t end)
+    {
+        TConditionFunction condition;
+        for (size_t s = start; s < end; ++s) {
+            BinaryData value = m_condition_column->get(s);
+            if (condition(m_value, value))
+                return s;
+        }
+        return not_found;
+    }
+
+protected:
+private:
+    BinaryData m_value;
+protected:
+    const ColumnBinary* m_condition_column;
+    ColumnType m_column_type;
+};
+
+
+
 // Conditions for strings. Note that Equal is specialized later in this file!
 template <class TConditionFunction> class StringNode: public ParentNode {
 public:
@@ -996,98 +1098,6 @@ protected:
 };
 
 
-// This node is currently used for floats and doubles only
-template <class TConditionValue, class TConditionFunction> class FloatDoubleNode: public ParentNode {
-public:
-    typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
-
-    FloatDoubleNode(TConditionValue v, size_t column_ndx) : m_value(v)
-    {
-        m_condition_column_idx = column_ndx;
-        m_child = 0;
-        m_dT = 1.0;
-    }
-    ~FloatDoubleNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
-
-    void init(const Table& table)
-    {
-        m_dD = 100.0;
-        m_table = &table;
-        m_condition_column.m_column = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx));
-        m_condition_column.m_leaf_end = 0;
-
-        if (m_child)
-            m_child->init(table);
-    }
-
-    size_t find_first_local(size_t start, size_t end)
-    {
-        TConditionFunction cond;
-
-        for (size_t s = start; s < end; ++s) {
-            TConditionValue v = m_condition_column.get_next(s);
-            if (cond(v, m_value))
-                return s;
-        }
-        return not_found;
-    }
-
-protected:
-    TConditionValue m_value;
-    SequentialGetter<TConditionValue> m_condition_column;
-};
-
-
-template <class TConditionFunction> class BinaryNode: public ParentNode {
-public:
-    template <Action TAction> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}
-
-    BinaryNode(BinaryData v, size_t column)
-    {
-        m_dT = 100.0;
-        m_condition_column_idx = column;
-        m_child = 0;
-
-        // FIXME: Store this in std::string instead.
-        char* data = new char[v.size()];
-        memcpy(data, v.data(), v.size());
-        m_value = BinaryData(data, v.size());
-    }
-
-    ~BinaryNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
-    {
-        delete[] m_value.data();
-    }
-
-    void init(const Table& table)
-    {
-        m_dD = 100.0;
-        m_table = &table;
-        m_condition_column = static_cast<const ColumnBinary*>(&get_column_base(table, m_condition_column_idx));
-        m_column_type = get_real_column_type(table, m_condition_column_idx);
-
-        if (m_child)
-            m_child->init(table);
-    }
-
-    size_t find_first_local(size_t start, size_t end)
-    {
-        TConditionFunction condition;
-        for (size_t s = start; s < end; ++s) {
-            BinaryData value = m_condition_column->get(s);
-            if (condition(m_value, value))
-                return s;
-        }
-        return not_found;
-    }
-
-protected:
-private:
-    BinaryData m_value;
-protected:
-    const ColumnBinary* m_condition_column;
-    ColumnType m_column_type;
-};
 
 // Specialization for Equal condition on Strings - we specialize because we can utilize indexes (if they exist) for Equal.
 // Future optimization: make specialization for greater, notequal, etc

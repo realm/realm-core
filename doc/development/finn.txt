@@ -1,0 +1,35 @@
+Idea
+********************************************************************************************************
+Move ParentNode::aggregate() to some place outside nodes (maybe into query.cpp?). Because it's confusing design that all nodes have this method and that you can call it on any of them. Scheduling/performance, etc, is exactly the same regardless of which is called. It was just sloppy development.
+
+Idea
+********************************************************************************************************
+Note: All nodes contain a list of all nodes the vector<ParentNode*>m_children vector (so that they can call methods on eachother). Pointer to self is also stored, always in entry 0. The m_children lists are populated in the init() methods from the m_child pointers of all nodes in the node chain that query.cpp costructs when the user calls condition methods:
+
+IntegerNode		  +---------> StringNode      +--------> ORNode             +-------> IntegerNode
+m_child -----------           m_child ---------          m_child = ----------         m_child = NULL
+                                                         m_cond[2]
+														 ||
+                                                         sub node chains
+
+The population of m_children happens through a gather_children() method call from init().
+
+All these m_children vectors could maybe be gathered into a single vector stored somewhere else. However, note that sub node chains of ORNodes would need their own. So a single global is not enough. More analyzing is needed.
+														 
+Idea
+********************************************************************************************************												 
+query_expression: Sqrt operator in query_expression.hpp
+
+
+Idea
+********************************************************************************************************												 
+query_engine: Optimize cost() method and/or m_dD and m_dT constants for the different node classes. Do not trust that any existing values or formulas are near optimal at all, because I have only done very little measurements, and
+mostly just guessing.
+
+
+Idea
+********************************************************************************************************												 
+query_engine: Implement NOT node
+
+Idea
+********************************************************************************************************												 
