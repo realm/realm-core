@@ -97,7 +97,7 @@ Query& Query::tableview(const TableView& tv)
 // Makes query search only in rows contained in tv
 Query& Query::tableview(const Array &arr)
 {
-    ParentNode* const p = new ArrayNode(arr);
+    ParentNode* const p = new ListviewNode(arr);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -366,27 +366,27 @@ Query& Query::equal(size_t column_ndx, bool value)
 // ------------- float
 Query& Query::equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BasicNode<float, Equal> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, Equal> >(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BasicNode<float, NotEqual> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, NotEqual> >(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, float value)
 {
-    return add_condition<float, BasicNode<float, Greater> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, Greater> >(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BasicNode<float, GreaterEqual> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, GreaterEqual> >(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BasicNode<float, LessEqual> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, LessEqual> >(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, float value)
 {
-    return add_condition<float, BasicNode<float, Less> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, Less> >(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, float from, float to)
 {
@@ -399,27 +399,27 @@ Query& Query::between(size_t column_ndx, float from, float to)
 // ------------- double
 Query& Query::equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BasicNode<double, Equal> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, Equal> >(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BasicNode<double, NotEqual> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, NotEqual> >(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, double value)
 {
-    return add_condition<double, BasicNode<double, Greater> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, Greater> >(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BasicNode<double, GreaterEqual> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, GreaterEqual> >(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BasicNode<double, LessEqual> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, LessEqual> >(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, double value)
 {
-    return add_condition<double, BasicNode<double, Less> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, Less> >(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, double from, double to)
 {
