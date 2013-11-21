@@ -270,7 +270,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             spawn_daemon(path);
         }
 #endif
-        
+        m_file.share();
     }
     else { // shared access
 
@@ -338,6 +338,7 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
+    m_reader_map.unmap();
     SharedInfo* info = m_info;
 
 #ifndef _WIN32
@@ -346,8 +347,8 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     }
 #endif
 
-    if (!m_file.try_get_exclusive_access())
-        return;
+    m_file.close();
+    if (! m_file.has_exclusive_access()) return;
 
     // If the db file is just backing for a transient data structure,
     // we can delete it when done.
@@ -361,7 +362,6 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
         catch(...) {} // ignored on purpose.
     }
 
-    m_reader_map.unmap();
 }
 
 

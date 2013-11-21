@@ -95,7 +95,7 @@ public:
         enum State { Unitialized = 0, Ready, Stale };
         Atomic<State> m_state;
         Atomic<uint32_t> m_transition_count;
-        Atomic<uint32_t> m_activity_count;
+        Atomic<uint32_t> m_exit_count;
     };
 
     template<typename T>
@@ -164,7 +164,15 @@ public:
     // gain exclusive access before this process gets it. Note, that there is no
     // option to WAIT for exclusive access. In case of contention, NO thread gets
     // exclusive access, all requests just returns false.
-    bool try_get_exclusive_access();
+    //
+    // If caller set promise_to_exit, he is obliged to not do any further calls
+    // to change state, except calling close. In return, the IPMFile guarantees
+    // that in case of a) contention and b) no one not contending, exactly one 
+    // of those contenders promising to exit will in fact get exclusivity.
+    bool try_get_exclusive_access(bool promise_to_exit = false);
+
+    // inquire exclusivity - do not attempt to get it if we don't have it.
+    bool has_exclusive_access();
 
     // true if the file has been removed since it was opened. On some systems (UNIX),
     // it is possible to remove a file even though it is open. This call also returns

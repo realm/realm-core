@@ -24,6 +24,9 @@
 #include "file.hpp"
 #include <limits>
 
+#include <iostream>
+using namespace std;
+
 namespace tightdb {
 
 struct IPMFile::IPMFileImplementation {
@@ -76,6 +79,7 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
 
     while (msec_timeout >= 0) {
 
+        cerr << "open: attempt to open file " << msec_timeout << endl;
         size_t file_size = 0;
         bool need_init;
         bool got_exclusive;
@@ -96,7 +100,6 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
         if (!got_exclusive && !got_shared) {
 
             // someone else has exclusive access, backout and retry
-            m_impl->m_file.unlock();
             m_impl->m_file.close();
             msec_timeout--;
             micro_sleep(1000);
@@ -169,10 +172,11 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
 
         IPMFileWrapper<uint64_t>* wrapped_data = m_impl->m_file_map.get_addr();
         IPMFileSharedInfo* info = & wrapped_data->info;
-        if (info->m_transition_count.load_acquire()) {
+        if (info->m_transition_count.load_acquire() || info->m_exit_count.load_acquire()) {
             // conflict or stale file...
             m_impl->m_file.unlock();
             micro_sleep(1000);
+            msec_timeout--;
             continue;
         }
 
@@ -180,8 +184,14 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
         is_exclusive = m_impl->m_is_exclusive = got_exclusive;
         fug.release();
         fcg.release();
+        if (is_exclusive)
+            cerr << "open: exclusive" << endl;
+        else
+            cerr << "open: shared" << endl;
+        m_impl->m_is_open = true;
         return static_cast<void*>( & wrapped_data->user_data );
     };
+    cerr << "open: timeout, throwing PresumablyStaleFile" << endl;
     throw PresumablyStaleFile(m_impl->m_path);
 }
 
@@ -189,6 +199,7 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
 void IPMFile::share()
 {
     if (m_impl->m_is_exclusive) {
+        cerr << "exclusive -> shared (begin)" << endl;
         // transition to shared state:
         IPMFileWrapper<uint64_t>* wrapped_data = m_impl->m_file_map.get_addr();
         IPMFileSharedInfo* info = & wrapped_data->info;
@@ -197,6 +208,7 @@ void IPMFile::share()
         m_impl->m_file.lock_shared();
         info->m_transition_count.dec();
         m_impl->m_is_exclusive = false;
+        cerr << "exclusive -> shared (done)" << endl;
     }
 }
 
@@ -204,7 +216,11 @@ void IPMFile::share()
 void IPMFile::close()
 {
     if (m_impl->m_is_open) {
-        bool is_exclusive = try_get_exclusive_access();
+        cerr << "closing..." << endl;
+        // It would be tempting to use try_get_exclusive access to determine exclusivity,
+        // but alas, it would not work, because in case of contention all contenders are
+        // rejected, and we need to pick exactly one to do the cleanup.
+        bool is_exclusive = try_get_exclusive_access(true);
         if (is_exclusive) {
 
             // we now poison the file by incrementing the transition count. This
@@ -215,11 +231,14 @@ void IPMFile::close()
             IPMFileWrapper<uint64_t>* wrapped_data = m_impl->m_file_map.get_addr();
             IPMFileSharedInfo* info = & wrapped_data->info;
             info->m_transition_count.inc();
+            m_impl->m_is_exclusive = true;
         }
         m_impl->m_file_map.unmap();
         m_impl->m_file.unlock();
         m_impl->m_file.close();
+        m_impl->m_is_open = false;
         if (is_exclusive) {
+            cerr << "removing..." << endl;
             File::try_remove(m_impl->m_path);
         }
     }
@@ -235,39 +254,86 @@ IPMFile::~IPMFile()
     if (m_impl->m_is_open) close();
 }
 
+bool IPMFile::has_exclusive_access()
+{
+    return m_impl->m_is_exclusive;
+}
 
-bool IPMFile::try_get_exclusive_access()
+bool IPMFile::try_get_exclusive_access(bool promise_to_exit)
 {
     if (m_impl->m_is_exclusive)
         return true;
 
+    cerr << "shared -> exclusive (begin)" << (promise_to_exit ? "  <exiting>" : "") << endl;
     // try to transition to exclusive state:
     IPMFileWrapper<uint64_t>* wrapped_data = m_impl->m_file_map.get_addr();
     IPMFileSharedInfo* info = & wrapped_data->info;
-    if (info->m_transition_count.load_acquire()) {
-        // conflict, even before lifting the shared lock, so just give up
+
+    if (promise_to_exit) {
+
+        // look for conflicts early, before trying to grab the lock
+        if (info->m_transition_count.load_relaxed()) {
+            cerr << "shared -> exclusive (contention)" << endl;
+            return false;
+        }
+
+        // go for it:
+        info->m_exit_count.inc();
+        m_impl->m_file.unlock();
+        if (m_impl->m_file.try_lock_exclusive()) {
+            
+            // got the lock, but look out for contenders.
+            // ignore contention for exit.
+            if (info->m_transition_count.load_relaxed() == 0) {
+
+                // no conflicts:
+                cerr << "shared -> exclusive (succes)" << endl;
+                m_impl->m_is_exclusive = true;
+                return true;
+            }
+        }
+        // could not get the lock, or there was contention. As we have promised
+        // to exit, we loose all locks, but we must revert exit count.
+        cerr << "shared -> exclusive (contention)" << endl;
+        info->m_exit_count.dec();
+        return false;
+        
+    }
+    else /* not promise_to_exit */ {
+
+        if (info->m_transition_count.load_acquire() || info->m_exit_count.load_acquire()) {
+            // conflict, even before lifting the shared lock, so just give up
+            cerr << "shared -> exclusive (contention)" << endl;
+            return false;
+        }
+
+        // indicate to other lock contenders, that we are here even though we 
+        // will now operate without locks for a brief moment. Do it differently
+        // depending on whether we are promising to exit
+        info->m_transition_count.inc();
+
+        // go for it:
+        m_impl->m_file.unlock();
+        if (m_impl->m_file.try_lock_exclusive()) {
+
+            // we got the exclusive lock! look for conflicts:
+            if (info->m_transition_count.load_relaxed() + info->m_transition_count.load_relaxed() == 1) {
+
+                // no conflicts
+                info->m_transition_count.dec();
+                m_impl->m_is_exclusive = true;
+                cerr << "shared -> exclusive (succes)" << endl;
+                return true;
+            }
+        }
+        // coming here, either because we couldn't get the exclusive lock, or because
+        // a conflict was detected. Re-acquire shared lock and indicate that we did
+        // not get the exclusive access.
+        m_impl->m_file.lock_shared();
+        info->m_transition_count.dec();
+        cerr << "shared -> exclusive (contention)" << endl;
         return false;
     }
-
-    // indicate to other lock contenders, that we are here even though we 
-    // will now operate without locks for a brief moment
-    info->m_transition_count.inc();
-    m_impl->m_file.unlock();
-    if (m_impl->m_file.try_lock_exclusive()) {
-        // we got the exclusive lock! look for conflicts:
-        if (info->m_transition_count.load_relaxed() == 1) {
-            // no conflicts
-            info->m_transition_count.dec();
-            m_impl->m_is_exclusive = true;
-            return true;
-        }
-    }    
-    // coming here, either because we couldn't get the exclusive lock, or because
-    // a conflict was detected. Re-acquire shared lock and indicate that we did
-    // not get the exclusive access.
-    m_impl->m_file.lock_shared();
-    info->m_transition_count.dec();
-    return false;
 }
 
 
