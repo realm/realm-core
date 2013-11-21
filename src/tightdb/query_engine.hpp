@@ -370,12 +370,12 @@ public:
     }
 
     /***************************************************************************************************************
-    /*                                                                                                             *
-    /* Main entry point of a query. Can be called on any of the nodes; yields same result. Schedules calls to      *
-    /* aggregate_local.                                                                                            *
-    /* Return value is the result of the query, or Array pointer for FindAll.                                      *
-    /*                                                                                                             *
-    /***************************************************************************************************************/
+    *                                                                                                             *
+    * Main entry point of a query. Can be called on any of the nodes; yields same result. Schedules calls to      *
+    * aggregate_local.                                                                                            *
+    * Return value is the result of the query, or Array pointer for FindAll.                                      *
+    *                                                                                                             *
+    ***************************************************************************************************************/
 
     template<Action TAction, class TResult, class TSourceColumn>
     TResult aggregate(QueryState<TResult>* st, size_t start, size_t end, size_t agg_col, size_t* matchcount)

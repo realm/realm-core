@@ -272,6 +272,94 @@ void TableViewBase::sort(size_t column, bool Ascending)
     ref.destroy();
 }
 
+
+void TableViewBase::pivot(size_t col1_ndx, size_t col2_ndx, Table::PivotType op, Table& result) const
+{
+    TIGHTDB_ASSERT(result.is_empty() && result.get_column_count() == 0);
+    TIGHTDB_ASSERT(col1_ndx < m_table->m_columns.size());
+    TIGHTDB_ASSERT(col2_ndx < m_table->m_columns.size());
+    
+    TIGHTDB_ASSERT(get_column_type(col1_ndx) == type_String);
+    TIGHTDB_ASSERT(get_column_type(col2_ndx) == type_Int);
+
+    
+    // Add columns to result table
+    result.add_column(type_String, get_column_name(col1_ndx));
+    result.add_column(type_Int, get_column_name(col2_ndx));
+    result.set_index(0);
+    
+    // Cache columms
+    const Column& src_column =  m_table->get_column(col2_ndx);
+    Column& dst_column = result.get_column(1);
+    //const StringIndex& dst_index = result.get_column_string(0).get_index();
+    
+    const size_t count = size();
+    
+    if (op == Table::pivot_count) {
+        for (size_t i = 0; i < count; ++i) {
+            StringData str = m_table->get_string(col1_ndx, i);
+            size_t ndx = result.lookup(str);
+            if (ndx == not_found) {
+                ndx = result.add_empty_row();
+                result.set_string(0, ndx, str);
+            }
+            
+            // Count
+            dst_column.adjust(ndx, 1);
+        }
+    }
+    else if (op == Table::pivot_sum) {
+        for (size_t i = 0; i < count; ++i) {
+            StringData str = m_table->get_string(col1_ndx, i);
+            size_t ndx = result.lookup(str);
+            if (ndx == not_found) {
+                ndx = result.add_empty_row();
+                result.set_string(0, ndx, str);
+            }
+            
+            // SUM
+            int64_t value = src_column.get(i);
+            dst_column.adjust(ndx, value);
+        }
+    }
+    else if (op == Table::pivot_avg) {
+        // Add temporary column for counts
+        result.add_column(type_Int, "count");
+        Column& cnt_column = result.get_column(2);
+        
+        for (size_t i = 0; i < count; ++i) {
+            StringData str = m_table->get_string(col1_ndx, i);
+            size_t ndx = result.lookup(str);
+            if (ndx == not_found) {
+                ndx = result.add_empty_row();
+                result.set_string(0, ndx, str);
+            }
+            
+            // SUM
+            int64_t value = src_column.get(i);
+            dst_column.adjust(ndx, value);
+            
+            // Increment count
+            cnt_column.adjust(ndx, 1);
+        }
+        
+        // Calculate averages
+        const size_t res_count = result.size();
+        for (size_t i = 0; i < res_count; ++i) {
+            int64_t sum   = result.get_int(1, i);
+            int64_t count = result.get_int(2, i);
+            int64_t res   = sum / count;
+            result.set_int(1, i, res);
+        }
+        
+        // Remove temp column
+        result.remove_column(2);
+    }
+}
+
+
+
+
 void TableViewBase::to_json(ostream& out) const
 {
     // Represent table as list of objects

@@ -94,6 +94,9 @@ public:
     // Sort the view according to the specified column and the
     // specified direction.
     void sort(size_t column_ndx, bool ascending = true);
+    
+    
+    void pivot(size_t col1_ndx, size_t col2_ndx, Table::PivotType op, Table& result) const;
 
     // Get row index in the source table this view is "looking" at.
     size_t get_source_ndx(size_t row_ndx) const TIGHTDB_NOEXCEPT
