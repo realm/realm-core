@@ -79,7 +79,9 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
 
     while (msec_timeout >= 0) {
 
+#ifdef TIGHTDB_ENABLE_LOGFILE
         cerr << "open: attempt to open file " << msec_timeout << endl;
+#endif
         size_t file_size = 0;
         bool need_init;
         bool got_exclusive;
@@ -180,14 +182,18 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
         is_exclusive = m_impl->m_is_exclusive = got_exclusive;
         fug.release();
         fcg.release();
+#ifdef TIGHTDB_ENABLE_LOGFILE
         if (is_exclusive)
             cerr << "open: exclusive" << endl;
         else
             cerr << "open: shared" << endl;
+#endif
         m_impl->m_is_open = true;
         return static_cast<void*>( & wrapped_data->user_data );
     };
+#ifdef TIGHTDB_ENABLE_LOGFILE
     cerr << "open: timeout, throwing PresumablyStaleFile" << endl;
+#endif
     throw PresumablyStaleFile(m_impl->m_path);
 }
 
@@ -195,7 +201,9 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
 void IPMFile::share()
 {
     if (m_impl->m_is_exclusive) {
+#ifdef TIGHTDB_ENABLE_LOGFILE
         cerr << "exclusive -> shared (begin)" << endl;
+#endif
         // transition to shared state:
         IPMFileWrapper<uint64_t>* wrapped_data = m_impl->m_file_map.get_addr();
         IPMFileSharedInfo* info = & wrapped_data->info;
@@ -204,7 +212,9 @@ void IPMFile::share()
         m_impl->m_file.lock_shared();
         info->m_transition_count.dec();
         m_impl->m_is_exclusive = false;
+#ifdef TIGHTDB_ENABLE_LOGFILE
         cerr << "exclusive -> shared (done)" << endl;
+#endif
     }
 }
 
@@ -212,8 +222,9 @@ void IPMFile::share()
 void IPMFile::close()
 {
     if (m_impl->m_is_open) {
+#ifdef TIGHTDB_ENABLE_LOGFILE
         cerr << "closing..." << endl;
-
+#endif
         bool is_exclusive = try_get_exclusive_access(true);
         if (is_exclusive) {
 
@@ -229,7 +240,9 @@ void IPMFile::close()
             m_impl->m_file.unlock();
             m_impl->m_file.close();
             m_impl->m_is_open = false;
+#ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "removing..." << endl;
+#endif
             File::try_remove(m_impl->m_path);
         }
         // If is_exclusive is false, try_get_exclusive_access has already closed the file.
@@ -256,7 +269,9 @@ bool IPMFile::try_get_exclusive_access(bool promise_to_exit)
     if (m_impl->m_is_exclusive)
         return true;
 
+#ifdef TIGHTDB_ENABLE_LOGFILE
     cerr << "shared -> exclusive (begin)" << (promise_to_exit ? "  <exiting>" : "") << endl;
+#endif
     // try to transition to exclusive state:
     IPMFileWrapper<uint64_t>* wrapped_data = m_impl->m_file_map.get_addr();
     IPMFileSharedInfo* info = & wrapped_data->info;
@@ -265,7 +280,9 @@ bool IPMFile::try_get_exclusive_access(bool promise_to_exit)
 
         // look for conflicts early, before trying to grab the lock
         if (info->m_transition_count.load_relaxed()) {
+#ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "shared -> exclusive (early-out contention)" << endl;
+#endif
             return false;
         }
 
@@ -279,7 +296,9 @@ bool IPMFile::try_get_exclusive_access(bool promise_to_exit)
             if (info->m_transition_count.load_relaxed() == 0) {
 
                 // no conflicts:
+#ifdef TIGHTDB_ENABLE_LOGFILE
                 cerr << "shared -> exclusive (succes)" << endl;
+#endif
                 m_impl->m_is_exclusive = true;
                 // poison the file by incrementing the transition count.
                 // This makes sure that no one get exclusive access to the file
@@ -291,7 +310,9 @@ bool IPMFile::try_get_exclusive_access(bool promise_to_exit)
         }
         // could not get the lock, or there was contention. As we have promised
         // to exit, we loose all locks and close the file, but we must revert exit count first.
+#ifdef TIGHTDB_ENABLE_LOGFILE
         cerr << "shared -> exclusive (contention) -> implicitly closed" << endl;
+#endif
         info->m_exit_count.dec();
         m_impl->m_file_map.unmap();
         m_impl->m_file.close();
@@ -303,7 +324,9 @@ bool IPMFile::try_get_exclusive_access(bool promise_to_exit)
 
         if (info->m_transition_count.load_acquire() || info->m_exit_count.load_acquire()) {
             // conflict, even before lifting the shared lock, so just give up
+#ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "shared -> exclusive (early-out contention)" << endl;
+#endif
             return false;
         }
 
@@ -321,7 +344,9 @@ bool IPMFile::try_get_exclusive_access(bool promise_to_exit)
                 // no conflicts
                 info->m_transition_count.dec();
                 m_impl->m_is_exclusive = true;
+#ifdef TIGHTDB_ENABLE_LOGFILE
                 cerr << "shared -> exclusive (succes)" << endl;
+#endif
                 return true;
             }
         }
@@ -330,7 +355,9 @@ bool IPMFile::try_get_exclusive_access(bool promise_to_exit)
         // not get the exclusive access.
         m_impl->m_file.lock_shared();
         info->m_transition_count.dec();
+#ifdef TIGHTDB_ENABLE_LOGFILE
         cerr << "shared -> exclusive (contention)" << endl;
+#endif
         return false;
     }
 }
