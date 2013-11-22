@@ -1672,7 +1672,7 @@ TEST(TestQueryOnTableView)
         size_t lbound = rand() % (TIGHTDB_MAX_LIST_SIZE * 10);
         size_t ubound = lbound + rand() % (TIGHTDB_MAX_LIST_SIZE * 10 - lbound);
 
-        for(int i = 0; i < TIGHTDB_MAX_LIST_SIZE * 10; i++) {
+        for(size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 10; i++) {
             int v = rand() % 3;
 
             if(v == 1 && i >= lbound && i < ubound && cnt0 < limit)
