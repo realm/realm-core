@@ -2039,28 +2039,29 @@ void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result)
         for (size_t i = 0; i < count; ++i) {
             StringData str = get_string(col1_ndx, i);
             size_t ndx = dst_index.find_first(str);
+            int64_t value = src_column.get(i);
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
                 result.set_string(0, ndx, str);
+                dst_column.set(ndx, value); // Set the real value, to ovwewrite the default value
+
+            } else {
+                dst_column.set(ndx, min(dst_column.get(ndx), value));
             }
-            
-            // Min
-            int64_t value = src_column.get(i);
-            dst_column.set(ndx, min(dst_column.get(ndx), value));
         }
     }
     else if (op == pivot_max) {
         for (size_t i = 0; i < count; ++i) {
             StringData str = get_string(col1_ndx, i);
             size_t ndx = dst_index.find_first(str);
+            int64_t value = src_column.get(i);
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
                 result.set_string(0, ndx, str);
+                dst_column.set(ndx, value);  // Set the real value, to ovwewrite the default value
+            } else {
+                dst_column.set(ndx, max(dst_column.get(ndx), value));
             }
-            
-            // Max
-            int64_t value = src_column.get(i);
-            dst_column.set(ndx, max(dst_column.get(ndx), value));
         }
     }
     else if (op == pivot_avg) {

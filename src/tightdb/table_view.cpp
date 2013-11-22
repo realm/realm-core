@@ -319,7 +319,6 @@ void TableViewBase::pivot(size_t col1_ndx, size_t col2_ndx, Table::PivotType op,
                 result.set_string(0, ndx, str);
             }
             
-            // SUM
             int64_t value = get_int(col2_ndx, i);
             dst_column.adjust(ndx, value);
         }
@@ -328,28 +327,28 @@ void TableViewBase::pivot(size_t col1_ndx, size_t col2_ndx, Table::PivotType op,
         for (size_t i = 0; i < count; ++i) {
             StringData str = get_string(col1_ndx, i);
             size_t ndx = result.lookup(str);
+            int64_t value = get_int(col2_ndx, i);
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
                 result.set_string(0, ndx, str);
+                dst_column.set(ndx, value); // set initial value other than defalt 0
+            } else {
+                dst_column.set(ndx, min(dst_column.get(ndx), value));
             }
-            
-            // SUM
-            int64_t value = get_int(col2_ndx, i);
-            dst_column.set(ndx, min(dst_column.get(ndx), value));
         }
     }
     else if (op == Table::pivot_max) {
         for (size_t i = 0; i < count; ++i) {
             StringData str = get_string(col1_ndx, i);
             size_t ndx = result.lookup(str);
+            int64_t value = get_int(col2_ndx, i);
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
                 result.set_string(0, ndx, str);
+                dst_column.set(ndx, value); // set initial value other than defalt 0
+            } else {
+                dst_column.set(ndx, max(dst_column.get(ndx), value));
             }
-            
-            // SUM
-            int64_t value = get_int(col2_ndx, i);
-            dst_column.set(ndx, max(dst_column.get(ndx), value));
         }
     }
     else if (op == Table::pivot_avg) {
