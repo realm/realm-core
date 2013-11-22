@@ -1985,21 +1985,8 @@ void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result)
 
     // Add columns to result table
     result.add_column(type_String, get_column_name(col1_ndx));
+    result.add_column(type_Int, get_column_name(col2_ndx));
     result.set_index(0);
-
-    
-    if (op == pivot_sum) {
-        if(get_column_type(col2_ndx) == type_Float) {
-            result.add_column(type_Double, get_column_name(col2_ndx));
-        } else {
-            result.add_column(get_column_type(col2_ndx), get_column_name(col2_ndx));
-        }
-    } else if (op == pivot_count) {
-        result.add_column(type_Int, get_column_name(col2_ndx)); // FIMXE add Column name "Count"
-    
-    } else
-        result.add_column(type_Int, get_column_name(col2_ndx)); //FIXME, should be double to support avg
-
 
     // Cache columms
     const Column& src_column = get_column(col2_ndx);
