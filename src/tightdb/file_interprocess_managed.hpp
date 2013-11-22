@@ -167,6 +167,11 @@ public:
     // to change state, except calling close. In return, the IPMFile guarantees
     // that in case of a) contention and b) no one not contending, exactly one 
     // of those contenders promising to exit will in fact get exclusivity.
+    //
+    // If promise_to_exit is set, and try_get_exclusive_access fails, the caller
+    // has also lost the right to access memory mapped by the file. To detect
+    // violation of this restriction, the primary mapping is removed and the
+    // file is closed.
     bool try_get_exclusive_access(bool promise_to_exit = false);
 
     // inquire exclusivity - do not attempt to get it if we don't have it.

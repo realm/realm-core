@@ -89,7 +89,11 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
         // Try to get a lock - preferably an exclusive lock,
         // but if not be contend with a shared lock for now. It is important to try
         // (and potentially retry) in order to ensure that ONE of the clients
-        // gets exclusive access if possible.
+        // gets exclusive access if possible. It is also important to back out
+        // and reopen the file in case of contention, because contention may be
+        // an indication that someone is in the process of removing the file, and
+        // if so we really, really need to get to the new one (or create it) instead
+        // of reusing a file which has been deleted.
         got_exclusive = m_impl->m_file.try_lock_exclusive();
         if (got_exclusive) {
             got_shared = false;
@@ -160,15 +164,7 @@ void* IPMFile::open(bool& is_exclusive, size_t size, int msec_timeout)
         //
         // A program crashing mid-transition will leave the lock file permanently damaged, in the
         // sense that no one can obtain exclusive access until the lock file is removed. The state
-        // transitions are implemented such that they minimize the frequency.
-        //
-        // FIXME: scheme outlined below does not work! Find something better.
-        //
-        // As long as programs are mid-transition, they must increment an activity counter within
-        // a very short time frame. When a file with non-zero transition count is encountered, the
-        // activity counter can be sampled and if it doesn't change within a short time frame, the
-        // file may be considered to be in indeterminate state, and an exception is thrown to
-        // indicate that operator intervention is required.
+        // transitions are implemented such that they should minimize the frequency.
 
         IPMFileWrapper<uint64_t>* wrapped_data = m_impl->m_file_map.get_addr();
         IPMFileSharedInfo* info = & wrapped_data->info;
@@ -217,9 +213,7 @@ void IPMFile::close()
 {
     if (m_impl->m_is_open) {
         cerr << "closing..." << endl;
-        // It would be tempting to use try_get_exclusive access to determine exclusivity,
-        // but alas, it would not work, because in case of contention all contenders are
-        // rejected, and we need to pick exactly one to do the cleanup.
+
         bool is_exclusive = try_get_exclusive_access(true);
         if (is_exclusive) {
 
@@ -231,16 +225,14 @@ void IPMFile::close()
             IPMFileWrapper<uint64_t>* wrapped_data = m_impl->m_file_map.get_addr();
             IPMFileSharedInfo* info = & wrapped_data->info;
             info->m_transition_count.inc();
-            m_impl->m_is_exclusive = true;
-        }
-        m_impl->m_file_map.unmap();
-        m_impl->m_file.unlock();
-        m_impl->m_file.close();
-        m_impl->m_is_open = false;
-        if (is_exclusive) {
+            m_impl->m_file_map.unmap();
+            m_impl->m_file.unlock();
+            m_impl->m_file.close();
+            m_impl->m_is_open = false;
             cerr << "removing..." << endl;
             File::try_remove(m_impl->m_path);
         }
+        // If is_exclusive is false, try_get_exclusive_access has already closed the file.
     }
 }
 
@@ -290,7 +282,7 @@ bool IPMFile::try_get_exclusive_access(bool promise_to_exit)
                 cerr << "shared -> exclusive (succes)" << endl;
                 m_impl->m_is_exclusive = true;
                 // poison the file by incrementing the transition count.
-                // makes sure that no one get exclusive access to the file
+                // This makes sure that no one get exclusive access to the file
                 // if the caller fails before removing the file (through close)
                 // we get a stale file.
                 info->m_transition_count.inc();
@@ -298,9 +290,12 @@ bool IPMFile::try_get_exclusive_access(bool promise_to_exit)
             }
         }
         // could not get the lock, or there was contention. As we have promised
-        // to exit, we loose all locks, but we must revert exit count.
-        cerr << "shared -> exclusive (contention)" << endl;
+        // to exit, we loose all locks and close the file, but we must revert exit count first.
+        cerr << "shared -> exclusive (contention) -> implicitly closed" << endl;
         info->m_exit_count.dec();
+        m_impl->m_file_map.unmap();
+        m_impl->m_file.close();
+        m_impl->m_is_open = false;
         return false;
         
     }
@@ -313,8 +308,7 @@ bool IPMFile::try_get_exclusive_access(bool promise_to_exit)
         }
 
         // indicate to other lock contenders, that we are here even though we 
-        // will now operate without locks for a brief moment. Do it differently
-        // depending on whether we are promising to exit
+        // will now operate without locks for a brief moment. 
         info->m_transition_count.inc();
 
         // go for it:
