@@ -172,6 +172,7 @@ public:
     // has also lost the right to access memory mapped by the file. To detect
     // violation of this restriction, the primary mapping is removed and the
     // file is closed.
+    // FIXME: do the same to secondary mapping(s)
     bool try_get_exclusive_access(bool promise_to_exit = false);
 
     // inquire exclusivity - do not attempt to get it if we don't have it.
