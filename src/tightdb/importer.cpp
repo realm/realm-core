@@ -214,7 +214,7 @@ template <bool can_fail> float Importer::parse_float(const char*col, bool* succe
         return 0.0;    
     }
 
-    if(can_fail && success != NULL)
+    if(can_fail && success != null_ptr)
         *success = true;
 
     return static_cast<float>(d);
@@ -229,7 +229,7 @@ template <bool can_fail> double Importer::parse_double(const char* col, bool* su
     double x;
     bool is_neg = false;
     size_t dummy;
-    if(can_fail && significants == NULL)
+    if(can_fail && significants == null_ptr)
         significants = &dummy;
 
     if(can_fail && is_null(col)) {
@@ -518,7 +518,7 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
     m_file = file;
     m_row = 1;
 
-    if(scheme2 == NULL) {
+    if(scheme2 == null_ptr) {
         // Header detection: 1) If first line is strings-only and next line has at least 1 occurence of non-string, then 
         // header is present. 2) If first line has at least one occurence of non-string or empty-field, then header is 
         // not present. 3) If first two lines are strings-only, we can't tell, and treat both as payload
@@ -679,7 +679,7 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
 
 size_t Importer::import_csv_auto(FILE* file, Table& table, size_t type_detection_rows, size_t import_rows)
 {
-    return import_csv(file, table, NULL, NULL, type_detection_rows, 0, import_rows);
+    return import_csv(file, table, null_ptr, null_ptr, type_detection_rows, 0, import_rows);
 }
 
 size_t Importer::import_csv_manual(FILE* file, Table& table, vector<DataType> scheme, vector<string> column_names, 

@@ -72,7 +72,7 @@ R ColumnBase::aggregate(T target, std::size_t start, std::size_t end,
         end = size();
 
     QueryState<R> state;
-    state.init(action, NULL, limit);
+    state.init(action, null_ptr, limit);
 
     ColType* column = const_cast<ColType*>(static_cast<const ColType*>(this));
     SequentialGetter<T> sg(column);

@@ -189,6 +189,21 @@ template<class T> inline bool is_negative(T value)
     return _impl::IsNegative<T, std::numeric_limits<T>::is_signed>::__test(value);
 }
 
+// Emulates nullptr of C++11
+const class {
+public:
+    template<class T> operator T*() const
+    {
+        return 0;
+    }
+    template<class C, class T> operator T C::*() const 
+    {
+        return 0;
+    }
+private:
+    void operator& () const;
+} null_ptr = {};   
+
 
 } // namespace tightdb
 
