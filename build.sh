@@ -10,7 +10,13 @@ if [ "$TIGHTDB_SCRIPT_DEBUG" ]; then
 fi
 
 
-cd "$(dirname "$0")" || exit 1
+if ! [ "$TIGHTDB_ORIG_CWD" ]; then
+    TIGHTDB_ORIG_CWD="$(pwd)" || exit 1
+    export ORIG_CWD
+fi
+
+dir="$(dirname "$0")" || exit 1
+cd "$dir" || exit 1
 TIGHTDB_HOME="$(pwd)" || exit 1
 export TIGHTDB_HOME
 
@@ -169,7 +175,7 @@ find_iphone_sdk()
 }
 
 
-CONFIG_MK="src/config-dyn.mk"
+CONFIG_MK="src/config.mk"
 
 require_config()
 {
@@ -366,7 +372,7 @@ XCODE_HOME          = $xcode_home
 IPHONE_SDKS         = ${iphone_sdks:-none}
 IPHONE_SDKS_AVAIL   = $iphone_sdks_avail
 EOF
-        if [ -z "$INTERACTIVE" ]; then
+        if ! [ "$INTERACTIVE" ]; then
             echo "New configuration in $CONFIG_MK:"
             cat "$CONFIG_MK" | sed 's/^/    /' || exit 1
             echo "Done configuring"
@@ -406,7 +412,11 @@ EOF
     "build-config-progs")
         auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
-        TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE -C "src/tightdb" "tightdb-config" "tightdb-config-dbg" || exit 1
+        # FIXME: Apparently, there are fluke cases where timestamps
+        # are such that src/tightdb/build_config.h is not recreated
+        # automatically by src/tightdb/Makfile. Using --always-make is
+        # a work-around.
+        TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE --always-make -C "src/tightdb" "tightdb-config" "tightdb-config-dbg" || exit 1
         echo "Done building config programs"
         exit 0
         ;;
@@ -815,7 +825,11 @@ EOF
             cat >"$PKG_DIR/build" <<EOF
 #!/bin/sh
 
-cd "\$(dirname "\$0")" || exit 1
+TIGHTDB_ORIG_CWD="\$(pwd)" || exit 1
+export ORIG_CWD
+
+dir="\$(dirname "\$0")" || exit 1
+cd "\$dir" || exit 1
 TIGHTDB_DIST_HOME="\$(pwd)" || exit 1
 export TIGHTDB_DIST_HOME
 
@@ -946,7 +960,7 @@ if [ \$# -ge 1 -a "\$1" = "config" ]; then
                     break
                 fi
             done
-            if [ -z "\$found" ]; then
+            if ! [ "\$found" ]; then
                 echo "No such extension '\$x'" 1>&2
                 all_found=""
                 break
@@ -965,7 +979,7 @@ exit 1
 EOF
             chmod +x "$PKG_DIR/build"
 
-            if [ -z "$INTERACTIVE" ]; then
+            if ! [ "$INTERACTIVE" ]; then
                 cat >"$PKG_DIR/README" <<EOF
 TightDB version $TIGHTDB_VERSION
 
@@ -1071,8 +1085,8 @@ EOF
 /config
 /Makefile
 /src/generic.mk
+/src/project.mk
 /src/config.mk
-/src/config-dyn.mk
 /src/Makefile
 /src/tightdb.hpp
 /src/tightdb/Makefile
@@ -1178,13 +1192,13 @@ EOF
             # use the shared core library, are not, so we have to set
             # the runtime library path. Also, the core library will
             # look for `tightdbd` in the wrong place, so we have to
-            # set `TIGHTDBD_PATH` too.
+            # set `TIGHTDB_ASYNC_DAEMON` too.
             if [ "$PREBUILT_CORE" ]; then
                 install_libdir="$(get_config_param "INSTALL_LIBDIR" "$TEST_PKG_DIR/tightdb")" || exit 1
                 path_list_prepend "$LD_LIBRARY_PATH_NAME" "$install_libdir"  || exit 1
                 export "$LD_LIBRARY_PATH_NAME"
                 install_libexecdir="$(get_config_param "INSTALL_LIBEXECDIR" "$TEST_PKG_DIR/tightdb")" || exit 1
-                export TIGHTDBD_PATH="$install_libexecdir/tightdbd"
+                export TIGHTDB_ASYNC_DAEMON="$install_libexecdir/tightdbd"
             fi
 
             log_message "Testing './build test-installed'"
@@ -1257,8 +1271,7 @@ EOF
 
     "dist-config")
         TEMP_DIR="$(mktemp -d /tmp/tightdb.dist-config.XXXX)" || exit 1
-        make_cmd="$(which make)"
-        if [ -z "$make_cmd" ]; then
+        if ! which "make" >/dev/null 2>&1; then
             echo "ERROR: GNU make must be installed."
             if [ "$OS" = "Darwin" ]; then
                 echo "Please install xcode and command-line tools and try again."
@@ -1291,7 +1304,7 @@ EOF
         if [ "$PREBUILT_CORE" ] && ! [ "$TIGHTDB_TEST_INSTALL_PREFIX" ]; then
             touch ".DIST_CORE_WAS_CONFIGURED" || exit 1
         else
-            if [ -z "$INTERACTIVE" ]; then
+            if ! [ "$INTERACTIVE" ]; then
                 if [ "$PREBUILT_CORE" ]; then
                     echo "RECONFIGURING Prebuilt core library (only for testing)" | tee -a "$LOG_FILE"
                 else
@@ -1313,18 +1326,6 @@ EOF
                 # they are available during configuration and building
                 # of extensions, just as if the core library has been
                 # previously installed.
-
-                # FIXME: Aparently, there are fluke cases where
-                # timestamps are such that
-                # src/tightdb/build_config.h is not recreated
-                # automatically by src/tightdb/Makfile. The following
-                # is a workaround:
-                if [ "$PREBUILT_CORE" ]; then
-                    rm "src/tightdb/build_config.h" || exit 1
-                    rm "src/tightdb/tightdb-config" || exit 1
-                    rm "src/tightdb/tightdb-config-dbg" || exit 1
-                fi
-
                 if ! sh "build.sh" build-config-progs >>"$LOG_FILE" 2>&1; then
                     ERROR="1"
                 fi
@@ -1350,10 +1351,10 @@ EOF
             done
             rm -f ".DIST_CXX_WAS_CONFIGURED" || exit 1
             if [ -e "$TEMP_DIR/select/c++" ]; then
-                if [ -z "$INTERACTIVE" ]; then
-                    echo "CONFIGURING Extension 'c++'" | tee -a "$LOG_FILE"
-                else
+                if [ "$INTERACTIVE" ]; then
                     echo "Configuring extension 'c++'" | tee -a "$LOG_FILE"
+                else
+                    echo "CONFIGURING Extension 'c++'" | tee -a "$LOG_FILE"
                 fi
                 touch ".DIST_CXX_WAS_CONFIGURED" || exit 1
             fi
@@ -1365,10 +1366,10 @@ EOF
                 EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
                 rm -f "$EXT_HOME/.DIST_WAS_CONFIGURED" || exit 1
                 if [ -e "$TEMP_DIR/select/$x" ]; then
-                    if [ -z "$INTERACTIVE" ]; then
-                        echo "CONFIGURING Extension '$x'" | tee -a "$LOG_FILE"
-                    else
+                    if [ "$INTERACTIVE" ]; then
                         echo "Configuring extension '$x'" | tee -a "$LOG_FILE"
+                    else
+                        echo "CONFIGURING Extension '$x'" | tee -a "$LOG_FILE"
                     fi
                     if [ "$INTERACTIVE" ]; then
                         if sh "$EXT_HOME/build.sh" config $TIGHTDB_TEST_INSTALL_PREFIX 2>&1 | tee -a "$LOG_FILE"; then
@@ -1386,12 +1387,12 @@ EOF
                     fi
                 fi
             done
-            if [ -z "$INTERACTIVE" ]; then
+            if ! [ "$INTERACTIVE" ]; then
                 echo "DONE CONFIGURING" | tee -a "$LOG_FILE"
             fi
         fi
         if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
-            if [ -z "$INTERACTIVE" ]; then
+            if ! [ "$INTERACTIVE" ]; then
                 if [ "$ERROR" ]; then
                     cat 1>&2 <<EOF
 
@@ -1448,7 +1449,7 @@ EOF
                 fi
             fi
         done
-        if [ -z "$INTERACTIVE" ]; then
+        if ! [ "$INTERACTIVE" ]; then
             echo "DONE CLEANING" | tee -a "$LOG_FILE"
         fi
         if [ "$ERROR" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
@@ -1492,18 +1493,18 @@ EOF
                 echo "Building core library"
             fi
         else
-            if [ -z "$INTERACTIVE" ]; then
-                echo "BUILDING Core library" | tee -a "$LOG_FILE"
-            else
+            if [ "$INTERACTIVE" ]; then
                 echo "Building c++ library" | tee -a "$LOG_FILE"
+            else
+                echo "BUILDING Core library" | tee -a "$LOG_FILE"
             fi
             if sh "build.sh" build >>"$LOG_FILE" 2>&1; then
                 touch ".DIST_CORE_WAS_BUILT" || exit 1
             else
-                if [ -z "$INTERACTIVE" ]; then
-                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
-                else
+                if [ "$INTERACTIVE" ]; then
                     echo "  > Failed!" | tee -a "$LOG_FILE"
+                else
+                    echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                 fi
                 if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
                     cat 1>&2 <<EOF
@@ -1520,31 +1521,31 @@ EOF
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" ]; then
-                if [ -z "$INTERACTIVE" ]; then
-                    echo "BUILDING Extension '$x'" | tee -a "$LOG_FILE"
-                else
+                if [ "$INTERACTIVE" ]; then
                     echo "Building extension '$x'" | tee -a "$LOG_FILE"
+                else
+                    echo "BUILDING Extension '$x'" | tee -a "$LOG_FILE"
                 fi
                 rm -f "$EXT_HOME/.DIST_WAS_BUILT" || exit 1
                 if sh "$EXT_HOME/build.sh" build >>"$LOG_FILE" 2>&1; then
                     touch "$EXT_HOME/.DIST_WAS_BUILT" || exit 1
                 else
-                    if [ -z "$INTERACTIVE" ]; then
-                        echo "Failed!" | tee -a "$LOG_FILE" 1>&2
-                    else
+                    if [ "$INTERACTIVE" ]; then
                         echo "  > Failed!" | tee -a "$LOG_FILE"
+                    else
+                        echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                     fi
                     ERROR="1"
                 fi
             fi
         done
-        if [ -z "$INTERACTIVE" ]; then
-            echo "DONE BUILDING" | tee -a "$LOG_FILE"
-        else
+        if [ "$INTERACTIVE" ]; then
             echo "Done building" | tee -a "$LOG_FILE"
+        else
+            echo "DONE BUILDING" | tee -a "$LOG_FILE"
         fi
         if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
-            if [ -z "$INTERACTIVE" ]; then
+            if ! [ "$INTERACTIVE" ]; then
                 if [ "$ERROR" ]; then
                     cat 1>&2 <<EOF
 
@@ -1639,7 +1640,7 @@ EOF
                 fi
             fi
         done
-        if [ -z "$INTERACTIVE" ]; then
+        if ! [ "$INTERACTIVE" ]; then
             echo "DONE BUILDING" | tee -a "$LOG_FILE"
         fi
         if ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
@@ -1707,11 +1708,11 @@ EOF
                 ERROR="1"
             fi
         fi
-        # We set `LD_LIBRARY_PATH` and `TIGHTDBD_PATH` here to be able
+        # We set `LD_LIBRARY_PATH` and `TIGHTDB_ASAYNC_DAEMON` here to be able
         # to test extensions before installation of the core library.
         path_list_prepend "$LD_LIBRARY_PATH_NAME" "$TIGHTDB_HOME/src/tightdb"  || exit 1
         export "$LD_LIBRARY_PATH_NAME"
-        export TIGHTDBD_PATH="$TIGHTDB_HOME/src/tightdb/$async_daemon"
+        export TIGHTDB_ASYNC_DAEMON="$TIGHTDB_HOME/src/tightdb/$async_daemon"
         for x in $EXTENSIONS; do
             EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
             if [ -e "$EXT_HOME/.DIST_WAS_BUILT" ]; then
@@ -1722,7 +1723,7 @@ EOF
                 fi
             fi
         done
-        if [ -z "$INTERACTIVE" ]; then
+        if ! [ "$INTERACTIVE" ]; then
             echo "DONE TESTING" | tee -a "$LOG_FILE"
         fi
         if [ "$ERROR" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then
@@ -1761,25 +1762,25 @@ EOF
         ) >>"$LOG_FILE"
         ERROR=""
         NEED_USR_LOCAL_LIB_NOTE=""
-        if [ -z "$INTERACTIVE" ]; then
+        if ! [ "$INTERACTIVE" ]; then
             echo "INSTALLING Core library" | tee -a "$LOG_FILE"
         fi
         if sh build.sh install-prod >>"$LOG_FILE" 2>&1; then
             touch ".DIST_CORE_WAS_INSTALLED" || exit 1
             if [ -e ".DIST_CXX_WAS_CONFIGURED" ]; then
-                if [ -z "$INTERACTIVE" ]; then
-                    echo "INSTALLING Extension 'c++'" | tee -a "$LOG_FILE"
-                else
+                if [ "$INTERACTIVE" ]; then
                     echo "Installing 'c++' (core)" | tee -a "$LOG_FILE"
+                else
+                    echo "INSTALLING Extension 'c++'" | tee -a "$LOG_FILE"
                 fi
                 if sh build.sh install-devel >>"$LOG_FILE" 2>&1; then
                     touch ".DIST_CXX_WAS_INSTALLED" || exit 1
                     NEED_USR_LOCAL_LIB_NOTE="$PLATFORM_HAS_LIBRARY_PATH_ISSUE"
                 else
-                    if [ -z "$INTERACTIVE" ]; then
-                        echo "Failed!" | tee -a "$LOG_FILE" 1>&2
-                    else
+                    if [ "$INTERACTIVE" ]; then
                         echo "  > Failed!" | tee -a "$LOG_FILE"
+                    else
+                        echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                     fi
                     ERROR="1"
                 fi
@@ -1787,10 +1788,10 @@ EOF
             for x in $EXTENSIONS; do
                 EXT_HOME="../$(map_ext_name_to_dir "$x")" || exit 1
                 if [ -e "$EXT_HOME/.DIST_WAS_CONFIGURED" -a -e "$EXT_HOME/.DIST_WAS_BUILT" ]; then
-                    if [ -z "$INTERACTIVE" ]; then
-                        echo "INSTALLING Extension '$x'" | tee -a "$LOG_FILE"
-                    else
+                    if [ "$INTERACTIVE" ]; then
                         echo "Installing extension '$x'" | tee -a "$LOG_FILE"
+                    else
+                        echo "INSTALLING Extension '$x'" | tee -a "$LOG_FILE"
                     fi
                     if sh "$EXT_HOME/build.sh" install >>"$LOG_FILE" 2>&1; then
                         touch "$EXT_HOME/.DIST_WAS_INSTALLED" || exit 1
@@ -1798,10 +1799,10 @@ EOF
                             NEED_USR_LOCAL_LIB_NOTE="$PLATFORM_HAS_LIBRARY_PATH_ISSUE"
                         fi
                     else
-                        if [ -z "$INTERACTIVE" ]; then
-                            echo "Failed!" | tee -a "$LOG_FILE" 1>&2
-                        else
+                        if [ "$INTERACTIVE" ]; then
                             echo "  > Failed!" | tee -a "$LOG_FILE"
+                        else
+                            echo "Failed!" | tee -a "$LOG_FILE" 1>&2
                         fi
                         ERROR="1"
                     fi
@@ -1829,7 +1830,7 @@ or Objective-C application:
 
 EOF
             fi
-            if [ -z "$INTERACTIVE" ]; then
+            if ! [ "$INTERACTIVE" ]; then
                 echo "DONE INSTALLING" | tee -a "$LOG_FILE"
             fi
         else
@@ -1840,7 +1841,7 @@ EOF
             if [ "$ERROR" ]; then
                 echo "Log file is here: $LOG_FILE" 1>&2
             else
-                if [ -z "$INTERACTIVE" ]; then
+                if ! [ "$INTERACTIVE" ]; then
                     cat <<EOF
 
 At this point you should run the following command to check that all
@@ -1968,7 +1969,7 @@ EOF
                 fi
             fi
         done
-        if [ -z "$INTERACTIVE" ]; then
+        if ! [ "$INTERACTIVE" ]; then
             echo "DONE TESTING" | tee -a "$LOG_FILE"
         fi
         if [ "$ERROR" ] && ! [ "$TIGHTDB_DIST_NONINTERACTIVE" ]; then

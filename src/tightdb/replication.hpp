@@ -242,6 +242,13 @@ protected:
     /// do_commit_write_transact(), or do_rollback_write_transact().
     static Group& get_group(SharedGroup&) TIGHTDB_NOEXCEPT;
 
+    // Part of a temporary ugly hack to avoid generating new
+    // transaction logs during application of ones that have olready
+    // been created elsewhere. See
+    // ReplicationImpl::do_begin_write_transact() in
+    // tigthdb/replication/simplified/provider.cpp for more on this.
+    static void set_replication(Group&, Replication*) TIGHTDB_NOEXCEPT;
+
     /// Must be called only from do_begin_write_transact(),
     /// do_commit_write_transact(), or do_rollback_write_transact().
     static version_type get_current_version(SharedGroup&) TIGHTDB_NOEXCEPT;

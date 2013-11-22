@@ -96,30 +96,30 @@ public:
 int main(int argc, char* argv[])
 {
 #ifndef _WIN32
-    string tightdbd_path;
+    string tightdb_async_daemon;
     // When running the unit-tests in Xcode, it runs them
     // in its own temporary directory. So we have to make sure we
     // look for the daemon there
     const char* xcode_env = getenv("__XCODE_BUILT_PRODUCTS_DIR_PATHS");
     if (xcode_env) {
 #  ifdef TIGHTDB_DEBUG
-        tightdbd_path = "tightdbd-dbg-noinst";
+        tightdb_async_daemon = "tightdbd-dbg-noinst";
 #  else
-        tightdbd_path = "tightdbd-noinst";
+        tightdb_async_daemon = "tightdbd-noinst";
 #  endif
     }
     else {
 #  ifdef TIGHTDB_COVER
-        tightdbd_path = "../src/tightdb/tightdbd-cov-noinst";
+        tightdb_async_daemon = "../src/tightdb/tightdbd-cov-noinst";
 #  else
 #    ifdef TIGHTDB_DEBUG
-        tightdbd_path = "../src/tightdb/tightdbd-dbg-noinst";
+        tightdb_async_daemon = "../src/tightdb/tightdbd-dbg-noinst";
 #    else
-        tightdbd_path = "../src/tightdb/tightdbd-noinst";
+        tightdb_async_daemon = "../src/tightdb/tightdbd-noinst";
 #    endif
 #  endif
     }
-    setenv("TIGHTDBD_PATH", tightdbd_path.c_str(), 0);
+    setenv("TIGHTDB_ASYNC_DAEMON", tightdb_async_daemon.c_str(), 0);
 #endif // ! _WIN32
     bool const no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
