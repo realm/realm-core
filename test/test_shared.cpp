@@ -138,8 +138,9 @@ TEST(Shared_Stale_Lock_File_Faked)
     {
         // create fake lock file
         std::ofstream dst("test_shared.tightdb.lock", std::ios::binary);
-        const char buf[] = { 0, 0, 0, 0 };
-        dst.write(buf, 4);
+        char buf[] = { 0,1,2,3,4,5,6,7  };
+        for (int i=0; i<200; i++)
+            dst.write(buf, 8);
     }
     try {
         SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);

@@ -92,8 +92,6 @@ public:
 
     struct IPMFileSharedInfo {
         // IPMFile specific fields:
-        enum State { Unitialized = 0, Ready, Stale };
-        Atomic<State> m_state;
         Atomic<uint32_t> m_transition_count;
         Atomic<uint32_t> m_exit_count;
     };

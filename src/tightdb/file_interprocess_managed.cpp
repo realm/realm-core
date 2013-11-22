@@ -273,7 +273,7 @@ bool IPMFile::try_get_exclusive_access(bool promise_to_exit)
 
         // look for conflicts early, before trying to grab the lock
         if (info->m_transition_count.load_relaxed()) {
-            cerr << "shared -> exclusive (contention)" << endl;
+            cerr << "shared -> exclusive (early-out contention)" << endl;
             return false;
         }
 
@@ -289,6 +289,11 @@ bool IPMFile::try_get_exclusive_access(bool promise_to_exit)
                 // no conflicts:
                 cerr << "shared -> exclusive (succes)" << endl;
                 m_impl->m_is_exclusive = true;
+                // poison the file by incrementing the transition count.
+                // makes sure that no one get exclusive access to the file
+                // if the caller fails before removing the file (through close)
+                // we get a stale file.
+                info->m_transition_count.inc();
                 return true;
             }
         }
@@ -303,7 +308,7 @@ bool IPMFile::try_get_exclusive_access(bool promise_to_exit)
 
         if (info->m_transition_count.load_acquire() || info->m_exit_count.load_acquire()) {
             // conflict, even before lifting the shared lock, so just give up
-            cerr << "shared -> exclusive (contention)" << endl;
+            cerr << "shared -> exclusive (early-out contention)" << endl;
             return false;
         }
 
@@ -317,7 +322,7 @@ bool IPMFile::try_get_exclusive_access(bool promise_to_exit)
         if (m_impl->m_file.try_lock_exclusive()) {
 
             // we got the exclusive lock! look for conflicts:
-            if (info->m_transition_count.load_relaxed() + info->m_transition_count.load_relaxed() == 1) {
+            if (info->m_transition_count.load_relaxed() + info->m_exit_count.load_relaxed() == 1) {
 
                 // no conflicts
                 info->m_transition_count.dec();
@@ -341,7 +346,7 @@ bool IPMFile::is_removed()
 {
     // TODO:
     // to implement this, we need to rely on inode info, timestampts and other stuff...
-    return false;
+    return m_impl->m_file.is_removed();
 }
 
 } // namespace tightdb

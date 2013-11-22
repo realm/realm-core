@@ -10,7 +10,7 @@
 #include <tightdb/group_shared.hpp>
 #include <tightdb/group_writer.hpp>
 
-// #define TIGHTDB_ENABLE_LOGFILE
+#define TIGHTDB_ENABLE_LOGFILE
 
 
 using namespace std;
@@ -347,8 +347,7 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     }
 #endif
 
-    m_file.close();
-    if (! m_file.has_exclusive_access()) return;
+    if (! m_file.try_get_exclusive_access(true)) return;
 
     // If the db file is just backing for a transient data structure,
     // we can delete it when done.
