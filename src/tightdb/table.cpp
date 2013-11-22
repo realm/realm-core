@@ -1980,13 +1980,26 @@ void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result)
     TIGHTDB_ASSERT(col2_ndx < m_columns.size());
 
     TIGHTDB_ASSERT(get_column_type(col1_ndx) == type_String);
-    TIGHTDB_ASSERT(get_column_type(col2_ndx) == type_Int);
+    //TIGHTDB_ASSERT(get_column_type(col2_ndx) == type_Int);
     
 
     // Add columns to result table
     result.add_column(type_String, get_column_name(col1_ndx));
-    result.add_column(type_Int, get_column_name(col2_ndx));
     result.set_index(0);
+
+    
+    if (op == pivot_sum) {
+        if(get_column_type(col2_ndx) == type_Float) {
+            result.add_column(type_Double, get_column_name(col2_ndx));
+        } else {
+            result.add_column(get_column_type(col2_ndx), get_column_name(col2_ndx));
+        }
+    } else if (op == pivot_count) {
+        result.add_column(type_Int, get_column_name(col2_ndx)); // FIMXE add Column name "Count"
+    
+    } else
+        result.add_column(type_Int, get_column_name(col2_ndx)); //FIXME, should be double to support avg
+
 
     // Cache columms
     const Column& src_column = get_column(col2_ndx);
@@ -2020,6 +2033,34 @@ void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result)
             // SUM
             int64_t value = src_column.get(i);
             dst_column.adjust(ndx, value);
+        }
+    }
+    else if (op == pivot_min) {
+        for (size_t i = 0; i < count; ++i) {
+            StringData str = get_string(col1_ndx, i);
+            size_t ndx = dst_index.find_first(str);
+            if (ndx == not_found) {
+                ndx = result.add_empty_row();
+                result.set_string(0, ndx, str);
+            }
+            
+            // Min
+            int64_t value = src_column.get(i);
+            dst_column.set(ndx, min(dst_column.get(ndx), value));
+        }
+    }
+    else if (op == pivot_max) {
+        for (size_t i = 0; i < count; ++i) {
+            StringData str = get_string(col1_ndx, i);
+            size_t ndx = dst_index.find_first(str);
+            if (ndx == not_found) {
+                ndx = result.add_empty_row();
+                result.set_string(0, ndx, str);
+            }
+            
+            // Max
+            int64_t value = src_column.get(i);
+            dst_column.set(ndx, max(dst_column.get(ndx), value));
         }
     }
     else if (op == pivot_avg) {

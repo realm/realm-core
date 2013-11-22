@@ -302,7 +302,9 @@ public:
     enum PivotType {
         pivot_count,
         pivot_sum,
-        pivot_avg
+        pivot_avg,
+        pivot_min,
+        pivot_max
     };
     void pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result) const;
 

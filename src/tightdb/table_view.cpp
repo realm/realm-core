@@ -2,6 +2,8 @@
 #include <tightdb/column.hpp>
 #include <tightdb/column_basic.hpp>
 
+#include <algorithm>    // std::min
+
 using namespace std;
 using namespace tightdb;
 
@@ -289,7 +291,7 @@ void TableViewBase::pivot(size_t col1_ndx, size_t col2_ndx, Table::PivotType op,
     result.set_index(0);
     
     // Cache columms
-    const Column& src_column =  m_table->get_column(col2_ndx);
+    //const Column& src_column =  m_table->get_column(col2_ndx);
     Column& dst_column = result.get_column(1);
     //const StringIndex& dst_index = result.get_column_string(0).get_index();
     
@@ -297,7 +299,7 @@ void TableViewBase::pivot(size_t col1_ndx, size_t col2_ndx, Table::PivotType op,
     
     if (op == Table::pivot_count) {
         for (size_t i = 0; i < count; ++i) {
-            StringData str = m_table->get_string(col1_ndx, i);
+            StringData str = get_string(col1_ndx, i);
             size_t ndx = result.lookup(str);
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
@@ -310,7 +312,7 @@ void TableViewBase::pivot(size_t col1_ndx, size_t col2_ndx, Table::PivotType op,
     }
     else if (op == Table::pivot_sum) {
         for (size_t i = 0; i < count; ++i) {
-            StringData str = m_table->get_string(col1_ndx, i);
+            StringData str = get_string(col1_ndx, i);
             size_t ndx = result.lookup(str);
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
@@ -318,8 +320,36 @@ void TableViewBase::pivot(size_t col1_ndx, size_t col2_ndx, Table::PivotType op,
             }
             
             // SUM
-            int64_t value = src_column.get(i);
+            int64_t value = get_int(col2_ndx, i);
             dst_column.adjust(ndx, value);
+        }
+    }
+    else if (op == Table::pivot_min) {
+        for (size_t i = 0; i < count; ++i) {
+            StringData str = get_string(col1_ndx, i);
+            size_t ndx = result.lookup(str);
+            if (ndx == not_found) {
+                ndx = result.add_empty_row();
+                result.set_string(0, ndx, str);
+            }
+            
+            // SUM
+            int64_t value = get_int(col2_ndx, i);
+            dst_column.set(ndx, min(dst_column.get(ndx), value));
+        }
+    }
+    else if (op == Table::pivot_max) {
+        for (size_t i = 0; i < count; ++i) {
+            StringData str = get_string(col1_ndx, i);
+            size_t ndx = result.lookup(str);
+            if (ndx == not_found) {
+                ndx = result.add_empty_row();
+                result.set_string(0, ndx, str);
+            }
+            
+            // SUM
+            int64_t value = get_int(col2_ndx, i);
+            dst_column.set(ndx, max(dst_column.get(ndx), value));
         }
     }
     else if (op == Table::pivot_avg) {
@@ -328,7 +358,7 @@ void TableViewBase::pivot(size_t col1_ndx, size_t col2_ndx, Table::PivotType op,
         Column& cnt_column = result.get_column(2);
         
         for (size_t i = 0; i < count; ++i) {
-            StringData str = m_table->get_string(col1_ndx, i);
+            StringData str = get_string(col1_ndx, i);
             size_t ndx = result.lookup(str);
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
@@ -336,7 +366,7 @@ void TableViewBase::pivot(size_t col1_ndx, size_t col2_ndx, Table::PivotType op,
             }
             
             // SUM
-            int64_t value = src_column.get(i);
+            int64_t value = get_int(col2_ndx, i);
             dst_column.adjust(ndx, value);
             
             // Increment count
