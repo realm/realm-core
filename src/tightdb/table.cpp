@@ -155,6 +155,11 @@ void Table::create_columns()
 
 void Table::detach() TIGHTDB_NOEXCEPT
 {
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    transact_log().on_table_destroyed();
+    m_spec.m_top.detach();
+#endif
+
     // This prevents the destructor from deallocating the underlying
     // memory structure, and from attempting to notify the parent. It
     // also causes is_attached() to return false.
@@ -319,15 +324,16 @@ void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
 
 Table::~Table() TIGHTDB_NOEXCEPT
 {
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().on_table_destroyed();
-#endif
-
     if (!is_attached()) {
         // This table has been detached.
         TIGHTDB_ASSERT(m_ref_count == 0);
         return;
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    transact_log().on_table_destroyed();
+    m_spec.m_top.detach();
+#endif
 
     if (!m_top.is_attached()) {
         // This is a table with a shared spec, and its lifetime is
@@ -2792,6 +2798,8 @@ void Table::print() const
                 cout << "Bool       "; break;
             case type_String:
                 cout << "String     "; break;
+            case col_type_StringEnum:
+                cout << "String     "; break;
             default:
                 TIGHTDB_ASSERT(false);
         }
@@ -2826,6 +2834,11 @@ void Table::print() const
                 }
                 case type_String: {
                     const AdaptiveStringColumn& column = get_column_string(n);
+                    cout << setw(10) << column.get(i) << " ";
+                    break;
+                }
+                case col_type_StringEnum: {
+                    const ColumnStringEnum& column = get_column_string_enum(n);
                     cout << setw(10) << column.get(i) << " ";
                     break;
                 }

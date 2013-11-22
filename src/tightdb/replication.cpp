@@ -33,6 +33,11 @@ Group& Replication::get_group(SharedGroup& sg) TIGHTDB_NOEXCEPT
     return sg.m_group;
 }
 
+void Replication::set_replication(Group& group, Replication* repl) TIGHTDB_NOEXCEPT
+{
+    group.set_replication(repl);
+}
+
 
 Replication::version_type Replication::get_current_version(SharedGroup& sg) TIGHTDB_NOEXCEPT
 {

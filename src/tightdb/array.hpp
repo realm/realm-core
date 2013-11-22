@@ -2176,7 +2176,8 @@ template<size_t width> uint64_t Array::cascade(uint64_t a) const
 }
 
 // This is the main finding function for Array. Other finding functions are just wrappers around this one.
-// Search for 'value' using condition cond2 (Equal, NotEqual, Less, etc) and call find_action() or find_action_pattern() for each match. Break and return if find_action() returns false or 'end' is reached.
+// Search for 'value' using condition cond2 (Equal, NotEqual, Less, etc) and call find_action() or find_action_pattern()
+// for each match. Break and return if find_action() returns false or 'end' is reached.
 template<class cond2, Action action, size_t bitwidth, class Callback> bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     cond2 c;
@@ -3085,7 +3086,7 @@ template<class cond> size_t Array::find_first(int64_t value, size_t start, size_
 {
     TIGHTDB_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
     QueryState<int64_t> state;
-    state.init(act_ReturnFirst, NULL, 1); // todo, would be nice to avoid this in order to speed up find_first loops
+    state.init(act_ReturnFirst, null_ptr, 1); // todo, would be nice to avoid this in order to speed up find_first loops
     Finder finder = m_finder[cond::condition];
     (this->*finder)(value, start, end, 0, &state);
 

@@ -30,7 +30,7 @@
 
 namespace tightdb {
 
-template<class T, class cond> class BasicNode;
+template<class T, class cond> class FloatDoubleNode;
 template<class T, class cond> class IntegerNode;
 template<class T> class SequentialGetter;
 
@@ -48,12 +48,12 @@ template<class cond> struct ColumnTypeTraits2<cond, bool> {
 };
 template<class cond> struct ColumnTypeTraits2<cond, float> {
     typedef ColumnFloat column_type;
-    typedef BasicNode<float,cond> node_type;
+    typedef FloatDoubleNode<float,cond> node_type;
     typedef ArrayFloat array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, double> {
     typedef ColumnDouble column_type;
-    typedef BasicNode<double,cond> node_type;
+    typedef FloatDoubleNode<double,cond> node_type;
     typedef ArrayDouble array_type;
 };
 
@@ -72,7 +72,7 @@ R ColumnBase::aggregate(T target, std::size_t start, std::size_t end,
         end = size();
 
     QueryState<R> state;
-    state.init(action, NULL, limit);
+    state.init(action, null_ptr, limit);
 
     ColType* column = const_cast<ColType*>(static_cast<const ColType*>(this));
     SequentialGetter<T> sg(column);

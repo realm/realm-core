@@ -65,7 +65,7 @@ FILE* open_files(char* in)
         return stdin;
     else {
         FILE* f = fopen(in, "rb");
-        abort2(f == NULL, "Error opening input file '%s' for reading", in);
+        abort2(f == null_ptr, "Error opening input file '%s' for reading", in);
         return f;
     }
 }

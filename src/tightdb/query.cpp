@@ -97,7 +97,7 @@ Query& Query::tableview(const TableView& tv)
 // Makes query search only in rows contained in tv
 Query& Query::tableview(const Array &arr)
 {
-    ParentNode* const p = new ArrayNode(arr);
+    ParentNode* const p = new ListviewNode(arr);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -366,27 +366,27 @@ Query& Query::equal(size_t column_ndx, bool value)
 // ------------- float
 Query& Query::equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BasicNode<float, Equal> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, Equal> >(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BasicNode<float, NotEqual> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, NotEqual> >(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, float value)
 {
-    return add_condition<float, BasicNode<float, Greater> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, Greater> >(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BasicNode<float, GreaterEqual> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, GreaterEqual> >(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, float value)
 {
-    return add_condition<float, BasicNode<float, LessEqual> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, LessEqual> >(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, float value)
 {
-    return add_condition<float, BasicNode<float, Less> >(column_ndx, value);
+    return add_condition<float, FloatDoubleNode<float, Less> >(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, float from, float to)
 {
@@ -399,27 +399,27 @@ Query& Query::between(size_t column_ndx, float from, float to)
 // ------------- double
 Query& Query::equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BasicNode<double, Equal> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, Equal> >(column_ndx, value);
 }
 Query& Query::not_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BasicNode<double, NotEqual> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, NotEqual> >(column_ndx, value);
 }
 Query& Query::greater(size_t column_ndx, double value)
 {
-    return add_condition<double, BasicNode<double, Greater> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, Greater> >(column_ndx, value);
 }
 Query& Query::greater_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BasicNode<double, GreaterEqual> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, GreaterEqual> >(column_ndx, value);
 }
 Query& Query::less_equal(size_t column_ndx, double value)
 {
-    return add_condition<double, BasicNode<double, LessEqual> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, LessEqual> >(column_ndx, value);
 }
 Query& Query::less(size_t column_ndx, double value)
 {
-    return add_condition<double, BasicNode<double, Less> >(column_ndx, value);
+    return add_condition<double, FloatDoubleNode<double, Less> >(column_ndx, value);
 }
 Query& Query::between(size_t column_ndx, double from, double to)
 {
@@ -489,7 +489,7 @@ template <Action action, typename T, typename R, class ColType>
 R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_t limit) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    if(m_table->is_degenerate()) {
+    if(limit == 0 || m_table->is_degenerate()) {
         if (resultcount)
             *resultcount = 0;
         return static_cast<R>(0);
@@ -514,7 +514,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
     Init(*m_table);
     size_t matchcount = 0;
     QueryState<R> st;
-    st.init(action, NULL, limit);
+    st.init(action, null_ptr, limit);
     R r = first[0]->aggregate<action, R, T>(&st, start, end, column_ndx, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
@@ -571,7 +571,7 @@ double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t star
 template <typename T>
 double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    if(m_table->is_degenerate()) {
+    if(limit == 0 || m_table->is_degenerate()) {
         if (resultcount)
             *resultcount = 0;
         return 0.;
@@ -688,7 +688,7 @@ size_t Query::find(size_t begin_at_table_row)
 
 TableView Query::find_all(size_t start, size_t end, size_t limit)
 {
-    if(m_table->is_degenerate())
+    if(limit == 0 || m_table->is_degenerate())
         return TableView(*m_table);
 
     TIGHTDB_ASSERT(start <= m_table->size());
@@ -717,14 +717,14 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     TableView tv(*m_table);
     QueryState<int64_t> st;
     st.init(act_FindAll, &tv.get_ref_column(), limit);
-    first[0]->aggregate<act_FindAll, int64_t, int64_t>(&st, start, end, not_found, NULL);
+    first[0]->aggregate<act_FindAll, int64_t, int64_t>(&st, start, end, not_found, null_ptr);
     return tv;
 }
 
 
 size_t Query::count(size_t start, size_t end, size_t limit) const
 {
-    if(m_table->is_degenerate())
+    if(limit == 0 || m_table->is_degenerate())
         return 0;
 
     if (end == size_t(-1))
@@ -737,8 +737,8 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 
     Init(*m_table);
     QueryState<int64_t> st;
-    st.init(act_Count, NULL, limit);
-    int64_t r = first[0]->aggregate<act_Count, int64_t, int64_t>(&st, start, end, not_found, NULL);
+    st.init(act_Count, null_ptr, limit);
+    int64_t r = first[0]->aggregate<act_Count, int64_t, int64_t>(&st, start, end, not_found, null_ptr);
     return size_t(r);
 }
 
@@ -746,7 +746,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 // todo, not sure if start, end and limit could be useful for delete.
 size_t Query::remove(size_t start, size_t end, size_t limit)
 {
-    if(m_table->is_degenerate())
+    if(limit == 0 || m_table->is_degenerate())
         return 0;
 
     if (end == not_found)
@@ -818,11 +818,11 @@ int Query::set_threads(unsigned int threadcount)
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
     pthread_win32_process_attach_np ();
 #endif
-    pthread_mutex_init(&ts.result_mutex, NULL);
-    pthread_cond_init(&ts.completed_cond, NULL);
-    pthread_mutex_init(&ts.jobs_mutex, NULL);
-    pthread_mutex_init(&ts.completed_mutex, NULL);
-    pthread_cond_init(&ts.jobs_cond, NULL);
+    pthread_mutex_init(&ts.result_mutex, null_ptr);
+    pthread_cond_init(&ts.completed_cond, null_ptr);
+    pthread_mutex_init(&ts.jobs_mutex, null_ptr);
+    pthread_mutex_init(&ts.completed_mutex, null_ptr);
+    pthread_cond_init(&ts.jobs_cond, null_ptr);
 
     pthread_mutex_lock(&ts.jobs_mutex);
 
@@ -830,7 +830,7 @@ int Query::set_threads(unsigned int threadcount)
         pthread_detach(threads[i]);
 
     for (size_t i = 0; i < threadcount; ++i) {
-        int r = pthread_create(&threads[i], NULL, query_thread, (void*)&ts);
+        int r = pthread_create(&threads[i], null_ptr, query_thread, (void*)&ts);
         if (r != 0)
             TIGHTDB_ASSERT(false); //todo
     }
@@ -915,7 +915,7 @@ string Query::validate()
 
 void Query::Init(const Table& table) const
 {
-    if (first[0] != NULL) {
+    if (first[0] != null_ptr) {
         ParentNode* top = first[0];
         top->init(table);
         vector<ParentNode*> v;
@@ -926,7 +926,7 @@ void Query::Init(const Table& table) const
 bool Query::is_initialized() const
 {
     const ParentNode* top = first[0];
-    if (top != NULL) {
+    if (top != null_ptr) {
         return top->is_initialized();
     }
     return true;
@@ -1002,10 +1002,10 @@ Query Query::operator||(Query q)
 
 Query Query::operator&&(Query q)
 {
-    if(first[0] == NULL)
+    if(first[0] == null_ptr)
         return q;
 
-    if(q.first[0] == NULL)
+    if(q.first[0] == null_ptr)
         return (*this);
 
     Query q2(*this->m_table);

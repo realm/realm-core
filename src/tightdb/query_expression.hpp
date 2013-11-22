@@ -221,7 +221,7 @@ public:
     // binds it to a Query at a later time
     virtual const Table* get_table() 
     { 
-        return NULL; 
+        return null_ptr; 
     }
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
@@ -706,15 +706,15 @@ template <class T> UnaryOperator<Pow<T> >& power (Subexpr2<T>& left) {
 template <> class Columns<StringData> : public Subexpr
 {
 public:
-    explicit Columns(size_t column, const Table* table) : m_table(NULL)
+    explicit Columns(size_t column, const Table* table) : m_table(null_ptr)
     {
         m_column = column;
         set_table(table);
     }
 
-    explicit Columns() : m_table(NULL) { }
+    explicit Columns() : m_table(null_ptr) { }
 
-    explicit Columns(size_t column) : m_table(NULL)
+    explicit Columns(size_t column) : m_table(null_ptr)
     {
         m_column = column;
     }
@@ -772,15 +772,15 @@ template <class T> Query operator != (const Columns<StringData>& left, T right) 
 template <class T> class Columns : public Subexpr2<T>, public ColumnsBase
 {
 public:
-    explicit Columns(size_t column, const Table* table) : m_table(NULL), sg(NULL)
+    explicit Columns(size_t column, const Table* table) : m_table(null_ptr), sg(null_ptr)
     {
         m_column = column;
         set_table(table);
     }
 
-    explicit Columns() : m_table(NULL), sg(NULL) { }
+    explicit Columns() : m_table(null_ptr), sg(null_ptr) { }
 
-    explicit Columns(size_t column) : m_table(NULL), m_column(column), sg(NULL) { }
+    explicit Columns(size_t column) : m_table(null_ptr), m_column(column), sg(null_ptr) { }
 
     ~Columns()
     {
@@ -802,7 +802,7 @@ public:
         m_table = table;
         typedef typename ColumnTypeTraits<T>::column_type ColType;
         const ColType* c = static_cast<const ColType*>(&table->get_column_base(m_column));
-        if(sg == NULL)
+        if(sg == null_ptr)
             sg = new SequentialGetter<T>();
         sg->init(c);
     }
@@ -914,9 +914,9 @@ public:
         const Table* r = m_right.get_table();
 
         // Queries do not support multiple different tables; all tables must be the same. 
-        TIGHTDB_ASSERT(l == NULL || r == NULL || l == r);
+        TIGHTDB_ASSERT(l == null_ptr || r == null_ptr || l == r);
 
-        // NULL pointer means expression which isn't yet associated with any table, or is a Value<T>
+        // null_ptr pointer means expression which isn't yet associated with any table, or is a Value<T>
         return l ? l : r;
     }
 
@@ -979,9 +979,9 @@ public:
         const Table* r = m_right.get_table();
 
         // Queries do not support multiple different tables; all tables must be the same. 
-        TIGHTDB_ASSERT(l == NULL || r == NULL || l == r);
+        TIGHTDB_ASSERT(l == null_ptr || r == null_ptr || l == r);
 
-        // NULL pointer means expression which isn't yet associated with any table, or is a Value<T>
+        // null_ptr pointer means expression which isn't yet associated with any table, or is a Value<T>
         return l ? l : r;
     }
 
