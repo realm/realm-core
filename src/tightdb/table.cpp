@@ -2037,16 +2037,19 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         }
 
         // Calculate averages
+        result.add_column(type_Double, "mean");
+        ColumnDouble& mean_column = result.get_column_double(3);
         const size_t res_count = result.size();
         for (size_t i = 0; i < res_count; ++i) {
             int64_t sum   = dst_column.get(i);
             int64_t count = cnt_column.get(i);
-            int64_t res   = sum / count;
-            dst_column.set(i, res);
+            double res   = sum / count;
+            mean_column.set(i, res);
         }
 
-        // Remove temp column
-        result.remove_column(2);
+        // Remove temp columns
+        result.remove_column(1); // sums
+        result.remove_column(1); // counts
     }
 }
 
