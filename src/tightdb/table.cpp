@@ -1967,6 +1967,21 @@ ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
     return tv;
 }
 
+namespace {
+
+inline size_t get_group_ndx(size_t i, size_t group_by_column, const Table& table, Table& result, const StringIndex& dst_index)
+{
+    StringData str = table.get_string(group_by_column, i);
+    size_t ndx = dst_index.find_first(str);
+    if (ndx == not_found) {
+        ndx = result.add_empty_row();
+        result.set_string(0, ndx, str);
+    }
+    return ndx;
+}
+
+} //namespace
+
 void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result) const
 {
     TIGHTDB_ASSERT(result.is_empty() && result.get_column_count() == 0);
@@ -1990,12 +2005,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
 
     if (op == aggr_count) {
         for (size_t i = 0; i < count; ++i) {
-            StringData str = get_string(group_by_column, i);
-            size_t ndx = dst_index.find_first(str);
-            if (ndx == not_found) {
-                ndx = result.add_empty_row();
-                result.set_string(0, ndx, str);
-            }
+            size_t ndx = get_group_ndx(i, group_by_column, *this, result, dst_index);
 
             // Count
             dst_column.adjust(ndx, 1);
@@ -2003,12 +2013,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
     }
     else if (op == aggr_sum) {
         for (size_t i = 0; i < count; ++i) {
-            StringData str = get_string(group_by_column, i);
-            size_t ndx = dst_index.find_first(str);
-            if (ndx == not_found) {
-                ndx = result.add_empty_row();
-                result.set_string(0, ndx, str);
-            }
+            size_t ndx = get_group_ndx(i, group_by_column, *this, result, dst_index);
 
             // SUM
             int64_t value = src_column.get(i);
@@ -2021,12 +2026,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         Column& cnt_column = result.get_column(2);
 
         for (size_t i = 0; i < count; ++i) {
-            StringData str = get_string(group_by_column, i);
-            size_t ndx = dst_index.find_first(str);
-            if (ndx == not_found) {
-                ndx = result.add_empty_row();
-                result.set_string(0, ndx, str);
-            }
+            size_t ndx = get_group_ndx(i, group_by_column, *this, result, dst_index);
 
             // SUM
             int64_t value = src_column.get(i);
