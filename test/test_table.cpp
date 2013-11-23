@@ -2862,6 +2862,18 @@ ONLY(Table_pivot)
     ss.str("");
     result_avg.to_string(ss);
     cout << ss.str();
+
+    // Test with enumerated strings
+    table.optimize();
+
+    Table result_count2;
+    timer.Start();
+    table.aggregate(0, 1, Table::aggr_count, result_count2);
+    printf("pivot_count2: %d\n", timer.GetTimeInMs());
+    ss.str("");
+    result_count2.to_string(ss);
+    cout << ss.str();
+
 }
 
 #endif // TEST_TABLE

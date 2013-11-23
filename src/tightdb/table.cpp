@@ -1980,6 +1980,23 @@ inline size_t get_group_ndx(size_t i, size_t group_by_column, const Table& table
     return ndx;
 }
 
+inline size_t get_group_ndx_blocked(size_t i, const ColumnStringEnum& enums, Table& result, vector<size_t>& keys, Array& block, size_t& offset, size_t& block_end)
+{
+    if (i == block_end) {
+        enums.Column::GetBlock(i, block, offset);
+        block_end = offset + block.size();
+    }
+    int64_t key = block.get(i-offset);
+    size_t ndx = keys[key];
+    if (ndx == 0) {
+        ndx = result.add_empty_row();
+        result.set_string(0, ndx, enums.get(i));
+        keys[key] = ndx+1;
+    }
+    else --ndx;
+    return ndx;
+}
+
 } //namespace
 
 void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result) const
@@ -2003,6 +2020,73 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
 
     const size_t count = size();
 
+    // When doing grouped aggregates, the column to group on is likely
+    // to be auto-enumerated (without a lot of duplicates grouping does not
+    // make much sense). So we can use this knowledge to optimize the process.
+    ColumnType key_type = get_real_column_type(group_by_column);
+    if (key_type == col_type_StringEnum) {
+        const ColumnStringEnum& enums = get_column_string_enum(group_by_column);
+        size_t key_count = enums.get_keys().size();
+        vector<size_t> keys(key_count);
+
+        Array block;
+        size_t offset;
+        enums.Column::GetBlock(0, block, offset);
+        size_t block_end = offset + block.size();
+
+        if (op == aggr_count) {
+            for (size_t i = 0; i < count; ++i) {
+                size_t ndx = get_group_ndx_blocked(i, enums, result, keys, block, offset, block_end);
+
+                // Count
+                dst_column.adjust(ndx, 1);
+            }
+        }
+        else if (op == aggr_sum) {
+            for (size_t i = 0; i < count; ++i) {
+                size_t ndx = get_group_ndx_blocked(i, enums, result, keys, block, offset, block_end);
+
+                // Sum
+                int64_t value = src_column.get(i);
+                dst_column.adjust(ndx, value);
+            }
+        }
+        else if (op == aggr_avg) {
+            // Add temporary column for counts
+            result.add_column(type_Int, "count");
+            Column& cnt_column = result.get_column(2);
+
+            for (size_t i = 0; i < count; ++i) {
+                size_t ndx = get_group_ndx(i, group_by_column, *this, result, dst_index);
+
+                // SUM
+                int64_t value = src_column.get(i);
+                dst_column.adjust(ndx, value);
+
+                // Increment count
+                cnt_column.adjust(ndx, 1);
+            }
+
+            // Calculate averages
+            result.add_column(type_Double, "mean");
+            ColumnDouble& mean_column = result.get_column_double(3);
+            const size_t res_count = result.size();
+            for (size_t i = 0; i < res_count; ++i) {
+                int64_t sum   = dst_column.get(i);
+                int64_t count = cnt_column.get(i);
+                double res   = sum / count;
+                mean_column.set(i, res);
+            }
+            
+            // Remove temp columns
+            result.remove_column(1); // sums
+            result.remove_column(1); // counts
+        }
+        return;
+    }
+
+    // If the group_by column is not auto-enumerated, we have to do
+    // (more expensive) direct lookups.
     if (op == aggr_count) {
         for (size_t i = 0; i < count; ++i) {
             size_t ndx = get_group_ndx(i, group_by_column, *this, result, dst_index);
