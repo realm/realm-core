@@ -1967,30 +1967,30 @@ ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
     return tv;
 }
 
-void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result) const
+void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result) const
 {
     TIGHTDB_ASSERT(result.is_empty() && result.get_column_count() == 0);
-    TIGHTDB_ASSERT(col1_ndx < m_columns.size());
-    TIGHTDB_ASSERT(col2_ndx < m_columns.size());
+    TIGHTDB_ASSERT(group_by_column < m_columns.size());
+    TIGHTDB_ASSERT(aggr_column < m_columns.size());
 
-    TIGHTDB_ASSERT(get_column_type(col1_ndx) == type_String);
-    TIGHTDB_ASSERT(get_column_type(col2_ndx) == type_Int);
+    TIGHTDB_ASSERT(get_column_type(group_by_column) == type_String);
+    TIGHTDB_ASSERT(get_column_type(aggr_column) == type_Int);
 
     // Add columns to result table
-    result.add_column(type_String, get_column_name(col1_ndx));
-    result.add_column(type_Int, get_column_name(col2_ndx));
+    result.add_column(type_String, get_column_name(group_by_column));
+    result.add_column(type_Int, get_column_name(aggr_column));
     result.set_index(0);
 
     // Cache columms
-    const Column& src_column = get_column(col2_ndx);
+    const Column& src_column = get_column(aggr_column);
     Column& dst_column = result.get_column(1);
     const StringIndex& dst_index = result.get_column_string(0).get_index();
 
     const size_t count = size();
 
-    if (op == pivot_count) {
+    if (op == aggr_count) {
         for (size_t i = 0; i < count; ++i) {
-            StringData str = get_string(col1_ndx, i);
+            StringData str = get_string(group_by_column, i);
             size_t ndx = dst_index.find_first(str);
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
@@ -2001,9 +2001,9 @@ void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result)
             dst_column.adjust(ndx, 1);
         }
     }
-    else if (op == pivot_sum) {
+    else if (op == aggr_sum) {
         for (size_t i = 0; i < count; ++i) {
-            StringData str = get_string(col1_ndx, i);
+            StringData str = get_string(group_by_column, i);
             size_t ndx = dst_index.find_first(str);
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
@@ -2015,13 +2015,13 @@ void Table::pivot(size_t col1_ndx, size_t col2_ndx, PivotType op, Table& result)
             dst_column.adjust(ndx, value);
         }
     }
-    else if (op == pivot_avg) {
+    else if (op == aggr_avg) {
         // Add temporary column for counts
         result.add_column(type_Int, "count");
         Column& cnt_column = result.get_column(2);
 
         for (size_t i = 0; i < count; ++i) {
-            StringData str = get_string(col1_ndx, i);
+            StringData str = get_string(group_by_column, i);
             size_t ndx = dst_index.find_first(str);
             if (ndx == not_found) {
                 ndx = result.add_empty_row();

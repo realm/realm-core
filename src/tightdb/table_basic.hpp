@@ -75,7 +75,7 @@ public:
     using Table::lookup;
     using Table::add_empty_row;
     using Table::insert_empty_row;
-    using Table::pivot;
+    using Table::aggregate;
 
     BasicTable(Allocator& alloc = Allocator::get_default()): Table(alloc)
     {

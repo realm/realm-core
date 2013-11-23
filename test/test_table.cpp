@@ -2833,27 +2833,31 @@ TIGHTDB_TABLE_3(TablePivotAgg,
 ONLY(Table_pivot)
 {
     TablePivotAgg table;
-    for (size_t i = 0; i < 10000; ++i) {
+    for (size_t i = 0; i < 500000; ++i) {
         StringData sex = i % 2 ? "Male" : "Female";
         table.add(sex, 20 + (i%20), true);
     }
 
-    Table result_count;
-    table.pivot(0, 1, Table::pivot_count, result_count);
-
+    UnitTest::Timer timer;
     stringstream ss;
+
+    Table result_count;
+    timer.Start();
+    table.aggregate(0, 1, Table::aggr_count, result_count);
+    printf("pivot_count1: %d\n", timer.GetTimeInMs());
+
     result_count.to_string(ss);
     cout << ss.str();
 
     Table result_sum;
-    table.pivot(0, 1, Table::pivot_sum, result_sum);
+    table.aggregate(0, 1, Table::aggr_sum, result_sum);
 
     ss.str("");
     result_sum.to_string(ss);
     cout << ss.str();
 
     Table result_avg;
-    table.pivot(0, 1, Table::pivot_avg, result_avg);
+    table.aggregate(0, 1, Table::aggr_avg, result_avg);
 
     ss.str("");
     result_avg.to_string(ss);
