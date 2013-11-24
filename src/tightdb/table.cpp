@@ -155,6 +155,11 @@ void Table::create_columns()
 
 void Table::detach() TIGHTDB_NOEXCEPT
 {
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    transact_log().on_table_destroyed();
+    m_spec.m_top.detach();
+#endif
+
     // This prevents the destructor from deallocating the underlying
     // memory structure, and from attempting to notify the parent. It
     // also causes is_attached() to return false.
@@ -319,15 +324,16 @@ void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
 
 Table::~Table() TIGHTDB_NOEXCEPT
 {
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().on_table_destroyed();
-#endif
-
     if (!is_attached()) {
         // This table has been detached.
         TIGHTDB_ASSERT(m_ref_count == 0);
         return;
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    transact_log().on_table_destroyed();
+    m_spec.m_top.detach();
+#endif
 
     if (!m_top.is_attached()) {
         // This is a table with a shared spec, and its lifetime is
@@ -2006,7 +2012,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
     TIGHTDB_ASSERT(aggr_column < m_columns.size());
 
     TIGHTDB_ASSERT(get_column_type(group_by_column) == type_String);
-    TIGHTDB_ASSERT(get_column_type(aggr_column) == type_Int);
+    //TIGHTDB_ASSERT(get_column_type(aggr_column) == type_Int);
 
     // Add columns to result table
     result.add_column(type_String, get_column_name(group_by_column));
@@ -2102,6 +2108,35 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
             // SUM
             int64_t value = src_column.get(i);
             dst_column.adjust(ndx, value);
+        }
+    }
+    else if (op == aggr_min) {
+        for (size_t i = 0; i < count; ++i) {
+            StringData str = get_string(group_by_column, i);
+            size_t ndx = dst_index.find_first(str);
+            int64_t value = src_column.get(i);
+            if (ndx == not_found) {
+                ndx = result.add_empty_row();
+                result.set_string(0, ndx, str);
+                dst_column.set(ndx, value); // Set the real value, to ovwewrite the default value
+
+            } else {
+                dst_column.set(ndx, min(dst_column.get(ndx), value));
+            }
+        }
+    }
+    else if (op == aggr_max) {
+        for (size_t i = 0; i < count; ++i) {
+            StringData str = get_string(group_by_column, i);
+            size_t ndx = dst_index.find_first(str);
+            int64_t value = src_column.get(i);
+            if (ndx == not_found) {
+                ndx = result.add_empty_row();
+                result.set_string(0, ndx, str);
+                dst_column.set(ndx, value);  // Set the real value, to ovwewrite the default value
+            } else {
+                dst_column.set(ndx, max(dst_column.get(ndx), value));
+            }
         }
     }
     else if (op == aggr_avg) {

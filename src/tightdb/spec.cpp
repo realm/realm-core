@@ -11,8 +11,10 @@ using namespace tightdb;
 Spec::~Spec() TIGHTDB_NOEXCEPT
 {
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = m_top.get_alloc().get_replication())
-        repl->on_spec_destroyed(this);
+    if (m_top.is_attached()) {
+        if (Replication* repl = m_top.get_alloc().get_replication())
+            repl->on_spec_destroyed(this);
+    }
 #endif
 }
 

@@ -302,7 +302,9 @@ public:
     enum AggrType {
         aggr_count,
         aggr_sum,
-        aggr_avg
+        aggr_avg,
+        aggr_min,
+        aggr_max
     };
     void aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result) const;
 
