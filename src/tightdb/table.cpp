@@ -1975,31 +1975,59 @@ ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
 
 namespace {
 
-inline size_t get_group_ndx(size_t i, size_t group_by_column, const Table& table, Table& result, const StringIndex& dst_index)
+struct AggrState {
+    AggrState() : added_row(false) {}
+
+    const Table* table;
+    const StringIndex* dst_index;
+    size_t group_by_column;
+
+    const ColumnStringEnum* enums;
+    vector<size_t> keys;
+    Array block;
+    size_t offset;
+    size_t block_end;
+
+    bool added_row;
+};
+
+typedef size_t (*get_group_fnc)(size_t, AggrState&, Table&);
+
+size_t get_group_ndx(size_t i, AggrState& state, Table& result)
 {
-    StringData str = table.get_string(group_by_column, i);
-    size_t ndx = dst_index.find_first(str);
+    StringData str = state.table->get_string(state.group_by_column, i);
+    size_t ndx = state.dst_index->find_first(str);
     if (ndx == not_found) {
         ndx = result.add_empty_row();
         result.set_string(0, ndx, str);
+        state.added_row = true;
     }
     return ndx;
 }
 
-inline size_t get_group_ndx_blocked(size_t i, const ColumnStringEnum& enums, Table& result, vector<size_t>& keys, Array& block, size_t& offset, size_t& block_end)
+size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
 {
-    if (i == block_end) {
-        enums.Column::GetBlock(i, block, offset);
-        block_end = offset + block.size();
+    // We iterate entire blocks at a time by keeping current leaf cached
+    if (i == state.block_end) {
+        state.enums->Column::GetBlock(i, state.block, state.offset);
+        state.block_end = state.offset + state.block.size();
     }
-    int64_t key = block.get(i-offset);
-    size_t ndx = keys[key];
+
+    // Since we know the exact number of distinct keys,
+    // we can use that to avoid index lookups
+    int64_t key = state.block.get(i - state.offset);
+    size_t ndx = state.keys[key];
+
+    // Stored position is offset by one, so zero can indicate
+    // that no entry have been added yet.
     if (ndx == 0) {
         ndx = result.add_empty_row();
-        result.set_string(0, ndx, enums.get(i));
-        keys[key] = ndx+1;
+        result.set_string(0, ndx, state.enums->get(i));
+        state.keys[key] = ndx+1;
+        state.added_row = true;
     }
-    else --ndx;
+    else
+        --ndx;
     return ndx;
 }
 
@@ -2017,14 +2045,14 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
     // Add columns to result table
     result.add_column(type_String, get_column_name(group_by_column));
     result.add_column(type_Int, get_column_name(aggr_column));
-    result.set_index(0);
 
     // Cache columms
     const Column& src_column = get_column(aggr_column);
     Column& dst_column = result.get_column(1);
-    const StringIndex& dst_index = result.get_column_string(0).get_index();
 
     const size_t count = size();
+    AggrState state;
+    get_group_fnc get_group_ndx_fnc = NULL;
 
     // When doing grouped aggregates, the column to group on is likely
     // to be auto-enumerated (without a lot of duplicates grouping does not
@@ -2033,37 +2061,52 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
     if (key_type == col_type_StringEnum) {
         const ColumnStringEnum& enums = get_column_string_enum(group_by_column);
         size_t key_count = enums.get_keys().size();
-        vector<size_t> keys(key_count);
 
-        Array block;
-        size_t offset;
-        enums.Column::GetBlock(0, block, offset);
-        size_t block_end = offset + block.size();
+        state.enums = &enums;
+        state.keys.assign(key_count, 0);
 
-        if (op == aggr_count) {
+        enums.Column::GetBlock(0, state.block, state.offset);
+        state.block_end = state.offset + state.block.size();
+        get_group_ndx_fnc = &get_group_ndx_blocked;
+    }
+    else {
+        // If the group_by column is not auto-enumerated, we have to do
+        // (more expensive) direct lookups.
+        result.set_index(0);
+        const StringIndex& dst_index = result.get_column_string(0).get_index();
+
+        state.table = this;
+        state.dst_index = &dst_index;
+        state.group_by_column = group_by_column;
+        get_group_ndx_fnc = &get_group_ndx;
+    }
+
+    switch (op) {
+        case aggr_count:
             for (size_t i = 0; i < count; ++i) {
-                size_t ndx = get_group_ndx_blocked(i, enums, result, keys, block, offset, block_end);
+                size_t ndx = (*get_group_ndx_fnc)(i, state, result);
 
                 // Count
                 dst_column.adjust(ndx, 1);
             }
-        }
-        else if (op == aggr_sum) {
+            break;
+        case aggr_sum:
             for (size_t i = 0; i < count; ++i) {
-                size_t ndx = get_group_ndx_blocked(i, enums, result, keys, block, offset, block_end);
+                size_t ndx = (*get_group_ndx_fnc)(i, state, result);
 
                 // Sum
                 int64_t value = src_column.get(i);
                 dst_column.adjust(ndx, value);
             }
-        }
-        else if (op == aggr_avg) {
+            break;
+        case aggr_avg:
+        {
             // Add temporary column for counts
             result.add_column(type_Int, "count");
             Column& cnt_column = result.get_column(2);
 
             for (size_t i = 0; i < count; ++i) {
-                size_t ndx = get_group_ndx(i, group_by_column, *this, result, dst_index);
+                size_t ndx = (*get_group_ndx_fnc)(i, state, result);
 
                 // SUM
                 int64_t value = src_column.get(i);
@@ -2087,88 +2130,38 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
             // Remove temp columns
             result.remove_column(1); // sums
             result.remove_column(1); // counts
+            break;
         }
-        return;
-    }
-
-    // If the group_by column is not auto-enumerated, we have to do
-    // (more expensive) direct lookups.
-    if (op == aggr_count) {
-        for (size_t i = 0; i < count; ++i) {
-            size_t ndx = get_group_ndx(i, group_by_column, *this, result, dst_index);
-
-            // Count
-            dst_column.adjust(ndx, 1);
-        }
-    }
-    else if (op == aggr_sum) {
-        for (size_t i = 0; i < count; ++i) {
-            size_t ndx = get_group_ndx(i, group_by_column, *this, result, dst_index);
-
-            // SUM
-            int64_t value = src_column.get(i);
-            dst_column.adjust(ndx, value);
-        }
-    }
-    else if (op == aggr_min) {
-        for (size_t i = 0; i < count; ++i) {
-            StringData str = get_string(group_by_column, i);
-            size_t ndx = dst_index.find_first(str);
-            int64_t value = src_column.get(i);
-            if (ndx == not_found) {
-                ndx = result.add_empty_row();
-                result.set_string(0, ndx, str);
-                dst_column.set(ndx, value); // Set the real value, to ovwewrite the default value
-
-            } else {
-                dst_column.set(ndx, min(dst_column.get(ndx), value));
+        case aggr_min:
+            for (size_t i = 0; i < count; ++i) {
+                size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+                int64_t value = src_column.get(i);
+                if (state.added_row) {
+                    dst_column.set(ndx, value); // Set the real value, to overwrite the default value
+                    state.added_row = false;
+                }
+                else {
+                    int64_t current = dst_column.get(ndx);
+                    if (value < current)
+                        dst_column.set(ndx, value);
+                }
             }
-        }
-    }
-    else if (op == aggr_max) {
-        for (size_t i = 0; i < count; ++i) {
-            StringData str = get_string(group_by_column, i);
-            size_t ndx = dst_index.find_first(str);
-            int64_t value = src_column.get(i);
-            if (ndx == not_found) {
-                ndx = result.add_empty_row();
-                result.set_string(0, ndx, str);
-                dst_column.set(ndx, value);  // Set the real value, to ovwewrite the default value
-            } else {
-                dst_column.set(ndx, max(dst_column.get(ndx), value));
+            break;
+        case aggr_max:
+            for (size_t i = 0; i < count; ++i) {
+                size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+                int64_t value = src_column.get(i);
+                if (state.added_row) {
+                    dst_column.set(ndx, value); // Set the real value, to overwrite the default value
+                    state.added_row = false;
+                }
+                else {
+                    int64_t current = dst_column.get(ndx);
+                    if (value > current)
+                        dst_column.set(ndx, value);
+                }
             }
-        }
-    }
-    else if (op == aggr_avg) {
-        // Add temporary column for counts
-        result.add_column(type_Int, "count");
-        Column& cnt_column = result.get_column(2);
-
-        for (size_t i = 0; i < count; ++i) {
-            size_t ndx = get_group_ndx(i, group_by_column, *this, result, dst_index);
-
-            // SUM
-            int64_t value = src_column.get(i);
-            dst_column.adjust(ndx, value);
-
-            // Increment count
-            cnt_column.adjust(ndx, 1);
-        }
-
-        // Calculate averages
-        result.add_column(type_Double, "mean");
-        ColumnDouble& mean_column = result.get_column_double(3);
-        const size_t res_count = result.size();
-        for (size_t i = 0; i < res_count; ++i) {
-            int64_t sum   = dst_column.get(i);
-            int64_t count = cnt_column.get(i);
-            double res   = sum / count;
-            mean_column.set(i, res);
-        }
-
-        // Remove temp columns
-        result.remove_column(1); // sums
-        result.remove_column(1); // counts
+            break;
     }
 }
 
