@@ -60,7 +60,7 @@ namespace tightdb {
 extern signed char sse_support;
 extern signed char avx_support;
 
-template<int version> TIGHTDB_FORCEINLINE bool cpuid_sse()
+template<int version> TIGHTDB_FORCEINLINE bool sseavx()
 {
 /*
     Return wether or not SSE 3.0 (if version = 30) or 4.2 (for version = 42) is supported. Return value
@@ -70,9 +70,13 @@ template<int version> TIGHTDB_FORCEINLINE bool cpuid_sse()
     sse_support = 0: SSE3
     sse_support = 1: SSE42
 
+    avx_support = -1: No AVX support
+    avx_support = 0: AVX1 supported
+    sse_support = 1: AVX2 supported (not yet implemented for detection in our cpuid_init(), todo)
+
     This lets us test very rapidly at runtime because we just need 1 compare instruction (with 0) to test both for
-    3 and 4.2 by caller (compiler optimizes if calls are concecutive), and can decide branch with ja/jl/je because
-    sse_support is signed type. Also, 0 requires no immediate operand
+    SSE 3 and 4.2 by caller (compiler optimizes if calls are concecutive), and can decide branch with ja/jl/je because
+    sse_support is signed type. Also, 0 requires no immediate operand. Same for AVX.
 
     We runtime-initialize sse_support in a constructor of a static variable which is not guaranteed to be called
     prior to cpu_sse(). So we compile-time initialize sse_support to -2 as fallback.

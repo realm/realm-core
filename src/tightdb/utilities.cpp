@@ -78,11 +78,11 @@ void cpuid_init()
 
     if (avxSupported)
     {
-        avx_support = 0;
+        avx_support = 0; // AVX1 supported
     }
     else
     {
-        avx_support = -1;
+        avx_support = -1; // No AVX supported
     }
 
 	// 1 is reserved for AVX2 
