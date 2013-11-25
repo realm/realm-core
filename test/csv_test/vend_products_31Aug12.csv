@@ -1,0 +1,186 @@
+handle,sku,composite_handle,composite_sku,composite_quantity,name,description,type,variant_option_one_name,variant_option_one_value,variant_option_two_name,variant_option_two_value,variant_option_three_name,variant_option_three_value,tags,supply_price,retail_price,tax_name,tax_value,account_code,account_code_purchase,brand_name,supplier_name,supplier_code,active,track_inventory,inventory_Auckland,reorder_point_Auckland,restock_level_Auckland
+-,2272,,,,-,,,,,,,,,,0,0,No GST,,,,,,,1,0,0,,
+$20discount,$20discount,,,,$20 discount,,admin,,,,,,,admin,-20,-20,NZ GST,,,,,none,,1,0,0,,
+10discount,10discount,,,,$10 discount,<p>Gives a $10 discount off a sale. Add a note.</p>,admin,,,,,,,admin,-10,-10,NZ GST,,,,,none,,1,0,0,,
+1hoursurfinglesson,10061,,,,1 hour surfing lesson,<p>Learn with an expert on the local beach for an hour.  </p>,surf,,,,,,,surf,0.01,60,NZ GST,,,,,,,1,0,0,,
+20discount,20discount,,,,$20 discount,,admin,,,,,,,admin,-20,-20,NZ GST,,,,,none,,1,0,0,,
+7footstarterboard,10060,,,,Surfboard 7 foot,"<p>Surf board recommended for starters, very stable in the big waves.</p>",surf,,,,,,,youth,180,355,NZ GST,,,,,Not specified,,1,1,26,9,8
+Anzacbiscuit,2257,,,,Anzac biscuit,<p>A really nice home made biscuit</p>,bistro,Size,medium,,,,,food cold,1,3,NZ GST,,,,Home Made,Italia,,1,1,22,12,20
+Anzacbiscuit,2269,,,,,,bistro,Size,Jumbo,,,,,,1.25,5,NZ GST,,,,,,,1,1,100,0,0
+Anzacbiscuit,2258,,,,,,bistro,Size,large,,,,,,1,3,NZ GST,,,,,,,1,1,17,10,11
+applejuice-1,10043,,,,Apple Juice,<p>Freshly squeezed apple juice</p>,food and beverage,Size,Medium,,,,,food,1,3,NZ GST,,,,Coke,Food & Beverage Supplies,,1,1,0,56,50
+applejuice-1,10044,,,,,,food and beverage,Size,Small,,,,,,1,2.5,NZ GST,,,,,,,1,1,749,899,80
+belt,10058,,,,belt,,clothing,Size,large,,,,,,10,23,NZ GST,,200,,Italia,Accessories Plus,111,1,1,50,25,0
+belt,10059,,,,,,clothing,Size,medium,,,,,,8,18.4,NZ GST,,200,,,,111,1,1,5,4,0
+beret,100007,,,,Beret,<p>This is a lovely beret that goes with the <strong>2011</strong> fashion really well.,clothing,Colour,black,Finish,flower,,,accessories,25,44.85,NZ GST,,,,Woolly heads,Berets are Best,brb,1,1,7,4,6
+beret,100008,,,,,,clothing,Colour,red,Finish,flower,,,,25,39,NZ GST,,,,,,,1,1,7,6,7
+beret,100009,,,,,,clothing,Colour,black,Finish,jewel,,,,50,78,NZ GST,,,,,,,1,1,12,6,7
+bottlemerlot-1,10013,,,,Bottle Merlot,<p>Silky smooth merlot</p>,food and beverage,,,,,,,alcohol,17,35,NZ GST,,,,Fine Wine NZ,Fine Wine NZ,300,1,1,96.2,71,78
+boxofchocolates-1,10014,,,,Box of chocolates,<p>Full of premium NZ chocolates</p>,food and beverage,,,,,,,giftware;food,4,8.95,NZ GST,,,,Quality NZ,Gift Supplies,200,1,1,76,68,67
+Bracelet,228379112,,,,Bracelet,,,Gem,Ruby,,,,,,10,14.95,NZ GST,,,,,,,1,1,0,0,0
+Bracelet,228379113,,,,,,,Gem,Emerald,,,,,,10,14.95,NZ GST,,,,,,,1,1,0,0,0
+Bracelet,228379114,,,,,,,Gem,Diamond,,,,,,10,14.95,NZ GST,,,,,,,1,1,0,0,0
+Bracelet,228379115,,,,,,,Gem,Sapphire,,,,,,10,14.95,NZ GST,,,,,,,1,1,0,0,0
+bronzenecklace,neckbronze,,,,Fashion long bronze necklace,<p>One size fits all</p>,clothing,Option one,Default,,,,,accessories;jewellery,45,70,NZ GST,,,,Italia,Cappuccino,,1,1,10,7,5
+BushShirt2,10068,,,,Bush Shirt,<p>Shirt for tramping</p>,clothing,Color,Blue,Size,Large,,,shirt;201;clothing,10,20,NZ GST,,,,,,,1,1,10,2,10
+BushShirt2,10069,,,,,,clothing,Color,Blue,Size,Small,,,,10,25,NZ GST,,,,,,,1,1,5,,
+cap,capBL,,,,cap,,,Colour,black,Size,large,,,,12,13.8,NZ GST,,,,,,,1,1,28,9,8
+cap,capBS,,,,,,,Colour,black,Size,small,,,,12,13.8,NZ GST,,,,,,,1,1,9,8,8
+cap,capWL,,,,,,,Colour,white,Size,large,,,,12,13.8,NZ GST,,,,,,,1,1,16,9,8
+cartonofcoke-1,10039,,,,Carton of coke,<p>20 cans of coke</p>,food and beverage,,,,,,,food,12,24,NZ GST,,,,Coke,Food & Beverage Supplies,600,1,1,19.65,11,10
+CashIn,CashIn,,,,Cash In,<p>Cash into the till</p>,admin,,,,,,,admin,0,0,No GST,,,,,none,,1,0,0,,
+CashOut,CashOut,,,,Cash Out,<p>Cash out of till - always leave a note as to why.</p>,admin,,,,,,,admin,0,0,No GST,,,,,none,,1,0,0,,
+chocolatecaramelslice,10037,,,,Chocolate Caramel Slice,<p>Delicious home made on the premises daily</p>,food and beverage,,,,,,,handmade;food,1.2,3.5,NZ GST,,,,Vender Bender,venderbender,500,1,0,0,,
+coffee,coffee-hot,,,,Coffee (Demo),<p>A cup of Coffee. You can delete this once you have some other products setup.</p>,General,,,,,,,General,0,3,NZ GST,,,,Generic Brand,venderbender,,1,0,-1,,
+CranberryJuice,2245,,,,Cranberry Juice,<p>a nice juice for a summers day</p>,bistro,Size,Medium,,,,,drinks cold;commission20,1.4,2.95,NZ GST,,,,Home Made,Cappuccino,,1,1,15,9,9
+CranberryJuice,2246,,,,,,bistro,Size,Large,,,,,,1.8,3.8,NZ GST,,,,,,,1,1,8,8,9
+decaffinatedoptionforcoffee,10007,,,,decaffinated option for coffee,,,,,,,,,,0,0.5,NZ GST,,,,,,,1,1,7,0,0
+Discount,100012,,,,Discount,<p>Discount product - put in price of discount.</p>,admin,,,,,,,admin,0,0,NZ GST,,,,,,,1,0,0,,
+Dressshirt,10052,,,,Dress shirt,,,Size,Medium,Colour,Red,Gender,Male,,50,100,NZ GST,,,,,,,1,1,29,9,9
+Dressshirt,10053,,,,,,,Size,Large,Colour,Red,Gender,Male,,60,120,NZ GST,,,,,,,1,1,36,19,19
+Dressshirt,10054,,,,,,,Size,Small,Colour,Red,Gender,Male,,40,80.01,NZ GST,,,,,,,1,1,8,9,9
+enamelnecklace,neckenml,,,,Fashion long enamel necklace,<p>One size fits all</p>,clothing,,,,,,,accessories;jewellery,45,70,NZ GST,,,,Italia,Cappuccino,,1,1,8,7,5
+flatwhite,10018,,,,Flat white,,food and beverage,Size,Regular,Milk,Full,Sweeteners,Sugar,food,1,4,NZ GST,,210,,Vender Bender,venderbender,,1,0,0,,
+flatwhite,10019,,,,,,food and beverage,Size,Regular,Milk,Trim,Sweeteners,Sugar,,1,4,NZ GST,,210,,,,,1,0,0,,
+flatwhite,10034,,,,,,food and beverage,Size,Large,Milk,Full,Sweeteners,Sweetener,,1,4.5,NZ GST,,210,,,,,1,0,0,,
+flatwhite,10020,,,,,,food and beverage,Size,Regular,Milk,Soy,Sweeteners,Sugar,,1,4.5,NZ GST,,210,,,,,1,0,0,,
+flatwhite,10035,,,,,,food and beverage,Size,Large,Milk,Trim,Sweeteners,Sweetener,,1,4.5,NZ GST,,210,,,,,1,0,0,,
+flatwhite,10022,,,,,,food and beverage,Size,Large,Milk,Full,Sweeteners,Sugar,,1,4.5,NZ GST,,210,,,,,1,0,0,,
+flatwhite,10036,,,,,,food and beverage,Size,Large,Milk,Soy,Sweeteners,Sweetener,,1,5,NZ GST,,210,,,,,1,0,0,,
+flatwhite,10023,,,,,,food and beverage,Size,Large,Milk,Trim,Sweeteners,Sugar,,1,4.5,NZ GST,,210,,,,,1,0,0,,
+flatwhite,10024,,,,,,food and beverage,Size,Large,Milk,Soy,Sweeteners,Sugar,,1,5,NZ GST,,210,,,,,1,0,0,,
+flatwhite,10025,,,,,,food and beverage,Size,Regular,Milk,Full,Sweeteners,No sugar,,1,4,NZ GST,,210,,,,,1,0,0,,
+flatwhite,10026,,,,,,food and beverage,Size,Regular,Milk,Trim,Sweeteners,No sugar,,1,4,NZ GST,,210,,,,,1,0,0,,
+flatwhite,10027,,,,,,food and beverage,Size,Regular,Milk,Soy,Sweeteners,No sugar,,1,4.5,NZ GST,,210,,,,,1,0,0,,
+flatwhite,10028,,,,,,food and beverage,Size,large,Milk,Full,Sweeteners,No sugar,,1,4.5,NZ GST,,210,,,,,1,0,0,,
+flatwhite,10029,,,,,,food and beverage,Size,Large,Milk,Trim,Sweeteners,No sugar,,1,4.5,NZ GST,,210,,,,,1,0,0,,
+flatwhite,10030,,,,,,food and beverage,Size,Large,Milk,Soy,Sweeteners,No sugar,,1,5,NZ GST,,210,,,,,1,0,0,,
+flatwhite,10031,,,,,,food and beverage,Size,Regular,Milk,Full,Sweeteners,Sweetener,,1,4,NZ GST,,210,,,,,1,0,0,,
+flatwhite,10032,,,,,,food and beverage,Size,Regular,Milk,Trin,Sweeteners,Sweetener,,1,4,NZ GST,,210,,,,,1,0,0,,
+flatwhite,10033,,,,,,food and beverage,Size,Regular,Milk,Soy,Sweeteners,Sweetner,,1,4.5,NZ GST,,210,,,,,1,1,0,0,0
+Float,2234,,,,Float,<p>sfjlkfjlfjlsjfljf;la,admin,,,,,,,,0,0,No Tax,,,,,,,1,0,0,,
+freight,freight,,,,Freight (Shopify),This is the default freight used for online sales,admin,,,,,,,admin,0,0,No Tax,,,,Freight,Freight,,1,0,0,,
+Gift,228379109,,,,Gift Voucher,,,,,,,,,,0,0,NZ GST,,,,,,,1,1,32,0,0
+Gloves,10055,,,,Gloves,<p>Lovely gloves for evening wear</p>,clothing,Colour,Black,Size,Medium,,,clothing;front window,17,32,NZ GST,,,,Roma,Italians,,1,1,45,25,30
+Gloves,10056,,,,,,clothing,Colour,White,Size,Large,,,,19,36,NZ GST,,,,,,,1,1,10,0,0
+ImportDuty,ImportDuty,,,,Import Duty,Import Duty on imported goods,admin,,,,,,,admin,0,0,NZ GST,,,,,none,,1,0,0,,
+InternationalShipping,InternationalShipping,,,,International Shipping,International Shipping,,,,,,,,,0,20,No Tax,,,,Freight,Freight,,1,0,0,,
+Jandals,10063,,,,Jandals,<p>Great classic kiwi jandals</p>,surf,Size,Medium,Colour,Pink,Style,Swirl,counter;beachwear,10,16.9,NZ GST,,,,,,,1,1,34,12,20
+Jandals,10064,,,,,,surf,Size,Large,Colour,Pink,Style,Swirl,,11,19,NZ GST,,,,,,,1,1,38,11,10
+jandalskeyring,10047,,,,Jandals keyring,<p>The essence of a NZ summer at hand at all times to remind you of our beautiful land.</p>,giftware,,,,,,,giftware,8,16,NZ GST,,,,Quality NZ,Gift Supplies,,1,1,215,98,90
+kiwifruitlollies-1,10015,,,,Kiwifruit lollies,<p>Delicious 100% authentic kiwifruit lollies direct from NZ</p>,giftware,,,,,,,giftware;food,6,14,NZ GST,,,,Quality NZ,Gift Supplies,200,1,1,129.5,89,80
+LandingCosts,LandingCosts,,,,Landing Costs,,admin,,,,,,,admin,0,0,NZ GST,,,,,none,,1,0,0,,
+layby,99917,,,,layby,"<p>max 6 weeks, min payment $20",admin,,,,,,,admin,0,0,No Tax,,,,,,,1,0,0,,
+Macintosh,98978787878,,,,Macintosh,<p>Great for winter</p>,clothing,Size,Medium,Colour,Black,Season,Winter,clothing;unisex,50,100,NZ GST,,210,301,Italia,Italia,,1,1,30,12,20
+Macintosh,10082,,,,,,clothing,Size,Large,Colour,Black,Season,Winter,,60,120,NZ GST,,210,,,,,1,1,24,13,12
+MilanRed,MilanDressRed10,,,,Milan Dress red,"<p>Milan Dress 2011 season, 100% cotton, made in Italy</p>",clothing,Size,10,,,,,one piece,99,160,NZ GST,,,,Milan,Italians,,1,1,6,4,4
+MilanRed,MilanDressRed12,,,,,,clothing,Size,12,,,,,,99,160,NZ GST,,,,,,,1,1,6,5,5
+MilanRed,MilanDressRed14,,,,,,clothing,Size,14,,,,,,99,160,NZ GST,,,,,,,1,1,4,3,4
+MilanRed,MilanDressRed16,,,,,,clothing,Size,16,,,,,,99,160,NZ GST,,,,,,,1,1,7,1,2
+Milkshake,99886,,,,Milkshake,"<p>Can come with soy milk, lots of different flavours.</p>",bistro,Flavour,vanilla,,,,,drinks cold,2,3.5,NZ GST,,,,Milk Shakers,Milk Shakers,,1,1,16,10,7
+Milkshake,99887,,,,,,bistro,Flavour,chocolate,,,,,,2,3.8,NZ GST,,,301,,,,1,1,19,12,12
+Muffin,100034,,,,Muffin,,bistro,Flavour,Chocolate,,,,,food cold;cabinet,1.5,4,NZ GST,,,,,,,1,0,0,,
+Muffin,100035,,,,,,bistro,Flavour,Berry,,,,,,1.5,4,NZ GST,,,301,,,,1,0,0,,
+Muffin,100036,,,,,,bistro,Flavour,Maple Walnut,,,,,,1.5,4,NZ GST,,,301,,,,1,0,0,,
+Muffin,100037,,,,,,bistro,Flavour,Banana,,,,,,1.5,4,NZ GST,,,,,,,1,0,0,,
+NZTshirt,nzts-sbf,,,,NZ Tshirt,<p>Female and Male styles</p>,clothing,Size,small,Colour,Black,Gender,ladies,tops,35,50,NZ GST,,,,Disney,Cappuccino,,1,1,6,5,5
+NZTshirt,nzts-mbf,,,,,,clothing,Size,medium,Colour,Black,Gender,ladies,,35,50,NZ GST,,,,,,,1,1,8,3,3
+NZTshirt,nzts-lbf,,,,,,clothing,Size,large,Colour,Black,Gender,ladies,,35,50,NZ GST,,,,,,,1,1,8,3,4
+NZTshirt,nzts-srf,,,,,,clothing,Size,small,Colour,Red,Gender,ladies,,35,50,NZ GST,,,,,,,1,1,5,3,4
+NZTshirt,nzts-mrf,,,,,,clothing,Size,medium,Colour,Red,Gender,ladies,,35,50,NZ GST,,,,,,,1,1,4,3,4
+NZTshirt,nzts-lrf,,,,,,clothing,Size,large,Colour,Red,Gender,ladies,,35,50,NZ GST,,,,,,,1,1,5,3,4
+NZTshirt,nzts-sbm,,,,,,clothing,Size,small,Colour,Black,Gender,guys,,35,50,NZ GST,,,,,,,1,1,4,3,4
+NZTshirt,nzts-mbm,,,,,,clothing,Size,medium,Colour,Black,Gender,guys,,35,50,NZ GST,,,,,,,1,1,6,3,4
+NZTshirt,Nzts-lbm,,,,,,clothing,Size,large,Colour,Black,Gender,guys,,35,50,NZ GST,,,,,,,1,1,6,3,4
+NZTshirt,nzts-srm,,,,,,clothing,Size,small,Colour,Red,Gender,guys,,35,50,NZ GST,,,,,,,1,1,3,3,4
+NZTshirt,nzts-mrm,,,,,,clothing,Size,medium,Colour,Red,Gender,guys,,35,50,NZ GST,,,,,,,1,1,3,3,4
+orangejuice,10040,,,,Orange Juice,<p>Freshly squeezed orange juice</p>,food and beverage,Size,Medium,,,,,food,1,3,NZ GST,,,,Coke,Food & Beverage Supplies,,1,1,149,89,80
+orangejuice,10041,,,,,,food and beverage,Size,Small,,,,,,1,2.5,NZ GST,,,,,,,1,1,131,78,70
+orangejuice,10042,,,,,,food and beverage,Size,Large,,,,,,1,3.5,NZ GST,,,,,,,1,1,101,78,70
+ovalbasket,10012,,,,Oval basket,,giftware,,,,,,,giftware;composite,4,12,NZ GST,,,,Cane Toad,Gift Supplies,200,1,1,114,79,78
+Panini,10073,,,,Panini,<p>A nice panini home made daily.</p>,food and beverage,Filling,Ham,Extras,None,Toasted,Yes,201;front window;food cold,3,5.8,NZ GST,,,,Big Ben,Big Ben,,1,1,22,11,12
+Panini,10074,,,,,,food and beverage,Filling,Ham,Extras,Bacon,Toasted,Yes,,3.5,6.8,NZ GST,,,,,,,1,1,22,11,12
+poncho,100044,,,,Poncho,"<p>Ponchos are the in thing this season - one size fits all, goes well with slim jeans.</p> <p><span style=""text-decoration: underline;""><strong>100% wool</strong></span></p>",clothing,Colour,Black,Season,Winter,Tassle,Yes,counter;tops,50,80.5,NZ GST,,,,Ponchos RUs,We love ponchos,,1,1,16,10,20
+poncho,100045,,,,,,clothing,Colour,White,Season,Summer,Tassle,No,,50,100,NZ GST,,,,,,,1,1,12,10,7
+Purplesocks,pplsocks,,,,Purple woolen socks,<p>One size fits all</p>,clothing,,,,,,,footwear,15,21,NZ GST,,,,Italia,Cappuccino,,1,1,7,4,8
+Quiche,10001,,,,Quiche,"<p>This lovely eggy quiche has a thick pastry base, lots of yummy cheese and a choice of fillings.</p>",bistro,Flavour,Ham,,,,,food hot,1.5,2.8,NZ GST,,,,Big Ben,Big Ben,,1,1,16,9,10
+Quiche,10002,,,,,,bistro,Flavour,Vegetarian,,,,,,1.4,2.5,NZ GST,,,,,,,1,1,8,8,8
+Redsocks,rwllsocks,,,,Red woolen socks,<p>One size fits all</p>,clothing,,,,,,,footwear,10,18,NZ GST,,,,Italia,Cappuccino,,1,1,-1,4,8
+Refund,100003,,,,Refund,,admin,,,,,,,admin,0,0,NZ GST,,,,,,,1,0,0,,
+Scone,99895,,,,Scone,<p>tasty scone made on premises</p>,bistro,Flavour,date,,,,,food cold;cabinet,0.5,2.5,NZ GST,,,,Home Made,Home Made,,1,1,10,8,15
+Scone,99896,,,,,,bistro,Flavour,cheese,,,,,,0.75,3,NZ GST,,,301,,,,1,0,0,,
+ShippingCosts,ShippingCosts,,,,Shipping Costs,<p>Cost of shipping on imported stock.</p>,admin,,,,,,,admin,0,0,NZ GST,,,,,none,,1,0,0,,
+Silvernecklace,necksilv,,,,Fashion long silver necklace,<p>One size fits all</p>,clothing,,,,,,,accessories;jewellery,45,70,NZ GST,,,,Italia,Cappuccino,,1,1,8,7,5
+skinnyjeans,10079,,,,Skinny Jeans,<p>These are all the rage at the moment.</p>,clothing,Size,Medium,Colour,Jade,Fly,Zip,clothing;front window,30,55,NZ GST,,,,Roma,Quality Suppliers,,1,1,52,20,35
+skinnyjeans,10080,,,,,,clothing,Size,Large,Colour,Jade,Fly,Zip,,35,64,NZ GST,,,,,,,1,1,22,11,12
+SlimJeans,SlimJeansSmall,,,,Slim Jeans in 100% Blue Denim,<p>Slim Jeans from 2011 European collection</p>,clothing,Size,small,,,,,bottoms,89,149,NZ GST,,,,Italia,Cappuccino,,1,1,8,3,4
+SlimJeans,SlimJeansMedium,,,,,,clothing,Size,medium,,,,,,89,149,NZ GST,,,,,,,1,1,4,3,4
+SlimJeans,SlimJeansLarge,,,,,,clothing,Size,large,,,,,,89,149,NZ GST,,,,,,,1,1,8,6,6
+Sneakers,99971,,,,Sneakers,,clothing,Size,8,Gender,ladies,,,commission20;footwear,220,303.6,NZ GST,,,,,,,1,1,24,23,15
+Sneakers,99972,,,,,,clothing,Size,8,Gender,guys,,,,220,303.6,NZ GST,,,,,,,1,1,25,23,15
+Sneakers,99973,,,,,,clothing,Size,9,Gender,ladies,,,,225,310.5,NZ GST,,,,,,,1,1,36,23,15
+Sneakers,99974,,,,,,clothing,Size,9,Gender,guys,,,,230,317.4,NZ GST,,,,,,,1,1,23,23,15
+Sneakers100,10066,,,,Sneakers,<p>Nice sneakers great for the gym.</p>,clothing,Size,Large,Colour,Black,Detail,Gray,,40,75,NZ GST,,,,Italia,Italians,,1,1,22,11,12
+Sneakers100,10067,,,,,,clothing,Size,Small,Colour,Black,Detail,Gray,,30,56,NZ GST,,,,,,,1,1,22,11,12
+socks,228379110,,,,socks,,,,,,,,,,1,1.15,NZ GST,,,,,,,1,1,11,0,0
+Spiralscarf,SpiralScarf,,,,Spiral scarf multicolour,<p>Multicolour Spiral Scarf OSFA</p>,clothing,,,,,,,accessories,25,43,NZ GST,,,,Roma,Accessories Plus,,1,1,8,5,4
+SpongebobTshirt,sbts-sbf,,,,Spongebob Tshirt,<p>Female and Male styles</p>,clothing,Size,small,Colour,Black,Gender,ladies,tops,35,50,NZ GST,,,,Disney,Cappuccino,,1,1,6,5,5
+SpongebobTshirt,sbts-sbm,,,,,,clothing,Size,small,Colour,Black,Gender,guys,,35,50,NZ GST,,,,,,,1,1,3,3,4
+SpongebobTshirt,sbts-mbm,,,,,,clothing,Size,medium,Colour,Black,Gender,guys,,35,50,NZ GST,,,,,,,1,1,3,3,4
+SpongebobTshirt,sbts-lbm,,,,,,clothing,Size,large,Colour,Red,Gender,guys,,35,50,NZ GST,,,,,,,1,1,4,3,4
+SpongebobTshirt,sbts-srm,,,,,,clothing,Size,small,Colour,Red,Gender,guys,,35,50,NZ GST,,,,,,,1,1,4,3,4
+SpongebobTshirt,sbts-mrm,,,,,,clothing,Size,medium,Colour,Red,Gender,guys,,35,50,NZ GST,,,,,,,1,1,4,3,4
+SpongebobTshirt,sbts-mbf,,,,,,clothing,Size,medium,Colour,Black,Gender,ladies,,35,50,NZ GST,,,,,,,1,1,5,3,3
+SpongebobTshirt,sbts-lbf,,,,,,clothing,Size,large,Colour,Black,Gender,lad,,35,50,NZ GST,,,,,,,1,1,5,3,4
+SpongebobTshirt,sbts-srf,,,,,,clothing,Size,small,Colour,Red,Gender,ladies,,35,50,NZ GST,,,,,,,1,1,4,3,4
+SpongebobTshirt,sbts-mrf,,,,,,clothing,Size,medium,Colour,Red,Gender,ladies,,35,50,NZ GST,,,,,,,1,1,3,3,4
+SpongebobTshirt,sbts-lrf,,,,,,clothing,Size,large,Colour,Red,Gender,ladies,,35,50,NZ GST,,,,,,,1,1,6,3,4
+Sportsbra,10075,,,,Sports bra,,,Size,C12,Colour,Black,Secondary colour,Pink,,0,25,NZ GST,,,,,,,1,1,10,,
+Sportsbra,10076,,,,,,,Size,F12,Colour,Black,Secondary colour,Pink,,0,30,NZ GST,,,,,,,1,1,10,,
+Sportsbra,10077,,,,,,,Size,C12,Colour,White,Secondary colour,Pink,,0,25,NZ GST,,,,,,,1,1,0,,
+Sportsbra,10078,,,,,,,Size,C12,Colour,Black,Secondary colour,Purple,,0,25,NZ GST,,,,,,,1,1,0,,
+spottysocks,sptsocks,,,,Purple & red spotty socks,<p>One size fits all</p>,clothing,,,,,,,footwear,10,18,NZ GST,,,,Italia,Cappuccino,,1,1,-2,4,8
+Starterwetsuit,10062,,,,Starter wetsuit,<p>Good wetsuit for learner surfers</p>,surf,,,,,,,,35.82,45,NZ GST,,,,,,,1,1,16,9,8
+Stripeysocks,strsocks,,,,Purple & red stripey socks,<p>One size fits all</p>,clothing,,,,,,,footwear,10,18,NZ GST,,,,Italia,Cappuccino,,1,1,9,4,8
+Sunglasses,sglsblack,,,,UV protection,<p>One size fits all</p>,clothing,Colour,black,,,,,accessories;commission20,89,167,NZ GST,,,,Italia,Cappuccino,,1,1,5,4,6
+Sunglasses,sglswhite,,,,,,clothing,Colour,white,,,,,,89,167,NZ GST,,,,,,,1,1,11,10,4
+Sunglasses,sglsred,,,,,,clothing,Colour,red,,,,,,89,167,NZ GST,,,,,,,1,1,12,10,4
+Sweatshirt,10048,,,,Sweatshirt,<p>80s sweatshirt</p>,clothing,Colour,Flouro Yellow,Size,Medium,Gender,Boys,20commission;clothing,50,89,NZ GST,,,,Woolly heads,We love ponchos,,1,1,28,10,20
+Sweatshirt,10049,,,,,,clothing,Colour,Flouro Green,Size,Medium,Gender,Boys,,50,89,NZ GST,,,,,,,1,1,16,10,9
+Sweatshirt,10050,,,,,,clothing,Colour,Flouro Yellow,Size,Large,Gender,Boys,,60,95,NZ GST,,,,,,,1,1,20,11,10
+tamarindchutney-1,10016,,,,Tamarind chutney,<p>Beautiful hand crafted tamarind chutney</p>,food and beverage,,,,,,,giftware;food,10,19,NZ GST,,,,Quality NZ,Gift Supplies,200,1,1,82.5,56,50
+toering,100005,,,,toe ring,,clothing,,,,,,,accessories,40,90,NZ GST,,,,Italia,Cappuccino,,1,1,67,30,45
+tshirt-1,tshirt-white,,,,T-shirt (Demo),"<p>T-shirt, white. You can delete this once you have some other products setup.</p>",General,,,,,,,General,2,4.95,NZ GST,,,,Generic Brand,venderbender,,1,1,0,0,0
+Wine,10071,,,,Wine Bottle,,,,,,,,,,0,20,NZ GST,,,,,,,1,1,0,,
+birthdaygiftbasket,10051,,,,birthday gift basket,,,,,,,,,front window,50,80,NZ GST,,,,,,,1,1,4,0,0
+birthdaygiftbasket,10051,toering,100005,1,,,,,,,,,,,,,,,,,,,,1,1,4,0,0
+birthdaygiftbasket,10051,Spiralscarf,SpiralScarf,1,,,,,,,,,,,,,,,,,,,,1,1,4,0,0
+birthdaygiftbasket,10051,socks,228379110,1,,,,,,,,,,,,,,,,,,,,1,1,4,0,0
+canofcoke,10038,,,,Can of coke,,food and beverage,,,,,,,food,0.6,1.9,NZ GST,,,,Coke,Food & Beverage Supplies,,1,1,392,98,90
+canofcoke,10038,cartonofcoke-1,10039,0.05,,,,,,,,,,,,,,,,,,,,1,1,392,98,90
+giftbasket-1,10017,,,,Gift Basket,<p>A beautiful gift basket showcasing the best NZ has to offer. </p>,General,,,,,,,giftware,100,149.5,NZ GST,,,,Vender Bender,venderbender,500,1,1,41,0,0
+giftbasket-1,10017,ovalbasket,10012,1,,,,,,,,,,,,,,,,,,,,1,1,41,0,0
+giftbasket-1,10017,bottlemerlot-1,10013,1,,,,,,,,,,,,,,,,,,,,1,1,41,0,0
+giftbasket-1,10017,kiwifruitlollies-1,10015,2,,,,,,,,,,,,,,,,,,,,1,1,41,0,0
+giftbasket-1,10017,tamarindchutney-1,10016,2,,,,,,,,,,,,,,,,,,,,1,1,41,0,0
+giftbasket-1,10017,boxofchocolates-1,10014,1,,,,,,,,,,,,,,,,,,,,1,1,41,0,0
+glassofmerlot,10046,,,,Glass of merlot,,food and beverage,,,,,,,food,4,7,NZ GST,,,,Fine Wine NZ,Fine Wine NZ,,1,1,481,0,0
+glassofmerlot,10046,bottlemerlot-1,10013,0.2,,,,,,,,,,,,,,,,,,,,1,1,481,0,0
+Goodstartbreakfast,10057,,,,Good start breakfast,,,,,,,,,,10,11.5,NZ GST,,,,,,,1,1,149,0,0
+Goodstartbreakfast,10057,orangejuice,10040,1,,,,,,,,,,,,,,,,,,,,1,1,149,0,0
+Goodstartbreakfast,10057,Muffin,100034,1,,,,,,,,,,,,,,,,,,,,1,1,149,0,0
+KiwiGiftBasket1,10081,,,,Kiwi Gift Basket,,,,,,,,,,0,150,NZ GST,,,,,,,1,1,64,,
+KiwiGiftBasket1,10081,kiwifruitlollies-1,10015,2,,,,,,,,,,,,,,,,,,,,1,1,64,,
+KiwiGiftBasket1,10081,jandalskeyring,10047,1,,,,,,,,,,,,,,,,,,,,1,1,64,,
+KiwiGiftBasket1,10081,tamarindchutney-1,10016,1,,,,,,,,,,,,,,,,,,,,1,1,64,,
+KiwiGiftBasket1,10081,bottlemerlot-1,10013,1,,,,,,,,,,,,,,,,,,,,1,1,64,,
+NzgiftPack,10070,,,,Nz gift Pack,,,,,,,,,,0,0,NZ GST,,,,,,,1,1,34,,
+NzgiftPack,10070,boxofchocolates-1,10014,1,,,,,,,,,,,,,,,,,,,,1,1,34,,
+NzgiftPack,10070,Jandals,10063,1,,,,,,,,,,,,,,,,,,,,1,1,34,,
+NzgiftPack,10070,ovalbasket,10012,1,,,,,,,,,,,,,,,,,,,,1,1,34,,
+Startersurfingset,10065,,,,Starter surfing set,,,,,,,,,,100,150,NZ GST,,,,,,,1,1,32,0,0
+Startersurfingset,10065,7footstarterboard,10060,1,,,,,,,,,,,,,,,,,,,,1,1,32,0,0
+Startersurfingset,10065,Starterwetsuit,10062,1,,,,,,,,,,,,,,,,,,,,1,1,32,0,0
+Startersurfingset,10065,1hoursurfinglesson,10061,1,,,,,,,,,,,,,,,,,,,,1,1,32,0,0
+Wineglass,10072,,,,Wine (glass),,,,,,,,,,0,4,NZ GST,,,,,,,1,1,0,,
+Wineglass,10072,Wine,10071,0.2,,,,,,,,,,,,,,,,,,,,1,1,0,,
