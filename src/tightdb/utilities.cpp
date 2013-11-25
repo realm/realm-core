@@ -8,11 +8,31 @@
 
 #ifdef _MSC_VER
     #include <intrin.h>
+#else
+	#include <cpuid.h>
 #endif
+
 
 namespace tightdb {
 
 signed char sse_support = -1;
+signed char avx_support = -1;
+
+#if defined(TIGHTDB_COMPILER_AVX) && defined(__GNUC__)
+#define _XCR_XFEATURE_ENABLED_MASK 0
+
+#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 4 
+static inline unsigned long long _xgetbv(unsigned int index){ 
+  unsigned int eax, edx; 
+  __asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index)); 
+  return ((unsigned long long)edx << 32) | eax; 
+} 
+#else 
+
+#define _xgetbv() 0 
+
+#endif 
+#endif
 
 void cpuid_init()
 {
@@ -40,6 +60,34 @@ void cpuid_init()
         sse_support = 0;
     else
         sse_support = -2;
+
+    bool avxSupported = false;
+ 
+#if (_MSC_FULL_VER >= 160040219) || !defined(_MSC_VER)
+ 
+    bool osUsesXSAVE_XRSTORE = cret & (1 << 27) || false;
+    bool cpuAVXSuport = cret & (1 << 28) || false;
+ 
+    if (osUsesXSAVE_XRSTORE && cpuAVXSuport)
+    {
+        // Check if the OS will save the YMM registers
+        unsigned long long xcrFeatureMask = _xgetbv(_XCR_XFEATURE_ENABLED_MASK);
+        avxSupported = (xcrFeatureMask & 0x6) || false;
+    }
+#endif
+
+    if (avxSupported)
+    {
+        avx_support = 0;
+    }
+    else
+    {
+        avx_support = -1;
+    }
+
+	// 1 is reserved for AVX2 
+
+
 #endif
 }
 

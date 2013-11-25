@@ -102,7 +102,22 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/array_basic.hpp>
 #include <tightdb/array_string.hpp>
+#include <tightdb/utilities.hpp>
 
+#if (_MSC_FULL_VER >= 160040219)
+    #include <immintrin.h>
+#endif
+
+/*
+
+typedef float __m256 __attribute__ ((__vector_size__ (32),
+                     __may_alias__));
+typedef long long __m256i __attribute__ ((__vector_size__ (32),
+                      __may_alias__));
+typedef double __m256d __attribute__ ((__vector_size__ (32),
+                       __may_alias__));
+
+*/
 
 namespace tightdb {
 
@@ -1506,11 +1521,23 @@ public:
             }
             else {
                 // This is for float and double.
+
+#if 0 && defined(TIGHTDB_COMPILER_AVX)
+// AVX has been disabled because of array alignment (see https://app.asana.com/0/search/8836174089724/5763107052506)
+//
+// For AVX you can call things like if(cpuid_sse<1>()) to test for AVX, and then utilize _mm256_movemask_ps (VC) 
+// or movemask_cmp_ps (gcc/clang)
+//
+// See https://github.com/rrrlasse/tightdb/tree/AVX for an example of utilizing AVX for a two-column search which has
+// been benchmarked to: floats: 288 ms vs 552 by using AVX compared to 2-level-unrolled FPU loop. doubles: 415 ms vs 
+// 475 (more bandwidth bound). Tests against SSE have not been performed; AVX may not pay off. Please benchmark
+#endif
+
                 TConditionValue v1 = m_getter1.get_next(s);
                 TConditionValue v2 = m_getter2.get_next(s);
                 TConditionFunction C;
 
-                if (C(v1, v2))
+                if(C(v1, v2))
                     return s;
                 else
                     s++;

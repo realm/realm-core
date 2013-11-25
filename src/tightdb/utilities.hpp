@@ -52,11 +52,13 @@
 
 #if defined(TIGHTDB_PTR_64) && defined(TIGHTDB_X86_OR_X64)
     #define TIGHTDB_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
+	#define TIGHTDB_COMPILER_AVX
 #endif
 
 namespace tightdb {
 
 extern signed char sse_support;
+extern signed char avx_support;
 
 template<int version> TIGHTDB_FORCEINLINE bool cpuid_sse()
 {
@@ -75,12 +77,17 @@ template<int version> TIGHTDB_FORCEINLINE bool cpuid_sse()
     We runtime-initialize sse_support in a constructor of a static variable which is not guaranteed to be called
     prior to cpu_sse(). So we compile-time initialize sse_support to -2 as fallback.
 */
-    TIGHTDB_STATIC_ASSERT(version == 30 || version == 42, "Only SSE 3 and 42 supported for detection");
+    TIGHTDB_STATIC_ASSERT(version == 1 || version == 2 || version == 30 || version == 42, "Only version == 1 (AVX), 2 (AVX2), 30 (SSE 3) and 42 (SSE 4.2) are supported for detection");
 #ifdef TIGHTDB_COMPILER_SSE
     if (version == 30)
         return (sse_support >= 0);
     else if (version == 42)
         return (sse_support > 0);   // faster than == 1 (0 requres no immediate operand)
+	else if (version == 1) // avx
+		return (avx_support >= 0);
+	else if (version == 2) // avx2
+		return (avx_support > 0);
+
 #else
     return false;
 #endif
