@@ -497,7 +497,7 @@ public:
                 }
                 TIGHTDB_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != null_ptr);
                 bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av));
-                if(!cont)
+                if (!cont)
                     return static_cast<size_t>(-1);
              }
         }
@@ -786,7 +786,7 @@ public:
                 (SameType<TSourceColumn, int64_t>::value
                  && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))) {
                 bool cont = m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
-                if(!cont)
+                if (!cont)
                     return not_found;
             }
             // Else, for each match in this node, call our IntegerNode::match_callback to test remaining nodes and/or extract
@@ -795,7 +795,7 @@ public:
                 m_source_column = source_column;
                 bool cont = m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, null_ptr,
                              std::bind1st(std::mem_fun(&IntegerNode::template match_callback<TAction, TSourceColumn>), this));
-                if(!cont)
+                if (!cont)
                     return not_found;
             }
 
@@ -1525,7 +1525,7 @@ public:
 #if 0 && defined(TIGHTDB_COMPILER_AVX)
 // AVX has been disabled because of array alignment (see https://app.asana.com/0/search/8836174089724/5763107052506)
 //
-// For AVX you can call things like if(sseavx<1>()) to test for AVX, and then utilize _mm256_movemask_ps (VC) 
+// For AVX you can call things like if (simd<1>()) to test for AVX, and then utilize _mm256_movemask_ps (VC) 
 // or movemask_cmp_ps (gcc/clang)
 //
 // See https://github.com/rrrlasse/tightdb/tree/AVX for an example of utilizing AVX for a two-column search which has
@@ -1537,7 +1537,7 @@ public:
                 TConditionValue v2 = m_getter2.get_next(s);
                 TConditionFunction C;
 
-                if(C(v1, v2))
+                if (C(v1, v2))
                     return s;
                 else
                     s++;
@@ -1568,7 +1568,7 @@ class ExpressionNode: public ParentNode {
 public:
     ~ExpressionNode() TIGHTDB_NOEXCEPT
     {
-        if(m_auto_delete)
+        if (m_auto_delete)
             delete m_compare, m_compare = null_ptr;
     }
 

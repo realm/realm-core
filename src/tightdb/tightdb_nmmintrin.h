@@ -55,17 +55,17 @@ template <int op> static inline int movemask_cmp_pd(__m256d* y1, __m256d* y2)
 static inline int movemask_cmp_ps(__m256* y1, __m256* y2, int op)
 {
 	// todo, use constexpr;
-	if(op == _CMP_EQ_OQ)
+	if (op == _CMP_EQ_OQ)
 		return movemask_cmp_ps<_CMP_NEQ_OQ>(y1, y2);
-	else if(op == _CMP_NEQ_OQ)
+	else if (op == _CMP_NEQ_OQ)
 		return movemask_cmp_ps<_CMP_NEQ_OQ>(y1, y2);
-	else if(op == _CMP_LT_OQ)
+	else if (op == _CMP_LT_OQ)
 		return movemask_cmp_ps<_CMP_LT_OQ>(y1, y2);
-	else if(op == _CMP_LE_OQ)
+	else if (op == _CMP_LE_OQ)
 		return movemask_cmp_ps<_CMP_LE_OQ>(y1, y2);
-	else if(op == _CMP_GE_OQ)
+	else if (op == _CMP_GE_OQ)
 		return movemask_cmp_ps<_CMP_GE_OQ>(y1, y2);
-	else if(op == _CMP_GT_OQ)
+	else if (op == _CMP_GT_OQ)
 		return movemask_cmp_ps<_CMP_GT_OQ>(y1, y2);
 
 	TIGHTDB_ASSERT(false);
@@ -75,17 +75,17 @@ static inline int movemask_cmp_ps(__m256* y1, __m256* y2, int op)
 static inline int movemask_cmp_pd(__m256d* y1, __m256d* y2, int op)
 {
 	// todo, use constexpr;
-	if(op == _CMP_EQ_OQ)
+	if (op == _CMP_EQ_OQ)
 		return movemask_cmp_pd<_CMP_NEQ_OQ>(y1, y2);
-	else if(op == _CMP_NEQ_OQ)
+	else if (op == _CMP_NEQ_OQ)
 		return movemask_cmp_pd<_CMP_NEQ_OQ>(y1, y2);
-	else if(op == _CMP_LT_OQ)
+	else if (op == _CMP_LT_OQ)
 		return movemask_cmp_pd<_CMP_LT_OQ>(y1, y2);
-	else if(op == _CMP_LE_OQ)
+	else if (op == _CMP_LE_OQ)
 		return movemask_cmp_pd<_CMP_LE_OQ>(y1, y2);
-	else if(op == _CMP_GE_OQ)
+	else if (op == _CMP_GE_OQ)
 		return movemask_cmp_pd<_CMP_GE_OQ>(y1, y2);
-	else if(op == _CMP_GT_OQ)
+	else if (op == _CMP_GT_OQ)
 		return movemask_cmp_pd<_CMP_GT_OQ>(y1, y2);
 
 	TIGHTDB_ASSERT(false);
