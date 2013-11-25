@@ -61,7 +61,7 @@ TEST(UPPERLOWERBOUND)
 
     int i;
     // we use 4 as constant in order to make border case sequences of v, v, v and v, v+1, v+2, etc, probable
-    for(i=0; i<100000; i++) {
+    for(i=0; i< (1000 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION)) ; i++) {
         int elements = rand() % 64;
         int val = rand() % 4; // random start value
 
@@ -74,17 +74,18 @@ TEST(UPPERLOWERBOUND)
             val += rand() % 4;
         }
 
-        int searches = val; // val exceeds last value by rand() % 4
-        for(int s = 0; s < searches; s++) {
-            int uarr = a.upper_bound_int(s);
-            int larr = a.lower_bound_int(s);
-            int uvec = std::upper_bound(v.begin(), v.end(), s) - v.begin();
-            int lvec = std::lower_bound(v.begin(), v.end(), s) - v.begin();
+        int64_t searches = val; // val exceeds last value by rand() % 4
+        for(size_t s = 0; s < searches; s++) {
+            size_t uarr = a.upper_bound_int(s);
+            size_t larr = a.lower_bound_int(s);
+            size_t uvec = std::upper_bound(v.begin(), v.end(), s) - v.begin();
+            size_t lvec = std::lower_bound(v.begin(), v.end(), s) - v.begin();
 
             CHECK_EQUAL(uvec, uarr);
             CHECK_EQUAL(lvec, larr);
         }
     }
+    a.destroy();
 }
 
 
