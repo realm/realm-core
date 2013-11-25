@@ -1525,7 +1525,7 @@ public:
 #if 0 && defined(TIGHTDB_COMPILER_AVX)
 // AVX has been disabled because of array alignment (see https://app.asana.com/0/search/8836174089724/5763107052506)
 //
-// For AVX you can call things like if (simd<1>()) to test for AVX, and then utilize _mm256_movemask_ps (VC) 
+// For AVX you can call things like if (sseavx<1>()) to test for AVX, and then utilize _mm256_movemask_ps (VC) 
 // or movemask_cmp_ps (gcc/clang)
 //
 // See https://github.com/rrrlasse/tightdb/tree/AVX for an example of utilizing AVX for a two-column search which has

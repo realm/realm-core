@@ -137,7 +137,7 @@ int main(int argc, char* argv[])
     cerr << "Compiler supported SSE (auto detect):       No\n";
 #endif
 
-    cerr << "This CPU supports SSE (auto detect):        " << (tightdb::simd<42>() ? "4.2" : (tightdb::simd<30>() ? "3.0" : "None"));
+    cerr << "This CPU supports SSE (auto detect):        " << (tightdb::sseavx<42>() ? "4.2" : (tightdb::sseavx<30>() ? "3.0" : "None"));
     cerr << "\n";
 
 #ifdef TIGHTDB_COMPILER_AVX
@@ -146,7 +146,7 @@ int main(int argc, char* argv[])
     cerr << "Compiler supported AVX (auto detect):       No\n";
 #endif
 
-    cerr << "This CPU supports AVX (AVX1) (auto detect): " << (tightdb::simd<1>() ? "Yes" : "No");
+    cerr << "This CPU supports AVX (AVX1) (auto detect): " << (tightdb::sseavx<1>() ? "Yes" : "No");
     cerr << "\n\n";
 
     CustomTestReporter reporter;
