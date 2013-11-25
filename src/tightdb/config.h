@@ -111,6 +111,14 @@
 #endif
 
 
+/* Support for C++11 variadic templates. */
+#if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_AT_LEAST_GCC(4, 3) || \
+    TIGHTDB_HAVE_CLANG_FEATURE(cxx_variadic_templates) || \
+    TIGHTDB_HAVE_AT_LEAST_MSVC_12_2013
+#  define TIGHTDB_HAVE_CXX11_VARIADIC_TEMPLATES 1
+#endif
+
+
 /* Support for C++11 static_assert(). */
 #if TIGHTDB_HAVE_CXX11 && TIGHTDB_HAVE_AT_LEAST_GCC(4, 3) || \
     TIGHTDB_HAVE_CLANG_FEATURE(cxx_static_assert) || \
