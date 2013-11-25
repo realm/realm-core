@@ -608,7 +608,6 @@ size_t Array::FindGTE(int64_t target, size_t start) const
 
     size_t orig_high;
     orig_high = high;
-
     while (high - start > 1) {
         size_t probe = (start + high) / 2; // FIXME: Prone to overflow - see lower_bound() for a solution
         int64_t v = get(probe);
@@ -2370,47 +2369,95 @@ inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t width,
 // We currently use binary search. See for example
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
 //
-// It may be worth considering if overall efficiency can be improved
-// by doing a linear search for short sequences.
+// The binary search used here is carefully optimized. Key trick is to use a single
+// loop controlling variable (size) instead of high/low pair, and to keep updates
+// to size done inside the loop independent of comparisons. Further key to speed
+// is to avoid branching inside the loop, using conditional moves instead. This
+// provides robust performance for random searches, though predictable searches
+// might be slightly faster if we used branches instead. The loop unrolling yields
+// a final 5-20% speedup depending on circumstances.
+
 template<int width>
 inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
-    size_t i = 0;
-    size_t size_2 = size;
-    while (0 < size_2) {
-        size_t half = size_2 / 2;
-        size_t mid = i + half;
-        int64_t probe = get_direct<width>(data, mid);
-        if (probe < value) {
-            i = mid + 1;
-            size_2 -= half + 1;
-        }
-        else {
-            size_2 = half;
-        }
+    size_t low = 0;
+
+    while (size > 8) {
+        size_t half = size / 2;
+        size_t probe = (low + half);
+        size_t pbadj = low + size - half;
+        int64_t v = get_direct<width>(data, probe);
+        size = half;
+        low = (v < value) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (v < value) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (v < value) ? pbadj : low;
     }
-    return i;
+    do {
+        size_t half = size / 2;
+        size_t probe = (low + half);
+        size_t pbadj = low + size - half;
+        int64_t v = get_direct<width>(data, probe);
+        size = half;
+        low = (v < value) ? pbadj : low;
+
+    } while (size > 0);
+
+    return low;
+
 }
 
 // See lower_bound()
 template<int width>
 inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
-    size_t i = 0;
-    size_t size_2 = size;
-    while (0 < size_2) {
-        size_t half = size_2 / 2;
-        size_t mid = i + half;
-        int64_t probe = get_direct<width>(data, mid);
-        if (!(value < probe)) {
-            i = mid + 1;
-            size_2 -= half + 1;
-        }
-        else {
-            size_2 = half;
-        }
+    size_t low = 0;
+    while (size >= 8) {
+        size_t half = size / 2;
+        size_t probe = (low + half);
+        size_t pbadj = low + size - half;
+        int64_t v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
     }
-    return i;
+
+    do {
+        size_t half = size / 2;
+        size_t probe = (low + half);
+        size_t pbadj = low + size - half;
+        int64_t v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+
+    } while (size > 0);
+
+    return low;
+
 }
 
 } // anonymous namespace
