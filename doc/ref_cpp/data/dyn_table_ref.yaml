@@ -1027,7 +1027,7 @@ CATEGORIES :
       DESCR    : &g_dyn_table_count_descr
                  This method counts the number of rows matching a specified value
                  in the specified column.
-                 It is convinient to determine the number briefly compared to using
+                 It is convinient to determine the number briefly, compared to using
                  a {@link class_dyn_query} object.
       SIGNATURE: |
                  size_t count_int(size_t column_ndx, int64_t value) const;
