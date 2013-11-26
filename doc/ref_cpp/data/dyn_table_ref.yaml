@@ -1079,7 +1079,7 @@ CATEGORIES :
       - NAME   : column_ndx
         TYPES  : size_t
         DESCR  : &g_dyn_table_sum_parm1_descr
-                 The column index (starting from 0) to summarize.
+                 The index (starting from 0) of the column to sum.
       RETURN:
         TYPES  : [int64_t, double, double]
         DESCR  : &g_dyn_table_sum_return_descr
