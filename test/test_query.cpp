@@ -424,6 +424,7 @@ TEST(NextGenSyntaxMonkey)
                 tvpos++;
             }
         }
+        CHECK_EQUAL(tvpos, tv_0.size());
 
         // (first == 0 || first == 1) && second == 1
         tightdb::Query q2_1 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 1) && table.column<int64_t>(1) == 1;
@@ -435,6 +436,8 @@ TEST(NextGenSyntaxMonkey)
                 tvpos++;
             }
         }
+        CHECK_EQUAL(tvpos, tv_1.size());
+
 
         // first == 0 || (first == 1 && second == 1) 
         tightdb::Query q2_2 = table.column<int64_t>(0) == 0 || (table.column<int64_t>(0) == 1 && table.column<int64_t>(1) == 1);
@@ -446,6 +449,8 @@ TEST(NextGenSyntaxMonkey)
                 tvpos++;
             }
         }
+        CHECK_EQUAL(tvpos, tv_2.size());
+
 
         // second == 0 && (first == 0 || first == 2)
         tightdb::Query q4_8 = table.column<int64_t>(1) == 0 && (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2);
@@ -457,6 +462,8 @@ TEST(NextGenSyntaxMonkey)
                 tvpos++;
             }
         }
+        CHECK_EQUAL(tvpos, tv_8.size());
+
 
         // (first == 0 || first == 2) && (first == 1 || second == 1) 
         tightdb::Query q3_7 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2) && (table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1);
@@ -468,6 +475,61 @@ TEST(NextGenSyntaxMonkey)
                 tvpos++;
             }
         }
+        CHECK_EQUAL(tvpos, tv_7.size());
+
+
+        // (first == 0 || first == 2) || (first == 1 || second == 1) 
+        tightdb::Query q4_7 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2) || (table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1);
+        tightdb::TableView tv_10 = q4_7.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) || (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
+                CHECK_EQUAL(r, tv_10.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+        CHECK_EQUAL(tvpos, tv_10.size());
+
+
+        TableView tv;
+
+        // first == 0 || first == 2 || first == 1 || second == 1 
+        tightdb::Query q20 = table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2 || table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1;
+        tv = q20.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(0, r) == 0 || table.get_int(0, r) == 2 || table.get_int(0, r) == 1 || table.get_int(1, r) == 1) {
+                CHECK_EQUAL(r, tv.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+        CHECK_EQUAL(tvpos, tv.size());
+
+
+        // first * 2 > second / 2 + third + 1
+        tightdb::Query q21 = table.column<int64_t>(0) * 2 > table.column<int64_t>(1) / 2 + table.column<int64_t>(2) + 1;
+        tv = q21.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(0, r) * 2 > table.get_int(1, r) / 2 + table.get_int(2, r) + 1) {
+                CHECK_EQUAL(r, tv.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+        CHECK_EQUAL(tvpos, tv.size());
+
+        // first * 2 > second / 2 + third + 1 + third - third + third - third + third - third + third - third + third - third 
+        tightdb::Query q22 = table.column<int64_t>(0) * 2 > table.column<int64_t>(1) / 2 + table.column<int64_t>(2) + 1 + table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2);
+        tv = q22.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(0, r) * 2 > table.get_int(1, r) / 2 + table.get_int(2, r) + 1) {
+                CHECK_EQUAL(r, tv.get_source_ndx(tvpos));
+                tvpos++;
+            }
+        }
+        CHECK_EQUAL(tvpos, tv.size());
+
     }
 }
 
