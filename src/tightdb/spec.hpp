@@ -71,7 +71,7 @@ public:
     void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
                                 ArrayParent*& keys_parent, size_t& keys_ndx);
     ref_type get_enumkeys_ref(size_t column_ndx,
-                              ArrayParent** keys_parent=NULL, size_t* keys_ndx=NULL);
+                              ArrayParent** keys_parent=null_ptr, size_t* keys_ndx=null_ptr);
 
     // Get position in column list adjusted for indexes
     // (since index refs are stored alongside column refs in

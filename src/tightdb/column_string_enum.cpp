@@ -218,7 +218,7 @@ bool ColumnStringEnum::compare_string(const ColumnStringEnum& c) const
 
 StringIndex& ColumnStringEnum::create_index()
 {
-    TIGHTDB_ASSERT(m_index == NULL);
+    TIGHTDB_ASSERT(m_index == null_ptr);
 
     // Create new index
     m_index = new StringIndex(this, &get_string, m_array->get_alloc());
@@ -241,7 +241,7 @@ void ColumnStringEnum::set_index_ref(ref_type ref, ArrayParent* parent, size_t n
 
 void ColumnStringEnum::install_index(StringIndex* index) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(m_index == NULL);
+    TIGHTDB_ASSERT(m_index == null_ptr);
 
     index->set_target(this, &get_string);
     m_index = index; // we now own this index

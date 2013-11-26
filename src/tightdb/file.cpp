@@ -222,16 +222,16 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
     if (handle != INVALID_HANDLE_VALUE) {
         m_handle    = handle;
         m_have_lock = false;
-        if (success != NULL) *success = true;
+        if (success != null_ptr) *success = true;
         return;
     }
 
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    if ((success != NULL) && (err == ERROR_FILE_EXISTS) && (c == create_Must)) {
+    if ((success != null_ptr) && (err == ERROR_FILE_EXISTS) && (c == create_Must)) {
         *success = false;
         return;
     }
-    if ((success != NULL) && (err == ERROR_FILE_NOT_FOUND) && (c == create_Never)) {
+    if ((success != null_ptr) && (err == ERROR_FILE_NOT_FOUND) && (c == create_Never)) {
         *success = false;
         return;
     }
@@ -262,16 +262,16 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
     int fd = ::open(path.c_str(), flags2, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     if (0 <= fd) {
         m_fd = fd;
-        if (success != NULL) *success = true;
+        if (success != null_ptr) *success = true;
         return;
     }
 
     int err = errno; // Eliminate any risk of clobbering
-    if ((success != NULL) && (err == EEXIST) && (c == create_Must)) {
+    if ((success != null_ptr) && (err == EEXIST) && (c == create_Must)) {
         *success = false;
         return;
     }
-    if ((success != NULL) && (err == ENOENT) && (c == create_Never)) {
+    if ((success != null_ptr) && (err == ENOENT) && (c == create_Never)) {
         *success = false;
         return;
     }

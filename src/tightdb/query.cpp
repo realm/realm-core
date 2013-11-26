@@ -514,7 +514,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
     Init(*m_table);
     size_t matchcount = 0;
     QueryState<R> st;
-    st.init(action, NULL, limit);
+    st.init(action, null_ptr, limit);
     R r = first[0]->aggregate<action, R, T>(&st, start, end, column_ndx, &matchcount);
     if (resultcount)
         *resultcount = matchcount;
@@ -717,7 +717,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     TableView tv(*m_table);
     QueryState<int64_t> st;
     st.init(act_FindAll, &tv.get_ref_column(), limit);
-    first[0]->aggregate<act_FindAll, int64_t, int64_t>(&st, start, end, not_found, NULL);
+    first[0]->aggregate<act_FindAll, int64_t, int64_t>(&st, start, end, not_found, null_ptr);
     return tv;
 }
 
@@ -737,8 +737,8 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 
     Init(*m_table);
     QueryState<int64_t> st;
-    st.init(act_Count, NULL, limit);
-    int64_t r = first[0]->aggregate<act_Count, int64_t, int64_t>(&st, start, end, not_found, NULL);
+    st.init(act_Count, null_ptr, limit);
+    int64_t r = first[0]->aggregate<act_Count, int64_t, int64_t>(&st, start, end, not_found, null_ptr);
     return size_t(r);
 }
 
@@ -818,11 +818,11 @@ int Query::set_threads(unsigned int threadcount)
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
     pthread_win32_process_attach_np ();
 #endif
-    pthread_mutex_init(&ts.result_mutex, NULL);
-    pthread_cond_init(&ts.completed_cond, NULL);
-    pthread_mutex_init(&ts.jobs_mutex, NULL);
-    pthread_mutex_init(&ts.completed_mutex, NULL);
-    pthread_cond_init(&ts.jobs_cond, NULL);
+    pthread_mutex_init(&ts.result_mutex, null_ptr);
+    pthread_cond_init(&ts.completed_cond, null_ptr);
+    pthread_mutex_init(&ts.jobs_mutex, null_ptr);
+    pthread_mutex_init(&ts.completed_mutex, null_ptr);
+    pthread_cond_init(&ts.jobs_cond, null_ptr);
 
     pthread_mutex_lock(&ts.jobs_mutex);
 
@@ -830,7 +830,7 @@ int Query::set_threads(unsigned int threadcount)
         pthread_detach(threads[i]);
 
     for (size_t i = 0; i < threadcount; ++i) {
-        int r = pthread_create(&threads[i], NULL, query_thread, (void*)&ts);
+        int r = pthread_create(&threads[i], null_ptr, query_thread, (void*)&ts);
         if (r != 0)
             TIGHTDB_ASSERT(false); //todo
     }
@@ -915,7 +915,7 @@ string Query::validate()
 
 void Query::Init(const Table& table) const
 {
-    if (first[0] != NULL) {
+    if (first[0] != null_ptr) {
         ParentNode* top = first[0];
         top->init(table);
         vector<ParentNode*> v;
@@ -926,7 +926,7 @@ void Query::Init(const Table& table) const
 bool Query::is_initialized() const
 {
     const ParentNode* top = first[0];
-    if (top != NULL) {
+    if (top != null_ptr) {
         return top->is_initialized();
     }
     return true;
@@ -1002,10 +1002,10 @@ Query Query::operator||(Query q)
 
 Query Query::operator&&(Query q)
 {
-    if(first[0] == NULL)
+    if(first[0] == null_ptr)
         return q;
 
-    if(q.first[0] == NULL)
+    if(q.first[0] == null_ptr)
         return (*this);
 
     Query q2(*this->m_table);

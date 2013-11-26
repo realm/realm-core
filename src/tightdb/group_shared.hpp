@@ -208,6 +208,8 @@ private:
     void        ringbuf_put(const ReadCount& v);
     void        ringbuf_expand();
 
+    void do_begin_write();
+
     // Must be called only by someone that has a lock on the write
     // mutex.
     uint64_t get_current_version() TIGHTDB_NOEXCEPT;
@@ -320,6 +322,27 @@ inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
 inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 {
     return m_file_map.is_attached();
+}
+
+inline Group& SharedGroup::begin_write()
+{
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = m_group.get_replication()) {
+        repl->begin_write_transact(*this); // Throws
+        try {
+            do_begin_write();
+        }
+        catch (...) {
+            repl->rollback_write_transact(*this);
+            throw;
+        }
+        return m_group;
+    }
+#endif
+
+    do_begin_write();
+
+    return m_group;
 }
 
 

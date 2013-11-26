@@ -647,7 +647,7 @@ void SharedGroup::do_async_commits()
             timespec ts;
             timeval tv;
             // clock_gettime(CLOCK_REALTIME, &ts); <- would like to use this, but not there on mac
-            gettimeofday(&tv, NULL);
+            gettimeofday(&tv, null_ptr);
             ts.tv_sec = tv.tv_sec;
             ts.tv_nsec = tv.tv_usec * 1000;
             ts.tv_nsec += 10000000; // 10 msec
@@ -763,7 +763,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 }
 
 
-Group& SharedGroup::begin_write()
+void SharedGroup::do_begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
@@ -805,20 +805,6 @@ Group& SharedGroup::begin_write()
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Writing;
 #endif
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication()) {
-        try {
-            repl->begin_write_transact(*this); // Throws
-        }
-        catch (...) {
-            rollback();
-            throw;
-        }
-    }
-#endif
-
-    return m_group;
 }
 
 

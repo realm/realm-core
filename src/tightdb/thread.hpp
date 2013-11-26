@@ -33,6 +33,7 @@
 #include <tightdb/assert.hpp>
 #include <tightdb/terminate.hpp>
 #include <tightdb/unique_ptr.hpp>
+#include <tightdb/meta.hpp>
 
 #ifdef TIGHTDB_HAVE_CXX11_ATOMIC
 #  include <atomic>
@@ -226,7 +227,7 @@ public:
     /// Wait for another thread to call notify() or notify_all().
     void wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT;
     template<class Func>
-    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = NULL);
+    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = null_ptr);
 
     /// If any threads are wating for this condition, wake up at least
     /// one.
@@ -419,7 +420,7 @@ template<class Func>
 inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
     int r;
-    if (tp == NULL) {
+    if (tp == null_ptr) {
         r = pthread_cond_wait(&m_impl, &m.m_impl);
     } else {
         r = pthread_cond_timedwait(&m_impl, &m.m_impl, tp);

@@ -128,7 +128,7 @@ Array* merge(const Array& array_list)
     size_t size = array_list.size();
 
     if (size == 1)
-        return NULL; // already sorted
+        return null_ptr; // already sorted
 
     Array left_half, right_half;
     const size_t leftSize = size / 2;
