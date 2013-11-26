@@ -1121,9 +1121,9 @@ CATEGORIES :
       TITLE    : minimum_*
       NAMES    : [minimum_int, minimum_float, minimum_double]
       SUMMARY  : &g_dyn_table_minimum_summary
-                 Find lowest value.
+                 Find the minimum value.
       DESCR    : &g_dyn_table_minimum_descr
-                 The method finds the lowest value in the specified column.
+                 The method finds the minimum value in the specified column.
       CONST    : True
       SIGNATURE: |
                  int64_t minimum_int(size_t column_ndx) const;
