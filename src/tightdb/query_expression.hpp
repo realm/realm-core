@@ -1000,7 +1000,7 @@ public:
                 return start + match;
         }
 
-        return end; // no match
+        return not_found; // no match
     }
     
 private: 
