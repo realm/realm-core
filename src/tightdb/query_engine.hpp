@@ -457,9 +457,9 @@ public:
     size_t m_probes;
     size_t m_matches;
 
-    const Table* m_table; // FIXME: Temporarily un-protected
 
 protected:
+    const Table* m_table;
     std::string error_code;
 
     const ColumnBase& get_column_base(const Table& table, std::size_t ndx)

@@ -531,8 +531,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
 
     /**************************************************************************************************************
     *                                                                                                             *
-    * Main entry point of a query. Can be called on any of the nodes; yields same result. Schedules calls to      *
-    * aggregate_local.                                                                                            *
+    * Main entry point of a query. Schedules calls to aggregate_local                                             *
     * Return value is the result of the query, or Array pointer for FindAll.                                      *
     *                                                                                                             *
     **************************************************************************************************************/
@@ -541,12 +540,12 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
     TResult Query::aggregate_internal(ParentNode* pn, QueryState<TResult>* st, size_t start, size_t end, size_t agg_col, size_t* matchcount) const
     {
         if (end == not_found)
-            end = pn->m_table->size();
+            end = m_table->size();
 
         SequentialGetter<TSourceColumn>* source_column = null_ptr;
 
         if (agg_col != not_found)
-            source_column = new SequentialGetter<TSourceColumn>(*pn->m_table, agg_col);
+            source_column = new SequentialGetter<TSourceColumn>(*m_table, agg_col);
 
         size_t td;
 
