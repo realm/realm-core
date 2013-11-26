@@ -1038,8 +1038,10 @@ CATEGORIES :
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : &g_dyn_table_count_parm1_descr
+        DESCR  :
+        - TEXT : &g_dyn_table_count_parm1_descr0
                  The column index (starting from 0).
+        - TEXT : &g_dyn_table_count_parm1_descr1
                  The data type in the column must match the type of the <code>value</code> value.
       - NAME   : &g_dyn_table_count_parm2_name
                  value
