@@ -369,63 +369,8 @@ public:
         return r;
     }
 
-    /**************************************************************************************************************
-    *                                                                                                             *
-    * Main entry point of a query. Can be called on any of the nodes; yields same result. Schedules calls to      *
-    * aggregate_local.                                                                                            *
-    * Return value is the result of the query, or Array pointer for FindAll.                                      *
-    *                                                                                                             *
-    **************************************************************************************************************/
 
-    template<Action TAction, class TResult, class TSourceColumn>
-    TResult aggregate(QueryState<TResult>* st, size_t start, size_t end, size_t agg_col, size_t* matchcount)
-    {
-        if (end == not_found)
-            end = m_table->size();
-
-        SequentialGetter<TSourceColumn>* source_column = null_ptr;
-
-        if (agg_col != not_found)
-            source_column = new SequentialGetter<TSourceColumn>(*m_table, agg_col);
-
-        size_t td;
-
-        while (start < end) {
-            size_t best = std::distance(m_children.begin(), std::min_element(m_children.begin(), m_children.end(), score_compare()));
-
-            // Find a large amount of local matches in best condition
-            td = m_children[best]->m_dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
-
-            // Executes start...end range of a query and will stay inside the condition loop of the node it was called
-            // on. Can be called on any node; yields same result, but different performance. Returns prematurely if
-            // condition of called node has evaluated to true local_matches number of times. 
-            // Return value is the next row for resuming aggregating (next row that caller must call aggregate_local on)
-            start = aggregate_local_selector<TAction, TResult, TSourceColumn>(m_children[best], st, start, td, findlocals, source_column, matchcount);
-
-            // Make remaining conditions compute their m_dD (statistics)
-            for (size_t c = 0; c < m_children.size() && start < end; c++) {
-                if (c == best)
-                    continue;
-
-                // Skip test if there is no way its cost can ever be better than best node's
-                double cost = m_children[c]->cost();
-                if (m_children[c]->m_dT < cost) {
-
-                    // Limit to bestdist in order not to skip too large parts of index nodes
-                    size_t maxD = m_children[c]->m_dT == 0.0 ? end - start : bestdist;
-                    td = m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
-                    start = aggregate_local_selector<TAction, TResult, TSourceColumn>(m_children[c], st, start, td, probe_matches, source_column, matchcount);
-                }
-            }
-        }
-
-        if (matchcount)
-            *matchcount = st->m_match_count;
-        delete source_column;
-
-        return st->m_state;
-
-    }
+    /* FSA: Aggregate was here */
 
     template<Action TAction, class TResult, class TSourceColumn>
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
@@ -512,9 +457,9 @@ public:
     size_t m_probes;
     size_t m_matches;
 
+    const Table* m_table; // FIXME: Temporarily un-protected
 
 protected:
-    const Table* m_table;
     std::string error_code;
 
     const ColumnBase& get_column_base(const Table& table, std::size_t ndx)
