@@ -1062,7 +1062,7 @@ CATEGORIES :
       TITLE    : sum_*
       NAMES    : [sum_int, sum_float, sum_double]
       SUMMARY  : &g_dyn_table_sum_summary
-                 Calculates the sum.
+                 Sum the values in a column.
       DESCR    :
       - TEXT   : &g_dyn_table_sum_descr
                  This method calculates the sum of all values in the specified column.
