@@ -1094,9 +1094,9 @@ CATEGORIES :
       TITLE    : maximum_*
       NAMES    : [maximum_int, maximum_float, maximum_double]
       SUMMARY  : &g_dyn_table_maximum_summary
-                 Find highest value.
+                 Find the maximum value.
       DESCR    : &g_dyn_table_maximum_descr
-                 The method finds the highest value in the specified column.
+                 The method finds the maximum value in the specified column.
       SIGNATURE: |
                  int64_t maximum_int(size_t column_ndx) const;
                  float   maximum_float(size_t column_ndx) const;
