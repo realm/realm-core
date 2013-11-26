@@ -586,6 +586,7 @@
     <ClCompile Include="src\tightdb\column_string_enum.cpp" />
     <ClCompile Include="src\tightdb\column_table.cpp" />
     <ClCompile Include="src\tightdb\file.cpp" />
+    <ClCompile Include="src\tightdb\file_interprocess_managed.cpp" />
     <ClCompile Include="src\tightdb\importer.cpp" />
     <ClCompile Include="src\tightdb\importer_tool.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
