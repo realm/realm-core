@@ -557,15 +557,25 @@ size_t Importer::import_csv(FILE* file, Table& table, vector<DataType> *scheme2,
         // (field payload that contains a line break) because it some times is a header.
         m_fields = scheme1.size();
 
+
         vector<DataType> scheme2 = detect_scheme(payload, 1, 2);
         bool only_strings1 = true;
         bool only_strings2 = true;
-        for(size_t t = 0; t < scheme1.size(); t++) {
+        for(size_t t = 0; t < scheme1.size() - 1; t++) {
             if(scheme1[t] != type_String)
                 only_strings1 = false;
             if(scheme2[t] != type_String)
                 only_strings2 = false;
         }
+
+        // For the first row, the last column is allowed to be "" and still be header. The only reason we allow this is
+        // because the "flight-database" we use internally and for demonstration purpose is "malformed" that way.
+        if(scheme1[scheme1.size() - 1] != type_String && payload[0][payload[0].size() - 1] != "")
+            only_strings1 = false;
+        if(scheme2[scheme2.size() - 1] != type_String)
+            only_strings2 = false;
+
+
         Empty_as_string = original_empty_as_string_flag;
 
         if(only_strings1 && !only_strings2)
