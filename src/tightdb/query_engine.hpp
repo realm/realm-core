@@ -570,7 +570,7 @@ public:
 //
 // We don't yet have any integer indexes (only for strings), but when we get one, we should specialize it
 // like: template <class TConditionValue, class Equal> class IntegerNode: public ParentNode
-template <class TConditionValue, class TConditionFunction, Action TAction2> class IntegerNode: public ParentNode {
+template <class TConditionValue, class TConditionFunction> class IntegerNode: public ParentNode {
 public:
     typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
 
@@ -603,7 +603,6 @@ public:
     // Return value: false means that the query-state (which consumes matches) has signalled to stop searching, perhaps
     template <Action TAction, class TSourceColumn> bool match_callback(int64_t v)
     {
-        TIGHTDB_ASSERT(TAction2 == TAction);
         size_t i = to_size_t(v);
         m_last_local_match = i;
         m_local_matches++;
@@ -639,37 +638,37 @@ public:
         size_t ret;
 
         if (TAction == act_ReturnFirst)
-            ret = aggregate_local<act_ReturnFirst, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_ReturnFirst, int64_t>(st, start, end, local_limit, source_column, matchcount);
 
         else if (TAction == act_Count)
-            ret = aggregate_local<act_Count, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Count, int64_t>(st, start, end, local_limit, source_column, matchcount);
 
         else if (TAction == act_Sum && col_id == type_Int)
-            ret = aggregate_local<act_Sum, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Sum, int64_t>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == act_Sum && col_id == type_Float)
-            ret = aggregate_local<act_Sum, float, void>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Sum, float>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == act_Sum && col_id == type_Double)
-            ret = aggregate_local<act_Sum, double, void>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Sum, double>(st, start, end, local_limit, source_column, matchcount);
 
         else if (TAction == act_Max && col_id == type_Int)
-            ret = aggregate_local<act_Max, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Max, int64_t>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == act_Max && col_id == type_Float)
-            ret = aggregate_local<act_Max, float, void>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Max, float>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == act_Max && col_id == type_Double)
-            ret = aggregate_local<act_Max, double, void>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Max, double>(st, start, end, local_limit, source_column, matchcount);
 
         else if (TAction == act_Min && col_id == type_Int)
-            ret = aggregate_local<act_Min, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Min, int64_t>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == act_Min && col_id == type_Float)
-            ret = aggregate_local<act_Min, float, void>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Min, float>(st, start, end, local_limit, source_column, matchcount);
         else if (TAction == act_Min && col_id == type_Double)
-            ret = aggregate_local<act_Min, double, void>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Min, double>(st, start, end, local_limit, source_column, matchcount);
 
         else if (TAction == act_FindAll)
-            ret = aggregate_local<act_FindAll, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_FindAll, int64_t>(st, start, end, local_limit, source_column, matchcount);
 
         else if (TAction == act_CallbackIdx)
-            ret = aggregate_local<act_CallbackIdx, int64_t, void>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_CallbackIdx, int64_t>(st, start, end, local_limit, source_column, matchcount);
 
         else {
             TIGHTDB_ASSERT(false);
@@ -680,7 +679,7 @@ public:
 
 
     // source_column: column number in m_table which must act as source for aggreate TAction
-    template <Action TAction, class TSourceColumn, class unused>
+    template <Action TAction, class TSourceColumn>
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                            SequentialGetterBase* source_column, size_t* matchcount)
     {
