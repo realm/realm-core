@@ -520,7 +520,6 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
         QueryState<R> st;
         st.init(action, null_ptr, limit);
 
-        // FSA: Call to guery engines aggregate
         R r = aggregate_internal<action, R, T>(first[0],&st, start, end, column_ndx, &matchcount);
         if (resultcount)
             *resultcount = matchcount;

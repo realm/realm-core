@@ -570,7 +570,7 @@ public:
 //
 // We don't yet have any integer indexes (only for strings), but when we get one, we should specialize it
 // like: template <class TConditionValue, class Equal> class IntegerNode: public ParentNode
-template <class TConditionValue, class TConditionFunction> class IntegerNode: public ParentNode {
+template <class TConditionValue, class TConditionFunction, Action TAction2> class IntegerNode: public ParentNode {
 public:
     typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
 
@@ -603,6 +603,7 @@ public:
     // Return value: false means that the query-state (which consumes matches) has signalled to stop searching, perhaps
     template <Action TAction, class TSourceColumn> bool match_callback(int64_t v)
     {
+        TIGHTDB_ASSERT(TAction2 == TAction);
         size_t i = to_size_t(v);
         m_last_local_match = i;
         m_local_matches++;
