@@ -185,6 +185,7 @@ int main(int argc, char* argv[])
         }
         else if (argc >= 3) {
             // Auto detection
+            abort2(skip_rows_flag > 0, "-s flag cannot be used in Simple auto-import mode");
             imported_rows = importer.import_csv_auto(in_file, table, auto_detection_flag ? auto_detection_flag : 10000, import_rows_flag ? import_rows_flag : static_cast<size_t>(-1));
         }
         else {
