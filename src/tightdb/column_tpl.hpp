@@ -38,22 +38,18 @@ template<class cond, class T> struct ColumnTypeTraits2;
 
 template<class cond> struct ColumnTypeTraits2<cond, int64_t> {
     typedef Column column_type;
-    typedef IntegerNode<int64_t,cond> node_type;
     typedef Array array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, bool> {
     typedef Column column_type;
-    typedef IntegerNode<bool,cond> node_type;
     typedef Array array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, float> {
     typedef ColumnFloat column_type;
-    typedef FloatDoubleNode<float,cond> node_type;
     typedef ArrayFloat array_type;
 };
 template<class cond> struct ColumnTypeTraits2<cond, double> {
     typedef ColumnDouble column_type;
-    typedef FloatDoubleNode<double,cond> node_type;
     typedef ArrayDouble array_type;
 };
 

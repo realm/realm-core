@@ -122,10 +122,10 @@ Caveats, notes and todos
 
 // Normally, if a next-generation-syntax condition is supported by the old query_engine.hpp, a query_engine node is
 // created because it's faster (by a factor of 5 - 10). Because many of our existing next-generation-syntax unit 
-// unit tests are indeed simple enough to fallback to old query_engine, query_expression gets low test coverage. Define
+// unit tests are indeed simple enough to fallback to old query_engine, query_expression gets low test coverage. Undef
 // flag to get higher query_expression test coverage. This is a good idea to try out each time you develop on/modify
 // query_expression.
-//#define TIGHTDB_NGQUERY_NO_FALLBACK
+#define TIGHTDB_OLDQUERY_FALLBACK
 
 // namespace tightdb {
 
@@ -354,7 +354,7 @@ template <class L, class Cond, class R> Query create (L left, const Subexpr2<R>&
     //
     // This method intercepts only Value <cond> Subexpr2. Interception of Subexpr2 <cond> Subexpr is elsewhere. 
 
-#ifndef TIGHTDB_NGQUERY_NO_FALLBACK // never fallback to useing query_engine.hpp; always use query_expression.hpp
+#ifdef TIGHTDB_OLDQUERY_FALLBACK // if not defined, then never fallback to query_engine.hpp; always use query_expression
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
     if(column && (std::numeric_limits<L>::is_integer) && (std::numeric_limits<R>::is_integer)) {
         const Table* t = (const_cast<Columns<R>*>(column))->get_table();
@@ -455,7 +455,7 @@ public:
     // This method intercepts Subexpr2 <cond> Subexpr2 only. Value <cond> Subexpr2 is intercepted elsewhere.
     template <class Cond> Query create2 (const Subexpr2<R>& right) 
     {
-#ifndef TIGHTDB_NGQUERY_NO_FALLBACK // never fallback to useing query_engine.hpp; always use query_expression.hpp
+#ifdef TIGHTDB_OLDQUERY_FALLBACK // if not defined, never fallback query_engine; always use query_expression
         // Test if expressions are of type Columns. Other possibilities are Value and Operator. 
         const Columns<R>* left_col = dynamic_cast<const Columns<R>*>(static_cast<Subexpr2<L>*>(this));
         const Columns<R>* right_col = dynamic_cast<const Columns<R>*>(&right);
@@ -1000,7 +1000,7 @@ public:
                 return start + match;
         }
 
-        return end; // no match
+        return not_found; // no match
     }
     
 private: 
