@@ -347,7 +347,7 @@ public:
     virtual size_t aggregate_call_specialized(Action /*TAction*/, DataType /*TResult*/,
                                               QueryStateBase* /*st*/,
                                               size_t /*start*/, size_t /*end*/, size_t /*local_limit*/,
-                                              SequentialGetterBase* /*source_column*/, size_t* /*matchcount*/)
+                                              SequentialGetterBase* /*source_column*/)
     {
         TIGHTDB_ASSERT(false);
         return 0;
@@ -355,17 +355,17 @@ public:
 
     template<Action TAction, class TResult, class TSourceColumn>
     size_t aggregate_local_selector(ParentNode* node, QueryState<TResult>* st, size_t start, size_t end, size_t local_limit,
-                                    SequentialGetter<TSourceColumn>* source_column, size_t* matchcount)
+                                    SequentialGetter<TSourceColumn>* source_column)
     {
         size_t r;
 
         if (node->m_is_integer_node)
             // call method in IntegerNode
             r = node->aggregate_call_specialized(TAction, ColumnTypeTraits<TSourceColumn>::id,(QueryStateBase*)st,
-                                                 start, end, local_limit, source_column, matchcount);
+                                                 start, end, local_limit, source_column);
         else
              // call method in ParentNode
-            r = node->aggregate_local<TAction, TResult, TSourceColumn>(st, start, end, local_limit, source_column, matchcount);
+            r = node->aggregate_local<TAction, TResult, TSourceColumn>(st, start, end, local_limit, source_column);
         return r;
     }
 
@@ -374,7 +374,7 @@ public:
 
     template<Action TAction, class TResult, class TSourceColumn>
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                           SequentialGetterBase* source_column, size_t* matchcount)
+                           SequentialGetterBase* source_column)
     {
         // aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
         // integer version, because find_first_local() is relatively slower here (because it's non-integers).
@@ -383,7 +383,6 @@ public:
         // in a tight loop if so (instead of testing if there are sub criterias after each match). Harder: Specialize
         // data type array to make array call match() directly on each match, like for integers.
 
-        static_cast<void>(matchcount);
         size_t local_matches = 0;
 
         size_t r = start - 1;
@@ -633,42 +632,42 @@ public:
 
     size_t aggregate_call_specialized(Action TAction, DataType col_id, QueryStateBase* st,
                                       size_t start, size_t end, size_t local_limit,
-                                      SequentialGetterBase* source_column, size_t* matchcount)
+                                      SequentialGetterBase* source_column)
     {
         size_t ret;
 
         if (TAction == act_ReturnFirst)
-            ret = aggregate_local<act_ReturnFirst, int64_t>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_ReturnFirst, int64_t>(st, start, end, local_limit, source_column);
 
         else if (TAction == act_Count)
-            ret = aggregate_local<act_Count, int64_t>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Count, int64_t>(st, start, end, local_limit, source_column);
 
         else if (TAction == act_Sum && col_id == type_Int)
-            ret = aggregate_local<act_Sum, int64_t>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Sum, int64_t>(st, start, end, local_limit, source_column);
         else if (TAction == act_Sum && col_id == type_Float)
-            ret = aggregate_local<act_Sum, float>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Sum, float>(st, start, end, local_limit, source_column);
         else if (TAction == act_Sum && col_id == type_Double)
-            ret = aggregate_local<act_Sum, double>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Sum, double>(st, start, end, local_limit, source_column);
 
         else if (TAction == act_Max && col_id == type_Int)
-            ret = aggregate_local<act_Max, int64_t>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Max, int64_t>(st, start, end, local_limit, source_column);
         else if (TAction == act_Max && col_id == type_Float)
-            ret = aggregate_local<act_Max, float>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Max, float>(st, start, end, local_limit, source_column);
         else if (TAction == act_Max && col_id == type_Double)
-            ret = aggregate_local<act_Max, double>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Max, double>(st, start, end, local_limit, source_column);
 
         else if (TAction == act_Min && col_id == type_Int)
-            ret = aggregate_local<act_Min, int64_t>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Min, int64_t>(st, start, end, local_limit, source_column);
         else if (TAction == act_Min && col_id == type_Float)
-            ret = aggregate_local<act_Min, float>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Min, float>(st, start, end, local_limit, source_column);
         else if (TAction == act_Min && col_id == type_Double)
-            ret = aggregate_local<act_Min, double>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_Min, double>(st, start, end, local_limit, source_column);
 
         else if (TAction == act_FindAll)
-            ret = aggregate_local<act_FindAll, int64_t>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_FindAll, int64_t>(st, start, end, local_limit, source_column);
 
         else if (TAction == act_CallbackIdx)
-            ret = aggregate_local<act_CallbackIdx, int64_t>(st, start, end, local_limit, source_column, matchcount);
+            ret = aggregate_local<act_CallbackIdx, int64_t>(st, start, end, local_limit, source_column);
 
         else {
             TIGHTDB_ASSERT(false);
@@ -681,7 +680,7 @@ public:
     // source_column: column number in m_table which must act as source for aggreate TAction
     template <Action TAction, class TSourceColumn>
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                           SequentialGetterBase* source_column, size_t* matchcount)
+                           SequentialGetterBase* source_column)
     {
         typedef typename ColumnTypeTraitsSum<TSourceColumn, TAction>::sum_type QueryStateType;
         TIGHTDB_ASSERT(source_column == null_ptr || dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != null_ptr);
@@ -734,9 +733,6 @@ public:
 
             s = end2 + m_leaf_start;
         }
-
-        if (matchcount)
-            *matchcount = int64_t(static_cast< QueryState<QueryStateType>* >(st)->m_match_count);
 
         if (m_local_matches == m_local_limit) {
             m_dD = (m_last_local_match + 1 - start) / (m_local_matches + 1.0);

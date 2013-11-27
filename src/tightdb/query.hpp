@@ -278,9 +278,8 @@ private:
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
 
     template<Action TAction, class TResult, class TSourceColumn>
-    TResult aggregate_internal(ParentNode* pn, QueryState<TResult>* st, 
-                               size_t start, size_t end, size_t agg_col, 
-                               size_t* matchcount) const;
+    void aggregate_internal(ParentNode* pn, QueryState<TResult>* st, 
+                            size_t start, size_t end, size_t agg_col) const;
 
     friend class Table;
     template <typename T> friend class BasicTable;
