@@ -2307,7 +2307,7 @@ TEST(TestQueryFindAll_Contains2_2)
     CHECK_EQUAL(4, tv2.get_source_ndx(1));
     CHECK_EQUAL(5, tv2.get_source_ndx(2));
 }
-/*
+
 TEST(TestQuery_sum_new_aggregates)
 {
     // test the new ACTION_FIND_PATTERN() method in array
@@ -2326,7 +2326,7 @@ TEST(TestQuery_sum_new_aggregates)
     CHECK_EQUAL(2000, c);
 
 }
-*/
+
 
 TEST(TestQuery_sum_min_max_avg_foreign_col)
 {
