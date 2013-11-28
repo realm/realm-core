@@ -2118,7 +2118,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
             }
 
             // Calculate averages
-            result.add_column(type_Double, "mean");
+            result.add_column(type_Double, "average");
             ColumnDouble& mean_column = result.get_column_double(3);
             const size_t res_count = result.size();
             for (size_t i = 0; i < res_count; ++i) {

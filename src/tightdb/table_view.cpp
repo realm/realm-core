@@ -2,8 +2,6 @@
 #include <tightdb/column.hpp>
 #include <tightdb/column_basic.hpp>
 
-#include <algorithm>    // std::min
-
 using namespace std;
 using namespace tightdb;
 
@@ -331,7 +329,7 @@ void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table:
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
                 result.set_string(0, ndx, str);
-                dst_column.set(ndx, value); // set initial value other than defalt 0
+                dst_column.set(ndx, value); // set initial value other than default 0
             } else {
                 dst_column.set(ndx, min(dst_column.get(ndx), value));
             }
@@ -345,7 +343,7 @@ void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table:
             if (ndx == not_found) {
                 ndx = result.add_empty_row();
                 result.set_string(0, ndx, str);
-                dst_column.set(ndx, value); // set initial value other than defalt 0
+                dst_column.set(ndx, value); // set initial value other than default 0
             } else {
                 dst_column.set(ndx, max(dst_column.get(ndx), value));
             }
@@ -373,7 +371,7 @@ void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table:
         }
         
         // Calculate averages
-        result.add_column(type_Double, "mean");
+        result.add_column(type_Double, "average");
         ColumnDouble& mean_column = result.get_column_double(3);
         const size_t res_count = result.size();
         for (size_t i = 0; i < res_count; ++i) {
