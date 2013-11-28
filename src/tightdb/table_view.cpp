@@ -274,7 +274,7 @@ void TableViewBase::sort(size_t column, bool Ascending)
     ref.destroy();
 }
 
-
+// Simple pivot aggregate method. Experimental! Please do not document method publicly.
 void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const
 {
     TIGHTDB_ASSERT(result.is_empty() && result.get_column_count() == 0);

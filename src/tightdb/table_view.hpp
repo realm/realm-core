@@ -95,7 +95,7 @@ public:
     // specified direction.
     void sort(size_t column_ndx, bool ascending = true);
     
-    
+    // Simple pivot aggregate method. Experimental! Please do not document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const;
 
     // Get row index in the source table this view is "looking" at.

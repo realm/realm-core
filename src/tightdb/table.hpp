@@ -299,6 +299,7 @@ public:
     TableView      get_sorted_view(std::size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;
 
+    // Pivot / aggregate operation types. Experimental! Please do not document method publicly.
     enum AggrType {
         aggr_count,
         aggr_sum,
@@ -306,6 +307,8 @@ public:
         aggr_min,
         aggr_max
     };
+    
+    // Simple pivot aggregate method. Experimental! Please do not document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result) const;
 
 private:

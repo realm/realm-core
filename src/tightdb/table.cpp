@@ -2033,6 +2033,7 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
 
 } //namespace
 
+// Simple pivot aggregate method. Experimental! Please do not document method publicly.
 void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result) const
 {
     TIGHTDB_ASSERT(result.is_empty() && result.get_column_count() == 0);
