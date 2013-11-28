@@ -5,7 +5,7 @@
 
 #include <tightdb/config.h>
 #include <tightdb/assert.hpp>
-
+#include <tightdb/utilities.hpp> // uses null_ptr
 
 namespace tightdb {
 

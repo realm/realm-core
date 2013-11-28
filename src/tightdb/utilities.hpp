@@ -168,6 +168,21 @@ bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 firs
 #endif
 }
 
+// Emulates nullptr of C++11
+const class {
+public:
+    template<class T> operator T*() const
+    {
+        return 0;
+    }
+    template<class C, class T> operator T C::*() const 
+    {
+        return 0;
+    }
+private:
+    void operator& () const;
+} null_ptr = {};
+
 } // namespace tightdb
 
 #endif // TIGHTDB_UTILITIES_HPP

@@ -63,7 +63,7 @@ void cpuid_init()
 
     bool avxSupported = false;
  
-#if (_MSC_FULL_VER >= 160040219) || !defined(_MSC_VER)
+#if (_MSC_FULL_VER >= 160040219) || defined(__GNUC__)
  
     bool osUsesXSAVE_XRSTORE = cret & (1 << 27) || false;
     bool cpuAVXSuport = cret & (1 << 28) || false;
