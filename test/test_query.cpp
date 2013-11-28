@@ -392,12 +392,49 @@ TEST(NextGenSyntax)
     delete first2;
 }
 
+TEST(NextGenSyntaxMonkey0)
+{
+    // Intended to test eval() for columns in query_expression.hpp which fetch 8 values at a time. This test varies
+    // table size to test out-of-bounds bugs.
+
+    for(int iter = 1; iter < 100 + TEST_DURATION * 10000; iter++)
+    {
+        const size_t rows = 1 + rand() % (2 * TIGHTDB_MAX_LIST_SIZE);
+        Table table;
+
+        // Two different row types prevents fallback to query_engine (good because we want to test query_expression)
+        table.add_column(type_Int, "first");
+        table.add_column(type_Float, "second");
+
+        for(size_t r = 0; r < rows; r++) {
+            table.add_empty_row();
+            // using '% iter' tests different bitwidths
+            table.set_int(0, r, rand() % iter);
+            table.set_float(1, r, float(rand() % iter));        
+        }
+
+        size_t tvpos;
+
+        tightdb::Query q = table.column<int64_t>(0) > table.column<float>(1);
+        tightdb::TableView tv = q.find_all();    
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(0, r) > table.get_float(1, r)) {
+                tvpos++;
+            }
+        }
+        CHECK_EQUAL(tvpos, tv.size());
+        
+    }
+
+}
+
 TEST(NextGenSyntaxMonkey)
 {
-    for(int iter = 1; iter < 20; iter++)
+    for(int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++)
     {
         // Keep at least '* 20' else some tests will give 0 matches and bad coverage
-        const size_t rows = TIGHTDB_MAX_LIST_SIZE * 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1);
+        const size_t rows = 1 + (rand() * rand()) % (TIGHTDB_MAX_LIST_SIZE * 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
@@ -2311,7 +2348,6 @@ TEST(TestQueryFindAll_Contains2_2)
 TEST(TestQuery_sum_new_aggregates)
 {
     // test the new ACTION_FIND_PATTERN() method in array
-
     OneIntTable t;
     for (size_t i = 0; i < 1000; i++) {
         t.add(1);
@@ -2324,7 +2360,6 @@ TEST(TestQuery_sum_new_aggregates)
 
     c = t.where().first.greater(2).count();
     CHECK_EQUAL(2000, c);
-
 }
 
 
