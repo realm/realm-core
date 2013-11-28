@@ -293,6 +293,20 @@ struct SetLeafElem: Array::UpdateHandler {
     }
 };
 
+struct AdjustLeafElem: Array::UpdateHandler {
+    Array m_leaf;
+    const int_fast64_t m_value;
+    AdjustLeafElem(Allocator& alloc, int_fast64_t value) TIGHTDB_NOEXCEPT:
+    m_leaf(alloc), m_value(value) {}
+    void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
+                size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+    {
+        m_leaf.init_from_mem(mem);
+        m_leaf.set_parent(parent, ndx_in_parent);
+        m_leaf.adjust(elem_ndx_in_leaf, m_value); // Throws
+    }
+};
+
 } // anonymous namespace
 
 void Column::set(size_t ndx, int64_t value)
@@ -305,6 +319,19 @@ void Column::set(size_t ndx, int64_t value)
     }
 
     SetLeafElem set_leaf_elem(m_array->get_alloc(), value);
+    m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
+}
+
+void Column::adjust(size_t ndx, int64_t diff)
+{
+    TIGHTDB_ASSERT(ndx < size());
+
+    if (m_array->is_leaf()) {
+        m_array->adjust(ndx, diff); // Throws
+        return;
+    }
+
+    AdjustLeafElem set_leaf_elem(m_array->get_alloc(), diff);
     m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 

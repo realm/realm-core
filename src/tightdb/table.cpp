@@ -1973,6 +1973,198 @@ ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
     return tv;
 }
 
+namespace {
+
+struct AggrState {
+    AggrState() : added_row(false) {}
+
+    const Table* table;
+    const StringIndex* dst_index;
+    size_t group_by_column;
+
+    const ColumnStringEnum* enums;
+    vector<size_t> keys;
+    Array block;
+    size_t offset;
+    size_t block_end;
+
+    bool added_row;
+};
+
+typedef size_t (*get_group_fnc)(size_t, AggrState&, Table&);
+
+size_t get_group_ndx(size_t i, AggrState& state, Table& result)
+{
+    StringData str = state.table->get_string(state.group_by_column, i);
+    size_t ndx = state.dst_index->find_first(str);
+    if (ndx == not_found) {
+        ndx = result.add_empty_row();
+        result.set_string(0, ndx, str);
+        state.added_row = true;
+    }
+    return ndx;
+}
+
+size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
+{
+    // We iterate entire blocks at a time by keeping current leaf cached
+    if (i == state.block_end) {
+        state.enums->Column::GetBlock(i, state.block, state.offset);
+        state.block_end = state.offset + state.block.size();
+    }
+
+    // Since we know the exact number of distinct keys,
+    // we can use that to avoid index lookups
+    int64_t key = state.block.get(i - state.offset);
+    size_t ndx = state.keys[key];
+
+    // Stored position is offset by one, so zero can indicate
+    // that no entry have been added yet.
+    if (ndx == 0) {
+        ndx = result.add_empty_row();
+        result.set_string(0, ndx, state.enums->get(i));
+        state.keys[key] = ndx+1;
+        state.added_row = true;
+    }
+    else
+        --ndx;
+    return ndx;
+}
+
+} //namespace
+
+void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result) const
+{
+    TIGHTDB_ASSERT(result.is_empty() && result.get_column_count() == 0);
+    TIGHTDB_ASSERT(group_by_column < m_columns.size());
+    TIGHTDB_ASSERT(aggr_column < m_columns.size());
+
+    TIGHTDB_ASSERT(get_column_type(group_by_column) == type_String);
+    //TIGHTDB_ASSERT(get_column_type(aggr_column) == type_Int);
+
+    // Add columns to result table
+    result.add_column(type_String, get_column_name(group_by_column));
+    result.add_column(type_Int, get_column_name(aggr_column));
+
+    // Cache columms
+    const Column& src_column = get_column(aggr_column);
+    Column& dst_column = result.get_column(1);
+
+    const size_t count = size();
+    AggrState state;
+    get_group_fnc get_group_ndx_fnc = NULL;
+
+    // When doing grouped aggregates, the column to group on is likely
+    // to be auto-enumerated (without a lot of duplicates grouping does not
+    // make much sense). So we can use this knowledge to optimize the process.
+    ColumnType key_type = get_real_column_type(group_by_column);
+    if (key_type == col_type_StringEnum) {
+        const ColumnStringEnum& enums = get_column_string_enum(group_by_column);
+        size_t key_count = enums.get_keys().size();
+
+        state.enums = &enums;
+        state.keys.assign(key_count, 0);
+
+        enums.Column::GetBlock(0, state.block, state.offset);
+        state.block_end = state.offset + state.block.size();
+        get_group_ndx_fnc = &get_group_ndx_blocked;
+    }
+    else {
+        // If the group_by column is not auto-enumerated, we have to do
+        // (more expensive) direct lookups.
+        result.set_index(0);
+        const StringIndex& dst_index = result.get_column_string(0).get_index();
+
+        state.table = this;
+        state.dst_index = &dst_index;
+        state.group_by_column = group_by_column;
+        get_group_ndx_fnc = &get_group_ndx;
+    }
+
+    switch (op) {
+        case aggr_count:
+            for (size_t i = 0; i < count; ++i) {
+                size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+
+                // Count
+                dst_column.adjust(ndx, 1);
+            }
+            break;
+        case aggr_sum:
+            for (size_t i = 0; i < count; ++i) {
+                size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+
+                // Sum
+                int64_t value = src_column.get(i);
+                dst_column.adjust(ndx, value);
+            }
+            break;
+        case aggr_avg:
+        {
+            // Add temporary column for counts
+            result.add_column(type_Int, "count");
+            Column& cnt_column = result.get_column(2);
+
+            for (size_t i = 0; i < count; ++i) {
+                size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+
+                // SUM
+                int64_t value = src_column.get(i);
+                dst_column.adjust(ndx, value);
+
+                // Increment count
+                cnt_column.adjust(ndx, 1);
+            }
+
+            // Calculate averages
+            result.add_column(type_Double, "mean");
+            ColumnDouble& mean_column = result.get_column_double(3);
+            const size_t res_count = result.size();
+            for (size_t i = 0; i < res_count; ++i) {
+                int64_t sum   = dst_column.get(i);
+                int64_t count = cnt_column.get(i);
+                double res   = sum / count;
+                mean_column.set(i, res);
+            }
+            
+            // Remove temp columns
+            result.remove_column(1); // sums
+            result.remove_column(1); // counts
+            break;
+        }
+        case aggr_min:
+            for (size_t i = 0; i < count; ++i) {
+                size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+                int64_t value = src_column.get(i);
+                if (state.added_row) {
+                    dst_column.set(ndx, value); // Set the real value, to overwrite the default value
+                    state.added_row = false;
+                }
+                else {
+                    int64_t current = dst_column.get(ndx);
+                    if (value < current)
+                        dst_column.set(ndx, value);
+                }
+            }
+            break;
+        case aggr_max:
+            for (size_t i = 0; i < count; ++i) {
+                size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+                int64_t value = src_column.get(i);
+                if (state.added_row) {
+                    dst_column.set(ndx, value); // Set the real value, to overwrite the default value
+                    state.added_row = false;
+                }
+                else {
+                    int64_t current = dst_column.get(ndx);
+                    if (value > current)
+                        dst_column.set(ndx, value);
+                }
+            }
+            break;
+    }
+}
+
 
 size_t Table::lower_bound_int(size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT
 {

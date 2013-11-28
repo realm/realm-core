@@ -94,6 +94,8 @@ public:
     std::size_t GetKeyNdx(StringData value) const;
     std::size_t GetKeyNdxOrAdd(StringData value);
 
+    const AdaptiveStringColumn& get_keys() const {return m_keys;}
+
 private:
     // Member variables
     AdaptiveStringColumn m_keys;

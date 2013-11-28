@@ -299,6 +299,15 @@ public:
     TableView      get_sorted_view(std::size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;
 
+    enum AggrType {
+        aggr_count,
+        aggr_sum,
+        aggr_avg,
+        aggr_min,
+        aggr_max
+    };
+    void aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result) const;
+
 private:
     template <class T> std::size_t find_first(std::size_t column_ndx, T value) const; // called by above methods
     template <class T> ConstTableView find_all(size_t column_ndx, T value) const;
