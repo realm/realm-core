@@ -397,7 +397,7 @@ TEST(NextGenSyntaxMonkey0)
     // Intended to test eval() for columns in query_expression.hpp which fetch 8 values at a time. This test varies
     // table size to test out-of-bounds bugs.
 
-    for(int iter = 1; iter < 100 + TEST_DURATION * 10000; iter++)
+    for(int iter = 1; iter < 100000 + TEST_DURATION * 10000; iter++)
     {
         const size_t rows = 1 + rand() % (2 * TIGHTDB_MAX_LIST_SIZE);
         Table table;
@@ -405,21 +405,42 @@ TEST(NextGenSyntaxMonkey0)
         // Two different row types prevents fallback to query_engine (good because we want to test query_expression)
         table.add_column(type_Int, "first");
         table.add_column(type_Float, "second");
+        table.add_column(type_String, "third");
 
         for(size_t r = 0; r < rows; r++) {
             table.add_empty_row();
             // using '% iter' tests different bitwidths
             table.set_int(0, r, rand() % iter);
-            table.set_float(1, r, float(rand() % iter));        
+            table.set_float(1, r, float(rand() % iter));
+            if(rand() % 2 == 0)
+                table.set_string(2, r, "a");
+            else
+                table.set_string(2, r, "b");
         }
 
         size_t tvpos;
 
-        tightdb::Query q = table.column<int64_t>(0) > table.column<float>(1);
-        tightdb::TableView tv = q.find_all();    
+        tightdb::Query q = table.column<Int>(0) > table.column<Float>(1) && table.column<String>(2) == "a";
+
+        // without start or limit
+        tightdb::TableView tv = q.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
-            if(table.get_int(0, r) > table.get_float(1, r)) {
+            if(table.get_int(0, r) > table.get_float(1, r) && table.get_string(2, r) == "a") {
+                tvpos++;
+            }
+        }
+        CHECK_EQUAL(tvpos, tv.size());
+
+        tvpos = 0;
+
+        // with start and limit
+        size_t start = rand() % rows;
+        size_t limit = rand() % rows;
+        tv = q.find_all(start, size_t(-1), limit);
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(r >= start && tvpos < limit && table.get_int(0, r) > table.get_float(1, r) && table.get_string(2, r) == "a") {
                 tvpos++;
             }
         }
