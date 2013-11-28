@@ -773,7 +773,7 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
     ++start;
 
 #ifdef TIGHTDB_COMPILER_SSE
-    if (cpuid_sse<42>()) {
+    if (sseavx<42>()) {
         // Test manually until 128 bit aligned
         for (; (start < end) && (((size_t(m_data) & 0xf) * 8 + start * w) % (128) != 0); start++) {
             if (find_max ? Get<w>(start) > m : Get<w>(start) < m)
@@ -912,7 +912,7 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
     }
 
 #ifdef TIGHTDB_COMPILER_SSE
-    if (cpuid_sse<42>()) {
+    if (sseavx<42>()) {
 
         // 2000 items summed 500000 times, 8/16/32 bits, miliseconds:
         // Naive, templated Get<>: 391 371 374
@@ -1465,20 +1465,20 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
     // To make Valgrind happy. Todo, I *think* it should work without, now, but if it reappears, add memset again. 
     // memset(res, 0, 8*8); 
 
-    if(TIGHTDB_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
+    if (TIGHTDB_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
         // This method is *multiple* times faster than performing 8 times Get<w>, even if unrolled. Apparently compilers
         // can't figure out to optimize it.
         uint64_t c;
         size_t bytealign = ndx / (8 / no0(w));
-        if(w == 1) {
+        if (w == 1) {
             c = *reinterpret_cast<uint16_t*>(m_data + bytealign);
             c >>= (ndx - bytealign * 8) * w;
         }
-        else if(w == 2) {
+        else if (w == 2) {
             c = *reinterpret_cast<uint32_t*>(m_data + bytealign);
             c >>= (ndx - bytealign * 4) * w;
         }
-        else if(w == 4) {
+        else if (w == 4) {
             c = *reinterpret_cast<uint64_t*>(m_data + bytealign);
             c >>= (ndx - bytealign * 2) * w;
         }
@@ -1505,7 +1505,7 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
 #ifdef TIGHTDB_DEBUG
     for(int j = 0; j + ndx < m_size && j < 8; j++) {
         int64_t expected = Get<w>(ndx + j);
-        if(res[j] != expected)
+        if (res[j] != expected)
             TIGHTDB_ASSERT(false);
     }
 #endif
