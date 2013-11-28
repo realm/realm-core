@@ -2830,7 +2830,7 @@ TIGHTDB_TABLE_3(TablePivotAgg,
                 age,   Int,
                 hired, Bool)
 
-ONLY(Table_pivot)
+TEST(Table_pivot)
 {
     TablePivotAgg table;
     for (size_t i = 0; i < 500000; ++i) {
@@ -2873,7 +2873,6 @@ ONLY(Table_pivot)
     ss.str("");
     result_count2.to_string(ss);
     cout << ss.str();
-
 }
 
 #endif // TEST_TABLE

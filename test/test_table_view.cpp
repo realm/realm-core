@@ -891,4 +891,57 @@ TEST(TableView_ref_counting)
     CHECK_EQUAL(s, "just a test string");
 }
 
+TEST(TableView_dyn_pivot)
+{
+    TableRef table = Table::create();
+    table->add_column(type_String, "sex");
+    table->add_column(type_Int, "age");
+    table->add_column(type_Bool, "hired");
+
+    for (size_t i = 0; i < 500000; ++i) {
+        StringData sex = i % 2 ? "Male" : "Female";
+        table->insert_string(0, i, sex);
+        table->insert_int(1, i, 20 + (i%20));
+        table->insert_bool(2, i, true);
+        table->insert_done();
+    }
+    
+    TableView tv = table->where().find_all();
+    
+    UnitTest::Timer timer;
+    stringstream ss;
+    
+    Table result_count;
+    timer.Start();
+    tv.aggregate(0, 1, Table::aggr_count, result_count);
+    printf("table_view_pivot_count1: %d\n", timer.GetTimeInMs());
+    
+    result_count.to_string(ss);
+    cout << ss.str();
+    
+    Table result_sum;
+    tv.aggregate(0, 1, Table::aggr_sum, result_sum);
+    
+    ss.str("");
+    result_sum.to_string(ss);
+    cout << ss.str();
+    
+    Table result_avg;
+    tv.aggregate(0, 1, Table::aggr_avg, result_avg);
+    
+    ss.str("");
+    result_avg.to_string(ss);
+    cout << ss.str();
+    
+    
+    Table result_count2;
+    timer.Start();
+    tv.aggregate(0, 1, Table::aggr_count, result_count2);
+    printf("table_view_pivot_count2: %d\n", timer.GetTimeInMs());
+    ss.str("");
+    result_count2.to_string(ss);
+    cout << ss.str();
+}
+
+
 #endif // TEST_TABLE_VIEW
