@@ -203,9 +203,9 @@ public:
 
     explicit Column(Allocator&);
     Column(Array::Type, Allocator&);
-    explicit Column(Array::Type = Array::type_Normal, ArrayParent* = 0,
+    explicit Column(Array::Type = Array::type_Normal, ArrayParent* = null_ptr,
                     std::size_t ndx_in_parent = 0, Allocator& = Allocator::get_default());
-    explicit Column(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+    explicit Column(ref_type, ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
                     Allocator& = Allocator::get_default()); // Throws
     Column(const Column&); // FIXME: Constness violation
     ~Column() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -406,12 +406,12 @@ inline void ColumnBase::EraseHandlerBase::replace_root(UniquePtr<Array>& leaf)
 
 
 inline Column::Column(Allocator& alloc):
-    ColumnBase(new Array(Array::type_Normal, 0, 0, alloc))
+    ColumnBase(new Array(Array::type_Normal, null_ptr, 0, alloc))
 {
 }
 
 inline Column::Column(Array::Type type, Allocator& alloc):
-    ColumnBase(new Array(type, 0, 0, alloc))
+    ColumnBase(new Array(type, null_ptr, 0, alloc))
 {
     TIGHTDB_ASSERT(root_is_leaf());
 }

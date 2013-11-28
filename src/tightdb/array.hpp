@@ -293,7 +293,7 @@ public:
     /// resource must be allocated in the constructor when, and only
     /// when it is released in the destructor (RAII). Anything else
     /// constitutes a "disaster waiting to happen".
-    explicit Array(Type type = type_Normal, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+    explicit Array(Type type = type_Normal, ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
                    Allocator& = Allocator::get_default());
 
     /// Initialize an array wrapper from the specified memory
@@ -304,7 +304,7 @@ public:
     /// reference. Note that the version taking a MemRef argument is
     /// slightly faster, because it does not need to map the 'ref' to
     /// a memory pointer.
-    explicit Array(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+    explicit Array(ref_type, ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
                    Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
 
     /// Create an array in the unattached state.
@@ -1770,7 +1770,7 @@ template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) c
                 new_refs.add(ref);
             }
             else {
-                Array sub(to_ref(ref), 0, 0, get_alloc());
+                Array sub(to_ref(ref), null_ptr, 0, get_alloc());
                 std::size_t sub_pos = sub.write(out, true, persist);
                 TIGHTDB_ASSERT((sub_pos & 0x7) == 0); // 64bit alignment
                 new_refs.add(sub_pos);

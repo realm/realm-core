@@ -27,7 +27,7 @@ public:
     typedef T element_type;
     typedef D deleter_type;
 
-    explicit UniquePtr(T* = 0) TIGHTDB_NOEXCEPT;
+    explicit UniquePtr(T* = null_ptr) TIGHTDB_NOEXCEPT;
     ~UniquePtr();
 
     T* get() const TIGHTDB_NOEXCEPT;
@@ -35,7 +35,7 @@ public:
     T* operator->() const TIGHTDB_NOEXCEPT;
 
     void swap(UniquePtr&) TIGHTDB_NOEXCEPT;
-    void reset(T* = 0);
+    void reset(T* = null_ptr);
     T* release() TIGHTDB_NOEXCEPT;
 
 protected:
@@ -67,7 +67,7 @@ public:
     typedef T element_type;
     typedef D deleter_type;
 
-    explicit UniquePtr(T* = 0) TIGHTDB_NOEXCEPT;
+    explicit UniquePtr(T* = null_ptr) TIGHTDB_NOEXCEPT;
 
     T& operator[](std::size_t) const TIGHTDB_NOEXCEPT;
 

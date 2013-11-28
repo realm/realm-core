@@ -66,7 +66,7 @@ void Thread::join()
 {
     if (!m_joinable)
         throw runtime_error("Thread is not joinable");
-    void** value_ptr = 0; // Ignore return value
+    void** value_ptr = null_ptr; // Ignore return value
     int r = pthread_join(m_id, value_ptr);
     if (TIGHTDB_UNLIKELY(r != 0))
         join_failed(r); // Throws

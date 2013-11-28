@@ -44,7 +44,7 @@ void Table::init_from_ref(ref_type top_ref, ArrayParent* parent, size_t ndx_in_p
 void Table::init_from_ref(ref_type spec_ref, ref_type columns_ref,
                           ArrayParent* parent, size_t ndx_in_parent)
 {
-    m_spec.init_from_ref(spec_ref, 0, 0);
+    m_spec.init_from_ref(spec_ref, null_ptr, 0);
 
     // A table instatiated with a zero-ref is just an empty table
     // but it will have to create itself on first modification
@@ -75,7 +75,7 @@ void Table::create_columns()
         ColumnType type = m_spec.get_real_column_type(i);
         ColumnAttr attr = m_spec.get_column_attr(i);
         size_t ref_pos =  m_columns.size();
-        ColumnBase* new_col = 0;
+        ColumnBase* new_col = null_ptr;
 
         switch (type) {
             case type_Int:
@@ -146,8 +146,6 @@ void Table::create_columns()
             TIGHTDB_ASSERT(attr == col_attr_Indexed); // only supported attr so far
             size_t column_ndx = m_cols.size()-1;
             set_index(column_ndx, false);
-
-            attr = col_attr_None;
         }
     }
 }
@@ -205,7 +203,7 @@ void Table::cache_columns()
         ColumnAttr attr = m_spec.get_column_attr(i);
         ref_type ref = m_columns.get_as_ref(ndx_in_parent);
 
-        ColumnBase* new_col = 0;
+        ColumnBase* new_col = null_ptr;
         size_t colsize = size_t(-1);
         switch (type) {
             case type_Int:
@@ -296,7 +294,6 @@ void Table::cache_columns()
             new_col->set_index_ref(index_ref, &m_columns, pndx);
 
             ++ndx_in_parent; // advance one matchcount pos to account for index
-            attr = col_attr_None;
         }
 
         // Set table size
@@ -420,7 +417,7 @@ size_t Table::do_add_column(DataType type)
     size_t count      = size();
     size_t column_ndx = m_cols.size();
 
-    ColumnBase* new_col = 0;
+    ColumnBase* new_col = null_ptr;
     Allocator& alloc = m_columns.get_alloc();
 
     switch (type) {
@@ -483,6 +480,8 @@ size_t Table::do_add_column(DataType type)
             c->fill(count);
             break;
         }
+        default:
+            TIGHTDB_ASSERT(false);
     }
 
     m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, even in C++11
@@ -759,7 +758,7 @@ ref_type Table::create_column(DataType column_type, size_t num_default_values, A
 
 ref_type Table::clone_columns(Allocator& alloc) const
 {
-    Array new_columns(Array::type_HasRefs, 0, 0, alloc);
+    Array new_columns(Array::type_HasRefs, null_ptr, 0, alloc);
     size_t n = get_column_count();
     for (size_t i=0; i<n; ++i) {
         ref_type new_col_ref;
@@ -789,7 +788,7 @@ ref_type Table::clone(Allocator& alloc) const
     if (m_top.is_attached())
         return m_top.clone(alloc); // Throws
 
-    Array new_top(Array::type_HasRefs, 0, 0, alloc); // Throws
+    Array new_top(Array::type_HasRefs, null_ptr, 0, alloc); // Throws
     new_top.add(m_spec.m_top.clone(alloc)); // Throws
     new_top.add(m_columns.clone(alloc)); // Throws
     return new_top.get_ref();
@@ -2689,7 +2688,7 @@ pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) 
     const ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx));
 
     const Array* root = col->get_root_array();
-    const Array* enum_root = 0;
+    const Array* enum_root = null_ptr;
 
     if (const ColumnStringEnum* c = dynamic_cast<const ColumnStringEnum*>(col)) {
         enum_root = c->get_enum_root_array();
