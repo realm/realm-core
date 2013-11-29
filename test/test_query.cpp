@@ -480,7 +480,7 @@ TEST(NextGenSyntaxMonkey0)
     }
 
 }
-
+/*
 TEST(NextGenSyntaxMonkey)
 {
     for(int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++)
@@ -621,7 +621,7 @@ TEST(NextGenSyntaxMonkey)
 
     }
 }
-
+*/
 
 TEST(LimitUntyped)
 {
