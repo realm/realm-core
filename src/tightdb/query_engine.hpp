@@ -179,12 +179,12 @@ template<> struct ColumnTypeTraits<StringData> {
 };
 
 // reverse mapping: from DataType to true type.
-template<DataType> ColumnTypeMap { };
-template<> ColumnTypeMap<type_Int>      { typedef int64_t typ; };
-template<> ColumnTypeMap<type_Float>    { typedef int64_t typ; };
-template<> ColumnTypeMap<type_Double>   { typedef int64_t typ; };
-template<> ColumnTypeMap<type_DateTime> { typedef int64_t typ; };
-template<> ColumnTypeMap<type_String>   { typedef int64_t typ; };
+template<DataType> struct ColumnTypeMap { };
+template<> struct ColumnTypeMap<type_Int>      { typedef int64_t typ; };
+template<> struct ColumnTypeMap<type_Float>    { typedef int64_t typ; };
+template<> struct ColumnTypeMap<type_Double>   { typedef int64_t typ; };
+template<> struct ColumnTypeMap<type_DateTime> { typedef int64_t typ; };
+template<> struct ColumnTypeMap<type_String>   { typedef int64_t typ; };
 
 // Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
 template<class T, Action A> struct ColumnTypeTraitsSum {
