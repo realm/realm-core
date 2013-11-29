@@ -366,8 +366,8 @@ public:
         return 0;
     }
 
-    template<Action TAction, class TResult, class TSourceColumn>
-    size_t aggregate_local_selector(ParentNode* node, QueryState<TResult>* st, size_t start, size_t end, size_t local_limit,
+    template<Action TAction, class TSourceColumn>
+    size_t aggregate_local_selector(ParentNode* node, QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                                     SequentialGetter<TSourceColumn>* source_column)
     {
         size_t r;
@@ -378,14 +378,14 @@ public:
                                                  start, end, local_limit, source_column);
         else
              // call method in ParentNode
-            r = node->aggregate_local<TAction, TResult, TSourceColumn>(st, start, end, local_limit, source_column);
+            r = node->aggregate_local<TAction, TSourceColumn>(st, start, end, local_limit, source_column);
         return r;
     }
 
 
     /* FSA: Aggregate was here */
 
-    template<Action TAction, class TResult, class TSourceColumn>
+    template<Action TAction, class TSourceColumn>
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                            SequentialGetterBase* source_column)
     {
@@ -396,6 +396,7 @@ public:
         // in a tight loop if so (instead of testing if there are sub criterias after each match). Harder: Specialize
         // data type array to make array call match() directly on each match, like for integers.
 
+        typedef typename ColumnTypeTraitsSum<TSourceColumn, TAction>::sum_type TResult;
         size_t local_matches = 0;
 
         size_t r = start - 1;
