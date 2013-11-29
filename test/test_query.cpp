@@ -480,13 +480,13 @@ TEST(NextGenSyntaxMonkey0)
     }
 
 }
-/*
+
 TEST(NextGenSyntaxMonkey)
 {
     for(int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++)
     {
         // Keep at least '* 20' else some tests will give 0 matches and bad coverage
-        const size_t rows = 1 + (rand() * rand()) % (TIGHTDB_MAX_LIST_SIZE * 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
+        const size_t rows = 1 + size_t(rand() * rand()) % (TIGHTDB_MAX_LIST_SIZE * 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
@@ -621,7 +621,7 @@ TEST(NextGenSyntaxMonkey)
 
     }
 }
-*/
+
 
 TEST(LimitUntyped)
 {
