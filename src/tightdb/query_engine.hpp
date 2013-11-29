@@ -168,7 +168,7 @@ template<> struct ColumnTypeTraits<DateTime> {
     typedef Column column_type;
     typedef Array array_type;
     typedef int64_t sum_type;
-    static const DataType id = type_Int;
+    static const DataType id = type_DateTime;
 };
 
 template<> struct ColumnTypeTraits<StringData> {
