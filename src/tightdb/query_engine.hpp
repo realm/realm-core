@@ -706,6 +706,13 @@ public:
         m_last_local_match = start - 1;
         m_state = st;
 
+        // If there are no other nodes than us (m_conds == 1) AND the column used for our condition is
+        // the same as the column used for the aggregate action, then the entire query can run within scope of that 
+        // column only, with no references to other columns:
+        bool fastmode = (m_conds == 1 && 
+                         (source_column == null_ptr ||
+                          (SameType<TSourceColumn, int64_t>::value
+                           && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column)));
         for (size_t s = start; s < end; ) {
             // Cache internal leafs
             if (s >= m_leaf_end) {
@@ -721,12 +728,7 @@ public:
             else
                 end2 = end - m_leaf_start;
 
-            // If there are no other nodes than us (m_conds == 1) AND the column used for our condition is
-            // the same as the column used for the aggregate action, then the entire query can run within scope of that 
-            // column only, with no references to other columns:
-            if (m_conds == 1 && (source_column == null_ptr ||
-                (SameType<TSourceColumn, int64_t>::value
-                 && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))) {
+            if (fastmode) {
                 bool cont = m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
                 if (!cont)
                     return not_found;
