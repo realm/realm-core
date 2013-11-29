@@ -18,11 +18,37 @@
 #include <tightdb/column_mixed.hpp>
 #include <tightdb/index_string.hpp>
 
-#include "query_engine.hpp"
-
 using namespace std;
 using namespace tightdb;
 
+// fixme, we need to gather all these typetraits definitions to just 1 single
+template<class T> struct ColumnTypeTraits3;
+
+template<> struct ColumnTypeTraits3<int64_t> {
+    const static ColumnType ct_id = col_type_Int;
+    const static ColumnType ct_id_real = col_type_Int;
+    typedef Column column_type;
+};
+template<> struct ColumnTypeTraits3<bool> {
+    const static ColumnType ct_id = col_type_Bool;
+    const static ColumnType ct_id_real = col_type_Bool;
+    typedef Column column_type;
+};
+template<> struct ColumnTypeTraits3<float> {
+    const static ColumnType ct_id = col_type_Float;
+    const static ColumnType ct_id_real = col_type_Float;
+    typedef ColumnFloat column_type;
+};
+template<> struct ColumnTypeTraits3<double> {
+    const static ColumnType ct_id = col_type_Double;
+    const static ColumnType ct_id_real = col_type_Double;
+    typedef ColumnDouble column_type;
+};
+template<> struct ColumnTypeTraits3<DateTime> {
+    const static ColumnType ct_id = col_type_DateTime;
+    const static ColumnType ct_id_real = col_type_Int;
+    typedef Column column_type;
+};
 
 // -- Table ---------------------------------------------------------------------------------
 
@@ -1744,13 +1770,13 @@ size_t Table::lookup(StringData value) const
 template <class T> std::size_t Table::find_first(std::size_t column_ndx, T value) const
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == ColumnTypeTraits<T>::ct_id_real);
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == ColumnTypeTraits3<T>::ct_id_real);
 
     if(!m_columns.is_attached())
         return not_found;
 
-    typedef typename ColumnTypeTraits<T>::column_type ColType;
-    const ColType& column = get_column<ColType, ColumnTypeTraits<T>::ct_id>(column_ndx);
+    typedef typename ColumnTypeTraits3<T>::column_type ColType;
+    const ColType& column = get_column<ColType, ColumnTypeTraits3<T>::ct_id>(column_ndx);
     return column.find_first(value);
 }
 
@@ -1816,8 +1842,8 @@ template <class T> ConstTableView Table::find_all(size_t column_ndx, T value) co
     TableView tv(*this);
 
     if(m_columns.is_attached()) {
-        typedef typename ColumnTypeTraits<T>::column_type ColType;
-        const ColType& column = get_column<ColType, ColumnTypeTraits<T>::ct_id>(column_ndx);
+        typedef typename ColumnTypeTraits3<T>::column_type ColType;
+        const ColType& column = get_column<ColType, ColumnTypeTraits3<T>::ct_id>(column_ndx);
         column.find_all(tv.get_ref_column(), value);
     }
     return tv;

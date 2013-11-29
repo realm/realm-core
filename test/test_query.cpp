@@ -397,7 +397,7 @@ TEST(NextGenSyntaxMonkey0)
     // Intended to test eval() for columns in query_expression.hpp which fetch 8 values at a time. This test varies
     // table size to test out-of-bounds bugs.
 
-    for(int iter = 1; iter < 100 + TEST_DURATION * 10000; iter++)
+    for(int iter = 1; iter < 10000 + TEST_DURATION * 10000; iter++)
     {
         const size_t rows = 1 + rand() % (2 * TIGHTDB_MAX_LIST_SIZE);
         Table table;
