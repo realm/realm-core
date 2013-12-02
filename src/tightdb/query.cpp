@@ -519,7 +519,9 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
         QueryState<R> st;
         st.init(action, null_ptr, limit);
 
-        aggregate_internal<action, T>(first[0],&st, start, end, column_ndx);
+        SequentialGetter<T> source_column(*m_table, column_ndx);
+
+        aggregate_internal(action, ColumnTypeTraits<T>::id, first[0],&st, start, end, &source_column);
         if (resultcount)
             *resultcount = st.m_match_count;
         return st.m_state;
@@ -534,19 +536,15 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
     *                                                                                                             *
     **************************************************************************************************************/
 
-    template<Action TAction, class TSourceColumn>
-    void Query::aggregate_internal(ParentNode* pn, QueryStateBase* st, size_t start, size_t end, size_t agg_col) const
+    void Query::aggregate_internal(Action TAction, DataType TSourceColumn,
+                                   ParentNode* pn, QueryStateBase* st, 
+                                   size_t start, size_t end, SequentialGetterBase* source_column) const
     {
         if (end == not_found)
             end = m_table->size();
 
-        SequentialGetter<TSourceColumn>* source_column = null_ptr;
-
-        if (agg_col != not_found)
-            source_column = new SequentialGetter<TSourceColumn>(*m_table, agg_col);
-
         for (size_t c = 0; c < pn->m_children.size(); c++)
-            pn->m_children[c]->aggregate_local_selector<TAction, TSourceColumn>(pn->m_children[c]);
+            pn->m_children[c]->aggregate_local_prepare(TAction, TSourceColumn);
 
         size_t td;
 
@@ -580,7 +578,6 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
                 }
             }
         }
-        delete source_column;
     }
 
 
@@ -780,7 +777,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     TableView tv(*m_table);
     QueryState<int64_t> st;
     st.init(act_FindAll, &tv.get_ref_column(), limit);
-    aggregate_internal<act_FindAll, int64_t>(first[0], &st, start, end, not_found);
+    aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
     return tv;
 }
 
@@ -801,7 +798,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     Init(*m_table);
     QueryState<int64_t> st;
     st.init(act_Count, null_ptr, limit);
-    aggregate_internal<act_Count, int64_t>(first[0], &st, start, end, not_found);
+    aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
     return size_t(st.m_match_count);
 }
 

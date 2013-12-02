@@ -358,22 +358,46 @@ public:
     }
 
     typedef size_t (ParentNode::* TAggregator)(QueryStateBase*, size_t, size_t, size_t, SequentialGetterBase*);
-
+    typedef ParentNode ThisType;
     // Only purpose is to make all IntegerNode classes have this function (overloaded only in IntegerNode)
-    virtual void aggregate_call_specialized(Action /*TAction*/, DataType /*TResult*/)
+    virtual void aggregate_local_prepare(Action TAction, DataType col_id)
     {
-        TIGHTDB_ASSERT(false);
-    }
+        if (TAction == act_ReturnFirst)
+            m_aggregator = & ThisType::aggregate_local<act_ReturnFirst, int64_t>;
 
-    template<Action TAction, class TSourceColumn>
-    void aggregate_local_selector(ParentNode* node)
-    {
-        if (node->m_is_integer_node)
-            // call method in IntegerNode
-            node->aggregate_call_specialized(TAction, ColumnTypeTraits<TSourceColumn>::id);
+        else if (TAction == act_Count)
+            m_aggregator = & ThisType::aggregate_local<act_Count, int64_t>;
+
+        else if (TAction == act_Sum && col_id == type_Int)
+            m_aggregator = & ThisType::aggregate_local<act_Sum, int64_t>;
+
+        else if (TAction == act_Sum && col_id == type_Float)
+            m_aggregator = & ThisType::aggregate_local<act_Sum, float>;
+        else if (TAction == act_Sum && col_id == type_Double)
+            m_aggregator = & ThisType::aggregate_local<act_Sum, double>;
+
+        else if (TAction == act_Max && col_id == type_Int)
+            m_aggregator = & ThisType::aggregate_local<act_Max, int64_t>;
+        else if (TAction == act_Max && col_id == type_Float)
+            m_aggregator = & ThisType::aggregate_local<act_Max, float>;
+        else if (TAction == act_Max && col_id == type_Double)
+            m_aggregator = & ThisType::aggregate_local<act_Max, double>;
+
+        else if (TAction == act_Min && col_id == type_Int)
+            m_aggregator = & ThisType::aggregate_local<act_Min, int64_t>;
+        else if (TAction == act_Min && col_id == type_Float)
+            m_aggregator = & ThisType::aggregate_local<act_Min, float>;
+        else if (TAction == act_Min && col_id == type_Double)
+            m_aggregator = & ThisType::aggregate_local<act_Min, double>;
+
+        else if (TAction == act_FindAll)
+            m_aggregator = & ThisType::aggregate_local<act_FindAll, int64_t>;
+
+        else if (TAction == act_CallbackIdx)
+            m_aggregator = & ThisType::aggregate_local<act_CallbackIdx, int64_t>;
+
         else {
-             // call method in ParentNode
-            m_aggregator = & ParentNode::aggregate_local<TAction, TSourceColumn>;
+            TIGHTDB_ASSERT(false);
         }
     }
 
@@ -383,8 +407,6 @@ public:
         TIGHTDB_ASSERT(m_aggregator != NULL);
         return (this->* m_aggregator)(st, start, end, local_limit, source_column);
     }
-
-    /* FSA: Aggregate was here */
 
     template<Action TAction, class TSourceColumn>
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
@@ -650,7 +672,7 @@ public:
     typedef IntegerNode<TConditionValue, TConditionFunction> ThisType;
     typedef size_t (ThisType::* TAggregator_specialised)(QueryStateBase*, size_t, size_t, size_t, SequentialGetterBase*);
 
-    void aggregate_call_specialized(Action TAction, DataType col_id)
+    void aggregate_local_prepare(Action TAction, DataType col_id)
     {
         if (TAction == act_ReturnFirst)
             m_aggregator_specialized = & ThisType::aggregate_local<act_ReturnFirst, int64_t>;

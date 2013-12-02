@@ -49,6 +49,7 @@ class TableView;
 class ConstTableView;
 class Array;
 class Expression;
+class SequentialGetterBase;
 
 class Query {
 public:
@@ -277,9 +278,8 @@ private:
         R aggregate(R (ColClass::*method)(size_t, size_t, size_t) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
 
-    template<Action TAction, class TSourceColumn>
-    void aggregate_internal(ParentNode* pn, QueryStateBase* st, 
-                            size_t start, size_t end, size_t agg_col) const;
+    void aggregate_internal(Action TAction, DataType TSourceColumn, ParentNode* pn, QueryStateBase* st, 
+                            size_t start, size_t end, SequentialGetterBase* source_column) const;
 
     friend class Table;
     template <typename T> friend class BasicTable;
