@@ -24,7 +24,7 @@
 
 #include <pthread.h>
 #ifdef TIGHTDB_PTHREADS_TEST
-#include <../test/pthread_test.hpp>
+#  include <../test/pthread_test.hpp>
 #endif
 #include <errno.h>
 #include <cstddef>
@@ -628,7 +628,7 @@ template<typename T>
 inline T Atomic<T>::load_acquire() const
 {
     T retval;
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     retval = __atomic_load_n(&state, __ATOMIC_ACQUIRE);
 #else
     __sync_synchronize();
@@ -641,7 +641,7 @@ template<typename T>
 inline T Atomic<T>::load_relaxed() const
 {
     T retval;
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     retval = __atomic_load_n(&state, __ATOMIC_RELAXED);
 #else
     if (sizeof(T) >= sizeof(ptrdiff_t)) {
@@ -667,7 +667,7 @@ inline T Atomic<T>::load_relaxed() const
 template<typename T>
 inline T Atomic<T>::load() const
 {
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     T retval = __atomic_load_n(&state, __ATOMIC_SEQ_CST);
 #else
     __sync_synchronize();
@@ -679,7 +679,7 @@ inline T Atomic<T>::load() const
 template<typename T>
 inline void Atomic<T>::store(T value) 
 {
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     __atomic_store_n(&state, value, __ATOMIC_SEQ_CST);
 #else
     if (sizeof(T) >= sizeof(ptrdiff_t)) {
@@ -701,7 +701,7 @@ inline void Atomic<T>::store(T value)
 template<typename T>
 inline void Atomic<T>::store_release(T value) 
 {
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     __atomic_store_n(&state, value, __ATOMIC_RELEASE);
 #else
     // prior to gcc 4.7 we have no portable way of expressing
@@ -713,7 +713,7 @@ inline void Atomic<T>::store_release(T value)
 template<typename T>
 inline void Atomic<T>::store_relaxed(T value) 
 {
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     __atomic_store_n(&state, value, __ATOMIC_RELAXED);
 #else
     // prior to gcc 4.7 we have no portable way of expressing
