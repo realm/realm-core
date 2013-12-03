@@ -125,6 +125,37 @@ TEST(Query_NoConditions)
     }
 }
 
+TEST(TestQueryCount) 
+{
+    // Intended to test QueryState::match<pattern = true>(); which is only triggered if:
+    // * Table size is large enough to have SSE-aligned or bithack-aligned rows (this requires
+    //   TIGHTDB_MAX_LIST_SIZE > [some large number]!)
+    // * You're doing a 'count' which is currently the only operation that uses 'pattern', and
+    // * There exists exactly 1 condition (if there is 0 conditions, it will fallback to column::count
+    //   and if there exists > 1 conditions, 'pattern' is currently not supported - but could easily be
+    //   extended to support it)
+
+    for(int j = 0; j < 100; j++) {
+        Table table;
+        table.add_column(type_Int, "i");
+
+        size_t count = 0;
+        size_t rows = rand() % (5 * TIGHTDB_MAX_LIST_SIZE); // to cross some leaf boundaries
+
+        for(int i = 0; i < rows; i++) {
+            table.add_empty_row();
+            int64_t val = rand() % 5;
+            table.set_int(0, i, val);
+            if(val == 2)
+                count++;
+        }
+
+        size_t count2 = table.where().equal(0, 2).count();
+        CHECK_EQUAL(count, count2);
+    }
+
+}
+
 
 TEST(NextGenSyntaxTypedString) 
 {
@@ -455,8 +486,7 @@ TEST(NextGenSyntaxMonkey)
     for(int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++)
     {
         // Keep at least '* 20' else some tests will give 0 matches and bad coverage
-        const size_t rows = 1 + ((size_t)rand() * (size_t)rand()) % (TIGHTDB_MAX_LIST_SIZE * 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
-        Table table;
+        const size_t rows = 1 + size_t(rand() * rand()) % (TIGHTDB_MAX_LIST_SIZE * 20 * (TEST_DURATION * TEST        Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
         table.add_column(type_Int, "third");
