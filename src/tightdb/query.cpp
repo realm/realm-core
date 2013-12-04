@@ -522,8 +522,9 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
         SequentialGetter<T> source_column(*m_table, column_ndx);
 
         aggregate_internal(action, ColumnTypeTraits<T>::id, first[0],&st, start, end, &source_column);
-        if (resultcount)
+        if (resultcount) {
             *resultcount = st.m_match_count;
+        }
         return st.m_state;
     }
 }
@@ -799,7 +800,7 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     QueryState<int64_t> st;
     st.init(act_Count, null_ptr, limit);
     aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
-    return size_t(st.m_match_count);
+    return size_t(st.m_state);
 }
 
 
