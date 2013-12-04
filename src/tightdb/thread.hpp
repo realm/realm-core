@@ -227,7 +227,7 @@ public:
     /// Wait for another thread to call notify() or notify_all().
     void wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT;
     template<class Func>
-    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = null_ptr);
+    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
 
     /// If any threads are wating for this condition, wake up at least
     /// one.
@@ -285,7 +285,7 @@ inline bool Thread::joinable() TIGHTDB_NOEXCEPT
 
 inline void Thread::start(entry_func_type entry_func, void* arg)
 {
-    const pthread_attr_t* attr = null_ptr; // Use default thread attributes
+    const pthread_attr_t* attr = 0; // Use default thread attributes
     int r = pthread_create(&m_id, attr, entry_func, arg);
     if (TIGHTDB_UNLIKELY(r != 0))
         create_failed(r); // Throws
@@ -420,9 +420,10 @@ template<class Func>
 inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
     int r;
-    if (tp == null_ptr) {
+    if (!tp) {
         r = pthread_cond_wait(&m_impl, &m.m_impl);
-    } else {
+    }
+    else {
         r = pthread_cond_timedwait(&m_impl, &m.m_impl, tp);
         if (r == ETIMEDOUT)
             return;
@@ -432,7 +433,7 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
 #ifdef TIGHTDB_HAVE_ROBUST_PTHREAD_MUTEX
     if (r == ENOTRECOVERABLE)
         throw NotRecoverable();
-    if (r != EOWNERDEAD) 
+    if (r != EOWNERDEAD)
         lock_failed(r); // does not return
 #endif
     try {
