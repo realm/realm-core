@@ -1,5 +1,5 @@
-#ifndef TIGHTDB_UNIQUE_PTR_HPP
-#define TIGHTDB_UNIQUE_PTR_HPP
+#ifndef TIGHTDB_UTIL_UNIQUE_PTR_HPP
+#define TIGHTDB_UTIL_UNIQUE_PTR_HPP
 
 #include <algorithm>
 
@@ -7,6 +7,7 @@
 #include <tightdb/util/assert.hpp>
 
 namespace tightdb {
+namespace util {
 
 
 template<class T> class DefaultDelete {
@@ -170,6 +171,7 @@ template<class T, class D> inline void swap(UniquePtr<T,D>& p, UniquePtr<T,D>& q
 }
 
 
+} // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_UNIQUE_PTR_HPP
+#endif // TIGHTDB_UTIL_UNIQUE_PTR_HPP

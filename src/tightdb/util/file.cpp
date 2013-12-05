@@ -28,6 +28,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 
 namespace {
@@ -97,6 +98,7 @@ string get_last_error_msg(const char* prefix, DWORD err)
 
 
 namespace tightdb {
+namespace util {
 
 
 void make_dir(const string& path)
@@ -181,6 +183,7 @@ string make_temp_dir()
 }
 
 
+} // namespace util
 } // namespace tightdb
 
 

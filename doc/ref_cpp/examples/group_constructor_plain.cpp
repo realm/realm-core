@@ -29,7 +29,7 @@ void func()
 int main()
 {
     func();
-    File::remove("people.tightdb");
+    util::File::remove("people.tightdb");
 }
 // @@EndFold@@
 // @@EndExample@@

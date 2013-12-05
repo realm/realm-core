@@ -88,7 +88,7 @@ void BenchmarkResults::try_load_baseline_results()
 {
     string baseline_file = m_results_file_stem;
     baseline_file += ".baseline";
-    if (File::exists(baseline_file)) {
+    if (util::File::exists(baseline_file)) {
         ifstream in(baseline_file.c_str());
         BaselineResults baseline_results;
         bool error = false;
@@ -146,7 +146,7 @@ void BenchmarkResults::save_results()
 
     string baseline_file = m_results_file_stem;
     baseline_file += ".baseline";
-    if (!File::exists(baseline_file)) {
+    if (!util::File::exists(baseline_file)) {
         int r = link(name.c_str(), baseline_file.c_str());
         static_cast<void>(r);
     }

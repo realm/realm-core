@@ -67,11 +67,11 @@ public:
 #endif
 
 private:
-    Group&          m_group;
-    SlabAlloc&      m_alloc;
-    uint64_t        m_current_version;
-    uint64_t        m_readlock_version;
-    File::Map<char> m_file_map;
+    Group&     m_group;
+    SlabAlloc& m_alloc;
+    uint64_t   m_current_version;
+    uint64_t   m_readlock_version;
+    util::File::Map<char> m_file_map;
 
     void merge_free_space();
 

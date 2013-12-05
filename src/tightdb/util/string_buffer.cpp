@@ -7,8 +7,8 @@
 #include <tightdb/util/string_buffer.hpp>
 
 using namespace std;
-
-namespace tightdb {
+using namespace tightdb;
+using namespace tightdb::util;
 
 
 char StringBuffer::m_zero = 0;
@@ -39,6 +39,3 @@ void StringBuffer::reallocate(size_t min_capacity)
         new_capacity = min_capacity_2;
     m_buffer.resize(new_capacity, 0, m_size, 0); // Throws
 }
-
-
-} // namespace tightdb

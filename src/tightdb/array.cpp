@@ -135,6 +135,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 
 namespace {
@@ -2095,7 +2096,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         TIGHTDB_ASSERT(!int_cast_with_overflow_detect(last_value/2, total_elems));
         TIGHTDB_ASSERT(num_elems == total_elems);
     }
-    return tightdb::tuple(num_elems, 1 + leaf_level_of_children, general_form);
+    return tightdb::util::tuple(num_elems, 1 + leaf_level_of_children, general_form);
 }
 
 } // anonymous namespace

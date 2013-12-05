@@ -67,7 +67,7 @@ public:
     }
 
 private:
-    Thread m_thread;
+    util::Thread m_thread;
     bool m_except;
     std::string m_except_msg;
 

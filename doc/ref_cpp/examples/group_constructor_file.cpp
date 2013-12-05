@@ -29,8 +29,8 @@ int main()
     Group g;
     g.write("people.tightdb");
     func();
-    File::remove("people.tightdb");
-    File::remove("people_new.tightdb");
+    util::File::remove("people.tightdb");
+    util::File::remove("people_new.tightdb");
 }
 // @@EndFold@@
 // @@EndExample@@

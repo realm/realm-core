@@ -62,7 +62,7 @@ void SlabAlloc::detach() TIGHTDB_NOEXCEPT
             goto found;
         case attach_SharedFile:
         case attach_UnsharedFile:
-            File::unmap(m_data, m_baseline);
+            util::File::unmap(m_data, m_baseline);
             m_file.close();
             goto found;
     }
@@ -358,6 +358,7 @@ ref_type SlabAlloc::attach_file(const string& path, bool is_shared, bool read_on
     TIGHTDB_ASSERT(!(is_shared && read_only));
     static_cast<void>(is_shared);
 
+    using namespace tightdb::util;
     File::AccessMode access = read_only ? File::access_ReadOnly : File::access_ReadWrite;
     File::CreateMode create = read_only || no_create ? File::create_Never : File::create_Auto;
     m_file.open(path.c_str(), access, create, 0); // Throws
@@ -578,7 +579,7 @@ bool SlabAlloc::remap(size_t file_size)
     // SlabAlloc::reset_free_space_tracking().
 
     void* addr =
-        m_file.remap(m_data, m_baseline, File::access_ReadOnly, file_size);
+        m_file.remap(m_data, m_baseline, util::File::access_ReadOnly, file_size);
 
     bool addr_changed = addr != m_data;
 

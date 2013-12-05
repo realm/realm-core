@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_FILE_HPP
-#define TIGHTDB_FILE_HPP
+#ifndef TIGHTDB_UTIL_FILE_HPP
+#define TIGHTDB_UTIL_FILE_HPP
 
 #include <cstddef>
 #include <stdint.h>
@@ -32,6 +32,7 @@
 #include <tightdb/util/safe_int_ops.hpp>
 
 namespace tightdb {
+namespace util {
 
 
 /// Create the specified directory in the file system.
@@ -832,6 +833,7 @@ inline void File::Streambuf::flush()
 }
 
 
+} // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_FILE_HPP
+#endif // TIGHTDB_UTIL_FILE_HPP

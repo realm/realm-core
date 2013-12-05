@@ -19,8 +19,8 @@ int main()
 
     if (group_1 == group_2) cout << "EQUAL\n";
 // @@Fold@@
-    File::remove("people_1.tightdb");
-    File::remove("people_2.tightdb");
+    util::File::remove("people_1.tightdb");
+    util::File::remove("people_2.tightdb");
 }
 // @@EndFold@@
 // @@EndExample@@

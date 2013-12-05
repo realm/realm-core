@@ -83,11 +83,11 @@ public:
     ///
     /// \param file Filesystem path to a TightDB database file.
     ///
-    /// \throw File::AccessError If the file could not be opened. If
-    /// the reason corresponds to one of the exception types that are
-    /// derived from File::AccessError, the derived exception type is
-    /// thrown. Note that InvalidDatabase is among these derived
-    /// exception types.
+    /// \throw util::File::AccessError If the file could not be
+    /// opened. If the reason corresponds to one of the exception
+    /// types that are derived from util::File::AccessError, the
+    /// derived exception type is thrown. Note that InvalidDatabase is
+    /// among these derived exception types.
     void open(const std::string& file, bool no_create = false,
               DurabilityLevel dlevel = durability_Full,
               bool is_backend = false);
@@ -128,7 +128,7 @@ public:
     /// specified size. On systems that do not support preallocation,
     /// this function has no effect. To know whether preallocation is
     /// supported by TightDB on your platform, call
-    /// File::is_prealloc_supported().
+    /// util::File::is_prealloc_supported().
     ///
     /// It is an error to call this function on an unattached shared
     /// group. Doing so will result in undefined behavior.
@@ -176,12 +176,12 @@ private:
     struct SharedInfo;
 
     // Member variables
-    Group                 m_group;
-    uint64_t              m_version;
-    File                  m_file;
-    File::Map<SharedInfo> m_file_map; // Never remapped
-    File::Map<SharedInfo> m_reader_map;
-    std::string           m_file_path;
+    Group      m_group;
+    uint64_t   m_version;
+    util::File m_file;
+    util::File::Map<SharedInfo> m_file_map; // Never remapped
+    util::File::Map<SharedInfo> m_reader_map;
+    std::string m_file_path;
 
 #ifdef TIGHTDB_DEBUG
     // In debug mode we want to track transaction stages

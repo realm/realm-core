@@ -19,6 +19,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
@@ -381,8 +382,8 @@ void thread(int index, string database_path)
 TEST(Transactions)
 {
     string database_path = "transactions.tightdb";
-    File::try_remove(database_path);
-    File::try_remove(database_path+".lock");
+    util::File::try_remove(database_path);
+    util::File::try_remove(database_path+".lock");
 
     // Run N rounds in each thread
     {

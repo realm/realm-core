@@ -36,8 +36,8 @@ int main()
     Group::unattached_tag tag;
     Group g2(tag);
     func(g2);
-    File::remove("people.tightdb");
-    File::remove("people_new.tightdb");
+    util::File::remove("people.tightdb");
+    util::File::remove("people_new.tightdb");
 }
 // @@EndFold@@
 // @@EndExample@@

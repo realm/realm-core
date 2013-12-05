@@ -428,13 +428,15 @@ public:
             }
 
             // Sum of float column must accumulate in double
-            TIGHTDB_STATIC_ASSERT( !(TAction == act_Sum && (SameType<TSourceColumn, float>::value && !SameType<TResult, double>::value)), "");
+            TIGHTDB_STATIC_ASSERT(!(TAction == act_Sum &&
+                                    util::SameType<TSourceColumn, float>::value &&
+                                    !util::SameType<TResult, double>::value), "");
 
             // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
             if (m == r) {
                 // TResult: type of query result
                 // TSourceColumn: type of aggregate source
-                TSourceColumn av = (TSourceColumn)0; 
+                TSourceColumn av = TSourceColumn(0);
                 // uses_val test becuase compiler cannot see that Column::Get has no side effect and result is discarded
                 if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != null_ptr) {
                     TIGHTDB_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != null_ptr);
@@ -728,8 +730,8 @@ public:
             // the same as the column used for the aggregate action, then the entire query can run within scope of that 
             // column only, with no references to other columns:
             if (m_conds == 1 && (source_column == null_ptr ||
-                (SameType<TSourceColumn, int64_t>::value
-                 && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))) {
+                                 (util::SameType<TSourceColumn, int64_t>::value
+                                  && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))) {
                 bool cont = m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
                 if (!cont)
                     return not_found;
@@ -944,8 +946,8 @@ public:
         char* upper = new char[6 * v.size()];
         char* lower = new char[6 * v.size()];
 
-        bool b1 = case_map(v, lower, false);
-        bool b2 = case_map(v, upper, true);
+        bool b1 = util::case_map(v, lower, false);
+        bool b2 = util::case_map(v, upper, true);
         if (!b1 || !b2)
             error_code = "Malformed UTF-8: " + std::string(v);
 
@@ -1450,7 +1452,7 @@ public:
         size_t s = start;
 
         while (s < end) {
-            if (SameType<TConditionValue, int64_t>::value) {
+            if (util::SameType<TConditionValue, int64_t>::value) {
                 // For int64_t we've created an array intrinsics named CompareLeafs which template expands bitwidths
                 // of boths arrays to make Get faster.
                 m_getter1.cache_next(s);

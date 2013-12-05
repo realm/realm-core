@@ -73,12 +73,12 @@ R ColumnBase::aggregate(T target, std::size_t start, std::size_t end,
     ColType* column = const_cast<ColType*>(static_cast<const ColType*>(this));
     SequentialGetter<T> sg(column);
 
-    bool cont = true;     
+    bool cont = true;
     for (size_t s = start; cont && s < end; ) {
         sg.cache_next(s);
         size_t end2 = sg.local_end(end);
 
-        if(SameType<T, int64_t>::value) {
+        if(util::SameType<T, int64_t>::value) {
             cont = (static_cast<const Array*>(sg.m_array_ptr))->find(c, action, int64_t(target), s - sg.m_leaf_start, end2, sg.m_leaf_start, reinterpret_cast<QueryState<int64_t>*>(&state));
         }
         else {
@@ -90,7 +90,7 @@ R ColumnBase::aggregate(T target, std::size_t start, std::size_t end,
             }
         }
         s = end2 + sg.m_leaf_start;
-    }        
+    }
 
     return state.m_state;
 }

@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_UTF8_HPP
-#define TIGHTDB_UTF8_HPP
+#ifndef TIGHTDB_UTIL_UTF8_HPP
+#define TIGHTDB_UTIL_UTF8_HPP
 
 #include <stdint.h>
 #include <string>
@@ -27,6 +27,8 @@
 #include <tightdb/string_data.hpp>
 
 namespace tightdb {
+namespace util {
+
 
 // FIXME: The current approach to case insensitive comparison requires
 // that case mappings can be done in a way that does not change he
@@ -422,6 +424,7 @@ inline std::size_t Utf8x16<Char16, Traits16>::find_utf8_buf_size(const Char16*& 
 }
 
 
+} // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_UTF8_HPP
+#endif // TIGHTDB_UTIL_UTF8_HPP

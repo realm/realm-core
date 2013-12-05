@@ -51,7 +51,7 @@ void func()
 int main()
 {
     func();
-    File::remove("shared_db.tightdb");
+    util::File::remove("shared_db.tightdb");
 }
 // @@EndFold@@
 // @@EndExample@@

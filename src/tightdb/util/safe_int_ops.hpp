@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_SAFE_INT_OPS_HPP
-#define TIGHTDB_SAFE_INT_OPS_HPP
+#ifndef TIGHTDB_UTIL_SAFE_INT_OPS_HPP
+#define TIGHTDB_UTIL_SAFE_INT_OPS_HPP
 
 #include <limits>
 
@@ -27,6 +27,7 @@
 #include <tightdb/util/meta.hpp>
 
 namespace tightdb {
+namespace util {
 
 
 //@{
@@ -278,6 +279,7 @@ template<class T, class F> inline bool int_cast_with_overflow_detect(F from, T& 
 }
 
 
+} // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_SAFE_INT_OPS_HPP
+#endif // TIGHTDB_UTIL_SAFE_INT_OPS_HPP

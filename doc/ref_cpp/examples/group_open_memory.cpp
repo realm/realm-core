@@ -42,7 +42,7 @@ int main()
         throw;
     }
     free(const_cast<char*>(buffer.data()));
-    File::remove("people.tightdb");
+    util::File::remove("people.tightdb");
 }
 // @@EndFold@@
 // @@EndExample@@

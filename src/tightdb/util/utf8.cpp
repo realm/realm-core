@@ -58,6 +58,7 @@ inline bool equal_sequence(const char*& begin, const char* end, const char* begi
 
 
 namespace tightdb {
+namespace util {
 
 
 
@@ -254,4 +255,5 @@ size_t search_case_fold(StringData haystack, const char* needle_upper, const cha
 }
 
 
+} // namespace util
 } // namespace tightdb

@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_STRING_BUFFER_HPP
-#define TIGHTDB_STRING_BUFFER_HPP
+#ifndef TIGHTDB_UTIL_STRING_BUFFER_HPP
+#define TIGHTDB_UTIL_STRING_BUFFER_HPP
 
 #include <cstddef>
 #include <cstring>
@@ -28,6 +28,7 @@
 #include <tightdb/util/buffer.hpp>
 
 namespace tightdb {
+namespace util {
 
 
 // FIXME: Check whether this class provides anything that a C++03
@@ -180,6 +181,7 @@ inline void StringBuffer::clear() TIGHTDB_NOEXCEPT
 }
 
 
+} // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_STRING_BUFFER_HPP
+#endif // TIGHTDB_UTIL_STRING_BUFFER_HPP

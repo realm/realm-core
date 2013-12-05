@@ -160,10 +160,10 @@ int main(int argc, char* argv[])
     abort2(auto_detection_flag > 0 && scheme.size() > 0, "-a flag cannot be used when scheme is specified manually with -t flag"); 
     abort2(empty_as_string_flag && scheme.size() > 0, "-e flag cannot be used when scheme is specified manually with -t flag"); 
 
-    abort2(!force_flag && File::exists(argv[argc - 1]), "Destination file '%s' already exists.", argv[argc - 1]);
+    abort2(!force_flag && util::File::exists(argv[argc - 1]), "Destination file '%s' already exists.", argv[argc - 1]);
 
-    if(File::exists(argv[argc - 1]))
-        File::try_remove(argv[argc - 1]);
+    if(util::File::exists(argv[argc - 1]))
+        util::File::try_remove(argv[argc - 1]);
 
     in_file = open_files(argv[argc - 2]);
     string path = argv[argc - 1];
