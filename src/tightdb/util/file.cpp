@@ -21,10 +21,10 @@
 #  endif
 #endif
 
+#include <tightdb/util/safe_int_ops.hpp>
+#include <tightdb/util/string_buffer.hpp>
+#include <tightdb/util/file.hpp>
 #include <tightdb/exceptions.hpp>
-#include <tightdb/safe_int_ops.hpp>
-#include <tightdb/string_buffer.hpp>
-#include <tightdb/file.hpp>
 
 using namespace std;
 using namespace tightdb;

@@ -23,14 +23,14 @@
 #include <algorithm>
 #include <ostream>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 
 #ifdef TIGHTDB_HAVE_CXX11_RVALUE_REFERENCE
-#include <utility>
+#  include <utility>
 #endif
 
 #ifdef TIGHTDB_HAVE_CXX11_ATOMIC
-#include <atomic>
+#  include <atomic>
 #endif
 
 

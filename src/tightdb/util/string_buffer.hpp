@@ -24,7 +24,7 @@
 #include <cstring>
 #include <string>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/util/buffer.hpp>
 
 namespace tightdb {

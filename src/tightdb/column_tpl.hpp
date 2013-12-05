@@ -22,7 +22,7 @@
 
 #include <cstdlib>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/array.hpp>
 #include <tightdb/array_basic.hpp>
 #include <tightdb/column.hpp>

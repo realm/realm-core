@@ -23,8 +23,8 @@
 #include <stdint.h>
 #include <string>
 
+#include <tightdb/util/utf8.hpp>
 #include <tightdb/binary_data.hpp>
-#include <tightdb/utf8.hpp>
 
 namespace tightdb {
 

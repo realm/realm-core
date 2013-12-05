@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_TABLE_VIEW_BASIC_HPP
 #define TIGHTDB_TABLE_VIEW_BASIC_HPP
 
-#include <tightdb/meta.hpp>
+#include <tightdb/util/meta.hpp>
 #include <tightdb/table_view.hpp>
 #include <tightdb/table_accessors.hpp>
 

@@ -1,7 +1,7 @@
 // @@Example: ex_cpp_group_is_attached @@
 // @@Fold@@
 #include <tightdb.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/file.hpp>
 
 using namespace tightdb;
 

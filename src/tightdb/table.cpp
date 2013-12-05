@@ -5,7 +5,7 @@
 #include <fstream>
 #include <sstream>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/table.hpp>
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/column.hpp>

@@ -1,5 +1,5 @@
 #include <tightdb.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/file.hpp>
 
 using namespace tightdb;
 

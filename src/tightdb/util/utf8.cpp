@@ -8,8 +8,8 @@
     #include <ctype.h>
 #endif
 
-#include <tightdb/safe_int_ops.hpp>
-#include <tightdb/utf8.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
+#include <tightdb/util/utf8.hpp>
 
 using namespace std;
 

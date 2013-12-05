@@ -1,8 +1,8 @@
 #include <cerrno>
 #include <stdexcept>
 
+#include <tightdb/util/thread.hpp>
 #include <tightdb/exceptions.hpp>
-#include <tightdb/thread.hpp>
 
 #if !defined _WIN32
 #  include <unistd.h>

@@ -4,10 +4,10 @@
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
-#include <tightdb/file.hpp>
-#include <tightdb/thread.hpp>
 #include <tightdb/util/bind.hpp>
 #include <tightdb/util/terminate.hpp>
+#include <tightdb/util/file.hpp>
+#include <tightdb/util/thread.hpp>
 
 #include "testsettings.hpp"
 

@@ -1,6 +1,6 @@
 #include <algorithm>
 
-#include <tightdb/safe_int_ops.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
 #include <tightdb/alloc_slab.hpp>

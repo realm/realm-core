@@ -22,7 +22,7 @@
 
 #include <ostream>
 
-#include <tightdb/type_list.hpp>
+#include <tightdb/util/type_list.hpp>
 
 namespace tightdb {
 

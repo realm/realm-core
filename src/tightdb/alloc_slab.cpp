@@ -3,11 +3,11 @@
 #include <iostream>
 
 #ifdef TIGHTDB_SLAB_ALLOC_DEBUG
-#include <cstdlib>
-#include <map>
+#  include <cstdlib>
+#  include <map>
 #endif
 
-#include <tightdb/safe_int_ops.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/util/terminate.hpp>
 #include <tightdb/array.hpp>
 #include <tightdb/alloc_slab.hpp>

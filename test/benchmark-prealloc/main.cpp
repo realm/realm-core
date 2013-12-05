@@ -2,7 +2,7 @@
 #include <iostream>
 
 #include <tightdb.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/file.hpp>
 
 TIGHTDB_TABLE_2(Alpha,
                 foo, Int,

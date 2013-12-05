@@ -23,17 +23,14 @@
 #include <exception>
 
 #include <pthread.h>
-#ifdef TIGHTDB_PTHREADS_TEST
-#  include <../test/pthread_test.hpp>
-#endif
 #include <errno.h>
 #include <cstddef>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/terminate.hpp>
-#include <tightdb/unique_ptr.hpp>
-#include <tightdb/meta.hpp>
+#include <tightdb/util/unique_ptr.hpp>
+#include <tightdb/util/meta.hpp>
 
 #ifdef TIGHTDB_HAVE_CXX11_ATOMIC
 #  include <atomic>

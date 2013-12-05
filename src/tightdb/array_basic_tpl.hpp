@@ -196,7 +196,7 @@ bool BasicArray<T>::compare(const BasicArray<T>& a) const
 template<class T>
 std::size_t BasicArray<T>::CalcByteLen(std::size_t count, std::size_t) const
 {
-    // FIXME: This arithemtic could overflow. Consider using <tightdb/safe_int_ops.hpp>
+    // FIXME: This arithemtic could overflow. Consider using <tightdb/util/safe_int_ops.hpp>
     return header_size + (count * sizeof (T));
 }
 

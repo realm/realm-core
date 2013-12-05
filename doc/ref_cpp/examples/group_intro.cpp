@@ -1,11 +1,11 @@
 // @@Example: ex_cpp_group_intro @@
 // @@Fold@@
-#include <tightdb.hpp>
-#include <tightdb/file.hpp>
 #include <iostream>
+#include <tightdb.hpp>
+#include <tightdb/util/file.hpp>
 
-using namespace tightdb;
 using namespace std;
+using namespace tightdb;
 
 // @@EndFold@@
 TIGHTDB_TABLE_2(PeopleTable,

@@ -23,8 +23,8 @@
 #include <stdint.h> // unint8_t etc
 #include <string>
 
-#include <tightdb/config.h>
-#include <tightdb/file.hpp>
+#include <tightdb/util/features.h>
+#include <tightdb/util/file.hpp>
 #include <tightdb/table_macros.hpp>
 
 namespace tightdb {

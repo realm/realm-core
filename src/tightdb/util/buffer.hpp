@@ -26,9 +26,9 @@
 #include <limits>
 #include <utility>
 
-#include <tightdb/config.h>
-#include <tightdb/safe_int_ops.hpp>
-#include <tightdb/unique_ptr.hpp>
+#include <tightdb/util/features.h>
+#include <tightdb/util/safe_int_ops.hpp>
+#include <tightdb/util/unique_ptr.hpp>
 
 namespace tightdb {
 namespace util {

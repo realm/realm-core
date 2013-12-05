@@ -23,7 +23,7 @@
 #include <stdint.h> // unint8_t etc
 #include <cstdlib> // std::size_t
 
-#include <tightdb/unique_ptr.hpp>
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/array.hpp>
 #include <tightdb/query_conditions.hpp>
 

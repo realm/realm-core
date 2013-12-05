@@ -7,8 +7,8 @@
 
 #include <UnitTest++.h>
 
-#include <tightdb/thread.hpp>
 #include <tightdb/util/bind.hpp>
+#include <tightdb/util/thread.hpp>
 
 #include "testsettings.hpp"
 

@@ -26,10 +26,10 @@
 #include <string>
 #include <streambuf>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/util/assert.hpp>
-#include <tightdb/unique_ptr.hpp>
-#include <tightdb/safe_int_ops.hpp>
+#include <tightdb/util/unique_ptr.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
 
 namespace tightdb {
 

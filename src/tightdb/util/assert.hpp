@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_UTIL_ASSERT_HPP
 #define TIGHTDB_UTIL_ASSERT_HPP
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 
 
 #ifdef TIGHTDB_DEBUG

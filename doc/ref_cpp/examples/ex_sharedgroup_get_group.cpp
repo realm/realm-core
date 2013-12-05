@@ -1,12 +1,12 @@
 // @@Example: ex_cpp_shared_group_get_group @@
 // @@Fold@@
 #include <cassert>
-#include <tightdb.hpp>
-#include <tightdb/file.hpp>
 #include <iostream>
+#include <tightdb.hpp>
+#include <tightdb/util/file.hpp>
 
-using namespace tightdb;
 using namespace std;
+using namespace tightdb;
 
 // Define schema for main table
 TIGHTDB_TABLE_3(PeopleTable,

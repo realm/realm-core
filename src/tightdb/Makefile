@@ -1,13 +1,14 @@
 REPLICATION_HPP = $(if $(ENABLE_REPLICATION),replication.hpp)
 REPLICATION_CPP = $(if $(ENABLE_REPLICATION),replication.cpp)
 
-nobase_subinclude_HEADERS = config.h meta.hpp util/assert.hpp exceptions.hpp util/terminate.hpp \
-type_list.hpp tuple.hpp util/bind.hpp safe_int_ops.hpp unique_ptr.hpp util/bind_ptr.hpp util/buffer.hpp \
-string_buffer.hpp util/logger.hpp file.hpp thread.hpp utf8.hpp utilities.hpp alloc.hpp alloc_slab.hpp \
-array.hpp array_string.hpp data_type.hpp column_type.hpp column_fwd.hpp spec.hpp datetime.hpp \
+nobase_subinclude_HEADERS = util/features.h util/meta.hpp util/assert.hpp util/terminate.hpp \
+util/type_list.hpp util/tuple.hpp util/bind.hpp util/safe_int_ops.hpp util/unique_ptr.hpp \
+util/bind_ptr.hpp util/buffer.hpp util/string_buffer.hpp util/logger.hpp util/file.hpp \
+util/thread.hpp util/utf8.hpp exceptions.hpp utilities.hpp alloc.hpp alloc_slab.hpp array.hpp \
+array_string.hpp data_type.hpp column_type.hpp column_fwd.hpp spec.hpp datetime.hpp \
 string_data.hpp binary_data.hpp mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp \
-table_accessors.hpp table_basic.hpp table_view.hpp table_view_basic.hpp table_macros.hpp group.hpp \
-group_shared.hpp $(REPLICATION_HPP) query.hpp query_conditions.hpp lang_bind_helper.hpp \
+table_accessors.hpp table_basic.hpp table_view.hpp table_view_basic.hpp table_macros.hpp \
+group.hpp group_shared.hpp $(REPLICATION_HPP) query.hpp query_conditions.hpp lang_bind_helper.hpp \
 tightdb_nmmintrin.h importer.hpp
 
 nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp
@@ -26,12 +27,12 @@ libexec_PROGRAMS = tightdbd
 bin_PROGRAMS     = tightdb-import
 DEV_PROGRAMS     = tightdb-config
 
-libtightdb_a_SOURCES = util/terminate.cpp string_buffer.cpp file.cpp thread.cpp utf8.cpp utilities.cpp \
-alloc.cpp alloc_slab.cpp array.cpp array_string.cpp array_string_long.cpp array_binary.cpp \
-array_blob.cpp array_blobs_big.cpp column.cpp column_string.cpp column_string_enum.cpp \
-column_binary.cpp column_table.cpp column_mixed.cpp spec.cpp table.cpp table_view.cpp group.cpp \
-group_writer.cpp group_shared.cpp $(REPLICATION_CPP) index_string.cpp query.cpp \
-lang_bind_helper.cpp importer.cpp
+libtightdb_a_SOURCES = util/terminate.cpp util/string_buffer.cpp util/file.cpp util/thread.cpp \
+util/utf8.cpp utilities.cpp alloc.cpp alloc_slab.cpp array.cpp array_string.cpp \
+array_string_long.cpp array_binary.cpp array_blob.cpp array_blobs_big.cpp column.cpp \
+column_string.cpp column_string_enum.cpp column_binary.cpp column_table.cpp column_mixed.cpp \
+spec.cpp table.cpp table_view.cpp group.cpp group_writer.cpp group_shared.cpp $(REPLICATION_CPP) \
+index_string.cpp query.cpp lang_bind_helper.cpp importer.cpp
 
 # Format: CURRENT[:REVISION[:AGE]]
 #
@@ -62,15 +63,15 @@ tightdbd_LIBS = libtightdb.a
 tightdb_import_SOURCES = importer_tool.cpp
 tightdb_import_LIBS    = libtightdb.a
 
-
+CONFIG_H = util/config.h
+CONFIG_SH = $(CONFIG_H:.h=.sh)
+EXTRA_CLEAN += $(CONFIG_H)
 ifneq ($(TIGHTDB_HAVE_CONFIG),)
-nobase_subinclude_HEADERS += build_config.h
-GENERATED_SOURCES += build_config.h
-build_config.h: ../config.mk config.sh
-	$(SHELL) config.sh $< $@
+nobase_subinclude_HEADERS += $(CONFIG_H)
+GENERATED_SOURCES += $(CONFIG_H)
+$(CONFIG_H): ../config.mk $(CONFIG_SH)
+	$(SHELL) $(CONFIG_SH) $< $@
 endif
-
-EXTRA_CLEAN += build_config.h
 
 
 ifeq ($(DISABLE_CHEETAH_CODE_GEN),)

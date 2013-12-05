@@ -23,7 +23,7 @@
 #include <cstdlib>
 #include <string>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 
 #ifdef TIGHTDB_DEBUG
 #  define TIGHTDB_TERMINATE(msg) tightdb::util::terminate((msg), __FILE__, __LINE__)

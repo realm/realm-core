@@ -2,8 +2,8 @@
 #include <iostream>
 #include <iomanip>
 
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/column_binary.hpp>
-#include <tightdb/unique_ptr.hpp>
 
 using namespace std;
 using namespace tightdb;

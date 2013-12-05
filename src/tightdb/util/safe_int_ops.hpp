@@ -22,9 +22,9 @@
 
 #include <limits>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/util/assert.hpp>
-#include <tightdb/meta.hpp>
+#include <tightdb/util/meta.hpp>
 
 namespace tightdb {
 

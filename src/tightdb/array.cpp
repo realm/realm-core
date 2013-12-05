@@ -9,13 +9,13 @@
 #  pragma warning (disable : 4127) // Condition is constant warning
 #endif
 
-#include <tightdb/tuple.hpp>
+#include <tightdb/util/tuple.hpp>
+#include <tightdb/utilities.hpp>
 #include <tightdb/array.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
 #include <tightdb/index_string.hpp>
-#include <tightdb/utilities.hpp>
 
 
 // Header format (8 bytes):
@@ -1183,7 +1183,7 @@ size_t Array::count(int64_t value) const
 
 size_t Array::CalcByteLen(size_t count, size_t width) const
 {
-    // FIXME: This arithemtic could overflow. Consider using <tightdb/safe_int_ops.hpp>
+    // FIXME: This arithemtic could overflow. Consider using <tightdb/util/safe_int_ops.hpp>
     size_t bits = count * width;
     size_t bytes = (bits+7) / 8; // round up
     return bytes + header_size; // add room for 8 byte header

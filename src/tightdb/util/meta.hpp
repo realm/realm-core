@@ -24,7 +24,7 @@
 #include <cwchar>
 #include <limits>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 
 #ifdef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
 #  include <type_traits>

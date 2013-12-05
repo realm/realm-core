@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <tightdb.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/file.hpp>
 
 using namespace std;
 using namespace tightdb;

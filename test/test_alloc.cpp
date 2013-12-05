@@ -4,7 +4,7 @@
 #include <UnitTest++.h>
 
 #include <tightdb/alloc_slab.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/file.hpp>
 
 using namespace tightdb;
 

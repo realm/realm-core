@@ -23,7 +23,7 @@
 #include <stdint.h> // unint8_t etc
 #include <utility>
 
-#include <tightdb/file.hpp>
+#include <tightdb/util/file.hpp>
 #include <tightdb/alloc.hpp>
 
 

@@ -11,8 +11,8 @@
 #include <UnitTest++.h>
 
 #include <tightdb/group_shared.hpp>
-#include <tightdb/file.hpp>
 #include <tightdb/util/bind.hpp>
+#include <tightdb/util/file.hpp>
 
 #include "util/thread_wrapper.hpp"
 #include "testsettings.hpp"

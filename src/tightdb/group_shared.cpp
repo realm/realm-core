@@ -2,9 +2,9 @@
 #include <errno.h>
 #include <algorithm>
 
-#include <tightdb/config.h>
-#include <tightdb/safe_int_ops.hpp>
-#include <tightdb/thread.hpp>
+#include <tightdb/util/features.h>
+#include <tightdb/util/safe_int_ops.hpp>
+#include <tightdb/util/thread.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group_shared.hpp>
 #include <tightdb/group_writer.hpp>

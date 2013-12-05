@@ -23,7 +23,7 @@
 #include <stdint.h>
 #include <string>
 
-#include <tightdb/safe_int_ops.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
 #include <tightdb/string_data.hpp>
 
 namespace tightdb {

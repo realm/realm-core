@@ -23,9 +23,9 @@
 #include <stdint.h>
 #include <cstddef>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/util/assert.hpp>
-#include <tightdb/safe_int_ops.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
 
 namespace tightdb {
 

@@ -9,10 +9,9 @@
 
 #include <unistd.h> // link()
 
-#include <tightdb/file.hpp>
+#include <tightdb/util/file.hpp>
 
-#include "../util/timer.hpp"
-
+#include "timer.hpp"
 #include "benchmark_results.hpp"
 
 using namespace std;

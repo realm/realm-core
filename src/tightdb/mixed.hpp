@@ -26,7 +26,7 @@
 #include <cstring>
 
 #include <tightdb/util/assert.hpp>
-#include <tightdb/meta.hpp>
+#include <tightdb/util/meta.hpp>
 #include <tightdb/data_type.hpp>
 #include <tightdb/datetime.hpp>
 #include <tightdb/string_data.hpp>

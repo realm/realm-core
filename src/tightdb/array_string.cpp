@@ -236,7 +236,7 @@ void ArrayString::erase(size_t ndx)
 size_t ArrayString::CalcByteLen(size_t count, size_t width) const
 {
     // FIXME: This arithemtic could overflow. Consider using one of
-    // the functions in <tightdb/safe_int_ops.hpp>
+    // the functions in <tightdb/util/safe_int_ops.hpp>
     return header_size + (count * width);
 }
 

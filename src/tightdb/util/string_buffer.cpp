@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <stdexcept>
 
-#include <tightdb/safe_int_ops.hpp>
-#include <tightdb/string_buffer.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
+#include <tightdb/util/string_buffer.hpp>
 
 using namespace std;
 

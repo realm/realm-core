@@ -90,7 +90,9 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <functional>
 #include <algorithm>
 
-#include <tightdb/meta.hpp>
+#include <tightdb/util/meta.hpp>
+#include <tightdb/util/utf8.hpp>
+#include <tightdb/utilities.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/table_view.hpp>
 #include <tightdb/column_fwd.hpp>
@@ -98,14 +100,12 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/column_binary.hpp>
 #include <tightdb/column_basic.hpp>
-#include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/array_basic.hpp>
 #include <tightdb/array_string.hpp>
-#include <tightdb/utilities.hpp>
 
-#if (_MSC_FULL_VER >= 160040219)
-    #include <immintrin.h>
+#if _MSC_FULL_VER >= 160040219
+#  include <immintrin.h>
 #endif
 
 /*
