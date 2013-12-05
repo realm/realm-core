@@ -10,7 +10,6 @@
 #endif
 
 #include <tightdb/tuple.hpp>
-#include <tightdb/terminate.hpp>
 #include <tightdb/array.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/query_conditions.hpp>

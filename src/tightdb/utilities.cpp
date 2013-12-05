@@ -1,9 +1,8 @@
 #include <cstdlib> // size_t
 #include <string>
+#include <iostream>
 #include <stdint.h>
 
-#include <iostream>
-#include <tightdb/assert.hpp>
 #include <tightdb/utilities.hpp>
 
 #ifdef _MSC_VER
