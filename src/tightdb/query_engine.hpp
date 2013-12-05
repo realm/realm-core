@@ -664,7 +664,7 @@ public:
     // NOTE: Be careful to call Array(no_prealloc_tag) constructors on m_array in the initializer list, otherwise
     // their default constructors are called which are slow
     IntegerNode(TConditionValue v, size_t column) : m_value(v), 
-                                                    m_aggregator_specialized(NULL)
+                                                    m_find_callback_specialized(NULL)
     {
         m_condition_column_idx = column;
         m_child = 0;
@@ -686,42 +686,45 @@ public:
     }
 
     typedef IntegerNode<TConditionValue, TConditionFunction> ThisType;
-    typedef size_t (ThisType::* TAggregator_specialised)(QueryStateBase*, size_t, size_t, size_t, SequentialGetterBase*);
+    typedef bool (ThisType::* TFind_callback_specialised)(size_t, size_t);
 
     void aggregate_local_prepare(Action TAction, DataType col_id)
     {
+        m_fastmode_disabled = (col_id == type_Float || col_id == type_Double);
+        m_TAction = TAction;
+
         if (TAction == act_ReturnFirst)
-            m_aggregator_specialized = & ThisType::aggregate_local<act_ReturnFirst, int64_t>;
+            m_find_callback_specialized = & ThisType::find_callback_specialization<act_ReturnFirst, int64_t>;
 
         else if (TAction == act_Count)
-            m_aggregator_specialized = & ThisType::aggregate_local<act_Count, int64_t>;
+            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Count, int64_t>;
 
         else if (TAction == act_Sum && col_id == type_Int)
-            m_aggregator_specialized = & ThisType::aggregate_local<act_Sum, int64_t>;
+            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Sum, int64_t>;
         else if (TAction == act_Sum && col_id == type_Float)
-            m_aggregator_specialized = & ThisType::aggregate_local<act_Sum, float>;
+            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Sum, float>;
         else if (TAction == act_Sum && col_id == type_Double)
-            m_aggregator_specialized = & ThisType::aggregate_local<act_Sum, double>;
+            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Sum, double>;
 
         else if (TAction == act_Max && col_id == type_Int)
-            m_aggregator_specialized = & ThisType::aggregate_local<act_Max, int64_t>;
+            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Max, int64_t>;
         else if (TAction == act_Max && col_id == type_Float)
-            m_aggregator_specialized = & ThisType::aggregate_local<act_Max, float>;
+            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Max, float>;
         else if (TAction == act_Max && col_id == type_Double)
-            m_aggregator_specialized = & ThisType::aggregate_local<act_Max, double>;
+            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Max, double>;
 
         else if (TAction == act_Min && col_id == type_Int)
-            m_aggregator_specialized = & ThisType::aggregate_local<act_Min, int64_t>;
+            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Min, int64_t>;
         else if (TAction == act_Min && col_id == type_Float)
-            m_aggregator_specialized = & ThisType::aggregate_local<act_Min, float>;
+            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Min, float>;
         else if (TAction == act_Min && col_id == type_Double)
-            m_aggregator_specialized = & ThisType::aggregate_local<act_Min, double>;
+            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Min, double>;
 
         else if (TAction == act_FindAll)
-            m_aggregator_specialized = & ThisType::aggregate_local<act_FindAll, int64_t>;
+            m_find_callback_specialized = & ThisType::find_callback_specialization<act_FindAll, int64_t>;
 
         else if (TAction == act_CallbackIdx)
-            m_aggregator_specialized = & ThisType::aggregate_local<act_CallbackIdx, int64_t>;
+            m_find_callback_specialized = & ThisType::find_callback_specialization<act_CallbackIdx, int64_t>;
 
         else {
             TIGHTDB_ASSERT(false);
@@ -731,21 +734,29 @@ public:
     virtual size_t call_aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                                         SequentialGetterBase* source_column)
     {
-        return (this->* m_aggregator_specialized)(st, start, end, local_limit, source_column);
+        //        return (this->* m_aggregator_specialized)(st, start, end, local_limit, source_column);
+        return aggregate_local(st,start,end,local_limit,source_column);
     }
 
-
+    template <Action TAction, class TSourceColumn>
+    bool find_callback_specialization(size_t s, size_t end2)
+    {
+        bool cont = m_array.find<TConditionFunction, act_CallbackIdx>
+            (m_value, s - m_leaf_start, end2, m_leaf_start, null_ptr,
+             std::bind1st(std::mem_fun(&IntegerNodeBase::template match_callback<TAction, TSourceColumn>), this));
+        return cont;
+    }
 
     // source_column: column number in m_table which must act as source for aggreate TAction
-    template <Action TAction, class TSourceColumn>
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                            SequentialGetterBase* source_column)
     {
+        /*
         typedef typename ColumnTypeTraitsSum<TSourceColumn, TAction>::sum_type QueryStateType;
         TIGHTDB_ASSERT(source_column == null_ptr || dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != null_ptr);
         TIGHTDB_ASSERT(dynamic_cast<QueryState<QueryStateType>*>(st) != null_ptr);
+        */
         TIGHTDB_ASSERT(m_conds > 0);
-
         int c = TConditionFunction::condition;
         m_local_matches = 0;
         m_local_limit = local_limit;
@@ -757,7 +768,7 @@ public:
         // column only, with no references to other columns:
         bool fastmode = (m_conds == 1 && 
                          (source_column == null_ptr ||
-                          (SameType<TSourceColumn, int64_t>::value
+                          (!m_fastmode_disabled
                            && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column)));
         for (size_t s = start; s < end; ) {
             // Cache internal leafs
@@ -775,7 +786,7 @@ public:
                 end2 = end - m_leaf_start;
 
             if (fastmode) {
-                bool cont = m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
+                bool cont = m_array.find(c, m_TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
                 if (!cont)
                     return not_found;
             }
@@ -783,8 +794,7 @@ public:
             // aggregate payload from aggregate column:
             else {
                 m_source_column = source_column;
-                bool cont = m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, null_ptr,
-                             std::bind1st(std::mem_fun(&IntegerNodeBase::template match_callback<TAction, TSourceColumn>), this));
+                bool cont = (this->* m_find_callback_specialized)(s, end2);
                 if (!cont)
                     return not_found;
             }
@@ -850,7 +860,9 @@ public:
 protected:
 
     const ColType* m_condition_column;                // Column on which search criteria is applied
-    TAggregator_specialised m_aggregator_specialized;
+    bool m_fastmode_disabled;
+    Action m_TAction;
+    TFind_callback_specialised m_find_callback_specialized;
 };
 
 
