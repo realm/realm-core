@@ -342,7 +342,7 @@ public:
         m_table = &table;
         if (m_child)
             m_child->init(table);
-        m_aggregator = NULL;
+        m_column_action_specializer = NULL;
     }
 
     virtual bool is_initialized() const
@@ -357,60 +357,72 @@ public:
         return m_child;
     }
 
-    typedef size_t (ParentNode::* TAggregator)(QueryStateBase*, size_t, size_t, size_t, SequentialGetterBase*);
+    typedef bool (ParentNode::* TColumn_action_specialized)(QueryStateBase*, SequentialGetterBase*, size_t);
     typedef ParentNode ThisType;
     // Only purpose is to make all IntegerNode classes have this function (overloaded only in IntegerNode)
     virtual void aggregate_local_prepare(Action TAction, DataType col_id)
     {
         if (TAction == act_ReturnFirst)
-            m_aggregator = & ThisType::aggregate_local<act_ReturnFirst, int64_t>;
-
+            m_column_action_specializer = & ThisType::column_action_specialization<act_ReturnFirst, int64_t>;
+        
         else if (TAction == act_Count)
-            m_aggregator = & ThisType::aggregate_local<act_Count, int64_t>;
+            m_column_action_specializer = & ThisType::column_action_specialization<act_Count, int64_t>;
 
         else if (TAction == act_Sum && col_id == type_Int)
-            m_aggregator = & ThisType::aggregate_local<act_Sum, int64_t>;
+            m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, int64_t>;
 
         else if (TAction == act_Sum && col_id == type_Float)
-            m_aggregator = & ThisType::aggregate_local<act_Sum, float>;
+            m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, float>;
         else if (TAction == act_Sum && col_id == type_Double)
-            m_aggregator = & ThisType::aggregate_local<act_Sum, double>;
+            m_column_action_specializer = & ThisType::column_action_specialization<act_Sum, double>;
 
         else if (TAction == act_Max && col_id == type_Int)
-            m_aggregator = & ThisType::aggregate_local<act_Max, int64_t>;
+            m_column_action_specializer = & ThisType::column_action_specialization<act_Max, int64_t>;
         else if (TAction == act_Max && col_id == type_Float)
-            m_aggregator = & ThisType::aggregate_local<act_Max, float>;
+            m_column_action_specializer = & ThisType::column_action_specialization<act_Max, float>;
         else if (TAction == act_Max && col_id == type_Double)
-            m_aggregator = & ThisType::aggregate_local<act_Max, double>;
+            m_column_action_specializer = & ThisType::column_action_specialization<act_Max, double>;
 
         else if (TAction == act_Min && col_id == type_Int)
-            m_aggregator = & ThisType::aggregate_local<act_Min, int64_t>;
+            m_column_action_specializer = & ThisType::column_action_specialization<act_Min, int64_t>;
         else if (TAction == act_Min && col_id == type_Float)
-            m_aggregator = & ThisType::aggregate_local<act_Min, float>;
+            m_column_action_specializer = & ThisType::column_action_specialization<act_Min, float>;
         else if (TAction == act_Min && col_id == type_Double)
-            m_aggregator = & ThisType::aggregate_local<act_Min, double>;
+            m_column_action_specializer = & ThisType::column_action_specialization<act_Min, double>;
 
         else if (TAction == act_FindAll)
-            m_aggregator = & ThisType::aggregate_local<act_FindAll, int64_t>;
+            m_column_action_specializer = & ThisType::column_action_specialization<act_FindAll, int64_t>;
 
         else if (TAction == act_CallbackIdx)
-            m_aggregator = & ThisType::aggregate_local<act_CallbackIdx, int64_t>;
+            m_column_action_specializer = & ThisType::column_action_specialization<act_CallbackIdx, int64_t>;
 
         else {
             TIGHTDB_ASSERT(false);
         }
     }
 
-    virtual size_t call_aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                                        SequentialGetterBase* source_column)
+    template<Action TAction, class TSourceColumn>
+    bool column_action_specialization(QueryStateBase* st, SequentialGetterBase* source_column, size_t r)
     {
-        TIGHTDB_ASSERT(m_aggregator != NULL);
-        return (this->* m_aggregator)(st, start, end, local_limit, source_column);
+        // Sum of float column must accumulate in double
+        typedef typename ColumnTypeTraitsSum<TSourceColumn, TAction>::sum_type TResult;
+        TIGHTDB_STATIC_ASSERT( !(TAction == act_Sum && (SameType<TSourceColumn, float>::value && !SameType<TResult, double>::value)), "");
+        
+        // TResult: type of query result
+        // TSourceColumn: type of aggregate source
+        TSourceColumn av = (TSourceColumn)0; 
+        // uses_val test becuase compiler cannot see that Column::Get has no side effect and result is discarded
+        if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != null_ptr) {
+            TIGHTDB_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != null_ptr);
+            av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
+        }
+        TIGHTDB_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != null_ptr);
+        bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av));
+        return cont;
     }
 
-    template<Action TAction, class TSourceColumn>
-    size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                           SequentialGetterBase* source_column)
+    virtual size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
+                                   SequentialGetterBase* source_column)
     {
         // aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
         // integer version, because find_first_local() is relatively slower here (because it's non-integers).
@@ -449,23 +461,11 @@ public:
 
             // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
             if (m == r) {
-                // Sum of float column must accumulate in double
-                typedef typename ColumnTypeTraitsSum<TSourceColumn, TAction>::sum_type TResult;
-                TIGHTDB_STATIC_ASSERT( !(TAction == act_Sum && (SameType<TSourceColumn, float>::value && !SameType<TResult, double>::value)), "");
-
-                // TResult: type of query result
-                // TSourceColumn: type of aggregate source
-                TSourceColumn av = (TSourceColumn)0; 
-                // uses_val test becuase compiler cannot see that Column::Get has no side effect and result is discarded
-                if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != null_ptr) {
-                    TIGHTDB_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != null_ptr);
-                    av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
-                }
-                TIGHTDB_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != null_ptr);
-                bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av));
-                if (!cont)
+                bool cont = (this->* m_column_action_specializer)(st, source_column, r);
+                if (!cont) {
                     return static_cast<size_t>(-1);
-             }
+                }
+            }
         }
     }
 
@@ -482,8 +482,7 @@ public:
 
     ParentNode* m_child;
     std::vector<ParentNode*>m_children;
-    TAggregator m_aggregator;
-
+TColumn_action_specialized m_column_action_specializer;
     size_t m_condition_column_idx; // Column of search criteria
 
     size_t m_conds;
@@ -638,7 +637,15 @@ protected:
         return b;
     }
 
-    IntegerNodeBase() :  m_array(Array::no_prealloc_tag()) {}
+    IntegerNodeBase() :  m_array(Array::no_prealloc_tag()) 
+    {
+        m_child = 0;
+        m_conds = 0;
+        m_dT = 1.0 / 4.0;
+        m_probes = 0;
+        m_matches = 0;
+    }
+
     size_t m_last_local_match;
     Array m_array;
     size_t m_leaf_start;
@@ -647,6 +654,8 @@ protected:
 
     size_t m_local_matches;
     size_t m_local_limit;
+    bool m_fastmode_disabled;
+    Action m_TAction;
 
     QueryStateBase* m_state;
     SequentialGetterBase* m_source_column; // Column of values used in aggregate (act_FindAll, act_ReturnFirst, act_Sum, etc)
@@ -667,11 +676,6 @@ public:
                                                     m_find_callback_specialized(NULL)
     {
         m_condition_column_idx = column;
-        m_child = 0;
-        m_conds = 0;
-        m_dT = 1.0 / 4.0;
-        m_probes = 0;
-        m_matches = 0;
     }
     ~IntegerNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
@@ -731,13 +735,6 @@ public:
         }
     }
 
-    virtual size_t call_aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                                        SequentialGetterBase* source_column)
-    {
-        //        return (this->* m_aggregator_specialized)(st, start, end, local_limit, source_column);
-        return aggregate_local(st,start,end,local_limit,source_column);
-    }
-
     template <Action TAction, class TSourceColumn>
     bool find_callback_specialization(size_t s, size_t end2)
     {
@@ -747,15 +744,10 @@ public:
         return cont;
     }
 
-    // source_column: column number in m_table which must act as source for aggreate TAction
-    size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
+    // FIXME: should be possible to move this up to IntegerNodeBase...
+    virtual size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                            SequentialGetterBase* source_column)
     {
-        /*
-        typedef typename ColumnTypeTraitsSum<TSourceColumn, TAction>::sum_type QueryStateType;
-        TIGHTDB_ASSERT(source_column == null_ptr || dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != null_ptr);
-        TIGHTDB_ASSERT(dynamic_cast<QueryState<QueryStateType>*>(st) != null_ptr);
-        */
         TIGHTDB_ASSERT(m_conds > 0);
         int c = TConditionFunction::condition;
         m_local_matches = 0;
@@ -860,8 +852,6 @@ public:
 protected:
 
     const ColType* m_condition_column;                // Column on which search criteria is applied
-    bool m_fastmode_disabled;
-    Action m_TAction;
     TFind_callback_specialised m_find_callback_specialized;
 };
 

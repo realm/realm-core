@@ -561,7 +561,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
             // on. Can be called on any node; yields same result, but different performance. Returns prematurely if
             // condition of called node has evaluated to true local_matches number of times.
             // Return value is the next row for resuming aggregating (next row that caller must call aggregate_local on)
-            start = pn->m_children[best]->call_aggregate_local(st, start, td, findlocals, source_column);
+            start = pn->m_children[best]->aggregate_local(st, start, td, findlocals, source_column);
 
             // Make remaining conditions compute their m_dD (statistics)
             for (size_t c = 0; c < pn->m_children.size() && start < end; c++) {
@@ -575,7 +575,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
                     // Limit to bestdist in order not to skip too large parts of index nodes
                     size_t maxD = pn->m_children[c]->m_dT == 0.0 ? end - start : bestdist;
                     td = pn->m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
-                    start = pn->m_children[c]->call_aggregate_local(st, start, td, probe_matches, source_column);
+                    start = pn->m_children[c]->aggregate_local(st, start, td, probe_matches, source_column);
                 }
             }
         }
