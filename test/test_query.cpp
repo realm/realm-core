@@ -486,7 +486,9 @@ TEST(NextGenSyntaxMonkey)
     for(int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++)
     {
         // Keep at least '* 20' else some tests will give 0 matches and bad coverage
-        const size_t rows = 1 + size_t(rand() * rand()) % (TIGHTDB_MAX_LIST_SIZE * 20 * (TEST_DURATION * TEST        Table table;
+        const size_t rows = 1 + ((size_t)rand() * (size_t)rand()) 
+            % (TIGHTDB_MAX_LIST_SIZE * 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
+        Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
         table.add_column(type_Int, "third");
