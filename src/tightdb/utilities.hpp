@@ -29,7 +29,7 @@
 #  include <intrin.h>
 #endif
 
-#include <tightdb/assert.hpp>
+#include <tightdb/util/assert.hpp>
 #include <tightdb/safe_int_ops.hpp>
 
 // GCC defines __i386__ and __x86_64__

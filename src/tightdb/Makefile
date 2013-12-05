@@ -1,16 +1,16 @@
 REPLICATION_HPP = $(if $(ENABLE_REPLICATION),replication.hpp)
 REPLICATION_CPP = $(if $(ENABLE_REPLICATION),replication.cpp)
 
-nobase_subinclude_HEADERS = config.h meta.hpp assert.hpp exceptions.hpp terminate.hpp \
-type_list.hpp tuple.hpp bind.hpp safe_int_ops.hpp unique_ptr.hpp bind_ptr.hpp buffer.hpp \
-string_buffer.hpp logger.hpp file.hpp thread.hpp utf8.hpp utilities.hpp alloc.hpp alloc_slab.hpp \
+nobase_subinclude_HEADERS = config.h meta.hpp util/assert.hpp exceptions.hpp util/terminate.hpp \
+type_list.hpp tuple.hpp util/bind.hpp safe_int_ops.hpp unique_ptr.hpp util/bind_ptr.hpp util/buffer.hpp \
+string_buffer.hpp util/logger.hpp file.hpp thread.hpp utf8.hpp utilities.hpp alloc.hpp alloc_slab.hpp \
 array.hpp array_string.hpp data_type.hpp column_type.hpp column_fwd.hpp spec.hpp datetime.hpp \
 string_data.hpp binary_data.hpp mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp \
 table_accessors.hpp table_basic.hpp table_view.hpp table_view_basic.hpp table_macros.hpp group.hpp \
 group_shared.hpp $(REPLICATION_HPP) query.hpp query_conditions.hpp lang_bind_helper.hpp \
 tightdb_nmmintrin.h importer.hpp
 
-nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp
+nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp
 
 # Temporary hack due to public dependency on query_engine.hpp in
 # Lasses new "query expressions" implementation. None of these should
@@ -26,7 +26,7 @@ libexec_PROGRAMS = tightdbd
 bin_PROGRAMS     = tightdb-import
 DEV_PROGRAMS     = tightdb-config
 
-libtightdb_a_SOURCES = terminate.cpp string_buffer.cpp file.cpp thread.cpp utf8.cpp utilities.cpp \
+libtightdb_a_SOURCES = util/terminate.cpp string_buffer.cpp file.cpp thread.cpp utf8.cpp utilities.cpp \
 alloc.cpp alloc_slab.cpp array.cpp array_string.cpp array_string_long.cpp array_binary.cpp \
 array_blob.cpp array_blobs_big.cpp column.cpp column_string.cpp column_string_enum.cpp \
 column_binary.cpp column_table.cpp column_mixed.cpp spec.cpp table.cpp table_view.cpp group.cpp \

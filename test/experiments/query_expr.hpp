@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <ostream>
 
-#include <tightdb/assert.hpp>
+#include <tightdb/util/assert.hpp>
 #include <tightdb/meta.hpp>
 #include <tightdb/tuple.hpp>
 

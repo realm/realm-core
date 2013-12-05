@@ -23,7 +23,7 @@
 #include <limits>
 
 #include <tightdb/config.h>
-#include <tightdb/assert.hpp>
+#include <tightdb/util/assert.hpp>
 #include <tightdb/meta.hpp>
 
 namespace tightdb {

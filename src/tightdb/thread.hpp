@@ -30,8 +30,8 @@
 #include <cstddef>
 
 #include <tightdb/config.h>
-#include <tightdb/assert.hpp>
-#include <tightdb/terminate.hpp>
+#include <tightdb/util/assert.hpp>
+#include <tightdb/util/terminate.hpp>
 #include <tightdb/unique_ptr.hpp>
 #include <tightdb/meta.hpp>
 

@@ -25,7 +25,7 @@
 #include <iostream>
 
 #include <tightdb/thread.hpp>
-#include <tightdb/bind.hpp>
+#include <tightdb/util/bind.hpp>
 
 namespace tightdb {
 namespace test_util {

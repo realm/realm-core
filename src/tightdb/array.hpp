@@ -48,7 +48,7 @@ Searching: The main finding function is:
 #include <stdint.h> // unint8_t etc
 
 #include <tightdb/meta.hpp>
-#include <tightdb/assert.hpp>
+#include <tightdb/util/assert.hpp>
 #include <tightdb/alloc.hpp>
 #include <tightdb/utilities.hpp>
 #include <tightdb/string_data.hpp>

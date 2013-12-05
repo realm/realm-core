@@ -1,10 +1,14 @@
 /*.d
 /*.o
+/util/*.d
+/util/*.o
 /*.libdeps
 
 # Coverage data
 /*.gcno
 /*.gcda
+/util/*.gcno
+/util/*.gcda
 
 /libtightdb.a
 /libtightdb.so

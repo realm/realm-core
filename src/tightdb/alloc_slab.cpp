@@ -8,7 +8,7 @@
 #endif
 
 #include <tightdb/safe_int_ops.hpp>
-#include <tightdb/terminate.hpp>
+#include <tightdb/util/terminate.hpp>
 #include <tightdb/array.hpp>
 #include <tightdb/alloc_slab.hpp>
 

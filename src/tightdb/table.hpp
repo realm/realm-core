@@ -602,7 +602,7 @@ private:
     friend class Group;
     friend class Query;
     friend class ColumnMixed;
-    template<class> friend class bind_ptr;
+    template<class> friend class util::bind_ptr;
     friend class ColumnSubtableParent;
     friend class LangBindHelper;
     friend class TableViewBase;

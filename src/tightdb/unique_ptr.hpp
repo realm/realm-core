@@ -4,7 +4,7 @@
 #include <algorithm>
 
 #include <tightdb/config.h>
-#include <tightdb/assert.hpp>
+#include <tightdb/util/assert.hpp>
 
 namespace tightdb {
 

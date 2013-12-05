@@ -8,7 +8,7 @@
 
 #include <UnitTest++.h>
 
-#include <tightdb/assert.hpp>
+#include <tightdb/util/assert.hpp>
 #include <tightdb/unique_ptr.hpp>
 #include <tightdb/utf8.hpp>
 

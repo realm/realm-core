@@ -27,7 +27,7 @@
 
 #include <tightdb/meta.hpp>
 #include <tightdb/tuple.hpp>
-#include <tightdb/buffer.hpp>
+#include <tightdb/util/buffer.hpp>
 #include <tightdb/file.hpp>
 #include <tightdb/mixed.hpp>
 

@@ -17,8 +17,8 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TERMINATE_HPP
-#define TIGHTDB_TERMINATE_HPP
+#ifndef TIGHTDB_UTIL_TERMINATE_HPP
+#define TIGHTDB_UTIL_TERMINATE_HPP
 
 #include <cstdlib>
 #include <string>
@@ -26,17 +26,19 @@
 #include <tightdb/config.h>
 
 #ifdef TIGHTDB_DEBUG
-#  define TIGHTDB_TERMINATE(msg) tightdb::terminate((msg), __FILE__, __LINE__)
+#  define TIGHTDB_TERMINATE(msg) tightdb::util::terminate((msg), __FILE__, __LINE__)
 #else
 #  define TIGHTDB_TERMINATE(msg) (static_cast<void>(msg), std::abort())
 #endif
 
 namespace tightdb {
+namespace util {
 
 
 TIGHTDB_NORETURN void terminate(std::string message, const char* file, long line) TIGHTDB_NOEXCEPT;
 
 
+} // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_TERMINATE_HPP
+#endif // TIGHTDB_UTIL_TERMINATE_HPP

@@ -25,7 +25,7 @@
 #include <cstddef> // size_t
 #include <cstring>
 
-#include <tightdb/assert.hpp>
+#include <tightdb/util/assert.hpp>
 #include <tightdb/meta.hpp>
 #include <tightdb/data_type.hpp>
 #include <tightdb/datetime.hpp>

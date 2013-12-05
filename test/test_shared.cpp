@@ -6,8 +6,8 @@
 #include <tightdb.hpp>
 #include <tightdb/file.hpp>
 #include <tightdb/thread.hpp>
-#include <tightdb/bind.hpp>
-#include <tightdb/terminate.hpp>
+#include <tightdb/util/bind.hpp>
+#include <tightdb/util/terminate.hpp>
 
 #include "testsettings.hpp"
 

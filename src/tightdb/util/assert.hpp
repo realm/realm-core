@@ -17,16 +17,17 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_ASSERT_HPP
-#define TIGHTDB_ASSERT_HPP
+#ifndef TIGHTDB_UTIL_ASSERT_HPP
+#define TIGHTDB_UTIL_ASSERT_HPP
 
 #include <tightdb/config.h>
 
 
 #ifdef TIGHTDB_DEBUG
-#  include <tightdb/terminate.hpp>
+#  include <tightdb/util/terminate.hpp>
 #  define TIGHTDB_ASSERT(condition) \
-    (condition ? static_cast<void>(0) : tightdb::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
+    (condition ? static_cast<void>(0) : \
+     tightdb::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
 #else
 #  define TIGHTDB_ASSERT(condition) static_cast<void>(0)
 #endif
@@ -36,16 +37,19 @@
 #  define TIGHTDB_STATIC_ASSERT(condition, message) static_assert(condition, message)
 #else
 #  define TIGHTDB_STATIC_ASSERT(condition, message) typedef \
-    tightdb::static_assert_dummy<sizeof(tightdb::TIGHTDB_STATIC_ASSERTION_FAILURE<bool(condition)>)> \
+    tightdb::util::static_assert_dummy<sizeof(tightdb::util:: \
+        TIGHTDB_STATIC_ASSERTION_FAILURE<bool(condition)>)> \
     TIGHTDB_JOIN(_tightdb_static_assert_, __LINE__) TIGHTDB_UNUSED
 #  define TIGHTDB_JOIN(x,y) TIGHTDB_JOIN2(x,y)
 #  define TIGHTDB_JOIN2(x,y) x ## y
 namespace tightdb {
+namespace util {
     template<bool> struct TIGHTDB_STATIC_ASSERTION_FAILURE;
     template<> struct TIGHTDB_STATIC_ASSERTION_FAILURE<true> {};
     template<int> struct static_assert_dummy {};
 }
+}
 #endif
 
 
-#endif // TIGHTDB_ASSERT_HPP
+#endif // TIGHTDB_UTIL_ASSERT_HPP
