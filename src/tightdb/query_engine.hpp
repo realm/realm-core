@@ -280,7 +280,7 @@ private:
 
 class ParentNode {
 public:
-    ParentNode(): m_is_integer_node(false), m_table(0) {}
+    ParentNode(): m_table(0) {}
 
     void gather_children(std::vector<ParentNode*>& v)
     {
@@ -485,7 +485,6 @@ public:
     TAggregator m_aggregator;
 
     size_t m_condition_column_idx; // Column of search criteria
-    bool m_is_integer_node; // true for IntegerNode, false for any other
 
     size_t m_conds;
     double m_dD; // Average row distance between each local match at current position
@@ -603,39 +602,9 @@ public:
 };
 
 
-// IntegerNode is for conditions for types stored as integers in a tightdb::Array (int, date, bool).
-//
-// We don't yet have any integer indexes (only for strings), but when we get one, we should specialize it
-// like: template <class TConditionValue, class Equal> class IntegerNode: public ParentNode
-template <class TConditionValue, class TConditionFunction> class IntegerNode: public ParentNode {
-public:
-    typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
-
-    // NOTE: Be careful to call Array(no_prealloc_tag) constructors on m_array in the initializer list, otherwise
-    // their default constructors are called which are slow
-    IntegerNode(TConditionValue v, size_t column) : m_value(v), m_array(Array::no_prealloc_tag()), 
-                                                    m_aggregator_specialized(NULL)
-    {
-        m_is_integer_node = true;
-        m_condition_column_idx = column;
-        m_child = 0;
-        m_conds = 0;
-        m_dT = 1.0 / 4.0;
-        m_probes = 0;
-        m_matches = 0;
-    }
-    ~IntegerNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
-
-    void init(const Table& table)
-    {
-        m_dD = 100.0;
-        m_condition_column = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx));
-        m_table = &table;
-        m_leaf_end = 0;
-        if (m_child)
-            m_child->init(table);
-    }
-
+class IntegerNodeBase : public ParentNode
+{
+protected:
     // This function is called from Array::find() for each search result if TAction == act_CallbackIdx
     // in the IntegerNode::aggregate_local() call. Used if aggregate source column is different from search criteria column
     // Return value: false means that the query-state (which consumes matches) has signalled to stop searching, perhaps
@@ -667,6 +636,53 @@ public:
         }
 
         return b;
+    }
+
+    IntegerNodeBase() :  m_array(Array::no_prealloc_tag()) {}
+    size_t m_last_local_match;
+    Array m_array;
+    size_t m_leaf_start;
+    size_t m_leaf_end;
+    size_t m_local_end;
+
+    size_t m_local_matches;
+    size_t m_local_limit;
+
+    QueryStateBase* m_state;
+    SequentialGetterBase* m_source_column; // Column of values used in aggregate (act_FindAll, act_ReturnFirst, act_Sum, etc)
+
+};
+
+// IntegerNode is for conditions for types stored as integers in a tightdb::Array (int, date, bool).
+//
+// We don't yet have any integer indexes (only for strings), but when we get one, we should specialize it
+// like: template <class TConditionValue, class Equal> class IntegerNode: public ParentNode
+template <class TConditionValue, class TConditionFunction> class IntegerNode: public IntegerNodeBase {
+public:
+    typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
+
+    // NOTE: Be careful to call Array(no_prealloc_tag) constructors on m_array in the initializer list, otherwise
+    // their default constructors are called which are slow
+    IntegerNode(TConditionValue v, size_t column) : m_value(v), 
+                                                    m_aggregator_specialized(NULL)
+    {
+        m_condition_column_idx = column;
+        m_child = 0;
+        m_conds = 0;
+        m_dT = 1.0 / 4.0;
+        m_probes = 0;
+        m_matches = 0;
+    }
+    ~IntegerNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+
+    void init(const Table& table)
+    {
+        m_dD = 100.0;
+        m_condition_column = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx));
+        m_table = &table;
+        m_leaf_end = 0;
+        if (m_child)
+            m_child->init(table);
     }
 
     typedef IntegerNode<TConditionValue, TConditionFunction> ThisType;
@@ -768,7 +784,7 @@ public:
             else {
                 m_source_column = source_column;
                 bool cont = m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, null_ptr,
-                             std::bind1st(std::mem_fun(&IntegerNode::template match_callback<TAction, TSourceColumn>), this));
+                             std::bind1st(std::mem_fun(&IntegerNodeBase::template match_callback<TAction, TSourceColumn>), this));
                 if (!cont)
                     return not_found;
             }
@@ -833,18 +849,7 @@ public:
 
 protected:
 
-    size_t m_last_local_match;
     const ColType* m_condition_column;                // Column on which search criteria is applied
-    Array m_array;
-    size_t m_leaf_start;
-    size_t m_leaf_end;
-    size_t m_local_end;
-
-    size_t m_local_matches;
-    size_t m_local_limit;
-
-    QueryStateBase* m_state;
-    SequentialGetterBase* m_source_column; // Column of values used in aggregate (act_FindAll, act_ReturnFirst, act_Sum, etc)
     TAggregator_specialised m_aggregator_specialized;
 };
 
