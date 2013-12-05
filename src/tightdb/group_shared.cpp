@@ -4,7 +4,6 @@
 
 #include <tightdb/config.h>
 #include <tightdb/safe_int_ops.hpp>
-#include <tightdb/terminate.hpp>
 #include <tightdb/thread.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group_shared.hpp>

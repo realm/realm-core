@@ -21,7 +21,6 @@
 #  endif
 #endif
 
-#include <tightdb/assert.hpp>
 #include <tightdb/exceptions.hpp>
 #include <tightdb/safe_int_ops.hpp>
 #include <tightdb/string_buffer.hpp>

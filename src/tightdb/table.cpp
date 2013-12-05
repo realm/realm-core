@@ -18,7 +18,7 @@
 #include <tightdb/column_mixed.hpp>
 #include <tightdb/index_string.hpp>
 
-#include "query_engine.hpp"
+#include <tightdb/query_engine.hpp>
 
 using namespace std;
 using namespace tightdb;

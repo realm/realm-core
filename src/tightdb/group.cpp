@@ -5,7 +5,6 @@
 #include <iomanip>
 #include <fstream>
 
-#include <tightdb/terminate.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
 #include <tightdb/utilities.hpp>
