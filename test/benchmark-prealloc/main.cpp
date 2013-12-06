@@ -2,14 +2,21 @@
 #include <iostream>
 
 #include <tightdb.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/file.hpp>
+
+using namespace std;
+using namespace tightdb;
+using namespace tightdb::util;
+
+
+namespace {
 
 TIGHTDB_TABLE_2(Alpha,
                 foo, Int,
                 bar, Int)
 
-using namespace std;
-using namespace tightdb;
+} // anonymous namespace
+
 
 #define DIR "/tmp"
 

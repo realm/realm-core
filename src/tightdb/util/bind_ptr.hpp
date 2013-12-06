@@ -17,24 +17,25 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_BIND_PTR_HPP
-#define TIGHTDB_BIND_PTR_HPP
+#ifndef TIGHTDB_UTIL_BIND_PTR_HPP
+#define TIGHTDB_UTIL_BIND_PTR_HPP
 
 #include <algorithm>
 #include <ostream>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 
 #ifdef TIGHTDB_HAVE_CXX11_RVALUE_REFERENCE
-#include <utility>
+#  include <utility>
 #endif
 
 #ifdef TIGHTDB_HAVE_CXX11_ATOMIC
-#include <atomic>
+#  include <atomic>
 #endif
 
 
 namespace tightdb {
+namespace util {
 
 /// A generic intrusive smart pointer that binds itself explicitely to
 /// the target object.
@@ -176,6 +177,7 @@ private:
 #endif // TIGHTDB_HAVE_CXX11_ATOMIC
 
 
+} // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_BIND_PTR_HPP
+#endif // TIGHTDB_UTIL_BIND_PTR_HPP

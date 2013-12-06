@@ -22,13 +22,12 @@
 
 #include <utility>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/table_ref.hpp>
 #include <tightdb/spec.hpp>
 #include <tightdb/mixed.hpp>
 #include <tightdb/query.hpp>
-//#include "query_expression.h"
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #endif
@@ -602,7 +601,7 @@ private:
     friend class Group;
     friend class Query;
     friend class ColumnMixed;
-    template<class> friend class bind_ptr;
+    template<class> friend class util::bind_ptr;
     friend class ColumnSubtableParent;
     friend class LangBindHelper;
     friend class TableViewBase;

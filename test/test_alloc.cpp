@@ -4,7 +4,7 @@
 #include <UnitTest++.h>
 
 #include <tightdb/alloc_slab.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/file.hpp>
 
 using namespace tightdb;
 
@@ -62,7 +62,7 @@ TEST(Alloc1)
 
 TEST(Alloc_AttachFile)
 {
-    File::try_remove("test.tightdb");
+    util::File::try_remove("test.tightdb");
 
     {
         SlabAlloc alloc;
@@ -85,17 +85,17 @@ TEST(Alloc_AttachFile)
         CHECK(alloc.is_attached());
     }
 
-    File::remove("test.tightdb");
+    util::File::remove("test.tightdb");
 }
 
 
 TEST(Alloc_BadFile)
 {
-    File::try_remove("test.tightdb");
-    File::try_remove("test2.tightdb");
+    util::File::try_remove("test.tightdb");
+    util::File::try_remove("test2.tightdb");
 
     {
-        File file("test.tightdb", File::mode_Append);
+        util::File file("test.tightdb", util::File::mode_Append);
         file.write("foo");
     }
 
@@ -124,18 +124,18 @@ TEST(Alloc_BadFile)
                                       skip_validate), InvalidDatabase);
     }
 
-    File::remove("test.tightdb");
-    File::remove("test2.tightdb");
+    util::File::remove("test.tightdb");
+    util::File::remove("test2.tightdb");
 }
 
 
 TEST(Alloc_AttachBuffer)
 {
     // Produce a valid buffer
-    UniquePtr<char[]> buffer;
+    util::UniquePtr<char[]> buffer;
     size_t buffer_size;
     {
-        File::try_remove("test.tightdb");
+        util::File::try_remove("test.tightdb");
         {
             SlabAlloc alloc;
             bool is_shared     = false;
@@ -145,13 +145,13 @@ TEST(Alloc_AttachBuffer)
             alloc.attach_file("test.tightdb", is_shared, read_only, no_create, skip_validate);
         }
         {
-            File file("test.tightdb");
+            util::File file("test.tightdb");
             buffer_size = size_t(file.get_size());
             buffer.reset(static_cast<char*>(malloc(buffer_size)));
             CHECK(bool(buffer));
             file.read(buffer.get(), buffer_size);
         }
-        File::remove("test.tightdb");
+        util::File::remove("test.tightdb");
     }
 
     {
@@ -185,7 +185,7 @@ TEST(Alloc_AttachBuffer)
 
 TEST(Alloc_BadBuffer)
 {
-    File::try_remove("test.tightdb");
+    util::File::try_remove("test.tightdb");
 
     // Produce an invalid buffer
     char buffer[32];
@@ -210,7 +210,7 @@ TEST(Alloc_BadBuffer)
         CHECK(!alloc.is_attached());
     }
 
-    File::remove("test.tightdb");
+    util::File::remove("test.tightdb");
 }
 
 #endif // TEST_ALLOC

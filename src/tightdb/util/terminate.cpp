@@ -1,10 +1,11 @@
 #include <iostream>
 
-#include <tightdb/terminate.hpp>
+#include <tightdb/util/terminate.hpp>
 
 using namespace std;
 
 namespace tightdb {
+namespace util {
 
 
 TIGHTDB_NORETURN void terminate(string message, const char* file, long line) TIGHTDB_NOEXCEPT
@@ -14,4 +15,5 @@ TIGHTDB_NORETURN void terminate(string message, const char* file, long line) TIG
 }
 
 
+} // namespace util
 } // namespace tightdb

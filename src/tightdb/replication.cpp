@@ -3,9 +3,9 @@
 #include <ostream>
 #include <iomanip>
 
-#include <tightdb/safe_int_ops.hpp>
-#include <tightdb/string_buffer.hpp>
-#include <tightdb/unique_ptr.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
+#include <tightdb/util/string_buffer.hpp>
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/group_shared.hpp>
 #include <tightdb/replication.hpp>

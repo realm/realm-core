@@ -29,8 +29,8 @@
 #  include <intrin.h>
 #endif
 
-#include <tightdb/assert.hpp>
-#include <tightdb/safe_int_ops.hpp>
+#include <tightdb/util/assert.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
 
 // GCC defines __i386__ and __x86_64__
 #if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
@@ -126,7 +126,7 @@ int fast_popcount64(int64_t x);
 // Safe cast from 64 to 32 bits on 32 bit architecture. Differs from to_ref() by not testing alignment and REF-bitflag.
 inline std::size_t to_size_t(int64_t v) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!int_cast_has_overflow<std::size_t>(v));
+    TIGHTDB_ASSERT(!util::int_cast_has_overflow<std::size_t>(v));
     return std::size_t(v);
 }
 

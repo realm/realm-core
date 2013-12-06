@@ -9,13 +9,13 @@
 #  pragma warning (disable : 4127) // Condition is constant warning
 #endif
 
-#include <tightdb/tuple.hpp>
+#include <tightdb/util/tuple.hpp>
+#include <tightdb/utilities.hpp>
 #include <tightdb/array.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
 #include <tightdb/index_string.hpp>
-#include <tightdb/utilities.hpp>
 
 
 // Header format (8 bytes):
@@ -135,6 +135,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 
 namespace {
@@ -1183,7 +1184,7 @@ size_t Array::count(int64_t value) const
 
 size_t Array::CalcByteLen(size_t count, size_t width) const
 {
-    // FIXME: This arithemtic could overflow. Consider using <tightdb/safe_int_ops.hpp>
+    // FIXME: This arithemtic could overflow. Consider using <tightdb/util/safe_int_ops.hpp>
     size_t bits = count * width;
     size_t bytes = (bits+7) / 8; // round up
     return bytes + header_size; // add room for 8 byte header
@@ -2095,7 +2096,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         TIGHTDB_ASSERT(!int_cast_with_overflow_detect(last_value/2, total_elems));
         TIGHTDB_ASSERT(num_elems == total_elems);
     }
-    return tightdb::tuple(num_elems, 1 + leaf_level_of_children, general_form);
+    return tightdb::util::tuple(num_elems, 1 + leaf_level_of_children, general_form);
 }
 
 } // anonymous namespace

@@ -45,8 +45,9 @@ TIGHTDB_TABLE_7(MainTableType,
                 yearOfDeath, Int,
                 zipCode, String,
                 events, Subtable<SubtableType>)
-                
-TEST(ManyColumnsCrash2) {
+
+TEST(ManyColumnsCrash2)
+{
     // Trying to reproduce Java crash. It currently fails to trigger the bug, though.
     for(int a = 0; a < 10; a++)
     {
@@ -83,7 +84,7 @@ TEST(ManyColumnsCrash2) {
 #if 0
 ONLY(ManyColumnsCrash) {
     // Trying to reproduce crash in Java code. This test has been disabled because it fails to crash, and because a
-    // much simpler Java snippet also makes it crash (see above test). 
+    // much simpler Java snippet also makes it crash (see above test).
     for(int a = 0; a < 100; a++)
     {
 
@@ -1517,7 +1518,7 @@ TEST(Table_Spec)
     }
 
     // Write the group to disk
-    File::try_remove("subtables.tightdb");
+    util::File::try_remove("subtables.tightdb");
     group.write("subtables.tightdb");
 
     // Read back tables
