@@ -358,7 +358,7 @@ Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
 }
 Query& Query::equal(size_t column_ndx, bool value)
 {
-    ParentNode* const p = new IntegerNode<bool, Equal>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, Equal>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }

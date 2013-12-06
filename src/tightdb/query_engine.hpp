@@ -178,14 +178,6 @@ template<> struct ColumnTypeTraits<StringData> {
     static const DataType id = type_String;
 };
 
-// reverse mapping: from DataType to true type.
-template<DataType> struct ColumnTypeMap { };
-template<> struct ColumnTypeMap<type_Int>      { typedef int64_t typ; };
-template<> struct ColumnTypeMap<type_Float>    { typedef int64_t typ; };
-template<> struct ColumnTypeMap<type_Double>   { typedef int64_t typ; };
-template<> struct ColumnTypeMap<type_DateTime> { typedef int64_t typ; };
-template<> struct ColumnTypeMap<type_String>   { typedef int64_t typ; };
-
 // Only purpose is to return 'double' if and only if source column (T) is float and you're doing a sum (A)
 template<class T, Action A> struct ColumnTypeTraitsSum {
     typedef T sum_type;
@@ -358,10 +350,10 @@ public:
     }
 
     typedef bool (ParentNode::* TColumn_action_specialized)(QueryStateBase*, SequentialGetterBase*, size_t);
-    typedef ParentNode ThisType;
     // Only purpose is to make all IntegerNode classes have this function (overloaded only in IntegerNode)
     virtual void aggregate_local_prepare(Action TAction, DataType col_id)
     {
+        typedef ParentNode ThisType;
         if (TAction == act_ReturnFirst)
             m_column_action_specializer = & ThisType::column_action_specialization<act_ReturnFirst, int64_t>;
         
@@ -672,8 +664,7 @@ public:
 
     // NOTE: Be careful to call Array(no_prealloc_tag) constructors on m_array in the initializer list, otherwise
     // their default constructors are called which are slow
-    IntegerNode(TConditionValue v, size_t column) : m_value(v), 
-                                                    m_find_callback_specialized(NULL)
+    IntegerNode(TConditionValue v, size_t column) : m_value(v), m_find_callback_specialized(NULL)
     {
         m_condition_column_idx = column;
     }
@@ -692,7 +683,7 @@ public:
     typedef IntegerNode<TConditionValue, TConditionFunction> ThisType;
     typedef bool (ThisType::* TFind_callback_specialised)(size_t, size_t);
 
-    void aggregate_local_prepare(Action TAction, DataType col_id)
+    virtual void aggregate_local_prepare(Action TAction, DataType col_id)
     {
         m_fastmode_disabled = (col_id == type_Float || col_id == type_Double);
         m_TAction = TAction;
