@@ -6,7 +6,6 @@
 #include <tightdb/config.h>
 #include <tightdb/assert.hpp>
 
-
 namespace tightdb {
 
 

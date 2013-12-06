@@ -171,7 +171,7 @@ inline ref_type Spec::create_empty_spec(Allocator& alloc)
 {
     // The 'spec_set' contains the specification (types and names) of
     // all columns and sub-tables
-    Array spec_set(Array::type_HasRefs, 0, 0, alloc);
+    Array spec_set(Array::type_HasRefs, null_ptr, 0, alloc);
     spec_set.add(Array::create_empty_array(Array::type_Normal, alloc)); // One type for each column
     spec_set.add(ArrayString::create_empty_array(alloc)); // One name for each column
     spec_set.add(ArrayString::create_empty_array(alloc)); // One attr set for each column

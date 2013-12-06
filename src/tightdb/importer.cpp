@@ -70,10 +70,17 @@ const char* DataTypeToText(DataType t) {
 void print_col_names(Table& table) {
     cout << "\n";
     for(size_t t = 0; t < table.get_column_count(); t++) {
-        string s = string(table.get_column_name(t).data()) + " (" + string(DataTypeToText(table.get_column_type(t))) + ")";
+        string s = string(table.get_column_name(t).data());
         s = set_width(s, print_width);
         cout << s.c_str() << " ";
     }
+    cout << "\n";
+    for(size_t t = 0; t < table.get_column_count(); t++) {
+        string s = "Type: " + string(DataTypeToText(table.get_column_type(t)));
+        s = set_width(s, print_width);
+        cout << s.c_str() << " ";
+    }
+
     cout << "\n" << string(table.get_column_count() * (print_width + 1), '-').c_str() << "\n";
 }
 

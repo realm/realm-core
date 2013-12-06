@@ -3,7 +3,6 @@
 #include <ostream>
 #include <iomanip>
 
-#include <tightdb/terminate.hpp>
 #include <tightdb/safe_int_ops.hpp>
 #include <tightdb/string_buffer.hpp>
 #include <tightdb/unique_ptr.hpp>

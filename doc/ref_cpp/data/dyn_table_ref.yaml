@@ -1147,7 +1147,7 @@ CATEGORIES :
       TITLE    : average_*
       NAMES    : [average_int, average_float, average_double]
       SUMMARY  : &g_dyn_table_average_summary
-                 Calculates the average.
+                 Calculate the average value.
       DESCR    : &g_dyn_table_average_descr
                  This method calculates the average value in the specified column.
       CONST    : True

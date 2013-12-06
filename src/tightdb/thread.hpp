@@ -24,7 +24,7 @@
 
 #include <pthread.h>
 #ifdef TIGHTDB_PTHREADS_TEST
-#include <../test/pthread_test.hpp>
+#  include <../test/pthread_test.hpp>
 #endif
 #include <errno.h>
 #include <cstddef>
@@ -227,7 +227,7 @@ public:
     /// Wait for another thread to call notify() or notify_all().
     void wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT;
     template<class Func>
-    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = null_ptr);
+    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
 
     /// If any threads are wating for this condition, wake up at least
     /// one.
@@ -420,9 +420,10 @@ template<class Func>
 inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
     int r;
-    if (tp == null_ptr) {
+    if (!tp) {
         r = pthread_cond_wait(&m_impl, &m.m_impl);
-    } else {
+    }
+    else {
         r = pthread_cond_timedwait(&m_impl, &m.m_impl, tp);
         if (r == ETIMEDOUT)
             return;
@@ -432,7 +433,7 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
 #ifdef TIGHTDB_HAVE_ROBUST_PTHREAD_MUTEX
     if (r == ENOTRECOVERABLE)
         throw NotRecoverable();
-    if (r != EOWNERDEAD) 
+    if (r != EOWNERDEAD)
         lock_failed(r); // does not return
 #endif
     try {
@@ -628,7 +629,7 @@ template<typename T>
 inline T Atomic<T>::load_acquire() const
 {
     T retval;
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     retval = __atomic_load_n(&state, __ATOMIC_ACQUIRE);
 #else
     __sync_synchronize();
@@ -641,7 +642,7 @@ template<typename T>
 inline T Atomic<T>::load_relaxed() const
 {
     T retval;
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     retval = __atomic_load_n(&state, __ATOMIC_RELAXED);
 #else
     if (sizeof(T) >= sizeof(ptrdiff_t)) {
@@ -667,7 +668,7 @@ inline T Atomic<T>::load_relaxed() const
 template<typename T>
 inline T Atomic<T>::load() const
 {
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     T retval = __atomic_load_n(&state, __ATOMIC_SEQ_CST);
 #else
     __sync_synchronize();
@@ -679,7 +680,7 @@ inline T Atomic<T>::load() const
 template<typename T>
 inline void Atomic<T>::store(T value) 
 {
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     __atomic_store_n(&state, value, __ATOMIC_SEQ_CST);
 #else
     if (sizeof(T) >= sizeof(ptrdiff_t)) {
@@ -701,7 +702,7 @@ inline void Atomic<T>::store(T value)
 template<typename T>
 inline void Atomic<T>::store_release(T value) 
 {
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     __atomic_store_n(&state, value, __ATOMIC_RELEASE);
 #else
     // prior to gcc 4.7 we have no portable way of expressing
@@ -713,7 +714,7 @@ inline void Atomic<T>::store_release(T value)
 template<typename T>
 inline void Atomic<T>::store_relaxed(T value) 
 {
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     __atomic_store_n(&state, value, __ATOMIC_RELAXED);
 #else
     // prior to gcc 4.7 we have no portable way of expressing

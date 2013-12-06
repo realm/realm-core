@@ -125,6 +125,37 @@ TEST(Query_NoConditions)
     }
 }
 
+TEST(TestQueryCount) 
+{
+    // Intended to test QueryState::match<pattern = true>(); which is only triggered if:
+    // * Table size is large enough to have SSE-aligned or bithack-aligned rows (this requires
+    //   TIGHTDB_MAX_LIST_SIZE > [some large number]!)
+    // * You're doing a 'count' which is currently the only operation that uses 'pattern', and
+    // * There exists exactly 1 condition (if there is 0 conditions, it will fallback to column::count
+    //   and if there exists > 1 conditions, 'pattern' is currently not supported - but could easily be
+    //   extended to support it)
+
+    for(int j = 0; j < 100; j++) {
+        Table table;
+        table.add_column(type_Int, "i");
+
+        size_t count = 0;
+        size_t rows = rand() % (5 * TIGHTDB_MAX_LIST_SIZE); // to cross some leaf boundaries
+
+        for(int i = 0; i < rows; i++) {
+            table.add_empty_row();
+            int64_t val = rand() % 5;
+            table.set_int(0, i, val);
+            if(val == 2)
+                count++;
+        }
+
+        size_t count2 = table.where().equal(0, 2).count();
+        CHECK_EQUAL(count, count2);
+    }
+
+}
+
 
 TEST(NextGenSyntaxTypedString) 
 {
@@ -392,12 +423,70 @@ TEST(NextGenSyntax)
     delete first2;
 }
 
+TEST(NextGenSyntaxMonkey0)
+{
+    // Intended to test eval() for columns in query_expression.hpp which fetch 8 values at a time. This test varies
+    // table size to test out-of-bounds bugs.
+
+    for(int iter = 1; iter < 100 + TEST_DURATION * 10000; iter++)
+    {
+        const size_t rows = 1 + rand() % (2 * TIGHTDB_MAX_LIST_SIZE);
+        Table table;
+
+        // Two different row types prevents fallback to query_engine (good because we want to test query_expression)
+        table.add_column(type_Int, "first");
+        table.add_column(type_Float, "second");
+        table.add_column(type_String, "third");
+
+        for(size_t r = 0; r < rows; r++) {
+            table.add_empty_row();
+            // using '% iter' tests different bitwidths
+            table.set_int(0, r, rand() % iter);
+            table.set_float(1, r, float(rand() % iter));
+            if(rand() % 2 == 0)
+                table.set_string(2, r, "a");
+            else
+                table.set_string(2, r, "b");
+        }
+
+        size_t tvpos;
+
+        tightdb::Query q = table.column<Int>(0) > table.column<Float>(1) && table.column<String>(2) == "a";
+
+        // without start or limit
+        tightdb::TableView tv = q.find_all();
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(table.get_int(0, r) > table.get_float(1, r) && table.get_string(2, r) == "a") {
+                tvpos++;
+            }
+        }
+        CHECK_EQUAL(tvpos, tv.size());
+
+        tvpos = 0;
+
+        // with start and limit
+        size_t start = rand() % rows;
+        size_t limit = rand() % rows;
+        tv = q.find_all(start, size_t(-1), limit);
+        tvpos = 0;
+        for(size_t r = 0; r < rows; r++) {
+            if(r >= start && tvpos < limit && table.get_int(0, r) > table.get_float(1, r) && table.get_string(2, r) == "a") {
+                tvpos++;
+            }
+        }
+        CHECK_EQUAL(tvpos, tv.size());
+        
+    }
+
+}
+
 TEST(NextGenSyntaxMonkey)
 {
-    for(int iter = 1; iter < 20; iter++)
+    for(int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++)
     {
         // Keep at least '* 20' else some tests will give 0 matches and bad coverage
-        const size_t rows = TIGHTDB_MAX_LIST_SIZE * 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1);
+        const size_t rows = 1 + size_t(rand() * rand()) % (TIGHTDB_MAX_LIST_SIZE * 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
@@ -2307,11 +2396,10 @@ TEST(TestQueryFindAll_Contains2_2)
     CHECK_EQUAL(4, tv2.get_source_ndx(1));
     CHECK_EQUAL(5, tv2.get_source_ndx(2));
 }
-/*
+
 TEST(TestQuery_sum_new_aggregates)
 {
     // test the new ACTION_FIND_PATTERN() method in array
-
     OneIntTable t;
     for (size_t i = 0; i < 1000; i++) {
         t.add(1);
@@ -2324,9 +2412,8 @@ TEST(TestQuery_sum_new_aggregates)
 
     c = t.where().first.greater(2).count();
     CHECK_EQUAL(2000, c);
-
 }
-*/
+
 
 TEST(TestQuery_sum_min_max_avg_foreign_col)
 {

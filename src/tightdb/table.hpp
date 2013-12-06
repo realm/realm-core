@@ -767,7 +767,7 @@ private:
 
 inline ref_type Table::create_empty_table(Allocator& alloc)
 {
-    Array top(Array::type_HasRefs, 0, 0, alloc);
+    Array top(Array::type_HasRefs, null_ptr, 0, alloc);
     top.add(Spec::create_empty_spec(alloc));
     top.add(Array::create_empty_array(Array::type_HasRefs, alloc)); // Columns
     return top.get_ref();
@@ -784,7 +784,7 @@ inline Table::Table(Allocator& alloc):
     m_lookup_index(0)
 {
     ref_type ref = create_empty_table(alloc); // Throws
-    init_from_ref(ref, 0, 0);
+    init_from_ref(ref, null_ptr, 0);
 }
 
 inline Table::Table(const Table& t, Allocator& alloc):
@@ -792,7 +792,7 @@ inline Table::Table(const Table& t, Allocator& alloc):
     m_lookup_index(0)
 {
     ref_type ref = t.clone(alloc); // Throws
-    init_from_ref(ref, 0, 0);
+    init_from_ref(ref, null_ptr, 0);
 }
 
 inline Table::Table(ref_count_tag, Allocator& alloc, ref_type top_ref,
@@ -825,14 +825,14 @@ inline void Table::set_index(std::size_t column_ndx)
 inline TableRef Table::create(Allocator& alloc)
 {
     ref_type ref = create_empty_table(alloc); // Throws
-    Table* table = new Table(ref_count_tag(), alloc, ref, 0, 0); // Throws
+    Table* table = new Table(ref_count_tag(), alloc, ref, null_ptr, 0); // Throws
     return table->get_table_ref();
 }
 
 inline TableRef Table::copy(Allocator& alloc) const
 {
     ref_type ref = clone(alloc); // Throws
-    Table* table = new Table(ref_count_tag(), alloc, ref, 0, 0); // Throws
+    Table* table = new Table(ref_count_tag(), alloc, ref, null_ptr, 0); // Throws
     return table->get_table_ref();
 }
 
