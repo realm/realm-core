@@ -1092,7 +1092,7 @@ EOF
 /src/Makefile
 /src/tightdb.hpp
 /src/tightdb/Makefile
-/src/tightdb/config.sh
+/src/tightdb/util/config.sh
 /src/tightdb/config_tool.cpp
 /test/Makefile
 /test/util/Makefile
