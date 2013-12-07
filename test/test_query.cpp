@@ -2047,7 +2047,7 @@ TEST(Group_GameAnalytics)
 {
     {
         Group g;
-		GATable::Ref t = g.get_table<GATable>("firstevents");
+        GATable::Ref t = g.get_table<GATable>("firstevents");
 
         for (size_t i = 0; i < 100; ++i) {
             const int64_t r1 = rand() % 100;

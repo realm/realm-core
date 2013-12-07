@@ -32,14 +32,14 @@ lower = better
 
 lasses new:
 ---------------------------------------------------
-byte array, random indexing:     	0.359155
-byte array, average direction:  	0.137718
-byte array, always go left:     	0.136732
-byte array, always go right:    	0.138683
-byte array, random indexing:     	0.617178
-32-bit array, average direction:	0.183052
-32-bit array, always go left:   	0.18274
-32-bit array, always go right:  	0.183802
+byte array, random indexing:        0.359155
+byte array, average direction:      0.137718
+byte array, always go left:         0.136732
+byte array, always go right:        0.138683
+byte array, random indexing:        0.617178
+32-bit array, average direction:    0.183052
+32-bit array, always go left:       0.18274
+32-bit array, always go right:      0.183802
 sum: 1.75601
 
 VC:
@@ -57,26 +57,26 @@ sum: 5.359
 
 finns:
 ---------------------------------------------------
-byte array, random indexing:     	0.710238
-byte array, average direction:  	0.189716
-byte array, always go left:     	0.220833
-byte array, always go right:    	0.174699
-byte array, random indexing:     	1.11801
-32-bit array, average direction:	0.325976
-32-bit array, always go left:   	0.322789
-32-bit array, always go right:  	0.282974
+byte array, random indexing:        0.710238
+byte array, average direction:      0.189716
+byte array, always go left:         0.220833
+byte array, always go right:        0.174699
+byte array, random indexing:        1.11801
+32-bit array, average direction:    0.325976
+32-bit array, always go left:       0.322789
+32-bit array, always go right:      0.282974
 sum: 3.01925
 
 old:
 ---------------------------------------------------
-byte array, random indexing:     	0.775043
-byte array, average direction:  	0.219906
-byte array, always go left:     	0.171949
-byte array, always go right:    	0.217915
-byte array, random indexing:     	1.05141
-32-bit array, average direction:	0.312408
-32-bit array, always go left:   	0.271111
-32-bit array, always go right:  	0.31265
+byte array, random indexing:        0.775043
+byte array, average direction:      0.219906
+byte array, always go left:         0.171949
+byte array, always go right:        0.217915
+byte array, random indexing:        1.05141
+32-bit array, average direction:    0.312408
+32-bit array, always go left:       0.271111
+32-bit array, always go right:      0.31265
 sum: 3.01998
 
 VC:
@@ -93,14 +93,14 @@ sum: 9.047
 
 current:
 ---------------------------------------------------
-byte array, random indexing:     	0.596216
-byte array, average direction:  	0.168881
-byte array, always go left:     	0.142262
-byte array, always go right:    	0.260875
-byte array, random indexing:     	1.59705
-32-bit array, average direction:	0.354992
-32-bit array, always go left:   	0.141033
-32-bit array, always go right:  	0.225017
+byte array, random indexing:        0.596216
+byte array, average direction:      0.168881
+byte array, always go left:         0.142262
+byte array, always go right:        0.260875
+byte array, random indexing:        1.59705
+32-bit array, average direction:    0.354992
+32-bit array, always go left:       0.141033
+32-bit array, always go right:      0.225017
 sum: 3.13134
 
 VC:

@@ -8,7 +8,7 @@
 #ifdef _MSC_VER
     #include <intrin.h>
 #else
-	#include <cpuid.h>
+    #include <cpuid.h>
 #endif
 
 
@@ -84,7 +84,7 @@ void cpuid_init()
         avx_support = -1; // No AVX supported
     }
 
-	// 1 is reserved for AVX2 
+    // 1 is reserved for AVX2 
 
 
 #endif

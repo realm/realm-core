@@ -52,7 +52,7 @@
 
 #if defined(TIGHTDB_PTR_64) && defined(TIGHTDB_X86_OR_X64)
     #define TIGHTDB_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
-	#define TIGHTDB_COMPILER_AVX
+    #define TIGHTDB_COMPILER_AVX
 #endif
 
 namespace tightdb {
@@ -87,10 +87,10 @@ template<int version> TIGHTDB_FORCEINLINE bool sseavx()
         return (sse_support >= 0);
     else if (version == 42)
         return (sse_support > 0);   // faster than == 1 (0 requres no immediate operand)
-	else if (version == 1) // avx
-		return (avx_support >= 0);
-	else if (version == 2) // avx2
-		return (avx_support > 0);
+    else if (version == 1) // avx
+        return (avx_support >= 0);
+    else if (version == 2) // avx2
+        return (avx_support > 0);
 
 #else
     return false;
