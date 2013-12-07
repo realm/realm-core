@@ -8,13 +8,14 @@
 
 #include <UnitTest++.h>
 
-#include <tightdb/assert.hpp>
-#include <tightdb/unique_ptr.hpp>
-#include <tightdb/utf8.hpp>
+#include <tightdb/util/assert.hpp>
+#include <tightdb/util/unique_ptr.hpp>
+#include <tightdb/util/utf8.hpp>
 
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 
 namespace {

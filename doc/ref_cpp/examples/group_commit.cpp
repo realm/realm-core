@@ -1,7 +1,7 @@
 // @@Example: ex_cpp_group_commit @@
 // @@Fold@@
 #include <tightdb.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/file.hpp>
 
 using namespace tightdb;
 
@@ -26,7 +26,7 @@ int main()
 {
     Group g("people.tightdb", Group::mode_ReadWrite);
     func(g);
-    File::remove("people.tightdb");
+    util::File::remove("people.tightdb");
 }
 // @@EndFold@@
 // @@EndExample@@

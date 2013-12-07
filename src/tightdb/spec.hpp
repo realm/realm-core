@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_SPEC_HPP
 #define TIGHTDB_SPEC_HPP
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/array.hpp>
 #include <tightdb/array_string.hpp>
 #include <tightdb/data_type.hpp>

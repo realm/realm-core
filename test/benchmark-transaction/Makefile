@@ -1,4 +1,4 @@
-TEST_PROGRAMS = transact
+check_PROGRAMS = transact
 
 transact_SOURCES = transact.cpp
 transact_LDFLAGS = -lsqlite3 -lmysqlclient -lrt

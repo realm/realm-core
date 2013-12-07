@@ -1,6 +1,10 @@
 EXAMPLES := $(wildcard *.cpp)
 
-TEST_PROGRAMS = $(patsubst %.cpp,%,$(EXAMPLES))
+check_PROGRAMS := $(patsubst %.cpp,%,$(EXAMPLES))
+
+PROG_SUFFIX = .example
+
+EXTRA_CLEAN = *.example
 
 define EXAMPLE_PROPS
 $(1)_SOURCES = $(2)

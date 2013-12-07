@@ -5,6 +5,7 @@
  *
  */
 
+#include <iostream>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -16,12 +17,11 @@
 #include <sqlite3.h>
 #include <mysql/mysql.h>
 #include <tightdb.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/file.hpp>
 #include <tightdb/group_shared.hpp>
-#include <iostream>
 
-using namespace tightdb;
 using namespace std;
+using namespace tightdb;
 
 
 // which databases are possible

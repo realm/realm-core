@@ -5,7 +5,7 @@
 #include <fstream>
 #include <sstream>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/table.hpp>
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/column.hpp>
@@ -18,7 +18,7 @@
 #include <tightdb/column_mixed.hpp>
 #include <tightdb/index_string.hpp>
 
-#include "query_engine.hpp"
+#include <tightdb/query_engine.hpp>
 
 using namespace std;
 using namespace tightdb;

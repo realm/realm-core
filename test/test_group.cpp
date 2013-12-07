@@ -7,7 +7,7 @@
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/file.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -37,7 +37,7 @@ TEST(Group_Unattached)
 
 TEST(Group_OpenFile)
 {
-    File::try_remove("test.tightdb");
+    util::File::try_remove("test.tightdb");
 
     {
         Group group((Group::unattached_tag()));
@@ -57,17 +57,17 @@ TEST(Group_OpenFile)
         CHECK(group.is_attached());
     }
 
-    File::remove("test.tightdb");
+    util::File::remove("test.tightdb");
 }
 
 
 TEST(Group_BadFile)
 {
-    File::try_remove("test.tightdb");
-    File::try_remove("test2.tightdb");
+    util::File::try_remove("test.tightdb");
+    util::File::try_remove("test2.tightdb");
 
     {
-        File file("test.tightdb", File::mode_Append);
+        util::File file("test.tightdb", util::File::mode_Append);
         file.write("foo");
     }
 
@@ -85,30 +85,30 @@ TEST(Group_BadFile)
         CHECK(group.is_attached());
     }
 
-    File::remove("test.tightdb");
-    File::remove("test2.tightdb");
+    util::File::remove("test.tightdb");
+    util::File::remove("test2.tightdb");
 }
 
 
 TEST(Group_OpenBuffer)
 {
     // Produce a valid buffer
-    UniquePtr<char[]> buffer;
+    util::UniquePtr<char[]> buffer;
     size_t buffer_size;
     {
-        File::try_remove("test.tightdb");
+        util::File::try_remove("test.tightdb");
         {
             Group group;
             group.write("test.tightdb");
         }
         {
-            File file("test.tightdb");
+            util::File file("test.tightdb");
             buffer_size = size_t(file.get_size());
             buffer.reset(static_cast<char*>(malloc(buffer_size)));
             CHECK(bool(buffer));
             file.read(buffer.get(), buffer_size);
         }
-        File::remove("test.tightdb");
+        util::File::remove("test.tightdb");
     }
 
 
@@ -132,7 +132,7 @@ TEST(Group_OpenBuffer)
 
 TEST(Group_BadBuffer)
 {
-    File::try_remove("test.tightdb");
+    util::File::try_remove("test.tightdb");
 
     // Produce an invalid buffer
     char buffer[32];
@@ -156,7 +156,7 @@ TEST(Group_BadBuffer)
         CHECK(group.is_attached());
     }
 
-    File::remove("test.tightdb");
+    util::File::remove("test.tightdb");
 }
 
 
@@ -247,11 +247,11 @@ TEST(Group_TableAccessorLeftBehind)
 
 TEST(Group_Invalid1)
 {
-    File::try_remove("table_test.tightdb");
+    util::File::try_remove("table_test.tightdb");
 
     // Try to open non-existing file
     // (read-only files have to exists to before opening)
-    CHECK_THROW(Group("table_test.tightdb"), File::NotFound);
+    CHECK_THROW(Group("table_test.tightdb"), util::File::NotFound);
 }
 
 TEST(Group_Invalid2)
@@ -267,26 +267,26 @@ TEST(Group_Invalid2)
 
 TEST(Group_Overwrite)
 {
-    File::try_remove("test_overwrite.tightdb");
+    util::File::try_remove("test_overwrite.tightdb");
     {
         Group g;
         g.write("test_overwrite.tightdb");
-        CHECK_THROW(g.write("test_overwrite.tightdb"), File::Exists);
+        CHECK_THROW(g.write("test_overwrite.tightdb"), util::File::Exists);
     }
     {
         Group g("test_overwrite.tightdb");
-        CHECK_THROW(g.write("test_overwrite.tightdb"), File::Exists);
+        CHECK_THROW(g.write("test_overwrite.tightdb"), util::File::Exists);
     }
     {
         Group g;
-        File::try_remove("test_overwrite.tightdb");
+        util::File::try_remove("test_overwrite.tightdb");
         g.write("test_overwrite.tightdb");
     }
 }
 
 TEST(Group_Serialize0)
 {
-    File::try_remove("table_test.tightdb");
+    util::File::try_remove("table_test.tightdb");
 
     // Create empty group and serialize to disk
     Group to_disk;
@@ -339,7 +339,7 @@ TEST(Group_Serialize1)
 #endif
 
     // Delete old file if there
-    File::try_remove("table_test.tightdb");
+    util::File::try_remove("table_test.tightdb");
 
     // Serialize to disk
     to_disk.write("table_test.tightdb");
@@ -396,7 +396,7 @@ TEST(Group_Serialize2)
 #endif
 
     // Delete old file if there
-    File::try_remove("table_test.tightdb");
+    util::File::try_remove("table_test.tightdb");
 
     // Serialize to disk
     to_disk.write("table_test.tightdb");
@@ -431,7 +431,7 @@ TEST(Group_Serialize3)
 #endif
 
     // Delete old file if there
-    File::try_remove("table_test.tightdb");
+    util::File::try_remove("table_test.tightdb");
 
     // Serialize to disk
     to_disk.write("table_test.tightdb");
@@ -587,7 +587,7 @@ TEST(Group_Serialize_All)
 TEST(Group_Persist)
 {
     // Delete old file if there
-    File::try_remove("testdb.tightdb");
+    util::File::try_remove("testdb.tightdb");
 
     // Create new database
     Group db("testdb.tightdb", Group::mode_ReadWrite);
@@ -742,7 +742,7 @@ TEST(Group_Subtable)
         }
     }
 
-    File::try_remove("subtables.tightdb");
+    util::File::try_remove("subtables.tightdb");
     g.write("subtables.tightdb");
 
     // Read back tables
@@ -836,7 +836,7 @@ TEST(Group_Subtable)
         }
     }
 
-    File::try_remove("subtables2.tightdb");
+    util::File::try_remove("subtables2.tightdb");
     g2.write("subtables2.tightdb");
 
     // Read back tables
@@ -930,7 +930,7 @@ TEST(Group_MultiLevelSubtables)
             }
             b->add_empty_row();
         }
-        File::try_remove("subtables.tightdb");
+        util::File::try_remove("subtables.tightdb");
         g.write("subtables.tightdb");
     }
 
@@ -954,7 +954,7 @@ TEST(Group_MultiLevelSubtables)
         // get a second ref to B (compare)
         CHECK_EQUAL(a->get_subtable(1, 0), b);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661012);
-        File::try_remove("subtables2.tightdb");
+        util::File::try_remove("subtables2.tightdb");
         g.write("subtables2.tightdb");
     }
     {
@@ -974,7 +974,7 @@ TEST(Group_MultiLevelSubtables)
         // Get third ref to B and verify last mod
         b = a->get_subtable(1, 0);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661013);
-        File::try_remove("subtables3.tightdb");
+        util::File::try_remove("subtables3.tightdb");
         g.write("subtables3.tightdb");
     }
 
@@ -998,7 +998,7 @@ TEST(Group_MultiLevelSubtables)
         // get a second ref to B (compare)
         CHECK_EQUAL(a->get_subtable(1, 0), b);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661012);
-        File::try_remove("subtables4.tightdb");
+        util::File::try_remove("subtables4.tightdb");
         g.write("subtables4.tightdb");
     }
     {
@@ -1018,7 +1018,7 @@ TEST(Group_MultiLevelSubtables)
         // Get third ref to B and verify last mod
         b = a->get_subtable(1, 0);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661013);
-        File::try_remove("subtables5.tightdb");
+        util::File::try_remove("subtables5.tightdb");
         g.write("subtables5.tightdb");
     }
 }

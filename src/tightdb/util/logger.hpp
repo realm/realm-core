@@ -24,9 +24,9 @@
 #include <sstream>
 #include <iostream>
 
-#include <tightdb/config.h>
-#include <tightdb/tuple.hpp>
-#include <tightdb/thread.hpp>
+#include <tightdb/util/features.h>
+#include <tightdb/util/tuple.hpp>
+#include <tightdb/util/thread.hpp>
 
 namespace tightdb {
 namespace util {
