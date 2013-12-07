@@ -8,8 +8,8 @@ TIGHTDB_TABLE_1(TestTable,
 
 int main()
 {
-    File::try_remove("test.tightdb");
-    File::try_remove("test.tightdb.lock");
+    util::File::try_remove("test.tightdb");
+    util::File::try_remove("test.tightdb.lock");
 
     // Testing 'async' mode because it has the special requirement of
     // being able to find `tightdbd` (typically in
@@ -29,6 +29,6 @@ int main()
             return 1;
     }
 
-    File::remove("test.tightdb");
-    File::remove("test.tightdb.lock");
+    util::File::remove("test.tightdb");
+    util::File::remove("test.tightdb.lock");
 }
