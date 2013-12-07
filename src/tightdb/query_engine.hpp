@@ -491,7 +491,7 @@ protected:
 };
 
 // Used for performing queries on a Tableview. This is done by simply passing the TableView to this query condition
-// actually it's the Array of the TableView which is passed). TableView must be sorted for Array::FindGTE to work 
+// actually it's the Array of the TableView which is passed). TableView must be sorted for Array::FindGTE to work
 // correctly.
 class ListviewNode: public ParentNode {
 public:
@@ -727,7 +727,7 @@ public:
                 end2 = end - m_leaf_start;
 
             // If there are no other nodes than us (m_conds == 1) AND the column used for our condition is
-            // the same as the column used for the aggregate action, then the entire query can run within scope of that 
+            // the same as the column used for the aggregate action, then the entire query can run within scope of that
             // column only, with no references to other columns:
             if (m_conds == 1 && (source_column == null_ptr ||
                                  (util::SameType<TSourceColumn, int64_t>::value
@@ -1314,8 +1314,8 @@ private:
 // OR node contains 3 Node pointers; m_cond[0], m_cond[1] and m_child
 //
 // For 'second.equal(23).begin_group().first.equal(111).Or().first.equal(222).end_group().third().equal(555)', this
-// will first set m_cond[0] = left-hand-side through constructor, and then later, when .first.equal(222) is invoked, 
-// invocation will set m_cond[1] = right-hand-side through Query& Query::Or() (see query.cpp). In there, m_child is 
+// will first set m_cond[0] = left-hand-side through constructor, and then later, when .first.equal(222) is invoked,
+// invocation will set m_cond[1] = right-hand-side through Query& Query::Or() (see query.cpp). In there, m_child is
 // also set to next AND condition (if any exists) following the OR. So we have following pointers:
 //
 //                        Equal(23)
@@ -1472,11 +1472,11 @@ public:
 #if 0 && defined(TIGHTDB_COMPILER_AVX)
 // AVX has been disabled because of array alignment (see https://app.asana.com/0/search/8836174089724/5763107052506)
 //
-// For AVX you can call things like if (sseavx<1>()) to test for AVX, and then utilize _mm256_movemask_ps (VC) 
+// For AVX you can call things like if (sseavx<1>()) to test for AVX, and then utilize _mm256_movemask_ps (VC)
 // or movemask_cmp_ps (gcc/clang)
 //
 // See https://github.com/rrrlasse/tightdb/tree/AVX for an example of utilizing AVX for a two-column search which has
-// been benchmarked to: floats: 288 ms vs 552 by using AVX compared to 2-level-unrolled FPU loop. doubles: 415 ms vs 
+// been benchmarked to: floats: 288 ms vs 552 by using AVX compared to 2-level-unrolled FPU loop. doubles: 415 ms vs
 // 475 (more bandwidth bound). Tests against SSE have not been performed; AVX may not pay off. Please benchmark
 #endif
 
@@ -1519,14 +1519,14 @@ public:
             delete m_compare, m_compare = null_ptr;
     }
 
-    ExpressionNode(Expression* compare, bool auto_delete) 
+    ExpressionNode(Expression* compare, bool auto_delete)
     {
         m_auto_delete = auto_delete;
         m_child = 0;
         m_compare = compare;
     }
 
-    void init(const Table& table) 
+    void init(const Table& table)
     {
         m_compare->set_table(&table);
         if (m_child)
@@ -1538,7 +1538,7 @@ public:
         size_t res = m_compare->find_first(start, end);
         return res;
     }
-    
+
     bool m_auto_delete;
     Expression* m_compare;
 };

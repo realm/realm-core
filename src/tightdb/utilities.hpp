@@ -175,7 +175,7 @@ public:
     {
         return 0;
     }
-    template<class C, class T> operator T C::*() const 
+    template<class C, class T> operator T C::*() const
     {
         return 0;
     }

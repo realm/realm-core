@@ -125,7 +125,7 @@ TEST(Query_NoConditions)
     }
 }
 
-TEST(TestQueryCount) 
+TEST(TestQueryCount)
 {
     // Intended to test QueryState::match<pattern = true>(); which is only triggered if:
     // * Table size is large enough to have SSE-aligned or bithack-aligned rows (this requires
@@ -157,7 +157,7 @@ TEST(TestQueryCount)
 }
 
 
-TEST(NextGenSyntaxTypedString) 
+TEST(NextGenSyntaxTypedString)
 {
     Books books;
 
@@ -176,11 +176,11 @@ TEST(NextGenSyntaxTypedString)
     // You can also create column objects and use them in expressions:
     Columns<Int> pages = books.column().pages;
     Columns<String> author = books.column().author;
-    match = (pages >= 200 && author == "David Griffiths").find(); 
+    match = (pages >= 200 && author == "David Griffiths").find();
     CHECK_EQUAL(1, match);
 }
 
-TEST(NextGenSyntax) 
+TEST(NextGenSyntax)
 {
     volatile size_t match;
 
@@ -209,13 +209,13 @@ TEST(NextGenSyntax)
     typed.add(20, 19.9f, 3.0, true, "hello");
     typed.add(20, 20.1f, 4.0, false, "world");
 
-    
+
     match = (untyped.column<String>(4) == "world").find();
     CHECK(match == 1);
-    
+
     match = ("world" == untyped.column<String>(4)).find();
     CHECK(match == 1);
-    
+
     match = ("hello" != untyped.column<String>(4)).find();
     CHECK(match == 1);
 
@@ -282,7 +282,7 @@ TEST(NextGenSyntax)
     // Left match 1
 
     match = (untyped.column<float>(1) > 20 || untyped.column<double>(2) > 9.5).find();
-    
+
     CHECK(match == 1);
 
     Query q4 = untyped.column<float>(1) + untyped.column<int64_t>(0) > 40;
@@ -322,22 +322,22 @@ TEST(NextGenSyntax)
     match = q3.find();
 
     match = q2.find();
-    CHECK(match == 0);    
+    CHECK(match == 0);
 
 
     // Typed, direct column addressing
     Query q1 = typed.column().second + typed.column().first > 40;
     match = q1.find();
-    CHECK(match == 1);   
+    CHECK(match == 1);
 
 
     match = (typed.column().first + typed.column().second > 40).find();
-    CHECK(match == 1);   
+    CHECK(match == 1);
 
 
     Query tq1 = typed.column().first + typed.column().second >= typed.column().first + typed.column().second;
     match = tq1.find();
-    CHECK(match == 0);   
+    CHECK(match == 0);
 
 
     // Typed, column objects
@@ -348,65 +348,65 @@ TEST(NextGenSyntax)
     CHECK(match == 1);
 
     match = q1.find();
-    CHECK(match == 1);   
+    CHECK(match == 1);
 
     match = (untyped.column<int64_t>(0) + untyped.column<float>(1) > 40).find();
-    CHECK(match == 1);    
+    CHECK(match == 1);
 
     match = (untyped.column<int64_t>(0) + untyped.column<float>(1) < 40).find();
-    CHECK(match == 0);    
+    CHECK(match == 0);
 
     match = (untyped.column<float>(1) <= untyped.column<int64_t>(0)).find();
-    CHECK(match == 0);    
+    CHECK(match == 0);
 
     match = (untyped.column<int64_t>(0) + untyped.column<float>(1) >= untyped.column<int64_t>(0) + untyped.column<float>(1)).find();
-    CHECK(match == 0);    
+    CHECK(match == 0);
 
     // Untyped, column objects
     Columns<int64_t> u0 = untyped.column<int64_t>(0);
     Columns<float> u1 = untyped.column<float>(1);
 
     match = (u0 + u1 > 40).find();
-    CHECK(match == 1);    
-    
-    
+    CHECK(match == 1);
+
+
     // Flexible language binding style
     Subexpr* first = new Columns<int64_t>(0);
     Subexpr* second = new Columns<float>(1);
     Subexpr* third = new Columns<double>(2);
-    Subexpr* constant = new Value<int64_t>(40);    
-    Subexpr* plus = new Operator<Plus<float> >(*first, *second);  
+    Subexpr* constant = new Value<int64_t>(40);
+    Subexpr* plus = new Operator<Plus<float> >(*first, *second);
     Expression *e = new Compare<Greater, float>(*plus, *constant);
 
 
     // Bind table and do search
     match = untyped.where().expression(e).find();
-    CHECK(match == 1);    
+    CHECK(match == 1);
 
     Query q9 = untyped.where().expression(e);
     match = q9.find();
-    CHECK(match == 1);    
+    CHECK(match == 1);
 
 
     Subexpr* first2 = new Columns<int64_t>(0);
     Subexpr* second2 = new Columns<float>(1);
     Subexpr* third2 = new Columns<double>(2);
-    Subexpr* constant2 = new Value<int64_t>(40);    
-    Subexpr* plus2 = new Operator<Plus<float> >(*first, *second);  
+    Subexpr* constant2 = new Value<int64_t>(40);
+    Subexpr* plus2 = new Operator<Plus<float> >(*first, *second);
     Expression *e2 = new Compare<Greater, float>(*plus, *constant);
 
     match = untyped.where().expression(e).expression(e2).find();
-    CHECK(match == 1);    
+    CHECK(match == 1);
 
     Query q10 = untyped.where().and_query(q9).expression(e2);
     match = q10.find();
-    CHECK(match == 1);    
+    CHECK(match == 1);
 
 
     Query tq3 = tq1;
     match = tq3.find();
-    CHECK(match == 0);   
- 
+    CHECK(match == 0);
+
     delete e;
     delete plus;
     delete constant;
@@ -476,7 +476,7 @@ TEST(NextGenSyntaxMonkey0)
             }
         }
         CHECK_EQUAL(tvpos, tv.size());
-        
+
     }
 
 }
@@ -496,8 +496,8 @@ TEST(NextGenSyntaxMonkey)
             table.add_empty_row();
             // using '% iter' tests different bitwidths
             table.set_int(0, r, rand() % iter);
-            table.set_int(1, r, rand() % iter);        
-            table.set_int(2, r, rand() % iter);        
+            table.set_int(1, r, rand() % iter);
+            table.set_int(2, r, rand() % iter);
         }
 
         size_t tvpos;
@@ -505,7 +505,7 @@ TEST(NextGenSyntaxMonkey)
         // second == 1
         tightdb::Query q1_0 = table.where().equal(1, 1);
         tightdb::Query q2_0 = table.column<int64_t>(1) == 1;
-        tightdb::TableView tv_0 = q2_0.find_all();    
+        tightdb::TableView tv_0 = q2_0.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(1, r) == 1) {
@@ -517,7 +517,7 @@ TEST(NextGenSyntaxMonkey)
 
         // (first == 0 || first == 1) && second == 1
         tightdb::Query q2_1 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 1) && table.column<int64_t>(1) == 1;
-        tightdb::TableView tv_1 = q2_1.find_all();    
+        tightdb::TableView tv_1 = q2_1.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
@@ -528,9 +528,9 @@ TEST(NextGenSyntaxMonkey)
         CHECK_EQUAL(tvpos, tv_1.size());
 
 
-        // first == 0 || (first == 1 && second == 1) 
+        // first == 0 || (first == 1 && second == 1)
         tightdb::Query q2_2 = table.column<int64_t>(0) == 0 || (table.column<int64_t>(0) == 1 && table.column<int64_t>(1) == 1);
-        tightdb::TableView tv_2 = q2_2.find_all();    
+        tightdb::TableView tv_2 = q2_2.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
@@ -543,7 +543,7 @@ TEST(NextGenSyntaxMonkey)
 
         // second == 0 && (first == 0 || first == 2)
         tightdb::Query q4_8 = table.column<int64_t>(1) == 0 && (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2);
-        tightdb::TableView tv_8 = q4_8.find_all();    
+        tightdb::TableView tv_8 = q4_8.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(1, r) == 0 && ((table.get_int(0, r) == 0) || table.get_int(0, r) == 2)) {
@@ -554,9 +554,9 @@ TEST(NextGenSyntaxMonkey)
         CHECK_EQUAL(tvpos, tv_8.size());
 
 
-        // (first == 0 || first == 2) && (first == 1 || second == 1) 
+        // (first == 0 || first == 2) && (first == 1 || second == 1)
         tightdb::Query q3_7 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2) && (table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1);
-        tightdb::TableView tv_7 = q3_7.find_all();    
+        tightdb::TableView tv_7 = q3_7.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) && (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
@@ -567,9 +567,9 @@ TEST(NextGenSyntaxMonkey)
         CHECK_EQUAL(tvpos, tv_7.size());
 
 
-        // (first == 0 || first == 2) || (first == 1 || second == 1) 
+        // (first == 0 || first == 2) || (first == 1 || second == 1)
         tightdb::Query q4_7 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2) || (table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1);
-        tightdb::TableView tv_10 = q4_7.find_all();    
+        tightdb::TableView tv_10 = q4_7.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) || (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
@@ -582,9 +582,9 @@ TEST(NextGenSyntaxMonkey)
 
         TableView tv;
 
-        // first == 0 || first == 2 || first == 1 || second == 1 
+        // first == 0 || first == 2 || first == 1 || second == 1
         tightdb::Query q20 = table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2 || table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1;
-        tv = q20.find_all();    
+        tv = q20.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(0, r) == 0 || table.get_int(0, r) == 2 || table.get_int(0, r) == 1 || table.get_int(1, r) == 1) {
@@ -597,7 +597,7 @@ TEST(NextGenSyntaxMonkey)
 
         // first * 2 > second / 2 + third + 1
         tightdb::Query q21 = table.column<int64_t>(0) * 2 > table.column<int64_t>(1) / 2 + table.column<int64_t>(2) + 1;
-        tv = q21.find_all();    
+        tv = q21.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(0, r) * 2 > table.get_int(1, r) / 2 + table.get_int(2, r) + 1) {
@@ -607,9 +607,9 @@ TEST(NextGenSyntaxMonkey)
         }
         CHECK_EQUAL(tvpos, tv.size());
 
-        // first * 2 > second / 2 + third + 1 + third - third + third - third + third - third + third - third + third - third 
+        // first * 2 > second / 2 + third + 1 + third - third + third - third + third - third + third - third + third - third
         tightdb::Query q22 = table.column<int64_t>(0) * 2 > table.column<int64_t>(1) / 2 + table.column<int64_t>(2) + 1 + table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2);
-        tv = q22.find_all();    
+        tv = q22.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(0, r) * 2 > table.get_int(1, r) / 2 + table.get_int(2, r) + 1) {
@@ -636,7 +636,7 @@ TEST(LimitUntyped)
 
     Query q = table.where();
     int64_t sum;
-    
+
     sum = q.sum_int(0, NULL, 0, -1, 1);
     CHECK_EQUAL(10000, sum);
 
@@ -658,13 +658,13 @@ TEST(MergeQueriesOverloads)
 
     table.add_empty_row(3);
     table.set_int(0, 0, 20);
-    table.set_int(1, 0, 20);        
+    table.set_int(1, 0, 20);
 
     table.set_int(0, 1, 20);
-    table.set_int(1, 1, 30);        
+    table.set_int(1, 1, 30);
 
     table.set_int(0, 2, 30);
-    table.set_int(1, 2, 30);        
+    table.set_int(1, 2, 30);
 
     size_t c;
 
@@ -681,14 +681,14 @@ TEST(MergeQueriesOverloads)
 
     // The overloads must behave such as if each side of the operator is inside parentheses, that is,
     // (first == 1 || first == 20) operator&& (second == 30), regardless of order of operands
-    
+
     // q1_0 && q2_0
     tightdb::Query q1_0 = table.where().equal(0, 10).Or().equal(0, 20);
     tightdb::Query q2_0 = table.where().equal(1, 30);
     tightdb::Query q3_0 = q1_0 && q2_0;
     c = q3_0.count();
     CHECK_EQUAL(1, c);
-    
+
     // q2_0 && q1_0 (reversed operand order)
     tightdb::Query q1_1 = table.where().equal(0, 10).Or().equal(0, 20);
     tightdb::Query q2_1 = table.where().equal(1, 30);
@@ -717,13 +717,13 @@ TEST(MergeQueries)
 
     table.add_empty_row(3);
     table.set_int(0, 0, 10);
-    table.set_int(1, 0, 20);        
+    table.set_int(1, 0, 20);
 
     table.set_int(0, 1, 20);
-    table.set_int(1, 1, 30);        
+    table.set_int(1, 1, 30);
 
     table.set_int(0, 2, 30);
-    table.set_int(1, 2, 20);        
+    table.set_int(1, 2, 20);
 
     // Must evaluate as if and_query is inside paranthesis, that is, (first == 1 || first == 20) && second == 30
     tightdb::Query q1_0 = table.where().equal(0, 10).Or().equal(0, 20);
@@ -750,8 +750,8 @@ TEST(MergeQueriesMonkey)
         for(size_t r = 0; r < rows; r++) {
             table.add_empty_row();
             table.set_int(0, r, rand() % 3);
-            table.set_int(1, r, rand() % 3);        
-            table.set_int(2, r, rand() % 3);        
+            table.set_int(1, r, rand() % 3);
+            table.set_int(2, r, rand() % 3);
         }
 
         size_t tvpos;
@@ -759,7 +759,7 @@ TEST(MergeQueriesMonkey)
         // and_query(second == 1)
         tightdb::Query q1_0 = table.where().equal(1, 1);
         tightdb::Query q2_0 = table.where().and_query(q1_0);
-        tightdb::TableView tv_0 = q2_0.find_all();    
+        tightdb::TableView tv_0 = q2_0.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(1, r) == 1) {
@@ -771,7 +771,7 @@ TEST(MergeQueriesMonkey)
         // (first == 0 || first == 1) && and_query(second == 1)
         tightdb::Query q1_1 = table.where().equal(1, 1);
         tightdb::Query q2_1 = table.where().group().equal(0, 0).Or().equal(0, 1).end_group().and_query(q1_1);
-        tightdb::TableView tv_1 = q2_1.find_all();    
+        tightdb::TableView tv_1 = q2_1.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
@@ -780,10 +780,10 @@ TEST(MergeQueriesMonkey)
             }
         }
 
-        // first == 0 || (first == 1 && and_query(second == 1)) 
+        // first == 0 || (first == 1 && and_query(second == 1))
         tightdb::Query q1_2 = table.where().equal(1, 1);
         tightdb::Query q2_2 = table.where().equal(0, 0).Or().equal(0, 1).and_query(q1_2);
-        tightdb::TableView tv_2 = q2_2.find_all();    
+        tightdb::TableView tv_2 = q2_2.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
@@ -792,10 +792,10 @@ TEST(MergeQueriesMonkey)
             }
         }
 
-        // and_query(first == 0) || (first == 1 && second == 1) 
+        // and_query(first == 0) || (first == 1 && second == 1)
         tightdb::Query q1_3 = table.where().equal(0, 0);
         tightdb::Query q2_3 = table.where().and_query(q1_3).Or().equal(0, 1).equal(1, 1);
-        tightdb::TableView tv_3 = q2_3.find_all();    
+        tightdb::TableView tv_3 = q2_3.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
@@ -805,10 +805,10 @@ TEST(MergeQueriesMonkey)
         }
 
 
-        // first == 0 || and_query(first == 1 && second == 1) 
+        // first == 0 || and_query(first == 1 && second == 1)
         tightdb::Query q2_4 = table.where().equal(0, 1).equal(1, 1);
         tightdb::Query q1_4 = table.where().equal(0, 0).Or().and_query(q2_4);
-        tightdb::TableView tv_4 = q1_4.find_all();    
+        tightdb::TableView tv_4 = q1_4.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
@@ -818,11 +818,11 @@ TEST(MergeQueriesMonkey)
         }
 
 
-        // and_query(first == 0 || first == 2) || and_query(first == 1 && second == 1) 
+        // and_query(first == 0 || first == 2) || and_query(first == 1 && second == 1)
         tightdb::Query q2_5 = table.where().equal(0, 0).Or().equal(0, 2);
         tightdb::Query q1_5 = table.where().equal(0, 1).equal(1, 1);
         tightdb::Query q3_5 = table.where().and_query(q2_5).Or().and_query(q1_5);
-        tightdb::TableView tv_5 = q3_5.find_all();    
+        tightdb::TableView tv_5 = q3_5.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
@@ -836,7 +836,7 @@ TEST(MergeQueriesMonkey)
         tightdb::Query q1_6 = table.where().equal(0, 0);
         tightdb::Query q2_6 = table.where().equal(1, 1);
         tightdb::Query q3_6 = table.where().and_query(q1_6).and_query(q2_6);
-        tightdb::TableView tv_6 = q3_6.find_all();    
+        tightdb::TableView tv_6 = q3_6.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(0, r) == 0 && table.get_int(1, r) == 1) {
@@ -845,11 +845,11 @@ TEST(MergeQueriesMonkey)
             }
         }
 
-        // and_query(first == 0 || first == 2) && and_query(first == 1 || second == 1) 
+        // and_query(first == 0 || first == 2) && and_query(first == 1 || second == 1)
         tightdb::Query q2_7 = table.where().equal(0, 0).Or().equal(0, 2);
         tightdb::Query q1_7 = table.where().equal(0, 1).equal(0, 1).Or().equal(1, 1);
         tightdb::Query q3_7 = table.where().and_query(q2_7).and_query(q1_7);
-        tightdb::TableView tv_7 = q3_7.find_all();    
+        tightdb::TableView tv_7 = q3_7.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) && (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
@@ -863,8 +863,8 @@ TEST(MergeQueriesMonkey)
         // second == 0 && and_query(first == 0 || and_query(first == 2))
         tightdb::Query q2_8 = table.where().equal(0, 2);
         tightdb::Query q3_8 = table.where().equal(0, 0).Or().and_query(q2_8);
-        tightdb::Query q4_8 = table.where().equal(1, 0).and_query(q3_8);    
-        tightdb::TableView tv_8 = q4_8.find_all();    
+        tightdb::Query q4_8 = table.where().equal(1, 0).and_query(q3_8);
+        tightdb::TableView tv_8 = q4_8.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(1, r) == 0 && ((table.get_int(0, r) == 0) || table.get_int(0, r) == 2)) {
@@ -880,8 +880,8 @@ TEST(MergeQueriesMonkey)
         tightdb::Query q2_9 = table.where().equal(0, 2);
         tightdb::Query q5_9 = table.where().equal(0, 0);
         tightdb::Query q3_9 = table.where().and_query(q5_9).Or().and_query(q2_9);
-        tightdb::Query q4_9 = table.where().equal(1, 0).and_query(q3_9);    
-        tightdb::TableView tv_9 = q4_9.find_all();    
+        tightdb::Query q4_9 = table.where().equal(1, 0).and_query(q3_9);
+        tightdb::TableView tv_9 = q4_9.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(1, r) == 0 && ((table.get_int(0, r) == 0) || table.get_int(0, r) == 2)) {
@@ -889,7 +889,7 @@ TEST(MergeQueriesMonkey)
                 tvpos++;
             }
         }
-   
+
 
         // Nested
 
@@ -897,8 +897,8 @@ TEST(MergeQueriesMonkey)
         tightdb::Query q2_10 = table.where().equal(0, 0);
         tightdb::Query q5_10 = table.where().and_query(q2_10);
         tightdb::Query q3_10 = table.where().and_query(q5_10);
-        tightdb::Query q4_10 = table.where().and_query(q3_10);    
-        tightdb::TableView tv_10 = q4_10.find_all();    
+        tightdb::Query q4_10 = table.where().and_query(q3_10);
+        tightdb::TableView tv_10 = q4_10.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(0, r) == 0) {
@@ -929,8 +929,8 @@ TEST(MergeQueriesMonkeyOverloads)
         for(size_t r = 0; r < rows; r++) {
             table.add_empty_row();
             table.set_int(0, r, rand() % 3);
-            table.set_int(1, r, rand() % 3);        
-            table.set_int(2, r, rand() % 3);        
+            table.set_int(1, r, rand() % 3);
+            table.set_int(2, r, rand() % 3);
         }
 
         size_t tvpos;
@@ -939,7 +939,7 @@ TEST(MergeQueriesMonkeyOverloads)
         // and_query(second == 1)
         tightdb::Query q1_0 = table.where().equal(1, 1);
         tightdb::Query q2_0 = table.where() && q1_0;
-        tightdb::TableView tv_0 = q2_0.find_all();    
+        tightdb::TableView tv_0 = q2_0.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(1, r) == 1) {
@@ -952,7 +952,7 @@ TEST(MergeQueriesMonkeyOverloads)
         // and_query(second == 1)
         tightdb::Query q1_10 = table.where().equal(1, 1);
         tightdb::Query q2_10 = q1_10 && table.where();
-        tightdb::TableView tv_10 = q2_10.find_all();    
+        tightdb::TableView tv_10 = q2_10.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(1, r) == 1) {
@@ -968,7 +968,7 @@ TEST(MergeQueriesMonkeyOverloads)
         tightdb::Query q4_1 = table.where().equal(1, 1);
         tightdb::Query q5_1 = q3_1 && q4_1;
 
-        tightdb::TableView tv_1 = q5_1.find_all();    
+        tightdb::TableView tv_1 = q5_1.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
@@ -979,7 +979,7 @@ TEST(MergeQueriesMonkeyOverloads)
 
         // (first == 0 || first == 1) && and_query(second == 1) as above, written in another way
         tightdb::Query q1_20 = table.where().equal(0, 0).Or().equal(0, 1) && table.where().equal(1, 1);
-        tightdb::TableView tv_20 = q1_20.find_all();    
+        tightdb::TableView tv_20 = q1_20.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if((table.get_int(0, r) == 0 || table.get_int(0, r) == 1) && table.get_int(1, r) == 1) {
@@ -988,12 +988,12 @@ TEST(MergeQueriesMonkeyOverloads)
             }
         }
 
-        // and_query(first == 0) || (first == 1 && second == 1) 
+        // and_query(first == 0) || (first == 1 && second == 1)
         tightdb::Query q1_3 = table.where().equal(0, 0);
         tightdb::Query q2_3 = table.where().equal(0, 1);
         tightdb::Query q3_3 = table.where().equal(1, 1);
-        tightdb::Query q4_3 = q1_3 || (q2_3 && q3_3); 
-        tightdb::TableView tv_3 = q4_3.find_all();    
+        tightdb::Query q4_3 = q1_3 || (q2_3 && q3_3);
+        tightdb::TableView tv_3 = q4_3.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
@@ -1006,8 +1006,8 @@ TEST(MergeQueriesMonkeyOverloads)
         // and_query(first == 0) || (first == 1 && second == 1) written in another way
         tightdb::Query q1_30 = table.where().equal(0, 0);
         tightdb::Query q3_30 = table.where().equal(1, 1);
-        tightdb::Query q4_30 = table.where().equal(0, 0) || (table.where().equal(0, 1) && q3_30); 
-        tightdb::TableView tv_30 = q4_30.find_all();    
+        tightdb::Query q4_30 = table.where().equal(0, 0) || (table.where().equal(0, 1) && q3_30);
+        tightdb::TableView tv_30 = q4_30.find_all();
         tvpos = 0;
         for(size_t r = 0; r < rows; r++) {
             if(table.get_int(0, r) == 0 || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
@@ -1056,7 +1056,7 @@ TEST(QueryExpressions0)
 
     left        right
     +           -           *           /          pow
-    Subexpr    Column       Value    
+    Subexpr    Column       Value
     >           <           ==          !=          >=          <=
     float       int         double      int64_t
 
@@ -1082,12 +1082,12 @@ TEST(QueryExpressions0)
     table.set_int(0, 1, 20);
     table.set_float(1, 1, 20.1f);
     table.set_double(2, 1, 4.0);
-   
+
     /**
     Conversion / promotion
     **/
 
-    // 20 must convert to float    
+    // 20 must convert to float
     match = (second + 0.2f > 20).find();
     CHECK(match == 0);
 
@@ -1136,7 +1136,7 @@ TEST(QueryExpressions0)
 
     match = (first * first != 400).find();
     CHECK(match == size_t(-1));
-  
+
     // Compare, left = Column, right = Value
     match = (second >= 20).find();
     CHECK(match == 1);
@@ -1289,7 +1289,7 @@ TEST(LimitUntyped2)
     int64_t sum;
     float sumf;
     double sumd;
-    
+
     // sum, limited by 'limit'
     sum = q.sum_int(0, NULL, 0, -1, 1);
     CHECK_EQUAL(10000, sum);
@@ -1812,7 +1812,7 @@ TEST(TestQueryHuge)
 
 TEST(TestQueryOnTableView)
 {
-    // Mostly intended to test the Array::FindGTE method 
+    // Mostly intended to test the Array::FindGTE method
     for(int iter = 0; iter < 100 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION); iter++) {
         srand(164);
         OneIntTable oti;

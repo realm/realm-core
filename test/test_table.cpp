@@ -99,7 +99,7 @@ ONLY(ManyColumnsCrash) {
             char buf[100];
             sprintf(buf, "CC%d", counter % 1000);
             StringData conceptId = buf;
-            
+
 
             // check if the patient exists
             size_t patient = counter % 100;
@@ -107,7 +107,7 @@ ONLY(ManyColumnsCrash) {
             if(t == -1)
             {
                 // create the event
-#if 1        
+#if 1
                 PatientTableType::Ref table = group->get_table<PatientTableType>("events");
                 table->add(obfuscatedYear, daysSinceLastVisit, conceptId);
 #else
@@ -850,7 +850,7 @@ TEST(Table_test_row_to_string)
     bool test_ok = test_util::equal_without_cr(row_str, expected);
     CHECK_EQUAL(true, test_ok);
     if (!test_ok) {
-        cerr << "row_to_string() failed\n" 
+        cerr << "row_to_string() failed\n"
              << "Expected: " << expected << "\n"
              << "Got     : " << row_str << endl;
     }
@@ -2756,7 +2756,7 @@ TEST(Table_Aggregates)
     CHECK_EQUAL(double(i_sum)/size, table.column().c_int.average());
     CHECK_EQUAL(double(f_sum)/size, table.column().c_float.average());
     // almost_equal because of double/float imprecision
-    CHECK(almost_equal(double(d_sum)/size, table.column().c_double.average()));     
+    CHECK(almost_equal(double(d_sum)/size, table.column().c_double.average()));
 }
 
 namespace {

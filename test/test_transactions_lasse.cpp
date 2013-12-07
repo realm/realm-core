@@ -168,7 +168,7 @@ TEST(Transactions_Stress1)
         for (int i = 0; i < WRITERS1; ++i) {
             bool writer_has_thrown = write_threads[i].join();
             CHECK(!writer_has_thrown);
-        }    
+        }
     }
 
     File::try_remove("database.tightdb");

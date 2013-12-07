@@ -29,7 +29,7 @@ int main()
         PeopleTable::Ref table2 = g2.get_table<PeopleTable>("people");
         cout << table2[2].age << endl;
         free(const_cast<char*>(buffer.data()));
-    } 
+    }
     catch (...) {
         free(const_cast<char*>(buffer.data()));
         throw;

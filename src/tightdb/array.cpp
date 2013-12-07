@@ -407,7 +407,7 @@ void Array::set(size_t ndx, int64_t value)
     // Set the value
     (this->*m_setter)(ndx, value);
 }
- 
+
 /*
 // Optimization for the common case of adding positive values to a local array
 // (happens a lot when returning results to TableViews)
@@ -1462,8 +1462,8 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
 {
     TIGHTDB_ASSERT(ndx < m_size);
 
-    // To make Valgrind happy. Todo, I *think* it should work without, now, but if it reappears, add memset again. 
-    // memset(res, 0, 8*8); 
+    // To make Valgrind happy. Todo, I *think* it should work without, now, but if it reappears, add memset again.
+    // memset(res, 0, 8*8);
 
     if (TIGHTDB_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
         // This method is *multiple* times faster than performing 8 times Get<w>, even if unrolled. Apparently compilers
@@ -1495,10 +1495,10 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
     }
     else {
         size_t i = 0;
-        for(; i + ndx < m_size && i < 8; i++) 
+        for(; i + ndx < m_size && i < 8; i++)
             res[i] = Get<w>(ndx + i);
 
-        for(; i < 8; i++) 
+        for(; i < 8; i++)
             res[i] = 0;
     }
 

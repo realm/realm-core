@@ -116,7 +116,7 @@ sum: 8.876
 
 
 */
-    
+
 // Define OLD, FINN or CURRENT inside the upper_count_int method in Array to benchmark different versions
     double score = 0;
 
@@ -137,8 +137,8 @@ sum: 8.876
         int index_table[1000];
         for (int i=0; i<1000; i++)
             index_table[i] = rand() % limit;
-        
-        best = 9999; //std::numeric_limits<double>::max();    
+
+        best = 9999; //std::numeric_limits<double>::max();
         for(int iter = 0; iter < 10; iter++) {
             t.reset();
             for(int j = 0; j < 100000; j++) {
@@ -152,7 +152,7 @@ sum: 8.876
         cerr << "byte array, random indexing:     \t" << best << "\n";
         score += best;
 
-        best = 9999; //std::numeric_limits<double>::max();    
+        best = 9999; //std::numeric_limits<double>::max();
         for(int iter = 0; iter < 10; iter++) {
             t.reset();
             for(int j = 0; j < 1000000; j++) {
@@ -166,7 +166,7 @@ sum: 8.876
         cerr << "byte array, average direction:  \t" << best << "\n";
         score += best;
 
-        best = 9999; //std::numeric_limits<double>::max();    
+        best = 9999; //std::numeric_limits<double>::max();
         for(int iter = 0; iter < 10; iter++) {
             t.reset();
             for(int j = 0; j < 1000000; j++) {
@@ -180,7 +180,7 @@ sum: 8.876
         cerr << "byte array, always go left:     \t" << best << "\n";
         score += best;
 
-        best = 9999; //std::numeric_limits<double>::max();         
+        best = 9999; //std::numeric_limits<double>::max();
         for(int iter = 0; iter < 10; iter++) {
             t.reset();
             for(int j = 0; j < 1000000; j++) {
@@ -213,7 +213,7 @@ sum: 8.876
         for (int i=0; i<1000; i++)
             index_table[i] = rand() % limit;
 
-        best = 9999; //std::numeric_limits<double>::max();    
+        best = 9999; //std::numeric_limits<double>::max();
         for(int iter = 0; iter < 10; iter++) {
             t.reset();
             for(int j = 0; j < 100000; j++) {
@@ -227,7 +227,7 @@ sum: 8.876
         cerr << "32-bit array, random indexing:     \t" << best << "\n";
         score += best;
 
-        best = 9999; //std::numeric_limits<double>::max();      
+        best = 9999; //std::numeric_limits<double>::max();
         for(int iter = 0; iter < 10; iter++) {
             t.reset();
             for(int j = 0; j < 30000; j++) {
@@ -240,7 +240,7 @@ sum: 8.876
         }
         cerr << "32-bit array, average direction:\t" << best << "\n";
 
-        best = 9999; //std::numeric_limits<double>::max();         
+        best = 9999; //std::numeric_limits<double>::max();
         for(int iter = 0; iter < 10; iter++) {
             t.reset();
             for(int j = 0; j < 30000; j++) {
@@ -254,7 +254,7 @@ sum: 8.876
         cerr << "32-bit array, always go left:   \t" << best << "\n";
         score += best;
 
-        best = 9999; //std::numeric_limits<double>::max();        
+        best = 9999; //std::numeric_limits<double>::max();
         for(int iter = 0; iter < 10; iter++) {
             t.reset();
             for(int j = 0; j < 30000; j++) {

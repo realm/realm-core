@@ -22,12 +22,12 @@
 typedef float __m256 __attribute__((__vector_size__(32), __may_alias__));
 typedef double __m256d __attribute__((__vector_size__(32), __may_alias__));
 
-const int _CMP_EQ_OQ = 0x00; // Equal (ordered, non-signaling) 
+const int _CMP_EQ_OQ = 0x00; // Equal (ordered, non-signaling)
 const int _CMP_NEQ_OQ = 0x0c; // Not-equal (ordered, non-signaling)
-const int _CMP_LT_OQ = 0x11; // Less-than (ordered, non-signaling) 
+const int _CMP_LT_OQ = 0x11; // Less-than (ordered, non-signaling)
 const int _CMP_LE_OQ = 0x12; // Less-than-or-equal (ordered, non-signaling)
-const int _CMP_GE_OQ = 0x1d; // Greater-than-or-equal (ordered, non-signaling)  
-const int _CMP_GT_OQ = 0x1e; // Greater-than (ordered, non-signaling) 
+const int _CMP_GE_OQ = 0x1d; // Greater-than-or-equal (ordered, non-signaling)
+const int _CMP_GT_OQ = 0x1e; // Greater-than (ordered, non-signaling)
 
 
 template <int op> static int movemask_cmp_ps(__m256* y1, __m256* y2)
@@ -92,7 +92,7 @@ static inline int movemask_cmp_pd(__m256d* y1, __m256d* y2, int op)
     return 0;
 }
 
-    
+
 #endif
 
 // Instructions introduced by SSE 3 and 4.2

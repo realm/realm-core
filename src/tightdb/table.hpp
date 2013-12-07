@@ -349,7 +349,7 @@ public:
     Query       where()       { return Query(*this); }
 
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
-    Query where() const { return Query(*this); } 
+    Query where() const { return Query(*this); }
 
     // Optimizing
     void optimize();
@@ -471,7 +471,7 @@ private:
     void destroy_column_accessors() TIGHTDB_NOEXCEPT;
 
     // A degenerate table is a subtable which isn't instantiated in the
-    // database file yet because there has not yet been write-access to 
+    // database file yet because there has not yet been write-access to
     // it. Avoiding instantiation is an optimization to save space, etc.
     bool is_degenerate() const TIGHTDB_NOEXCEPT { return m_columns.m_data == null_ptr; }
 

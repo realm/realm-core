@@ -2234,7 +2234,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         else {
             TIGHTDB_ASSERT(state->m_match_count < state->m_limit);
             size_t process = state->m_limit - state->m_match_count;
-            end2 = end - start > process ? start + process : end;        
+            end2 = end - start > process ? start + process : end;
         }
         if (action == act_Sum || action == act_Max || action == act_Min) {
             int64_t res;

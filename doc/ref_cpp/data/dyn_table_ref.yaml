@@ -408,7 +408,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_add_empty_row_summary
                  Append empty rows.
       DESCR    : &g_dyn_table_add_empty_row_descr
-                 This method adds one or more empty rows at the end of the table. 
+                 This method adds one or more empty rows at the end of the table.
                  The default cell values are 0, null, or "", as appropriate to the column types.
                  The table is required to have at least one column.
       SIGNATURE: |
