@@ -5,12 +5,12 @@ ID        : cpp
 TITLE     : 'C++'
 STATUS:
   CODE    : Beta
-  DESCR   : All the features of TightDB are fully functional and tested and used 
+  DESCR   : All the features of TightDB are fully functional and tested and used
             by some companies in production.
             It is however to be considered beta software, and changes to the API
             based on user feedback should still be expected.
             The latest feature "Asynchroneous" durability in SharedGroup, should
-            still be considered "experimental", due to the limited exposure to 
+            still be considered "experimental", due to the limited exposure to
             customer usage for such a new feature.
 DESCR     : &g_introduction_descr
             >

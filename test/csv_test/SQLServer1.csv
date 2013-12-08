@@ -1,0 +1,3 @@
+Id,Float,Datetime,Nvarchar
+1,123.4567,2011-06-17 01:00:00,"Hello, SQL Server!"
+2,0,,"Hello, Excel!"

@@ -1,46 +1,59 @@
 SUBDIRS = src test
 test_DEPS = src
 
-include src/generic.mk
+PASSIVE_SUBDIRS = doc/ref_cpp/examples
+doc_ref_cpp_examples_DEPS = src
+
+# Continue support for obsolete `test`-based goal names.
+# You should use the new `check`-based names instead.
+test: check
+test-debug: check-debug
+memtest: memcheck
+memtest-debug: memcheck-debug
+
+# Build and run documentation examples
+.PHONY: check-doc-examples
+check-doc-examples: check-debug-norun/subdir/src
+	@$(MAKE) -C doc/ref_cpp/examples check-debug
 
 # Build and run the benchmarking programs
 .PHONY: benchmark
-benchmark: test-norun/subdir/src
+benchmark: check-norun/subdir/src
 	@$(MAKE) -C test benchmark
 
 # Build and run the performance matrix benchmarking program
 .PHONY: performance
-performance: test-norun/subdir/src
+performance: check-norun/subdir/src
 	@$(MAKE) -C test performance
 
 # Build the add/insert benchmarking program
 .PHONY: benchmark-insert-add
-benchmark-insert-add: test-norun/subdir/src
+benchmark-insert-add: check-norun/subdir/src
 	@$(MAKE) -C test benchmark-insert-add
 
 # Build and run the insert/get/set benchmarking program
 .PHONY: benchmark-insert-get-set
-benchmark-insert-get-set: test-norun/subdir/src
+benchmark-insert-get-set: check-norun/subdir/src
 	@$(MAKE) -C test benchmark-insert-get-set
 
 # Build and run the prealloc benchmarking program
 .PHONY: benchmark-prealloc
-benchmark-prealloc: test-norun/subdir/src
+benchmark-prealloc: check-norun/subdir/src
 	@$(MAKE) -C test benchmark-prealloc
 
 # Build the index benchmarking program
 .PHONY: benchmark-index
-benchmark-index: test-norun/subdir/src
+benchmark-index: check-norun/subdir/src
 	@$(MAKE) -C test benchmark-index
 
 # Build the transaction benchmarking program
 .PHONY: benchmark-transaction
-benchmark-transaction: test-norun/subdir/src
+benchmark-transaction: check-norun/subdir/src
 	@$(MAKE) -C test benchmark-transaction
 
 # Run coverage analysis after building everything, this time using LCOV
 .PHONY: lcov
-lcov: test-cover
+lcov: check-cover
 	lcov --capture --directory . --output-file /tmp/tightdb.lcov
 	lcov --extract /tmp/tightdb.lcov '$(abspath .)/src/*' --output-file /tmp/tightdb-clean.lcov
 	rm -fr cover_html
@@ -48,22 +61,15 @@ lcov: test-cover
 
 # Run coverage analysis after building everything, this time using GCOVR
 .PHONY: gcovr
-gcovr: test-cover
+gcovr: check-cover
 	gcovr --filter='.*src/tightdb.*' -x >gcovr.xml
 
 # Build and run whatever is in test/experiements/testcase.cpp
 .PHONY: testcase testcase-debug
-testcase: test-norun/subdir/src
+testcase: check-norun/subdir/src
 	@$(MAKE) -C test testcase
-testcase-debug: test-debug-norun/subdir/src
+testcase-debug: check-debug-norun/subdir/src
 	@$(MAKE) -C test testcase-debug
-
-# Check documentation examples
-.PHONY: check-doc-ex clean-doc-ex
-check-doc-ex: test-debug-norun/subdir/src
-	@$(MAKE) -C doc/ref_cpp/examples test-debug
-clean-doc-ex:
-	@$(MAKE) -C doc/ref_cpp/examples clean
 
 # Used by build.sh
 .PHONY: get-exec-prefix get-includedir get-bindir get-libdir get-libexecdir
@@ -84,3 +90,6 @@ get-cxx:
 	@echo $(CXX)
 get-ld:
 	@echo $(LD)
+
+
+include src/generic.mk

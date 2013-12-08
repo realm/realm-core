@@ -1,5 +1,12 @@
 Idea
 ********************************************************************************************************
+Create ArrayFloat::find() and ArrayDouble::find() that utilize SSE and then create a specialized Node
+template <class Equal, class TConditionFunction> class FloatDoubleNode: public ParentNode
+to integrate it into query system
+
+
+Idea
+********************************************************************************************************
 Move ParentNode::aggregate() to some place outside nodes (maybe into query.cpp?). Because it's confusing design that all nodes have this method and that you can call it on any of them. Scheduling/performance, etc, is exactly the same regardless of which is called. It was just sloppy development.
 
 Idea

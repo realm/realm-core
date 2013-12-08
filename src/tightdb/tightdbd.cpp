@@ -7,7 +7,7 @@
 using namespace tightdb;
 using namespace std;
 
-int main(int argc, char* argv[]) 
+int main(int argc, char* argv[])
 {
 
     // rudimentary check that a database name is provided as parameter.

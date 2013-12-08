@@ -25,10 +25,10 @@
 #include <exception>
 #include <string>
 
-#include <tightdb/meta.hpp>
-#include <tightdb/tuple.hpp>
-#include <tightdb/buffer.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/meta.hpp>
+#include <tightdb/util/tuple.hpp>
+#include <tightdb/util/buffer.hpp>
+#include <tightdb/util/file.hpp>
 #include <tightdb/mixed.hpp>
 
 namespace tightdb {
@@ -183,12 +183,8 @@ public:
     ///
     /// \throw BadTransactLog If the transaction log could not be
     /// successfully parsed, or ended prematurely.
-#ifdef TIGHTDB_DEBUG
     static void apply_transact_log(InputStream& transact_log, Group& target,
                                    std::ostream* apply_log = 0);
-#else
-    static void apply_transact_log(InputStream& transact_log, Group& target);
-#endif
 
     virtual ~Replication() TIGHTDB_NOEXCEPT {}
 
@@ -252,9 +248,6 @@ protected:
     /// Must be called only from do_begin_write_transact(),
     /// do_commit_write_transact(), or do_rollback_write_transact().
     static version_type get_current_version(SharedGroup&) TIGHTDB_NOEXCEPT;
-
-    /// Must be called only from do_begin_write_transact().
-    static void commit_foreign_transact_log(SharedGroup&, version_type new_version);
 
 private:
     struct TransactLogApplier;

@@ -1,4 +1,4 @@
-TEST_PROGRAMS = mkindex
+check_PROGRAMS = mkindex
 
 mkindex_SOURCES = mkindex.cpp
 mkindex_LIBS = ../util/test-util.a

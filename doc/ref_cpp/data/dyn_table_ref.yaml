@@ -408,7 +408,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_add_empty_row_summary
                  Append empty rows.
       DESCR    : &g_dyn_table_add_empty_row_descr
-                 This method adds one or more empty rows at the end of the table. 
+                 This method adds one or more empty rows at the end of the table.
                  The default cell values are 0, null, or "", as appropriate to the column types.
                  The table is required to have at least one column.
       SIGNATURE: |
@@ -1027,21 +1027,24 @@ CATEGORIES :
       DESCR    : &g_dyn_table_count_descr
                  This method counts the number of rows matching a specified value
                  in the specified column.
-                 It is convinient to determine the number briefly compared to using
+                 It is convinient to determine the number briefly, compared to using
                  a {@link class_dyn_query} object.
       SIGNATURE: |
-                 size_t count_int(size_t column_ndx, int64_t target) const;
-                 size_t count_float(size_t column_ndx, float target) const;
-                 size_t count_double(size_t column_ndx, double target) const;
-                 size_t count_string(size_t column_ndx, StringData target) const;
+                 size_t count_int(size_t column_ndx, int64_t value) const;
+                 size_t count_float(size_t column_ndx, float value) const;
+                 size_t count_double(size_t column_ndx, double value) const;
+                 size_t count_string(size_t column_ndx, StringData value) const;
       CONST    : True
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : &g_dyn_table_count_parm1_descr
+        DESCR  :
+        - TEXT : &g_dyn_table_count_parm1_descr0
                  The column index (starting from 0).
-                 The data type in the column must match the type of the <code>target</code> value.
-      - NAME   : target
+        - TEXT : &g_dyn_table_count_parm1_descr1
+                 The data type in the column must match the type of the <code>value</code> value.
+      - NAME   : &g_dyn_table_count_parm2_name
+                 value
         TYPES  : [int64_t, float, double, StringData]
         DESCR  : &g_dyn_table_count_parm2_descr
                  The value to count.
@@ -1059,7 +1062,7 @@ CATEGORIES :
       TITLE    : sum_*
       NAMES    : [sum_int, sum_float, sum_double]
       SUMMARY  : &g_dyn_table_sum_summary
-                 Calculates the sum.
+                 Sum the values in a column.
       DESCR    :
       - TEXT   : &g_dyn_table_sum_descr
                  This method calculates the sum of all values in the specified column.
@@ -1076,7 +1079,7 @@ CATEGORIES :
       - NAME   : column_ndx
         TYPES  : size_t
         DESCR  : &g_dyn_table_sum_parm1_descr
-                 The column index (starting from 0) to summarize.
+                 The index (starting from 0) of the column to sum.
       RETURN:
         TYPES  : [int64_t, double, double]
         DESCR  : &g_dyn_table_sum_return_descr
@@ -1091,9 +1094,9 @@ CATEGORIES :
       TITLE    : maximum_*
       NAMES    : [maximum_int, maximum_float, maximum_double]
       SUMMARY  : &g_dyn_table_maximum_summary
-                 Find highest value.
+                 Find the maximum value.
       DESCR    : &g_dyn_table_maximum_descr
-                 The method finds the highest value in the specified column.
+                 The method finds the maximum value in the specified column.
       SIGNATURE: |
                  int64_t maximum_int(size_t column_ndx) const;
                  float   maximum_float(size_t column_ndx) const;
@@ -1118,9 +1121,9 @@ CATEGORIES :
       TITLE    : minimum_*
       NAMES    : [minimum_int, minimum_float, minimum_double]
       SUMMARY  : &g_dyn_table_minimum_summary
-                 Find lowest value.
+                 Find the minimum value.
       DESCR    : &g_dyn_table_minimum_descr
-                 The method finds the lowest value in the specified column.
+                 The method finds the minimum value in the specified column.
       CONST    : True
       SIGNATURE: |
                  int64_t minimum_int(size_t column_ndx) const;
@@ -1144,7 +1147,7 @@ CATEGORIES :
       TITLE    : average_*
       NAMES    : [average_int, average_float, average_double]
       SUMMARY  : &g_dyn_table_average_summary
-                 Calculates the average.
+                 Calculate the average value.
       DESCR    : &g_dyn_table_average_descr
                  This method calculates the average value in the specified column.
       CONST    : True

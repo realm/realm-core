@@ -23,9 +23,9 @@
 #include <stdint.h>
 #include <cstddef>
 
-#include <tightdb/config.h>
-#include <tightdb/assert.hpp>
-#include <tightdb/safe_int_ops.hpp>
+#include <tightdb/util/features.h>
+#include <tightdb/util/assert.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
 
 namespace tightdb {
 
@@ -37,7 +37,7 @@ typedef std::size_t ref_type;
 
 inline ref_type to_ref(int64_t v) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!int_cast_has_overflow<ref_type>(v));
+    TIGHTDB_ASSERT(!util::int_cast_has_overflow<ref_type>(v));
     // Check that v is divisible by 8 (64-bit aligned).
     TIGHTDB_ASSERT(v % 8 == 0);
     return ref_type(v);

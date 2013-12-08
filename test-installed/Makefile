@@ -1,4 +1,4 @@
-TEST_PROGRAMS = test-installed
+check_PROGRAMS = test-installed
 
 TIGHTDB_INCLUDEDIR    := $(shell tightdb-config     --includedir)
 TIGHTDB_CFLAGS        := $(shell tightdb-config     --cflags)

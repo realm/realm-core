@@ -165,8 +165,8 @@ public:
     Query& Or();
 
     Query& and_query(Query q);
-    Query operator||(Query q); 
-    Query operator&&(Query q); 
+    Query operator||(Query q);
+    Query operator&&(Query q);
 
 
 
@@ -211,7 +211,7 @@ public:
     TableRef& get_table() {return m_table;}
 
     std::string validate();
-   
+
     mutable bool do_delete;
 
 protected:
@@ -276,6 +276,11 @@ private:
     template <Action action, typename T, typename R, class ColClass>
         R aggregate(R (ColClass::*method)(size_t, size_t, size_t) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
+
+    template<Action TAction, class TResult, class TSourceColumn>
+    TResult aggregate_internal(ParentNode* pn, QueryState<TResult>* st,
+                               size_t start, size_t end, size_t agg_col,
+                               size_t* matchcount) const;
 
     friend class Table;
     template <typename T> friend class BasicTable;

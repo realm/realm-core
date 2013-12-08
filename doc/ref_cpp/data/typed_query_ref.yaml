@@ -8,7 +8,7 @@ SUMMARY    : &g_typed_query_intro_summary
              Query your TightDB table.
 DESCR      : &g_typed_query_intro_descr
              >
-             NOTE: The current documentation of Typed Query is under construction, 
+             NOTE: The current documentation of Typed Query is under construction,
              and not completely correct yet.
 
              Query objects are used to build up queries. A query is tied to a
@@ -418,7 +418,7 @@ CATEGORIES :
       PARAMS:
       - NAME   : start
         TYPES  : size_t
-        DESCR: 
+        DESCR:
         - TEXT : &g_typed_query_find_all_parm_1_descr
                  Table row index to start search from (inclusive).
         - TEXT : Default is 0 (start from beginning).
@@ -444,13 +444,13 @@ CATEGORIES :
                  Find first matching row.
       DESCR    : &g_typed_query_find_descr
                  This method will find the first row that fulfils the query condition.
-                 Use the return value + 1 as parameter for successive calls to iterate through 
+                 Use the return value + 1 as parameter for successive calls to iterate through
                  matching rows.
       SIGNATURE: size_t find(size_t begin_at_table_row = 0)
       PARAMS:
       - NAME   : begin_at_table_row
         TYPES  : size_t
-        DESCR: 
+        DESCR:
         - TEXT : &g_typed_query_find_parm_1_descr
                  Table row index to start search from (inclusive).
         - TEXT : Default is 0 (start from beginning).

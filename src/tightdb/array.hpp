@@ -47,10 +47,10 @@ Searching: The main finding function is:
 
 #include <stdint.h> // unint8_t etc
 
-#include <tightdb/meta.hpp>
-#include <tightdb/assert.hpp>
-#include <tightdb/alloc.hpp>
+#include <tightdb/util/meta.hpp>
+#include <tightdb/util/assert.hpp>
 #include <tightdb/utilities.hpp>
+#include <tightdb/alloc.hpp>
 #include <tightdb/string_data.hpp>
 #include <tightdb/query_conditions.hpp>
 
@@ -293,7 +293,7 @@ public:
     /// resource must be allocated in the constructor when, and only
     /// when it is released in the destructor (RAII). Anything else
     /// constitutes a "disaster waiting to happen".
-    explicit Array(Type type = type_Normal, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+    explicit Array(Type type = type_Normal, ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
                    Allocator& = Allocator::get_default());
 
     /// Initialize an array wrapper from the specified memory
@@ -304,7 +304,7 @@ public:
     /// reference. Note that the version taking a MemRef argument is
     /// slightly faster, because it does not need to map the 'ref' to
     /// a memory pointer.
-    explicit Array(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+    explicit Array(ref_type, ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
                    Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
 
     /// Create an array in the unattached state.
@@ -1088,7 +1088,7 @@ public:
             if (action == act_Count) {
                 // If we are close to 'limit' argument in query, we cannot count-up a complete chunk. Count up single
                 // elements instead
-                if(m_match_count + 64 >= m_limit)
+                if (m_match_count + 64 >= m_limit)
                     return false;
 
                 m_state += fast_popcount64(indexpattern);
@@ -1142,7 +1142,8 @@ public:
 
     void init(Action action, Array*, size_t limit)
     {
-        TIGHTDB_STATIC_ASSERT((SameType<R, float>::value || SameType<R, double>::value), "");
+        TIGHTDB_STATIC_ASSERT((util::SameType<R, float>::value ||
+                               util::SameType<R, double>::value), "");
         m_match_count = 0;
         m_limit = limit;
 
@@ -1770,7 +1771,7 @@ template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) c
                 new_refs.add(ref);
             }
             else {
-                Array sub(to_ref(ref), 0, 0, get_alloc());
+                Array sub(to_ref(ref), null_ptr, 0, get_alloc());
                 std::size_t sub_pos = sub.write(out, true, persist);
                 TIGHTDB_ASSERT((sub_pos & 0x7) == 0); // 64bit alignment
                 new_refs.add(sub_pos);
@@ -2067,7 +2068,7 @@ template<Action action, class Callback>
 bool Array::find_action_pattern(size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const
 {
     static_cast<void>(callback);
-    if(action == act_CallbackIdx) {
+    if (action == act_CallbackIdx) {
         // Possible future optimization: call callback(index) like in above find_action(), in a loop for each bit set in 'pattern'
         return false;
     }
@@ -2228,12 +2229,12 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     if (c.will_match(value, m_lbound, m_ubound)) {
         size_t end2;
 
-        if(action == act_CallbackIdx)
+        if (action == act_CallbackIdx)
             end2 = end;
         else {
             TIGHTDB_ASSERT(state->m_match_count < state->m_limit);
             size_t process = state->m_limit - state->m_match_count;
-            end2 = end - start > process ? start + process : end;        
+            end2 = end - start > process ? start + process : end;
         }
         if (action == act_Sum || action == act_Max || action == act_Min) {
             int64_t res;
@@ -2263,8 +2264,8 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     TIGHTDB_ASSERT(m_width != 0);
 
 #if defined(TIGHTDB_COMPILER_SSE)
-    if ((cpuid_sse<42>() &&                                  (end - start >= sizeof (__m128i) && m_width >= 8))
-    ||  (cpuid_sse<30>() && (SameType<cond2, Equal>::value && end - start >= sizeof (__m128i) && m_width >= 8 && m_width < 64))) {
+    if ((sseavx<42>() &&                                        (end - start >= sizeof (__m128i) && m_width >= 8))
+    ||  (sseavx<30>() && (util::SameType<cond2, Equal>::value && end - start >= sizeof (__m128i) && m_width >= 8 && m_width < 64))) {
 
         // FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
         __m128i* const a = reinterpret_cast<__m128i*>(round_up(m_data + start * bitwidth / 8, sizeof (__m128i)));
@@ -2275,11 +2276,11 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
 
         // Search aligned area with SSE
         if (b > a) {
-            if (cpuid_sse<42>()) {
+            if (sseavx<42>()) {
                 if (!FindSSE<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
                     return false;
                 }
-                else if (cpuid_sse<30>()) {
+                else if (sseavx<30>()) {
 
                 if (!FindSSE<Equal, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
                     return false;
@@ -2769,7 +2770,7 @@ bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t 
 {
     cond c;
     TIGHTDB_ASSERT(start <= end);
-    if(start == end)
+    if (start == end)
         return true;
 
 
@@ -2843,7 +2844,7 @@ bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t
 
 
 #if defined(TIGHTDB_COMPILER_SSE)
-    if (cpuid_sse<42>() && width == foreign_width && (width == 8 || width == 16 || width == 32)) {
+    if (sseavx<42>() && width == foreign_width && (width == 8 || width == 16 || width == 32)) {
         // We can only use SSE if both bitwidths are equal and above 8 bits and all values are signed
         while (start < end && (((reinterpret_cast<size_t>(m_data) & 0xf) * 8 + start * width) % (128) != 0)) {
             int64_t v = GetUniversal<width>(m_data, start);

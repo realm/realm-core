@@ -3,7 +3,7 @@
 #include <string>
 #include <iostream>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 
 #define TO_STR(x) TO_STR2(x)
 #define TO_STR2(x) #x
