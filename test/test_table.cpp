@@ -99,11 +99,7 @@ ONLY(ManyColumnsCrash) {
             char buf[100];
             sprintf(buf, "CC%d", counter % 1000);
             StringData conceptId = buf;
-<<<<<<< HEAD
-            
-=======
 
->>>>>>> abf1774a4e47201e63b31f020660c5f60406d9ce
 
             // check if the patient exists
             size_t patient = counter % 100;
@@ -111,11 +107,8 @@ ONLY(ManyColumnsCrash) {
             if(t == -1)
             {
                 // create the event
-<<<<<<< HEAD
-#if 1        
-=======
 #if 1
->>>>>>> abf1774a4e47201e63b31f020660c5f60406d9ce
+
                 PatientTableType::Ref table = group->get_table<PatientTableType>("events");
                 table->add(obfuscatedYear, daysSinceLastVisit, conceptId);
 #else
