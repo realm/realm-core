@@ -8,7 +8,7 @@ SUMMARY    : &g_typed_view_intro_summary
              The TableView class.
 DESCR      : &g_typed_view_intro_descr
              >
-             NOTE: The current documentation of Typed TableView is under construction, 
+             NOTE: The current documentation of Typed TableView is under construction,
              and not completely correct yet.
 
              Queries and searches can return <code>TableView</code>
@@ -430,7 +430,7 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_typed_view_to_json
         DESCR  :
-  
+
   - g_typed_view_to_string:
       NAME     : to_string
       SUMMARY  : &g_typed_view_to_string_summary

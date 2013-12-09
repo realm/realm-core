@@ -8,7 +8,7 @@
 #ifdef _MSC_VER
     #include <intrin.h>
 #else
-	#include <cpuid.h>
+    #include <cpuid.h>
 #endif
 
 
@@ -20,17 +20,17 @@ signed char avx_support = -1;
 #if defined(TIGHTDB_COMPILER_AVX) && defined(__GNUC__)
 #define _XCR_XFEATURE_ENABLED_MASK 0
 
-#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 4 
-static inline unsigned long long _xgetbv(unsigned int index){ 
-  unsigned int eax, edx; 
-  __asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index)); 
-  return ((unsigned long long)edx << 32) | eax; 
-} 
-#else 
+#if __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 4
+static inline unsigned long long _xgetbv(unsigned int index){
+  unsigned int eax, edx;
+  __asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index));
+  return ((unsigned long long)edx << 32) | eax;
+}
+#else
 
-#define _xgetbv() 0 
+#define _xgetbv() 0
 
-#endif 
+#endif
 #endif
 
 void cpuid_init()
@@ -61,12 +61,12 @@ void cpuid_init()
         sse_support = -2;
 
     bool avxSupported = false;
- 
+
 // seems like in jenkins builds, __GNUC__ is defined for clang?! todo fixme
 #if !defined(__clang__) && ((_MSC_FULL_VER >= 160040219) || defined(__GNUC__))
     bool osUsesXSAVE_XRSTORE = cret & (1 << 27) || false;
     bool cpuAVXSuport = cret & (1 << 28) || false;
- 
+
     if (osUsesXSAVE_XRSTORE && cpuAVXSuport)
     {
         // Check if the OS will save the YMM registers
@@ -84,7 +84,7 @@ void cpuid_init()
         avx_support = -1; // No AVX supported
     }
 
-	// 1 is reserved for AVX2 
+    // 1 is reserved for AVX2
 
 
 #endif
@@ -194,7 +194,7 @@ void checksum_rolling(unsigned char* data, size_t len, checksum_t* t)
     return;
 }
 
-// popcount, counts number of set (1) bits in argument. Intrinsics has been disabled because it's just 10-20% faster 
+// popcount, counts number of set (1) bits in argument. Intrinsics has been disabled because it's just 10-20% faster
 // than fallback method, so a runtime-detection of support would be more expensive in total. Popcount is supported
 // with SSE42 but not with SSE3, and we don't want separate builds for each architecture - hence a runtime check would
 // be required.

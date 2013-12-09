@@ -24,8 +24,8 @@
 #include <cstddef>
 #include <utility>
 
-#include <tightdb/meta.hpp>
-#include <tightdb/tuple.hpp>
+#include <tightdb/util/meta.hpp>
+#include <tightdb/util/tuple.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/query.hpp>
 #include <tightdb/table_accessors.hpp>
@@ -90,7 +90,10 @@ public:
 
     Ref copy(Allocator& = Allocator::get_default()) const;
 
-    static int get_column_count() TIGHTDB_NOEXCEPT { return TypeCount<typename Spec::Columns>::value; }
+    static int get_column_count() TIGHTDB_NOEXCEPT
+    {
+        return util::TypeCount<typename Spec::Columns>::value;
+    }
 
     Ref get_table_ref() { return Ref(this); }
 
@@ -98,13 +101,13 @@ public:
 
 private:
     template<int col_idx> struct Col {
-        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
+        typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::ColumnAccessor<BasicTable, col_idx, value_type> type;
     };
     typedef typename Spec::template ColNames<Col, BasicTable*> ColsAccessor;
 
     template<int col_idx> struct ConstCol {
-        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
+        typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::ColumnAccessor<const BasicTable, col_idx, value_type> type;
     };
     typedef typename Spec::template ColNames<ConstCol, const BasicTable*> ConstColsAccessor;
@@ -115,14 +118,14 @@ public:
 
 private:
     template<int col_idx> struct Field {
-        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
+        typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::FieldAccessor<BasicTable, col_idx, value_type, false> type;
     };
     typedef std::pair<BasicTable*, std::size_t> FieldInit;
     typedef typename Spec::template ColNames<Field, FieldInit> RowAccessor;
 
     template<int col_idx> struct ConstField {
-        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
+        typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::FieldAccessor<const BasicTable, col_idx, value_type, true> type;
     };
     typedef std::pair<const BasicTable*, std::size_t> ConstFieldInit;
@@ -167,8 +170,9 @@ public:
 
     RowAccessor add() { return RowAccessor(std::make_pair(this, add_empty_row())); }
 
-    template<class L> void add(const Tuple<L>& tuple)
+    template<class L> void add(const util::Tuple<L>& tuple)
     {
+        using namespace tightdb::util;
         TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
                               "Wrong number of tuple elements");
         ForEachType<Columns, _impl::InsertIntoCol>::exec(static_cast<Table*>(this), size(), tuple);
@@ -177,26 +181,32 @@ public:
 
     void insert(std::size_t i) { insert_empty_row(i); }
 
-    template<class L> void insert(std::size_t i, const Tuple<L>& tuple)
+    template<class L> void insert(std::size_t i, const util::Tuple<L>& tuple)
     {
+        using namespace tightdb::util;
         TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
                               "Wrong number of tuple elements");
         ForEachType<Columns, _impl::InsertIntoCol>::exec(static_cast<Table*>(this), i, tuple);
         insert_done();
     }
 
-    template<class L> void set(std::size_t i, const Tuple<L>& tuple)
+    template<class L> void set(std::size_t i, const util::Tuple<L>& tuple)
     {
+        using namespace tightdb::util;
         TIGHTDB_STATIC_ASSERT(TypeCount<L>::value == TypeCount<Columns>::value,
                               "Wrong number of tuple elements");
         ForEachType<Columns, _impl::AssignIntoCol>::exec(static_cast<Table*>(this), i, tuple);
     }
 
-    using Spec::ConvenienceMethods::add; // FIXME: This probably fails if Spec::ConvenienceMethods has no add().
-    using Spec::ConvenienceMethods::insert; // FIXME: This probably fails if Spec::ConvenienceMethods has no insert().
-    using Spec::ConvenienceMethods::set; // FIXME: This probably fails if Spec::ConvenienceMethods has no set().
+    // FIXME: This probably fails if Spec::ConvenienceMethods has no add().
+    using Spec::ConvenienceMethods::add;
+    // FIXME: This probably fails if Spec::ConvenienceMethods has no insert().
+    using Spec::ConvenienceMethods::insert;
+    // FIXME: This probably fails if Spec::ConvenienceMethods has no set().
+    using Spec::ConvenienceMethods::set;
 
-    typedef RowAccessor Cursor; // FIXME: A cursor must be a distinct class that can be constructed from a RowAccessor
+    // FIXME: A cursor must be a distinct class that can be constructed from a RowAccessor
+    typedef RowAccessor Cursor;
     typedef ConstRowAccessor ConstCursor;
 
 
@@ -249,7 +259,7 @@ public:
 
 private:
     template<int col_idx> struct QueryCol {
-        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
+        typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::QueryColumn<BasicTable, col_idx, value_type> type;
     };
 
@@ -269,6 +279,7 @@ private:
 
     static void set_dynamic_spec(Table& table)
     {
+        using namespace tightdb::util;
         tightdb::Spec& spec = table.get_spec();
         const int num_cols = TypeCount<typename Spec::Columns>::value;
         StringData dyn_col_names[num_cols];
@@ -279,7 +290,8 @@ private:
 
     static bool matches_dynamic_spec(const tightdb::Spec* spec) TIGHTDB_NOEXCEPT
     {
-        const int num_cols = TypeCount<typename Spec::Columns>::value;
+        using namespace tightdb::util;
+        const int num_cols = util::TypeCount<typename Spec::Columns>::value;
         StringData dyn_col_names[num_cols];
         Spec::dyn_col_names(dyn_col_names);
         return !HasType<typename Spec::Columns,
@@ -290,10 +302,10 @@ private:
     // other Specs are also derived from Table.
     template<class> friend class BasicTable;
 
-    // These allow bind_ptr to know that this class is derived from
-    // Table.
-    friend class bind_ptr<BasicTable>;
-    friend class bind_ptr<const BasicTable>;
+    // These allow util::bind_ptr to know that this class is derived
+    // from Table.
+    friend class util::bind_ptr<BasicTable>;
+    friend class util::bind_ptr<const BasicTable>;
 
     // These allow BasicTableRef to refer to RowAccessor and
     // ConstRowAccessor.
@@ -449,6 +461,7 @@ namespace _impl
     template<class Subtab, int col_idx> struct AddCol<SpecBase::Subtable<Subtab>, col_idx> {
         static void exec(Spec* spec, const StringData* col_names)
         {
+            using namespace tightdb::util;
             TIGHTDB_ASSERT(col_idx == spec->get_column_count());
             typedef typename Subtab::Columns Subcolumns;
             Spec subspec = spec->add_subtable_column(col_names[col_idx]);
@@ -484,81 +497,81 @@ namespace _impl
 
     // InsertIntoCol specialization for integers
     template<int col_idx> struct InsertIntoCol<int64_t, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->insert_int(col_idx, row_idx, at<col_idx>(tuple));
+            t->insert_int(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
     // InsertIntoCol specialization for float
     template<int col_idx> struct InsertIntoCol<float, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->insert_float(col_idx, row_idx, at<col_idx>(tuple));
+            t->insert_float(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
     // InsertIntoCol specialization for double
     template<int col_idx> struct InsertIntoCol<double, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->insert_double(col_idx, row_idx, at<col_idx>(tuple));
+            t->insert_double(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
     // InsertIntoCol specialization for booleans
     template<int col_idx> struct InsertIntoCol<bool, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->insert_bool(col_idx, row_idx, at<col_idx>(tuple));
+            t->insert_bool(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
     // InsertIntoCol specialization for strings
     template<int col_idx> struct InsertIntoCol<StringData, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->insert_string(col_idx, row_idx, at<col_idx>(tuple));
+            t->insert_string(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
     // InsertIntoCol specialization for enumerations
     template<class E, int col_idx> struct InsertIntoCol<SpecBase::Enum<E>, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->insert_enum(col_idx, row_idx, at<col_idx>(tuple));
+            t->insert_enum(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
     // InsertIntoCol specialization for dates
     template<int col_idx> struct InsertIntoCol<DateTime, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->insert_datetime(col_idx, row_idx, at<col_idx>(tuple));
+            t->insert_datetime(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
     // InsertIntoCol specialization for binary data
     template<int col_idx> struct InsertIntoCol<BinaryData, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->insert_binary(col_idx, row_idx, at<col_idx>(tuple));
+            t->insert_binary(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
     // InsertIntoCol specialization for subtables
     template<class T, int col_idx> struct InsertIntoCol<SpecBase::Subtable<T>, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            static_cast<const T*>(at<col_idx>(tuple))->insert_into(t, col_idx, row_idx);
+            static_cast<const T*>(util::at<col_idx>(tuple))->insert_into(t, col_idx, row_idx);
         }
     };
 
     // InsertIntoCol specialization for mixed type
     template<int col_idx> struct InsertIntoCol<Mixed, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->insert_mixed(col_idx, row_idx, at<col_idx>(tuple));
+            t->insert_mixed(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
@@ -566,83 +579,84 @@ namespace _impl
 
     // AssignIntoCol specialization for integers
     template<int col_idx> struct AssignIntoCol<int64_t, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->set_int(col_idx, row_idx, at<col_idx>(tuple));
+            t->set_int(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
     // AssignIntoCol specialization for floats
     template<int col_idx> struct AssignIntoCol<float, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->set_float(col_idx, row_idx, at<col_idx>(tuple));
+            t->set_float(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
     // AssignIntoCol specialization for doubles
     template<int col_idx> struct AssignIntoCol<double, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->set_double(col_idx, row_idx, at<col_idx>(tuple));
+            t->set_double(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
     // AssignIntoCol specialization for booleans
     template<int col_idx> struct AssignIntoCol<bool, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->set_bool(col_idx, row_idx, at<col_idx>(tuple));
+            t->set_bool(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
     // AssignIntoCol specialization for strings
     template<int col_idx> struct AssignIntoCol<StringData, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->set_string(col_idx, row_idx, at<col_idx>(tuple));
+            t->set_string(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
     // AssignIntoCol specialization for enumerations
     template<class E, int col_idx> struct AssignIntoCol<SpecBase::Enum<E>, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->set_enum(col_idx, row_idx, at<col_idx>(tuple));
+            t->set_enum(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
     // AssignIntoCol specialization for dates
     template<int col_idx> struct AssignIntoCol<DateTime, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->set_datetime(col_idx, row_idx, at<col_idx>(tuple));
+            t->set_datetime(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
     // AssignIntoCol specialization for binary data
     template<int col_idx> struct AssignIntoCol<BinaryData, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->set_binary(col_idx, row_idx, at<col_idx>(tuple));
+            t->set_binary(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 
     // AssignIntoCol specialization for subtables
     template<class T, int col_idx> struct AssignIntoCol<SpecBase::Subtable<T>, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
             t->clear_subtable(col_idx, row_idx);
-            TIGHTDB_ASSERT(!static_cast<const T*>(at<col_idx>(tuple))); // FIXME: Implement table copy when specified!
+            // FIXME: Implement table copy when specified!
+            TIGHTDB_ASSERT(!static_cast<const T*>(util::at<col_idx>(tuple)));
             static_cast<void>(tuple);
         }
     };
 
     // AssignIntoCol specialization for mixed type
     template<int col_idx> struct AssignIntoCol<Mixed, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, Tuple<L> tuple)
+        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
         {
-            t->set_mixed(col_idx, row_idx, at<col_idx>(tuple));
+            t->set_mixed(col_idx, row_idx, util::at<col_idx>(tuple));
         }
     };
 }

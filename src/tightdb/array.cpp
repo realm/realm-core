@@ -9,13 +9,13 @@
 #  pragma warning (disable : 4127) // Condition is constant warning
 #endif
 
-#include <tightdb/tuple.hpp>
+#include <tightdb/util/tuple.hpp>
+#include <tightdb/utilities.hpp>
 #include <tightdb/array.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
 #include <tightdb/index_string.hpp>
-#include <tightdb/utilities.hpp>
 
 
 // Header format (8 bytes):
@@ -135,6 +135,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 
 namespace {
@@ -406,7 +407,7 @@ void Array::set(size_t ndx, int64_t value)
     // Set the value
     (this->*m_setter)(ndx, value);
 }
- 
+
 /*
 // Optimization for the common case of adding positive values to a local array
 // (happens a lot when returning results to TableViews)
@@ -1183,7 +1184,7 @@ size_t Array::count(int64_t value) const
 
 size_t Array::CalcByteLen(size_t count, size_t width) const
 {
-    // FIXME: This arithemtic could overflow. Consider using <tightdb/safe_int_ops.hpp>
+    // FIXME: This arithemtic could overflow. Consider using <tightdb/util/safe_int_ops.hpp>
     size_t bits = count * width;
     size_t bytes = (bits+7) / 8; // round up
     return bytes + header_size; // add room for 8 byte header
@@ -1461,8 +1462,8 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
 {
     TIGHTDB_ASSERT(ndx < m_size);
 
-    // To make Valgrind happy. Todo, I *think* it should work without, now, but if it reappears, add memset again. 
-    // memset(res, 0, 8*8); 
+    // To make Valgrind happy. Todo, I *think* it should work without, now, but if it reappears, add memset again.
+    // memset(res, 0, 8*8);
 
     if (TIGHTDB_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
         // This method is *multiple* times faster than performing 8 times Get<w>, even if unrolled. Apparently compilers
@@ -1494,10 +1495,10 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
     }
     else {
         size_t i = 0;
-        for(; i + ndx < m_size && i < 8; i++) 
+        for(; i + ndx < m_size && i < 8; i++)
             res[i] = Get<w>(ndx + i);
 
-        for(; i < 8; i++) 
+        for(; i < 8; i++)
             res[i] = 0;
     }
 
@@ -2095,7 +2096,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         TIGHTDB_ASSERT(!int_cast_with_overflow_detect(last_value/2, total_elems));
         TIGHTDB_ASSERT(num_elems == total_elems);
     }
-    return tightdb::tuple(num_elems, 1 + leaf_level_of_children, general_form);
+    return tightdb::util::tuple(num_elems, 1 + leaf_level_of_children, general_form);
 }
 
 } // anonymous namespace

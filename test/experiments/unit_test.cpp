@@ -12,7 +12,7 @@
 #  include <cxxabi.h>
 #endif
 
-#include <tightdb/thread.hpp>
+#include <tightdb/util/thread.hpp>
 
 #include "../util/timer.hpp"
 #include "unit_test.hpp"

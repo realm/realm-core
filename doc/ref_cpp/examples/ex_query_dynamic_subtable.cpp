@@ -9,8 +9,8 @@ using namespace std;
 int main()
 {
 // @@EndFold@@
-    /* 
-    Create following dynamically typed table with below subtables, 
+    /*
+    Create following dynamically typed table with below subtables,
     and then find Names who have at least 1 Score greater than 500
     (Peter and Bob).
 
@@ -25,7 +25,7 @@ int main()
     Bob             223
                     160
                     912
-    
+
     Alice           123
                     111
     */

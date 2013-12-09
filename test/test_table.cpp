@@ -45,8 +45,9 @@ TIGHTDB_TABLE_7(MainTableType,
                 yearOfDeath, Int,
                 zipCode, String,
                 events, Subtable<SubtableType>)
-                
-TEST(ManyColumnsCrash2) {
+
+TEST(ManyColumnsCrash2)
+{
     // Trying to reproduce Java crash. It currently fails to trigger the bug, though.
     for(int a = 0; a < 10; a++)
     {
@@ -83,7 +84,7 @@ TEST(ManyColumnsCrash2) {
 #if 0
 ONLY(ManyColumnsCrash) {
     // Trying to reproduce crash in Java code. This test has been disabled because it fails to crash, and because a
-    // much simpler Java snippet also makes it crash (see above test). 
+    // much simpler Java snippet also makes it crash (see above test).
     for(int a = 0; a < 100; a++)
     {
 
@@ -98,7 +99,11 @@ ONLY(ManyColumnsCrash) {
             char buf[100];
             sprintf(buf, "CC%d", counter % 1000);
             StringData conceptId = buf;
+<<<<<<< HEAD
             
+=======
+
+>>>>>>> abf1774a4e47201e63b31f020660c5f60406d9ce
 
             // check if the patient exists
             size_t patient = counter % 100;
@@ -106,7 +111,11 @@ ONLY(ManyColumnsCrash) {
             if(t == -1)
             {
                 // create the event
+<<<<<<< HEAD
 #if 1        
+=======
+#if 1
+>>>>>>> abf1774a4e47201e63b31f020660c5f60406d9ce
                 PatientTableType::Ref table = group->get_table<PatientTableType>("events");
                 table->add(obfuscatedYear, daysSinceLastVisit, conceptId);
 #else
@@ -849,7 +858,7 @@ TEST(Table_test_row_to_string)
     bool test_ok = test_util::equal_without_cr(row_str, expected);
     CHECK_EQUAL(true, test_ok);
     if (!test_ok) {
-        cerr << "row_to_string() failed\n" 
+        cerr << "row_to_string() failed\n"
              << "Expected: " << expected << "\n"
              << "Got     : " << row_str << endl;
     }
@@ -1517,7 +1526,7 @@ TEST(Table_Spec)
     }
 
     // Write the group to disk
-    File::try_remove("subtables.tightdb");
+    util::File::try_remove("subtables.tightdb");
     group.write("subtables.tightdb");
 
     // Read back tables
@@ -2755,7 +2764,7 @@ TEST(Table_Aggregates)
     CHECK_EQUAL(double(i_sum)/size, table.column().c_int.average());
     CHECK_EQUAL(double(f_sum)/size, table.column().c_float.average());
     // almost_equal because of double/float imprecision
-    CHECK(almost_equal(double(d_sum)/size, table.column().c_double.average()));     
+    CHECK(almost_equal(double(d_sum)/size, table.column().c_double.average()));
 }
 
 namespace {

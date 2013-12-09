@@ -4,10 +4,10 @@
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
-#include <tightdb/file.hpp>
-#include <tightdb/thread.hpp>
-#include <tightdb/bind.hpp>
-#include <tightdb/terminate.hpp>
+#include <tightdb/util/bind.hpp>
+#include <tightdb/util/terminate.hpp>
+#include <tightdb/util/file.hpp>
+#include <tightdb/util/thread.hpp>
 
 #include "testsettings.hpp"
 
@@ -46,8 +46,8 @@ TIGHTDB_TABLE_4(TestTableShared,
 TEST(Shared_no_create_cleanup_lock_file_after_failure)
 {
     // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.lock"); // also the info file
     bool ok = false;
     try {
         SharedGroup sg("test_shared.tightdb", true, SharedGroup::durability_Full);
@@ -55,20 +55,20 @@ TEST(Shared_no_create_cleanup_lock_file_after_failure)
         CHECK(false);
     }
     catch (runtime_error &) {
-        ok = true; 
+        ok = true;
     }
     CHECK(ok);
 
     // Verify no .lock file is left.
-    CHECK( !File::exists("test_shared.tightdb") );
-    CHECK( !File::exists("test_shared.tightdb.lock") );    //     <========= FAILS
+    CHECK( !util::File::exists("test_shared.tightdb") );
+    CHECK( !util::File::exists("test_shared.tightdb.lock") );    //     <========= FAILS
 }
 
 TEST(Shared_no_create_cleanup_lock_file_after_failure_2)
 {
     // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.lock"); // also the info file
     bool ok = false;
     try {
         SharedGroup sg("test_shared.tightdb", true, SharedGroup::durability_Full);
@@ -76,30 +76,30 @@ TEST(Shared_no_create_cleanup_lock_file_after_failure_2)
         CHECK(false);
     }
     catch (runtime_error &) {
-        ok = true; 
+        ok = true;
     }
     CHECK(ok);
 
-    CHECK( !File::exists("test_shared.tightdb") );
-    if (File::exists("test_shared.tightdb.lock") )
+    CHECK( !util::File::exists("test_shared.tightdb") );
+    if (util::File::exists("test_shared.tightdb.lock") )
     {
         try {
             // Let's see if any leftover .lock file is correctly removed or reinitialized
             SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
         }
         catch (runtime_error &) {
-            CHECK(false); 
+            CHECK(false);
         }
     }
-    CHECK( !File::exists("test_shared.tightdb.lock") );
+    CHECK( !util::File::exists("test_shared.tightdb.lock") );
 
 }
 
 TEST(Shared_Initial)
 {
     // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -118,7 +118,7 @@ TEST(Shared_Initial)
     }
 
     // Verify that lock file was deleted after use
-    CHECK(!File::exists("test_shared.tightdb.lock"));
+    CHECK(!util::File::exists("test_shared.tightdb.lock"));
 }
 
 void copy_file(const char* from, const char* to)
@@ -132,8 +132,8 @@ void copy_file(const char* from, const char* to)
 TEST(Shared_Stale_Lock_File_Faked)
 {
     // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.lock"); // also the info file
     bool ok = false;
     {
         // create fake lock file
@@ -156,8 +156,8 @@ TEST(Shared_Stale_Lock_File_Faked)
 TEST(Shared_Stale_Lock_File_Renamed)
 {
     // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // create lock file
@@ -184,15 +184,15 @@ TEST(Shared_Stale_Lock_File_Renamed)
         CHECK(false);
     }
     // lock file should be gone when we get here:
-    CHECK(File::exists("test_shared.tightdb.lock") == false);
+    CHECK(util::File::exists("test_shared.tightdb.lock") == false);
 }
 
 
 TEST(Shared_Initial_Mem)
 {
     // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -211,8 +211,8 @@ TEST(Shared_Initial_Mem)
     }
 
     // Verify that both db and lock file was deleted after use
-    CHECK(!File::exists("test_shared.tightdb"));
-    CHECK(!File::exists("test_shared.tightdb.lock"));
+    CHECK(!util::File::exists("test_shared.tightdb"));
+    CHECK(!util::File::exists("test_shared.tightdb.lock"));
 
 }
 
@@ -220,8 +220,8 @@ TEST(Shared_Initial_Mem)
 TEST(Shared_Initial2)
 {
     // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -261,15 +261,15 @@ TEST(Shared_Initial2)
     }
 
     // Verify that lock file was deleted after use
-    CHECK(!File::exists("test_shared.tightdb.lock"));
+    CHECK(!util::File::exists("test_shared.tightdb.lock"));
 }
 
 
 TEST(Shared_Initial2_Mem)
 {
     // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -309,15 +309,15 @@ TEST(Shared_Initial2_Mem)
     }
 
     // Verify that both db and lock file was deleted after use
-    CHECK(!File::exists("test_shared.tightdb"));
-    CHECK(!File::exists("test_shared.tightdb.lock"));
+    CHECK(!util::File::exists("test_shared.tightdb"));
+    CHECK(!util::File::exists("test_shared.tightdb.lock"));
 }
 
 TEST(Shared1)
 {
     // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -405,14 +405,14 @@ TEST(Shared1)
     }
 
     // Verify that lock file was deleted after use
-    CHECK(!File::exists("test_shared.tightdb.lock"));
+    CHECK(!util::File::exists("test_shared.tightdb.lock"));
 }
 
 TEST(Shared_rollback)
 {
     // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -478,14 +478,14 @@ TEST(Shared_rollback)
     }
 
     // Verify that lock file was deleted after use
-    CHECK(!File::exists("test_shared.tightdb.lock"));
+    CHECK(!util::File::exists("test_shared.tightdb.lock"));
 }
 
 TEST(Shared_Writes)
 {
     // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -520,7 +520,7 @@ TEST(Shared_Writes)
     }
 
     // Verify that lock file was deleted after use
-    CHECK(!File::exists("test_shared.tightdb.lock"));
+    CHECK(!util::File::exists("test_shared.tightdb.lock"));
 }
 
 #if TEST_DURATION > 0
@@ -556,8 +556,8 @@ TEST(Shared_ManyReaders)
     for (int round = 0; round < num_rounds; ++round) {
         int N = rounds[round];
 
-        File::try_remove("test.tightdb");
-        File::try_remove("test.tightdb.lock");
+        util::File::try_remove("test.tightdb");
+        util::File::try_remove("test.tightdb.lock");
 
         SharedGroup root_sg("test.tightdb", false, SharedGroup::durability_MemOnly);
 
@@ -774,8 +774,8 @@ TIGHTDB_TABLE_1(MyTable_SpecialOrder, first,  Int)
 
 TEST(Shared_Writes_SpecialOrder)
 {
-    File::try_remove("test.tightdb");
-    File::try_remove("test.tightdb.lock");
+    util::File::try_remove("test.tightdb");
+    util::File::try_remove("test.tightdb.lock");
 
     SharedGroup sg("test.tightdb");
 
@@ -857,8 +857,8 @@ void increment_entry_thread(size_t row_ndx)
 TEST(Shared_WriterThreads)
 {
     // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -877,7 +877,7 @@ TEST(Shared_WriterThreads)
             wt.commit();
         }
 
-        Thread threads[thread_count];
+        util::Thread threads[thread_count];
 
         // Create all threads
         for (size_t i = 0; i < thread_count; ++i) {
@@ -903,7 +903,7 @@ TEST(Shared_WriterThreads)
     }
 
     // Verify that lock file was deleted after use
-    CHECK(!File::exists("test_shared.tightdb.lock"));
+    CHECK(!util::File::exists("test_shared.tightdb.lock"));
 }
 
 
@@ -919,7 +919,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
     // This test can only be conducted by spawning independent
     // processes which can then be terminated individually.
 
-    File::try_remove("test.tightdb");
+    util::File::try_remove("test.tightdb");
 
     for (int i = 0; i < 10; ++i) {
         pid_t pid = fork();
@@ -972,7 +972,7 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
         CHECK_EQUAL(10, table->get_int(0,0));
     }
 
-    File::remove("test.tightdb");
+    util::File::remove("test.tightdb");
 }
 
 #endif // defined TEST_ROBUSTNESS && defined ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
@@ -980,8 +980,8 @@ TEST(Shared_RobustAgainstDeathDuringWrite)
 
 TEST(Shared_FormerErrorCase1)
 {
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock");
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.lock");
     SharedGroup sg("test_shared.tightdb");
     {
         WriteTransaction wt(sg);
@@ -1138,8 +1138,8 @@ TIGHTDB_TABLE_1(FormerErrorCase2_Table,
 
 TEST(Shared_FormerErrorCase2)
 {
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock");
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.lock");
 
     for (int i=0; i<10; ++i) {
         SharedGroup sg("test_shared.tightdb");
@@ -1179,8 +1179,8 @@ TEST(Shared_SpaceOveruse)
 
     // Many transactions
     {
-        File::try_remove("over_alloc_1.tightdb");
-        File::try_remove("over_alloc_1.tightdb.lock");
+        util::File::try_remove("over_alloc_1.tightdb");
+        util::File::try_remove("over_alloc_1.tightdb.lock");
         SharedGroup sg("over_alloc_1.tightdb");
 
         // Do a lot of sequential transactions
@@ -1216,8 +1216,8 @@ TEST(Shared_SpaceOveruse)
 TEST(Shared_Notifications)
 {
     // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     {
         // Create a new shared db
@@ -1272,8 +1272,8 @@ TEST(Shared_Notifications)
 TEST(Shared_FromSerialized)
 {
     // Delete old files if there
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.lock"); // also the info file
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.lock"); // also the info file
 
     // Create new group and serialize to disk
     {
@@ -1302,8 +1302,8 @@ TEST(Shared_FromSerialized)
 #if TEST_DURATION > 2
 TEST(StringIndex_Bug1)
 {
-    File::try_remove("test.tightdb");
-    File::try_remove("test.tightdb.lock");
+    util::File::try_remove("test.tightdb");
+    util::File::try_remove("test.tightdb.lock");
     SharedGroup db("test.tightdb");
 
     {
@@ -1329,8 +1329,8 @@ TEST(StringIndex_Bug1)
 
 TEST(StringIndex_Bug2)
 {
-    File::try_remove("test.tightdb");
-    File::try_remove("test.tightdb.lock");
+    util::File::try_remove("test.tightdb");
+    util::File::try_remove("test.tightdb.lock");
     SharedGroup sg("test.tightdb");
 
     {
@@ -1360,8 +1360,8 @@ void rand_str(char* res, size_t len) {
 
 TEST(StringIndex_Bug3)
 {
-    File::try_remove("indexbug.tightdb");
-    File::try_remove("indexbug.tightdb.lock");
+    util::File::try_remove("indexbug.tightdb");
+    util::File::try_remove("indexbug.tightdb.lock");
     SharedGroup db("indexbug.tightdb");
 
     {
@@ -1414,8 +1414,8 @@ TEST(StringIndex_Bug3)
 TEST(Shared_Async)
 {
     // Clean up old state
-    File::try_remove("asynctest.tightdb");
-    File::try_remove("asynctest.tightdb.lock");
+    util::File::try_remove("asynctest.tightdb");
+    util::File::try_remove("asynctest.tightdb.lock");
 
     // Do some changes in a async db
     {
@@ -1432,7 +1432,7 @@ TEST(Shared_Async)
     }
 
     // Wait for async_commit process to shutdown
-    while (File::exists("asynctest.tightdb.lock")) {
+    while (util::File::exists("asynctest.tightdb.lock")) {
         sleep(1);
     }
 
@@ -1509,9 +1509,9 @@ void* IncrementEntry(void* arg)
 
 void make_table(size_t rows)
 {
-    File::try_remove("test_shared.tightdb");
-    File::try_remove("test_shared.tightdb.log");
-    File::try_remove("test_alone.tightdb");
+    util::File::try_remove("test_shared.tightdb");
+    util::File::try_remove("test_shared.tightdb.log");
+    util::File::try_remove("test_alone.tightdb");
     // Create first table in group
 #if 1
 #if 0
@@ -1564,7 +1564,7 @@ void make_table(size_t rows)
 #endif
 #endif
     // Wait for async_commit process to shutdown
-    while (File::exists("test_shared.tightdb.lock")) {
+    while (util::File::exists("test_shared.tightdb.lock")) {
         usleep(100);
     }
 #else
@@ -1620,7 +1620,7 @@ void multi_threaded(size_t thread_count, size_t base)
 void validate_and_clear(size_t rows, int result)
 {
     // Wait for async_commit process to shutdown
-    while (File::exists("test_shared.tightdb.lock")) {
+    while (util::File::exists("test_shared.tightdb.lock")) {
         usleep(100);
     }
     // Verify - once more, in sync mode - that the changes were made
@@ -1657,7 +1657,7 @@ void multi_process(int numprocs, size_t numthreads)
 TEST(Shared_Multiprocess)
 {
     // wait for any daemon hanging around to exit
-    File::try_remove("test_shared.tightdb.lock");
+    util::File::try_remove("test_shared.tightdb.lock");
     usleep(100);
 
 #if TEST_DURATION < 1
@@ -1688,7 +1688,7 @@ TEST(Shared_Multiprocess)
 
 TEST(Shared_MixedWithNonShared)
 {
-    File::try_remove("test.tightdb");
+    util::File::try_remove("test.tightdb");
     {
         // Create empty file without free-space tracking
         Group g;
@@ -1701,7 +1701,7 @@ TEST(Shared_MixedWithNonShared)
         g.commit();
     }
 
-    File::try_remove("test.tightdb");
+    util::File::try_remove("test.tightdb");
     {
         // Create non-empty file without free-space tracking
         Group g;
@@ -1715,7 +1715,7 @@ TEST(Shared_MixedWithNonShared)
         g.commit();
     }
 
-    File::try_remove("test.tightdb");
+    util::File::try_remove("test.tightdb");
     {
         // Create empty file without free-space tracking
         Group g;
@@ -1737,7 +1737,7 @@ TEST(Shared_MixedWithNonShared)
         }
     }
 
-    File::try_remove("test.tightdb");
+    util::File::try_remove("test.tightdb");
     {
         // Create non-empty file without free-space tracking
         Group g;
@@ -1803,32 +1803,32 @@ TEST(Shared_MixedWithNonShared)
             CHECK(rt.has_table("baz"));
         }
     }
-    File::remove("test.tightdb");
+    util::File::remove("test.tightdb");
 }
 
 
 TEST(GroupShared_MultipleRollbacks)
 {
-    File::try_remove("test.tightdb");
+    util::File::try_remove("test.tightdb");
     {
         SharedGroup sg("test.tightdb");
         sg.begin_write();
         sg.rollback();
         sg.rollback();
     }
-    File::remove("test.tightdb");
+    util::File::remove("test.tightdb");
 }
 
 TEST(GroupShared_MultipleEndReads)
 {
-    File::try_remove("test.tightdb");
+    util::File::try_remove("test.tightdb");
     {
         SharedGroup sg("test.tightdb");
         sg.begin_read();
         sg.end_read();
         sg.end_read();
     }
-    File::remove("test.tightdb");
+    util::File::remove("test.tightdb");
 }
 
 
@@ -1836,26 +1836,26 @@ TEST(GroupShared_ReserveDiskSpace)
 {
     // SharedGroup::reserve() has no effect unless file preallocation
     // is supported.
-    if (!File::is_prealloc_supported())
+    if (!util::File::is_prealloc_supported())
         return;
 
-    File::try_remove("test.tightdb");
+    util::File::try_remove("test.tightdb");
     {
         SharedGroup sg("test.tightdb");
-        size_t orig_file_size = size_t(File("test.tightdb").get_size());
+        size_t orig_file_size = size_t(util::File("test.tightdb").get_size());
 
         // Check that reserve() does not change the file size if the
         // specified size is less than the actual file size.
         size_t reserve_size_1 = orig_file_size / 2;
         sg.reserve(reserve_size_1);
-        size_t new_file_size_1 = size_t(File("test.tightdb").get_size());
+        size_t new_file_size_1 = size_t(util::File("test.tightdb").get_size());
         CHECK_EQUAL(orig_file_size, new_file_size_1);
 
         // Check that reserve() does not change the file size if the
         // specified size is equal to the actual file size.
         size_t reserve_size_2 = orig_file_size;
         sg.reserve(reserve_size_2);
-        size_t new_file_size_2 = size_t(File("test.tightdb").get_size());
+        size_t new_file_size_2 = size_t(util::File("test.tightdb").get_size());
         CHECK_EQUAL(orig_file_size, new_file_size_2);
 
         // Check that reserve() does change the file size if the
@@ -1863,7 +1863,7 @@ TEST(GroupShared_ReserveDiskSpace)
         // that the new size is at least as big as the requested size.
         size_t reserve_size_3 = orig_file_size + 1;
         sg.reserve(reserve_size_3);
-        size_t new_file_size_3 = size_t(File("test.tightdb").get_size());
+        size_t new_file_size_3 = size_t(util::File("test.tightdb").get_size());
         CHECK(new_file_size_3 >= reserve_size_3);
 
         // Check that disk space reservation is independent of transactions
@@ -1873,25 +1873,25 @@ TEST(GroupShared_ReserveDiskSpace)
             wt.get_table<TestTableShared>("table_1")->add_empty_row(2000);
             wt.commit();
         }
-        orig_file_size = size_t(File("test.tightdb").get_size());
+        orig_file_size = size_t(util::File("test.tightdb").get_size());
         size_t reserve_size_4 = 2 * orig_file_size + 1;
         sg.reserve(reserve_size_4);
-        size_t new_file_size_4 = size_t(File("test.tightdb").get_size());
+        size_t new_file_size_4 = size_t(util::File("test.tightdb").get_size());
         CHECK(new_file_size_4 >= reserve_size_4);
         WriteTransaction wt(sg);
         wt.get_group().Verify();
         wt.get_table<TestTableShared>("table_2")->add_empty_row(2000);
-        orig_file_size = size_t(File("test.tightdb").get_size());
+        orig_file_size = size_t(util::File("test.tightdb").get_size());
         size_t reserve_size_5 = orig_file_size + 333;
         sg.reserve(reserve_size_5);
-        size_t new_file_size_5 = size_t(File("test.tightdb").get_size());
+        size_t new_file_size_5 = size_t(util::File("test.tightdb").get_size());
         CHECK(new_file_size_5 >= reserve_size_5);
         wt.get_table<TestTableShared>("table_3")->add_empty_row(2000);
         wt.commit();
-        orig_file_size = size_t(File("test.tightdb").get_size());
+        orig_file_size = size_t(util::File("test.tightdb").get_size());
         size_t reserve_size_6 = orig_file_size + 459;
         sg.reserve(reserve_size_6);
-        size_t new_file_size_6 = size_t(File("test.tightdb").get_size());
+        size_t new_file_size_6 = size_t(util::File("test.tightdb").get_size());
         CHECK(new_file_size_6 >= reserve_size_6);
         {
             WriteTransaction wt(sg);
@@ -1899,7 +1899,7 @@ TEST(GroupShared_ReserveDiskSpace)
             wt.commit();
         }
     }
-    File::remove("test.tightdb");
+    util::File::remove("test.tightdb");
 }
 
 #endif // TEST_SHARED

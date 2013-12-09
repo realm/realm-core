@@ -413,7 +413,7 @@ EOF
         auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
         # FIXME: Apparently, there are fluke cases where timestamps
-        # are such that src/tightdb/build_config.h is not recreated
+        # are such that <src/tightdb/util/config.h> is not recreated
         # automatically by src/tightdb/Makfile. Using --always-make is
         # a work-around.
         TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE --always-make -C "src/tightdb" "tightdb-config" "tightdb-config-dbg" || exit 1
@@ -1092,7 +1092,7 @@ EOF
 /src/Makefile
 /src/tightdb.hpp
 /src/tightdb/Makefile
-/src/tightdb/config.sh
+/src/tightdb/util/config.sh
 /src/tightdb/config_tool.cpp
 /test/Makefile
 /test/util/Makefile

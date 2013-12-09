@@ -162,7 +162,7 @@ class ConstTableView;
 /// makes a proper copy. Copying a temporary TableView is optimized
 /// away on all modern compilers due to such things as 'return value
 /// optimization'. Move semantics is accessed using the move()
-/// function. 
+/// function.
 ///
 /// You should use 'return tv' whenever the type of 'tv' matches the
 /// return type in the function signature exactly, such as
@@ -171,12 +171,12 @@ class ConstTableView;
 /// respectively.
 ///
 /// You should use 'return move(tv)' whenever the type of 'tv' mismatch
-/// the signature (where 'tv' needs conversion to return type), such as 
+/// the signature (where 'tv' needs conversion to return type), such as
 /// ´ConstTableView fun() {TableView tv; return move(tv);}´ to enable
 /// move-semantics.
 ///
-/// Avoid return(tv) whenever possible because it inhibits rvo and nrvo. 
-/// ´return tv´ has been benchmarked to be slower than ´return move(tv)´ 
+/// Avoid return(tv) whenever possible because it inhibits rvo and nrvo.
+/// ´return tv´ has been benchmarked to be slower than ´return move(tv)´
 /// for both VC2012 and GCC 4.7 in many cases but never the opposite.
 //
 /// Note that move(tv) removes the contents from tv and leaves it
@@ -306,7 +306,7 @@ inline TableViewBase::~TableViewBase() TIGHTDB_NOEXCEPT
 {
     m_refs.destroy();
 }
- 
+
 inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
     m_table(tv->m_table),
     m_refs(tv->m_refs) // Note: This is a moving copy

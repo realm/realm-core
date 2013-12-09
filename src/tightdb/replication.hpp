@@ -25,10 +25,10 @@
 #include <exception>
 #include <string>
 
-#include <tightdb/meta.hpp>
-#include <tightdb/tuple.hpp>
-#include <tightdb/buffer.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/meta.hpp>
+#include <tightdb/util/tuple.hpp>
+#include <tightdb/util/buffer.hpp>
+#include <tightdb/util/file.hpp>
 #include <tightdb/mixed.hpp>
 
 namespace tightdb {

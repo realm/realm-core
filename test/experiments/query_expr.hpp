@@ -3,9 +3,9 @@
 #include <algorithm>
 #include <ostream>
 
-#include <tightdb/assert.hpp>
-#include <tightdb/meta.hpp>
-#include <tightdb/tuple.hpp>
+#include <tightdb/util/assert.hpp>
+#include <tightdb/util/meta.hpp>
+#include <tightdb/util/tuple.hpp>
 
 
 // Check that Inlining is still perfect when referring to context variables whose value are not known to be constant (e.g. a function argument)
