@@ -142,7 +142,7 @@ TEST(TestQueryCount)
         size_t count = 0;
         size_t rows = rand() % (5 * TIGHTDB_MAX_LIST_SIZE); // to cross some leaf boundaries
 
-        for(int i = 0; i < rows; i++) {
+        for(size_t i = 0; i < rows; i++) {
             table.add_empty_row();
             int64_t val = rand() % 5;
             table.set_int(0, i, val);
