@@ -281,7 +281,7 @@ void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table:
     
     TIGHTDB_ASSERT(get_column_type(group_by_column) == type_String);
     TIGHTDB_ASSERT(get_column_type(aggr_column) == type_Int);
-
+    
     
     // Add columns to result table
     result.add_column(type_String, get_column_name(group_by_column));
@@ -295,95 +295,98 @@ void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table:
     
     const size_t count = size();
     
-    if (op == Table::aggr_count) {
-        for (size_t i = 0; i < count; ++i) {
-            StringData str = get_string(group_by_column, i);
-            size_t ndx = result.lookup(str);
-            if (ndx == not_found) {
-                ndx = result.add_empty_row();
-                result.set_string(0, ndx, str);
+    switch (op) {
+            
+        case Table::aggr_count:
+            for (size_t i = 0; i < count; ++i) {
+                StringData str = get_string(group_by_column, i);
+                size_t ndx = result.lookup(str);
+                if (ndx == not_found) {
+                    ndx = result.add_empty_row();
+                    result.set_string(0, ndx, str);
+                }
+                
+                // Count
+                dst_column.adjust(ndx, 1);
+            }
+            break;
+        case Table::aggr_sum:
+            for (size_t i = 0; i < count; ++i) {
+                StringData str = get_string(group_by_column, i);
+                size_t ndx = result.lookup(str);
+                if (ndx == not_found) {
+                    ndx = result.add_empty_row();
+                    result.set_string(0, ndx, str);
+                }
+                
+                int64_t value = get_int(aggr_column, i);
+                dst_column.adjust(ndx, value);
+            }
+            break;
+        case Table::aggr_min:
+            for (size_t i = 0; i < count; ++i) {
+                StringData str = get_string(group_by_column, i);
+                size_t ndx = result.lookup(str);
+                int64_t value = get_int(aggr_column, i);
+                if (ndx == not_found) {
+                    ndx = result.add_empty_row();
+                    result.set_string(0, ndx, str);
+                    dst_column.set(ndx, value); // set initial value other than default 0
+                } else {
+                    dst_column.set(ndx, min(dst_column.get(ndx), value));
+                }
+            }
+            break;
+        case Table::aggr_max:
+            for (size_t i = 0; i < count; ++i) {
+                StringData str = get_string(group_by_column, i);
+                size_t ndx = result.lookup(str);
+                int64_t value = get_int(aggr_column, i);
+                if (ndx == not_found) {
+                    ndx = result.add_empty_row();
+                    result.set_string(0, ndx, str);
+                    dst_column.set(ndx, value); // set initial value other than default 0
+                } else {
+                    dst_column.set(ndx, max(dst_column.get(ndx), value));
+                }
+            }
+            break;
+        case Table::aggr_avg:
+            // Add temporary column for counts
+            result.add_column(type_Int, "count");
+            Column& cnt_column = result.get_column(2);
+            
+            for (size_t i = 0; i < count; ++i) {
+                StringData str = get_string(group_by_column, i);
+                size_t ndx = result.lookup(str);
+                if (ndx == not_found) {
+                    ndx = result.add_empty_row();
+                    result.set_string(0, ndx, str);
+                }
+                
+                // SUM
+                int64_t value = get_int(aggr_column, i);
+                dst_column.adjust(ndx, value);
+                
+                // Increment count
+                cnt_column.adjust(ndx, 1);
             }
             
-            // Count
-            dst_column.adjust(ndx, 1);
-        }
-    }
-    else if (op == Table::aggr_sum) {
-        for (size_t i = 0; i < count; ++i) {
-            StringData str = get_string(group_by_column, i);
-            size_t ndx = result.lookup(str);
-            if (ndx == not_found) {
-                ndx = result.add_empty_row();
-                result.set_string(0, ndx, str);
+            // Calculate averages
+            result.add_column(type_Double, "average");
+            ColumnDouble& mean_column = result.get_column_double(3);
+            const size_t res_count = result.size();
+            for (size_t i = 0; i < res_count; ++i) {
+                int64_t sum   = dst_column.get(i);
+                int64_t count = cnt_column.get(i);
+                double res   = sum / count;
+                mean_column.set(i, res);
             }
             
-            int64_t value = get_int(aggr_column, i);
-            dst_column.adjust(ndx, value);
-        }
-    }
-    else if (op == Table::aggr_min) {
-        for (size_t i = 0; i < count; ++i) {
-            StringData str = get_string(group_by_column, i);
-            size_t ndx = result.lookup(str);
-            int64_t value = get_int(aggr_column, i);
-            if (ndx == not_found) {
-                ndx = result.add_empty_row();
-                result.set_string(0, ndx, str);
-                dst_column.set(ndx, value); // set initial value other than default 0
-            } else {
-                dst_column.set(ndx, min(dst_column.get(ndx), value));
-            }
-        }
-    }
-    else if (op == Table::aggr_max) {
-        for (size_t i = 0; i < count; ++i) {
-            StringData str = get_string(group_by_column, i);
-            size_t ndx = result.lookup(str);
-            int64_t value = get_int(aggr_column, i);
-            if (ndx == not_found) {
-                ndx = result.add_empty_row();
-                result.set_string(0, ndx, str);
-                dst_column.set(ndx, value); // set initial value other than default 0
-            } else {
-                dst_column.set(ndx, max(dst_column.get(ndx), value));
-            }
-        }
-    }
-    else if (op == Table::aggr_avg) {
-        // Add temporary column for counts
-        result.add_column(type_Int, "count");
-        Column& cnt_column = result.get_column(2);
-        
-        for (size_t i = 0; i < count; ++i) {
-            StringData str = get_string(group_by_column, i);
-            size_t ndx = result.lookup(str);
-            if (ndx == not_found) {
-                ndx = result.add_empty_row();
-                result.set_string(0, ndx, str);
-            }
-            
-            // SUM
-            int64_t value = get_int(aggr_column, i);
-            dst_column.adjust(ndx, value);
-            
-            // Increment count
-            cnt_column.adjust(ndx, 1);
-        }
-        
-        // Calculate averages
-        result.add_column(type_Double, "average");
-        ColumnDouble& mean_column = result.get_column_double(3);
-        const size_t res_count = result.size();
-        for (size_t i = 0; i < res_count; ++i) {
-            int64_t sum   = dst_column.get(i);
-            int64_t count = cnt_column.get(i);
-            double res   = sum / count;
-            mean_column.set(i, res);
-        }
-
-        // Remove temp columns
-        result.remove_column(1); // sums
-        result.remove_column(1); // counts
+            // Remove temp columns
+            result.remove_column(1); // sums
+            result.remove_column(1); // counts
+            break;
     }
 }
 
