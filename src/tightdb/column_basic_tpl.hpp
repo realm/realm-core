@@ -21,7 +21,7 @@
 #define TIGHTDB_COLUMN_BASIC_TPL_HPP
 
 // Todo: It's bad design (headers are entangled) that a Column uses query_engine.hpp which again uses Column.
-// It's the aggregate() method that calls query_engine, and a quick fix (still not optimal) could be to create 
+// It's the aggregate() method that calls query_engine, and a quick fix (still not optimal) could be to create
 // the call and include inside float and double's .cpp files.
 #include <tightdb/query_engine.hpp>
 
@@ -29,7 +29,7 @@ namespace tightdb {
 
 // Predeclarations from query_engine.hpp
 class ParentNode;
-template<class T, class F> class BasicNode;
+template<class T, class F> class FloatDoubleNode;
 template<class T> class SequentialGetter;
 
 
@@ -229,16 +229,16 @@ public:
     {
         ArrayParent* parent = 0;
         std::size_t ndx_in_parent = 0;
-        UniquePtr<Array> leaf(new BasicArray<T>(leaf_mem, parent, ndx_in_parent,
-                                                get_alloc())); // Throws
+        util::UniquePtr<Array> leaf(new BasicArray<T>(leaf_mem, parent, ndx_in_parent,
+                                                      get_alloc())); // Throws
         replace_root(leaf); // Throws
     }
     void replace_root_by_empty_leaf() TIGHTDB_OVERRIDE
     {
         ArrayParent* parent = 0;
         std::size_t ndx_in_parent = 0;
-        UniquePtr<Array> leaf(new BasicArray<T>(parent, ndx_in_parent,
-                                                get_alloc())); // Throws
+        util::UniquePtr<Array> leaf(new BasicArray<T>(parent, ndx_in_parent,
+                                                      get_alloc())); // Throws
         replace_root(leaf); // Throws
     }
 };

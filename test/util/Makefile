@@ -1,4 +1,4 @@
-TEST_LIBRARIES = test-util.a
+check_LIBRARIES = test-util.a
 
 test_util_a_SOURCES = mem.cpp timer.cpp benchmark_results.cpp misc.cpp
 test_util_a_LIBS = ../../src/tightdb/libtightdb.a

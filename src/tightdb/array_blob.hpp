@@ -27,7 +27,7 @@ namespace tightdb {
 
 class ArrayBlob: public Array {
 public:
-    explicit ArrayBlob(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+    explicit ArrayBlob(ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
                        Allocator& = Allocator::get_default());
     ArrayBlob(ref_type, ArrayParent*, std::size_t ndx_in_parent,
               Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
@@ -111,18 +111,18 @@ inline void ArrayBlob::insert(std::size_t pos, const char* data, std::size_t siz
 
 inline void ArrayBlob::erase(std::size_t start, std::size_t end)
 {
-    replace(start, end, 0, 0);
+    replace(start, end, null_ptr, 0);
 }
 
 inline void ArrayBlob::resize(std::size_t size)
 {
     TIGHTDB_ASSERT(size <= m_size);
-    replace(size, m_size, 0, 0);
+    replace(size, m_size, null_ptr, 0);
 }
 
 inline void ArrayBlob::clear()
 {
-    replace(0, m_size, 0, 0);
+    replace(0, m_size, null_ptr, 0);
 }
 
 inline const char* ArrayBlob::get(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT

@@ -5,7 +5,7 @@
 #include <fstream>
 #include <sstream>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/table.hpp>
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/column.hpp>
@@ -18,7 +18,7 @@
 #include <tightdb/column_mixed.hpp>
 #include <tightdb/index_string.hpp>
 
-#include "query_engine.hpp"
+#include <tightdb/query_engine.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -44,7 +44,7 @@ void Table::init_from_ref(ref_type top_ref, ArrayParent* parent, size_t ndx_in_p
 void Table::init_from_ref(ref_type spec_ref, ref_type columns_ref,
                           ArrayParent* parent, size_t ndx_in_parent)
 {
-    m_spec.init_from_ref(spec_ref, 0, 0);
+    m_spec.init_from_ref(spec_ref, null_ptr, 0);
 
     // A table instatiated with a zero-ref is just an empty table
     // but it will have to create itself on first modification
@@ -75,7 +75,7 @@ void Table::create_columns()
         ColumnType type = m_spec.get_real_column_type(i);
         ColumnAttr attr = m_spec.get_column_attr(i);
         size_t ref_pos =  m_columns.size();
-        ColumnBase* new_col = 0;
+        ColumnBase* new_col = null_ptr;
 
         switch (type) {
             case type_Int:
@@ -146,8 +146,6 @@ void Table::create_columns()
             TIGHTDB_ASSERT(attr == col_attr_Indexed); // only supported attr so far
             size_t column_ndx = m_cols.size()-1;
             set_index(column_ndx, false);
-
-            attr = col_attr_None;
         }
     }
 }
@@ -155,6 +153,11 @@ void Table::create_columns()
 
 void Table::detach() TIGHTDB_NOEXCEPT
 {
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    transact_log().on_table_destroyed();
+    m_spec.m_top.detach();
+#endif
+
     // This prevents the destructor from deallocating the underlying
     // memory structure, and from attempting to notify the parent. It
     // also causes is_attached() to return false.
@@ -200,7 +203,7 @@ void Table::cache_columns()
         ColumnAttr attr = m_spec.get_column_attr(i);
         ref_type ref = m_columns.get_as_ref(ndx_in_parent);
 
-        ColumnBase* new_col = 0;
+        ColumnBase* new_col = null_ptr;
         size_t colsize = size_t(-1);
         switch (type) {
             case type_Int:
@@ -291,18 +294,22 @@ void Table::cache_columns()
             new_col->set_index_ref(index_ref, &m_columns, pndx);
 
             ++ndx_in_parent; // advance one matchcount pos to account for index
-            attr = col_attr_None;
         }
 
         // Set table size
         // (and verify that all column are same size)
-        if (num_rows == size_t(-1)) num_rows = colsize;
-        else TIGHTDB_ASSERT(num_rows == colsize);
+        if (num_rows == size_t(-1)) {
+            num_rows = colsize;
+        }
+        else {
+            TIGHTDB_ASSERT(num_rows == colsize);
+        }
 
         ++ndx_in_parent;
     }
 
-    if (num_rows != size_t(-1)) m_size = num_rows;
+    if (num_rows != size_t(-1))
+        m_size = num_rows;
 }
 
 void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
@@ -319,15 +326,16 @@ void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
 
 Table::~Table() TIGHTDB_NOEXCEPT
 {
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().on_table_destroyed();
-#endif
-
     if (!is_attached()) {
         // This table has been detached.
         TIGHTDB_ASSERT(m_ref_count == 0);
         return;
     }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    transact_log().on_table_destroyed();
+    m_spec.m_top.detach();
+#endif
 
     if (!m_top.is_attached()) {
         // This is a table with a shared spec, and its lifetime is
@@ -414,7 +422,7 @@ size_t Table::do_add_column(DataType type)
     size_t count      = size();
     size_t column_ndx = m_cols.size();
 
-    ColumnBase* new_col = 0;
+    ColumnBase* new_col = null_ptr;
     Allocator& alloc = m_columns.get_alloc();
 
     switch (type) {
@@ -477,6 +485,8 @@ size_t Table::do_add_column(DataType type)
             c->fill(count);
             break;
         }
+        default:
+            TIGHTDB_ASSERT(false);
     }
 
     m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, even in C++11
@@ -753,7 +763,7 @@ ref_type Table::create_column(DataType column_type, size_t num_default_values, A
 
 ref_type Table::clone_columns(Allocator& alloc) const
 {
-    Array new_columns(Array::type_HasRefs, 0, 0, alloc);
+    Array new_columns(Array::type_HasRefs, null_ptr, 0, alloc);
     size_t n = get_column_count();
     for (size_t i=0; i<n; ++i) {
         ref_type new_col_ref;
@@ -783,7 +793,7 @@ ref_type Table::clone(Allocator& alloc) const
     if (m_top.is_attached())
         return m_top.clone(alloc); // Throws
 
-    Array new_top(Array::type_HasRefs, 0, 0, alloc); // Throws
+    Array new_top(Array::type_HasRefs, null_ptr, 0, alloc); // Throws
     new_top.add(m_spec.m_top.clone(alloc)); // Throws
     new_top.add(m_columns.clone(alloc)); // Throws
     return new_top.get_ref();
@@ -1778,7 +1788,7 @@ template <class T> std::size_t Table::find_first(std::size_t column_ndx, T value
 }
 
 size_t Table::find_first_int(size_t column_ndx, int64_t value) const
-{    
+{
     return find_first<int64_t>(column_ndx, value);
 }
 
@@ -1910,7 +1920,7 @@ ConstTableView Table::find_all_string(size_t column_ndx, StringData value) const
 
     ColumnType type = get_real_column_type(column_ndx);
     ConstTableView tv(*this);
-    
+
     if(m_columns.is_attached()) {
         if (type == col_type_String) {
             const AdaptiveStringColumn& column = get_column_string(column_ndx);
@@ -2711,7 +2721,7 @@ pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) 
     const ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx));
 
     const Array* root = col->get_root_array();
-    const Array* enum_root = 0;
+    const Array* enum_root = null_ptr;
 
     if (const ColumnStringEnum* c = dynamic_cast<const ColumnStringEnum*>(col)) {
         enum_root = c->get_enum_root_array();
@@ -2820,6 +2830,8 @@ void Table::print() const
                 cout << "Bool       "; break;
             case type_String:
                 cout << "String     "; break;
+            case col_type_StringEnum:
+                cout << "String     "; break;
             default:
                 TIGHTDB_ASSERT(false);
         }
@@ -2854,6 +2866,11 @@ void Table::print() const
                 }
                 case type_String: {
                     const AdaptiveStringColumn& column = get_column_string(n);
+                    cout << setw(10) << column.get(i) << " ";
+                    break;
+                }
+                case col_type_StringEnum: {
+                    const ColumnStringEnum& column = get_column_string_enum(n);
                     cout << setw(10) << column.get(i) << " ";
                     break;
                 }

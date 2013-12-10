@@ -10,7 +10,13 @@ if [ "$TIGHTDB_SCRIPT_DEBUG" ]; then
 fi
 
 
-cd "$(dirname "$0")" || exit 1
+if ! [ "$TIGHTDB_ORIG_CWD" ]; then
+    TIGHTDB_ORIG_CWD="$(pwd)" || exit 1
+    export ORIG_CWD
+fi
+
+dir="$(dirname "$0")" || exit 1
+cd "$dir" || exit 1
 TIGHTDB_HOME="$(pwd)" || exit 1
 export TIGHTDB_HOME
 
@@ -407,7 +413,7 @@ EOF
         auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
         # FIXME: Apparently, there are fluke cases where timestamps
-        # are such that src/tightdb/build_config.h is not recreated
+        # are such that <src/tightdb/util/config.h> is not recreated
         # automatically by src/tightdb/Makfile. Using --always-make is
         # a work-around.
         TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE --always-make -C "src/tightdb" "tightdb-config" "tightdb-config-dbg" || exit 1
@@ -424,6 +430,7 @@ EOF
             exit 1
         fi
         temp_dir="$(mktemp -d /tmp/tightdb.build-iphone.XXXX)" || exit 1
+        mkdir "$temp_dir/platforms" || exit 1
         xcode_home="$(get_config_param "XCODE_HOME")" || exit 1
         iphone_sdks="$(get_config_param "IPHONE_SDKS")" || exit 1
         for x in $iphone_sdks; do
@@ -432,22 +439,23 @@ EOF
             arch="$(printf "%s\n" "$x" | cut -d: -f3)" || exit 1
             sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
             $MAKE -C "src/tightdb" "libtightdb-$platform.a" "libtightdb-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="-arch $arch -isysroot $sdk_root" || exit 1
-            mkdir "$temp_dir/$platform" || exit 1
-            cp "src/tightdb/libtightdb-$platform.a"     "$temp_dir/$platform/libtightdb.a"     || exit 1
-            cp "src/tightdb/libtightdb-$platform-dbg.a" "$temp_dir/$platform/libtightdb-dbg.a" || exit 1
+            mkdir "$temp_dir/platforms/$platform" || exit 1
+            cp "src/tightdb/libtightdb-$platform.a"     "$temp_dir/platforms/$platform/libtightdb.a"     || exit 1
+            cp "src/tightdb/libtightdb-$platform-dbg.a" "$temp_dir/platforms/$platform/libtightdb-dbg.a" || exit 1
         done
         TIGHTDB_ENABLE_FAT_BINARIES="1" $MAKE -C "src/tightdb" "tightdb-config-ios" "tightdb-config-ios-dbg" BASE_DENOM="ios" CFLAGS_ARCH="-DTIGHTDB_CONFIG_IOS" || exit 1
         mkdir -p "$IPHONE_DIR" || exit 1
         echo "Creating '$IPHONE_DIR/libtightdb-ios.a'"
-        lipo "$temp_dir"/*/"libtightdb.a"     -create -output "$IPHONE_DIR/libtightdb-ios.a"     || exit 1
+        lipo "$temp_dir/platforms"/*/"libtightdb.a"     -create -output "$IPHONE_DIR/libtightdb-ios.a"     || exit 1
         echo "Creating '$IPHONE_DIR/libtightdb-ios-dbg.a'"
-        lipo "$temp_dir"/*/"libtightdb-dbg.a" -create -output "$IPHONE_DIR/libtightdb-ios-dbg.a" || exit 1
+        lipo "$temp_dir/platforms"/*/"libtightdb-dbg.a" -create -output "$IPHONE_DIR/libtightdb-ios-dbg.a" || exit 1
         echo "Copying headers to '$IPHONE_DIR/include'"
         mkdir -p "$IPHONE_DIR/include" || exit 1
         cp "src/tightdb.hpp" "$IPHONE_DIR/include/" || exit 1
         mkdir -p "$IPHONE_DIR/include/tightdb" || exit 1
-        inst_headers="$(cd src/tightdb && $MAKE --no-print-directory get-inst-headers)" || exit 1
-        (cd "src/tightdb" && cp $inst_headers "$TIGHTDB_HOME/$IPHONE_DIR/include/tightdb/") || exit 1
+        inst_headers="$(cd "src/tightdb" && $MAKE --no-print-directory get-inst-headers)" || exit 1
+        (cd "src/tightdb" && tar czf "$temp_dir/headers.tar.gz" $inst_headers) || exit 1
+        (cd "$TIGHTDB_HOME/$IPHONE_DIR/include/tightdb" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
         for x in "tightdb-config" "tightdb-config-dbg"; do
             echo "Creating '$IPHONE_DIR/$x'"
             y="$(printf "%s\n" "$x" | sed 's/tightdb-config/tightdb-config-ios/')" || exit 1
@@ -460,7 +468,7 @@ EOF
     "test")
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE test || exit 1
+        $MAKE check || exit 1
         echo "Test passed"
         exit 0
         ;;
@@ -468,7 +476,7 @@ EOF
     "test-debug")
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE test-debug || exit 1
+        $MAKE check-debug || exit 1
         echo "Test passed"
         exit 0
         ;;
@@ -540,7 +548,7 @@ EOF
     "uninstall-devel")
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE uninstall INSTALL_FILTER=static-libs,dev-progs,extra || exit 1
+        $MAKE uninstall INSTALL_FILTER=static-libs,dev-progs,headers || exit 1
         echo "Done uninstalling"
         exit 0
         ;;
@@ -550,7 +558,7 @@ EOF
         install_bindir="$(get_config_param "INSTALL_BINDIR")" || exit 1
         path_list_prepend PATH "$install_bindir" || exit 1
         $MAKE -C "test-installed" clean || exit 1
-        $MAKE -C "test-installed" test  || exit 1
+        $MAKE -C "test-installed" check  || exit 1
         echo "Test passed"
         exit 0
         ;;
@@ -819,7 +827,11 @@ EOF
             cat >"$PKG_DIR/build" <<EOF
 #!/bin/sh
 
-cd "\$(dirname "\$0")" || exit 1
+TIGHTDB_ORIG_CWD="\$(pwd)" || exit 1
+export ORIG_CWD
+
+dir="\$(dirname "\$0")" || exit 1
+cd "\$dir" || exit 1
 TIGHTDB_DIST_HOME="\$(pwd)" || exit 1
 export TIGHTDB_DIST_HOME
 
@@ -872,11 +884,11 @@ if [ \$# -gt 0 -a "\$1" = "interactive" ]; then
         mkdir -p \$HOME/tightdb_examples
         for x in \$EXT; do
             if [ "\$x" != "c++" -a "\$x" != "c" ]; then
-                cp -a tightdb_\$x/examples/* \$HOME/tightdb_examples/\$x
+                cp -a tightdb_\$x/examples \$HOME/tightdb_examples/\$x
             fi
         done
-        if [ \$(echo \$EXT | grep -c c++) -eq 1]; then
-            cp -a tightdb/examples/* \$HOME/tightdb_examples/c++
+        if [ \$(echo \$EXT | grep -c c++) -eq 1 ]; then
+            cp -a tightdb/examples \$HOME/tightdb_examples/c++
         fi
         if [ \$(echo \$EXT | grep -c java) -eq 1 ]; then
             find \$HOME/tightdb_examples/java -name build.xml -exec sed -i -e 's/value="\.\.\/\.\.\/lib"/value="\/usr\/local\/share\/java"/' \{\} \\;
@@ -1080,23 +1092,25 @@ EOF
 /src/Makefile
 /src/tightdb.hpp
 /src/tightdb/Makefile
-/src/tightdb/config.sh
+/src/tightdb/util/config.sh
 /src/tightdb/config_tool.cpp
 /test/Makefile
 /test/util/Makefile
 /test-installed
 /doc
 EOF
+                INST_HEADERS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE --no-print-directory get-inst-headers)" || exit 1
+                INST_LIBS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE --no-print-directory get-inst-libraries)" || exit 1
+                INST_PROGS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE --no-print-directory get-inst-programs)" || exit 1
+                for x in $INST_HEADERS $INST_LIBS $INST_PROGS; do
+                    echo "/src/tightdb/$x" >> "$TEMP_DIR/transfer/include"
+                done
                 grep -E -v '^(#.*)?$' "$TEMP_DIR/transfer/include" >"$TEMP_DIR/transfer/include2" || exit 1
                 sed -e 's/\([.\[^$]\)/\\\1/g' -e 's|\*|[^/]*|g' -e 's|^\([^/]\)|^\\(.*/\\)\\{0,1\\}\1|' -e 's|^/|^|' -e 's|$|\\(/.*\\)\\{0,1\\}$|' "$TEMP_DIR/transfer/include2" >"$TEMP_DIR/transfer/include.bre" || exit 1
                 (cd "$PREBUILD_DIR" && find -L * -type f) >"$TEMP_DIR/transfer/files1" || exit 1
                 grep -f "$TEMP_DIR/transfer/include.bre" "$TEMP_DIR/transfer/files1" >"$TEMP_DIR/transfer/files2" || exit 1
                 (cd "$PREBUILD_DIR" && tar czf "$TEMP_DIR/transfer/core.tar.gz" -T "$TEMP_DIR/transfer/files2") || exit 1
                 (cd "$PKG_DIR/tightdb" && tar xzmf "$TEMP_DIR/transfer/core.tar.gz") || exit 1
-                INST_HEADERS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE --no-print-directory get-inst-headers)" || exit 1
-                INST_LIBS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE --no-print-directory get-inst-libraries)" || exit 1
-                INST_PROGS="$(cd "$PREBUILD_DIR/src/tightdb" && TIGHTDB_HAVE_CONFIG="1" $MAKE --no-print-directory get-inst-programs)" || exit 1
-                (cd "$PREBUILD_DIR/src/tightdb" && cp -R -P $INST_HEADERS $INST_LIBS $INST_PROGS "$PKG_DIR/tightdb/src/tightdb/") || exit 1
                 if [ "$INCLUDE_IPHONE" ]; then
                     cp -R "$PREBUILD_DIR/$IPHONE_DIR" "$PKG_DIR/tightdb/" || exit 1
                 fi

@@ -211,7 +211,7 @@ inline void BasicArray<T>::foreach(const Array* a, ForEachOp<T>* op) TIGHTDB_NOE
 template<class T>
 std::size_t BasicArray<T>::CalcByteLen(std::size_t count, std::size_t) const
 {
-    // FIXME: This arithemtic could overflow. Consider using <tightdb/safe_int_ops.hpp>
+    // FIXME: This arithemtic could overflow. Consider using <tightdb/util/safe_int_ops.hpp>
     return header_size + (count * sizeof (T));
 }
 

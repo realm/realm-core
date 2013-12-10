@@ -28,7 +28,7 @@ namespace tightdb {
 /// types like float, double.
 template<class T> class BasicArray: public Array {
 public:
-    explicit BasicArray(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+    explicit BasicArray(ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
                         Allocator& = Allocator::get_default());
     BasicArray(MemRef, ArrayParent*, std::size_t ndx_in_parent,
                Allocator&) TIGHTDB_NOEXCEPT;

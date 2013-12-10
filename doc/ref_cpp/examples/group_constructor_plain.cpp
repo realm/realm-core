@@ -1,7 +1,7 @@
 // @@Example: ex_cpp_group_constructor_plain @@
 // @@Fold@@
 #include <tightdb.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/file.hpp>
 
 using namespace tightdb;
 
@@ -29,7 +29,7 @@ void func()
 int main()
 {
     func();
-    File::remove("people.tightdb");
+    util::File::remove("people.tightdb");
 }
 // @@EndFold@@
 // @@EndExample@@

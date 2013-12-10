@@ -165,8 +165,8 @@ public:
     Query& Or();
 
     Query& and_query(Query q);
-    Query operator||(Query q); 
-    Query operator&&(Query q); 
+    Query operator||(Query q);
+    Query operator&&(Query q);
 
 
 
@@ -178,24 +178,24 @@ public:
     // Aggregates
     size_t count(size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
 
-    int64_t sum_int(    size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    double  average_int(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    int64_t maximum_int(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    int64_t minimum_int(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    int64_t sum_int(    size_t column_ndx, size_t* resultcount=null_ptr, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double  average_int(size_t column_ndx, size_t* resultcount=null_ptr, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    int64_t maximum_int(size_t column_ndx, size_t* resultcount=null_ptr, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    int64_t minimum_int(size_t column_ndx, size_t* resultcount=null_ptr, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 
-    double sum_float(    size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    double average_float(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    float  maximum_float(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    float  minimum_float(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double sum_float(    size_t column_ndx, size_t* resultcount=null_ptr, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double average_float(size_t column_ndx, size_t* resultcount=null_ptr, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    float  maximum_float(size_t column_ndx, size_t* resultcount=null_ptr, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    float  minimum_float(size_t column_ndx, size_t* resultcount=null_ptr, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 
-    double sum_double(    size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    double average_double(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    double maximum_double(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-    double minimum_double(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double sum_double(    size_t column_ndx, size_t* resultcount=null_ptr, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double average_double(size_t column_ndx, size_t* resultcount=null_ptr, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double maximum_double(size_t column_ndx, size_t* resultcount=null_ptr, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+    double minimum_double(size_t column_ndx, size_t* resultcount=null_ptr, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 
 /*
-  TODO:  time_t maximum_datetime(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
-  TODO:  time_t minimum_datetime(const Table& table, size_t column, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+  TODO:  time_t maximum_datetime(const Table& table, size_t column, size_t* resultcount=null_ptr, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
+  TODO:  time_t minimum_datetime(const Table& table, size_t column, size_t* resultcount=null_ptr, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
 */
 
     // Deletion
@@ -211,7 +211,7 @@ public:
     TableRef& get_table() {return m_table;}
 
     std::string validate();
-   
+
     mutable bool do_delete;
 
 protected:
@@ -272,10 +272,15 @@ private:
 
     template <typename T, class N> Query& add_condition(size_t column_ndx, T value);
     template<typename T>
-        double average(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
+        double average(size_t column_ndx, size_t* resultcount=null_ptr, size_t start=0, size_t end=size_t(-1), size_t limit=size_t(-1)) const;
     template <Action action, typename T, typename R, class ColClass>
         R aggregate(R (ColClass::*method)(size_t, size_t, size_t) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
+
+    template<Action TAction, class TResult, class TSourceColumn>
+    TResult aggregate_internal(ParentNode* pn, QueryState<TResult>* st,
+                               size_t start, size_t end, size_t agg_col,
+                               size_t* matchcount) const;
 
     friend class Table;
     template <typename T> friend class BasicTable;

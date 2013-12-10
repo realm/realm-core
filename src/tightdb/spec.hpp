@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_SPEC_HPP
 #define TIGHTDB_SPEC_HPP
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/array.hpp>
 #include <tightdb/array_string.hpp>
 #include <tightdb/data_type.hpp>
@@ -71,7 +71,7 @@ public:
     void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
                                 ArrayParent*& keys_parent, size_t& keys_ndx);
     ref_type get_enumkeys_ref(size_t column_ndx,
-                              ArrayParent** keys_parent=NULL, size_t* keys_ndx=NULL);
+                              ArrayParent** keys_parent=null_ptr, size_t* keys_ndx=null_ptr);
 
     // Get position in column list adjusted for indexes
     // (since index refs are stored alongside column refs in
@@ -171,7 +171,7 @@ inline ref_type Spec::create_empty_spec(Allocator& alloc)
 {
     // The 'spec_set' contains the specification (types and names) of
     // all columns and sub-tables
-    Array spec_set(Array::type_HasRefs, 0, 0, alloc);
+    Array spec_set(Array::type_HasRefs, null_ptr, 0, alloc);
     spec_set.add(Array::create_empty_array(Array::type_Normal, alloc)); // One type for each column
     spec_set.add(ArrayString::create_empty_array(alloc)); // One name for each column
     spec_set.add(ArrayString::create_empty_array(alloc)); // One attr set for each column
