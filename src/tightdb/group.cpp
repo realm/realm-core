@@ -5,14 +5,15 @@
 #include <iomanip>
 #include <fstream>
 
+#include <tightdb/util/thread.hpp>
+#include <tightdb/utilities.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
-#include <tightdb/utilities.hpp>
-#include <tightdb/thread.hpp>
 #include <pthread.h>
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 
 namespace {

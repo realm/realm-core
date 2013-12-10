@@ -23,7 +23,7 @@
 #include <stdint.h> // unint8_t etc
 #include <cstdlib> // std::size_t
 
-#include <tightdb/unique_ptr.hpp>
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/array.hpp>
 #include <tightdb/query_conditions.hpp>
 
@@ -190,7 +190,7 @@ protected:
     EraseHandlerBase(ColumnBase& column) TIGHTDB_NOEXCEPT: m_column(column) {}
     ~EraseHandlerBase() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
     Allocator& get_alloc() TIGHTDB_NOEXCEPT;
-    void replace_root(UniquePtr<Array>& leaf);
+    void replace_root(util::UniquePtr<Array>& leaf);
 private:
     ColumnBase& m_column;
 };
@@ -394,7 +394,7 @@ inline Allocator& ColumnBase::EraseHandlerBase::get_alloc() TIGHTDB_NOEXCEPT
     return m_column.m_array->get_alloc();
 }
 
-inline void ColumnBase::EraseHandlerBase::replace_root(UniquePtr<Array>& leaf)
+inline void ColumnBase::EraseHandlerBase::replace_root(util::UniquePtr<Array>& leaf)
 {
     ArrayParent* parent = m_column.m_array->get_parent();
     std::size_t ndx_in_parent = m_column.m_array->get_ndx_in_parent();

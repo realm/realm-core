@@ -29,7 +29,7 @@ int main()
     // You can also create column objects and use them in expressions:
     Columns<Int> pages = books.column().pages;
     Columns<String> author = books.column().author;
-    match = (pages >= 200 && author == "Griffiths").find(); 
+    match = (pages >= 200 && author == "Griffiths").find();
     assert(match == 1);
 }
 // @@EndExample@@

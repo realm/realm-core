@@ -1,22 +1,22 @@
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TightDB", "TightDBVS2012.vcxproj", "{C18EDDC1-166A-49C4-B483-11458F48CF8E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TightDBVS2012", "TightDBVS2012.vcxproj", "{C18EDDC1-166A-49C4-B483-11458F48CF8E}"
 	ProjectSection(ProjectDependencies) = postProject
 		{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6} = {64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnitTest++", "test\UnitTest++\UnitTest++.vsnet2005VS2012.vcxproj", "{64A4FEFE-0461-4E95-8CC1-91EF5F57DBC6}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test-tightdb", "test\test-tightdb\test-tightdbVS2012.vcxproj", "{6DF07480-ECC6-4116-860A-818B9D2BA7B3}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test-tightdbVS2012", "test\test-tightdb\test-tightdbVS2012.vcxproj", "{6DF07480-ECC6-4116-860A-818B9D2BA7B3}"
 	ProjectSection(ProjectDependencies) = postProject
 		{C18EDDC1-166A-49C4-B483-11458F48CF8E} = {C18EDDC1-166A-49C4-B483-11458F48CF8E}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test-sqlite3", "test\test-sqlite3\test-sqlite3VS2012.vcxproj", "{9C49632F-A4C9-471E-B643-42472DBF13B9}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test-sqlite3VS2012", "test\test-sqlite3\test-sqlite3VS2012.vcxproj", "{9C49632F-A4C9-471E-B643-42472DBF13B9}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test-stl", "test\test-stl\test-stlVS2012.vcxproj", "{C485A179-016D-4A21-AA14-1970BA070154}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test-stlVS2012", "test\test-stl\test-stlVS2012.vcxproj", "{C485A179-016D-4A21-AA14-1970BA070154}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{088C4E60-A1F6-452B-8950-6A7A7B8CC418}"
 	ProjectSection(SolutionItems) = preProject
@@ -25,11 +25,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		TraceAndTestImpact.testsettings = TraceAndTestImpact.testsettings
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "benchmark-stl", "test\benchmark-stl\benchmark-stlVS2012.vcxproj", "{54618B78-8356-44A7-8860-18A455509A86}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "benchmark-stlVS2012", "test\benchmark-stl\benchmark-stlVS2012.vcxproj", "{54618B78-8356-44A7-8860-18A455509A86}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "benchmark-tightdb", "test\benchmark-tightdb\benchmark-tightdbVS2012.vcxproj", "{64D11991-F0F0-470D-B230-48410066090E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "benchmark-tightdbVS2012", "test\benchmark-tightdb\benchmark-tightdbVS2012.vcxproj", "{64D11991-F0F0-470D-B230-48410066090E}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "benchmark-sqlite", "test\benchmark-sqlite\benchmark-sqliteVS2012.vcxproj", "{69AAE70E-B352-433B-B6E9-1AEEC438B49C}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "benchmark-sqliteVS2012", "test\benchmark-sqlite\benchmark-sqliteVS2012.vcxproj", "{69AAE70E-B352-433B-B6E9-1AEEC438B49C}"
 EndProject
 Global
 	GlobalSection(TestCaseManagementSettings) = postSolution
@@ -103,13 +103,9 @@ Global
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.csv release|x64.ActiveCfg = csv importer|x64
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.csv release|x64.Build.0 = csv importer|x64
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Debug|Win32.ActiveCfg = Debug|Win32
-		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Debug|Win32.Build.0 = Debug|Win32
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Debug|x64.ActiveCfg = Debug|x64
-		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Debug|x64.Build.0 = Debug|x64
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Release|Win32.ActiveCfg = Release|Win32
-		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Release|Win32.Build.0 = Release|Win32
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Release|x64.ActiveCfg = Release|x64
-		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Release|x64.Build.0 = Release|x64
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Static lib, debug|Win32.ActiveCfg = Static library, debug|Win32
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Static lib, debug|x64.ActiveCfg = Static library, debug|x64
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Static lib, release|Win32.ActiveCfg = Static library, release|Win32
@@ -123,13 +119,9 @@ Global
 		{9C49632F-A4C9-471E-B643-42472DBF13B9}.csv release|x64.ActiveCfg = csv importer|x64
 		{9C49632F-A4C9-471E-B643-42472DBF13B9}.csv release|x64.Build.0 = csv importer|x64
 		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Debug|Win32.ActiveCfg = Debug|Win32
-		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Debug|Win32.Build.0 = Debug|Win32
 		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Debug|x64.ActiveCfg = Debug|x64
-		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Debug|x64.Build.0 = Debug|x64
 		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Release|Win32.ActiveCfg = Release|Win32
-		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Release|Win32.Build.0 = Release|Win32
 		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Release|x64.ActiveCfg = Release|x64
-		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Release|x64.Build.0 = Release|x64
 		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Static lib, debug|Win32.ActiveCfg = Static library, debug|Win32
 		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Static lib, debug|x64.ActiveCfg = Static library, debug|x64
 		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Static lib, release|Win32.ActiveCfg = Static library, release|Win32
@@ -143,13 +135,9 @@ Global
 		{C485A179-016D-4A21-AA14-1970BA070154}.csv release|x64.ActiveCfg = csv importer|x64
 		{C485A179-016D-4A21-AA14-1970BA070154}.csv release|x64.Build.0 = csv importer|x64
 		{C485A179-016D-4A21-AA14-1970BA070154}.Debug|Win32.ActiveCfg = Debug|Win32
-		{C485A179-016D-4A21-AA14-1970BA070154}.Debug|Win32.Build.0 = Debug|Win32
 		{C485A179-016D-4A21-AA14-1970BA070154}.Debug|x64.ActiveCfg = Debug|x64
-		{C485A179-016D-4A21-AA14-1970BA070154}.Debug|x64.Build.0 = Debug|x64
 		{C485A179-016D-4A21-AA14-1970BA070154}.Release|Win32.ActiveCfg = Release|Win32
-		{C485A179-016D-4A21-AA14-1970BA070154}.Release|Win32.Build.0 = Release|Win32
 		{C485A179-016D-4A21-AA14-1970BA070154}.Release|x64.ActiveCfg = Release|x64
-		{C485A179-016D-4A21-AA14-1970BA070154}.Release|x64.Build.0 = Release|x64
 		{C485A179-016D-4A21-AA14-1970BA070154}.Static lib, debug|Win32.ActiveCfg = Static library, debug|Win32
 		{C485A179-016D-4A21-AA14-1970BA070154}.Static lib, debug|x64.ActiveCfg = Static library, debug|x64
 		{C485A179-016D-4A21-AA14-1970BA070154}.Static lib, release|Win32.ActiveCfg = Static library, release|Win32
@@ -163,13 +151,9 @@ Global
 		{54618B78-8356-44A7-8860-18A455509A86}.csv release|x64.ActiveCfg = csv importer|x64
 		{54618B78-8356-44A7-8860-18A455509A86}.csv release|x64.Build.0 = csv importer|x64
 		{54618B78-8356-44A7-8860-18A455509A86}.Debug|Win32.ActiveCfg = Debug|Win32
-		{54618B78-8356-44A7-8860-18A455509A86}.Debug|Win32.Build.0 = Debug|Win32
 		{54618B78-8356-44A7-8860-18A455509A86}.Debug|x64.ActiveCfg = Debug|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.Debug|x64.Build.0 = Debug|x64
 		{54618B78-8356-44A7-8860-18A455509A86}.Release|Win32.ActiveCfg = Release|Win32
-		{54618B78-8356-44A7-8860-18A455509A86}.Release|Win32.Build.0 = Release|Win32
 		{54618B78-8356-44A7-8860-18A455509A86}.Release|x64.ActiveCfg = Release|x64
-		{54618B78-8356-44A7-8860-18A455509A86}.Release|x64.Build.0 = Release|x64
 		{54618B78-8356-44A7-8860-18A455509A86}.Static lib, debug|Win32.ActiveCfg = Static library, debug|Win32
 		{54618B78-8356-44A7-8860-18A455509A86}.Static lib, debug|x64.ActiveCfg = Static library, debug|x64
 		{54618B78-8356-44A7-8860-18A455509A86}.Static lib, release|Win32.ActiveCfg = Static library, release|Win32
@@ -183,13 +167,9 @@ Global
 		{64D11991-F0F0-470D-B230-48410066090E}.csv release|x64.ActiveCfg = csv importer|x64
 		{64D11991-F0F0-470D-B230-48410066090E}.csv release|x64.Build.0 = csv importer|x64
 		{64D11991-F0F0-470D-B230-48410066090E}.Debug|Win32.ActiveCfg = Debug|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.Debug|Win32.Build.0 = Debug|Win32
 		{64D11991-F0F0-470D-B230-48410066090E}.Debug|x64.ActiveCfg = Debug|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.Debug|x64.Build.0 = Debug|x64
 		{64D11991-F0F0-470D-B230-48410066090E}.Release|Win32.ActiveCfg = Release|Win32
-		{64D11991-F0F0-470D-B230-48410066090E}.Release|Win32.Build.0 = Release|Win32
 		{64D11991-F0F0-470D-B230-48410066090E}.Release|x64.ActiveCfg = Release|x64
-		{64D11991-F0F0-470D-B230-48410066090E}.Release|x64.Build.0 = Release|x64
 		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, debug|Win32.ActiveCfg = Static library, debug|Win32
 		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, debug|x64.ActiveCfg = Static library, debug|x64
 		{64D11991-F0F0-470D-B230-48410066090E}.Static lib, release|Win32.ActiveCfg = Static library, release|Win32
@@ -203,13 +183,9 @@ Global
 		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.csv release|x64.ActiveCfg = csv importer|x64
 		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.csv release|x64.Build.0 = csv importer|x64
 		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Debug|Win32.ActiveCfg = Debug|Win32
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Debug|Win32.Build.0 = Debug|Win32
 		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Debug|x64.ActiveCfg = Debug|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Debug|x64.Build.0 = Debug|x64
 		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Release|Win32.ActiveCfg = Release|Win32
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Release|Win32.Build.0 = Release|Win32
 		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Release|x64.ActiveCfg = Release|x64
-		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Release|x64.Build.0 = Release|x64
 		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Static lib, debug|Win32.ActiveCfg = Static library, debug|Win32
 		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Static lib, debug|x64.ActiveCfg = Static library, debug|x64
 		{69AAE70E-B352-433B-B6E9-1AEEC438B49C}.Static lib, release|Win32.ActiveCfg = Static library, release|Win32

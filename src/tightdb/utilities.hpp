@@ -29,15 +29,16 @@
 #  include <intrin.h>
 #endif
 
-#include <tightdb/assert.hpp>
-#include <tightdb/safe_int_ops.hpp>
+#include <tightdb/util/features.h>
+#include <tightdb/util/assert.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
 
 // GCC defines __i386__ and __x86_64__
 #if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
-    #define TIGHTDB_X86_OR_X64
-    #define TIGHTDB_X86_OR_X64_TRUE true
+#  define TIGHTDB_X86_OR_X64
+#  define TIGHTDB_X86_OR_X64_TRUE true
 #else
-    #define TIGHTDB_X86_OR_X64_TRUE false
+#  define TIGHTDB_X86_OR_X64_TRUE false
 #endif
 
 // GCC defines __arm__
@@ -46,13 +47,13 @@
 #endif
 
 #if defined _LP64 || defined __LP64__ || defined __64BIT__ || _ADDR64 || defined _WIN64 || defined __arch64__ || __WORDSIZE == 64 || (defined __sparc && defined __sparcv9) || defined __x86_64 || defined __amd64 || defined __x86_64__ || defined _M_X64 || defined _M_IA64 || defined __ia64 || defined __IA64__
-    #define TIGHTDB_PTR_64
+#  define TIGHTDB_PTR_64
 #endif
 
 
 #if defined(TIGHTDB_PTR_64) && defined(TIGHTDB_X86_OR_X64)
-    #define TIGHTDB_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
-	#define TIGHTDB_COMPILER_AVX
+#  define TIGHTDB_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
+#  define TIGHTDB_COMPILER_AVX
 #endif
 
 namespace tightdb {
@@ -87,10 +88,10 @@ template<int version> TIGHTDB_FORCEINLINE bool sseavx()
         return (sse_support >= 0);
     else if (version == 42)
         return (sse_support > 0);   // faster than == 1 (0 requres no immediate operand)
-	else if (version == 1) // avx
-		return (avx_support >= 0);
-	else if (version == 2) // avx2
-		return (avx_support > 0);
+    else if (version == 1) // avx
+        return (avx_support >= 0);
+    else if (version == 2) // avx2
+        return (avx_support > 0);
 
 #else
     return false;
@@ -126,7 +127,7 @@ int fast_popcount64(int64_t x);
 // Safe cast from 64 to 32 bits on 32 bit architecture. Differs from to_ref() by not testing alignment and REF-bitflag.
 inline std::size_t to_size_t(int64_t v) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!int_cast_has_overflow<std::size_t>(v));
+    TIGHTDB_ASSERT(!util::int_cast_has_overflow<std::size_t>(v));
     return std::size_t(v);
 }
 
@@ -175,7 +176,7 @@ public:
     {
         return 0;
     }
-    template<class C, class T> operator T C::*() const 
+    template<class C, class T> operator T C::*() const
     {
         return 0;
     }

@@ -47,10 +47,10 @@ Searching: The main finding function is:
 
 #include <stdint.h> // unint8_t etc
 
-#include <tightdb/meta.hpp>
-#include <tightdb/assert.hpp>
-#include <tightdb/alloc.hpp>
+#include <tightdb/util/meta.hpp>
+#include <tightdb/util/assert.hpp>
 #include <tightdb/utilities.hpp>
+#include <tightdb/alloc.hpp>
 #include <tightdb/string_data.hpp>
 #include <tightdb/query_conditions.hpp>
 
@@ -1142,7 +1142,8 @@ public:
 
     void init(Action action, Array*, size_t limit)
     {
-        TIGHTDB_STATIC_ASSERT((SameType<R, float>::value || SameType<R, double>::value), "");
+        TIGHTDB_STATIC_ASSERT((util::SameType<R, float>::value ||
+                               util::SameType<R, double>::value), "");
         m_match_count = 0;
         m_limit = limit;
 
@@ -2233,7 +2234,7 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
         else {
             TIGHTDB_ASSERT(state->m_match_count < state->m_limit);
             size_t process = state->m_limit - state->m_match_count;
-            end2 = end - start > process ? start + process : end;        
+            end2 = end - start > process ? start + process : end;
         }
         if (action == act_Sum || action == act_Max || action == act_Min) {
             int64_t res;
@@ -2263,8 +2264,8 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     TIGHTDB_ASSERT(m_width != 0);
 
 #if defined(TIGHTDB_COMPILER_SSE)
-    if ((sseavx<42>() &&                                  (end - start >= sizeof (__m128i) && m_width >= 8))
-    ||  (sseavx<30>() && (SameType<cond2, Equal>::value && end - start >= sizeof (__m128i) && m_width >= 8 && m_width < 64))) {
+    if ((sseavx<42>() &&                                        (end - start >= sizeof (__m128i) && m_width >= 8))
+    ||  (sseavx<30>() && (util::SameType<cond2, Equal>::value && end - start >= sizeof (__m128i) && m_width >= 8 && m_width < 64))) {
 
         // FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
         __m128i* const a = reinterpret_cast<__m128i*>(round_up(m_data + start * bitwidth / 8, sizeof (__m128i)));

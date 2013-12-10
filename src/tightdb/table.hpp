@@ -22,13 +22,12 @@
 
 #include <utility>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/table_ref.hpp>
 #include <tightdb/spec.hpp>
 #include <tightdb/mixed.hpp>
 #include <tightdb/query.hpp>
-//#include "query_expression.h"
 #ifdef TIGHTDB_ENABLE_REPLICATION
 #  include <tightdb/replication.hpp>
 #endif
@@ -350,7 +349,7 @@ public:
     Query       where()       { return Query(*this); }
 
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
-    Query where() const { return Query(*this); } 
+    Query where() const { return Query(*this); }
 
     // Optimizing
     void optimize();
@@ -472,7 +471,7 @@ private:
     void destroy_column_accessors() TIGHTDB_NOEXCEPT;
 
     // A degenerate table is a subtable which isn't instantiated in the
-    // database file yet because there has not yet been write-access to 
+    // database file yet because there has not yet been write-access to
     // it. Avoiding instantiation is an optimization to save space, etc.
     bool is_degenerate() const TIGHTDB_NOEXCEPT { return m_columns.m_data == null_ptr; }
 
@@ -602,7 +601,7 @@ private:
     friend class Group;
     friend class Query;
     friend class ColumnMixed;
-    template<class> friend class bind_ptr;
+    template<class> friend class util::bind_ptr;
     friend class ColumnSubtableParent;
     friend class LangBindHelper;
     friend class TableViewBase;

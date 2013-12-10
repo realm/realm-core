@@ -1,11 +1,13 @@
 #include <cstring>
 #include <algorithm>
 #include <vector>
+#include <fstream>
 #include <iostream>
 #include <iomanip>
 
 #include <UnitTest++.h>
 #include <TestReporter.h> // Part of UnitTest++
+#include <XmlTestReporter.h>
 #include <tightdb.hpp>
 #include <tightdb/utilities.hpp>
 
@@ -149,9 +151,19 @@ int main(int argc, char* argv[])
     cerr << "This CPU supports AVX (AVX1) (auto detect): " << (tightdb::sseavx<1>() ? "Yes" : "No");
     cerr << "\n\n";
 
-    CustomTestReporter reporter;
-    TestRunner runner(reporter);
-    const int res = runner.RunTestsIf(Test::GetTestList(), 0, True(), 0);
+    int res;
+    char* pPath;
+    pPath = getenv("JENKINS_URL");
+    if(pPath == NULL) {
+        CustomTestReporter reporter;
+        TestRunner runner(reporter);
+        res = runner.RunTestsIf(Test::GetTestList(), 0, True(), 0);
+    } else {
+        ofstream f("unit-test-report.xml");
+        XmlTestReporter reporter(f);
+        TestRunner runner(reporter);
+        res = runner.RunTestsIf(Test::GetTestList(), 0, True(), 0);
+    }
 
 #ifdef _MSC_VER
     getchar(); // wait for key

@@ -8,8 +8,8 @@
     #include <ctype.h>
 #endif
 
-#include <tightdb/safe_int_ops.hpp>
-#include <tightdb/utf8.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
+#include <tightdb/util/utf8.hpp>
 
 using namespace std;
 
@@ -58,6 +58,7 @@ inline bool equal_sequence(const char*& begin, const char* end, const char* begi
 
 
 namespace tightdb {
+namespace util {
 
 
 
@@ -254,4 +255,5 @@ size_t search_case_fold(StringData haystack, const char* needle_upper, const cha
 }
 
 
+} // namespace util
 } // namespace tightdb

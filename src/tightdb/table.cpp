@@ -5,7 +5,7 @@
 #include <fstream>
 #include <sstream>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/table.hpp>
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/column.hpp>
@@ -324,13 +324,18 @@ void Table::cache_columns()
 
         // Set table size
         // (and verify that all column are same size)
-        if (num_rows == size_t(-1)) num_rows = colsize;
-        else TIGHTDB_ASSERT(num_rows == colsize);
+        if (num_rows == size_t(-1)) {
+            num_rows = colsize;
+        }
+        else {
+            TIGHTDB_ASSERT(num_rows == colsize);
+        }
 
         ++ndx_in_parent;
     }
 
-    if (num_rows != size_t(-1)) m_size = num_rows;
+    if (num_rows != size_t(-1))
+        m_size = num_rows;
 }
 
 void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
@@ -1781,7 +1786,7 @@ template <class T> std::size_t Table::find_first(std::size_t column_ndx, T value
 }
 
 size_t Table::find_first_int(size_t column_ndx, int64_t value) const
-{    
+{
     return find_first<int64_t>(column_ndx, value);
 }
 
@@ -1913,7 +1918,7 @@ ConstTableView Table::find_all_string(size_t column_ndx, StringData value) const
 
     ColumnType type = get_real_column_type(column_ndx);
     ConstTableView tv(*this);
-    
+
     if(m_columns.is_attached()) {
         if (type == col_type_String) {
             const AdaptiveStringColumn& column = get_column_string(column_ndx);

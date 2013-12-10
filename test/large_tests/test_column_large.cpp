@@ -44,11 +44,11 @@ TEST(LESS)
                      -2147483647LL, -2147483646LL, -2147483649LL, -4294967296LL, -4294967295LL,
                      4294967297LL, -4294967294LL, -9223372036854775807LL, (-9223372036854775807LL - 1), -9223372036854775806LL,
                      /* (-9223372036854775807LL - 1) because -9223372036854775808LL is buggy; it's seen as a minus token and then a right-hand-side
-                     exceeding long long's range. Furthermore, std::numeric_limits<int64_t>::min is typedef'ed to 'long long' which cannot be used in 
+                     exceeding long long's range. Furthermore, std::numeric_limits<int64_t>::min is typedef'ed to 'long long' which cannot be used in
                      initializer list for int64_t */
     };
 
-    
+
 
     for (size_t w = 0; w < sizeof(v) / sizeof(*v); w++) {
         const size_t LEN = 64 * 20 + 1000;
@@ -158,7 +158,7 @@ TEST(LESS)
                             akku.clear();
                             state.init(act_FindAll, &akku, size_t(-1));
                             a.find(cond_Less, act_FindAll, v[w], from, to, 0, &state);
-                    
+
                             a.set(match, v[w]);
                             a.set(match + off, v[w]);
 

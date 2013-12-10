@@ -17,14 +17,15 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TUPLE_HPP
-#define TIGHTDB_TUPLE_HPP
+#ifndef TIGHTDB_UTIL_TUPLE_HPP
+#define TIGHTDB_UTIL_TUPLE_HPP
 
 #include <ostream>
 
-#include <tightdb/type_list.hpp>
+#include <tightdb/util/type_list.hpp>
 
 namespace tightdb {
+namespace util {
 
 
 template<class L> struct Tuple {
@@ -101,31 +102,36 @@ inline Tuple<typename TypeAppend<L,V>::type> operator,(const Tuple<L>& t, const 
     return append(t,v);
 }
 
+} // namespace util
+
 namespace _impl {
     template<class L, int i> struct TupleAt {
-        static typename TypeAt<L,i>::type exec(const Tuple<L>& t)
+        static typename util::TypeAt<L,i>::type exec(const util::Tuple<L>& t)
         {
             return TupleAt<typename L::tail, i-1>::exec(t.m_tail);
         }
     };
     template<class L> struct TupleAt<L,0> {
-        static typename L::head exec(const Tuple<L>& t) { return t.m_head; }
+        static typename L::head exec(const util::Tuple<L>& t) { return t.m_head; }
     };
 
     template<class Ch, class Tr, class T>
-    inline void write(std::basic_ostream<Ch, Tr>& out, const Tuple<TypeCons<T, void> >& t)
+    inline void write(std::basic_ostream<Ch, Tr>& out,
+                      const util::Tuple<util::TypeCons<T, void> >& t)
     {
         out << t.m_head;
     }
     template<class Ch, class Tr>
-    inline void write(std::basic_ostream<Ch, Tr>&, const Tuple<void>&) {}
+    inline void write(std::basic_ostream<Ch, Tr>&, const util::Tuple<void>&) {}
     template<class Ch, class Tr, class L>
-    inline void write(std::basic_ostream<Ch, Tr>& out, const Tuple<L>& t)
+    inline void write(std::basic_ostream<Ch, Tr>& out, const util::Tuple<L>& t)
     {
         out << t.m_head << ',';
         write(out, t.m_tail);
     }
 }
+
+namespace util {
 
 template<int i, class L> inline typename TypeAt<L,i>::type at(const Tuple<L>& tuple)
 {
@@ -160,6 +166,7 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
 }
 
 
+} // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_TUPLE_HPP
+#endif // TIGHTDB_UTIL_TUPLE_HPP

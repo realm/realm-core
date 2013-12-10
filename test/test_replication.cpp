@@ -2,10 +2,10 @@
 
 #include <UnitTest++.h>
 
-#include <tightdb/config.h>
 #include <tightdb.hpp>
-#include <tightdb/unique_ptr.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/features.h>
+#include <tightdb/util/unique_ptr.hpp>
+#include <tightdb/util/file.hpp>
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
 

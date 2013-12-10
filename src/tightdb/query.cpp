@@ -14,7 +14,7 @@ namespace {
 const size_t thread_chunk_size = 1000;
 }
 
-Query::Query() 
+Query::Query()
 {
     Create();
 //    expression(static_cast<Expression*>(this));
@@ -507,7 +507,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
         // - this bypasses the query system and is faster
         // User created query with no criteria; aggregate range
         if (resultcount) {
-            *resultcount = limit < (end - start) ? limit : (end - start);            
+            *resultcount = limit < (end - start) ? limit : (end - start);
         }
         // direct aggregate on the column
         return (column.*aggregateMethod)(start, end, limit);
@@ -550,8 +550,8 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
         size_t td;
 
         while (start < end) {
-            size_t best = std::distance(pn->m_children.begin(), 
-                                        std::min_element(pn->m_children.begin(), pn->m_children.end(), 
+            size_t best = std::distance(pn->m_children.begin(),
+                                        std::min_element(pn->m_children.begin(), pn->m_children.end(),
                                                          ParentNode::score_compare()));
 
             // Find a large amount of local matches in best condition
@@ -1035,7 +1035,7 @@ void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
 *
 ******************************************************************************************************************** */
 
-Query& Query::and_query(Query q) 
+Query& Query::and_query(Query q)
 {
     ParentNode* const p = q.first[0];
     UpdatePointers(p, &p->m_child);
@@ -1059,7 +1059,7 @@ Query Query::operator||(Query q)
 
     return q2;
 }
- 
+
 
 Query Query::operator&&(Query q)
 {
@@ -1075,4 +1075,4 @@ Query Query::operator&&(Query q)
 
     return q2;
 }
- 
+

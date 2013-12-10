@@ -17,12 +17,12 @@
  * from TightDB Incorporated.
  *
  *************************************************************************/
-#ifndef TIGHTDB_CONFIG_H
-#define TIGHTDB_CONFIG_H
+#ifndef TIGHTDB_UTIL_FEATURES_H
+#define TIGHTDB_UTIL_FEATURES_H
 
 
 #ifdef TIGHTDB_HAVE_CONFIG
-#  include <tightdb/build_config.h>
+#  include <tightdb/util/config.h>
 #else
 #  define TIGHTDB_VERSION "unknown"
 #  ifndef _WIN32
@@ -248,4 +248,4 @@
 #endif
 
 
-#endif /* TIGHTDB_CONFIG_H */
+#endif /* TIGHTDB_UTIL_FEATURES_H */
