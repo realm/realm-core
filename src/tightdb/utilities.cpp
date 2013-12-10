@@ -17,19 +17,23 @@
 namespace {
 
 #ifdef TIGHTDB_COMPILER_SSE
-#  if defined TIGHTDB_COMPILER_AVX && defined __GNUC__
-#    define _XCR_XFEATURE_ENABLED_MASK 0
+#  if !defined __clang__ && ((_MSC_FULL_VER >= 160040219) || defined __GNUC__)
+#    if defined TIGHTDB_COMPILER_AVX && defined __GNUC__
+#      define _XCR_XFEATURE_ENABLED_MASK 0
+
 inline unsigned long long _xgetbv(unsigned index)
 {
-#    if TIGHTDB_HAVE_AT_LEAST_GCC(4, 4)
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 4)
     unsigned int eax, edx;
     __asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index));
     return (static_cast<unsigned long long>(edx) << 32) | eax;
-#    else
+#else
     static_cast<void>(index);
     return 0;
-#    endif
+#endif
 }
+
+#    endif
 #  endif
 #endif
 
