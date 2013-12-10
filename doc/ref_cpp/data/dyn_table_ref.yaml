@@ -408,7 +408,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_add_empty_row_summary
                  Append empty rows.
       DESCR    : &g_dyn_table_add_empty_row_descr
-                 This method adds one or more empty rows at the end of the table. 
+                 This method adds one or more empty rows at the end of the table.
                  The default cell values are 0, null, or "", as appropriate to the column types.
                  The table is required to have at least one column.
       SIGNATURE: |
@@ -1147,7 +1147,7 @@ CATEGORIES :
       TITLE    : average_*
       NAMES    : [average_int, average_float, average_double]
       SUMMARY  : &g_dyn_table_average_summary
-                 Calculates the average.
+                 Calculate the average value.
       DESCR    : &g_dyn_table_average_descr
                  This method calculates the average value in the specified column.
       CONST    : True

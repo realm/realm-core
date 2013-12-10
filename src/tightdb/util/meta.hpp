@@ -17,20 +17,21 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_META_HPP
-#define TIGHTDB_META_HPP
+#ifndef TIGHTDB_UTIL_META_HPP
+#define TIGHTDB_UTIL_META_HPP
 
 #include <climits>
 #include <cwchar>
 #include <limits>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 
 #ifdef TIGHTDB_HAVE_CXX11_TYPE_TRAITS
 #  include <type_traits>
 #endif
 
 namespace tightdb {
+namespace util {
 
 
 /// A ternary operator that selects the first type if the condition
@@ -170,7 +171,7 @@ private:
     T m_value;
 };
 
-
+} // namespace util
 
 namespace _impl {
     template<class T, bool is_signed> struct IsNegative {
@@ -181,6 +182,8 @@ namespace _impl {
     };
 }
 
+namespace util {
+
 /// This function allows you to test for a negative value in any
 /// numeric type. Normally, if the type is unsigned, such a test will
 /// produce a compiler warning.
@@ -189,22 +192,8 @@ template<class T> inline bool is_negative(T value)
     return _impl::IsNegative<T, std::numeric_limits<T>::is_signed>::__test(value);
 }
 
-// Emulates nullptr of C++11
-const class {
-public:
-    template<class T> operator T*() const
-    {
-        return 0;
-    }
-    template<class C, class T> operator T C::*() const 
-    {
-        return 0;
-    }
-private:
-    void operator& () const;
-} null_ptr = {};   
 
-
+} // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_META_HPP
+#endif // TIGHTDB_UTIL_META_HPP

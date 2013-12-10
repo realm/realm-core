@@ -21,14 +21,14 @@
 #  endif
 #endif
 
-#include <tightdb/assert.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
+#include <tightdb/util/string_buffer.hpp>
+#include <tightdb/util/file.hpp>
 #include <tightdb/exceptions.hpp>
-#include <tightdb/safe_int_ops.hpp>
-#include <tightdb/string_buffer.hpp>
-#include <tightdb/file.hpp>
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 
 namespace {
@@ -98,6 +98,7 @@ string get_last_error_msg(const char* prefix, DWORD err)
 
 
 namespace tightdb {
+namespace util {
 
 
 void make_dir(const string& path)
@@ -182,6 +183,7 @@ string make_temp_dir()
 }
 
 
+} // namespace util
 } // namespace tightdb
 
 
@@ -222,16 +224,17 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
     if (handle != INVALID_HANDLE_VALUE) {
         m_handle    = handle;
         m_have_lock = false;
-        if (success != null_ptr) *success = true;
+        if (success)
+            *success = true;
         return;
     }
 
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    if ((success != null_ptr) && (err == ERROR_FILE_EXISTS) && (c == create_Must)) {
+    if (success && err == ERROR_FILE_EXISTS && c == create_Must) {
         *success = false;
         return;
     }
-    if ((success != null_ptr) && (err == ERROR_FILE_NOT_FOUND) && (c == create_Never)) {
+    if (success && err == ERROR_FILE_NOT_FOUND && c == create_Never) {
         *success = false;
         return;
     }
@@ -262,16 +265,17 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
     int fd = ::open(path.c_str(), flags2, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     if (0 <= fd) {
         m_fd = fd;
-        if (success != null_ptr) *success = true;
+        if (success)
+            *success = true;
         return;
     }
 
     int err = errno; // Eliminate any risk of clobbering
-    if ((success != null_ptr) && (err == EEXIST) && (c == create_Must)) {
+    if (success && err == EEXIST && c == create_Must) {
         *success = false;
         return;
     }
-    if ((success != null_ptr) && (err == ENOENT) && (c == create_Never)) {
+    if (success && err == ENOENT && c == create_Never) {
         *success = false;
         return;
     }

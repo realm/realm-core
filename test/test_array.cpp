@@ -75,7 +75,7 @@ TEST(UPPERLOWERBOUND)
         }
 
         int64_t searches = val; // val exceeds last value by rand() % 4
-        for(size_t s = 0; s < searches; s++) {
+        for(int64_t s = 0; s < searches; s++) {
             size_t uarr = a.upper_bound_int(s);
             size_t larr = a.lower_bound_int(s);
             size_t uvec = std::upper_bound(v.begin(), v.end(), s) - v.begin();

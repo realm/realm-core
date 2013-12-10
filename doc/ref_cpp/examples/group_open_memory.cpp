@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <tightdb.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/file.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -42,7 +42,7 @@ int main()
         throw;
     }
     free(const_cast<char*>(buffer.data()));
-    File::remove("people.tightdb");
+    util::File::remove("people.tightdb");
 }
 // @@EndFold@@
 // @@EndExample@@

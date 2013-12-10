@@ -1,4 +1,4 @@
-NOINST_PROGRAMS = table dyntable query view group sharedgroup
+noinst_PROGRAMS = table dyntable query view group sharedgroup
 
 table_SOURCES = table.cpp
 table_LDFLAGS =
@@ -24,4 +24,4 @@ sharedgroup_SOURCES = sharedgroup.cpp
 sharedgroup_LDFLAGS =
 sharedgroup_LIBS = ../../src/tightdb/libtightdb.a
 
-include ../../generic.mk
+include ../../src/generic.mk

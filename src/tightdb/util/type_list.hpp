@@ -17,10 +17,11 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_TYPE_LIST_HPP
-#define TIGHTDB_TYPE_LIST_HPP
+#ifndef TIGHTDB_UTIL_TYPE_LIST_HPP
+#define TIGHTDB_UTIL_TYPE_LIST_HPP
 
 namespace tightdb {
+namespace util {
 
 
 /**
@@ -161,6 +162,7 @@ template<template<class T, int i> class Pred, int i> struct HasType<void, Pred, 
 };
 
 
+} // namespace util
 } // namespace tightdb
 
-#endif // TIGHTDB_TYPE_LIST_HPP
+#endif // TIGHTDB_UTIL_TYPE_LIST_HPP

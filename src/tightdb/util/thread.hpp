@@ -17,23 +17,20 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_THREAD_HPP
-#define TIGHTDB_THREAD_HPP
+#ifndef TIGHTDB_UTIL_THREAD_HPP
+#define TIGHTDB_UTIL_THREAD_HPP
 
 #include <exception>
 
 #include <pthread.h>
-#ifdef TIGHTDB_PTHREADS_TEST
-#include <../test/pthread_test.hpp>
-#endif
 #include <errno.h>
 #include <cstddef>
 
-#include <tightdb/config.h>
-#include <tightdb/assert.hpp>
-#include <tightdb/terminate.hpp>
-#include <tightdb/unique_ptr.hpp>
-#include <tightdb/meta.hpp>
+#include <tightdb/util/features.h>
+#include <tightdb/util/assert.hpp>
+#include <tightdb/util/terminate.hpp>
+#include <tightdb/util/unique_ptr.hpp>
+#include <tightdb/util/meta.hpp>
 
 #ifdef TIGHTDB_HAVE_CXX11_ATOMIC
 #  include <atomic>
@@ -41,6 +38,7 @@
 
 
 namespace tightdb {
+namespace util {
 
 
 /// A separate thread of execution.
@@ -227,7 +225,7 @@ public:
     /// Wait for another thread to call notify() or notify_all().
     void wait(Mutex::Lock& l) TIGHTDB_NOEXCEPT;
     template<class Func>
-    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = null_ptr);
+    void wait(RobustMutex& m, Func recover_func, const struct timespec* tp = 0);
 
     /// If any threads are wating for this condition, wake up at least
     /// one.
@@ -420,9 +418,10 @@ template<class Func>
 inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
     int r;
-    if (tp == null_ptr) {
+    if (!tp) {
         r = pthread_cond_wait(&m_impl, &m.m_impl);
-    } else {
+    }
+    else {
         r = pthread_cond_timedwait(&m_impl, &m.m_impl, tp);
         if (r == ETIMEDOUT)
             return;
@@ -432,7 +431,7 @@ inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timesp
 #ifdef TIGHTDB_HAVE_ROBUST_PTHREAD_MUTEX
     if (r == ENOTRECOVERABLE)
         throw NotRecoverable();
-    if (r != EOWNERDEAD) 
+    if (r != EOWNERDEAD)
         lock_failed(r); // does not return
 #endif
     try {
@@ -505,17 +504,17 @@ public:
         state = 0;
     }
 
-    inline Atomic(T init_value) 
-    { 
-        state = init_value; 
+    inline Atomic(T init_value)
+    {
+        state = init_value;
     }
 
     T load() const;
     T load_acquire() const;
     T load_relaxed() const;
-    void store(T value); 
-    void store_release(T value); 
-    void store_relaxed(T value); 
+    void store(T value);
+    void store_release(T value);
+    void store_relaxed(T value);
     bool compare_and_swap(T oldvalue, T newvalue);
 private:
     // the following is not supported
@@ -530,7 +529,7 @@ private:
     volatile T state;
 #else
 #ifdef __GNUC__
-    T state; 
+    T state;
 #else
 #error "Atomic is not support on this compiler"
 #endif
@@ -559,25 +558,25 @@ inline T Atomic<T>::load_relaxed() const
 }
 
 template<typename T>
-inline void Atomic<T>::store(T value) 
+inline void Atomic<T>::store(T value)
 {
     state.store(value);
 }
 
 template<typename T>
-inline void Atomic<T>::store_release(T value) 
+inline void Atomic<T>::store_release(T value)
 {
     state.store(value, std::memory_order_release);
 }
 
 template<typename T>
-inline void Atomic<T>::store_relaxed(T value) 
+inline void Atomic<T>::store_relaxed(T value)
 {
     state.store(value, std::memory_order_relaxed);
 }
 
 template<typename T>
-inline bool Atomic<T>::compare_and_swap(T oldvalue, T newvalue) 
+inline bool Atomic<T>::compare_and_swap(T oldvalue, T newvalue)
 {
     return state.compare_exchange_weak(oldvalue, newvalue);
 }
@@ -603,20 +602,20 @@ inline T Atomic<T>::load_acquire() const
 }
 
 template<typename T>
-inline void Atomic<T>::store(T value) 
+inline void Atomic<T>::store(T value)
 {
     state = value;
 }
 
 template<typename T>
-inline void Atomic<T>::store_relaxed(T value) 
+inline void Atomic<T>::store_relaxed(T value)
 {
     state = value;
 
 }
 
 template<typename T>
-inline void Atomic<T>::store_release(T value) 
+inline void Atomic<T>::store_release(T value)
 {
     state = value;
 }
@@ -628,7 +627,7 @@ template<typename T>
 inline T Atomic<T>::load_acquire() const
 {
     T retval;
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     retval = __atomic_load_n(&state, __ATOMIC_ACQUIRE);
 #else
     __sync_synchronize();
@@ -641,7 +640,7 @@ template<typename T>
 inline T Atomic<T>::load_relaxed() const
 {
     T retval;
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     retval = __atomic_load_n(&state, __ATOMIC_RELAXED);
 #else
     if (sizeof(T) >= sizeof(ptrdiff_t)) {
@@ -651,7 +650,7 @@ inline T Atomic<T>::load_relaxed() const
         retval = state;
         asm volatile ("" : : : "memory");
         T val = state;
-        while (retval != val) { 
+        while (retval != val) {
             asm volatile ("" : : : "memory");
             val = retval;
             retval = state;
@@ -667,7 +666,7 @@ inline T Atomic<T>::load_relaxed() const
 template<typename T>
 inline T Atomic<T>::load() const
 {
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     T retval = __atomic_load_n(&state, __ATOMIC_SEQ_CST);
 #else
     __sync_synchronize();
@@ -677,9 +676,9 @@ inline T Atomic<T>::load() const
 }
 
 template<typename T>
-inline void Atomic<T>::store(T value) 
+inline void Atomic<T>::store(T value)
 {
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     __atomic_store_n(&state, value, __ATOMIC_SEQ_CST);
 #else
     if (sizeof(T) >= sizeof(ptrdiff_t)) {
@@ -699,9 +698,9 @@ inline void Atomic<T>::store(T value)
 }
 
 template<typename T>
-inline void Atomic<T>::store_release(T value) 
+inline void Atomic<T>::store_release(T value)
 {
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     __atomic_store_n(&state, value, __ATOMIC_RELEASE);
 #else
     // prior to gcc 4.7 we have no portable way of expressing
@@ -711,9 +710,9 @@ inline void Atomic<T>::store_release(T value)
 }
 
 template<typename T>
-inline void Atomic<T>::store_relaxed(T value) 
+inline void Atomic<T>::store_relaxed(T value)
 {
-#ifdef TIGHTDB_HAVE_GCC_GE_4_7
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
     __atomic_store_n(&state, value, __ATOMIC_RELAXED);
 #else
     // prior to gcc 4.7 we have no portable way of expressing
@@ -724,7 +723,7 @@ inline void Atomic<T>::store_relaxed(T value)
 }
 
 template<typename T>
-inline bool Atomic<T>::compare_and_swap(T oldvalue, T newvalue) 
+inline bool Atomic<T>::compare_and_swap(T oldvalue, T newvalue)
 {
     return __sync_bool_compare_and_swap(&state, oldvalue, newvalue);
 }
@@ -747,9 +746,9 @@ public:
         state = 0;
     }
 
-    inline Relaxed(T init_value) 
-    { 
-        state = init_value; 
+    inline Relaxed(T init_value)
+    {
+        state = init_value;
     }
 
     T load_relaxed() const
@@ -775,7 +774,7 @@ private:
     volatile T state;
 #else
 #ifdef __GNUC__
-    T state; 
+    T state;
 #else
 #error "Unsupported use of Relaxed on this compiler"
 #endif
@@ -783,10 +782,7 @@ private:
 };
 
 
-
-
+} // namespace util
 } // namespace tightdb
 
-
-
-#endif // TIGHTDB_THREAD_HPP
+#endif // TIGHTDB_UTIL_THREAD_HPP

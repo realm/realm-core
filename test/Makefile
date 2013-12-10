@@ -8,13 +8,10 @@ test_tightdb_DEPS = util
 test_sqlite3_DEPS = util
 test_stl_DEPS     = util
 
-TEST_PROGRAMS = tightdb-tests
+check_PROGRAMS = tightdb-tests
 
-TEST_SOURCES := $(wildcard *.c *.cpp large_tests/*.cpp)
-tightdb_tests_SOURCES = $(TEST_SOURCES)
-tightdb_tests_LIBS    = util/test-util.a
-
-EXTRA_CLEAN_DIRS = large_tests
+tightdb_tests_SOURCES := $(wildcard *.c *.cpp large_tests/*.cpp)
+tightdb_tests_LIBS    := util/test-util.a
 
 ifeq ($(shell pkg-config unittest++ --exists 2>/dev/null && echo yes),yes)
 UNITTESTPP_CFLAGS  := $(shell pkg-config unittest++ --cflags)
@@ -28,10 +25,8 @@ tightdb_tests_LDFLAGS = -LUnitTest++ -lUnitTest++
 tightdb_tests_DEPS    = fallback-UnitTest++
 endif
 
-include ../src/generic.mk
-
 .PHONY: benchmark
-benchmark: test-norun/subdir/test-tightdb test-norun/subdir/test-sqlite3 test-norun/subdir/test-stl
+benchmark: check-norun/subdir/test-tightdb check-norun/subdir/test-sqlite3 check-norun/subdir/test-stl
 	@echo ""
 	@echo ".:: TightDB ::."
 	test-tightdb/test-tightdb
@@ -55,37 +50,40 @@ fallback-UnitTest++:
 
 # Build and run the performance matrix benchmarking program
 .PHONY: performance
-performance: test-norun/subdir/util
-	@$(MAKE) -C performance test
+performance: check-norun/subdir/util
+	@$(MAKE) -C performance check
 
 # Build the add/insert benchmark
 .PHONY: benchmark-insert-add
-benchmark-insert-add: test-norun/subdir/util
-	@$(MAKE) -C benchmark-insert-add test-norun
+benchmark-insert-add: check-norun/subdir/util
+	@$(MAKE) -C benchmark-insert-add check-norun
 
 # Build and run the insert/get/set benchmark
 .PHONY: benchmark-insert-get-set
-benchmark-insert-get-set: test-norun/subdir/util
-	@$(MAKE) -C benchmark-insert-get-set test
+benchmark-insert-get-set: check-norun/subdir/util
+	@$(MAKE) -C benchmark-insert-get-set check
 
 # Build and run the prealloc benchmark
 .PHONY: benchmark-prealloc
-benchmark-prealloc: test-norun/subdir/util
-	@$(MAKE) -C benchmark-prealloc test
+benchmark-prealloc: check-norun/subdir/util
+	@$(MAKE) -C benchmark-prealloc check
 
 # Build the index benchmark
 .PHONY: benchmark-index
-benchmark-index: test-norun/subdir/util
-	@$(MAKE) -C benchmark-index test-norun
+benchmark-index: check-norun/subdir/util
+	@$(MAKE) -C benchmark-index check-norun
 
 # Build the transaction benchmark
 .PHONY: benchmark-transaction
-benchmark-transaction: test-norun/subdir/util
-	@$(MAKE) -C benchmark-transaction test-norun
+benchmark-transaction: check-norun/subdir/util
+	@$(MAKE) -C benchmark-transaction check-norun
 
 # Build and run whatever is in experiements/testcase.cpp
 .PHONY: testcase testcase-debug
-testcase: test-norun/subdir/util
-	@$(MAKE) -C experiments test
-testcase-debug: test-debug-norun/subdir/util
-	@$(MAKE) -C experiments test-debug
+testcase: check-norun/subdir/util
+	@$(MAKE) -C experiments check
+testcase-debug: check-debug-norun/subdir/util
+	@$(MAKE) -C experiments check-debug
+
+
+include ../src/generic.mk

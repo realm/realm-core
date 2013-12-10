@@ -24,7 +24,7 @@
 #include <algorithm>
 #include <ostream>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/utilities.hpp>
 
 namespace tightdb {

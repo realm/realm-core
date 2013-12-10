@@ -90,7 +90,9 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <functional>
 #include <algorithm>
 
-#include <tightdb/meta.hpp>
+#include <tightdb/util/meta.hpp>
+#include <tightdb/util/utf8.hpp>
+#include <tightdb/utilities.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/table_view.hpp>
 #include <tightdb/column_fwd.hpp>
@@ -98,11 +100,24 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/column_binary.hpp>
 #include <tightdb/column_basic.hpp>
-#include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/array_basic.hpp>
 #include <tightdb/array_string.hpp>
 
+#if _MSC_FULL_VER >= 160040219
+#  include <immintrin.h>
+#endif
+
+/*
+
+typedef float __m256 __attribute__ ((__vector_size__ (32),
+                     __may_alias__));
+typedef long long __m256i __attribute__ ((__vector_size__ (32),
+                      __may_alias__));
+typedef double __m256d __attribute__ ((__vector_size__ (32),
+                       __may_alias__));
+
+*/
 
 namespace tightdb {
 
@@ -413,13 +428,15 @@ public:
             }
 
             // Sum of float column must accumulate in double
-            TIGHTDB_STATIC_ASSERT( !(TAction == act_Sum && (SameType<TSourceColumn, float>::value && !SameType<TResult, double>::value)), "");
+            TIGHTDB_STATIC_ASSERT(!(TAction == act_Sum &&
+                                    util::SameType<TSourceColumn, float>::value &&
+                                    !util::SameType<TResult, double>::value), "");
 
             // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
             if (m == r) {
                 // TResult: type of query result
                 // TSourceColumn: type of aggregate source
-                TSourceColumn av = (TSourceColumn)0; 
+                TSourceColumn av = TSourceColumn(0);
                 // uses_val test becuase compiler cannot see that Column::Get has no side effect and result is discarded
                 if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != null_ptr) {
                     TIGHTDB_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != null_ptr);
@@ -427,7 +444,7 @@ public:
                 }
                 TIGHTDB_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != null_ptr);
                 bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av));
-                if(!cont)
+                if (!cont)
                     return static_cast<size_t>(-1);
              }
         }
@@ -474,7 +491,7 @@ protected:
 };
 
 // Used for performing queries on a Tableview. This is done by simply passing the TableView to this query condition
-// actually it's the Array of the TableView which is passed). TableView must be sorted for Array::FindGTE to work 
+// actually it's the Array of the TableView which is passed). TableView must be sorted for Array::FindGTE to work
 // correctly.
 class ListviewNode: public ParentNode {
 public:
@@ -710,13 +727,13 @@ public:
                 end2 = end - m_leaf_start;
 
             // If there are no other nodes than us (m_conds == 1) AND the column used for our condition is
-            // the same as the column used for the aggregate action, then the entire query can run within scope of that 
+            // the same as the column used for the aggregate action, then the entire query can run within scope of that
             // column only, with no references to other columns:
             if (m_conds == 1 && (source_column == null_ptr ||
-                (SameType<TSourceColumn, int64_t>::value
-                 && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))) {
+                                 (util::SameType<TSourceColumn, int64_t>::value
+                                  && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))) {
                 bool cont = m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
-                if(!cont)
+                if (!cont)
                     return not_found;
             }
             // Else, for each match in this node, call our IntegerNode::match_callback to test remaining nodes and/or extract
@@ -725,7 +742,7 @@ public:
                 m_source_column = source_column;
                 bool cont = m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, null_ptr,
                              std::bind1st(std::mem_fun(&IntegerNode::template match_callback<TAction, TSourceColumn>), this));
-                if(!cont)
+                if (!cont)
                     return not_found;
             }
 
@@ -929,8 +946,8 @@ public:
         char* upper = new char[6 * v.size()];
         char* lower = new char[6 * v.size()];
 
-        bool b1 = case_map(v, lower, false);
-        bool b2 = case_map(v, upper, true);
+        bool b1 = util::case_map(v, lower, false);
+        bool b2 = util::case_map(v, upper, true);
         if (!b1 || !b2)
             error_code = "Malformed UTF-8: " + std::string(v);
 
@@ -1297,8 +1314,8 @@ private:
 // OR node contains 3 Node pointers; m_cond[0], m_cond[1] and m_child
 //
 // For 'second.equal(23).begin_group().first.equal(111).Or().first.equal(222).end_group().third().equal(555)', this
-// will first set m_cond[0] = left-hand-side through constructor, and then later, when .first.equal(222) is invoked, 
-// invocation will set m_cond[1] = right-hand-side through Query& Query::Or() (see query.cpp). In there, m_child is 
+// will first set m_cond[0] = left-hand-side through constructor, and then later, when .first.equal(222) is invoked,
+// invocation will set m_cond[1] = right-hand-side through Query& Query::Or() (see query.cpp). In there, m_child is
 // also set to next AND condition (if any exists) following the OR. So we have following pointers:
 //
 //                        Equal(23)
@@ -1435,7 +1452,7 @@ public:
         size_t s = start;
 
         while (s < end) {
-            if (SameType<TConditionValue, int64_t>::value) {
+            if (util::SameType<TConditionValue, int64_t>::value) {
                 // For int64_t we've created an array intrinsics named CompareLeafs which template expands bitwidths
                 // of boths arrays to make Get faster.
                 m_getter1.cache_next(s);
@@ -1451,6 +1468,18 @@ public:
             }
             else {
                 // This is for float and double.
+
+#if 0 && defined(TIGHTDB_COMPILER_AVX)
+// AVX has been disabled because of array alignment (see https://app.asana.com/0/search/8836174089724/5763107052506)
+//
+// For AVX you can call things like if (sseavx<1>()) to test for AVX, and then utilize _mm256_movemask_ps (VC)
+// or movemask_cmp_ps (gcc/clang)
+//
+// See https://github.com/rrrlasse/tightdb/tree/AVX for an example of utilizing AVX for a two-column search which has
+// been benchmarked to: floats: 288 ms vs 552 by using AVX compared to 2-level-unrolled FPU loop. doubles: 415 ms vs
+// 475 (more bandwidth bound). Tests against SSE have not been performed; AVX may not pay off. Please benchmark
+#endif
+
                 TConditionValue v1 = m_getter1.get_next(s);
                 TConditionValue v2 = m_getter2.get_next(s);
                 TConditionFunction C;
@@ -1486,18 +1515,18 @@ class ExpressionNode: public ParentNode {
 public:
     ~ExpressionNode() TIGHTDB_NOEXCEPT
     {
-        if(m_auto_delete)
+        if (m_auto_delete)
             delete m_compare, m_compare = null_ptr;
     }
 
-    ExpressionNode(Expression* compare, bool auto_delete) 
+    ExpressionNode(Expression* compare, bool auto_delete)
     {
         m_auto_delete = auto_delete;
         m_child = 0;
         m_compare = compare;
     }
 
-    void init(const Table& table) 
+    void init(const Table& table)
     {
         m_compare->set_table(&table);
         if (m_child)
@@ -1509,7 +1538,7 @@ public:
         size_t res = m_compare->find_first(start, end);
         return res;
     }
-    
+
     bool m_auto_delete;
     Expression* m_compare;
 };

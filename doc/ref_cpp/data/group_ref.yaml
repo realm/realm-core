@@ -121,7 +121,7 @@ CATEGORIES  :
                  group, and in case the buffer needs to be deallocated
                  afterwards, that is your responsibility too.
 
-                 If an exception is signalled, the caller retains ownership 
+                 If an exception is signalled, the caller retains ownership
                  and must free the buffer, even if <tt>take_ownership</tt> was true.
       RETURN:
         TYPES  : Group
@@ -222,8 +222,8 @@ CATEGORIES  :
 
                  Specifying a memory buffer is equivalent to
                  specifying a file except that (a) in this case the
-                 database is assumed to be stored in that buffer instead 
-                 of a file and (b) it is not possible to use commit or in 
+                 database is assumed to be stored in that buffer instead
+                 of a file and (b) it is not possible to use commit or in
                  other ways change the buffer. If you change the contents
                  of the group and want to persist your changes you must
                  use one of the functions for serialization.
@@ -500,10 +500,10 @@ CATEGORIES  :
       NAME     : write_to_mem
       SUMMARY  : &g_group_write_to_mem_summary
                  Write a group to an in-memory buffer.
-      DESCR    : 
+      DESCR    :
       - TEXT   : &g_group_write_to_mem_descr
                  This method will write the group to an in-memory buffer. This may be useful if you
-                 want to transfer a group over a network connection. 
+                 want to transfer a group over a network connection.
       - TEXT   : The returned buffer will have been
                  allocated using std::malloc(). The ownership of the buffer is passed to the caller.
       CONST    : true
@@ -518,9 +518,9 @@ CATEGORIES  :
       NAME     : to_string
       SUMMARY  : &g_group_to_string_summary
                  Get a string representation of the group.
-      DESCR:    
+      DESCR:
       - TEXT   : &g_group_to_string_descr
-                 This method provides a string representation of the group. 
+                 This method provides a string representation of the group.
       - TEXT   : The string representation is added to an output stream.
       CONST    : true
       PARAMS:
@@ -537,7 +537,7 @@ CATEGORIES  :
       SUMMARY  : &g_group_to_json_summary
                  Get a JSON representation of the group.
       SIGNATURE: template<class S> void to_json(S& out) const
-      DESCR    : 
+      DESCR    :
       - TEXT   : &g_group_to_json_descr
                  This methods provides a JSON representation of the group.
                  The group is represented as an JSON object where the tables are

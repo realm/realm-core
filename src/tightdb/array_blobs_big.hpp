@@ -29,7 +29,7 @@ class ArrayBigBlobs: public Array {
 public:
     typedef BinaryData value_type;
 
-    explicit ArrayBigBlobs(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+    explicit ArrayBigBlobs(ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
                          Allocator& = Allocator::get_default());
     ArrayBigBlobs(MemRef, ArrayParent*, std::size_t ndx_in_parent,
                 Allocator&) TIGHTDB_NOEXCEPT;
