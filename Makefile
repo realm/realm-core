@@ -62,7 +62,7 @@ lcov: check-cover
 # Run coverage analysis after building everything, this time using GCOVR
 .PHONY: gcovr
 gcovr: check-cover
-	gcovr -r src -x >gcovr.xml
+	gcovr --filter='.*src/tightdb.*' -x >gcovr.xml
 
 # Build and run whatever is in test/experiements/testcase.cpp
 .PHONY: testcase testcase-debug
