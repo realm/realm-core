@@ -298,13 +298,18 @@ void Table::cache_columns()
 
         // Set table size
         // (and verify that all column are same size)
-        if (num_rows == size_t(-1)) num_rows = colsize;
-        else TIGHTDB_ASSERT(num_rows == colsize);
+        if (num_rows == size_t(-1)) {
+            num_rows = colsize;
+        }
+        else {
+            TIGHTDB_ASSERT(num_rows == colsize);
+        }
 
         ++ndx_in_parent;
     }
 
-    if (num_rows != size_t(-1)) m_size = num_rows;
+    if (num_rows != size_t(-1))
+        m_size = num_rows;
 }
 
 void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
