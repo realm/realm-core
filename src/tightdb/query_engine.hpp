@@ -271,7 +271,9 @@ private:
 
 
 class ParentNode {
+    typedef ParentNode ThisType;
 public:
+
     ParentNode(): m_table(0) {}
 
     void gather_children(std::vector<ParentNode*>& v)
@@ -349,11 +351,8 @@ public:
         return m_child;
     }
 
-    typedef bool (ParentNode::* TColumn_action_specialized)(QueryStateBase*, SequentialGetterBase*, size_t);
-    // Only purpose is to make all IntegerNode classes have this function (overloaded only in IntegerNode)
     virtual void aggregate_local_prepare(Action TAction, DataType col_id)
     {
-        typedef ParentNode ThisType;
         if (TAction == act_ReturnFirst)
             m_column_action_specializer = & ThisType::column_action_specialization<act_ReturnFirst, int64_t>;
         
@@ -474,7 +473,6 @@ public:
 
     ParentNode* m_child;
     std::vector<ParentNode*>m_children;
-TColumn_action_specialized m_column_action_specializer;
     size_t m_condition_column_idx; // Column of search criteria
 
     size_t m_conds;
@@ -486,6 +484,8 @@ TColumn_action_specialized m_column_action_specializer;
 
 
 protected:
+    typedef bool (ParentNode::* TColumn_action_specialized)(QueryStateBase*, SequentialGetterBase*, size_t);
+    TColumn_action_specialized m_column_action_specializer;
     const Table* m_table;
     std::string error_code;
 
@@ -508,7 +508,7 @@ public:
     ListviewNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.size()) {m_child = 0; m_dT = 0.0;}
     ~ListviewNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
-    void init(const Table& table)
+    void init(const Table& table) TIGHTDB_OVERRIDE
     {
         m_table = &table;
 
@@ -522,7 +522,7 @@ public:
         if (m_child) m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end)
+    size_t find_first_local(size_t start, size_t end)  TIGHTDB_OVERRIDE
     {
         // Simply return next TableView item which is >= start
         size_t r = m_arr.FindGTE(start, m_next);
@@ -547,7 +547,8 @@ public:
     SubtableNode(size_t column): m_column(column) {m_child = 0; m_child2 = 0; m_dT = 100.0;}
     SubtableNode() {};
     ~SubtableNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
-    void init(const Table& table)
+
+    void init(const Table& table) TIGHTDB_OVERRIDE
     {
         m_dD = 10.0;
         m_probes = 0;
@@ -565,7 +566,7 @@ public:
             m_child2->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end)
+    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
         TIGHTDB_ASSERT(m_table);
         TIGHTDB_ASSERT(m_child);
@@ -659,6 +660,7 @@ protected:
 // We don't yet have any integer indexes (only for strings), but when we get one, we should specialize it
 // like: template <class TConditionValue, class Equal> class IntegerNode: public ParentNode
 template <class TConditionValue, class TConditionFunction> class IntegerNode: public IntegerNodeBase {
+    typedef IntegerNode<TConditionValue, TConditionFunction> ThisType;
 public:
     typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
 
@@ -670,7 +672,7 @@ public:
     }
     ~IntegerNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
-    void init(const Table& table)
+    void init(const Table& table) TIGHTDB_OVERRIDE
     {
         m_dD = 100.0;
         m_condition_column = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx));
@@ -680,10 +682,7 @@ public:
             m_child->init(table);
     }
 
-    typedef IntegerNode<TConditionValue, TConditionFunction> ThisType;
-    typedef bool (ThisType::* TFind_callback_specialised)(size_t, size_t);
-
-    virtual void aggregate_local_prepare(Action TAction, DataType col_id)
+    void aggregate_local_prepare(Action TAction, DataType col_id) TIGHTDB_OVERRIDE
     {
         m_fastmode_disabled = (col_id == type_Float || col_id == type_Double);
         m_TAction = TAction;
@@ -736,8 +735,8 @@ public:
     }
 
     // FIXME: should be possible to move this up to IntegerNodeBase...
-    virtual size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                           SequentialGetterBase* source_column)
+    size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
+                           SequentialGetterBase* source_column) TIGHTDB_OVERRIDE
     {
         TIGHTDB_ASSERT(m_conds > 0);
         int c = TConditionFunction::condition;
@@ -798,7 +797,7 @@ public:
         }
     }
 
-    size_t find_first_local(size_t start, size_t end)
+    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
         TConditionFunction condition;
         TIGHTDB_ASSERT(m_table);
@@ -841,6 +840,7 @@ public:
     TConditionValue m_value;
 
 protected:
+    typedef bool (ThisType::* TFind_callback_specialised)(size_t, size_t);
 
     const ColType* m_condition_column;                // Column on which search criteria is applied
     TFind_callback_specialised m_find_callback_specialized;
@@ -862,7 +862,7 @@ public:
     }
     ~FloatDoubleNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
-    void init(const Table& table)
+    void init(const Table& table) TIGHTDB_OVERRIDE
     {
         m_dD = 100.0;
         m_table = &table;
@@ -873,7 +873,7 @@ public:
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end)
+    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
         TConditionFunction cond;
 
@@ -912,7 +912,7 @@ public:
         delete[] m_value.data();
     }
 
-    void init(const Table& table)
+    void init(const Table& table) TIGHTDB_OVERRIDE
     {
         m_dD = 100.0;
         m_table = &table;
@@ -923,7 +923,7 @@ public:
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end)
+    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
         TConditionFunction condition;
         for (size_t s = start; s < end; ++s) {
@@ -987,7 +987,7 @@ public:
         clear_leaf_state();
     }
 
-    void init(const Table& table)
+    void init(const Table& table) TIGHTDB_OVERRIDE
     {
         clear_leaf_state();
 
@@ -1025,7 +1025,7 @@ public:
         m_leaf = 0;
     }
 
-    size_t find_first_local(size_t start, size_t end)
+    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
         TConditionFunction cond;
 
@@ -1157,7 +1157,7 @@ public:
         m_index_getter = null_ptr;
     }
 
-    void init(const Table& table)
+    void init(const Table& table) TIGHTDB_OVERRIDE
     {
         deallocate();
         m_dD = 10.0;
@@ -1227,7 +1227,7 @@ public:
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end)
+    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
         TIGHTDB_ASSERT(m_table);
 
@@ -1361,7 +1361,7 @@ public:
     OrNode(ParentNode* p1) {m_child = null_ptr; m_cond[0] = p1; m_cond[1] = null_ptr; m_dT = 50.0;}
     ~OrNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
-    void init(const Table& table)
+    void init(const Table& table) TIGHTDB_OVERRIDE
     {
         m_dD = 10.0;
 
@@ -1381,7 +1381,7 @@ public:
         m_table = &table;
     }
 
-    size_t find_first_local(size_t start, size_t end)
+    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
         for (size_t s = start; s < end; ++s) {
             size_t f[2];
@@ -1407,7 +1407,7 @@ public:
         return not_found;
     }
 
-    virtual std::string validate()
+    std::string validate() TIGHTDB_OVERRIDE
     {
         if (error_code != "")
             return error_code;
@@ -1454,7 +1454,7 @@ public:
         delete[] m_value.data();
     }
 
-    void init(const Table& table)
+    void init(const Table& table) TIGHTDB_OVERRIDE
     {
         typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
         m_dD = 100.0;
@@ -1470,7 +1470,7 @@ public:
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end)
+    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
         size_t s = start;
 
@@ -1549,14 +1549,14 @@ public:
         m_compare = compare;
     }
 
-    void init(const Table& table) 
+    void init(const Table& table)  TIGHTDB_OVERRIDE
     {
         m_compare->set_table(&table);
         if (m_child)
             m_child->init(table);
     }
 
-    size_t find_first_local(size_t start, size_t end)
+    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
         size_t res = m_compare->find_first(start, end);
         return res;
