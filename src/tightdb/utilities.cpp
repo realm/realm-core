@@ -16,19 +16,21 @@
 
 namespace {
 
-#if defined TIGHTDB_COMPILER_AVX && defined __GNUC__
-#  define _XCR_XFEATURE_ENABLED_MASK 0
+#ifdef TIGHTDB_COMPILER_SSE
+#  if defined TIGHTDB_COMPILER_AVX && defined __GNUC__
+#    define _XCR_XFEATURE_ENABLED_MASK 0
 inline unsigned long long _xgetbv(unsigned index)
 {
-#  if TIGHTDB_HAVE_AT_LEAST_GCC(4, 4)
+#    if TIGHTDB_HAVE_AT_LEAST_GCC(4, 4)
     unsigned int eax, edx;
     __asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(index));
     return (static_cast<unsigned long long>(edx) << 32) | eax;
-#  else
+#    else
     static_cast<void>(index);
     return 0;
-#  endif
+#    endif
 }
+#  endif
 #endif
 
 } // anonymous namespace
@@ -44,11 +46,11 @@ void cpuid_init()
 {
 #ifdef TIGHTDB_COMPILER_SSE
     int cret;
-#ifdef _MSC_VER
+#  ifdef _MSC_VER
     int CPUInfo[4];
     __cpuid(CPUInfo, 1);
     cret = CPUInfo[2];
-#else
+#  else
     int a = 1;
     __asm ( "mov %1, %%eax; "            // a into eax
           "cpuid;"
@@ -57,7 +59,7 @@ void cpuid_init()
           :"r"(a)                      // input
           :"%eax","%ebx","%ecx","%edx" // clobbered register
          );
-#endif
+#  endif
 
 // Byte is atomic. Race can/will occur but that's fine
     if (cret & 0x100000) { // test for 4.2
@@ -73,7 +75,7 @@ void cpuid_init()
     bool avxSupported = false;
 
 // seems like in jenkins builds, __GNUC__ is defined for clang?! todo fixme
-#if !defined __clang__ && ((_MSC_FULL_VER >= 160040219) || defined __GNUC__)
+#  if !defined __clang__ && ((_MSC_FULL_VER >= 160040219) || defined __GNUC__)
     bool osUsesXSAVE_XRSTORE = cret & (1 << 27) || false;
     bool cpuAVXSuport = cret & (1 << 28) || false;
 
@@ -82,7 +84,7 @@ void cpuid_init()
         unsigned long long xcrFeatureMask = _xgetbv(_XCR_XFEATURE_ENABLED_MASK);
         avxSupported = (xcrFeatureMask & 0x6) || false;
     }
-#endif
+#  endif
 
     if (avxSupported) {
         avx_support = 0; // AVX1 supported
