@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_TABLE_VIEW_BASIC_HPP
 #define TIGHTDB_TABLE_VIEW_BASIC_HPP
 
-#include <tightdb/meta.hpp>
+#include <tightdb/util/meta.hpp>
 #include <tightdb/table_view.hpp>
 #include <tightdb/table_accessors.hpp>
 
@@ -59,32 +59,38 @@ private:
     typedef typename Tab::spec_type Spec;
 
     template<int col_idx> struct Col {
-        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
+        typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::ColumnAccessor<View, col_idx, value_type> type;
     };
     typedef typename Spec::template ColNames<Col, View*> ColsAccessor;
 
     template<int col_idx> struct ConstCol {
-        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
+        typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::ColumnAccessor<const View, col_idx, value_type> type;
     };
     typedef typename Spec::template ColNames<ConstCol, const View*> ConstColsAccessor;
 
 public:
-    ColsAccessor column() TIGHTDB_NOEXCEPT { return ColsAccessor(static_cast<View*>(this)); }
+    ColsAccessor column() TIGHTDB_NOEXCEPT
+    {
+        return ColsAccessor(static_cast<View*>(this));
+    }
 
-    ConstColsAccessor column() const TIGHTDB_NOEXCEPT { return ConstColsAccessor(static_cast<const View*>(this)); }
+    ConstColsAccessor column() const TIGHTDB_NOEXCEPT
+    {
+        return ConstColsAccessor(static_cast<const View*>(this));
+    }
 
 private:
     template<int col_idx> struct Field {
-        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
-        typedef _impl::FieldAccessor<View, col_idx, value_type, IsConst<Tab>::value> type;
+        typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
+        typedef _impl::FieldAccessor<View, col_idx, value_type, util::IsConst<Tab>::value> type;
     };
     typedef std::pair<View*, std::size_t> FieldInit;
     typedef typename Spec::template ColNames<Field, FieldInit> RowAccessor;
 
     template<int col_idx> struct ConstField {
-        typedef typename TypeAt<typename Spec::Columns, col_idx>::type value_type;
+        typedef typename util::TypeAt<typename Spec::Columns, col_idx>::type value_type;
         typedef _impl::FieldAccessor<const View, col_idx, value_type, true> type;
     };
     typedef std::pair<const View*, std::size_t> ConstFieldInit;

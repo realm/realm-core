@@ -90,7 +90,9 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <functional>
 #include <algorithm>
 
-#include <tightdb/meta.hpp>
+#include <tightdb/util/meta.hpp>
+#include <tightdb/util/utf8.hpp>
+#include <tightdb/utilities.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/table_view.hpp>
 #include <tightdb/column_fwd.hpp>
@@ -98,11 +100,24 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <tightdb/column_string_enum.hpp>
 #include <tightdb/column_binary.hpp>
 #include <tightdb/column_basic.hpp>
-#include <tightdb/utf8.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/array_basic.hpp>
 #include <tightdb/array_string.hpp>
 
+#if _MSC_FULL_VER >= 160040219
+#  include <immintrin.h>
+#endif
+
+/*
+
+typedef float __m256 __attribute__ ((__vector_size__ (32),
+                     __may_alias__));
+typedef long long __m256i __attribute__ ((__vector_size__ (32),
+                      __may_alias__));
+typedef double __m256d __attribute__ ((__vector_size__ (32),
+                       __may_alias__));
+
+*/
 
 namespace tightdb {
 
@@ -318,7 +333,7 @@ public:
                 start = m;
             }
         }
-        return end;
+        return not_found;
     }
 
 
@@ -333,7 +348,7 @@ public:
 
     virtual bool is_initialized() const
     {
-        return m_table != NULL;
+        return m_table != null_ptr;
     }
 
     virtual size_t find_first_local(size_t start, size_t end) = 0;
@@ -365,56 +380,12 @@ public:
                                                  start, end, local_limit, source_column, matchcount);
         else
              // call method in ParentNode
-            r = aggregate_local<TAction, TResult, TSourceColumn>(st, start, end, local_limit, source_column, matchcount);
+            r = node->aggregate_local<TAction, TResult, TSourceColumn>(st, start, end, local_limit, source_column, matchcount);
         return r;
     }
 
 
-    template<Action TAction, class TResult, class TSourceColumn>
-    TResult aggregate(QueryState<TResult>* st, size_t start, size_t end, size_t agg_col, size_t* matchcount)
-    {
-        if (end == not_found)
-            end = m_table->size();
-
-        SequentialGetter<TSourceColumn>* source_column = NULL;
-
-        if (agg_col != not_found)
-            source_column = new SequentialGetter<TSourceColumn>(*m_table, agg_col);
-
-        size_t td;
-
-        while (start < end) {
-            size_t best = std::distance(m_children.begin(), std::min_element(m_children.begin(), m_children.end(), score_compare()));
-
-            // Find a large amount of local matches in best condition
-            td = m_children[best]->m_dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
-
-            start = aggregate_local_selector<TAction, TResult, TSourceColumn>(m_children[best], st, start, td, findlocals, source_column, matchcount);
-
-            // Make remaining conditions compute their m_dD (statistics)
-            for (size_t c = 0; c < m_children.size() && start < end; c++) {
-                if (c == best)
-                    continue;
-
-                // Skip test if there is no way its cost can ever be better than best node's
-                double cost = m_children[c]->cost();
-                if (m_children[c]->m_dT < cost) {
-
-                    // Limit to bestdist in order not to skip too large parts of index nodes
-                    size_t maxD = m_children[c]->m_dT == 0.0 ? end - start : bestdist;
-                    td = m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
-                    start = aggregate_local_selector<TAction, TResult, TSourceColumn>(m_children[c], st, start, td, probe_matches, source_column, matchcount);
-                }
-            }
-        }
-
-        if (matchcount)
-            *matchcount = st->m_match_count;
-        delete source_column;
-
-        return st->m_state;
-
-    }
+    /* FSA: Aggregate was here */
 
     template<Action TAction, class TResult, class TSourceColumn>
     size_t aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
@@ -439,7 +410,7 @@ public:
 
             // Find first match in this condition node
             r = find_first_local(r + 1, end);
-            if (r == end) {
+            if (r == not_found) {
                 m_dD = double(r - start) / (local_matches + 1.1);
                 return end;
             }
@@ -456,18 +427,24 @@ public:
                 }
             }
 
-            TIGHTDB_STATIC_ASSERT( !(TAction == act_Sum && (SameType<TSourceColumn, float>::value && !SameType<TResult, double>::value)), "");
+            // Sum of float column must accumulate in double
+            TIGHTDB_STATIC_ASSERT(!(TAction == act_Sum &&
+                                    util::SameType<TSourceColumn, float>::value &&
+                                    !util::SameType<TResult, double>::value), "");
 
             // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
             if (m == r) {
-                TSourceColumn av = (TSourceColumn)0;
-                if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != NULL) {
-                    TIGHTDB_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != NULL);
+                // TResult: type of query result
+                // TSourceColumn: type of aggregate source
+                TSourceColumn av = TSourceColumn(0);
+                // uses_val test becuase compiler cannot see that Column::Get has no side effect and result is discarded
+                if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != null_ptr) {
+                    TIGHTDB_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != null_ptr);
                     av = static_cast<SequentialGetter<TSourceColumn>*>(source_column)->get_next(r);
                 }
-                TIGHTDB_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != NULL);
+                TIGHTDB_ASSERT(dynamic_cast<QueryState<TResult>*>(st) != null_ptr);
                 bool cont = static_cast<QueryState<TResult>*>(st)->template match<TAction, 0>(r, 0, TResult(av));
-                if(!cont)
+                if (!cont)
                     return static_cast<size_t>(-1);
              }
         }
@@ -513,11 +490,13 @@ protected:
     }
 };
 
-
-class ArrayNode: public ParentNode {
+// Used for performing queries on a Tableview. This is done by simply passing the TableView to this query condition
+// actually it's the Array of the TableView which is passed). TableView must be sorted for Array::FindGTE to work
+// correctly.
+class ListviewNode: public ParentNode {
 public:
-    ArrayNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.size()) {m_child = 0; m_dT = 0.0;}
-    ~ArrayNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+    ListviewNode(const Array& arr) : m_arr(arr), m_max(0), m_next(0), m_size(arr.size()) {m_child = 0; m_dT = 0.0;}
+    ~ListviewNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     void init(const Table& table)
     {
@@ -535,9 +514,10 @@ public:
 
     size_t find_first_local(size_t start, size_t end)
     {
+        // Simply return next TableView item which is >= start
         size_t r = m_arr.FindGTE(start, m_next);
-        if (r == not_found)
-            return end;
+        if (r >= end)
+            return not_found;
 
         m_next = r;
         return to_size_t(m_arr.get(r));
@@ -550,7 +530,8 @@ protected:
     size_t m_size;
 };
 
-
+// For conditions on a subtable (encapsulated in subtable()...end_subtable()). These return the parent row as match if and
+// only if one or more subtable rows match the condition.
 class SubtableNode: public ParentNode {
 public:
     SubtableNode(size_t column): m_column(column) {m_child = 0; m_child2 = 0; m_dT = 100.0;}
@@ -586,10 +567,10 @@ public:
             const size_t subsize = subtable->size();
             const size_t sub = m_child->find_first(0, subsize);
 
-            if (sub != subsize)
+            if (sub != not_found)
                 return s;
         }
-        return end;
+        return not_found;
     }
 
     ParentNode* child_criteria()
@@ -601,7 +582,11 @@ public:
     size_t m_column;
 };
 
-// IntegerNode is for conditions for types stored as integers in a tightdb::Array (int, date, bool)
+
+// IntegerNode is for conditions for types stored as integers in a tightdb::Array (int, date, bool).
+//
+// We don't yet have any integer indexes (only for strings), but when we get one, we should specialize it
+// like: template <class TConditionValue, class Equal> class IntegerNode: public ParentNode
 template <class TConditionValue, class TConditionFunction> class IntegerNode: public ParentNode {
 public:
     typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
@@ -716,8 +701,8 @@ public:
                            SequentialGetterBase* source_column, size_t* matchcount)
     {
         typedef typename ColumnTypeTraitsSum<TSourceColumn, TAction>::sum_type QueryStateType;
-        TIGHTDB_ASSERT(source_column == NULL || dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != NULL);
-        TIGHTDB_ASSERT(dynamic_cast<QueryState<QueryStateType>*>(st) != NULL);
+        TIGHTDB_ASSERT(source_column == null_ptr || dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != null_ptr);
+        TIGHTDB_ASSERT(dynamic_cast<QueryState<QueryStateType>*>(st) != null_ptr);
         TIGHTDB_ASSERT(m_conds > 0);
 
         int c = TConditionFunction::condition;
@@ -742,23 +727,23 @@ public:
                 end2 = end - m_leaf_start;
 
             // If there are no other nodes than us (m_conds == 1) AND the column used for our condition is
-            // the same as the column used for the aggregate action, then the entire query can run within scope of that 
+            // the same as the column used for the aggregate action, then the entire query can run within scope of that
             // column only, with no references to other columns:
-            if (m_conds == 1 && (source_column == NULL ||
-                (SameType<TSourceColumn, int64_t>::value
-                 && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))) {
+            if (m_conds == 1 && (source_column == null_ptr ||
+                                 (util::SameType<TSourceColumn, int64_t>::value
+                                  && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column))) {
                 bool cont = m_array.find(c, TAction, m_value, s - m_leaf_start, end2, m_leaf_start, (QueryState<int64_t>*)st);
-                if(!cont)
-                    return static_cast<size_t>(-1);
+                if (!cont)
+                    return not_found;
             }
             // Else, for each match in this node, call our IntegerNode::match_callback to test remaining nodes and/or extract
             // aggregate payload from aggregate column:
             else {
                 m_source_column = source_column;
-                bool cont = m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, NULL,
+                bool cont = m_array.find<TConditionFunction, act_CallbackIdx>(m_value, s - m_leaf_start, end2, m_leaf_start, null_ptr,
                              std::bind1st(std::mem_fun(&IntegerNode::template match_callback<TAction, TSourceColumn>), this));
-                if(!cont)
-                    return static_cast<size_t>(-1);
+                if (!cont)
+                    return not_found;
             }
 
             if (m_local_matches == m_local_limit)
@@ -798,7 +783,7 @@ public:
                 if (condition(m_array.get(start - m_leaf_start), m_value))
                     return start;
                 else
-                    return end;
+                    return not_found;
             }
 
             size_t end2;
@@ -817,7 +802,7 @@ public:
                 return s + m_leaf_start;
         }
 
-        return end;
+        return not_found;
     }
 
     TConditionValue m_value;
@@ -839,6 +824,104 @@ protected:
 };
 
 
+
+
+// This node is currently used for floats and doubles only
+template <class TConditionValue, class TConditionFunction> class FloatDoubleNode: public ParentNode {
+public:
+    typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
+
+    FloatDoubleNode(TConditionValue v, size_t column_ndx) : m_value(v)
+    {
+        m_condition_column_idx = column_ndx;
+        m_child = 0;
+        m_dT = 1.0;
+    }
+    ~FloatDoubleNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+
+    void init(const Table& table)
+    {
+        m_dD = 100.0;
+        m_table = &table;
+        m_condition_column.m_column = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx));
+        m_condition_column.m_leaf_end = 0;
+
+        if (m_child)
+            m_child->init(table);
+    }
+
+    size_t find_first_local(size_t start, size_t end)
+    {
+        TConditionFunction cond;
+
+        for (size_t s = start; s < end; ++s) {
+            TConditionValue v = m_condition_column.get_next(s);
+            if (cond(v, m_value))
+                return s;
+        }
+        return not_found;
+    }
+
+protected:
+    TConditionValue m_value;
+    SequentialGetter<TConditionValue> m_condition_column;
+};
+
+
+template <class TConditionFunction> class BinaryNode: public ParentNode {
+public:
+    template <Action TAction> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}
+
+    BinaryNode(BinaryData v, size_t column)
+    {
+        m_dT = 100.0;
+        m_condition_column_idx = column;
+        m_child = 0;
+
+        // FIXME: Store this in std::string instead.
+        char* data = new char[v.size()];
+        memcpy(data, v.data(), v.size());
+        m_value = BinaryData(data, v.size());
+    }
+
+    ~BinaryNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    {
+        delete[] m_value.data();
+    }
+
+    void init(const Table& table)
+    {
+        m_dD = 100.0;
+        m_table = &table;
+        m_condition_column = static_cast<const ColumnBinary*>(&get_column_base(table, m_condition_column_idx));
+        m_column_type = get_real_column_type(table, m_condition_column_idx);
+
+        if (m_child)
+            m_child->init(table);
+    }
+
+    size_t find_first_local(size_t start, size_t end)
+    {
+        TConditionFunction condition;
+        for (size_t s = start; s < end; ++s) {
+            BinaryData value = m_condition_column->get(s);
+            if (condition(m_value, value))
+                return s;
+        }
+        return not_found;
+    }
+
+protected:
+private:
+    BinaryData m_value;
+protected:
+    const ColumnBinary* m_condition_column;
+    ColumnType m_column_type;
+};
+
+
+
+// Conditions for strings. Note that Equal is specialized later in this file!
 template <class TConditionFunction> class StringNode: public ParentNode {
 public:
     template <Action TAction>
@@ -853,18 +936,18 @@ public:
         m_condition_column_idx = column;
         m_child = 0;
         m_dT = 10.0;
-        m_leaf = NULL;
+        m_leaf = null_ptr;
 
         // FIXME: Store these in std::string instead.
-        // FIXME: Why are these sizes 6 times the required size?
+        // '*6' because case converted strings can take up more space. Todo, investigate
         char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
-        std::copy(v.data(), v.data()+v.size(), data);
+        memcpy(data, v.data(), v.size());
         m_value = StringData(data, v.size());
         char* upper = new char[6 * v.size()];
         char* lower = new char[6 * v.size()];
 
-        bool b1 = case_map(v, lower, false);
-        bool b2 = case_map(v, upper, true);
+        bool b1 = util::case_map(v, lower, false);
+        bool b2 = util::case_map(v, upper, true);
         if (!b1 || !b2)
             error_code = "Malformed UTF-8: " + std::string(v);
 
@@ -956,7 +1039,7 @@ public:
             if (cond(m_value, m_ucase, m_lcase, t))
                 return s;
         }
-        return end;
+        return not_found;
     }
 
 private:
@@ -977,100 +1060,9 @@ protected:
 };
 
 
-// Can be used for simple types (currently float and double)
-template <class TConditionValue, class TConditionFunction> class BasicNode: public ParentNode {
-public:
-    typedef typename ColumnTypeTraits<TConditionValue>::column_type ColType;
 
-    BasicNode(TConditionValue v, size_t column_ndx) : m_value(v)
-    {
-        m_condition_column_idx = column_ndx;
-        m_child = 0;
-        m_dT = 1.0;
-    }
-    ~BasicNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
-
-    void init(const Table& table)
-    {
-        m_dD = 100.0;
-        m_table = &table;
-        m_condition_column.m_column = static_cast<const ColType*>(&get_column_base(table, m_condition_column_idx));
-        m_condition_column.m_leaf_end = 0;
-
-        if (m_child)
-            m_child->init(table);
-    }
-
-    size_t find_first_local(size_t start, size_t end)
-    {
-        TConditionFunction cond;
-
-        for (size_t s = start; s < end; ++s) {
-            TConditionValue v = m_condition_column.get_next(s);
-            if (cond(v, m_value))
-                return s;
-        }
-        return end;
-    }
-
-protected:
-    TConditionValue m_value;
-    SequentialGetter<TConditionValue> m_condition_column;
-};
-
-
-template <class TConditionFunction> class BinaryNode: public ParentNode {
-public:
-    template <Action TAction> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}
-
-    BinaryNode(BinaryData v, size_t column)
-    {
-        m_dT = 100.0;
-        m_condition_column_idx = column;
-        m_child = 0;
-
-        // FIXME: Store this in std::string instead.
-        char* data = new char[v.size()];
-        std::copy(v.data(), v.data()+v.size(), data);
-        m_value = BinaryData(data, v.size());
-    }
-
-    ~BinaryNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
-    {
-        delete[] m_value.data();
-    }
-
-    void init(const Table& table)
-    {
-        m_dD = 100.0;
-        m_table = &table;
-        m_condition_column = static_cast<const ColumnBinary*>(&get_column_base(table, m_condition_column_idx));
-        m_column_type = get_real_column_type(table, m_condition_column_idx);
-
-        if (m_child)
-            m_child->init(table);
-    }
-
-    size_t find_first_local(size_t start, size_t end)
-    {
-        TConditionFunction condition;
-        for (size_t s = start; s < end; ++s) {
-            BinaryData value = m_condition_column->get(s);
-            if (condition(m_value, value))
-                return s;
-        }
-        return end;
-    }
-
-protected:
-private:
-    BinaryData m_value;
-protected:
-    const ColumnBinary* m_condition_column;
-    ColumnType m_column_type;
-};
-
-
+// Specialization for Equal condition on Strings - we specialize because we can utilize indexes (if they exist) for Equal.
+// Future optimization: make specialization for greater, notequal, etc
 template<> class StringNode<Equal>: public ParentNode {
 public:
     template <Action TAction>
@@ -1087,9 +1079,9 @@ public:
         // FIXME: Store this in std::string instead.
         // FIXME: Why are the sizes 6 times the required size?
         char* data = new char[6 * v.size()]; // FIXME: Arithmetic is prone to overflow
-        std::copy(v.data(), v.data()+v.size(), data);
+        memcpy(data, v.data(), v.size());
         m_value = StringData(data, v.size());
-        m_leaf = NULL;
+        m_leaf = null_ptr;
         m_index_getter = 0;
         m_index_matches = 0;
         m_index_matches_destroy = false;
@@ -1136,10 +1128,10 @@ public:
         m_index_matches_destroy = false;
 
         delete m_index_matches;
-        m_index_matches = NULL;
+        m_index_matches = null_ptr;
 
         delete m_index_getter;
-        m_index_getter = NULL;
+        m_index_getter = null_ptr;
     }
 
     void init(const Table& table)
@@ -1226,20 +1218,20 @@ public:
                     m_index_getter->cache_next(last_indexed);
                     f = m_index_getter->m_array_ptr->FindGTE(s, last_indexed - m_index_getter->m_leaf_start);
 
-                    if (f == not_found) {
+                    if (f >= end || f == not_found) {
                         last_indexed = m_index_getter->m_leaf_end;
                     }
                     else {
                         s = to_size_t(m_index_getter->m_array_ptr->get(f));
-                        if (s > end)
-                            return end;
+                        if (s >= end)
+                            return not_found;
                         else {
                             last_indexed = f + m_index_getter->m_leaf_start;
                             return s;
                         }
                     }
                 }
-                return end;
+                return not_found;
             }
             else {
                 if (m_column_type != col_type_String) {
@@ -1286,7 +1278,7 @@ public:
                 }
             }
         }
-        return end;
+        return not_found;
     }
 
 private:
@@ -1319,7 +1311,22 @@ private:
     size_t m_index_size;
 };
 
-
+// OR node contains 3 Node pointers; m_cond[0], m_cond[1] and m_child
+//
+// For 'second.equal(23).begin_group().first.equal(111).Or().first.equal(222).end_group().third().equal(555)', this
+// will first set m_cond[0] = left-hand-side through constructor, and then later, when .first.equal(222) is invoked,
+// invocation will set m_cond[1] = right-hand-side through Query& Query::Or() (see query.cpp). In there, m_child is
+// also set to next AND condition (if any exists) following the OR. So we have following pointers:
+//
+//                        Equal(23)
+//                           |
+//                           |
+// OR node: m_cond[0]     m_child     m_cond[1]
+//             |             |           |
+//      Equal(111) node      |    Equal(222) node
+//                           |
+//                       Equal(555)
+//
 class OrNode: public ParentNode {
 public:
     template <Action TAction> int64_t find_all(Array*, size_t, size_t, size_t, size_t)
@@ -1328,7 +1335,7 @@ public:
         return 0;
     }
 
-    OrNode(ParentNode* p1) {m_child = NULL; m_cond[0] = p1; m_cond[1] = NULL; m_dT = 50.0;}
+    OrNode(ParentNode* p1) {m_child = null_ptr; m_cond[0] = p1; m_cond[1] = null_ptr; m_dT = 50.0;}
     ~OrNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     void init(const Table& table)
@@ -1364,17 +1371,17 @@ public:
                 else {
                     size_t fmax = m_last[c] > s ? m_last[c] : s;
                     f[c] = m_cond[c]->find_first(fmax, end);
-                    m_was_match[c] = (f[c] != end);
-                    m_last[c] = f[c];
+                    m_was_match[c] = (f[c] != not_found);
+                    m_last[c] = f[c] == not_found ? end : f[c];
                 }
             }
 
             s = f[0] < f[1] ? f[0] : f[1];
-            s = s > end ? end : s;
+            s = s >= end ? not_found : s;
 
             return s;
         }
-        return end;
+        return not_found;
     }
 
     virtual std::string validate()
@@ -1406,8 +1413,7 @@ private:
 };
 
 
-
-
+// Compare two columns with eachother row-by-row
 template <class TConditionValue, class TConditionFunction> class TwoColumnsNode: public ParentNode {
 public:
     template <Action TAction> int64_t find_all(Array* /*res*/, size_t /*start*/, size_t /*end*/, size_t /*limit*/, size_t /*source_column*/) {TIGHTDB_ASSERT(false); return 0;}
@@ -1446,7 +1452,7 @@ public:
         size_t s = start;
 
         while (s < end) {
-            if (SameType<TConditionValue, int64_t>::value) {
+            if (util::SameType<TConditionValue, int64_t>::value) {
                 // For int64_t we've created an array intrinsics named CompareLeafs which template expands bitwidths
                 // of boths arrays to make Get faster.
                 m_getter1.cache_next(s);
@@ -1458,10 +1464,22 @@ public:
                 if (resume)
                     s = m_getter1.m_leaf_end;
                 else
-                return to_size_t(qs.m_state) + m_getter1.m_leaf_start;
+                    return to_size_t(qs.m_state) + m_getter1.m_leaf_start;
             }
             else {
                 // This is for float and double.
+
+#if 0 && defined(TIGHTDB_COMPILER_AVX)
+// AVX has been disabled because of array alignment (see https://app.asana.com/0/search/8836174089724/5763107052506)
+//
+// For AVX you can call things like if (sseavx<1>()) to test for AVX, and then utilize _mm256_movemask_ps (VC)
+// or movemask_cmp_ps (gcc/clang)
+//
+// See https://github.com/rrrlasse/tightdb/tree/AVX for an example of utilizing AVX for a two-column search which has
+// been benchmarked to: floats: 288 ms vs 552 by using AVX compared to 2-level-unrolled FPU loop. doubles: 415 ms vs
+// 475 (more bandwidth bound). Tests against SSE have not been performed; AVX may not pay off. Please benchmark
+#endif
+
                 TConditionValue v1 = m_getter1.get_next(s);
                 TConditionValue v2 = m_getter2.get_next(s);
                 TConditionFunction C;
@@ -1472,7 +1490,7 @@ public:
                     s++;
             }
         }
-        return end;
+        return not_found;
     }
 
 protected:
@@ -1491,24 +1509,24 @@ protected:
 #include "query_expression.hpp"
 
 
-// For expressions like col1 / col2 + 123 > col4 * 100
+// For Nexgt-Generation expressions like col1 / col2 + 123 > col4 * 100
 class ExpressionNode: public ParentNode {
 
 public:
     ~ExpressionNode() TIGHTDB_NOEXCEPT
     {
-        if(m_auto_delete)
-            delete m_compare, m_compare = NULL;
+        if (m_auto_delete)
+            delete m_compare, m_compare = null_ptr;
     }
 
-    ExpressionNode(Expression* compare, bool auto_delete) 
+    ExpressionNode(Expression* compare, bool auto_delete)
     {
         m_auto_delete = auto_delete;
         m_child = 0;
         m_compare = compare;
     }
 
-    void init(const Table& table) 
+    void init(const Table& table)
     {
         m_compare->set_table(&table);
         if (m_child)
@@ -1520,7 +1538,7 @@ public:
         size_t res = m_compare->find_first(start, end);
         return res;
     }
-    
+
     bool m_auto_delete;
     Expression* m_compare;
 };

@@ -367,6 +367,7 @@
       <AdditionalLibraryDirectories>
       </AdditionalLibraryDirectories>
       <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
+      <OutputFile>csv.exe</OutputFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">
@@ -538,6 +539,7 @@
       <TargetMachine>MachineX64</TargetMachine>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
+      <OutputFile>csv.exe</OutputFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">
@@ -585,7 +587,7 @@
     <ClCompile Include="src\tightdb\column_string.cpp" />
     <ClCompile Include="src\tightdb\column_string_enum.cpp" />
     <ClCompile Include="src\tightdb\column_table.cpp" />
-    <ClCompile Include="src\tightdb\file.cpp" />
+    <ClCompile Include="src\tightdb\util\file.cpp" />
     <ClCompile Include="src\tightdb\importer.cpp" />
     <ClCompile Include="src\tightdb\importer_tool.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -599,18 +601,18 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="src\tightdb\thread.cpp" />
+    <ClCompile Include="src\tightdb\util\thread.cpp" />
     <ClCompile Include="src\tightdb\group.cpp" />
     <ClCompile Include="src\tightdb\group_shared.cpp" />
     <ClCompile Include="src\tightdb\group_writer.cpp" />
     <ClCompile Include="src\tightdb\index_string.cpp" />
     <ClCompile Include="src\tightdb\query.cpp" />
     <ClCompile Include="src\tightdb\spec.cpp" />
-    <ClCompile Include="src\tightdb\string_buffer.cpp" />
+    <ClCompile Include="src\tightdb\util\string_buffer.cpp" />
     <ClCompile Include="src\tightdb\table.cpp" />
     <ClCompile Include="src\tightdb\table_view.cpp" />
-    <ClCompile Include="src\tightdb\terminate.cpp" />
-    <ClCompile Include="src\tightdb\utf8.cpp" />
+    <ClCompile Include="src\tightdb\util\terminate.cpp" />
+    <ClCompile Include="src\tightdb\util\utf8.cpp" />
     <ClCompile Include="src\tightdb\utilities.cpp" />
     <ClCompile Include="src\tightdb\lang_bind_helper.cpp" />
     <ClCompile Include="src\win32\pthread\pthread.c">
@@ -991,8 +993,8 @@
     <ClInclude Include="src\tightdb\binary_data.hpp" />
     <ClInclude Include="src\tightdb\importer.hpp" />
     <ClInclude Include="src\tightdb\query_expression.hpp" />
-    <ClInclude Include="src\tightdb\unique_ptr.hpp" />
-    <ClInclude Include="src\tightdb\bind_ptr.hpp" />
+    <ClInclude Include="src\tightdb\util\unique_ptr.hpp" />
+    <ClInclude Include="src\tightdb\util\bind_ptr.hpp" />
     <ClInclude Include="src\tightdb\column.hpp" />
     <ClInclude Include="src\tightdb\column_binary.hpp" />
     <ClInclude Include="src\tightdb\column_fwd.hpp" />
@@ -1006,25 +1008,25 @@
     <ClInclude Include="src\tightdb\column_tpl.hpp" />
     <ClInclude Include="src\tightdb\data_type.hpp" />
     <ClInclude Include="src\tightdb\column_type.hpp" />
-    <ClInclude Include="src\tightdb\config.h" />
+    <ClInclude Include="src\tightdb\util\features.h" />
     <ClInclude Include="src\tightdb\datetime.hpp" />
     <ClInclude Include="src\tightdb\group.hpp" />
     <ClInclude Include="src\tightdb\group_shared.hpp" />
     <ClInclude Include="src\tightdb\group_writer.hpp" />
     <ClInclude Include="src\tightdb\index_string.hpp" />
     <ClInclude Include="src\tightdb\lang_bind_helper.hpp" />
-    <ClInclude Include="src\tightdb\meta.hpp" />
+    <ClInclude Include="src\tightdb\util\meta.hpp" />
     <ClInclude Include="src\tightdb\mixed.hpp" />
     <ClInclude Include="src\tightdb\overflow.hpp" />
-    <ClInclude Include="src\tightdb\thread.hpp" />
+    <ClInclude Include="src\tightdb\util\thread.hpp" />
     <ClInclude Include="src\tightdb\query.hpp" />
     <ClInclude Include="src\tightdb\query_conditions.hpp" />
     <ClInclude Include="src\tightdb\query_engine.hpp" />
     <ClInclude Include="src\tightdb\replication.hpp" />
-    <ClInclude Include="src\tightdb\safe_int_ops.hpp" />
+    <ClInclude Include="src\tightdb\util\safe_int_ops.hpp" />
     <ClInclude Include="src\tightdb\spec.hpp" />
     <ClInclude Include="src\tightdb\static_assert.hpp" />
-    <ClInclude Include="src\tightdb\string_buffer.hpp" />
+    <ClInclude Include="src\tightdb\util\string_buffer.hpp" />
     <ClInclude Include="src\tightdb\table.hpp" />
     <ClInclude Include="src\tightdb\table_accessors.hpp" />
     <ClInclude Include="src\tightdb\table_basic.hpp" />
@@ -1033,9 +1035,9 @@
     <ClInclude Include="src\tightdb\table_view.hpp" />
     <ClInclude Include="src\tightdb\table_view_basic.hpp" />
     <ClInclude Include="src\tightdb\tightdb_nmmintrin.h" />
-    <ClInclude Include="src\tightdb\tuple.hpp" />
-    <ClInclude Include="src\tightdb\type_list.hpp" />
-    <ClInclude Include="src\tightdb\utf8.hpp" />
+    <ClInclude Include="src\tightdb\util\tuple.hpp" />
+    <ClInclude Include="src\tightdb\util\type_list.hpp" />
+    <ClInclude Include="src\tightdb\util\utf8.hpp" />
     <ClInclude Include="src\tightdb\utilities.hpp" />
     <ClInclude Include="src\win32\pthread\pthread.h" />
     <ClInclude Include="test\large_tests\verified_integer.hpp">

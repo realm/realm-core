@@ -9,14 +9,13 @@
 #  pragma warning (disable : 4127) // Condition is constant warning
 #endif
 
-#include <tightdb/tuple.hpp>
-#include <tightdb/terminate.hpp>
+#include <tightdb/util/tuple.hpp>
+#include <tightdb/utilities.hpp>
 #include <tightdb/array.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
 #include <tightdb/index_string.hpp>
-#include <tightdb/utilities.hpp>
 
 
 // Header format (8 bytes):
@@ -136,6 +135,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 
 namespace {
@@ -407,7 +407,7 @@ void Array::set(size_t ndx, int64_t value)
     // Set the value
     (this->*m_setter)(ndx, value);
 }
- 
+
 /*
 // Optimization for the common case of adding positive values to a local array
 // (happens a lot when returning results to TableViews)
@@ -608,7 +608,6 @@ size_t Array::FindGTE(int64_t target, size_t start) const
 
     size_t orig_high;
     orig_high = high;
-
     while (high - start > 1) {
         size_t probe = (start + high) / 2; // FIXME: Prone to overflow - see lower_bound() for a solution
         int64_t v = get(probe);
@@ -774,7 +773,7 @@ template<bool find_max, size_t w> bool Array::minmax(int64_t& result, size_t sta
     ++start;
 
 #ifdef TIGHTDB_COMPILER_SSE
-    if (cpuid_sse<42>()) {
+    if (sseavx<42>()) {
         // Test manually until 128 bit aligned
         for (; (start < end) && (((size_t(m_data) & 0xf) * 8 + start * w) % (128) != 0); start++) {
             if (find_max ? Get<w>(start) > m : Get<w>(start) < m)
@@ -913,7 +912,7 @@ template<size_t w> int64_t Array::sum(size_t start, size_t end) const
     }
 
 #ifdef TIGHTDB_COMPILER_SSE
-    if (cpuid_sse<42>()) {
+    if (sseavx<42>()) {
 
         // 2000 items summed 500000 times, 8/16/32 bits, miliseconds:
         // Naive, templated Get<>: 391 371 374
@@ -1185,7 +1184,7 @@ size_t Array::count(int64_t value) const
 
 size_t Array::CalcByteLen(size_t count, size_t width) const
 {
-    // FIXME: This arithemtic could overflow. Consider using <tightdb/safe_int_ops.hpp>
+    // FIXME: This arithemtic could overflow. Consider using <tightdb/util/safe_int_ops.hpp>
     size_t bits = count * width;
     size_t bytes = (bits+7) / 8; // round up
     return bytes + header_size; // add room for 8 byte header
@@ -1463,23 +1462,23 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
 {
     TIGHTDB_ASSERT(ndx < m_size);
 
-    // To make Valgrind happy. Todo, I *think* it should work without, now, but if it reappears, add memset again. 
-    // memset(res, 0, 8*8); 
+    // To make Valgrind happy. Todo, I *think* it should work without, now, but if it reappears, add memset again.
+    // memset(res, 0, 8*8);
 
-    if(TIGHTDB_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
+    if (TIGHTDB_X86_OR_X64_TRUE && (w == 1 || w == 2 || w == 4) && ndx + 32 < m_size) {
         // This method is *multiple* times faster than performing 8 times Get<w>, even if unrolled. Apparently compilers
         // can't figure out to optimize it.
         uint64_t c;
         size_t bytealign = ndx / (8 / no0(w));
-        if(w == 1) {
+        if (w == 1) {
             c = *reinterpret_cast<uint16_t*>(m_data + bytealign);
             c >>= (ndx - bytealign * 8) * w;
         }
-        else if(w == 2) {
+        else if (w == 2) {
             c = *reinterpret_cast<uint32_t*>(m_data + bytealign);
             c >>= (ndx - bytealign * 4) * w;
         }
-        else if(w == 4) {
+        else if (w == 4) {
             c = *reinterpret_cast<uint64_t*>(m_data + bytealign);
             c >>= (ndx - bytealign * 2) * w;
         }
@@ -1496,17 +1495,17 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
     }
     else {
         size_t i = 0;
-        for(; i + ndx < m_size && i < 8; i++) 
+        for(; i + ndx < m_size && i < 8; i++)
             res[i] = Get<w>(ndx + i);
 
-        for(; i < 8; i++) 
+        for(; i < 8; i++)
             res[i] = 0;
     }
 
 #ifdef TIGHTDB_DEBUG
     for(int j = 0; j + ndx < m_size && j < 8; j++) {
         int64_t expected = Get<w>(ndx + j);
-        if(res[j] != expected)
+        if (res[j] != expected)
             TIGHTDB_ASSERT(false);
     }
 #endif
@@ -2097,7 +2096,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         TIGHTDB_ASSERT(!int_cast_with_overflow_detect(last_value/2, total_elems));
         TIGHTDB_ASSERT(num_elems == total_elems);
     }
-    return tightdb::tuple(num_elems, 1 + leaf_level_of_children, general_form);
+    return tightdb::util::tuple(num_elems, 1 + leaf_level_of_children, general_form);
 }
 
 } // anonymous namespace
@@ -2370,47 +2369,95 @@ inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t width,
 // We currently use binary search. See for example
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
 //
-// It may be worth considering if overall efficiency can be improved
-// by doing a linear search for short sequences.
+// The binary search used here is carefully optimized. Key trick is to use a single
+// loop controlling variable (size) instead of high/low pair, and to keep updates
+// to size done inside the loop independent of comparisons. Further key to speed
+// is to avoid branching inside the loop, using conditional moves instead. This
+// provides robust performance for random searches, though predictable searches
+// might be slightly faster if we used branches instead. The loop unrolling yields
+// a final 5-20% speedup depending on circumstances.
+
 template<int width>
 inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
-    size_t i = 0;
-    size_t size_2 = size;
-    while (0 < size_2) {
-        size_t half = size_2 / 2;
-        size_t mid = i + half;
-        int64_t probe = get_direct<width>(data, mid);
-        if (probe < value) {
-            i = mid + 1;
-            size_2 -= half + 1;
-        }
-        else {
-            size_2 = half;
-        }
+    size_t low = 0;
+
+    while (size > 8) {
+        size_t half = size / 2;
+        size_t probe = (low + half);
+        size_t pbadj = low + size - half;
+        int64_t v = get_direct<width>(data, probe);
+        size = half;
+        low = (v < value) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (v < value) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (v < value) ? pbadj : low;
     }
-    return i;
+    do {
+        size_t half = size / 2;
+        size_t probe = (low + half);
+        size_t pbadj = low + size - half;
+        int64_t v = get_direct<width>(data, probe);
+        size = half;
+        low = (v < value) ? pbadj : low;
+
+    } while (size > 0);
+
+    return low;
+
 }
 
 // See lower_bound()
 template<int width>
 inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
-    size_t i = 0;
-    size_t size_2 = size;
-    while (0 < size_2) {
-        size_t half = size_2 / 2;
-        size_t mid = i + half;
-        int64_t probe = get_direct<width>(data, mid);
-        if (!(value < probe)) {
-            i = mid + 1;
-            size_2 -= half + 1;
-        }
-        else {
-            size_2 = half;
-        }
+    size_t low = 0;
+    while (size >= 8) {
+        size_t half = size / 2;
+        size_t probe = (low + half);
+        size_t pbadj = low + size - half;
+        int64_t v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+
+        half = size / 2;
+        probe = (low + half);
+        pbadj = low + size - half;
+        v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
     }
-    return i;
+
+    do {
+        size_t half = size / 2;
+        size_t probe = (low + half);
+        size_t pbadj = low + size - half;
+        int64_t v = get_direct<width>(data, probe);
+        size = half;
+        low = (value >= v) ? pbadj : low;
+
+    } while (size > 0);
+
+    return low;
+
 }
 
 } // anonymous namespace

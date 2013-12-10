@@ -23,7 +23,7 @@
 #include <stdint.h> // unint8_t etc
 #include <cstdlib> // std::size_t
 
-#include <tightdb/unique_ptr.hpp>
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/array.hpp>
 #include <tightdb/query_conditions.hpp>
 
@@ -190,7 +190,7 @@ protected:
     EraseHandlerBase(ColumnBase& column) TIGHTDB_NOEXCEPT: m_column(column) {}
     ~EraseHandlerBase() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
     Allocator& get_alloc() TIGHTDB_NOEXCEPT;
-    void replace_root(UniquePtr<Array>& leaf);
+    void replace_root(util::UniquePtr<Array>& leaf);
 private:
     ColumnBase& m_column;
 };
@@ -203,9 +203,9 @@ public:
 
     explicit Column(Allocator&);
     Column(Array::Type, Allocator&);
-    explicit Column(Array::Type = Array::type_Normal, ArrayParent* = 0,
+    explicit Column(Array::Type = Array::type_Normal, ArrayParent* = null_ptr,
                     std::size_t ndx_in_parent = 0, Allocator& = Allocator::get_default());
-    explicit Column(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+    explicit Column(ref_type, ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
                     Allocator& = Allocator::get_default()); // Throws
     Column(const Column&); // FIXME: Constness violation
     ~Column() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -394,7 +394,7 @@ inline Allocator& ColumnBase::EraseHandlerBase::get_alloc() TIGHTDB_NOEXCEPT
     return m_column.m_array->get_alloc();
 }
 
-inline void ColumnBase::EraseHandlerBase::replace_root(UniquePtr<Array>& leaf)
+inline void ColumnBase::EraseHandlerBase::replace_root(util::UniquePtr<Array>& leaf)
 {
     ArrayParent* parent = m_column.m_array->get_parent();
     std::size_t ndx_in_parent = m_column.m_array->get_ndx_in_parent();
@@ -406,12 +406,12 @@ inline void ColumnBase::EraseHandlerBase::replace_root(UniquePtr<Array>& leaf)
 
 
 inline Column::Column(Allocator& alloc):
-    ColumnBase(new Array(Array::type_Normal, 0, 0, alloc))
+    ColumnBase(new Array(Array::type_Normal, null_ptr, 0, alloc))
 {
 }
 
 inline Column::Column(Array::Type type, Allocator& alloc):
-    ColumnBase(new Array(type, 0, 0, alloc))
+    ColumnBase(new Array(type, null_ptr, 0, alloc))
 {
     TIGHTDB_ASSERT(root_is_leaf());
 }

@@ -1,7 +1,7 @@
 // @@Example: ex_cpp_group_open_file @@
 // @@Fold@@
 #include <tightdb.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/file.hpp>
 
 using namespace tightdb;
 
@@ -32,8 +32,8 @@ int main()
     Group g;
     g.write("people.tightdb");
     func();
-    File::remove("people.tightdb");
-    File::remove("people_new.tightdb");
+    util::File::remove("people.tightdb");
+    util::File::remove("people_new.tightdb");
 }
 // @@EndFold@@
 // @@EndExample@@

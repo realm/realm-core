@@ -1,11 +1,11 @@
-#include <fcntl.h>
-#include <errno.h>
 #include <algorithm>
+#include <cerrno>
 
-#include <tightdb/config.h>
-#include <tightdb/safe_int_ops.hpp>
-#include <tightdb/terminate.hpp>
-#include <tightdb/thread.hpp>
+#include <fcntl.h>
+
+#include <tightdb/util/features.h>
+#include <tightdb/util/safe_int_ops.hpp>
+#include <tightdb/util/thread.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group_shared.hpp>
 #include <tightdb/group_writer.hpp>
@@ -24,6 +24,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 
 namespace {
@@ -154,15 +155,15 @@ void spawn_daemon(const string& file)
         // start commit daemon executable
         // Note that getenv (which is not thread safe) is called in a
         // single threaded context. This is ensured by the fork above.
-        const char* exe = getenv("TIGHTDBD_PATH");
-        if (!exe) {
+        const char* async_daemon = getenv("TIGHTDB_ASYNC_DAEMON");
+        if (!async_daemon) {
 #ifndef TIGTHDB_DEBUG
-            exe = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd";
+            async_daemon = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd";
 #else
-            exe = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd-dbg";
+            async_daemon = TIGHTDB_INSTALL_LIBEXECDIR "/tightdbd-dbg";
 #endif
         }
-        execl(exe, exe, file.c_str(), 0);
+        execl(async_daemon, async_daemon, file.c_str(), 0);
 
         // if we continue here, exec has failed so return error
         // if exec succeeds, we don't come back here.
@@ -260,6 +261,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             need_init = true;
         }
 
+        using namespace tightdb::util;
         File::CloseGuard fcg(m_file);
         int time_left = max_wait_for_ok_filesize;
         while (1) {
@@ -426,7 +428,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             bool skip_validate = true; // To avoid race conditions
             try {
                 alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
-            } 
+            }
             catch (File::NotFound) {
                 throw LockFileButNoData(path);
             }
@@ -497,7 +499,7 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
             size_t path_len = m_file_path.size()-5; // remove ".lock"
             string db_path = m_file_path.substr(0, path_len); // Throws
             m_group.m_alloc.detach();
-            File::remove(db_path.c_str());
+            util::File::remove(db_path.c_str());
         }
         catch(...) {} // ignored on purpose.
     }
@@ -508,7 +510,7 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     m_file_map.unmap();
     m_reader_map.unmap();
     try {
-        File::remove(m_file_path.c_str());
+        util::File::remove(m_file_path.c_str());
     }
     catch (...) {} // ignored on purpose
 }
@@ -625,7 +627,7 @@ void SharedGroup::do_async_commits()
             cerr << "Removing coordination file" << endl;
 #endif
             if (!file_already_removed)
-                File::remove(m_file_path);
+                util::File::remove(m_file_path);
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Daemon exiting nicely" << endl << endl;
 #endif
@@ -647,7 +649,7 @@ void SharedGroup::do_async_commits()
             timespec ts;
             timeval tv;
             // clock_gettime(CLOCK_REALTIME, &ts); <- would like to use this, but not there on mac
-            gettimeofday(&tv, NULL);
+            gettimeofday(&tv, null_ptr);
             ts.tv_sec = tv.tv_sec;
             ts.tv_nsec = tv.tv_usec * 1000;
             ts.tv_nsec += 10000000; // 10 msec
@@ -680,7 +682,7 @@ const Group& SharedGroup::begin_read()
         Mutex::Lock lock(info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
-            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize); // Throws
+            m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
 
         // Get the current top ref
         new_top_ref   = to_size_t(info->current_top);
@@ -735,7 +737,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
         Mutex::Lock lock(info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
-            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
+            m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize);
 
         // Find entry for current version
         size_t ndx = ringbuf_find(m_version);
@@ -763,7 +765,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 }
 
 
-Group& SharedGroup::begin_write()
+void SharedGroup::do_begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
@@ -805,20 +807,6 @@ Group& SharedGroup::begin_write()
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Writing;
 #endif
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication()) {
-        try {
-            repl->begin_write_transact(*this); // Throws
-        }
-        catch (...) {
-            rollback();
-            throw;
-        }
-    }
-#endif
-
-    return m_group;
 }
 
 
@@ -1004,7 +992,7 @@ void SharedGroup::ringbuf_expand()
 
     // Extend lock file
     m_file.prealloc(0, new_file_size); // Throws
-    m_reader_map.remap(m_file, File::access_ReadWrite, new_file_size); // Throws
+    m_reader_map.remap(m_file, util::File::access_ReadWrite, new_file_size); // Throws
     info = m_reader_map.get_addr();
 
     // If the contents of the ring buffer crosses the end of the
@@ -1167,7 +1155,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
         Mutex::Lock lock(info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
-            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize); // Throws
+            m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
 
         if (ringbuf_is_empty()) {
             readlock_version = new_version;
@@ -1215,8 +1203,8 @@ void SharedGroup::reserve(size_t size)
     // FIXME: There is currently no synchronization between this and
     // concurrent commits in progress. This is so because it is
     // believed that the OS guarantees race free behavior when
-    // File::prealloc_if_supported() (posix_fallocate() on Linux) runs
-    // concurrently with modfications via a memory map of the
-    // file. This assumption must be verified though.
+    // util::File::prealloc_if_supported() (posix_fallocate() on
+    // Linux) runs concurrently with modfications via a memory map of
+    // the file. This assumption must be verified though.
     m_group.m_alloc.reserve(size);
 }

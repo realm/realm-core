@@ -66,7 +66,7 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_mixed_constructor
         DESCR  :
-        
+
 - Getters:
   METHODS:
   - g_mixed_get_type:
@@ -83,7 +83,7 @@ CATEGORIES:
       EXAMPLES:
       - CODE   : ex_cpp_mixed_get_type
         DESCR  :
-        
+
   - g_mixed_get_bool:
       NAME     : get_bool
   - g_mixed_get_int:
@@ -91,7 +91,7 @@ CATEGORIES:
   - g_mixed_get_float:
       NAME     : get_float
   - g_mixed_get_double:
-      NAME     : get_double      
+      NAME     : get_double
   - g_mixed_get_date:
       NAME     : get_date
   - g_mixed_get_string:
@@ -107,7 +107,7 @@ CATEGORIES:
                  bool        get_bool()   const;
                  int64_t     get_int()    const;
                  float       get_float()  const;
-                 double      get_double() const;                 
+                 double      get_double() const;
                  DateTime    get_datetime()   const;
                  StringData  get_string() const;
                  BinaryData  get_binary() const;

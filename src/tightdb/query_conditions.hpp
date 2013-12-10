@@ -23,8 +23,8 @@
 #include <stdint.h>
 #include <string>
 
+#include <tightdb/util/utf8.hpp>
 #include <tightdb/binary_data.hpp>
-#include <tightdb/utf8.hpp>
 
 namespace tightdb {
 
@@ -50,6 +50,7 @@ struct EndsWith {
 };
 
 struct Equal {
+    static const int avx = 0x00; // _CMP_EQ_OQ
     bool operator()(const bool v1, const bool v2) const { return v1 == v2; }
 
     // To avoid a "performance warning" in VC++
@@ -65,6 +66,7 @@ struct Equal {
 };
 
 struct NotEqual {
+    static const int avx = 0x0B; // _CMP_FALSE_OQ
     bool operator()(StringData v1, const char*, const char*, StringData v2) const { return v1 != v2; }
     bool operator()(BinaryData v1, BinaryData v2) const { return v1 != v2; }
     template<class T> bool operator()(const T& v1, const T& v2) const { return v1 != v2; }
@@ -77,7 +79,7 @@ struct NotEqual {
 struct ContainsIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
-        return search_case_fold(v2, v1_upper, v1_lower, v1.size()) != v2.size();
+        return util::search_case_fold(v2, v1_upper, v1_lower, v1.size()) != v2.size();
     }
     static const int condition = -1;
 };
@@ -86,7 +88,7 @@ struct ContainsIns {
 struct BeginsWithIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
-        return v1.size() <= v2.size() && equal_case_fold(v2.prefix(v1.size()), v1_upper, v1_lower);
+        return v1.size() <= v2.size() && util::equal_case_fold(v2.prefix(v1.size()), v1_upper, v1_lower);
     }
     static const int condition = -1;
 };
@@ -95,7 +97,7 @@ struct BeginsWithIns {
 struct EndsWithIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
-        return v1.size() <= v2.size() && equal_case_fold(v2.suffix(v1.size()), v1_upper, v1_lower);
+        return v1.size() <= v2.size() && util::equal_case_fold(v2.suffix(v1.size()), v1_upper, v1_lower);
     }
     static const int condition = -1;
 };
@@ -103,7 +105,7 @@ struct EndsWithIns {
 struct EqualIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
-        return v1.size() == v2.size() && equal_case_fold(v2, v1_upper, v1_lower);
+        return v1.size() == v2.size() && util::equal_case_fold(v2, v1_upper, v1_lower);
     }
     static const int condition = -1;
 };
@@ -111,12 +113,13 @@ struct EqualIns {
 struct NotEqualIns {
     bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2) const
     {
-        return v1.size() != v2.size() || !equal_case_fold(v2, v1_upper, v1_lower);
+        return v1.size() != v2.size() || !util::equal_case_fold(v2, v1_upper, v1_lower);
     }
     static const int condition = -1;
 };
 
 struct Greater {
+    static const int avx = 0x1E;  // _CMP_GT_OQ
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 > v2;}
     static const int condition = cond_Greater;
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(lbound); return ubound > v; }
@@ -132,6 +135,7 @@ struct None {
 };
 
 struct Less {
+    static const int avx = 0x11; // _CMP_LT_OQ
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 < v2;}
     static const int condition = cond_Less;
     bool can_match(int64_t v, int64_t lbound, int64_t ubound) { static_cast<void>(ubound); return lbound < v; }
@@ -139,11 +143,13 @@ struct Less {
 };
 
 struct LessEqual {
+    static const int avx = 0x12;  // _CMP_LE_OQ
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 <= v2;}
     static const int condition = cond_LessEqual;
 };
 
 struct GreaterEqual {
+    static const int avx = 0x1D;  // _CMP_GE_OQ
     template<class T> bool operator()(const T& v1, const T& v2) const {return v1 >= v2;}
     static const int condition = cond_GreaterEqual;
 };

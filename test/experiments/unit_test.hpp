@@ -24,8 +24,8 @@
 #include <string>
 #include <sstream>
 
-#include <tightdb/meta.hpp>
-#include <tightdb/safe_int_ops.hpp>
+#include <tightdb/util/meta.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
 
 
 #define CHECK(cond) tightdb::unit_test::do_cond((cond), __FILE__, __LINE__, #cond)

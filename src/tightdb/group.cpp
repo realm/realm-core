@@ -5,15 +5,15 @@
 #include <iomanip>
 #include <fstream>
 
-#include <tightdb/terminate.hpp>
+#include <tightdb/util/thread.hpp>
+#include <tightdb/utilities.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
-#include <tightdb/utilities.hpp>
-#include <tightdb/thread.hpp>
 #include <pthread.h>
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 
 namespace {
@@ -436,7 +436,7 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
 
     Array::DestroyGuard ref_dg(Table::create_empty_table(m_alloc), m_alloc); // Throws
     Table::UnbindGuard table_ug(new Table(Table::ref_count_tag(), m_alloc,
-                                          ref_dg.get(), 0, 0)); // Throws
+                                          ref_dg.get(), null_ptr, 0)); // Throws
 
     // The table accessor owns the ref until the point below where a
     // parent is set in Table::m_top.

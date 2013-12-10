@@ -11,6 +11,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 
 namespace {
@@ -128,7 +129,7 @@ Array* merge(const Array& array_list)
     size_t size = array_list.size();
 
     if (size == 1)
-        return NULL; // already sorted
+        return null_ptr; // already sorted
 
     Array left_half, right_half;
     const size_t leftSize = size / 2;
@@ -229,10 +230,10 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
                                     bool is_append)
 {
     // At this point the original root and its new sibling is either
-    // both leaves, or both inner nodes on the same form, compact or
+    // both leafs, or both inner nodes on the same form, compact or
     // general. Due to invar:bptree-node-form, the new root may be on
-    // the compact form if is_append is true and both are either
-    // leaves or inner nodes on the compact form.
+    // the compact form if is_append is true and both are either leafs
+    // or inner nodes on the compact form.
 
     Array* orig_root = m_array;
     Allocator& alloc = orig_root->get_alloc();
