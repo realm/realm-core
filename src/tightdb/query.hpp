@@ -158,6 +158,9 @@ public:
     Query& ends_with(size_t column_ndx, BinaryData value);
     Query& contains(size_t column_ndx, BinaryData value);
 
+    // Negation
+    Query& Not();
+
     // Grouping
     Query& group();
     Query& end_group();
