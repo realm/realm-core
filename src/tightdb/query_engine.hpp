@@ -188,7 +188,8 @@ template<> struct ColumnTypeTraitsSum<float, act_Sum> {
 };
 
 
-struct SequentialGetterBase {
+class SequentialGetterBase {
+public:
     virtual ~SequentialGetterBase() TIGHTDB_NOEXCEPT {}
 };
 
@@ -597,7 +598,7 @@ public:
 
 class IntegerNodeBase : public ParentNode
 {
-protected:
+public:
     // This function is called from Array::find() for each search result if TAction == act_CallbackIdx
     // in the IntegerNode::aggregate_local() call. Used if aggregate source column is different from search criteria column
     // Return value: false means that the query-state (which consumes matches) has signalled to stop searching, perhaps
@@ -1361,6 +1362,97 @@ public:
 
     OrNode(ParentNode* p1) {m_child = null_ptr; m_cond[0] = p1; m_cond[1] = null_ptr; m_dT = 50.0;}
     ~OrNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+
+    void init(const Table& table) TIGHTDB_OVERRIDE
+    {
+        m_dD = 10.0;
+
+        std::vector<ParentNode*> v;
+
+        for (size_t c = 0; c < 2; ++c) {
+            m_cond[c]->init(table);
+            v.clear();
+            m_cond[c]->gather_children(v);
+            m_last[c] = 0;
+            m_was_match[c] = false;
+        }
+
+        if (m_child)
+            m_child->init(table);
+
+        m_table = &table;
+    }
+
+    size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
+    {
+        for (size_t s = start; s < end; ++s) {
+            size_t f[2];
+
+            for (size_t c = 0; c < 2; ++c) {
+                if (m_last[c] >= end)
+                    f[c] = end;
+                else if (m_was_match[c] && m_last[c] >= s)
+                    f[c] = m_last[c];
+                else {
+                    size_t fmax = m_last[c] > s ? m_last[c] : s;
+                    f[c] = m_cond[c]->find_first(fmax, end);
+                    m_was_match[c] = (f[c] != not_found);
+                    m_last[c] = f[c] == not_found ? end : f[c];
+                }
+            }
+
+            s = f[0] < f[1] ? f[0] : f[1];
+            s = s >= end ? not_found : s;
+
+            return s;
+        }
+        return not_found;
+    }
+
+    std::string validate() TIGHTDB_OVERRIDE
+    {
+        if (error_code != "")
+            return error_code;
+        if (m_cond[0] == 0)
+            return "Missing left-hand side of OR";
+        if (m_cond[1] == 0)
+            return "Missing right-hand side of OR";
+        std::string s;
+        if (m_child != 0)
+            s = m_child->validate();
+        if (s != "")
+            return s;
+        s = m_cond[0]->validate();
+        if (s != "")
+            return s;
+        s = m_cond[1]->validate();
+        if (s != "")
+            return s;
+        return "";
+    }
+
+    ParentNode* m_cond[2];
+private:
+    size_t m_last[2];
+    bool m_was_match[2];
+};
+
+
+
+
+
+
+
+class NotNode: public ParentNode {
+public:
+    template <Action TAction> int64_t find_all(Array*, size_t, size_t, size_t, size_t)
+    {
+        TIGHTDB_ASSERT(false);
+        return 0;
+    }
+
+    NotNode(ParentNode* p1) {m_child = null_ptr; m_cond[0] = p1; m_cond[1] = null_ptr; m_dT = 50.0;}
+    ~NotNode() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     void init(const Table& table) TIGHTDB_OVERRIDE
     {
