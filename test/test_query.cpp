@@ -3341,7 +3341,7 @@ TEST(TestQueryFindAll_Parans1)
     ttt.add(11, "X");
 
     // first > 3 && (second == X)
-    TupleTableType::Query q1 = ttt.where().group().second.equal("X").end_group();
+    TupleTableType::Query q1 = ttt.where().first.greater(3).group().second.equal("X").end_group();
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(6, tv1.get_source_ndx(0));
