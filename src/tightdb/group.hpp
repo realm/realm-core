@@ -148,11 +148,11 @@ public:
     /// read/write mode unless you want to be able to call
     /// Group::commit().
     ///
-    /// \throw File::AccessError If the file could not be opened. If
-    /// the reason corresponds to one of the exception types that are
-    /// derived from File::AccessError, the derived exception type is
-    /// thrown. Note that InvalidDatabase is among these derived
-    /// exception types.
+    /// \throw util::File::AccessError If the file could not be
+    /// opened. If the reason corresponds to one of the exception
+    /// types that are derived from util::File::AccessError, the
+    /// derived exception type is thrown. Note that InvalidDatabase is
+    /// among these derived exception types.
     void open(const std::string& file, OpenMode mode = mode_ReadOnly);
 
     /// Attach this Group instance to the specified memory buffer.
@@ -251,11 +251,11 @@ public:
     ///
     /// \param file A filesystem path.
     ///
-    /// \throw File::AccessError If the file could not be opened. If
-    /// the reason corresponds to one of the exception types that are
-    /// derived from File::AccessError, the derived exception type is
-    /// thrown. In particular, File::Exists will be thrown if the file
-    /// exists already.
+    /// \throw util::File::AccessError If the file could not be
+    /// opened. If the reason corresponds to one of the exception
+    /// types that are derived from util::File::AccessError, the
+    /// derived exception type is thrown. In particular,
+    /// util::File::Exists will be thrown if the file exists already.
     void write(const std::string& file) const;
 
     /// Write this database to a memory buffer.
