@@ -354,8 +354,10 @@ Query& Query::less(size_t column_ndx, int64_t value)
 }
 Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
 {
+    group();
     greater_equal(column_ndx, from);
     less_equal(column_ndx, to);
+    end_group();
     return *this;
 }
 Query& Query::equal(size_t column_ndx, bool value)
@@ -392,8 +394,10 @@ Query& Query::less(size_t column_ndx, float value)
 }
 Query& Query::between(size_t column_ndx, float from, float to)
 {
+    group();
     greater_equal(column_ndx, from);
     less_equal(column_ndx, to);
+    end_group();
     return *this;
 }
 
@@ -425,8 +429,10 @@ Query& Query::less(size_t column_ndx, double value)
 }
 Query& Query::between(size_t column_ndx, double from, double to)
 {
+    group();
     greater_equal(column_ndx, from);
     less_equal(column_ndx, to);
+    end_group();
     return *this;
 }
 
@@ -723,12 +729,13 @@ Query& Query::Not()
     if (update[update.size()-1] != 0)
         *update[update.size()-1] = p;
 
-
+    //update[update.size()-1] = &p->m_child;
     group();
     pending_not[pending_not.size()-1] = true;
     // value for update for sub-condition
     update[update.size()-1] = &p->m_cond;
     // pending value for update, once the sub-condition ends:
+    // not needed: 
     update_override[update_override.size()-1] = &p->m_child;
     return *this;
 }

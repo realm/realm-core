@@ -1478,9 +1478,17 @@ public:
                 f = m_last;
             else {
                 size_t fmax = m_last > s ? m_last : s;
-                f = m_cond->find_first(fmax, end);
-                m_was_match = (f != not_found);
-                m_last = f == not_found ? end : f;
+                for (f = fmax; f < end; f++) {
+                    if (m_cond->find_first(f,f+1)==not_found) {
+                        m_was_match = true;
+                        m_last = f;
+                        return f;
+                    }
+                }
+                // ID: f = m_cond->find_first(fmax, end);
+                m_was_match = false;
+                m_last = end;
+                f = end;
             }
 
             s = f;

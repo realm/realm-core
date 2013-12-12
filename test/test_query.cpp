@@ -2652,6 +2652,21 @@ TEST(TestQuerySimple)
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
 }
 
+TEST(TestQueryNot)
+{
+    TupleTableType ttt;
+
+    ttt.add(1, "a");
+    ttt.add(2, "a");
+    ttt.add(3, "X");
+
+    TupleTableType::Query q1 = ttt.where().Not().second.equal("a");
+
+    TupleTableType::View tv1 = q1.find_all();
+    CHECK_EQUAL(1, tv1.size());
+    CHECK_EQUAL(2, tv1.get_source_ndx(0));
+}
+
 TEST(TestQuerySimpleBUGdetect)
 {
     TupleTableType ttt;

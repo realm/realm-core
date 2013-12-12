@@ -359,6 +359,8 @@ public:
 
     Query& Or() { m_impl.Or(); return *this; }
 
+    Query& Not() { m_impl.Not(); return *this; }
+
     std::size_t find(std::size_t begin_at_table_row = 0)
     {
         return m_impl.find(begin_at_table_row);
