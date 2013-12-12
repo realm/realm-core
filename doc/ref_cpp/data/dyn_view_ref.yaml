@@ -478,6 +478,39 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_sum
         DESCR  :
+
+  - g_dyn_view_average_int:
+  - g_dyn_view_average_float:
+  - g_dyn_view_average_double:
+      TITLE    : average*
+      NAMES    : [average_int, average_float, average_double]
+      SUMMARY  : &g_dyn_view_average_summary
+                 Calculates the average.
+      DESCR    :
+      - TEXT   : &g_dyn_view_average_descr
+                 Calculates the average of a column.
+      - TEXT   : >
+                 As the sum of many <code>int64_t</code> or <code>float</code>
+                 values can be greater than the average value of the type, a <code>double</code>
+                 is returned.
+      CONST    : True
+      SIGNATURE: |
+                 double  average_int(size_t column_ndx) const;
+                 double  average_float(size_t column_ndx) const;
+                 double  average_double(size_t column_ndx) const;
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : *g_dyn_view_column_index_descr
+      RETURN:
+        TYPES  : [double, double, double]
+        DESCR  : >
+                 The average of values of the cells.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_view_average
+        DESCR  :
+
+
   - g_dyn_view_maximum_int:
   - g_dyn_view_maximum_float:
   - g_dyn_view_maximum_double:

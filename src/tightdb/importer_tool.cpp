@@ -1,3 +1,25 @@
+/*************************************************************************
+ *
+ * TIGHTDB CONFIDENTIAL
+ * __________________
+ *
+ *  [2011] - [2012] TightDB Inc
+ *  All Rights Reserved.
+ *
+ * NOTICE:  All information contained herein is, and remains
+ * the property of TightDB Incorporated and its suppliers,
+ * if any.  The intellectual and technical concepts contained
+ * herein are proprietary to TightDB Incorporated
+ * and its suppliers and may be covered by U.S. and Foreign Patents,
+ * patents in process, and are protected by trade secret or copyright law.
+ * Dissemination of this information or reproduction of this material
+ * is strictly forbidden unless prior written permission is obtained
+ * from TightDB Incorporated.
+ *
+ **************************************************************************/
+
+// Test tool in test/test_csv/test.pl
+
 #define NOMINMAX
 
 #include <cstring>
@@ -21,7 +43,7 @@ bool force_flag = false;
 bool quiet_flag = false;
 bool empty_as_string_flag = false;
 
-const char* legend = 
+const char* legend =
     "Simple auto-import (works in most cases):\n"
     "  csv <.csv file | -stdin> <.tightdb file>\n"
     "\n"
@@ -33,7 +55,7 @@ const char* legend =
     "\n"
     " -a: Use the first N rows to auto-detect scheme (default =10000). Lower is faster but more error prone\n"
     " -e: TightDB does not support null values. Set the -e flag to import a column as a String type column if\n"
-    "     it has occurences of empty fields. Otherwise empty fields may be converted to 0, 0.0 or false\n" 
+    "     it has occurences of empty fields. Otherwise empty fields may be converted to 0, 0.0 or false\n"
     " -n: Only import first N rows of payload\n"
     " -t: List of column types where s=string, i=integer, b=bool, f=float, d=double\n"
     " -s: Skip first N rows (can be used to skip headers)\n"
@@ -134,14 +156,14 @@ int main(int argc, char* argv[])
     }
 
     // Check invalid combinations of flags
-    abort2(auto_detection_flag > 0 && skip_rows_flag > 0, "-a flag and -s flag cannot be used at the same time"); 
-    abort2(auto_detection_flag > 0 && scheme.size() > 0, "-a flag cannot be used when scheme is specified manually with -t flag"); 
-    abort2(empty_as_string_flag && scheme.size() > 0, "-e flag cannot be used when scheme is specified manually with -t flag"); 
+    abort2(auto_detection_flag > 0 && skip_rows_flag > 0, "-a flag and -s flag cannot be used at the same time");
+    abort2(auto_detection_flag > 0 && scheme.size() > 0, "-a flag cannot be used when scheme is specified manually with -t flag");
+    abort2(empty_as_string_flag && scheme.size() > 0, "-e flag cannot be used when scheme is specified manually with -t flag");
 
-    abort2(!force_flag && File::exists(argv[argc - 1]), "Destination file '%s' already exists.", argv[argc - 1]);
+    abort2(!force_flag && util::File::exists(argv[argc - 1]), "Destination file '%s' already exists.", argv[argc - 1]);
 
-    if(File::exists(argv[argc - 1]))
-        File::try_remove(argv[argc - 1]);
+    if(util::File::exists(argv[argc - 1]))
+        util::File::try_remove(argv[argc - 1]);
 
     in_file = open_files(argv[argc - 2]);
     string path = argv[argc - 1];
@@ -163,6 +185,7 @@ int main(int argc, char* argv[])
         }
         else if (argc >= 3) {
             // Auto detection
+            abort2(skip_rows_flag > 0, "-s flag cannot be used in Simple auto-import mode");
             imported_rows = importer.import_csv_auto(in_file, table, auto_detection_flag ? auto_detection_flag : 10000, import_rows_flag ? import_rows_flag : static_cast<size_t>(-1));
         }
         else {

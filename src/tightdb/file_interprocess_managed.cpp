@@ -18,14 +18,16 @@
  *
  **************************************************************************/
 
-#include "file_interprocess_managed.hpp"
-#include "thread.hpp"
-#include "utilities.hpp"
-#include "file.hpp"
+#include <tightdb/file_interprocess_managed.hpp>
+#include <tightdb/util/thread.hpp>
+#include <tightdb/utilities.hpp>
+#include <tightdb/util/file.hpp>
 #include <limits>
 
 #include <iostream>
 using namespace std;
+using namespace tightdb;
+using namespace tightdb::util;
 
 namespace tightdb {
 

@@ -1,4 +1,4 @@
-SOURCE_ROOT = .
+INCLUDE_ROOT = .
 ENABLE_INSTALL_STATIC_LIBS = 1
 ENABLE_INSTALL_DEBUG_LIBS  = 1
 ENABLE_INSTALL_DEBUG_PROGS = 1
@@ -18,9 +18,18 @@ endif
 
 # FIXME: '-fno-elide-constructors' currently causes TightDB to fail
 #CFLAGS_DEBUG   += -fno-elide-constructors
-CFLAGS_PTHREAD += -pthread
+CFLAGS_PTHREADS += -pthread
 CFLAGS_GENERAL += -Wextra -ansi -pedantic -Wno-long-long
 # CFLAGS_CXX = -std=c++11
+
+# Avoid a warning from Clang when linking on OS X. By default,
+# `LDFLAGS_PTHREADS` inherits its value from `CFLAGS_PTHREADS`, so we
+# have to override that with an empty value.
+ifneq ($(call CC_CXX_AND_LD_ARE,clang),)
+ifeq ($(OS),Darwin)
+LDFLAGS_PTHREADS =
+endif
+endif
 
 # Note: While CFLAGS (those specified above) can be overwritten by
 # setting the CFLAGS variable on the command line, PROJECT_CFLAGS are

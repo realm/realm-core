@@ -22,9 +22,9 @@
 
 #include <limits>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/group.hpp>
-#include "tightdb/file_interprocess_managed.hpp"
+#include <tightdb/file_interprocess_managed.hpp>
 
 namespace tightdb {
 
@@ -84,11 +84,11 @@ public:
     ///
     /// \param file Filesystem path to a TightDB database file.
     ///
-    /// \throw File::AccessError If the file could not be opened. If
-    /// the reason corresponds to one of the exception types that are
-    /// derived from File::AccessError, the derived exception type is
-    /// thrown. Note that InvalidDatabase is among these derived
-    /// exception types.
+    /// \throw util::File::AccessError If the file could not be
+    /// opened. If the reason corresponds to one of the exception
+    /// types that are derived from util::File::AccessError, the
+    /// derived exception type is thrown. Note that InvalidDatabase is
+    /// among these derived exception types.
     void open(const std::string& file, bool no_create = false,
               DurabilityLevel dlevel = durability_Full,
               bool is_backend = false);
@@ -129,7 +129,7 @@ public:
     /// specified size. On systems that do not support preallocation,
     /// this function has no effect. To know whether preallocation is
     /// supported by TightDB on your platform, call
-    /// File::is_prealloc_supported().
+    /// util::File::is_prealloc_supported().
     ///
     /// It is an error to call this function on an unattached shared
     /// group. Doing so will result in undefined behavior.
@@ -181,7 +181,7 @@ private:
     uint64_t              m_version;
     IPMFile               m_file;
     SharedInfo*           m_info; // Never remapped
-    File::Map<IPMFile::IPMFileWrapper<SharedInfo> > m_reader_map;
+    util::File::Map<IPMFile::IPMFileWrapper<SharedInfo> > m_reader_map;
     std::string           m_file_path;
 
 #ifdef TIGHTDB_DEBUG
@@ -208,6 +208,8 @@ private:
     ReadCount&  ringbuf_get_last() TIGHTDB_NOEXCEPT;
     void        ringbuf_put(const ReadCount& v);
     void        ringbuf_expand();
+
+    void do_begin_write();
 
     // Must be called only by someone that has a lock on the write
     // mutex.
@@ -321,6 +323,27 @@ inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
 inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 {
     return m_reader_map.is_attached();
+}
+
+inline Group& SharedGroup::begin_write()
+{
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = m_group.get_replication()) {
+        repl->begin_write_transact(*this); // Throws
+        try {
+            do_begin_write();
+        }
+        catch (...) {
+            repl->rollback_write_transact(*this);
+            throw;
+        }
+        return m_group;
+    }
+#endif
+
+    do_begin_write();
+
+    return m_group;
 }
 
 

@@ -88,7 +88,7 @@
     <ClCompile Include="src\tightdb\table.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\tightdb\utf8.cpp">
+    <ClCompile Include="src\tightdb\util\utf8.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\tightdb\alloc.cpp">
@@ -112,16 +112,16 @@
     <ClCompile Include="test\test_shared.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="src\tightdb\file.cpp">
+    <ClCompile Include="src\tightdb\util\file.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\tightdb\thread.cpp">
+    <ClCompile Include="src\tightdb\util\thread.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\tightdb\index_string.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\tightdb\string_buffer.cpp">
+    <ClCompile Include="src\tightdb\util\string_buffer.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\tightdb\lang_bind_helper.cpp">
@@ -130,7 +130,7 @@
     <ClCompile Include="test\test_index_string.cpp">
       <Filter>test</Filter>
     </ClCompile>
-    <ClCompile Include="src\tightdb\terminate.cpp">
+    <ClCompile Include="src\tightdb\util\terminate.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="test\test_transactions.cpp">
@@ -258,13 +258,13 @@
     <ClInclude Include="src\tightdb\table_view_basic.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\tuple.hpp">
+    <ClInclude Include="src\tightdb\util\tuple.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\type_list.hpp">
+    <ClInclude Include="src\tightdb\util\type_list.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\utf8.hpp">
+    <ClInclude Include="src\tightdb\util\utf8.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\utilities.hpp">
@@ -294,10 +294,10 @@
     <ClInclude Include="src\tightdb\binary_data.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\unique_ptr.hpp">
+    <ClInclude Include="src\tightdb\util\unique_ptr.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\bind_ptr.hpp">
+    <ClInclude Include="src\tightdb\util\bind_ptr.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\column.hpp">
@@ -330,7 +330,7 @@
     <ClInclude Include="src\tightdb\column_type.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\config.h">
+    <ClInclude Include="src\tightdb\util\features.h">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\datetime.hpp">
@@ -348,7 +348,7 @@
     <ClInclude Include="src\tightdb\lang_bind_helper.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\meta.hpp">
+    <ClInclude Include="src\tightdb\util\meta.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\mixed.hpp">
@@ -369,10 +369,10 @@
     <ClInclude Include="src\tightdb\replication.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\string_buffer.hpp">
+    <ClInclude Include="src\tightdb\util\string_buffer.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\thread.hpp">
+    <ClInclude Include="src\tightdb\util\thread.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\tightdb_nmmintrin.h">
@@ -393,7 +393,7 @@
     <ClInclude Include="src\tightdb\column_mixed_tpl.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
-    <ClInclude Include="src\tightdb\safe_int_ops.hpp">
+    <ClInclude Include="src\tightdb\util\safe_int_ops.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="test\pthread_test.hpp">

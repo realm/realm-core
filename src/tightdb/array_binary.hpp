@@ -28,7 +28,7 @@ namespace tightdb {
 
 class ArrayBinary: public Array {
 public:
-    explicit ArrayBinary(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+    explicit ArrayBinary(ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
                          Allocator& = Allocator::get_default());
     ArrayBinary(MemRef, ArrayParent*, std::size_t ndx_in_parent,
                 Allocator&) TIGHTDB_NOEXCEPT;

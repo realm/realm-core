@@ -822,7 +822,7 @@ private:
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {
         // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
-        Columns<int64_t>::m_column = col_idx; 
+        Columns<int64_t>::m_column = col_idx;
         Columns<int64_t>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
     }
 
@@ -894,7 +894,7 @@ private:
 public:
     explicit ColumnAccessor(Taboid* t) TIGHTDB_NOEXCEPT: Base(t) {
         // Columns store their own copy of m_table in order not to have too much class dependency/entanglement
-        Columns<float>::m_column = col_idx; 
+        Columns<float>::m_column = col_idx;
         Columns<float>::m_table = reinterpret_cast<const Table*>(Base::m_table->get_impl());
     }
 

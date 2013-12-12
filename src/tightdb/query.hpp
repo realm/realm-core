@@ -49,6 +49,7 @@ class TableView;
 class ConstTableView;
 class Array;
 class Expression;
+class SequentialGetterBase;
 
 class Query {
 public:
@@ -165,8 +166,8 @@ public:
     Query& Or();
 
     Query& and_query(Query q);
-    Query operator||(Query q); 
-    Query operator&&(Query q); 
+    Query operator||(Query q);
+    Query operator&&(Query q);
 
 
 
@@ -211,7 +212,7 @@ public:
     TableRef& get_table() {return m_table;}
 
     std::string validate();
-   
+
     mutable bool do_delete;
 
 protected:
@@ -276,6 +277,10 @@ private:
     template <Action action, typename T, typename R, class ColClass>
         R aggregate(R (ColClass::*method)(size_t, size_t, size_t) const,
                     size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const;
+
+    void aggregate_internal(Action TAction, DataType TSourceColumn,
+                            ParentNode* pn, QueryStateBase* st, 
+                            size_t start, size_t end, SequentialGetterBase* source_column) const;
 
     friend class Table;
     template <typename T> friend class BasicTable;

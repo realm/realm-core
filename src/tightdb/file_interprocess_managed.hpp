@@ -26,12 +26,12 @@
 #include <string>
 #include <streambuf>
 
-#include <tightdb/config.h>
-#include <tightdb/assert.hpp>
-#include <tightdb/unique_ptr.hpp>
-#include <tightdb/safe_int_ops.hpp>
-#include <tightdb/file.hpp>
-#include <tightdb/thread.hpp>
+#include <tightdb/util/features.h>
+#include <tightdb/util/assert.hpp>
+#include <tightdb/util/unique_ptr.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
+#include <tightdb/util/file.hpp>
+#include <tightdb/util/thread.hpp>
 
 namespace tightdb {
 
@@ -92,8 +92,8 @@ public:
 
     struct IPMFileSharedInfo {
         // IPMFile specific fields:
-        Atomic<uint32_t> m_transition_count;
-        Atomic<uint32_t> m_exit_count;
+        util::Atomic<uint32_t> m_transition_count;
+        util::Atomic<uint32_t> m_exit_count;
     };
 
     template<typename T>
@@ -138,7 +138,7 @@ public:
     // subfields.
     // FIXME: find more elegant api for this form of mapping, so that IPMFileWrapper 
     // isn't exposed here.
-    File& get_file();
+    util::File& get_file();
 
     // release exclusive access if you have it, ignored otherwise. Transitioning
     // to shared state is atomic, i.e. no other process can gain exclusive access

@@ -6,8 +6,12 @@
 
 #include "../util/timer.hpp"
 
-using namespace tightdb;
 using namespace std;
+using namespace tightdb;
+using namespace tightdb::util;
+
+
+namespace {
 
 enum Mode {
     mode_UseShared,
@@ -35,6 +39,8 @@ void usage()
     cout << "  -r : rows/commit (default: 1)" << endl;
     cout << "  -R : insert at random position (only useful with -i)" << endl;
 }
+
+} // anonymous namespace
 
 
 int main(int argc, char *argv[])

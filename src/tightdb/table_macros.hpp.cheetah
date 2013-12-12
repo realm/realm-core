@@ -53,7 +53,7 @@ directiveStartToken = %
 ) \
 struct Table##Spec: ::tightdb::SpecBase { \
 %for $j in range($num_cols)
-    typedef ::tightdb::TypeAppend< %slurp
+    typedef ::tightdb::util::TypeAppend< %slurp
 %if $j == 0
 void,     %slurp
 %else
@@ -100,7 +100,7 @@ type${j+1} name${j+1}%slurp
         { \
             ::tightdb::BasicTable<Table##Spec>* const t = \
                 static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
-            t->add((::tightdb::tuple()%slurp
+            t->add((::tightdb::util::tuple()%slurp
 %for $j in range($num_cols)
 , name${j+1}%slurp
 %end for
@@ -114,7 +114,7 @@ type${j+1} name${j+1}%slurp
         { \
             ::tightdb::BasicTable<Table##Spec>* const t = \
                 static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
-            t->insert(_i, (::tightdb::tuple()%slurp
+            t->insert(_i, (::tightdb::util::tuple()%slurp
 %for $j in range($num_cols)
 , name${j+1}%slurp
 %end for
@@ -128,7 +128,7 @@ type${j+1} name${j+1}%slurp
         { \
             ::tightdb::BasicTable<Table##Spec>* const t = \
                 static_cast< ::tightdb::BasicTable<Table##Spec>* >(this); \
-            t->set(_i, (::tightdb::tuple()%slurp
+            t->set(_i, (::tightdb::util::tuple()%slurp
 %for $j in range($num_cols)
 , name${j+1}%slurp
 %end for

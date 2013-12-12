@@ -14,7 +14,7 @@ namespace {
 const size_t thread_chunk_size = 1000;
 }
 
-Query::Query() 
+Query::Query()
 {
     Create();
 //    expression(static_cast<Expression*>(this));
@@ -358,7 +358,7 @@ Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
 }
 Query& Query::equal(size_t column_ndx, bool value)
 {
-    ParentNode* const p = new IntegerNode<bool, Equal>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, Equal>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -502,24 +502,85 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
         m_table->get_column<ColType, ColumnType(ColumnTypeTraits<T>::id)>(column_ndx);
 
     if (first.size() == 0 || first[0] == 0) {
+
+        // No criteria, so call aggregate METHODS directly on columns
+        // - this bypasses the query system and is faster
         // User created query with no criteria; aggregate range
         if (resultcount) {
-            *resultcount = limit < (end - start) ? limit : (end - start);            
+            *resultcount = limit < (end - start) ? limit : (end - start);
         }
         // direct aggregate on the column
         return (column.*aggregateMethod)(start, end, limit);
     }
+    else {
 
-    // Aggregate with criteria
-    Init(*m_table);
-    size_t matchcount = 0;
-    QueryState<R> st;
-    st.init(action, null_ptr, limit);
-    R r = first[0]->aggregate<action, R, T>(&st, start, end, column_ndx, &matchcount);
-    if (resultcount)
-        *resultcount = matchcount;
-    return r;
+        // Aggregate with criteria - goest through the nodes in the query system
+        Init(*m_table);
+        QueryState<R> st;
+        st.init(action, null_ptr, limit);
+
+        SequentialGetter<T> source_column(*m_table, column_ndx);
+
+        aggregate_internal(action, ColumnTypeTraits<T>::id, first[0],&st, start, end, &source_column);
+        if (resultcount) {
+            *resultcount = st.m_match_count;
+        }
+        return st.m_state;
+    }
 }
+
+
+    /**************************************************************************************************************
+    *                                                                                                             *
+    * Main entry point of a query. Schedules calls to aggregate_local                                             *
+    * Return value is the result of the query, or Array pointer for FindAll.                                      *
+    *                                                                                                             *
+    **************************************************************************************************************/
+
+    void Query::aggregate_internal(Action TAction, DataType TSourceColumn,
+                                   ParentNode* pn, QueryStateBase* st, 
+                                   size_t start, size_t end, SequentialGetterBase* source_column) const
+    {
+        if (end == not_found)
+            end = m_table->size();
+
+        for (size_t c = 0; c < pn->m_children.size(); c++)
+            pn->m_children[c]->aggregate_local_prepare(TAction, TSourceColumn);
+
+        size_t td;
+
+        while (start < end) {
+            size_t best = std::distance(pn->m_children.begin(),
+                                        std::min_element(pn->m_children.begin(), pn->m_children.end(),
+                                                         ParentNode::score_compare()));
+
+            // Find a large amount of local matches in best condition
+            td = pn->m_children[best]->m_dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
+
+            // Executes start...end range of a query and will stay inside the condition loop of the node it was called
+            // on. Can be called on any node; yields same result, but different performance. Returns prematurely if
+            // condition of called node has evaluated to true local_matches number of times.
+            // Return value is the next row for resuming aggregating (next row that caller must call aggregate_local on)
+            start = pn->m_children[best]->aggregate_local(st, start, td, findlocals, source_column);
+
+            // Make remaining conditions compute their m_dD (statistics)
+            for (size_t c = 0; c < pn->m_children.size() && start < end; c++) {
+                if (c == best)
+                    continue;
+
+                // Skip test if there is no way its cost can ever be better than best node's
+                double cost = pn->m_children[c]->cost();
+                if (pn->m_children[c]->m_dT < cost) {
+
+                    // Limit to bestdist in order not to skip too large parts of index nodes
+                    size_t maxD = pn->m_children[c]->m_dT == 0.0 ? end - start : bestdist;
+                    td = pn->m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
+                    start = pn->m_children[c]->aggregate_local(st, start, td, probe_matches, source_column);
+                }
+            }
+        }
+    }
+
 
 // Sum
 
@@ -717,7 +778,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     TableView tv(*m_table);
     QueryState<int64_t> st;
     st.init(act_FindAll, &tv.get_ref_column(), limit);
-    first[0]->aggregate<act_FindAll, int64_t, int64_t>(&st, start, end, not_found, null_ptr);
+    aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
     return tv;
 }
 
@@ -738,8 +799,8 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     Init(*m_table);
     QueryState<int64_t> st;
     st.init(act_Count, null_ptr, limit);
-    int64_t r = first[0]->aggregate<act_Count, int64_t, int64_t>(&st, start, end, not_found, null_ptr);
-    return size_t(r);
+    aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
+    return size_t(st.m_state);
 }
 
 
@@ -974,7 +1035,7 @@ void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
 *
 ******************************************************************************************************************** */
 
-Query& Query::and_query(Query q) 
+Query& Query::and_query(Query q)
 {
     ParentNode* const p = q.first[0];
     UpdatePointers(p, &p->m_child);
@@ -998,7 +1059,7 @@ Query Query::operator||(Query q)
 
     return q2;
 }
- 
+
 
 Query Query::operator&&(Query q)
 {
@@ -1014,4 +1075,4 @@ Query Query::operator&&(Query q)
 
     return q2;
 }
- 
+

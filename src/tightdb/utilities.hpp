@@ -39,15 +39,16 @@
 #  include <intrin.h>
 #endif
 
-#include <tightdb/assert.hpp>
-#include <tightdb/safe_int_ops.hpp>
+#include <tightdb/util/features.h>
+#include <tightdb/util/assert.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
 
 // GCC defines __i386__ and __x86_64__
 #if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
-    #define TIGHTDB_X86_OR_X64
-    #define TIGHTDB_X86_OR_X64_TRUE true
+#  define TIGHTDB_X86_OR_X64
+#  define TIGHTDB_X86_OR_X64_TRUE true
 #else
-    #define TIGHTDB_X86_OR_X64_TRUE false
+#  define TIGHTDB_X86_OR_X64_TRUE false
 #endif
 
 // GCC defines __arm__
@@ -56,19 +57,21 @@
 #endif
 
 #if defined _LP64 || defined __LP64__ || defined __64BIT__ || _ADDR64 || defined _WIN64 || defined __arch64__ || __WORDSIZE == 64 || (defined __sparc && defined __sparcv9) || defined __x86_64 || defined __amd64 || defined __x86_64__ || defined _M_X64 || defined _M_IA64 || defined __ia64 || defined __IA64__
-    #define TIGHTDB_PTR_64
+#  define TIGHTDB_PTR_64
 #endif
 
 
 #if defined(TIGHTDB_PTR_64) && defined(TIGHTDB_X86_OR_X64)
-    #define TIGHTDB_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
+#  define TIGHTDB_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
+#  define TIGHTDB_COMPILER_AVX
 #endif
 
 namespace tightdb {
 
 extern signed char sse_support;
+extern signed char avx_support;
 
-template<int version> TIGHTDB_FORCEINLINE bool cpuid_sse()
+template<int version> TIGHTDB_FORCEINLINE bool sseavx()
 {
 /*
     Return wether or not SSE 3.0 (if version = 30) or 4.2 (for version = 42) is supported. Return value
@@ -78,19 +81,28 @@ template<int version> TIGHTDB_FORCEINLINE bool cpuid_sse()
     sse_support = 0: SSE3
     sse_support = 1: SSE42
 
+    avx_support = -1: No AVX support
+    avx_support = 0: AVX1 supported
+    sse_support = 1: AVX2 supported (not yet implemented for detection in our cpuid_init(), todo)
+
     This lets us test very rapidly at runtime because we just need 1 compare instruction (with 0) to test both for
-    3 and 4.2 by caller (compiler optimizes if calls are concecutive), and can decide branch with ja/jl/je because
-    sse_support is signed type. Also, 0 requires no immediate operand
+    SSE 3 and 4.2 by caller (compiler optimizes if calls are concecutive), and can decide branch with ja/jl/je because
+    sse_support is signed type. Also, 0 requires no immediate operand. Same for AVX.
 
     We runtime-initialize sse_support in a constructor of a static variable which is not guaranteed to be called
     prior to cpu_sse(). So we compile-time initialize sse_support to -2 as fallback.
 */
-    TIGHTDB_STATIC_ASSERT(version == 30 || version == 42, "Only SSE 3 and 42 supported for detection");
+    TIGHTDB_STATIC_ASSERT(version == 1 || version == 2 || version == 30 || version == 42, "Only version == 1 (AVX), 2 (AVX2), 30 (SSE 3) and 42 (SSE 4.2) are supported for detection");
 #ifdef TIGHTDB_COMPILER_SSE
     if (version == 30)
         return (sse_support >= 0);
     else if (version == 42)
         return (sse_support > 0);   // faster than == 1 (0 requres no immediate operand)
+    else if (version == 1) // avx
+        return (avx_support >= 0);
+    else if (version == 2) // avx2
+        return (avx_support > 0);
+
 #else
     return false;
 #endif
@@ -125,7 +137,7 @@ int fast_popcount64(int64_t x);
 // Safe cast from 64 to 32 bits on 32 bit architecture. Differs from to_ref() by not testing alignment and REF-bitflag.
 inline std::size_t to_size_t(int64_t v) TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!int_cast_has_overflow<std::size_t>(v));
+    TIGHTDB_ASSERT(!util::int_cast_has_overflow<std::size_t>(v));
     return std::size_t(v);
 }
 
@@ -168,7 +180,6 @@ bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 firs
 }
 
 
-
 inline void micro_sleep(uint64_t microsec_delay)
 {
 #ifdef _WIN32
@@ -179,6 +190,20 @@ inline void micro_sleep(uint64_t microsec_delay)
 #endif
 }
 
+// Emulates nullptr of C++11
+const class {
+public:
+    template<class T> operator T*() const
+    {
+        return 0;
+    }
+    template<class C, class T> operator T C::*() const
+    {
+        return 0;
+    }
+private:
+    void operator& () const;
+} null_ptr = {};
 
 } // namespace tightdb
 

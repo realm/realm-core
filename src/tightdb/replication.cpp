@@ -3,10 +3,9 @@
 #include <ostream>
 #include <iomanip>
 
-#include <tightdb/terminate.hpp>
-#include <tightdb/safe_int_ops.hpp>
-#include <tightdb/string_buffer.hpp>
-#include <tightdb/unique_ptr.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
+#include <tightdb/util/string_buffer.hpp>
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/group_shared.hpp>
 #include <tightdb/replication.hpp>
@@ -42,12 +41,6 @@ void Replication::set_replication(Group& group, Replication* repl) TIGHTDB_NOEXC
 Replication::version_type Replication::get_current_version(SharedGroup& sg) TIGHTDB_NOEXCEPT
 {
     return sg.get_current_version();
-}
-
-
-void Replication::commit_foreign_transact_log(SharedGroup& sg, version_type new_version)
-{
-    sg.low_level_commit(new_version);
 }
 
 
@@ -139,14 +132,12 @@ struct Replication::TransactLogApplier {
         delete_subspecs();
     }
 
-#ifdef TIGHTDB_DEBUG
     void set_apply_log(ostream* log)
     {
         m_log = log;
         if (m_log)
             *m_log << boolalpha;
     }
-#endif
 
     void apply();
 
@@ -162,9 +153,7 @@ private:
     size_t m_num_subspecs;
     bool m_dirty_spec;
     StringBuffer m_string_buffer;
-#ifdef TIGHTDB_DEBUG
     ostream* m_log;
-#endif
 
     // Returns false if no more input was available
     bool fill_input_buffer()
@@ -354,131 +343,163 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
     switch (m_table->get_column_type(column_ndx)) {
         case type_Int: {
             int64_t value = read_int<int64_t>(); // Throws
-            if (insert)
-                m_table->insert_int(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-            else
-                m_table->set_int(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
             if (m_log) {
-                if (insert)
+                if (insert) {
                     *m_log << "table->insert_int("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
-                else
+                }
+                else {
                     *m_log << "table->set_int("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                }
             }
 #endif
+            if (insert) {
+                m_table->insert_int(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            }
+            else {
+                m_table->set_int(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            }
             return;
         }
         case type_Bool: {
             bool value = read_int<bool>(); // Throws
-            if (insert)
-                m_table->insert_bool(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-            else
-                m_table->set_bool(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
             if (m_log) {
-                if (insert)
+                if (insert) {
                     *m_log << "table->insert_bool("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
-                else
+                }
+                else {
                     *m_log << "table->set_bool("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                }
             }
 #endif
+            if (insert) {
+                m_table->insert_bool(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            }
+            else {
+                m_table->set_bool(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            }
             return;
         }
         case type_Float: {
             float value = read_float(); // Throws
-            if (insert)
-                m_table->insert_float(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-            else
-                m_table->set_float(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
             if (m_log) {
-                if (insert)
+                if (insert) {
                     *m_log << "table->insert_float("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
-                else
+                }
+                else {
                     *m_log << "table->set_float("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                }
             }
 #endif
+            if (insert) {
+                m_table->insert_float(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            }
+            else {
+                m_table->set_float(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            }
             return;
         }
         case type_Double: {
             double value = read_double(); // Throws
-            if (insert)
-                m_table->insert_double(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-            else
-                m_table->set_double(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
             if (m_log) {
-                if (insert)
+                if (insert) {
                     *m_log << "table->insert_double("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
-                else
+                }
+                else {
                     *m_log << "table->set_double("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                }
             }
 #endif
+            if (insert) {
+                m_table->insert_double(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            }
+            else {
+                m_table->set_double(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            }
             return;
         }
         case type_DateTime: {
             time_t value = read_int<time_t>(); // Throws
-            if (insert)
-                m_table->insert_datetime(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-            else
-                m_table->set_datetime(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
             if (m_log) {
-                if (insert)
+                if (insert) {
                     *m_log << "table->insert_datetime("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
-                else
+                }
+                else {
                     *m_log << "table->set_datetime("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                }
             }
 #endif
+            if (insert) {
+                m_table->insert_datetime(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            }
+            else {
+                m_table->set_datetime(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            }
             return;
         }
         case type_String: {
             read_string(m_string_buffer); // Throws
             StringData value(m_string_buffer.data(), m_string_buffer.size());
-            if (insert)
-                m_table->insert_string(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-            else
-                m_table->set_string(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
             if (m_log) {
-                if (insert)
+                if (insert) {
                     *m_log << "table->insert_string("<<column_ndx<<", "<<ndx<<", \""<<value<<"\")\n";
-                else
+                }
+                else {
                     *m_log << "table->set_string("<<column_ndx<<", "<<ndx<<", \""<<value<<"\")\n";
+                }
             }
 #endif
+            if (insert) {
+                m_table->insert_string(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            }
+            else {
+                m_table->set_string(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            }
             return;
         }
         case type_Binary: {
             read_string(m_string_buffer); // Throws
             BinaryData value(m_string_buffer.data(), m_string_buffer.size());
-            if (insert)
-                m_table->insert_binary(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-            else
-                m_table->set_binary(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
             if (m_log) {
-                if (insert)
+                if (insert) {
                     *m_log << "table->insert_binary("<<column_ndx<<", "<<ndx<<", ...)\n";
-                else
+                }
+                else {
                     *m_log << "table->set_binary("<<column_ndx<<", "<<ndx<<", ...)\n";
+                }
             }
 #endif
+            if (insert) {
+                m_table->insert_binary(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            }
+            else {
+                m_table->set_binary(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+            }
             return;
         }
         case type_Table: {
-            if (insert)
-                m_table->insert_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
-            else
-                m_table->clear_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
             if (m_log) {
-                if (insert)
+                if (insert) {
                     *m_log << "table->insert_subtable("<<column_ndx<<", "<<ndx<<")\n";
-                else
+                }
+                else {
                     *m_log << "table->clear_subtable("<<column_ndx<<", "<<ndx<<")\n";
+                }
             }
 #endif
+            if (insert) {
+                m_table->insert_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
+            }
+            else {
+                m_table->clear_subtable(column_ndx, ndx); // FIXME: Memory allocation failure!!!
+            }
             return;
         }
         case type_Mixed: {
@@ -486,99 +507,123 @@ void Replication::TransactLogApplier::set_or_insert(int column_ndx, size_t ndx)
             switch (type) {
                 case type_Int: {
                     int64_t value = read_int<int64_t>(); // Throws
-                    if (insert)
-                        m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    else
-                        m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
                     if (m_log) {
-                        if (insert)
+                        if (insert) {
                             *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
-                        else
+                        }
+                        else {
                             *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                        }
                     }
 #endif
+                    if (insert) {
+                        m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    }
+                    else {
+                        m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    }
                     return;
                 }
                 case type_Bool: {
                     bool value = read_int<bool>(); // Throws
-                    if (insert)
-                        m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    else
-                        m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
                     if (m_log) {
-                        if (insert)
+                        if (insert) {
                             *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
-                        else
+                        }
+                        else {
                             *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", "<<value<<")\n";
+                        }
                     }
 #endif
+                    if (insert) {
+                        m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    }
+                    else {
+                        m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    }
                     return;
                 }
                 case type_DateTime: {
                     time_t value = read_int<time_t>(); // Throws
-                    if (insert)
-                        m_table->insert_mixed(column_ndx, ndx, DateTime(value)); // FIXME: Memory allocation failure!!!
-                    else
-                        m_table->set_mixed(column_ndx, ndx, DateTime(value)); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
                     if (m_log) {
-                        if (insert)
+                        if (insert) {
                             *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", DateTime("<<value<<"))\n";
-                        else
+                        }
+                        else {
                             *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", DateTime("<<value<<"))\n";
+                        }
                     }
 #endif
+                    if (insert) {
+                        m_table->insert_mixed(column_ndx, ndx, DateTime(value)); // FIXME: Memory allocation failure!!!
+                    }
+                    else {
+                        m_table->set_mixed(column_ndx, ndx, DateTime(value)); // FIXME: Memory allocation failure!!!
+                    }
                     return;
                 }
                 case type_String: {
                     read_string(m_string_buffer); // Throws
                     StringData value(m_string_buffer.data(), m_string_buffer.size());
-                    if (insert)
-                        m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    else
-                        m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
                     if (m_log) {
-                        if (insert)
+                        if (insert) {
                             *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", \""<<value<<"\")\n";
-                        else
+                        }
+                        else {
                             *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", \""<<value<<"\")\n";
+                        }
                     }
 #endif
+                    if (insert) {
+                        m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    }
+                    else {
+                        m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    }
                     return;
                 }
                 case type_Binary: {
                     read_string(m_string_buffer); // Throws
                     BinaryData value(m_string_buffer.data(), m_string_buffer.size());
-                    if (insert)
-                        m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
-                    else
-                        m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
                     if (m_log) {
-                        if (insert)
+                        if (insert) {
                             *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", BinaryData(...))\n";
-                        else
+                        }
+                        else {
                             *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", BinaryData(...))\n";
+                        }
                     }
 #endif
+                    if (insert) {
+                        m_table->insert_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    }
+                    else {
+                        m_table->set_mixed(column_ndx, ndx, value); // FIXME: Memory allocation failure!!!
+                    }
                     return;
                 }
                 case type_Table: {
-                    if (insert)
-                        m_table->insert_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
-                    else
-                        m_table->set_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
                     if (m_log) {
-                        if (insert)
+                        if (insert) {
                             *m_log << "table->insert_mixed("<<column_ndx<<", "<<ndx<<", Mixed::subtable_tag())\n";
-                        else
+                        }
+                        else {
                             *m_log << "table->set_mixed("<<column_ndx<<", "<<ndx<<", Mixed::subtable_tag())\n";
+                        }
                     }
 #endif
+                    if (insert) {
+                        m_table->insert_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
+                    }
+                    else {
+                        m_table->set_mixed(column_ndx, ndx, Mixed::subtable_tag()); // FIXME: Memory allocation failure!!!
+                    }
                     return;
                 }
             }
@@ -601,7 +646,7 @@ void Replication::TransactLogApplier::apply()
         char instr;
         if (!read_char(instr))
             break;
-// cerr << "["<<instr<<"]";
+//cerr << "["<<instr<<"]";
         switch (instr) {
             case 's': { // Set value
                 if (m_dirty_spec)
@@ -640,11 +685,11 @@ void Replication::TransactLogApplier::apply()
                     finalize_spec();
                 if (!m_table)
                     goto bad_transact_log;
-                m_table->insert_done(); // FIXME: May fail
 #ifdef TIGHTDB_DEBUG
                 if (m_log)
                     *m_log << "table->insert_done()\n";
 #endif
+                m_table->insert_done(); // FIXME: May fail
                 break;
             }
 
@@ -655,11 +700,11 @@ void Replication::TransactLogApplier::apply()
                 size_t num_rows = read_int<size_t>(); // Throws
                 if (!m_table || m_table->size() < ndx)
                     goto bad_transact_log;
-                m_table->insert_empty_row(ndx, num_rows); // FIXME: May fail
 #ifdef TIGHTDB_DEBUG
                 if (m_log)
                     *m_log << "table->insert_empty_row("<<ndx<<", "<<num_rows<<")\n";
 #endif
+                m_table->insert_empty_row(ndx, num_rows); // FIXME: May fail
                 break;
             }
 
@@ -669,11 +714,11 @@ void Replication::TransactLogApplier::apply()
                 size_t ndx = read_int<size_t>(); // Throws
                 if (!m_table || m_table->size() < ndx)
                     goto bad_transact_log;
-                m_table->remove(ndx); // FIXME: May fail
 #ifdef TIGHTDB_DEBUG
                 if (m_log)
                     *m_log << "table->remove("<<ndx<<")\n";
 #endif
+                m_table->remove(ndx); // FIXME: May fail
                 break;
             }
 
@@ -686,11 +731,11 @@ void Replication::TransactLogApplier::apply()
                 if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
                     goto bad_transact_log;
                 int64_t value = read_int<int64_t>(); // Throws
-                m_table->add_int(column_ndx, value); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
                 if (m_log)
                     *m_log << "table->add_int("<<column_ndx<<", "<<value<<")\n";
 #endif
+                m_table->add_int(column_ndx, value); // FIXME: Memory allocation failure!!!
                 break;
             }
 
@@ -701,11 +746,11 @@ void Replication::TransactLogApplier::apply()
                 size_t ndx = read_int<size_t>(); // Throws
                 if (m_group.size() <= ndx)
                     goto bad_transact_log;
-                m_table = m_group.get_table_by_ndx(ndx)->get_table_ref();
 #ifdef TIGHTDB_DEBUG
                 if (m_log)
                     *m_log << "table = group->get_table_by_ndx("<<ndx<<")\n";
 #endif
+                m_table = m_group.get_table_by_ndx(ndx)->get_table_ref();
                 spec = 0;
                 for (int i=0; i<levels; ++i) {
                     int column_ndx = read_int<int>(); // Throws
@@ -714,6 +759,10 @@ void Replication::TransactLogApplier::apply()
                         goto bad_transact_log;
                     if (m_table->size() <= ndx)
                         goto bad_transact_log;
+#ifdef TIGHTDB_DEBUG
+                    if (m_log)
+                        *m_log << "table = table->get_subtable("<<column_ndx<<", "<<ndx<<")\n";
+#endif
                     switch (m_table->get_column_type(column_ndx)) {
                         case type_Table:
                             m_table = m_table->get_subtable(column_ndx, ndx);
@@ -726,10 +775,6 @@ void Replication::TransactLogApplier::apply()
                         default:
                             goto bad_transact_log;
                     }
-#ifdef TIGHTDB_DEBUG
-                    if (m_log)
-                        *m_log << "table = table->get_subtable("<<column_ndx<<", "<<ndx<<")\n";
-#endif
                 }
                 break;
             }
@@ -739,11 +784,11 @@ void Replication::TransactLogApplier::apply()
                     finalize_spec();
                 if (!m_table)
                     goto bad_transact_log;
-                m_table->clear(); // FIXME: Can probably fail!
 #ifdef TIGHTDB_DEBUG
                 if (m_log)
                     *m_log << "table->clear()\n";
 #endif
+                m_table->clear(); // FIXME: Can probably fail!
                 break;
             }
 
@@ -755,11 +800,11 @@ void Replication::TransactLogApplier::apply()
                     goto bad_transact_log;
                 if (column_ndx < 0 || int(m_table->get_column_count()) <= column_ndx)
                     goto bad_transact_log;
-                m_table->set_index(column_ndx); // FIXME: Memory allocation failure!!!
 #ifdef TIGHTDB_DEBUG
                 if (m_log)
                     *m_log << "table->set_index("<<column_ndx<<")\n";
 #endif
+                m_table->set_index(column_ndx); // FIXME: Memory allocation failure!!!
                 break;
             }
 
@@ -774,11 +819,11 @@ void Replication::TransactLogApplier::apply()
                 // FIXME: Is it legal to have multiple columns with the same name?
                 if (spec->get_column_index(name) != size_t(-1))
                     goto bad_transact_log;
-                spec->add_column(DataType(type), name);
 #ifdef TIGHTDB_DEBUG
                 if (m_log)
                     *m_log << "spec->add_column("<<type<<", \""<<name<<"\")\n";
 #endif
+                spec->add_column(DataType(type), name);
                 m_dirty_spec = true;
                 break;
             }
@@ -787,23 +832,23 @@ void Replication::TransactLogApplier::apply()
                 delete_subspecs();
                 if (!m_table)
                     goto bad_transact_log;
-                spec = &m_table->get_spec();
 #ifdef TIGHTDB_DEBUG
                 if (m_log)
                     *m_log << "spec = table->get_spec()\n";
 #endif
+                spec = &m_table->get_spec();
                 int levels = read_int<int>(); // Throws
                 for (int i=0; i<levels; ++i) {
                     int subspec_ndx = read_int<int>(); // Throws
                     if (subspec_ndx < 0 || int(spec->get_num_subspecs()) <= subspec_ndx)
                         goto bad_transact_log;
-                    UniquePtr<Spec> spec2(new Spec(spec->get_subspec_by_ndx(subspec_ndx)));
-                    add_subspec(spec2.get());
-                    spec = spec2.release();
 #ifdef TIGHTDB_DEBUG
                     if (m_log)
                         *m_log << "spec = spec->get_subspec_by_ndx("<<subspec_ndx<<")\n";
 #endif
+                    UniquePtr<Spec> spec2(new Spec(spec->get_subspec_by_ndx(subspec_ndx)));
+                    add_subspec(spec2.get());
+                    spec = spec2.release();
                 }
                 break;
             }
@@ -813,11 +858,11 @@ void Replication::TransactLogApplier::apply()
                 StringData name(m_string_buffer.data(), m_string_buffer.size());
                 if (m_group.has_table(name))
                     goto bad_transact_log;
-                m_group.create_new_table(name); // Throws
 #ifdef TIGHTDB_DEBUG
                 if (m_log)
                     *m_log << "group->create_new_table(\""<<name<<"\")\n";
 #endif
+                m_group.create_new_table(name); // Throws
                 break;
             }
 
@@ -826,11 +871,11 @@ void Replication::TransactLogApplier::apply()
                     finalize_spec();
                 if (!m_table)
                     goto bad_transact_log;
-                m_table->optimize(); // FIXME: May fail
 #ifdef TIGHTDB_DEBUG
                 if (m_log)
                     *m_log << "table->optimize()\n";
 #endif
+                m_table->optimize(); // FIXME: May fail
                 break;
             }
 
@@ -848,20 +893,12 @@ void Replication::TransactLogApplier::apply()
 }
 
 
-#ifdef TIGHTDB_DEBUG
 void Replication::apply_transact_log(InputStream& transact_log, Group& group, ostream* log)
 {
     TransactLogApplier applier(transact_log, group);
     applier.set_apply_log(log);
     applier.apply(); // Throws
 }
-#else
-void Replication::apply_transact_log(InputStream& transact_log, Group& group)
-{
-    TransactLogApplier applier(transact_log, group);
-    applier.apply(); // Throws
-}
-#endif
 
 
 namespace {

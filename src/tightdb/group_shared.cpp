@@ -1,11 +1,11 @@
-#include <fcntl.h>
-#include <errno.h>
 #include <algorithm>
+#include <cerrno>
 
-#include <tightdb/config.h>
-#include <tightdb/safe_int_ops.hpp>
-#include <tightdb/terminate.hpp>
-#include <tightdb/thread.hpp>
+#include <fcntl.h>
+
+#include <tightdb/util/features.h>
+#include <tightdb/util/safe_int_ops.hpp>
+#include <tightdb/util/thread.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group_shared.hpp>
 #include <tightdb/group_writer.hpp>
@@ -15,6 +15,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 
 namespace {
@@ -590,7 +591,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 }
 
 
-Group& SharedGroup::begin_write()
+void SharedGroup::do_begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
@@ -632,20 +633,6 @@ Group& SharedGroup::begin_write()
 #ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Writing;
 #endif
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication()) {
-        try {
-            repl->begin_write_transact(*this); // Throws
-        }
-        catch (...) {
-            rollback();
-            throw;
-        }
-    }
-#endif
-
-    return m_group;
 }
 
 
@@ -1042,8 +1029,8 @@ void SharedGroup::reserve(size_t size)
     // FIXME: There is currently no synchronization between this and
     // concurrent commits in progress. This is so because it is
     // believed that the OS guarantees race free behavior when
-    // File::prealloc_if_supported() (posix_fallocate() on Linux) runs
-    // concurrently with modfications via a memory map of the
-    // file. This assumption must be verified though.
+    // util::File::prealloc_if_supported() (posix_fallocate() on
+    // Linux) runs concurrently with modfications via a memory map of
+    // the file. This assumption must be verified though.
     m_group.m_alloc.reserve(size);
 }
