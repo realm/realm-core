@@ -46,7 +46,7 @@ public:
     //
     // - nonexisting: the file does not exist.
     //
-    // - stale: the file exists, but noone is accessing it.
+    // - stale: the file exists, but no one is accessing it.
     //
     //          Note: from the applications point of view, there is no operational
     //          difference between stale and nonexisting. The difference is only visible
@@ -64,7 +64,7 @@ public:
     //              share the file or crashes.
     //
     // - indeterminate: the file exists, but it cannot be determined that
-    //                  noone is accessing it. Such files are NEVER automatically
+    //                  no one is accessing it. Such files are NEVER automatically
     //                  deleted or reinitialized. Instead the situation is reported
     //                  by throwing an exception.
 
@@ -72,7 +72,7 @@ public:
     // 1) To minimize the occurence of indeterminate IPMFiles, to properly
     //    recognize them and to signal using exceptions.
     // 2) To properly recognize stale IPMFiles and re-initialize them.
-    // 3) To automatically remove IPMFiles if noone accesses them. This is a "best effort";
+    // 3) To automatically remove IPMFiles if no one accesses them. This is a "best effort";
     //    there is no guarantee of always removing unreferenced files.
     // 4) To ensure proper (re)initialization and assignment of exclusive ownership.
     // 5) To ensure atomic transitions between the first four states.
