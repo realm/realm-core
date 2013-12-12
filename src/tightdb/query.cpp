@@ -35,6 +35,7 @@ void Query::Create()
     update.push_back(0);
     update_override.push_back(0);
     first.push_back(0);
+    pending_not.push_back(false);
 #if TIGHTDB_MULTITHREAD_QUERY
     m_threadcount = 0;
 #endif
@@ -49,6 +50,7 @@ Query::Query(const Query& copy)
     update = copy.update;
     update_override = copy.update_override;
     first = copy.first;
+    pending_not = copy.pending_not;
     error_code = copy.error_code;
 #if TIGHTDB_MULTITHREAD_QUERY
     m_threadcount = copy.m_threadcount;
@@ -670,6 +672,7 @@ Query& Query::group()
     update.push_back(0);
     update_override.push_back(0);
     first.push_back(0);
+    pending_not.push_back(false);
     return *this;
 }
 Query& Query::end_group()
@@ -679,23 +682,68 @@ Query& Query::end_group()
         return *this;
     }
 
+    // append first node in current group to surrounding group. If an Or node was met,
+    // it will have manipulated first, so that it (the Or node) is the first node in the
+    // current group.
     if (update[update.size()-2] != 0)
         *update[update.size()-2] = first[first.size()-1];
 
+    // similarly, if the surrounding group is empty, simply make first node of current group,
+    // the first node of the surrounding group.
     if (first[first.size()-2] == 0)
         first[first.size()-2] = first[first.size()-1];
 
+    // the update back link for the surrounding group must be updated to support
+    // the linking in of nodes that follows. If the node we are adding to the surrounding
+    // context has taken control of the nodes in the inner group, then we set up an
+    // update to a field inside it - if not, then we just copy the last update in the
+    // current group into the surrounding group. So: the update override is used to override
+    // the normal sequential linking in of nodes, producing e.g. the structure used for
+    // OrNodes and NotNodes.
     if (update_override[update_override.size()-1] != 0)
         update[update.size() - 2] = update_override[update_override.size()-1];
     else if (update[update.size()-1] != 0)
         update[update.size() - 2] = update[update.size()-1];
 
     first.pop_back();
+    pending_not.pop_back();
     update.pop_back();
     update_override.pop_back();
+    HandlePendingNot();
     return *this;
 }
 
+Query& Query::Not()
+{
+    NotNode* const p = new NotNode;
+    all_nodes.push_back(p);
+    if (first[first.size()-1] == 0)
+        first[first.size()-1] = p;
+
+    if (update[update.size()-1] != 0)
+        *update[update.size()-1] = p;
+
+
+    group();
+    pending_not[pending_not.size()-1] = true;
+    // value for update for sub-condition
+    update[update.size()-1] = &p->m_cond;
+    // pending value for update, once the sub-condition ends:
+    update_override[update_override.size()-1] = &p->m_child;
+    return *this;
+}
+
+void Query::HandlePendingNot()
+{
+    if (pending_not.size() > 1 && pending_not[pending_not.size()-1]) {
+        // we are inside group(s) implicitly created to handle a not, so pop it/them:
+        // but first, prevent the pop from linking the current node into the surrounding
+        // context - the current node is instead hanging of from the previously added NotNode's
+        // m_cond field.
+        update[update.size()-1] = 0;
+        end_group();
+    }
+}
 Query& Query::Or()
 {
     ParentNode* const o = new OrNode(first[first.size()-1]);
@@ -1027,6 +1075,8 @@ void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
         *update[update.size()-1] = p;
 
     update[update.size()-1] = newnode;
+
+    HandlePendingNot();
 }
 
 /* ********************************************************************************************************************
