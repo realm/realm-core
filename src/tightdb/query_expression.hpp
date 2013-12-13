@@ -28,6 +28,7 @@ Type conversion/promotion semantics is the same as in the C++ expressions, e.g f
 Grammar:
 -----------------------------------------------------------------------------------------------------------------------
     Expression:         Subexpr2<T>  Compare<Cond, T>  Subexpr2<T>
+                        operator! Expression
 
     Subexpr2<T>:        Value<T>
                         Columns<T>
@@ -183,16 +184,6 @@ template<class T1, class T2, bool b> struct Common<T1, T2, true , false, b> {
 };
 
 
-class Expression : public Query
-{
-public:
-    Expression() {}
-
-    virtual size_t find_first(size_t start, size_t end) const = 0;
-    virtual void set_table(const Table* table) = 0;
-    virtual ~Expression() {}
-};
-
 class ValueBase
 {
 public:
@@ -202,6 +193,17 @@ public:
     virtual void export_int64_t(ValueBase& destination) const = 0;
     virtual void export_double(ValueBase& destination) const = 0;
     virtual void import(const ValueBase& destination) = 0;
+};
+
+class Expression : public Query
+{
+public:
+    Expression() {}
+
+    virtual size_t find_first(size_t start, size_t end) const = 0;
+    virtual void set_table(const Table* table) = 0;
+    virtual void evaluate(size_t index, ValueBase& destination) = 0;
+    virtual ~Expression() {}
 };
 
 class Subexpr
@@ -707,6 +709,82 @@ template <class T> UnaryOperator<Pow<T> >& power (Subexpr2<T>& left) {
 }
 
 
+// support for negation:
+class Negate : public Expression
+{
+public:
+    Negate(Expression& expr, bool auto_delete = false);
+    ~Negate();
+    void set_table(const Table* table);
+    const Table* get_table();
+    size_t find_first(size_t start, size_t end) const;
+    void evaluate(size_t index, ValueBase& destination);
+private:
+    bool m_auto_delete;
+    Expression& m_expr;
+};
+
+inline Expression& operator! (Expression& left) {
+    return *new Negate(left, true);
+}
+
+inline Negate::Negate(Expression& expr, bool auto_delete) : m_expr(expr)
+{
+    m_auto_delete = auto_delete;
+    Query::expression(this, auto_delete);
+    Table* t = const_cast<Table*>(get_table()); // todo, const
+    
+    if (t)
+        Query::m_table = t->get_table_ref();
+}
+
+inline Negate::~Negate()
+{
+    if (m_auto_delete)
+        delete &m_expr;
+}
+
+inline void Negate::set_table(const Table* table)
+{
+    m_expr.set_table(table);
+}
+
+
+inline const Table* Negate::get_table()
+{
+    return m_expr.get_table();
+}
+
+inline size_t Negate::find_first(size_t start, size_t end) const
+{
+        size_t match;
+        Value<bool> all_false;
+        Value<bool> result;
+
+        for (; start < end; start += ValueBase::elements) {
+            m_expr.evaluate(start, result);
+            match = Value<bool>::template compare<Equal>(&result, &all_false);
+
+            // Note the second condition that tests if match position in chunk exceeds column length
+            if (match != ValueBase::elements && start + match < end)
+                return start + match;
+        }
+
+        return not_found; // no match
+}
+
+inline void Negate::evaluate(size_t index, ValueBase& destination)
+{
+    Value<T> expr;
+    Value<bool> all_false;
+    Value<bool> res;
+    
+    m_expr.evaluate(index, expr);
+    match = Value<bool>::template compare<Equal>(&expr, &all_false);
+    destination.import(match);
+}
+
+
 // Handling of String columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
 template <> class Columns<StringData> : public Subexpr
 {
@@ -1008,6 +1086,18 @@ public:
         }
 
         return not_found; // no match
+    }
+
+    void evaluate(size_t index, ValueBase& destination)
+    {
+        Value<T> right;
+        Value<T> left;
+        Value<bool> match;
+
+        m_left.evaluate(index, left);
+        m_right.evaluate(start, right);
+        match = Value<bool>::template compare<TCond>(&left, &right);
+        destination.import(match);
     }
 
 private:
