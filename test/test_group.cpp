@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <sys/stat.h>
 
 #include <UnitTest++.h>
 
@@ -59,6 +60,33 @@ TEST(Group_OpenFile)
 
     util::File::remove("test.tightdb");
 }
+
+
+TEST(Group_Permissions)
+{
+    util::File::try_remove("test.tightdb");
+    {
+        Group group1;
+        TableRef t1 = group1.get_table("table1");
+        t1->add_column(type_String, "s");
+        t1->add_column(type_Int,    "i");
+        for(size_t i=0; i<4; ++i) {
+            t1->insert_string(0, i, "a");
+            t1->insert_int(1, i, 3);
+            t1->insert_done();
+        }
+        group1.write("test.tightdb");
+    }
+
+    chmod("test.tightdb", S_IWUSR);
+
+    {
+        Group group2((Group::unattached_tag()));
+        CHECK_THROW(group2.open("test.tightdb", Group::mode_ReadOnly), util::File::PermissionDenied);
+    }
+    util::File::try_remove("test.tightdb");
+}
+
 
 
 TEST(Group_BadFile)
