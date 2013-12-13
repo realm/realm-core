@@ -13,8 +13,11 @@ TIGHTDB_TABLE_3(PeopleTable,
                   hired,  Bool)
 
 // @@EndFold@@
-void some_function_making_it_impossible_to_use_RAII(SharedGroup& g)
+void some_function_making_it_impossible_to_use_RAII(SharedGroup& g, PeopleTable::ConstRef employees)
 {
+    // Get table
+    assert(employees->column().age.sum() == 64);
+
     g.end_read();
 }
 
@@ -23,21 +26,18 @@ void func()
     // Create a new shared group
     SharedGroup db("shared_db.tightdb");
 
-    // Do a write transaction
     {
         Group& g = db.begin_write();
+        PeopleTable::Ref employees = g.get_table<PeopleTable>("employees");
+        employees->add("joe", 42, false);
+        employees->add("jessica", 22, true);
+        db.commit();
 
         try {
-
-            // Get table (creating it if it does not exist)
-            PeopleTable::Ref employees = g.get_table<PeopleTable>("employees");
-
-            // Add initial rows (with sub-tables)
-            if (employees->is_empty()) {
-                employees->add("joe", 42, false);
-                employees->add("jessica", 22, true);
-            }
-            some_function_making_it_impossible_to_use_RAII(db);
+            // Do a read transaction
+            const Group& g = db.begin_read();
+            PeopleTable::ConstRef empl = g.get_table<PeopleTable>("employees");
+            some_function_making_it_impossible_to_use_RAII(db, empl);
         }
         catch (...) {
             db.end_read();
