@@ -81,8 +81,9 @@ TEST(Group_Permissions)
     chmod("test.tightdb", S_IWUSR);
 
     {
-        Group group2((Group::unattached_tag()));
+        Group group2;
         CHECK_THROW(group2.open("test.tightdb", Group::mode_ReadOnly), util::File::PermissionDenied);
+        CHECK(!group2.has_table("table1"));  // is not attached
     }
     util::File::try_remove("test.tightdb");
 }
