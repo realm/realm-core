@@ -53,7 +53,6 @@ public:
     void insert(std::size_t ndx, StringData);
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
-    void resize(std::size_t ndx);
     void fill(std::size_t count);
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
 

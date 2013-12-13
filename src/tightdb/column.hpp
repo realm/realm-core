@@ -61,13 +61,6 @@ public:
     /// number of elements by one.
     virtual void move_last_over(std::size_t ndx) = 0;
 
-    // FIXME: Carefull with this one. It resizes the root node, not
-    // the column. Depending on what it is used for, either rename to
-    // resize_root() or upgrade to handle proper column
-    // resizing. Check if it is used at all. Same for various specific
-    // column types such as AdaptiveStringColumn.
-    void resize(std::size_t size) { m_array->resize(size); }
-
     virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT { return false; }
 
     virtual void destroy() TIGHTDB_NOEXCEPT;

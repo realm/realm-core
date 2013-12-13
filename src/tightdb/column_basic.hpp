@@ -58,7 +58,6 @@ public:
     void insert(std::size_t ndx, T value);
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
-    void resize(std::size_t ndx);
     void fill(std::size_t count);
     // Experimental. Overwrites the row at ndx with the last row and removes the last row. For unordered tables.
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;

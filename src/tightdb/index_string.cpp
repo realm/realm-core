@@ -212,8 +212,8 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
                     ref_type ref = m_array->get_as_ref(i);
                     new_node.NodeAddKey(ref);
                 }
-                offsets.resize(node_ndx);
-                m_array->resize(refs_ndx);
+                offsets.truncate(node_ndx);
+                m_array->truncate(refs_ndx);
                 return NodeChange(NodeChange::split, get_ref(), new_node.get_ref());
         }
     }
@@ -259,8 +259,8 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
             new_offsets.add(v2);
             new_list.m_array->add(v3);
         }
-        old_offsets.resize(ndx);
-        m_array->resize(ndx+1);
+        old_offsets.truncate(ndx);
+        m_array->truncate(ndx+1);
 
         return NodeChange(NodeChange::split, get_ref(), new_list.get_ref());
     }

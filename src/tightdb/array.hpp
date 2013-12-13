@@ -395,8 +395,8 @@ public:
     bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
     Type get_type() const TIGHTDB_NOEXCEPT;
 
-    void insert(std::size_t ndx, int64_t value);
-    void add(int64_t value);
+    void insert(std::size_t ndx, int_fast64_t value);
+    void add(int_fast64_t value);
 
     /// This function is guaranteed not to throw if
     /// ensure_minimum_width(value) has been called and
@@ -526,14 +526,15 @@ public:
     void sort();
     void ReferenceSort(Array& ref);
 
-    // FIXME: Carefull with this one. It handles only shortening
-    // operations. Either rename to truncate() or implement expanding
-    // case.
+    // Reduce the size of this array to the specified number of
+    // elements. It is an error to specify a size that is greater than
+    // the current size of this array. The effect of doing so is
+    // undefined.
     ///
     /// FIXME: Carefull with this one. It does not destroy/deallocate
     /// subarrays as clear() does. This difference is surprising and
     /// highly counterintuitive.
-    void resize(std::size_t count);
+    void truncate(std::size_t size);
 
     /// Returns true if type is not type_InnerColumnNode
     bool is_leaf() const TIGHTDB_NOEXCEPT { return !m_isNode; }
@@ -1321,6 +1322,12 @@ inline void Array::destroy() TIGHTDB_NOEXCEPT
     char* header = get_header_from_data(m_data);
     m_alloc.free_(m_ref, header);
     m_data = 0;
+}
+
+
+inline void Array::add(int_fast64_t value)
+{
+    insert(m_size, value);
 }
 
 

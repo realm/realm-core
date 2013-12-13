@@ -251,24 +251,6 @@ void ColumnBinary::erase(size_t ndx, bool is_last)
 }
 
 
-void ColumnBinary::resize(size_t n)
-{
-    TIGHTDB_ASSERT(root_is_leaf()); // currently only available on leaf level (used by b-tree code)
-    TIGHTDB_ASSERT(n < size());
-
-    bool is_big = m_array->context_bit();
-    if (!is_big) {
-        // Small blobs
-        ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
-        leaf->resize(n); // Throws
-        return;
-    }
-    // Big blobs
-    ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
-    leaf->resize(n); // Throws
-}
-
-
 void ColumnBinary::move_last_over(size_t ndx)
 {
     // FIXME: ExceptionSafety: The current implementation of this

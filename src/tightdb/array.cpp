@@ -429,7 +429,7 @@ void Array::AddPositiveLocal(int64_t value)
 }
 */
 
-void Array::insert(size_t ndx, int64_t value)
+void Array::insert(size_t ndx, int_fast64_t value)
 {
     TIGHTDB_ASSERT(ndx <= m_size);
 
@@ -488,20 +488,15 @@ void Array::insert(size_t ndx, int64_t value)
 }
 
 
-void Array::add(int64_t value)
+void Array::truncate(size_t size)
 {
-    insert(m_size, value);
-}
-
-void Array::resize(size_t count)
-{
-    TIGHTDB_ASSERT(count <= m_size);
+    TIGHTDB_ASSERT(size <= m_size);
 
     copy_on_write(); // Throws
 
     // Update size (also in header)
-    m_size = count;
-    set_header_size(m_size);
+    m_size = size;
+    set_header_size(size);
 }
 
 void Array::ensure_minimum_width(int64_t value)
@@ -1971,7 +1966,7 @@ ref_type Array::bptree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& st
     else {
         for (size_t i = ndx; i != leaf_size; ++i)
             new_leaf.add(get(i));
-        resize(ndx);
+        truncate(ndx);
         add(value);
         state.m_split_offset = ndx + 1;
     }

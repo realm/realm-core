@@ -318,7 +318,7 @@ ref_type BasicArray<T>::bptree_leaf_insert(size_t ndx, T value, TreeInsertBase& 
         // array, then copy elements with std::copy().
         for (size_t i = ndx; i != leaf_size; ++i)
             new_leaf.add(get(i));
-        resize(ndx);
+        truncate(ndx);
         add(value);
         state.m_split_offset = ndx + 1;
     }

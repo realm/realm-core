@@ -47,7 +47,6 @@ public:
     void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, BinaryData()); }
     void insert(std::size_t ndx, BinaryData value);
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
-    void resize(std::size_t ndx);
     void clear() TIGHTDB_OVERRIDE;
     void fill(std::size_t count);
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;

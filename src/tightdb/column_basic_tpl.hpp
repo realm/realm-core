@@ -97,14 +97,6 @@ void BasicColumn<T>::clear()
 }
 
 template<class T>
-void BasicColumn<T>::resize(std::size_t ndx)
-{
-    TIGHTDB_ASSERT(root_is_leaf()); // currently only available on leaf level (used by b-tree code)
-    TIGHTDB_ASSERT(ndx < size());
-    static_cast<BasicArray<T>*>(m_array)->resize(ndx);
-}
-
-template<class T>
 void BasicColumn<T>::move_last_over(std::size_t ndx)
 {
     TIGHTDB_ASSERT(ndx+1 < size());

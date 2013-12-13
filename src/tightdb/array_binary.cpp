@@ -96,14 +96,14 @@ void ArrayBinary::erase(size_t ndx)
     m_offsets.adjust(ndx, m_offsets.size(), int64_t(start) - end);
 }
 
-void ArrayBinary::resize(size_t ndx)
+void ArrayBinary::truncate(size_t size)
 {
-    TIGHTDB_ASSERT(ndx < m_offsets.size());
+    TIGHTDB_ASSERT(size < m_offsets.size());
 
-    size_t size = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t blob_size = size ? to_size_t(m_offsets.get(size-1)) : 0;
 
-    m_offsets.resize(ndx);
-    m_blob.resize(size);
+    m_offsets.truncate(size);
+    m_blob.truncate(blob_size);
 }
 
 void ArrayBinary::clear()
@@ -151,7 +151,7 @@ ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_
     else {
         for (size_t i = ndx; i != leaf_size; ++i)
             new_leaf.add(get(i));
-        resize(ndx);
+        truncate(ndx);
         add(value, add_zero_term);
         state.m_split_offset = ndx + 1;
     }

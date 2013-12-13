@@ -41,7 +41,7 @@ public:
     void replace(std::size_t begin, std::size_t end, const char* data, std::size_t size,
                  bool add_zero_term = false);
     void erase(std::size_t begin, std::size_t end);
-    void resize(std::size_t size);
+    void truncate(std::size_t size);
     void clear();
 
     /// Get the specified element without the cost of constructing an
@@ -114,7 +114,7 @@ inline void ArrayBlob::erase(std::size_t start, std::size_t end)
     replace(start, end, null_ptr, 0);
 }
 
-inline void ArrayBlob::resize(std::size_t size)
+inline void ArrayBlob::truncate(std::size_t size)
 {
     TIGHTDB_ASSERT(size <= m_size);
     replace(size, m_size, null_ptr, 0);

@@ -45,7 +45,7 @@ public:
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
     void insert(std::size_t ndx, BinaryData value, bool add_zero_term = false);
     void erase(std::size_t ndx);
-    void resize(std::size_t ndx);
+    void truncate(std::size_t size);
     void clear();
 
     /// Get the specified element without the cost of constructing an

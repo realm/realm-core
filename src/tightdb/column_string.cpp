@@ -234,30 +234,6 @@ void AdaptiveStringColumn::clear()
 }
 
 
-void AdaptiveStringColumn::resize(size_t n)
-{
-    TIGHTDB_ASSERT(root_is_leaf()); // currently only available on leaf level (used by b-tree code)
-
-    bool long_strings = m_array->has_refs();
-    if (!long_strings) {
-        // Small strings
-        ArrayString* leaf = static_cast<ArrayString*>(m_array);
-        leaf->resize(n); // Throws
-        return;
-    }
-    bool is_big = m_array->context_bit();
-    if (!is_big) {
-        // Medium strings
-        ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
-        leaf->resize(n); // Throws
-        return;
-    }
-    // Big strings
-    ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
-    leaf->resize(n); // Throws
-}
-
-
 namespace {
 
 class SetLeafElem: public Array::UpdateHandler {
