@@ -37,7 +37,7 @@ ColumnBinary::ColumnBinary(ref_type ref, ArrayParent* parent, size_t ndx_in_pare
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref);
-    bool root_is_leaf = Array::get_isleaf_from_header(header);
+    bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
     if (root_is_leaf) {
         bool is_big = Array::get_context_bit_from_header(header);
         if (!is_big) {
@@ -62,7 +62,8 @@ ColumnBinary::~ColumnBinary() TIGHTDB_NOEXCEPT
 
 void ColumnBinary::clear()
 {
-    if (m_array->is_leaf()) {
+    bool root_is_leaf = !m_array->is_inner_bptree_node();
+    if (root_is_leaf) {
         bool is_big = m_array->context_bit();
         if (!is_big) {
             // Small blobs root leaf
@@ -126,7 +127,8 @@ void ColumnBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
 {
     TIGHTDB_ASSERT(ndx < size());
 
-    if (m_array->is_leaf()) {
+    bool root_is_leaf = !m_array->is_inner_bptree_node();
+    if (root_is_leaf) {
         bool is_big = upgrade_root_leaf(value.size()); // Throws
         if (!is_big) {
             // Small blobs root leaf
@@ -230,7 +232,8 @@ void ColumnBinary::erase(size_t ndx, bool is_last)
     TIGHTDB_ASSERT(ndx < size());
     TIGHTDB_ASSERT(is_last == (ndx == size()-1));
 
-    if (m_array->is_leaf()) {
+    bool root_is_leaf = !m_array->is_inner_bptree_node();
+    if (root_is_leaf) {
         bool is_big = m_array->context_bit();
         if (!is_big) {
             // Small blobs root leaf
@@ -258,7 +261,7 @@ void ColumnBinary::move_last_over(size_t ndx)
     // repair it.
 
     // FIXME: Consider doing two nested calls to
-    // update_bptree_elem(). If the two leafs are not the same, no
+    // update_bptree_elem(). If the two leaves are not the same, no
     // copying is needed. If they are the same, call
     // ArrayBinary::move_last_over() (does not yet
     // exist). ArrayBinary::move_last_over() could be implemented in a

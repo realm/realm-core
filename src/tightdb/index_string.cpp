@@ -21,14 +21,14 @@ void get_child(Array& parent, size_t child_ref_ndx, Array& child) TIGHTDB_NOEXCE
 
 Array* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 {
-    Array::Type type = is_leaf ? Array::type_HasRefs : Array::type_InnerColumnNode;
+    Array::Type type = is_leaf ? Array::type_HasRefs : Array::type_InnerBptreeNode;
     UniquePtr<Array> top(new Array(type, 0, 0, alloc));
 
     // Mark that this is part of index
-    // (as opposed to columns under leafs)
+    // (as opposed to columns under leaves)
     top->set_is_index_node(true);
 
-    // Add subcolumns for leafs
+    // Add subcolumns for leaves
     Array values(Array::type_Normal, 0, 0, alloc);
     values.ensure_minimum_width(0x7FFFFFFF); // This ensures 31 bits plus a sign bit
     top->add(values.get_ref()); // first entry in refs points to offsets
@@ -76,7 +76,7 @@ void StringIndex::InsertWithOffset(size_t row_ndx, size_t offset, StringData val
 
 void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
 {
-    TIGHTDB_ASSERT(m_array->is_leaf()); // only works in leafs
+    TIGHTDB_ASSERT(!m_array->is_inner_bptree_node()); // only works in leaves
 
     // Create 4 byte index key
     key_type key = create_key(value.substr(offset));
@@ -446,7 +446,7 @@ void StringIndex::distinct(Array& result) const
     const size_t count = m_array->size();
 
     // Get first matching row for every key
-    if (!m_array->is_leaf()) {
+    if (m_array->is_inner_bptree_node()) {
         for (size_t i = 1; i < count; ++i) {
             size_t ref = m_array->get_as_ref(i);
             const StringIndex ndx(ref, 0, 0, m_target_column, m_get_func, alloc);
@@ -485,7 +485,7 @@ void StringIndex::UpdateRefs(size_t pos, int diff)
     Allocator& alloc = m_array->get_alloc();
     const size_t count = m_array->size();
 
-    if (!m_array->is_leaf()) {
+    if (m_array->is_inner_bptree_node()) {
         for (size_t i = 1; i < count; ++i) {
             size_t ref = m_array->get_as_ref(i);
             StringIndex ndx(ref, m_array, i, m_target_column, m_get_func, alloc);
@@ -570,7 +570,7 @@ void StringIndex::DoDelete(size_t row_ndx, StringData value, size_t offset)
     const size_t pos_refs = pos + 1; // first entry in refs points to offsets
     TIGHTDB_ASSERT(pos != values.size());
 
-    if (!m_array->is_leaf()) {
+    if (m_array->is_inner_bptree_node()) {
         ref_type ref = m_array->get_as_ref(pos_refs);
         StringIndex node(ref, m_array, pos_refs, m_target_column, m_get_func, alloc);
         node.DoDelete(row_ndx, value, offset);
@@ -642,7 +642,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
     size_t pos_refs = pos + 1; // first entry in refs points to offsets
     TIGHTDB_ASSERT(pos != values.size());
 
-    if (!m_array->is_leaf()) {
+    if (m_array->is_inner_bptree_node()) {
         ref_type ref = m_array->get_as_ref(pos_refs);
         StringIndex node(ref, m_array, pos_refs, m_target_column, m_get_func, alloc);
         node.do_update_ref(value, row_ndx, new_row_ndx, offset);
@@ -755,13 +755,13 @@ void StringIndex::array_to_dot(ostream& out, const Array& array)
     TIGHTDB_ASSERT(array.size() == offsets.size()+1);
     ref_type ref  = array.get_ref();
 
-    if (array.is_leaf()) {
-        out << "subgraph cluster_string_index_leaf" << ref << " {" << endl;
-        out << " label = \"Leaf\";" << endl;
-    }
-    else {
+    if (array.is_inner_bptree_node()) {
         out << "subgraph cluster_string_index_inner_node" << ref << " {" << endl;
         out << " label = \"Inner node\";" << endl;
+    }
+    else {
+        out << "subgraph cluster_string_index_leaf" << ref << " {" << endl;
+        out << " label = \"Leaf\";" << endl;
     }
 
     array.to_dot(out);
@@ -797,8 +797,10 @@ void StringIndex::keys_to_dot(ostream& out, const Array& array, StringData title
     // Header
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
     out << "0x" << hex << ref << dec << "<BR/>";
-    if (!array.is_leaf()) out << "IsNode<BR/>";
-    if (array.has_refs()) out << "HasRefs<BR/>";
+    if (array.is_inner_bptree_node())
+        out << "IsNode<BR/>";
+    if (array.has_refs())
+        out << "HasRefs<BR/>";
     out << "</FONT></TD>" << endl;
 
     // Values
@@ -817,7 +819,8 @@ void StringIndex::keys_to_dot(ostream& out, const Array& array, StringData title
     }
 
     out << "</TR></TABLE>>];" << endl;
-    if (0 < title.size()) out << "}" << endl;
+    if (0 < title.size())
+        out << "}" << endl;
 
     array.to_dot_parent_edge(out);
 

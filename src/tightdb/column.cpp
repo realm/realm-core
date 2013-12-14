@@ -230,18 +230,19 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
                                     bool is_append)
 {
     // At this point the original root and its new sibling is either
-    // both leafs, or both inner nodes on the same form, compact or
+    // both leaves, or both inner nodes on the same form, compact or
     // general. Due to invar:bptree-node-form, the new root may be on
-    // the compact form if is_append is true and both are either leafs
-    // or inner nodes on the compact form.
+    // the compact form if is_append is true and both are either
+    // leaves or inner nodes on the compact form.
 
     Array* orig_root = m_array;
     Allocator& alloc = orig_root->get_alloc();
     ArrayParent* parent = orig_root->get_parent();
     size_t ndx_in_parent = orig_root->get_ndx_in_parent();
-    UniquePtr<Array> new_root(new Array(Array::type_InnerColumnNode,
+    UniquePtr<Array> new_root(new Array(Array::type_InnerBptreeNode,
                                         parent, ndx_in_parent, alloc)); // Throws
-    bool compact_form = is_append && (orig_root->is_leaf() || orig_root->get(0) % 2 == 1);
+    bool compact_form =
+        is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 == 1);
     // Something is wrong if we were not appending and the original
     // root is still on the compact form.
     TIGHTDB_ASSERT(!compact_form || is_append);
@@ -273,7 +274,7 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
 void Column::clear()
 {
     m_array->clear();
-    if (!m_array->is_leaf())
+    if (m_array->is_inner_bptree_node())
         m_array->set_type(Array::type_Normal);
 }
 
@@ -300,7 +301,7 @@ void Column::set(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx < size());
 
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         m_array->set(ndx, value); // Throws
         return;
     }
@@ -438,7 +439,7 @@ void Column::erase(size_t ndx, bool is_last)
     TIGHTDB_ASSERT(ndx < size());
     TIGHTDB_ASSERT(is_last == (ndx == size()-1));
 
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         m_array->erase(ndx); // Throws
         return;
     }
@@ -487,7 +488,7 @@ template<bool with_limit> struct AdjustHandler: Array::UpdateHandler {
 
 void Column::adjust(int_fast64_t diff)
 {
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         m_array->adjust(0, m_array->size(), diff); // Throws
         return;
     }
@@ -502,7 +503,7 @@ void Column::adjust(int_fast64_t diff)
 
 void Column::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 {
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         m_array->adjust_ge(limit, diff); // Throws
         return;
     }

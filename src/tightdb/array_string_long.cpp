@@ -27,7 +27,8 @@ ArrayStringLong::ArrayStringLong(MemRef mem, ArrayParent* parent, size_t ndx_in_
     m_offsets(Array::get_as_ref(0), 0, 0, alloc),
     m_blob(Array::get_as_ref(1), 0, 0, alloc)
 {
-    TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
+    // has_refs() indicates that this is a long string
+    TIGHTDB_ASSERT(has_refs() && !is_inner_bptree_node());
     TIGHTDB_ASSERT(Array::size() == 2);
     TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : to_size_t(m_offsets.back())));
 
@@ -41,7 +42,8 @@ ArrayStringLong::ArrayStringLong(ref_type ref, ArrayParent* parent, size_t ndx_i
     m_offsets(Array::get_as_ref(0), 0, 0, alloc),
     m_blob(Array::get_as_ref(1), 0, 0, alloc)
 {
-    TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
+    // has_refs() indicates that this is a long string
+    TIGHTDB_ASSERT(has_refs() && !is_inner_bptree_node());
     TIGHTDB_ASSERT(Array::size() == 2);
     TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : to_size_t(m_offsets.back())));
 

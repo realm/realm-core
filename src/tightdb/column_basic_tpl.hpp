@@ -73,7 +73,7 @@ inline std::size_t BasicColumn<T>::size() const TIGHTDB_NOEXCEPT
 template<class T>
 void BasicColumn<T>::clear()
 {
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         static_cast<BasicArray<T>*>(m_array)->clear(); // Throws
         return;
     }
@@ -142,7 +142,7 @@ public:
 template<class T>
 void BasicColumn<T>::set(std::size_t ndx, T value)
 {
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         static_cast<BasicArray<T>*>(m_array)->set(ndx, value); // Throws
         return;
     }
@@ -241,7 +241,7 @@ void BasicColumn<T>::erase(std::size_t ndx, bool is_last)
     TIGHTDB_ASSERT(ndx < size());
     TIGHTDB_ASSERT(is_last == (ndx == size()-1));
 
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         static_cast<BasicArray<T>*>(m_array)->erase(ndx); // Throws
         return;
     }

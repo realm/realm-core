@@ -74,11 +74,11 @@ inline ref_type BasicArray<T>::create_empty_array(Allocator& alloc)
     std::size_t capacity = Array::initial_capacity;
     MemRef mem_ref = alloc.alloc(capacity); // Throws
 
-    bool is_leaf = true;
+    bool is_inner_bptree_node = false;
     bool has_refs = false;
     int width = sizeof (T);
     std::size_t size = 0;
-    init_header(mem_ref.m_addr, is_leaf, has_refs, wtype_Multiply, width, size, capacity);
+    init_header(mem_ref.m_addr, is_inner_bptree_node, has_refs, wtype_Multiply, width, size, capacity);
 
     return mem_ref.m_ref;
 }

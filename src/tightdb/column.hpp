@@ -152,7 +152,7 @@ protected:
     //@}
 
     // Node functions
-    bool root_is_leaf() const TIGHTDB_NOEXCEPT { return m_array->is_leaf(); }
+    bool root_is_leaf() const TIGHTDB_NOEXCEPT { return !m_array->is_inner_bptree_node(); }
 
     static std::size_t get_size_from_ref(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
     static bool root_is_leaf_from_ref(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
@@ -308,7 +308,7 @@ inline void ColumnBase::set_parent(ArrayParent* parent, std::size_t ndx_in_paren
 inline const Array& ColumnBase::get_leaf(std::size_t ndx, std::size_t& ndx_in_leaf,
                                          Array& fallback) const TIGHTDB_NOEXCEPT
 {
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         ndx_in_leaf = ndx;
         return *m_array;
     }
@@ -368,7 +368,7 @@ inline std::size_t ColumnBase::get_size_from_ref(ref_type ref, Allocator& alloc)
 {
     const char* header = alloc.translate(ref);
     std::size_t size = Array::get_size_from_header(header);
-    bool is_leaf = Array::get_isleaf_from_header(header);
+    bool is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
     if (is_leaf)
         return size;
     int_fast64_t v = Array::get(header, size-1);
@@ -378,7 +378,7 @@ inline std::size_t ColumnBase::get_size_from_ref(ref_type ref, Allocator& alloc)
 inline bool ColumnBase::root_is_leaf_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
     const char* header = alloc.translate(ref);
-    return Array::get_isleaf_from_header(header);
+    return !Array::get_is_inner_bptree_node_from_header(header);
 }
 
 

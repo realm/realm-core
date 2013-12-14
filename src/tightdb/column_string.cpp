@@ -71,13 +71,13 @@ AdaptiveStringColumn::AdaptiveStringColumn(ref_type ref, ArrayParent* parent, si
     char* header = alloc.translate(ref);
     MemRef mem(header, ref);
 
-    // Within an AdaptiveStringColumn the leafs can be of different types
-    // optimized for the lengths of the strings contained therein.
-    // The type is indicated by the combination of the is_node(N), has_refs(R)
-    // and context_bit(C):
+    // Within an AdaptiveStringColumn the leaves can be of different
+    // type optimized for the lengths of the strings contained
+    // therein.  The type is indicated by the combination of the
+    // is_inner_bptree_node(N), has_refs(R) and context_bit(C):
     //
     //   N R C
-    //   1 0 0   InnerNode (not leaf)
+    //   1 0 0   InnerBptreeNode (not leaf)
     //   0 0 0   ArrayString
     //   0 1 0   ArrayStringLong
     //   0 1 1   ArrayBigBlobs
@@ -99,7 +99,7 @@ AdaptiveStringColumn::AdaptiveStringColumn(ref_type ref, ArrayParent* parent, si
             m_array = new ArrayBigBlobs(mem, parent, ndx_in_parent, alloc);
             return;
         }
-        case Array::type_InnerColumnNode: {
+        case Array::type_InnerBptreeNode: {
             // Non-leaf root
             m_array = new Array(mem, parent, ndx_in_parent, alloc);
             return;
@@ -303,7 +303,8 @@ void AdaptiveStringColumn::set(size_t ndx, StringData value)
         m_index->set(ndx, old_val, value); // Throws
     }
 
-    if (m_array->is_leaf()) {
+    bool root_is_leaf = !m_array->is_inner_bptree_node();
+    if (root_is_leaf) {
         LeafType leaf_type = upgrade_root_leaf(value.size()); // Throws
         switch (leaf_type) {
             case leaf_type_Small: {
@@ -447,7 +448,8 @@ void AdaptiveStringColumn::erase(size_t ndx, bool is_last)
         m_index->erase(ndx, old_val, is_last);
     }
 
-    if (m_array->is_leaf()) {
+    bool root_is_leaf = !m_array->is_inner_bptree_node();
+    if (root_is_leaf) {
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
@@ -482,7 +484,7 @@ void AdaptiveStringColumn::move_last_over(size_t ndx)
     // repair it.
 
     // FIXME: Consider doing two nested calls to
-    // update_bptree_elem(). If the two leafs are not the same, no
+    // update_bptree_elem(). If the two leaves are not the same, no
     // copying is needed. If they are the same, call
     // Array::move_last_over() (does not yet
     // exist). Array::move_last_over() could be implemented in a way
@@ -509,7 +511,8 @@ void AdaptiveStringColumn::move_last_over(size_t ndx)
         m_index->update_ref(copy_of_value, last_ndx, ndx);
     }
 
-    if (m_array->is_leaf()) {
+    bool root_is_leaf = !m_array->is_inner_bptree_node();
+    if (root_is_leaf) {
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf

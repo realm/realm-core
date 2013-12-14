@@ -33,7 +33,7 @@
 // |             checksum              |12344555|           size           |
 //
 //
-//  1: 'inner_bpnode' (inner node of B+-tree).
+//  1: 'is_inner_bptree_node' (inner node of B+-tree).
 //
 //  2: 'has_refs' (elements whose first bit is zero are refs to subarrays).
 //
@@ -178,8 +178,8 @@ void Array::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
     char* header = mem.m_addr;
 
     // Parse header
-    m_isNode   = !get_isleaf_from_header(header);
-    m_hasRefs  = get_hasrefs_from_header(header);
+    m_is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
+    m_has_refs = get_hasrefs_from_header(header);
     m_width    = get_width_from_header(header);
     m_size     = get_size_from_header(header);
 
@@ -242,21 +242,21 @@ void Array::set_type(Type type)
 
     copy_on_write(); // Throws
 
-    bool is_leaf = false, has_refs = false;
+    bool is_inner_bptree_node = false, has_refs = false;
     switch (type) {
         case type_Normal:
-            is_leaf = true;
             break;
-        case type_InnerColumnNode:
+        case type_InnerBptreeNode:
+            is_inner_bptree_node = true;
             has_refs = true;
             break;
         case type_HasRefs:
-            has_refs = is_leaf = true;
+            has_refs = true;
             break;
     }
-    m_isNode  = !is_leaf;
-    m_hasRefs = has_refs;
-    set_header_isleaf(is_leaf);
+    m_is_inner_bptree_node = is_inner_bptree_node;
+    m_has_refs = has_refs;
+    set_header_is_inner_bptree_node(is_inner_bptree_node);
     set_header_hasrefs(has_refs);
 }
 
@@ -1230,12 +1230,13 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
     MemRef mem_ref = clone_alloc.alloc(initial_capacity); // Throws
     char* clone_header = mem_ref.m_addr;
     {
-        bool is_leaf = get_isleaf_from_header(header);
+        bool is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
         bool has_refs = true;
         WidthType width_type = wtype_Bits;
         int width = 0;
         size_t size = 0;
-        init_header(clone_header, is_leaf, has_refs, width_type, width, size, initial_capacity);
+        init_header(clone_header, is_inner_bptree_node, has_refs, width_type, width, size,
+                    initial_capacity);
     }
 
     Array new_array(clone_alloc);
@@ -1302,16 +1303,16 @@ void Array::copy_on_write()
 
 ref_type Array::create_empty_array(Type type, WidthType width_type, Allocator& alloc)
 {
-    bool is_leaf = false, has_refs = false;
+    bool is_inner_bptree_node = false, has_refs = false;
     switch (type) {
         case type_Normal:
-            is_leaf = true;
             break;
-        case type_InnerColumnNode:
+        case type_InnerBptreeNode:
+            is_inner_bptree_node = true;
             has_refs = true;
             break;
         case type_HasRefs:
-            has_refs = is_leaf = true;
+            has_refs = true;
             break;
     }
 
@@ -1320,7 +1321,7 @@ ref_type Array::create_empty_array(Type type, WidthType width_type, Allocator& a
 
     int width = 0;
     size_t size = 0;
-    init_header(mem_ref.m_addr, is_leaf, has_refs, width_type, width, size, capacity);
+    init_header(mem_ref.m_addr, is_inner_bptree_node, has_refs, width_type, width, size, capacity);
 
     return mem_ref.m_ref;
 }
@@ -1882,7 +1883,7 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
 
     Allocator& alloc = get_alloc();
     Array new_sibling(alloc), new_offsets(alloc);
-    new_sibling.create(type_InnerColumnNode); // Throws
+    new_sibling.create(type_InnerBptreeNode); // Throws
     if (offsets.is_attached()) {
         new_offsets.set_parent(&new_sibling, 0);
         new_offsets.create(type_Normal); // Throws
@@ -2014,7 +2015,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
     node.Verify();
 
     // This node must not be a leaf
-    TIGHTDB_ASSERT(node.get_type() == Array::type_InnerColumnNode);
+    TIGHTDB_ASSERT(node.get_type() == Array::type_InnerBptreeNode);
 
     TIGHTDB_ASSERT(node.size() >= 2);
     size_t num_children = node.size() - 2;
@@ -2045,7 +2046,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
     for (size_t i = 0; i < num_children; ++i) {
         ref_type child_ref = node.get_as_ref(1 + i);
         char* child_header = alloc.translate(child_ref);
-        bool child_is_leaf = Array::get_isleaf_from_header(child_header);
+        bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
         size_t elems_in_child;
         int leaf_level_of_child;
         if (child_is_leaf) {
@@ -2103,7 +2104,8 @@ void Array::verify_bptree(LeafVerifier leaf_verifier) const
 
 void Array::dump_bptree_structure(ostream& out, int level, LeafDumper leaf_dumper) const
 {
-    if (is_leaf()) {
+    bool root_is_leaf = !is_inner_bptree_node();
+    if (root_is_leaf) {
         (*leaf_dumper)(get_mem(), m_alloc, out, level);
         return;
     }
@@ -2152,7 +2154,8 @@ void Array::dump_bptree_structure(ostream& out, int level, LeafDumper leaf_dumpe
 
 void Array::bptree_to_dot(ostream& out, ToDotHandler& handler) const
 {
-    if (is_leaf()) {
+    bool root_is_leaf = !is_inner_bptree_node();
+    if (root_is_leaf) {
         handler.to_dot(get_mem(), get_parent(), get_ndx_in_parent(), out);
         return;
     }
@@ -2202,16 +2205,16 @@ void Array::to_dot(ostream& out, StringData title) const
     // Header
     out << "<TD BGCOLOR=\"lightgrey\"><FONT POINT-SIZE=\"7\"> ";
     out << "0x" << hex << ref << dec << "<BR/>";
-    if (m_isNode)
+    if (m_is_inner_bptree_node)
         out << "IsNode<BR/>";
-    if (m_hasRefs)
+    if (m_has_refs)
         out << "HasRefs<BR/>";
     out << "</FONT></TD>" << endl;
 
     // Values
     for (size_t i = 0; i < m_size; ++i) {
         int64_t v =  get(i);
-        if (m_hasRefs) {
+        if (m_has_refs) {
             // zero-refs and refs that are not 64-aligned do not point to sub-trees
             if (v == 0)
                 out << "<TD>none";
@@ -2267,7 +2270,7 @@ void Array::stats(MemStats& stats) const
     stats.add(m);
 
     // Add stats for all sub-arrays
-    if (m_hasRefs) {
+    if (m_has_refs) {
         for (size_t i = 0; i < m_size; ++i) {
             int64_t v = get(i);
             if (v == 0 || v & 0x1)
@@ -2626,7 +2629,7 @@ const Array* Array::GetBlock(size_t ndx, Array& arr, size_t& off,
                              bool use_retval) const TIGHTDB_NOEXCEPT
 {
     // Reduce time overhead for cols with few entries
-    if (is_leaf()) {
+    if (!is_inner_bptree_node()) {
         if (!use_retval)
             arr.CreateFromHeaderDirect(get_header_from_data(m_data));
         off = 0;
@@ -2646,7 +2649,7 @@ size_t Array::IndexStringFindFirst(StringData value, void* column, StringGetter 
     const char* data   = m_data;
     const char* header;
     size_t width = m_width;
-    bool is_leaf = !m_isNode;
+    bool is_inner_node = m_is_inner_bptree_node;
     typedef StringIndex::key_type key_type;
     key_type key;
 
@@ -2672,12 +2675,12 @@ top:
         size_t pos_refs = pos + 1; // first entry in refs points to offsets
         int64_t ref = get_direct(data, width, pos_refs);
 
-        if (!is_leaf) {
+        if (is_inner_node) {
             // Set vars for next iteration
-            header  = m_alloc.translate(to_ref(ref));
-            data    = get_data_from_header(header);
-            width   = get_width_from_header(header);
-            is_leaf = get_isleaf_from_header(header);
+            header        = m_alloc.translate(to_ref(ref));
+            data          = get_data_from_header(header);
+            width         = get_width_from_header(header);
+            is_inner_node = get_is_inner_bptree_node_from_header(header);
             continue;
         }
 
@@ -2708,7 +2711,7 @@ top:
         if (!sub_isindex) {
             const char*  sub_data   = get_data_from_header(sub_header);
             const size_t sub_width  = get_width_from_header(sub_header);
-            const bool   sub_isleaf = get_isleaf_from_header(sub_header);
+            const bool   sub_isleaf = !get_is_inner_bptree_node_from_header(sub_header);
 
             // In most cases the row list will just be an array but
             // there might be so many matches that it has branched
@@ -2736,10 +2739,10 @@ top:
         }
 
         // Recurse into sub-index;
-        header  = sub_header;
-        data    = get_data_from_header(header);
-        width   = get_width_from_header(header);
-        is_leaf = get_isleaf_from_header(header);
+        header        = sub_header;
+        data          = get_data_from_header(header);
+        width         = get_width_from_header(header);
+        is_inner_node = get_is_inner_bptree_node_from_header(header);
         if (value_2.size() <= 4) {
             value_2 = StringData();
         }
@@ -2757,7 +2760,7 @@ void Array::IndexStringFindAll(Array& result, StringData value, void* column, St
     const char* data = m_data;
     const char* header;
     size_t width = m_width;
-    bool is_leaf = !m_isNode;
+    bool is_inner_node = m_is_inner_bptree_node;
     typedef StringIndex::key_type key_type;
     key_type key;
 
@@ -2783,12 +2786,12 @@ top:
         size_t pos_refs = pos + 1; // first entry in refs points to offsets
         int64_t ref = get_direct(data, width, pos_refs);
 
-        if (!is_leaf) {
+        if (is_inner_node) {
             // Set vars for next iteration
-            header  = m_alloc.translate(to_ref(ref));
-            data    = get_data_from_header(header);
-            width   = get_width_from_header(header);
-            is_leaf = get_isleaf_from_header(header);
+            header        = m_alloc.translate(to_ref(ref));
+            data          = get_data_from_header(header);
+            width         = get_width_from_header(header);
+            is_inner_node = get_is_inner_bptree_node_from_header(header);
             continue;
         }
 
@@ -2819,7 +2822,7 @@ top:
 
         // List of matching row indexes
         if (!sub_isindex) {
-            const bool sub_isleaf = get_isleaf_from_header(sub_header);
+            const bool sub_isleaf = !get_is_inner_bptree_node_from_header(sub_header);
 
             // In most cases the row list will just be an array but there
             // might be so many matches that it has branched into a column
@@ -2868,10 +2871,10 @@ top:
         }
 
         // Recurse into sub-index;
-        header  = sub_header;
-        data    = get_data_from_header(header);
-        width   = get_width_from_header(header);
-        is_leaf = get_isleaf_from_header(header);
+        header        = sub_header;
+        data          = get_data_from_header(header);
+        width         = get_width_from_header(header);
+        is_inner_node = get_is_inner_bptree_node_from_header(header);
         if (value_2.size() <= 4) {
             value_2 = StringData();
         }
@@ -2889,7 +2892,7 @@ FindRes Array::IndexStringFindAllNoCopy(StringData value, size_t& res_ref, void*
     const char* data = m_data;
     const char* header;
     size_t width = m_width;
-    bool is_leaf = !m_isNode;
+    bool is_inner_node = m_is_inner_bptree_node;
     typedef StringIndex::key_type key_type;
     key_type key;
 
@@ -2915,12 +2918,12 @@ top:
         size_t pos_refs = pos + 1; // first entry in refs points to offsets
         int64_t ref = get_direct(data, width, pos_refs);
 
-        if (!is_leaf) {
+        if (is_inner_node) {
             // Set vars for next iteration
-            header  = m_alloc.translate(to_ref(ref));
-            data    = get_data_from_header(header);
-            width   = get_width_from_header(header);
-            is_leaf = get_isleaf_from_header(header);
+            header        = m_alloc.translate(to_ref(ref));
+            data          = get_data_from_header(header);
+            width         = get_width_from_header(header);
+            is_inner_node = get_is_inner_bptree_node_from_header(header);
             continue;
         }
 
@@ -2953,7 +2956,7 @@ top:
 
         // List of matching row indexes
         if (!sub_isindex) {
-            const bool sub_isleaf = get_isleaf_from_header(sub_header);
+            const bool sub_isleaf = !get_is_inner_bptree_node_from_header(sub_header);
 
             // In most cases the row list will just be an array but there
             // might be so many matches that it has branched into a column
@@ -2989,10 +2992,10 @@ top:
         }
 
         // Recurse into sub-index;
-        header  = sub_header;
-        data    = get_data_from_header(header);
-        width   = get_width_from_header(header);
-        is_leaf = get_isleaf_from_header(header);
+        header        = sub_header;
+        data          = get_data_from_header(header);
+        width         = get_width_from_header(header);
+        is_inner_node = get_is_inner_bptree_node_from_header(header);
         if (value_2.size() <= 4) {
             value_2 = StringData();
         }
@@ -3011,7 +3014,7 @@ size_t Array::IndexStringCount(StringData value, void* column, StringGetter get_
     const char* data   = m_data;
     const char* header;
     size_t width = m_width;
-    bool is_leaf = !m_isNode;
+    bool is_inner_node = m_is_inner_bptree_node;
     typedef StringIndex::key_type key_type;
     key_type key;
 
@@ -3037,12 +3040,12 @@ top:
         size_t pos_refs = pos + 1; // first entry in refs points to offsets
         int64_t ref = get_direct(data, width, pos_refs);
 
-        if (!is_leaf) {
+        if (is_inner_node) {
             // Set vars for next iteration
-            header  = m_alloc.translate(to_ref(ref));
-            data    = get_data_from_header(header);
-            width   = get_width_from_header(header);
-            is_leaf = get_isleaf_from_header(header);
+            header        = m_alloc.translate(to_ref(ref));
+            data          = get_data_from_header(header);
+            width         = get_width_from_header(header);
+            is_inner_node = get_is_inner_bptree_node_from_header(header);
             continue;
         }
 
@@ -3071,7 +3074,7 @@ top:
 
         // List of matching row indexes
         if (!sub_isindex) {
-            const bool sub_isleaf = get_isleaf_from_header(sub_header);
+            const bool sub_isleaf = !get_is_inner_bptree_node_from_header(sub_header);
             size_t sub_count;
             size_t row_ref;
 
@@ -3111,10 +3114,10 @@ top:
         }
 
         // Recurse into sub-index;
-        header  = sub_header;
-        data    = get_data_from_header(header);
-        width   = get_width_from_header(header);
-        is_leaf = get_isleaf_from_header(header);
+        header        = sub_header;
+        data          = get_data_from_header(header);
+        width         = get_width_from_header(header);
+        is_inner_node = get_is_inner_bptree_node_from_header(header);
         if (value_2.size() <= 4) {
             value_2 = StringData();
         }
@@ -3201,7 +3204,7 @@ inline pair<ref_type, size_t> find_bptree_child(const char* data, size_t ndx,
 template<class Handler> void foreach_bptree_leaf(Array& node, Handler handler)
     TIGHTDB_NOEXCEPT_IF(noexcept(handler(MemRef(), 0, 0)))
 {
-    TIGHTDB_ASSERT(!node.is_leaf());
+    TIGHTDB_ASSERT(node.is_inner_bptree_node());
 
     TIGHTDB_ASSERT(node.size() >= 2);
     size_t num_children = node.size() - 2;
@@ -3211,7 +3214,7 @@ template<class Handler> void foreach_bptree_leaf(Array& node, Handler handler)
     Allocator& alloc = node.get_alloc();
     ref_type child_ref = node.get_as_ref(child_ref_ndx);
     char* child_header = alloc.translate(child_ref);
-    bool children_are_leaves = Array::get_isleaf_from_header(child_header);
+    bool children_are_leaves = !Array::get_is_inner_bptree_node_from_header(child_header);
     if (children_are_leaves) {
         for (;;) {
             MemRef child_mem(child_header, child_ref);
@@ -3263,7 +3266,7 @@ void destroy_singlet_bptree_branch(MemRef mem, Allocator& alloc,
     MemRef mem_2 = mem;
     for (;;) {
         const char* header = mem_2.m_addr;
-        bool is_leaf = Array::get_isleaf_from_header(header);
+        bool is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
         if (is_leaf) {
             handler.destroy_leaf(mem_2);
             return;
@@ -3290,7 +3293,7 @@ void elim_superfluous_bptree_root(Array* root, MemRef parent_mem,
     Allocator& alloc = root->get_alloc();
     char* child_header = alloc.translate(child_ref);
     MemRef child_mem(child_header, child_ref);
-    bool child_is_leaf = Array::get_isleaf_from_header(child_header);
+    bool child_is_leaf = !Array::get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
         handler.replace_root_by_leaf(child_mem); // Throws
         // Since the tree has now been modified, the height reduction
@@ -3349,7 +3352,7 @@ void elim_superfluous_bptree_root(Array* root, MemRef parent_mem,
 
 pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!is_leaf());
+    TIGHTDB_ASSERT(is_inner_bptree_node());
 
     size_t ndx_2 = ndx;
     int width = int(m_width);
@@ -3361,7 +3364,7 @@ pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const TIGHTDB_NOEXCEPT
         ref_type child_ref  = p.first;
         size_t ndx_in_child = p.second;
         char* child_header = m_alloc.translate(child_ref);
-        bool child_is_leaf = get_isleaf_from_header(child_header);
+        bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
         if (child_is_leaf) {
             MemRef mem(child_header, child_ref);
             return make_pair(mem, ndx_in_child);
@@ -3382,7 +3385,7 @@ void Array::update_bptree_leaves(UpdateHandler& handler)
 
 void Array::update_bptree_elem(size_t elem_ndx, UpdateHandler& handler)
 {
-    TIGHTDB_ASSERT(!is_leaf());
+    TIGHTDB_ASSERT(is_inner_bptree_node());
 
     pair<size_t, size_t> p = find_bptree_child(*this, elem_ndx);
     size_t child_ndx    = p.first;
@@ -3391,7 +3394,7 @@ void Array::update_bptree_elem(size_t elem_ndx, UpdateHandler& handler)
     ref_type child_ref = get_as_ref(child_ref_ndx);
     char* child_header = m_alloc.translate(child_ref);
     MemRef child_mem(child_header, child_ref);
-    bool child_is_leaf = get_isleaf_from_header(child_header);
+    bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
         handler.update(child_mem, this, child_ref_ndx, ndx_in_child); // Throws
         return;
@@ -3405,14 +3408,12 @@ void Array::update_bptree_elem(size_t elem_ndx, UpdateHandler& handler)
 
 void Array::erase_bptree_elem(Array* root, std::size_t elem_ndx, EraseHandler& handler)
 {
-    TIGHTDB_ASSERT(!root->is_leaf());
+    TIGHTDB_ASSERT(root->is_inner_bptree_node());
     TIGHTDB_ASSERT(root->size() >= 1 + 1 + 1); // invar:bptree-nonempty-inner
     TIGHTDB_ASSERT(elem_ndx == npos || elem_ndx+1 != root->get_bptree_size());
 
     // Note that this function is implemented in a way that makes it
     // fully exception safe. Please be sure to keep it that way.
-
-    TIGHTDB_ASSERT(!root->is_leaf());
 
     bool destroy_root = root->do_erase_bptree_elem(elem_ndx, handler); // Throws
 
@@ -3504,7 +3505,7 @@ bool Array::do_erase_bptree_elem(size_t elem_ndx, EraseHandler& handler)
     ref_type child_ref = get_as_ref(child_ref_ndx);
     char* child_header = m_alloc.translate(child_ref);
     MemRef child_mem(child_header, child_ref);
-    bool child_is_leaf = get_isleaf_from_header(child_header);
+    bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
     bool destroy_child;
     if (child_is_leaf) {
         destroy_child =

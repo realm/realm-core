@@ -29,6 +29,8 @@
 
 namespace tightdb {
 
+class Allocator;
+
 #ifdef TIGHTDB_ENABLE_REPLICATION
 class Replication;
 #endif
@@ -46,6 +48,7 @@ inline ref_type to_ref(int64_t v) TIGHTDB_NOEXCEPT
 struct MemRef {
     MemRef(): m_addr(0), m_ref(0) {}
     MemRef(char* addr, ref_type ref): m_addr(addr), m_ref(ref) {}
+    MemRef(ref_type ref, Allocator& alloc);
     char* m_addr;
     ref_type m_ref;
 };
@@ -132,6 +135,10 @@ protected:
 
 
 // Implementation:
+
+inline MemRef::MemRef(ref_type ref, Allocator& alloc): m_addr(alloc.translate(ref)), m_ref(ref)
+{
+}
 
 inline bool Allocator::is_read_only(ref_type ref) const TIGHTDB_NOEXCEPT
 {
