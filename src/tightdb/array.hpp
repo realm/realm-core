@@ -366,9 +366,10 @@ public:
 
     void move_assign(Array&) TIGHTDB_NOEXCEPT; // Move semantics for assignment
 
-    /// Construct an empty array of the specified type and return just
-    /// the reference to the underlying memory.
-    static ref_type create_empty_array(Type, Allocator&);
+    /// Construct an array of the specified type and size, and return
+    /// just the reference to the underlying memory. All elements will
+    /// be initialized to zero.
+    static ref_type create_array(Type, std::size_t size, Allocator&);
 
     // Parent tracking
     bool has_parent() const TIGHTDB_NOEXCEPT { return m_parent != 0; }
@@ -952,7 +953,7 @@ protected:
     /// array. Must be a multiple of 8 (i.e., 64-bit aligned).
     static const std::size_t initial_capacity = 128;
 
-    static ref_type create_empty_array(Type, WidthType, Allocator&);
+    static ref_type create_array(Type, WidthType, std::size_t size, Allocator&);
     static ref_type clone(const char* header, Allocator& alloc, Allocator& clone_alloc);
 
     /// Get the address of the header of this array.
@@ -1237,7 +1238,8 @@ inline Array::Array(no_prealloc_tag) TIGHTDB_NOEXCEPT: m_alloc(*static_cast<Allo
 
 inline void Array::create(Type type)
 {
-    ref_type ref = create_empty_array(type, m_alloc); // Throws
+    std::size_t size = 0;
+    ref_type ref = create_array(type, size, m_alloc); // Throws
     init_from_ref(ref);
 }
 
@@ -1835,9 +1837,9 @@ inline void Array::move_assign(Array& a) TIGHTDB_NOEXCEPT
     a.detach();
 }
 
-inline ref_type Array::create_empty_array(Type type, Allocator& alloc)
+inline ref_type Array::create_array(Type type, std::size_t size, Allocator& alloc)
 {
-    return create_empty_array(type, wtype_Bits, alloc); // Throws
+    return create_array(type, wtype_Bits, size, alloc); // Throws
 }
 
 inline std::size_t Array::get_max_byte_size(std::size_t num_elems) TIGHTDB_NOEXCEPT

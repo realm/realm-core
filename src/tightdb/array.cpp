@@ -1301,7 +1301,7 @@ void Array::copy_on_write()
 }
 
 
-ref_type Array::create_empty_array(Type type, WidthType width_type, Allocator& alloc)
+ref_type Array::create_array(Type type, WidthType width_type, size_t size, Allocator& alloc)
 {
     bool is_inner_bptree_node = false, has_refs = false;
     switch (type) {
@@ -1316,11 +1316,10 @@ ref_type Array::create_empty_array(Type type, WidthType width_type, Allocator& a
             break;
     }
 
-    size_t capacity = initial_capacity;
+    size_t capacity = initial_capacity; // The number of bytes to allocate
     MemRef mem_ref = alloc.alloc(capacity); // Throws
 
     int width = 0;
-    size_t size = 0;
     init_header(mem_ref.m_addr, is_inner_bptree_node, has_refs, width_type, width, size, capacity);
 
     return mem_ref.m_ref;
