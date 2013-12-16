@@ -84,16 +84,10 @@ public:
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
 
-    // FIXME: Should be moved into concrete derivatives, since not all
-    // column types have a unique root (string enum).
     ref_type get_ref() const TIGHTDB_NOEXCEPT { return m_array->get_ref(); }
 
-    // FIXME: Should be moved into concrete derivatives, since not all
-    // column types have a unique root (string enum).
     void set_parent(ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
 
-    // FIXME: Should be moved into concrete derivatives, since not all
-    // column types have a unique root (string enum).
     const Array* get_root_array() const TIGHTDB_NOEXCEPT { return m_array; }
 
     /// Provides access to the leaf that contains the element at the
