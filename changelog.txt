@@ -10,6 +10,11 @@ Format:
 - Removed/deprecated feature/method .... (user visible removed feature - passed on to release notes)
 . Any other notes .... 				     (internal changes)
 
+
+2013-12-16 (Kristian Spangsege)
+. Table::add_column() optimized. For integer columns, the speedup is by more than a factor of 1000 for large tables.
+
+
 2013-11-07 (Alexander Stigsen)
 . BREAKING CHANGE: Schema now handles attributes separately for better performance when there are many colummns.
 
