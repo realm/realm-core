@@ -133,7 +133,8 @@ inline const char* ArrayBlob::get(const char* header, std::size_t pos) TIGHTDB_N
 
 inline void ArrayBlob::create()
 {
-    ref_type ref = create_empty_array(type_Normal, wtype_Ignore, get_alloc()); // Throws
+    std::size_t size = 0;
+    ref_type ref = create_array(type_Normal, wtype_Ignore, size, get_alloc()); // Throws
     init_from_ref(ref);
 }
 

@@ -271,6 +271,60 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
 }
 
 
+ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
+                           Allocator& alloc, CreateHandler& handler)
+{
+    size_t rest_size = *rest_size_ptr;
+    size_t orig_rest_size = rest_size;
+    size_t leaf_size = min(size_t(TIGHTDB_MAX_LIST_SIZE), rest_size);
+    rest_size -= leaf_size;
+    ref_type node = handler.create_leaf(leaf_size);
+    size_t height = 1;
+    try {
+	for (;;) {
+	    if (fixed_height > 0 ? fixed_height == height : rest_size == 0) {
+		*rest_size_ptr = rest_size;
+		return node;
+	    }
+	    Array new_inner_node(alloc);
+	    new_inner_node.create(Array::type_InnerBptreeNode); // Throws
+	    try {
+		int_fast64_t v = orig_rest_size - rest_size; // elems_per_child
+		new_inner_node.add(1 + 2*v); // Throws
+		v = node; // FIXME: Dangerous cast here (unsigned -> signed)
+		new_inner_node.add(v); // Throws
+		node = new_inner_node.get_ref();
+	    }
+	    catch (...) {
+		new_inner_node.destroy();
+		throw;
+	    }
+	    size_t num_children = 1;
+	    for (;;) {
+		ref_type child = build(&rest_size, height, alloc, handler); // Throws
+		try {
+		    int_fast64_t v = child; // FIXME: Dangerous cast here (unsigned -> signed)
+		    new_inner_node.add(v); // Throws
+ 		}
+		catch (...) {
+		    Array::destroy(child, alloc);
+		    throw;
+		}
+		if (rest_size == 0 || ++num_children == TIGHTDB_MAX_LIST_SIZE)
+		    break;
+	    }
+	    int_fast64_t v = orig_rest_size - rest_size; // total_elems_in_tree
+	    new_inner_node.add(1 + 2*v); // Throws
+	    ++height;
+	}
+    }
+    catch (...) {
+	Array::destroy(node, alloc);
+	throw;
+    }
+}
+
+
 void Column::clear()
 {
     m_array->clear();
@@ -613,6 +667,24 @@ void Column::do_insert(size_t ndx, int64_t value)
         bool is_append = ndx == npos;
         introduce_new_root(new_sibling_ref, state, is_append);
     }
+}
+
+
+class Column::CreateHandler: public ColumnBase::CreateHandler {
+public:
+    CreateHandler(Allocator& alloc): m_alloc(alloc) {}
+    ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
+    {
+        return Array::create_array(Array::type_Normal, size, m_alloc);
+    }
+private:
+    Allocator& m_alloc;
+};
+
+ref_type Column::create(size_t size, Allocator& alloc)
+{
+    CreateHandler handler(alloc);
+    return ColumnBase::create(size, alloc, handler);
 }
 
 

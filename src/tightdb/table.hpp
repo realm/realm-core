@@ -756,7 +756,8 @@ inline ref_type Table::create_empty_table(Allocator& alloc)
 {
     Array top(Array::type_HasRefs, null_ptr, 0, alloc);
     top.add(Spec::create_empty_spec(alloc));
-    top.add(Array::create_empty_array(Array::type_HasRefs, alloc)); // Columns
+    std::size_t size = 0;
+    top.add(Array::create_array(Array::type_HasRefs, size, alloc)); // Columns
     return top.get_ref();
 }
 

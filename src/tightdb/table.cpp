@@ -101,7 +101,7 @@ void Table::create_columns()
         ColumnType type = m_spec.get_real_column_type(i);
         ColumnAttr attr = m_spec.get_column_attr(i);
         size_t ref_pos =  m_columns.size();
-        ColumnBase* new_col = null_ptr;
+        ColumnBase* new_col = 0;
 
         switch (type) {
             case type_Int:
@@ -229,7 +229,7 @@ void Table::cache_columns()
         ColumnAttr attr = m_spec.get_column_attr(i);
         ref_type ref = m_columns.get_as_ref(ndx_in_parent);
 
-        ColumnBase* new_col = null_ptr;
+        ColumnBase* new_col = 0;
         size_t colsize = size_t(-1);
         switch (type) {
             case type_Int:
@@ -445,76 +445,69 @@ size_t Table::add_subcolumn(const vector<size_t>& column_path, DataType type, St
 
 size_t Table::do_add_column(DataType type)
 {
-    size_t count      = size();
     size_t column_ndx = m_cols.size();
 
-    ColumnBase* new_col = null_ptr;
+    ColumnBase* new_col = 0;
     Allocator& alloc = m_columns.get_alloc();
 
     switch (type) {
         case type_Int:
         case type_Bool:
         case type_DateTime: {
-            Column* c = new Column(Array::type_Normal, alloc);
-            m_columns.add(c->get_ref());
-            c->set_parent(&m_columns, m_columns.size()-1);
-            new_col = c;
-            c->fill(count);
+            ref_type ref = Column::create(size(), alloc); // Throws
+            try {
+                Column* c = new Column(ref, 0, 0, alloc); // Throws
+                new_col = c;
+            }
+            catch (...) {
+                Array::destroy(ref, alloc);
+                throw;
+            }
             break;
         }
         case type_Float: {
             ColumnFloat* c = new ColumnFloat(alloc);
-            m_columns.add(c->get_ref());
-            c->set_parent(&m_columns, m_columns.size()-1);
+            c->fill(size());
             new_col = c;
-            c->fill(count);
             break;
         }
         case type_Double: {
             ColumnDouble* c = new ColumnDouble(alloc);
-            m_columns.add(c->get_ref());
-            c->set_parent(&m_columns, m_columns.size()-1);
+            c->fill(size());
             new_col = c;
-            c->fill(count);
             break;
         }
         case type_String: {
             AdaptiveStringColumn* c = new AdaptiveStringColumn(alloc);
-            m_columns.add(c->get_ref());
-            c->set_parent(&m_columns, m_columns.size()-1);
+            c->fill(size());
             new_col = c;
-            c->fill(count);
             break;
         }
         case type_Binary: {
             ColumnBinary* c = new ColumnBinary(alloc);
-            m_columns.add(c->get_ref());
-            c->set_parent(&m_columns, m_columns.size()-1);
+            c->fill(size());
             new_col = c;
-            c->fill(count);
             break;
         }
         case type_Table: {
             ref_type spec_ref = m_spec.get_subspec_ref(m_spec.get_num_subspecs()-1);
             ColumnTable* c = new ColumnTable(alloc, this, column_ndx, spec_ref);
-            m_columns.add(c->get_ref());
-            c->set_parent(&m_columns, m_columns.size()-1);
+            c->fill(size());
             new_col = c;
-            c->fill(count);
             break;
         }
         case type_Mixed: {
             ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx);
-            m_columns.add(c->get_ref());
-            c->set_parent(&m_columns, m_columns.size()-1);
+            c->fill(size());
             new_col = c;
-            c->fill(count);
             break;
         }
         default:
             TIGHTDB_ASSERT(false);
     }
 
+    m_columns.add(new_col->get_ref());
+    new_col->set_parent(&m_columns, m_columns.size()-1);
     m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, even in C++11
 
     return column_ndx;
@@ -2719,7 +2712,7 @@ pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) 
     const ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx));
 
     const Array* root = col->get_root_array();
-    const Array* enum_root = null_ptr;
+    const Array* enum_root = 0;
 
     if (const ColumnStringEnum* c = dynamic_cast<const ColumnStringEnum*>(col)) {
         enum_root = c->get_enum_root_array();

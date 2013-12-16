@@ -167,12 +167,23 @@ protected:
 
     class EraseHandlerBase;
 
+    class CreateHandler {
+    public:
+        virtual ref_type create_leaf(std::size_t size) = 0;
+    };
+
+    static ref_type create(std::size_t size, Allocator&, CreateHandler&);
+
 #ifdef TIGHTDB_DEBUG
     class LeafToDot;
     virtual void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
                              std::ostream&) const = 0;
     void tree_to_dot(std::ostream&) const;
 #endif
+
+private:
+    static ref_type build(std::size_t* rest_size_ptr, std::size_t fixed_height,
+                          Allocator&, CreateHandler&);
 
     friend class StringIndex;
 };
@@ -196,9 +207,9 @@ public:
 
     explicit Column(Allocator&);
     Column(Array::Type, Allocator&);
-    explicit Column(Array::Type = Array::type_Normal, ArrayParent* = null_ptr,
+    explicit Column(Array::Type = Array::type_Normal, ArrayParent* = 0,
                     std::size_t ndx_in_parent = 0, Allocator& = Allocator::get_default());
-    explicit Column(ref_type, ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
+    explicit Column(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                     Allocator& = Allocator::get_default()); // Throws
     Column(const Column&); // FIXME: Constness violation
     ~Column() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -250,6 +261,8 @@ public:
     /// Compare two columns for equality.
     bool compare_int(const Column&) const;
 
+    static ref_type create(std::size_t size, Allocator&);
+
     // Debug
 #ifdef TIGHTDB_DEBUG
     virtual void Verify() const TIGHTDB_OVERRIDE;
@@ -279,6 +292,7 @@ private:
                                 Allocator&, std::size_t insert_ndx, Array::TreeInsert<Column>&);
 
     class EraseLeafElem;
+    class CreateHandler;
 
     friend class Array;
     friend class ColumnBase;
@@ -395,6 +409,13 @@ inline void ColumnBase::EraseHandlerBase::replace_root(util::UniquePtr<Array>& l
     leaf->update_parent(); // Throws
     delete m_column.m_array;
     m_column.m_array = leaf.release();
+}
+
+inline ref_type ColumnBase::create(std::size_t size, Allocator& alloc, CreateHandler& handler)
+{
+    std::size_t rest_size = size;
+    std::size_t fixed_height = 0; // Not fixed
+    return build(&rest_size, fixed_height, alloc, handler);
 }
 
 
