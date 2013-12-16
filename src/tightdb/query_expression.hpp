@@ -202,6 +202,7 @@ public:
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_table(const Table* table) = 0;
+    virtual const Table* get_table() = 0;
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
     virtual ~Expression() {}
 };
@@ -752,7 +753,8 @@ inline void Negate::set_table(const Table* table)
 
 inline const Table* Negate::get_table()
 {
-    return m_expr.get_table();
+    const Table* t =  m_expr.get_table();
+    return t;
 }
 
 inline size_t Negate::find_first(size_t start, size_t end) const
@@ -763,7 +765,7 @@ inline size_t Negate::find_first(size_t start, size_t end) const
 
         for (; start < end; start += ValueBase::elements) {
             m_expr.evaluate(start, result);
-            match = Value<bool>::template compare<Equal>(&result, &all_false);
+            match = Value<bool>::compare<Equal>(&result, &all_false);
 
             // Note the second condition that tests if match position in chunk exceeds column length
             if (match != ValueBase::elements && start + match < end)
@@ -775,13 +777,13 @@ inline size_t Negate::find_first(size_t start, size_t end) const
 
 inline void Negate::evaluate(size_t index, ValueBase& destination)
 {
-    Value<T> expr;
+    Value<bool> expr;
     Value<bool> all_false;
     Value<bool> res;
-    
+
     m_expr.evaluate(index, expr);
-    match = Value<bool>::template compare<Equal>(&expr, &all_false);
-    destination.import(match);
+    res = Value<bool>::compare<Equal>(&expr, &all_false);
+    destination.import(res);
 }
 
 
@@ -1095,7 +1097,7 @@ public:
         Value<bool> match;
 
         m_left.evaluate(index, left);
-        m_right.evaluate(start, right);
+        m_right.evaluate(index, right);
         match = Value<bool>::template compare<TCond>(&left, &right);
         destination.import(match);
     }
