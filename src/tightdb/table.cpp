@@ -6,6 +6,7 @@
 #include <sstream>
 
 #include <tightdb/util/features.h>
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/column.hpp>
@@ -447,7 +448,7 @@ size_t Table::do_add_column(DataType type)
 {
     size_t column_ndx = m_cols.size();
 
-    ColumnBase* new_col = 0;
+    util::UniquePtr<ColumnBase> new_col;
     Allocator& alloc = m_columns.get_alloc();
 
     switch (type) {
@@ -456,59 +457,81 @@ size_t Table::do_add_column(DataType type)
         case type_DateTime: {
             ref_type ref = Column::create(size(), alloc); // Throws
             try {
-                Column* c = new Column(ref, 0, 0, alloc); // Throws
-                new_col = c;
+                new_col.reset(new Column(ref, 0, 0, alloc)); // Throws
+                break;
             }
             catch (...) {
                 Array::destroy(ref, alloc);
                 throw;
             }
-            break;
         }
         case type_Float: {
-            ColumnFloat* c = new ColumnFloat(alloc);
-            c->fill(size());
-            new_col = c;
+            ColumnFloat* c = new ColumnFloat(alloc); // Throws
+            c->fill(size()); // Throws
+            new_col.reset(c);
             break;
         }
         case type_Double: {
-            ColumnDouble* c = new ColumnDouble(alloc);
-            c->fill(size());
-            new_col = c;
+            ColumnDouble* c = new ColumnDouble(alloc); // Throws
+            c->fill(size()); // Throws
+            new_col.reset(c);
             break;
         }
         case type_String: {
-            AdaptiveStringColumn* c = new AdaptiveStringColumn(alloc);
-            c->fill(size());
-            new_col = c;
-            break;
+            ref_type ref = AdaptiveStringColumn::create(size(), alloc); // Throws
+            try {
+                new_col.reset(new AdaptiveStringColumn(ref, 0, 0, alloc)); // Throws
+                break;
+            }
+            catch (...) {
+                Array::destroy(ref, alloc);
+                throw;
+            }
         }
         case type_Binary: {
-            ColumnBinary* c = new ColumnBinary(alloc);
-            c->fill(size());
-            new_col = c;
+            ColumnBinary* c = new ColumnBinary(alloc); // Throws
+            c->fill(size()); // Throws
+            new_col.reset(c);
             break;
         }
         case type_Table: {
             ref_type spec_ref = m_spec.get_subspec_ref(m_spec.get_num_subspecs()-1);
-            ColumnTable* c = new ColumnTable(alloc, this, column_ndx, spec_ref);
-            c->fill(size());
-            new_col = c;
+            ColumnTable* c = new ColumnTable(alloc, this, column_ndx, spec_ref); // Throws
+            c->fill(size()); // Throws
+            new_col.reset(c);
             break;
         }
         case type_Mixed: {
-            ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx);
-            c->fill(size());
-            new_col = c;
+            ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx); // Throws
+            c->fill(size()); // Throws
+            new_col.reset(c);
             break;
         }
         default:
             TIGHTDB_ASSERT(false);
     }
 
-    m_columns.add(new_col->get_ref());
-    new_col->set_parent(&m_columns, m_columns.size()-1);
-    m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, even in C++11
+    try {
+        size_t orig_columns_size = m_columns.size();
+        m_columns.add(new_col->get_ref()); // Throws
+        new_col->set_parent(&m_columns, orig_columns_size);
+        try {
+            // FIXME: intptr_t is not guaranteed to exists, even in
+            // C++11. Solve this by changing the type of
+            // `Table::m_cols` to `std::vector<ColumnBase*>`. Also
+            // change name to `Table::m_column_accessors`.
+            m_cols.add(intptr_t(new_col.get())); // Throws
+            new_col.release();
+        }
+        catch (...) {
+            m_columns.truncate(orig_columns_size); // Guaranteed to not throw
+            throw;
+        }
+    }
+    catch (...) {
+        new_col->destroy();
+        throw;
+    }
 
     return column_ndx;
 }

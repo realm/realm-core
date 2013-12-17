@@ -174,8 +174,8 @@ inline ref_type Spec::create_empty_spec(Allocator& alloc)
     Array spec_set(Array::type_HasRefs, null_ptr, 0, alloc);
     std::size_t size = 0;
     spec_set.add(Array::create_array(Array::type_Normal, size, alloc)); // One type for each column
-    spec_set.add(ArrayString::create_empty_array(alloc)); // One name for each column
-    spec_set.add(ArrayString::create_empty_array(alloc)); // One attr set for each column
+    spec_set.add(ArrayString::create_array(size, alloc)); // One name for each column
+    spec_set.add(ArrayString::create_array(size, alloc)); // One attr set for each column
     return spec_set.get_ref();
 }
 

@@ -476,7 +476,7 @@ public:
     /// in the range [`begin`,`end`), and \a dest_end must not be in
     /// the range (`begin`,`end`].
     ///
-    /// These functions are guaranteed not to throw if
+    /// These functions are guaranteed to not throw if
     /// get_alloc().is_read_only(get_ref()) returns false.
     void move(std::size_t begin, std::size_t end, std::size_t dest_begin);
     void move_backward(std::size_t begin, std::size_t end, std::size_t dest_end);
@@ -533,6 +533,9 @@ public:
     // elements. It is an error to specify a size that is greater than
     // the current size of this array. The effect of doing so is
     // undefined.
+    ///
+    /// This function is guaranteed to not throw if
+    /// get_alloc().is_read_only(get_ref()) returns false.
     ///
     /// FIXME: Carefull with this one. It does not destroy/deallocate
     /// subarrays as clear() does. This difference is surprising and

@@ -1080,6 +1080,24 @@ AdaptiveStringColumn::GetBlock(size_t ndx, ArrayParent** ap, size_t& off, bool u
 }
 
 
+class AdaptiveStringColumn::CreateHandler: public ColumnBase::CreateHandler {
+public:
+    CreateHandler(Allocator& alloc): m_alloc(alloc) {}
+    ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
+    {
+        return ArrayString::create_array(size, m_alloc);
+    }
+private:
+    Allocator& m_alloc;
+};
+
+ref_type AdaptiveStringColumn::create(size_t size, Allocator& alloc)
+{
+    CreateHandler handler(alloc);
+    return ColumnBase::create(size, alloc, handler);
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 namespace {
