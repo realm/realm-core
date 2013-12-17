@@ -28,15 +28,36 @@
 namespace tightdb {
 
 
-/// When two threads or processes want to access the same database
-/// file, they must each create their own instance of SharedGroup.
+/// A SharedGroup facilitates transactions.
 ///
-/// Processes that share a database file must reside on the same host.
+/// When multiple threads or processes need to access a database
+/// concurrently, they must do so using transactions. By design,
+/// TightDB does not allow for multiple threads (or processes) to
+/// share a single instance of SharedGroup. Instead, each concurrently
+/// executing thread or process must use a separate instance of
+/// SharedGroup.
+///
+/// Each instance of SharedGroup manages a single transaction at a
+/// time. That transaction can be either a read transaction, or a
+/// write transaction.
+///
+/// Utility classes ReadTransaction and WriteTransaction are provided
+/// to make it safe and easy to work with transactions in a scoped
+/// manner (by means of the RAII idiom). However, transactions can
+/// also be explicitly started (begin_read(), begin_write()) and
+/// stopped (end_read(), commit(), rollback()).
+///
+/// If a transaction is active when the SharedGroup is destroyed, that
+/// transaction is implicitely terminated, either by a call to
+/// end_read() or rollback().
+///
+/// Two processes that want to share a database file must reside on
+/// the same host.
 class SharedGroup {
 public:
     enum DurabilityLevel {
-        durability_Full
-        , durability_MemOnly
+        durability_Full,
+        durability_MemOnly
 #ifndef _WIN32
         // Async commits are not yet supported on windows
         , durability_Async
@@ -183,15 +204,12 @@ private:
     util::File::Map<SharedInfo> m_reader_map;
     std::string m_file_path;
 
-#ifdef TIGHTDB_DEBUG
-    // In debug mode we want to track transaction stages
     enum TransactStage {
         transact_Ready,
         transact_Reading,
         transact_Writing
     };
     TransactStage m_transact_stage;
-#endif
 
     struct ReadCount;
 
