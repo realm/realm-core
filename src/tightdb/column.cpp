@@ -293,33 +293,35 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                 new_inner_node.add(1 + 2*v); // Throws
                 v = node; // FIXME: Dangerous cast here (unsigned -> signed)
                 new_inner_node.add(v); // Throws
-                node = new_inner_node.get_ref();
+                node = 0;
+                size_t num_children = 1;
+                for (;;) {
+                    ref_type child = build(&rest_size, height, alloc, handler); // Throws
+                    try {
+                        int_fast64_t v = child; // FIXME: Dangerous cast here (unsigned -> signed)
+                        new_inner_node.add(v); // Throws
+                    }
+                    catch (...) {
+                        Array::destroy(child, alloc);
+                        throw;
+                    }
+                    if (rest_size == 0 || ++num_children == TIGHTDB_MAX_LIST_SIZE)
+                        break;
+                }
+                v = orig_rest_size - rest_size; // total_elems_in_tree
+                new_inner_node.add(1 + 2*v); // Throws
             }
             catch (...) {
                 new_inner_node.destroy();
                 throw;
             }
-            size_t num_children = 1;
-            for (;;) {
-                ref_type child = build(&rest_size, height, alloc, handler); // Throws
-                try {
-                    int_fast64_t v = child; // FIXME: Dangerous cast here (unsigned -> signed)
-                    new_inner_node.add(v); // Throws
-                }
-                catch (...) {
-                    Array::destroy(child, alloc);
-                    throw;
-                }
-                if (rest_size == 0 || ++num_children == TIGHTDB_MAX_LIST_SIZE)
-                    break;
-            }
-            int_fast64_t v = orig_rest_size - rest_size; // total_elems_in_tree
-            new_inner_node.add(1 + 2*v); // Throws
+            node = new_inner_node.get_ref();
             ++height;
         }
     }
     catch (...) {
-        Array::destroy(node, alloc);
+        if (node != 0)
+            Array::destroy(node, alloc);
         throw;
     }
 }
