@@ -22,6 +22,8 @@
 
 #include <stdint.h>
 #include <cmath>
+#include <string>
+#include <sstream>
 #include <ostream>
 
 namespace tightdb {
@@ -55,6 +57,8 @@ public:
 
     template<class Ch, class Tr>
     static void format(double seconds, std::basic_ostream<Ch, Tr>&);
+
+    static std::string format(double seconds);
 
 private:
     const Type m_type;
@@ -129,6 +133,14 @@ void Timer::format(double seconds_float, std::basic_ostream<Ch, Tr>& out)
             }
         }
     }
+}
+
+
+inline std::string Timer::format(double seconds)
+{
+    std::ostringstream out;
+    format(seconds, out);
+    return out.str();
 }
 
 
