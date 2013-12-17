@@ -516,6 +516,8 @@ public:
     void store_release(T value);
     void store_relaxed(T value);
     bool compare_and_swap(T oldvalue, T newvalue);
+    void inc();
+    void dec();
 private:
     // the following is not supported
     Atomic(Atomic<T>&);
@@ -537,6 +539,21 @@ private:
 #endif
 };
 
+template<class T>
+inline void Atomic<T>::inc() {
+    T i = load_acquire();
+    while (compare_and_swap(i, i+1) == false) {
+        i = load_acquire();
+    }
+}
+
+template<class T>
+inline void Atomic<T>::dec() {
+    T i = load_acquire();
+    while (compare_and_swap(i, i-1) == false) {
+        i = load_acquire();
+    }
+}
 
 #ifdef TIGHTDB_HAVE_CXX11_ATOMIC
 template<typename T>

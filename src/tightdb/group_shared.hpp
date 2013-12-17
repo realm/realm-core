@@ -24,6 +24,7 @@
 
 #include <tightdb/util/features.h>
 #include <tightdb/group.hpp>
+#include <tightdb/file_interprocess_managed.hpp>
 
 namespace tightdb {
 
@@ -197,12 +198,12 @@ private:
     struct SharedInfo;
 
     // Member variables
-    Group      m_group;
-    uint64_t   m_version;
-    util::File m_file;
-    util::File::Map<SharedInfo> m_file_map; // Never remapped
-    util::File::Map<SharedInfo> m_reader_map;
-    std::string m_file_path;
+    Group                 m_group;
+    uint64_t              m_version;
+    IPMFile               m_file;
+    SharedInfo*           m_info; // Never remapped
+    util::File::Map<IPMFile::IPMFileWrapper<SharedInfo> > m_reader_map;
+    std::string           m_file_path;
 
     enum TransactStage {
         transact_Ready,
@@ -339,7 +340,7 @@ inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
 
 inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 {
-    return m_file_map.is_attached();
+    return m_reader_map.is_attached();
 }
 
 inline Group& SharedGroup::begin_write()

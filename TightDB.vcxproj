@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="csv debug|Win32">
@@ -587,6 +587,7 @@
     <ClCompile Include="src\tightdb\column_string.cpp" />
     <ClCompile Include="src\tightdb\column_string_enum.cpp" />
     <ClCompile Include="src\tightdb\column_table.cpp" />
+    <ClCompile Include="src\tightdb\file_interprocess_managed.cpp" />
     <ClCompile Include="src\tightdb\util\file.cpp" />
     <ClCompile Include="src\tightdb\importer.cpp" />
     <ClCompile Include="src\tightdb\importer_tool.cpp">

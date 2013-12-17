@@ -32,7 +32,7 @@ util/utf8.cpp utilities.cpp alloc.cpp alloc_slab.cpp array.cpp array_string.cpp 
 array_string_long.cpp array_binary.cpp array_blob.cpp array_blobs_big.cpp column.cpp \
 column_string.cpp column_string_enum.cpp column_binary.cpp column_table.cpp column_mixed.cpp \
 spec.cpp table.cpp table_view.cpp group.cpp group_writer.cpp group_shared.cpp $(REPLICATION_CPP) \
-index_string.cpp query.cpp lang_bind_helper.cpp importer.cpp
+index_string.cpp query.cpp lang_bind_helper.cpp importer.cpp file_interprocess_managed.cpp
 
 # Format: CURRENT[:REVISION[:AGE]]
 #
