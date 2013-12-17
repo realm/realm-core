@@ -1640,6 +1640,8 @@ public:
         m_auto_delete = auto_delete;
         m_child = 0;
         m_compare = compare;
+        m_dD = 10.0;
+        m_dT = 50.0;
     }
 
     void init(const Table& table)  TIGHTDB_OVERRIDE
