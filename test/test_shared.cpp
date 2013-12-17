@@ -1459,9 +1459,10 @@ void* IncrementEntry(void* arg)
         const size_t row_ndx = (size_t)arg;
 
         // Open shared db
+        printf("GOK\n");
         SharedGroup sg("test_shared.tightdb",
                        false, SharedGroup::durability_Async );
-
+        printf("GYF\n");
         for (size_t i = 0; i < INCREMENTS; ++i) {
 
             // Increment cell

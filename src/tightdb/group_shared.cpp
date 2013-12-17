@@ -227,6 +227,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
         info = m_info = m_file.open<SharedInfo>(is_exclusive, max_wait_for_sharedinfo_valid);
     } 
     catch (IPMFile::PresumablyStaleFile&) {
+        cout << "Stale..." << endl;
         throw PresumablyStaleLockFile(m_file_path);
     }
     // FIXME: need a close guard for m_file
