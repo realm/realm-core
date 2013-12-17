@@ -13,6 +13,7 @@ Format:
 
 2013-12-17 (Kristian Spangsege)
 + Implicit termination of active transaction when SharedGroup is destroyed.
+. Class `File` and related exceptions such as `File::AccessError` moved to namespace `tightdb::util`.
 
 
 2013-11-07 (Alexander Stigsen)
