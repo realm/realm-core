@@ -55,3 +55,47 @@
    fun:_ZN7tightdb11GroupWriter14get_free_spaceEm
    ...
 }
+{
+   <serialization false positive>
+   Memcheck:Param
+   write(buf)
+   obj:/lib/x86_64-linux-gnu/libpthread-2.17.so
+   fun:_ZN7tightdb4util4File5writeEPKcm
+   fun:_ZNK7tightdb5Group5writeERKSs
+   ...
+}
+{
+   <sync_map false positive>
+   Memcheck:Param
+   msync(start)
+   fun:__msync_nocancel
+   fun:_ZN7tightdb4util4File8sync_mapEPvm
+   fun:_ZN7tightdb11GroupWriter6commitEm
+   ...
+}
+{
+   <msync again>
+   Memcheck:Param
+   msync(start)
+   fun:__msync_nocancel
+   fun:_ZN7tightdb4util4File8sync_mapEPvm
+   ...
+}
+{
+   <more msync>
+   Memcheck:Param
+   msync(start)
+   obj:/lib/x86_64-linux-gnu/libpthread-2.17.so
+   fun:_ZN7tightdb4util4File8sync_mapEPvm
+   ...
+}
+{
+   <writing, uninit values at end (inconsquential)>
+   Memcheck:Param
+   write(buf)
+   fun:__write_nocancel
+   fun:_ZN7tightdb4util4File5writeEPKcm
+   fun:_ZNK7tightdb5Group5writeERKSs
+   ...
+}
+

@@ -61,7 +61,8 @@ void StringIndex::set(size_t ndx, StringData old_value, StringData new_value)
 void StringIndex::insert(size_t row_ndx, StringData value, bool is_last)
 {
     // If it is last item in column, we don't have to update refs
-    if (!is_last) UpdateRefs(row_ndx, 1);
+    if (!is_last)
+        UpdateRefs(row_ndx, 1);
 
     InsertWithOffset(row_ndx, 0, value);
 }
@@ -109,7 +110,7 @@ void StringIndex::InsertRowList(size_t ref, size_t offset, StringData value)
 
 void StringIndex::TreeInsert(size_t row_ndx, key_type key, size_t offset, StringData value)
 {
-    const NodeChange nc = DoInsert(row_ndx, key, offset, value);
+    NodeChange nc = DoInsert(row_ndx, key, offset, value);
     switch (nc.type) {
         case NodeChange::none:
             return;
@@ -178,8 +179,12 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
 
         // If there is room, just update node directly
         if (offsets.size() < TIGHTDB_MAX_LIST_SIZE) {
-            if (nc.type == NodeChange::split) NodeInsertSplit(node_ndx, nc.ref2);
-            else NodeInsert(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
+            if (nc.type == NodeChange::split) {
+                NodeInsertSplit(node_ndx, nc.ref2);
+            }
+            else {
+                NodeInsert(node_ndx, nc.ref1); // ::INSERT_BEFORE/AFTER
+            }
             return NodeChange::none;
         }
 
@@ -204,7 +209,7 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
             case TIGHTDB_MAX_LIST_SIZE: // insert after
                 if (nc.type == NodeChange::split)
                     return NodeChange(NodeChange::split, get_ref(), new_node.get_ref());
-                else return NodeChange(NodeChange::insert_after, new_node.get_ref());
+                return NodeChange(NodeChange::insert_after, new_node.get_ref());
             default:            // split
                 // Move items after split to new node
                 size_t len = m_array->size();
@@ -239,14 +244,12 @@ StringIndex::NodeChange StringIndex::DoInsert(size_t row_ndx, key_type key, size
         size_t ndx = old_offsets.lower_bound_int(key);
 
         // insert before
-        if (ndx == 0) {
+        if (ndx == 0)
             return NodeChange(NodeChange::insert_before, new_list.get_ref());
-        }
 
         // insert after
-        if (ndx == old_offsets.size()) {
+        if (ndx == old_offsets.size())
             return NodeChange(NodeChange::insert_after, new_list.get_ref());
-        }
 
         // split
         Array new_offsets(alloc);
@@ -331,7 +334,8 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
     size_t ins_pos = values.lower_bound_int(key);
     size_t ins_pos_refs = ins_pos + 1; // first entry in refs points to offsets
     if (ins_pos == values.size()) {
-        if (noextend) return false;
+        if (noextend)
+            return false;
 
         // When key is outside current range, we can just add it
         values.add(key);
@@ -344,7 +348,8 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
 
     // If key is not present we add it at the correct location
     if (k != key) {
-        if (noextend) return false;
+        if (noextend)
+            return false;
 
         values.insert(ins_pos, key);
         int64_t shifted = int64_t((uint64_t(row_ndx) << 1) + 1); // shift to indicate literal
@@ -388,14 +393,17 @@ bool StringIndex::LeafInsert(size_t row_ndx, key_type key, size_t offset, String
             // In most cases we refs will be added to the end. So we test for that
             // first to see if we can avoid the binary search for insert position
             size_t last_ref = size_t(sub.back());
-            if (row_ndx > last_ref)
+            if (row_ndx > last_ref) {
                 sub.add(row_ndx);
+            }
             else {
                 size_t pos = sub.lower_bound_int(row_ndx);
-                if (pos == sub.size())
+                if (pos == sub.size()) {
                     sub.add(row_ndx);
-                else
+                }
+                else {
                     sub.insert(pos, row_ndx);
+                }
             }
         }
         else {
@@ -470,7 +478,7 @@ void StringIndex::distinct(Array& result) const
                 }
                 else {
                     const Column sub(to_ref(ref), m_array, i, alloc);
-                    const size_t r = to_size_t(sub.get(0)); // get first match
+                    size_t r = to_size_t(sub.get(0)); // get first match
                     result.add(r);
                 }
             }
