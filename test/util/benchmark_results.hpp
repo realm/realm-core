@@ -33,7 +33,14 @@ public:
     BenchmarkResults(int max_lead_text_width, const char* results_file_stem = "results");
     ~BenchmarkResults();
 
-    void submit(double elapsed_seconds, const char* ident, const char* lead_text);
+    enum ChangeType {
+        change_Percent,
+        change_DropFactor,
+        change_RiseFactor
+    };
+
+    void submit(double elapsed_seconds, const char* ident, const char* lead_text,
+                ChangeType = change_Percent);
 
 private:
     int m_max_lead_text_width;
