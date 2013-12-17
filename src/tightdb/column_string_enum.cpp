@@ -235,7 +235,8 @@ StringIndex& ColumnStringEnum::create_index()
     size_t n = size();
     for (size_t i = 0; i != n; ++i) {
         StringData value = get(i);
-        m_index->insert(i, value, true);
+        bool is_last = true;
+        m_index->insert(i, value, is_last);
     }
 
     return *m_index;
