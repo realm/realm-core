@@ -5,10 +5,16 @@ Format:
 
 2012-mm-dd
 ----------
-! Fixed bug [github issuenr]: .... 		 (user visible bug fixed       - passed on to release notes)
-+ Added feature ....				     (user visible new feature     - passed on to release notes)
+! Fixed bug [github issuenr]: ....       (user visible bug fixed       - passed on to release notes)
++ Added feature ....                     (user visible new feature     - passed on to release notes)
 - Removed/deprecated feature/method .... (user visible removed feature - passed on to release notes)
-. Any other notes .... 				     (internal changes)
+. Any other notes ....                   (internal changes)
+
+
+2013-12-17 (Kristian Spangsege)
++ Implicit termination of active transaction when SharedGroup is destroyed.
+. Class `File` and related exceptions such as `File::AccessError` moved to namespace `tightdb::util`.
+
 
 2013-11-07 (Alexander Stigsen)
 . BREAKING CHANGE: Schema now handles attributes separately for better performance when there are many colummns.
@@ -389,14 +395,14 @@ Format:
 - Removed Table::find_pos_int(...) from public API
 
 + Added a the following methods to a TableView:
-	template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
-	ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const;
-	size_t      get_subtable_size(size_t column_ndx, size_t row_ndx) const;
-	void        clear_subtable(size_t column_ndx, size_t row_ndx);
-	size_t      find_first_bool(size_t column_ndx, bool value) const;
+    template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
+    ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const;
+    size_t      get_subtable_size(size_t column_ndx, size_t row_ndx) const;
+    void        clear_subtable(size_t column_ndx, size_t row_ndx);
+    size_t      find_first_bool(size_t column_ndx, bool value) const;
     size_t      find_first_date(size_t column_ndx, time_t value) const;
-	void		add_int(size_t column_ndx, int64_t value);
-	TableView      find_all_bool(size_t column_ndx, bool value);
+    void        add_int(size_t column_ndx, int64_t value);
+    TableView      find_all_bool(size_t column_ndx, bool value);
     ConstTableView find_all_bool(size_t column_ndx, bool value) const; (for class TableView and ConstTableView)
     TableView      find_all_date(size_t column_ndx, time_t value);
     ConstTableView find_all_date(size_t column_ndx, time_t value) const; (for class TableView and ConstTableView)
