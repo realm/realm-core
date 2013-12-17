@@ -2347,8 +2347,8 @@ inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t width,
 }
 
 
-// Lower/upper bound in sorted sequence:
-// -------------------------------------
+// Lower/upper bound in sorted sequence
+// ------------------------------------
 //
 //   3 3 3 4 4 4 5 6 7 9 9 9
 //   ^     ^     ^     ^     ^
@@ -2368,7 +2368,30 @@ inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t width,
 //
 // We currently use binary search. See for example
 // http://www.tbray.org/ongoing/When/200x/2003/03/22/Binary.
-//
+template<int width>
+inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
+{
+    size_t i = 0;
+    size_t size_2 = size;
+    while (0 < size_2) {
+        size_t half = size_2 / 2;
+        size_t mid = i + half;
+        int64_t probe = get_direct<width>(data, mid);
+        if (probe < value) {
+            i = mid + 1;
+            size_2 -= half + 1;
+        }
+        else {
+            size_2 = half;
+        }
+    }
+    return i;
+
+// The optimized implementation below fails. This is revealed by
+// running ColumnStringAutoEnumerateIndex under Valgrind, for example.
+
+/*
+
 // The binary search used here is carefully optimized. Key trick is to use a single
 // loop controlling variable (size) instead of high/low pair, and to keep updates
 // to size done inside the loop independent of comparisons. Further key to speed
@@ -2377,9 +2400,6 @@ inline pair<int_fast64_t, int_fast64_t> get_two(const char* data, size_t width,
 // might be slightly faster if we used branches instead. The loop unrolling yields
 // a final 5-20% speedup depending on circumstances.
 
-template<int width>
-inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
-{
     size_t low = 0;
 
     while (size > 8) {
@@ -2412,16 +2432,37 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_
         size = half;
         low = (v < value) ? pbadj : low;
 
-    } while (size > 0);
+    }
+    while (size > 0);
 
     return low;
-
+*/
 }
 
 // See lower_bound()
 template<int width>
 inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
+    size_t i = 0;
+    size_t size_2 = size;
+    while (0 < size_2) {
+        size_t half = size_2 / 2;
+        size_t mid = i + half;
+        int64_t probe = get_direct<width>(data, mid);
+        if (!(value < probe)) {
+            i = mid + 1;
+            size_2 -= half + 1;
+        }
+        else {
+            size_2 = half;
+        }
+    }
+    return i;
+
+// The optimized implementation below fails. This is revealed by
+// running ColumnStringAutoEnumerateIndex under Valgrind, for example.
+
+/*
     size_t low = 0;
     while (size >= 8) {
         size_t half = size / 2;
@@ -2454,10 +2495,11 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_
         size = half;
         low = (value >= v) ? pbadj : low;
 
-    } while (size > 0);
+    }
+    while (size > 0);
 
     return low;
-
+ */
 }
 
 } // anonymous namespace
