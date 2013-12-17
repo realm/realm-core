@@ -2047,12 +2047,7 @@ EOF
 /test
 /test-installed
 /doc
-/debian/changelog.in
-/debian/rules
-/debian/compat
-/debian/control
-/debian/copyright
-/examples/tutorial.cpp
+/debian
 EOF
         cat >"$TEMP_DIR/exclude" <<EOF
 .gitignore

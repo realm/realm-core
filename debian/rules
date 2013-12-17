@@ -44,7 +44,6 @@ libtightdb-dev: build
 	dh_testroot -a
 	dh_installdocs -a
 	dh_installchangelogs -p$@ -a
-	dh_installexamples $$(pwd)/examples/tutorial.cpp
 	dh_strip -p$@ -a
 	dh_compress -p$@ -s
 	dh_fixperms -p$@ -a
