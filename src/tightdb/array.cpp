@@ -2404,7 +2404,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_
         size = half;
         low = (v < value) ? pbadj : low;
     }
-    do {
+    while (size > 0) {
         size_t half = size / 2;
         size_t probe = (low + half);
         size_t pbadj = low + size - half;
@@ -2412,7 +2412,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_
         size = half;
         low = (v < value) ? pbadj : low;
 
-    } while (size > 0);
+    };
 
     return low;
 
@@ -2446,7 +2446,7 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_
         low = (value >= v) ? pbadj : low;
     }
 
-    do {
+    while (size > 0) {
         size_t half = size / 2;
         size_t probe = (low + half);
         size_t pbadj = low + size - half;
@@ -2454,7 +2454,7 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_
         size = half;
         low = (value >= v) ? pbadj : low;
 
-    } while (size > 0);
+    };
 
     return low;
 
