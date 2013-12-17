@@ -128,21 +128,20 @@ CATEGORIES  :
         DESCR  : &g_group_constructor_memory_return1_descr
                  A - possibly empty - group.
       THROWS:
-      - EXCEPT : File::AccessError
+      - EXCEPT : util::File::AccessError
         DESCR  : &g_group_constructor_memory_throws_descr
                  Thrown if the file (or buffer) could not be opened. If the reason
                  corresponds to one of the following exception types which are
-                 derived from File::AccessError, the derived exception
-                 type is thrown. Note that InvalidDatabase is among
-                 these derived exception types.
-      - EXCEPT : File::PermissionDenied
+                 derived from util::File::AccessError, the derived exception
+                 type is thrown.
+      - EXCEPT : util::File::PermissionDenied
         DESCR  : &g_group_exc_perm
                  Thrown if the user haven't got sufficient permissions
                  to open the database file in the desired mode.
-      - EXCEPT : File::NotFound
+      - EXCEPT : util::File::NotFound
         DESCR  : &g_group_exc_notfound
                  Thrown if the database file cannot be found.
-      - EXCEPT : File::Exists
+      - EXCEPT : util::File::Exists
         DESCR  : &g_group_exc_exists
                  Thrown if create_Never was specified and the database file exists.
       - EXCEPT : InvalidDatabase
@@ -253,13 +252,13 @@ CATEGORIES  :
         TYPES  : bool
         DESCR  : *g_group_take_ownership_desc
       THROWS:
-      - EXCEPT : File::AccessError
+      - EXCEPT : util::File::AccessError
         DESCR  : *g_group_constructor_memory_throws_descr
-      - EXCEPT : File::PermissionDenied
+      - EXCEPT : util::File::PermissionDenied
         DESCR  : *g_group_exc_perm
-      - EXCEPT : File::NotFound
+      - EXCEPT : util::File::NotFound
         DESCR  : *g_group_exc_notfound
-      - EXCEPT : File::Exists
+      - EXCEPT : util::File::Exists
         DESCR  : *g_group_exc_exists
       - EXCEPT : InvalidDatabase
         DESCR  : *g_group_exc_invalid_db
@@ -481,16 +480,16 @@ CATEGORIES  :
         DESCR  : &g_group_write_to_file_parm1_descr
                  A filesystem path to write to.
       THROWS:
-      - EXCEPT : File::AccessError
+      - EXCEPT : util::File::AccessError
         DESCR  : &g_group_write_to_file_throws_descr
                  Thrown if the file could not be opened. If the reason
                  corresponds to one of the exception types that are
-                 derived from File::AccessError, the derived exception
-                 type is thrown. In particular, File::Exists will be
+                 derived from util::File::AccessError, the derived exception
+                 type is thrown. In particular, util::File::Exists will be
                  thrown if the file exists already.
-      - EXCEPT : File::PermissionDenied
+      - EXCEPT : util::File::PermissionDenied
         DESCR  : *g_group_exc_perm
-      - EXCEPT : File::Exists
+      - EXCEPT : util::File::Exists
         DESCR  : *g_group_exc_exists
       EXAMPLES:
       - DESCR  :
