@@ -57,6 +57,11 @@ public:
     ref_type bptree_leaf_insert(std::size_t ndx, BinaryData, bool add_zero_term,
                                 TreeInsertBase& state);
 
+    /// Construct a binary array of the specified size and return just
+    /// the reference to the underlying memory. All elements will be
+    /// initialized to zero size blobs.
+    static ref_type create_array(std::size_t size, Allocator&);
+
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
 #endif

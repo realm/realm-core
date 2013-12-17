@@ -386,6 +386,24 @@ bool ColumnBinary::upgrade_root_leaf(size_t value_size)
 }
 
 
+class ColumnBinary::CreateHandler: public ColumnBase::CreateHandler {
+public:
+    CreateHandler(Allocator& alloc): m_alloc(alloc) {}
+    ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
+    {
+        return ArrayBinary::create_array(size, m_alloc);
+    }
+private:
+    Allocator& m_alloc;
+};
+
+ref_type ColumnBinary::create(size_t size, Allocator& alloc)
+{
+    CreateHandler handler(alloc);
+    return ColumnBase::create(size, alloc, handler);
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 namespace {

@@ -466,16 +466,26 @@ size_t Table::do_add_column(DataType type)
             }
         }
         case type_Float: {
-            ColumnFloat* c = new ColumnFloat(alloc); // Throws
-            c->fill(size()); // Throws
-            new_col.reset(c);
-            break;
+            ref_type ref = ColumnFloat::create(size(), alloc); // Throws
+            try {
+                new_col.reset(new ColumnFloat(ref, 0, 0, alloc)); // Throws
+                break;
+            }
+            catch (...) {
+                Array::destroy(ref, alloc);
+                throw;
+            }
         }
         case type_Double: {
-            ColumnDouble* c = new ColumnDouble(alloc); // Throws
-            c->fill(size()); // Throws
-            new_col.reset(c);
-            break;
+            ref_type ref = ColumnDouble::create(size(), alloc); // Throws
+            try {
+                new_col.reset(new ColumnDouble(ref, 0, 0, alloc)); // Throws
+                break;
+            }
+            catch (...) {
+                Array::destroy(ref, alloc);
+                throw;
+            }
         }
         case type_String: {
             ref_type ref = AdaptiveStringColumn::create(size(), alloc); // Throws
@@ -489,10 +499,15 @@ size_t Table::do_add_column(DataType type)
             }
         }
         case type_Binary: {
-            ColumnBinary* c = new ColumnBinary(alloc); // Throws
-            c->fill(size()); // Throws
-            new_col.reset(c);
-            break;
+            ref_type ref = ColumnBinary::create(size(), alloc); // Throws
+            try {
+                new_col.reset(new ColumnBinary(ref, 0, 0, alloc)); // Throws
+                break;
+            }
+            catch (...) {
+                Array::destroy(ref, alloc);
+                throw;
+            }
         }
         case type_Table: {
             ref_type spec_ref = m_spec.get_subspec_ref(m_spec.get_num_subspecs()-1);

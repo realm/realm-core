@@ -21,7 +21,10 @@
 #define TIGHTDB_ARRAY_BASIC_TPL_HPP
 
 #include <algorithm>
+#include <stdexcept>
 #include <iomanip>
+
+#include <tightdb/util/safe_int_ops.hpp>
 
 namespace tightdb {
 
@@ -63,22 +66,25 @@ inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT: Array(no_pre
 template<class T>
 inline void BasicArray<T>::create()
 {
-    ref_type ref = create_empty_array(get_alloc()); // Throws
+    std::size_t size = 0;
+    ref_type ref = create_array(size, get_alloc()); // Throws
     init_from_ref(ref);
 }
 
 
 template<class T>
-inline ref_type BasicArray<T>::create_empty_array(Allocator& alloc)
+inline ref_type BasicArray<T>::create_array(std::size_t size, Allocator& alloc)
 {
-    std::size_t capacity = Array::initial_capacity;
-    MemRef mem_ref = alloc.alloc(capacity); // Throws
+    // Adding zero to Array::initial_capacity to avoid taking the
+    // address of that member
+    std::size_t byte_size = std::max(calc_byte_size(size), Array::initial_capacity+0); // Throws
+    MemRef mem_ref = alloc.alloc(byte_size); // Throws
 
     bool is_inner_bptree_node = false;
     bool has_refs = false;
     int width = sizeof (T);
-    std::size_t size = 0;
-    init_header(mem_ref.m_addr, is_inner_bptree_node, has_refs, wtype_Multiply, width, size, capacity);
+    init_header(mem_ref.m_addr, is_inner_bptree_node, has_refs, wtype_Multiply, width, size,
+                byte_size);
 
     return mem_ref.m_ref;
 }
@@ -194,10 +200,9 @@ bool BasicArray<T>::compare(const BasicArray<T>& a) const
 
 
 template<class T>
-std::size_t BasicArray<T>::CalcByteLen(std::size_t count, std::size_t) const
+std::size_t BasicArray<T>::CalcByteLen(std::size_t size, std::size_t) const
 {
-    // FIXME: This arithemtic could overflow. Consider using <tightdb/util/safe_int_ops.hpp>
-    return header_size + (count * sizeof (T));
+    return calc_byte_size(size);
 }
 
 template<class T>
@@ -340,6 +345,17 @@ inline std::size_t BasicArray<T>::upper_bound(T value) const TIGHTDB_NOEXCEPT
     const T* begin = reinterpret_cast<const T*>(m_data);
     const T* end = begin + size();
     return std::upper_bound(begin, end, value) - begin;
+}
+
+template<class T>
+inline std::size_t BasicArray<T>::calc_byte_size(std::size_t size)
+{
+    std::size_t byte_size = size;
+    bool a = util::int_multiply_with_overflow_detect(byte_size, sizeof (T));
+    bool b = util::int_multiply_with_overflow_detect(byte_size, header_size);
+    if (a || b)
+        throw std::runtime_error("Byte size overflow");
+    return byte_size;
 }
 
 

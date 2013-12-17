@@ -32,7 +32,7 @@ public:
     typedef BinaryData value_type;
 
     explicit ColumnBinary(Allocator& = Allocator::get_default());
-    explicit ColumnBinary(ref_type, ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
+    explicit ColumnBinary(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                           Allocator& = Allocator::get_default());
     ~ColumnBinary() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -61,6 +61,8 @@ public:
     /// Compare two binary columns for equality.
     bool compare_binary(const ColumnBinary&) const;
 
+    static ref_type create(std::size_t size, Allocator&);
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
@@ -86,6 +88,7 @@ private:
     };
 
     class EraseLeafElem;
+    class CreateHandler;
 
     /// Root must be a leaf. Upgrades the root leaf if
     /// necessary. Returns true if, and only if the root is a 'big

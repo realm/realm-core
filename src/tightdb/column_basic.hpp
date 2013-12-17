@@ -43,7 +43,7 @@ public:
     typedef T value_type;
 
     explicit BasicColumn(Allocator& = Allocator::get_default());
-    explicit BasicColumn(ref_type, ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
+    explicit BasicColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                          Allocator& = Allocator::get_default());
     ~BasicColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -86,6 +86,8 @@ public:
     /// Compare two columns for equality.
     bool compare(const BasicColumn&) const;
 
+    static ref_type create(std::size_t size, Allocator&);
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
@@ -108,6 +110,7 @@ private:
 
     class SetLeafElem;
     class EraseLeafElem;
+    class CreateHandler;
 
 #ifdef TIGHTDB_DEBUG
     static std::size_t verify_leaf(MemRef, Allocator&);

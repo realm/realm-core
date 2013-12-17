@@ -1,5 +1,5 @@
 #ifdef _MSC_VER
-#include <win32/types.h>
+#  include <win32/types.h>
 #endif
 
 #include <tightdb/array_binary.hpp>
@@ -54,8 +54,12 @@ void ArrayBinary::add(BinaryData value, bool add_zero_term)
 
     m_blob.add(value.data(), value.size(), add_zero_term);
     size_t stored_size = value.size();
-    if (add_zero_term) ++stored_size;
-    m_offsets.add(m_offsets.is_empty() ? stored_size : m_offsets.back() + stored_size);
+    if (add_zero_term)
+        ++stored_size;
+    size_t offset = stored_size;
+    if (!m_offsets.is_empty())
+        offset += m_offsets.back();
+    m_offsets.add(offset);
 }
 
 void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
@@ -66,7 +70,8 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
     size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     size_t current_end = to_size_t(m_offsets.get(ndx));
     size_t stored_size = value.size();
-    if (add_zero_term) ++stored_size;
+    if (add_zero_term)
+        ++stored_size;
     ssize_t diff =  (start + stored_size) - current_end;
     m_blob.replace(start, current_end, value.data(), value.size(), add_zero_term);
     m_offsets.adjust(ndx, m_offsets.size(), diff);
@@ -81,7 +86,8 @@ void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
 
     size_t stored_size = value.size();
-    if (add_zero_term) ++stored_size;
+    if (add_zero_term)
+        ++stored_size;
     m_offsets.insert(ndx, pos + stored_size);
     m_offsets.adjust(ndx+1, m_offsets.size(), stored_size);
 }
@@ -159,6 +165,37 @@ ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_
     }
     state.m_split_size = leaf_size + 1;
     return new_leaf.get_ref();
+}
+
+
+ref_type ArrayBinary::create_array(std::size_t size, Allocator& alloc)
+{
+    Array top(alloc);
+    top.create(type_HasRefs); // Throws
+    try {
+        ref_type offsets_ref = Array::create_array(type_Normal, size, alloc);
+        try {
+            top.add(offsets_ref);
+        }
+        catch (...) {
+            Array::destroy(offsets_ref, alloc);
+            throw;
+        }
+        size_t blobs_size = 0;
+        ref_type blobs_ref = ArrayBlob::create_array(blobs_size, alloc);
+        try {
+            top.add(blobs_ref);
+        }
+        catch (...) {
+            Array::destroy(blobs_ref, alloc);
+            throw;
+        }
+        return top.get_ref();
+    }
+    catch (...) {
+        top.destroy();
+        throw;
+    }
 }
 
 

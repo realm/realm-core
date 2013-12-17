@@ -252,6 +252,24 @@ void BasicColumn<T>::erase(std::size_t ndx, bool is_last)
 }
 
 
+template<class T> class BasicColumn<T>::CreateHandler: public ColumnBase::CreateHandler {
+public:
+    CreateHandler(Allocator& alloc): m_alloc(alloc) {}
+    ref_type create_leaf(std::size_t size) TIGHTDB_OVERRIDE
+    {
+        return BasicArray<T>::create_array(size, m_alloc);
+    }
+private:
+    Allocator& m_alloc;
+};
+
+template<class T> ref_type BasicColumn<T>::create(std::size_t size, Allocator& alloc)
+{
+    CreateHandler handler(alloc);
+    return ColumnBase::create(size, alloc, handler);
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 template<class T>
