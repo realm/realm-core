@@ -1794,7 +1794,7 @@ size_t Table::lookup(StringData value) const
     return m_lookup_index->find_first(value);
 }
 
-template <class T> std::size_t Table::find_first(std::size_t column_ndx, T value) const
+template <class T> size_t Table::find_first(size_t column_ndx, T value) const
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == ColumnTypeTraits3<T>::ct_id_real);

@@ -1180,8 +1180,8 @@ size_t Array::count(int64_t value) const
 size_t Array::calc_aligned_byte_size(size_t size, int width)
 {
     TIGHTDB_ASSERT(width != 0 && (width & (width - 1)) == 0); // Is a power of two
-    std::size_t max = std::numeric_limits<std::size_t>::max();
-    std::size_t max_2 = max & ~size_t(7); // Allow for upwards 8-byte alignment
+    size_t max = numeric_limits<size_t>::max();
+    size_t max_2 = max & ~size_t(7); // Allow for upwards 8-byte alignment
     bool overflow;
     size_t byte_size;
     if (width < 8) {
@@ -1198,7 +1198,7 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
         byte_size = header_size + size * bytes_per_elem;
     }
     if (overflow)
-        throw std::runtime_error("Byte size overflow");
+        throw runtime_error("Byte size overflow");
     TIGHTDB_ASSERT(byte_size > 0);
     size_t aligned_byte_size = ((byte_size-1) | 7) + 1; // 8-byte alignment
     return aligned_byte_size;
@@ -3536,7 +3536,7 @@ void Array::update_bptree_elem(size_t elem_ndx, UpdateHandler& handler)
 }
 
 
-void Array::erase_bptree_elem(Array* root, std::size_t elem_ndx, EraseHandler& handler)
+void Array::erase_bptree_elem(Array* root, size_t elem_ndx, EraseHandler& handler)
 {
     TIGHTDB_ASSERT(root->is_inner_bptree_node());
     TIGHTDB_ASSERT(root->size() >= 1 + 1 + 1); // invar:bptree-nonempty-inner
@@ -3699,8 +3699,8 @@ void Array::create_bptree_offsets(Array& offsets, int_fast64_t first_value)
     offsets.create(type_Normal); // Throws
     int_fast64_t elems_per_child = first_value/2;
     int_fast64_t accum_num_elems = 0;
-    std::size_t num_children = size() - 2;
-    for (std::size_t i = 0; i != num_children-1; ++i) {
+    size_t num_children = size() - 2;
+    for (size_t i = 0; i != num_children-1; ++i) {
         accum_num_elems += elems_per_child;
         offsets.add(accum_num_elems); // Throws
     }
