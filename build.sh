@@ -1065,6 +1065,8 @@ EOF
                 done
             fi
 
+            export DISABLE_CHEETAH_CODE_GEN="1"
+
             mkdir "$PKG_DIR/tightdb" || exit 1
             if [ "$PREBUILT_CORE" ]; then
                 message "Building core library"
