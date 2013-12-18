@@ -45,7 +45,7 @@ public:
     void set(std::size_t ndx, StringData value);
     void insert(std::size_t ndx, StringData value);
     void erase(std::size_t ndx);
-    void resize(std::size_t ndx);
+    void truncate(std::size_t size);
     void clear();
 
     std::size_t count(StringData value, std::size_t begin = 0,

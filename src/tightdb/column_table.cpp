@@ -86,19 +86,6 @@ void ColumnTable::set(size_t ndx, const Table* subtable)
     Column::set(ndx, columns_ref);
 }
 
-void ColumnTable::fill(size_t n)
-{
-    TIGHTDB_ASSERT(is_empty());
-
-    // Fill column with default values
-    // TODO: this is a very naive approach
-    // we could speedup by creating full nodes directly
-    for (size_t i = 0; i < n; ++i) {
-        Table* t = 0; // Null for empty table
-        add(t); // Throws
-    }
-}
-
 void ColumnTable::erase(size_t ndx, bool is_last)
 {
     TIGHTDB_ASSERT(ndx < size());
