@@ -2381,7 +2381,7 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_
 
     size_t low = 0;
 
-    while (size > 8) {
+    while (size >= 8) {
         // The following code (at X, Y and Z) is 3 times manually unrolled instances of (A) below.
         // These code blocks must be kept in sync. Meassurements indicate 3 times unrolling to give
         // the best performance. See (A) for comments on the loop body.
@@ -2458,7 +2458,7 @@ template<int width>
 inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
     size_t low = 0;
-    while (size > 8) {
+    while (size >= 8) {
         size_t half = size / 2;
         size_t other_half = size - half;
         size_t probe = low + half;
