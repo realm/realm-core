@@ -203,7 +203,7 @@ public:
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_table(const Table* table) = 0;
     virtual const Table* get_table() = 0;
-    virtual void evaluate(size_t index, ValueBase& destination) = 0;
+    // virtual void evaluate(size_t index, ValueBase& destination) = 0;
     virtual ~Expression() {}
 };
 
@@ -709,7 +709,7 @@ template <class T> UnaryOperator<Pow<T> >& power (Subexpr2<T>& left) {
     return *new UnaryOperator<Pow<T> >(left.clone(), true);
 }
 
-
+#if 0
 // support for negation:
 class Negate : public Expression
 {
@@ -785,7 +785,7 @@ inline void Negate::evaluate(size_t index, ValueBase& destination)
     res = Value<bool>::compare<Equal>(&expr, &all_false);
     destination.import(res);
 }
-
+#endif
 
 // Handling of String columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
 template <> class Columns<StringData> : public Subexpr
@@ -1089,7 +1089,7 @@ public:
 
         return not_found; // no match
     }
-
+#if 0
     void evaluate(size_t index, ValueBase& destination)
     {
         Value<T> right;
@@ -1101,6 +1101,7 @@ public:
         match = Value<bool>::template compare<TCond>(&left, &right);
         destination.import(match);
     }
+#endif
 
 private:
     bool m_auto_delete;

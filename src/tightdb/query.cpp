@@ -1133,3 +1133,10 @@ Query Query::operator&&(Query q)
     return q2;
 }
 
+Query Query::operator!()
+{
+    Query q(*this->m_table);
+    q.Not();
+    q.and_query(*this);
+    return q;
+}

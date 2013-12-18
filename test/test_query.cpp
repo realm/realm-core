@@ -225,6 +225,12 @@ TEST(NextGenSyntax)
     match = (!(untyped.column<String>(4) == StringData("hello"))).find();
     CHECK(match == 1);
 
+    match = (!(!(untyped.column<String>(4) != StringData("hello")))).find();
+    CHECK(match == 1);
+
+
+    
+
     // This is a demonstration of fallback to old query_engine for the specific cases where it's possible
     // because old engine is faster. This will return a ->less(...) query
     match = (untyped.column<int64_t>(0) == untyped.column<int64_t>(0)).find();
