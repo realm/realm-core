@@ -2424,6 +2424,17 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_
         // mispredictions, because they can be determined earlier 
         // and the speculation corrected earlier.
 
+        // Counterintuitive:
+        // To make size independent of data, we cannot always split the 
+        // range at the theoretical optimal point. When we determine that
+        // the key is larger than the probe at some index K, and prepare 
+        // to search the upper part of the range, you would normally start 
+        // the search at the next index, K+1, to get the shortest range.
+        // We can only do this when splitting a range with odd number of entries.
+        // If there is an even number of entries we search from K instead of K+1.
+        // This potentially leads to redundant comparisons, but in practice we
+        // gain more performance by making the changes to size predictable.
+
         // if size is even, half and other_half are the same.
         // if size is odd, half is one less than other_half.
         size_t half = size / 2;
@@ -2447,7 +2458,7 @@ template<int width>
 inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_NOEXCEPT
 {
     size_t low = 0;
-    while (size >= 8) {
+    while (size > 8) {
         size_t half = size / 2;
         size_t other_half = size - half;
         size_t probe = low + half;
