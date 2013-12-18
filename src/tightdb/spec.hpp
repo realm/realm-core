@@ -120,8 +120,8 @@ private:
     void set_column_type(std::size_t column_ndx, ColumnType type);
     void set_column_attr(std::size_t column_ndx, ColumnAttr attr);
 
-    std::size_t get_subspec_ndx(std::size_t column_ndx) const;
-    std::size_t get_subspec_ref(std::size_t subspec_ndx) const;
+    std::size_t get_subspec_ndx(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+    std::size_t get_subspec_ref(std::size_t subspec_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_num_subspecs() const TIGHTDB_NOEXCEPT;
     Spec get_subspec_by_ndx(std::size_t subspec_ndx);
 

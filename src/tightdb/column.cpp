@@ -674,18 +674,20 @@ void Column::do_insert(size_t ndx, int64_t value)
 
 class Column::CreateHandler: public ColumnBase::CreateHandler {
 public:
-    CreateHandler(Allocator& alloc): m_alloc(alloc) {}
+    CreateHandler(Array::Type leaf_type, Allocator& alloc):
+        m_leaf_type(leaf_type), m_alloc(alloc) {}
     ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
     {
-        return Array::create_array(Array::type_Normal, size, m_alloc);
+        return Array::create_array(m_leaf_type, size, m_alloc);
     }
 private:
+    const Array::Type m_leaf_type;
     Allocator& m_alloc;
 };
 
-ref_type Column::create(size_t size, Allocator& alloc)
+ref_type Column::create(Array::Type leaf_type, size_t size, Allocator& alloc)
 {
-    CreateHandler handler(alloc);
+    CreateHandler handler(leaf_type, alloc);
     return ColumnBase::create(size, alloc, handler);
 }
 

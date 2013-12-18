@@ -455,7 +455,7 @@ size_t Table::do_add_column(DataType type)
         case type_Int:
         case type_Bool:
         case type_DateTime: {
-            ref_type ref = Column::create(size(), alloc); // Throws
+            ref_type ref = Column::create(Array::type_Normal, size(), alloc); // Throws
             try {
                 new_col.reset(new Column(ref, 0, 0, alloc)); // Throws
                 break;
@@ -511,10 +511,16 @@ size_t Table::do_add_column(DataType type)
         }
         case type_Table: {
             ref_type spec_ref = m_spec.get_subspec_ref(m_spec.get_num_subspecs()-1);
-            ColumnTable* c = new ColumnTable(alloc, this, column_ndx, spec_ref); // Throws
-            c->fill(size()); // Throws
-            new_col.reset(c);
-            break;
+            ref_type ref = ColumnTable::create(size(), alloc); // Throws
+            try {
+                new_col.reset(new ColumnTable(alloc, this, column_ndx, 0, 0, spec_ref,
+                                              ref)); // Throws
+                break;
+            }
+            catch (...) {
+                Array::destroy(ref, alloc);
+                throw;
+            }
         }
         case type_Mixed: {
             ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx); // Throws

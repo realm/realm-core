@@ -255,7 +255,7 @@ public:
     /// Compare two columns for equality.
     bool compare_int(const Column&) const;
 
-    static ref_type create(std::size_t size, Allocator&);
+    static ref_type create(Array::Type leaf_type, std::size_t size, Allocator&);
 
     // Debug
 #ifdef TIGHTDB_DEBUG

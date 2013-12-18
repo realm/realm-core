@@ -50,8 +50,8 @@ protected:
     /// Table::m_cols array. Note that this corresponds to the logical
     /// index of the column, which is not always the same as the index
     /// of this column within Table::m_columns. This is because
-    /// Table::m_columns contains a varying number of entries for each
-    /// column depending on the type of column.
+    /// Table::m_columns contains columns as well as indexes for those
+    /// columns.
     std::size_t m_index;
 
     ColumnSubtableParent(Allocator&, const Table*, std::size_t column_ndx);
@@ -359,9 +359,7 @@ inline ref_type ColumnSubtableParent::clone_table_columns(const Table* t)
 
 inline ref_type ColumnSubtableParent::create(std::size_t size, Allocator& alloc)
 {
-    Column c(Array::type_HasRefs, alloc);
-    c.fill(size);
-    return c.get_ref();
+    return Column::create(Array::type_HasRefs, size, alloc); // Throws
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -399,7 +397,7 @@ inline void ColumnTable::add(const Table* subtable)
 
 inline ref_type ColumnTable::create(std::size_t size, Allocator& alloc)
 {
-    return ColumnSubtableParent::create(size, alloc);
+    return ColumnSubtableParent::create(size, alloc); // Throws
 }
 
 
