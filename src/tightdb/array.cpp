@@ -2382,34 +2382,61 @@ inline size_t lower_bound(const char* data, size_t size, int64_t value) TIGHTDB_
     size_t low = 0;
 
     while (size > 8) {
+        // The following code (at X, Y and Z) is 3 times manually unrolled instances of (A) below.
+        // These code blocks must be kept in sync. Meassurements indicate 3 times unrolling to give
+        // the best performance. See (A) for comments on the loop body.
+        // (X)
         size_t half = size / 2;
-        size_t probe = (low + half);
-        size_t pbadj = low + size - half;
+        size_t other_half = size - half;
+        size_t probe = low + half;
+        size_t other_low = low + other_half;
         int64_t v = get_direct<width>(data, probe);
         size = half;
-        low = (v < value) ? pbadj : low;
+        low = (v < value) ? other_low : low;
 
+        // (Y)
         half = size / 2;
-        probe = (low + half);
-        pbadj = low + size - half;
+        other_half = size - half;
+        probe = low + half;
+        other_low = low + other_half;
         v = get_direct<width>(data, probe);
         size = half;
-        low = (v < value) ? pbadj : low;
+        low = (v < value) ? other_low : low;
 
+        // (Z)
         half = size / 2;
-        probe = (low + half);
-        pbadj = low + size - half;
+        other_half = size - half;
+        probe = low + half;
+        other_low = low + other_half;
         v = get_direct<width>(data, probe);
         size = half;
-        low = (v < value) ? pbadj : low;
+        low = (v < value) ? other_low : low;
     }
     while (size > 0) {
+        // (A)
+        // To understand the idea in this code, please note that
+        // for performance, computation of size for the next iteration
+        // MUST be INDEPENDENT of the conditional. This allows the
+        // processor to unroll the loop as fast as possible, and it
+        // minimizes the length of dependence chains leading up to branches.
+        // Making the unfolding of the loop independent of the data being
+        // searched, also minimizes the delays incurred by branch
+        // mispredictions, because they can be determined earlier 
+        // and the speculation corrected earlier.
+
+        // if size is even, half and other_half are the same.
+        // if size is odd, half is one less than other_half.
         size_t half = size / 2;
-        size_t probe = (low + half);
-        size_t pbadj = low + size - half;
+        size_t other_half = size - half;
+        size_t probe = low + half;
+        size_t other_low = low + other_half;
         int64_t v = get_direct<width>(data, probe);
         size = half;
-        low = (v < value) ? pbadj : low;
+        // for max performance, the line below should compile into a conditional
+        // move instruction. Not all compilers do this. To maximize chance
+        // of succes, no computation should be done in the branches of the
+        // conditional.
+        low = (v < value) ? other_low : low;
     };
 
     return low;
@@ -2422,34 +2449,38 @@ inline size_t upper_bound(const char* data, size_t size, int64_t value) TIGHTDB_
     size_t low = 0;
     while (size >= 8) {
         size_t half = size / 2;
-        size_t probe = (low + half);
-        size_t pbadj = low + size - half;
+        size_t other_half = size - half;
+        size_t probe = low + half;
+        size_t other_low = low + other_half;
         int64_t v = get_direct<width>(data, probe);
         size = half;
-        low = (value >= v) ? pbadj : low;
+        low = (value >= v) ? other_low : low;
 
         half = size / 2;
-        probe = (low + half);
-        pbadj = low + size - half;
+        other_half = size - half;
+        probe = low + half;
+        other_low = low + other_half;
         v = get_direct<width>(data, probe);
         size = half;
-        low = (value >= v) ? pbadj : low;
+        low = (value >= v) ? other_low : low;
 
         half = size / 2;
-        probe = (low + half);
-        pbadj = low + size - half;
+        other_half = size - half;
+        probe = low + half;
+        other_low = low + other_half;
         v = get_direct<width>(data, probe);
         size = half;
-        low = (value >= v) ? pbadj : low;
+        low = (value >= v) ? other_low : low;
     }
 
     while (size > 0) {
         size_t half = size / 2;
-        size_t probe = (low + half);
-        size_t pbadj = low + size - half;
+        size_t other_half = size - half;
+        size_t probe = low + half;
+        size_t other_low = low + other_half;
         int64_t v = get_direct<width>(data, probe);
         size = half;
-        low = (value >= v) ? pbadj : low;
+        low = (value >= v) ? other_low : low;
     };
 
     return low;
