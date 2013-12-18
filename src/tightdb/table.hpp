@@ -752,18 +752,10 @@ private:
     Table* m_table;
 };
 
-inline ref_type Table::create_empty_table(Allocator& alloc)
-{
-    Array top(Array::type_HasRefs, null_ptr, 0, alloc);
-    top.add(Spec::create_empty_spec(alloc));
-    std::size_t size = 0;
-    top.add(Array::create_array(Array::type_HasRefs, size, alloc)); // Columns
-    return top.get_ref();
-}
-
 #ifdef _MSC_VER
 #pragma warning(push)
-// Disable the Microsoft warning about passing "this" as a parameter to another constructor. Here it's safe.
+// Disable the Microsoft warning about passing "this" as a parameter
+// to another constructor. Here it's safe.
 #pragma warning(disable: 4355)
 #endif
 

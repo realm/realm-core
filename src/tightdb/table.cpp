@@ -446,103 +446,64 @@ size_t Table::add_subcolumn(const vector<size_t>& column_path, DataType type, St
 
 size_t Table::do_add_column(DataType type)
 {
-    size_t column_ndx = m_cols.size();
-
-    util::UniquePtr<ColumnBase> new_col;
     Allocator& alloc = m_columns.get_alloc();
-
-    switch (type) {
-        case type_Int:
-        case type_Bool:
-        case type_DateTime: {
-            ref_type ref = Column::create(Array::type_Normal, size(), alloc); // Throws
-            try {
-                new_col.reset(new Column(ref, 0, 0, alloc)); // Throws
-                break;
-            }
-            catch (...) {
-                Array::destroy(ref, alloc);
-                throw;
-            }
-        }
-        case type_Float: {
-            ref_type ref = ColumnFloat::create(size(), alloc); // Throws
-            try {
-                new_col.reset(new ColumnFloat(ref, 0, 0, alloc)); // Throws
-                break;
-            }
-            catch (...) {
-                Array::destroy(ref, alloc);
-                throw;
-            }
-        }
-        case type_Double: {
-            ref_type ref = ColumnDouble::create(size(), alloc); // Throws
-            try {
-                new_col.reset(new ColumnDouble(ref, 0, 0, alloc)); // Throws
-                break;
-            }
-            catch (...) {
-                Array::destroy(ref, alloc);
-                throw;
-            }
-        }
-        case type_String: {
-            ref_type ref = AdaptiveStringColumn::create(size(), alloc); // Throws
-            try {
-                new_col.reset(new AdaptiveStringColumn(ref, 0, 0, alloc)); // Throws
-                break;
-            }
-            catch (...) {
-                Array::destroy(ref, alloc);
-                throw;
-            }
-        }
-        case type_Binary: {
-            ref_type ref = ColumnBinary::create(size(), alloc); // Throws
-            try {
-                new_col.reset(new ColumnBinary(ref, 0, 0, alloc)); // Throws
-                break;
-            }
-            catch (...) {
-                Array::destroy(ref, alloc);
-                throw;
-            }
-        }
-        case type_Table: {
-            ref_type spec_ref = m_spec.get_subspec_ref(m_spec.get_num_subspecs()-1);
-            ref_type ref = ColumnTable::create(size(), alloc); // Throws
-            try {
-                new_col.reset(new ColumnTable(alloc, this, column_ndx, 0, 0, spec_ref,
-                                              ref)); // Throws
-                break;
-            }
-            catch (...) {
-                Array::destroy(ref, alloc);
-                throw;
-            }
-        }
-        case type_Mixed: {
-            ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx); // Throws
-            c->fill(size()); // Throws
-            new_col.reset(c);
-            break;
-        }
-        default:
-            TIGHTDB_ASSERT(false);
-    }
+    ref_type ref = 0;
+    size_t column_ndx = m_cols.size();
+    Array* parent = &m_columns;
+    size_t orig_columns_size = m_columns.size();
+    size_t ndx_in_parent = orig_columns_size;
+    util::UniquePtr<ColumnBase> new_col;
 
     try {
-        size_t orig_columns_size = m_columns.size();
+        switch (type) {
+            case type_Int:
+            case type_Bool:
+            case type_DateTime: {
+                int_fast64_t value = 0;
+                ref = Column::create(Array::type_Normal, size(), value, alloc); // Throws
+                new_col.reset(new Column(ref, parent, ndx_in_parent, alloc)); // Throws
+                goto add;
+            }
+            case type_Float:
+                ref = ColumnFloat::create(size(), alloc); // Throws
+                new_col.reset(new ColumnFloat(ref, parent, ndx_in_parent, alloc)); // Throws
+                goto add;
+            case type_Double:
+                ref = ColumnDouble::create(size(), alloc); // Throws
+                new_col.reset(new ColumnDouble(ref, parent, ndx_in_parent, alloc)); // Throws
+                goto add;
+            case type_String:
+                ref = AdaptiveStringColumn::create(size(), alloc); // Throws
+                new_col.reset(new AdaptiveStringColumn(ref, parent, ndx_in_parent,
+                                                       alloc)); // Throws
+                goto add;
+            case type_Binary:
+                ref = ColumnBinary::create(size(), alloc); // Throws
+                new_col.reset(new ColumnBinary(ref, parent, ndx_in_parent, alloc)); // Throws
+                goto add;
+            case type_Table: {
+                ref = ColumnTable::create(size(), alloc); // Throws
+                ref_type spec_ref = m_spec.get_subspec_ref(m_spec.get_num_subspecs()-1);
+                new_col.reset(new ColumnTable(alloc, this, column_ndx, parent, ndx_in_parent,
+                                              spec_ref, ref)); // Throws
+                goto add;
+            }
+            case type_Mixed:
+                ref = ColumnMixed::create(size(), alloc); // Throws
+                new_col.reset(new ColumnMixed(alloc, this, column_ndx, parent, ndx_in_parent,
+                                              ref)); // Throws
+                goto add;
+        }
+        TIGHTDB_ASSERT(false);
+
+      add:
         m_columns.add(new_col->get_ref()); // Throws
-        new_col->set_parent(&m_columns, orig_columns_size);
         try {
             // FIXME: intptr_t is not guaranteed to exists, even in
             // C++11. Solve this by changing the type of
             // `Table::m_cols` to `std::vector<ColumnBase*>`. Also
-            // change name to `Table::m_column_accessors`.
+            // change its name to `Table::m_column_accessors`.
             m_cols.add(intptr_t(new_col.get())); // Throws
-            new_col.release();
         }
         catch (...) {
             m_columns.truncate(orig_columns_size); // Guaranteed to not throw
@@ -550,10 +511,12 @@ size_t Table::do_add_column(DataType type)
         }
     }
     catch (...) {
-        new_col->destroy();
+        if (ref != 0)
+            Array::destroy(ref, alloc);
         throw;
     }
 
+    new_col.release();
     return column_ndx;
 }
 
@@ -782,40 +745,62 @@ void Table::validate_column_type(const ColumnBase& column, ColumnType coltype, s
 }
 
 
-ref_type Table::create_column(DataType column_type, size_t num_default_values, Allocator& alloc)
+ref_type Table::create_empty_table(Allocator& alloc)
+{
+    Array top(alloc);
+    top.create(Array::type_HasRefs); // Throws
+    try {
+        ref_type spec_ref = Spec::create_empty_spec(alloc); // Throws
+        try {
+            int_fast64_t v = spec_ref; // FIXME: Dangerous case: unsigned -> signed
+            top.add(v); // Throws
+        }
+        catch (...) {
+            Array::destroy(spec_ref, alloc);
+            throw;
+        }
+        size_t size = 0;
+        int_fast64_t value = 0;
+        ref_type columns_ref =
+            Array::create_array(Array::type_HasRefs, size, value, alloc); // Throws
+        try {
+            int_fast64_t v = columns_ref; // FIXME: Dangerous case: unsigned -> signed
+            top.add(v); // Throws
+        }
+        catch (...) {
+            Array::destroy(columns_ref, alloc);
+            throw;
+        }
+    }
+    catch (...) {
+        top.destroy();
+        throw;
+    }
+    return top.get_ref();
+}
+
+
+ref_type Table::create_column(DataType column_type, size_t size, Allocator& alloc)
 {
     switch (column_type) {
         case type_Int:
         case type_Bool:
         case type_DateTime: {
-            Column c(Array::type_Normal, alloc);
-            c.fill(num_default_values);
-            return c.get_ref();
+            int_fast64_t value = 0;
+            return Column::create(Array::type_Normal, size, value, alloc); // Throws
         }
-        case type_Float: {
-            ColumnFloat c(alloc);
-            c.fill(num_default_values);
-            return c.get_ref();
-        }
-        case type_Double: {
-            ColumnDouble c(alloc);
-            c.fill(num_default_values);
-            return c.get_ref();
-        }
-        case type_String: {
-            AdaptiveStringColumn c(alloc);
-            c.fill(num_default_values);
-            return c.get_ref();
-        }
-        case type_Binary: {
-            ColumnBinary c(alloc);
-            c.fill(num_default_values);
-            return c.get_ref();
-        }
+        case type_Float:
+            return ColumnFloat::create(size, alloc); // Throws
+        case type_Double:
+            return ColumnDouble::create(size, alloc); // Throws
+        case type_String:
+            return AdaptiveStringColumn::create(size, alloc); // Throws
+        case type_Binary:
+            return ColumnBinary::create(size, alloc); // Throws
         case type_Table:
-            return ColumnTable::create(num_default_values, alloc);
+            return ColumnTable::create(size, alloc); // Throws
         case type_Mixed: {
-            return ColumnMixed::create(num_default_values, alloc);
+            return ColumnMixed::create(size, alloc); // Throws
         }
     }
 

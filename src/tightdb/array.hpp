@@ -368,8 +368,8 @@ public:
 
     /// Construct an array of the specified type and size, and return
     /// just the reference to the underlying memory. All elements will
-    /// be initialized to zero.
-    static ref_type create_array(Type, std::size_t size, Allocator&);
+    /// be initialized to the specified value.
+    static ref_type create_array(Type, std::size_t size, int_fast64_t value, Allocator&);
 
     // Parent tracking
     bool has_parent() const TIGHTDB_NOEXCEPT { return m_parent != 0; }
@@ -837,6 +837,8 @@ public:
     /// can be returned by get_byte_size().
     static std::size_t get_max_byte_size(std::size_t num_elems) TIGHTDB_NOEXCEPT;
 
+    static std::size_t calc_aligned_byte_size(std::size_t size, int width);
+
 #ifdef TIGHTDB_DEBUG
     void print() const;
     void Verify() const;
@@ -890,7 +892,9 @@ protected:
 
     void CreateFromHeaderDirect(char* header, ref_type = 0) TIGHTDB_NOEXCEPT;
 
-    virtual std::size_t CalcByteLen(std::size_t count, std::size_t width) const; // Not 8-byte aligned
+    // Includes array header. Not necessarily 8-byte aligned.
+    virtual std::size_t CalcByteLen(std::size_t size, std::size_t width) const;
+
     virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const TIGHTDB_NOEXCEPT;
     virtual WidthType GetWidthType() const { return wtype_Bits; }
 
@@ -956,7 +960,8 @@ protected:
     /// array. Must be a multiple of 8 (i.e., 64-bit aligned).
     static const std::size_t initial_capacity = 128;
 
-    static ref_type create_array(Type, WidthType, std::size_t size, Allocator&);
+    static ref_type create_array(Type, WidthType, std::size_t size, int_fast64_t value,
+                                 Allocator&);
     static ref_type clone(const char* header, Allocator& alloc, Allocator& clone_alloc);
 
     /// Get the address of the header of this array.
@@ -1242,7 +1247,8 @@ inline Array::Array(no_prealloc_tag) TIGHTDB_NOEXCEPT: m_alloc(*static_cast<Allo
 inline void Array::create(Type type)
 {
     std::size_t size = 0;
-    ref_type ref = create_array(type, size, m_alloc); // Throws
+    int_fast64_t value = 0;
+    ref_type ref = create_array(type, size, value, m_alloc); // Throws
     init_from_ref(ref);
 }
 
@@ -1840,9 +1846,10 @@ inline void Array::move_assign(Array& a) TIGHTDB_NOEXCEPT
     a.detach();
 }
 
-inline ref_type Array::create_array(Type type, std::size_t size, Allocator& alloc)
+inline ref_type Array::create_array(Type type, std::size_t size, int_fast64_t value,
+                                    Allocator& alloc)
 {
-    return create_array(type, wtype_Bits, size, alloc); // Throws
+    return create_array(type, wtype_Bits, size, value, alloc); // Throws
 }
 
 inline std::size_t Array::get_max_byte_size(std::size_t num_elems) TIGHTDB_NOEXCEPT

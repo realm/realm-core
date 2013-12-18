@@ -331,19 +331,6 @@ void AdaptiveStringColumn::set(size_t ndx, StringData value)
 }
 
 
-void AdaptiveStringColumn::fill(size_t n)
-{
-    TIGHTDB_ASSERT(is_empty());
-    TIGHTDB_ASSERT(!m_index);
-
-    // Fill column with default values
-    // TODO: this is a very naive approach
-    // we could speedup by creating full nodes directly
-    for (size_t i = 0; i != n; ++i)
-        add(StringData()); // Throws
-}
-
-
 class AdaptiveStringColumn::EraseLeafElem: public ColumnBase::EraseHandlerBase {
 public:
     EraseLeafElem(AdaptiveStringColumn& column) TIGHTDB_NOEXCEPT:

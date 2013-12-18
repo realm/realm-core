@@ -93,8 +93,9 @@ private:
 
     /// Calculate the total number of bytes needed for a basic array
     /// with the specified number of elements. This includes the size
-    /// of the header.
-    static std::size_t calc_byte_size(std::size_t size);
+    /// of the header. The result will be upwards aligned to the
+    /// closest 8-byte boundary.
+    static std::size_t calc_aligned_byte_size(std::size_t size);
 };
 
 

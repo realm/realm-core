@@ -48,7 +48,6 @@ public:
     void insert(std::size_t ndx, BinaryData value);
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
-    void fill(std::size_t count);
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
 
     // Requires that the specified entry was inserted as StringData.

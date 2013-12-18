@@ -70,12 +70,14 @@ struct MemRef {
 /// \sa SlabAlloc
 class Allocator {
 public:
-    /// The specified size must not be zero.
+    /// The specified size must be divisible by 8, and must not be
+    /// zero.
     ///
     /// \throw std::bad_alloc If insufficient memory was available.
     virtual MemRef alloc(std::size_t size) = 0;
 
-    /// The specified size must not be zero.
+    /// The specified size must be divisible by 8, and must not be
+    /// zero.
     ///
     /// \throw std::bad_alloc If insufficient memory was available.
     ///

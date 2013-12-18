@@ -1177,8 +1177,42 @@ size_t Array::count(int64_t value) const
     return count;
 }
 
+size_t Array::calc_aligned_byte_size(size_t size, int width)
+{
+    TIGHTDB_ASSERT(width != 0 && (width & (width - 1)) == 0); // Is a power of two
+    std::size_t max = std::numeric_limits<std::size_t>::max();
+    std::size_t max_2 = max & ~size_t(7); // Allow for upwards 8-byte alignment
+    bool overflow;
+    size_t byte_size;
+    if (width < 8) {
+        size_t elems_per_byte = 8 / width;
+        size_t byte_size_0 = size / elems_per_byte;
+        if (size % elems_per_byte != 0)
+            ++byte_size_0;
+        overflow = byte_size_0 > max_2 - header_size;
+        byte_size = header_size + byte_size_0;
+    }
+    else {
+        size_t bytes_per_elem = width / 8;
+        overflow = size > (max_2 - header_size) / bytes_per_elem;
+        byte_size = header_size + size * bytes_per_elem;
+    }
+    if (overflow)
+        throw std::runtime_error("Byte size overflow");
+    TIGHTDB_ASSERT(byte_size > 0);
+    size_t aligned_byte_size = ((byte_size-1) | 7) + 1; // 8-byte alignment
+    return aligned_byte_size;
+}
+
 size_t Array::CalcByteLen(size_t count, size_t width) const
 {
+    // FIXME: Consider calling `calc_aligned_byte_size(size)`
+    // instead. Note however, that CalcByteLen() is supposed to return
+    // the unaligned byte size. It is probably the case that no harm
+    // is done by returning the aligned version, and most callers of
+    // CalcByteLen() will actually benefit if CalcByteLen() was
+    // changed to always return the aligned byte size.
+
     // FIXME: This arithemtic could overflow. Consider using <tightdb/util/safe_int_ops.hpp>
     size_t bits = count * width;
     size_t bytes = (bits+7) / 8; // round up
@@ -1290,8 +1324,9 @@ void Array::copy_on_write()
     m_capacity = CalcItemCount(new_size, m_width);
     TIGHTDB_ASSERT(m_capacity > 0);
 
-    // Update capacity in header
-    set_header_capacity(new_size); // uses m_data to find header, so m_data must be initialized correctly first
+    // Update capacity in header. Uses m_data to find header, so
+    // m_data must be initialized correctly first.
+    set_header_capacity(new_size);
 
     update_parent();
 
@@ -1301,7 +1336,83 @@ void Array::copy_on_write()
 }
 
 
-ref_type Array::create_array(Type type, WidthType width_type, size_t size, Allocator& alloc)
+namespace {
+
+template<size_t width>
+void set_direct(char* data, size_t ndx, int_fast64_t value) TIGHTDB_NOEXCEPT
+{
+    // FIXME: The code below makes the non-portable assumption that
+    // negative number are represented using two's complement. See
+    // Replication::encode_int() for a possible solution. This is not
+    // guaranteed by C++03.
+    //
+    // FIXME: The code below makes the non-portable assumption that
+    // the types `int8_t`, `int16_t`, `int32_t`, and `int64_t`
+    // exist. This is not guaranteed by C++03.
+    if (width == 0) {
+        TIGHTDB_ASSERT(value == 0);
+        return;
+    }
+    else if (width == 1) {
+        TIGHTDB_ASSERT(0 <= value && value <= 0x01);
+        size_t byte_ndx = ndx / 8;
+        size_t bit_ndx  = ndx % 8;
+        typedef unsigned char uchar;
+        uchar* p = reinterpret_cast<uchar*>(data) + byte_ndx;
+        *p = uchar((*p & ~(0x01 << bit_ndx)) | (int(value) & 0x01) << bit_ndx);
+    }
+    else if (width == 2) {
+        TIGHTDB_ASSERT(0 <= value && value <= 0x03);
+        size_t byte_ndx = ndx / 4;
+        size_t bit_ndx  = ndx % 4 * 2;
+        typedef unsigned char uchar;
+        uchar* p = reinterpret_cast<uchar*>(data) + byte_ndx;
+        *p = uchar((*p & ~(0x03 << bit_ndx)) | (int(value) & 0x03) << bit_ndx);
+    }
+    else if (width == 4) {
+        TIGHTDB_ASSERT(0 <= value && value <= 0x0F);
+        size_t byte_ndx = ndx / 2;
+        size_t bit_ndx  = ndx % 2 * 4;
+        typedef unsigned char uchar;
+        uchar* p = reinterpret_cast<uchar*>(data) + byte_ndx;
+        *p = uchar((*p & ~(0x0F << bit_ndx)) | (int(value) & 0x0F) << bit_ndx);
+    }
+    else if (width == 8) {
+        typedef numeric_limits<int8_t> lim;
+        TIGHTDB_ASSERT(lim::min() <= value && value <= lim::max());
+        *(reinterpret_cast<int8_t*>(data) + ndx) = int8_t(value);
+    }
+    else if (width == 16) {
+        typedef numeric_limits<int16_t> lim;
+        TIGHTDB_ASSERT(lim::min() <= value && value <= lim::max());
+        *(reinterpret_cast<int16_t*>(data) + ndx) = int16_t(value);
+    }
+    else if (width == 32) {
+        typedef numeric_limits<int32_t> lim;
+        TIGHTDB_ASSERT(lim::min() <= value && value <= lim::max());
+        *(reinterpret_cast<int32_t*>(data) + ndx) = int32_t(value);
+    }
+    else if (width == 64) {
+        typedef numeric_limits<int64_t> lim;
+        TIGHTDB_ASSERT(lim::min() <= value && value <= lim::max());
+        *(reinterpret_cast<int64_t*>(data) + ndx) = int64_t(value);
+    }
+    else {
+        TIGHTDB_ASSERT(false);
+    }
+}
+
+template<size_t width>
+void fill_direct(char* data, size_t begin, size_t end, int_fast64_t value) TIGHTDB_NOEXCEPT
+{
+    for (size_t i = begin; i != end; ++i)
+        set_direct<width>(data, i, value);
+}
+
+} // anonymous namespace
+
+ref_type Array::create_array(Type type, WidthType width_type, size_t size, int_fast64_t value,
+                             Allocator& alloc)
 {
     bool is_inner_bptree_node = false, has_refs = false;
     switch (type) {
@@ -1316,11 +1427,25 @@ ref_type Array::create_array(Type type, WidthType width_type, size_t size, Alloc
             break;
     }
 
-    size_t capacity = initial_capacity; // The number of bytes to allocate
-    MemRef mem_ref = alloc.alloc(capacity); // Throws
-
     int width = 0;
-    init_header(mem_ref.m_addr, is_inner_bptree_node, has_refs, width_type, width, size, capacity);
+    size_t byte_size_0 = header_size;
+    if (value != 0) {
+        width = bit_width(value);;
+        byte_size_0 = calc_aligned_byte_size(size, width); // Throws
+    }
+    // Adding zero to Array::initial_capacity to avoid taking the
+    // address of that member
+    size_t byte_size = max(byte_size_0, initial_capacity+0);
+    MemRef mem_ref = alloc.alloc(byte_size); // Throws
+    char* header = mem_ref.m_addr;
+
+    init_header(header, is_inner_bptree_node, has_refs, width_type, width, size, byte_size);
+
+    if (value != 0) {
+        char* data = get_data_from_header(header);
+        size_t begin = 0, end = size;
+        TIGHTDB_TEMPEX(fill_direct, width, (data, begin, end, value));
+    }
 
     return mem_ref.m_ref;
 }
@@ -1508,55 +1633,19 @@ template<size_t w> void Array::get_chunk(size_t ndx, int64_t res[8]) const TIGHT
 
 }
 
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4127)
-#endif
-template<size_t w> void Array::Set(size_t ndx, int64_t value)
+
+template<size_t width> void Array::Set(size_t ndx, int64_t value)
 {
-    if (w == 0) {
-        return;
-    }
-    else if (w == 1) {
-        size_t offset = ndx >> 3;
-        ndx &= 7;
-        uint8_t* p = reinterpret_cast<uint8_t*>(m_data) + offset;
-        *p = (*p &~ (1 << ndx)) | uint8_t((value & 1) << ndx);
-    }
-    else if (w == 2) {
-        size_t offset = ndx >> 2;
-        uint8_t n = uint8_t((ndx & 3) << 1);
-        uint8_t* p = reinterpret_cast<uint8_t*>(m_data) + offset;
-        *p = (*p &~ (0x03 << n)) | uint8_t((value & 0x03) << n);
-    }
-    else if (w == 4) {
-        size_t offset = ndx >> 1;
-        uint8_t n = uint8_t((ndx & 1) << 2);
-        uint8_t* p = reinterpret_cast<uint8_t*>(m_data) + offset;
-        *p = (*p &~ (0x0F << n)) | uint8_t((value & 0x0F) << n);
-    }
-    else if (w == 8) {
-        *(reinterpret_cast<int8_t*>(m_data) + ndx) = int8_t(value);
-    }
-    else if (w == 16) {
-        *(reinterpret_cast<int16_t*>(m_data) + ndx) = int16_t(value);
-    }
-    else if (w == 32) {
-        *(reinterpret_cast<int32_t*>(m_data) + ndx) = int32_t(value);
-    }
-    else if (w == 64) {
-        *(reinterpret_cast<int64_t*>(m_data) + ndx) = value;
-    }
+    set_direct<width>(m_data, ndx, value);
 }
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
+
 
 // Sort array.
 void Array::sort()
 {
     TIGHTDB_TEMPEX(sort, m_width, ());
 }
+
 
 // Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
 // Useful for counting-sort functions
@@ -2256,7 +2345,7 @@ pair<ref_type, size_t> Array::get_to_dot_parent(size_t ndx_in_parent) const
 void Array::stats(MemStats& stats) const
 {
     size_t capacity_bytes;
-    size_t bytes_used     = CalcByteLen(m_size, m_width);
+    size_t bytes_used = CalcByteLen(m_size, m_width);
 
     if (m_alloc.is_read_only(m_ref)) {
         capacity_bytes = bytes_used;

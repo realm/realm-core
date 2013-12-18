@@ -222,7 +222,6 @@ public:
     void insert(std::size_t ndx, int64_t value);
     void add() TIGHTDB_OVERRIDE { add(0); }
     void add(int64_t value);
-    void fill(std::size_t count);
 
     std::size_t count(int64_t target) const;
     int64_t sum(std::size_t start = 0, std::size_t end = -1, size_t limit = size_t(-1)) const;
@@ -255,7 +254,8 @@ public:
     /// Compare two columns for equality.
     bool compare_int(const Column&) const;
 
-    static ref_type create(Array::Type leaf_type, std::size_t size, Allocator&);
+    static ref_type create(Array::Type leaf_type, std::size_t size, int_fast64_t value,
+                           Allocator&);
 
     // Debug
 #ifdef TIGHTDB_DEBUG

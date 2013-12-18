@@ -171,19 +171,6 @@ DataType ColumnMixed::get_type(size_t ndx) const TIGHTDB_NOEXCEPT
     }
 }
 
-void ColumnMixed::fill(size_t count)
-{
-    TIGHTDB_ASSERT(is_empty());
-
-    // Fill column with default values
-    // TODO: this is a very naive approach
-    // we could speedup by creating full nodes directly
-    for (size_t i = 0; i < count; ++i)
-        m_types->insert(i, mixcol_Int);
-    for (size_t i = 0; i < count; ++i)
-        m_data->insert(i, 1); // 1 is zero shifted one and low bit set;
-}
-
 
 void ColumnMixed::set_string(size_t ndx, StringData value)
 {
@@ -303,6 +290,39 @@ bool ColumnMixed::compare_mixed(const ColumnMixed& c) const
 void ColumnMixed::do_detach_subtable_accessors() TIGHTDB_NOEXCEPT
 {
     detach_subtable_accessors();
+}
+
+ref_type ColumnMixed::create(size_t size, Allocator& alloc)
+{
+    Array top(alloc);
+    top.create(Array::type_HasRefs); // Throws
+    try {
+        int_fast64_t v = mixcol_Int;
+        ref_type types_ref = Column::create(Array::type_Normal, size, v, alloc); // Throws
+        try {
+            v = types_ref; // FIXME: Dangerous cast: unsigned -> signed
+            top.add(v); // Throws
+        }
+        catch (...) {
+            Array::destroy(types_ref, alloc);
+            throw;
+        }
+        v = 1; // 1 + 2*value where value is 0
+        ref_type data_ref = Column::create(Array::type_HasRefs, size, v, alloc); // Throws
+        try {
+            v = data_ref; // FIXME: Dangerous cast: unsigned -> signed
+            top.add(v); // Throws
+        }
+        catch (...) {
+            Array::destroy(data_ref, alloc);
+            throw;
+        }
+        return top.get_ref();
+    }
+    catch (...) {
+        top.destroy();
+        throw;
+    }
 }
 
 

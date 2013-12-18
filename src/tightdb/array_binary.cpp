@@ -173,18 +173,21 @@ ref_type ArrayBinary::create_array(std::size_t size, Allocator& alloc)
     Array top(alloc);
     top.create(type_HasRefs); // Throws
     try {
-        ref_type offsets_ref = Array::create_array(type_Normal, size, alloc);
+        int_fast64_t value = 0;
+        ref_type offsets_ref = Array::create_array(type_Normal, size, value, alloc); // Throws
         try {
-            top.add(offsets_ref);
+            int_fast64_t v = offsets_ref; // FIXME: Dangerous cast: unsigned -> signed
+            top.add(v); // Throws
         }
         catch (...) {
             Array::destroy(offsets_ref, alloc);
             throw;
         }
         size_t blobs_size = 0;
-        ref_type blobs_ref = ArrayBlob::create_array(blobs_size, alloc);
+        ref_type blobs_ref = ArrayBlob::create_array(blobs_size, alloc); // Throws
         try {
-            top.add(blobs_ref);
+            int_fast64_t v = blobs_ref; // FIXME: Dangerous cast: unsigned -> signed
+            top.add(v); // Throws
         }
         catch (...) {
             Array::destroy(blobs_ref, alloc);

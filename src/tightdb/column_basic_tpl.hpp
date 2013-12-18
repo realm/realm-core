@@ -166,18 +166,6 @@ void BasicColumn<T>::insert(std::size_t ndx, T value)
 }
 
 template<class T>
-void BasicColumn<T>::fill(std::size_t count)
-{
-    TIGHTDB_ASSERT(is_empty());
-
-    // Fill column with default values
-    // TODO: this is a very naive approach
-    // we could speedup by creating full nodes directly
-    for (std::size_t i = 0; i < count; ++i)
-        add(T());
-}
-
-template<class T>
 bool BasicColumn<T>::compare(const BasicColumn& c) const
 {
     std::size_t n = size();

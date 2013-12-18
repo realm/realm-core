@@ -21,10 +21,9 @@
 #define TIGHTDB_ARRAY_BASIC_TPL_HPP
 
 #include <algorithm>
+#include <limits>
 #include <stdexcept>
 #include <iomanip>
-
-#include <tightdb/util/safe_int_ops.hpp>
 
 namespace tightdb {
 
@@ -75,9 +74,11 @@ inline void BasicArray<T>::create()
 template<class T>
 inline ref_type BasicArray<T>::create_array(std::size_t size, Allocator& alloc)
 {
+    std::size_t byte_size_0 = calc_aligned_byte_size(size); // Throws
     // Adding zero to Array::initial_capacity to avoid taking the
     // address of that member
-    std::size_t byte_size = std::max(calc_byte_size(size), Array::initial_capacity+0); // Throws
+    std::size_t byte_size = std::max(byte_size_0, Array::initial_capacity+0); // Throws
+
     MemRef mem_ref = alloc.alloc(byte_size); // Throws
 
     bool is_inner_bptree_node = false;
@@ -202,7 +203,13 @@ bool BasicArray<T>::compare(const BasicArray<T>& a) const
 template<class T>
 std::size_t BasicArray<T>::CalcByteLen(std::size_t size, std::size_t) const
 {
-    return calc_byte_size(size);
+    // FIXME: Consider calling `calc_aligned_byte_size(size)`
+    // instead. Note however, that CalcByteLen() is supposed to return
+    // the unaligned byte size. It is probably the case that no harm
+    // is done by returning the aligned version, and most callers of
+    // CalcByteLen() will actually benefit if CalcByteLen() was
+    // changed to always return the aligned byte size.
+    return header_size + size * sizeof (T); // FIXME: Prone to overflow
 }
 
 template<class T>
@@ -348,14 +355,16 @@ inline std::size_t BasicArray<T>::upper_bound(T value) const TIGHTDB_NOEXCEPT
 }
 
 template<class T>
-inline std::size_t BasicArray<T>::calc_byte_size(std::size_t size)
+inline std::size_t BasicArray<T>::calc_aligned_byte_size(std::size_t size)
 {
-    std::size_t byte_size = size;
-    bool a = util::int_multiply_with_overflow_detect(byte_size, sizeof (T));
-    bool b = util::int_multiply_with_overflow_detect(byte_size, header_size);
-    if (a || b)
+    std::size_t max = std::numeric_limits<std::size_t>::max();
+    std::size_t max_2 = max & ~size_t(7); // Allow for upwards 8-byte alignment
+    if (size > (max_2 - header_size) / sizeof (T))
         throw std::runtime_error("Byte size overflow");
-    return byte_size;
+    size_t byte_size = header_size + size * sizeof (T);
+    TIGHTDB_ASSERT(byte_size > 0);
+    size_t aligned_byte_size = ((byte_size-1) | 7) + 1; // 8-byte alignment
+    return aligned_byte_size;
 }
 
 

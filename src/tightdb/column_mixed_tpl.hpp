@@ -75,13 +75,6 @@ inline void ColumnMixed::detach_subtable_accessors() TIGHTDB_NOEXCEPT
     m_data->detach_subtable_accessors();
 }
 
-inline ref_type ColumnMixed::create(std::size_t size, Allocator& alloc)
-{
-    ColumnMixed c(alloc, 0, 0);
-    c.fill(size);
-    return c.get_ref();
-}
-
 
 //
 // Getters

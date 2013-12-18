@@ -118,7 +118,6 @@ public:
     void clear() TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
-    void fill(std::size_t count);
 
     /// Compare two mixed columns for equality.
     bool compare_mixed(const ColumnMixed&) const;

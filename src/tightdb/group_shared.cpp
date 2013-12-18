@@ -256,7 +256,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // Make sure to initialize the file in such a way, that when it reaches the
             // size of SharedInfo, it contains just zeroes.
             char empty_buf[sizeof (SharedInfo)];
-            std::fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
+            fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
             m_file.write(empty_buf, info_size);
             need_init = true;
         }

@@ -366,18 +366,6 @@ void Column::set(size_t ndx, int64_t value)
     m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
-void Column::fill(size_t count)
-{
-    TIGHTDB_ASSERT(size() == 0);
-
-    // Fill column with default values
-    //
-    // FIXME: this is a very naive approach we could speedup by
-    // creating full nodes directly
-    for (size_t i = 0; i < count; ++i)
-        add(0);
-}
-
 // int64_t specific:
 
 size_t Column::count(int64_t target) const
@@ -674,20 +662,21 @@ void Column::do_insert(size_t ndx, int64_t value)
 
 class Column::CreateHandler: public ColumnBase::CreateHandler {
 public:
-    CreateHandler(Array::Type leaf_type, Allocator& alloc):
-        m_leaf_type(leaf_type), m_alloc(alloc) {}
+    CreateHandler(Array::Type leaf_type, int_fast64_t value, Allocator& alloc):
+        m_leaf_type(leaf_type), m_value(value), m_alloc(alloc) {}
     ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
     {
-        return Array::create_array(m_leaf_type, size, m_alloc);
+        return Array::create_array(m_leaf_type, size, m_value, m_alloc);
     }
 private:
     const Array::Type m_leaf_type;
+    const int_fast64_t m_value;
     Allocator& m_alloc;
 };
 
-ref_type Column::create(Array::Type leaf_type, size_t size, Allocator& alloc)
+ref_type Column::create(Array::Type leaf_type, size_t size, int_fast64_t value, Allocator& alloc)
 {
-    CreateHandler handler(leaf_type, alloc);
+    CreateHandler handler(leaf_type, value, alloc);
     return ColumnBase::create(size, alloc, handler);
 }
 

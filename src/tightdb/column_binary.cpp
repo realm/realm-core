@@ -148,18 +148,6 @@ void ColumnBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
 }
 
 
-void ColumnBinary::fill(size_t n)
-{
-    TIGHTDB_ASSERT(is_empty());
-
-    // Fill column with default values
-    // TODO: this is a very naive approach
-    // we could speedup by creating full nodes directly
-    for (size_t i = 0; i != n; ++i)
-        add(BinaryData());
-}
-
-
 class ColumnBinary::EraseLeafElem: public ColumnBase::EraseHandlerBase {
 public:
     EraseLeafElem(ColumnBinary& column) TIGHTDB_NOEXCEPT:

@@ -171,11 +171,46 @@ inline ref_type Spec::create_empty_spec(Allocator& alloc)
 {
     // The 'spec_set' contains the specification (types and names) of
     // all columns and sub-tables
-    Array spec_set(Array::type_HasRefs, null_ptr, 0, alloc);
-    std::size_t size = 0;
-    spec_set.add(Array::create_array(Array::type_Normal, size, alloc)); // One type for each column
-    spec_set.add(ArrayString::create_array(size, alloc)); // One name for each column
-    spec_set.add(ArrayString::create_array(size, alloc)); // One attr set for each column
+    Array spec_set(alloc);
+    spec_set.create(Array::type_HasRefs); // Throws
+    try {
+        std::size_t size = 0;
+        int_fast64_t value = 0;
+        // One type for each column
+        ref_type types_ref = Array::create_array(Array::type_Normal, size, value, alloc); // Throws
+        try {
+            int_fast64_t v = types_ref; // FIXME: Dangerous case: unsigned -> signed
+            spec_set.add(v); // Throws
+        }
+        catch (...) {
+            Array::destroy(types_ref, alloc);
+            throw;
+        }
+        // One name for each column
+        ref_type names_ref = ArrayString::create_array(size, alloc); // Throws
+        try {
+            int_fast64_t v = names_ref; // FIXME: Dangerous case: unsigned -> signed
+            spec_set.add(v); // Throws
+        }
+        catch (...) {
+            Array::destroy(names_ref, alloc);
+            throw;
+        }
+        // One attrib set for each column
+        ref_type attribs_ref = ArrayString::create_array(size, alloc); // Throws
+        try {
+            int_fast64_t v = attribs_ref; // FIXME: Dangerous case: unsigned -> signed
+            spec_set.add(v); // Throws
+        }
+        catch (...) {
+            Array::destroy(attribs_ref, alloc);
+            throw;
+        }
+    }
+    catch (...) {
+        spec_set.destroy();
+        throw;
+    }
     return spec_set.get_ref();
 }
 
