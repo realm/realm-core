@@ -162,14 +162,14 @@ private:
 
     /// Stores the data for each entry. For a subtable, the stored
     /// value is the ref of the subtable. For string and binary data,
-    /// the stored value is an index within `m_data`. For other types
-    /// the stored value is itself. Since we only have 63 bits
+    /// the stored value is an index within `m_binary_data`. For other
+    /// types the stored value is itself. Since we only have 63 bits
     /// available for a non-ref value, the sign of numeric values is
     /// encoded as part of the type in `m_types`.
-    RefsColumn* m_refs; // FIXME: Should be renamed to m_data
+    RefsColumn* m_data;
 
     /// For string and binary data types, the bytes are stored here.
-    ColumnBinary* m_data; // FIXME: Should be renamed to m_binary_data
+    ColumnBinary* m_binary_data;
 
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
 
@@ -180,7 +180,7 @@ private:
 
     void clear_value(std::size_t ndx, MixedColType new_type);
 
-    // Get/set/insert 64-bit values in m_refs/m_types
+    // Get/set/insert 64-bit values in m_data/m_types
     int64_t get_value(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void set_value(std::size_t ndx, int64_t value, MixedColType);
     void insert_int64(std::size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
