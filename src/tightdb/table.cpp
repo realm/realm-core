@@ -6,6 +6,7 @@
 #include <sstream>
 
 #include <tightdb/util/features.h>
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/column.hpp>
@@ -101,7 +102,7 @@ void Table::create_columns()
         ColumnType type = m_spec.get_real_column_type(i);
         ColumnAttr attr = m_spec.get_column_attr(i);
         size_t ref_pos =  m_columns.size();
-        ColumnBase* new_col = null_ptr;
+        ColumnBase* new_col = 0;
 
         switch (type) {
             case type_Int:
@@ -229,7 +230,7 @@ void Table::cache_columns()
         ColumnAttr attr = m_spec.get_column_attr(i);
         ref_type ref = m_columns.get_as_ref(ndx_in_parent);
 
-        ColumnBase* new_col = null_ptr;
+        ColumnBase* new_col = 0;
         size_t colsize = size_t(-1);
         switch (type) {
             case type_Int:
@@ -445,78 +446,77 @@ size_t Table::add_subcolumn(const vector<size_t>& column_path, DataType type, St
 
 size_t Table::do_add_column(DataType type)
 {
-    size_t count      = size();
-    size_t column_ndx = m_cols.size();
-
-    ColumnBase* new_col = null_ptr;
     Allocator& alloc = m_columns.get_alloc();
+    ref_type ref = 0;
+    size_t column_ndx = m_cols.size();
+    Array* parent = &m_columns;
+    size_t orig_columns_size = m_columns.size();
+    size_t ndx_in_parent = orig_columns_size;
+    util::UniquePtr<ColumnBase> new_col;
 
-    switch (type) {
-        case type_Int:
-        case type_Bool:
-        case type_DateTime: {
-            Column* c = new Column(Array::type_Normal, alloc);
-            m_columns.add(c->get_ref());
-            c->set_parent(&m_columns, m_columns.size()-1);
-            new_col = c;
-            c->fill(count);
-            break;
+    try {
+        switch (type) {
+            case type_Int:
+            case type_Bool:
+            case type_DateTime: {
+                int_fast64_t value = 0;
+                ref = Column::create(Array::type_Normal, size(), value, alloc); // Throws
+                new_col.reset(new Column(ref, parent, ndx_in_parent, alloc)); // Throws
+                goto add;
+            }
+            case type_Float:
+                ref = ColumnFloat::create(size(), alloc); // Throws
+                new_col.reset(new ColumnFloat(ref, parent, ndx_in_parent, alloc)); // Throws
+                goto add;
+            case type_Double:
+                ref = ColumnDouble::create(size(), alloc); // Throws
+                new_col.reset(new ColumnDouble(ref, parent, ndx_in_parent, alloc)); // Throws
+                goto add;
+            case type_String:
+                ref = AdaptiveStringColumn::create(size(), alloc); // Throws
+                new_col.reset(new AdaptiveStringColumn(ref, parent, ndx_in_parent,
+                                                       alloc)); // Throws
+                goto add;
+            case type_Binary:
+                ref = ColumnBinary::create(size(), alloc); // Throws
+                new_col.reset(new ColumnBinary(ref, parent, ndx_in_parent, alloc)); // Throws
+                goto add;
+            case type_Table: {
+                ref = ColumnTable::create(size(), alloc); // Throws
+                ref_type spec_ref = m_spec.get_subspec_ref(m_spec.get_num_subspecs()-1);
+                new_col.reset(new ColumnTable(alloc, this, column_ndx, parent, ndx_in_parent,
+                                              spec_ref, ref)); // Throws
+                goto add;
+            }
+            case type_Mixed:
+                ref = ColumnMixed::create(size(), alloc); // Throws
+                new_col.reset(new ColumnMixed(alloc, this, column_ndx, parent, ndx_in_parent,
+                                              ref)); // Throws
+                goto add;
         }
-        case type_Float: {
-            ColumnFloat* c = new ColumnFloat(alloc);
-            m_columns.add(c->get_ref());
-            c->set_parent(&m_columns, m_columns.size()-1);
-            new_col = c;
-            c->fill(count);
-            break;
+        TIGHTDB_ASSERT(false);
+
+      add:
+        m_columns.add(new_col->get_ref()); // Throws
+        try {
+            // FIXME: intptr_t is not guaranteed to exists, even in
+            // C++11. Solve this by changing the type of
+            // `Table::m_cols` to `std::vector<ColumnBase*>`. Also
+            // change its name to `Table::m_column_accessors`.
+            m_cols.add(intptr_t(new_col.get())); // Throws
         }
-        case type_Double: {
-            ColumnDouble* c = new ColumnDouble(alloc);
-            m_columns.add(c->get_ref());
-            c->set_parent(&m_columns, m_columns.size()-1);
-            new_col = c;
-            c->fill(count);
-            break;
+        catch (...) {
+            m_columns.truncate(orig_columns_size); // Guaranteed to not throw
+            throw;
         }
-        case type_String: {
-            AdaptiveStringColumn* c = new AdaptiveStringColumn(alloc);
-            m_columns.add(c->get_ref());
-            c->set_parent(&m_columns, m_columns.size()-1);
-            new_col = c;
-            c->fill(count);
-            break;
-        }
-        case type_Binary: {
-            ColumnBinary* c = new ColumnBinary(alloc);
-            m_columns.add(c->get_ref());
-            c->set_parent(&m_columns, m_columns.size()-1);
-            new_col = c;
-            c->fill(count);
-            break;
-        }
-        case type_Table: {
-            ref_type spec_ref = m_spec.get_subspec_ref(m_spec.get_num_subspecs()-1);
-            ColumnTable* c = new ColumnTable(alloc, this, column_ndx, spec_ref);
-            m_columns.add(c->get_ref());
-            c->set_parent(&m_columns, m_columns.size()-1);
-            new_col = c;
-            c->fill(count);
-            break;
-        }
-        case type_Mixed: {
-            ColumnMixed* c = new ColumnMixed(alloc, this, column_ndx);
-            m_columns.add(c->get_ref());
-            c->set_parent(&m_columns, m_columns.size()-1);
-            new_col = c;
-            c->fill(count);
-            break;
-        }
-        default:
-            TIGHTDB_ASSERT(false);
+    }
+    catch (...) {
+        if (ref != 0)
+            Array::destroy(ref, alloc);
+        throw;
     }
 
-    m_cols.add(reinterpret_cast<intptr_t>(new_col)); // FIXME: intptr_t is not guaranteed to exists, even in C++11
-
+    new_col.release();
     return column_ndx;
 }
 
@@ -745,40 +745,62 @@ void Table::validate_column_type(const ColumnBase& column, ColumnType coltype, s
 }
 
 
-ref_type Table::create_column(DataType column_type, size_t num_default_values, Allocator& alloc)
+ref_type Table::create_empty_table(Allocator& alloc)
+{
+    Array top(alloc);
+    top.create(Array::type_HasRefs); // Throws
+    try {
+        ref_type spec_ref = Spec::create_empty_spec(alloc); // Throws
+        try {
+            int_fast64_t v = spec_ref; // FIXME: Dangerous case: unsigned -> signed
+            top.add(v); // Throws
+        }
+        catch (...) {
+            Array::destroy(spec_ref, alloc);
+            throw;
+        }
+        size_t size = 0;
+        int_fast64_t value = 0;
+        ref_type columns_ref =
+            Array::create_array(Array::type_HasRefs, size, value, alloc); // Throws
+        try {
+            int_fast64_t v = columns_ref; // FIXME: Dangerous case: unsigned -> signed
+            top.add(v); // Throws
+        }
+        catch (...) {
+            Array::destroy(columns_ref, alloc);
+            throw;
+        }
+    }
+    catch (...) {
+        top.destroy();
+        throw;
+    }
+    return top.get_ref();
+}
+
+
+ref_type Table::create_column(DataType column_type, size_t size, Allocator& alloc)
 {
     switch (column_type) {
         case type_Int:
         case type_Bool:
         case type_DateTime: {
-            Column c(Array::type_Normal, alloc);
-            c.fill(num_default_values);
-            return c.get_ref();
+            int_fast64_t value = 0;
+            return Column::create(Array::type_Normal, size, value, alloc); // Throws
         }
-        case type_Float: {
-            ColumnFloat c(alloc);
-            c.fill(num_default_values);
-            return c.get_ref();
-        }
-        case type_Double: {
-            ColumnDouble c(alloc);
-            c.fill(num_default_values);
-            return c.get_ref();
-        }
-        case type_String: {
-            AdaptiveStringColumn c(alloc);
-            c.fill(num_default_values);
-            return c.get_ref();
-        }
-        case type_Binary: {
-            ColumnBinary c(alloc);
-            c.fill(num_default_values);
-            return c.get_ref();
-        }
+        case type_Float:
+            return ColumnFloat::create(size, alloc); // Throws
+        case type_Double:
+            return ColumnDouble::create(size, alloc); // Throws
+        case type_String:
+            return AdaptiveStringColumn::create(size, alloc); // Throws
+        case type_Binary:
+            return ColumnBinary::create(size, alloc); // Throws
         case type_Table:
-            return ColumnTable::create(num_default_values, alloc);
+            return ColumnTable::create(size, alloc); // Throws
         case type_Mixed: {
-            return ColumnMixed::create(num_default_values, alloc);
+            return ColumnMixed::create(size, alloc); // Throws
         }
     }
 
@@ -1772,7 +1794,7 @@ size_t Table::lookup(StringData value) const
     return m_lookup_index->find_first(value);
 }
 
-template <class T> std::size_t Table::find_first(std::size_t column_ndx, T value) const
+template <class T> size_t Table::find_first(size_t column_ndx, T value) const
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == ColumnTypeTraits3<T>::ct_id_real);
@@ -2719,7 +2741,7 @@ pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) 
     const ColumnBase* col = reinterpret_cast<ColumnBase*>(m_cols.get(col_ndx));
 
     const Array* root = col->get_root_array();
-    const Array* enum_root = null_ptr;
+    const Array* enum_root = 0;
 
     if (const ColumnStringEnum* c = dynamic_cast<const ColumnStringEnum*>(col)) {
         enum_root = c->get_enum_root_array();

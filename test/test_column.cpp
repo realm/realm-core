@@ -390,7 +390,7 @@ TEST_FIXTURE(db_setup, Column_FindLeafs)
 {
     Column a;
 
-    // Create values that span multible leafs
+    // Create values that span multible leaves
     // we use 5 to ensure that we get two levels
     // when testing with TIGHTDB_MAX_LIST_SIZE=4
     for (size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE*5; ++i)

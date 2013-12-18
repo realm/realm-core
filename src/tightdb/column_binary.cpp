@@ -37,7 +37,7 @@ ColumnBinary::ColumnBinary(ref_type ref, ArrayParent* parent, size_t ndx_in_pare
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref);
-    bool root_is_leaf = Array::get_isleaf_from_header(header);
+    bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
     if (root_is_leaf) {
         bool is_big = Array::get_context_bit_from_header(header);
         if (!is_big) {
@@ -62,7 +62,8 @@ ColumnBinary::~ColumnBinary() TIGHTDB_NOEXCEPT
 
 void ColumnBinary::clear()
 {
-    if (m_array->is_leaf()) {
+    bool root_is_leaf = !m_array->is_inner_bptree_node();
+    if (root_is_leaf) {
         bool is_big = m_array->context_bit();
         if (!is_big) {
             // Small blobs root leaf
@@ -126,7 +127,8 @@ void ColumnBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
 {
     TIGHTDB_ASSERT(ndx < size());
 
-    if (m_array->is_leaf()) {
+    bool root_is_leaf = !m_array->is_inner_bptree_node();
+    if (root_is_leaf) {
         bool is_big = upgrade_root_leaf(value.size()); // Throws
         if (!is_big) {
             // Small blobs root leaf
@@ -143,18 +145,6 @@ void ColumnBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
     // Non-leaf root
     SetLeafElem set_leaf_elem(m_array->get_alloc(), value, add_zero_term);
     m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
-}
-
-
-void ColumnBinary::fill(size_t n)
-{
-    TIGHTDB_ASSERT(is_empty());
-
-    // Fill column with default values
-    // TODO: this is a very naive approach
-    // we could speedup by creating full nodes directly
-    for (size_t i = 0; i != n; ++i)
-        add(BinaryData());
 }
 
 
@@ -230,7 +220,8 @@ void ColumnBinary::erase(size_t ndx, bool is_last)
     TIGHTDB_ASSERT(ndx < size());
     TIGHTDB_ASSERT(is_last == (ndx == size()-1));
 
-    if (m_array->is_leaf()) {
+    bool root_is_leaf = !m_array->is_inner_bptree_node();
+    if (root_is_leaf) {
         bool is_big = m_array->context_bit();
         if (!is_big) {
             // Small blobs root leaf
@@ -251,24 +242,6 @@ void ColumnBinary::erase(size_t ndx, bool is_last)
 }
 
 
-void ColumnBinary::resize(size_t n)
-{
-    TIGHTDB_ASSERT(root_is_leaf()); // currently only available on leaf level (used by b-tree code)
-    TIGHTDB_ASSERT(n < size());
-
-    bool is_big = m_array->context_bit();
-    if (!is_big) {
-        // Small blobs
-        ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
-        leaf->resize(n); // Throws
-        return;
-    }
-    // Big blobs
-    ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
-    leaf->resize(n); // Throws
-}
-
-
 void ColumnBinary::move_last_over(size_t ndx)
 {
     // FIXME: ExceptionSafety: The current implementation of this
@@ -276,7 +249,7 @@ void ColumnBinary::move_last_over(size_t ndx)
     // repair it.
 
     // FIXME: Consider doing two nested calls to
-    // update_bptree_elem(). If the two leafs are not the same, no
+    // update_bptree_elem(). If the two leaves are not the same, no
     // copying is needed. If they are the same, call
     // ArrayBinary::move_last_over() (does not yet
     // exist). ArrayBinary::move_last_over() could be implemented in a
@@ -398,6 +371,24 @@ bool ColumnBinary::upgrade_root_leaf(size_t value_size)
     delete leaf;
     m_array = new_leaf.release();
     return true; // Big
+}
+
+
+class ColumnBinary::CreateHandler: public ColumnBase::CreateHandler {
+public:
+    CreateHandler(Allocator& alloc): m_alloc(alloc) {}
+    ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
+    {
+        return ArrayBinary::create_array(size, m_alloc);
+    }
+private:
+    Allocator& m_alloc;
+};
+
+ref_type ColumnBinary::create(size_t size, Allocator& alloc)
+{
+    CreateHandler handler(alloc);
+    return ColumnBase::create(size, alloc, handler);
 }
 
 
