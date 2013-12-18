@@ -188,7 +188,8 @@ template<> struct ColumnTypeTraitsSum<float, act_Sum> {
 };
 
 
-struct SequentialGetterBase {
+class SequentialGetterBase {
+public:
     virtual ~SequentialGetterBase() TIGHTDB_NOEXCEPT {}
 };
 
@@ -597,7 +598,7 @@ public:
 
 class IntegerNodeBase : public ParentNode
 {
-protected:
+public:
     // This function is called from Array::find() for each search result if TAction == act_CallbackIdx
     // in the IntegerNode::aggregate_local() call. Used if aggregate source column is different from search criteria column
     // Return value: false means that the query-state (which consumes matches) has signalled to stop searching, perhaps
@@ -754,7 +755,7 @@ public:
                           (!m_fastmode_disabled
                            && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column)));
         for (size_t s = start; s < end; ) {
-            // Cache internal leafs
+            // Cache internal leaves
             if (s >= m_leaf_end) {
                 m_condition_column->GetBlock(s, m_array, m_leaf_start);
                 m_leaf_end = m_leaf_start + m_array.size();
@@ -805,7 +806,7 @@ public:
 
         while (start < end) {
 
-            // Cache internal leafs
+            // Cache internal leaves
             if (start >= m_leaf_end) {
                 m_condition_column->GetBlock(start, m_array, m_leaf_start);
                 m_leaf_end = m_leaf_start + m_array.size();
@@ -1470,6 +1471,7 @@ public:
     size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
         for (size_t s = start; s < end; ++s) {
+
             size_t f;
 
             if (m_last >= end)
@@ -1634,6 +1636,8 @@ public:
         m_auto_delete = auto_delete;
         m_child = 0;
         m_compare = compare;
+        m_dD = 10.0;
+        m_dT = 50.0;
     }
 
     void init(const Table& table)  TIGHTDB_OVERRIDE

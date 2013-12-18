@@ -906,7 +906,7 @@ public:
         size_t colsize = sg->m_column->size();
 
         if (util::SameType<T, int64_t>::value && index + ValueBase::elements < sg->m_leaf_end) {
-            // int64_t leafs have a get_chunk optimization that returns 8 int64_t values at once
+            // int64_t leaves have a get_chunk optimization that returns 8 int64_t values at once
             sg->m_array_ptr->get_chunk(index - sg->m_leaf_start, static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_v);
         }
         else {

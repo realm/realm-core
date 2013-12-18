@@ -38,6 +38,8 @@ public:
 
     ~ColumnSubtableParent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
+    static ref_type create(std::size_t size, Allocator&);
+
 protected:
     /// A pointer to the table that this column is part of. For a
     /// free-standing column, this pointer is null.
@@ -50,8 +52,8 @@ protected:
     /// Table::m_cols array. Note that this corresponds to the logical
     /// index of the column, which is not always the same as the index
     /// of this column within Table::m_columns. This is because
-    /// Table::m_columns contains a varying number of entries for each
-    /// column depending on the type of column.
+    /// Table::m_columns contains columns as well as indexes for those
+    /// columns.
     std::size_t m_index;
 
     ColumnSubtableParent(Allocator&, const Table*, std::size_t column_ndx);
@@ -98,8 +100,6 @@ protected:
     /// In the clone, no string column will be of the enumeration
     /// type.
     ref_type clone_table_columns(const Table*);
-
-    static ref_type create(std::size_t size, Allocator&);
 
 #ifdef TIGHTDB_DEBUG
     std::pair<ref_type, std::size_t>
@@ -184,7 +184,6 @@ public:
     void set(std::size_t ndx, const Table*);
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear_table(std::size_t ndx);
-    void fill(std::size_t count);
 
     void clear() TIGHTDB_OVERRIDE;
 
@@ -192,8 +191,6 @@ public:
 
     /// Compare two subtable columns for equality.
     bool compare_table(const ColumnTable&) const;
-
-    static ref_type create(std::size_t size, Allocator&);
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
@@ -359,9 +356,8 @@ inline ref_type ColumnSubtableParent::clone_table_columns(const Table* t)
 
 inline ref_type ColumnSubtableParent::create(std::size_t size, Allocator& alloc)
 {
-    Column c(Array::type_HasRefs, alloc);
-    c.fill(size);
-    return c.get_ref();
+    int_fast64_t value = 0;
+    return Column::create(Array::type_HasRefs, size, value, alloc); // Throws
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -395,11 +391,6 @@ inline ColumnTable::ColumnTable(Allocator& alloc, const Table* table, std::size_
 inline void ColumnTable::add(const Table* subtable)
 {
     insert(size(), subtable);
-}
-
-inline ref_type ColumnTable::create(std::size_t size, Allocator& alloc)
-{
-    return ColumnSubtableParent::create(size, alloc);
 }
 
 

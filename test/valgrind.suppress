@@ -55,3 +55,160 @@
    fun:_ZN7tightdb11GroupWriter14get_free_spaceEm
    ...
 }
+{
+   <serialization false positive>
+   Memcheck:Param
+   write(buf)
+   obj:/lib/x86_64-linux-gnu/libpthread-2.17.so
+   fun:_ZN7tightdb4util4File5writeEPKcm
+   fun:_ZNK7tightdb5Group5writeERKSs
+   ...
+}
+{
+   <sync_map false positive>
+   Memcheck:Param
+   msync(start)
+   fun:__msync_nocancel
+   fun:_ZN7tightdb4util4File8sync_mapEPvm
+   fun:_ZN7tightdb11GroupWriter6commitEm
+   ...
+}
+{
+   <msync again>
+   Memcheck:Param
+   msync(start)
+   fun:__msync_nocancel
+   fun:_ZN7tightdb4util4File8sync_mapEPvm
+   ...
+}
+{
+   <more msync>
+   Memcheck:Param
+   msync(start)
+   obj:/lib/x86_64-linux-gnu/libpthread-2.17.so
+   fun:_ZN7tightdb4util4File8sync_mapEPvm
+   ...
+}
+{
+   <even more msync>
+   Memcheck:Param
+   msync(start)
+   obj:/lib/x86_64-linux-gnu/libpthread-2.15.so
+   fun:_ZN7tightdb4util4File8sync_mapEPvm
+   fun:_ZN7tightdb11GroupWriter6commitEm
+   fun:_ZN7tightdb11SharedGroup16low_level_commitEm
+   ...
+}
+{
+   <even, even more msync>
+   Memcheck:Param
+   msync(start)
+   obj:/lib/x86_64-linux-gnu/libpthread-2.15.so
+   fun:_ZN7tightdb4util4File8sync_mapEPvm
+   fun:_ZN7tightdb11SharedGroup16low_level_commitEm
+   fun:_ZN7tightdb11SharedGroup6commitEv
+   ...
+}
+{
+   <for all msync lovers>
+   Memcheck:Param
+   msync(start)
+   obj:/lib/x86_64-linux-gnu/libpthread-2.15.so
+   fun:_ZN7tightdb4util4File8sync_mapEPvm
+   fun:_ZN7tightdb5Group6commitEv
+   ...
+}
+{
+   <yet another msync>
+   Memcheck:Param
+   msync(start)
+   obj:/lib/x86_64-linux-gnu/libpthread-2.15.so
+   fun:_ZN7tightdb4util4File8sync_mapEPvm
+   fun:_ZN7tightdb11GroupWriter6commitEm
+   fun:_ZN7tightdb5Group6commitEv
+   ...
+}
+{
+   <more writes>
+   Memcheck:Param
+   write(buf)
+   obj:/lib/x86_64-linux-gnu/libpthread-2.15.so
+   fun:_ZN7tightdb4util4File5writeEPKcm
+   fun:_ZNK7tightdb5Group5writeERKSs
+   ...
+}
+{
+   <as below>
+   Memcheck:Param
+   write(buf)
+   obj:/lib/x86_64-linux-gnu/libpthread-2.15.so
+   fun:_ZN7tightdb4util4File5writeEPKcm
+   fun:_ZNK7tightdb5Group5writeERKSs
+   fun:_ZNK25TestShared_FromSerialized7RunImplEv
+   ...
+}
+{
+   <writing, uninit values at end (inconsquential)>
+   Memcheck:Param
+   write(buf)
+   fun:__write_nocancel
+   fun:_ZN7tightdb4util4File5writeEPKcm
+   fun:_ZNK7tightdb5Group5writeERKSs
+   ...
+}
+{
+   <more holes in data (presumed ok)>
+   Memcheck:Param
+   write(buf)
+   fun:__write_nocancel
+   fun:_ZN7tightdb4util4File5writeEPKcm
+   fun:_ZN7tightdb4util4File9Streambuf5flushEv
+   fun:_ZN7tightdb4util4File9StreambufD1Ev
+   fun:_ZN12_GLOBAL__N_111FileOStreamD1Ev
+   fun:_ZNK7tightdb5Group5writeERKSs
+   ...
+}
+{
+   <even more holes in data (presumed ok)>
+   Memcheck:Param
+   msync(start)
+   obj:/lib/x86_64-linux-gnu/libpthread-2.15.so
+   fun:_ZN7tightdb4util4File8sync_mapEPvm
+   fun:_ZN7tightdb4util4File7MapBase4syncEv
+   fun:_ZN7tightdb4util4File3MapIcE4syncEv
+   fun:_ZN7tightdb11GroupWriter6commitEm
+   fun:_ZN7tightdb11SharedGroup16low_level_commitEm
+   ...
+}
+{
+   <another one with holes in data, this time as part of serialization>
+   Memcheck:Param
+   write(buf)
+   obj:/lib/x86_64-linux-gnu/libpthread-2.15.so
+   fun:_ZN7tightdb4util4File5writeEPKcm
+   fun:_ZN7tightdb4util4File9Streambuf5flushEv
+   fun:_ZN7tightdb4util4File9StreambufD1Ev
+   fun:_ZN12_GLOBAL__N_111FileOStreamD1Ev
+   fun:_ZNK7tightdb5Group5writeERKSs
+   ...
+}
+{
+   <holes, release mode>
+   Memcheck:Cond
+   fun:_ZN7tightdb11StringIndex10LeafInsertEmmmNS_10StringDataEb
+   fun:_ZN7tightdb11StringIndex8DoInsertEmmmNS_10StringDataE
+   fun:_ZN7tightdb11StringIndex10TreeInsertEmmmNS_10StringDataE
+   ...
+}
+{
+   <more holes, release mode>
+   Memcheck:Cond
+   fun:_ZN7tightdb11StringIndex13InsertRowListEmmNS_10StringDataE
+   fun:_ZN7tightdb11StringIndex10LeafInsertEmmmNS_10StringDataEb
+   fun:_ZN7tightdb11StringIndex8DoInsertEmmmNS_10StringDataE
+   fun:_ZN7tightdb11StringIndex10TreeInsertEmmmNS_10StringDataE
+   ...
+}
+
+
+

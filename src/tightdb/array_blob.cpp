@@ -49,6 +49,7 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t size,
     m_size = new_size;
 }
 
+
 #ifdef TIGHTDB_DEBUG
 
 void ArrayBlob::to_dot(ostream& out, StringData title) const

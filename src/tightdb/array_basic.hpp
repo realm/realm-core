@@ -73,6 +73,11 @@ public:
     /// underlying node. It is not owned by the accessor.
     void create();
 
+    /// Construct a basic array of the specified size and return just
+    /// the reference to the underlying memory. All elements will be
+    /// initialized to `T()`.
+    static ref_type create_array(std::size_t size, Allocator&);
+
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
@@ -85,7 +90,12 @@ private:
     virtual WidthType GetWidthType() const { return wtype_Multiply; }
 
     template<bool find_max> bool minmax(T& result, std::size_t begin, std::size_t end) const;
-    static ref_type create_empty_array(Allocator&);
+
+    /// Calculate the total number of bytes needed for a basic array
+    /// with the specified number of elements. This includes the size
+    /// of the header. The result will be upwards aligned to the
+    /// closest 8-byte boundary.
+    static std::size_t calc_aligned_byte_size(std::size_t size);
 };
 
 

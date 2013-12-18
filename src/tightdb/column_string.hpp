@@ -36,7 +36,7 @@ public:
     typedef StringData value_type;
 
     explicit AdaptiveStringColumn(Allocator& = Allocator::get_default());
-    explicit AdaptiveStringColumn(ref_type, ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
+    explicit AdaptiveStringColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                                   Allocator& = Allocator::get_default());
     ~AdaptiveStringColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -53,8 +53,6 @@ public:
     void insert(std::size_t ndx, StringData);
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
-    void resize(std::size_t ndx);
-    void fill(std::size_t count);
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
 
     std::size_t count(StringData value) const;
@@ -78,7 +76,7 @@ public:
     bool has_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_index != 0; }
     void set_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_OVERRIDE;
     const StringIndex& get_index() const { return *m_index; }
-    StringIndex* release_index() TIGHTDB_NOEXCEPT { StringIndex* i = m_index; m_index = 0; return i;}
+    StringIndex* release_index() TIGHTDB_NOEXCEPT;
     StringIndex& create_index();
 
     // Optimizing data layout
@@ -95,6 +93,8 @@ public:
 
     LeafType GetBlock(std::size_t ndx, ArrayParent**, std::size_t& off,
                       bool use_retval = false) const;
+
+    static ref_type create(std::size_t size, Allocator&);
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
@@ -116,6 +116,7 @@ private:
                                 Array::TreeInsert<AdaptiveStringColumn>& state);
 
     class EraseLeafElem;
+    class CreateHandler;
 
     /// Root must be a leaf. Upgrades the root leaf as
     /// necessary. Returns the type of the root leaf as it is upon
@@ -171,6 +172,13 @@ inline void AdaptiveStringColumn::insert(size_t ndx, StringData value)
     if (size() <= ndx)
         ndx = npos;
     do_insert(ndx, value);
+}
+
+inline StringIndex* AdaptiveStringColumn::release_index() TIGHTDB_NOEXCEPT
+{
+    StringIndex* i = m_index;
+    m_index = 0;
+    return i;
 }
 
 } // namespace tightdb

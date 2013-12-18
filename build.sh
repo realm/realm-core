@@ -1,6 +1,5 @@
 # NOTE: THIS SCRIPT IS SUPPOSED TO RUN IN A POSIX SHELL
 
-
 # Enable tracing if TIGHTDB_SCRIPT_DEBUG is set
 if [ -e $HOME/.tightdb ]; then
     . $HOME/.tightdb
@@ -2048,6 +2047,7 @@ EOF
 /test
 /test-installed
 /doc
+/debian
 EOF
         cat >"$TEMP_DIR/exclude" <<EOF
 .gitignore

@@ -126,7 +126,7 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
             ref_type blob_ref = Array::get_as_ref(i);
             new_leaf.Array::add(blob_ref);
         }
-        resize(ndx);
+        truncate(ndx);
         add(value, add_zero_term);
         state.m_split_offset = ndx + 1;
     }

@@ -1880,7 +1880,7 @@ TEST(TestQueryStrIndex3)
             int f2 = rand() % TIGHTDB_MAX_LIST_SIZE / 2 + 1;
             bool longstrings = (rand() % 5 == 1);
 
-            // 2200 entries with that probability to fill out two concecutive 1000 sized leafs with above probability,
+            // 2200 entries with that probability to fill out two concecutive 1000 sized leaves with above probability,
             // plus a remainder (edge case)
             for (int j = 0; j < TIGHTDB_MAX_LIST_SIZE * 2 + TIGHTDB_MAX_LIST_SIZE / 5; j++) {
                 if (rand() % f1 == 0)
@@ -3178,7 +3178,7 @@ TEST(TestQueryFindNextBackwards)
 {
     TupleTableType ttt;
 
-    // Create multiple leafs
+    // Create multiple leaves
     for(size_t i = 0; i < TIGHTDB_MAX_LIST_SIZE * 4; i++) {
         ttt.add(6, "X");
         ttt.add(7, "X");
@@ -3203,7 +3203,7 @@ TEST(TestQueryFindRandom)
     int64_t search = TIGHTDB_MAX_LIST_SIZE / 2;
     size_t rows = TIGHTDB_MAX_LIST_SIZE * 20;
 
-    // Create multiple leafs
+    // Create multiple leaves
     for(size_t i = 0; i < rows; i++) {
         // This value distribution makes us sometimes cross a leaf boundary, and sometimes not, with both having
         // a fair probability of happening
