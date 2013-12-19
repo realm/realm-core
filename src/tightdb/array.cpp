@@ -1378,23 +1378,23 @@ void set_direct(char* data, size_t ndx, int_fast64_t value) TIGHTDB_NOEXCEPT
         *p = uchar((*p & ~(0x0F << bit_ndx)) | (int(value) & 0x0F) << bit_ndx);
     }
     else if (width == 8) {
-        typedef numeric_limits<int8_t> lim;
-        TIGHTDB_ASSERT(lim::min() <= value && value <= lim::max());
+        TIGHTDB_ASSERT(numeric_limits<int8_t>::min() <= value &&
+                       value <= numeric_limits<int8_t>::max());
         *(reinterpret_cast<int8_t*>(data) + ndx) = int8_t(value);
     }
     else if (width == 16) {
-        typedef numeric_limits<int16_t> lim;
-        TIGHTDB_ASSERT(lim::min() <= value && value <= lim::max());
+        TIGHTDB_ASSERT(numeric_limits<int16_t>::min() <= value &&
+                       value <= numeric_limits<int16_t>::max());
         *(reinterpret_cast<int16_t*>(data) + ndx) = int16_t(value);
     }
     else if (width == 32) {
-        typedef numeric_limits<int32_t> lim;
-        TIGHTDB_ASSERT(lim::min() <= value && value <= lim::max());
+        TIGHTDB_ASSERT(numeric_limits<int32_t>::min() <= value &&
+                       value <= numeric_limits<int32_t>::max());
         *(reinterpret_cast<int32_t*>(data) + ndx) = int32_t(value);
     }
     else if (width == 64) {
-        typedef numeric_limits<int64_t> lim;
-        TIGHTDB_ASSERT(lim::min() <= value && value <= lim::max());
+        TIGHTDB_ASSERT(numeric_limits<int64_t>::min() <= value &&
+                       value <= numeric_limits<int64_t>::max());
         *(reinterpret_cast<int64_t*>(data) + ndx) = int64_t(value);
     }
     else {
