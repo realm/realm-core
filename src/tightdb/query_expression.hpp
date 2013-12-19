@@ -203,7 +203,6 @@ public:
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_table(const Table* table) = 0;
     virtual const Table* get_table() = 0;
-    // virtual void evaluate(size_t index, ValueBase& destination) = 0;
     virtual ~Expression() {}
 };
 
@@ -709,83 +708,6 @@ template <class T> UnaryOperator<Pow<T> >& power (Subexpr2<T>& left) {
     return *new UnaryOperator<Pow<T> >(left.clone(), true);
 }
 
-#if 0
-// support for negation:
-class Negate : public Expression
-{
-public:
-    Negate(Expression& expr, bool auto_delete = false);
-    ~Negate();
-    void set_table(const Table* table);
-    const Table* get_table();
-    size_t find_first(size_t start, size_t end) const;
-    void evaluate(size_t index, ValueBase& destination);
-private:
-    bool m_auto_delete;
-    Expression& m_expr;
-};
-
-inline Expression& operator! (Expression& left) {
-    return *new Negate(left, true);
-}
-
-inline Negate::Negate(Expression& expr, bool auto_delete) : m_expr(expr)
-{
-    m_auto_delete = auto_delete;
-    Query::expression(this, auto_delete);
-    Table* t = const_cast<Table*>(get_table()); // todo, const
-    
-    if (t)
-        Query::m_table = t->get_table_ref();
-}
-
-inline Negate::~Negate()
-{
-    if (m_auto_delete)
-        delete &m_expr;
-}
-
-inline void Negate::set_table(const Table* table)
-{
-    m_expr.set_table(table);
-}
-
-
-inline const Table* Negate::get_table()
-{
-    const Table* t =  m_expr.get_table();
-    return t;
-}
-
-inline size_t Negate::find_first(size_t start, size_t end) const
-{
-        size_t match;
-        Value<bool> all_false;
-        Value<bool> result;
-
-        for (; start < end; start += ValueBase::elements) {
-            m_expr.evaluate(start, result);
-            match = Value<bool>::compare<Equal>(&result, &all_false);
-
-            // Note the second condition that tests if match position in chunk exceeds column length
-            if (match != ValueBase::elements && start + match < end)
-                return start + match;
-        }
-
-        return not_found; // no match
-}
-
-inline void Negate::evaluate(size_t index, ValueBase& destination)
-{
-    Value<bool> expr;
-    Value<bool> all_false;
-    Value<bool> res;
-
-    m_expr.evaluate(index, expr);
-    res = Value<bool>::compare<Equal>(&expr, &all_false);
-    destination.import(res);
-}
-#endif
 
 // Handling of String columns. These support only == and != compare operators. No 'arithmetic' operators (+, etc).
 template <> class Columns<StringData> : public Subexpr
@@ -1089,19 +1011,6 @@ public:
 
         return not_found; // no match
     }
-#if 0
-    void evaluate(size_t index, ValueBase& destination)
-    {
-        Value<T> right;
-        Value<T> left;
-        Value<bool> match;
-
-        m_left.evaluate(index, left);
-        m_right.evaluate(index, right);
-        match = Value<bool>::template compare<TCond>(&left, &right);
-        destination.import(match);
-    }
-#endif
 
 private:
     bool m_auto_delete;

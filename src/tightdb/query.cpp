@@ -719,6 +719,7 @@ Query& Query::end_group()
     return *this;
 }
 
+// Not creates an implicit group to capture the term that we want to negate.
 Query& Query::Not()
 {
     NotNode* const p = new NotNode;
@@ -729,17 +730,19 @@ Query& Query::Not()
     if (update[update.size()-1] != 0)
         *update[update.size()-1] = p;
 
-    //update[update.size()-1] = &p->m_child;
     group();
     pending_not[pending_not.size()-1] = true;
     // value for update for sub-condition
     update[update.size()-1] = &p->m_cond;
     // pending value for update, once the sub-condition ends:
-    // not needed: 
     update_override[update_override.size()-1] = &p->m_child;
     return *this;
 }
 
+// And-terms must end by calling HandlePendingNot. This will check if a negation is pending,
+// and if so, it will end the implicit group created to hold the term to negate. Note that
+// end_group itself will recurse into HandlePendingNot if multiple implicit groups are nested
+// within each other.
 void Query::HandlePendingNot()
 {
     if (pending_not.size() > 1 && pending_not[pending_not.size()-1]) {
@@ -751,6 +754,7 @@ void Query::HandlePendingNot()
         end_group();
     }
 }
+
 Query& Query::Or()
 {
     ParentNode* const o = new OrNode(first[first.size()-1]);
