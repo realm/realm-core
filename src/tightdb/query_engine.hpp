@@ -690,37 +690,37 @@ public:
         m_TAction = TAction;
 
         if (TAction == act_ReturnFirst)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_ReturnFirst, int64_t>;
+            m_find_callback_specialized = &ThisType::template find_callback_specialization<act_ReturnFirst, int64_t>;
 
         else if (TAction == act_Count)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Count, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Count, int64_t>;
 
         else if (TAction == act_Sum && col_id == type_Int)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Sum, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Sum, int64_t>;
         else if (TAction == act_Sum && col_id == type_Float)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Sum, float>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Sum, float>;
         else if (TAction == act_Sum && col_id == type_Double)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Sum, double>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Sum, double>;
 
         else if (TAction == act_Max && col_id == type_Int)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Max, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Max, int64_t>;
         else if (TAction == act_Max && col_id == type_Float)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Max, float>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Max, float>;
         else if (TAction == act_Max && col_id == type_Double)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Max, double>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Max, double>;
 
         else if (TAction == act_Min && col_id == type_Int)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Min, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Min, int64_t>;
         else if (TAction == act_Min && col_id == type_Float)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Min, float>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Min, float>;
         else if (TAction == act_Min && col_id == type_Double)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Min, double>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Min, double>;
 
         else if (TAction == act_FindAll)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_FindAll, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_FindAll, int64_t>;
 
         else if (TAction == act_CallbackIdx)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_CallbackIdx, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_CallbackIdx, int64_t>;
 
         else {
             TIGHTDB_ASSERT(false);
