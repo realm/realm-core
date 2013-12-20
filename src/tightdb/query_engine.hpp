@@ -277,7 +277,9 @@ class ParentNode {
     typedef ParentNode ThisType;
 public:
 
-    ParentNode(): m_table(0) { std::cout << "ParentNode @ " << this << std::endl; }
+    ParentNode(): m_table(0) 
+    { 
+    }
 
     void gather_children(std::vector<ParentNode*>& v)
     {

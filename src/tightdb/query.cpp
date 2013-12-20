@@ -675,7 +675,6 @@ double Query::average_double(size_t column_ndx, size_t* resultcount, size_t star
 // Grouping
 Query& Query::group()
 {
-    cout << "push" << endl;
     update.push_back(0);
     update_override.push_back(0);
     first.push_back(0);
@@ -684,7 +683,6 @@ Query& Query::group()
 }
 Query& Query::end_group()
 {
-    cout << "pop" << endl;
     if (first.size() < 2) {
         error_code = "Unbalanced blockBegin/blockEnd";
         return *this;
@@ -727,22 +725,17 @@ Query& Query::Not()
     NotNode* const p = new NotNode;
     all_nodes.push_back(p);
     if (first[first.size()-1] == 0) {
-        cout << "Not() is first ";
         first[first.size()-1] = p;
     }
     if (update[update.size()-1] != 0) {
-        cout << "Not() has backlink at " << update[update.size()-1] << " ";
         *update[update.size()-1] = p;
     }
-    cout << "Not() - implicit ";
     group();
     pending_not[pending_not.size()-1] = true;
     // value for update for sub-condition
-    cout << "   - Not() adding backlink (m_cond) at " << &p->m_cond;
     update[update.size()-2] = 0;
     update[update.size()-1] = &p->m_cond;
     // pending value for update, once the sub-condition ends:
-    cout << "   and override at " << &p->m_child << endl;
     update_override[update_override.size()-1] = &p->m_child;
     return *this;
 }
@@ -759,7 +752,6 @@ void Query::HandlePendingNot()
         // context - the current node is instead hanging of from the previously added NotNode's
         // m_cond field.
         // update[update.size()-1] = 0;
-        cout << "implicit ";
         end_group();
     }
 }
@@ -1089,15 +1081,12 @@ void Query::UpdatePointers(ParentNode* p, ParentNode** newnode)
 {
     all_nodes.push_back(p);
     if (first[first.size()-1] == 0) {
-        cout << " {adding as first element} ";
         first[first.size()-1] = p;
     }
 
     if (update[update.size()-1] != 0) {
-        cout << " { updating link field at " << update[update.size()-1] << " } ";
         *update[update.size()-1] = p;
     }
-    cout << " { adding linkfield " << newnode << " } ";
     update[update.size()-1] = newnode;
 
     HandlePendingNot();
