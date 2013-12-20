@@ -1,9 +1,10 @@
-#include <cerrno>
-#include <cstring>
-#include <cstdio>
-#include <cstdlib>
 #include <limits>
 #include <algorithm>
+
+#include <errno.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #ifdef _WIN32
 #  define NOMINMAX
@@ -39,26 +40,29 @@ string get_errno_msg(const char* prefix, int err)
     StringBuffer buffer;
     buffer.append_c_str(prefix);
 
-#if defined _BSD_SOURCE || defined _WIN32
+#if defined _WIN32 // Windows version <stdlib.h>
 
-    const char* const* errlist;
-    int nerr;
-#  ifdef _BSD_SOURCE
-    errlist = sys_errlist; // BSD <stdio.h>
-    nerr    = sys_nerr;
-#  else
-    errlist = _sys_errlist; // Windows <stdlib.h>
-    nerr    = _sys_nerr;
-#  endif
-    if (TIGHTDB_LIKELY(0 <= err || err < nerr)) {
-        buffer.append_c_str(errlist[err]);
+    if (TIGHTDB_LIKELY(0 <= err || err < _sys_nerr)) {
+        buffer.append_c_str(_sys_errlist[err]);
         return buffer.str();
     }
 
-#else // POSIX <string.h>
+#elif _GNU_SOURCE // GNU specific version <string.h>
+
+    // Note that Linux provides the GNU specific version even though
+    // it sets _POSIX_C_SOURCE >= 200112L.
 
     size_t offset = buffer.size();
-    size_t max_msg_size = 1024;
+    size_t max_msg_size = 256;
+    buffer.resize(offset + max_msg_size);
+    if (char* msg = strerror_r(err, buffer.data()+offset, max_msg_size))
+        return msg;
+    buffer.resize(offset);
+
+#else // POSIX.1-2001 fallback version <string.h>
+
+    size_t offset = buffer.size();
+    size_t max_msg_size = 256;
     buffer.resize(offset + max_msg_size);
     if (TIGHTDB_LIKELY(strerror_r(err, buffer.data()+offset, max_msg_size) == 0))
         return buffer.str();
