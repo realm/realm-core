@@ -104,6 +104,8 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <tightdb/array_basic.hpp>
 #include <tightdb/array_string.hpp>
 
+#include <iostream>
+
 #if _MSC_FULL_VER >= 160040219
 #  include <immintrin.h>
 #endif
@@ -275,7 +277,7 @@ class ParentNode {
     typedef ParentNode ThisType;
 public:
 
-    ParentNode(): m_table(0) {}
+    ParentNode(): m_table(0) { std::cout << "ParentNode @ " << this << std::endl; }
 
     void gather_children(std::vector<ParentNode*>& v)
     {
