@@ -20,20 +20,20 @@
 
 namespace tightdb {
 
-inline ColumnMixed::ColumnMixed(): m_data(0)
+inline ColumnMixed::ColumnMixed(): m_binary_data(0)
 {
     create(Allocator::get_default(), 0, 0);
 }
 
 inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* table, std::size_t column_ndx):
-    m_data(0)
+    m_binary_data(0)
 {
     create(alloc, table, column_ndx);
 }
 
 inline ColumnMixed::ColumnMixed(Allocator& alloc, const Table* table, std::size_t column_ndx,
                                 ArrayParent* parent, std::size_t ndx_in_parent, ref_type ref):
-    m_data(0)
+    m_binary_data(0)
 {
     create(alloc, table, column_ndx, parent, ndx_in_parent, ref);
 }
@@ -43,7 +43,7 @@ inline ref_type ColumnMixed::get_subtable_ref(std::size_t row_idx) const TIGHTDB
     TIGHTDB_ASSERT(row_idx < m_types->size());
     if (m_types->get(row_idx) != type_Table)
         return 0;
-    return m_refs->get_as_ref(row_idx);
+    return m_data->get_as_ref(row_idx);
 }
 
 inline std::size_t ColumnMixed::get_subtable_size(std::size_t row_idx) const TIGHTDB_NOEXCEPT
@@ -54,12 +54,12 @@ inline std::size_t ColumnMixed::get_subtable_size(std::size_t row_idx) const TIG
     ref_type top_ref = get_subtable_ref(row_idx);
     if (!top_ref)
         return 0;
-    ref_type columns_ref = Array(top_ref, 0, 0, m_refs->get_alloc()).get_as_ref(1);
-    Array columns(columns_ref, 0, 0, m_refs->get_alloc());
+    ref_type columns_ref = Array(top_ref, 0, 0, m_data->get_alloc()).get_as_ref(1);
+    Array columns(columns_ref, 0, 0, m_data->get_alloc());
     if (columns.is_empty())
         return 0;
     ref_type first_col_ref = columns.get_as_ref(0);
-    return get_size_from_ref(first_col_ref, m_refs->get_alloc());
+    return get_size_from_ref(first_col_ref, m_data->get_alloc());
 }
 
 inline Table* ColumnMixed::get_subtable_ptr(std::size_t row_idx) const
@@ -67,19 +67,12 @@ inline Table* ColumnMixed::get_subtable_ptr(std::size_t row_idx) const
     TIGHTDB_ASSERT(row_idx < m_types->size());
     if (m_types->get(row_idx) != type_Table)
         return 0;
-    return m_refs->get_subtable_ptr(row_idx);
+    return m_data->get_subtable_ptr(row_idx);
 }
 
 inline void ColumnMixed::detach_subtable_accessors() TIGHTDB_NOEXCEPT
 {
-    m_refs->detach_subtable_accessors();
-}
-
-inline ref_type ColumnMixed::create(std::size_t size, Allocator& alloc)
-{
-    ColumnMixed c(alloc, 0, 0);
-    c.fill(size);
-    return c.get_ref();
+    m_data->detach_subtable_accessors();
 }
 
 
@@ -95,7 +88,7 @@ inline int64_t ColumnMixed::get_value(std::size_t ndx) const TIGHTDB_NOEXCEPT
 
     // Shift the unsigned value right - ensuring 0 gets in from left.
     // Shifting signed integers right doesn't ensure 0's.
-    uint64_t value = uint64_t(m_refs->get(ndx)) >> 1;
+    uint64_t value = uint64_t(m_data->get(ndx)) >> 1;
     return int64_t(value);
 }
 
@@ -160,20 +153,20 @@ inline StringData ColumnMixed::get_string(std::size_t ndx) const TIGHTDB_NOEXCEP
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
     TIGHTDB_ASSERT(m_types->get(ndx) == mixcol_String);
-    TIGHTDB_ASSERT(m_data);
+    TIGHTDB_ASSERT(m_binary_data);
 
-    std::size_t data_ndx = std::size_t(int64_t(m_refs->get(ndx)) >> 1);
-    return m_data->get_string(data_ndx);
+    std::size_t data_ndx = std::size_t(int64_t(m_data->get(ndx)) >> 1);
+    return m_binary_data->get_string(data_ndx);
 }
 
 inline BinaryData ColumnMixed::get_binary(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
     TIGHTDB_ASSERT(m_types->get(ndx) == mixcol_Binary);
-    TIGHTDB_ASSERT(m_data);
+    TIGHTDB_ASSERT(m_binary_data);
 
-    std::size_t data_ndx = std::size_t(uint64_t(m_refs->get(ndx)) >> 1);
-    return m_data->get(data_ndx);
+    std::size_t data_ndx = std::size_t(uint64_t(m_data->get(ndx)) >> 1);
+    return m_binary_data->get(data_ndx);
 }
 
 //
@@ -181,7 +174,7 @@ inline BinaryData ColumnMixed::get_binary(std::size_t ndx) const TIGHTDB_NOEXCEP
 //
 
 // Set a int64 value.
-// Store 63 bit of the value in m_refs. Store sign bit in m_types.
+// Store 63 bit of the value in m_data. Store sign bit in m_types.
 
 inline void ColumnMixed::set_int64(std::size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type)
 {
@@ -195,7 +188,7 @@ inline void ColumnMixed::set_int64(std::size_t ndx, int64_t value, MixedColType 
 
     // Shift value one bit and set lowest bit to indicate that this is not a ref
     value = (value << 1) + 1;
-    m_refs->set(ndx, value);
+    m_data->set(ndx, value);
 }
 
 inline void ColumnMixed::set_int(std::size_t ndx, int64_t value)
@@ -220,7 +213,7 @@ inline void ColumnMixed::set_value(std::size_t ndx, int64_t value, MixedColType 
 
     // Shift value one bit and set lowest bit to indicate that this is not a ref
     int64_t v = (value << 1) + 1;
-    m_refs->set(ndx, v);
+    m_data->set(ndx, v);
 }
 
 inline void ColumnMixed::set_float(std::size_t ndx, float value)
@@ -254,7 +247,7 @@ inline void ColumnMixed::set_subtable(std::size_t ndx, const Table* t)
         ref = Table::create_empty_table(m_array->get_alloc()); // Throws
     }
     clear_value(ndx, mixcol_Table); // Remove any previous refs or binary data
-    m_refs->set(ndx, ref);
+    m_data->set(ndx, ref);
 }
 
 //
@@ -262,7 +255,7 @@ inline void ColumnMixed::set_subtable(std::size_t ndx, const Table* t)
 //
 
 // Insert a int64 value.
-// Store 63 bit of the value in m_refs. Store sign bit in m_types.
+// Store 63 bit of the value in m_data. Store sign bit in m_types.
 
 inline void ColumnMixed::insert_int64(std::size_t ndx, int64_t value, MixedColType pos_type,
                                       MixedColType neg_type)
@@ -277,7 +270,7 @@ inline void ColumnMixed::insert_int64(std::size_t ndx, int64_t value, MixedColTy
 
     // Shift value one bit and set lowest bit to indicate that this is not a ref
     value = (value << 1) + 1;
-    m_refs->insert(ndx, value);
+    m_data->insert(ndx, value);
 }
 
 inline void ColumnMixed::insert_int(std::size_t ndx, int64_t value)
@@ -303,7 +296,7 @@ inline void ColumnMixed::insert_float(std::size_t ndx, float value)
 
     // Shift value one bit and set lowest bit to indicate that this is not a ref
     int64_t val64 = (int64_t(val32) << 1) + 1;
-    m_refs->insert(ndx, val64);
+    m_data->insert(ndx, val64);
     m_types->insert(ndx, mixcol_Float);
 }
 
@@ -316,7 +309,7 @@ inline void ColumnMixed::insert_bool(std::size_t ndx, bool value)
     int64_t v = ((value ? 1 : 0) << 1) + 1;
 
     m_types->insert(ndx, mixcol_Bool);
-    m_refs->insert(ndx, v);
+    m_data->insert(ndx, v);
 }
 
 inline void ColumnMixed::insert_datetime(std::size_t ndx, DateTime value)
@@ -328,7 +321,7 @@ inline void ColumnMixed::insert_datetime(std::size_t ndx, DateTime value)
     int64_t v = (int64_t(value.get_datetime()) << 1) + 1;
 
     m_types->insert(ndx, mixcol_Date);
-    m_refs->insert(ndx, v);
+    m_data->insert(ndx, v);
 }
 
 inline void ColumnMixed::insert_string(std::size_t ndx, StringData value)
@@ -337,14 +330,14 @@ inline void ColumnMixed::insert_string(std::size_t ndx, StringData value)
     detach_subtable_accessors();
     init_data_column();
 
-    std::size_t data_ndx = m_data->size();
-    m_data->add_string(value);
+    std::size_t data_ndx = m_binary_data->size();
+    m_binary_data->add_string(value);
 
     // Shift value one bit and set lowest bit to indicate that this is not a ref
     int64_t v = int64_t((uint64_t(data_ndx) << 1) + 1);
 
     m_types->insert(ndx, mixcol_String);
-    m_refs->insert(ndx, v);
+    m_data->insert(ndx, v);
 }
 
 inline void ColumnMixed::insert_binary(std::size_t ndx, BinaryData value)
@@ -353,14 +346,14 @@ inline void ColumnMixed::insert_binary(std::size_t ndx, BinaryData value)
     detach_subtable_accessors();
     init_data_column();
 
-    std::size_t data_ndx = m_data->size();
-    m_data->add(value);
+    std::size_t data_ndx = m_binary_data->size();
+    m_binary_data->add(value);
 
     // Shift value one bit and set lowest bit to indicate that this is not a ref
     int64_t v = int64_t((uint64_t(data_ndx) << 1) + 1);
 
     m_types->insert(ndx, mixcol_Binary);
-    m_refs->insert(ndx, v);
+    m_data->insert(ndx, v);
 }
 
 inline void ColumnMixed::insert_subtable(std::size_t ndx, const Table* t)
@@ -375,7 +368,7 @@ inline void ColumnMixed::insert_subtable(std::size_t ndx, const Table* t)
         ref = Table::create_empty_table(m_array->get_alloc()); // Throws
     }
     m_types->insert(ndx, mixcol_Table);
-    m_refs->insert(ndx, ref);
+    m_data->insert(ndx, ref);
 }
 
 } // namespace tightdb

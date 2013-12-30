@@ -70,9 +70,10 @@ public:
     /// underlying node. It is not owned by the accessor.
     void create();
 
-    /// Construct an empty string array and return just the reference
-    /// to the underlying memory.
-    static ref_type create_empty_array(Allocator&);
+    /// Construct a string array of the specified size and return just
+    /// the reference to the underlying memory. All elements will be
+    /// initialized to the empty string.
+    static ref_type create_array(std::size_t size, Allocator&);
 
 #ifdef TIGHTDB_DEBUG
     void string_stats() const;
@@ -128,13 +129,15 @@ inline ArrayString::ArrayString(Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
 
 inline void ArrayString::create()
 {
-    ref_type ref = create_empty_array(get_alloc()); // Throws
+    std::size_t size = 0;
+    ref_type ref = create_array(size, get_alloc()); // Throws
     init_from_ref(ref);
 }
 
-inline ref_type ArrayString::create_empty_array(Allocator& alloc)
+inline ref_type ArrayString::create_array(std::size_t size, Allocator& alloc)
 {
-    return Array::create_empty_array(type_Normal, wtype_Multiply, alloc); // Throws
+    int_fast64_t value = 0;
+    return Array::create_array(type_Normal, wtype_Multiply, size, value, alloc); // Throws
 }
 
 inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT

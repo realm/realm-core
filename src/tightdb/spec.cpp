@@ -215,7 +215,7 @@ const Spec Spec::get_subtable_spec(size_t column_ndx) const
     return Spec(m_table, alloc, ref, 0, 0);
 }
 
-size_t Spec::get_subspec_ndx(size_t column_ndx) const
+size_t Spec::get_subspec_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     // The subspec array only keep info for subtables
     // so we need to count up to it's position
@@ -227,7 +227,7 @@ size_t Spec::get_subspec_ndx(size_t column_ndx) const
     return pos;
 }
 
-ref_type Spec::get_subspec_ref(size_t subspec_ndx) const
+ref_type Spec::get_subspec_ref(size_t subspec_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(subspec_ndx < m_subspecs.size());
 

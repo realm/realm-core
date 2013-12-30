@@ -138,7 +138,7 @@ CATEGORIES:
       - NAME   : no_create
         TYPES  : bool
         DESCR  : &g_shared_group_constructor_parm2_descr
-                 If set to <tt>true</tt>, File::NotFound will be thrown
+                 If set to <tt>true</tt>, util::File::NotFound will be thrown
                  if the file does not already exist.
       - NAME   : dlevel
         TYPES  : DurabilityLevel
@@ -150,13 +150,13 @@ CATEGORIES:
         DESCR  : &g_shared_group_constructor_return1_descr
                  A shared group.
       THROWS:
-      - EXCEPT : File::AccessError
+      - EXCEPT : util::File::AccessError
         DESCR  : *g_group_constructor_memory_throws_descr
-      - EXCEPT : File::PermissionDenied
+      - EXCEPT : util::File::PermissionDenied
         DESCR  : *g_group_exc_perm
-      - EXCEPT : File::NotFound
+      - EXCEPT : util::File::NotFound
         DESCR  : *g_group_exc_notfound
-      - EXCEPT : File::Exists
+      - EXCEPT : util::File::Exists
         DESCR  : *g_group_exc_exists
       - EXCEPT : InvalidDatabase
         DESCR  : *g_group_exc_invalid_db
@@ -369,20 +369,20 @@ CATEGORIES:
       - NAME   : no_create
         TYPES  : bool
         DESCR  : &g_shared_group_open_parm2_descr
-                 If set to <tt>true</tt>, File::NotFound will be thrown
+                 If set to <tt>true</tt>, util::File::NotFound will be thrown
                  if the file does not already exist.
       - NAME   : dlevel
         TYPES  : DurabilityLevel
         DESCR  : &g_shared_group_open_parm3_descr
                  Durability Level (durability_Full or durability_MemOnly).
       THROWS:
-      - EXCEPT : File::AccessError
+      - EXCEPT : util::File::AccessError
         DESCR  : *g_group_constructor_memory_throws_descr
-      - EXCEPT : File::PermissionDenied
+      - EXCEPT : util::File::PermissionDenied
         DESCR  : *g_group_exc_perm
-      - EXCEPT : File::NotFound
+      - EXCEPT : util::File::NotFound
         DESCR  : *g_group_exc_notfound
-      - EXCEPT : File::Exists
+      - EXCEPT : util::File::Exists
         DESCR  : *g_group_exc_exists
       - EXCEPT : InvalidDatabase
         DESCR  : *g_group_exc_invalid_db
@@ -434,7 +434,7 @@ CATEGORIES:
                  specified size. On systems that do not support
                  preallocation, this function has no effect. To know
                  whether preallocation is supported by TightDB on your
-                 platform, call File::is_prealloc_supported().
+                 platform, call util::File::is_prealloc_supported().
 
                  It is an error to call this function on an unattached
                  shared group. Doing so will result in undefined

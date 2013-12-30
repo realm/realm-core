@@ -230,18 +230,19 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
                                     bool is_append)
 {
     // At this point the original root and its new sibling is either
-    // both leafs, or both inner nodes on the same form, compact or
+    // both leaves, or both inner nodes on the same form, compact or
     // general. Due to invar:bptree-node-form, the new root may be on
-    // the compact form if is_append is true and both are either leafs
-    // or inner nodes on the compact form.
+    // the compact form if is_append is true and both are either
+    // leaves or inner nodes on the compact form.
 
     Array* orig_root = m_array;
     Allocator& alloc = orig_root->get_alloc();
     ArrayParent* parent = orig_root->get_parent();
     size_t ndx_in_parent = orig_root->get_ndx_in_parent();
-    UniquePtr<Array> new_root(new Array(Array::type_InnerColumnNode,
+    UniquePtr<Array> new_root(new Array(Array::type_InnerBptreeNode,
                                         parent, ndx_in_parent, alloc)); // Throws
-    bool compact_form = is_append && (orig_root->is_leaf() || orig_root->get(0) % 2 == 1);
+    bool compact_form =
+        is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 == 1);
     // Something is wrong if we were not appending and the original
     // root is still on the compact form.
     TIGHTDB_ASSERT(!compact_form || is_append);
@@ -270,10 +271,66 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
 }
 
 
+ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
+                           Allocator& alloc, CreateHandler& handler)
+{
+    size_t rest_size = *rest_size_ptr;
+    size_t orig_rest_size = rest_size;
+    size_t leaf_size = min(size_t(TIGHTDB_MAX_LIST_SIZE), rest_size);
+    rest_size -= leaf_size;
+    ref_type node = handler.create_leaf(leaf_size);
+    size_t height = 1;
+    try {
+        for (;;) {
+            if (fixed_height > 0 ? fixed_height == height : rest_size == 0) {
+                *rest_size_ptr = rest_size;
+                return node;
+            }
+            Array new_inner_node(alloc);
+            new_inner_node.create(Array::type_InnerBptreeNode); // Throws
+            try {
+                int_fast64_t v = orig_rest_size - rest_size; // elems_per_child
+                new_inner_node.add(1 + 2*v); // Throws
+                v = node; // FIXME: Dangerous cast here (unsigned -> signed)
+                new_inner_node.add(v); // Throws
+                node = 0;
+                size_t num_children = 1;
+                for (;;) {
+                    ref_type child = build(&rest_size, height, alloc, handler); // Throws
+                    try {
+                        int_fast64_t v = child; // FIXME: Dangerous cast here (unsigned -> signed)
+                        new_inner_node.add(v); // Throws
+                    }
+                    catch (...) {
+                        Array::destroy(child, alloc);
+                        throw;
+                    }
+                    if (rest_size == 0 || ++num_children == TIGHTDB_MAX_LIST_SIZE)
+                        break;
+                }
+                v = orig_rest_size - rest_size; // total_elems_in_tree
+                new_inner_node.add(1 + 2*v); // Throws
+            }
+            catch (...) {
+                new_inner_node.destroy();
+                throw;
+            }
+            node = new_inner_node.get_ref();
+            ++height;
+        }
+    }
+    catch (...) {
+        if (node != 0)
+            Array::destroy(node, alloc);
+        throw;
+    }
+}
+
+
 void Column::clear()
 {
     m_array->clear();
-    if (!m_array->is_leaf())
+    if (m_array->is_inner_bptree_node())
         m_array->set_type(Array::type_Normal);
 }
 
@@ -314,7 +371,7 @@ void Column::set(size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(ndx < size());
 
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         m_array->set(ndx, value); // Throws
         return;
     }
@@ -327,7 +384,7 @@ void Column::adjust(size_t ndx, int64_t diff)
 {
     TIGHTDB_ASSERT(ndx < size());
 
-    if (m_array->is_leaf()) {
+    if (m_array->is_inner_bptree_node()) {
         m_array->adjust(ndx, diff); // Throws
         return;
     }
@@ -336,17 +393,6 @@ void Column::adjust(size_t ndx, int64_t diff)
     m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
-void Column::fill(size_t count)
-{
-    TIGHTDB_ASSERT(size() == 0);
-
-    // Fill column with default values
-    //
-    // FIXME: this is a very naive approach we could speedup by
-    // creating full nodes directly
-    for (size_t i = 0; i < count; ++i)
-        add(0);
-}
 
 // int64_t specific:
 
@@ -465,7 +511,7 @@ void Column::erase(size_t ndx, bool is_last)
     TIGHTDB_ASSERT(ndx < size());
     TIGHTDB_ASSERT(is_last == (ndx == size()-1));
 
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         m_array->erase(ndx); // Throws
         return;
     }
@@ -514,7 +560,7 @@ template<bool with_limit> struct AdjustHandler: Array::UpdateHandler {
 
 void Column::adjust(int_fast64_t diff)
 {
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         m_array->adjust(0, m_array->size(), diff); // Throws
         return;
     }
@@ -529,7 +575,7 @@ void Column::adjust(int_fast64_t diff)
 
 void Column::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 {
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         m_array->adjust_ge(limit, diff); // Throws
         return;
     }
@@ -639,6 +685,27 @@ void Column::do_insert(size_t ndx, int64_t value)
         bool is_append = ndx == npos;
         introduce_new_root(new_sibling_ref, state, is_append);
     }
+}
+
+
+class Column::CreateHandler: public ColumnBase::CreateHandler {
+public:
+    CreateHandler(Array::Type leaf_type, int_fast64_t value, Allocator& alloc):
+        m_leaf_type(leaf_type), m_value(value), m_alloc(alloc) {}
+    ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
+    {
+        return Array::create_array(m_leaf_type, size, m_value, m_alloc);
+    }
+private:
+    const Array::Type m_leaf_type;
+    const int_fast64_t m_value;
+    Allocator& m_alloc;
+};
+
+ref_type Column::create(Array::Type leaf_type, size_t size, int_fast64_t value, Allocator& alloc)
+{
+    CreateHandler handler(leaf_type, value, alloc);
+    return ColumnBase::create(size, alloc, handler);
 }
 
 
