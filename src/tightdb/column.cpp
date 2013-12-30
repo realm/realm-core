@@ -384,7 +384,7 @@ void Column::adjust(size_t ndx, int64_t diff)
 {
     TIGHTDB_ASSERT(ndx < size());
 
-    if (m_array->is_inner_bptree_node()) {
+    if (!m_array->is_inner_bptree_node()) {
         m_array->adjust(ndx, diff); // Throws
         return;
     }
