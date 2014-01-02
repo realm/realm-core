@@ -1,6 +1,5 @@
 # NOTE: THIS SCRIPT IS SUPPOSED TO RUN IN A POSIX SHELL
 
-
 # Enable tracing if TIGHTDB_SCRIPT_DEBUG is set
 if [ -e $HOME/.tightdb ]; then
     . $HOME/.tightdb
@@ -1066,6 +1065,8 @@ EOF
                 done
             fi
 
+            export DISABLE_CHEETAH_CODE_GEN="1"
+
             mkdir "$PKG_DIR/tightdb" || exit 1
             if [ "$PREBUILT_CORE" ]; then
                 message "Building core library"
@@ -2048,6 +2049,7 @@ EOF
 /test
 /test-installed
 /doc
+/debian
 EOF
         cat >"$TEMP_DIR/exclude" <<EOF
 .gitignore

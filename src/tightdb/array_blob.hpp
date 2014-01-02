@@ -27,7 +27,7 @@ namespace tightdb {
 
 class ArrayBlob: public Array {
 public:
-    explicit ArrayBlob(ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
+    explicit ArrayBlob(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                        Allocator& = Allocator::get_default());
     ArrayBlob(ref_type, ArrayParent*, std::size_t ndx_in_parent,
               Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
@@ -41,7 +41,7 @@ public:
     void replace(std::size_t begin, std::size_t end, const char* data, std::size_t size,
                  bool add_zero_term = false);
     void erase(std::size_t begin, std::size_t end);
-    void resize(std::size_t size);
+    void truncate(std::size_t size);
     void clear();
 
     /// Get the specified element without the cost of constructing an
@@ -56,6 +56,11 @@ public:
     /// Note that the caller assumes ownership of the allocated
     /// underlying node. It is not owned by the accessor.
     void create();
+
+    /// Construct a blob of the specified size and return just the
+    /// reference to the underlying memory. All bytes will be
+    /// initialized to zero.
+    static ref_type create_array(std::size_t size, Allocator&);
 
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, StringData title = StringData()) const;
@@ -109,20 +114,30 @@ inline void ArrayBlob::insert(std::size_t pos, const char* data, std::size_t siz
     replace(pos, pos, data, size, add_zero_term);
 }
 
-inline void ArrayBlob::erase(std::size_t start, std::size_t end)
+inline void ArrayBlob::erase(std::size_t begin, std::size_t end)
 {
-    replace(start, end, null_ptr, 0);
+    const char* data = 0;
+    std::size_t size = 0;
+    replace(begin, end, data, size);
 }
 
-inline void ArrayBlob::resize(std::size_t size)
+inline void ArrayBlob::truncate(std::size_t size)
 {
     TIGHTDB_ASSERT(size <= m_size);
-    replace(size, m_size, null_ptr, 0);
+    std::size_t begin  = size;
+    std::size_t end    = m_size;
+    const char* data   = 0;
+    std::size_t size_2 = 0;
+    replace(begin, end, data, size_2);
 }
 
 inline void ArrayBlob::clear()
 {
-    replace(0, m_size, null_ptr, 0);
+    std::size_t begin = 0;
+    std::size_t end   = m_size;
+    const char* data  = 0;
+    std::size_t size  = 0;
+    replace(begin, end, data, size);
 }
 
 inline const char* ArrayBlob::get(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT
@@ -133,8 +148,15 @@ inline const char* ArrayBlob::get(const char* header, std::size_t pos) TIGHTDB_N
 
 inline void ArrayBlob::create()
 {
-    ref_type ref = create_empty_array(type_Normal, wtype_Ignore, get_alloc()); // Throws
+    std::size_t size = 0;
+    ref_type ref = create_array(size, get_alloc()); // Throws
     init_from_ref(ref);
+}
+
+inline ref_type ArrayBlob::create_array(std::size_t size, Allocator& alloc)
+{
+    int_fast64_t value = 0;
+    return Array::create_array(type_Normal, wtype_Ignore, size, value, alloc); // Throws
 }
 
 inline std::size_t ArrayBlob::CalcByteLen(std::size_t count, std::size_t) const
