@@ -1430,7 +1430,7 @@ ref_type Array::create_array(Type type, WidthType width_type, size_t size, int_f
     int width = 0;
     size_t byte_size_0 = header_size;
     if (value != 0) {
-        width = bit_width(value);;
+        width = int(bit_width(value));
         byte_size_0 = calc_aligned_byte_size(size, width); // Throws
     }
     // Adding zero to Array::initial_capacity to avoid taking the
