@@ -261,7 +261,7 @@ template<class T> ref_type BasicColumn<T>::create(std::size_t size, Allocator& a
 template<class T>
 inline void BasicColumn<T>::foreach(Array::ForEachOp<T>* op) const TIGHTDB_NOEXCEPT
 {
-    if (TIGHTDB_LIKELY(m_array->is_leaf())) {
+    if (TIGHTDB_LIKELY(!m_array->is_inner_bptree_node())) {
         static_cast<const BasicArray<T>*>(m_array)->foreach(op);
         return;
     }
@@ -279,7 +279,7 @@ inline void BasicColumn<T>::foreach(const Array* parent, Array::ForEachOp<T>* op
     for (std::size_t i=0; i<n; ++i) {
         std::size_t ref = children.get_as_ref(i);
         Array child(ref, 0, 0, alloc);
-        if (TIGHTDB_LIKELY(child.is_leaf())) {
+        if (TIGHTDB_LIKELY(!child.is_inner_bptree_node())) {
             BasicArray<T>::foreach(&child, op);
         }
         else {

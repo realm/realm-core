@@ -1076,7 +1076,7 @@ void AdaptiveStringColumn::foreach(const Array* parent, Array::ForEachOp<StringD
     for (size_t i=0; i<n; ++i) {
         const size_t ref = children.get_as_ref(i);
         Array child(ref, 0, 0, alloc);
-        if (TIGHTDB_LIKELY(child.is_leaf())) {
+        if (TIGHTDB_LIKELY(!child.is_inner_bptree_node())) {
             if (child.has_refs()) {
                 ArrayStringLong::foreach(&child, op);
             }

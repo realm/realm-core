@@ -689,7 +689,7 @@ void Column::foreach(const Array* parent, Array::ForEachOp<int64_t>* op) TIGHTDB
     for (std::size_t i=0; i<n; ++i) {
         const std::size_t ref = children.get_as_ref(i);
         Array child(ref, 0, 0, alloc);
-        if (TIGHTDB_LIKELY(child.is_leaf())) {
+        if (TIGHTDB_LIKELY(!child.is_inner_bptree_node())) {
             child.foreach(op);
         }
         else {

@@ -518,7 +518,7 @@ inline std::size_t Column::upper_bound_int(int64_t value) const TIGHTDB_NOEXCEPT
 
 inline void Column::foreach(Array::ForEachOp<int64_t>* op) const TIGHTDB_NOEXCEPT
 {
-    if (TIGHTDB_LIKELY(m_array->is_leaf())) {
+    if (TIGHTDB_LIKELY(!m_array->is_inner_bptree_node())) {
         m_array->foreach(op);
         return;
     }

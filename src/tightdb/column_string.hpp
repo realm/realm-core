@@ -189,7 +189,7 @@ inline StringIndex* AdaptiveStringColumn::release_index() TIGHTDB_NOEXCEPT
 
 inline void AdaptiveStringColumn::foreach(Array::ForEachOp<StringData>* op) const TIGHTDB_NOEXCEPT
 {
-    if (TIGHTDB_LIKELY(m_array->is_leaf())) {
+    if (TIGHTDB_LIKELY(!m_array->is_inner_bptree_node())) {
         if (m_array->has_refs()) {
             static_cast<const ArrayStringLong*>(m_array)->foreach(op);
         }
