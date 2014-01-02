@@ -148,11 +148,11 @@ public:
     /// read/write mode unless you want to be able to call
     /// Group::commit().
     ///
-    /// \throw File::AccessError If the file could not be opened. If
-    /// the reason corresponds to one of the exception types that are
-    /// derived from File::AccessError, the derived exception type is
-    /// thrown. Note that InvalidDatabase is among these derived
-    /// exception types.
+    /// \throw util::File::AccessError If the file could not be
+    /// opened. If the reason corresponds to one of the exception
+    /// types that are derived from util::File::AccessError, the
+    /// derived exception type is thrown. Note that InvalidDatabase is
+    /// among these derived exception types.
     void open(const std::string& file, OpenMode mode = mode_ReadOnly);
 
     /// Attach this Group instance to the specified memory buffer.
@@ -251,11 +251,11 @@ public:
     ///
     /// \param file A filesystem path.
     ///
-    /// \throw File::AccessError If the file could not be opened. If
-    /// the reason corresponds to one of the exception types that are
-    /// derived from File::AccessError, the derived exception type is
-    /// thrown. In particular, File::Exists will be thrown if the file
-    /// exists already.
+    /// \throw util::File::AccessError If the file could not be
+    /// opened. If the reason corresponds to one of the exception
+    /// types that are derived from util::File::AccessError, the
+    /// derived exception type is thrown. In particular,
+    /// util::File::Exists will be thrown if the file exists already.
     void write(const std::string& file) const;
 
     /// Write this database to a memory buffer.
@@ -607,7 +607,7 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
     Array top(Array::type_HasRefs); // Throws
     // FIXME: Dangerous cast: unsigned -> signed
     top.ensure_minimum_width(1 + 2*max_final_file_size); // Throws
-    // FIXME: We really need to make Array::resize() able to expand the size also.
+    // FIXME: We really an alternative to Array::truncate() that is able to expand.
     // FIXME: Dangerous cast: unsigned -> signed
     top.add(names_pos); // Throws
     top.add(tables_pos); // Throws
@@ -625,7 +625,7 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
     top.write(out, recurse); // Throws
     TIGHTDB_ASSERT(out.get_pos() == final_file_size);
 
-    top.resize(0); // Avoid recursive destruction
+    top.truncate(0); // Avoid recursive destruction
     top.destroy();
 
     // Write streaming footer

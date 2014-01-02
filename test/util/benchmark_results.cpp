@@ -38,10 +38,29 @@ string format_change_percent(double baseline, double seconds)
     return out.str();
 }
 
+string format_drop_factor(double baseline, double seconds)
+{
+    double factor = baseline / seconds;
+    ostringstream out;
+    out.precision(3);
+    out << factor << ":1";
+    return out.str();
+}
+
+string format_rise_factor(double baseline, double seconds)
+{
+    double factor = seconds / baseline;
+    ostringstream out;
+    out.precision(3);
+    out << "1:" << factor;
+    return out.str();
+}
+
 } // anonymous namespace
 
 
-void BenchmarkResults::submit(double elapsed_seconds, const char *ident, const char* lead_text)
+void BenchmarkResults::submit(double elapsed_seconds, const char *ident, const char* lead_text,
+                              ChangeType change_type)
 {
     double baseline_seconds = 0;
     bool have_baseline = false;
@@ -72,7 +91,19 @@ void BenchmarkResults::submit(double elapsed_seconds, const char *ident, const c
         if (have_baseline) {
             out << setw(time_width+separation_2) << format_elapsed_time(baseline_seconds);
             out << setw(time_width+separation_3) << format_elapsed_time(elapsed_seconds);
-            out << "("<<format_change_percent(baseline_seconds, elapsed_seconds)<<")";
+            out << "(";
+            switch (change_type) {
+                case change_Percent:
+                    out << format_change_percent(baseline_seconds, elapsed_seconds);
+                    break;
+                case change_DropFactor:
+                    out << format_drop_factor(baseline_seconds, elapsed_seconds);
+                    break;
+                case change_RiseFactor:
+                    out << format_rise_factor(baseline_seconds, elapsed_seconds);
+                    break;
+            }
+            out << ")";
         }
         else {
             out << setw(time_width+separation_2) << "";

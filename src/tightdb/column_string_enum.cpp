@@ -128,7 +128,8 @@ size_t ColumnStringEnum::count(StringData value) const
         return m_index->count(value);
 
     size_t key_ndx = m_keys.find_first(value);
-    if (key_ndx == not_found) return 0;
+    if (key_ndx == not_found)
+        return 0;
     return Column::count(key_ndx);
 }
 
@@ -138,16 +139,16 @@ void ColumnStringEnum::find_all(Array& res, StringData value, size_t begin, size
         return m_index->find_all(res, value);
 
     size_t key_ndx = m_keys.find_first(value);
-    if (key_ndx == size_t(-1)) return;
+    if (key_ndx == size_t(-1))
+        return;
     Column::find_all(res, key_ndx, begin, end);
-    return;
 }
 
 void ColumnStringEnum::find_all(Array& res, size_t key_ndx, size_t begin, size_t end) const
 {
-    if (key_ndx == size_t(-1)) return;
+    if (key_ndx == size_t(-1))
+        return;
     Column::find_all(res, key_ndx, begin, end);
-    return;
 }
 
 FindRes ColumnStringEnum::find_all_indexref(StringData value, size_t& dst) const
@@ -161,7 +162,8 @@ FindRes ColumnStringEnum::find_all_indexref(StringData value, size_t& dst) const
 size_t ColumnStringEnum::find_first(size_t key_ndx, size_t begin, size_t end) const
 {
     // Find key
-    if (key_ndx == size_t(-1)) return size_t(-1);
+    if (key_ndx == size_t(-1))
+        return size_t(-1);
 
     return Column::find_first(key_ndx, begin, end);
 }
@@ -173,7 +175,8 @@ size_t ColumnStringEnum::find_first(StringData value, size_t begin, size_t end) 
 
     // Find key
     size_t key_ndx = m_keys.find_first(value);
-    if (key_ndx == size_t(-1)) return size_t(-1);
+    if (key_ndx == size_t(-1))
+        return size_t(-1);
 
     return Column::find_first(key_ndx, begin, end);
 }
@@ -186,7 +189,8 @@ size_t ColumnStringEnum::GetKeyNdx(StringData value) const
 size_t ColumnStringEnum::GetKeyNdxOrAdd(StringData value)
 {
     size_t res = m_keys.find_first(value);
-    if (res != size_t(-1)) return res;
+    if (res != size_t(-1))
+        return res;
     else {
         // Add key if it does not exist
         size_t pos = m_keys.size();
@@ -197,20 +201,24 @@ size_t ColumnStringEnum::GetKeyNdxOrAdd(StringData value)
 
 bool ColumnStringEnum::compare_string(const AdaptiveStringColumn& c) const
 {
-    const size_t n = size();
-    if (c.size() != n) return false;
-    for (size_t i=0; i<n; ++i) {
-        if (get(i) != c.get(i)) return false;
+    size_t n = size();
+    if (c.size() != n)
+        return false;
+    for (size_t i = 0; i != n; ++i) {
+        if (get(i) != c.get(i))
+            return false;
     }
     return true;
 }
 
 bool ColumnStringEnum::compare_string(const ColumnStringEnum& c) const
 {
-    const size_t n = size();
-    if (c.size() != n) return false;
-    for (size_t i=0; i<n; ++i) {
-        if (get(i) != c.get(i)) return false;
+    size_t n = size();
+    if (c.size() != n)
+        return false;
+    for (size_t i = 0; i != n; ++i) {
+        if (get(i) != c.get(i))
+            return false;
     }
     return true;
 }
@@ -236,16 +244,17 @@ void ColumnStringEnum::ForEachIndexOp::handle_chunk(const int64_t* begin, const 
 
 StringIndex& ColumnStringEnum::create_index()
 {
-    TIGHTDB_ASSERT(m_index == null_ptr);
+    TIGHTDB_ASSERT(!m_index);
 
     // Create new index
     m_index = new StringIndex(this, &get_string, m_array->get_alloc());
 
     // Populate the index
-    const size_t count = size();
-    for (size_t i = 0; i < count; ++i) {
+    size_t n = size();
+    for (size_t i = 0; i != n; ++i) {
         StringData value = get(i);
-        m_index->insert(i, value, true);
+        bool is_last = true;
+        m_index->insert(i, value, is_last);
     }
 
     return *m_index;

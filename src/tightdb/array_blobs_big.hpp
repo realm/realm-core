@@ -91,14 +91,14 @@ inline ArrayBigBlobs::ArrayBigBlobs(MemRef mem, ArrayParent* parent, std::size_t
                                     Allocator& alloc) TIGHTDB_NOEXCEPT:
     Array(mem, parent, ndx_in_parent, alloc)
 {
-    TIGHTDB_ASSERT(is_leaf() && has_refs() && context_bit());
+    TIGHTDB_ASSERT(!is_inner_bptree_node() && has_refs() && context_bit());
 }
 
 inline ArrayBigBlobs::ArrayBigBlobs(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
                                     Allocator& alloc) TIGHTDB_NOEXCEPT:
     Array(ref, parent, ndx_in_parent, alloc)
 {
-    TIGHTDB_ASSERT(is_leaf() && has_refs() && context_bit());
+    TIGHTDB_ASSERT(!is_inner_bptree_node() && has_refs() && context_bit());
 }
 
 inline BinaryData ArrayBigBlobs::get(std::size_t ndx) const TIGHTDB_NOEXCEPT

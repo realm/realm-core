@@ -358,7 +358,7 @@ Query& Query::between(size_t column_ndx, int64_t from, int64_t to)
 }
 Query& Query::equal(size_t column_ndx, bool value)
 {
-    ParentNode* const p = new IntegerNode<bool, Equal>(value, column_ndx);
+    ParentNode* const p = new IntegerNode<int64_t, Equal>(value, column_ndx);
     UpdatePointers(p, &p->m_child);
     return *this;
 }
@@ -516,15 +516,16 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
 
         // Aggregate with criteria - goest through the nodes in the query system
         Init(*m_table);
-        size_t matchcount = 0;
         QueryState<R> st;
         st.init(action, null_ptr, limit);
 
-        // FSA: Call to guery engines aggregate
-        R r = aggregate_internal<action, R, T>(first[0],&st, start, end, column_ndx, &matchcount);
-        if (resultcount)
-            *resultcount = matchcount;
-        return r;
+        SequentialGetter<T> source_column(*m_table, column_ndx);
+
+        aggregate_internal(action, ColumnTypeTraits<T>::id, first[0],&st, start, end, &source_column);
+        if (resultcount) {
+            *resultcount = st.m_match_count;
+        }
+        return st.m_state;
     }
 }
 
@@ -536,16 +537,15 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
     *                                                                                                             *
     **************************************************************************************************************/
 
-    template<Action TAction, class TResult, class TSourceColumn>
-    TResult Query::aggregate_internal(ParentNode* pn, QueryState<TResult>* st, size_t start, size_t end, size_t agg_col, size_t* matchcount) const
+    void Query::aggregate_internal(Action TAction, DataType TSourceColumn,
+                                   ParentNode* pn, QueryStateBase* st, 
+                                   size_t start, size_t end, SequentialGetterBase* source_column) const
     {
         if (end == not_found)
             end = m_table->size();
 
-        SequentialGetter<TSourceColumn>* source_column = null_ptr;
-
-        if (agg_col != not_found)
-            source_column = new SequentialGetter<TSourceColumn>(*m_table, agg_col);
+        for (size_t c = 0; c < pn->m_children.size(); c++)
+            pn->m_children[c]->aggregate_local_prepare(TAction, TSourceColumn);
 
         size_t td;
 
@@ -561,8 +561,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
             // on. Can be called on any node; yields same result, but different performance. Returns prematurely if
             // condition of called node has evaluated to true local_matches number of times.
             // Return value is the next row for resuming aggregating (next row that caller must call aggregate_local on)
-            start = pn->aggregate_local_selector<TAction, TResult, TSourceColumn>
-                (pn->m_children[best], st, start, td, findlocals, source_column, matchcount);
+            start = pn->m_children[best]->aggregate_local(st, start, td, findlocals, source_column);
 
             // Make remaining conditions compute their m_dD (statistics)
             for (size_t c = 0; c < pn->m_children.size() && start < end; c++) {
@@ -576,18 +575,10 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
                     // Limit to bestdist in order not to skip too large parts of index nodes
                     size_t maxD = pn->m_children[c]->m_dT == 0.0 ? end - start : bestdist;
                     td = pn->m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
-                    start = pn->aggregate_local_selector<TAction, TResult, TSourceColumn>
-                        (pn->m_children[c], st, start, td, probe_matches, source_column, matchcount);
+                    start = pn->m_children[c]->aggregate_local(st, start, td, probe_matches, source_column);
                 }
             }
         }
-
-        if (matchcount)
-            *matchcount = st->m_match_count;
-        delete source_column;
-
-        return st->m_state;
-
     }
 
 
@@ -787,7 +778,7 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
     TableView tv(*m_table);
     QueryState<int64_t> st;
     st.init(act_FindAll, &tv.get_ref_column(), limit);
-    aggregate_internal<act_FindAll, int64_t, int64_t>(first[0], &st, start, end, not_found, null_ptr);
+    aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
     return tv;
 }
 
@@ -808,8 +799,8 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
     Init(*m_table);
     QueryState<int64_t> st;
     st.init(act_Count, null_ptr, limit);
-    int64_t r = aggregate_internal<act_Count, int64_t, int64_t>(first[0], &st, start, end, not_found, null_ptr);
-    return size_t(r);
+    aggregate_internal(act_Count, ColumnTypeTraits<int64_t>::id, first[0], &st, start, end, NULL);
+    return size_t(st.m_state);
 }
 
 

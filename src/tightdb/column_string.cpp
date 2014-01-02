@@ -71,13 +71,13 @@ AdaptiveStringColumn::AdaptiveStringColumn(ref_type ref, ArrayParent* parent, si
     char* header = alloc.translate(ref);
     MemRef mem(header, ref);
 
-    // Within an AdaptiveStringColumn the leafs can be of different types
-    // optimized for the lengths of the strings contained therein.
-    // The type is indicated by the combination of the is_node(N), has_refs(R)
-    // and context_bit(C):
+    // Within an AdaptiveStringColumn the leaves can be of different
+    // type optimized for the lengths of the strings contained
+    // therein.  The type is indicated by the combination of the
+    // is_inner_bptree_node(N), has_refs(R) and context_bit(C):
     //
     //   N R C
-    //   1 0 0   InnerNode (not leaf)
+    //   1 0 0   InnerBptreeNode (not leaf)
     //   0 0 0   ArrayString
     //   0 1 0   ArrayStringLong
     //   0 1 1   ArrayBigBlobs
@@ -99,7 +99,7 @@ AdaptiveStringColumn::AdaptiveStringColumn(ref_type ref, ArrayParent* parent, si
             m_array = new ArrayBigBlobs(mem, parent, ndx_in_parent, alloc);
             return;
         }
-        case Array::type_InnerColumnNode: {
+        case Array::type_InnerBptreeNode: {
             // Non-leaf root
             m_array = new Array(mem, parent, ndx_in_parent, alloc);
             return;
@@ -234,30 +234,6 @@ void AdaptiveStringColumn::clear()
 }
 
 
-void AdaptiveStringColumn::resize(size_t n)
-{
-    TIGHTDB_ASSERT(root_is_leaf()); // currently only available on leaf level (used by b-tree code)
-
-    bool long_strings = m_array->has_refs();
-    if (!long_strings) {
-        // Small strings
-        ArrayString* leaf = static_cast<ArrayString*>(m_array);
-        leaf->resize(n); // Throws
-        return;
-    }
-    bool is_big = m_array->context_bit();
-    if (!is_big) {
-        // Medium strings
-        ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
-        leaf->resize(n); // Throws
-        return;
-    }
-    // Big strings
-    ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
-    leaf->resize(n); // Throws
-}
-
-
 namespace {
 
 class SetLeafElem: public Array::UpdateHandler {
@@ -327,7 +303,8 @@ void AdaptiveStringColumn::set(size_t ndx, StringData value)
         m_index->set(ndx, old_val, value); // Throws
     }
 
-    if (m_array->is_leaf()) {
+    bool root_is_leaf = !m_array->is_inner_bptree_node();
+    if (root_is_leaf) {
         LeafType leaf_type = upgrade_root_leaf(value.size()); // Throws
         switch (leaf_type) {
             case leaf_type_Small: {
@@ -351,19 +328,6 @@ void AdaptiveStringColumn::set(size_t ndx, StringData value)
 
     SetLeafElem set_leaf_elem(m_array->get_alloc(), value);
     m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
-}
-
-
-void AdaptiveStringColumn::fill(size_t n)
-{
-    TIGHTDB_ASSERT(is_empty());
-    TIGHTDB_ASSERT(!m_index);
-
-    // Fill column with default values
-    // TODO: this is a very naive approach
-    // we could speedup by creating full nodes directly
-    for (size_t i = 0; i != n; ++i)
-        add(StringData()); // Throws
 }
 
 
@@ -471,7 +435,8 @@ void AdaptiveStringColumn::erase(size_t ndx, bool is_last)
         m_index->erase(ndx, old_val, is_last);
     }
 
-    if (m_array->is_leaf()) {
+    bool root_is_leaf = !m_array->is_inner_bptree_node();
+    if (root_is_leaf) {
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
@@ -506,7 +471,7 @@ void AdaptiveStringColumn::move_last_over(size_t ndx)
     // repair it.
 
     // FIXME: Consider doing two nested calls to
-    // update_bptree_elem(). If the two leafs are not the same, no
+    // update_bptree_elem(). If the two leaves are not the same, no
     // copying is needed. If they are the same, call
     // Array::move_last_over() (does not yet
     // exist). Array::move_last_over() could be implemented in a way
@@ -533,7 +498,8 @@ void AdaptiveStringColumn::move_last_over(size_t ndx)
         m_index->update_ref(copy_of_value, last_ndx, ndx);
     }
 
-    if (m_array->is_leaf()) {
+    bool root_is_leaf = !m_array->is_inner_bptree_node();
+    if (root_is_leaf) {
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
             // Small strings root leaf
@@ -1122,6 +1088,24 @@ void AdaptiveStringColumn::foreach(const Array* parent, Array::ForEachOp<StringD
             foreach(&child, op);
         }
     }
+}
+
+
+class AdaptiveStringColumn::CreateHandler: public ColumnBase::CreateHandler {
+public:
+    CreateHandler(Allocator& alloc): m_alloc(alloc) {}
+    ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
+    {
+        return ArrayString::create_array(size, m_alloc);
+    }
+private:
+    Allocator& m_alloc;
+};
+
+ref_type AdaptiveStringColumn::create(size_t size, Allocator& alloc)
+{
+    CreateHandler handler(alloc);
+    return ColumnBase::create(size, alloc, handler);
 }
 
 

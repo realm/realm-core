@@ -43,7 +43,7 @@ public:
     typedef T value_type;
 
     explicit BasicColumn(Allocator& = Allocator::get_default());
-    explicit BasicColumn(ref_type, ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
+    explicit BasicColumn(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                          Allocator& = Allocator::get_default());
     ~BasicColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
@@ -58,8 +58,6 @@ public:
     void insert(std::size_t ndx, T value);
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
-    void resize(std::size_t ndx);
-    void fill(std::size_t count);
     // Experimental. Overwrites the row at ndx with the last row and removes the last row. For unordered tables.
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
 
@@ -87,6 +85,8 @@ public:
     /// Compare two columns for equality.
     bool compare(const BasicColumn&) const;
 
+    static ref_type create(std::size_t size, Allocator&);
+
     void foreach(Array::ForEachOp<T>*) const TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
@@ -111,6 +111,7 @@ private:
 
     class SetLeafElem;
     class EraseLeafElem;
+    class CreateHandler;
 
     static void foreach(const Array* parent, Array::ForEachOp<T>*) TIGHTDB_NOEXCEPT;
 

@@ -1,9 +1,10 @@
-#include <cerrno>
-#include <cstring>
-#include <cstdio>
-#include <cstdlib>
 #include <limits>
 #include <algorithm>
+
+#include <errno.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #ifdef _WIN32
 #  define NOMINMAX
@@ -39,26 +40,29 @@ string get_errno_msg(const char* prefix, int err)
     StringBuffer buffer;
     buffer.append_c_str(prefix);
 
-#if defined _BSD_SOURCE || defined _WIN32
+#if defined _WIN32 // Windows version <stdlib.h>
 
-    const char* const* errlist;
-    int nerr;
-#  ifdef _BSD_SOURCE
-    errlist = sys_errlist; // BSD <stdio.h>
-    nerr    = sys_nerr;
-#  else
-    errlist = _sys_errlist; // Windows <stdlib.h>
-    nerr    = _sys_nerr;
-#  endif
-    if (TIGHTDB_LIKELY(0 <= err || err < nerr)) {
-        buffer.append_c_str(errlist[err]);
+    if (TIGHTDB_LIKELY(0 <= err || err < _sys_nerr)) {
+        buffer.append_c_str(_sys_errlist[err]);
         return buffer.str();
     }
 
-#else // POSIX <string.h>
+#elif _GNU_SOURCE // GNU specific version <string.h>
+
+    // Note that Linux provides the GNU specific version even though
+    // it sets _POSIX_C_SOURCE >= 200112L.
 
     size_t offset = buffer.size();
-    size_t max_msg_size = 1024;
+    size_t max_msg_size = 256;
+    buffer.resize(offset + max_msg_size);
+    if (char* msg = strerror_r(err, buffer.data()+offset, max_msg_size))
+        return msg;
+    buffer.resize(offset);
+
+#else // POSIX.1-2001 fallback version <string.h>
+
+    size_t offset = buffer.size();
+    size_t max_msg_size = 256;
     buffer.resize(offset + max_msg_size);
     if (TIGHTDB_LIKELY(strerror_r(err, buffer.data()+offset, max_msg_size) == 0))
         return buffer.str();
@@ -85,7 +89,8 @@ string get_last_error_msg(const char* prefix, DWORD err)
     DWORD size =
         FormatMessageA(flags, 0, err, language_id, buffer.data()+offset,
                        static_cast<DWORD>(max_msg_size), 0);
-    if (0 < size) return string(buffer.data(), offset+size);
+    if (0 < size)
+        return string(buffer.data(), offset+size);
     buffer.resize(offset);
     buffer.append_c_str("Unknown error");
     return buffer.str();
@@ -104,23 +109,30 @@ namespace util {
 void make_dir(const string& path)
 {
 #ifdef _WIN32
-    if (_mkdir(path.c_str()) == 0) return;
+    if (_mkdir(path.c_str()) == 0)
+        return;
 #else // POSIX
-    if (::mkdir(path.c_str(), S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH) == 0) return;
+    if (::mkdir(path.c_str(), S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH) == 0)
+        return;
 #endif
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("open() failed: ", err);
     switch (err) {
         case EACCES:
-        case EROFS:         throw File::PermissionDenied(msg);
-        case EEXIST:        throw File::Exists(msg);
+        case EROFS:
+            throw File::PermissionDenied(msg);
+        case EEXIST:
+            throw File::Exists(msg);
         case ELOOP:
         case EMLINK:
         case ENAMETOOLONG:
         case ENOENT:
-        case ENOTDIR:       throw File::AccessError(msg);
-        case ENOSPC:        throw ResourceAllocError(msg);
-        default:            throw runtime_error(msg);
+        case ENOTDIR:
+            throw File::AccessError(msg);
+        case ENOSPC:
+            throw ResourceAllocError(msg);
+        default:
+            throw runtime_error(msg);
     }
 }
 
@@ -128,9 +140,11 @@ void make_dir(const string& path)
 void remove_dir(const string& path)
 {
 #ifdef _WIN32
-    if (_rmdir(path.c_str()) == 0) return;
+    if (_rmdir(path.c_str()) == 0)
+        return;
 #else // POSIX
-    if (::rmdir(path.c_str()) == 0) return;
+    if (::rmdir(path.c_str()) == 0)
+        return;
 #endif
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("open() failed: ", err);
@@ -140,13 +154,17 @@ void remove_dir(const string& path)
         case EBUSY:
         case EPERM:
         case EEXIST:
-        case ENOTEMPTY:     throw File::PermissionDenied(msg);
-        case ENOENT:        throw File::NotFound(msg);
+        case ENOTEMPTY:
+            throw File::PermissionDenied(msg);
+        case ENOENT:
+            throw File::NotFound(msg);
         case ELOOP:
         case ENAMETOOLONG:
         case EINVAL:
-        case ENOTDIR:       throw File::AccessError(msg);
-        default:            throw runtime_error(msg);
+        case ENOTDIR:
+            throw File::AccessError(msg);
+        default:
+            throw runtime_error(msg);
     }
 }
 
@@ -166,7 +184,8 @@ string make_temp_dir()
             throw runtime_error("GetTempFileName() failed");
         if (DeleteFileA(buffer2.c_str()) == 0)
             throw runtime_error("DeleteFile() failed");
-        if (CreateDirectoryA(buffer2.c_str(), 0) != 0) break;
+        if (CreateDirectoryA(buffer2.c_str(), 0) != 0)
+            break;
         if (GetLastError() != ERROR_ALREADY_EXISTS)
             throw runtime_error("CreateDirectory() failed");
     }
@@ -176,7 +195,8 @@ string make_temp_dir()
 
     StringBuffer buffer;
     buffer.append_c_str(P_tmpdir "/tightdb_XXXXXX");
-    if (mkdtemp(buffer.c_str()) == 0) throw runtime_error("mkdtemp() failed");
+    if (mkdtemp(buffer.c_str()) == 0)
+        throw runtime_error("mkdtemp() failed");
     return buffer.str();
 
 #endif
@@ -198,8 +218,12 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
         case access_ReadOnly:
             break;
         case access_ReadWrite:
-            if (flags & flag_Append) desired_access  = FILE_APPEND_DATA;
-            else                     desired_access |= GENERIC_WRITE;
+            if (flags & flag_Append) {
+                desired_access  = FILE_APPEND_DATA;
+            }
+            else {
+                desired_access |= GENERIC_WRITE;
+            }
             break;
     }
     // FIXME: Should probably be zero if we are called on behalf of a
@@ -241,27 +265,43 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
     string msg = get_last_error_msg("CreateFile() failed: ", err);
     switch (err) {
         case ERROR_SHARING_VIOLATION:
-        case ERROR_ACCESS_DENIED:       throw PermissionDenied(msg);
-        case ERROR_FILE_NOT_FOUND:      throw NotFound(msg);
-        case ERROR_FILE_EXISTS:         throw Exists(msg);
-        case ERROR_TOO_MANY_OPEN_FILES: throw ResourceAllocError(msg);
-        default:                        throw runtime_error(msg);
+        case ERROR_ACCESS_DENIED:
+            throw PermissionDenied(msg);
+        case ERROR_FILE_NOT_FOUND:
+            throw NotFound(msg);
+        case ERROR_FILE_EXISTS:
+            throw Exists(msg);
+        case ERROR_TOO_MANY_OPEN_FILES:
+            throw ResourceAllocError(msg);
+        default:
+            throw runtime_error(msg);
     }
 
 #else // POSIX version
 
     int flags2 = 0;
     switch (a) {
-        case access_ReadOnly:  flags2 = O_RDONLY; break;
-        case access_ReadWrite: flags2 = O_RDWR;   break;
+        case access_ReadOnly:
+            flags2 = O_RDONLY;
+            break;
+        case access_ReadWrite:
+            flags2 = O_RDWR;
+            break;
     }
     switch (c) {
-        case create_Auto:  flags2 |= O_CREAT;          break;
-        case create_Never:                             break;
-        case create_Must:  flags2 |= O_CREAT | O_EXCL; break;
+        case create_Auto:
+            flags2 |= O_CREAT;
+            break;
+        case create_Never:
+            break;
+        case create_Must:
+            flags2 |= O_CREAT | O_EXCL;
+            break;
     }
-    if (flags & flag_Trunc)  flags2 |= O_TRUNC;
-    if (flags & flag_Append) flags2 |= O_APPEND;
+    if (flags & flag_Trunc)
+        flags2 |= O_TRUNC;
+    if (flags & flag_Append)
+        flags2 |= O_APPEND;
     int fd = ::open(path.c_str(), flags2, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     if (0 <= fd) {
         m_fd = fd;
@@ -283,20 +323,26 @@ void File::open_internal(const string& path, AccessMode a, CreateMode c, int fla
     switch (err) {
         case EACCES:
         case EROFS:
-        case ETXTBSY:       throw PermissionDenied(msg);
-        case ENOENT:        throw NotFound(msg);
-        case EEXIST:        throw Exists(msg);
+        case ETXTBSY:
+            throw PermissionDenied(msg);
+        case ENOENT:
+            throw NotFound(msg);
+        case EEXIST:
+            throw Exists(msg);
         case EISDIR:
         case ELOOP:
         case ENAMETOOLONG:
         case ENOTDIR:
-        case ENXIO:         throw AccessError(msg);
+        case ENXIO:
+            throw AccessError(msg);
         case EMFILE:
         case ENFILE:
         case ENOSR:
         case ENOSPC:
-        case ENOMEM:        throw ResourceAllocError(msg);
-        default:            throw runtime_error(msg);
+        case ENOMEM:
+            throw ResourceAllocError(msg);
+        default:
+            throw runtime_error(msg);
     }
 
 #endif
@@ -307,8 +353,10 @@ void File::close() TIGHTDB_NOEXCEPT
 {
 #ifdef _WIN32 // Windows version
 
-    if (!m_handle) return;
-    if (m_have_lock) unlock();
+    if (!m_handle)
+        return;
+    if (m_have_lock)
+        unlock();
 
     BOOL r = CloseHandle(m_handle);
     TIGHTDB_ASSERT(r);
@@ -317,7 +365,8 @@ void File::close() TIGHTDB_NOEXCEPT
 
 #else // POSIX version
 
-    if (m_fd < 0) return;
+    if (m_fd < 0)
+        return;
     int r = ::close(m_fd);
     TIGHTDB_ASSERT(r == 0);
     static_cast<void>(r);
@@ -376,8 +425,10 @@ size_t File::read(char* data, size_t size)
     string msg = get_errno_msg("read(): failed: ", err);
     switch (err) {
         case ENOBUFS:
-        case ENOMEM:  throw ResourceAllocError(msg);
-        default:      throw runtime_error(msg);
+        case ENOMEM:
+            throw ResourceAllocError(msg);
+        default:
+            throw runtime_error(msg);
     }
 
 #endif
@@ -428,8 +479,10 @@ void File::write(const char* data, size_t size)
     string msg = get_errno_msg("write(): failed: ", err);
     switch (err) {
         case ENOSPC:
-        case ENOBUFS: throw ResourceAllocError(msg);
-        default:      throw runtime_error(msg);
+        case ENOBUFS:
+            throw ResourceAllocError(msg);
+        default:
+            throw runtime_error(msg);
     }
 
 #endif
@@ -485,7 +538,8 @@ void File::resize(SizeType size)
 
     // POSIX specifies that introduced bytes read as zero. This is not
     // required by File::resize().
-    if (::ftruncate(m_fd, size2) == 0) return;
+    if (::ftruncate(m_fd, size2) == 0)
+        return;
     throw runtime_error("ftruncate() failed");
 
 #endif
@@ -504,7 +558,8 @@ void File::prealloc(SizeType offset, size_t size)
 
     if (int_add_with_overflow_detect(offset, size))
         throw runtime_error("File size overflow");
-    if (get_size() < offset) resize(offset);
+    if (get_size() < offset)
+        resize(offset);
 
 #endif
 }
@@ -522,12 +577,15 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
     if (int_cast_with_overflow_detect(size, size2))
         throw runtime_error("File size overflow");
 
-    if (::posix_fallocate(m_fd, offset, size2) == 0) return;
+    if (::posix_fallocate(m_fd, offset, size2) == 0)
+        return;
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("posix_fallocate() failed: ", err);
     switch (err) {
-        case ENOSPC: throw ResourceAllocError(msg);
-        default:     throw runtime_error(msg);
+        case ENOSPC:
+            throw ResourceAllocError(msg);
+        default:
+            throw runtime_error(msg);
     }
 
     // FIXME: OS X does not have any version of fallocate, but see
@@ -578,7 +636,8 @@ void File::seek(SizeType position)
     if (int_cast_with_overflow_detect(position, position2))
         throw runtime_error("File position overflow");
 
-    if (0 <= ::lseek(m_fd, position2, SEEK_SET)) return;
+    if (0 <= ::lseek(m_fd, position2, SEEK_SET))
+        return;
     throw runtime_error("lseek() failed");
 
 #endif
@@ -595,12 +654,14 @@ void File::sync()
 
 #ifdef _WIN32 // Windows version
 
-    if (FlushFileBuffers(m_handle)) return;
+    if (FlushFileBuffers(m_handle))
+        return;
     throw runtime_error("FlushFileBuffers() failed");
 
 #else // POSIX version
 
-    if (::fsync(m_fd) == 0) return;
+    if (::fsync(m_fd) == 0)
+        return;
     throw runtime_error("fsync() failed");
 
 #endif
@@ -620,8 +681,10 @@ bool File::lock(bool exclusive, bool non_blocking)
     // system, but there is no guarantees on the timing.
 
     DWORD flags = 0;
-    if (exclusive)    flags |= LOCKFILE_EXCLUSIVE_LOCK;
-    if (non_blocking) flags |= LOCKFILE_FAIL_IMMEDIATELY;
+    if (exclusive)
+        flags |= LOCKFILE_EXCLUSIVE_LOCK;
+    if (non_blocking)
+        flags |= LOCKFILE_FAIL_IMMEDIATELY;
     OVERLAPPED overlapped;
     memset(&overlapped, 0, sizeof overlapped);
     overlapped.Offset = 0;        // Just for clarity
@@ -631,7 +694,8 @@ bool File::lock(bool exclusive, bool non_blocking)
         return true;
     }
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    if (err == ERROR_LOCK_VIOLATION) return false;
+    if (err == ERROR_LOCK_VIOLATION)
+        return false;
     string msg = get_last_error_msg("LockFileEx() failed: ", err);
     throw runtime_error(msg);
 
@@ -656,12 +720,16 @@ bool File::lock(bool exclusive, bool non_blocking)
     // from this 'spurious unlocking issue'.
 
     int operation = exclusive ? LOCK_EX : LOCK_SH;
-    if (non_blocking) operation |=  LOCK_NB;
-    if (flock(m_fd, operation) == 0) return true;
+    if (non_blocking)
+        operation |=  LOCK_NB;
+    if (flock(m_fd, operation) == 0)
+        return true;
     int err = errno; // Eliminate any risk of clobbering
-    if (err == EWOULDBLOCK) return false;
+    if (err == EWOULDBLOCK)
+        return false;
     string msg = get_errno_msg("flock() failed: ", err);
-    if (err == ENOLCK) throw ResourceAllocError(msg);
+    if (err == ENOLCK)
+        throw ResourceAllocError(msg);
     throw runtime_error(msg);
 
 #endif
@@ -672,7 +740,8 @@ void File::unlock() TIGHTDB_NOEXCEPT
 {
 #ifdef _WIN32 // Windows version
 
-    if (!m_have_lock) return;
+    if (!m_have_lock)
+        return;
     BOOL r = UnlockFile(m_handle, 0, 0, 1, 0);
     TIGHTDB_ASSERT(r);
     static_cast<void>(r);
@@ -722,7 +791,8 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
         TIGHTDB_ASSERT(r);
         static_cast<void>(r);
     }
-    if (TIGHTDB_LIKELY(addr)) return addr;
+    if (TIGHTDB_LIKELY(addr))
+        return addr;
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     string msg = get_last_error_msg("MapViewOfFile() failed: ", err);
     throw runtime_error(msg);
@@ -736,19 +806,25 @@ void* File::map(AccessMode a, size_t size, int map_flags) const
 
     int prot = PROT_READ;
     switch (a) {
-        case access_ReadWrite: prot |= PROT_WRITE; break;
-        case access_ReadOnly:                      break;
+        case access_ReadWrite:
+            prot |= PROT_WRITE;
+            break;
+        case access_ReadOnly:
+            break;
     }
     void* addr = ::mmap(0, size, prot, MAP_SHARED, m_fd, 0);
-    if (addr != MAP_FAILED) return addr;
+    if (addr != MAP_FAILED)
+        return addr;
 
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("mmap() failed: ", err);
     switch (err) {
         case EAGAIN:
         case EMFILE:
-        case ENOMEM: throw ResourceAllocError(msg);
-        default:     throw runtime_error(msg);
+        case ENOMEM:
+            throw ResourceAllocError(msg);
+        default:
+            throw runtime_error(msg);
     }
 
 #endif
@@ -781,13 +857,16 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
     static_cast<void>(a);
     static_cast<void>(map_flags);
     void* new_addr = ::mremap(old_addr, old_size, new_size, MREMAP_MAYMOVE);
-    if (new_addr != MAP_FAILED) return new_addr;
+    if (new_addr != MAP_FAILED)
+        return new_addr;
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("mremap(): failed: ", err);
     switch (err) {
         case EAGAIN:
-        case ENOMEM: throw ResourceAllocError(msg);
-        default:     throw runtime_error(msg);
+        case ENOMEM:
+            throw ResourceAllocError(msg);
+        default:
+            throw runtime_error(msg);
     }
 #else
     void* new_addr = map(a, new_size, map_flags);
@@ -801,12 +880,14 @@ void File::sync_map(void* addr, size_t size)
 {
 #ifdef _WIN32 // Windows version
 
-    if (FlushViewOfFile(addr, size)) return;
+    if (FlushViewOfFile(addr, size))
+        return;
     throw runtime_error("FlushViewOfFile() failed");
 
 #else // POSIX version
 
-    if (::msync(addr, size, MS_SYNC) == 0) return;
+    if (::msync(addr, size, MS_SYNC) == 0)
+        return;
     int err = errno; // Eliminate any risk of clobbering
     throw runtime_error(get_errno_msg("msync() failed: ", err));
 
@@ -817,27 +898,33 @@ void File::sync_map(void* addr, size_t size)
 bool File::exists(const string& path)
 {
 #ifdef _WIN32
-    if (_access(path.c_str(), 0) == 0) return true;
+    if (_access(path.c_str(), 0) == 0)
+        return true;
 #else // POSIX
-    if (::access(path.c_str(), F_OK) == 0) return true;
+    if (::access(path.c_str(), F_OK) == 0)
+        return true;
 #endif
     int err = errno; // Eliminate any risk of clobbering
     switch (err) {
         case EACCES:
         case ENOENT:
-        case ENOTDIR: return false;
+        case ENOTDIR:
+            return false;
     }
     string msg = get_errno_msg("access() failed: ", err);
     switch (err) {
-        case ENOMEM:  throw ResourceAllocError(msg);
-        default:      throw runtime_error(msg);
+        case ENOMEM:
+            throw ResourceAllocError(msg);
+        default:
+            throw runtime_error(msg);
     }
 }
 
 
 void File::remove(const string& path)
 {
-    if (try_remove(path)) return;
+    if (try_remove(path))
+        return;
     int err = ENOENT;
     string msg = get_errno_msg("open() failed: ", err);
     throw NotFound(msg);
@@ -847,9 +934,11 @@ void File::remove(const string& path)
 bool File::try_remove(const string& path)
 {
 #ifdef _WIN32
-    if (_unlink(path.c_str()) == 0) return true;
+    if (_unlink(path.c_str()) == 0)
+        return true;
 #else // POSIX
-    if (::unlink(path.c_str()) == 0) return true;
+    if (::unlink(path.c_str()) == 0)
+        return true;
 #endif
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("unlink() failed: ", err);
@@ -858,13 +947,17 @@ bool File::try_remove(const string& path)
         case EROFS:
         case ETXTBSY:
         case EBUSY:
-        case EPERM:         throw PermissionDenied(msg);
-        case ENOENT:        return false;
+        case EPERM:
+            throw PermissionDenied(msg);
+        case ENOENT:
+            return false;
         case ELOOP:
         case ENAMETOOLONG:
-        case EISDIR:        // Returned by Linux when path refers to a directory
-        case ENOTDIR:       throw AccessError(msg);
-        default:            throw runtime_error(msg);
+        case EISDIR: // Returned by Linux when path refers to a directory
+        case ENOTDIR:
+            throw AccessError(msg);
+        default:
+            throw runtime_error(msg);
     }
 }
 
@@ -914,9 +1007,8 @@ bool File::is_same_file(const File& f) const
     if (::fstat(m_fd, &statbuf) == 0) {
         dev_t device_id = statbuf.st_dev;
         ino_t inode_num = statbuf.st_ino;
-        if (::fstat(f.m_fd, &statbuf) == 0) {
+        if (::fstat(f.m_fd, &statbuf) == 0)
             return device_id == statbuf.st_dev && inode_num == statbuf.st_ino;
-        }
     }
     int err = errno; // Eliminate any risk of clobbering
     string msg = get_errno_msg("fstat() failed: ", err);
@@ -937,7 +1029,8 @@ bool File::is_removed() const
 #else // POSIX version
 
     struct stat statbuf;
-    if (::fstat(m_fd, &statbuf) == 0) return statbuf.st_nlink == 0;
+    if (::fstat(m_fd, &statbuf) == 0)
+        return statbuf.st_nlink == 0;
     throw runtime_error("fstat() failed");
 
 #endif

@@ -256,7 +256,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // Make sure to initialize the file in such a way, that when it reaches the
             // size of SharedInfo, it contains just zeroes.
             char empty_buf[sizeof (SharedInfo)];
-            std::fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
+            fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
             m_file.write(empty_buf, info_size);
             need_init = true;
         }
@@ -441,9 +441,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
     }
     while (must_retry);
 
-#ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
-#endif
+
 #ifndef _WIN32
     if (dlevel == durability_Async) {
         if (is_backend) {
@@ -471,7 +470,16 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     if (!is_attached())
         return;
 
-    TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
+    switch (m_transact_stage) {
+        case transact_Ready:
+            break;
+        case transact_Reading:
+            end_read();
+            break;
+        case transact_Writing:
+            rollback();
+            break;
+    }
 
     SharedInfo* info = m_file_map.get_addr();
 
@@ -593,9 +601,8 @@ void SharedGroup::do_async_commits()
 #endif
             // Get a read lock on the (current) version that we want
             // to commit to disk.
-#ifdef TIGHTDB_DEBUG
             m_transact_stage = transact_Ready;
-#endif
+
             begin_read();
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "(version " << m_version << " from "
@@ -706,9 +713,7 @@ const Group& SharedGroup::begin_read()
         }
     }
 
-#ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Reading;
-#endif
 
     // Make sure the group is up-to-date.
     // A zero ref means that the file has just been created.
@@ -759,9 +764,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     // The read may have allocated some temporary state
     m_group.detach();
 
-#ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
-#endif
 }
 
 
@@ -804,9 +807,7 @@ void SharedGroup::do_begin_write()
     // zero ref means that the file has just been created
     m_group.update_from_shared(new_top_ref, new_file_size); // Throws
 
-#ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Writing;
-#endif
 }
 
 
@@ -857,9 +858,7 @@ void SharedGroup::commit()
 
     m_group.detach();
 
-#ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
-#endif
 }
 
 
@@ -885,9 +884,7 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
         // Clear all changes made during transaction
         m_group.detach();
 
-#ifdef TIGHTDB_DEBUG
         m_transact_stage = transact_Ready;
-#endif
     }
 }
 
