@@ -2086,7 +2086,7 @@ size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
 } //namespace
 
 // Simple pivot aggregate method. Experimental! Please do not document method publicly.
-void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result) const
+void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result, const Array* viewrefs) const
 {
     TIGHTDB_ASSERT(result.is_empty() && result.get_column_count() == 0);
     TIGHTDB_ASSERT(group_by_column < m_columns.size());
@@ -2103,7 +2103,6 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
     const Column& src_column = get_column(aggr_column);
     Column& dst_column = result.get_column(1);
 
-    const size_t count = size();
     AggrState state;
     get_group_fnc get_group_ndx_fnc = NULL;
 
@@ -2134,87 +2133,185 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         get_group_ndx_fnc = &get_group_ndx;
     }
 
-    switch (op) {
-        case aggr_count:
-            for (size_t i = 0; i < count; ++i) {
-                size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+    if (viewrefs) {
+        // Aggregating over a view
+        const size_t count = viewrefs->size();
 
-                // Count
-                dst_column.adjust(ndx, 1);
+        switch (op) {
+            case aggr_count:
+                for (size_t r = 0; r < count; ++r) {
+                    size_t i = viewrefs->get(r);
+                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+
+                    // Count
+                    dst_column.adjust(ndx, 1);
+                }
+                break;
+            case aggr_sum:
+                for (size_t r = 0; r < count; ++r) {
+                    size_t i = viewrefs->get(r);
+                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+
+                    // Sum
+                    int64_t value = src_column.get(i);
+                    dst_column.adjust(ndx, value);
+                }
+                break;
+            case aggr_avg:
+            {
+                // Add temporary column for counts
+                result.add_column(type_Int, "count");
+                Column& cnt_column = result.get_column(2);
+
+                for (size_t r = 0; r < count; ++r) {
+                    size_t i = viewrefs->get(r);
+                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+
+                    // SUM
+                    int64_t value = src_column.get(i);
+                    dst_column.adjust(ndx, value);
+
+                    // Increment count
+                    cnt_column.adjust(ndx, 1);
+                }
+
+                // Calculate averages
+                result.add_column(type_Double, "average");
+                ColumnDouble& mean_column = result.get_column_double(3);
+                const size_t res_count = result.size();
+                for (size_t i = 0; i < res_count; ++i) {
+                    int64_t sum   = dst_column.get(i);
+                    int64_t count = cnt_column.get(i);
+                    double res   = sum / count;
+                    mean_column.set(i, res);
+                }
+
+                // Remove temp columns
+                result.remove_column(1); // sums
+                result.remove_column(1); // counts
+                break;
             }
-            break;
-        case aggr_sum:
-            for (size_t i = 0; i < count; ++i) {
-                size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+            case aggr_min:
+                for (size_t r = 0; r < count; ++r) {
+                    size_t i = viewrefs->get(r);
 
-                // Sum
-                int64_t value = src_column.get(i);
-                dst_column.adjust(ndx, value);
-            }
-            break;
-        case aggr_avg:
-        {
-            // Add temporary column for counts
-            result.add_column(type_Int, "count");
-            Column& cnt_column = result.get_column(2);
+                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+                    int64_t value = src_column.get(i);
+                    if (state.added_row) {
+                        dst_column.set(ndx, value); // Set the real value, to overwrite the default value
+                        state.added_row = false;
+                    }
+                    else {
+                        int64_t current = dst_column.get(ndx);
+                        if (value < current)
+                            dst_column.set(ndx, value);
+                    }
+                }
+                break;
+            case aggr_max:
+                for (size_t r = 0; r < count; ++r) {
+                    size_t i = viewrefs->get(r);
 
-            for (size_t i = 0; i < count; ++i) {
-                size_t ndx = (*get_group_ndx_fnc)(i, state, result);
-
-                // SUM
-                int64_t value = src_column.get(i);
-                dst_column.adjust(ndx, value);
-
-                // Increment count
-                cnt_column.adjust(ndx, 1);
-            }
-
-            // Calculate averages
-            result.add_column(type_Double, "average");
-            ColumnDouble& mean_column = result.get_column_double(3);
-            const size_t res_count = result.size();
-            for (size_t i = 0; i < res_count; ++i) {
-                int64_t sum   = dst_column.get(i);
-                int64_t count = cnt_column.get(i);
-                double res   = sum / count;
-                mean_column.set(i, res);
-            }
-            
-            // Remove temp columns
-            result.remove_column(1); // sums
-            result.remove_column(1); // counts
-            break;
+                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+                    int64_t value = src_column.get(i);
+                    if (state.added_row) {
+                        dst_column.set(ndx, value); // Set the real value, to overwrite the default value
+                        state.added_row = false;
+                    }
+                    else {
+                        int64_t current = dst_column.get(ndx);
+                        if (value > current)
+                            dst_column.set(ndx, value);
+                    }
+                }
+                break;
         }
-        case aggr_min:
-            for (size_t i = 0; i < count; ++i) {
-                size_t ndx = (*get_group_ndx_fnc)(i, state, result);
-                int64_t value = src_column.get(i);
-                if (state.added_row) {
-                    dst_column.set(ndx, value); // Set the real value, to overwrite the default value
-                    state.added_row = false;
+    }
+    else {
+        const size_t count = size();
+
+        switch (op) {
+            case aggr_count:
+                for (size_t i = 0; i < count; ++i) {
+                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+
+                    // Count
+                    dst_column.adjust(ndx, 1);
                 }
-                else {
-                    int64_t current = dst_column.get(ndx);
-                    if (value < current)
-                        dst_column.set(ndx, value);
+                break;
+            case aggr_sum:
+                for (size_t i = 0; i < count; ++i) {
+                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+
+                    // Sum
+                    int64_t value = src_column.get(i);
+                    dst_column.adjust(ndx, value);
                 }
+                break;
+            case aggr_avg:
+            {
+                // Add temporary column for counts
+                result.add_column(type_Int, "count");
+                Column& cnt_column = result.get_column(2);
+
+                for (size_t i = 0; i < count; ++i) {
+                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+
+                    // SUM
+                    int64_t value = src_column.get(i);
+                    dst_column.adjust(ndx, value);
+
+                    // Increment count
+                    cnt_column.adjust(ndx, 1);
+                }
+
+                // Calculate averages
+                result.add_column(type_Double, "average");
+                ColumnDouble& mean_column = result.get_column_double(3);
+                const size_t res_count = result.size();
+                for (size_t i = 0; i < res_count; ++i) {
+                    int64_t sum   = dst_column.get(i);
+                    int64_t count = cnt_column.get(i);
+                    double res   = sum / count;
+                    mean_column.set(i, res);
+                }
+
+                // Remove temp columns
+                result.remove_column(1); // sums
+                result.remove_column(1); // counts
+                break;
             }
-            break;
-        case aggr_max:
-            for (size_t i = 0; i < count; ++i) {
-                size_t ndx = (*get_group_ndx_fnc)(i, state, result);
-                int64_t value = src_column.get(i);
-                if (state.added_row) {
-                    dst_column.set(ndx, value); // Set the real value, to overwrite the default value
-                    state.added_row = false;
+            case aggr_min:
+                for (size_t i = 0; i < count; ++i) {
+                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+                    int64_t value = src_column.get(i);
+                    if (state.added_row) {
+                        dst_column.set(ndx, value); // Set the real value, to overwrite the default value
+                        state.added_row = false;
+                    }
+                    else {
+                        int64_t current = dst_column.get(ndx);
+                        if (value < current)
+                            dst_column.set(ndx, value);
+                    }
                 }
-                else {
-                    int64_t current = dst_column.get(ndx);
-                    if (value > current)
-                        dst_column.set(ndx, value);
+                break;
+            case aggr_max:
+                for (size_t i = 0; i < count; ++i) {
+                    size_t ndx = (*get_group_ndx_fnc)(i, state, result);
+                    int64_t value = src_column.get(i);
+                    if (state.added_row) {
+                        dst_column.set(ndx, value); // Set the real value, to overwrite the default value
+                        state.added_row = false;
+                    }
+                    else {
+                        int64_t current = dst_column.get(ndx);
+                        if (value > current)
+                            dst_column.set(ndx, value);
+                    }
                 }
-            }
-            break;
+                break;
+        }
     }
 }
 
