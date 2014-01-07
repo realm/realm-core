@@ -109,6 +109,7 @@ ONLY(ManyColumnsCrash) {
             {
                 // create the event
 #if 1
+
                 PatientTableType::Ref table = group->get_table<PatientTableType>("events");
                 table->add(obfuscatedYear, daysSinceLastVisit, conceptId);
 #else
@@ -2803,6 +2804,56 @@ TEST(Table_FormerLeakCase)
     root.add_empty_row(1);
     root.set_subtable(0, 0, &sub);
     root.set_subtable(0, 0, 0);
+}
+
+TIGHTDB_TABLE_3(TablePivotAgg,
+                sex,   String,
+                age,   Int,
+                hired, Bool)
+
+TEST(Table_pivot)
+{
+    TablePivotAgg table;
+    for (size_t i = 0; i < 500000; ++i) {
+        StringData sex = i % 2 ? "Male" : "Female";
+        table.add(sex, 20 + (i%20), true);
+    }
+
+    UnitTest::Timer timer;
+    stringstream ss;
+
+    Table result_count;
+    timer.Start();
+    table.aggregate(0, 1, Table::aggr_count, result_count);
+    printf("pivot_count1: %d\n", timer.GetTimeInMs());
+
+    result_count.to_string(ss);
+    cout << ss.str();
+
+    Table result_sum;
+    table.aggregate(0, 1, Table::aggr_sum, result_sum);
+
+    ss.str("");
+    result_sum.to_string(ss);
+    cout << ss.str();
+
+    Table result_avg;
+    table.aggregate(0, 1, Table::aggr_avg, result_avg);
+
+    ss.str("");
+    result_avg.to_string(ss);
+    cout << ss.str();
+
+    // Test with enumerated strings
+    table.optimize();
+
+    Table result_count2;
+    timer.Start();
+    table.aggregate(0, 1, Table::aggr_count, result_count2);
+    printf("pivot_count2: %d\n", timer.GetTimeInMs());
+    ss.str("");
+    result_count2.to_string(ss);
+    cout << ss.str();
 }
 
 #endif // TEST_TABLE
