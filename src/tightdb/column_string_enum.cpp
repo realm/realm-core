@@ -43,12 +43,7 @@ void ColumnStringEnum::destroy() TIGHTDB_NOEXCEPT
 
 void ColumnStringEnum::adjust_keys_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
 {
-    m_keys.adjust_ndx_in_parent(diff);
-}
-
-void ColumnStringEnum::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
-{
-    Column::adjust_ndx_in_parent(diff);
+    m_keys.get_root_array()->adjust_ndx_in_parent(diff);
 }
 
 void ColumnStringEnum::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT

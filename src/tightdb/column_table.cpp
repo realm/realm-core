@@ -157,10 +157,10 @@ void ColumnTable::Verify() const
 
     // Verify each sub-table
     size_t n = size();
-    for (size_t i = 0; i < n; ++i) {
+    for (size_t i = 0; i != n; ++i) {
         // We want to verify any cached table accessors so we do not
         // want to skip null refs here.
-        ConstTableRef subtable = get_subtable(i, m_spec_ref);
+        ConstTableRef subtable = get_subtable_ptr(i)->get_table_ref();
         subtable->Verify();
     }
 }
@@ -180,7 +180,7 @@ void ColumnTable::to_dot(ostream& out, StringData title) const
     for (size_t i = 0; i != n; ++i) {
         if (get_as_ref(i) == 0)
             continue;
-        ConstTableRef subtable = get_subtable(i, m_spec_ref);
+        ConstTableRef subtable = get_subtable_ptr(i)->get_table_ref();
         subtable->to_dot(out);
     }
 }
