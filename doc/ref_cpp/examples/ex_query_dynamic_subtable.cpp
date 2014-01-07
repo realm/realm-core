@@ -36,9 +36,9 @@ int main()
     table->add_column(type_String, "Names");
     table->add_column(type_Table, "Scores");
 
-    Spec tablespec = table->get_spec();
-    Spec subspec = tablespec.get_subtable_spec(1);
-    subspec.add_column(type_Int, "Score");
+    vector<size_t> path;
+    path.push_back(1);
+    table->add_subcolumn(path, type_Int, "Score");
 
     table->add_empty_row();
     table->set_string(0, 0, "Peter");
