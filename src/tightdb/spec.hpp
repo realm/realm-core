@@ -125,6 +125,7 @@ private:
     std::size_t get_subspec_ndx(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_subspec_ref(std::size_t subspec_ndx) const TIGHTDB_NOEXCEPT;
     std::size_t get_num_subspecs() const TIGHTDB_NOEXCEPT;
+    SubspecRef get_subspec_by_ndx(std::size_t subspec_ndx) TIGHTDB_NOEXCEPT;
 
     size_t get_enumkeys_ndx(size_t column_ndx) const;
 
@@ -299,6 +300,11 @@ inline ConstSubspecRef Spec::get_subtable_spec(std::size_t column_ndx) const TIG
     TIGHTDB_ASSERT(get_column_type(column_ndx) == type_Table);
     std::size_t subspec_ndx = get_subspec_ndx(column_ndx);
     return ConstSubspecRef(&m_subspecs, subspec_ndx);
+}
+
+inline SubspecRef Spec::get_subspec_by_ndx(std::size_t subspec_ndx) TIGHTDB_NOEXCEPT
+{
+    return SubspecRef(&m_subspecs, subspec_ndx);
 }
 
 inline void Spec::init(SubspecRef r) TIGHTDB_NOEXCEPT

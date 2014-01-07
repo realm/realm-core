@@ -824,7 +824,7 @@ void Replication::TransactLogApplier::apply()
                 if (m_log)
                     *m_log << "spec->add_column("<<type<<", \""<<name<<"\")\n";
 #endif
-                spec->add_column(DataType(type), name);
+                spec->add_column(&*m_table, DataType(type), name);
                 m_dirty_spec = true;
                 break;
             }
