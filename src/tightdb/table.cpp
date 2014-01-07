@@ -2025,6 +2025,16 @@ ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
     return tv;
 }
 
+TableView Table::range(size_t start, size_t end)
+{
+    TIGHTDB_ASSERT(!m_columns.is_attached());
+
+    TableView tv(*this);
+    for (size_t i = start; i < end; i++)
+        tv.get_ref_column().add(i);
+    return tv;
+}
+
 
 size_t Table::lower_bound_int(size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT
 {

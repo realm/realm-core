@@ -758,6 +758,19 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, res);
 }
 
+TEST(Table_range)
+{
+    Table table;
+    table.add_column(type_Int, "int");
+    table.add_empty_row(100);
+    for (int i = 0 ; i < 100; ++i)
+        table.set_int(0, i, i);
+    TableView tv = table.range(10, 20);
+    CHECK_EQUAL(10, tv.size());
+    for (size_t i = 0; i<tv.size(); ++i)
+        CHECK_EQUAL(i+10, tv.get_int(0, i));
+}
+
 
 // enable to generate testfiles for to_string and json below
 #define GENERATE 0

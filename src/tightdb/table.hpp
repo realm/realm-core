@@ -298,6 +298,10 @@ public:
     TableView      get_sorted_view(std::size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;
 
+    TableView      range(std::size_t start, std::size_t end);
+//    ConstTableView range(std::size_t start, std::size_t end) const;
+
+
 private:
     template <class T> std::size_t find_first(std::size_t column_ndx, T value) const; // called by above methods
     template <class T> ConstTableView find_all(size_t column_ndx, T value) const;
