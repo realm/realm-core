@@ -19,6 +19,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 using namespace test_util;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
@@ -460,21 +461,19 @@ namespace {
 void setup_multi_table(Table& table, size_t rows, size_t sub_rows)
 {
     // Create table with all column types
-    Spec& s = table.get_spec();
-    s.add_column(type_Int,    "int");
-    s.add_column(type_Bool,   "bool");
-    s.add_column(type_DateTime,"date");
-    s.add_column(type_Float,  "float");
-    s.add_column(type_Double, "double");
-    s.add_column(type_String, "string");
-    s.add_column(type_String, "string_long");
-    s.add_column(type_String, "string_enum"); // becomes ColumnStringEnum
-    s.add_column(type_Binary, "binary");
-    s.add_column(type_Mixed,  "mixed");
-    Spec sub = s.add_subtable_column("tables");
-    sub.add_column(type_Int,    "sub_first");
-    sub.add_column(type_String, "sub_second");
-    table.update_from_spec();
+    table.add_column(type_Int,      "int");
+    table.add_column(type_Bool,     "bool");
+    table.add_column(type_DateTime, "date");
+    table.add_column(type_Float,    "float");
+    table.add_column(type_Double,   "double");
+    table.add_column(type_String,   "string");
+    table.add_column(type_String,   "string_long");
+    table.add_column(type_String,   "string_enum"); // becomes ColumnStringEnum
+    table.add_column(type_Binary,   "binary");
+    table.add_column(type_Mixed,    "mixed");
+    table.add_column(type_Table,    "tables");
+    table.add_subcolumn(tuple(10), type_Int,    "sub_first");
+    table.add_subcolumn(tuple(10), type_String, "sub_second");
 
     // Add some rows
     for (size_t i = 0; i < rows; ++i) {
@@ -616,25 +615,19 @@ TEST(Table_Move_All_Types)
 TEST(Table_DegenerateSubtableSearchAndAggregate)
 {
     Table parent;
-    {
-        Spec& parent_spec = parent.get_spec();
-        Spec child_spec = parent_spec.add_subtable_column("child");
 
-        // Add all column types
-        child_spec.add_column(type_Int,      "int");    // 0
-        child_spec.add_column(type_Bool,     "bool");   // 1
-        child_spec.add_column(type_Float,    "float");  // 2
-        child_spec.add_column(type_Double,   "double"); // 3
-        child_spec.add_column(type_DateTime, "date");   // 4
-        child_spec.add_column(type_String,   "string"); // 5
-        child_spec.add_column(type_Binary,   "binary"); // 6
-        {
-            Spec subspec = child_spec.add_subtable_column("table"); // 7
-            subspec.add_column(type_Int, "i");
-        }
-        child_spec.add_column(type_Mixed,  "mixed");  // 8
-    }
-    parent.update_from_spec();
+    // Add all column types
+    parent.add_column(type_Table, "child");
+    parent.add_subcolumn(tuple(0), type_Int,      "int");    // 0
+    parent.add_subcolumn(tuple(0), type_Bool,     "bool");   // 1
+    parent.add_subcolumn(tuple(0), type_Float,    "float");  // 2
+    parent.add_subcolumn(tuple(0), type_Double,   "double"); // 3
+    parent.add_subcolumn(tuple(0), type_DateTime, "date");   // 4
+    parent.add_subcolumn(tuple(0), type_String,   "string"); // 5
+    parent.add_subcolumn(tuple(0), type_Binary,   "binary"); // 6
+    parent.add_subcolumn(tuple(0), type_Table,    "table");  // 7
+    parent.add_subcolumn(tuple(0), type_Mixed,    "mixed");  // 8
+    parent.add_subcolumn(tuple(0,7), type_Int, "i");
 
     parent.add_empty_row(); // Create a degenerate subtable
 
@@ -1474,13 +1467,11 @@ TEST(Table_Spec)
     TableRef table = group.get_table("test");
 
     // Create specification with sub-table
-    Spec& s = table->get_spec();
-    s.add_column(type_Int,    "first");
-    s.add_column(type_String, "second");
-    Spec sub = s.add_subtable_column("third");
-        sub.add_column(type_Int,    "sub_first");
-        sub.add_column(type_String, "sub_second");
-    table->update_from_spec();
+    table->add_column(type_Int,    "first");
+    table->add_column(type_String, "second");
+    table->add_column(type_Table,   "third");
+    table->add_subcolumn(tuple(2), type_Int,    "sub_first");
+    table->add_subcolumn(tuple(2), type_String, "sub_second");
 
     CHECK_EQUAL(3, table->get_column_count());
 
@@ -1518,7 +1509,7 @@ TEST(Table_Spec)
     }
 
     // Write the group to disk
-    util::File::try_remove("subtables.tightdb");
+    File::try_remove("subtables.tightdb");
     group.write("subtables.tightdb");
 
     // Read back tables
@@ -2129,13 +2120,9 @@ TEST(Table_Mixed2)
 TEST(Table_SubtableSizeAndClear)
 {
     Table table;
-    Spec& spec = table.get_spec();
-    {
-        Spec subspec = spec.add_subtable_column("subtab");
-        subspec.add_column(type_Int, "int");
-    }
-    spec.add_column(type_Mixed, "mixed");
-    table.update_from_spec();
+    table.add_column(type_Table, "subtab");
+    table.add_column(type_Mixed, "mixed");
+    table.add_subcolumn(tuple(0), type_Int, "int");
 
     table.insert_subtable(0, 0);
     table.insert_mixed(1, 0, false);
@@ -2160,11 +2147,7 @@ TEST(Table_SubtableSizeAndClear)
 
     TableRef subtab1 = table.get_subtable(0, 0);
     TableRef subtab2 = table.get_subtable(1, 0);
-    {
-        Spec& subspec = subtab2->get_spec();
-        subspec.add_column(type_Int, "int");
-        subtab2->update_from_spec();
-    }
+    subtab2->add_column(type_Int, "int");
 
     CHECK_EQUAL(table.get_subtable_size(1, 0), 0);
     CHECK(table.get_subtable(1, 0));
@@ -2493,11 +2476,9 @@ TEST(Table_Test_Clear_With_Subtable_AND_Group)
     TableRef table = group.get_table("test");
 
     // Create specification with sub-table
-    Spec& s = table->get_spec();
-    s.add_column(type_String, "name");
-    Spec sub = s.add_subtable_column("sub");
-        sub.add_column(type_Int, "num");
-    table->update_from_spec();
+    table->add_column(type_String, "name");
+    table->add_column(type_Table,  "sub");
+    table->add_subcolumn(tuple(1), type_Int, "num");
 
     CHECK_EQUAL(2, table->get_column_count());
 
@@ -2817,10 +2798,8 @@ TEST(Table_FormerLeakCase)
     sub.add_column(type_Int, "a");
 
     Table root;
-    Spec& s = root.get_spec();
-    Spec subs = s.add_subtable_column("b");
-    subs.add_column(type_Int, "a");
-    root.update_from_spec();
+    root.add_column(type_Table, "b");
+    root.add_subcolumn(tuple(0), type_Int, "a");
     root.add_empty_row(1);
     root.set_subtable(0, 0, &sub);
     root.set_subtable(0, 0, 0);

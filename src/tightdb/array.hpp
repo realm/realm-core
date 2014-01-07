@@ -372,8 +372,8 @@ public:
     static ref_type create_array(Type, std::size_t size, int_fast64_t value, Allocator&);
 
     // Parent tracking
-    bool has_parent() const TIGHTDB_NOEXCEPT { return m_parent != 0; }
-    ArrayParent* get_parent() const TIGHTDB_NOEXCEPT { return m_parent; }
+    bool has_parent() const TIGHTDB_NOEXCEPT;
+    ArrayParent* get_parent() const TIGHTDB_NOEXCEPT;
 
     /// Setting a new parent affects ownership of the attached array
     /// node, if any. If a non-null parent is specified, and there was
@@ -383,17 +383,17 @@ public:
     /// list of children in the affected parents.
     void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
 
-    std::size_t get_ndx_in_parent() const TIGHTDB_NOEXCEPT { return m_ndx_in_parent; }
-    void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT { m_ndx_in_parent += diff; }
+    std::size_t get_ndx_in_parent() const TIGHTDB_NOEXCEPT;
+    void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT;
 
-    bool is_attached() const TIGHTDB_NOEXCEPT { return m_data != 0; }
+    bool is_attached() const TIGHTDB_NOEXCEPT;
 
     /// Detach from the underlying array node. This method has no
     /// effect if the accessor is currently unattached (idempotency).
-    void detach() TIGHTDB_NOEXCEPT { m_data = 0; }
+    void detach() TIGHTDB_NOEXCEPT;
 
     std::size_t size() const TIGHTDB_NOEXCEPT;
-    bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
+    bool is_empty() const TIGHTDB_NOEXCEPT;
     Type get_type() const TIGHTDB_NOEXCEPT;
 
     void insert(std::size_t ndx, int_fast64_t value);
@@ -1253,13 +1253,6 @@ inline void Array::create(Type type)
 }
 
 
-inline std::size_t Array::size() const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(is_attached());
-    return m_size;
-}
-
-
 inline Array::Type Array::get_type() const TIGHTDB_NOEXCEPT
 {
     if (m_is_inner_bptree_node) {
@@ -1850,6 +1843,56 @@ inline ref_type Array::create_array(Type type, std::size_t size, int_fast64_t va
                                     Allocator& alloc)
 {
     return create_array(type, wtype_Bits, size, value, alloc); // Throws
+}
+
+inline bool Array::has_parent() const TIGHTDB_NOEXCEPT
+{
+    return m_parent != 0;
+}
+
+inline ArrayParent* Array::get_parent() const TIGHTDB_NOEXCEPT
+{
+    return m_parent;
+}
+
+inline void Array::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT
+{
+    m_parent = parent;
+    m_ndx_in_parent = ndx_in_parent;
+}
+
+inline std::size_t Array::get_ndx_in_parent() const TIGHTDB_NOEXCEPT
+{
+    return m_ndx_in_parent;
+}
+
+inline void Array::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
+{
+    // Note that `diff` is promoted to an unsigned type, and that
+    // C++03 still guarantees the expected result regardless of the
+    // sizes of `int` and `decltype(m_ndx_in_parent)`.
+    m_ndx_in_parent += diff;
+}
+
+inline bool Array::is_attached() const TIGHTDB_NOEXCEPT
+{
+    return m_data != 0;
+}
+
+inline void Array::detach() TIGHTDB_NOEXCEPT
+{
+    m_data = 0;
+}
+
+inline std::size_t Array::size() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    return m_size;
+}
+
+inline bool Array::is_empty() const TIGHTDB_NOEXCEPT
+{
+    return size() == 0;
 }
 
 inline std::size_t Array::get_max_byte_size(std::size_t num_elems) TIGHTDB_NOEXCEPT
