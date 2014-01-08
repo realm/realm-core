@@ -687,12 +687,13 @@ const Group& SharedGroup::begin_read()
     {
         Mutex::Lock lock(info->readmutex);
 
-        if (m_version == info->current_version.load_relaxed() && !m_deferred_detach) {
+        if (m_version == info->current_version.load_relaxed() && m_deferred_detach) {
             // just reuse prior group update instead of calling update from shared...
 
             // Update last entry in reader list
             if (info->last_reader.count && info->last_reader.version == m_version) {
                 ++info->last_reader.count;
+                m_deferred_detach = false;
                 // early out: group is already up to date, and ringbuffer is not needed
                 return m_group;
             }
@@ -728,10 +729,11 @@ const Group& SharedGroup::begin_read()
     // Make sure the group is up-to-date.
     // A zero ref means that the file has just been created.
     try {
-        if (m_deferred_detach) 
+        if (m_deferred_detach) {
             m_group.detach();
+            m_deferred_detach = false;
+        }
         m_group.update_from_shared(new_top_ref, new_file_size); // Throws
-        m_deferred_detach = false;
     }
     catch (...) {
         end_read();
@@ -744,7 +746,7 @@ const Group& SharedGroup::begin_read()
 
 void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
-    if (!m_group.is_attached())
+    if (m_deferred_detach || !m_group.is_attached())
         return;
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);

@@ -203,7 +203,8 @@ private:
     util::File::Map<SharedInfo> m_file_map; // Never remapped
     util::File::Map<SharedInfo> m_reader_map;
     std::string m_file_path;
-    bool m_deferred_detach;
+    bool m_deferred_detach; // implies that is_attached should say no, even though the group is attached
+    // also implies that if version matches, current group attachment can be reused instead of recreated.
 
     enum TransactStage {
         transact_Ready,
