@@ -108,6 +108,7 @@ SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, size_t i
     shutdown_started.store_release(0);
     free_write_slots = 0;
     last_reader.count = 0;
+    last_reader.version = 0;
     init_complete.store_release(1);
 }
 
@@ -689,9 +690,8 @@ const Group& SharedGroup::begin_read()
 
         if (m_version == info->current_version.load_relaxed() && m_deferred_detach) {
             // just reuse prior group update instead of calling update from shared...
-
             // Update last entry in reader list
-            if (info->last_reader.count && info->last_reader.version == m_version) {
+            if (/* info->last_reader.count && */ info->last_reader.version == m_version) {
                 ++info->last_reader.count;
                 m_deferred_detach = false;
                 // early out: group is already up to date, and ringbuffer is not needed
