@@ -758,7 +758,7 @@ TEST(Table_range)
     table.add_empty_row(100);
     for (int i = 0 ; i < 100; ++i)
         table.set_int(0, i, i);
-    TableView tv = table.range(10, 20);
+    TableView tv = table.get_range_view(10, 20);
     CHECK_EQUAL(10, tv.size());
     for (size_t i = 0; i<tv.size(); ++i)
         CHECK_EQUAL(i+10, tv.get_int(0, i));

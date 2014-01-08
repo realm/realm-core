@@ -298,8 +298,8 @@ public:
     TableView      get_sorted_view(std::size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;
 
-    TableView      range(std::size_t start, std::size_t end);
-//    ConstTableView range(std::size_t start, std::size_t end) const;
+    TableView      get_range_view(std::size_t start, std::size_t end);
+    ConstTableView get_range_view(std::size_t start, std::size_t end) const;
 
 
 private:
