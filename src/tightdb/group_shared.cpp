@@ -1124,11 +1124,11 @@ void SharedGroup::zero_free_space()
         file_size = to_size_t(info->filesize);
 
         if (ringbuf_is_empty()) {
-            readlock_version = current_version;//FIXME:vs2012 warning  warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
+            readlock_version = current_version;//FIXME:vs2012 32bit warning  warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
         }
         else {
             const ReadCount& r = ringbuf_get_first();
-            readlock_version = r.version;//FIXME:vs2012 warning C4244: '=' : conversion from 'const uint64_t' to 'size_t', possible loss of data
+            readlock_version = r.version;//FIXME:vs2012 32bit warning C4244: '=' : conversion from 'const uint64_t' to 'size_t', possible loss of data
         }
     }
 
@@ -1167,7 +1167,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
     TIGHTDB_ASSERT(m_group.m_top.is_attached());
     TIGHTDB_ASSERT(readlock_version <= new_version);
     GroupWriter out(m_group); // Throws
-    //FIXME: VS2012 warning:  src\tightdb\group_shared.cpp(1087): warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
+    //FIXME: VS2012 32bit warning:  src\tightdb\group_shared.cpp(1087): warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
     m_group.m_readlock_version = readlock_version;
     out.set_versions(new_version, readlock_version);
     // Recursively write all changed arrays to end of file

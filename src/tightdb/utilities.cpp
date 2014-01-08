@@ -8,8 +8,6 @@
 #ifdef TIGHTDB_COMPILER_SSE
 #  ifdef _MSC_VER
 #    include <intrin.h>
-#  else
-#    include <cpuid.h>
 #  endif
 #endif
 
