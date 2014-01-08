@@ -18,7 +18,7 @@ Spec::~Spec() TIGHTDB_NOEXCEPT
 #endif
 }
 
-void Spec::init_from_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT
+void Spec::init(ref_type ref, ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT
 {
     m_top.init_from_ref(ref);
     m_top.set_parent(parent, ndx_in_parent);
@@ -64,7 +64,7 @@ void Spec::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
         m_enumkeys.update_from_parent(old_baseline);
 }
 
-size_t Spec::add_column(DataType type, StringData name, ColumnAttr attr)
+size_t Spec::add_column(const Table* table, DataType type, StringData name, ColumnAttr attr)
 {
     m_names.add(name);
     m_spec.add(type);
@@ -101,34 +101,37 @@ size_t Spec::add_column(DataType type, StringData name, ColumnAttr attr)
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
     if (Replication* repl = m_top.get_alloc().get_replication())
-        repl->add_column(m_table, this, type, name); // Throws
+        repl->add_column(table, this, type, name); // Throws
+#else
+    static_cast<void>(table);
 #endif
 
     return m_names.size() - 1; // column_ndx
 }
 
-size_t Spec::add_subcolumn(const vector<size_t>& column_path, DataType type, StringData name)
+size_t Spec::add_subcolumn(const Table* table, const vector<size_t>& column_path,
+                           DataType type, StringData name)
 {
     if (column_path.empty())
-        return add_column(type, name);
-    return do_add_subcolumn(column_path, 0, type, name);
+        return add_column(table, type, name);
+    return do_add_subcolumn(table, column_path, 0, type, name);
 }
 
-size_t Spec::do_add_subcolumn(const vector<size_t>& column_ids, size_t pos, DataType type, StringData name)
+size_t Spec::do_add_subcolumn(const Table* table, const vector<size_t>& column_ids, size_t pos,
+                              DataType type, StringData name)
 {
     size_t column_ndx = column_ids[pos];
     Spec subspec = get_subtable_spec(column_ndx);
 
     if (pos == column_ids.size() - 1)
-        return subspec.add_column(type, name);
-    return subspec.do_add_subcolumn(column_ids, pos+1, type, name);
+        return subspec.add_column(table, type, name);
+    return subspec.do_add_subcolumn(table, column_ids, pos+1, type, name);
 }
 
-Spec Spec::add_subtable_column(StringData name)
+SubspecRef Spec::add_subtable_column(const Table* table, StringData name)
 {
     size_t column_ndx = m_names.size();
-    add_column(type_Table, name);
-
+    add_column(table, type_Table, name);
     return get_subtable_spec(column_ndx);
 }
 
@@ -187,32 +190,6 @@ void Spec::do_remove_column(const vector<size_t>& column_ids, size_t pos)
         Spec subspec = get_subtable_spec(column_ndx);
         subspec.do_remove_column(column_ids, pos+1);
     }
-}
-
-Spec Spec::get_subtable_spec(size_t column_ndx)
-{
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == type_Table);
-
-    size_t subspec_ndx = get_subspec_ndx(column_ndx);
-
-    Allocator& alloc = m_top.get_alloc();
-    ref_type ref = m_subspecs.get_as_ref(subspec_ndx);
-
-    return Spec(m_table, alloc, ref, &m_subspecs, subspec_ndx);
-}
-
-const Spec Spec::get_subtable_spec(size_t column_ndx) const
-{
-    TIGHTDB_ASSERT(column_ndx < get_column_count());
-    TIGHTDB_ASSERT(get_column_type(column_ndx) == type_Table);
-
-    size_t subspec_ndx = get_subspec_ndx(column_ndx);
-
-    Allocator& alloc = m_top.get_alloc();
-    ref_type ref = m_subspecs.get_as_ref(subspec_ndx);
-
-    return Spec(m_table, alloc, ref, 0, 0);
 }
 
 size_t Spec::get_subspec_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
@@ -338,9 +315,7 @@ void Spec::get_subcolumn_info(const vector<size_t>& column_path, size_t column_p
         return;
     }
 
-    size_t subspec_ndx = get_subspec_ndx(column_ndx);
-    ref_type subspec_ref = get_subspec_ref(subspec_ndx);
-    Spec subspec(0, m_top.get_alloc(), subspec_ref, 0, 0);
+    Spec subspec = SubspecRef(SubspecRef::const_cast_tag(), get_subtable_spec(column_ndx));
     subspec.get_subcolumn_info(column_path, column_path_ndx+1, info);
 }
 
@@ -408,7 +383,7 @@ void Spec::to_dot(ostream& out, StringData) const
         size_t count = m_subspecs.size();
         for (size_t i = 0; i < count; ++i) {
             ref_type ref = m_subspecs.get_as_ref(i);
-            Spec s(m_table, alloc, ref, const_cast<Array*>(&m_subspecs), i);
+            Spec s(alloc, ref, const_cast<Array*>(&m_subspecs), i);
             s.to_dot(out);
         }
     }

@@ -283,7 +283,7 @@ private:
         const int num_cols = TypeCount<typename Spec::Columns>::value;
         StringData dyn_col_names[num_cols];
         Spec::dyn_col_names(dyn_col_names);
-        ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&spec, dyn_col_names);
+        ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&table, &spec, dyn_col_names);
         table.update_from_spec();
     }
 
@@ -449,25 +449,25 @@ namespace _impl
 
 
     template<class Type, int col_idx> struct AddCol {
-        static void exec(Spec* spec, const StringData* col_names)
+        static void exec(const Table* table, Spec* spec, const StringData* col_names)
         {
             TIGHTDB_ASSERT(col_idx == spec->get_column_count());
-            spec->add_column(GetColumnTypeId<Type>::id, col_names[col_idx]);
+            spec->add_column(table, GetColumnTypeId<Type>::id, col_names[col_idx]);
         }
     };
 
     // AddCol specialization for subtables
     template<class Subtab, int col_idx> struct AddCol<SpecBase::Subtable<Subtab>, col_idx> {
-        static void exec(Spec* spec, const StringData* col_names)
+        static void exec(const Table* table, Spec* spec, const StringData* col_names)
         {
             using namespace tightdb::util;
             TIGHTDB_ASSERT(col_idx == spec->get_column_count());
             typedef typename Subtab::Columns Subcolumns;
-            Spec subspec = spec->add_subtable_column(col_names[col_idx]);
+            Spec subspec = spec->add_subtable_column(table, col_names[col_idx]);
             const int num_cols = TypeCount<typename Subtab::spec_type::Columns>::value;
             StringData dyn_col_names[num_cols];
             Subtab::spec_type::dyn_col_names(dyn_col_names);
-            ForEachType<Subcolumns, _impl::AddCol>::exec(&subspec, dyn_col_names);
+            ForEachType<Subcolumns, _impl::AddCol>::exec(table, &subspec, dyn_col_names);
         }
     };
 
@@ -487,7 +487,7 @@ namespace _impl
         {
             if (spec->get_column_type(col_idx) != type_Table ||
                 col_names[col_idx] != spec->get_column_name(col_idx)) return true;
-            Spec subspec = spec->get_subtable_spec(col_idx);
+            const Spec subspec = const_cast<Spec*>(spec)->get_subtable_spec(col_idx);
             return !Subtab::matches_dynamic_spec(&subspec);
         }
     };

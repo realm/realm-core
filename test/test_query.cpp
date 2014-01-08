@@ -8,14 +8,12 @@
 
 #include <tightdb.hpp>
 #include <tightdb/lang_bind_helper.hpp>
-
-#include "testsettings.hpp"
-
 #include <tightdb/column.hpp>
 #include <tightdb/query_engine.hpp>
 
-using namespace tightdb;
 using namespace std;
+using namespace tightdb;
+using namespace tightdb::util;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
@@ -1410,10 +1408,7 @@ TEST(TestQueryStrIndexCrash)
     for(int iter = 0; iter < 5; ++iter) {
         Group group;
         TableRef table = group.get_table("test");
-
-        Spec& s = table->get_spec();
-        s.add_column(type_String, "first");
-        table->update_from_spec();
+        table->add_column(type_String, "first");
 
         size_t eights = 0;
 
@@ -2057,7 +2052,7 @@ TEST(Group_GameAnalytics)
             t->add("10", "US", "1.0", r1, r2);
         }
         t->optimize();
-        util::File::try_remove("ga_test.tightdb");
+        File::try_remove("ga_test.tightdb");
         g.write("ga_test.tightdb");
     }
 
@@ -2678,13 +2673,11 @@ TEST(TestQuerySubtable)
     TableRef table = group.get_table("test");
 
     // Create specification with sub-table
-    Spec& s = table->get_spec();
-    s.add_column(type_Int,    "first");
-    s.add_column(type_String, "second");
-    Spec sub = s.add_subtable_column("third");
-        sub.add_column(type_Int,    "sub_first");
-        sub.add_column(type_String, "sub_second");
-    table->update_from_spec();
+    table->add_column(type_Int,    "first");
+    table->add_column(type_String, "second");
+    table->add_column(type_Table,  "third");
+    table->add_subcolumn(tuple(2), type_Int,    "sub_first");
+    table->add_subcolumn(tuple(2), type_String, "sub_second");
 
     CHECK_EQUAL(3, table->get_column_count());
 
@@ -4061,22 +4054,16 @@ TEST(TestQuery_Subtables_Typed)
 TEST(TestQuery_AllTypes_DynamicallyTyped)
 {
     Table table;
-    {
-        Spec& spec = table.get_spec();
-        spec.add_column(type_Bool,     "boo");
-        spec.add_column(type_Int,      "int");
-        spec.add_column(type_Float,    "flt");
-        spec.add_column(type_Double,   "dbl");
-        spec.add_column(type_String,   "str");
-        spec.add_column(type_Binary,   "bin");
-        spec.add_column(type_DateTime, "dat");
-        {
-            Spec subspec = spec.add_subtable_column("tab");
-            subspec.add_column(type_Int, "sub_int");
-        }
-        spec.add_column(type_Mixed,  "mix");
-    }
-    table.update_from_spec();
+    table.add_column(type_Bool,     "boo");
+    table.add_column(type_Int,      "int");
+    table.add_column(type_Float,    "flt");
+    table.add_column(type_Double,   "dbl");
+    table.add_column(type_String,   "str");
+    table.add_column(type_Binary,   "bin");
+    table.add_column(type_DateTime, "dat");
+    table.add_column(type_Table,    "tab");
+    table.add_column(type_Mixed,    "mix");
+    table.add_subcolumn(tuple(7), type_Int, "sub_int");
 
     const char bin[4] = { 0, 1, 2, 3 };
     BinaryData bin1(bin, sizeof bin / 2);
