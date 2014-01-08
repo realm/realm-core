@@ -46,6 +46,16 @@ const int max_wait_for_daemon_start = 100;
 struct SharedGroup::ReadCount {
     uint64_t version;
     uint32_t count;
+    ReadCount() : version(0), count(0) {};
+    ReadCount(const ReadCount& rc) : version(rc.version), count(rc.count) {};
+    ReadCount& operator=(const ReadCount& rc)
+    {
+        if (&rc != this) {
+            count = rc.count;
+            version = rc.version;
+        }
+        return *this;
+    }
 };
 
 struct SharedGroup::SharedInfo {
@@ -72,7 +82,7 @@ struct SharedGroup::SharedInfo {
     uint32_t capacity_mask; // Must be on the form 2**n - 1
     uint32_t put_pos;
     uint32_t get_pos;
-    ReadCount last_reader;
+    Atomic<__int128> last_reader;
 
     static const int init_readers_size = 32; // Must be a power of two
     ReadCount readers[init_readers_size];
@@ -89,12 +99,13 @@ SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, size_t i
     writemutex(), // Throws
     balancemutex(), // Throws
     room_to_write(CondVar::process_shared_tag()), // Throws
-    work_to_do(CondVar::process_shared_tag()) // Throws
+    work_to_do(CondVar::process_shared_tag()), // Throws
 #else
     readmutex(Mutex::process_shared_tag()), // Throws
     writemutex(), // Throws
-    balancemutex() // Throws
+    balancemutex(), // Throws
 #endif
+    last_reader(ReadCount())
 {
     version  = 0;
     flags    = dlevel; // durability level is fixed from creation
@@ -107,8 +118,6 @@ SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, size_t i
     get_pos = 0;
     shutdown_started.store_release(0);
     free_write_slots = 0;
-    last_reader.count = 0;
-    last_reader.version = 0;
     init_complete.store_release(1);
 }
 
@@ -691,8 +700,13 @@ const Group& SharedGroup::begin_read()
             // Update last entry in reader list
             // FIXME: Atomic instead of lock
             Mutex::Lock lock(info->readmutex);
-            if (info->last_reader.version == m_version) {
-                ++info->last_reader.count;
+            ReadCount rc = info->last_reader.load_relaxed();
+            ReadCount new_rc;
+            new_rc.version = rc.version;
+            new_rc.count = rc.count + 1;
+            rc.version = m_version;
+            // CAS may fail spuriously, but that is ok in this context, it will be handled below
+            if (info->last_reader.compare_and_swap(rc, new_rc)) {
                 m_deferred_detach = false;
                 // early out: group is already up to date, and ringbuffer is not needed
                 m_transact_stage = transact_Reading;
@@ -715,14 +729,27 @@ const Group& SharedGroup::begin_read()
         m_version     = info->current_version.load_relaxed();
 
         // Update reader list
-        // FIXME: Atomic
-        if (info->last_reader.version == m_version) {
-            ++info->last_reader.count;
-        }
-        else {
-            ringbuf_put(info->last_reader);
-            info->last_reader.version = m_version;
-            info->last_reader.count = 1;
+        bool transfer_to_ringbuffer = false;
+        ReadCount old_rc;
+        ReadCount rc;
+        ReadCount new_rc;
+        do {
+            rc = info->last_reader.load_relaxed();
+            if (rc.version == m_version) {
+                new_rc.version = rc.version;
+                new_rc.count = rc.count - 1;
+            }
+            else {
+                new_rc.version = m_version;
+                new_rc.count = 1;
+                transfer_to_ringbuffer = true;
+                old_rc.version = rc.version;
+                old_rc.count = rc.count;
+            }
+            rc.version = m_version;
+        } while ( info->last_reader.compare_and_swap(rc, new_rc) == false);
+        if (transfer_to_ringbuffer) {
+            ringbuf_put(old_rc);
         }
     }
 
@@ -762,12 +789,19 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 
         // FIXME: Atomic instead of lock
         Mutex::Lock lock(info->readmutex);
-        if (info->last_reader.version == m_version) {
-            --info->last_reader.count;
-            slowpath = false;
-            if (info->last_reader.count == 0)
-                cleanup = true;
-        }
+        ReadCount rc;
+        ReadCount new_rc;
+        do {
+            rc = info->last_reader.load_relaxed();
+            if (rc.version != m_version) {
+                slowpath = false;
+                break;
+            }
+            new_rc.count = rc.count - 1;
+            new_rc.version = rc.version;
+        } while ( info->last_reader.compare_and_swap(rc, new_rc) == false);
+        if (!slowpath && new_rc.count == 0)
+            cleanup = true;
     }
     if (slowpath || cleanup) {
         Mutex::Lock lock(info->readmutex);
@@ -1160,8 +1194,9 @@ void SharedGroup::zero_free_space()
 
         if (ringbuf_is_empty()) {
             // FIXME: Here we consider version valid ONLY if count>0, but elsewhere we use version more liberally
-            if (info->last_reader.count)
-                readlock_version = info->last_reader.version;
+            ReadCount rc = info->last_reader.load_relaxed();
+            if (rc.count)
+                readlock_version = rc.version;
             else
                 readlock_version = current_version;//FIXME:vs2012 32bit warning  warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
         }
@@ -1195,8 +1230,9 @@ void SharedGroup::low_level_commit(uint64_t new_version)
 
         if (ringbuf_is_empty()) {
             // FIXME: Here we consider version valid ONLY if count>0, but elsewhere we use version more liberally
-            if (info->last_reader.count)
-                readlock_version = info->last_reader.version;
+            ReadCount rc = info->last_reader.load_relaxed();
+            if (rc.count)
+                readlock_version = rc.version;
             else
                 readlock_version = new_version;
         }
