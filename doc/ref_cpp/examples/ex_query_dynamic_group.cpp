@@ -21,11 +21,8 @@ int main()
 // @@EndShow@@
     Group group;
     TableRef table = group.get_table("test");
-
-    Spec& s = table->get_spec();
-    s.add_column(type_String, "name");
-    s.add_column(type_Int,    "age");
-    table->update_from_spec();
+    table->add_column(type_String, "name");
+    table->add_column(type_Int,    "age");
 
     table->add_empty_row();
     table->set_string(0, 0, "Mary");
