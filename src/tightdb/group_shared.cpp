@@ -686,15 +686,16 @@ const Group& SharedGroup::begin_read()
 
     SharedInfo* info = m_file_map.get_addr();
     {
-        Mutex::Lock lock(info->readmutex);
-
         if (m_version == info->current_version.load_relaxed() && m_deferred_detach) {
             // just reuse prior group update instead of calling update from shared...
             // Update last entry in reader list
-            if (/* info->last_reader.count && */ info->last_reader.version == m_version) {
+            // FIXME: Atomic instead of lock
+            Mutex::Lock lock(info->readmutex);
+            if (info->last_reader.version == m_version) {
                 ++info->last_reader.count;
                 m_deferred_detach = false;
                 // early out: group is already up to date, and ringbuffer is not needed
+                m_transact_stage = transact_Reading;
                 return m_group;
             }
         }
@@ -714,7 +715,8 @@ const Group& SharedGroup::begin_read()
         m_version     = info->current_version.load_relaxed();
 
         // Update reader list
-        if (info->last_reader.count && info->last_reader.version == m_version) {
+        // FIXME: Atomic
+        if (info->last_reader.version == m_version) {
             ++info->last_reader.count;
         }
         else {
@@ -752,24 +754,29 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
+    SharedInfo* info = m_file_map.get_addr();
+    bool cleanup = false;
+    bool slowpath = true;
     {
-        SharedInfo* info = m_file_map.get_addr();
+        // special handling if current version is last version (outside ringbuffer)
+
+        // FIXME: Atomic instead of lock
+        Mutex::Lock lock(info->readmutex);
+        if (info->last_reader.version == m_version) {
+            --info->last_reader.count;
+            slowpath = false;
+            if (info->last_reader.count == 0)
+                cleanup = true;
+        }
+    }
+    if (slowpath || cleanup) {
         Mutex::Lock lock(info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize);
 
-        bool cleanup = false;
-
-        // special handling if current version is last version (outside ringbuffer)
-        if (info->last_reader.count && info->last_reader.version == m_version) {
-            --info->last_reader.count;
-            if (info->last_reader.count == 0)
-                cleanup = true;
-        }
-        else {
-
-            // Find entry for current version
+        if (slowpath) {
+            // Find entry for current version (not found outside ringbuffer)
             size_t ndx = ringbuf_find(m_version);
             TIGHTDB_ASSERT(ndx != not_found);
             ReadCount& r = ringbuf_get(ndx);
@@ -1152,6 +1159,7 @@ void SharedGroup::zero_free_space()
         file_size = to_size_t(info->filesize);
 
         if (ringbuf_is_empty()) {
+            // FIXME: Here we consider version valid ONLY if count>0, but elsewhere we use version more liberally
             if (info->last_reader.count)
                 readlock_version = info->last_reader.version;
             else
@@ -1186,6 +1194,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
 
         if (ringbuf_is_empty()) {
+            // FIXME: Here we consider version valid ONLY if count>0, but elsewhere we use version more liberally
             if (info->last_reader.count)
                 readlock_version = info->last_reader.version;
             else
