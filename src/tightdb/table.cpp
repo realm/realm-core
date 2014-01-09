@@ -2029,20 +2029,20 @@ ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
     return tv;
 }
 
-TableView Table::get_range_view(size_t start, size_t end)
+TableView Table::get_range_view(size_t begin, size_t end)
 {
-    ConstTableView ctv = const_cast<const Table*>(this)->get_range_view(start, end);
-    return ctv;
+    ConstTableView ctv = const_cast<const Table*>(this)->get_range_view(begin, end);
+    return move(ctv);
 }
 
-ConstTableView Table::get_range_view(size_t start, size_t end) const
+ConstTableView Table::get_range_view(size_t begin, size_t end) const
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || end < size());
 
     ConstTableView ctv(*this);
     if (m_columns.is_attached()) {
         Array& refs = ctv.get_ref_column();
-        for (size_t i = start; i < end; ++i)
+        for (size_t i = begin; i < end; ++i)
             refs.add(i);
     }
     return ctv;
