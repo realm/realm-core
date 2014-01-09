@@ -203,6 +203,8 @@ private:
     util::File::Map<SharedInfo> m_file_map; // Never remapped
     util::File::Map<SharedInfo> m_reader_map;
     std::string m_file_path;
+    bool m_deferred_detach; // implies that is_attached should say no, even though the group is attached
+    // also implies that if version matches, current group attachment can be reused instead of recreated.
 
     enum TransactStage {
         transact_Ready,
@@ -327,13 +329,15 @@ private:
 // Implementation:
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel):
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()),
+    m_deferred_detach(false)
 {
     open(file, no_create, dlevel);
 }
 
 inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()),
+    m_deferred_detach(false)
 {
 }
 
