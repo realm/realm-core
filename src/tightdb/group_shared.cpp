@@ -44,17 +44,17 @@ const int max_wait_for_daemon_start = 100;
 
 
 struct SharedGroup::ReadCount {
-    uint64_t version;
+    uint32_t version;
     uint32_t count;
     ReadCount() : version(0), count(0) {};
-    ReadCount(const ReadCount& rc) : version(rc.version), count(rc.count) {};
-    ReadCount& operator=(const ReadCount& rc)
-    {
-        if (&rc != this) {
-            count = rc.count;
-            version = rc.version;
-        }
-        return *this;
+    ReadCount(int v, int c) : version(v), count(c) {};
+    ReadCount(uint64_t binary) : version(binary >> 32), count(binary) {};
+    operator uint64_t() 
+    { 
+        uint64_t res = version;
+        res <<= 32;
+        res |= count;
+        return res;
     }
 };
 
@@ -82,7 +82,7 @@ struct SharedGroup::SharedInfo {
     uint32_t capacity_mask; // Must be on the form 2**n - 1
     uint32_t put_pos;
     uint32_t get_pos;
-    Atomic<__int128> last_reader;
+    Atomic<uint64_t> last_reader;
 
     static const int init_readers_size = 32; // Must be a power of two
     ReadCount readers[init_readers_size];
@@ -699,7 +699,7 @@ const Group& SharedGroup::begin_read()
             // just reuse prior group update instead of calling update from shared...
             // Update last entry in reader list
             // FIXME: Atomic instead of lock
-            Mutex::Lock lock(info->readmutex);
+            // Mutex::Lock lock(info->readmutex);
             ReadCount rc = info->last_reader.load_relaxed();
             ReadCount new_rc;
             new_rc.version = rc.version;
@@ -738,6 +738,7 @@ const Group& SharedGroup::begin_read()
             if (rc.version == m_version) {
                 new_rc.version = rc.version;
                 new_rc.count = rc.count - 1;
+                rc.version = m_version;
             }
             else {
                 new_rc.version = m_version;
@@ -746,7 +747,6 @@ const Group& SharedGroup::begin_read()
                 old_rc.version = rc.version;
                 old_rc.count = rc.count;
             }
-            rc.version = m_version;
         } while ( info->last_reader.compare_and_swap(rc, new_rc) == false);
         if (transfer_to_ringbuffer) {
             ringbuf_put(old_rc);
@@ -783,18 +783,18 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 
     SharedInfo* info = m_file_map.get_addr();
     bool cleanup = false;
-    bool slowpath = true;
+    bool slowpath = false;
     {
         // special handling if current version is last version (outside ringbuffer)
 
         // FIXME: Atomic instead of lock
-        Mutex::Lock lock(info->readmutex);
+        // Mutex::Lock lock(info->readmutex);
         ReadCount rc;
         ReadCount new_rc;
         do {
             rc = info->last_reader.load_relaxed();
             if (rc.version != m_version) {
-                slowpath = false;
+                slowpath = true;
                 break;
             }
             new_rc.count = rc.count - 1;
@@ -1103,7 +1103,7 @@ void SharedGroup::test_ringbuf()
 {
     TIGHTDB_ASSERT(ringbuf_is_empty());
 
-    ReadCount rc = { 1, 1 };
+    ReadCount rc(1, 1);
     ringbuf_put(rc);
     TIGHTDB_ASSERT(ringbuf_size() == 1);
 
@@ -1113,7 +1113,7 @@ void SharedGroup::test_ringbuf()
     // Fill buffer (within capacity)
     size_t capacity = ringbuf_capacity();
     for (size_t i = 0; i < capacity; ++i) {
-        ReadCount r = { 1, uint32_t(i) };
+        ReadCount r( 1, uint32_t(i));
         ringbuf_put(r);
         TIGHTDB_ASSERT(ringbuf_get_last().count == i);
     }
@@ -1128,7 +1128,7 @@ void SharedGroup::test_ringbuf()
 
     // Fill buffer and force split
     for (size_t i = 0; i < capacity; ++i) {
-        ReadCount r = { 1, uint32_t(i) };
+        ReadCount r( 1, uint32_t(i));
         ringbuf_put(r);
         TIGHTDB_ASSERT(ringbuf_get_last().count == i);
     }
@@ -1139,7 +1139,7 @@ void SharedGroup::test_ringbuf()
         ringbuf_remove_first();
     }
     for (size_t i = 0; i < capacity/2; ++i) {
-        ReadCount r = { 1, uint32_t(i) };
+        ReadCount r( 1, uint32_t(i) );
         ringbuf_put(r);
     }
     for (size_t i = 0; i < capacity; ++i) {
@@ -1150,7 +1150,7 @@ void SharedGroup::test_ringbuf()
     // Fill buffer above capacity (forcing it to expand)
     size_t capacity_plus = ringbuf_capacity() + (1+16);
     for (size_t i = 0; i < capacity_plus; ++i) {
-        ReadCount r = { 1, uint32_t(i) };
+        ReadCount r( 1, uint32_t(i) );
         ringbuf_put(r);
         TIGHTDB_ASSERT(ringbuf_get_last().count == i);
     }
@@ -1164,7 +1164,7 @@ void SharedGroup::test_ringbuf()
     // Fill buffer above capacity again (forcing it to expand with overlap)
     capacity_plus = ringbuf_capacity() + (1+16);
     for (size_t i = 0; i < capacity_plus; ++i) {
-        ReadCount r = { 1, uint32_t(i) };
+        ReadCount r( 1, uint32_t(i) );
         ringbuf_put(r);
         TIGHTDB_ASSERT(ringbuf_get_last().count == i);
     }
