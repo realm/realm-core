@@ -2093,11 +2093,11 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
     TIGHTDB_ASSERT(aggr_column < m_columns.size());
 
     TIGHTDB_ASSERT(get_column_type(group_by_column) == type_String);
-    //TIGHTDB_ASSERT(get_column_type(aggr_column) == type_Int);
+    TIGHTDB_ASSERT(op == aggr_count || get_column_type(aggr_column) == type_Int);
 
     // Add columns to result table
     result.add_column(type_String, get_column_name(group_by_column));
-    result.add_column(type_Int, get_column_name(aggr_column));
+    result.add_column(type_Int,    get_column_name(aggr_column));
 
     // Cache columms
     const Column& src_column = get_column(aggr_column);
