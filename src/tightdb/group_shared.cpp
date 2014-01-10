@@ -43,6 +43,59 @@ const int max_wait_for_daemon_start = 100;
 } // anonymous namespace
 
 
+// preliminary reader/writers lock - I want the exact prioritization below, and posix does not guarantee it.
+class RWLock {
+public:
+    void shared_lock();
+    void shared_unlock();
+    void exclusive_lock();
+    void exclusive_unlock();
+    RWLock() : state(0) {};
+private:
+    Atomic<uint32_t> state; // bit 0 is write lock, remaining bits are read count.
+};
+
+void RWLock::shared_lock()
+{
+    uint32_t old_state;
+    uint32_t new_state;
+    do {
+        do {
+            old_state = state.load_relaxed();
+        } while (old_state & 1);
+        // no write pending
+        new_state = old_state + 2;
+    } while (state.compare_and_swap(old_state, new_state) == false);
+}
+
+void RWLock::shared_unlock()
+{
+    uint32_t old_state;
+    uint32_t new_state;
+    do {
+        old_state = state.load_relaxed();
+        new_state = old_state - 2;
+    } while (state.compare_and_swap(old_state, new_state) == false);
+}
+
+void RWLock::exclusive_lock()
+{
+    uint32_t old_state;
+    uint32_t new_state;
+    do {
+        do {
+            old_state = state.load_relaxed();
+        } while (old_state);
+        // no other operation pending, lock for write:
+        new_state = 1;
+    } while (state.compare_and_swap(old_state, new_state) == false);
+}
+
+void RWLock::exclusive_unlock()
+{
+    state.store_release(0);
+}
+
 struct SharedGroup::ReadCount {
     uint64_t version;
     uint32_t count;
@@ -55,7 +108,7 @@ struct SharedGroup::SharedInfo {
     uint16_t version;
     uint16_t flags;
 
-    Mutex readmutex;
+    RWLock readlock;
     RobustMutex writemutex;
     RobustMutex balancemutex;
 #ifndef _WIN32
@@ -84,13 +137,13 @@ struct SharedGroup::SharedInfo {
 SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, size_t info_size,
                                     DurabilityLevel dlevel):
 #ifndef _WIN32
-    readmutex(Mutex::process_shared_tag()), // Throws
+//    readlock(Mutex::process_shared_tag()), // Throws
     writemutex(), // Throws
     balancemutex(), // Throws
     room_to_write(CondVar::process_shared_tag()), // Throws
     work_to_do(CondVar::process_shared_tag()) // Throws
 #else
-    readmutex(Mutex::process_shared_tag()), // Throws
+//    readlock(Mutex::process_shared_tag()), // Throws
     writemutex(), // Throws
     balancemutex() // Throws
 #endif
@@ -527,7 +580,7 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 {
     const SharedInfo* info = m_file_map.get_addr();
-    // this variable is changed under lock (the readmutex), but
+    // this variable is changed under lock (the readlock), but
     // inspected here without taking a lock. This is intentional.
     // The variable is only compared for inequality against a value
     // it is known to have had once, let's call it INIT.
@@ -683,10 +736,12 @@ const Group& SharedGroup::begin_read()
 
     ref_type new_top_ref = 0;
     size_t new_file_size = 0;
+    uint64_t old_version = m_version;
 
     {
         SharedInfo* info = m_file_map.get_addr();
-        Mutex::Lock lock(info->readmutex);
+        //Mutex::Lock lock(info->readlock);
+        info->readlock.exclusive_lock();
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
@@ -695,6 +750,7 @@ const Group& SharedGroup::begin_read()
         new_top_ref   = to_size_t(info->current_top);
         new_file_size = to_size_t(info->filesize);
         m_version     = info->current_version.load_relaxed();
+        
 
         // Update reader list
         if (ringbuf_is_empty()) {
@@ -711,10 +767,19 @@ const Group& SharedGroup::begin_read()
                 ringbuf_put(r2); // Throws
             }
         }
+        info->readlock.exclusive_unlock();
     }
 
     m_transact_stage = transact_Reading;
 
+    if (old_version == m_version && m_deferred_detach) {
+        m_deferred_detach = false;
+        return m_group;
+    }
+    if (m_deferred_detach) {
+        m_group.detach();
+        m_deferred_detach = false;
+    }
     // Make sure the group is up-to-date.
     // A zero ref means that the file has just been created.
     try {
@@ -731,7 +796,7 @@ const Group& SharedGroup::begin_read()
 
 void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
-    if (!m_group.is_attached())
+    if (m_deferred_detach || !m_group.is_attached())
         return;
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
@@ -739,7 +804,8 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 
     {
         SharedInfo* info = m_file_map.get_addr();
-        Mutex::Lock lock(info->readmutex);
+        //Mutex::Lock lock(info->readlock);
+        info->readlock.exclusive_lock();
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize);
@@ -759,10 +825,12 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
             TIGHTDB_ASSERT(r.count > 0);
             --r.count;
         }
+        info->readlock.exclusive_unlock();
     }
 
     // The read may have allocated some temporary state
-    m_group.detach();
+    //m_group.detach();
+    m_deferred_detach = true;
 
     m_transact_stage = transact_Ready;
 }
@@ -771,7 +839,10 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 void SharedGroup::do_begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-
+    if (m_deferred_detach) {
+        m_group.detach();
+        m_deferred_detach = false;
+    }
     SharedInfo* info = m_file_map.get_addr();
 
     // Get write lock
@@ -856,7 +927,8 @@ void SharedGroup::commit()
     // Release write lock
     info->writemutex.unlock();
 
-    m_group.detach();
+    //m_group.detach();
+    m_deferred_detach = true;
 
     m_transact_stage = transact_Ready;
 }
@@ -1119,7 +1191,8 @@ void SharedGroup::zero_free_space()
     size_t file_size;
 
     {
-        Mutex::Lock lock(info->readmutex);
+        // Mutex::Lock lock(info->readlock);
+        info->readlock.exclusive_lock();
         current_version = info->current_version.load_relaxed() + 1;
         file_size = to_size_t(info->filesize);
 
@@ -1130,6 +1203,7 @@ void SharedGroup::zero_free_space()
             const ReadCount& r = ringbuf_get_first();
             readlock_version = r.version;//FIXME:vs2012 32bit warning C4244: '=' : conversion from 'const uint64_t' to 'size_t', possible loss of data
         }
+        info->readlock.exclusive_unlock();
     }
 
     m_group.zero_free_space(file_size, readlock_version);
@@ -1149,7 +1223,8 @@ void SharedGroup::low_level_commit(uint64_t new_version)
     SharedInfo* info = m_file_map.get_addr();
     uint64_t readlock_version;
     {
-        Mutex::Lock lock(info->readmutex);
+        // Mutex::Lock lock(info->readlock);
+        info->readlock.exclusive_lock();
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
@@ -1161,6 +1236,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
             const ReadCount& r = ringbuf_get_first();
             readlock_version = r.version;
         }
+        info->readlock.exclusive_unlock();
     }
 
     // Do the actual commit
@@ -1183,10 +1259,12 @@ void SharedGroup::low_level_commit(uint64_t new_version)
 
     // Update reader info
     {
-        Mutex::Lock lock(info->readmutex);
+        // Mutex::Lock lock(info->readlock);
+        info->readlock.exclusive_lock();
         info->current_top = new_top_ref;
         info->filesize    = new_file_size;
         info->current_version.store_relaxed(new_version);
+        info->readlock.exclusive_unlock();
     }
 
     // Save last version for has_changed()
