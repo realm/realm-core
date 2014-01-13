@@ -160,6 +160,7 @@ struct SharedGroup::SharedInfo {
 
     static const int init_readers_size = 32; // Must be a power of two
     ReadCount readers[init_readers_size];
+    ReadCount last_reader;
 
     SharedInfo(ref_type top_ref, size_t file_size, size_t info_size, DurabilityLevel);
     ~SharedInfo() TIGHTDB_NOEXCEPT {}
@@ -552,6 +553,10 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
 SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 {
+    if (m_deferred_detach) {
+        m_group.detach();
+        m_deferred_detach = false;
+    }
     if (!is_attached())
         return;
 
@@ -771,52 +776,43 @@ const Group& SharedGroup::begin_read()
     uint64_t old_version = m_version;
 
     {
-        bool has_exclusive_lock = false;
         SharedInfo* info = m_file_map.get_addr();
-        //Mutex::Lock lock(info->readlock);
         info->readlock.shared_lock();
-      retry:
 
-        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
-            m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
-
-        // Get the current top ref
+        // fast path:
         new_top_ref   = to_size_t(info->current_top);
         new_file_size = to_size_t(info->filesize);
-        m_version     = info->current_version.load_relaxed();
-        
+        m_version = info->current_version.load_relaxed();
+        if (m_version == info->last_reader.version) {
 
-        // Update reader list
-/*        if (ringbuf_is_empty()) {
-            ReadCount r2(m_version, 1);
-            if (!has_exclusive_lock) {
-                info->readlock.shared_unlock();
-                info->readlock.exclusive_lock();
-                has_exclusive_lock = true;
-                goto retry;
-            }
-            ringbuf_put(r2); // Throws
-        }
-        else {
-*/            ReadCount& r = ringbuf_get_last();
-            if (r.version == m_version) {
-                atomic_inc(r.count);
-            }
-            else {
-                ReadCount r2(m_version, 1);
-                if (!has_exclusive_lock) {
-                    info->readlock.shared_unlock();
-                    info->readlock.exclusive_lock();
-                    has_exclusive_lock = true;
-                    goto retry;
-                }
-                ringbuf_put(r2); // Throws
-            }
-//        }
-        if (has_exclusive_lock)
-            info->readlock.exclusive_unlock();
-        else
+            atomic_inc(info->last_reader.count);
             info->readlock.shared_unlock();
+        } 
+        else { // slow path:
+
+            info->readlock.shared_unlock();
+            info->readlock.exclusive_lock();
+            // we must re-read shared variables:
+            new_top_ref   = to_size_t(info->current_top);
+            new_file_size = to_size_t(info->filesize);
+            m_version = info->current_version.load_relaxed();
+
+            if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
+                m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
+
+            if (m_version == info->last_reader.version) {
+                atomic_inc(info->last_reader.count);
+            }
+            else { // must allocate new reader entry
+
+                if (info->last_reader.count.load_relaxed()) 
+                    ringbuf_put(info->last_reader);
+                info->last_reader.version = m_version;
+                info->last_reader.count.store_relaxed(1);
+
+            }
+            info->readlock.exclusive_unlock();
+        }
     }
 
     m_transact_stage = transact_Reading;
@@ -829,7 +825,6 @@ const Group& SharedGroup::begin_read()
         m_group.detach();
         m_deferred_detach = false;
     }
-    // Make sure the group is up-to-date.
     // A zero ref means that the file has just been created.
     try {
         m_group.update_from_shared(new_top_ref, new_file_size); // Throws
@@ -853,39 +848,53 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 
     {
         SharedInfo* info = m_file_map.get_addr();
-        //Mutex::Lock lock(info->readlock);
-        bool has_exclusive_lock = false;
         info->readlock.shared_lock();
-      retry:
+        if (m_version == info->last_reader.version) {
 
-        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
-            m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize);
-
-        // Find entry for current version
-        size_t ndx = ringbuf_find(m_version);
-        TIGHTDB_ASSERT(ndx != not_found);
-        ReadCount& r = ringbuf_get(ndx);
-
-        // Decrement count and remove as many entries as possible
-        if (r.count.load_relaxed() == 1 && ringbuf_is_first(ndx)) {
-            if (!has_exclusive_lock) {
-                info->readlock.shared_unlock();
-                info->readlock.exclusive_lock();
-                has_exclusive_lock = true;
-                goto retry;
-            }
-            ringbuf_remove_first();
-            while (!ringbuf_is_empty() && ringbuf_get_first().count.load_relaxed() == 0)
-                ringbuf_remove_first();
+            // Fast path:
+            atomic_dec(info->last_reader.count);
+            info->readlock.shared_unlock();
         }
         else {
-            TIGHTDB_ASSERT(r.count.load_relaxed() > 0);
-            atomic_dec(r.count);
+
+            // Slower path:
+            if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
+                m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize);
+
+            // Find entry for current version
+            size_t ndx = ringbuf_find(m_version);
+            TIGHTDB_ASSERT(ndx != not_found);
+            ReadCount& r = ringbuf_get(ndx);
+
+            if (!ringbuf_is_first(ndx)) {
+                atomic_dec(r.count);
+                info->readlock.shared_unlock();
+            }
+            else {
+
+                // Very slow path, need to get exclusive lock before potential cleanup
+                info->readlock.shared_unlock();
+                info->readlock.exclusive_lock();
+
+                // buffer layout may have changed:
+                if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
+                    m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize);
+
+                // Find entry for current version (entry could have moved)
+                size_t ndx = ringbuf_find(m_version);
+                TIGHTDB_ASSERT(ndx != not_found);
+                ReadCount& r = ringbuf_get(ndx);
+
+                // Decrement count and remove as many entries as possible
+                atomic_dec(r.count);
+                if (r.count.load_relaxed() == 0 && ringbuf_is_first(ndx)) {
+                    ringbuf_remove_first();
+                    while (!ringbuf_is_empty() && ringbuf_get_first().count.load_relaxed() == 0)
+                        ringbuf_remove_first();
+                }
+                info->readlock.exclusive_unlock();
+            }
         }
-        if (has_exclusive_lock)
-            info->readlock.exclusive_unlock();
-        else
-            info->readlock.shared_unlock();
     }
 
     // The read may have allocated some temporary state
@@ -1000,6 +1009,10 @@ void SharedGroup::commit()
 // rollback() does not handle all cases.
 void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 {
+    if (m_deferred_detach) {
+        m_group.detach();
+        m_deferred_detach = false;
+    }
     if (m_group.is_attached()) {
         TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
@@ -1257,7 +1270,10 @@ void SharedGroup::zero_free_space()
         file_size = to_size_t(info->filesize);
 
         if (ringbuf_is_empty()) {
-            readlock_version = current_version;//FIXME:vs2012 32bit warning  warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
+            if (info->last_reader.count.load_relaxed())
+                readlock_version = info->last_reader.version;
+            else
+                readlock_version = current_version;//FIXME:vs2012 32bit warning  warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
         }
         else {
             const ReadCount& r = ringbuf_get_first();
@@ -1290,7 +1306,10 @@ void SharedGroup::low_level_commit(uint64_t new_version)
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
 
         if (ringbuf_is_empty()) {
-            readlock_version = new_version;
+            if (info->last_reader.count.load_relaxed())
+                readlock_version = info->last_reader.version;
+            else
+                readlock_version = new_version;
         }
         else {
             const ReadCount& r = ringbuf_get_first();

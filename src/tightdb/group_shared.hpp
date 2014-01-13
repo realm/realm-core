@@ -341,7 +341,7 @@ inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
 
 inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 {
-    return m_file_map.is_attached();
+    return m_deferred_detach || m_file_map.is_attached();
 }
 
 inline Group& SharedGroup::begin_write()
