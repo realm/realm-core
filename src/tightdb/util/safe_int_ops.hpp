@@ -222,10 +222,12 @@ template<class A, class B> inline bool int_greater_than_or_equal(A a, B b)
 template<class L, class R> inline bool int_add_with_overflow_detect(L& lval, R rval)
 {
     if (is_negative(rval)) {
-        if (int_less_than(lval, std::numeric_limits<R>::min() - rval)) return true;
+        if (int_less_than(lval, std::numeric_limits<R>::min() - rval))
+            return true;
     }
     else {
-        if (int_less_than(std::numeric_limits<R>::max() - rval, lval)) return true;
+        if (int_less_than(std::numeric_limits<R>::max() - rval, lval))
+            return true;
     }
     lval = L(lval + rval);
     return false;
@@ -234,10 +236,12 @@ template<class L, class R> inline bool int_add_with_overflow_detect(L& lval, R r
 template<class L, class R> inline bool int_subtract_with_overflow_detect(L& lval, R rval)
 {
     if (is_negative(rval)) {
-        if (int_less_than(std::numeric_limits<R>::max() + rval, lval)) return true;
+        if (int_less_than(std::numeric_limits<R>::max() + rval, lval))
+            return true;
     }
     else {
-        if (int_less_than(lval, std::numeric_limits<R>::min() + rval)) return true;
+        if (int_less_than(lval, std::numeric_limits<R>::min() + rval))
+            return true;
     }
     lval = L(lval - rval);
     return false;
@@ -251,7 +255,8 @@ template<class L, class R> inline bool int_multiply_with_overflow_detect(L& lval
                           "Both types must be specialized");
     TIGHTDB_STATIC_ASSERT(lim_l::is_integer && lim_r::is_integer,
                           "Both types must be integers");
-    if (int_less_than(lim_r::max() / rval, lval)) return true;
+    if (int_less_than(lim_r::max() / rval, lval))
+        return true;
     lval = L(lval * rval);
     return false;
 }

@@ -347,7 +347,7 @@ void ColumnMixed::Verify() const
         int64_t v = m_data->get(i);
         if (v == 0 || v & 0x1)
             continue;
-        ConstTableRef subtable = m_data->get_subtable(i);
+        ConstTableRef subtable = m_data->get_subtable_ptr(i)->get_table_ref();
         subtable->Verify();
     }
 }
@@ -373,7 +373,7 @@ void ColumnMixed::to_dot(ostream& out, StringData title) const
         MixedColType type = MixedColType(m_types->get(i));
         if (type != mixcol_Table)
             continue;
-        ConstTableRef subtable = m_data->get_subtable(i);
+        ConstTableRef subtable = m_data->get_subtable_ptr(i)->get_table_ref();
         subtable->to_dot(out);
     }
 

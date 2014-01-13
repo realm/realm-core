@@ -64,14 +64,19 @@ void Table::init_from_ref(ref_type top_ref, ArrayParent* parent, size_t ndx_in_p
     ref_type spec_ref    = m_top.get_as_ref(0);
     ref_type columns_ref = m_top.get_as_ref(1);
 
-    init_from_ref(spec_ref, columns_ref, &m_top, 1);
-    m_spec.set_parent(&m_top, 0);
+    size_t spec_ndx_in_parent = 0;
+    m_spec.init(spec_ref, &m_top, spec_ndx_in_parent);
+    m_columns.init_from_ref(columns_ref);
+    size_t columns_ndx_in_parent = 1;
+    m_columns.set_parent(&m_top, columns_ndx_in_parent);
+
+    cache_columns(); // Also initializes m_size
 }
 
-void Table::init_from_ref(ref_type spec_ref, ref_type columns_ref,
+void Table::init_from_ref(ConstSubspecRef shared_spec, ref_type columns_ref,
                           ArrayParent* parent, size_t ndx_in_parent)
 {
-    m_spec.init_from_ref(spec_ref, null_ptr, 0);
+    m_spec.init(SubspecRef(SubspecRef::const_cast_tag(), shared_spec));
 
     // A table instatiated with a zero-ref is just an empty table
     // but it will have to create itself on first modification
@@ -93,7 +98,6 @@ void Table::create_columns()
         m_columns.update_parent();
     }
 
-    size_t subtable_count = 0;
     Allocator& alloc = m_columns.get_alloc();
 
     // Add the newly defined columns
@@ -144,12 +148,10 @@ void Table::create_columns()
             }
             case type_Table: {
                 size_t column_ndx = m_cols.size();
-                ref_type subspec_ref = m_spec.get_subspec_ref(subtable_count);
-                ColumnTable* c = new ColumnTable(alloc, this, column_ndx, subspec_ref);
+                ColumnTable* c = new ColumnTable(alloc, this, column_ndx);
                 m_columns.add(c->get_ref());
                 c->set_parent(&m_columns, ref_pos);
                 new_col = c;
-                ++subtable_count;
                 break;
             }
             case type_Mixed: {
@@ -221,7 +223,6 @@ void Table::cache_columns()
     Allocator& alloc = m_columns.get_alloc();
     size_t num_rows = size_t(-1);
     size_t ndx_in_parent = 0;
-    size_t subtable_count = 0;
 
     // Cache columns
     size_t num_entries_in_spec = m_spec.get_column_count();
@@ -281,12 +282,10 @@ void Table::cache_columns()
             }
             case type_Table: {
                 size_t column_ndx = m_cols.size();
-                ref_type spec_ref = m_spec.get_subspec_ref(subtable_count);
-                ColumnTable* c = new ColumnTable(alloc, this, column_ndx, &m_columns, ndx_in_parent,
-                                                 spec_ref, ref);
+                ColumnTable* c =
+                    new ColumnTable(alloc, this, column_ndx, &m_columns, ndx_in_parent, ref);
                 colsize = c->size();
                 new_col = c;
-                ++subtable_count;
                 break;
             }
             case type_Mixed: {
@@ -413,7 +412,7 @@ size_t Table::add_column(DataType type, StringData name)
     detach_subtable_accessors();
 
     // Update spec
-    m_spec.add_column(type, name);
+    m_spec.add_column(this, type, name);
 
     // Create column and add cached instance
     size_t column_ndx = do_add_column(type);
@@ -431,7 +430,7 @@ size_t Table::add_subcolumn(const vector<size_t>& column_path, DataType type, St
     detach_subtable_accessors();
 
     // Update spec
-    size_t column_ndx = m_spec.add_subcolumn(column_path, type, name);
+    size_t column_ndx = m_spec.add_subcolumn(this, column_path, type, name);
 
     // Update existing tables
     do_add_subcolumn(column_path, 0, type);
@@ -483,9 +482,8 @@ size_t Table::do_add_column(DataType type)
                 goto add;
             case type_Table: {
                 ref = ColumnTable::create(size(), alloc); // Throws
-                ref_type spec_ref = m_spec.get_subspec_ref(m_spec.get_num_subspecs()-1);
                 new_col.reset(new ColumnTable(alloc, this, column_ndx, parent, ndx_in_parent,
-                                              spec_ref, ref)); // Throws
+                                              ref)); // Throws
                 goto add;
             }
             case type_Mixed:
@@ -540,7 +538,8 @@ void Table::do_add_subcolumn(const vector<size_t>& column_path, size_t column_pa
         Allocator& alloc = m_columns.get_alloc();
         for (size_t i = 0; i < num_rows; ++i) {
             ref_type subtable_ref = subtables.get_as_ref(i);
-            if (subtable_ref == 0) continue; // Degenerate empty subatble
+            if (subtable_ref == 0)
+                continue; // Degenerate empty subatble
             size_t subtable_size = subtables.get_subtable_size(i);
             ref_type column_ref = create_column(type, subtable_size, alloc);
             Array subcolumns(subtable_ref, &subtables, i, alloc);
@@ -549,7 +548,8 @@ void Table::do_add_subcolumn(const vector<size_t>& column_path, size_t column_pa
     }
     else {
         for (size_t i = 0; i < num_rows; ++i) {
-            if (subtables.get_as_ref(i) == 0) continue; // Degenerate empty subatble
+            if (subtables.get_as_ref(i) == 0)
+                continue; // Degenerate empty subatble
             TableRef subtable = subtables.get_subtable_ptr(i)->get_table_ref();
             subtable->do_add_subcolumn(column_path, column_path_ndx+1, type);
         }
@@ -567,15 +567,17 @@ void Table::remove_column(size_t column_ndx)
     // Update Spec
     m_spec.remove_column(column_ndx);
 
-    // Remove the column from this table
+    // Remove the column within the underlying structure of array
+    // nodes
     do_remove_column(m_columns, info);
 
-    // Delete the cached column
+    // Delete the column accessor
     delete reinterpret_cast<ColumnBase*>(m_cols.get(column_ndx));
     m_cols.erase(column_ndx);
 
-    // Update 'indexes in parent' for subsequent columns
-    adjust_column_ndx_in_parent(column_ndx, -(info.m_has_index ? 2 : 1));
+    // Update cached column indexes for subsequent column accessors
+    int diff = -1, diff_in_parent = info.m_has_index ? -2 : -1;
+    adjust_column_index(column_ndx, diff, diff_in_parent);
 
     // If there are no columns left, mark the table as empty
     if (get_column_count() == 0)
@@ -672,7 +674,8 @@ void Table::set_index(size_t column_ndx, bool update_spec)
 {
     TIGHTDB_ASSERT(!has_shared_spec());
     TIGHTDB_ASSERT(column_ndx < get_column_count());
-    if (has_index(column_ndx)) return;
+    if (has_index(column_ndx))
+        return;
 
     ColumnType ct = get_real_column_type(column_ndx);
     Spec::ColumnInfo info;
@@ -703,7 +706,8 @@ void Table::set_index(size_t column_ndx, bool update_spec)
 
     // Insert ref into columns list after the owning column
     m_columns.insert(column_pos+1, index_ref);
-    adjust_column_ndx_in_parent(column_ndx+1, 1);
+    int diff = 0, diff_in_parent = 1;
+    adjust_column_index(column_ndx+1, diff, diff_in_parent);
 
     // Update spec
     if (update_spec)
@@ -2025,6 +2029,7 @@ ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
     return tv;
 }
 
+
 namespace {
 
 struct AggrState {
@@ -2314,6 +2319,25 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         }
     }
 }
+    
+TableView Table::get_range_view(size_t start, size_t end)
+{
+    ConstTableView ctv = const_cast<const Table*>(this)->get_range_view(start, end);
+    return ctv;
+}
+
+ConstTableView Table::get_range_view(size_t start, size_t end) const
+{
+    TIGHTDB_ASSERT(!m_columns.is_attached() || end < size());
+
+    ConstTableView ctv(*this);
+    if (m_columns.is_attached()) {
+        Array& refs = ctv.get_ref_column();
+        for (size_t i = start; i < end; ++i)
+            refs.add(i);
+    }
+    return ctv;
+}
 
 
 size_t Table::lower_bound_int(size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT
@@ -2441,7 +2465,8 @@ void Table::optimize()
 
             // Replace column
             ColumnStringEnum* e =
-                new ColumnStringEnum(keys_ref, values_ref, &m_columns, pos_in_mcolumns, keys_parent, keys_ndx, alloc);
+                new ColumnStringEnum(keys_ref, values_ref, &m_columns,
+                                     pos_in_mcolumns, keys_parent, keys_ndx, alloc);
             m_columns.set(pos_in_mcolumns, values_ref);
             m_cols.set(i, intptr_t(e));
 
@@ -2462,11 +2487,14 @@ void Table::optimize()
 #endif
 }
 
-void Table::adjust_column_ndx_in_parent(size_t column_ndx_begin, int diff) TIGHTDB_NOEXCEPT
+void Table::adjust_column_index(size_t column_ndx_begin, int diff, int diff_in_parent)
+    TIGHTDB_NOEXCEPT
 {
     for (size_t i = column_ndx_begin; i < m_cols.size(); ++i) {
         ColumnBase* column = reinterpret_cast<ColumnBase*>(m_cols.get(i));
-        column->adjust_ndx_in_parent(diff);
+        column->get_root_array()->adjust_ndx_in_parent(diff_in_parent);
+        if (ColumnSubtableParent* c = dynamic_cast<ColumnSubtableParent*>(column))
+            c->adjust_column_index(diff);
     }
 }
 
@@ -2487,7 +2515,7 @@ void Table::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 
     // Update column accessors
     size_t n = m_cols.size();
-    for (size_t i = 0; i < n; ++i) {
+    for (size_t i = 0; i != n; ++i) {
         ColumnBase* column = reinterpret_cast<ColumnBase*>(uintptr_t(m_cols.get(i)));
         column->update_from_parent(old_baseline);
     }

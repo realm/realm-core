@@ -215,11 +215,6 @@ void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
 } // anonymous namespace
 
 
-void ColumnBase::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
-{
-    m_array->adjust_ndx_in_parent(diff);
-}
-
 void ColumnBase::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     m_array->update_from_parent(old_baseline);

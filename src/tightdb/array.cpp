@@ -265,19 +265,19 @@ bool Array::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(m_parent);
 
-    // Array nodes that a part of the previous version of the database
-    // will not be overwritte by Group::commit(). This is necessary
-    // for robustness in the face of abrupt termination of the
-    // process. It also means that we can be sure that an array
+    // Array nodes that are part of the previous version of the
+    // database will not be overwritten by Group::commit(). This is
+    // necessary for robustness in the face of abrupt termination of
+    // the process. It also means that we can be sure that an array
     // remains unchanged across a commit if the new ref is equal to
-    // the old ref and the ref is below the previous basline.
+    // the old ref and the ref is below the previous baseline.
 
     ref_type new_ref = m_parent->get_child_ref(m_ndx_in_parent);
     if (new_ref == m_ref && new_ref < old_baseline)
         return false; // Has not changed
 
     init_from_ref(new_ref);
-    return true; // Has changed
+    return true; // Might have changed
 }
 
 // Allocates space for 'count' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
@@ -295,12 +295,6 @@ void Array::Preset(int64_t min, int64_t max, size_t count)
 {
     size_t w = ::max(bit_width(max), bit_width(min));
     Preset(w, count);
-}
-
-void Array::set_parent(ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT
-{
-    m_parent = parent;
-    m_ndx_in_parent = ndx_in_parent;
 }
 
 
@@ -1430,7 +1424,7 @@ ref_type Array::create_array(Type type, WidthType width_type, size_t size, int_f
     int width = 0;
     size_t byte_size_0 = header_size;
     if (value != 0) {
-        width = bit_width(value);;
+        width = int(bit_width(value));
         byte_size_0 = calc_aligned_byte_size(size, width); // Throws
     }
     // Adding zero to Array::initial_capacity to avoid taking the

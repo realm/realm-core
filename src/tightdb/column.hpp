@@ -71,8 +71,6 @@ public:
     virtual bool has_index() const TIGHTDB_NOEXCEPT { return false; }
     virtual void set_index_ref(ref_type, ArrayParent*, std::size_t) {}
 
-    virtual void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT;
-
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please
     /// note that this works only for non-transactional commits. Table
@@ -88,6 +86,7 @@ public:
 
     void set_parent(ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
 
+    Array* get_root_array() TIGHTDB_NOEXCEPT { return m_array; }
     const Array* get_root_array() const TIGHTDB_NOEXCEPT { return m_array; }
 
     /// Provides access to the leaf that contains the element at the

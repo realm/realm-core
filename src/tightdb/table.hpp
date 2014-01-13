@@ -23,6 +23,7 @@
 #include <utility>
 
 #include <tightdb/util/features.h>
+#include <tightdb/util/tuple.hpp>
 #include <tightdb/column_fwd.hpp>
 #include <tightdb/table_ref.hpp>
 #include <tightdb/spec.hpp>
@@ -38,7 +39,7 @@ class TableView;
 class ConstTableView;
 class StringIndex;
 
-template <class T> class Columns;
+template<class> class Columns;
 
 /// The Table class is non-polymorphic, that is, it has no virtual
 /// functions. This is important because it ensures that there is no
@@ -159,6 +160,8 @@ public:
     std::size_t add_column(DataType type, StringData name); // Add a column dynamically
     std::size_t add_subcolumn(const std::vector<std::size_t>& column_path, DataType type,
                               StringData name);
+    template<class L> std::size_t add_subcolumn(const util::Tuple<L>& column_path, DataType type,
+                                                StringData name);
     void remove_column(std::size_t column_ndx);
     void remove_subcolumn(const std::vector<std::size_t>& column_path);
     void rename_column(std::size_t column_ndx, StringData name);
@@ -167,14 +170,11 @@ public:
     void set_index(std::size_t column_ndx);
     //@}
 
-    template <class T> Columns<T> column(size_t column)
-    {
-        return Columns<T>(column, this);
-    }
+    template<class T> Columns<T> column(std::size_t column); // FIXME: Should this one have been declared TIGHTDB_NOEXCEPT?
 
     // Table size and deletion
-    bool        is_empty() const TIGHTDB_NOEXCEPT { return m_size == 0; }
-    std::size_t size() const TIGHTDB_NOEXCEPT { return m_size; }
+    bool        is_empty() const TIGHTDB_NOEXCEPT;
+    std::size_t size() const TIGHTDB_NOEXCEPT;
     void        clear();
 
     // Column information
@@ -187,7 +187,7 @@ public:
     std::size_t add_empty_row(std::size_t num_rows = 1);
     void        insert_empty_row(std::size_t row_ndx, std::size_t num_rows = 1);
     void        remove(std::size_t row_ndx);
-    void        remove_last() { if (!is_empty()) remove(m_size-1); }
+    void        remove_last();
 
     /// Move the last row to the specified index. This overwrites the
     /// target row and reduces the number of rows by one. The
@@ -298,6 +298,9 @@ public:
     TableView      get_sorted_view(std::size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;
 
+    TableView      get_range_view(std::size_t start, std::size_t end);
+    ConstTableView get_range_view(std::size_t start, std::size_t end) const;
+
     // Pivot / aggregate operation types. Experimental! Please do not document method publicly.
     enum AggrType {
         aggr_count,
@@ -309,6 +312,7 @@ public:
     
     // Simple pivot aggregate method. Experimental! Please do not document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result, const Array* viewrefs=NULL) const;
+
 
 private:
     template <class T> std::size_t find_first(std::size_t column_ndx, T value) const; // called by above methods
@@ -358,7 +362,7 @@ public:
     //@}
 
     // Queries
-    Query       where()       { return Query(*this); }
+    Query where() { return Query(*this); }
 
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
     Query where() const { return Query(*this); }
@@ -471,12 +475,12 @@ private:
     /// It is possible to construct a 'null' table by passing zero for
     /// \a columns_ref, in this case the columns will be created on
     /// demand.
-    Table(ref_count_tag, Allocator&, ref_type spec_ref, ref_type columns_ref,
-          Parent*, std::size_t ndx_in_parent);
+    Table(ref_count_tag, ConstSubspecRef shared_spec, ref_type columns_ref, Parent*,
+          std::size_t ndx_in_parent);
 
     void init_from_ref(ref_type top_ref, ArrayParent*, std::size_t ndx_in_parent);
-    void init_from_ref(ref_type spec_ref, ref_type columns_ref,
-                       ArrayParent*, std::size_t ndx_in_parent);
+    void init_from_ref(ConstSubspecRef shared_spec, ref_type columns_ref,
+                       ArrayParent* parent, std::size_t ndx_in_parent);
 
     void create_columns();
     void cache_columns();
@@ -494,8 +498,20 @@ private:
     /// when the transaction ends.
     void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
 
+    /// Called to update column accessors when the corresponding
+    /// column indexes have changed.
+    ///
+    /// \param diff The change in logical index of this column.
+    ///
+    /// \param diff_in_parent The change in index from the point of
+    /// view of the parent of this column. This may differ from the
+    /// logical column index when the parent node is Table::m_columns,
+    /// since Table::m_columns contains index structures as separate
+    /// entries.
+    void adjust_column_index(std::size_t column_ndx_begin, int diff, int diff_in_parent)
+        TIGHTDB_NOEXCEPT;
+
     // Specification
-    void adjust_column_ndx_in_parent(std::size_t column_ndx_begin, int diff) TIGHTDB_NOEXCEPT;
     std::size_t do_add_column(DataType);
     void do_add_subcolumn(const std::vector<std::size_t>& column_path, std::size_t pos, DataType);
     static void do_remove_column(Array& column_refs, const Spec::ColumnInfo&);
@@ -726,6 +742,26 @@ inline const Spec& Table::get_spec() const TIGHTDB_NOEXCEPT
     return m_spec;
 }
 
+
+namespace _impl {
+template<class T> struct ColPathAppend {
+    void operator()(const T& val, std::vector<std::size_t>* vec)
+    {
+        vec->push_back(val);
+    }
+};
+} // namespace _impl
+
+template<class L> inline std::size_t Table::add_subcolumn(const util::Tuple<L>& column_path,
+                                                          DataType type, StringData name)
+{
+    std::vector<std::size_t> vec;
+    util::for_each<_impl::ColPathAppend>(column_path, &vec);
+    return add_subcolumn(vec, type, name);
+}
+
+
+
 class Table::UnbindGuard {
 public:
     UnbindGuard(Table* table) TIGHTDB_NOEXCEPT: m_table(table)
@@ -764,24 +800,16 @@ private:
     Table* m_table;
 };
 
-#ifdef _MSC_VER
-#pragma warning(push)
-// Disable the Microsoft warning about passing "this" as a parameter
-// to another constructor. Here it's safe.
-#pragma warning(disable: 4355)
-#endif
 
 inline Table::Table(Allocator& alloc):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec(this, alloc), m_ref_count(1),
-    m_lookup_index(0)
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec(alloc), m_ref_count(1), m_lookup_index(0)
 {
     ref_type ref = create_empty_table(alloc); // Throws
     init_from_ref(ref, null_ptr, 0);
 }
 
 inline Table::Table(const Table& t, Allocator& alloc):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec(this, alloc), m_ref_count(1),
-    m_lookup_index(0)
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec(alloc), m_ref_count(1), m_lookup_index(0)
 {
     ref_type ref = t.clone(alloc); // Throws
     init_from_ref(ref, null_ptr, 0);
@@ -789,23 +817,18 @@ inline Table::Table(const Table& t, Allocator& alloc):
 
 inline Table::Table(ref_count_tag, Allocator& alloc, ref_type top_ref,
                     Parent* parent, std::size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec(this, alloc), m_ref_count(0),
-    m_lookup_index(0)
+    m_size(0), m_top(alloc), m_columns(alloc), m_spec(alloc), m_ref_count(0), m_lookup_index(0)
 {
     init_from_ref(top_ref, parent, ndx_in_parent);
 }
 
-inline Table::Table(ref_count_tag, Allocator& alloc, ref_type spec_ref, ref_type columns_ref,
+inline Table::Table(ref_count_tag, ConstSubspecRef shared_spec, ref_type columns_ref,
                     Parent* parent, std::size_t ndx_in_parent):
-    m_size(0), m_top(alloc), m_columns(alloc), m_spec(this, alloc), m_ref_count(0),
-    m_lookup_index(0)
+    m_size(0), m_top(shared_spec.get_alloc()), m_columns(shared_spec.get_alloc()),
+    m_spec(shared_spec.get_alloc()), m_ref_count(0), m_lookup_index(0)
 {
-    init_from_ref(spec_ref, columns_ref, parent, ndx_in_parent);
+    init_from_ref(shared_spec, columns_ref, parent, ndx_in_parent);
 }
-
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
 
 
 inline void Table::set_index(std::size_t column_ndx)
@@ -828,6 +851,26 @@ inline TableRef Table::copy(Allocator& alloc) const
     return table->get_table_ref();
 }
 
+template<class T> inline Columns<T> Table::column(std::size_t column)
+{
+    return Columns<T>(column, this);
+}
+
+inline bool Table::is_empty() const TIGHTDB_NOEXCEPT
+{
+    return m_size == 0;
+}
+
+inline std::size_t Table::size() const TIGHTDB_NOEXCEPT
+{
+    return m_size;
+}
+
+inline void Table::remove_last()
+{
+    if (!is_empty())
+        remove(m_size-1);
+}
 
 inline void Table::insert_bool(std::size_t column_ndx, std::size_t row_ndx, bool value)
 {
