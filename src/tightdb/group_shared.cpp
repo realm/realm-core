@@ -65,7 +65,14 @@ template<typename T> bool inline try_to_lock(T& result, Atomic<T>& locked_counte
 template<typename T> T inline wait_for_lock(Atomic<T>& locked_counter)
 {
     T val;
-    while (! try_to_lock(val, locked_counter)) { } // spinlock
+    int i = 100;
+    while (! try_to_lock(val, locked_counter)) { 
+        i--;
+        if (i==0) {
+            sched_yield();
+            i = 100;
+        }
+    } // spinlock
     return val;
 }
 
