@@ -43,60 +43,38 @@ const int max_wait_for_daemon_start = 100;
 } // anonymous namespace
 
 
-// preliminary reader/writers lock - I want the exact prioritization below, and posix does not guarantee it.
-class RWLock {
-public:
-    void shared_lock();
-    void shared_unlock();
-    void exclusive_lock();
-    void exclusive_unlock();
-    RWLock() : state(0) {};
-private:
-    Atomic<uint32_t> state; // bit 0 is write lock, remaining bits are read count.
-};
 
-void RWLock::shared_lock()
+// this following primitives adds a simple lock bit to an integral type
+template<typename T> bool inline try_to_lock(T& result, Atomic<T>& locked_counter)
 {
-    uint32_t old_state;
-    uint32_t new_state;
+    T old_val;
+    T new_val;
     do {
-        do {
-            old_state = state.load_relaxed();
-        } while (old_state & 1);
-        // no write pending
-        new_state = old_state + 2;
-    } while (state.compare_and_swap(old_state, new_state) == false);
+        old_val = locked_counter.load_relaxed();
+        if (old_val & 1) {
+            result = old_val >> 1;
+            return false; // locking failed
+        }
+        new_val = old_val | 1;
+    } while (locked_counter.compare_and_swap(old_val, new_val) == false); // needs to acquire when succes
+    result = old_val >> 1;
+    return true;
 }
 
-void RWLock::shared_unlock()
+template<typename T> T inline wait_for_lock(Atomic<T>& locked_counter)
 {
-    uint32_t old_state;
-    uint32_t new_state;
-    do {
-        old_state = state.load_relaxed();
-        new_state = old_state - 2;
-    } while (state.compare_and_swap(old_state, new_state) == false);
+    T val;
+    while (! try_to_lock(val, locked_counter)) { } // spinlock
+    return val;
 }
 
-void RWLock::exclusive_lock()
+// release lock: new_value is just the new value
+template<typename T> inline void release_locked(Atomic<T>& locked_counter, T new_value)
 {
-    uint32_t old_state;
-    uint32_t new_state;
-    do {
-        do {
-            old_state = state.load_relaxed();
-        } while (old_state);
-        // no other operation pending, lock for write:
-        new_state = 1;
-    } while (state.compare_and_swap(old_state, new_state) == false);
+    locked_counter.store_release(new_value << 1);
 }
 
-void RWLock::exclusive_unlock()
-{
-    state.store_release(0);
-}
-
-template<typename T> void inline atomic_inc(Atomic<T>& counter)
+template<typename T> inline T atomic_inc(Atomic<T>& counter)
 {
     T old_val;
     T new_val;
@@ -104,9 +82,10 @@ template<typename T> void inline atomic_inc(Atomic<T>& counter)
         old_val = counter.load_relaxed();
         new_val = old_val + 1;
     } while (counter.compare_and_swap(old_val, new_val) == false);
+    return new_val;
 }
 
-template<typename T> void inline atomic_dec(Atomic<T>& counter)
+template<typename T> inline T atomic_dec(Atomic<T>& counter)
 {
     T old_val;
     T new_val;
@@ -114,14 +93,13 @@ template<typename T> void inline atomic_dec(Atomic<T>& counter)
         old_val = counter.load_relaxed();
         new_val = old_val - 1;
     } while (counter.compare_and_swap(old_val, new_val) == false);
+    return new_val;
 }
-
 
 struct SharedGroup::ReadCount {
     uint64_t version;
     Atomic<uint32_t> count;
     ReadCount(uint64_t v, uint32_t c) : version(v), count(c) {};
-    ReadCount(const ReadCount& rc) : version(rc.version), count(rc.count.load_relaxed()) {};
     ReadCount() : version(0), count(0) {};
     ReadCount& operator=(const ReadCount& rc)
     {
@@ -140,7 +118,7 @@ struct SharedGroup::SharedInfo {
     uint16_t version;
     uint16_t flags;
 
-    RWLock readlock;
+    // RWLock readlock;
     RobustMutex writemutex;
     RobustMutex balancemutex;
 #ifndef _WIN32
@@ -161,6 +139,7 @@ struct SharedGroup::SharedInfo {
     static const int init_readers_size = 32; // Must be a power of two
     ReadCount readers[init_readers_size];
     ReadCount last_reader;
+    Atomic<uint32_t> active_readers;
 
     SharedInfo(ref_type top_ref, size_t file_size, size_t info_size, DurabilityLevel);
     ~SharedInfo() TIGHTDB_NOEXCEPT {}
@@ -170,13 +149,11 @@ struct SharedGroup::SharedInfo {
 SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, size_t info_size,
                                     DurabilityLevel dlevel):
 #ifndef _WIN32
-//    readlock(Mutex::process_shared_tag()), // Throws
     writemutex(), // Throws
     balancemutex(), // Throws
     room_to_write(CondVar::process_shared_tag()), // Throws
     work_to_do(CondVar::process_shared_tag()) // Throws
 #else
-//    readlock(Mutex::process_shared_tag()), // Throws
     writemutex(), // Throws
     balancemutex() // Throws
 #endif
@@ -777,7 +754,7 @@ const Group& SharedGroup::begin_read()
 
     {
         SharedInfo* info = m_file_map.get_addr();
-        info->readlock.shared_lock();
+        uint32_t count = wait_for_lock(info->last_reader.count);
 
         // fast path:
         new_top_ref   = to_size_t(info->current_top);
@@ -785,33 +762,24 @@ const Group& SharedGroup::begin_read()
         m_version = info->current_version.load_relaxed();
         if (m_version == info->last_reader.version) {
 
-            atomic_inc(info->last_reader.count);
-            info->readlock.shared_unlock();
+            release_locked(info->last_reader.count, count + 1);
         } 
         else { // slow path:
-
-            info->readlock.shared_unlock();
-            info->readlock.exclusive_lock();
-            // we must re-read shared variables:
-            new_top_ref   = to_size_t(info->current_top);
-            new_file_size = to_size_t(info->filesize);
-            m_version = info->current_version.load_relaxed();
 
             if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
                 m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
 
-            if (m_version == info->last_reader.version) {
-                atomic_inc(info->last_reader.count);
+            // must allocate new reader entry
+            
+            if (count) {
+                while (info->active_readers.load_relaxed()) {
+                    // wait for any active readers to leave the ringbuffer
+                    // this wait also prevents new readers from entering
+                }
+                ringbuf_put(info->last_reader);
             }
-            else { // must allocate new reader entry
-
-                if (info->last_reader.count.load_relaxed()) 
-                    ringbuf_put(info->last_reader);
-                info->last_reader.version = m_version;
-                info->last_reader.count.store_relaxed(1);
-
-            }
-            info->readlock.exclusive_unlock();
+            info->last_reader.version = m_version;
+            release_locked(info->last_reader.count, (uint32_t) 1);;
         }
     }
 
@@ -848,52 +816,51 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 
     {
         SharedInfo* info = m_file_map.get_addr();
-        info->readlock.shared_lock();
+        uint32_t count = wait_for_lock(info->last_reader.count);
+
         if (m_version == info->last_reader.version) {
 
             // Fast path:
-            atomic_dec(info->last_reader.count);
-            info->readlock.shared_unlock();
+            release_locked(info->last_reader.count, count - 1);
         }
         else {
+
+            // before leaving the critical section, inc the count of active readers,
+            // thus preventing any changes to the ringbuffer while we search and/or
+            // clean it.
+            atomic_inc(info->active_readers);
+            release_locked(info->last_reader.count, count);
 
             // Slower path:
             if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
                 m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize);
 
             // Find entry for current version
+            // Find can run concurrently with cleanup because the key searched
+            // for must be there, and will prevent the cleanup from killing it.
+            // Find could in principle run concurrently with put, EXCEPT when put
+            // triggers a ringbuf expansion. Since this only happens seldom and
+            // put is normally very fast, we just decide to handle find and put as
+            // mutual exclusive operations.
+            // Multiple find operations should be able to run in parallel.
             size_t ndx = ringbuf_find(m_version);
             TIGHTDB_ASSERT(ndx != not_found);
             ReadCount& r = ringbuf_get(ndx);
 
-            if (!ringbuf_is_first(ndx)) {
-                atomic_dec(r.count);
-                info->readlock.shared_unlock();
-            }
-            else {
-
-                // Very slow path, need to get exclusive lock before potential cleanup
-                info->readlock.shared_unlock();
-                info->readlock.exclusive_lock();
-
-                // buffer layout may have changed:
-                if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
-                    m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize);
-
-                // Find entry for current version (entry could have moved)
-                size_t ndx = ringbuf_find(m_version);
-                TIGHTDB_ASSERT(ndx != not_found);
-                ReadCount& r = ringbuf_get(ndx);
-
-                // Decrement count and remove as many entries as possible
-                atomic_dec(r.count);
+            // Decrement ref count on found entry.
+            uint32_t count = atomic_dec(r.count);
+            if (count == 0) {
+                // cleanup - at most one thread should clean up at a time
+                // remove as many entries as possible. 
+                uint32_t lock_count = wait_for_lock(info->last_reader.count);
                 if (r.count.load_relaxed() == 0 && ringbuf_is_first(ndx)) {
                     ringbuf_remove_first();
                     while (!ringbuf_is_empty() && ringbuf_get_first().count.load_relaxed() == 0)
                         ringbuf_remove_first();
                 }
-                info->readlock.exclusive_unlock();
+                release_locked(info->last_reader.count, lock_count);
             }
+            atomic_dec(info->active_readers);
         }
     }
 
@@ -1264,13 +1231,12 @@ void SharedGroup::zero_free_space()
     size_t file_size;
 
     {
-        // Mutex::Lock lock(info->readlock);
-        info->readlock.exclusive_lock();
+        uint32_t count = wait_for_lock(info->last_reader.count);
         current_version = info->current_version.load_relaxed() + 1;
         file_size = to_size_t(info->filesize);
 
         if (ringbuf_is_empty()) {
-            if (info->last_reader.count.load_relaxed())
+            if (count)
                 readlock_version = info->last_reader.version;
             else
                 readlock_version = current_version;//FIXME:vs2012 32bit warning  warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
@@ -1279,7 +1245,7 @@ void SharedGroup::zero_free_space()
             const ReadCount& r = ringbuf_get_first();
             readlock_version = r.version;//FIXME:vs2012 32bit warning C4244: '=' : conversion from 'const uint64_t' to 'size_t', possible loss of data
         }
-        info->readlock.exclusive_unlock();
+        release_locked(info->last_reader.count, count);
     }
 
     m_group.zero_free_space(file_size, readlock_version);
@@ -1299,14 +1265,13 @@ void SharedGroup::low_level_commit(uint64_t new_version)
     SharedInfo* info = m_file_map.get_addr();
     uint64_t readlock_version;
     {
-        // Mutex::Lock lock(info->readlock);
-        info->readlock.shared_lock();
+        uint32_t count = wait_for_lock(info->last_reader.count);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
 
         if (ringbuf_is_empty()) {
-            if (info->last_reader.count.load_relaxed())
+            if (count)
                 readlock_version = info->last_reader.version;
             else
                 readlock_version = new_version;
@@ -1315,7 +1280,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
             const ReadCount& r = ringbuf_get_first();
             readlock_version = r.version;
         }
-        info->readlock.shared_unlock();
+        release_locked(info->last_reader.count, count);
     }
 
     // Do the actual commit
@@ -1338,12 +1303,11 @@ void SharedGroup::low_level_commit(uint64_t new_version)
 
     // Update reader info
     {
-        // Mutex::Lock lock(info->readlock);
-        info->readlock.exclusive_lock();
+        uint32_t count = wait_for_lock(info->last_reader.count);
         info->current_top = new_top_ref;
         info->filesize    = new_file_size;
         info->current_version.store_relaxed(new_version);
-        info->readlock.exclusive_unlock();
+        release_locked(info->last_reader.count, count);
     }
 
     // Save last version for has_changed()
