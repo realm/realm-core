@@ -45,6 +45,7 @@ const int max_wait_for_daemon_start = 100;
 
 
 // this following primitives adds a simple lock bit to an integral type
+// (placing the lock in the lowest bit.
 template<typename T> bool inline try_to_lock(T& result, Atomic<T>& locked_counter)
 {
     T old_val;
@@ -853,7 +854,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
                 // cleanup - at most one thread should clean up at a time
                 // remove as many entries as possible. 
                 uint32_t lock_count = wait_for_lock(info->last_reader.count);
-                if (r.count.load_relaxed() == 0 && ringbuf_is_first(ndx)) {
+                if (ringbuf_is_first(ndx)) {
                     ringbuf_remove_first();
                     while (!ringbuf_is_empty() && ringbuf_get_first().count.load_relaxed() == 0)
                         ringbuf_remove_first();

@@ -726,7 +726,11 @@ inline void Atomic<T>::store_relaxed(T value)
 template<typename T>
 inline bool Atomic<T>::compare_and_swap(T oldvalue, T newvalue)
 {
+//#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
+//    return __atomic_compare_exchange_n(&state, &oldvalue, newvalue, true, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
+//#else
     return __sync_bool_compare_and_swap(&state, oldvalue, newvalue);
+//#endif
 }
 
 
