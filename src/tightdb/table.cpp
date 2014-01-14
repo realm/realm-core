@@ -2065,7 +2065,7 @@ size_t get_group_ndx(size_t i, AggrState& state, Table& result)
 size_t get_group_ndx_blocked(size_t i, AggrState& state, Table& result)
 {
     // We iterate entire blocks at a time by keeping current leaf cached
-    if (i == state.block_end) {
+    if (i >= state.block_end) {
         state.enums->Column::GetBlock(i, state.block, state.offset);
         state.block_end = state.offset + state.block.size();
     }
