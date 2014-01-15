@@ -46,38 +46,42 @@ const int max_wait_for_daemon_start = 100;
 
 // this following primitives adds a simple lock bit to an integral type
 // (placing the lock in the lowest bit.
-template<typename T> bool inline try_to_lock(T& result, Atomic<T>& locked_counter)
+template<typename T> bool try_to_lock(T& result, Atomic<T>& locked_counter)
 {
     T old_val;
     T new_val;
+    old_val = locked_counter.load_relaxed();
     do {
-        old_val = locked_counter.load_relaxed();
         if (old_val & 1) {
             result = old_val >> 1;
             return false; // locking failed
         }
         new_val = old_val | 1;
-    } while (locked_counter.compare_and_swap(old_val, new_val) == false); // needs to acquire when succes
+    } while (locked_counter.compare_and_swap(old_val, new_val) == false);
     result = old_val >> 1;
     return true;
 }
 
-template<typename T> T inline wait_for_lock(Atomic<T>& locked_counter)
+template<typename T> T wait_for_lock(Atomic<T>& locked_counter)
 {
     T val;
-    int i = 100;
+    int delay = 0;
     while (! try_to_lock(val, locked_counter)) { 
-        i--;
-        if (i==0) {
+        delay++;
+/*
+        volatile int k = delay;
+        while (k--); // delay
+*/
+        if (delay == 10) {
             sched_yield();
-            i = 100;
+            delay = 0;
         }
     } // spinlock
     return val;
 }
 
 // release lock: new_value is just the new value
-template<typename T> inline void release_locked(Atomic<T>& locked_counter, T new_value)
+template<typename T> void release_locked(Atomic<T>& locked_counter, T new_value)
 {
     locked_counter.store_release(new_value << 1);
 }
@@ -109,6 +113,7 @@ struct SharedGroup::ReadCount {
     Atomic<uint32_t> count;
     ReadCount(uint64_t v, uint32_t c) : version(v), count(c) {};
     ReadCount() : version(0), count(0) {};
+    // Required because we put them in a vector and copy them :-(
     ReadCount& operator=(const ReadCount& rc)
     {
         if (&rc != this) {
@@ -117,6 +122,7 @@ struct SharedGroup::ReadCount {
         }
         return *this;
     }
+
 };
 
 struct SharedGroup::SharedInfo {
@@ -764,28 +770,43 @@ const Group& SharedGroup::begin_read()
         SharedInfo* info = m_file_map.get_addr();
         uint32_t count = wait_for_lock(info->last_reader.count);
 
-        // fast path:
+        // fast path (s):
         new_top_ref   = to_size_t(info->current_top);
         new_file_size = to_size_t(info->filesize);
         m_version = info->current_version.load_relaxed();
         if (m_version == info->last_reader.version) {
 
             release_locked(info->last_reader.count, count + 1);
-        } 
+        }
+        else if (count == 0) {
+
+            info->last_reader.version = m_version;
+            release_locked(info->last_reader.count, (uint32_t) 1);
+        }
         else { // slow path:
 
             if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
                 m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
 
-            // must allocate new reader entry
-            
+            // must allocate new reader entry - this occurs in parallel with any searching in end_read,
+            // but ONLY if expansion cannot occur.
             if (count) {
-                while (info->active_readers.load_relaxed()) {
-                    // wait for any active readers to leave the ringbuffer
-                    // this wait also prevents new readers from entering
+
+                size_t size = ringbuf_size();
+                bool is_full = size == info->capacity_mask;
+                if (is_full) {
+                    while (info->active_readers.load_relaxed()) {
+                        // spinlock, waiting for any searching readers to finish before we blow
+                        // away (part of) the ringbuffer from under their feet
+                    }
+                    ringbuf_expand();
                 }
-                ringbuf_put(info->last_reader);
+                SharedInfo* r_info = m_reader_map.get_addr();
+                r_info->readers[info->put_pos].version = info->last_reader.version;
+                r_info->readers[info->put_pos].count.store_relaxed(info->last_reader.count.load_relaxed() >> 1);
+                info->put_pos = (info->put_pos + 1) & info->capacity_mask;
             }
+
             info->last_reader.version = m_version;
             release_locked(info->last_reader.count, (uint32_t) 1);;
         }
@@ -833,9 +854,11 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
         }
         else {
 
-            // before leaving the critical section, inc the count of active readers,
-            // thus preventing any changes to the ringbuffer while we search and/or
-            // clean it.
+            // we now leave the critical region and search the buffer. This allows multiple
+            // searches to go on in parallel, even though new items may be added to the ringbuffer
+            // concurrently. Such a search may not see any additional items added to the ringbuffer,
+            // BUT it could never match any new item anyway, so it is ok.
+            // Expanding the ringbuffer is NOT ok, so we must prevent it while we are searching.
             atomic_inc(info->active_readers);
             release_locked(info->last_reader.count, count);
 
@@ -1079,7 +1102,8 @@ void SharedGroup::ringbuf_put(const ReadCount& v)
         info = m_reader_map.get_addr();
     }
 
-    info->readers[info->put_pos] = v;
+    info->readers[info->put_pos].version = v.version;
+    info->readers[info->put_pos].count.store_relaxed(v.count.load_relaxed() >> 1);
     info->put_pos = (info->put_pos + 1) & info->capacity_mask;
 }
 
