@@ -155,7 +155,7 @@
 # primary prefix in `bin_PROGRAMS`, for example. The following primary
 # prefixes are supported directly by `generic.mk`:
 #
-#   Prefix     Variable    Default value
+#   Prefix     Variable    Installation directory  Default value
 #   ----------------------------------------------------------------------------
 #   bin        bindir      $(exec_prefix)/bin      (/usr/local/bin)
 #   sbin       sbindir     $(exec_prefix)/sbin     (/usr/local/sbin)
@@ -236,8 +236,53 @@
 # installed libraries.
 #
 #
-# Programs that should not be installed
-# -------------------------------------
+# Installed programs
+# ------------------
+#
+# If a program, that is supposed to be installed, is linked against a
+# locally built shared library, then `generic.mk` will pass the
+# appropriate `-rpath` option to the program linker, such that the
+# dynamic linker can find the library in its installed
+# location. Unfortunately this does not enable the program to find the
+# locally built library, and therefore it will generally not be
+# possible to execute the program until after the library is
+# installed.
+#
+# To work around this problem, `generic.mk` will create an extra
+# version of the program, where it sets the `RPATH` in such a way that
+# the (yet to be installed) library can be found. The name of the
+# extra version is constructed by appending `-noinst` to the name of
+# the regular version. The extra 'noinst' version is created only for
+# testing purposes, and it will not be included during
+# installation. It should be noted that the extra 'noinst' version is
+# created only for programs that are linked against locally built,
+# shared libraries.
+#
+# The extra 'noinst' versions of installed programs, as well as test
+# programs and programs declared using the special primary prefix
+# `noinst`, are all configured with relative `RPATH`s. This means that
+# they will continue to work even when the project is relocated to a
+# different directory, as long as the internal directory structure
+# remains the same.
+#
+# Note that the standard installation procedure, that places targets
+# in system directories according to category (`/usr/local/bin`,
+# `/usr/local/lib`, ...), does not in general preserve the relative
+# paths between targets with respect to how they occur in your project
+# directory. Further more, the standard installation procedure is
+# based upon the idea that the final installed location of targets is
+# specified and fixed at build time.
+#
+# As a special option, `generic.mk` can be asked to completely disable
+# its support for installation, and instead link all programs as if
+# they had been declared as 'noinst' programs in the first place. This
+# mode also disables the creation of the extra 'noinst' versions. This
+# mode is enabled by setting the environment variable `ENABLE_NOINST`
+# to a non-empty value.
+#
+#
+# Programs that are not installed
+# -------------------------------
 #
 # Sometimes it is desirable to build a program that is not supposed to
 # be installed when running `make install`. One reason could be that
@@ -670,8 +715,6 @@ SHELL_ESCAPE = $(shell printf '%s\n' '$(call SHELL_ESCAPE_1,$(1))' | sed $(SHELL
 SHELL_ESCAPE_1 = $(subst $(APOSTROPHE),$(APOSTROPHE)\$(APOSTROPHE)$(APOSTROPHE),$(1))
 SHELL_ESCAPE_2 = 's/\([]$(TAB)$(SPACE)!"\#$$&'\''()*;<>?[\`{|}~]\)/\\\1/g'
 
-SHELL_ESCAPE_ABS_PATH = $(call SHELL_ESCAPE,$(call MAKE_ABS_PATH,$(1)))
-
 HAVE_CMD = $(shell which $(1))
 MATCH_CMD = $(filter $(1) $(1)-%,$(notdir $(2)))
 MAP_CMD = $(if $(call MATCH_CMD,$(1),$(3)),$(if $(findstring /,$(3)),$(dir $(3)))$(patsubst $(1)%,$(2)%,$(notdir $(3))))
@@ -854,6 +897,7 @@ endif
 ifneq ($(INCLUDE_ROOT),)
 REL_INCLUDE_ROOT := $(call MAKE_REL_PATH,$(dir $(GENERIC_MK))/$(INCLUDE_ROOT))
 endif
+
 
 
 # SETUP BUILD COMMANDS
@@ -1375,8 +1419,9 @@ install-only/local:$(INSTALL_DIR_RECIPES)$(INSTALL_RECIPES)
 uninstall/local:$(UNINSTALL_RECIPES)$(UNINSTALL_DIR_RECIPES)
 endef
 
+ifeq ($(ENABLE_NOINST),)
 $(eval $(INSTALL_RULES))
-
+endif
 
 
 # TESTING (A.K.A CHECKING)
@@ -1529,8 +1574,14 @@ FINALIZE_LIBREFS_DEP_INFO = $(call FILTER_UNPACK,noinst:% inst:% libdeps:%,$(cal
 
 # ARGS: finalized_expanded_librefs
 LDFLAGS_FROM_LIBREFS = $(call FILTER_PATSUBST,noinst:%,%,$(1)) $(call FILTER_PATSUBST,lib:%,-l%,$(1)) $(call FILTER_PATSUBST,dir:%,-L%,$(1)) $(call FILTER_PATSUBST,ldflag:%,%,$(1))
+RPATHS_FROM_LIBREFS = $(NOINST_RPATHS_FROM_LIBREFS)
+ifeq ($(ENABLE_NOINST),)
 RPATHS_FROM_LIBREFS = $(foreach x,$(call FILTER_PATSUBST,rpath:%,%,$(1)),-Wl,-rpath,$(x))
-NOINST_RPATHS_FROM_LIBREFS = $(foreach x,$(call FILTER_PATSUBST,rpath-noinst:%,%,$(1)),-Wl,-rpath,$(call SHELL_ESCAPE_ABS_PATH,$(x)))
+endif
+NOINST_RPATHS_FROM_LIBREFS = $(foreach x,$(call FILTER_PATSUBST,rpath-noinst:%,%,$(1)),-Wl,-rpath,\$$ORIGIN$(if $(call IS_EQUAL_TO,$(x),.),,/$(x)))
+ifeq ($(OS),Darwin)
+NOINST_RPATHS_FROM_LIBREFS = $(foreach x,$(call FILTER_PATSUBST,rpath-noinst:%,%,$(1)),-Wl,-rpath,@loader_path/$(x))
+endif
 
 # ARGS: target, objects, abstract_target, compile_mode
 NOINST_PROG_RECIPE = $(call NOINST_PROG_RECIPE_1,$(1),$(2),$(3),$(4),$(call FINALIZE_EXPANDED_LIBREFS,$(call EXPAND_LIBREFS,$(3)),$(4)))
@@ -1545,7 +1596,7 @@ $(1): $(2) $(3)
 	$$(call NOINST_PROG_RECIPE,$(1),$(2),$(4),$(5))
 endef
 define INST_PROG_RULES
-ifeq ($(6),)
+ifeq ($(if $(ENABLE_NOINST),,$(6)),)
 $(1): $(2) $(3)
 	$$(call INST_PROG_RECIPE,$(1),$(2),$(4),$(5))
 else
