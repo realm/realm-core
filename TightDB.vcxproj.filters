@@ -208,6 +208,9 @@
     <ClCompile Include="src\tightdb\importer.cpp">
       <Filter>csv importer</Filter>
     </ClCompile>
+    <ClCompile Include="test\test_file_locks.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">
