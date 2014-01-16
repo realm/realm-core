@@ -790,25 +790,21 @@ const Group& SharedGroup::begin_read()
 
             // must allocate new reader entry - this occurs in parallel with any searching in end_read,
             // but ONLY if expansion cannot occur.
-            if (count) {
-
-                size_t size = ringbuf_size();
-                while (!ringbuf_is_empty() && ringbuf_get_first().count.load_relaxed() == 0)
-                    ringbuf_remove_first();
-                bool is_full = size == info->capacity_mask;
-                if (is_full) {
-                    while (info->active_readers.load_relaxed()) {
-                        // spinlock, waiting for any searching readers to finish before we blow
-                        // away (part of) the ringbuffer from under their feet
-                    }
-                    ringbuf_expand();
+            while (!ringbuf_is_empty() && ringbuf_get_first().count.load_relaxed() == 0)
+                ringbuf_remove_first();
+            size_t size = ringbuf_size();
+            bool is_full = size == info->capacity_mask;
+            if (is_full) {
+                while (info->active_readers.load_relaxed()) {
+                    // spinlock, waiting for any searching readers to finish before we blow
+                    // away (part of) the ringbuffer from under their feet
                 }
-                SharedInfo* r_info = m_reader_map.get_addr();
-                r_info->readers[info->put_pos].version = info->last_reader.version;
-                r_info->readers[info->put_pos].count.store_relaxed(info->last_reader.count.load_relaxed() >> 1);
-                info->put_pos = (info->put_pos + 1) & info->capacity_mask;
+                ringbuf_expand();
             }
-
+            SharedInfo* r_info = m_reader_map.get_addr();
+            r_info->readers[info->put_pos].version = info->last_reader.version;
+            r_info->readers[info->put_pos].count.store_relaxed(info->last_reader.count.load_relaxed() >> 1);
+            info->put_pos = (info->put_pos + 1) & info->capacity_mask;
             info->last_reader.version = m_version;
             release_locked(info->last_reader.count, (uint32_t) 1);;
         }
