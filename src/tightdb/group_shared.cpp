@@ -793,6 +793,8 @@ const Group& SharedGroup::begin_read()
             if (count) {
 
                 size_t size = ringbuf_size();
+                while (!ringbuf_is_empty() && ringbuf_get_first().count.load_relaxed() == 0)
+                    ringbuf_remove_first();
                 bool is_full = size == info->capacity_mask;
                 if (is_full) {
                     while (info->active_readers.load_relaxed()) {
@@ -879,18 +881,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
             ReadCount& r = ringbuf_get(ndx);
 
             // Decrement ref count on found entry.
-            uint32_t count = atomic_dec(r.count);
-            if (count == 0) {
-                // cleanup - at most one thread should clean up at a time
-                // remove as many entries as possible. 
-                uint32_t lock_count = wait_for_lock(info->last_reader.count);
-                if (ringbuf_is_first(ndx)) {
-                    ringbuf_remove_first();
-                    while (!ringbuf_is_empty() && ringbuf_get_first().count.load_relaxed() == 0)
-                        ringbuf_remove_first();
-                }
-                release_locked(info->last_reader.count, lock_count);
-            }
+            atomic_dec(r.count);
             atomic_dec(info->active_readers);
         }
     }
