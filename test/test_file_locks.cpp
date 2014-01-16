@@ -17,8 +17,17 @@ using namespace tightdb::util;
 
 namespace {
 
-const int num_slaves = 2;
+#if TEST_DURATION < 1
 const int num_rounds = 1000;
+#elif TEST_DURATION < 2
+const int num_rounds = 10000;
+#elif TEST_DURATION < 3
+const int num_rounds = 100000;
+#else
+const int num_rounds = 1000000;
+#endif
+
+const int num_slaves = 2;
 
 map<int, int> results;
 
@@ -69,7 +78,13 @@ void slave(int ndx)
 } // anonymous namespace
 
 
-TEST(File_Locks)
+// The assumption is that if multiple processes try to place an
+// exclusive lock on a file in a non-blocking fashion, then at least
+// one will succeed (assuming that no one else interferes). This test
+// trys to verify that this is the case by repeatedly letting two
+// treads compete for the lock. This is by no means a "water tight"
+// test, but it is probably the best we can do.
+TEST(File_NoSpuriousTryLockFailures)
 {
     Thread slaves[num_slaves];
     for (int i = 0; i != num_slaves; ++i) {
