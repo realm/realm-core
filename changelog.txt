@@ -11,6 +11,9 @@ Format:
 . Any other notes ....                   (internal changes)
 
 
+2014-01-07 (Kenneth Geisshirt)
++ Table::range() added. The method returns a set of rows as a TableView.
+
 2014-01-06 (Kristian Spangsege)
 ! 'No parent info in shared specs' conflicts with implementation of `Group::commit()`.
 ! `ColumnTable::m_spec_ref` not updated when Spec object is reallocated.
