@@ -894,11 +894,12 @@ TEST(TableView_ref_counting)
 TEST(TableView_dyn_pivot)
 {
     TableRef table = Table::create();
-    table->add_column(type_String, "sex");
-    table->add_column(type_Int, "age");
+    size_t column_ndx_sex   = table->add_column(type_String, "sex");
+    size_t column_ndx_age   = table->add_column(type_Int, "age");
     table->add_column(type_Bool, "hired");
 
-    for (size_t i = 0; i < 500000; ++i) {
+    size_t count = 5000;
+    for (size_t i = 0; i < count; ++i) {
         StringData sex = i % 2 ? "Male" : "Female";
         table->insert_string(0, i, sex);
         table->insert_int(1, i, 20 + (i%20));
@@ -907,81 +908,37 @@ TEST(TableView_dyn_pivot)
     }
     
     TableView tv = table->where().find_all();
-    
-    UnitTest::Timer timer;
-    stringstream ss;
     
     Table result_count;
-    timer.Start();
     tv.aggregate(0, 1, Table::aggr_count, result_count);
-    printf("table_view_pivot_count1: %d\n", timer.GetTimeInMs());
-    
-    result_count.to_string(ss);
-    cout << ss.str();
-    
-    Table result_sum;
-    tv.aggregate(0, 1, Table::aggr_sum, result_sum);
-    
-    ss.str("");
-    result_sum.to_string(ss);
-    cout << ss.str();
-    
-    Table result_avg;
-    tv.aggregate(0, 1, Table::aggr_avg, result_avg);
-    
-    ss.str("");
-    result_avg.to_string(ss);
-    cout << ss.str();
-    
-    
-    Table result_count2;
-    timer.Start();
-    tv.aggregate(0, 1, Table::aggr_count, result_count2);
-    printf("table_view_pivot_count2: %d\n", timer.GetTimeInMs());
-    ss.str("");
-    result_count2.to_string(ss);
-    cout << ss.str();
-}
-
-TEST(TableView_dyn_pivot2)
-{
-    TableRef table = Table::create();
-    size_t column_ndx_sex = table->add_column(type_String, "sex");
-    size_t column_ndx_age = table->add_column(type_Int, "age");
-    table->add_column(type_Bool, "hired");
-    
-    for (size_t i = 0; i < 500000; ++i) {
-        StringData sex = i % 2 ? "Male" : "Female";
-        table->insert_string(0, i, sex);
-        table->insert_int(1, i, 20 + (i%20));
-        table->insert_bool(2, i, true);
-        table->insert_done();
-    }
-    
-    TableView tv = table->where().find_all();
+    int64_t half = count/2;
+    CHECK_EQUAL(2, result_count.get_column_count());
+    CHECK_EQUAL(2, result_count.size());
+    CHECK_EQUAL(half, result_count.get_int(1, 0));
+    CHECK_EQUAL(half, result_count.get_int(1, 1));
     
     Table result_sum;
     tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_sum, result_sum);
     
-    // Only 2 distinct group values (male and female)
-    CHECK_EQUAL(2, result_sum.size());
-    
-    Table result_count;
-    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_count, result_count);
+    Table result_avg;
+    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_avg, result_avg);
 
-    CHECK_EQUAL(250000, result_count.get_int(1, 0));
-    CHECK_EQUAL(250000, result_count.get_int(1, 1));
-    
     Table result_min;
     tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_min, result_min);
-    CHECK_EQUAL(20, result_min.get_int(1, 0));
-    CHECK_EQUAL(21, result_min.get_int(1, 1));
-    
+
     Table result_max;
     tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_max, result_max);
-    CHECK_EQUAL(38, result_max.get_int(1, 0));
-    CHECK_EQUAL(39, result_max.get_int(1, 1));
 
+
+    // Test with enumerated strings
+    table->optimize();
+
+    Table result_count2;
+    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_count, result_count2);
+    CHECK_EQUAL(2, result_count2.get_column_count());
+    CHECK_EQUAL(2, result_count2.size());
+    CHECK_EQUAL(half, result_count2.get_int(1, 0));
+    CHECK_EQUAL(half, result_count2.get_int(1, 1));
 }
 
 
