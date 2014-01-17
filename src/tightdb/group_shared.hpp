@@ -199,6 +199,7 @@ private:
     // Member variables
     Group      m_group;
     uint64_t   m_version;
+    uint32_t   m_reader_idx;
     util::File m_file;
     util::File::Map<SharedInfo> m_file_map; // Never remapped
     util::File::Map<SharedInfo> m_reader_map;
@@ -210,21 +211,6 @@ private:
         transact_Writing
     };
     TransactStage m_transact_stage;
-
-    struct ReadCount;
-
-    // Ring buffer managment
-    bool        ringbuf_is_empty() const TIGHTDB_NOEXCEPT;
-    std::size_t ringbuf_size() const TIGHTDB_NOEXCEPT;
-    std::size_t ringbuf_capacity() const TIGHTDB_NOEXCEPT;
-    bool        ringbuf_is_first(std::size_t ndx) const TIGHTDB_NOEXCEPT;
-    void        ringbuf_remove_first() TIGHTDB_NOEXCEPT;
-    std::size_t ringbuf_find(uint64_t version) const TIGHTDB_NOEXCEPT;
-    ReadCount&  ringbuf_get(std::size_t ndx) TIGHTDB_NOEXCEPT;
-    ReadCount&  ringbuf_get_first() TIGHTDB_NOEXCEPT;
-    ReadCount&  ringbuf_get_last() TIGHTDB_NOEXCEPT;
-    void        ringbuf_put(const ReadCount& v);
-    void        ringbuf_expand();
 
     void do_begin_write();
 

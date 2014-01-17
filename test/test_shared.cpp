@@ -112,10 +112,6 @@ TEST(Shared_Initial)
             CHECK(rt.get_group().is_empty());
         }
 
-#ifdef TIGHTDB_DEBUG
-        // Also do a basic ringbuffer test
-        sg.test_ringbuf();
-#endif
     }
 
     // Verify that lock file was deleted after use
@@ -205,10 +201,6 @@ TEST(Shared_Initial_Mem)
             CHECK(rt.get_group().is_empty());
         }
 
-#ifdef TIGHTDB_DEBUG
-        // Also do a basic ringbuffer test
-        sg.test_ringbuf();
-#endif
     }
 
     // Verify that both db and lock file was deleted after use
