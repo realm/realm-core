@@ -1,6 +1,9 @@
-check_PROGRAMS = testcase
+check_PROGRAMS = testcase innotest
 
 testcase_SOURCES = unit_test.cpp testcase.cpp
 testcase_LIBS = ../util/test-util.a
+
+innotest_SOURCES = innotest.cpp
+innotest_LIBS = ../../src/tightdb/libtightdb.a
 
 include ../../src/generic.mk

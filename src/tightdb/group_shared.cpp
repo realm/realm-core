@@ -43,9 +43,86 @@ const int max_wait_for_daemon_start = 100;
 } // anonymous namespace
 
 
+
+// this following primitives adds a simple lock bit to an integral type
+// (placing the lock in the lowest bit.
+template<typename T> bool try_to_lock(T& result, Atomic<T>& locked_counter)
+{
+    T old_val;
+    T new_val;
+    old_val = locked_counter.load_relaxed();
+    do {
+        if (old_val & 1) {
+            result = old_val >> 1;
+            return false; // locking failed
+        }
+        new_val = old_val | 1;
+    } while (locked_counter.compare_and_swap(old_val, new_val) == false);
+    result = old_val >> 1;
+    return true;
+}
+
+template<typename T> T wait_for_lock(Atomic<T>& locked_counter)
+{
+    T val;
+    int delay = 0;
+    while (! try_to_lock(val, locked_counter)) { 
+        delay++;
+/*
+        volatile int k = delay;
+        while (k--); // delay
+*/
+        if (delay == 10) {
+            sched_yield();
+            delay = 0;
+        }
+    } // spinlock
+    return val;
+}
+
+// release lock: new_value is just the new value
+template<typename T> void release_locked(Atomic<T>& locked_counter, T new_value)
+{
+    locked_counter.store_release(new_value << 1);
+}
+
+template<typename T> inline T atomic_inc(Atomic<T>& counter)
+{
+    T old_val;
+    T new_val;
+    do {
+        old_val = counter.load_relaxed();
+        new_val = old_val + 1;
+    } while (counter.compare_and_swap(old_val, new_val) == false);
+    return new_val;
+}
+
+template<typename T> inline T atomic_dec(Atomic<T>& counter)
+{
+    T old_val;
+    T new_val;
+    do {
+        old_val = counter.load_relaxed();
+        new_val = old_val - 1;
+    } while (counter.compare_and_swap(old_val, new_val) == false);
+    return new_val;
+}
+
 struct SharedGroup::ReadCount {
     uint64_t version;
-    uint32_t count;
+    Atomic<uint32_t> count;
+    ReadCount(uint64_t v, uint32_t c) : version(v), count(c) {};
+    ReadCount() : version(0), count(0) {};
+    // Required because we put them in a vector and copy them :-(
+    ReadCount& operator=(const ReadCount& rc)
+    {
+        if (&rc != this) {
+            version = rc.version;
+            count.store_relaxed(rc.count.load_relaxed());
+        }
+        return *this;
+    }
+
 };
 
 struct SharedGroup::SharedInfo {
@@ -55,7 +132,7 @@ struct SharedGroup::SharedInfo {
     uint16_t version;
     uint16_t flags;
 
-    Mutex readmutex;
+    // RWLock readlock;
     RobustMutex writemutex;
     RobustMutex balancemutex;
 #ifndef _WIN32
@@ -75,6 +152,8 @@ struct SharedGroup::SharedInfo {
 
     static const int init_readers_size = 32; // Must be a power of two
     ReadCount readers[init_readers_size];
+    ReadCount last_reader;
+    Atomic<uint32_t> active_readers;
 
     SharedInfo(ref_type top_ref, size_t file_size, size_t info_size, DurabilityLevel);
     ~SharedInfo() TIGHTDB_NOEXCEPT {}
@@ -84,13 +163,11 @@ struct SharedGroup::SharedInfo {
 SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, size_t info_size,
                                     DurabilityLevel dlevel):
 #ifndef _WIN32
-    readmutex(Mutex::process_shared_tag()), // Throws
     writemutex(), // Throws
     balancemutex(), // Throws
     room_to_write(CondVar::process_shared_tag()), // Throws
     work_to_do(CondVar::process_shared_tag()) // Throws
 #else
-    readmutex(Mutex::process_shared_tag()), // Throws
     writemutex(), // Throws
     balancemutex() // Throws
 #endif
@@ -467,6 +544,10 @@ void SharedGroup::open(const string& path, bool no_create_file,
 
 SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 {
+    if (m_deferred_detach) {
+        m_group.detach();
+        m_deferred_detach = false;
+    }
     if (!is_attached())
         return;
 
@@ -527,7 +608,7 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
 bool SharedGroup::has_changed() const TIGHTDB_NOEXCEPT
 {
     const SharedInfo* info = m_file_map.get_addr();
-    // this variable is changed under lock (the readmutex), but
+    // this variable is changed under lock (the readlock), but
     // inspected here without taking a lock. This is intentional.
     // The variable is only compared for inequality against a value
     // it is known to have had once, let's call it INIT.
@@ -683,39 +764,62 @@ const Group& SharedGroup::begin_read()
 
     ref_type new_top_ref = 0;
     size_t new_file_size = 0;
+    uint64_t old_version = m_version;
 
     {
         SharedInfo* info = m_file_map.get_addr();
-        Mutex::Lock lock(info->readmutex);
+        uint32_t count = wait_for_lock(info->last_reader.count);
 
-        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
-            m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
-
-        // Get the current top ref
+        // fast path (s):
         new_top_ref   = to_size_t(info->current_top);
         new_file_size = to_size_t(info->filesize);
-        m_version     = info->current_version.load_relaxed();
+        m_version = info->current_version.load_relaxed();
+        if (m_version == info->last_reader.version) {
 
-        // Update reader list
-        if (ringbuf_is_empty()) {
-            ReadCount r2 = { m_version, 1 };
-            ringbuf_put(r2); // Throws
+            release_locked(info->last_reader.count, count + 1);
         }
-        else {
-            ReadCount& r = ringbuf_get_last();
-            if (r.version == m_version) {
-                ++r.count;
+        else if (count == 0) {
+
+            info->last_reader.version = m_version;
+            release_locked(info->last_reader.count, (uint32_t) 1);
+        }
+        else { // slow path:
+
+            if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
+                m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
+
+            // must allocate new reader entry - this occurs in parallel with any searching in end_read,
+            // but ONLY if expansion cannot occur.
+            while (!ringbuf_is_empty() && ringbuf_get_first().count.load_relaxed() == 0)
+                ringbuf_remove_first();
+            size_t size = ringbuf_size();
+            bool is_full = size == info->capacity_mask;
+            if (is_full) {
+                while (info->active_readers.load_relaxed()) {
+                    // spinlock, waiting for any searching readers to finish before we blow
+                    // away (part of) the ringbuffer from under their feet
+                }
+                ringbuf_expand();
             }
-            else {
-                ReadCount r2 = { m_version, 1 };
-                ringbuf_put(r2); // Throws
-            }
+            SharedInfo* r_info = m_reader_map.get_addr();
+            r_info->readers[info->put_pos].version = info->last_reader.version;
+            r_info->readers[info->put_pos].count.store_relaxed(info->last_reader.count.load_relaxed() >> 1);
+            info->put_pos = (info->put_pos + 1) & info->capacity_mask;
+            info->last_reader.version = m_version;
+            release_locked(info->last_reader.count, (uint32_t) 1);;
         }
     }
 
     m_transact_stage = transact_Reading;
 
-    // Make sure the group is up-to-date.
+    if (old_version == m_version && m_deferred_detach) {
+        m_deferred_detach = false;
+        return m_group;
+    }
+    if (m_deferred_detach) {
+        m_group.detach();
+        m_deferred_detach = false;
+    }
     // A zero ref means that the file has just been created.
     try {
         m_group.update_from_shared(new_top_ref, new_file_size); // Throws
@@ -731,7 +835,7 @@ const Group& SharedGroup::begin_read()
 
 void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 {
-    if (!m_group.is_attached())
+    if (m_deferred_detach || !m_group.is_attached())
         return;
 
     TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
@@ -739,30 +843,48 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 
     {
         SharedInfo* info = m_file_map.get_addr();
-        Mutex::Lock lock(info->readmutex);
+        uint32_t count = wait_for_lock(info->last_reader.count);
 
-        if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
-            m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize);
+        if (m_version == info->last_reader.version) {
 
-        // Find entry for current version
-        size_t ndx = ringbuf_find(m_version);
-        TIGHTDB_ASSERT(ndx != not_found);
-        ReadCount& r = ringbuf_get(ndx);
-
-        // Decrement count and remove as many entries as possible
-        if (r.count == 1 && ringbuf_is_first(ndx)) {
-            ringbuf_remove_first();
-            while (!ringbuf_is_empty() && ringbuf_get_first().count == 0)
-                ringbuf_remove_first();
+            // Fast path:
+            release_locked(info->last_reader.count, count - 1);
         }
         else {
-            TIGHTDB_ASSERT(r.count > 0);
-            --r.count;
+
+            // we now leave the critical region and search the buffer. This allows multiple
+            // searches to go on in parallel, even though new items may be added to the ringbuffer
+            // concurrently. Such a search may not see any additional items added to the ringbuffer,
+            // BUT it could never match any new item anyway, so it is ok.
+            // Expanding the ringbuffer is NOT ok, so we must prevent it while we are searching.
+            atomic_inc(info->active_readers);
+            release_locked(info->last_reader.count, count);
+
+            // Slower path:
+            if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
+                m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize);
+
+            // Find entry for current version
+            // Find can run concurrently with cleanup because the key searched
+            // for must be there, and will prevent the cleanup from killing it.
+            // Find could in principle run concurrently with put, EXCEPT when put
+            // triggers a ringbuf expansion. Since this only happens seldom and
+            // put is normally very fast, we just decide to handle find and put as
+            // mutual exclusive operations.
+            // Multiple find operations should be able to run in parallel.
+            size_t ndx = ringbuf_find(m_version);
+            TIGHTDB_ASSERT(ndx != not_found);
+            ReadCount& r = ringbuf_get(ndx);
+
+            // Decrement ref count on found entry.
+            atomic_dec(r.count);
+            atomic_dec(info->active_readers);
         }
     }
 
     // The read may have allocated some temporary state
-    m_group.detach();
+    //m_group.detach();
+    m_deferred_detach = true;
 
     m_transact_stage = transact_Ready;
 }
@@ -771,7 +893,10 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 void SharedGroup::do_begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
-
+    if (m_deferred_detach) {
+        m_group.detach();
+        m_deferred_detach = false;
+    }
     SharedInfo* info = m_file_map.get_addr();
 
     // Get write lock
@@ -856,7 +981,8 @@ void SharedGroup::commit()
     // Release write lock
     info->writemutex.unlock();
 
-    m_group.detach();
+    //m_group.detach();
+    m_deferred_detach = true;
 
     m_transact_stage = transact_Ready;
 }
@@ -868,6 +994,10 @@ void SharedGroup::commit()
 // rollback() does not handle all cases.
 void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 {
+    if (m_deferred_detach) {
+        m_group.detach();
+        m_deferred_detach = false;
+    }
     if (m_group.is_attached()) {
         TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
@@ -959,7 +1089,8 @@ void SharedGroup::ringbuf_put(const ReadCount& v)
         info = m_reader_map.get_addr();
     }
 
-    info->readers[info->put_pos] = v;
+    info->readers[info->put_pos].version = v.version;
+    info->readers[info->put_pos].count.store_relaxed(v.count.load_relaxed() >> 1);
     info->put_pos = (info->put_pos + 1) & info->capacity_mask;
 }
 
@@ -1034,7 +1165,7 @@ void SharedGroup::test_ringbuf()
 {
     TIGHTDB_ASSERT(ringbuf_is_empty());
 
-    ReadCount rc = { 1, 1 };
+    ReadCount rc(1, 1);
     ringbuf_put(rc);
     TIGHTDB_ASSERT(ringbuf_size() == 1);
 
@@ -1044,14 +1175,14 @@ void SharedGroup::test_ringbuf()
     // Fill buffer (within capacity)
     size_t capacity = ringbuf_capacity();
     for (size_t i = 0; i < capacity; ++i) {
-        ReadCount r = { 1, uint32_t(i) };
+        ReadCount r( 1, uint32_t(i) );
         ringbuf_put(r);
-        TIGHTDB_ASSERT(ringbuf_get_last().count == i);
+        TIGHTDB_ASSERT(ringbuf_get_last().count.load_relaxed() == i);
     }
     TIGHTDB_ASSERT(ringbuf_size() == capacity);
     for (size_t i = 0; i < capacity; ++i) {
         const ReadCount& r = ringbuf_get_first();
-        TIGHTDB_ASSERT(r.count == i);
+        TIGHTDB_ASSERT(r.count.load_relaxed() == i);
 
         ringbuf_remove_first();
     }
@@ -1059,18 +1190,18 @@ void SharedGroup::test_ringbuf()
 
     // Fill buffer and force split
     for (size_t i = 0; i < capacity; ++i) {
-        ReadCount r = { 1, uint32_t(i) };
+        ReadCount r( 1, uint32_t(i) );
         ringbuf_put(r);
-        TIGHTDB_ASSERT(ringbuf_get_last().count == i);
+        TIGHTDB_ASSERT(ringbuf_get_last().count.load_relaxed() == i);
     }
     for (size_t i = 0; i < capacity/2; ++i) {
         const ReadCount& r = ringbuf_get_first();
-        TIGHTDB_ASSERT(r.count == i);
+        TIGHTDB_ASSERT(r.count.load_relaxed() == i);
 
         ringbuf_remove_first();
     }
     for (size_t i = 0; i < capacity/2; ++i) {
-        ReadCount r = { 1, uint32_t(i) };
+        ReadCount r( 1, uint32_t(i) );
         ringbuf_put(r);
     }
     for (size_t i = 0; i < capacity; ++i) {
@@ -1081,13 +1212,13 @@ void SharedGroup::test_ringbuf()
     // Fill buffer above capacity (forcing it to expand)
     size_t capacity_plus = ringbuf_capacity() + (1+16);
     for (size_t i = 0; i < capacity_plus; ++i) {
-        ReadCount r = { 1, uint32_t(i) };
+        ReadCount r( 1, uint32_t(i) );
         ringbuf_put(r);
-        TIGHTDB_ASSERT(ringbuf_get_last().count == i);
+        TIGHTDB_ASSERT(ringbuf_get_last().count.load_relaxed() == i);
     }
     for (size_t i = 0; i < capacity_plus; ++i) {
         const ReadCount& r = ringbuf_get_first();
-        TIGHTDB_ASSERT(r.count == i);
+        TIGHTDB_ASSERT(r.count.load_relaxed() == i);
         ringbuf_remove_first();
     }
     TIGHTDB_ASSERT(ringbuf_is_empty());
@@ -1095,13 +1226,13 @@ void SharedGroup::test_ringbuf()
     // Fill buffer above capacity again (forcing it to expand with overlap)
     capacity_plus = ringbuf_capacity() + (1+16);
     for (size_t i = 0; i < capacity_plus; ++i) {
-        ReadCount r = { 1, uint32_t(i) };
+        ReadCount r( 1, uint32_t(i) );
         ringbuf_put(r);
-        TIGHTDB_ASSERT(ringbuf_get_last().count == i);
+        TIGHTDB_ASSERT(ringbuf_get_last().count.load_relaxed() == i);
     }
     for (size_t i = 0; i < capacity_plus; ++i) {
         const ReadCount& r = ringbuf_get_first();
-        TIGHTDB_ASSERT(r.count == i);
+        TIGHTDB_ASSERT(r.count.load_relaxed() == i);
 
         ringbuf_remove_first();
     }
@@ -1119,17 +1250,21 @@ void SharedGroup::zero_free_space()
     size_t file_size;
 
     {
-        Mutex::Lock lock(info->readmutex);
+        uint32_t count = wait_for_lock(info->last_reader.count);
         current_version = info->current_version.load_relaxed() + 1;
         file_size = to_size_t(info->filesize);
 
         if (ringbuf_is_empty()) {
-            readlock_version = current_version;//FIXME:vs2012 32bit warning  warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
+            if (count)
+                readlock_version = info->last_reader.version;
+            else
+                readlock_version = current_version;//FIXME:vs2012 32bit warning  warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
         }
         else {
             const ReadCount& r = ringbuf_get_first();
             readlock_version = r.version;//FIXME:vs2012 32bit warning C4244: '=' : conversion from 'const uint64_t' to 'size_t', possible loss of data
         }
+        release_locked(info->last_reader.count, count);
     }
 
     m_group.zero_free_space(file_size, readlock_version);
@@ -1149,18 +1284,22 @@ void SharedGroup::low_level_commit(uint64_t new_version)
     SharedInfo* info = m_file_map.get_addr();
     uint64_t readlock_version;
     {
-        Mutex::Lock lock(info->readmutex);
+        uint32_t count = wait_for_lock(info->last_reader.count);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
             m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
 
         if (ringbuf_is_empty()) {
-            readlock_version = new_version;
+            if (count)
+                readlock_version = info->last_reader.version;
+            else
+                readlock_version = new_version;
         }
         else {
             const ReadCount& r = ringbuf_get_first();
             readlock_version = r.version;
         }
+        release_locked(info->last_reader.count, count);
     }
 
     // Do the actual commit
@@ -1183,10 +1322,11 @@ void SharedGroup::low_level_commit(uint64_t new_version)
 
     // Update reader info
     {
-        Mutex::Lock lock(info->readmutex);
+        uint32_t count = wait_for_lock(info->last_reader.count);
         info->current_top = new_top_ref;
         info->filesize    = new_file_size;
         info->current_version.store_relaxed(new_version);
+        release_locked(info->last_reader.count, count);
     }
 
     // Save last version for has_changed()

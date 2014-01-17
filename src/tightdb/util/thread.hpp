@@ -516,7 +516,7 @@ public:
     void store(T value);
     void store_release(T value);
     void store_relaxed(T value);
-    bool compare_and_swap(T oldvalue, T newvalue);
+    bool compare_and_swap(T& oldvalue, T newvalue);
 private:
     // the following is not supported
     Atomic(Atomic<T>&);
@@ -577,7 +577,7 @@ inline void Atomic<T>::store_relaxed(T value)
 }
 
 template<typename T>
-inline bool Atomic<T>::compare_and_swap(T oldvalue, T newvalue)
+inline bool Atomic<T>::compare_and_swap(T& oldvalue, T newvalue)
 {
     return state.compare_exchange_weak(oldvalue, newvalue);
 }
@@ -724,9 +724,16 @@ inline void Atomic<T>::store_relaxed(T value)
 }
 
 template<typename T>
-inline bool Atomic<T>::compare_and_swap(T oldvalue, T newvalue)
+inline bool Atomic<T>::compare_and_swap(T& oldvalue, T newvalue)
 {
-    return __sync_bool_compare_and_swap(&state, oldvalue, newvalue);
+//#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
+//    return __atomic_compare_exchange_n(&state, &oldvalue, newvalue, true, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
+//#else
+    T ov = oldvalue;
+    oldvalue = __sync_val_compare_and_swap(&state, oldvalue, newvalue);
+    return (ov == oldvalue);
+    
+//#endif
 }
 
 

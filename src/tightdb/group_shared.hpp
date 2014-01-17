@@ -203,7 +203,7 @@ private:
     util::File::Map<SharedInfo> m_file_map; // Never remapped
     util::File::Map<SharedInfo> m_reader_map;
     std::string m_file_path;
-
+    bool m_deferred_detach;
     enum TransactStage {
         transact_Ready,
         transact_Reading,
@@ -327,19 +327,21 @@ private:
 // Implementation:
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel dlevel):
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()),
+    m_deferred_detach(false)
 {
     open(file, no_create, dlevel);
 }
 
 inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()),
+    m_deferred_detach(false)
 {
 }
 
 inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 {
-    return m_file_map.is_attached();
+    return m_deferred_detach || m_file_map.is_attached();
 }
 
 inline Group& SharedGroup::begin_write()
@@ -367,7 +369,8 @@ inline Group& SharedGroup::begin_write()
 #ifdef TIGHTDB_ENABLE_REPLICATION
 
 inline SharedGroup::SharedGroup(Replication& repl):
-    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max())
+    m_group(Group::shared_tag()), m_version(std::numeric_limits<std::size_t>::max()),
+    m_deferred_detach(false)
 {
     open(repl);
 }
