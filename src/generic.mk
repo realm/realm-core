@@ -276,9 +276,12 @@
 # As a special option, `generic.mk` can be asked to completely disable
 # its support for installation, and instead link all programs as if
 # they had been declared as 'noinst' programs in the first place. This
-# mode also disables the creation of the extra 'noinst' versions. This
-# mode is enabled by setting the environment variable `ENABLE_NOINST`
-# to a non-empty value.
+# mode also disables the creation of the extra 'noinst' versions (as
+# they would be redundant), and it will disable shared library
+# versioning, that is, it will build each library as if no version was
+# specified for it (see 'Library versioning' below). This mode is
+# enabled by setting the environment variable `ENABLE_NOINST_BUILD` to
+# a non-empty value.
 #
 #
 # Programs that are not installed
@@ -977,8 +980,8 @@ GET_LIBRARY_STEM         = $(patsubst %.a,%,$(1))
 GET_OBJECTS_FOR_TARGET   = $(addsuffix $(2),$(basename $($(call FOLD_TARGET,$(1))_SOURCES)))
 GET_LDFLAGS_FOR_TARGET   = $(foreach x,PROJECT DIR $(call FOLD_TARGET,$(1)),$(call GET_FLAGS,$(x)_LDFLAGS,$(2)))
 GET_DEPS_FOR_TARGET      = $($(call FOLD_TARGET,$(1))_DEPS)
-GET_VERSION_FOR_TARGET   = $(call GET_VERSION_FOR_TARGET_2,$(strip $($(call FOLD_TARGET,$(1))_VERSION)))
-GET_VERSION_FOR_TARGET_2 = $(if $(1),$(wordlist 1,3,$(subst :, ,$(1):0:0)))
+GET_LIBRARY_VERSION      = $(call GET_LIBRARY_VERSION_2,$(strip $($(call FOLD_TARGET,$(1))_VERSION)))
+GET_LIBRARY_VERSION_2    = $(if $(1),$(wordlist 1,3,$(subst :, ,$(1):0:0)))
 
 INC_FLAGS := $(CFLAGS_INCLUDE)
 INC_FLAGS_COVER = $(CFLAGS_INCLUDE)
@@ -1157,7 +1160,7 @@ MAP_SHARED_LIB_VERSION_3 = $(patsubst %.dylib,%,$(1)).$(2).dylib $(3) $(3).$(4)
 endif
 
 TARGETS_LIB_SHARED_ALIASES = $(foreach x,$(INST_LIBRARIES),$(foreach y,OPTIM DEBUG COVER,$(call TARGETS_LIB_SHARED_ALIASES_1,$(x),$(SUFFIX_LIB_SHARED_$(y)))))
-TARGETS_LIB_SHARED_ALIASES_1 = $(call GET_SHARED_LIB_ALIASES,$(call GET_LIBRARY_STEM,$(1))$(2),$(call GET_VERSION_FOR_TARGET,$(1)))
+TARGETS_LIB_SHARED_ALIASES_1 = $(call GET_SHARED_LIB_ALIASES,$(call GET_LIBRARY_STEM,$(1))$(2),$(call GET_LIBRARY_VERSION,$(1)))
 
 TARGETS := $(TARGETS_LIB_STATIC) $(TARGETS_LIB_SHARED_ALIASES) $(TARGETS_INST_LIB_LIBDEPS)
 TARGETS += $(TARGETS_NOINST_LIB) $(TARGETS_NOINST_LIB_LIBDEPS)
@@ -1331,12 +1334,12 @@ endif
 
 # ARGS: abstract_targets
 INSTALL_FILES_STATIC_LIBS = $(foreach x,$(1),$(foreach y,$(INST_STATIC_LIB_SUFFICES),$(call GET_LIBRARY_STEM,$(x))$(patsubst +%,%,$(y))))
-INSTALL_FILES_SHARED_LIBS = $(foreach x,$(1),$(foreach y,$(INST_SHARED_LIB_SUFFICES),$(call INSTALL_FILES_VERSIONED_LIB,$(call GET_LIBRARY_STEM,$(x))$(patsubst +%,%,$(y)),$(call GET_VERSION_FOR_TARGET,$(x)))))
+INSTALL_FILES_SHARED_LIBS = $(foreach x,$(1),$(foreach y,$(INST_SHARED_LIB_SUFFICES),$(call INSTALL_FILES_VERSIONED_LIB,$(call GET_LIBRARY_STEM,$(x))$(patsubst +%,%,$(y)),$(call GET_LIBRARY_VERSION,$(x)))))
 INSTALL_FILES_PROGRAMS    = $(foreach x,$(1),$(foreach y,$(INST_PROG_SUFFICES),$(x)$(patsubst +%,%,$(y))))
 
 # ARGS: install_dir, abstract_targets
 INSTALL_RECIPE_STATIC_LIBS = $(call INSTALL_RECIPE_LIBS,$(1),$(call INSTALL_FILES_STATIC_LIBS,$(2)))
-INSTALL_RECIPE_SHARED_LIBS = $(foreach x,$(2),$(foreach y,$(INST_SHARED_LIB_SUFFICES),$(call INSTALL_RECIPE_VERSIONED_LIB,$(1),$(call GET_LIBRARY_STEM,$(x))$(patsubst +%,%,$(y)),$(call GET_VERSION_FOR_TARGET,$(x)))$(NEWLINE)))
+INSTALL_RECIPE_SHARED_LIBS = $(foreach x,$(2),$(foreach y,$(INST_SHARED_LIB_SUFFICES),$(call INSTALL_RECIPE_VERSIONED_LIB,$(1),$(call GET_LIBRARY_STEM,$(x))$(patsubst +%,%,$(y)),$(call GET_LIBRARY_VERSION,$(x)))$(NEWLINE)))
 INSTALL_RECIPE_PROGRAMS    = $(NL_TAB)$$(INSTALL_PROGRAM) $(call INSTALL_FILES_PROGRAMS,$(2)) $$(DESTDIR_2)$(1)
 
 # ARGS: primary, is_for_uninstall
@@ -1419,7 +1422,7 @@ install-only/local:$(INSTALL_DIR_RECIPES)$(INSTALL_RECIPES)
 uninstall/local:$(UNINSTALL_RECIPES)$(UNINSTALL_DIR_RECIPES)
 endef
 
-ifeq ($(ENABLE_NOINST),)
+ifeq ($(ENABLE_NOINST_BUILD),)
 $(eval $(INSTALL_RULES))
 endif
 
@@ -1575,7 +1578,7 @@ FINALIZE_LIBREFS_DEP_INFO = $(call FILTER_UNPACK,noinst:% inst:% libdeps:%,$(cal
 # ARGS: finalized_expanded_librefs
 LDFLAGS_FROM_LIBREFS = $(call FILTER_PATSUBST,noinst:%,%,$(1)) $(call FILTER_PATSUBST,lib:%,-l%,$(1)) $(call FILTER_PATSUBST,dir:%,-L%,$(1)) $(call FILTER_PATSUBST,ldflag:%,%,$(1))
 RPATHS_FROM_LIBREFS = $(NOINST_RPATHS_FROM_LIBREFS)
-ifeq ($(ENABLE_NOINST),)
+ifeq ($(ENABLE_NOINST_BUILD),)
 RPATHS_FROM_LIBREFS = $(foreach x,$(call FILTER_PATSUBST,rpath:%,%,$(1)),-Wl,-rpath,$(x))
 endif
 NOINST_RPATHS_FROM_LIBREFS = $(foreach x,$(call FILTER_PATSUBST,rpath-noinst:%,%,$(1)),-Wl,-rpath,\$$ORIGIN$(if $(call IS_EQUAL_TO,$(x),.),,/$(x)))
@@ -1596,7 +1599,7 @@ $(1): $(2) $(3)
 	$$(call NOINST_PROG_RECIPE,$(1),$(2),$(4),$(5))
 endef
 define INST_PROG_RULES
-ifeq ($(if $(ENABLE_NOINST),,$(6)),)
+ifeq ($(if $(ENABLE_NOINST_BUILD),,$(6)),)
 $(1): $(2) $(3)
 	$$(call INST_PROG_RECIPE,$(1),$(2),$(4),$(5))
 else
@@ -1705,7 +1708,7 @@ $(1): $(2) $(3)
 endef
 
 # ARGS: real_local_path, objects, finalized_expanded_librefs, extra_deps, link_cmd, ldflags, lib_version
-SHARED_LIBRARY_RULE_HELPER = $(call SHARED_LIBRARY_RULE,$(1),$(2) $(call FILTER_UNPACK,inst:% libdeps:%,$(3)) $(4),$(5) $(2) $(call LDFLAGS_FROM_LIBREFS,$(3)) $(6) $$(LDFLAGS_ARCH),$(7))
+SHARED_LIBRARY_RULE_HELPER = $(call SHARED_LIBRARY_RULE,$(1),$(2) $(call FILTER_UNPACK,inst:% libdeps:%,$(3)) $(4),$(5) $(2) $(call LDFLAGS_FROM_LIBREFS,$(3)) $(6) $$(LDFLAGS_ARCH),$(if $(ENABLE_NOINST_BUILD),,$(7)))
 
 # ARGS: qual_lib_name, deps, cmd, version
 SHARED_LIBRARY_RULE = $(SHARED_LIBRARY_RULE_DEFAULT)
@@ -1770,9 +1773,9 @@ define INST_LIB_RULES
 $(call STATIC_LIBRARY_RULE,$(call GET_LIBRARY_STEM,$(1))$(SUFFIX_LIB_STATIC_OPTIM),$(call GET_OBJECTS_FOR_TARGET,$(1),$(SUFFIX_OBJ_STATIC_OPTIM)),$(3))
 $(call STATIC_LIBRARY_RULE,$(call GET_LIBRARY_STEM,$(1))$(SUFFIX_LIB_STATIC_DEBUG),$(call GET_OBJECTS_FOR_TARGET,$(1),$(SUFFIX_OBJ_STATIC_DEBUG)),$(3))
 $(call STATIC_LIBRARY_RULE,$(call GET_LIBRARY_STEM,$(1))$(SUFFIX_LIB_STATIC_COVER),$(call GET_OBJECTS_FOR_TARGET,$(1),$(SUFFIX_OBJ_STATIC_COVER)),$(3))
-$(call SHARED_LIBRARY_RULE_HELPER,$(call GET_LIBRARY_STEM,$(1))$(SUFFIX_LIB_SHARED_OPTIM),$(call GET_OBJECTS_FOR_TARGET,$(1),$(SUFFIX_OBJ_SHARED_OPTIM)),$(call FINALIZE_EXPANDED_LIBREFS,$(2),OPTIM),$(3),$$(LD_LIB_OPTIM),$(call GET_LDFLAGS_FOR_TARGET,$(1),OPTIM),$(call GET_VERSION_FOR_TARGET,$(1)))
-$(call SHARED_LIBRARY_RULE_HELPER,$(call GET_LIBRARY_STEM,$(1))$(SUFFIX_LIB_SHARED_DEBUG),$(call GET_OBJECTS_FOR_TARGET,$(1),$(SUFFIX_OBJ_SHARED_DEBUG)),$(call FINALIZE_EXPANDED_LIBREFS,$(2),DEBUG),$(3),$$(LD_LIB_DEBUG),$(call GET_LDFLAGS_FOR_TARGET,$(1),DEBUG),$(call GET_VERSION_FOR_TARGET,$(1)))
-$(call SHARED_LIBRARY_RULE_HELPER,$(call GET_LIBRARY_STEM,$(1))$(SUFFIX_LIB_SHARED_COVER),$(call GET_OBJECTS_FOR_TARGET,$(1),$(SUFFIX_OBJ_SHARED_COVER)),$(call FINALIZE_EXPANDED_LIBREFS,$(2),COVER),$(3),$$(LD_LIB_COVER),$(call GET_LDFLAGS_FOR_TARGET,$(1),COVER),$(call GET_VERSION_FOR_TARGET,$(1)))
+$(call SHARED_LIBRARY_RULE_HELPER,$(call GET_LIBRARY_STEM,$(1))$(SUFFIX_LIB_SHARED_OPTIM),$(call GET_OBJECTS_FOR_TARGET,$(1),$(SUFFIX_OBJ_SHARED_OPTIM)),$(call FINALIZE_EXPANDED_LIBREFS,$(2),OPTIM),$(3),$$(LD_LIB_OPTIM),$(call GET_LDFLAGS_FOR_TARGET,$(1),OPTIM),$(call GET_LIBRARY_VERSION,$(1)))
+$(call SHARED_LIBRARY_RULE_HELPER,$(call GET_LIBRARY_STEM,$(1))$(SUFFIX_LIB_SHARED_DEBUG),$(call GET_OBJECTS_FOR_TARGET,$(1),$(SUFFIX_OBJ_SHARED_DEBUG)),$(call FINALIZE_EXPANDED_LIBREFS,$(2),DEBUG),$(3),$$(LD_LIB_DEBUG),$(call GET_LDFLAGS_FOR_TARGET,$(1),DEBUG),$(call GET_LIBRARY_VERSION,$(1)))
+$(call SHARED_LIBRARY_RULE_HELPER,$(call GET_LIBRARY_STEM,$(1))$(SUFFIX_LIB_SHARED_COVER),$(call GET_OBJECTS_FOR_TARGET,$(1),$(SUFFIX_OBJ_SHARED_COVER)),$(call FINALIZE_EXPANDED_LIBREFS,$(2),COVER),$(3),$$(LD_LIB_COVER),$(call GET_LDFLAGS_FOR_TARGET,$(1),COVER),$(call GET_LIBRARY_VERSION,$(1)))
 $(call LIBDEPS_RULE,$(call GET_LIBRARY_STEM,$(1)),$(call EXTRACT_INST_LIB_LIBDEPS,$(2)),$(call FILTER_PATSUBST,libdeps:%,%,$(2)))
 endef
 
