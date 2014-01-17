@@ -281,7 +281,8 @@
 # versioning, that is, it will build each library as if no version was
 # specified for it (see 'Library versioning' below). This mode is
 # enabled by setting the environment variable `ENABLE_NOINST_BUILD` to
-# a non-empty value.
+# a non-empty value. Be sure to do a `make clean` when you switch
+# between 'noinst' and regular mode.
 #
 #
 # Programs that are not installed
