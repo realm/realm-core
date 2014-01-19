@@ -217,6 +217,7 @@ public:
     ref_type get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     int64_t back() const TIGHTDB_NOEXCEPT { return get(size()-1); }
     void set(std::size_t ndx, int64_t value);
+    void adjust(std::size_t ndx, int64_t diff);
     void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
     void insert(std::size_t ndx, int64_t value);
     void add() TIGHTDB_OVERRIDE { add(0); }

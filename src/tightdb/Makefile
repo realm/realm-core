@@ -3,8 +3,8 @@ REPLICATION_CPP = $(if $(ENABLE_REPLICATION),replication.cpp)
 
 nobase_subinclude_HEADERS = util/features.h util/meta.hpp util/assert.hpp util/terminate.hpp \
 util/type_list.hpp util/tuple.hpp util/bind.hpp util/safe_int_ops.hpp util/unique_ptr.hpp \
-util/bind_ptr.hpp util/buffer.hpp util/string_buffer.hpp util/logger.hpp util/file.hpp \
-util/thread.hpp util/utf8.hpp exceptions.hpp utilities.hpp alloc.hpp alloc_slab.hpp array.hpp \
+util/bind_ptr.hpp util/buffer.hpp util/string_buffer.hpp util/logger.hpp util/thread.hpp \
+util/file.hpp util/utf8.hpp exceptions.hpp utilities.hpp alloc.hpp alloc_slab.hpp array.hpp \
 array_string.hpp data_type.hpp column_type.hpp column_fwd.hpp spec.hpp datetime.hpp \
 string_data.hpp binary_data.hpp mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp \
 table_accessors.hpp table_basic.hpp table_view.hpp table_view_basic.hpp table_macros.hpp \
@@ -27,7 +27,7 @@ libexec_PROGRAMS = tightdbd
 bin_PROGRAMS     = tightdb-import
 DEV_PROGRAMS     = tightdb-config
 
-libtightdb_a_SOURCES = util/terminate.cpp util/string_buffer.cpp util/file.cpp util/thread.cpp \
+libtightdb_a_SOURCES = util/terminate.cpp util/string_buffer.cpp util/thread.cpp util/file.cpp \
 util/utf8.cpp utilities.cpp alloc.cpp alloc_slab.cpp array.cpp array_string.cpp \
 array_string_long.cpp array_binary.cpp array_blob.cpp array_blobs_big.cpp column.cpp \
 column_string.cpp column_string_enum.cpp column_binary.cpp column_table.cpp column_mixed.cpp \

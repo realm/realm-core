@@ -109,6 +109,7 @@ ONLY(ManyColumnsCrash) {
             {
                 // create the event
 #if 1
+
                 PatientTableType::Ref table = group->get_table<PatientTableType>("events");
                 table->add(obfuscatedYear, daysSinceLastVisit, conceptId);
 #else
@@ -749,6 +750,19 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     size_t res;
     degen_child->where().equal(5, "hello").average_int(0, &res);
     CHECK_EQUAL(0, res);
+}
+
+TEST(Table_range)
+{
+    Table table;
+    table.add_column(type_Int, "int");
+    table.add_empty_row(100);
+    for (size_t i = 0 ; i < 100; ++i)
+        table.set_int(0, i, i);
+    TableView tv = table.get_range_view(10, 20);
+    CHECK_EQUAL(10, tv.size());
+    for (size_t i = 0; i < tv.size(); ++i)
+        CHECK_EQUAL(int64_t(i+10), tv.get_int(0, i));
 }
 
 
@@ -2803,6 +2817,51 @@ TEST(Table_FormerLeakCase)
     root.add_empty_row(1);
     root.set_subtable(0, 0, &sub);
     root.set_subtable(0, 0, 0);
+}
+
+TIGHTDB_TABLE_3(TablePivotAgg,
+                sex,   String,
+                age,   Int,
+                hired, Bool)
+
+TEST(Table_pivot)
+{
+    size_t count = 5000;
+    TablePivotAgg table;
+    for (size_t i = 0; i < count; ++i) {
+        StringData sex = i % 2 ? "Male" : "Female";
+        table.add(sex, 20 + (i%20), true);
+    }
+
+    Table result_count;
+    table.aggregate(0, 1, Table::aggr_count, result_count);
+    int64_t half = count/2;
+    CHECK_EQUAL(2, result_count.get_column_count());
+    CHECK_EQUAL(2, result_count.size());
+    CHECK_EQUAL(half, result_count.get_int(1, 0));
+    CHECK_EQUAL(half, result_count.get_int(1, 1));
+
+    Table result_sum;
+    table.aggregate(0, 1, Table::aggr_sum, result_sum);
+
+    Table result_avg;
+    table.aggregate(0, 1, Table::aggr_avg, result_avg);
+
+    Table result_min;
+    table.aggregate(0, 1, Table::aggr_min, result_min);
+
+    Table result_max;
+    table.aggregate(0, 1, Table::aggr_max, result_max);
+
+    // Test with enumerated strings
+    table.optimize();
+
+    Table result_count2;
+    table.aggregate(0, 1, Table::aggr_count, result_count2);
+    CHECK_EQUAL(2, result_count2.get_column_count());
+    CHECK_EQUAL(2, result_count2.size());
+    CHECK_EQUAL(half, result_count2.get_int(1, 0));
+    CHECK_EQUAL(half, result_count2.get_int(1, 1));
 }
 
 #endif // TEST_TABLE
