@@ -7,14 +7,14 @@ int main()
 {
     //int pid = fork();
     srand(time(NULL));
-    const int reads_per_write = 100;
+    const int reads_per_write = 0; // 500000;
     ProfilerStart("gnyf.prof");
     SharedGroup db("test2.tightdb");
 
     for (size_t round = 0; round < 20; ++round) {
     
         for (size_t i = 0; i < 1000000; ++i) {
-            if ((i % reads_per_write) == 0)
+            if (reads_per_write != 0 && (i % reads_per_write) == 0)
             {
                 WriteTransaction trx(db);
             
@@ -25,6 +25,7 @@ int main()
             
                 StringData str = t->get_string(1, ndx);
                 t->set_string(1, ndx, str);
+                trx.commit();
 //                const char* s = str.data();         
             }
             else {
