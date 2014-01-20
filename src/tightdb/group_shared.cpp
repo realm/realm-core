@@ -1056,56 +1056,7 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
     }
 }
 
-
 #if 0
-
-void SharedGroup::ringbuf_expand()
-{
-    SharedInfo* info = m_reader_map.get_addr();
-    size_t old_buffer_size = info->capacity_mask + 1; // FIXME: Why size_t and not uint32 as capacity?
-    size_t base_file_size = sizeof (SharedInfo) - sizeof (ReadCount[SharedInfo::init_readers_size]);
-
-    // Be sure that the new file size, after doubling the size of the
-    // ring buffer, can be stored in a size_t. This also guarantees
-    // that there is no arithmetic overflow in the calculation of the
-    // new file size. We must always double the size of the ring
-    // buffer, such that we can continue to use the capacity as a bit
-    // mask. Note that the capacity of the ring buffer is one less
-    // than the size of the containing linear buffer.
-    //
-    // FIXME: It is no good that we convert back and forth between
-    // uint32_t and size_t, because that defeats the purpose of this
-    // check.
-    if (old_buffer_size > (numeric_limits<size_t>::max() -
-                           base_file_size) / (2 * sizeof (ReadCount)))
-        throw runtime_error("Overflow in size of 'readers' buffer");
-    size_t new_buffer_size = 2 * old_buffer_size;
-    size_t new_file_size = base_file_size + (sizeof (ReadCount) * new_buffer_size);
-
-    // Extend lock file
-    m_file.prealloc(0, new_file_size); // Throws
-    m_reader_map.remap(m_file, util::File::access_ReadWrite, new_file_size); // Throws
-    info = m_reader_map.get_addr();
-
-    // If the contents of the ring buffer crosses the end of the
-    // containing linear buffer (continuing at the beginning) then the
-    // section whose end coincided with the old end of the linear
-    // buffer, must be moved forward such that its end becomes
-    // coincident with the end of the expanded linear buffer.
-    if (info->put_pos < info->get_pos) {
-        // Since we always double the size of the linear buffer, there
-        // is never any risk of aliasing/clobbering during copying.
-        ReadCount* begin = info->readers + info->get_pos;
-        ReadCount* end   = info->readers + old_buffer_size;
-        ReadCount* new_begin = begin + old_buffer_size;
-        copy(begin, end, new_begin);
-        info->get_pos += uint32_t(old_buffer_size);
-    }
-
-    info->infosize = uint32_t(new_file_size); // notify other processes of expansion
-    info->capacity_mask = uint32_t(new_buffer_size) - 1;
-}
-
 void SharedGroup::zero_free_space()
 {
     SharedInfo* info = m_file_map.get_addr();
@@ -1152,7 +1103,7 @@ bool SharedGroup::grow_reader_mapping(uint32_t index)
         return false;
 }
 
-uint64_t SharedGroup::get_current_version() TIGHTDB_NOEXCEPT
+uint64_t SharedGroup::get_current_version()
 {
     SharedInfo* info = m_file_map.get_addr();
     uint32_t index;

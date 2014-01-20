@@ -217,7 +217,7 @@ private:
 
     // Must be called only by someone that has a lock on the write
     // mutex.
-    uint64_t get_current_version() TIGHTDB_NOEXCEPT;
+    uint64_t get_current_version();
 
     // make sure the given index is within the currently mapped area.
     // if not, expand the mapped area. Returns true if the area is expanded.
