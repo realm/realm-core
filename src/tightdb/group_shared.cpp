@@ -42,7 +42,7 @@ const int max_wait_for_daemon_start = 100;
 
 } // anonymous namespace
 
-
+/*
 
 // this following primitives adds a simple lock bit to an integral type
 // (placing the lock in the lowest bit.
@@ -68,10 +68,6 @@ template<typename T> T wait_for_lock(Atomic<T>& locked_counter)
     int delay = 0;
     while (! try_to_lock(val, locked_counter)) { 
         delay++;
-/*
-        volatile int k = delay;
-        while (k--); // delay
-*/
         if (delay == 10) {
             sched_yield();
             delay = 0;
@@ -85,7 +81,7 @@ template<typename T> void release_locked(Atomic<T>& locked_counter, T new_value)
 {
     locked_counter.store_release(new_value << 1);
 }
-
+*/
 template<typename T> inline T atomic_inc(Atomic<T>& counter)
 {
     T old_val;
@@ -95,6 +91,20 @@ template<typename T> inline T atomic_inc(Atomic<T>& counter)
         new_val = old_val + 1;
     } while (counter.compare_and_swap(old_val, new_val) == false);
     return new_val;
+}
+
+template<typename T> inline T atomic_inc_if_nz(Atomic<T>& counter)
+{
+    T old_val;
+    T new_val;
+    do {
+        old_val = counter.load_relaxed();
+        if (old_val == 0) {
+            return 0;
+        }
+        new_val = old_val + 1;
+    } while (counter.compare_and_swap(old_val, new_val) == false);
+    return old_val;
 }
 
 template<typename T> inline T atomic_dec(Atomic<T>& counter)
@@ -107,6 +117,20 @@ template<typename T> inline T atomic_dec(Atomic<T>& counter)
     } while (counter.compare_and_swap(old_val, new_val) == false);
     return new_val;
 }
+
+template<typename T> inline T atomic_dec_if_nz(Atomic<T>& counter)
+{
+    T old_val;
+    T new_val;
+    do {
+        old_val = counter.load_relaxed();
+        if (old_val == 0)
+            return 0;
+        new_val = old_val - 1;
+    } while (counter.compare_and_swap(old_val, new_val) == false);
+    return old_val;
+}
+
 
 // nonblocking ringbuffer
 class Ringbuffer {
@@ -177,13 +201,20 @@ public:
     }
 
     void use_next() {
+        get_next().count.store_release(1);
         put_pos.store_release(next());
     }
 
-    void cleanup() { // invariant: entry held by put_pos has count != 0.
-        while (get(old_pos).count.load_relaxed() == 0 ) {
+    void cleanup() { // invariant: entry held by put_pos has count > 1.
+        // cout << "cleanup: from " << old_pos << " to " << put_pos.load_relaxed() << endl;
+        while (old_pos != put_pos.load_relaxed()) {
+            const ReadCount& r = get(old_pos);
+            uint32_t count = atomic_dec_if_nz( r.count );
+            if (count > 0)
+                break;
             old_pos = get(old_pos).next;
         }
+        // cout << "cleanup: done " << old_pos << " to " << put_pos.load_relaxed() << endl;
     }
 };
 
@@ -231,7 +262,6 @@ SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, size_t i
     r.filesize = file_size;
     r.version = 1;
     r.current_top = top_ref;
-    r.count.store_relaxed( 1 );
     readers.use_next();
     infosize = uint32_t(info_size);
     shutdown_started.store_release(0);
@@ -821,15 +851,19 @@ const Group& SharedGroup::begin_read()
 
     {
         SharedInfo* info = m_file_map.get_addr();
-        m_reader_idx = info->readers.last();
-        // TODO: handle mapping expansion if required
-        const Ringbuffer::ReadCount& r = info->readers.get(m_reader_idx);
-        atomic_inc(r.count);
-        m_version = r.version;
-        // TODO: detect & handle too-old date, when we get here too late....
-        new_top_ref   = to_size_t(r.current_top);
-        new_file_size = to_size_t(r.filesize);
-
+        do {
+            m_reader_idx = info->readers.last();
+            // TODO: handle mapping expansion if required
+            const Ringbuffer::ReadCount& r = info->readers.get(m_reader_idx);
+            // if the entry is stale and has been cleared by the cleanup process,
+            // we need to start all over again. This is extremely unlikely, but possible.
+            if (atomic_inc_if_nz(r.count) == 0) {
+                continue;
+            }
+            m_version = r.version;
+            new_top_ref   = to_size_t(r.current_top);
+            new_file_size = to_size_t(r.filesize);
+        } while (0);
 
 /*
             if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
