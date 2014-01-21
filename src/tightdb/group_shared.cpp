@@ -147,7 +147,7 @@ public:
     Atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
     uint32_t old_pos; // only accessed during write transactions and under lock
 
-    const static int init_readers_size = 32;
+    const static int init_readers_size = 4;
     ReadCount data[init_readers_size];
 
     Ringbuffer()
@@ -165,8 +165,36 @@ public:
         old_pos = 0;
     }
 
+    void dump() 
+    {
+        uint32_t i = old_pos;
+        cout << "--- " << endl;
+        do {
+            cout << "  used " << i << " : " 
+                 << data[i].count.load_relaxed() << " | "
+                 << data[i].version
+                 << endl;
+            i = data[i].next;
+        } while (i != put_pos.load_relaxed());
+        cout << "  LAST " << i << " : " 
+             << data[i].count.load_relaxed() << " | "
+             << data[i].version
+             << endl;
+        i = data[i].next;
+        while (i != old_pos) {
+            cout << "  free " << i << " : " 
+                 << data[i].count.load_relaxed() << " | "
+                 << data[i].version
+                 << endl;
+            i = data[i].next;
+        }
+        cout << "--- Done" << endl;
+    }
+
     void expand_to(uint32_t new_entries)
     {
+        cout << "expanding to " << new_entries << endl;
+        dump();
         for (uint32_t i = entries; i < new_entries; i++) {
             data[i].version = 0;
             data[i].count.store_relaxed( 0 );
@@ -177,6 +205,7 @@ public:
         data[ new_entries - 1 ].next = old_pos;
         data[ put_pos.load_relaxed() ].next = entries;
         entries = new_entries;
+        dump();
     }
 
     static size_t compute_required_space(uint32_t num_entries) { 
@@ -208,7 +237,7 @@ public:
 
     bool is_full() const {
         uint32_t idx = get(last()).next;
-        return idx == last();
+        return idx == old_pos;
     }
 
     uint32_t next() const { // do not call this if the buffer is full!
@@ -227,7 +256,8 @@ public:
     }
 
     void cleanup() { // invariant: entry held by put_pos has count > 1.
-        // cout << "cleanup: from " << old_pos << " to " << put_pos.load_relaxed() << endl;
+        // cout << "cleanup: from " << old_pos << " to " << put_pos.load_relaxed();
+        // dump();
         while (old_pos != put_pos.load_relaxed()) {
             const ReadCount& r = get(old_pos);
             uint32_t count = atomic_dec_if_nz( r.count );
@@ -235,7 +265,7 @@ public:
                 break;
             old_pos = get(old_pos).next;
         }
-        // cout << "cleanup: done " << old_pos << " to " << put_pos.load_relaxed() << endl;
+        // cout << "  - moved old_pos to " << old_pos << endl;
     }
 };
 
@@ -916,7 +946,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     {
         SharedInfo* info = m_file_map.get_addr();
         const Ringbuffer::ReadCount& r = info->readers.get(m_reader_idx);
-        atomic_dec(r.count);
+        TIGHTDB_ASSERT(atomic_dec(r.count) > 0);
     }
     m_deferred_detach = true;
 
