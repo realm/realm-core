@@ -272,6 +272,15 @@ void TableViewBase::sort(size_t column, bool Ascending)
     ref.destroy();
 }
 
+// Simple pivot aggregate method. Experimental! Please do not document method publicly.
+void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const
+{
+    m_table->aggregate(group_by_column, aggr_column, op, result, &m_refs);
+}
+
+
+
+
 void TableViewBase::to_json(ostream& out) const
 {
     // Represent table as list of objects
