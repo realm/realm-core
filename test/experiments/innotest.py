@@ -3,7 +3,7 @@ import os
 import random
 
 # this is just a test, so start over each time
-db_path = 'test2.tightdb'
+db_path = 'parallel_benchmark.tightdb'
 if os.path.exists(db_path):
     os.remove(db_path)
 
