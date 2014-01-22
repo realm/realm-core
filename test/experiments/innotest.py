@@ -17,10 +17,4 @@ with db.write() as group:
     for i in range(1000000):
         table += [i, str(i)]
 
-print "Reading random values"
-for i in range(1000000):   
-    with db.read("test") as table:
-        ndx = random.randint(0, 999999)
-        text = table[ndx].value
-        
 print "done"
