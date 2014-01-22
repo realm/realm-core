@@ -19,7 +19,7 @@
 #  include <windows.h>
 #endif
 
-// #define TIGHTDB_ENABLE_LOGFILE
+#define TIGHTDB_ENABLE_LOGFILE
 
 
 using namespace std;
@@ -42,46 +42,6 @@ const int max_wait_for_daemon_start = 100;
 
 } // anonymous namespace
 
-/*
-
-// this following primitives adds a simple lock bit to an integral type
-// (placing the lock in the lowest bit.
-template<typename T> bool try_to_lock(T& result, Atomic<T>& locked_counter)
-{
-    T old_val;
-    T new_val;
-    old_val = locked_counter.load_relaxed();
-    do {
-        if (old_val & 1) {
-            result = old_val >> 1;
-            return false; // locking failed
-        }
-        new_val = old_val | 1;
-    } while (locked_counter.compare_and_swap(old_val, new_val) == false);
-    result = old_val >> 1;
-    return true;
-}
-
-template<typename T> T wait_for_lock(Atomic<T>& locked_counter)
-{
-    T val;
-    int delay = 0;
-    while (! try_to_lock(val, locked_counter)) { 
-        delay++;
-        if (delay == 10) {
-            sched_yield();
-            delay = 0;
-        }
-    } // spinlock
-    return val;
-}
-
-// release lock: new_value is just the new value
-template<typename T> void release_locked(Atomic<T>& locked_counter, T new_value)
-{
-    locked_counter.store_release(new_value << 1);
-}
-*/
 template<typename T> inline T atomic_inc(Atomic<T>& counter)
 {
     T old_val;
@@ -90,9 +50,11 @@ template<typename T> inline T atomic_inc(Atomic<T>& counter)
         old_val = counter.load_relaxed();
         new_val = old_val + 1;
     } while (counter.compare_and_swap(old_val, new_val) == false);
-    return new_val;
+    return old_val;
 }
 
+// Atomically increment a counter if it is already non-zero. 
+// return the old value.
 template<typename T> inline T atomic_inc_if_nz(Atomic<T>& counter)
 {
     T old_val;
@@ -115,17 +77,19 @@ template<typename T> inline T atomic_dec(Atomic<T>& counter)
         old_val = counter.load_relaxed();
         new_val = old_val - 1;
     } while (counter.compare_and_swap(old_val, new_val) == false);
-    return new_val;
+    return old_val;
 }
 
-template<typename T> inline T atomic_dec_if_nz(Atomic<T>& counter)
+// Atomically decrement a counter if it is 1.
+// return the old value.
+template<typename T> inline T atomic_dec_if_one(Atomic<T>& counter)
 {
     T old_val;
     T new_val;
     do {
         old_val = counter.load_relaxed();
-        if (old_val == 0)
-            return 0;
+        if (old_val != 1)
+            return old_val;
         new_val = old_val - 1;
     } while (counter.compare_and_swap(old_val, new_val) == false);
     return old_val;
@@ -135,47 +99,60 @@ template<typename T> inline T atomic_dec_if_nz(Atomic<T>& counter)
 // nonblocking ringbuffer
 class Ringbuffer {
 public:
+    // the ringbuffer is a circular list of ReadCount structures.
+    // Entries from old_pos to put_pos are considered live and may
+    // have count values of 1 or above. The count indicates the
+    // number of referring transactions PLUS ONE.
+    // Entries from after put_pos up till (not including) old_pos
+    // are free entries and must have a count of ZERO.
+    // Cleanup is performed by starting at old_pos and decrementing
+    // (atomically) from 1 to 0 and moving the put_pos. It stops 
+    // if count is above 1.
     struct ReadCount {
         uint64_t version;
         uint64_t filesize;
         uint64_t current_top;
+        // The count field acts as synchronization point for accesses to the above
+        // fields. A succesfull inc or dec implies acqurie/release.
         mutable Atomic<uint32_t> count;
         uint32_t next;
     };
 
+    // number of entries. Access synchronized through put_pos.
     uint32_t entries;
     Atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
     uint32_t old_pos; // only accessed during write transactions and under lock
 
-    const static int init_readers_size = 4;
+    const static int init_readers_size = 1000;
     ReadCount data[init_readers_size];
 
     Ringbuffer()
     {
         entries = init_readers_size;
         for (int i=0; i < init_readers_size; i++) {
-            data[i].version = 0;
+            data[i].version = 1;
             data[i].count.store_relaxed( 0 );
             data[i].current_top = 0;
             data[i].filesize = 0;
             data[i].next = i + 1;
         }
-        data[ init_readers_size-1 ].next = 0 ;
-        put_pos.store_relaxed( (uint32_t)0);
         old_pos = 0;
+        data[ 0 ].count.store_relaxed( 1 );
+        data[ init_readers_size-1 ].next = 0 ;
+        put_pos.store_release( (uint32_t)0);
     }
 
     void dump() 
     {
         uint32_t i = old_pos;
         cout << "--- " << endl;
-        do {
+         while (i != put_pos.load_relaxed()) {
             cout << "  used " << i << " : " 
                  << data[i].count.load_relaxed() << " | "
                  << data[i].version
                  << endl;
             i = data[i].next;
-        } while (i != put_pos.load_relaxed());
+        }
         cout << "  LAST " << i << " : " 
              << data[i].count.load_relaxed() << " | "
              << data[i].version
@@ -212,7 +189,7 @@ public:
         // get space required for given number of entries beyond the initial count.
         // NB: this not the size of the ringbuffer, it is the size minus whatever was
         // the initial size.
-        return sizeof(ReadCount) * (num_entries - init_readers_size);
+        return sizeof(ReadCount) * (num_entries - init_readers_size) + 4096;
     }
 
     uint32_t get_num_entries() const {
@@ -260,8 +237,9 @@ public:
         // dump();
         while (old_pos != put_pos.load_relaxed()) {
             const ReadCount& r = get(old_pos);
-            uint32_t count = atomic_dec_if_nz( r.count );
-            if (count > 0)
+            uint32_t count = atomic_dec_if_one( r.count );
+            TIGHTDB_ASSERT(count != 0);
+            if (count != 1)
                 break;
             old_pos = get(old_pos).next;
         }
@@ -284,8 +262,8 @@ struct SharedGroup::SharedInfo {
     CondVar room_to_write;
     CondVar work_to_do;
 #endif
-    Ringbuffer readers;
     uint16_t free_write_slots;
+    Ringbuffer readers;
     SharedInfo(ref_type top_ref, size_t file_size, DurabilityLevel);
     ~SharedInfo() TIGHTDB_NOEXCEPT {}
     uint64_t get_current_version_unchecked() const {
@@ -307,6 +285,7 @@ SharedGroup::SharedInfo::SharedInfo(ref_type top_ref, size_t file_size, Durabili
 {
     version  = 0;
     flags    = dlevel; // durability level is fixed from creation
+    // Create our first versioning entry:
     Ringbuffer::ReadCount& r = readers.get_next();
     r.filesize = file_size;
     r.version = 1;
@@ -764,9 +743,12 @@ void SharedGroup::do_async_commits()
     // processes that that they can start commiting to the db.
     begin_read();
     uint64_t last_version = m_version;
+    uint32_t last_version_index = m_reader_idx;
+
     info->free_write_slots = max_write_slots;
     info->init_complete.store_release(2); // allow waiting clients to proceed
     m_group.detach();
+    m_deferred_detach = false;
 
     while(true) {
 
@@ -804,15 +786,16 @@ void SharedGroup::do_async_commits()
 #endif
             // Get a read lock on the (current) version that we want
             // to commit to disk.
-            m_transact_stage = transact_Ready;
-
+            m_transact_stage = transact_Ready; // FAKE stage to prevent begin_read from failing
             begin_read();
+
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "(version " << m_version << " from "
-                 << last_version << "), ringbuf_size = "
-                 << ringbuf_size() << "...";
+                 << last_version << ")" << endl;
+            // cannot do this: info->readers.dump();
 #endif
             uint64_t current_version = m_version;
+            uint32_t current_version_index = m_reader_idx;
             size_t current_top_ref = m_group.m_top.get_ref();
 
             GroupWriter writer(m_group);
@@ -821,8 +804,10 @@ void SharedGroup::do_async_commits()
             // Now we can release the version that was previously commited
             // to disk and just keep the lock on the latest version.
             m_version = last_version;
+            m_reader_idx = last_version_index;
             end_read();
             last_version = current_version;
+            last_version_index = current_version_index;
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "..and Done" << endl;
 #endif
@@ -902,6 +887,7 @@ const Group& SharedGroup::begin_read()
             // if the entry is stale and has been cleared by the cleanup process,
             // we need to start all over again. This is extremely unlikely, but possible.
             if (atomic_inc_if_nz(r.count) == 0) {
+                cout << "ODD: starting over after trying to begin_read at cleared entry" << endl;
                 continue;
             }
             m_version = r.version;
@@ -940,13 +926,19 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     if (m_deferred_detach || !m_group.is_attached())
         return;
 
-    TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
+    //TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
     {
         SharedInfo* info = m_file_map.get_addr();
         const Ringbuffer::ReadCount& r = info->readers.get(m_reader_idx);
-        TIGHTDB_ASSERT(atomic_dec(r.count) > 0);
+        uint32_t old_val = atomic_dec(r.count);
+        (void) old_val;
+        if (old_val <= 1) {
+            cout << "Trying to end_read on a free entry at index " << m_reader_idx << endl;
+            info->readers.dump();
+            TIGHTDB_ASSERT(old_val > 1);
+        }
     }
     m_deferred_detach = true;
 
@@ -957,10 +949,12 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
 void SharedGroup::do_begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
+    
     if (m_deferred_detach) {
         m_group.detach();
         m_deferred_detach = false;
     }
+    
     SharedInfo* info = m_file_map.get_addr();
 
     // Get write lock
@@ -988,18 +982,8 @@ void SharedGroup::do_begin_write()
     }
 #endif
 
-    // FIXME: Consider simply calling begin_read here instead. Wouldn't it be logical?
-    // After all, the write transaction can read, can't it ?
-
-    // Get the current top ref
-    const Ringbuffer::ReadCount& r = info->readers.get_last();
-    ref_type new_top_ref = to_size_t(r.current_top);
-    size_t new_file_size = to_size_t(r.filesize);
-
-    // Make sure the group is up-to-date
-    // zero ref means that the file has just been created
-    m_group.update_from_shared(new_top_ref, new_file_size); // Throws
-
+    // A write transaction implies a read transaction...
+    begin_read();
     m_transact_stage = transact_Writing;
 }
 
@@ -1037,6 +1021,7 @@ void SharedGroup::commit()
         // Reset version tracking in group if we are
         // starting from a new lock file
         if (new_version == 2) {
+            cout << "init versions" << endl;
             // The reason this is not done in begin_write is that a rollback will
             // leave the versioning unchanged, hence a new begin_write following
             // a rollback would call init_shared again.
@@ -1046,13 +1031,9 @@ void SharedGroup::commit()
         low_level_commit(new_version); // Throws
     }
 
+    end_read();
     // Release write lock
     info->writemutex.unlock();
-
-    //m_group.detach();
-    m_deferred_detach = true;
-
-    m_transact_stage = transact_Ready;
 }
 
 
@@ -1062,10 +1043,6 @@ void SharedGroup::commit()
 // rollback() does not handle all cases.
 void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 {
-    if (m_deferred_detach) {
-        m_group.detach();
-        m_deferred_detach = false;
-    }
     if (m_group.is_attached()) {
         TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
@@ -1074,6 +1051,12 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
             repl->rollback_write_transact(*this);
 #endif
 
+        if (m_deferred_detach) {
+            m_group.detach();
+            m_deferred_detach = false;
+        }
+        end_read();
+
         SharedInfo* info = m_file_map.get_addr();
 
         // Release write lock
@@ -1081,7 +1064,7 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
 
         // Clear all changes made during transaction
         m_group.detach();
-
+        m_deferred_detach = false;
         m_transact_stage = transact_Ready;
     }
 }
@@ -1159,6 +1142,8 @@ void SharedGroup::low_level_commit(uint64_t new_version)
     // Do the actual commit
     TIGHTDB_ASSERT(m_group.m_top.is_attached());
     TIGHTDB_ASSERT(readlock_version <= new_version);
+    cout << "Committing version " << new_version << ", Readlock at version " << readlock_version << endl;
+    // info->readers.dump();
     GroupWriter out(m_group); // Throws
     //FIXME: VS2012 32bit warning:  src\tightdb\group_shared.cpp(1087): warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
     m_group.m_readlock_version = readlock_version;
