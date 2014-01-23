@@ -19,7 +19,7 @@
 #  include <windows.h>
 #endif
 
-#define TIGHTDB_ENABLE_LOGFILE
+//#define TIGHTDB_ENABLE_LOGFILE
 
 
 using namespace std;
@@ -123,8 +123,8 @@ public:
     Atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
     uint32_t old_pos; // only accessed during write transactions and under lock
 
-    const static int init_readers_size = 1000;
-    ReadCount data[init_readers_size];
+    const static int init_readers_size = 4;
+    ReadCount data[init_readers_size + 64];
 
     Ringbuffer()
     {
@@ -170,8 +170,8 @@ public:
 
     void expand_to(uint32_t new_entries)
     {
-        cout << "expanding to " << new_entries << endl;
-        dump();
+        // cout << "expanding to " << new_entries << endl;
+        // dump();
         for (uint32_t i = entries; i < new_entries; i++) {
             data[i].version = 0;
             data[i].count.store_relaxed( 0 );
@@ -182,14 +182,14 @@ public:
         data[ new_entries - 1 ].next = old_pos;
         data[ put_pos.load_relaxed() ].next = entries;
         entries = new_entries;
-        dump();
+        // dump();
     }
 
     static size_t compute_required_space(uint32_t num_entries) { 
         // get space required for given number of entries beyond the initial count.
         // NB: this not the size of the ringbuffer, it is the size minus whatever was
         // the initial size.
-        return sizeof(ReadCount) * (num_entries - init_readers_size) + 4096;
+        return sizeof(ReadCount) * (num_entries - init_readers_size);
     }
 
     uint32_t get_num_entries() const {
@@ -874,15 +874,15 @@ const Group& SharedGroup::begin_read()
     uint64_t old_version = m_version;
 
     {
-        SharedInfo* info = m_file_map.get_addr();
+        // SharedInfo* info = m_file_map.get_addr();
         do {
-            m_reader_idx = info->readers.last();
+            SharedInfo* r_info = m_reader_map.get_addr();
+            m_reader_idx = r_info->readers.last();
             if (grow_reader_mapping(m_reader_idx)) {
 
                 // remapping takes time, so retry with a fresh entry
                 continue;
             }
-            SharedInfo* r_info = m_reader_map.get_addr();
             const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
             // if the entry is stale and has been cleared by the cleanup process,
             // we need to start all over again. This is extremely unlikely, but possible.
@@ -930,13 +930,13 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
     {
-        SharedInfo* info = m_file_map.get_addr();
-        const Ringbuffer::ReadCount& r = info->readers.get(m_reader_idx);
+        SharedInfo* r_info = m_reader_map.get_addr();
+        const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
         uint32_t old_val = atomic_dec(r.count);
         (void) old_val;
         if (old_val <= 1) {
             cout << "Trying to end_read on a free entry at index " << m_reader_idx << endl;
-            info->readers.dump();
+            r_info->readers.dump();
             TIGHTDB_ASSERT(old_val > 1);
         }
     }
@@ -1021,7 +1021,6 @@ void SharedGroup::commit()
         // Reset version tracking in group if we are
         // starting from a new lock file
         if (new_version == 2) {
-            cout << "init versions" << endl;
             // The reason this is not done in begin_write is that a rollback will
             // leave the versioning unchanged, hence a new begin_write following
             // a rollback would call init_shared again.
@@ -1106,9 +1105,9 @@ bool SharedGroup::grow_reader_mapping(uint32_t index)
     if (index >= m_local_max_entry) {
 
         // handle mapping expansion if required
-        SharedInfo* info = m_reader_map.get_addr();
-        m_local_max_entry = info->readers.get_num_entries();
-        size_t infosize = sizeof(SharedInfo) + info->readers.compute_required_space(m_local_max_entry);
+        SharedInfo* r_info = m_reader_map.get_addr();
+        m_local_max_entry = r_info->readers.get_num_entries();
+        size_t infosize = sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
         m_reader_map.remap(m_file, util::File::access_ReadWrite, infosize); // Throws
         return true;
     }
@@ -1118,13 +1117,13 @@ bool SharedGroup::grow_reader_mapping(uint32_t index)
 
 uint64_t SharedGroup::get_current_version()
 {
-    SharedInfo* info = m_file_map.get_addr();
+    SharedInfo* r_info = m_reader_map.get_addr();
     uint32_t index;
     do {
-        index = info->readers.last();
+        index = r_info->readers.last();
     } while (grow_reader_mapping(index));
 
-    SharedInfo* r_info = m_reader_map.get_addr();
+    r_info = m_reader_map.get_addr();
     return r_info->readers.get(index).version;
 }
 
@@ -1134,15 +1133,16 @@ void SharedGroup::low_level_commit(uint64_t new_version)
     uint64_t readlock_version;
     {
         // FIXME: ensure the path leading here has the proper read map set!!
-        info->readers.cleanup();
-        const Ringbuffer::ReadCount& r = info->readers.get_oldest();
+        SharedInfo* r_info = m_reader_map.get_addr();
+        r_info->readers.cleanup();
+        const Ringbuffer::ReadCount& r = r_info->readers.get_oldest();
         readlock_version = r.version;
     }
 
     // Do the actual commit
     TIGHTDB_ASSERT(m_group.m_top.is_attached());
     TIGHTDB_ASSERT(readlock_version <= new_version);
-    cout << "Committing version " << new_version << ", Readlock at version " << readlock_version << endl;
+    // cout << "Committing version " << new_version << ", Readlock at version " << readlock_version << endl;
     // info->readers.dump();
     GroupWriter out(m_group); // Throws
     //FIXME: VS2012 32bit warning:  src\tightdb\group_shared.cpp(1087): warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
@@ -1158,21 +1158,20 @@ void SharedGroup::low_level_commit(uint64_t new_version)
     if (info->flags == durability_Full)
         out.commit(new_top_ref); // Throws
     size_t new_file_size = out.get_file_size();
-    SharedInfo* r_info;
     // Update reader info
     {
-        if (info->readers.is_full()) {
+        SharedInfo* r_info = m_reader_map.get_addr();
+        if (r_info->readers.is_full()) {
             // buffer expansion
-            uint32_t entries = info->readers.get_num_entries();
-            entries = entries * 2;
-            size_t new_info_size = sizeof(SharedInfo) + info->readers.compute_required_space( entries );
+            uint32_t entries = r_info->readers.get_num_entries();
+            entries = entries + 4;
+            size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space( entries );
             m_file.prealloc(0, new_info_size); // Throws
             m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
+            r_info = m_reader_map.get_addr();
             m_local_max_entry = entries;
-            r_info = m_reader_map.get_addr();
             r_info->readers.expand_to(entries);
-        } else
-            r_info = m_reader_map.get_addr();
+        } 
         Ringbuffer::ReadCount& r = r_info->readers.get_next();
         r.current_top = new_top_ref;
         r.filesize    = new_file_size;
