@@ -19,7 +19,7 @@
 #  include <windows.h>
 #endif
 
-//#define TIGHTDB_ENABLE_LOGFILE
+#define TIGHTDB_ENABLE_LOGFILE
 
 
 using namespace std;
@@ -124,7 +124,7 @@ public:
     uint32_t old_pos; // only accessed during write transactions and under lock
 
     const static int init_readers_size = 4;
-    ReadCount data[init_readers_size + 64];
+    ReadCount data[init_readers_size];
 
     Ringbuffer()
     {
@@ -787,16 +787,22 @@ void SharedGroup::do_async_commits()
             // Get a read lock on the (current) version that we want
             // to commit to disk.
             m_transact_stage = transact_Ready; // FAKE stage to prevent begin_read from failing
+
+            // force begin_read to refresh top pointer
+            if (m_deferred_detach) {
+                m_deferred_detach = false;
+                m_group.detach();
+            }
             begin_read();
 
-#ifdef TIGHTDB_ENABLE_LOGFILE
-            cerr << "(version " << m_version << " from "
-                 << last_version << ")" << endl;
-            // cannot do this: info->readers.dump();
-#endif
             uint64_t current_version = m_version;
             uint32_t current_version_index = m_reader_idx;
             size_t current_top_ref = m_group.m_top.get_ref();
+#ifdef TIGHTDB_ENABLE_LOGFILE
+            cerr << "(version " << m_version << " from "
+                 << last_version << ", topptr " << current_top_ref << ")";
+            // cannot do this: info->readers.dump();
+#endif
 
             GroupWriter writer(m_group);
             writer.commit(current_top_ref);
@@ -1142,14 +1148,14 @@ void SharedGroup::low_level_commit(uint64_t new_version)
     // Do the actual commit
     TIGHTDB_ASSERT(m_group.m_top.is_attached());
     TIGHTDB_ASSERT(readlock_version <= new_version);
-    // cout << "Committing version " << new_version << ", Readlock at version " << readlock_version << endl;
     // info->readers.dump();
     GroupWriter out(m_group); // Throws
-    //FIXME: VS2012 32bit warning:  src\tightdb\group_shared.cpp(1087): warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
     m_group.m_readlock_version = readlock_version;
     out.set_versions(new_version, readlock_version);
     // Recursively write all changed arrays to end of file
     ref_type new_top_ref = out.write_group(); // Throws
+    // cout << "Writing version " << new_version << ", Topptr " << new_top_ref 
+    //     << " Readlock at version " << readlock_version << endl;
     // In durability_Full mode, we just use the file as backing for
     // the shared memory. So we never actually flush the data to disk
     // (the OS may do so opportinisticly, or when swapping). So in
@@ -1166,6 +1172,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
             uint32_t entries = r_info->readers.get_num_entries();
             entries = entries + 4;
             size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space( entries );
+            cout << "resizing: " << entries << " = " << new_info_size << endl;
             m_file.prealloc(0, new_info_size); // Throws
             m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
             r_info = m_reader_map.get_addr();
@@ -1176,7 +1183,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
         r.current_top = new_top_ref;
         r.filesize    = new_file_size;
         r.version =     new_version;
-        r.count.store_relaxed(1);
+        r.count.store_release(1);
         r_info->readers.use_next();
     }
 
