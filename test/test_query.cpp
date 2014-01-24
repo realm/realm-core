@@ -2790,6 +2790,40 @@ TEST(TestQuerySubtable)
     CHECK_EQUAL(3, t4.get_source_ndx(2));
 }
 
+
+TEST(TestQuerySubtable_bug)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+
+    // Create specification with sub-table
+    Spec& s = table->get_spec();
+    s.add_column(type_Int,    "first");
+    Spec sub = s.add_subtable_column("second");
+        sub.add_column(type_Int,    "sub_first");
+        sub.add_column(type_String, "sub_second");
+        sub.add_column(type_Bool,   "sub_third");
+    table->update_from_spec();
+    CHECK_EQUAL(2, table->get_column_count());
+
+    table->insert_int(0, 0, 100);
+    table->insert_subtable(1, 0);
+    table->insert_done();
+
+    TableRef subtable = table->get_subtable(1, 0);
+    subtable->insert_int(0, 0, 11);
+    subtable->insert_string(1, 0, "a");
+    subtable->insert_bool(2, 0, true);
+    subtable->insert_done();
+
+    Query q1 = table->where();
+    q1.subtable(2);
+    q1.equal(2, true);
+    q1.end_subtable();
+    TableView t1 = q1.find_all(0, size_t(-1));
+    CHECK_EQUAL(1, t1.size());
+}
+
 /*
 // Disabled because assert has now been added to disallow adding rows when no columns exist
 TEST(Query_SubtableViewSizeBug)
