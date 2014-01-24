@@ -52,17 +52,18 @@ public:
 
     template<class F> explicit Thread(F func);
 
-    /// This method is an extension to the API provided by
+    /// This method is an extension of the API provided by
     /// std::thread. This method exists because proper move semantics
     /// is unavailable in C++03. If move semantics had been available,
-    /// calling <tt>start(func)</tt> would have been equivalent to
-    /// <tt>*this = Thread(func)</tt>. Please see
-    /// std::thread::operator=() for details.
+    /// calling `start(func)` would have been equivalent to `*this =
+    /// Thread(func)`. Please see std::thread::operator=() for
+    /// details.
     template<class F> void start(F func);
 
     bool joinable() TIGHTDB_NOEXCEPT;
 
     void join();
+
 private:
     pthread_t m_id;
     bool m_joinable;
