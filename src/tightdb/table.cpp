@@ -8,6 +8,7 @@
 #include <tightdb/util/features.h>
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/table.hpp>
+#include <tightdb/descriptor.hpp>
 #include <tightdb/alloc_slab.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/column_basic.hpp>
@@ -21,6 +22,8 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
+
 
 // fixme, we need to gather all these typetraits definitions to just 1 single
 template<class T> struct ColumnTypeTraits3;
@@ -52,6 +55,106 @@ template<> struct ColumnTypeTraits3<DateTime> {
 };
 
 // -- Table ---------------------------------------------------------------------------------
+
+
+size_t Table::add_column(DataType type, StringData name)
+{
+    TIGHTDB_ASSERT(!has_shared_type());
+    get_descriptor()->add_column(type, name); // Throws
+    return get_column_count() - 1;
+}
+
+void Table::add_column(DataType type, StringData name, DescriptorRef& subdesc)
+{
+    TIGHTDB_ASSERT(!has_shared_type());
+    get_descriptor()->add_column(type, name, subdesc); // Throws
+}
+
+void Table::remove_column(size_t column_ndx)
+{
+    TIGHTDB_ASSERT(!has_shared_type());
+    get_descriptor()->remove_column(column_ndx); // Throws
+}
+
+void Table::rename_column(size_t column_ndx, StringData name)
+{
+    TIGHTDB_ASSERT(!has_shared_type());
+    get_descriptor()->rename_column(column_ndx, name); // Throws
+}
+
+
+DescriptorRef Table::get_descriptor()
+{
+    TIGHTDB_ASSERT(is_attached());
+
+    if (has_shared_type()) {
+        ArrayParent* array_parent = m_columns.get_parent();
+        TIGHTDB_ASSERT(dynamic_cast<Parent*>(array_parent));
+        Parent* table_parent = static_cast<Parent*>(array_parent);
+        size_t column_ndx = 0;
+        Table* parent = table_parent->get_parent_table(&column_ndx);
+        TIGHTDB_ASSERT(parent);
+        return parent->get_descriptor()->get_subdescriptor(column_ndx); // Throws
+    }
+
+    DescriptorRef desc;
+    if (!m_descriptor) {
+        desc.reset(new Descriptor); // Throws
+        Descriptor* parent = 0;
+        desc->attach(this, parent, &m_spec);
+        m_descriptor = desc.get();
+    }
+    else {
+        desc.reset(m_descriptor);
+    }
+    return move(desc);
+}
+
+ConstDescriptorRef Table::get_descriptor() const
+{
+    return const_cast<Table*>(this)->get_descriptor(); // Throws
+}
+
+DescriptorRef Table::get_subdescriptor(size_t column_ndx)
+{
+    return get_descriptor()->get_subdescriptor(column_ndx); // Throws
+}
+
+ConstDescriptorRef Table::get_subdescriptor(size_t column_ndx) const
+{
+    return get_descriptor()->get_subdescriptor(column_ndx); // Throws
+}
+
+DescriptorRef Table::get_subdescriptor(const path_vec& path)
+{
+    DescriptorRef desc = get_descriptor(); // Throws
+    typedef path_vec::const_iterator iter;
+    iter end = path.end();
+    for (iter i = path.begin(); i != end; ++i)
+        desc = desc->get_subdescriptor(*i); // Throws
+    return desc;
+}
+
+ConstDescriptorRef Table::get_subdescriptor(const path_vec& path) const
+{
+    return const_cast<Table*>(this)->get_subdescriptor(path); // Throws
+}
+
+void Table::add_subcolumn(const path_vec& path, DataType type, StringData name)
+{
+    get_subdescriptor(path)->add_column(type, name); // Throws
+}
+
+void Table::remove_subcolumn(const path_vec& path, std::size_t column_ndx)
+{
+    get_subdescriptor(path)->remove_column(column_ndx); // Throws
+}
+
+void Table::rename_subcolumn(const path_vec& path, std::size_t column_ndx, StringData name)
+{
+    get_subdescriptor(path)->rename_column(column_ndx, name); // Throws
+}
+
 
 
 void Table::init_from_ref(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent)
@@ -86,6 +189,271 @@ void Table::init_from_ref(ConstSubspecRef shared_spec, ref_type columns_ref,
     }
     m_columns.set_parent(parent, ndx_in_parent);
 }
+
+
+struct Table::AddSubtableColumns: Table::SubtableUpdater {
+    AddSubtableColumns(DataType t): m_type(t) {}
+    void update(const ColumnTable& subtables, size_t row_ndx, Array& subcolumns) TIGHTDB_OVERRIDE
+    {
+        size_t subtable_size = subtables.get_subtable_size(row_ndx);
+        Allocator& alloc = subcolumns.get_alloc();
+        ref_type column_ref = create_column(m_type, subtable_size, alloc); // Throws
+        Array::DestroyGuard dg(column_ref, alloc);
+        subcolumns.add(column_ref); // Throws
+        dg.release();
+    }
+private:
+    const DataType m_type;
+};
+
+struct Table::RemoveSubtableColumns: Table::SubtableUpdater {
+    RemoveSubtableColumns(size_t i): m_column_ndx(i) {}
+    void update(const ColumnTable&, size_t, Array& subcolumns) TIGHTDB_OVERRIDE
+    {
+        ref_type column_ref = subcolumns.get(m_column_ndx);
+        subcolumns.erase(m_column_ndx); // Throws
+        Array::destroy(column_ref, subcolumns.get_alloc());
+    }
+private:
+    const size_t m_column_ndx;
+};
+
+void Table::do_add_column(const Descriptor& desc, DataType type, StringData name)
+{
+    TIGHTDB_ASSERT(desc.is_attached());
+
+    Table& root_table = *desc.m_root_table;
+    TIGHTDB_ASSERT(!root_table.has_shared_type());
+
+    root_table.detach_subtable_accessors();
+
+    if (desc.is_root()) {
+        root_table.add_root_column(type, name); // Throws
+    }
+    else {
+        desc.m_spec->add_column(type, name); // Throws
+        if (!root_table.is_empty()) {
+            AddSubtableColumns updater(type);
+            update_subtables(desc, updater); // Throws
+        }
+    }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    root_table.transact_log().add_column(*desc.m_spec, type, name); // Throws
+#endif
+}
+
+void Table::do_remove_column(const Descriptor& desc, size_t column_ndx)
+{
+    TIGHTDB_ASSERT(desc.is_attached());
+
+    Table& root_table = *desc.m_root_table;
+    TIGHTDB_ASSERT(!root_table.has_shared_type());
+
+    root_table.detach_subtable_accessors();
+
+    if (desc.is_root()) {
+        root_table.remove_root_column(column_ndx); // Throws
+    }
+    else {
+        desc.m_spec->remove_column(column_ndx); // Throws
+        if (!root_table.is_empty()) {
+            RemoveSubtableColumns updater(column_ndx);
+            update_subtables(desc, updater); // Throws
+        }
+    }
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    root_table.transact_log().remove_column(*desc.m_spec, column_ndx); // Throws
+#endif
+}
+
+void Table::do_rename_column(const Descriptor& desc, size_t column_ndx, StringData name)
+{
+    TIGHTDB_ASSERT(desc.is_attached());
+
+    Table& root_table = *desc.m_root_table;
+    TIGHTDB_ASSERT(!root_table.has_shared_type());
+
+    root_table.detach_subtable_accessors();
+    desc.m_spec->rename_column(column_ndx, name); // Throws
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    root_table.transact_log().rename_column(*desc.m_spec, column_ndx, name); // Throws
+#endif
+}
+
+size_t Table::get_num_subdescs(const Descriptor& desc) TIGHTDB_NOEXCEPT
+{
+    return desc.m_spec->get_num_subspecs();
+}
+
+
+void Table::add_root_column(DataType type, StringData name)
+{
+    // Add the column to the spec
+    m_spec.add_column(type, name); // Throws
+
+    Allocator& alloc = m_columns.get_alloc();
+    ref_type ref = 0;
+    size_t column_ndx = m_cols.size();
+    Array* parent = &m_columns;
+    size_t orig_columns_size = m_columns.size();
+    size_t ndx_in_parent = orig_columns_size;
+    UniquePtr<ColumnBase> new_col;
+
+    try {
+        switch (type) {
+            case type_Int:
+            case type_Bool:
+            case type_DateTime: {
+                int_fast64_t value = 0;
+                ref = Column::create(Array::type_Normal, size(), value, alloc); // Throws
+                new_col.reset(new Column(ref, parent, ndx_in_parent, alloc)); // Throws
+                goto add;
+            }
+            case type_Float:
+                ref = ColumnFloat::create(size(), alloc); // Throws
+                new_col.reset(new ColumnFloat(ref, parent, ndx_in_parent, alloc)); // Throws
+                goto add;
+            case type_Double:
+                ref = ColumnDouble::create(size(), alloc); // Throws
+                new_col.reset(new ColumnDouble(ref, parent, ndx_in_parent, alloc)); // Throws
+                goto add;
+            case type_String:
+                ref = AdaptiveStringColumn::create(size(), alloc); // Throws
+                new_col.reset(new AdaptiveStringColumn(ref, parent, ndx_in_parent,
+                                                       alloc)); // Throws
+                goto add;
+            case type_Binary:
+                ref = ColumnBinary::create(size(), alloc); // Throws
+                new_col.reset(new ColumnBinary(ref, parent, ndx_in_parent, alloc)); // Throws
+                goto add;
+            case type_Table: {
+                ref = ColumnTable::create(size(), alloc); // Throws
+                new_col.reset(new ColumnTable(alloc, this, column_ndx, parent, ndx_in_parent,
+                                              ref)); // Throws
+                goto add;
+            }
+            case type_Mixed:
+                ref = ColumnMixed::create(size(), alloc); // Throws
+                new_col.reset(new ColumnMixed(alloc, this, column_ndx, parent, ndx_in_parent,
+                                              ref)); // Throws
+                goto add;
+        }
+        TIGHTDB_ASSERT(false);
+
+      add:
+        m_columns.add(new_col->get_ref()); // Throws
+        try {
+            // FIXME: intptr_t is not guaranteed to exists, even in
+            // C++11. Solve this by changing the type of
+            // `Table::m_cols` to `std::vector<ColumnBase*>`. Also
+            // change its name to `Table::m_column_accessors`.
+            m_cols.add(intptr_t(new_col.get())); // Throws
+        }
+        catch (...) {
+            m_columns.truncate(orig_columns_size); // Guaranteed to not throw
+            throw;
+        }
+    }
+    catch (...) {
+        if (ref != 0)
+            Array::destroy(ref, alloc);
+        throw;
+    }
+
+    new_col.release();
+}
+
+
+void Table::remove_root_column(size_t column_ndx)
+{
+    Spec::ColumnInfo info;
+    m_spec.get_column_info(column_ndx, info);
+
+    // Remove the column from the spec
+    m_spec.remove_column(column_ndx); // Throws
+
+    // Remove and destroy the ref from m_columns
+    ref_type column_ref = m_columns.get_as_ref(info.m_column_ref_ndx);
+    Array::destroy(column_ref, m_columns.get_alloc());
+    m_columns.erase(info.m_column_ref_ndx);
+
+    // If the column had an index we have to remove that as well
+    if (info.m_has_index) {
+        ref_type index_ref = m_columns.get_as_ref(info.m_column_ref_ndx);
+        Array::destroy(index_ref, m_columns.get_alloc());
+        m_columns.erase(info.m_column_ref_ndx);
+    }
+
+    // Delete the column accessor
+    delete reinterpret_cast<ColumnBase*>(m_cols.get(column_ndx));
+    m_cols.erase(column_ndx);
+
+    // Update cached column indexes for subsequent column accessors
+    int diff = -1, diff_in_parent = info.m_has_index ? -2 : -1;
+    adjust_column_index(column_ndx, diff, diff_in_parent);
+
+    // If there are no columns left, mark the table as empty
+    if (get_column_count() == 0)
+        m_size = 0;
+}
+
+
+void Table::update_subtables(const Descriptor& desc, SubtableUpdater& updater)
+{
+    size_t stat_buf[8];
+    size_t size = sizeof stat_buf / sizeof *stat_buf;
+    size_t* begin = stat_buf;
+    size_t* end = begin + size;
+    UniquePtr<size_t> dyn_buf;
+    for (;;) {
+        begin = desc.record_subdesc_path(begin, end);
+        if (TIGHTDB_LIKELY(begin)) {
+            desc.m_root_table->update_subtables(begin, end, updater); // Throws
+            return;
+        }
+        if (int_multiply_with_overflow_detect(size, 2))
+            throw runtime_error("Too many subdescriptor nesting levels");
+        begin = new size_t[size]; // Throws
+        end = begin + size;
+        dyn_buf.reset(begin);
+    }
+}
+
+void Table::update_subtables(const size_t* path_begin, const size_t* path_end,
+                             SubtableUpdater& updater)
+{
+    size_t path_size = path_end - path_begin;
+    TIGHTDB_ASSERT(path_size >= 1);
+
+    size_t column_ndx = *path_begin;
+    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Table);
+
+    ColumnTable& subtables = get_column_table(column_ndx); // Throws
+    size_t num_rows = size();
+    bool modify_level = path_size == 1;
+    if (modify_level) {
+        Allocator& alloc = m_columns.get_alloc();
+        for (size_t i = 0; i < num_rows; ++i) {
+            ref_type subtable_ref = subtables.get_as_ref(i);
+            if (subtable_ref == 0)
+                continue; // Degenerate empty subatble
+            Array subcolumns(subtable_ref, &subtables, i, alloc);
+            updater.update(subtables, i, subcolumns); // Throws
+        }
+    }
+    else {
+        for (size_t i = 0; i < num_rows; ++i) {
+            if (subtables.get_as_ref(i) == 0)
+                continue; // Degenerate empty subatble
+            TableRef subtable(subtables.get_subtable_ptr(i)); // Throws
+            subtable->update_subtables(path_begin+1, path_end, updater); // Throws
+        }
+    }
+}
+
 
 // Create columns as well as column accessors.
 void Table::create_columns()
@@ -187,6 +555,8 @@ void Table::detach() TIGHTDB_NOEXCEPT
     m_spec.m_top.detach();
 #endif
 
+    detach_desc_accessor();
+
     // This prevents the destructor from deallocating the underlying
     // memory structure, and from attempting to notify the parent. It
     // also causes is_attached() to return false.
@@ -201,10 +571,24 @@ void Table::detach() TIGHTDB_NOEXCEPT
 
 void Table::detach_subtable_accessors() TIGHTDB_NOEXCEPT
 {
+    if (is_empty())
+        return;
+
     size_t n = m_cols.size();
     for (size_t i=0; i<n; ++i) {
         ColumnBase* c = reinterpret_cast<ColumnBase*>(uintptr_t(m_cols.get(i)));
         c->detach_subtable_accessors();
+    }
+}
+
+
+void Table::detach_desc_accessor() TIGHTDB_NOEXCEPT
+{
+    if (m_descriptor) {
+        // Must hold a reliable reference count while detaching
+        DescriptorRef desc(m_descriptor);
+        desc->detach();
+        m_descriptor = 0;
     }
 }
 
@@ -342,8 +726,8 @@ void Table::destroy_column_accessors() TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(m_cols.is_attached());
 
-    size_t count = m_cols.size();
-    for (size_t i = 0; i < count; ++i) {
+    size_t n = m_cols.size();
+    for (size_t i = 0; i != n; ++i) {
         ColumnBase* column = reinterpret_cast<ColumnBase*>(m_cols.get(i));
         delete column;
     }
@@ -394,9 +778,9 @@ Table::~Table() TIGHTDB_NOEXCEPT
     // this point. Otherwise the table has been created using
     // LangBindHelper::new_table(), and then the reference count must
     // be zero, because that is what has caused the destructor to be
-    // called. In the latter case, there can be no subtables to
-    // detach, because attached ones would have kept their parent
-    // alive.
+    // called. In the latter case, there can be no descriptors or
+    // subtables to detach, because attached ones would have kept
+    // their parent alive.
     if (0 < m_ref_count) {
         detach();
     }
@@ -406,264 +790,7 @@ Table::~Table() TIGHTDB_NOEXCEPT
     m_top.destroy();
 }
 
-size_t Table::add_column(DataType type, StringData name)
-{
-    TIGHTDB_ASSERT(!has_shared_spec());
-    detach_subtable_accessors();
-
-    // Update spec
-    m_spec.add_column(this, type, name);
-
-    // Create column and add cached instance
-    size_t column_ndx = do_add_column(type);
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    transact_log().add_column(type, name); // Throws
-#endif
-
-    return column_ndx;
-}
-
-size_t Table::add_subcolumn(const vector<size_t>& column_path, DataType type, StringData name)
-{
-    TIGHTDB_ASSERT(!has_shared_spec());
-    detach_subtable_accessors();
-
-    // Update spec
-    size_t column_ndx = m_spec.add_subcolumn(this, column_path, type, name);
-
-    // Update existing tables
-    do_add_subcolumn(column_path, 0, type);
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    // FIXME: Implement this!
-    //transact_log().add_column(type, name); // Throws
-#endif
-
-    return column_ndx;
-}
-
-size_t Table::do_add_column(DataType type)
-{
-    Allocator& alloc = m_columns.get_alloc();
-    ref_type ref = 0;
-    size_t column_ndx = m_cols.size();
-    Array* parent = &m_columns;
-    size_t orig_columns_size = m_columns.size();
-    size_t ndx_in_parent = orig_columns_size;
-    util::UniquePtr<ColumnBase> new_col;
-
-    try {
-        switch (type) {
-            case type_Int:
-            case type_Bool:
-            case type_DateTime: {
-                int_fast64_t value = 0;
-                ref = Column::create(Array::type_Normal, size(), value, alloc); // Throws
-                new_col.reset(new Column(ref, parent, ndx_in_parent, alloc)); // Throws
-                goto add;
-            }
-            case type_Float:
-                ref = ColumnFloat::create(size(), alloc); // Throws
-                new_col.reset(new ColumnFloat(ref, parent, ndx_in_parent, alloc)); // Throws
-                goto add;
-            case type_Double:
-                ref = ColumnDouble::create(size(), alloc); // Throws
-                new_col.reset(new ColumnDouble(ref, parent, ndx_in_parent, alloc)); // Throws
-                goto add;
-            case type_String:
-                ref = AdaptiveStringColumn::create(size(), alloc); // Throws
-                new_col.reset(new AdaptiveStringColumn(ref, parent, ndx_in_parent,
-                                                       alloc)); // Throws
-                goto add;
-            case type_Binary:
-                ref = ColumnBinary::create(size(), alloc); // Throws
-                new_col.reset(new ColumnBinary(ref, parent, ndx_in_parent, alloc)); // Throws
-                goto add;
-            case type_Table: {
-                ref = ColumnTable::create(size(), alloc); // Throws
-                new_col.reset(new ColumnTable(alloc, this, column_ndx, parent, ndx_in_parent,
-                                              ref)); // Throws
-                goto add;
-            }
-            case type_Mixed:
-                ref = ColumnMixed::create(size(), alloc); // Throws
-                new_col.reset(new ColumnMixed(alloc, this, column_ndx, parent, ndx_in_parent,
-                                              ref)); // Throws
-                goto add;
-        }
-        TIGHTDB_ASSERT(false);
-
-      add:
-        m_columns.add(new_col->get_ref()); // Throws
-        try {
-            // FIXME: intptr_t is not guaranteed to exists, even in
-            // C++11. Solve this by changing the type of
-            // `Table::m_cols` to `std::vector<ColumnBase*>`. Also
-            // change its name to `Table::m_column_accessors`.
-            m_cols.add(intptr_t(new_col.get())); // Throws
-        }
-        catch (...) {
-            m_columns.truncate(orig_columns_size); // Guaranteed to not throw
-            throw;
-        }
-    }
-    catch (...) {
-        if (ref != 0)
-            Array::destroy(ref, alloc);
-        throw;
-    }
-
-    new_col.release();
-    return column_ndx;
-}
-
-void Table::do_add_subcolumn(const vector<size_t>& column_path, size_t column_path_ndx,
-                             DataType type)
-{
-    if (column_path.empty()) {
-        do_add_column(type);
-        return;
-    }
-
-    TIGHTDB_ASSERT(column_path_ndx <= column_path.size() - 1);
-
-    size_t column_ndx = column_path[column_path_ndx];
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Table);
-
-    ColumnTable& subtables = get_column_table(column_ndx);
-    size_t num_rows = size();
-    bool modify_level = column_path.size() <= column_path_ndx + 1;
-    if (modify_level) {
-        Allocator& alloc = m_columns.get_alloc();
-        for (size_t i = 0; i < num_rows; ++i) {
-            ref_type subtable_ref = subtables.get_as_ref(i);
-            if (subtable_ref == 0)
-                continue; // Degenerate empty subatble
-            size_t subtable_size = subtables.get_subtable_size(i);
-            ref_type column_ref = create_column(type, subtable_size, alloc);
-            Array subcolumns(subtable_ref, &subtables, i, alloc);
-            subcolumns.add(column_ref);
-        }
-    }
-    else {
-        for (size_t i = 0; i < num_rows; ++i) {
-            if (subtables.get_as_ref(i) == 0)
-                continue; // Degenerate empty subatble
-            TableRef subtable = subtables.get_subtable_ptr(i)->get_table_ref();
-            subtable->do_add_subcolumn(column_path, column_path_ndx+1, type);
-        }
-    }
-}
-
-void Table::remove_column(size_t column_ndx)
-{
-    TIGHTDB_ASSERT(!has_shared_spec());
-    detach_subtable_accessors();
-
-    Spec::ColumnInfo info;
-    m_spec.get_column_info(column_ndx, info);
-
-    // Update Spec
-    m_spec.remove_column(column_ndx);
-
-    // Remove the column within the underlying structure of array
-    // nodes
-    do_remove_column(m_columns, info);
-
-    // Delete the column accessor
-    delete reinterpret_cast<ColumnBase*>(m_cols.get(column_ndx));
-    m_cols.erase(column_ndx);
-
-    // Update cached column indexes for subsequent column accessors
-    int diff = -1, diff_in_parent = info.m_has_index ? -2 : -1;
-    adjust_column_index(column_ndx, diff, diff_in_parent);
-
-    // If there are no columns left, mark the table as empty
-    if (get_column_count() == 0)
-        m_size = 0;
-}
-
-void Table::remove_subcolumn(const vector<size_t>& column_path)
-{
-    TIGHTDB_ASSERT(2 <= column_path.size());
-    TIGHTDB_ASSERT(!has_shared_spec());
-    detach_subtable_accessors();
-
-    Spec::ColumnInfo info;
-    m_spec.get_subcolumn_info(column_path, 0, info);
-
-    // Update Spec
-    m_spec.remove_column(column_path);
-
-    // Remove the column from all tables using the affected subspec
-    do_remove_subcolumn(column_path, 0, info);
-}
-
-
-void Table::do_remove_column(Array& column_refs, const Spec::ColumnInfo& info)
-{
-    // Remove from column list
-    ref_type column_ref = column_refs.get_as_ref(info.m_column_ref_ndx);
-    Array::destroy(column_ref, column_refs.get_alloc());
-    column_refs.erase(info.m_column_ref_ndx);
-
-    // If the column had an index we have to remove that as well
-    if (info.m_has_index) {
-        ref_type index_ref = column_refs.get_as_ref(info.m_column_ref_ndx);
-        Array::destroy(index_ref, column_refs.get_alloc());
-        column_refs.erase(info.m_column_ref_ndx);
-    }
-}
-
-void Table::do_remove_subcolumn(const vector<size_t>& column_path, size_t column_path_ndx,
-                                const Spec::ColumnInfo& info)
-{
-    TIGHTDB_ASSERT(2 <= column_path.size());
-    TIGHTDB_ASSERT(column_path_ndx <= column_path.size() - 2);
-
-    size_t column_ndx = column_path[column_path_ndx];
-    TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Table);
-
-    ColumnTable& subtables = get_column_table(column_ndx);
-    size_t num_rows = size();
-    bool modify_level = column_path.size() <= column_path_ndx + 2;
-    if (modify_level) {
-        Allocator& alloc = m_columns.get_alloc();
-        for (size_t i = 0; i < num_rows; ++i) {
-            ref_type subtable_ref = subtables.get_as_ref(i);
-            if (subtable_ref == 0) continue; // Degenerate empty subatble
-            Array subcolumns(subtable_ref, &subtables, i, alloc);
-            do_remove_column(subcolumns, info);
-        }
-    }
-    else {
-        for (size_t i = 0; i < num_rows; ++i) {
-            if (subtables.get_as_ref(i) == 0) continue; // Degenerate empty subatble
-            TableRef subtable = subtables.get_subtable_ptr(i)->get_table_ref();
-            subtable->do_remove_subcolumn(column_path, column_path_ndx+1, info);
-        }
-    }
-}
-
-
-void Table::rename_column(size_t column_ndx, StringData name)
-{
-    TIGHTDB_ASSERT(!has_shared_spec());
-    detach_subtable_accessors();
-    m_spec.rename_column(column_ndx, name);
-}
-
-void Table::rename_subcolumn(const vector<size_t>& column_path, StringData name)
-{
-    TIGHTDB_ASSERT(2 <= column_path.size());
-    TIGHTDB_ASSERT(!has_shared_spec());
-    detach_subtable_accessors();
-    m_spec.rename_column(column_path, name);
-}
-
-
-bool Table::has_index(size_t column_ndx) const
+bool Table::has_index(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     const ColumnBase& col = get_column_base(column_ndx);
@@ -672,7 +799,7 @@ bool Table::has_index(size_t column_ndx) const
 
 void Table::set_index(size_t column_ndx, bool update_spec)
 {
-    TIGHTDB_ASSERT(!has_shared_spec());
+    TIGHTDB_ASSERT(!has_shared_type());
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     if (has_index(column_ndx))
         return;
@@ -746,6 +873,20 @@ void Table::validate_column_type(const ColumnBase& column, ColumnType coltype, s
     }
     static_cast<void>(column);
     static_cast<void>(ndx);
+}
+
+
+size_t Table::get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
+                                Allocator& alloc) TIGHTDB_NOEXCEPT
+{
+    ColumnType first_col_type = ColumnType();
+    if (!Spec::get_first_column_type_from_ref(spec_ref, alloc, first_col_type))
+        return 0;
+    const char* columns_header = alloc.translate(columns_ref);
+    TIGHTDB_ASSERT(Array::get_size_from_header(columns_header) != 0);
+    ref_type first_col_ref = to_ref(Array::get(columns_header, 0));
+    size_t size = ColumnBase::get_size_from_type_and_ref(first_col_type, first_col_ref, alloc);
+    return size;
 }
 
 
@@ -1171,6 +1312,18 @@ void Table::clear_subtable(size_t col_idx, size_t row_idx)
     else {
         TIGHTDB_ASSERT(false);
     }
+}
+
+
+TableRef Table::get_parent_table() TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    const Array& real_top = m_top.is_attached() ? m_top : m_columns;
+    ArrayParent* array_parent = real_top.get_parent();
+    TIGHTDB_ASSERT(dynamic_cast<Parent*>(array_parent));
+    Parent* table_parent = static_cast<Parent*>(array_parent);
+    Table* parent = table_parent->get_parent_table();
+    return parent ? TableRef(parent) : TableRef();
 }
 
 
@@ -2323,7 +2476,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
         }
     }
 }
-    
+
 TableView Table::get_range_view(size_t start, size_t end)
 {
     ConstTableView ctv = const_cast<const Table*>(this)->get_range_view(start, end);
@@ -2431,7 +2584,7 @@ void Table::optimize()
     // enumeration column. Since this involves changing the spec of
     // the table, it is not something we can do for a subtable with
     // shared spec.
-    if (has_shared_spec())
+    if (has_shared_type())
         return;
 
     Allocator& alloc = m_columns.get_alloc();
@@ -2497,8 +2650,7 @@ void Table::adjust_column_index(size_t column_ndx_begin, int diff, int diff_in_p
     for (size_t i = column_ndx_begin; i < m_cols.size(); ++i) {
         ColumnBase* column = reinterpret_cast<ColumnBase*>(m_cols.get(i));
         column->get_root_array()->adjust_ndx_in_parent(diff_in_parent);
-        if (ColumnSubtableParent* c = dynamic_cast<ColumnSubtableParent*>(column))
-            c->adjust_column_index(diff);
+        column->adjust_column_index(diff);
     }
 }
 
@@ -2523,17 +2675,6 @@ void Table::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
         ColumnBase* column = reinterpret_cast<ColumnBase*>(uintptr_t(m_cols.get(i)));
         column->update_from_parent(old_baseline);
     }
-}
-
-
-void Table::update_from_spec()
-{
-    TIGHTDB_ASSERT(!has_shared_spec());
-    TIGHTDB_ASSERT(m_columns.is_empty() && m_cols.is_empty()); // only on initial creation
-
-    detach_subtable_accessors();
-
-    create_columns();
 }
 
 
@@ -3029,7 +3170,7 @@ bool Table::compare_rows(const Table& t) const
             case col_type_Table: {
                 const ColumnTable& c1 = get_column_table(i);
                 const ColumnTable& c2 = t.get_column_table(i);
-                if (!c1.compare_table(c2))
+                if (!c1.compare_table(c2)) // Throws
                     return false;
                 break;
             }
@@ -3076,6 +3217,12 @@ pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) 
 }
 
 
+Table* Table::Parent::get_parent_table(size_t*) const TIGHTDB_NOEXCEPT
+{
+    return 0;
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 void Table::Verify() const
@@ -3116,8 +3263,7 @@ void Table::to_dot(ostream& out, StringData title) const
             out << "\\n'" << title << "'";
         out << "\";" << endl;
         m_top.to_dot(out, "table_top");
-        const Spec& specset = get_spec();
-        specset.to_dot(out);
+        m_spec.to_dot(out);
     }
     else {
         out << "subgraph cluster_table_"  << m_columns.get_ref() <<  " {" << endl;

@@ -113,6 +113,8 @@ public:
 };
 
 
+
+
 // Implementation:
 
 inline Table* LangBindHelper::new_table()

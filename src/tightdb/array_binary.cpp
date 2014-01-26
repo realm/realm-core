@@ -122,14 +122,14 @@ void ArrayBinary::clear()
 
 BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    pair<size_t, size_t> p = Array::get_size_pair(header, 0);
-    const char* offsets_header = alloc.translate(p.first);
-    const char* blob_header = alloc.translate(p.second);
+    pair<int_least64_t, int_least64_t> p = get_two(header, 0);
+    const char* offsets_header = alloc.translate(to_ref(p.first));
+    const char* blob_header = alloc.translate(to_ref(p.second));
     size_t begin, end;
     if (ndx) {
-        pair<size_t, size_t> p2 = Array::get_size_pair(offsets_header, ndx-1);
-        begin = p2.first;
-        end   = p2.second;
+        p = get_two(offsets_header, ndx-1);
+        begin = to_size_t(p.first);
+        end   = to_size_t(p.second);
     }
     else {
         begin = 0;

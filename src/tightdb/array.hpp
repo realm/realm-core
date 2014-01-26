@@ -423,8 +423,11 @@ public:
     /// Erase the element at the specified index, and move elements at
     /// succeeding indexes to the next lower index.
     ///
-    /// This function is guaranteed not to throw if
-    /// get_alloc().is_read_only(get_ref()) returns false.
+    /// This function is guaranteed to *never* throw if
+    /// `get_alloc().is_read_only(get_ref())` returns false. This is
+    /// automatically guaranteed if the array is used in a
+    /// non-transactional context, or if the array has already been
+    /// successfully modified within the current write transaction.
     ///
     /// FIXME: Carefull with this one. It does not destroy/deallocate
     /// subarrays as clear() does. This difference is surprising and
@@ -694,6 +697,9 @@ public:
     /// efficiency when inserting after, and erasing the last element.
     std::size_t get_bptree_size() const TIGHTDB_NOEXCEPT;
 
+    /// The root must not be a leaf.
+    static std::size_t get_bptree_size_from_header(const char* root_header) TIGHTDB_NOEXCEPT;
+
 
     /// Find the leaf node corresponding to the specified tree-level
     /// index. This function must be called on an inner B+-tree node,
@@ -790,7 +796,12 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static int64_t get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+    static int_fast64_t get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+
+    /// Like get(const char*, std::size_t) but gets two consecutive
+    /// elements.
+    static std::pair<int_least64_t, int_least64_t> get_two(const char* header,
+                                                           std::size_t ndx) TIGHTDB_NOEXCEPT;
 
     /// The meaning of 'width' depends on the context in which this
     /// array is used.
@@ -932,9 +943,6 @@ protected:
     void set_width(std::size_t) TIGHTDB_NOEXCEPT;
     void alloc(std::size_t count, std::size_t width);
     void copy_on_write();
-
-    static std::pair<std::size_t, std::size_t> get_size_pair(const char* header,
-                                                             std::size_t ndx) TIGHTDB_NOEXCEPT;
 
 private:
     std::size_t m_ref;
@@ -1923,6 +1931,14 @@ inline std::size_t Array::get_bptree_size() const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(is_inner_bptree_node());
     int_fast64_t v = back();
     return std::size_t(v / 2); // v = 1 + 2*total_elems_in_tree
+}
+
+inline std::size_t Array::get_bptree_size_from_header(const char* root_header) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(get_is_inner_bptree_node_from_header(root_header));
+    size_t root_size = get_size_from_header(root_header);
+    int_fast64_t v = get(root_header, root_size-1);
+    return size_t(v / 2); // v = 1 + 2*total_elems_in_tree
 }
 
 inline void Array::ensure_bptree_offsets(Array& offsets)

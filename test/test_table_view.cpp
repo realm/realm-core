@@ -906,9 +906,9 @@ TEST(TableView_dyn_pivot)
         table->insert_bool(2, i, true);
         table->insert_done();
     }
-    
+
     TableView tv = table->where().find_all();
-    
+
     Table result_count;
     tv.aggregate(0, 1, Table::aggr_count, result_count);
     int64_t half = count/2;
@@ -916,10 +916,10 @@ TEST(TableView_dyn_pivot)
     CHECK_EQUAL(2, result_count.size());
     CHECK_EQUAL(half, result_count.get_int(1, 0));
     CHECK_EQUAL(half, result_count.get_int(1, 1));
-    
+
     Table result_sum;
     tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_sum, result_sum);
-    
+
     Table result_avg;
     tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_avg, result_avg);
 

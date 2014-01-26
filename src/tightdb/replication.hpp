@@ -127,8 +127,10 @@ public:
     //
     //   N  New top level table
     //   T  Select table
-    //   S  Select spec for currently selected table
-    //   A  Add column to selected spec
+    //   S  Select desscriptor from currently selected root table
+    //   O  Add column to selected descriptor
+    //   P  Remove column from selected descriptor
+    //   Q  Rename column in selected descriptor
     //   s  Set value
     //   i  Insert value
     //   c  Row insert complete
@@ -143,6 +145,8 @@ public:
 
     void new_top_level_table(StringData name);
     void add_column (const Table*, const Spec*, DataType, StringData name);
+    void remove_column (const Table*, const Spec*, std::size_t column_ndx);
+    void rename_column (const Table*, const Spec*, std::size_t column_ndx, StringData name);
 
     template<class T>
     void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
@@ -266,10 +270,10 @@ private:
     void transact_log_append(const char* data, std::size_t size);
 
     void check_table(const Table*);
-    void select_table(const Table*);
+    void select_table(const Table*); // Deselects a selected spec
 
     void check_spec(const Table*, const Spec*);
-    void select_spec(const Table*, const Spec*);
+    void select_spec(const Table*, const Spec*); // Table must *not* have shared type descriptor
 
     void string_cmd(char cmd, std::size_t column_ndx, std::size_t ndx,
                     const char* data, std::size_t size);
@@ -634,7 +638,22 @@ inline void Replication::add_column(const Table* table, const Spec* spec,
                                     DataType type, StringData name)
 {
     check_spec(table, spec); // Throws
-    simple_cmd('A', util::tuple(int(type), name.size())); // Throws
+    simple_cmd('O', util::tuple(int(type), name.size())); // Throws
+    transact_log_append(name.data(), name.size()); // Throws
+}
+
+inline void Replication::remove_column(const Table* table, const Spec* spec,
+                                       std::size_t column_ndx)
+{
+    check_spec(table, spec); // Throws
+    simple_cmd('P', util::tuple(column_ndx)); // Throws
+}
+
+inline void Replication::rename_column(const Table* table, const Spec* spec,
+                                       std::size_t column_ndx, StringData name)
+{
+    check_spec(table, spec); // Throws
+    simple_cmd('Q', util::tuple(column_ndx, name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
 }
 

@@ -620,8 +620,8 @@ public:
     template<class T> bool is_subtable() const
     {
         // FIXME: Conversion from TableRef to ConstTableRef is relatively expensive, or is it? Check whether it involves access to the reference count!
-        const ConstTableRef t = static_cast<const FieldAccessor*>(this)->get_subtable();
-        return t && T::matches_dynamic_spec(&t->get_spec());
+        ConstTableRef t = static_cast<const FieldAccessor*>(this)->get_subtable();
+        return t && T::matches_dynamic_spec(TableFriend::get_spec(*t));
     }
 
     /// Generally more efficient that get_subtable()->size().

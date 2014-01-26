@@ -1,0 +1,476 @@
+/*************************************************************************
+ *
+ * TIGHTDB CONFIDENTIAL
+ * __________________
+ *
+ *  [2011] - [2012] TightDB Inc
+ *  All Rights Reserved.
+ *
+ * NOTICE:  All information contained herein is, and remains
+ * the property of TightDB Incorporated and its suppliers,
+ * if any.  The intellectual and technical concepts contained
+ * herein are proprietary to TightDB Incorporated
+ * and its suppliers and may be covered by U.S. and Foreign Patents,
+ * patents in process, and are protected by trade secret or copyright law.
+ * Dissemination of this information or reproduction of this material
+ * is strictly forbidden unless prior written permission is obtained
+ * from TightDB Incorporated.
+ *
+ **************************************************************************/
+#ifndef TIGHTDB_DESCRIPTOR_HPP
+#define TIGHTDB_DESCRIPTOR_HPP
+
+#include <cstddef>
+
+#include <tightdb/util/assert.hpp>
+#include <tightdb/descriptor_fwd.hpp>
+#include <tightdb/table.hpp>
+
+
+namespace tightdb {
+
+/*
+
+FIXME: Add test/test_descriptor.cpp
+
+FIXME: Add documentation.
+
+FIXME: Fix language bindings.
+
+
+
+Next step is to simplify and speed up things by merging Spec and
+Descriptor classes as follows:
+
+- Replace `Spec Table::m_spec` with `DescriptorRef
+  Table::m_descriptor`. Multiple subtable accessors will refer to a
+  shared descriptor. A table accessor will always keep the descriptor
+  accesssor alive. An app that holds on to a descriptor accessor, will
+  keep the root table accessor alive, but not the subtable accessors
+  of the root table.
+
+- Change `Spec::m_subspecs` such that it is indexed by logical column
+  index (for speed). It should still be empty if there are no subtable
+  columns.
+
+- Remove `Descriptor::m_subspec_map` since it is now made redundant by
+  `Spec::m_subspecs`.
+
+- Remove `Descriptor::m_subspec_map` since it is now made redundant by
+  `Spec::m_subspecs`.
+
+- Remove `Descriptor::record_subdesc_path()`since it is now made
+  redundant by `Spec::record_subspec_path()`.
+
+- Make sure there is a distinct column accessor class for each logical
+  column type. For example, add a class `BooleanColumn` as a subclass
+  of `Column` (IntegerColumn).
+
+- Add `virtual ColumnBase::check_type(type)` and
+  `LangBindHelper::check_column_type(column_ndx, data_type)`.
+
+This can be done without changing the public API, but it does rely
+(weakly) on a BREAKING CHANGE OF FILE FORMAT!
+
+*/
+
+
+
+
+/// Accessor for table type descriptors.
+///
+/// A table type descriptor is an entity that specifies the dynamic
+/// type of a TightDB table. Objects of this class are accessors
+/// through which the descriptor can be inspected and
+/// changed. Accessors can become detached, see is_attached() for more
+/// on this. The descriptor itself is stored inside the database file,
+/// or elsewhere in case of a free-standing table or a table in a
+/// free-stading group.
+///
+/// The dynamic type consists first, and foremost of an ordered list
+/// of column descriptors. Each column descriptor specifies the name
+/// and type of the column.
+///
+/// When a table has a subtable column, every cell in than column
+/// contains a subtable. All those subtables have the same dynamic
+/// type, and therefore have a shared descriptor. See is_root() for
+/// more on this.
+///
+/// The Table class contains convenience methods, such as
+/// Table::get_column_count() and Table::add_column(), that allow you
+/// to inspect and change the dynamic type of simple tables without
+/// resorting to use of descriptors. For example, the following two
+/// statements have the same effect:
+///
+///     table->add_column(type, name);
+///     table->get_descriptor()->add_column(type, name);
+///
+/// Note, however, that this equivalence holds only as long as no
+/// shared subtable descriptors are involved.
+///
+/// \sa Table::get_descriptor()
+class Descriptor {
+public:
+    /// Get the number of columns in the assocaited tables.
+    std::size_t get_column_count() const TIGHTDB_NOEXCEPT;
+
+    /// Get the type of the column at the specified index.
+    ///
+    /// The consequences of specifying a column index that is out of
+    /// range, are undefined.
+    DataType get_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+
+    /// Get the name of the column at the specified index.
+    ///
+    /// The consequences of specifying a column index that is out of
+    /// range, are undefined.
+    StringData get_column_name(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
+
+    /// Search for a column with the specified name.
+    ///
+    /// This function finds the first column with the specified name,
+    /// and returns its index. If there are no such columns, it
+    /// returns `not_found`.
+    std::size_t get_column_index(StringData name) const TIGHTDB_NOEXCEPT;
+
+    /// Add a new column to the each of the associated tables.
+    ///
+    /// This function modifies the dynamic type of all the tables that
+    /// share this descriptor. It does this by appending a new column
+    /// with the specified name and type to the descriptor, and to
+    /// each of the tables that share this descriptor.
+    ///
+    /// This function will detach all accessors of subtables of the
+    /// root table. Only the accessor of the root table will remain
+    /// attached. The root table is the table associated with the root
+    /// descriptor.
+    ///
+    /// \sa is_root()
+    /// \sa Table::add_column()
+    void add_column(DataType type, StringData name);
+
+    /// Same as add_column(type, name), but if the type is
+    /// `type_Table`, then a reference to the descriptor of the new
+    /// subtable column is stored in \a subdesc.
+    void add_column(DataType type, StringData name, DescriptorRef& subdesc);
+
+    /// Remove the specified column from each of the associated
+    /// tables.
+    ///
+    /// This function modifies the dynamic type of all the tables that
+    /// share this descriptor. It does this by removing the column at
+    /// the specified index from the descriptor, and from each of the
+    /// that share this descriptor. The consequences of specifying a
+    /// column index that is out of range, are undefined.
+    ///
+    /// If the removed column was a subtable column, then the
+    /// associated descriptor accessor will be detached, if it
+    /// exists. This function will also detach all accessors of
+    /// subtables of the root table. Only the accessor of the root
+    /// table will remain attached. The root table is the table
+    /// associated with the root descriptor.
+    ///
+    /// \sa is_root()
+    /// \sa Table::remove_column()
+    void remove_column(std::size_t column_ndx);
+
+    /// Rename the specified column.
+    ///
+    /// This function modifies the dynamic type of all the tables that
+    /// share this descriptor. The consequences of specifying a column
+    /// index that is out of range, are undefined.
+    ///
+    /// This function will detach all accessors of subtables of the
+    /// root table. Only the accessor of the root table will remain
+    /// attached. The root table is the table associated with the root
+    /// descriptor.
+    ///
+    /// \sa is_root()
+    /// \sa Table::rename_column()
+    void rename_column(std::size_t column_ndx, StringData new_name);
+
+    //@{
+    /// Get the descriptor for the specified subtable column.
+    ///
+    /// This function provides access to the shared subtable
+    /// descriptor for the subtables in the specified column. The
+    /// specified column must be a column whose type is 'table'. The
+    /// consequences of specifying a column of a different type, or
+    /// specifying an index that is out of range, are undefined.
+    ///
+    /// Note that this function cannot be used with 'mixed' columns,
+    /// since subtables of that kind have independent dynamic types,
+    /// and therefore, have independent descriptors. You can only get
+    /// access to the descriptor of a subtable in a mixed column by
+    /// first getting access to the subtable itself.
+    ///
+    /// \sa is_root()
+    DescriptorRef get_subdescriptor(std::size_t column_ndx);
+    ConstDescriptorRef get_subdescriptor(std::size_t column_ndx) const;
+    //@}
+
+    //@{
+    /// Returns the parent table descriptor, if any.
+    ///
+    /// If this descriptor is the *root destriptor*, then this
+    /// function returns null. Otherwise it returns the accessor of
+    /// the parent descriptor.
+    ///
+    /// \sa is_root()
+    DescriptorRef get_parent_descriptor() TIGHTDB_NOEXCEPT;
+    ConstDescriptorRef get_parent_descriptor() const TIGHTDB_NOEXCEPT;
+    //@}
+
+    //@{
+    /// Get the table associated with the root descriptor.
+    ///
+    /// \sa get_parent_descriptor()
+    /// \sa is_root()
+    TableRef get_root_table() TIGHTDB_NOEXCEPT;
+    ConstTableRef get_root_table() const TIGHTDB_NOEXCEPT;
+    //@}
+
+    /// Is this a root descriptor?
+    ///
+    /// Descriptors of tables with independent dynamic type are root
+    /// destriptors. Root descriptors are never shared. Tables that
+    /// are direct members of groups have independent dynamic
+    /// types. The same is true for free-standing tables and subtables
+    /// in columns of type 'mixed'.
+    ///
+    /// When a table has a column of type 'table', the cells in that
+    /// column contain subtables. All those subtables have the same
+    /// dynamic type, and they share a single dynamic type
+    /// descriptor. Such shared descriptors are never root
+    /// descriptors.
+    ///
+    /// A type descriptor can even be shared by subtables with
+    /// different parent tables, but only if the parent tables
+    /// themselves have a shared type descritpor. For examaple, if a
+    /// table has a column `foo` of type 'table', and each of the
+    /// subtables in `foo` havs a column `bar` of type 'table', then
+    /// all the subtables in all the `bar` columns share the same
+    /// dynamic type descriptor.
+    ///
+    /// \sa Table::has_shared_type()
+    bool is_root() const TIGHTDB_NOEXCEPT;
+
+    /// Determine whether this accessor is still attached.
+    ///
+    /// A table descriptor accesor may get detached from the
+    /// underlying descriptor for various reasons (see below). When it
+    /// does, it no longer refers to that descriptor, and can no
+    /// longer be used, except for calling is_attached(). The
+    /// consequences of doing so are undefined. A newly obtained table
+    /// descriptor accesor is always in the 'attached' state.
+    ///
+    /// A descriptor accessor that is obtained directly from a table
+    /// becomes detached if the table becomes detached. A shared
+    /// subtable descriptor accessor that is obtained by a call to
+    /// get_subdescriptor() becomes detached if the parent descriptor
+    /// accessor becomes detached, or if the corresponding subtable
+    /// column is removed. A descriptor accessor does not get detached
+    /// under any other circumstances.
+    bool is_attached() const TIGHTDB_NOEXCEPT;
+
+    ~Descriptor() TIGHTDB_NOEXCEPT;
+
+private:
+    TableRef m_root_table; // Table associated with root descriptor. Detached iff null.
+    DescriptorRef m_parent; // Null iff detached or root descriptor.
+    Spec* m_spec; // Valid if attached. Owned iff valid and `m_parent`.
+
+    mutable unsigned long m_ref_count;
+
+    // Whenever a subtable descriptor accessor is created, it is
+    // stored in this map. This ensures that when get_subdescriptor()
+    // is called to created multiple DescriptorRef objects that
+    // overlap in time, then they will all refer to the same
+    // descriptor object.
+    //
+    // It also enables the necessary resursive detaching of descriptor
+    // objects.
+    struct subdesc_entry {
+        std::size_t m_column_ndx;
+        Descriptor* m_subdesc;
+        subdesc_entry(std::size_t n, Descriptor* d): m_column_ndx(n), m_subdesc(d) {}
+    };
+    typedef std::vector<subdesc_entry> subdesc_map;
+    mutable subdesc_map m_subdesc_map;
+
+    Descriptor() TIGHTDB_NOEXCEPT;
+
+    void bind_ref() const TIGHTDB_NOEXCEPT;
+    void unbind_ref() const TIGHTDB_NOEXCEPT;
+
+    // Called by the root table if this becomes the root
+    // descriptor. Otherwise it is called by the descriptor that
+    // becomes its parent.
+    //
+    // Puts this descriptor accessor into the attached state. This
+    // attaches it to the underlying structure of array nodes. It does
+    // not establish the parents reference to this descriptor, that is
+    // the job of the parent. When this function returns,
+    // is_attached() will return true.
+    //
+    // Not idempotent.
+    //
+    // The specified table is not allowed to be a subtable with a
+    // shareable spec. That is, Table::has_shared_spec() must return
+    // false.
+    //
+    // The specified spec must be the spec of the specified table or
+    // of one of its direct or indirect subtable columns.
+    //
+    // When the specified spec is the spec of the root table, the
+    // parent must be specified as null. When the specified spec is
+    // not the root spec, a proper parent must be specified.
+    void attach(Table*, Descriptor* parent, Spec*) TIGHTDB_NOEXCEPT;
+
+    // Detach accessor from underlying descriptor. Caller must ensure
+    // that a reference count exists upon return, for example by
+    // obtaining an extra reference count before the call.
+    //
+    // This function is called either by the root table if this is the
+    // root descriptor, or by the parent descriptor, if it is not.
+    //
+    // Puts this descriptor accessor into the detached state. This
+    // detaches it from the underlying structure of array nodes. It
+    // also calls detach_subdesc_accessors(). When this function
+    // returns, is_attached() will return false.
+    //
+    // Not idempotent.
+    void detach() TIGHTDB_NOEXCEPT;
+
+    // Recursively detach all subtable descriptor accessors that
+    // exist, that is, all subtable descriptor accessors that have
+    // this descriptor as ancestor.
+    void detach_subdesc_accessors() TIGHTDB_NOEXCEPT;
+
+    // Remove the entry from m_subdesc_map that refers to the
+    // specified subtable descriptor. It must be there.
+    void remove_subdesc_entry(Descriptor* subdesc) const TIGHTDB_NOEXCEPT;
+
+    // Record the path in terms of subtable column indexes from the
+    // root descriptor to this descriptor. If this descriptor is a
+    // root descriptor, the path is empty. Returns zero if the path is
+    // too long to fit in the specified buffer. Otherwise the path
+    // indexes will be stored between `begin_2`and `end`, where
+    // `begin_2` is the returned pointer.
+    std::size_t* record_subdesc_path(std::size_t* begin, std::size_t* end) const TIGHTDB_NOEXCEPT;
+
+    friend class util::bind_ptr<Descriptor>;
+    friend class util::bind_ptr<const Descriptor>;
+    friend class Table;
+};
+
+
+
+
+// Implementation:
+
+inline std::size_t Descriptor::get_column_count() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    return m_spec->get_column_count();
+}
+
+inline StringData Descriptor::get_column_name(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    return m_spec->get_column_name(ndx);
+}
+
+inline DataType Descriptor::get_column_type(std::size_t ndx) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    return m_spec->get_column_type(ndx);
+}
+
+inline std::size_t Descriptor::get_column_index(StringData name) const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    return m_spec->get_column_index(name);
+}
+
+inline void Descriptor::add_column(DataType type, StringData name)
+{
+    TIGHTDB_ASSERT(is_attached());
+    _impl::TableFriend::add_column(*this, type, name); // Throws
+}
+
+inline void Descriptor::add_column(DataType type, StringData name, DescriptorRef& subdesc)
+{
+    add_column(type, name); // Throws
+    if (type == type_Table)
+        subdesc = get_subdescriptor(get_column_count()-1);
+}
+
+inline void Descriptor::rename_column(std::size_t column_ndx, StringData name)
+{
+    TIGHTDB_ASSERT(is_attached());
+    _impl::TableFriend::rename_column(*this, column_ndx, name); // Throws
+}
+
+inline ConstDescriptorRef Descriptor::get_subdescriptor(std::size_t column_ndx) const
+{
+    return const_cast<Descriptor*>(this)->get_subdescriptor(column_ndx);
+}
+
+inline DescriptorRef Descriptor::get_parent_descriptor() TIGHTDB_NOEXCEPT
+{
+    return m_parent;
+}
+
+inline ConstDescriptorRef Descriptor::get_parent_descriptor() const TIGHTDB_NOEXCEPT
+{
+    return const_cast<Descriptor*>(this)->get_parent_descriptor();
+}
+
+inline TableRef Descriptor::get_root_table() TIGHTDB_NOEXCEPT
+{
+    return m_root_table;
+}
+
+inline ConstTableRef Descriptor::get_root_table() const TIGHTDB_NOEXCEPT
+{
+    return const_cast<Descriptor*>(this)->get_root_table();
+}
+
+inline bool Descriptor::is_root() const TIGHTDB_NOEXCEPT
+{
+    return !m_parent;
+}
+
+inline Descriptor::Descriptor() TIGHTDB_NOEXCEPT: m_ref_count(0)
+{
+}
+
+inline void Descriptor::bind_ref() const TIGHTDB_NOEXCEPT
+{
+    ++m_ref_count;
+}
+
+inline void Descriptor::unbind_ref() const TIGHTDB_NOEXCEPT
+{
+    if (--m_ref_count == 0)
+        delete this;
+}
+
+inline void Descriptor::attach(Table* table, Descriptor* parent, Spec* spec) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!is_attached());
+    TIGHTDB_ASSERT(!table->has_shared_type());
+    m_root_table.reset(table);
+    m_parent.reset(parent);
+    m_spec = spec;
+}
+
+inline bool Descriptor::is_attached() const TIGHTDB_NOEXCEPT
+{
+    return bool(m_root_table);
+}
+
+} // namespace tightdb
+
+#endif // TIGHTDB_DESCRIPTOR_HPP

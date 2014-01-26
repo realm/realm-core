@@ -7,6 +7,8 @@
 #include <iomanip>
 
 #include <tightdb/column.hpp>
+#include <tightdb/column_table.hpp>
+#include <tightdb/column_mixed.hpp>
 #include <tightdb/query_engine.hpp>
 
 using namespace std;
@@ -218,6 +220,66 @@ void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
 void ColumnBase::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     m_array->update_from_parent(old_baseline);
+}
+
+
+namespace {
+
+struct GetSizeFromRef {
+    const ref_type m_ref;
+    Allocator& m_alloc;
+    size_t m_size;
+    GetSizeFromRef(ref_type r, Allocator& a): m_ref(r), m_alloc(a), m_size(0) {}
+    template<class Col> void call() TIGHTDB_NOEXCEPT
+    {
+        m_size = Col::get_size_from_ref(m_ref, m_alloc);
+    }
+};
+
+template<class Op> void col_type_deleg(Op& op, ColumnType type)
+{
+    switch (type) {
+        case col_type_Int:
+        case col_type_Bool:
+        case col_type_DateTime:
+            op.template call<Column>();
+            return;
+        case col_type_String:
+            op.template call<AdaptiveStringColumn>();
+            return;
+        case col_type_StringEnum:
+            op.template call<ColumnStringEnum>();
+            return;
+        case col_type_Binary:
+            op.template call<ColumnBinary>();
+            return;
+        case col_type_Table:
+            op.template call<ColumnTable>();
+            return;
+        case col_type_Mixed:
+            op.template call<ColumnMixed>();
+            return;
+        case col_type_Float:
+            op.template call<ColumnFloat>();
+            return;
+        case col_type_Double:
+            op.template call<ColumnDouble>();
+            return;
+        case col_type_Reserved1:
+        case col_type_Reserved4:
+            break;
+    }
+    TIGHTDB_ASSERT(false);
+}
+
+} // anonymous namespace
+
+size_t ColumnBase::get_size_from_type_and_ref(ColumnType type, ref_type ref,
+                                              Allocator& alloc) TIGHTDB_NOEXCEPT
+{
+    GetSizeFromRef op(ref, alloc);
+    col_type_deleg(op, type);
+    return op.m_size;
 }
 
 

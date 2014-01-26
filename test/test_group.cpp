@@ -655,10 +655,12 @@ TEST(Group_Subtable)
 
     Group g;
     TableRef table = g.get_table("test");
-    table->add_column(type_Int, "foo");
-    table->add_column(type_Table, "sub");
+    DescriptorRef sub;
+    table->add_column(type_Int,   "foo");
+    table->add_column(type_Table, "sub", sub);
     table->add_column(type_Mixed, "baz");
-    table->add_subcolumn(tuple(1), type_Int, "bar");
+    sub->add_column(type_Int, "bar");
+    sub.reset();
 
     for (int i=0; i<n; ++i) {
         table->add_empty_row();
@@ -889,12 +891,15 @@ TEST(Group_MultiLevelSubtables)
     {
         Group g;
         TableRef table = g.get_table("test");
-        table->add_column(type_Int, "int");
-        table->add_column(type_Table, "tab");
-        table->add_column(type_Mixed, "mix");
-        table->add_subcolumn(tuple(1), type_Int, "int");
-        table->add_subcolumn(tuple(1), type_Table, "tab");
-        table->add_subcolumn(tuple(1,1), type_Int, "int");
+        {
+            DescriptorRef sub_1, sub_2;
+            table->add_column(type_Int,   "int");
+            table->add_column(type_Table, "tab", sub_1);
+            table->add_column(type_Mixed, "mix");
+            sub_1->add_column(type_Int,   "int");
+            sub_1->add_column(type_Table, "tab", sub_2);
+            sub_2->add_column(type_Int,   "int");
+        }
         table->add_empty_row();
         {
             TableRef a = table->get_subtable(1, 0);
@@ -1013,8 +1018,10 @@ TEST(Group_CommitSubtable)
     Group group("test.tightdb", Group::mode_ReadWrite);
 
     TableRef table = group.get_table("test");
-    table->add_column(type_Table, "subtable");
-    table->add_subcolumn(tuple(0), type_Int, "int");
+    DescriptorRef sub_1;
+    table->add_column(type_Table, "subtable", sub_1);
+    sub_1->add_column(type_Int,   "int");
+    sub_1.reset();
     table->add_empty_row();
 
     TableRef subtable = table->get_subtable(0,0);
