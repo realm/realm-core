@@ -234,10 +234,21 @@ public:
 
     void add_int(std::size_t column_ndx, int64_t value);
 
+    /// Assumes that the specified column is a subtable column (in
+    /// particular, not a mixed column) and that the specified table
+    /// has a spec that is compatible with that column, that is, the
+    /// number of columns must be the same, and corresponding columns
+    /// must have identical data types (as returned by
+    /// get_column_type()).
+    void insert_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
+    void insert_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
+
     /// Like insert_subtable(std::size_t, std::size_t, const Table*)
     /// but overwrites the specified cell rather than inserting a new
     /// one.
     void set_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
+    void set_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
+
 
     // Sub-tables (works on columns whose type is either 'subtable' or
     // 'mixed', for a value in a mixed column that is not a subtable,
@@ -524,18 +535,6 @@ private:
     void to_json_row(std::size_t row_ndx, std::ostream& out) const;
     void to_string_header(std::ostream& out, std::vector<std::size_t>& widths) const;
     void to_string_row(std::size_t row_ndx, std::ostream& out, const std::vector<std::size_t>& widths) const;
-
-    /// Assumes that the specified column is a subtable column (in
-    /// particular, not a mixed column) and that the specified table
-    /// has a spec that is compatible with that column, that is, the
-    /// number of columns must be the same, and corresponding columns
-    /// must have identical data types (as returned by
-    /// get_column_type()).
-    void insert_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
-
-    void insert_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
-
-    void set_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
 
     /// Put this table accessor into the detached state. This detaches
     /// it from the underlying structure of array nodes. Also do this

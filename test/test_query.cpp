@@ -484,7 +484,7 @@ TEST(NextGenSyntaxMonkey)
     for(int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++)
     {
         // Keep at least '* 20' else some tests will give 0 matches and bad coverage
-        const size_t rows = 1 + ((size_t)rand() * (size_t)rand()) 
+        const size_t rows = 1 + ((size_t)rand() * (size_t)rand())
             % (TIGHTDB_MAX_LIST_SIZE * 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
         table.add_column(type_Int, "first");
@@ -3879,6 +3879,85 @@ TEST(TestQuerySyntaxCheck)
     CHECK(s != "");
 #endif
 */
+}
+
+TEST(TestQuerySubtableSyntaxCheck)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+    string s;
+
+    // Create specification with sub-table
+    table->add_column(type_Int,    "first");
+    table->add_column(type_String, "second");
+    table->add_column(type_Table,  "third");
+    table->add_subcolumn(tuple(2), type_Int,    "sub_first");
+    table->add_subcolumn(tuple(2), type_String, "sub_second");
+
+    // Main table
+    table->insert_int(0, 0, 111);
+    table->insert_string(1, 0, "this");
+    table->insert_subtable(2, 0);
+    table->insert_done();
+
+    table->insert_int(0, 1, 222);
+    table->insert_string(1, 1, "is");
+    table->insert_subtable(2, 1);
+    table->insert_done();
+
+    table->insert_int(0, 2, 333);
+    table->insert_string(1, 2, "a test");
+    table->insert_subtable(2, 2);
+    table->insert_done();
+
+    table->insert_int(0, 3, 444);
+    table->insert_string(1, 3, "of queries");
+    table->insert_subtable(2, 3);
+    table->insert_done();
+
+
+    // Sub tables
+    TableRef subtable = table->get_subtable(2, 0);
+    subtable->insert_int(0, 0, 11);
+    subtable->insert_string(1, 0, "a");
+    subtable->insert_done();
+
+    subtable = table->get_subtable(2, 1);
+    subtable->insert_int(0, 0, 22);
+    subtable->insert_string(1, 0, "b");
+    subtable->insert_done();
+    subtable->insert_int(0, 1, 33);
+    subtable->insert_string(1, 1, "c");
+    subtable->insert_done();
+
+    subtable = table->get_subtable(2, 2);
+    subtable->insert_int(0, 0, 44);
+    subtable->insert_string(1, 0, "d");
+    subtable->insert_done();
+
+    subtable = table->get_subtable(2, 3);
+    subtable->insert_int(0, 0, 55);
+    subtable->insert_string(1, 0, "e");
+    subtable->insert_done();
+
+    Query q1 = table->where();
+    q1.subtable(2);
+    q1.greater(0, 50);
+    s = q1.validate();
+    CHECK(s != "");
+
+    Query q2 = table->where();
+    q2.subtable(2);
+    q2.greater(0, 50);
+    q2.end_subtable();
+    s = q2.validate();
+    CHECK(s == "");
+
+    Query q3 = table->where();
+    q3.greater(0, 50);
+    q3.end_subtable();
+    s = q3.validate();
+    CHECK(s != "");
 }
 
 TEST(TestTV)

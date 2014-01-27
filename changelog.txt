@@ -16,6 +16,11 @@ Format:
   In debug mode it could assert when querying a subtable with more columns than the base table.
 
 
+2014-01-23 (Kenneth Geisshirt)
+! Fixed bug: Subtable queries is validated by Query::validate(). An invalid subtable query can lead to a segfault.
+
+
+
 2014-01-07 (Kenneth Geisshirt)
 + Table::range() added. The method returns a set of rows as a TableView.
 

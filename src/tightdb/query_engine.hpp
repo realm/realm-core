@@ -356,7 +356,7 @@ public:
     {
         if (TAction == act_ReturnFirst)
             m_column_action_specializer = & ThisType::column_action_specialization<act_ReturnFirst, int64_t>;
-        
+
         else if (TAction == act_Count)
             m_column_action_specializer = & ThisType::column_action_specialization<act_Count, int64_t>;
 
@@ -398,12 +398,12 @@ public:
     {
         // Sum of float column must accumulate in double
         typedef typename ColumnTypeTraitsSum<TSourceColumn, TAction>::sum_type TResult;
-        TIGHTDB_STATIC_ASSERT( !(TAction == act_Sum && (util::SameType<TSourceColumn, float>::value && 
+        TIGHTDB_STATIC_ASSERT( !(TAction == act_Sum && (util::SameType<TSourceColumn, float>::value &&
                                                         !util::SameType<TResult, double>::value)), "");
-        
+
         // TResult: type of query result
         // TSourceColumn: type of aggregate source
-        TSourceColumn av = (TSourceColumn)0; 
+        TSourceColumn av = (TSourceColumn)0;
         // uses_val test becuase compiler cannot see that Column::Get has no side effect and result is discarded
         if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != null_ptr) {
             TIGHTDB_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != null_ptr);
@@ -571,6 +571,16 @@ public:
             m_child2->init(table);
     }
 
+    std::string validate()
+    {
+        if (error_code != "")
+            return error_code;
+        if (m_child == 0)
+            return "Unbalanced subtable/end_subtable block";
+        else
+            return m_child->validate();
+    }
+
     size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
         TIGHTDB_ASSERT(m_table);
@@ -638,7 +648,7 @@ public:
         return b;
     }
 
-    IntegerNodeBase() :  m_array(Array::no_prealloc_tag()) 
+    IntegerNodeBase() :  m_array(Array::no_prealloc_tag())
     {
         m_child = 0;
         m_conds = 0;
@@ -754,9 +764,9 @@ public:
         m_state = st;
 
         // If there are no other nodes than us (m_conds == 1) AND the column used for our condition is
-        // the same as the column used for the aggregate action, then the entire query can run within scope of that 
+        // the same as the column used for the aggregate action, then the entire query can run within scope of that
         // column only, with no references to other columns:
-        bool fastmode = (m_conds == 1 && 
+        bool fastmode = (m_conds == 1 &&
                          (source_column == null_ptr ||
                           (!m_fastmode_disabled
                            && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column)));
