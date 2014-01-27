@@ -8,8 +8,8 @@ util/file.hpp util/utf8.hpp exceptions.hpp utilities.hpp alloc.hpp alloc_slab.hp
 array_string.hpp data_type.hpp column_type.hpp column_fwd.hpp spec.hpp datetime.hpp \
 string_data.hpp binary_data.hpp mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp \
 table_accessors.hpp table_basic.hpp table_view.hpp table_view_basic.hpp table_macros.hpp \
-descriptor.hpp group.hpp group_shared.hpp $(REPLICATION_HPP) query.hpp query_conditions.hpp \
-lang_bind_helper.hpp tightdb_nmmintrin.h importer.hpp
+descriptor_fwd.hpp descriptor.hpp group.hpp group_shared.hpp $(REPLICATION_HPP) query.hpp \
+query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h importer.hpp
 
 nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp
 
