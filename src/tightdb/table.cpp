@@ -2033,7 +2033,7 @@ ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
 namespace {
 
 struct AggrState {
-    AggrState() : added_row(false) {}
+    AggrState() : block(Array::no_prealloc_tag()), added_row(false) {}
 
     const Table* table;
     const StringIndex* dst_index;
