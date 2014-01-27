@@ -1,5 +1,5 @@
-REPLICATION_HPP = $(if $(ENABLE_REPLICATION),replication.hpp)
-REPLICATION_CPP = $(if $(ENABLE_REPLICATION),replication.cpp)
+REPLICATION_HPP = $(if $(TIGHTDB_ENABLE_REPLICATION),replication.hpp)
+REPLICATION_CPP = $(if $(TIGHTDB_ENABLE_REPLICATION),replication.cpp)
 
 nobase_subinclude_HEADERS = util/features.h util/meta.hpp util/assert.hpp util/terminate.hpp \
 util/type_list.hpp util/tuple.hpp util/bind.hpp util/safe_int_ops.hpp util/unique_ptr.hpp \
