@@ -7,11 +7,18 @@ using namespace tightdb;
 
 /*
 
-Multiple subdescs, insert subdescriptor, check that all subdescriptors are still attached and still work. Also check that subtable accessors are detached.
+FIXME: Test: Multiple subdescs, insert subdescriptor, check that all
+subdescriptors are still attached and still work. Also check that
+subtable accessors are detached.
 
-Multiple subdescs, then remove column, then use others, and theck that they are still attached. Also check that removed descriptor is detached. Also check that subtable accessors are detached.
+FIXME: Test: Multiple subdescs, then remove column, then use others,
+and theck that they are still attached. Also check that removed
+descriptor is detached. Also check that subtable accessors are
+detached.
 
-Multiple subdescs, rename column, check that all subdescriptors are still attached and still work. Also check that subtable accessors are detached.
+FIXME: Test: Multiple subdescs, rename column, check that all
+subdescriptors are still attached and still work. Also check that
+subtable accessors are detached.
 
 */
 
@@ -285,11 +292,11 @@ TEST(Descriptor_SubtableColumn)
     CHECK_EQUAL(0, subdesc->get_column_index("foo"));
     CHECK_EQUAL(1, subdesc->get_column_index("bar"));
 
-    // Add a new integer column and see that the subtable column still
-    // works
+    // FIXME: Test: Add a new integer column and see that the subtable
+    // column still works
 
-    // Remove the subtable column and see that the integer column
-    // still works
+    // FIXME: Test: Remove the subtable column and see that the
+    // integer column still works
 }
 
 

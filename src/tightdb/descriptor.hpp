@@ -86,7 +86,9 @@ public:
     /// returns `not_found`.
     std::size_t get_column_index(StringData name) const TIGHTDB_NOEXCEPT;
 
-    /// Add a new column to each of the associated tables.
+    /// Add a new column to each of the associated tables. If any of
+    /// the tables are not empty, the new column will be filled with
+    /// the default value for the specified type.
     ///
     /// This function modifies the dynamic type of all the tables that
     /// share this descriptor. It does this by appending a new column
@@ -107,7 +109,9 @@ public:
     /// subtable column is stored in \a subdesc.
     void add_column(DataType type, StringData name, DescriptorRef& subdesc);
 
-    /// Insert a new column into each of the associated tables.
+    /// Insert a new column into each of the associated tables. If any
+    /// of the tables are not empty, the new column will be filled
+    /// with the default value for the specified type.
     ///
     /// This function modifies the dynamic type of all the tables that
     /// share this descriptor. It does this by inserting a new column

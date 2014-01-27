@@ -142,7 +142,7 @@ public:
     //@}
 
     //@{
-    /// Conventience methods for manipulating the dynamic table type.
+    /// Convenience methods for manipulating the dynamic table type.
     ///
     /// These function must be called only for tables with independent
     /// dynamic type. A table has independent dynamic type if the
@@ -156,7 +156,7 @@ public:
     /// Apart from that, these methods behave as if they were called
     /// on the descriptor returned by get_descriptor().
     ///
-    /// If you need yo change the shared dynamic type of the subtables
+    /// If you need to change the shared dynamic type of the subtables
     /// in a subtable column, consider using the API offered by the
     /// Descriptor class.
     ///
