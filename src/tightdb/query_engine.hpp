@@ -558,12 +558,15 @@ public:
 
         m_table = &table;
 
+        // m_child is first node in condition of subtable query.
         if (m_child) {
-            m_child->init(table);
+            // Can't call init() here as usual since the subtable can be degenerate
+            // m_child->init(table);
             std::vector<ParentNode*> v;
             m_child->gather_children(v);
         }
 
+        // m_child2 is next node of parent query
         if (m_child2)
             m_child2->init(table);
     }
@@ -575,6 +578,9 @@ public:
 
         for (size_t s = start; s < end; ++s) {
             const TableRef subtable = ((Table*)m_table)->get_subtable(m_column, s);
+
+            if (subtable->is_degenerate())
+                return not_found;
 
             m_child->init(*subtable);
             const size_t subsize = subtable->size();

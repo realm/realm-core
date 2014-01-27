@@ -625,7 +625,7 @@ private:
 #ifdef TIGHTDB_DEBUG
     void to_dot_internal(std::ostream&) const;
 #endif
-
+    friend class SubtableNode;
     friend class Group;
     friend class Query;
     friend class ColumnMixed;
@@ -899,6 +899,9 @@ inline void Table::set_enum(std::size_t column_ndx, std::size_t row_ndx, E value
     set_int(column_ndx, row_ndx, value);
 }
 
+// The subtable returned may be degenerate. 
+// FIXME: Consider if we should return a "dummy" degenerate object in that case,
+// such that the caller don't have to check before accessing the subtable.
 inline TableRef Table::get_subtable(std::size_t column_ndx, std::size_t row_ndx)
 {
     return TableRef(get_subtable_ptr(column_ndx, row_ndx));

@@ -2717,10 +2717,12 @@ TEST(TestQuerySubtable)
     subtable->insert_string(1, 1, "c");
     subtable->insert_done();
 
+    /*  Intentially have empty (degenerate) subtable 
     subtable = table->get_subtable(2, 2);
     subtable->insert_int(0, 0, 44);
     subtable->insert_string(1, 0, "d");
     subtable->insert_done();
+    */
 
     subtable = table->get_subtable(2, 3);
     subtable->insert_int(0, 0, 55);
@@ -2739,10 +2741,8 @@ TEST(TestQuerySubtable)
     q1.less(0, val50);
     q1.end_subtable();
     TableView t1 = q1.find_all(0, size_t(-1));
-    CHECK_EQUAL(2, t1.size());
+    CHECK_EQUAL(1, t1.size());
     CHECK_EQUAL(1, t1.get_source_ndx(0));
-    CHECK_EQUAL(2, t1.get_source_ndx(1));
-
 
     Query q2 = table->where();
     q2.subtable(2);
@@ -2751,10 +2751,8 @@ TEST(TestQuerySubtable)
     q2.less(0, val20);
     q2.end_subtable();
     TableView t2 = q2.find_all(0, size_t(-1));
-    CHECK_EQUAL(2, t2.size());
+    CHECK_EQUAL(1, t2.size());
     CHECK_EQUAL(0, t2.get_source_ndx(0));
-    CHECK_EQUAL(3, t2.get_source_ndx(1));
-
 
     Query q3 = table->where();
     q3.subtable(2);
@@ -2777,32 +2775,30 @@ TEST(TestQuerySubtable)
     q4.less(0, val20);
     q4.end_subtable();
     TableView t4 = q4.find_all(0, size_t(-1));
-    CHECK_EQUAL(3, t4.size());
+    CHECK_EQUAL(2, t4.size());
     CHECK_EQUAL(0, t4.get_source_ndx(0));
     CHECK_EQUAL(2, t4.get_source_ndx(1));
-    CHECK_EQUAL(3, t4.get_source_ndx(2));
 }
 
 
-TEST(TestQuerySubtable_bug)
+ONLY(TestQuerySubtable_bug)
 {
     Group group;
     TableRef table = group.get_table("test");
-
+    
     // Create specification with sub-table
-    Spec& s = table->get_spec();
-    s.add_column(type_Int,    "first");
-    Spec sub = s.add_subtable_column("second");
-        sub.add_column(type_Int,    "sub_first");
-        sub.add_column(type_String, "sub_second");
-        sub.add_column(type_Bool,   "sub_third");
-    table->update_from_spec();
+    table->add_column(type_Int,   "col 0");
+    table->add_column(type_Table, "col 1");
+    table->add_subcolumn(tuple(1), type_Int,    "sub 0");
+    table->add_subcolumn(tuple(1), type_String, "sub 1");
+    table->add_subcolumn(tuple(1), type_Bool,   "sub 2");
     CHECK_EQUAL(2, table->get_column_count());
 
-    table->insert_int(0, 0, 100);
-    table->insert_subtable(1, 0);
-    table->insert_done();
-
+    for (int i=0; i<5; i++) {
+        table->insert_int(0, i, 100);
+        table->insert_subtable(1, i);
+        table->insert_done();
+    }
     TableRef subtable = table->get_subtable(1, 0);
     subtable->insert_int(0, 0, 11);
     subtable->insert_string(1, 0, "a");
@@ -2810,9 +2806,11 @@ TEST(TestQuerySubtable_bug)
     subtable->insert_done();
 
     Query q1 = table->where();
-    q1.subtable(2);
+    q1.subtable(1);
     q1.equal(2, true);
     q1.end_subtable();
+    string s = q1.validate();
+
     TableView t1 = q1.find_all(0, size_t(-1));
     CHECK_EQUAL(1, t1.size());
 }

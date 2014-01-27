@@ -11,8 +11,14 @@ Format:
 . Any other notes ....                   (internal changes)
 
 
+2014-01-27 (Brian Munkholm)
+! Fixed bug in Query with subtables. Whith empty subtables query returned incorrect results.
+  In debug mode it could assert when querying a subtable with more columns than the base table.
+
+
 2014-01-07 (Kenneth Geisshirt)
 + Table::range() added. The method returns a set of rows as a TableView.
+
 
 2014-01-06 (Kristian Spangsege)
 ! 'No parent info in shared specs' conflicts with implementation of `Group::commit()`.
