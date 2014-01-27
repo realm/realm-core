@@ -320,14 +320,14 @@ public:
         aggr_min,
         aggr_max
     };
-    
+
     // Simple pivot aggregate method. Experimental! Please do not document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result, const Array* viewrefs=NULL) const;
 
 
 private:
     template <class T> std::size_t find_first(std::size_t column_ndx, T value) const; // called by above methods
-    template <class T> ConstTableView find_all(size_t column_ndx, T value) const;
+    template <class T> TableView find_all(size_t column_ndx, T value);
 public:
 
 
