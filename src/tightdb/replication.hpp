@@ -127,8 +127,8 @@ public:
     //
     //   N  New top level table
     //   T  Select table
-    //   S  Select desscriptor from currently selected root table
-    //   O  Add column to selected descriptor
+    //   S  Select descriptor from currently selected root table
+    //   O  Insert column into selected descriptor
     //   P  Remove column from selected descriptor
     //   Q  Rename column in selected descriptor
     //   s  Set value
@@ -144,7 +144,8 @@ public:
     struct subtable_tag {};
 
     void new_top_level_table(StringData name);
-    void add_column (const Table*, const Spec*, DataType, StringData name);
+    void insert_column (const Table*, const Spec*, std::size_t column_ndx,
+                        DataType type, StringData name);
     void remove_column (const Table*, const Spec*, std::size_t column_ndx);
     void rename_column (const Table*, const Spec*, std::size_t column_ndx, StringData name);
 
@@ -634,11 +635,11 @@ inline void Replication::new_top_level_table(StringData name)
 }
 
 
-inline void Replication::add_column(const Table* table, const Spec* spec,
-                                    DataType type, StringData name)
+inline void Replication::insert_column(const Table* table, const Spec* spec,
+                                       std::size_t column_ndx, DataType type, StringData name)
 {
     check_spec(table, spec); // Throws
-    simple_cmd('O', util::tuple(int(type), name.size())); // Throws
+    simple_cmd('O', util::tuple(column_ndx, int(type), name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
 }
 

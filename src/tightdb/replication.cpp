@@ -746,19 +746,22 @@ void Replication::TransactLogApplier::apply()
                 break;
             }
 
-            case 'O': { // Add column to selected descriptor
+            case 'O': { // Insert column into selected descriptor
+                size_t column_ndx = read_int<size_t>(); // Throws
                 int type = read_int<int>(); // Throws
-                if (!is_valid_column_type(type))
-                    goto bad_transact_log;
                 read_string(m_string_buffer); // Throws
                 StringData name(m_string_buffer.data(), m_string_buffer.size());
                 if (!desc)
                     goto bad_transact_log;
+                if (column_ndx > desc->get_column_count())
+                    goto bad_transact_log;
+                if (!is_valid_column_type(type))
+                    goto bad_transact_log;
 #ifdef TIGHTDB_DEBUG
                 if (m_log)
-                    *m_log << "desc->add_column("<<type<<", \""<<name<<"\")\n";
+                    *m_log << "desc->insert_column("<<column_ndx<<", "<<type<<", \""<<name<<"\")\n";
 #endif
-                _impl::TableFriend::add_column(*desc, DataType(type), name);
+                _impl::TableFriend::insert_column(*desc, column_ndx, DataType(type), name);
                 break;
             }
 

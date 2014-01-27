@@ -64,42 +64,89 @@ void Spec::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
         m_enumkeys.update_from_parent(old_baseline);
 }
 
-size_t Spec::add_column(DataType type, StringData name, ColumnAttr attr)
+ref_type Spec::create_empty_spec(Allocator& alloc)
 {
-    m_names.add(name);
-    m_spec.add(type);
-    m_attr.add(attr); // TODO: add to replication log
+    // The 'spec_set' contains the specification (types and names) of
+    // all columns and sub-tables
+    Array spec_set(alloc);
+    spec_set.create(Array::type_HasRefs); // Throws
+    try {
+        size_t size = 0;
+        int_fast64_t value = 0;
+        // One type for each column
+        ref_type types_ref = Array::create_array(Array::type_Normal, size, value, alloc); // Throws
+        try {
+            int_fast64_t v = types_ref; // FIXME: Dangerous case: unsigned -> signed
+            spec_set.add(v); // Throws
+        }
+        catch (...) {
+            Array::destroy(types_ref, alloc);
+            throw;
+        }
+        // One name for each column
+        ref_type names_ref = ArrayString::create_array(size, alloc); // Throws
+        try {
+            int_fast64_t v = names_ref; // FIXME: Dangerous case: unsigned -> signed
+            spec_set.add(v); // Throws
+        }
+        catch (...) {
+            Array::destroy(names_ref, alloc);
+            throw;
+        }
+        // One attrib set for each column
+        ref_type attribs_ref = ArrayString::create_array(size, alloc); // Throws
+        try {
+            int_fast64_t v = attribs_ref; // FIXME: Dangerous case: unsigned -> signed
+            spec_set.add(v); // Throws
+        }
+        catch (...) {
+            Array::destroy(attribs_ref, alloc);
+            throw;
+        }
+    }
+    catch (...) {
+        spec_set.destroy();
+        throw;
+    }
+    return spec_set.get_ref();
+}
+
+void Spec::insert_column(size_t column_ndx, DataType type, StringData name, ColumnAttr attr)
+{
+    TIGHTDB_ASSERT(column_ndx <= m_spec.size());
+
+    m_names.insert(column_ndx, name); // Throws
+    m_spec.insert(column_ndx, type); // Throws
+    // FIXME: So far, attributes are never reported to the replication system
+    m_attr.insert(column_ndx, attr); // Throws
 
     if (type == type_Table) {
-        // SubSpecs array is only there when there are subtables
+        Allocator& alloc = m_top.get_alloc();
+        // `m_subspecs` array is only present when the spec contains a subtable column
         if (!m_subspecs.is_attached()) {
-            m_subspecs.create(Array::type_HasRefs);
+            ref_type subspecs_ref = Array::create_empty_array(Array::type_HasRefs, alloc); // Throws
+            Array::DestroyGuard dg(subspecs_ref, alloc);
             if (m_top.size() == 3) {
-                m_top.add(m_subspecs.get_ref());
+                m_top.add(subspecs_ref); // Throws
             }
             else {
-                m_top.set(3, m_subspecs.get_ref());
+                m_top.set(3, subspecs_ref); // Throws
             }
+            m_subspecs.init_from_ref(subspecs_ref);
             m_subspecs.set_parent(&m_top, 3);
+            dg.release();
         }
 
-        Allocator& alloc = m_top.get_alloc();
-
-        // Create spec for new subtable
-        Array spec(Array::type_Normal, 0, 0, alloc);
-        ArrayString names(0, 0, alloc);
-        Array attr(Array::type_Normal, 0, 0, alloc);
-        Array spec_set(Array::type_HasRefs, 0, 0, alloc);
-        spec_set.add(spec.get_ref());
-        spec_set.add(names.get_ref());
-        spec_set.add(attr.get_ref());
-
-        // Add to list of subspecs
-        ref_type ref = spec_set.get_ref();
-        m_subspecs.add(ref);
+        // Add a new empty spec to `m_subspecs`
+        {
+            ref_type subspec_ref = create_empty_spec(alloc); // Throws
+            Array::DestroyGuard dg(subspec_ref, alloc);
+            size_t subspec_ndx = column_ndx == get_column_count() ?
+                get_num_subspecs() : get_subspec_ndx(column_ndx);
+            m_subspecs.insert(subspec_ndx, subspec_ref); // Throws
+            dg.release();
+        }
     }
-
-    return m_names.size() - 1; // column_ndx
 }
 
 void Spec::remove_column(size_t column_ndx)
@@ -135,14 +182,17 @@ void Spec::remove_column(size_t column_ndx)
 
 size_t Spec::get_subspec_ndx(size_t column_ndx) const TIGHTDB_NOEXCEPT
 {
-    // The subspec array only keep info for subtables
-    // so we need to count up to it's position
-    size_t pos = 0;
-    for (size_t i = 0; i < column_ndx; ++i) {
+    TIGHTDB_ASSERT(column_ndx < get_column_count());
+    TIGHTDB_ASSERT(get_column_type(column_ndx) == type_Table);
+
+    // The m_subspecs array only keep info for subtables so we need to
+    // count up to it's position
+    size_t subspec_ndx = 0;
+    for (size_t i = 0; i != column_ndx; ++i) {
         if (ColumnType(m_spec.get(i)) == col_type_Table)
-            ++pos;
+            ++subspec_ndx;
     }
-    return pos;
+    return subspec_ndx;
 }
 
 void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,

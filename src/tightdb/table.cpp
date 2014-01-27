@@ -70,6 +70,19 @@ void Table::add_column(DataType type, StringData name, DescriptorRef& subdesc)
     get_descriptor()->add_column(type, name, subdesc); // Throws
 }
 
+void Table::insert_column(size_t column_ndx, DataType type, StringData name)
+{
+    TIGHTDB_ASSERT(!has_shared_type());
+    get_descriptor()->insert_column(column_ndx, type, name); // Throws
+}
+
+void Table::insert_column(size_t column_ndx, DataType type, StringData name,
+                          DescriptorRef& subdesc)
+{
+    TIGHTDB_ASSERT(!has_shared_type());
+    get_descriptor()->insert_column(column_ndx, type, name, subdesc); // Throws
+}
+
 void Table::remove_column(size_t column_ndx)
 {
     TIGHTDB_ASSERT(!has_shared_type());
@@ -191,23 +204,30 @@ void Table::init_from_ref(ConstSubspecRef shared_spec, ref_type columns_ref,
 }
 
 
-struct Table::AddSubtableColumns: Table::SubtableUpdater {
-    AddSubtableColumns(DataType t): m_type(t) {}
+struct Table::InsertSubtableColumns: Table::SubtableUpdater {
+    InsertSubtableColumns(size_t i, DataType t):
+        m_column_ndx(i), m_type(t)
+    {
+    }
     void update(const ColumnTable& subtables, size_t row_ndx, Array& subcolumns) TIGHTDB_OVERRIDE
     {
         size_t subtable_size = subtables.get_subtable_size(row_ndx);
         Allocator& alloc = subcolumns.get_alloc();
         ref_type column_ref = create_column(m_type, subtable_size, alloc); // Throws
         Array::DestroyGuard dg(column_ref, alloc);
-        subcolumns.add(column_ref); // Throws
+        subcolumns.insert(m_column_ndx, column_ref); // Throws
         dg.release();
     }
 private:
+    const size_t m_column_ndx;
     const DataType m_type;
 };
 
 struct Table::RemoveSubtableColumns: Table::SubtableUpdater {
-    RemoveSubtableColumns(size_t i): m_column_ndx(i) {}
+    RemoveSubtableColumns(size_t i):
+        m_column_ndx(i)
+    {
+    }
     void update(const ColumnTable&, size_t, Array& subcolumns) TIGHTDB_OVERRIDE
     {
         ref_type column_ref = subcolumns.get(m_column_ndx);
@@ -218,28 +238,30 @@ private:
     const size_t m_column_ndx;
 };
 
-void Table::do_add_column(const Descriptor& desc, DataType type, StringData name)
+void Table::do_insert_column(const Descriptor& desc, size_t column_ndx,
+                             DataType type, StringData name)
 {
     TIGHTDB_ASSERT(desc.is_attached());
 
     Table& root_table = *desc.m_root_table;
     TIGHTDB_ASSERT(!root_table.has_shared_type());
+    TIGHTDB_ASSERT(column_ndx <= desc.m_spec->get_column_count());
 
     root_table.detach_subtable_accessors();
 
     if (desc.is_root()) {
-        root_table.add_root_column(type, name); // Throws
+        root_table.insert_root_column(column_ndx, type, name); // Throws
     }
     else {
-        desc.m_spec->add_column(type, name); // Throws
+        desc.m_spec->insert_column(column_ndx, type, name); // Throws
         if (!root_table.is_empty()) {
-            AddSubtableColumns updater(type);
+            InsertSubtableColumns updater(column_ndx, type);
             update_subtables(desc, updater); // Throws
         }
     }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    root_table.transact_log().add_column(*desc.m_spec, type, name); // Throws
+    root_table.transact_log().insert_column(*desc.m_spec, column_ndx, type, name); // Throws
 #endif
 }
 
@@ -249,6 +271,7 @@ void Table::do_remove_column(const Descriptor& desc, size_t column_ndx)
 
     Table& root_table = *desc.m_root_table;
     TIGHTDB_ASSERT(!root_table.has_shared_type());
+    TIGHTDB_ASSERT(column_ndx < desc.m_spec->get_column_count());
 
     root_table.detach_subtable_accessors();
 
@@ -274,6 +297,7 @@ void Table::do_rename_column(const Descriptor& desc, size_t column_ndx, StringDa
 
     Table& root_table = *desc.m_root_table;
     TIGHTDB_ASSERT(!root_table.has_shared_type());
+    TIGHTDB_ASSERT(column_ndx < desc.m_spec->get_column_count());
 
     root_table.detach_subtable_accessors();
     desc.m_spec->rename_column(column_ndx, name); // Throws
@@ -289,17 +313,18 @@ size_t Table::get_num_subdescs(const Descriptor& desc) TIGHTDB_NOEXCEPT
 }
 
 
-void Table::add_root_column(DataType type, StringData name)
+void Table::insert_root_column(size_t column_ndx, DataType type, StringData name)
 {
     // Add the column to the spec
-    m_spec.add_column(type, name); // Throws
+    m_spec.insert_column(column_ndx, type, name); // Throws
+
+    Spec::ColumnInfo info;
+    m_spec.get_column_info(column_ndx, info);
 
     Allocator& alloc = m_columns.get_alloc();
     ref_type ref = 0;
-    size_t column_ndx = m_cols.size();
     Array* parent = &m_columns;
-    size_t orig_columns_size = m_columns.size();
-    size_t ndx_in_parent = orig_columns_size;
+    size_t ndx_in_parent = info.m_column_ref_ndx;
     UniquePtr<ColumnBase> new_col;
 
     try {
@@ -344,16 +369,17 @@ void Table::add_root_column(DataType type, StringData name)
         TIGHTDB_ASSERT(false);
 
       add:
-        m_columns.add(new_col->get_ref()); // Throws
+        m_columns.insert(ndx_in_parent, new_col->get_ref()); // Throws
         try {
             // FIXME: intptr_t is not guaranteed to exists, even in
             // C++11. Solve this by changing the type of
             // `Table::m_cols` to `std::vector<ColumnBase*>`. Also
             // change its name to `Table::m_column_accessors`.
             m_cols.add(intptr_t(new_col.get())); // Throws
+            new_col.release();
         }
         catch (...) {
-            m_columns.truncate(orig_columns_size); // Guaranteed to not throw
+            m_columns.erase(ndx_in_parent); // Guaranteed to not throw
             throw;
         }
     }
@@ -362,8 +388,6 @@ void Table::add_root_column(DataType type, StringData name)
             Array::destroy(ref, alloc);
         throw;
     }
-
-    new_col.release();
 }
 
 

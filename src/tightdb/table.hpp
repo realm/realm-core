@@ -146,7 +146,7 @@ public:
     ///
     /// These function must be called only for tables with independent
     /// dynamic type. A table has independent dynamic type if the
-    /// function has_shared_type() returns false. A tables that is a
+    /// function has_shared_type() returns false. A table that is a
     /// direct member of a group has independent dynamic type. So does
     /// a free-standing table, and a subtable in a column of type
     /// 'mixed'. All other tables have shared dynamic type. The
@@ -168,6 +168,9 @@ public:
     /// \sa Descriptor::add_column()
     std::size_t add_column(DataType type, StringData name);
     void add_column(DataType type, StringData name, DescriptorRef& subdesc);
+    void insert_column(std::size_t column_ndx, DataType type, StringData name);
+    void insert_column(std::size_t column_ndx, DataType type, StringData name,
+                       DescriptorRef& subdesc);
     void remove_column(std::size_t column_ndx);
     void rename_column(std::size_t column_ndx, StringData new_name);
     //@}
@@ -585,16 +588,17 @@ private:
                        ArrayParent* parent, std::size_t ndx_in_parent);
 
     // Detaches all subtable accessors
-    static void do_add_column(const Descriptor&, DataType type, StringData name);
+    static void do_insert_column(const Descriptor&, std::size_t column_ndx,
+                                 DataType type, StringData name);
     static void do_remove_column(const Descriptor&, std::size_t column_ndx);
     static void do_rename_column(const Descriptor&, std::size_t column_ndx, StringData name);
 
     static std::size_t get_num_subdescs(const Descriptor&) TIGHTDB_NOEXCEPT;
 
-    struct AddSubtableColumns;
+    struct InsertSubtableColumns;
     struct RemoveSubtableColumns;
 
-    void add_root_column(DataType type, StringData name);
+    void insert_root_column(std::size_t column_ndx, DataType type, StringData name);
     void remove_root_column(std::size_t column_ndx);
 
     struct SubtableUpdater {
@@ -604,8 +608,6 @@ private:
     static void update_subtables(const Descriptor&, SubtableUpdater&);
     void update_subtables(const std::size_t* path_begin, const std::size_t* path_end,
                           SubtableUpdater&);
-
-    void add_column_to_subtables(std::size_t* path_begin, std::size_t* path_end, DataType);
 
     void create_columns();
     void cache_columns();
@@ -1132,10 +1134,10 @@ struct Table::LocalTransactLog {
             m_repl->optimize_table(m_table); // Throws
     }
 
-    void add_column(const Spec& spec, DataType type, StringData name)
+    void insert_column(const Spec& spec, std::size_t column_ndx, DataType type, StringData name)
     {
         if (m_repl)
-            m_repl->add_column(m_table, &spec, type, name); // Throws
+            m_repl->insert_column(m_table, &spec, column_ndx, type, name); // Throws
     }
 
     void remove_column(const Spec& spec, std::size_t column_ndx)
@@ -1257,9 +1259,10 @@ public:
 
     static void add_column_to_spec(Table& table, Spec& spec, DataType type, StringData name)
     {
-        spec.add_column(type, name); // Throws
+        std::size_t column_ndx = spec.get_column_count();
+        spec.insert_column(column_ndx, type, name); // Throws
 #ifdef TIGHTDB_ENABLE_REPLICATION
-        table.transact_log().add_column(spec, type, name); // Throws
+        table.transact_log().insert_column(spec, column_ndx, type, name); // Throws
 #else
         static_cast<void>(table);
 #endif
@@ -1280,9 +1283,10 @@ public:
         return table.record_subtable_path(begin, end);
     }
 
-    static void add_column(const Descriptor& desc, DataType type, StringData name)
+    static void insert_column(const Descriptor& desc, std::size_t column_ndx,
+                              DataType type, StringData name)
     {
-        Table::do_add_column(desc, type, name); // Throws
+        Table::do_insert_column(desc, column_ndx, type, name); // Throws
     }
 
     static void remove_column(const Descriptor& desc, std::size_t column_ndx)

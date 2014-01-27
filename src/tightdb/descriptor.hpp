@@ -29,53 +29,6 @@
 
 namespace tightdb {
 
-/*
-
-FIXME: Add test/test_descriptor.cpp
-
-FIXME: Add documentation.
-
-FIXME: Fix language bindings.
-
-
-
-Next step is to simplify and speed up things by merging Spec and
-Descriptor classes as follows:
-
-- Replace `Spec Table::m_spec` with `DescriptorRef
-  Table::m_descriptor`. Multiple subtable accessors will refer to a
-  shared descriptor. A table accessor will always keep the descriptor
-  accesssor alive. An app that holds on to a descriptor accessor, will
-  keep the root table accessor alive, but not the subtable accessors
-  of the root table.
-
-- Change `Spec::m_subspecs` such that it is indexed by logical column
-  index (for speed). It should still be empty if there are no subtable
-  columns.
-
-- Remove `Descriptor::m_subspec_map` since it is now made redundant by
-  `Spec::m_subspecs`.
-
-- Remove `Descriptor::m_subspec_map` since it is now made redundant by
-  `Spec::m_subspecs`.
-
-- Remove `Descriptor::record_subdesc_path()`since it is now made
-  redundant by `Spec::record_subspec_path()`.
-
-- Make sure there is a distinct column accessor class for each logical
-  column type. For example, add a class `BooleanColumn` as a subclass
-  of `Column` (IntegerColumn).
-
-- Add `virtual ColumnBase::check_type(type)` and
-  `LangBindHelper::check_column_type(column_ndx, data_type)`.
-
-This can be done without changing the public API, but it does rely
-(weakly) on a BREAKING CHANGE OF FILE FORMAT!
-
-*/
-
-
-
 
 /// Accessor for table type descriptors.
 ///
@@ -133,7 +86,7 @@ public:
     /// returns `not_found`.
     std::size_t get_column_index(StringData name) const TIGHTDB_NOEXCEPT;
 
-    /// Add a new column to the each of the associated tables.
+    /// Add a new column to each of the associated tables.
     ///
     /// This function modifies the dynamic type of all the tables that
     /// share this descriptor. It does this by appending a new column
@@ -153,6 +106,29 @@ public:
     /// `type_Table`, then a reference to the descriptor of the new
     /// subtable column is stored in \a subdesc.
     void add_column(DataType type, StringData name, DescriptorRef& subdesc);
+
+    /// Insert a new column into each of the associated tables.
+    ///
+    /// This function modifies the dynamic type of all the tables that
+    /// share this descriptor. It does this by inserting a new column
+    /// with the specified name and type into the descriptor at the
+    /// specified index, and into each of the tables that share this
+    /// descriptor.
+    ///
+    /// This function will detach all accessors of subtables of the
+    /// root table. Only the accessor of the root table will remain
+    /// attached. The root table is the table associated with the root
+    /// descriptor.
+    ///
+    /// \sa is_root()
+    /// \sa Table::insert_column()
+    void insert_column(std::size_t column_ndx, DataType type, StringData name);
+
+    /// Same as insert_column(column_ndx, type, name), but if the type
+    /// is `type_Table`, then a reference to the descriptor of the new
+    /// subtable column is stored in \a subdesc.
+    void insert_column(std::size_t column_ndx, DataType type, StringData name,
+                       DescriptorRef& subdesc);
 
     /// Remove the specified column from each of the associated
     /// tables.
@@ -217,14 +193,14 @@ public:
     /// the parent descriptor.
     ///
     /// \sa is_root()
-    DescriptorRef get_parent_descriptor() TIGHTDB_NOEXCEPT;
-    ConstDescriptorRef get_parent_descriptor() const TIGHTDB_NOEXCEPT;
+    DescriptorRef get_parent() TIGHTDB_NOEXCEPT;
+    ConstDescriptorRef get_parent() const TIGHTDB_NOEXCEPT;
     //@}
 
     //@{
     /// Get the table associated with the root descriptor.
     ///
-    /// \sa get_parent_descriptor()
+    /// \sa get_parent()
     /// \sa is_root()
     TableRef get_root_table() TIGHTDB_NOEXCEPT;
     ConstTableRef get_root_table() const TIGHTDB_NOEXCEPT;
@@ -395,15 +371,22 @@ inline std::size_t Descriptor::get_column_index(StringData name) const TIGHTDB_N
 
 inline void Descriptor::add_column(DataType type, StringData name)
 {
-    TIGHTDB_ASSERT(is_attached());
-    _impl::TableFriend::add_column(*this, type, name); // Throws
+    std::size_t column_ndx = get_column_count();
+    insert_column(column_ndx, type, name); // Throws
 }
 
 inline void Descriptor::add_column(DataType type, StringData name, DescriptorRef& subdesc)
 {
-    add_column(type, name); // Throws
+    std::size_t column_ndx = get_column_count();
+    insert_column(column_ndx, type, name, subdesc); // Throws
+}
+
+inline void Descriptor::insert_column(std::size_t column_ndx, DataType type, StringData name,
+                                      DescriptorRef& subdesc)
+{
+    insert_column(column_ndx, type, name); // Throws
     if (type == type_Table)
-        subdesc = get_subdescriptor(get_column_count()-1);
+        subdesc = get_subdescriptor(column_ndx);
 }
 
 inline void Descriptor::rename_column(std::size_t column_ndx, StringData name)
@@ -417,14 +400,14 @@ inline ConstDescriptorRef Descriptor::get_subdescriptor(std::size_t column_ndx) 
     return const_cast<Descriptor*>(this)->get_subdescriptor(column_ndx);
 }
 
-inline DescriptorRef Descriptor::get_parent_descriptor() TIGHTDB_NOEXCEPT
+inline DescriptorRef Descriptor::get_parent() TIGHTDB_NOEXCEPT
 {
     return m_parent;
 }
 
-inline ConstDescriptorRef Descriptor::get_parent_descriptor() const TIGHTDB_NOEXCEPT
+inline ConstDescriptorRef Descriptor::get_parent() const TIGHTDB_NOEXCEPT
 {
-    return const_cast<Descriptor*>(this)->get_parent_descriptor();
+    return const_cast<Descriptor*>(this)->get_parent();
 }
 
 inline TableRef Descriptor::get_root_table() TIGHTDB_NOEXCEPT

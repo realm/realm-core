@@ -39,7 +39,8 @@ public:
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT;
 
-    std::size_t add_column(DataType type, StringData name, ColumnAttr attr = col_attr_None);
+    void insert_column(std::size_t column_ndx, DataType type, StringData name,
+                       ColumnAttr attr = col_attr_None);
     void rename_column(std::size_t column_ndx, StringData new_name);
 
     /// Erase the column at the specified index, and move columns at
@@ -221,53 +222,6 @@ inline std::size_t Spec::get_num_subspecs() const TIGHTDB_NOEXCEPT
     return m_subspecs.is_attached() ? m_subspecs.size() : 0;
 }
 
-inline ref_type Spec::create_empty_spec(Allocator& alloc)
-{
-    // The 'spec_set' contains the specification (types and names) of
-    // all columns and sub-tables
-    Array spec_set(alloc);
-    spec_set.create(Array::type_HasRefs); // Throws
-    try {
-        std::size_t size = 0;
-        int_fast64_t value = 0;
-        // One type for each column
-        ref_type types_ref = Array::create_array(Array::type_Normal, size, value, alloc); // Throws
-        try {
-            int_fast64_t v = types_ref; // FIXME: Dangerous case: unsigned -> signed
-            spec_set.add(v); // Throws
-        }
-        catch (...) {
-            Array::destroy(types_ref, alloc);
-            throw;
-        }
-        // One name for each column
-        ref_type names_ref = ArrayString::create_array(size, alloc); // Throws
-        try {
-            int_fast64_t v = names_ref; // FIXME: Dangerous case: unsigned -> signed
-            spec_set.add(v); // Throws
-        }
-        catch (...) {
-            Array::destroy(names_ref, alloc);
-            throw;
-        }
-        // One attrib set for each column
-        ref_type attribs_ref = ArrayString::create_array(size, alloc); // Throws
-        try {
-            int_fast64_t v = attribs_ref; // FIXME: Dangerous case: unsigned -> signed
-            spec_set.add(v); // Throws
-        }
-        catch (...) {
-            Array::destroy(attribs_ref, alloc);
-            throw;
-        }
-    }
-    catch (...) {
-        spec_set.destroy();
-        throw;
-    }
-    return spec_set.get_ref();
-}
-
 
 inline Spec::Spec(SubspecRef r) TIGHTDB_NOEXCEPT:
     m_top(r.m_parent->get_alloc()), m_spec(r.m_parent->get_alloc()),
@@ -352,9 +306,6 @@ inline void Spec::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIG
 inline void Spec::rename_column(std::size_t column_ndx, StringData new_name)
 {
     TIGHTDB_ASSERT(column_ndx < m_spec.size());
-
-    //TODO: Verify that new name is valid
-
     m_names.set(column_ndx, new_name);
 }
 

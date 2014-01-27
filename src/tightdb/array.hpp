@@ -371,6 +371,10 @@ public:
     /// be initialized to the specified value.
     static ref_type create_array(Type, std::size_t size, int_fast64_t value, Allocator&);
 
+    /// Construct an empty array of the specified type, and return
+    /// just the reference to the underlying memory.
+    static ref_type create_empty_array(Type, Allocator&);
+
     // Parent tracking
     bool has_parent() const TIGHTDB_NOEXCEPT;
     ArrayParent* get_parent() const TIGHTDB_NOEXCEPT;
@@ -1851,6 +1855,13 @@ inline ref_type Array::create_array(Type type, std::size_t size, int_fast64_t va
                                     Allocator& alloc)
 {
     return create_array(type, wtype_Bits, size, value, alloc); // Throws
+}
+
+inline ref_type Array::create_empty_array(Type type, Allocator& alloc)
+{
+    std::size_t size = 0;
+    int_fast64_t value = 0;
+    return create_array(type, size, value, alloc); // Throws
 }
 
 inline bool Array::has_parent() const TIGHTDB_NOEXCEPT

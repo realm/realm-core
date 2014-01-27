@@ -5,10 +5,30 @@ using namespace tightdb;
 using namespace tightdb::util;
 
 
+void Descriptor::insert_column(size_t column_ndx, DataType type, StringData name)
+{
+    TIGHTDB_ASSERT(is_attached());
+    _impl::TableFriend::insert_column(*this, column_ndx, type, name); // Throws
+
+    // Adjust the column indexes of subdescriptor accessors at higher
+    // column indexes.
+    typedef subdesc_map::iterator iter;
+    iter end = m_subdesc_map.end();
+    for (iter i = m_subdesc_map.begin(); i != end; ++i) {
+        if (i->m_column_ndx >= column_ndx)
+            ++i->m_column_ndx;
+    }
+}
+
+
 void Descriptor::remove_column(size_t column_ndx)
 {
     TIGHTDB_ASSERT(is_attached());
     _impl::TableFriend::remove_column(*this, column_ndx); // Throws
+
+    // If it exists, remove and detach the subdescriptor accessor
+    // associated with the removed column. Also adjust the column
+    // indexes of subdescriptor accessors at higher column indexes.
     typedef subdesc_map::iterator iter;
     iter end = m_subdesc_map.end();
     iter erase = end;
