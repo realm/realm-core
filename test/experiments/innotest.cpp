@@ -43,11 +43,10 @@ int main(int argc, char* argv [])
                     
                     TableRef t = trx.get_table("test");
                     
-                    size_t key = rand() % 1000000;
-                    size_t ndx = t->lower_bound_int(0, key);
+                    size_t ndx = rand() % 1000000;
                     
-                    StringData str = t->get_string(1, ndx);
-                    t->set_string(1, ndx, str);
+                    int v = t->get_int(0, ndx);
+                    t->set_int(0, ndx, v + 1);
                     trx.commit();
                 }
                 else {
@@ -55,11 +54,10 @@ int main(int argc, char* argv [])
                     
                     ConstTableRef t = trx.get_table("test");
                     
-                    size_t key = rand() % 1000000;
-                    size_t ndx = t->lower_bound_int(0, key);
-                    
-                    StringData str = t->get_string(1, ndx);
-                    const char* s = str.data();         
+                    size_t ndx = rand() % 1000000;
+                    volatile int v;
+                    v = t->get_int(0, ndx);
+                    (void) v;
                 }
             }
         }
