@@ -19,7 +19,7 @@
 #  include <windows.h>
 #endif
 
-#define TIGHTDB_ENABLE_LOGFILE
+//#define TIGHTDB_ENABLE_LOGFILE
 
 
 using namespace std;
@@ -123,7 +123,7 @@ public:
     Atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
     uint32_t old_pos; // only accessed during write transactions and under lock
 
-    const static int init_readers_size = 4;
+    const static int init_readers_size = 32;
     ReadCount data[init_readers_size];
 
     Ringbuffer()
@@ -483,6 +483,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
         File::UnmapGuard fug_2(m_reader_map);
 
         SharedInfo* info = m_file_map.get_addr();
+        m_local_max_entry = 0;
+        m_version = 0;
         SlabAlloc& alloc = m_group.m_alloc;
 
         // If we are the process that *Created* the coordination buffer, we are obliged to
@@ -999,6 +1001,7 @@ void SharedGroup::commit()
     TIGHTDB_ASSERT(m_transact_stage == transact_Writing);
 
     SharedInfo* info = m_file_map.get_addr();
+    SharedInfo* r_info = m_reader_map.get_addr();
 
     // FIXME: ExceptionSafety: Corruption has happened if
     // low_level_commit() throws, because we have already told the
@@ -1015,14 +1018,14 @@ void SharedGroup::commit()
         // fails, then the transaction is not completed. A subsequent call
         // to rollback() must roll it back.
         if (Replication* repl = m_group.get_replication()) {
-            uint_fast64_t current_version = info->get_current_version_unchecked();
+            uint_fast64_t current_version = r_info->get_current_version_unchecked();
             new_version = repl->commit_write_transact(*this, current_version); // Throws
         }
         else {
-            new_version = info->get_current_version_unchecked() + 1;
+            new_version = r_info->get_current_version_unchecked() + 1;
         }
 #else
-        new_version = info->get_current_version_unchecked() + 1;
+        new_version = r_info->get_current_version_unchecked() + 1;
 #endif
         // Reset version tracking in group if we are
         // starting from a new lock file
@@ -1114,7 +1117,14 @@ bool SharedGroup::grow_reader_mapping(uint32_t index)
         SharedInfo* r_info = m_reader_map.get_addr();
         m_local_max_entry = r_info->readers.get_num_entries();
         size_t infosize = sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
+        // cout << "Growing reader mapping to " << infosize << endl;
         m_reader_map.remap(m_file, util::File::access_ReadWrite, infosize); // Throws
+        /*
+        SharedInfo* r_info_2 = m_reader_map.get_addr();
+        if (r_info != r_info_2)
+            cout << "Changing reader map base address to " << r_info_2 
+                 << " from " << r_info << endl;
+        */
         return true;
     }
     else
@@ -1123,14 +1133,28 @@ bool SharedGroup::grow_reader_mapping(uint32_t index)
 
 uint64_t SharedGroup::get_current_version()
 {
-    SharedInfo* r_info = m_reader_map.get_addr();
-    uint32_t index;
-    do {
-        index = r_info->readers.last();
-    } while (grow_reader_mapping(index));
+    // As get_current_version may be called outside of the write mutex, another
+    // thread may be performing changes to the ringbuffer concurrently. It may
+    // even cleanup and recycle the current entry from under our feet, so we need
+    // to protect the entry by temporarily increment its reader ref count until
+    // we've got a safe reading of the version number.
+    while (1) {
+        uint32_t index;
+        SharedInfo* r_info;
+        do {
+            r_info = m_reader_map.get_addr();
+            index = r_info->readers.last();
+        } while (grow_reader_mapping(index));
 
-    r_info = m_reader_map.get_addr();
-    return r_info->readers.get(index).version;
+        const Ringbuffer::ReadCount& r = r_info->readers.get(index);
+        if (atomic_inc_if_nz(r.count) == 0) {
+            cout << "ODD: starting over after trying to 'lock' cleared entry" << endl;
+            continue;
+        }
+        uint64_t version = r.version;
+        atomic_dec(r.count);
+        return version;
+    }
 }
 
 void SharedGroup::low_level_commit(uint64_t new_version)
@@ -1170,9 +1194,9 @@ void SharedGroup::low_level_commit(uint64_t new_version)
         if (r_info->readers.is_full()) {
             // buffer expansion
             uint32_t entries = r_info->readers.get_num_entries();
-            entries = entries + 4;
+            entries = entries + 32;
             size_t new_info_size = sizeof(SharedInfo) + r_info->readers.compute_required_space( entries );
-            cout << "resizing: " << entries << " = " << new_info_size << endl;
+            // cout << "resizing: " << entries << " = " << new_info_size << endl;
             m_file.prealloc(0, new_info_size); // Throws
             m_reader_map.remap(m_file, util::File::access_ReadWrite, new_info_size); // Throws
             r_info = m_reader_map.get_addr();
