@@ -513,6 +513,8 @@ public:
     T load() const;
     T load_acquire() const;
     T load_relaxed() const;
+    T fetch_sub_relaxed(T v);
+    T fetch_add_acquire(T v);
     void store(T value);
     void store_release(T value);
     void store_relaxed(T value);
@@ -556,6 +558,18 @@ template<typename T>
 inline T Atomic<T>::load_relaxed() const
 {
     return state.load(std::memory_order_relaxed);
+}
+
+template<typename T>
+inline T Atomic<T>::fetch_sub_relaxed(T v)
+{
+    return state.fetch_sub(v, std::memory_order_relaxed);
+}
+
+template<typename T>
+inline T Atomic<T>::fetch_add_acquire(T v)
+{
+    return state.fetch_add(v, std::memory_order_acquire);
 }
 
 template<typename T>
@@ -677,6 +691,28 @@ inline T Atomic<T>::load() const
 }
 
 template<typename T>
+inline T Atomic<T>::fetch_sub_relaxed(T v)
+{
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
+    return __atomic_fetch_sub(&state, v, __ATOMIC_RELAXED);
+#else
+    return __sync_fetch_and_sub(&state, v);
+#endif
+}
+
+template<typename T>
+inline T Atomic<T>::fetch_add_acquire(T v)
+{
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
+    return __atomic_fetch_add(&state, v, __ATOMIC_ACQUIRE);
+#else
+    return __sync_fetch_and_add(&state, v);
+#endif
+}
+
+
+
+template<typename T>
 inline void Atomic<T>::store(T value)
 {
 #if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
@@ -726,14 +762,14 @@ inline void Atomic<T>::store_relaxed(T value)
 template<typename T>
 inline bool Atomic<T>::compare_and_swap(T& oldvalue, T newvalue)
 {
-//#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
-//    return __atomic_compare_exchange_n(&state, &oldvalue, newvalue, true, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
-//#else
+#if TIGHTDB_HAVE_AT_LEAST_GCC(4, 7)
+    return __atomic_compare_exchange_n(&state, &oldvalue, newvalue, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
+#else
     T ov = oldvalue;
     oldvalue = __sync_val_compare_and_swap(&state, oldvalue, newvalue);
     return (ov == oldvalue);
     
-//#endif
+#endif
 }
 
 
