@@ -2044,7 +2044,7 @@ size_t Table::find_first_binary(size_t, BinaryData) const
 }
 
 
-template <class T> ConstTableView Table::find_all(size_t column_ndx, T value) const
+template <class T> TableView Table::find_all(size_t column_ndx, T value)
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
     TableView tv(*this);
@@ -2060,67 +2060,61 @@ template <class T> ConstTableView Table::find_all(size_t column_ndx, T value) co
 
 TableView Table::find_all_int(size_t column_ndx, int64_t value)
 {
-    return const_cast<const Table*>(this)->find_all<int64_t>(column_ndx, value);
+    return find_all<int64_t>(column_ndx, value);
 }
 
 ConstTableView Table::find_all_int(size_t column_ndx, int64_t value) const
 {
-    return find_all<int64_t>(column_ndx, value);
+    return const_cast<Table*>(this)->find_all<int64_t>(column_ndx, value);
 }
 
 TableView Table::find_all_bool(size_t column_ndx, bool value)
 {
-    return const_cast<const Table*>(this)->find_all<bool>(column_ndx, value);
+    return find_all<bool>(column_ndx, value);
 }
 
 ConstTableView Table::find_all_bool(size_t column_ndx, bool value) const
 {
-    return find_all<int64_t>(column_ndx, value);
+    return const_cast<Table*>(this)->find_all<int64_t>(column_ndx, value);
 }
 
 
 TableView Table::find_all_float(size_t column_ndx, float value)
 {
-    return const_cast<const Table*>(this)->find_all<float>(column_ndx, value);
+    return find_all<float>(column_ndx, value);
 }
 
 ConstTableView Table::find_all_float(size_t column_ndx, float value) const
 {
-    return find_all<float>(column_ndx, value);
+    return const_cast<Table*>(this)->find_all<float>(column_ndx, value);
 }
 
 TableView Table::find_all_double(size_t column_ndx, double value)
 {
-    return const_cast<const Table*>(this)->find_all<double>(column_ndx, value);
+    return find_all<double>(column_ndx, value);
 }
 
 ConstTableView Table::find_all_double(size_t column_ndx, double value) const
 {
-    return find_all<double>(column_ndx, value);
+    return const_cast<Table*>(this)->find_all<double>(column_ndx, value);
 }
 
 TableView Table::find_all_datetime(size_t column_ndx, DateTime value)
 {
-    return const_cast<const Table*>(this)->find_all<int64_t>(column_ndx, static_cast<int64_t>(value.get_datetime()));
+    return find_all<int64_t>(column_ndx, static_cast<int64_t>(value.get_datetime()));
 }
 
 ConstTableView Table::find_all_datetime(size_t column_ndx, DateTime value) const
 {
-    return find_all<int64_t>(column_ndx, static_cast<int64_t>(value.get_datetime()));
+    return const_cast<Table*>(this)->find_all<int64_t>(column_ndx, static_cast<int64_t>(value.get_datetime()));
 }
 
 TableView Table::find_all_string(size_t column_ndx, StringData value)
 {
-    ConstTableView ctv = const_cast<const Table*>(this)->find_all_string(column_ndx, value);
-    return ctv;
-}
-
-ConstTableView Table::find_all_string(size_t column_ndx, StringData value) const
-{
     TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
 
     ColumnType type = get_real_column_type(column_ndx);
-    ConstTableView tv(*this);
+    TableView tv(*this);
 
     if(m_columns.is_attached()) {
         if (type == col_type_String) {
@@ -2134,6 +2128,11 @@ ConstTableView Table::find_all_string(size_t column_ndx, StringData value) const
         }
     }
     return tv;
+}
+
+ConstTableView Table::find_all_string(size_t column_ndx, StringData value) const
+{
+    return const_cast<Table*>(this)->find_all_string(column_ndx, value);
 }
 
 TableView Table::find_all_binary(size_t, BinaryData)
@@ -2150,20 +2149,13 @@ ConstTableView Table::find_all_binary(size_t, BinaryData) const
 
 TableView Table::get_distinct_view(size_t column_ndx)
 {
-    ConstTableView ctv = const_cast<const Table*>(this)->get_distinct_view(column_ndx);
-    return ctv;
-}
-
-ConstTableView Table::get_distinct_view(size_t column_ndx) const
-{
     TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
     TIGHTDB_ASSERT(has_index(column_ndx));
 
-    ConstTableView tv(*this);
+    TableView tv(*this);
     Array& refs = tv.get_ref_column();
 
-    if(m_columns.is_attached())
-    {
+    if(m_columns.is_attached()) {
         ColumnType type = get_real_column_type(column_ndx);
         if (type == col_type_String) {
             const AdaptiveStringColumn& column = get_column_string(column_ndx);
@@ -2180,17 +2172,16 @@ ConstTableView Table::get_distinct_view(size_t column_ndx) const
     return tv;
 }
 
-TableView Table::get_sorted_view(size_t column_ndx, bool ascending)
+ConstTableView Table::get_distinct_view(size_t column_ndx) const
 {
-    ConstTableView ctv = const_cast<const Table*>(this)->get_sorted_view(column_ndx, ascending);
-    return ctv;
+    return const_cast<Table*>(this)->get_distinct_view(column_ndx);
 }
 
-ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
+TableView Table::get_sorted_view(size_t column_ndx, bool ascending)
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || column_ndx < m_columns.size());
 
-    ConstTableView tv(*this);
+    TableView tv(*this);
 
     if(m_columns.is_attached()) {
         // Insert refs to all rows in table
@@ -2206,11 +2197,16 @@ ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
     return tv;
 }
 
+ConstTableView Table::get_sorted_view(size_t column_ndx, bool ascending) const
+{
+    return const_cast<Table*>(this)->get_sorted_view(column_ndx, ascending);
+}
+
 
 namespace {
 
 struct AggrState {
-    AggrState() : added_row(false) {}
+    AggrState() : block(Array::no_prealloc_tag()), added_row(false) {}
 
     const Table* table;
     const StringIndex* dst_index;
@@ -2501,17 +2497,12 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
     }
 }
 
-TableView Table::get_range_view(size_t start, size_t end)
-{
-    ConstTableView ctv = const_cast<const Table*>(this)->get_range_view(start, end);
-    return ctv;
-}
 
-ConstTableView Table::get_range_view(size_t start, size_t end) const
+TableView Table::get_range_view(size_t start, size_t end)
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || end < size());
 
-    ConstTableView ctv(*this);
+    TableView ctv(*this);
     if (m_columns.is_attached()) {
         Array& refs = ctv.get_ref_column();
         for (size_t i = start; i < end; ++i)
@@ -2519,6 +2510,12 @@ ConstTableView Table::get_range_view(size_t start, size_t end) const
     }
     return ctv;
 }
+
+ConstTableView Table::get_range_view(size_t start, size_t end) const
+{
+    return const_cast<Table*>(this)->get_range_view(start, end);
+}
+
 
 
 size_t Table::lower_bound_int(size_t column_ndx, int64_t value) const TIGHTDB_NOEXCEPT

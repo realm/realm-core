@@ -420,7 +420,7 @@ public:
 
 private:
     template <class T> std::size_t find_first(std::size_t column_ndx, T value) const; // called by above methods
-    template <class T> ConstTableView find_all(size_t column_ndx, T value) const;
+    template <class T> TableView find_all(size_t column_ndx, T value);
 public:
 
 
