@@ -53,46 +53,34 @@ template<typename T> inline T atomic_inc(Atomic<T>& counter)
     return old_val;
 }
 
-// Atomically increment a counter if it is already non-zero. 
-// return the old value.
-template<typename T> inline T atomic_inc_if_nz(Atomic<T>& counter)
+// Atomically double increment a counter if it is even, returns true
+// if succesfull
+template<typename T> bool atomic_double_inc_if_even(Atomic<T>& counter)
 {
-    T old_val;
-    T new_val;
-    do {
-        old_val = counter.load_relaxed();
-        if (old_val == 0) {
-            return 0;
-        }
-        new_val = old_val + 1;
-    } while (counter.compare_and_swap(old_val, new_val) == false);
-    return old_val;
+    T oldval = counter.fetch_add_acquire(2);
+    if (oldval & 1) {
+        // oooops! was odd, adjust
+        counter.fetch_sub_relaxed(2);
+        return false;
+    }
+    return true;
 }
 
-template<typename T> inline T atomic_dec(Atomic<T>& counter)
+template<typename T> inline T atomic_double_dec(Atomic<T>& counter)
 {
-    T old_val;
-    T new_val;
-    do {
-        old_val = counter.load_relaxed();
-        new_val = old_val - 1;
-    } while (counter.compare_and_swap(old_val, new_val) == false);
-    return old_val;
+    return counter.fetch_sub_relaxed(2);
 }
 
-// Atomically decrement a counter if it is 1.
-// return the old value.
-template<typename T> inline T atomic_dec_if_one(Atomic<T>& counter)
+// Atomically set a counter to one, if it is 0.
+// true if succesfull.
+template<typename T> bool atomic_one_if_zero(Atomic<T>& counter)
 {
-    T old_val;
-    T new_val;
-    do {
-        old_val = counter.load_relaxed();
-        if (old_val != 1)
-            return old_val;
-        new_val = old_val - 1;
-    } while (counter.compare_and_swap(old_val, new_val) == false);
-    return old_val;
+    T old_val = counter.fetch_add_acquire(1);
+    if (old_val != 0) {
+        counter.fetch_sub_relaxed(1);
+        return false;
+    } 
+    return true;
 }
 
 
@@ -101,19 +89,21 @@ class Ringbuffer {
 public:
     // the ringbuffer is a circular list of ReadCount structures.
     // Entries from old_pos to put_pos are considered live and may
-    // have count values of 1 or above. The count indicates the
-    // number of referring transactions PLUS ONE.
+    // have an even value in 'count'. The count indicates the
+    // number of referring transactions times 2
     // Entries from after put_pos up till (not including) old_pos
-    // are free entries and must have a count of ZERO.
-    // Cleanup is performed by starting at old_pos and decrementing
-    // (atomically) from 1 to 0 and moving the put_pos. It stops 
-    // if count is above 1.
+    // are free entries and must have a count of ONE.
+    // Cleanup is performed by starting at old_pos and incrementing
+    // (atomically) from 0 to 1 and moving the put_pos. It stops 
+    // if count is odd. This approach requires that only a single thread
+    // at a time tries to perform cleanup.
     struct ReadCount {
         uint64_t version;
         uint64_t filesize;
         uint64_t current_top;
         // The count field acts as synchronization point for accesses to the above
-        // fields. A succesfull inc or dec implies acqurie/release.
+        // fields. A succesfull inc implies acqurie. Release is triggered by explicitly
+        // storing into count whenever a new entry has been initialized.
         mutable Atomic<uint32_t> count;
         uint32_t next;
     };
@@ -131,13 +121,13 @@ public:
         entries = init_readers_size;
         for (int i=0; i < init_readers_size; i++) {
             data[i].version = 1;
-            data[i].count.store_relaxed( 0 );
+            data[i].count.store_relaxed( 1 );
             data[i].current_top = 0;
             data[i].filesize = 0;
             data[i].next = i + 1;
         }
         old_pos = 0;
-        data[ 0 ].count.store_relaxed( 1 );
+        data[ 0 ].count.store_relaxed( 0 );
         data[ init_readers_size-1 ].next = 0 ;
         put_pos.store_release( (uint32_t)0);
     }
@@ -174,7 +164,7 @@ public:
         // dump();
         for (uint32_t i = entries; i < new_entries; i++) {
             data[i].version = 0;
-            data[i].count.store_relaxed( 0 );
+            data[i].count.store_relaxed( 1 );
             data[i].current_top = 0;
             data[i].filesize = 0;
             data[i].next = i + 1;
@@ -228,7 +218,7 @@ public:
     }
 
     void use_next() {
-        get_next().count.store_release(1);
+        get_next().count.store_release(0);
         put_pos.store_release(next());
     }
 
@@ -237,13 +227,10 @@ public:
         // dump();
         while (old_pos != put_pos.load_relaxed()) {
             const ReadCount& r = get(old_pos);
-            uint32_t count = atomic_dec_if_one( r.count );
-            TIGHTDB_ASSERT(count != 0);
-            if (count != 1)
+            if (! atomic_one_if_zero( r.count ))
                 break;
             old_pos = get(old_pos).next;
         }
-        // cout << "  - moved old_pos to " << old_pos << endl;
     }
 };
 
@@ -820,6 +807,8 @@ void SharedGroup::do_async_commits()
             cerr << "..and Done" << endl;
 #endif
         }
+        else
+            sched_yield(); // prevent spinning on has_changed!
 
         if (shutdown) {
             // Being the backend process, we own the lock file, so we
@@ -894,8 +883,8 @@ const Group& SharedGroup::begin_read()
             const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
             // if the entry is stale and has been cleared by the cleanup process,
             // we need to start all over again. This is extremely unlikely, but possible.
-            if (atomic_inc_if_nz(r.count) == 0) {
-                cout << "ODD: starting over after trying to begin_read at cleared entry" << endl;
+            if (! atomic_double_inc_if_even(r.count)) {
+
                 continue;
             }
             m_version = r.version;
@@ -940,13 +929,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     {
         SharedInfo* r_info = m_reader_map.get_addr();
         const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
-        uint32_t old_val = atomic_dec(r.count);
-        (void) old_val;
-        if (old_val <= 1) {
-            cout << "Trying to end_read on a free entry at index " << m_reader_idx << endl;
-            r_info->readers.dump();
-            TIGHTDB_ASSERT(old_val > 1);
-        }
+        atomic_double_dec(r.count);
     }
     m_deferred_detach = true;
 
@@ -1119,12 +1102,6 @@ bool SharedGroup::grow_reader_mapping(uint32_t index)
         size_t infosize = sizeof(SharedInfo) + r_info->readers.compute_required_space(m_local_max_entry);
         // cout << "Growing reader mapping to " << infosize << endl;
         m_reader_map.remap(m_file, util::File::access_ReadWrite, infosize); // Throws
-        /*
-        SharedInfo* r_info_2 = m_reader_map.get_addr();
-        if (r_info != r_info_2)
-            cout << "Changing reader map base address to " << r_info_2 
-                 << " from " << r_info << endl;
-        */
         return true;
     }
     else
@@ -1136,23 +1113,28 @@ uint64_t SharedGroup::get_current_version()
     // As get_current_version may be called outside of the write mutex, another
     // thread may be performing changes to the ringbuffer concurrently. It may
     // even cleanup and recycle the current entry from under our feet, so we need
-    // to protect the entry by temporarily increment its reader ref count until
+    // to protect the entry by temporarily incrementing the reader ref count until
     // we've got a safe reading of the version number.
     while (1) {
         uint32_t index;
         SharedInfo* r_info;
         do {
+            // make sure that the index we are about to dereference falls within
+            // the portion of the ringbuffer that we have mapped - if not, extend
+            // the mapping to fit.
             r_info = m_reader_map.get_addr();
             index = r_info->readers.last();
         } while (grow_reader_mapping(index));
 
+        // now (double) increment the read count so that no-one cleans up the entry
+        // while we read it.
         const Ringbuffer::ReadCount& r = r_info->readers.get(index);
-        if (atomic_inc_if_nz(r.count) == 0) {
-            cout << "ODD: starting over after trying to 'lock' cleared entry" << endl;
+        if (! atomic_double_inc_if_even(r.count)) {
+            // cout << "ODD: starting over after trying to 'lock' cleared entry" << endl;
             continue;
         }
         uint64_t version = r.version;
-        atomic_dec(r.count);
+        atomic_double_dec(r.count);
         return version;
     }
 }
@@ -1207,7 +1189,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
         r.current_top = new_top_ref;
         r.filesize    = new_file_size;
         r.version =     new_version;
-        r.count.store_release(1);
+        r.count.store_release(0);
         r_info->readers.use_next();
     }
 
