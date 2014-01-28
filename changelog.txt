@@ -11,6 +11,9 @@ Format:
 . Any other notes ....                   (internal changes)
 
 
+2014-01-28 (Finn Schiermer Andersen)
++ Added negation to the query engine.
+
 2014-01-23 (Kenneth Geisshirt)
 ! Fixed bug: Subtable queries is validated by Query::validate(). An invalid subtable query can lead to a segfault.
 
