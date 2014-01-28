@@ -42,16 +42,20 @@ const int max_wait_for_daemon_start = 100;
 
 } // anonymous namespace
 
-template<typename T> inline T atomic_inc(Atomic<T>& counter)
-{
-    T old_val;
-    T new_val;
-    do {
-        old_val = counter.load_relaxed();
-        new_val = old_val + 1;
-    } while (counter.compare_and_swap(old_val, new_val) == false);
-    return old_val;
-}
+// The following 3 functions are carefully designed for minimal overhead
+// in case of contention among read transactions. In case of contention,
+// they consume roughly 90% of the cycles used to start and end a read transaction.
+//
+// Each live version carries a "count" field, which combines a reference count
+// of the readers bound to that version, and a single-bit "reclaimed" flag, which
+// indicates that the entry does not hold valid data.
+//
+// Read transactions increment and decrement the reference count. A write transaction
+// may set the "reclaimed" flag to indicate that the entry is being recycled, and clear
+// it again once the entry has been initialized with new data. The write transaction
+// will only reclaim an entry with a reference count of zero. Read transactions may see
+// (very rarely) a reclaimed entry in which case, they abandon the entry and obtain a
+// reference to a newer one.
 
 // Atomically double increment a counter if it is even, returns true
 // if succesfull
@@ -90,20 +94,23 @@ public:
     // the ringbuffer is a circular list of ReadCount structures.
     // Entries from old_pos to put_pos are considered live and may
     // have an even value in 'count'. The count indicates the
-    // number of referring transactions times 2
+    // number of referring transactions times 2.
     // Entries from after put_pos up till (not including) old_pos
     // are free entries and must have a count of ONE.
     // Cleanup is performed by starting at old_pos and incrementing
     // (atomically) from 0 to 1 and moving the put_pos. It stops 
-    // if count is odd. This approach requires that only a single thread
-    // at a time tries to perform cleanup.
+    // if count is non-zero. This approach requires that only a single thread
+    // at a time tries to perform cleanup. This is ensured by doing the cleanup
+    // as part of write transactions, where mutual exclusion is assured by the
+    // write mutex.
     struct ReadCount {
         uint64_t version;
         uint64_t filesize;
         uint64_t current_top;
         // The count field acts as synchronization point for accesses to the above
-        // fields. A succesfull inc implies acqurie. Release is triggered by explicitly
-        // storing into count whenever a new entry has been initialized.
+        // fields. A succesfull inc implies acquire wrt memory consistency. 
+        // Release is triggered by explicitly storing into count whenever a 
+        // new entry has been initialized.
         mutable Atomic<uint32_t> count;
         uint32_t next;
     };
@@ -241,7 +248,6 @@ struct SharedGroup::SharedInfo {
     uint16_t version;
     uint16_t flags;
 
-    // RWLock readlock;
     RobustMutex writemutex;
     RobustMutex balancemutex;
 #ifndef _WIN32
@@ -731,6 +737,7 @@ void SharedGroup::do_async_commits()
     // Note that taking this lock also signals to the other
     // processes that that they can start commiting to the db.
     begin_read();
+    // we must treat version and version_index the same way:
     uint64_t last_version = m_version;
     uint32_t last_version_index = m_reader_idx;
 
@@ -883,7 +890,7 @@ const Group& SharedGroup::begin_read()
             const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
             // if the entry is stale and has been cleared by the cleanup process,
             // we need to start all over again. This is extremely unlikely, but possible.
-            if (! atomic_double_inc_if_even(r.count)) {
+            if (! atomic_double_inc_if_even(r.count)) { // <-- most of the exec time spent here!
 
                 continue;
             }
@@ -923,13 +930,13 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     if (m_deferred_detach || !m_group.is_attached())
         return;
 
-    //TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
+    TIGHTDB_ASSERT(m_transact_stage == transact_Reading);
     TIGHTDB_ASSERT(m_version != numeric_limits<size_t>::max());
 
     {
         SharedInfo* r_info = m_reader_map.get_addr();
         const Ringbuffer::ReadCount& r = r_info->readers.get(m_reader_idx);
-        atomic_double_dec(r.count);
+        atomic_double_dec(r.count); // <-- most of the exec time spent here
     }
     m_deferred_detach = true;
 
@@ -1022,6 +1029,8 @@ void SharedGroup::commit()
         low_level_commit(new_version); // Throws
     }
 
+    // downgrade to a read transaction (if not, assert in end_read)
+    m_transact_stage = transact_Reading;
     end_read();
     // Release write lock
     info->writemutex.unlock();
@@ -1046,6 +1055,7 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
             m_group.detach();
             m_deferred_detach = false;
         }
+        m_transact_stage = transact_Reading;
         end_read();
 
         SharedInfo* info = m_file_map.get_addr();
@@ -1056,7 +1066,6 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
         // Clear all changes made during transaction
         m_group.detach();
         m_deferred_detach = false;
-        m_transact_stage = transact_Ready;
     }
 }
 
@@ -1092,6 +1101,9 @@ void SharedGroup::zero_free_space()
 }
 #endif
 
+
+// given an index (which the caller wants to used to index the ringbuffer), verify
+// that the given entry is within the memory mapped. If not, remap it!
 bool SharedGroup::grow_reader_mapping(uint32_t index)
 {
     if (index >= m_local_max_entry) {
@@ -1130,10 +1142,11 @@ uint64_t SharedGroup::get_current_version()
         // while we read it.
         const Ringbuffer::ReadCount& r = r_info->readers.get(index);
         if (! atomic_double_inc_if_even(r.count)) {
-            // cout << "ODD: starting over after trying to 'lock' cleared entry" << endl;
+
             continue;
         }
         uint64_t version = r.version;
+        // release the entry again:
         atomic_double_dec(r.count);
         return version;
     }
@@ -1144,7 +1157,6 @@ void SharedGroup::low_level_commit(uint64_t new_version)
     SharedInfo* info = m_file_map.get_addr();
     uint64_t readlock_version;
     {
-        // FIXME: ensure the path leading here has the proper read map set!!
         SharedInfo* r_info = m_reader_map.get_addr();
         r_info->readers.cleanup();
         const Ringbuffer::ReadCount& r = r_info->readers.get_oldest();
