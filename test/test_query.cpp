@@ -2676,9 +2676,9 @@ TEST(TestQuerySubtable)
     DescriptorRef sub_1;
     table->add_column(type_Int,    "first");
     table->add_column(type_String, "second");
-    table->add_column(type_Table,  "third", sub_1);
-    sub_1->add_column(type_Int,    "sub_first");
-    sub_1->add_column(type_String, "sub_second");
+    table->add_column(type_Table,  "third", &sub_1);
+    sub_1->add_column(type_Int,      "sub_first");
+    sub_1->add_column(type_String,   "sub_second");
     sub_1.reset();
 
     CHECK_EQUAL(3, table->get_column_count());
@@ -3861,7 +3861,7 @@ TEST(TestQuerySubtableSyntaxCheck)
     DescriptorRef subdesc;
     table->add_column(type_Int,    "first");
     table->add_column(type_String, "second");
-    table->add_column(type_Table,  "third", subdesc);
+    table->add_column(type_Table,  "third", &subdesc);
     subdesc->add_column(type_Int,    "sub_first");
     subdesc->add_column(type_String, "sub_second");
 
@@ -4144,9 +4144,9 @@ TEST(TestQuery_AllTypes_DynamicallyTyped)
     table.add_column(type_String,   "str");
     table.add_column(type_Binary,   "bin");
     table.add_column(type_DateTime, "dat");
-    table.add_column(type_Table,    "tab", sub1);
+    table.add_column(type_Table,    "tab", &sub1);
     table.add_column(type_Mixed,    "mix");
-    sub1->add_column(type_Int, "sub_int");
+    sub1->add_column(type_Int,        "sub_int");
     sub1.reset();
 
     const char bin[4] = { 0, 1, 2, 3 };

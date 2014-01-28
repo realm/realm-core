@@ -17,7 +17,7 @@ TEST(InsertSubtable)
 {
     Table t1;
     DescriptorRef s;
-    t1.add_column(type_Table, "sub", s);
+    t1.add_column(type_Table, "sub", &s);
     s->add_column(type_Int, "i1");
     s->add_column(type_Int, "i2");
     s.reset();
@@ -48,7 +48,7 @@ TEST(SetSubtable)
 {
     Table t1;
     DescriptorRef s;
-    t1.add_column(type_Table, "sub", s);
+    t1.add_column(type_Table, "sub", &s);
     s->add_column(type_Int, "i1");
     s->add_column(type_Int, "i2");
     s.reset();

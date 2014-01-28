@@ -5,7 +5,8 @@ using namespace tightdb;
 using namespace tightdb::util;
 
 
-void Descriptor::insert_column(size_t column_ndx, DataType type, StringData name)
+void Descriptor::insert_column(size_t column_ndx, DataType type, StringData name,
+                               DescriptorRef* subdesc)
 {
     TIGHTDB_ASSERT(is_attached());
     _impl::TableFriend::insert_column(*this, column_ndx, type, name); // Throws
@@ -18,6 +19,9 @@ void Descriptor::insert_column(size_t column_ndx, DataType type, StringData name
         if (i->m_column_ndx >= column_ndx)
             ++i->m_column_ndx;
     }
+
+    if (subdesc && type == type_Table)
+        *subdesc = get_subdescriptor(column_ndx);
 }
 
 

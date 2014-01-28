@@ -57,27 +57,15 @@ template<> struct ColumnTypeTraits3<DateTime> {
 // -- Table ---------------------------------------------------------------------------------
 
 
-size_t Table::add_column(DataType type, StringData name)
-{
-    TIGHTDB_ASSERT(!has_shared_type());
-    get_descriptor()->add_column(type, name); // Throws
-    return get_column_count() - 1;
-}
-
-void Table::add_column(DataType type, StringData name, DescriptorRef& subdesc)
+size_t Table::add_column(DataType type, StringData name, DescriptorRef* subdesc)
 {
     TIGHTDB_ASSERT(!has_shared_type());
     get_descriptor()->add_column(type, name, subdesc); // Throws
-}
-
-void Table::insert_column(size_t column_ndx, DataType type, StringData name)
-{
-    TIGHTDB_ASSERT(!has_shared_type());
-    get_descriptor()->insert_column(column_ndx, type, name); // Throws
+    return get_column_count() - 1;
 }
 
 void Table::insert_column(size_t column_ndx, DataType type, StringData name,
-                          DescriptorRef& subdesc)
+                          DescriptorRef* subdesc)
 {
     TIGHTDB_ASSERT(!has_shared_type());
     get_descriptor()->insert_column(column_ndx, type, name, subdesc); // Throws

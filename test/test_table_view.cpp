@@ -894,8 +894,8 @@ TEST(TableView_ref_counting)
 TEST(TableView_dyn_pivot)
 {
     TableRef table = Table::create();
-    size_t column_ndx_sex   = table->add_column(type_String, "sex");
-    size_t column_ndx_age   = table->add_column(type_Int, "age");
+    size_t column_ndx_sex = table->add_column(type_String, "sex");
+    size_t column_ndx_age = table->add_column(type_Int,    "age");
     table->add_column(type_Bool, "hired");
 
     size_t count = 5000;

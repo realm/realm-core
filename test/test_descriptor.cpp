@@ -161,7 +161,7 @@ TEST(Descriptor_SubtableColumn)
     TableRef table = Table::create();
     DescriptorRef desc = table->get_descriptor(), subdesc;
     desc->add_column(type_Int,   "alpha");
-    desc->add_column(type_Table, "beta", subdesc);
+    desc->add_column(type_Table, "beta", &subdesc);
     CHECK_EQUAL(2, desc->get_column_count());
     CHECK_EQUAL(type_Int,   desc->get_column_type(0));
     CHECK_EQUAL(type_Table, desc->get_column_type(1));
@@ -304,8 +304,8 @@ TEST(Descriptor_Subtables)
 {
     TableRef table = Table::create();
     DescriptorRef desc = table->get_descriptor(), subdesc, subsubdesc;
-    desc->add_column(type_Table, "alpha", subdesc);
-    subdesc->add_column(type_Table, "beta", subsubdesc);
+    desc->add_column(type_Table, "alpha", &subdesc);
+    subdesc->add_column(type_Table, "beta", &subsubdesc);
     subdesc->add_column(type_Int, "gamma");
 
     // Add some subtables
@@ -363,7 +363,7 @@ TEST(Descriptor_DeeplyNested)
     DescriptorRef desc = table->get_descriptor(), subdesc;
     for (int i = 0; i != 128; ++i) {
         desc->add_column(type_Int,   "foo");
-        desc->add_column(type_Table, "bar", subdesc);
+        desc->add_column(type_Table, "bar", &subdesc);
         CHECK(subdesc);
         CHECK(!subdesc->is_root());
         desc = subdesc;
@@ -381,7 +381,7 @@ TEST(Descriptor_DeeplyNested)
         desc->insert_column(0, type_Int, "a");
         desc->insert_column(2, type_Int, "b");
         desc->insert_column(4, type_Int, "c");
-        desc->add_column(type_Table, "baz", subdesc);
+        desc->add_column(type_Table, "baz", &subdesc);
         for (int i_2 = 0; i_2 != i; ++i_2)
             subdesc->add_column(type_Bool, "dummy");
         desc = desc->get_subdescriptor(3); // bar

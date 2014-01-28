@@ -88,7 +88,7 @@ public:
 
     /// Add a new column to each of the associated tables. If any of
     /// the tables are not empty, the new column will be filled with
-    /// the default value for the specified type.
+    /// the default value associated with the specified type.
     ///
     /// This function modifies the dynamic type of all the tables that
     /// share this descriptor. It does this by appending a new column
@@ -100,18 +100,19 @@ public:
     /// attached. The root table is the table associated with the root
     /// descriptor.
     ///
+    /// \param subdesc If a non-null pointer is passed, and the
+    /// specified type is `type_Table`, then this function
+    /// automatically reteives the descriptor associated with the new
+    /// subtable column, and stores a reference to its accessor in
+    /// `*subdesc`.
+    ///
     /// \sa is_root()
     /// \sa Table::add_column()
-    void add_column(DataType type, StringData name);
-
-    /// Same as add_column(type, name), but if the type is
-    /// `type_Table`, then a reference to the descriptor of the new
-    /// subtable column is stored in \a subdesc.
-    void add_column(DataType type, StringData name, DescriptorRef& subdesc);
+    void add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
 
     /// Insert a new column into each of the associated tables. If any
     /// of the tables are not empty, the new column will be filled
-    /// with the default value for the specified type.
+    /// with the default value associated with the specified type.
     ///
     /// This function modifies the dynamic type of all the tables that
     /// share this descriptor. It does this by inserting a new column
@@ -124,18 +125,21 @@ public:
     /// attached. The root table is the table associated with the root
     /// descriptor.
     ///
+    /// \param subdesc If a non-null pointer is passed, and the
+    /// specified type is `type_Table`, then this function
+    /// automatically reteives the descriptor associated with the new
+    /// subtable column, and stores a reference to its accessor in
+    /// `*subdesc`.
+    ///
     /// \sa is_root()
     /// \sa Table::insert_column()
-    void insert_column(std::size_t column_ndx, DataType type, StringData name);
-
-    /// Same as insert_column(column_ndx, type, name), but if the type
-    /// is `type_Table`, then a reference to the descriptor of the new
-    /// subtable column is stored in \a subdesc.
     void insert_column(std::size_t column_ndx, DataType type, StringData name,
-                       DescriptorRef& subdesc);
+                       DescriptorRef* subdesc = 0);
 
     /// Remove the specified column from each of the associated
-    /// tables.
+    /// tables. If the removed column is the only column in the
+    /// descriptor, then the table size will drop to zero for all
+    /// tables that were not already empty.
     ///
     /// This function modifies the dynamic type of all the tables that
     /// share this descriptor. It does this by removing the column at
@@ -241,8 +245,10 @@ public:
     /// underlying descriptor for various reasons (see below). When it
     /// does, it no longer refers to that descriptor, and can no
     /// longer be used, except for calling is_attached(). The
-    /// consequences of doing so are undefined. A newly obtained table
-    /// descriptor accesor is always in the 'attached' state.
+    /// consequences of calling other methods on a detached accessor
+    /// are undefined. Descriptor accessors obtained by callaing
+    /// functions in the TightDB API are always in the 'attached'
+    /// state immediately upon return from those functions.
     ///
     /// A descriptor accessor that is obtained directly from a table
     /// becomes detached if the table becomes detached. A shared
@@ -373,24 +379,10 @@ inline std::size_t Descriptor::get_column_index(StringData name) const TIGHTDB_N
     return m_spec->get_column_index(name);
 }
 
-inline void Descriptor::add_column(DataType type, StringData name)
-{
-    std::size_t column_ndx = get_column_count();
-    insert_column(column_ndx, type, name); // Throws
-}
-
-inline void Descriptor::add_column(DataType type, StringData name, DescriptorRef& subdesc)
+inline void Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc)
 {
     std::size_t column_ndx = get_column_count();
     insert_column(column_ndx, type, name, subdesc); // Throws
-}
-
-inline void Descriptor::insert_column(std::size_t column_ndx, DataType type, StringData name,
-                                      DescriptorRef& subdesc)
-{
-    insert_column(column_ndx, type, name); // Throws
-    if (type == type_Table)
-        subdesc = get_subdescriptor(column_ndx);
 }
 
 inline void Descriptor::rename_column(std::size_t column_ndx, StringData name)

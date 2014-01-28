@@ -160,17 +160,21 @@ public:
     /// in a subtable column, consider using the API offered by the
     /// Descriptor class.
     ///
-    /// The value returned by add_column(DataType, StringData), is the
-    /// index of the added column.
+    /// \param subdesc If a non-null pointer is passed, and the
+    /// specified type is `type_Table`, then this function
+    /// automatically reteives the descriptor associated with the new
+    /// subtable column, and stores a reference to its accessor in
+    /// `*subdesc`.
+    ///
+    /// \return The value returned by add_column(), is the index of
+    /// the added column.
     ///
     /// \sa has_shared_type()
     /// \sa get_descriptor()
     /// \sa Descriptor::add_column()
-    std::size_t add_column(DataType type, StringData name);
-    void add_column(DataType type, StringData name, DescriptorRef& subdesc);
-    void insert_column(std::size_t column_ndx, DataType type, StringData name);
+    std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
     void insert_column(std::size_t column_ndx, DataType type, StringData name,
-                       DescriptorRef& subdesc);
+                       DescriptorRef* subdesc = 0);
     void remove_column(std::size_t column_ndx);
     void rename_column(std::size_t column_ndx, StringData new_name);
     //@}

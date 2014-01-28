@@ -472,7 +472,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows)
         table.add_column(type_String,   "string_enum"); // becomes ColumnStringEnum
         table.add_column(type_Binary,   "binary");
         table.add_column(type_Mixed,    "mixed");
-        table.add_column(type_Table,    "tables", sub1);
+        table.add_column(type_Table,    "tables", &sub1);
         sub1->add_column(type_Int,        "sub_first");
         sub1->add_column(type_String,     "sub_second");
     }
@@ -621,16 +621,16 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     // Add all column types
     {
         DescriptorRef sub_1, sub_2;
-        parent.add_column(type_Table,  "child", sub_1);
-        sub_1->add_column(type_Int,      "int");          // 0
-        sub_1->add_column(type_Bool,     "bool");         // 1
-        sub_1->add_column(type_Float,    "float");        // 2
-        sub_1->add_column(type_Double,   "double");       // 3
-        sub_1->add_column(type_DateTime, "date");         // 4
-        sub_1->add_column(type_String,   "string");       // 5
-        sub_1->add_column(type_Binary,   "binary");       // 6
-        sub_1->add_column(type_Table,    "table", sub_2); // 7
-        sub_1->add_column(type_Mixed,    "mixed");        // 8
+        parent.add_column(type_Table,  "child", &sub_1);
+        sub_1->add_column(type_Int,      "int");           // 0
+        sub_1->add_column(type_Bool,     "bool");          // 1
+        sub_1->add_column(type_Float,    "float");         // 2
+        sub_1->add_column(type_Double,   "double");        // 3
+        sub_1->add_column(type_DateTime, "date");          // 4
+        sub_1->add_column(type_String,   "string");        // 5
+        sub_1->add_column(type_Binary,   "binary");        // 6
+        sub_1->add_column(type_Table,    "table", &sub_2); // 7
+        sub_1->add_column(type_Mixed,    "mixed");         // 8
         sub_2->add_column(type_Int,        "i");
     }
 
@@ -1489,7 +1489,7 @@ TEST(Table_Spec)
         DescriptorRef sub_1;
         table->add_column(type_Int,    "first");
         table->add_column(type_String, "second");
-        table->add_column(type_Table,  "third", sub_1);
+        table->add_column(type_Table,  "third", &sub_1);
         sub_1->add_column(type_Int,      "sub_first");
         sub_1->add_column(type_String,   "sub_second");
     }
@@ -1959,7 +1959,7 @@ TEST(Table_Spec_DeleteColumnsBug)
 TEST(Table_Mixed)
 {
     Table table;
-    table.add_column(type_Int, "first");
+    table.add_column(type_Int,   "first");
     table.add_column(type_Mixed, "second");
 
     CHECK_EQUAL(type_Int, table.get_column_type(0));
@@ -2140,7 +2140,7 @@ TEST(Table_SubtableSizeAndClear)
 {
     Table table;
     DescriptorRef subdesc;
-    table.add_column(type_Table, "subtab", subdesc);
+    table.add_column(type_Table, "subtab", &subdesc);
     table.add_column(type_Mixed, "mixed");
     subdesc->add_column(type_Int,  "int");
 
@@ -2498,7 +2498,7 @@ TEST(Table_Test_Clear_With_Subtable_AND_Group)
 
     // Create specification with sub-table
     table->add_column(type_String, "name");
-    table->add_column(type_Table,  "sub", sub_1);
+    table->add_column(type_Table,  "sub", &sub_1);
     sub_1->add_column(type_Int,      "num");
 
     CHECK_EQUAL(2, table->get_column_count());
@@ -2820,7 +2820,7 @@ TEST(Table_FormerLeakCase)
 
     Table root;
     DescriptorRef subdesc;
-    root.add_column(type_Table, "b", subdesc);
+    root.add_column(type_Table, "b", &subdesc);
     subdesc->add_column(type_Int,  "a");
     root.add_empty_row(1);
     root.set_subtable(0, 0, &sub);

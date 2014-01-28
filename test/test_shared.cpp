@@ -538,7 +538,7 @@ TEST(Shared_AddColumnToSubspec)
             WriteTransaction wt(sg);
             TableRef table = wt.get_table("table");
             DescriptorRef sub_1;
-            table->add_column(type_Table, "subtable", sub_1);
+            table->add_column(type_Table, "subtable", &sub_1);
             sub_1->add_column(type_Int,   "int");
             table->add_empty_row();
             TableRef subtable = table->get_subtable(0,0);
@@ -604,7 +604,7 @@ TEST(Shared_RemoveColumnBeforeSubtableColumn)
             DescriptorRef sub_1;
             TableRef table = wt.get_table("table");
             table->add_column(type_Int,   "int");
-            table->add_column(type_Table, "subtable", sub_1);
+            table->add_column(type_Table, "subtable", &sub_1);
             sub_1->add_column(type_Int,   "int");
             table->add_empty_row();
             TableRef subtable = table->get_subtable(1,0);
@@ -1119,11 +1119,11 @@ TEST(Shared_FormerErrorCase1)
         table->add_column(type_DateTime, "delta");
         table->add_column(type_String,   "epsilon");
         table->add_column(type_Binary,   "zeta");
-        table->add_column(type_Table,    "eta", sub_1);
+        table->add_column(type_Table,    "eta", &sub_1);
         table->add_column(type_Mixed,    "theta");
-        sub_1->add_column(type_Int,      "foo");
-        sub_1->add_column(type_Table,    "bar", sub_2);
-        sub_2->add_column(type_Int, "value");
+        sub_1->add_column(type_Int,        "foo");
+        sub_1->add_column(type_Table,      "bar", &sub_2);
+        sub_2->add_column(type_Int,          "value");
         table->insert_empty_row(0, 1);
         wt.commit();
     }
