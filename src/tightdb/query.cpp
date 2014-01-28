@@ -721,7 +721,7 @@ Query& Query::end_subtable()
 {
     if (subtables.size() == 0) {
         error_code = "Unbalanced subtable";
-        return;
+        return *this;
     }
 
     end_group();

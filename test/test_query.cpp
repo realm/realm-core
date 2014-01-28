@@ -2781,7 +2781,7 @@ TEST(TestQuerySubtable)
 }
 
 
-ONLY(TestQuerySubtable_bug)
+TEST(TestQuerySubtable_bug)
 {
     Group group;
     TableRef table = group.get_table("test");
