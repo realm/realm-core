@@ -203,7 +203,6 @@ public:
         ColumnSubtableParent(alloc, table, column_ndx, parent, ndx_in_parent, ref) {}
     ~RefsColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
     using ColumnSubtableParent::get_subtable_ptr;
-    using ColumnSubtableParent::get_subtable;
 };
 
 

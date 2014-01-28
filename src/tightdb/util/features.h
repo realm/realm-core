@@ -184,14 +184,14 @@
 #  define TIGHTDB_NOEXCEPT
 #endif
 #if TIGHTDB_HAVE_CXX11_NOEXCEPT
-#  define TIGHTDB_NOEXCEPT_IF(cond) noexcept(cond)
+#  define TIGHTDB_NOEXCEPT_IF(cond) noexcept (cond)
 #else
 #  define TIGHTDB_NOEXCEPT_IF(cond)
 #endif
 #if TIGHTDB_HAVE_CXX11_NOEXCEPT
 #  define TIGHTDB_NOEXCEPT_OR_NOTHROW noexcept
 #else
-#  define TIGHTDB_NOEXCEPT_OR_NOTHROW throw()
+#  define TIGHTDB_NOEXCEPT_OR_NOTHROW throw ()
 #endif
 
 

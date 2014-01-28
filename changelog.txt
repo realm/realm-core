@@ -11,6 +11,22 @@ Format:
 . Any other notes ....                   (internal changes)
 
 
+2014-01-23 (Kenneth Geisshirt)
+! Fixed bug: Subtable queries is validated by Query::validate(). An invalid subtable query can lead to a segfault.
+
+2014-01-07 (Kenneth Geisshirt)
++ Table::range() added. The method returns a set of rows as a TableView.
+
+2014-01-06 (Kristian Spangsege)
+! 'No parent info in shared specs' conflicts with implementation of `Group::commit()`.
+! `ColumnTable::m_spec_ref` not updated when Spec object is reallocated.
+! `ColumnSubtableParent::m_index` not updated when preceeding columns are removed.
++ Addition of `template<class L> std::size_t Table::add_subcolumn(const util::Tuple<L>&, DataType, StringData)`. This makes it much easier to add columns to subtable specs.
+. `Spec::get_subtable_spec()` now returns `SubspecRef` or `ConstSubspecRef`. This fixes a design bug relating to propagation of constness to subspecs, and it improves the efficiency of access to subspecs by avoiding expensive copying of `Spec` objects.
+. Elimination of `Spec::m_table` and `ColumnTable::m_spec_ref`.
+. `Spec::add_column()` and `Spec::add_subcolumn()` now take a `Table*` as argument.
+
+
 2013-12-17 (Kristian Spangsege)
 + Implicit termination of active transaction when SharedGroup is destroyed.
 . Class `File` and related exceptions such as `File::AccessError` moved to namespace `tightdb::util`.

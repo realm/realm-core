@@ -546,7 +546,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
     **************************************************************************************************************/
 
     void Query::aggregate_internal(Action TAction, DataType TSourceColumn,
-                                   ParentNode* pn, QueryStateBase* st, 
+                                   ParentNode* pn, QueryStateBase* st,
                                    size_t start, size_t end, SequentialGetterBase* source_column) const
     {
         if (end == not_found)
@@ -684,7 +684,7 @@ Query& Query::group()
 Query& Query::end_group()
 {
     if (first.size() < 2) {
-        error_code = "Unbalanced blockBegin/blockEnd";
+        error_code = "Unbalanced group";
         return *this;
     }
 
@@ -778,6 +778,11 @@ void Query::subtable(size_t column)
 
 void Query::end_subtable()
 {
+    if (subtables.size() == 0) {
+        error_code = "Unbalanced subtable";
+        return;
+    }
+
     end_group();
 
     if (update[update.size()-1] != 0)
@@ -1138,6 +1143,7 @@ Query Query::operator&&(Query q)
 
     return q2;
 }
+
 
 Query Query::operator!()
 {

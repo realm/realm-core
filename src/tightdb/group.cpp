@@ -577,12 +577,12 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
     // info.
     TIGHTDB_ASSERT(m_top.size() >= 5);
 
-    // Array nodes that a part of the previous version of the database
-    // will not be overwritte by Group::commit(). This is necessary
-    // for robustness in the face of abrupt termination of the
-    // process. It also means that we can be sure that an array
+    // Array nodes that are part of the previous version of the
+    // database will not be overwritten by Group::commit(). This is
+    // necessary for robustness in the face of abrupt termination of
+    // the process. It also means that we can be sure that an array
     // remains unchanged across a commit if the new ref is equal to
-    // the old ref and the ref is below the previous basline.
+    // the old ref and the ref is below the previous baseline.
 
     if (top_ref < old_baseline && m_top.get_ref() == top_ref)
         return;

@@ -7,6 +7,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
@@ -14,11 +15,9 @@ using namespace tightdb;
 TEST(InsertSubtable)
 {
     Table t;
-    Spec& spec = t.get_spec();
-    Spec subspec = spec.add_subtable_column("sub");
-    subspec.add_column(type_Int, "i1");
-    subspec.add_column(type_Int, "i2");
-    t.update_from_spec();
+    t.add_column(type_Table, "sub");
+    t.add_subcolumn(tuple(0), type_Int, "i1");
+    t.add_subcolumn(tuple(0), type_Int, "i2");
 
     Table t2;
     t2.add_column(type_Int, "i1");
@@ -45,11 +44,9 @@ TEST(InsertSubtable)
 TEST(SetSubtable)
 {
     Table t;
-    Spec& spec = t.get_spec();
-    Spec subspec = spec.add_subtable_column("sub");
-    subspec.add_column(type_Int, "i1");
-    subspec.add_column(type_Int, "i2");
-    t.update_from_spec();
+    t.add_column(type_Table, "sub");
+    t.add_subcolumn(tuple(0), type_Int, "i1");
+    t.add_subcolumn(tuple(0), type_Int, "i2");
     t.add_empty_row();
 
     Table t2;
