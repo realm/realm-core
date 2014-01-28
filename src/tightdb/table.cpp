@@ -141,17 +141,26 @@ ConstDescriptorRef Table::get_subdescriptor(const path_vec& path) const
     return const_cast<Table*>(this)->get_subdescriptor(path); // Throws
 }
 
-void Table::add_subcolumn(const path_vec& path, DataType type, StringData name)
+size_t Table::add_subcolumn(const path_vec& path, DataType type, StringData name)
 {
-    get_subdescriptor(path)->add_column(type, name); // Throws
+    DescriptorRef desc = get_subdescriptor(path); // Throws
+    size_t column_ndx = desc->get_column_count();
+    desc->insert_column(column_ndx, type, name); // Throws
+    return column_ndx;
 }
 
-void Table::remove_subcolumn(const path_vec& path, std::size_t column_ndx)
+void Table::insert_subcolumn(const path_vec& path, size_t column_ndx,
+                             DataType type, StringData name)
+{
+    get_subdescriptor(path)->insert_column(column_ndx, type, name); // Throws
+}
+
+void Table::remove_subcolumn(const path_vec& path, size_t column_ndx)
 {
     get_subdescriptor(path)->remove_column(column_ndx); // Throws
 }
 
-void Table::rename_subcolumn(const path_vec& path, std::size_t column_ndx, StringData name)
+void Table::rename_subcolumn(const path_vec& path, size_t column_ndx, StringData name)
 {
     get_subdescriptor(path)->rename_column(column_ndx, name); // Throws
 }

@@ -217,25 +217,34 @@ public:
     //@}
 
     //@{
-    /// Convenience method for accessing and manipulating nested table
-    /// types.
+    /// Get access to an arbitrarily nested dynamic type descriptor.
     ///
-    /// The descriptor returned by get_subdescriptor(const path_vec&)
-    /// is the one you would get by calling
+    /// The returned descriptor is the one you would get by calling
     /// Descriptor::get_subdescriptor() once for each entry in the
     /// specified path, starting with the descriptor returned by
-    /// get_descriptor(). The path can be empty.
-    ///
-    /// The modifying path based functions behave as if they were
-    /// called on the descriptor returned by
-    /// `get_subdescriptor(path)`. These function too, must be called
-    /// only on tables with independent dynamic type.
-    ///
-    /// \sa has_shared_type()
+    /// get_descriptor(). The path is allowed to be empty.
     typedef std::vector<std::size_t> path_vec;
     DescriptorRef get_subdescriptor(const path_vec& path);
     ConstDescriptorRef get_subdescriptor(const path_vec& path) const;
-    void add_subcolumn(const path_vec& path, DataType type, StringData name);
+    //@}
+
+    //@{
+    /// Convenience methods for manipulating nested table types.
+    ///
+    /// These functions behave as if they were called on the
+    /// descriptor returned by `get_subdescriptor(path)`. These
+    /// function must be called only on tables with independent
+    /// dynamic type.
+    ///
+    /// \return The value returned by add_subcolumn(), is the index of
+    /// the added column within the descriptor referenced by the
+    /// specified path.
+    ///
+    /// \sa Descriptor::add_column()
+    /// \sa has_shared_type()
+    std::size_t add_subcolumn(const path_vec& path, DataType type, StringData name);
+    void insert_subcolumn(const path_vec& path, std::size_t column_ndx,
+                          DataType type, StringData name);
     void remove_subcolumn(const path_vec& path, std::size_t column_ndx);
     void rename_subcolumn(const path_vec& path, std::size_t column_ndx, StringData new_name);
     //@}
