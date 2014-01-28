@@ -181,7 +181,7 @@ public:
 
     bool has_index(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
 
-    /// Ad an indexe to a table with independent dynamic type.
+    /// Add an index to a table with independent dynamic type.
     ///
     /// This function must be called only for tables with independent
     /// dynamic type. See add_column() for more on this.
