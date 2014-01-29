@@ -34,6 +34,7 @@ using std::size_t;
 class TableViewBase {
 public:
     bool is_empty() const TIGHTDB_NOEXCEPT { return m_refs.is_empty(); }
+    bool is_valid() const TIGHTDB_NOEXCEPT { return m_table != NULL; }
     std::size_t size() const TIGHTDB_NOEXCEPT { return m_refs.size(); }
 
     // Column information
@@ -110,7 +111,8 @@ public:
     void row_to_string(std::size_t row_ndx, std::ostream& out) const;
 
 protected:
-    TableRef m_table;
+
+    mutable TableRef m_table;
     Array m_refs;
 
 
@@ -119,7 +121,11 @@ protected:
     TableViewBase(): m_refs(Allocator::get_default()) {}
 
     /// Construct empty view, ready for addition of row indices.
-    TableViewBase(Table* parent): m_table(parent->get_table_ref()) {}
+    TableViewBase(Table* parent): m_table(parent->get_table_ref()) 
+    {
+        parent->register_view(this);
+    }
+    void kill() const TIGHTDB_NOEXCEPT { m_table = TableRef(); }
 
     /// Copy constructor.
     TableViewBase(const TableViewBase& tv):
@@ -303,6 +309,10 @@ private:
 
 inline TableViewBase::~TableViewBase() TIGHTDB_NOEXCEPT
 {
+    if (m_table != NULL) {
+        m_table->unregister_view(this);
+        m_table = TableRef();
+    }
     m_refs.destroy();
 }
 

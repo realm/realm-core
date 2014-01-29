@@ -589,6 +589,17 @@ void Table::detach() TIGHTDB_NOEXCEPT
     destroy_column_accessors();
 }
 
+void Table::kill_views_except(const TableViewBase* view)
+{
+    while (views.size()) {
+        const TableViewBase* v = views.back();
+        views.pop_back();
+        if (v != view)
+            v->kill();
+    }
+    if (view)
+        views.push_back(view);
+}
 
 void Table::detach_subtable_accessors() TIGHTDB_NOEXCEPT
 {

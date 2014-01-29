@@ -37,6 +37,7 @@
 namespace tightdb {
 
 class TableView;
+class TableViewBase;
 class ConstTableView;
 class StringIndex;
 
@@ -558,6 +559,9 @@ private:
     mutable const StringIndex* m_lookup_index;
     mutable Descriptor* m_descriptor;
 
+    // Table view instances
+    mutable std::vector<const TableViewBase*> views;
+
     /// Disable copying assignment.
     ///
     /// It could easily be implemented by calling assign(), but the
@@ -687,6 +691,27 @@ private:
 
     void bind_ref() const TIGHTDB_NOEXCEPT { ++m_ref_count; }
     void unbind_ref() const TIGHTDB_NOEXCEPT { if (--m_ref_count == 0) delete this; }
+
+    void register_view(const TableViewBase* view)
+    {
+        views.push_back(view);
+    }
+
+    void unregister_view(const TableViewBase* view)
+    {
+        // Fixme: O(n) may be unacceptable - if so, put and maintain
+        // iterator or index in TableViewBase.
+        std::vector<const TableViewBase*>::iterator it;
+        for (it = views.begin(); it != views.end(); ++it) {
+            if (*it == view) {
+                *it = views.back();
+                views.pop_back();
+                break;
+            }
+        }
+    }
+
+    void kill_views_except(const TableViewBase* view);
 
     class UnbindGuard;
 
