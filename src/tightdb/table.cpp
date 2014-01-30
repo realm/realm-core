@@ -2361,7 +2361,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
                 for (size_t i = 0; i < res_count; ++i) {
                     int64_t sum   = dst_column.get(i);
                     int64_t count = cnt_column.get(i);
-                    double res   = sum / count;
+                    double res   = double(sum) / double(count);
                     mean_column.set(i, res);
                 }
 
@@ -2451,7 +2451,7 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
                 for (size_t i = 0; i < res_count; ++i) {
                     int64_t sum   = dst_column.get(i);
                     int64_t count = cnt_column.get(i);
-                    double res   = sum / count;
+                    double res    = double(sum) / double(count);
                     mean_column.set(i, res);
                 }
 
