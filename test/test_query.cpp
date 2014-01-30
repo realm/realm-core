@@ -4276,6 +4276,8 @@ TEST(TestQuery_AllTypes_StaticallyTyped)
     CHECK_EQUAL(1, table.where().date_col.equal(0).count());
 //    CHECK_EQUAL(1, table.where().table_col.equal(subtab).count());
 //    CHECK_EQUAL(1, table.where().mixed_col.equal(mix_int).count());
+// FIXME: It's not possible to construct a subtable query. .table_col.subtable() does not return an object with 'age':
+//    CHECK_EQUAL(1, table.where().table_col.subtable().age.end_subtable().count());
 
     TestQueryAllTypes::Query query = table.where().bool_col.equal(false);
 
