@@ -2839,42 +2839,78 @@ TIGHTDB_TABLE_3(TablePivotAgg,
 
 TEST(Table_pivot)
 {
-    size_t count = 5000;
+    size_t count = 1717;
     TablePivotAgg table;
+    int64_t age_sum[2] = {0, 0};
+    int64_t age_cnt[2] = {0, 0};
+    int64_t age_min[2];
+    int64_t age_max[2];
+    double age_avg[2];
+
     for (size_t i = 0; i < count; ++i) {
-        StringData sex = i % 2 ? "Male" : "Female";
-        table.add(sex, 20 + (i%20), true);
+        size_t sex = i % 2;
+        int64_t age =  3 + (i%117);
+        table.add((sex==0) ? "Male" : "Female", age, true);
+
+        age_sum[sex] += age;
+        age_cnt[sex] += 1;
+        if ((i < 2) || age < age_min[sex])
+            age_min[sex] = age;
+        if ((i < 2) || age > age_max[sex])
+            age_max[sex] = age;
+    }
+    for (size_t sex = 0; sex < 2; ++sex) {
+        age_avg[sex] = double(age_sum[sex]) / double(age_cnt[sex]);
     }
 
-    Table result_count;
-    table.aggregate(0, 1, Table::aggr_count, result_count);
-    int64_t half = count/2;
-    CHECK_EQUAL(2, result_count.get_column_count());
-    CHECK_EQUAL(2, result_count.size());
-    CHECK_EQUAL(half, result_count.get_int(1, 0));
-    CHECK_EQUAL(half, result_count.get_int(1, 1));
 
-    Table result_sum;
-    table.aggregate(0, 1, Table::aggr_sum, result_sum);
+    for (int i = 0; i < 2; ++i) {
+        Table result_count;
+        table.aggregate(0, 1, Table::aggr_count, result_count);
+        CHECK_EQUAL(2, result_count.get_column_count());
+        CHECK_EQUAL(2, result_count.size());
+        for (size_t sex = 0; sex < 2; ++sex) {
+            CHECK_EQUAL(age_cnt[sex], result_count.get_int(1, sex));
+        }
 
-    Table result_avg;
-    table.aggregate(0, 1, Table::aggr_avg, result_avg);
+        Table result_sum;
+        table.aggregate(0, 1, Table::aggr_sum, result_sum);
+        for (size_t sex = 0; sex < 2; ++sex) {
+            CHECK_EQUAL(age_sum[sex], result_sum.get_int(1, sex));
+        }
 
-    Table result_min;
-    table.aggregate(0, 1, Table::aggr_min, result_min);
+        Table result_avg;
+        table.aggregate(0, 1, Table::aggr_avg, result_avg);
+        if (false) {
+            ostringstream ss;
+            result_avg.to_string(ss);
+            std::cerr << "\nMax:\n" << ss.str();
+        }
+        CHECK_EQUAL(2, result_avg.get_column_count());
+        CHECK_EQUAL(2, result_avg.size());
+        for (size_t sex = 0; sex < 2; ++sex) {
+            CHECK_EQUAL(age_avg[sex], result_avg.get_double(1, sex));
+        }
 
-    Table result_max;
-    table.aggregate(0, 1, Table::aggr_max, result_max);
+        Table result_min;
+        table.aggregate(0, 1, Table::aggr_min, result_min);
+        CHECK_EQUAL(2, result_min.get_column_count());
+        CHECK_EQUAL(2, result_min.size());
+        for (size_t sex = 0; sex < 2; ++sex) {
+            CHECK_EQUAL(age_min[sex], result_min.get_int(1, sex));
+        }
 
-    // Test with enumerated strings
-    table.optimize();
+        Table result_max;
+        table.aggregate(0, 1, Table::aggr_max, result_max);
+        CHECK_EQUAL(2, result_max.get_column_count());
+        CHECK_EQUAL(2, result_max.size());
+        for (size_t sex = 0; sex < 2; ++sex) {
+            CHECK_EQUAL(age_max[sex], result_max.get_int(1, sex));
+        }
 
-    Table result_count2;
-    table.aggregate(0, 1, Table::aggr_count, result_count2);
-    CHECK_EQUAL(2, result_count2.get_column_count());
-    CHECK_EQUAL(2, result_count2.size());
-    CHECK_EQUAL(half, result_count2.get_int(1, 0));
-    CHECK_EQUAL(half, result_count2.get_int(1, 1));
+        // Test with enumerated strings in second loop
+        table.optimize();
+    }
 }
 
 #endif // TEST_TABLE
