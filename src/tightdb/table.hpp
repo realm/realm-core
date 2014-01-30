@@ -284,14 +284,14 @@ public:
     // Row handling
     std::size_t add_empty_row(std::size_t num_rows = 1);
     void        insert_empty_row(std::size_t row_ndx, std::size_t num_rows = 1);
-    void        remove(std::size_t row_ndx);
-    void        remove_last();
+    void        remove(std::size_t row_ndx, TableViewBase* view = NULL);
+    void        remove_last(TableViewBase* view = NULL);
 
     /// Move the last row to the specified index. This overwrites the
     /// target row and reduces the number of rows by one. The
     /// specified index must be strictly less than `N-1`, where `N` is
     /// the number of rows in the table.
-    void move_last_over(std::size_t ndx);
+    void move_last_over(std::size_t ndx, TableViewBase* view = NULL);
 
     // Insert row
     // NOTE: You have to insert values in ALL columns followed by insert_done().
@@ -305,7 +305,7 @@ public:
     void insert_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData value);
     void insert_subtable(std::size_t column_ndx, std::size_t row_ndx); // Insert empty table
     void insert_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
-    void insert_done();
+    void insert_done(TableViewBase* view = NULL);
 
     // Get cell values
     int64_t     get_int(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
@@ -319,18 +319,18 @@ public:
     DataType    get_mixed_type(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
 
     // Set cell values
-    void set_int(std::size_t column_ndx, std::size_t row_ndx, int64_t value);
-    void set_bool(std::size_t column_ndx, std::size_t row_ndx, bool value);
-    void set_datetime(std::size_t column_ndx, std::size_t row_ndx, DateTime value);
-    template<class E> void set_enum(std::size_t column_ndx, std::size_t row_ndx, E value);
-    void set_float(std::size_t column_ndx, std::size_t row_ndx, float value);
-    void set_double(std::size_t column_ndx, std::size_t row_ndx, double value);
-    void set_string(std::size_t column_ndx, std::size_t row_ndx, StringData value);
-    void set_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData value);
-    void set_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value);
+    void set_int(std::size_t column_ndx, std::size_t row_ndx, int64_t value, TableViewBase* view = NULL);
+    void set_bool(std::size_t column_ndx, std::size_t row_ndx, bool value, TableViewBase* view = NULL);
+    void set_datetime(std::size_t column_ndx, std::size_t row_ndx, DateTime value, TableViewBase* view = NULL);
+    template<class E> void set_enum(std::size_t column_ndx, std::size_t row_ndx, E value, TableViewBase* view = NULL);
+    void set_float(std::size_t column_ndx, std::size_t row_ndx, float value, TableViewBase* view = NULL);
+    void set_double(std::size_t column_ndx, std::size_t row_ndx, double value, TableViewBase* view = NULL);
+    void set_string(std::size_t column_ndx, std::size_t row_ndx, StringData value, TableViewBase* view = NULL);
+    void set_binary(std::size_t column_ndx, std::size_t row_ndx, BinaryData value, TableViewBase* view = NULL);
+    void set_mixed(std::size_t column_ndx, std::size_t row_ndx, Mixed value, TableViewBase* view = NULL);
 
 
-    void add_int(std::size_t column_ndx, int64_t value);
+    void add_int(std::size_t column_ndx, int64_t value, TableViewBase* view = NULL);
 
     /// Assumes that the specified column is a subtable column (in
     /// particular, not a mixed column) and that the specified table
@@ -338,24 +338,24 @@ public:
     /// number of columns must be the same, and corresponding columns
     /// must have identical data types (as returned by
     /// get_column_type()).
-    void insert_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
-    void insert_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
+    void insert_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*, TableViewBase* view = NULL);
+    void insert_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*, TableViewBase* view = NULL);
 
     /// Like insert_subtable(std::size_t, std::size_t, const Table*)
     /// but overwrites the specified cell rather than inserting a new
     /// one.
-    void set_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
-    void set_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*);
+    void set_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*, TableViewBase* view = NULL);
+    void set_mixed_subtable(std::size_t col_ndx, std::size_t row_ndx, const Table*, TableViewBase* view = NULL);
 
 
     // Sub-tables (works on columns whose type is either 'subtable' or
     // 'mixed', for a value in a mixed column that is not a subtable,
     // get_subtable() returns null, get_subtable_size() returns zero,
     // and clear_subtable() replaces the value with an empty table.)
-    TableRef       get_subtable(std::size_t column_ndx, std::size_t row_ndx);
+    TableRef       get_subtable(std::size_t column_ndx, std::size_t row_ndx, TableViewBase* view = NULL);
     ConstTableRef  get_subtable(std::size_t column_ndx, std::size_t row_ndx) const;
     size_t         get_subtable_size(std::size_t column_ndx, std::size_t row_ndx) const TIGHTDB_NOEXCEPT;
-    void           clear_subtable(std::size_t column_ndx, std::size_t row_ndx);
+    void           clear_subtable(std::size_t column_ndx, std::size_t row_ndx, TableViewBase* view = NULL);
 
     //@{
     /// If this table accessor is attached to a subtable in a column
@@ -977,6 +977,7 @@ inline Table::Table(ref_count_tag, ConstSubspecRef shared_spec, ref_type columns
 inline void Table::set_index(std::size_t column_ndx)
 {
     detach_subtable_accessors();
+    kill_views_except(NULL);
     set_index(column_ndx, true);
 }
 
@@ -1009,10 +1010,10 @@ inline std::size_t Table::size() const TIGHTDB_NOEXCEPT
     return m_size;
 }
 
-inline void Table::remove_last()
+inline void Table::remove_last(TableViewBase* view)
 {
     if (!is_empty())
-        remove(m_size-1);
+        remove(m_size-1, view);
 }
 
 inline void Table::insert_bool(std::size_t column_ndx, std::size_t row_ndx, bool value)
@@ -1033,17 +1034,19 @@ inline void Table::insert_enum(std::size_t column_ndx, std::size_t row_ndx, E va
 
 inline void Table::insert_subtable(std::size_t col_ndx, std::size_t row_ndx)
 {
+    kill_views_except(NULL);
     insert_subtable(col_ndx, row_ndx, 0); // Null stands for an empty table
 }
 
 template<class E>
-inline void Table::set_enum(std::size_t column_ndx, std::size_t row_ndx, E value)
+inline void Table::set_enum(std::size_t column_ndx, std::size_t row_ndx, E value, TableViewBase* view)
 {
-    set_int(column_ndx, row_ndx, value);
+    set_int(column_ndx, row_ndx, value, view);
 }
 
-inline TableRef Table::get_subtable(std::size_t column_ndx, std::size_t row_ndx)
+inline TableRef Table::get_subtable(std::size_t column_ndx, std::size_t row_ndx, TableViewBase* view)
 {
+    kill_views_except(view);
     return TableRef(get_subtable_ptr(column_ndx, row_ndx));
 }
 
