@@ -106,9 +106,11 @@ public:
     /// subtable column, and stores a reference to its accessor in
     /// `*subdesc`.
     ///
+    /// The index of the new column is returned.
+    ///
     /// \sa is_root()
     /// \sa Table::add_column()
-    void add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
+    std::size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = 0);
 
     /// Insert a new column into each of the associated tables. If any
     /// of the tables are not empty, the new column will be filled
@@ -143,9 +145,9 @@ public:
     ///
     /// This function modifies the dynamic type of all the tables that
     /// share this descriptor. It does this by removing the column at
-    /// the specified index from the descriptor, and from each of the
-    /// that share this descriptor. The consequences of specifying a
-    /// column index that is out of range, are undefined.
+    /// the specified index from the descriptor, and from each of the 
+    /// tables that share this descriptor. The consequences of specifying
+    /// a column index that is out of range, are undefined.
     ///
     /// If the removed column was a subtable column, then the
     /// associated descriptor accessor will be detached, if it
@@ -246,7 +248,7 @@ public:
     /// does, it no longer refers to that descriptor, and can no
     /// longer be used, except for calling is_attached(). The
     /// consequences of calling other methods on a detached accessor
-    /// are undefined. Descriptor accessors obtained by callaing
+    /// are undefined. Descriptor accessors obtained by calling
     /// functions in the TightDB API are always in the 'attached'
     /// state immediately upon return from those functions.
     ///
@@ -379,10 +381,11 @@ inline std::size_t Descriptor::get_column_index(StringData name) const TIGHTDB_N
     return m_spec->get_column_index(name);
 }
 
-inline void Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc)
+inline std::size_t Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc)
 {
     std::size_t column_ndx = get_column_count();
     insert_column(column_ndx, type, name, subdesc); // Throws
+    return column_ndx;
 }
 
 inline void Descriptor::rename_column(std::size_t column_ndx, StringData name)
