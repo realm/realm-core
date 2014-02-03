@@ -1203,13 +1203,12 @@ void Table::move_last_over(size_t ndx, TableViewBase* view)
 }
 
 
-void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* table, TableViewBase* view)
+void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 {
     TIGHTDB_ASSERT(col_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Table);
     TIGHTDB_ASSERT(row_ndx <= m_size);
 
-    kill_views_except(view);
     ColumnTable& subtables = get_column_table(col_ndx);
     subtables.insert(row_ndx, table);
 
@@ -1220,13 +1219,12 @@ void Table::insert_subtable(size_t col_ndx, size_t row_ndx, const Table* table, 
 }
 
 
-void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table, TableViewBase* view)
+void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table)
 {
     TIGHTDB_ASSERT(col_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Table);
     TIGHTDB_ASSERT(row_ndx < m_size);
 
-    kill_views_except(view);
     ColumnTable& subtables = get_column_table(col_ndx);
     subtables.set(row_ndx, table);
 
@@ -1237,13 +1235,12 @@ void Table::set_subtable(size_t col_ndx, size_t row_ndx, const Table* table, Tab
 }
 
 
-void Table::insert_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t, TableViewBase* view)
+void Table::insert_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
 {
     TIGHTDB_ASSERT(col_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Mixed);
     TIGHTDB_ASSERT(row_ndx <= m_size);
 
-    kill_views_except(view);
     ColumnMixed& mixed_col = get_column_mixed(col_ndx);
     mixed_col.insert_subtable(row_ndx, t);
 
@@ -1254,13 +1251,12 @@ void Table::insert_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t
 }
 
 
-void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t, TableViewBase* view)
+void Table::set_mixed_subtable(size_t col_ndx, size_t row_ndx, const Table* t)
 {
     TIGHTDB_ASSERT(col_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(col_ndx) == col_type_Mixed);
     TIGHTDB_ASSERT(row_ndx < m_size);
 
-    kill_views_except(view);
     ColumnMixed& mixed_col = get_column_mixed(col_ndx);
     mixed_col.set_subtable(row_ndx, t);
 
@@ -1325,12 +1321,11 @@ size_t Table::get_subtable_size(size_t col_idx, size_t row_idx) const TIGHTDB_NO
     return 0;
 }
 
-void Table::clear_subtable(size_t col_idx, size_t row_idx, TableViewBase* view)
+void Table::clear_subtable(size_t col_idx, size_t row_idx)
 {
     TIGHTDB_ASSERT(col_idx < get_column_count());
     TIGHTDB_ASSERT(row_idx <= m_size);
 
-    kill_views_except(view);
     ColumnType type = get_real_column_type(col_idx);
     if (type == col_type_Table) {
         ColumnTable& subtables = get_column_table(col_idx);
@@ -1375,12 +1370,11 @@ int64_t Table::get_int(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
     return column.get(ndx);
 }
 
-void Table::set_int(size_t column_ndx, size_t ndx, int64_t value, TableViewBase* view)
+void Table::set_int(size_t column_ndx, size_t ndx, int64_t value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    kill_views_except(view);
     Column& column = get_column(column_ndx);
     column.set(ndx, value);
 
@@ -1389,11 +1383,10 @@ void Table::set_int(size_t column_ndx, size_t ndx, int64_t value, TableViewBase*
 #endif
 }
 
-void Table::add_int(size_t column_ndx, int64_t value, TableViewBase* view)
+void Table::add_int(size_t column_ndx, int64_t value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Int);
-    kill_views_except(view);
     get_column(column_ndx).adjust(value);
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
@@ -1412,13 +1405,12 @@ bool Table::get_bool(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
     return column.get(ndx) != 0;
 }
 
-void Table::set_bool(size_t column_ndx, size_t ndx, bool value, TableViewBase* view)
+void Table::set_bool(size_t column_ndx, size_t ndx, bool value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_Bool);
     TIGHTDB_ASSERT(ndx < m_size);
 
-    kill_views_except(view);
     Column& column = get_column(column_ndx);
     column.set(ndx, value ? 1 : 0);
 
@@ -1437,13 +1429,12 @@ DateTime Table::get_datetime(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCE
     return time_t(column.get(ndx));
 }
 
-void Table::set_datetime(size_t column_ndx, size_t ndx, DateTime value, TableViewBase* view)
+void Table::set_datetime(size_t column_ndx, size_t ndx, DateTime value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(get_real_column_type(column_ndx) == col_type_DateTime);
     TIGHTDB_ASSERT(ndx < m_size);
 
-    kill_views_except(view);
     Column& column = get_column(column_ndx);
     column.set(ndx, int64_t(value.get_datetime()));
 
@@ -1475,12 +1466,11 @@ float Table::get_float(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
     return column.get(ndx);
 }
 
-void Table::set_float(size_t column_ndx, size_t ndx, float value, TableViewBase* view)
+void Table::set_float(size_t column_ndx, size_t ndx, float value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    kill_views_except(view);
     ColumnFloat& column = get_column_float(column_ndx);
     column.set(ndx, value);
 
@@ -1512,12 +1502,11 @@ double Table::get_double(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCEPT
     return column.get(ndx);
 }
 
-void Table::set_double(size_t column_ndx, size_t ndx, double value, TableViewBase* view)
+void Table::set_double(size_t column_ndx, size_t ndx, double value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    kill_views_except(view);
     ColumnDouble& column = get_column_double(column_ndx);
     column.set(ndx, value);
 
@@ -1556,12 +1545,11 @@ StringData Table::get_string(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCE
     return column.get(ndx);
 }
 
-void Table::set_string(size_t column_ndx, size_t ndx, StringData value, TableViewBase* view)
+void Table::set_string(size_t column_ndx, size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    kill_views_except(view);
     ColumnType type = get_real_column_type(column_ndx);
     if (type == col_type_String) {
         AdaptiveStringColumn& column = get_column_string(column_ndx);
@@ -1609,12 +1597,11 @@ BinaryData Table::get_binary(size_t column_ndx, size_t ndx) const TIGHTDB_NOEXCE
     return column.get(ndx);
 }
 
-void Table::set_binary(size_t column_ndx, size_t ndx, BinaryData value, TableViewBase* view)
+void Table::set_binary(size_t column_ndx, size_t ndx, BinaryData value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    kill_views_except(view);
     ColumnBinary& column = get_column_binary(column_ndx);
     column.set(ndx, value);
 
@@ -1678,12 +1665,11 @@ DataType Table::get_mixed_type(size_t column_ndx, size_t ndx) const TIGHTDB_NOEX
     return column.get_type(ndx);
 }
 
-void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value, TableViewBase* view)
+void Table::set_mixed(size_t column_ndx, size_t ndx, Mixed value)
 {
     TIGHTDB_ASSERT(column_ndx < get_column_count());
     TIGHTDB_ASSERT(ndx < m_size);
 
-    kill_views_except(view);
     ColumnMixed& column = get_column_mixed(column_ndx);
     DataType type = value.get_type();
 
@@ -1765,9 +1751,9 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value)
 #endif
 }
 
-void Table::insert_done(TableViewBase* view)
+void Table::insert_done()
 {
-    kill_views_except(view);
+    kill_views_except(NULL);
     ++m_size;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION

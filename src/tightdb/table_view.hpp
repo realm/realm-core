@@ -129,7 +129,11 @@ protected:
 
     /// Copy constructor.
     TableViewBase(const TableViewBase& tv):
-        m_table(tv.m_table), m_refs(tv.m_refs, Allocator::get_default()) {}
+        m_table(tv.m_table), m_refs(tv.m_refs, Allocator::get_default()) 
+    {
+        if (m_table)
+            m_table->register_view(this);
+    }
 
     /// Moving constructor.
     TableViewBase(TableViewBase*) TIGHTDB_NOEXCEPT;
@@ -320,6 +324,10 @@ inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
     m_table(tv->m_table),
     m_refs(tv->m_refs) // Note: This is a moving copy
 {
+    if (m_table) {
+        m_table->unregister_view(tv);
+        m_table->register_view(this);
+    }
     tv->m_table = TableRef();
     tv->m_refs.detach();
 }
@@ -327,6 +335,10 @@ inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
 inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
 {
     m_table = tv->m_table;
+    if (m_table) {
+        m_table->unregister_view(tv);
+        m_table->register_view(this);
+    }
     tv->m_table = TableRef();
     m_refs.move_assign(tv->m_refs);
 }
@@ -682,7 +694,7 @@ inline TableRef TableView::get_subtable(size_t column_ndx, size_t row_ndx)
     TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
-    return m_table->get_subtable(column_ndx, real_ndx, this);
+    return m_table->get_subtable(column_ndx, real_ndx);
 }
 
 inline ConstTableRef TableView::get_subtable(size_t column_ndx, size_t row_ndx) const
@@ -706,7 +718,7 @@ inline void TableView::clear_subtable(size_t column_ndx, size_t row_ndx)
     TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
-    return m_table->clear_subtable(column_ndx, real_ndx, this);
+    return m_table->clear_subtable(column_ndx, real_ndx);
 }
 
 
@@ -718,7 +730,7 @@ inline void TableView::set_int(size_t column_ndx, size_t row_ndx, int64_t value)
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Int);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
-    m_table->set_int(column_ndx, real_ndx, value, this);
+    m_table->set_int(column_ndx, real_ndx, value);
 }
 
 inline void TableView::set_bool(size_t column_ndx, size_t row_ndx, bool value)
@@ -726,7 +738,7 @@ inline void TableView::set_bool(size_t column_ndx, size_t row_ndx, bool value)
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Bool);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
-    m_table->set_bool(column_ndx, real_ndx, value, this);
+    m_table->set_bool(column_ndx, real_ndx, value);
 }
 
 inline void TableView::set_datetime(size_t column_ndx, size_t row_ndx, DateTime value)
@@ -734,7 +746,7 @@ inline void TableView::set_datetime(size_t column_ndx, size_t row_ndx, DateTime 
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_DateTime);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
-    m_table->set_datetime(column_ndx, real_ndx, value, this);
+    m_table->set_datetime(column_ndx, real_ndx, value);
 }
 
 inline void TableView::set_float(size_t column_ndx, size_t row_ndx, float value)
@@ -742,7 +754,7 @@ inline void TableView::set_float(size_t column_ndx, size_t row_ndx, float value)
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Float);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
-    m_table->set_float(column_ndx, real_ndx, value, this);
+    m_table->set_float(column_ndx, real_ndx, value);
 }
 
 inline void TableView::set_double(size_t column_ndx, size_t row_ndx, double value)
@@ -750,13 +762,13 @@ inline void TableView::set_double(size_t column_ndx, size_t row_ndx, double valu
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Double);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
-    m_table->set_double(column_ndx, real_ndx, value, this);
+    m_table->set_double(column_ndx, real_ndx, value);
 }
 
 template<class E> inline void TableView::set_enum(size_t column_ndx, size_t row_ndx, E value)
 {
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
-    m_table->set_int(column_ndx, real_ndx, value, this);
+    m_table->set_int(column_ndx, real_ndx, value);
 }
 
 inline void TableView::set_string(size_t column_ndx, size_t row_ndx, StringData value)
@@ -764,7 +776,7 @@ inline void TableView::set_string(size_t column_ndx, size_t row_ndx, StringData 
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_String);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
-    m_table->set_string(column_ndx, real_ndx, value, this);
+    m_table->set_string(column_ndx, real_ndx, value);
 }
 
 inline void TableView::set_binary(size_t column_ndx, size_t row_ndx, BinaryData value)
@@ -772,7 +784,7 @@ inline void TableView::set_binary(size_t column_ndx, size_t row_ndx, BinaryData 
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Binary);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
-    m_table->set_binary(column_ndx, real_ndx, value, this);
+    m_table->set_binary(column_ndx, real_ndx, value);
 }
 
 inline void TableView::set_mixed(size_t column_ndx, size_t row_ndx, Mixed value)
@@ -780,20 +792,20 @@ inline void TableView::set_mixed(size_t column_ndx, size_t row_ndx, Mixed value)
     TIGHTDB_ASSERT_INDEX_AND_TYPE(column_ndx, row_ndx, type_Mixed);
 
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
-    m_table->set_mixed(column_ndx, real_ndx, value, this);
+    m_table->set_mixed(column_ndx, real_ndx, value);
 }
 
 inline void TableView::set_subtable(size_t column_ndx, size_t row_ndx, const Table* value)
 {
     TIGHTDB_ASSERT_INDEX_AND_TYPE_TABLE_OR_MIXED(column_ndx, row_ndx);
     const size_t real_ndx = size_t(m_refs.get(row_ndx));
-    m_table->set_subtable(column_ndx, real_ndx, value, this);
+    m_table->set_subtable(column_ndx, real_ndx, value);
 }
 
 
 inline void TableView::add_int(size_t column_ndx, int64_t value)
 {
-    m_table->add_int(column_ndx, value, this);
+    m_table->add_int(column_ndx, value);
 }
 
 } // namespace tightdb
