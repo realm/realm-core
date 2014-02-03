@@ -417,8 +417,10 @@ void Table::remove_root_column(size_t column_ndx)
     adjust_column_index(column_ndx, diff, diff_in_parent);
 
     // If there are no columns left, mark the table as empty
-    if (get_column_count() == 0)
+    if (get_column_count() == 0) {
+        kill_views_except(NULL);
         m_size = 0;
+    }
 }
 
 
@@ -1155,6 +1157,7 @@ void Table::insert_empty_row(size_t ndx, size_t num_rows)
 
 void Table::clear()
 {
+    kill_views_except(NULL);
     size_t n = get_column_count();
     for (size_t i = 0; i != n; ++i) {
         ColumnBase& column = get_column_base(i);
