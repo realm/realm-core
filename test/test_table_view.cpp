@@ -224,7 +224,7 @@ TEST(TableViewSum)
     CHECK_EQUAL(10, sum);
 }
 
-TEST(TableViewSumNegative)
+TEST(TableViewIsValid)
 {
     TestTableInt table;
 
@@ -233,11 +233,17 @@ TEST(TableViewSumNegative)
     table.add(0);
 
     TestTableInt::View v = table.column().first.find_all(0);
+    TestTableInt::View v2 = table.column().first.find_all(0);
     v[0].first = 11;
-    v[2].first = -20;
+    CHECK_EQUAL(true, v.is_valid());
+    CHECK_EQUAL(true, v2.is_valid());
+    v.remove_last();
+    CHECK_EQUAL(true, v.is_valid());
+    CHECK_EQUAL(false, v2.is_valid());
 
-    int64_t sum = v.column().first.sum();
-    CHECK_EQUAL(-9, sum);
+    table.remove_last();
+    CHECK_EQUAL(false, v.is_valid());
+    CHECK_EQUAL(false, v2.is_valid());
 }
 
 TEST(TableViewMax)
