@@ -2673,11 +2673,13 @@ TEST(TestQuerySubtable)
     TableRef table = group.get_table("test");
 
     // Create specification with sub-table
+    DescriptorRef sub_1;
     table->add_column(type_Int,    "first");
     table->add_column(type_String, "second");
-    table->add_column(type_Table,  "third");
-    table->add_subcolumn(tuple(2), type_Int,    "sub_first");
-    table->add_subcolumn(tuple(2), type_String, "sub_second");
+    table->add_column(type_Table,  "third", &sub_1);
+    sub_1->add_column(type_Int,      "sub_first");
+    sub_1->add_column(type_String,   "sub_second");
+    sub_1.reset();
 
     CHECK_EQUAL(3, table->get_column_count());
 
@@ -3888,11 +3890,12 @@ TEST(TestQuerySubtableSyntaxCheck)
     string s;
 
     // Create specification with sub-table
+    DescriptorRef subdesc;
     table->add_column(type_Int,    "first");
     table->add_column(type_String, "second");
-    table->add_column(type_Table,  "third");
-    table->add_subcolumn(tuple(2), type_Int,    "sub_first");
-    table->add_subcolumn(tuple(2), type_String, "sub_second");
+    table->add_column(type_Table,  "third", &subdesc);
+    subdesc->add_column(type_Int,    "sub_first");
+    subdesc->add_column(type_String, "sub_second");
 
     // Main table
     table->insert_int(0, 0, 111);
@@ -4165,6 +4168,7 @@ TEST(TestQuery_Subtables_Typed)
 TEST(TestQuery_AllTypes_DynamicallyTyped)
 {
     Table table;
+    DescriptorRef sub1;
     table.add_column(type_Bool,     "boo");
     table.add_column(type_Int,      "int");
     table.add_column(type_Float,    "flt");
@@ -4172,9 +4176,10 @@ TEST(TestQuery_AllTypes_DynamicallyTyped)
     table.add_column(type_String,   "str");
     table.add_column(type_Binary,   "bin");
     table.add_column(type_DateTime, "dat");
-    table.add_column(type_Table,    "tab");
+    table.add_column(type_Table,    "tab", &sub1);
     table.add_column(type_Mixed,    "mix");
-    table.add_subcolumn(tuple(7), type_Int, "sub_int");
+    sub1->add_column(type_Int,        "sub_int");
+    sub1.reset();
 
     const char bin[4] = { 0, 1, 2, 3 };
     BinaryData bin1(bin, sizeof bin / 2);

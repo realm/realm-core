@@ -42,12 +42,13 @@ BasicColumn<T>::BasicColumn(Allocator& alloc)
 template<class T>
 BasicColumn<T>::BasicColumn(ref_type ref, ArrayParent* parent, std::size_t pndx, Allocator& alloc)
 {
-    bool root_is_leaf = root_is_leaf_from_ref(ref, alloc);
+    char* header = alloc.translate(ref);
+    bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
     if (root_is_leaf) {
-        m_array = new BasicArray<T>(ref, parent, pndx, alloc);
+        m_array = new BasicArray<T>(MemRef(header, ref), parent, pndx, alloc);
     }
     else {
-        m_array = new Array(ref, parent, pndx, alloc);
+        m_array = new Array(MemRef(header, ref), parent, pndx, alloc);
     }
 }
 

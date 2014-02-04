@@ -62,6 +62,8 @@ public:
     /// initialized to zero size blobs.
     static ref_type create_array(std::size_t size, Allocator&);
 
+    static std::size_t get_size_from_header(const char*, Allocator&) TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
 #endif
@@ -94,6 +96,14 @@ inline BinaryData ArrayBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     std::size_t begin = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     std::size_t end   = to_size_t(m_offsets.get(ndx));
     return BinaryData(m_blob.get(begin), end-begin);
+}
+
+inline std::size_t ArrayBinary::get_size_from_header(const char* header,
+                                                     Allocator& alloc) TIGHTDB_NOEXCEPT
+{
+    ref_type offsets_ref = to_ref(Array::get(header, 0));
+    const char* offsets_header = alloc.translate(offsets_ref);
+    return Array::get_size_from_header(offsets_header);
 }
 
 

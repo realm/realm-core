@@ -11,6 +11,17 @@ Format:
 . Any other notes ....                   (internal changes)
 
 
+2014-02-04 (Kristian Spangsege)
++ Introducing Table::get_parent_table() with allows a subtable to know its parent table.
++ Table::rename_subcolumn() and Table::remove_subcolumn() now take an extra argument which is the index of the column to rename. Before the index was specified as part of the path.
++ Introducing Table::insert_column() and Table::insert_subcolumn() for inserting new columns at arbitrary positions.
++ New class `Descriptor` introduced into the public API. It plays the role that `Spec` played before. Class `Spec` is no longer to be considered part of the public API.
++ Table::add_column() now takes a third optinal argument `DescriptorRef* subdesc`.
++ Introducing Table::get_descriptor() and Table::get_subdescriptor()
+- Table::get_spec() and Table::update_from_spec() removed from public API since are part of the now non-public `Spec` API.
+. Table::has_shared_spec() renamed to Table::has_shared_type().
+
+
 2014-01-27 (Brian Munkholm)
 ! Fixed bug in Query with subtables. Whith empty subtables query returned incorrect results.
   In debug mode it could assert when querying a subtable with more columns than the base table.
@@ -18,7 +29,6 @@ Format:
 
 2014-01-23 (Kenneth Geisshirt)
 ! Fixed bug: Subtable queries is validated by Query::validate(). An invalid subtable query can lead to a segfault.
-
 
 
 2014-01-07 (Kenneth Geisshirt)

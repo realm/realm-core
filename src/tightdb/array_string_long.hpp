@@ -63,6 +63,8 @@ public:
 
     ref_type bptree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase&);
 
+    static std::size_t get_size_from_header(const char*, Allocator&) TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
@@ -104,6 +106,14 @@ inline StringData ArrayStringLong::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     }
     --end; // Discount the terminating zero
     return StringData(m_blob.get(begin), end-begin);
+}
+
+inline std::size_t ArrayStringLong::get_size_from_header(const char* header,
+                                                         Allocator& alloc) TIGHTDB_NOEXCEPT
+{
+    ref_type offsets_ref = to_ref(Array::get(header, 0));
+    const char* offsets_header = alloc.translate(offsets_ref);
+    return Array::get_size_from_header(offsets_header);
 }
 
 
