@@ -24,8 +24,7 @@ DESCR      : &g_dyn_view_intro_descr
              a table cause any views linked to the table to become detached.
              Access to detached views are undefined, except for the is_attached() method.
 
-             It is possible to create multiple views for the table as
-             long as you do not change the original table. Updates to one
+             It is possible to create multiple views for one table. Updates to one
              view propagates to the original table and is visible from other
              views linked to the same table. Deletion of rows through a view
              propagates to the original table and cause any other views
