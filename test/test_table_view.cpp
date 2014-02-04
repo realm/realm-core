@@ -224,6 +224,22 @@ TEST(TableViewSum)
     CHECK_EQUAL(10, sum);
 }
 
+TEST(TableViewSumNegative)
+{
+    TestTableInt table;
+
+    table.add(0);
+    table.add(0);
+    table.add(0);
+
+    TestTableInt::View v = table.column().first.find_all(0);
+    v[0].first = 11;
+    v[2].first = -20;
+
+    int64_t sum = v.column().first.sum();
+    CHECK_EQUAL(-9, sum);
+}
+
 TEST(TableViewIsValid)
 {
     TestTableInt table;
