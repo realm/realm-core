@@ -522,7 +522,7 @@ public:
     class Parent;
 
 protected:
-   /// Get the subtable at the specified column and row index.
+    /// Get the subtable at the specified column and row index.
     ///
     /// The returned table pointer must always end up being wrapped in
     /// a TableRef.
@@ -549,7 +549,7 @@ private:
 
     void do_remove(std::size_t row_ndx);
 
-     // Number of rows in this table
+    // Number of rows in this table
     std::size_t m_size;
 
     // On-disk format
