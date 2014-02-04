@@ -2717,7 +2717,7 @@ TEST(TestQuerySubtable)
     subtable->insert_string(1, 1, "c");
     subtable->insert_done();
 
-    /*  Intentially have empty (degenerate) subtable 
+    /*  Intentioally have empty (degenerate) subtable 
     subtable = table->get_subtable(2, 2);
     subtable->insert_int(0, 0, 44);
     subtable->insert_string(1, 0, "d");
