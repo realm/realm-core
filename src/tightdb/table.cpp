@@ -1189,10 +1189,9 @@ void Table::clear()
 #endif
 }
 
-void Table::from_view_remove(size_t ndx, TableViewBase* view)
+void Table::do_remove(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_size);
-    detach_views_except(view);
     bool is_last = ndx == m_size - 1;
 
     size_t n = get_column_count();

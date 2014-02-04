@@ -547,6 +547,8 @@ private:
     // view management support:
     void from_view_remove(std::size_t row_ndx, TableViewBase* view);
 
+    void do_remove(std::size_t row_ndx);
+
      // Number of rows in this table
     std::size_t m_size;
 
@@ -787,7 +789,14 @@ private:
 
 inline void Table::remove(std::size_t row_ndx) 
 { 
-    from_view_remove(row_ndx, NULL); 
+    detach_views_except(NULL);
+    do_remove(row_ndx); 
+}
+
+inline void Table::from_view_remove(std::size_t row_ndx, TableViewBase* view) 
+{ 
+    detach_views_except(view);
+    do_remove(row_ndx); 
 }
 
 inline void Table::remove_last() 
