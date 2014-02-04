@@ -5,6 +5,15 @@
 #include <fstream>
 #include <sys/stat.h>
 
+// File permissions for Windows
+// http://stackoverflow.com/questions/592448/c-how-to-set-file-permissions-cross-platform
+#ifdef _WIN32
+#include <io.h>
+typedef int mode_t;
+static const mode_t S_IWUSR = mode_t(_S_IWRITE);
+static const mode_t MS_MODE_MASK = 0x0000ffff;
+#endif
+
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
@@ -79,7 +88,11 @@ TEST(Group_Permissions)
         group1.write("test.tightdb");
     }
 
+#ifdef _WIN32
+    _chmod("test.tightdb", S_IWUSR & MS_MODE_MASK);
+#else
     chmod("test.tightdb", S_IWUSR);
+#endif
 
     {
         Group group2;
