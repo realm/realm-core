@@ -96,6 +96,8 @@ public:
 
     static ref_type create(std::size_t size, Allocator&);
 
+    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
@@ -180,6 +182,29 @@ inline StringIndex* AdaptiveStringColumn::release_index() TIGHTDB_NOEXCEPT
     m_index = 0;
     return i;
 }
+
+inline std::size_t AdaptiveStringColumn::get_size_from_ref(ref_type root_ref,
+                                                           Allocator& alloc) TIGHTDB_NOEXCEPT
+{
+    const char* root_header = alloc.translate(root_ref);
+    bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
+    if (root_is_leaf) {
+        bool long_strings = Array::get_hasrefs_from_header(root_header);
+        if (!long_strings) {
+            // Small strings leaf
+            return ArrayString::get_size_from_header(root_header);
+        }
+        bool is_big = Array::get_context_bit_from_header(root_header);
+        if (!is_big) {
+            // Medium strings leaf
+            return ArrayStringLong::get_size_from_header(root_header, alloc);
+        }
+        // Big strings leaf
+        return ArrayBigBlobs::get_size_from_header(root_header);
+    }
+    return Array::get_bptree_size_from_header(root_header);
+}
+
 
 } // namespace tightdb
 

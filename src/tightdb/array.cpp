@@ -3698,7 +3698,7 @@ void Array::create_bptree_offsets(Array& offsets, int_fast64_t first_value)
 }
 
 
-int64_t Array::get(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
+int_fast64_t Array::get(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);
@@ -3706,10 +3706,10 @@ int64_t Array::get(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 }
 
 
-pair<size_t, size_t> Array::get_size_pair(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
+pair<int_least64_t, int_least64_t> Array::get_two(const char* header, size_t ndx) TIGHTDB_NOEXCEPT
 {
     const char* data = get_data_from_header(header);
     int width = get_width_from_header(header);
-    pair<int_fast64_t, int_fast64_t> p = get_two(data, width, ndx);
-    return make_pair(to_size_t(p.first), to_size_t(p.second));
+    pair<int_fast64_t, int_fast64_t> p = ::get_two(data, width, ndx);
+    return make_pair(int_least64_t(p.first), int_least64_t(p.second));
 }

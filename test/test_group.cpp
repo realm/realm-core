@@ -551,12 +551,12 @@ TEST(Group_Serialize_All)
     Group to_mem;
     TableRef table = to_mem.get_table("test");
 
-    table->add_column(type_Int,    "int");
-    table->add_column(type_Bool,   "bool");
-    table->add_column(type_DateTime,   "date");
-    table->add_column(type_String, "string");
-    table->add_column(type_Binary, "binary");
-    table->add_column(type_Mixed,  "mixed");
+    table->add_column(type_Int,      "int");
+    table->add_column(type_Bool,     "bool");
+    table->add_column(type_DateTime, "date");
+    table->add_column(type_String,   "string");
+    table->add_column(type_Binary,   "binary");
+    table->add_column(type_Mixed,    "mixed");
 
     table->insert_int(0, 0, 12);
     table->insert_bool(1, 0, true);
@@ -595,12 +595,12 @@ TEST(Group_Persist)
 
     // Insert some data
     TableRef table = db.get_table("test");
-    table->add_column(type_Int,    "int");
-    table->add_column(type_Bool,   "bool");
-    table->add_column(type_DateTime,   "date");
-    table->add_column(type_String, "string");
-    table->add_column(type_Binary, "binary");
-    table->add_column(type_Mixed,  "mixed");
+    table->add_column(type_Int,      "int");
+    table->add_column(type_Bool,     "bool");
+    table->add_column(type_DateTime, "date");
+    table->add_column(type_String,   "string");
+    table->add_column(type_Binary,   "binary");
+    table->add_column(type_Mixed,    "mixed");
     table->insert_int(0, 0, 12);
     table->insert_bool(1, 0, true);
     table->insert_datetime(2, 0, 12345);
@@ -655,10 +655,12 @@ TEST(Group_Subtable)
 
     Group g;
     TableRef table = g.get_table("test");
-    table->add_column(type_Int, "foo");
-    table->add_column(type_Table, "sub");
+    DescriptorRef sub;
+    table->add_column(type_Int,   "foo");
+    table->add_column(type_Table, "sub", &sub);
     table->add_column(type_Mixed, "baz");
-    table->add_subcolumn(tuple(1), type_Int, "bar");
+    sub->add_column(type_Int, "bar");
+    sub.reset();
 
     for (int i=0; i<n; ++i) {
         table->add_empty_row();
@@ -889,12 +891,15 @@ TEST(Group_MultiLevelSubtables)
     {
         Group g;
         TableRef table = g.get_table("test");
-        table->add_column(type_Int, "int");
-        table->add_column(type_Table, "tab");
-        table->add_column(type_Mixed, "mix");
-        table->add_subcolumn(tuple(1), type_Int, "int");
-        table->add_subcolumn(tuple(1), type_Table, "tab");
-        table->add_subcolumn(tuple(1,1), type_Int, "int");
+        {
+            DescriptorRef sub_1, sub_2;
+            table->add_column(type_Int,   "int");
+            table->add_column(type_Table, "tab", &sub_1);
+            table->add_column(type_Mixed, "mix");
+            sub_1->add_column(type_Int,   "int");
+            sub_1->add_column(type_Table, "tab", &sub_2);
+            sub_2->add_column(type_Int,   "int");
+        }
         table->add_empty_row();
         {
             TableRef a = table->get_subtable(1, 0);
@@ -1013,8 +1018,10 @@ TEST(Group_CommitSubtable)
     Group group("test.tightdb", Group::mode_ReadWrite);
 
     TableRef table = group.get_table("test");
-    table->add_column(type_Table, "subtable");
-    table->add_subcolumn(tuple(0), type_Int, "int");
+    DescriptorRef sub_1;
+    table->add_column(type_Table, "subtable", &sub_1);
+    sub_1->add_column(type_Int,   "int");
+    sub_1.reset();
     table->add_empty_row();
 
     TableRef subtable = table->get_subtable(0,0);
@@ -1213,19 +1220,18 @@ TEST(Group_ToDot)
 
     // Create table with all column types
     TableRef table = mygroup.get_table("test");
-    Spec s = table->get_spec();
-    s.add_column(type_Int,    "int");
-    s.add_column(type_Bool,   "bool");
-    s.add_column(type_DateTime,   "date");
-    s.add_column(type_String, "string");
-    s.add_column(type_String, "string_long");
-    s.add_column(type_String, "string_enum"); // becomes ColumnStringEnum
-    s.add_column(type_Binary, "binary");
-    s.add_column(type_Mixed,  "mixed");
-    Spec sub = s.add_subtable_column("tables");
-    sub.add_column(type_Int,  "sub_first");
-    sub.add_column(type_String, "sub_second");
-    table->UpdateFromSpec(s.get_ref());
+    DescriptorRef subdesc;
+    s.add_column(type_Int,      "int");
+    s.add_column(type_Bool,     "bool");
+    s.add_column(type_DateTime, "date");
+    s.add_column(type_String,   "string");
+    s.add_column(type_String,   "string_long");
+    s.add_column(type_String,   "string_enum"); // becomes ColumnStringEnum
+    s.add_column(type_Binary,   "binary");
+    s.add_column(type_Mixed,    "mixed");
+    s.add_column(type_Table,    "tables", &subdesc);
+    subdesc->add_column(type_Int,    "sub_first");
+    subdesc->add_column(type_String, "sub_second");
 
     // Add some rows
     for (size_t i = 0; i < 15; ++i) {
