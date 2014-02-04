@@ -424,7 +424,7 @@ void Table::remove_root_column(size_t column_ndx)
 }
 
 
-void Table::unregister_view(const TableViewBase* view)
+void Table::unregister_view(const TableViewBase* view) TIGHTDB_NOEXCEPT
 {
     // Fixme: O(n) may be unacceptable - if so, put and maintain
     // iterator or index in TableViewBase.
@@ -608,7 +608,7 @@ void Table::detach() TIGHTDB_NOEXCEPT
     detach_views_except(NULL);
 }
 
-void Table::detach_views_except(const TableViewBase* view)
+void Table::detach_views_except(const TableViewBase* view) TIGHTDB_NOEXCEPT
 {
     std::vector<const TableViewBase*>::iterator end = m_views.end();
     std::vector<const TableViewBase*>::iterator it = m_views.begin();
