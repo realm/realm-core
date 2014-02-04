@@ -284,14 +284,14 @@ public:
     // Row handling
     std::size_t add_empty_row(std::size_t num_rows = 1);
     void        insert_empty_row(std::size_t row_ndx, std::size_t num_rows = 1);
-    void        remove(std::size_t row_ndx) { remove(row_ndx, NULL); };
-    void        remove_last() { remove_last(NULL); };
+    void        remove(std::size_t row_ndx);
+    void        remove_last();
 
     /// Move the last row to the specified index. This overwrites the
     /// target row and reduces the number of rows by one. The
     /// specified index must be strictly less than `N-1`, where `N` is
     /// the number of rows in the table.
-    void move_last_over(std::size_t ndx)  { move_last_over(ndx, NULL); };
+    void move_last_over(std::size_t ndx);
     // Insert row
     // NOTE: You have to insert values in ALL columns followed by insert_done().
     void insert_int(std::size_t column_ndx, std::size_t row_ndx, int64_t value);
@@ -522,11 +522,7 @@ public:
     class Parent;
 
 protected:
-    void remove(std::size_t row_ndx, TableViewBase* view);
-    void remove_last(TableViewBase* view);
-    void move_last_over(std::size_t ndx, TableViewBase* view);
-
-    /// Get the subtable at the specified column and row index.
+   /// Get the subtable at the specified column and row index.
     ///
     /// The returned table pointer must always end up being wrapped in
     /// a TableRef.
@@ -548,7 +544,10 @@ protected:
     void set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
 
 private:
-    // Number of rows in this table
+    // view management support:
+    void from_view_remove(std::size_t row_ndx, TableViewBase* view);
+
+     // Number of rows in this table
     std::size_t m_size;
 
     // On-disk format
@@ -563,7 +562,7 @@ private:
     mutable Descriptor* m_descriptor;
 
     // Table view instances
-    mutable std::vector<const TableViewBase*> views;
+    mutable std::vector<const TableViewBase*> m_views;
 
     /// Disable copying assignment.
     ///
@@ -695,26 +694,9 @@ private:
     void bind_ref() const TIGHTDB_NOEXCEPT { ++m_ref_count; }
     void unbind_ref() const TIGHTDB_NOEXCEPT { if (--m_ref_count == 0) delete this; }
 
-    void register_view(const TableViewBase* view)
-    {
-        views.push_back(view);
-    }
-
-    void unregister_view(const TableViewBase* view)
-    {
-        // Fixme: O(n) may be unacceptable - if so, put and maintain
-        // iterator or index in TableViewBase.
-        std::vector<const TableViewBase*>::iterator it;
-        for (it = views.begin(); it != views.end(); ++it) {
-            if (*it == view) {
-                *it = views.back();
-                views.pop_back();
-                break;
-            }
-        }
-    }
-
-    void kill_views_except(const TableViewBase* view);
+    void register_view(const TableViewBase* view);
+    void unregister_view(const TableViewBase* view) TIGHTDB_NOEXCEPT;
+    void detach_views_except(const TableViewBase* view) TIGHTDB_NOEXCEPT;
 
     class UnbindGuard;
 
@@ -801,6 +783,23 @@ private:
     friend class ParentNode;
     template<class> friend class SequentialGetter;
 };
+
+
+inline void Table::remove(std::size_t row_ndx) 
+{ 
+    from_view_remove(row_ndx, NULL); 
+}
+
+inline void Table::remove_last() 
+{ 
+    if (!is_empty())
+        remove(size()-1); 
+}
+
+inline void Table::register_view(const TableViewBase* view)
+{
+    m_views.push_back(view);
+}
 
 
 
@@ -981,7 +980,6 @@ inline Table::Table(ref_count_tag, ConstSubspecRef shared_spec, ref_type columns
 inline void Table::set_index(std::size_t column_ndx)
 {
     detach_subtable_accessors();
-    kill_views_except(NULL);
     set_index(column_ndx, true);
 }
 
@@ -1012,12 +1010,6 @@ inline bool Table::is_empty() const TIGHTDB_NOEXCEPT
 inline std::size_t Table::size() const TIGHTDB_NOEXCEPT
 {
     return m_size;
-}
-
-inline void Table::remove_last(TableViewBase* view)
-{
-    if (!is_empty())
-        remove(m_size-1, view);
 }
 
 inline void Table::insert_bool(std::size_t column_ndx, std::size_t row_ndx, bool value)
