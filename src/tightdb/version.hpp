@@ -23,15 +23,16 @@
 #include <string>
 #include <sstream>
 
-#define TIGHTDB_VER_MAJOR   0
-#define TIGHTDB_VER_MINOR   1
-#define TIGHTDB_VER_PATCH   6
+#define TIGHTDB_VER_MAJOR 0
+#define TIGHTDB_VER_MINOR 1
+#define TIGHTDB_VER_PATCH 6
 
 namespace tightdb {
 
 enum Feature {
+    feature_Debug,
     feature_Replication
-}
+};
 
 class Version
 {
@@ -41,42 +42,8 @@ public:
     static int get_patch() { return TIGHTDB_VER_PATCH; }
     static std::string get_version();
     static bool is_at_least(int major, int minor, int patch);
-    bool has_feature(Feature feature);
+    static bool has_feature(Feature feature);
 };
-
-
-// Implementation:
-
-std::string Version::get_version() 
-{
-    std::stringstream ss;
-    ss << get_major() << "." << get_minor() << "." << get_patch();
-    return ss.str();
-}
-
-bool Version::is_at_least(int major, int minor, int patch)
-{
-    if (get_major() < major)
-        return false;
-    if (get_minor() < minor)
-        return false;
-    if (get_patch() < patch)
-        return false;
-}
-
-bool Version::has_feature(Feature feature)
-{
-    switch (feature)
-    {
-        case feature_Replication:
-#ifdef TIGHTDB_ENABLE_REPLICATION
-            return true;
-#else
-            return false;
-#endif
-    }
-    return false;
-}
 
 
 } // namespace tigthdb

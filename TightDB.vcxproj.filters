@@ -217,6 +217,12 @@
     <ClCompile Include="test\test_descriptor.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="src\tightdb\version.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_version.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">
@@ -424,6 +430,9 @@
       <Filter>src\include</Filter>
     </ClInclude>
     <ClInclude Include="src\tightdb\descriptor_fwd.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\version.hpp">
       <Filter>src\include</Filter>
     </ClInclude>
   </ItemGroup>
