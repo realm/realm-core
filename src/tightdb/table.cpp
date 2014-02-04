@@ -429,7 +429,8 @@ void Table::unregister_view(const TableViewBase* view)
     // Fixme: O(n) may be unacceptable - if so, put and maintain
     // iterator or index in TableViewBase.
     std::vector<const TableViewBase*>::iterator it;
-    for (it = m_views.begin(); it != m_views.end(); ++it) {
+    std::vector<const TableViewBase*>::iterator end = m_views.end();
+    for (it = m_views.begin(); it != end; ++it) {
         if (*it == view) {
             *it = m_views.back();
             m_views.pop_back();
@@ -609,12 +610,15 @@ void Table::detach() TIGHTDB_NOEXCEPT
 
 void Table::detach_views_except(const TableViewBase* view)
 {
-    while (m_views.size()) {
-        const TableViewBase* v = m_views.back();
-        m_views.pop_back();
+    std::vector<const TableViewBase*>::iterator end = m_views.end();
+    std::vector<const TableViewBase*>::iterator it = m_views.begin();
+    while (it != end) {
+        const TableViewBase* v = *it;
         if (v != view)
             v->detach();
+        ++it;
     }
+    m_views.clear();
     if (view)
         m_views.push_back(view);
 }
