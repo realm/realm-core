@@ -3,7 +3,7 @@
  * TIGHTDB CONFIDENTIAL
  * __________________
  *
- *  [2011] - [2012] TightDB Inc
+ *  [2011] - [2013] TightDB Inc
  *  All Rights Reserved.
  *
  * NOTICE:  All information contained herein is, and remains
@@ -29,6 +29,10 @@
 
 namespace tightdb {
 
+enum Feature {
+    feature_Replication
+}
+
 class Version
 {
 public:
@@ -37,8 +41,7 @@ public:
     static int get_patch() { return TIGHTDB_VER_PATCH; }
     static std::string get_version();
     static bool is_at_least(int major, int minor, int patch);
-    
-    // TODO: bool has_feature(feature)
+    bool has_feature(Feature feature);
 };
 
 
@@ -61,6 +64,19 @@ bool Version::is_at_least(int major, int minor, int patch)
         return false;
 }
 
+bool Version::has_feature(Feature feature)
+{
+    switch (feature)
+    {
+        case feature_Replication:
+#ifdef TIGHTDB_ENABLE_REPLICATION
+            return true;
+#else
+            return false;
+#endif
+    }
+    return false;
+}
 
 
 } // namespace tigthdb
