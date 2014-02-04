@@ -133,11 +133,7 @@ template<class> class BasicTable;
 /// \sa TableRef
 template<class T> class BasicTableRef: util::bind_ptr<T> {
 public:
-#ifdef TIGHTDB_HAVE_CXX11_CONSTEXPR
-    constexpr BasicTableRef() TIGHTDB_NOEXCEPT {}
-#else
-    BasicTableRef() TIGHTDB_NOEXCEPT {}
-#endif
+    TIGHTDB_CONSTEXPR BasicTableRef() TIGHTDB_NOEXCEPT {}
     ~BasicTableRef() TIGHTDB_NOEXCEPT {}
 
 #ifdef TIGHTDB_HAVE_CXX11_RVALUE_REFERENCE
@@ -209,7 +205,9 @@ public:
 #  endif
 #endif
 
+    T* get() const TIGHTDB_NOEXCEPT { return util::bind_ptr<T>::get(); }
     void reset() TIGHTDB_NOEXCEPT { util::bind_ptr<T>::reset(); }
+    void reset(T* t) TIGHTDB_NOEXCEPT { util::bind_ptr<T>::reset(t); }
 
     void swap(BasicTableRef& r) TIGHTDB_NOEXCEPT { this->util::bind_ptr<T>::swap(r); }
     friend void swap(BasicTableRef& a, BasicTableRef& b) TIGHTDB_NOEXCEPT { a.swap(b); }

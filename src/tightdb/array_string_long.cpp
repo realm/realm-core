@@ -27,7 +27,8 @@ ArrayStringLong::ArrayStringLong(MemRef mem, ArrayParent* parent, size_t ndx_in_
     m_offsets(Array::get_as_ref(0), 0, 0, alloc),
     m_blob(Array::get_as_ref(1), 0, 0, alloc)
 {
-    TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
+    // has_refs() indicates that this is a long string
+    TIGHTDB_ASSERT(has_refs() && !is_inner_bptree_node());
     TIGHTDB_ASSERT(Array::size() == 2);
     TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : to_size_t(m_offsets.back())));
 
@@ -41,7 +42,8 @@ ArrayStringLong::ArrayStringLong(ref_type ref, ArrayParent* parent, size_t ndx_i
     m_offsets(Array::get_as_ref(0), 0, 0, alloc),
     m_blob(Array::get_as_ref(1), 0, 0, alloc)
 {
-    TIGHTDB_ASSERT(has_refs() && is_leaf()); // has_refs() indicates that this is a long string
+    // has_refs() indicates that this is a long string
+    TIGHTDB_ASSERT(has_refs() && !is_inner_bptree_node());
     TIGHTDB_ASSERT(Array::size() == 2);
     TIGHTDB_ASSERT(m_blob.size() == (m_offsets.is_empty() ? 0 : to_size_t(m_offsets.back())));
 
@@ -97,14 +99,14 @@ void ArrayStringLong::erase(size_t ndx)
     m_offsets.adjust(ndx, m_offsets.size(), int64_t(begin) - int64_t(end));
 }
 
-void ArrayStringLong::resize(size_t ndx)
+void ArrayStringLong::truncate(size_t size)
 {
-    TIGHTDB_ASSERT(ndx < m_offsets.size());
+    TIGHTDB_ASSERT(size < m_offsets.size());
 
-    size_t size = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t blob_size = size ? to_size_t(m_offsets.get(size-1)) : 0;
 
-    m_offsets.resize(ndx);
-    m_blob.resize(size);
+    m_offsets.truncate(size);
+    m_blob.truncate(blob_size);
 }
 
 void ArrayStringLong::clear()
@@ -167,16 +169,16 @@ void ArrayStringLong::find_all(Array& result, StringData value, size_t add_offse
 
 StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    pair<size_t, size_t> p = get_size_pair(header, 0);
-    ref_type offsets_ref = p.first;
-    ref_type blob_ref    = p.second;
+    pair<int_least64_t, int_least64_t> p = get_two(header, 0);
+    ref_type offsets_ref = to_ref(p.first);
+    ref_type blob_ref    = to_ref(p.second);
 
     const char* offsets_header = alloc.translate(offsets_ref);
     size_t begin, end;
     if (0 < ndx) {
-        p = get_size_pair(offsets_header, ndx-1);
-        begin = p.first;
-        end   = p.second;
+        p = get_two(offsets_header, ndx-1);
+        begin = to_size_t(p.first);
+        end   = to_size_t(p.second);
     }
     else {
         begin = 0;
@@ -211,7 +213,7 @@ ref_type ArrayStringLong::bptree_leaf_insert(size_t ndx, StringData value, TreeI
         for (size_t i = ndx; i != leaf_size; ++i) {
             new_leaf.add(get(i));
         }
-        resize(ndx);
+        truncate(ndx);
         add(value);
         state.m_split_offset = ndx + 1;
     }

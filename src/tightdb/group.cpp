@@ -335,8 +335,8 @@ void Group::detach_table_accessors() TIGHTDB_NOEXCEPT
     iter end = m_table_accessors.end();
     for (iter i = m_table_accessors.begin(); i != end; ++i) {
         if (Table* t = *i) {
-            t->detach();
-            t->unbind_ref();
+            _impl::TableFriend::detach(*t);
+            _impl::TableFriend::unbind_ref(*t);
         }
     }
 }
@@ -370,9 +370,9 @@ Table* Group::get_table_by_ndx(size_t ndx)
     Table* table = m_table_accessors[ndx];
     if (!table) {
         ref_type ref = m_tables.get_as_ref(ndx);
-        table = new Table(Table::ref_count_tag(), m_alloc, ref, this, ndx); // Throws
+        table = _impl::TableFriend::create_ref_counted(m_alloc, ref, this, ndx); // Throws
         m_table_accessors[ndx] = table;
-        table->bind_ref(); // Increase reference count from 0 to 1
+        _impl::TableFriend::bind_ref(*table); // Increase reference count from 0 to 1
     }
     return table;
 }
@@ -388,7 +388,7 @@ ref_type Group::create_new_table(StringData name)
     // side-effects when it throws, at least not in any way that
     // matters.
 
-    Array::DestroyGuard ref_dg(Table::create_empty_table(m_alloc), m_alloc); // Throws
+    Array::DestroyGuard ref_dg(_impl::TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
     size_t ndx = m_tables.size();
     TIGHTDB_ASSERT(ndx == m_table_names.size());
     m_tables.insert(ndx, ref_dg.get()); // Throws
@@ -434,18 +434,19 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
         repl->new_top_level_table(name); // Throws
 #endif
 
-    Array::DestroyGuard ref_dg(Table::create_empty_table(m_alloc), m_alloc); // Throws
-    Table::UnbindGuard table_ug(new Table(Table::ref_count_tag(), m_alloc,
-                                          ref_dg.get(), null_ptr, 0)); // Throws
+    Array::DestroyGuard ref_dg(_impl::TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
+    typedef _impl::TableFriend::UnbindGuard TableUnbindGuard;
+    TableUnbindGuard table_ug(_impl::TableFriend::create_ref_counted(m_alloc, ref_dg.get(),
+                                                                     null_ptr, 0)); // Throws
 
     // The table accessor owns the ref until the point below where a
     // parent is set in Table::m_top.
     ref_type ref = ref_dg.release();
-    table_ug->bind_ref(); // Increase reference count from 0 to 1
+    _impl::TableFriend::bind_ref(*table_ug); // Increase reference count from 0 to 1
 
     size_t ndx = m_tables.size();
     m_table_accessors.resize(ndx+1); // Throws
-    table_ug->m_top.set_parent(this, ndx);
+    _impl::TableFriend::set_top_parent(*table_ug, this, ndx);
     try {
         if (spec_setter)
             (*spec_setter)(*table_ug); // Throws
@@ -465,7 +466,7 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
         }
     }
     catch (...) {
-        table_ug->m_top.set_parent(0,0);
+        _impl::TableFriend::set_top_parent(*table_ug, 0, 0);
         throw;
     }
 }
@@ -577,12 +578,12 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
     // info.
     TIGHTDB_ASSERT(m_top.size() >= 5);
 
-    // Array nodes that a part of the previous version of the database
-    // will not be overwritte by Group::commit(). This is necessary
-    // for robustness in the face of abrupt termination of the
-    // process. It also means that we can be sure that an array
+    // Array nodes that are part of the previous version of the
+    // database will not be overwritten by Group::commit(). This is
+    // necessary for robustness in the face of abrupt termination of
+    // the process. It also means that we can be sure that an array
     // remains unchanged across a commit if the new ref is equal to
-    // the old ref and the ref is below the previous basline.
+    // the old ref and the ref is below the previous baseline.
 
     if (top_ref < old_baseline && m_top.get_ref() == top_ref)
         return;
@@ -605,7 +606,7 @@ void Group::update_refs(ref_type top_ref, size_t old_baseline) TIGHTDB_NOEXCEPT
     iter end = m_table_accessors.end();
     for (iter i = m_table_accessors.begin(); i != end; ++i) {
         if (Table* table = *i)
-            table->update_from_parent(old_baseline);
+            _impl::TableFriend::update_from_parent(*table, old_baseline);
     }
 }
 

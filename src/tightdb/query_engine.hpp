@@ -356,7 +356,7 @@ public:
     {
         if (TAction == act_ReturnFirst)
             m_column_action_specializer = & ThisType::column_action_specialization<act_ReturnFirst, int64_t>;
-        
+
         else if (TAction == act_Count)
             m_column_action_specializer = & ThisType::column_action_specialization<act_Count, int64_t>;
 
@@ -398,12 +398,12 @@ public:
     {
         // Sum of float column must accumulate in double
         typedef typename ColumnTypeTraitsSum<TSourceColumn, TAction>::sum_type TResult;
-        TIGHTDB_STATIC_ASSERT( !(TAction == act_Sum && (util::SameType<TSourceColumn, float>::value && 
+        TIGHTDB_STATIC_ASSERT( !(TAction == act_Sum && (util::SameType<TSourceColumn, float>::value &&
                                                         !util::SameType<TResult, double>::value)), "");
-        
+
         // TResult: type of query result
         // TSourceColumn: type of aggregate source
-        TSourceColumn av = (TSourceColumn)0; 
+        TSourceColumn av = (TSourceColumn)0;
         // uses_val test becuase compiler cannot see that Column::Get has no side effect and result is discarded
         if (static_cast<QueryState<TResult>*>(st)->template uses_val<TAction>() && source_column != null_ptr) {
             TIGHTDB_ASSERT(dynamic_cast<SequentialGetter<TSourceColumn>*>(source_column) != null_ptr);
@@ -568,6 +568,16 @@ public:
             m_child2->init(table);
     }
 
+    std::string validate()
+    {
+        if (error_code != "")
+            return error_code;
+        if (m_child == 0)
+            return "Unbalanced subtable/end_subtable block";
+        else
+            return m_child->validate();
+    }
+
     size_t find_first_local(size_t start, size_t end) TIGHTDB_OVERRIDE
     {
         TIGHTDB_ASSERT(m_table);
@@ -632,7 +642,7 @@ public:
         return b;
     }
 
-    IntegerNodeBase() :  m_array(Array::no_prealloc_tag()) 
+    IntegerNodeBase() :  m_array(Array::no_prealloc_tag())
     {
         m_child = 0;
         m_conds = 0;
@@ -690,37 +700,37 @@ public:
         m_TAction = TAction;
 
         if (TAction == act_ReturnFirst)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_ReturnFirst, int64_t>;
+            m_find_callback_specialized = &ThisType::template find_callback_specialization<act_ReturnFirst, int64_t>;
 
         else if (TAction == act_Count)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Count, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Count, int64_t>;
 
         else if (TAction == act_Sum && col_id == type_Int)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Sum, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Sum, int64_t>;
         else if (TAction == act_Sum && col_id == type_Float)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Sum, float>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Sum, float>;
         else if (TAction == act_Sum && col_id == type_Double)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Sum, double>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Sum, double>;
 
         else if (TAction == act_Max && col_id == type_Int)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Max, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Max, int64_t>;
         else if (TAction == act_Max && col_id == type_Float)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Max, float>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Max, float>;
         else if (TAction == act_Max && col_id == type_Double)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Max, double>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Max, double>;
 
         else if (TAction == act_Min && col_id == type_Int)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Min, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Min, int64_t>;
         else if (TAction == act_Min && col_id == type_Float)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Min, float>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Min, float>;
         else if (TAction == act_Min && col_id == type_Double)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_Min, double>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_Min, double>;
 
         else if (TAction == act_FindAll)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_FindAll, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_FindAll, int64_t>;
 
         else if (TAction == act_CallbackIdx)
-            m_find_callback_specialized = & ThisType::find_callback_specialization<act_CallbackIdx, int64_t>;
+            m_find_callback_specialized = & ThisType::template find_callback_specialization<act_CallbackIdx, int64_t>;
 
         else {
             TIGHTDB_ASSERT(false);
@@ -748,14 +758,14 @@ public:
         m_state = st;
 
         // If there are no other nodes than us (m_conds == 1) AND the column used for our condition is
-        // the same as the column used for the aggregate action, then the entire query can run within scope of that 
+        // the same as the column used for the aggregate action, then the entire query can run within scope of that
         // column only, with no references to other columns:
-        bool fastmode = (m_conds == 1 && 
+        bool fastmode = (m_conds == 1 &&
                          (source_column == null_ptr ||
                           (!m_fastmode_disabled
                            && static_cast<SequentialGetter<int64_t>*>(source_column)->m_column == m_condition_column)));
         for (size_t s = start; s < end; ) {
-            // Cache internal leafs
+            // Cache internal leaves
             if (s >= m_leaf_end) {
                 m_condition_column->GetBlock(s, m_array, m_leaf_start);
                 m_leaf_end = m_leaf_start + m_array.size();
@@ -806,7 +816,7 @@ public:
 
         while (start < end) {
 
-            // Cache internal leafs
+            // Cache internal leaves
             if (start >= m_leaf_end) {
                 m_condition_column->GetBlock(start, m_array, m_leaf_start);
                 m_leaf_end = m_leaf_start + m_array.size();
@@ -1640,6 +1650,8 @@ public:
         m_auto_delete = auto_delete;
         m_child = 0;
         m_compare = compare;
+        m_dD = 10.0;
+        m_dT = 50.0;
     }
 
     void init(const Table& table)  TIGHTDB_OVERRIDE

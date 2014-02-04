@@ -1,6 +1,5 @@
 # NOTE: THIS SCRIPT IS SUPPOSED TO RUN IN A POSIX SHELL
 
-
 # Enable tracing if TIGHTDB_SCRIPT_DEBUG is set
 if [ -e $HOME/.tightdb ]; then
     . $HOME/.tightdb
@@ -310,9 +309,14 @@ case "$MODE" in
             tightdb_version="$(printf "%s\n" "$value" | sed 's/^v//')" || exit 1
         fi
 
-        enable_replication=""
+        enable_replication="no"
         if [ "$TIGHTDB_ENABLE_REPLICATION" ]; then
             enable_replication="yes"
+        fi
+
+        enable_alloc_set_zero="no"
+        if [ "$TIGHTDB_ENABLE_ALLOC_SET_ZERO" ]; then
+            enable_alloc_set_zero="yes"
         fi
 
         xcode_home="none"
@@ -360,17 +364,18 @@ case "$MODE" in
         fi
 
         cat >"$CONFIG_MK" <<EOF
-TIGHTDB_VERSION     = $tightdb_version
-INSTALL_PREFIX      = $install_prefix
-INSTALL_EXEC_PREFIX = $install_exec_prefix
-INSTALL_INCLUDEDIR  = $install_includedir
-INSTALL_BINDIR      = $install_bindir
-INSTALL_LIBDIR      = $install_libdir
-INSTALL_LIBEXECDIR  = $install_libexecdir
-ENABLE_REPLICATION  = $enable_replication
-XCODE_HOME          = $xcode_home
-IPHONE_SDKS         = ${iphone_sdks:-none}
-IPHONE_SDKS_AVAIL   = $iphone_sdks_avail
+TIGHTDB_VERSION       = $tightdb_version
+INSTALL_PREFIX        = $install_prefix
+INSTALL_EXEC_PREFIX   = $install_exec_prefix
+INSTALL_INCLUDEDIR    = $install_includedir
+INSTALL_BINDIR        = $install_bindir
+INSTALL_LIBDIR        = $install_libdir
+INSTALL_LIBEXECDIR    = $install_libexecdir
+ENABLE_REPLICATION    = $enable_replication
+ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
+XCODE_HOME            = $xcode_home
+IPHONE_SDKS           = ${iphone_sdks:-none}
+IPHONE_SDKS_AVAIL     = $iphone_sdks_avail
 EOF
         if ! [ "$INTERACTIVE" ]; then
             echo "New configuration in $CONFIG_MK:"
@@ -477,6 +482,22 @@ EOF
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
         $MAKE check-debug || exit 1
+        echo "Test passed"
+        exit 0
+        ;;
+
+    "memtest")
+        require_config || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE memcheck || exit 1
+        echo "Test passed"
+        exit 0
+        ;;
+
+    "memtest-debug")
+        require_config || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE memcheck-debug || exit 1
         echo "Test passed"
         exit 0
         ;;
@@ -1066,6 +1087,8 @@ EOF
                 done
             fi
 
+            export DISABLE_CHEETAH_CODE_GEN="1"
+
             mkdir "$PKG_DIR/tightdb" || exit 1
             if [ "$PREBUILT_CORE" ]; then
                 message "Building core library"
@@ -1084,6 +1107,7 @@ EOF
                 cat >"$TEMP_DIR/transfer/include" <<EOF
 /README.*
 /build.sh
+/libtightdb.spec
 /config
 /Makefile
 /src/generic.mk
@@ -2048,6 +2072,7 @@ EOF
 /test
 /test-installed
 /doc
+/debian
 EOF
         cat >"$TEMP_DIR/exclude" <<EOF
 .gitignore

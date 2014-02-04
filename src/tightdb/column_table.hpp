@@ -32,16 +32,20 @@ namespace tightdb {
 /// Base class for any type of column that can contain subtables.
 class ColumnSubtableParent: public Column, public Table::Parent {
 public:
+    void adjust_column_index(int diff) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
     void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void detach_subtable_accessors() TIGHTDB_NOEXCEPT;
 
     ~ColumnSubtableParent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
+    static ref_type create(std::size_t size, Allocator&);
+
 protected:
     /// A pointer to the table that this column is part of. For a
     /// free-standing column, this pointer is null.
-    const Table* const m_table;
+    Table* const m_table;
 
     /// The index of this column within the table that this column is
     /// part of. For a free-standing column, this index is zero.
@@ -50,68 +54,10 @@ protected:
     /// Table::m_cols array. Note that this corresponds to the logical
     /// index of the column, which is not always the same as the index
     /// of this column within Table::m_columns. This is because
-    /// Table::m_columns contains a varying number of entries for each
-    /// column depending on the type of column.
-    std::size_t m_index;
+    /// Table::m_columns contains columns as well as indexes for those
+    /// columns.
+    std::size_t m_column_ndx;
 
-    ColumnSubtableParent(Allocator&, const Table*, std::size_t column_ndx);
-
-    ColumnSubtableParent(Allocator&, const Table*, std::size_t column_ndx,
-                         ArrayParent*, std::size_t ndx_in_parent, ref_type);
-
-    /// Get the subtable at the specified index.
-    ///
-    /// This method must be used only for subtables with shared spec,
-    /// i.e. for elements of a ColumnTable.
-    ///
-    /// The returned table pointer must always end up being wrapped in
-    /// a TableRef.
-    Table* get_subtable_ptr(std::size_t subtable_ndx, ref_type spec_ref) const;
-
-    /// Get the subtable at the specified index.
-    ///
-    /// This method must be used only for subtables with independent
-    /// specs, i.e. for elements of a ColumnMixed.
-    ///
-    /// The returned table pointer must always end up being wrapped in
-    /// a TableRef.
-    Table* get_subtable_ptr(std::size_t subtable_ndx) const;
-
-    /// This method must be used only for subtables with shared spec,
-    /// i.e. for elements of a ColumnTable.
-    TableRef get_subtable(std::size_t subtable_ndx, ref_type spec_ref) const;
-
-    /// This method must be used only for subtables with independent
-    /// specs, i.e. for elements of a ColumnMixed.
-    TableRef get_subtable(std::size_t subtable_ndx) const;
-
-    void update_child_ref(std::size_t subtable_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
-    ref_type get_child_ref(std::size_t subtable_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void child_accessor_destroyed(std::size_t subtable_ndx) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
-    /// Assumes that the two tables have the same spec.
-    static bool compare_subtable_rows(const Table&, const Table&);
-
-    /// Construct a copy of the columns array of the specified table
-    /// and return just the ref to that array.
-    ///
-    /// In the clone, no string column will be of the enumeration
-    /// type.
-    ref_type clone_table_columns(const Table*);
-
-    static ref_type create(std::size_t size, Allocator&);
-
-#ifdef TIGHTDB_DEBUG
-    std::pair<ref_type, std::size_t>
-    get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
-#endif
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    std::size_t* record_subtable_path(std::size_t* begin,
-                                      std::size_t* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-#endif
-
-private:
     struct SubtableMap {
         ~SubtableMap() TIGHTDB_NOEXCEPT {}
         bool empty() const TIGHTDB_NOEXCEPT { return m_entries.empty(); }
@@ -130,12 +76,53 @@ private:
     };
 
     mutable SubtableMap m_subtable_map;
+
+    ColumnSubtableParent(Allocator&, Table*, std::size_t column_ndx);
+
+    ColumnSubtableParent(Allocator&, Table*, std::size_t column_ndx,
+                         ArrayParent*, std::size_t ndx_in_parent, ref_type);
+
+    /// Get the subtable at the specified index.
+    ///
+    /// This method must be used only for subtables with independent
+    /// specs, i.e. for elements of a ColumnMixed.
+    ///
+    /// The returned table pointer must always end up being wrapped in
+    /// a TableRef.
+    Table* get_subtable_ptr(std::size_t subtable_ndx) const;
+
+    void update_child_ref(std::size_t subtable_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
+    ref_type get_child_ref(std::size_t subtable_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    void child_accessor_destroyed(std::size_t subtable_ndx) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    Table* get_parent_table(std::size_t*) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    /// Assumes that the two tables have the same spec.
+    static bool compare_subtable_rows(const Table&, const Table&);
+
+    /// Construct a copy of the columns array of the specified table
+    /// and return just the ref to that array.
+    ///
+    /// In the clone, no string column will be of the enumeration
+    /// type.
+    ref_type clone_table_columns(const Table*);
+
+#ifdef TIGHTDB_DEBUG
+    std::pair<ref_type, std::size_t>
+    get_to_dot_parent(std::size_t ndx_in_parent) const TIGHTDB_OVERRIDE;
+#endif
+
+    std::size_t* record_subtable_path(std::size_t* begin,
+                                      std::size_t* end) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    friend class Table;
 };
 
 
 
 class ColumnTable: public ColumnSubtableParent {
 public:
+    void adjust_column_index(int diff) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
     /// Create a subtable column accessor and have it instantiate a
     /// new underlying structure of arrays.
     ///
@@ -145,7 +132,7 @@ public:
     /// \param column_ndx If this column is used as part of a table
     /// you must pass the logical index of the column within that
     /// table. Otherwise you should pass zero.
-    ColumnTable(Allocator&, const Table* table, std::size_t column_ndx, ref_type spec_ref);
+    ColumnTable(Allocator&, Table* table, std::size_t column_ndx);
 
     /// Create a subtable column accessor and attach it to a
     /// preexisting underlying structure of arrays.
@@ -156,9 +143,8 @@ public:
     /// \param column_ndx If this column is used as part of a table
     /// you must pass the logical index of the column within that
     /// table. Otherwise you should pass zero.
-    ColumnTable(Allocator&, const Table* table, std::size_t column_ndx,
-                ArrayParent*, std::size_t ndx_in_parent,
-                ref_type spec_ref, ref_type column_ref);
+    ColumnTable(Allocator&, Table* table, std::size_t column_ndx,
+                ArrayParent*, std::size_t ndx_in_parent, ref_type column_ref);
 
     ~ColumnTable() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
@@ -166,10 +152,7 @@ public:
 
     /// The returned table pointer must always end up being wrapped in
     /// an instance of BasicTableRef.
-    Table* get_subtable_ptr(std::size_t subtable_ndx) const
-    {
-        return ColumnSubtableParent::get_subtable_ptr(subtable_ndx, m_spec_ref);
-    }
+    Table* get_subtable_ptr(std::size_t subtable_ndx) const;
 
     // When passing a table to add() or insert() it is assumed that
     // the table spec is compatible with this column. The number of
@@ -184,7 +167,6 @@ public:
     void set(std::size_t ndx, const Table*);
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear_table(std::size_t ndx);
-    void fill(std::size_t count);
 
     void clear() TIGHTDB_OVERRIDE;
 
@@ -192,8 +174,6 @@ public:
 
     /// Compare two subtable columns for equality.
     bool compare_table(const ColumnTable&) const;
-
-    static ref_type create(std::size_t size, Allocator&);
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
@@ -203,7 +183,9 @@ public:
 #endif
 
 private:
-    const ref_type m_spec_ref;
+    mutable std::size_t m_subspec_ndx; // Unknown if equal to `npos`
+
+    std::size_t get_subspec_ndx() const TIGHTDB_NOEXCEPT;
 
     void destroy_subtable(std::size_t ndx);
 
@@ -216,55 +198,36 @@ private:
 
 // Implementation
 
+inline void ColumnSubtableParent::adjust_column_index(int diff) TIGHTDB_NOEXCEPT
+{
+    Column::adjust_column_index(diff);
+    // Note that `diff` is promoted to an unsigned type, and note that
+    // C++03 still guarantees the expected result regardless of the
+    // sizes of `int` and `decltype(m_column_ndx)`.
+    m_column_ndx += diff;
+}
+
 inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx) const
 {
     TIGHTDB_ASSERT(subtable_ndx < size());
 
     Table* subtable = m_subtable_map.find(subtable_ndx);
     if (!subtable) {
+        typedef _impl::TableFriend tf;
         ref_type top_ref = get_as_ref(subtable_ndx);
         Allocator& alloc = get_alloc();
-        subtable = new Table(Table::ref_count_tag(), alloc, top_ref,
-                             const_cast<ColumnSubtableParent*>(this), subtable_ndx);
+        ColumnSubtableParent* parent = const_cast<ColumnSubtableParent*>(this);
+        subtable = tf::create_ref_counted(alloc, top_ref, parent, subtable_ndx);
         bool was_empty = m_subtable_map.empty();
         m_subtable_map.add(subtable_ndx, subtable);
         if (was_empty && m_table)
-            m_table->bind_ref();
+            tf::bind_ref(*m_table);
     }
     return subtable;
 }
 
-inline Table* ColumnSubtableParent::get_subtable_ptr(std::size_t subtable_ndx,
-                                                     ref_type spec_ref) const
-{
-    TIGHTDB_ASSERT(subtable_ndx < size());
-
-    Table* subtable = m_subtable_map.find(subtable_ndx);
-    if (!subtable) {
-        ref_type columns_ref = get_as_ref(subtable_ndx);
-        Allocator& alloc = get_alloc();
-        subtable = new Table(Table::ref_count_tag(), alloc, spec_ref, columns_ref,
-                             const_cast<ColumnSubtableParent*>(this), subtable_ndx);
-        bool was_empty = m_subtable_map.empty();
-        m_subtable_map.add(subtable_ndx, subtable);
-        if (was_empty && m_table)
-            m_table->bind_ref();
-    }
-    return subtable;
-}
-
-inline TableRef ColumnSubtableParent::get_subtable(std::size_t subtable_ndx,
-                                                   ref_type spec_ref) const
-{
-    return TableRef(get_subtable_ptr(subtable_ndx, spec_ref));
-}
-
-inline TableRef ColumnSubtableParent::get_subtable(std::size_t subtable_ndx) const
-{
-    return TableRef(get_subtable_ptr(subtable_ndx));
-}
-
-inline Table* ColumnSubtableParent::SubtableMap::find(std::size_t subtable_ndx) const TIGHTDB_NOEXCEPT
+inline Table* ColumnSubtableParent::SubtableMap::find(std::size_t subtable_ndx) const
+    TIGHTDB_NOEXCEPT
 {
     typedef entries::const_iterator iter;
     iter end = m_entries.end();
@@ -295,37 +258,40 @@ inline void ColumnSubtableParent::SubtableMap::remove(std::size_t subtable_ndx) 
     TIGHTDB_ASSERT(false);
 }
 
-inline void ColumnSubtableParent::SubtableMap::
-update_from_parent(std::size_t old_baseline) const TIGHTDB_NOEXCEPT
+inline void ColumnSubtableParent::SubtableMap::update_from_parent(std::size_t old_baseline) const
+    TIGHTDB_NOEXCEPT
 {
     typedef entries::const_iterator iter;
     iter end = m_entries.end();
     for (iter i = m_entries.begin(); i != end; ++i)
-        i->m_table->update_from_parent(old_baseline);
+        _impl::TableFriend::update_from_parent(*i->m_table, old_baseline);
 }
 
 inline void ColumnSubtableParent::SubtableMap::detach_accessors() TIGHTDB_NOEXCEPT
 {
     typedef entries::const_iterator iter;
     iter end = m_entries.end();
-    for (iter i = m_entries.begin(); i != end; ++i)
-        i->m_table->detach();
+    for (iter i = m_entries.begin(); i != end; ++i) {
+        // Must hold a reliable reference count while detaching
+        TableRef table(i->m_table);
+        _impl::TableFriend::detach(*table);
+    }
     m_entries.clear();
 }
 
 inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
-                                                  const Table* table, std::size_t column_ndx):
+                                                  Table* table, std::size_t column_ndx):
     Column(Array::type_HasRefs, alloc),
-    m_table(table), m_index(column_ndx)
+    m_table(table), m_column_ndx(column_ndx)
 {
 }
 
 inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
-                                                  const Table* table, std::size_t column_ndx,
+                                                  Table* table, std::size_t column_ndx,
                                                   ArrayParent* parent, std::size_t ndx_in_parent,
                                                   ref_type ref):
     Column(ref, parent, ndx_in_parent, alloc),
-    m_table(table), m_index(column_ndx)
+    m_table(table), m_column_ndx(column_ndx)
 {
 }
 
@@ -344,52 +310,74 @@ inline void ColumnSubtableParent::detach_subtable_accessors() TIGHTDB_NOEXCEPT
     bool was_empty = m_subtable_map.empty();
     m_subtable_map.detach_accessors();
     if (!was_empty && m_table)
-        m_table->unbind_ref();
+        _impl::TableFriend::unbind_ref(*m_table);
 }
 
 inline bool ColumnSubtableParent::compare_subtable_rows(const Table& a, const Table& b)
 {
-    return a.compare_rows(b);
+    return _impl::TableFriend::compare_rows(a,b);
 }
 
 inline ref_type ColumnSubtableParent::clone_table_columns(const Table* t)
 {
-    return t->clone_columns(m_array->get_alloc());
+    return _impl::TableFriend::clone_columns(*t, m_array->get_alloc());
 }
 
 inline ref_type ColumnSubtableParent::create(std::size_t size, Allocator& alloc)
 {
-    Column c(Array::type_HasRefs, alloc);
-    c.fill(size);
-    return c.get_ref();
+    int_fast64_t value = 0;
+    return Column::create(Array::type_HasRefs, size, value, alloc); // Throws
 }
 
-#ifdef TIGHTDB_ENABLE_REPLICATION
 inline std::size_t* ColumnSubtableParent::record_subtable_path(std::size_t* begin,
                                                                std::size_t* end) TIGHTDB_NOEXCEPT
 {
     if (end == begin)
         return 0; // Error, not enough space in buffer
-    *begin++ = m_index;
+    *begin++ = m_column_ndx;
     if (end == begin)
         return 0; // Error, not enough space in buffer
-    return m_table->record_subtable_path(begin, end);
+    return _impl::TableFriend::record_subtable_path(*m_table, begin, end);
 }
-#endif // TIGHTDB_ENABLE_REPLICATION
 
 
-inline ColumnTable::ColumnTable(Allocator& alloc, const Table* table, std::size_t column_ndx,
-                                ref_type spec_ref):
-    ColumnSubtableParent(alloc, table, column_ndx), m_spec_ref(spec_ref)
+inline void ColumnTable::adjust_column_index(int diff) TIGHTDB_NOEXCEPT
+{
+    ColumnSubtableParent::adjust_column_index(diff);
+    m_subspec_ndx = tightdb::npos;
+}
+
+inline ColumnTable::ColumnTable(Allocator& alloc, Table* table, std::size_t column_ndx):
+    ColumnSubtableParent(alloc, table, column_ndx), m_subspec_ndx(tightdb::npos)
 {
 }
 
-inline ColumnTable::ColumnTable(Allocator& alloc, const Table* table, std::size_t column_ndx,
-                                ArrayParent* parent, std::size_t ndx_in_parent,
-                                ref_type spec_ref, ref_type column_ref):
+inline ColumnTable::ColumnTable(Allocator& alloc, Table* table, std::size_t column_ndx,
+                                ArrayParent* parent, std::size_t ndx_in_parent, ref_type column_ref):
     ColumnSubtableParent(alloc, table, column_ndx, parent, ndx_in_parent, column_ref),
-    m_spec_ref(spec_ref)
+    m_subspec_ndx(tightdb::npos)
 {
+}
+
+inline Table* ColumnTable::get_subtable_ptr(std::size_t subtable_ndx) const
+{
+    TIGHTDB_ASSERT(subtable_ndx < size());
+
+    Table* subtable = m_subtable_map.find(subtable_ndx);
+    if (!subtable) {
+        typedef _impl::TableFriend tf;
+        const Spec* spec = tf::get_spec(*m_table);
+        std::size_t subspec_ndx = get_subspec_ndx();
+        ConstSubspecRef shared_subspec = spec->get_subspec_by_ndx(subspec_ndx);
+        ref_type columns_ref = get_as_ref(subtable_ndx);
+        ColumnTable* parent = const_cast<ColumnTable*>(this);
+        subtable = tf::create_ref_counted(shared_subspec, columns_ref, parent, subtable_ndx);
+        bool was_empty = m_subtable_map.empty();
+        m_subtable_map.add(subtable_ndx, subtable);
+        if (was_empty && m_table)
+            tf::bind_ref(*m_table);
+    }
+    return subtable;
 }
 
 inline void ColumnTable::add(const Table* subtable)
@@ -397,9 +385,13 @@ inline void ColumnTable::add(const Table* subtable)
     insert(size(), subtable);
 }
 
-inline ref_type ColumnTable::create(std::size_t size, Allocator& alloc)
+inline std::size_t ColumnTable::get_subspec_ndx() const TIGHTDB_NOEXCEPT
 {
-    return ColumnSubtableParent::create(size, alloc);
+    if (TIGHTDB_UNLIKELY(m_subspec_ndx == tightdb::npos)) {
+        const Spec* spec = _impl::TableFriend::get_spec(*m_table);
+        m_subspec_ndx = spec->get_subspec_ndx(m_column_ndx);
+    }
+    return m_subspec_ndx;
 }
 
 

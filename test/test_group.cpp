@@ -12,6 +12,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
@@ -38,7 +39,7 @@ TEST(Group_Unattached)
 
 TEST(Group_OpenFile)
 {
-    util::File::try_remove("test.tightdb");
+    File::try_remove("test.tightdb");
 
     {
         Group group((Group::unattached_tag()));
@@ -58,7 +59,7 @@ TEST(Group_OpenFile)
         CHECK(group.is_attached());
     }
 
-    util::File::remove("test.tightdb");
+    File::remove("test.tightdb");
 }
 
 
@@ -92,11 +93,11 @@ TEST(Group_Permissions)
 
 TEST(Group_BadFile)
 {
-    util::File::try_remove("test.tightdb");
-    util::File::try_remove("test2.tightdb");
+    File::try_remove("test.tightdb");
+    File::try_remove("test2.tightdb");
 
     {
-        util::File file("test.tightdb", util::File::mode_Append);
+        File file("test.tightdb", File::mode_Append);
         file.write("foo");
     }
 
@@ -114,30 +115,30 @@ TEST(Group_BadFile)
         CHECK(group.is_attached());
     }
 
-    util::File::remove("test.tightdb");
-    util::File::remove("test2.tightdb");
+    File::remove("test.tightdb");
+    File::remove("test2.tightdb");
 }
 
 
 TEST(Group_OpenBuffer)
 {
     // Produce a valid buffer
-    util::UniquePtr<char[]> buffer;
+    UniquePtr<char[]> buffer;
     size_t buffer_size;
     {
-        util::File::try_remove("test.tightdb");
+        File::try_remove("test.tightdb");
         {
             Group group;
             group.write("test.tightdb");
         }
         {
-            util::File file("test.tightdb");
+            File file("test.tightdb");
             buffer_size = size_t(file.get_size());
             buffer.reset(static_cast<char*>(malloc(buffer_size)));
             CHECK(bool(buffer));
             file.read(buffer.get(), buffer_size);
         }
-        util::File::remove("test.tightdb");
+        File::remove("test.tightdb");
     }
 
 
@@ -161,7 +162,7 @@ TEST(Group_OpenBuffer)
 
 TEST(Group_BadBuffer)
 {
-    util::File::try_remove("test.tightdb");
+    File::try_remove("test.tightdb");
 
     // Produce an invalid buffer
     char buffer[32];
@@ -185,7 +186,7 @@ TEST(Group_BadBuffer)
         CHECK(group.is_attached());
     }
 
-    util::File::remove("test.tightdb");
+    File::remove("test.tightdb");
 }
 
 
@@ -276,11 +277,11 @@ TEST(Group_TableAccessorLeftBehind)
 
 TEST(Group_Invalid1)
 {
-    util::File::try_remove("table_test.tightdb");
+    File::try_remove("table_test.tightdb");
 
     // Try to open non-existing file
     // (read-only files have to exists to before opening)
-    CHECK_THROW(Group("table_test.tightdb"), util::File::NotFound);
+    CHECK_THROW(Group("table_test.tightdb"), File::NotFound);
 }
 
 TEST(Group_Invalid2)
@@ -296,26 +297,26 @@ TEST(Group_Invalid2)
 
 TEST(Group_Overwrite)
 {
-    util::File::try_remove("test_overwrite.tightdb");
+    File::try_remove("test_overwrite.tightdb");
     {
         Group g;
         g.write("test_overwrite.tightdb");
-        CHECK_THROW(g.write("test_overwrite.tightdb"), util::File::Exists);
+        CHECK_THROW(g.write("test_overwrite.tightdb"), File::Exists);
     }
     {
         Group g("test_overwrite.tightdb");
-        CHECK_THROW(g.write("test_overwrite.tightdb"), util::File::Exists);
+        CHECK_THROW(g.write("test_overwrite.tightdb"), File::Exists);
     }
     {
         Group g;
-        util::File::try_remove("test_overwrite.tightdb");
+        File::try_remove("test_overwrite.tightdb");
         g.write("test_overwrite.tightdb");
     }
 }
 
 TEST(Group_Serialize0)
 {
-    util::File::try_remove("table_test.tightdb");
+    File::try_remove("table_test.tightdb");
 
     // Create empty group and serialize to disk
     Group to_disk;
@@ -368,7 +369,7 @@ TEST(Group_Serialize1)
 #endif
 
     // Delete old file if there
-    util::File::try_remove("table_test.tightdb");
+    File::try_remove("table_test.tightdb");
 
     // Serialize to disk
     to_disk.write("table_test.tightdb");
@@ -425,7 +426,7 @@ TEST(Group_Serialize2)
 #endif
 
     // Delete old file if there
-    util::File::try_remove("table_test.tightdb");
+    File::try_remove("table_test.tightdb");
 
     // Serialize to disk
     to_disk.write("table_test.tightdb");
@@ -460,7 +461,7 @@ TEST(Group_Serialize3)
 #endif
 
     // Delete old file if there
-    util::File::try_remove("table_test.tightdb");
+    File::try_remove("table_test.tightdb");
 
     // Serialize to disk
     to_disk.write("table_test.tightdb");
@@ -579,12 +580,12 @@ TEST(Group_Serialize_All)
     Group to_mem;
     TableRef table = to_mem.get_table("test");
 
-    table->add_column(type_Int,    "int");
-    table->add_column(type_Bool,   "bool");
-    table->add_column(type_DateTime,   "date");
-    table->add_column(type_String, "string");
-    table->add_column(type_Binary, "binary");
-    table->add_column(type_Mixed,  "mixed");
+    table->add_column(type_Int,      "int");
+    table->add_column(type_Bool,     "bool");
+    table->add_column(type_DateTime, "date");
+    table->add_column(type_String,   "string");
+    table->add_column(type_Binary,   "binary");
+    table->add_column(type_Mixed,    "mixed");
 
     table->insert_int(0, 0, 12);
     table->insert_bool(1, 0, true);
@@ -616,19 +617,19 @@ TEST(Group_Serialize_All)
 TEST(Group_Persist)
 {
     // Delete old file if there
-    util::File::try_remove("testdb.tightdb");
+    File::try_remove("testdb.tightdb");
 
     // Create new database
     Group db("testdb.tightdb", Group::mode_ReadWrite);
 
     // Insert some data
     TableRef table = db.get_table("test");
-    table->add_column(type_Int,    "int");
-    table->add_column(type_Bool,   "bool");
-    table->add_column(type_DateTime,   "date");
-    table->add_column(type_String, "string");
-    table->add_column(type_Binary, "binary");
-    table->add_column(type_Mixed,  "mixed");
+    table->add_column(type_Int,      "int");
+    table->add_column(type_Bool,     "bool");
+    table->add_column(type_DateTime, "date");
+    table->add_column(type_String,   "string");
+    table->add_column(type_Binary,   "binary");
+    table->add_column(type_Mixed,    "mixed");
     table->insert_int(0, 0, 12);
     table->insert_bool(1, 0, true);
     table->insert_datetime(2, 0, 12345);
@@ -683,12 +684,12 @@ TEST(Group_Subtable)
 
     Group g;
     TableRef table = g.get_table("test");
-    Spec& s = table->get_spec();
-    s.add_column(type_Int, "foo");
-    Spec sub = s.add_subtable_column("sub");
-    sub.add_column(type_Int, "bar");
-    s.add_column(type_Mixed, "baz");
-    table->update_from_spec();
+    DescriptorRef sub;
+    table->add_column(type_Int,   "foo");
+    table->add_column(type_Table, "sub", &sub);
+    table->add_column(type_Mixed, "baz");
+    sub->add_column(type_Int, "bar");
+    sub.reset();
 
     for (int i=0; i<n; ++i) {
         table->add_empty_row();
@@ -771,7 +772,7 @@ TEST(Group_Subtable)
         }
     }
 
-    util::File::try_remove("subtables.tightdb");
+    File::try_remove("subtables.tightdb");
     g.write("subtables.tightdb");
 
     // Read back tables
@@ -865,7 +866,7 @@ TEST(Group_Subtable)
         }
     }
 
-    util::File::try_remove("subtables2.tightdb");
+    File::try_remove("subtables2.tightdb");
     g2.write("subtables2.tightdb");
 
     // Read back tables
@@ -920,18 +921,13 @@ TEST(Group_MultiLevelSubtables)
         Group g;
         TableRef table = g.get_table("test");
         {
-            Spec& s = table->get_spec();
-            s.add_column(type_Int, "int");
-            {
-                Spec sub = s.add_subtable_column("tab");
-                sub.add_column(type_Int, "int");
-                {
-                    Spec subsub = sub.add_subtable_column("tab");
-                    subsub.add_column(type_Int, "int");
-                }
-            }
-            s.add_column(type_Mixed, "mix");
-            table->update_from_spec();
+            DescriptorRef sub_1, sub_2;
+            table->add_column(type_Int,   "int");
+            table->add_column(type_Table, "tab", &sub_1);
+            table->add_column(type_Mixed, "mix");
+            sub_1->add_column(type_Int,   "int");
+            sub_1->add_column(type_Table, "tab", &sub_2);
+            sub_2->add_column(type_Int,   "int");
         }
         table->add_empty_row();
         {
@@ -943,23 +939,15 @@ TEST(Group_MultiLevelSubtables)
         {
             table->set_mixed(2, 0, Mixed::subtable_tag());
             TableRef a = table->get_subtable(2, 0);
-            {
-                Spec& s = a->get_spec();
-                s.add_column(type_Int, "int");
-                s.add_column(type_Mixed, "mix");
-                a->update_from_spec();
-            }
+            a->add_column(type_Int,   "int");
+            a->add_column(type_Mixed, "mix");
             a->add_empty_row();
             a->set_mixed(1, 0, Mixed::subtable_tag());
             TableRef b = a->get_subtable(1, 0);
-            {
-                Spec& s = b->get_spec();
-                s.add_column(type_Int, "int");
-                b->update_from_spec();
-            }
+            b->add_column(type_Int, "int");
             b->add_empty_row();
         }
-        util::File::try_remove("subtables.tightdb");
+        File::try_remove("subtables.tightdb");
         g.write("subtables.tightdb");
     }
 
@@ -983,7 +971,7 @@ TEST(Group_MultiLevelSubtables)
         // get a second ref to B (compare)
         CHECK_EQUAL(a->get_subtable(1, 0), b);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661012);
-        util::File::try_remove("subtables2.tightdb");
+        File::try_remove("subtables2.tightdb");
         g.write("subtables2.tightdb");
     }
     {
@@ -1003,7 +991,7 @@ TEST(Group_MultiLevelSubtables)
         // Get third ref to B and verify last mod
         b = a->get_subtable(1, 0);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661013);
-        util::File::try_remove("subtables3.tightdb");
+        File::try_remove("subtables3.tightdb");
         g.write("subtables3.tightdb");
     }
 
@@ -1027,7 +1015,7 @@ TEST(Group_MultiLevelSubtables)
         // get a second ref to B (compare)
         CHECK_EQUAL(a->get_subtable(1, 0), b);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661012);
-        util::File::try_remove("subtables4.tightdb");
+        File::try_remove("subtables4.tightdb");
         g.write("subtables4.tightdb");
     }
     {
@@ -1047,10 +1035,73 @@ TEST(Group_MultiLevelSubtables)
         // Get third ref to B and verify last mod
         b = a->get_subtable(1, 0);
         CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661013);
-        util::File::try_remove("subtables5.tightdb");
+        File::try_remove("subtables5.tightdb");
         g.write("subtables5.tightdb");
     }
 }
+
+
+TEST(Group_CommitSubtable)
+{
+    File::try_remove("test.tightdb");
+    Group group("test.tightdb", Group::mode_ReadWrite);
+
+    TableRef table = group.get_table("test");
+    DescriptorRef sub_1;
+    table->add_column(type_Table, "subtable", &sub_1);
+    sub_1->add_column(type_Int,   "int");
+    sub_1.reset();
+    table->add_empty_row();
+
+    TableRef subtable = table->get_subtable(0,0);
+    subtable->add_empty_row();
+
+    group.commit();
+
+    table->add_empty_row();
+    group.commit();
+
+    subtable = table->get_subtable(0,0);
+    subtable->add_empty_row();
+    group.commit();
+
+    table->add_empty_row();
+    subtable = table->get_subtable(0,0);
+    subtable->add_empty_row();
+    group.commit();
+}
+
+
+TEST(Group_CommitSubtableMixed)
+{
+    File::try_remove("test.tightdb");
+    Group group("test.tightdb", Group::mode_ReadWrite);
+
+    TableRef table = group.get_table("test");
+    table->add_column(type_Mixed, "mixed");
+
+    table->add_empty_row();
+
+    table->clear_subtable(0,0);
+    TableRef subtable = table->get_subtable(0,0);
+    subtable->add_column(type_Int, "int");
+    subtable->add_empty_row();
+
+    group.commit();
+
+    table->add_empty_row();
+    group.commit();
+
+    subtable = table->get_subtable(0,0);
+    subtable->add_empty_row();
+    group.commit();
+
+    table->add_empty_row();
+    subtable = table->get_subtable(0,0);
+    subtable->add_empty_row();
+    group.commit();
+}
+
 
 namespace {
 
@@ -1198,19 +1249,18 @@ TEST(Group_ToDot)
 
     // Create table with all column types
     TableRef table = mygroup.get_table("test");
-    Spec s = table->get_spec();
-    s.add_column(type_Int,    "int");
-    s.add_column(type_Bool,   "bool");
-    s.add_column(type_DateTime,   "date");
-    s.add_column(type_String, "string");
-    s.add_column(type_String, "string_long");
-    s.add_column(type_String, "string_enum"); // becomes ColumnStringEnum
-    s.add_column(type_Binary, "binary");
-    s.add_column(type_Mixed,  "mixed");
-    Spec sub = s.add_subtable_column("tables");
-    sub.add_column(type_Int,  "sub_first");
-    sub.add_column(type_String, "sub_second");
-    table->UpdateFromSpec(s.get_ref());
+    DescriptorRef subdesc;
+    s.add_column(type_Int,      "int");
+    s.add_column(type_Bool,     "bool");
+    s.add_column(type_DateTime, "date");
+    s.add_column(type_String,   "string");
+    s.add_column(type_String,   "string_long");
+    s.add_column(type_String,   "string_enum"); // becomes ColumnStringEnum
+    s.add_column(type_Binary,   "binary");
+    s.add_column(type_Mixed,    "mixed");
+    s.add_column(type_Table,    "tables", &subdesc);
+    subdesc->add_column(type_Int,    "sub_first");
+    subdesc->add_column(type_String, "sub_second");
 
     // Add some rows
     for (size_t i = 0; i < 15; ++i) {

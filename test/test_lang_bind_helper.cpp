@@ -4,21 +4,23 @@
 #include <UnitTest++.h>
 
 #include <tightdb/lang_bind_helper.hpp>
+#include <tightdb/descriptor.hpp>
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
 
 TEST(InsertSubtable)
 {
-    Table t;
-    Spec& spec = t.get_spec();
-    Spec subspec = spec.add_subtable_column("sub");
-    subspec.add_column(type_Int, "i1");
-    subspec.add_column(type_Int, "i2");
-    t.update_from_spec();
+    Table t1;
+    DescriptorRef s;
+    t1.add_column(type_Table, "sub", &s);
+    s->add_column(type_Int, "i1");
+    s->add_column(type_Int, "i2");
+    s.reset();
 
     Table t2;
     t2.add_column(type_Int, "i1");
@@ -30,10 +32,10 @@ TEST(InsertSubtable)
     t2.insert_int(1, 1, 100);
     t2.insert_done();
 
-    LangBindHelper::insert_subtable(t, 0, 0, t2);
-    t.insert_done();
+    LangBindHelper::insert_subtable(t1, 0, 0, t2);
+    t1.insert_done();
 
-    TableRef sub = t.get_subtable(0, 0);
+    TableRef sub = t1.get_subtable(0, 0);
 
     CHECK_EQUAL(t2.get_column_count(), sub->get_column_count());
     CHECK_EQUAL(t2.size(), sub->size());
@@ -44,13 +46,13 @@ TEST(InsertSubtable)
 // FIXME: Move this test to test_table.cpp
 TEST(SetSubtable)
 {
-    Table t;
-    Spec& spec = t.get_spec();
-    Spec subspec = spec.add_subtable_column("sub");
-    subspec.add_column(type_Int, "i1");
-    subspec.add_column(type_Int, "i2");
-    t.update_from_spec();
-    t.add_empty_row();
+    Table t1;
+    DescriptorRef s;
+    t1.add_column(type_Table, "sub", &s);
+    s->add_column(type_Int, "i1");
+    s->add_column(type_Int, "i2");
+    s.reset();
+    t1.add_empty_row();
 
     Table t2;
     t2.add_column(type_Int, "i1");
@@ -62,9 +64,9 @@ TEST(SetSubtable)
     t2.insert_int(1, 1, 100);
     t2.insert_done();
 
-    t.set_subtable( 0, 0, &t2);
+    t1.set_subtable( 0, 0, &t2);
 
-    TableRef sub = t.get_subtable(0, 0);
+    TableRef sub = t1.get_subtable(0, 0);
 
     CHECK_EQUAL(t2.get_column_count(), sub->get_column_count());
     CHECK_EQUAL(t2.size(), sub->size());

@@ -9,10 +9,7 @@ int main()
 {
     Group group;
     TableRef table = group.get_table("test");
-
-    Spec& s = table->get_spec();
-    s.add_column(type_String, "Name");
-    table->update_from_spec();
+    table->add_column(type_String, "Name");
 
     table->add_empty_row(5);
 // @@Show@@

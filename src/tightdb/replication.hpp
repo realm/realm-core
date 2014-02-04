@@ -127,8 +127,10 @@ public:
     //
     //   N  New top level table
     //   T  Select table
-    //   S  Select spec for currently selected table
-    //   A  Add column to selected spec
+    //   S  Select descriptor from currently selected root table
+    //   O  Insert column into selected descriptor
+    //   P  Remove column from selected descriptor
+    //   Q  Rename column in selected descriptor
     //   s  Set value
     //   i  Insert value
     //   c  Row insert complete
@@ -142,7 +144,10 @@ public:
     struct subtable_tag {};
 
     void new_top_level_table(StringData name);
-    void add_column (const Table*, const Spec*, DataType, StringData name);
+    void insert_column (const Table*, const Spec*, std::size_t column_ndx,
+                        DataType type, StringData name);
+    void remove_column (const Table*, const Spec*, std::size_t column_ndx);
+    void rename_column (const Table*, const Spec*, std::size_t column_ndx, StringData name);
 
     template<class T>
     void set_value(const Table*, std::size_t column_ndx, std::size_t ndx, T value);
@@ -266,17 +271,17 @@ private:
     void transact_log_append(const char* data, std::size_t size);
 
     void check_table(const Table*);
-    void select_table(const Table*);
+    void select_table(const Table*); // Deselects a selected spec
 
     void check_spec(const Table*, const Spec*);
-    void select_spec(const Table*, const Spec*);
+    void select_spec(const Table*, const Spec*); // Table must *not* have shared type descriptor
 
     void string_cmd(char cmd, std::size_t column_ndx, std::size_t ndx,
                     const char* data, std::size_t size);
 
     void mixed_cmd(char cmd, std::size_t column_ndx, std::size_t ndx, const Mixed& value);
 
-    template<class L> void simple_cmd(char cmd, const Tuple<L>& numbers);
+    template<class L> void simple_cmd(char cmd, const util::Tuple<L>& numbers);
 
     template<class> struct EncodeNumber;
 
@@ -460,7 +465,7 @@ template<class T> inline char* Replication::encode_int(char* ptr, T value)
 {
     TIGHTDB_STATIC_ASSERT(std::numeric_limits<T>::is_integer, "Integer required");
     bool negative = false;
-    if (is_negative(value)) {
+    if (util::is_negative(value)) {
         negative = true;
         // The following conversion is guaranteed by C++03 to never
         // overflow (contrast this with "-value" which indeed could
@@ -469,7 +474,7 @@ template<class T> inline char* Replication::encode_int(char* ptr, T value)
     }
     // At this point 'value' is always a positive number. Also, small
     // negative numbers have been converted to small positive numbers.
-    TIGHTDB_ASSERT(!is_negative(value));
+    TIGHTDB_ASSERT(!util::is_negative(value));
     // One sign bit plus number of value bits
     const int num_bits = 1 + std::numeric_limits<T>::digits;
     // Only the first 7 bits are available per byte. Had it not been
@@ -483,7 +488,8 @@ template<class T> inline char* Replication::encode_int(char* ptr, T value)
     // in the hope that it will help the optimizer (to do loop
     // unrolling, for example).
     for (int i=0; i<max_bytes; ++i) {
-        if (value >> (bits_per_byte-1) == 0) break;
+        if (value >> (bits_per_byte-1) == 0)
+            break;
         *reinterpret_cast<unsigned char*>(ptr) =
             (1U<<bits_per_byte) | unsigned(value & ((1U<<bits_per_byte)-1));
         ++ptr;
@@ -535,32 +541,34 @@ template<> struct Replication::EncodeNumber<double> {
 };
 
 
-template<class L> inline void Replication::simple_cmd(char cmd, const Tuple<L>& numbers)
+template<class L> inline void Replication::simple_cmd(char cmd, const util::Tuple<L>& numbers)
 {
     char* buf;
-    transact_log_reserve(&buf, 1 + TypeCount<L>::value*max_enc_bytes_per_num); // Throws
+    transact_log_reserve(&buf, 1 + util::TypeCount<L>::value*max_enc_bytes_per_num); // Throws
     *buf++ = cmd;
-    for_each<EncodeNumber>(numbers, &buf);
+    util::for_each<EncodeNumber>(numbers, &buf);
     transact_log_advance(buf);
 }
 
 
 inline void Replication::check_table(const Table* t)
 {
-    if (t != m_selected_table) select_table(t); // Throws
+    if (t != m_selected_table)
+        select_table(t); // Throws
 }
 
 
 inline void Replication::check_spec(const Table* t, const Spec* s)
 {
-    if (s != m_selected_spec) select_spec(t,s); // Throws
+    if (s != m_selected_spec)
+        select_spec(t,s); // Throws
 }
 
 
 inline void Replication::string_cmd(char cmd, std::size_t column_ndx,
                                     std::size_t ndx, const char* data, std::size_t size)
 {
-    simple_cmd(cmd, tuple(column_ndx, ndx, size)); // Throws
+    simple_cmd(cmd, util::tuple(column_ndx, ndx, size)); // Throws
     transact_log_append(data, size); // Throws
 }
 
@@ -622,16 +630,31 @@ inline void Replication::mixed_cmd(char cmd, std::size_t column_ndx,
 
 inline void Replication::new_top_level_table(StringData name)
 {
-    simple_cmd('N', tuple(name.size())); // Throws
+    simple_cmd('N', util::tuple(name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
 }
 
 
-inline void Replication::add_column(const Table* table, const Spec* spec,
-                                    DataType type, StringData name)
+inline void Replication::insert_column(const Table* table, const Spec* spec,
+                                       std::size_t column_ndx, DataType type, StringData name)
 {
     check_spec(table, spec); // Throws
-    simple_cmd('A', tuple(int(type), name.size())); // Throws
+    simple_cmd('O', util::tuple(column_ndx, int(type), name.size())); // Throws
+    transact_log_append(name.data(), name.size()); // Throws
+}
+
+inline void Replication::remove_column(const Table* table, const Spec* spec,
+                                       std::size_t column_ndx)
+{
+    check_spec(table, spec); // Throws
+    simple_cmd('P', util::tuple(column_ndx)); // Throws
+}
+
+inline void Replication::rename_column(const Table* table, const Spec* spec,
+                                       std::size_t column_ndx, StringData name)
+{
+    check_spec(table, spec); // Throws
+    simple_cmd('Q', util::tuple(column_ndx, name.size())); // Throws
     transact_log_append(name.data(), name.size()); // Throws
 }
 
@@ -641,7 +664,7 @@ inline void Replication::set_value(const Table* t, std::size_t column_ndx,
                                    std::size_t ndx, T value)
 {
     check_table(t); // Throws
-    simple_cmd('s', tuple(column_ndx, ndx, value)); // Throws
+    simple_cmd('s', util::tuple(column_ndx, ndx, value)); // Throws
 }
 
 inline void Replication::set_value(const Table* t, std::size_t column_ndx,
@@ -669,7 +692,7 @@ inline void Replication::set_value(const Table* t, std::size_t column_ndx,
                                    std::size_t ndx, subtable_tag)
 {
     check_table(t); // Throws
-    simple_cmd('s', tuple(column_ndx, ndx)); // Throws
+    simple_cmd('s', util::tuple(column_ndx, ndx)); // Throws
 }
 
 
@@ -678,7 +701,7 @@ inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
                                       std::size_t ndx, T value)
 {
     check_table(t); // Throws
-    simple_cmd('i', tuple(column_ndx, ndx, value)); // Throws
+    simple_cmd('i', util::tuple(column_ndx, ndx, value)); // Throws
 }
 
 inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
@@ -706,14 +729,14 @@ inline void Replication::insert_value(const Table* t, std::size_t column_ndx,
                                       std::size_t ndx, subtable_tag)
 {
     check_table(t); // Throws
-    simple_cmd('i', tuple(column_ndx, ndx)); // Throws
+    simple_cmd('i', util::tuple(column_ndx, ndx)); // Throws
 }
 
 
 inline void Replication::row_insert_complete(const Table* t)
 {
     check_table(t); // Throws
-    simple_cmd('c', tuple()); // Throws
+    simple_cmd('c', util::tuple()); // Throws
 }
 
 
@@ -721,54 +744,56 @@ inline void Replication::insert_empty_rows(const Table* t, std::size_t row_ndx,
                                            std::size_t num_rows)
 {
     check_table(t); // Throws
-    simple_cmd('I', tuple(row_ndx, num_rows)); // Throws
+    simple_cmd('I', util::tuple(row_ndx, num_rows)); // Throws
 }
 
 
 inline void Replication::remove_row(const Table* t, std::size_t row_ndx)
 {
     check_table(t); // Throws
-    simple_cmd('R', tuple(row_ndx)); // Throws
+    simple_cmd('R', util::tuple(row_ndx)); // Throws
 }
 
 
 inline void Replication::add_int_to_column(const Table* t, std::size_t column_ndx, int64_t value)
 {
     check_table(t); // Throws
-    simple_cmd('a', tuple(column_ndx, value)); // Throws
+    simple_cmd('a', util::tuple(column_ndx, value)); // Throws
 }
 
 
 inline void Replication::add_index_to_column(const Table* t, std::size_t column_ndx)
 {
     check_table(t); // Throws
-    simple_cmd('x', tuple(column_ndx)); // Throws
+    simple_cmd('x', util::tuple(column_ndx)); // Throws
 }
 
 
 inline void Replication::clear_table(const Table* t)
 {
     check_table(t); // Throws
-    simple_cmd('C', tuple()); // Throws
+    simple_cmd('C', util::tuple()); // Throws
 }
 
 
 inline void Replication::optimize_table(const Table* t)
 {
     check_table(t); // Throws
-    simple_cmd('Z', tuple()); // Throws
+    simple_cmd('Z', util::tuple()); // Throws
 }
 
 
 inline void Replication::on_table_destroyed(const Table* t) TIGHTDB_NOEXCEPT
 {
-    if (m_selected_table == t) m_selected_table = 0;
+    if (m_selected_table == t)
+        m_selected_table = 0;
 }
 
 
 inline void Replication::on_spec_destroyed(const Spec* s) TIGHTDB_NOEXCEPT
 {
-    if (m_selected_spec == s) m_selected_spec = 0;
+    if (m_selected_spec == s)
+        m_selected_spec = 0;
 }
 
 

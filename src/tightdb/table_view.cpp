@@ -5,10 +5,6 @@
 using namespace std;
 using namespace tightdb;
 
-// Convert ConstTableView to TableView. Used to let const and non-const public methods Table::find_all_xxx re-use
-// eachothers code
-TableView::TableView(ConstTableView tv): TableViewBase(&tv) {}
-
 // Searching
 
 // find_*_integer() methods are used for all "kinds" of integer values (bool, int, DateTime)
@@ -271,6 +267,15 @@ void TableViewBase::sort(size_t column, bool Ascending)
     result.destroy();
     ref.destroy();
 }
+
+// Simple pivot aggregate method. Experimental! Please do not document method publicly.
+void TableViewBase::aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const
+{
+    m_table->aggregate(group_by_column, aggr_column, op, result, &m_refs);
+}
+
+
+
 
 void TableViewBase::to_json(ostream& out) const
 {

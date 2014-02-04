@@ -17,11 +17,18 @@
  * from TightDB Incorporated.
  *
  **************************************************************************/
-#ifndef TIGHTDB_HPP
-#define TIGHTDB_HPP
+#ifndef TIGHTDB_DESCRIPTOR_FWD_HPP
+#define TIGHTDB_DESCRIPTOR_FWD_HPP
 
-#include <tightdb/group_shared.hpp>
-#include <tightdb/table_macros.hpp>
-#include <tightdb/descriptor.hpp>
+#include <tightdb/util/bind_ptr.hpp>
 
-#endif // TIGHTDB_HPP
+
+namespace tightdb {
+
+class Descriptor;
+typedef util::bind_ptr<Descriptor> DescriptorRef;
+typedef util::bind_ptr<const Descriptor> ConstDescriptorRef;
+
+} // namespace tightdb
+
+#endif // TIGHTDB_DESCRIPTOR_FWD_HPP

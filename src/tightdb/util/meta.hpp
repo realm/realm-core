@@ -126,10 +126,13 @@ template<> struct IntegralPromote<long double> { typedef long double type; };
 
 
 
-/// Determine the type of the result of an arithmetic operation (+, -,
-/// *, /, %, |, &, ^). The type of the result of a shift operation
-/// (<<, >>) can instead be found as the type resulting from integral
-/// promotion of the left operand.
+/// Determine the type of the result of a binary arithmetic (or
+/// bitwise) operation (+, -, *, /, %, |, &, ^). The type of the
+/// result of a shift operation (<<, >>) can instead be found as the
+/// type resulting from integral promotion of the left operand. The
+/// type of the result of a unary arithmetic (or bitwise) operation
+/// can be found as the type resulting from integral promotion of the
+/// operand.
 ///
 /// \note Enum types are supported only when the compiler supports the
 /// C++11 'decltype' feature.

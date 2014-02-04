@@ -42,12 +42,13 @@ BasicColumn<T>::BasicColumn(Allocator& alloc)
 template<class T>
 BasicColumn<T>::BasicColumn(ref_type ref, ArrayParent* parent, std::size_t pndx, Allocator& alloc)
 {
-    bool root_is_leaf = root_is_leaf_from_ref(ref, alloc);
+    char* header = alloc.translate(ref);
+    bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
     if (root_is_leaf) {
-        m_array = new BasicArray<T>(ref, parent, pndx, alloc);
+        m_array = new BasicArray<T>(MemRef(header, ref), parent, pndx, alloc);
     }
     else {
-        m_array = new Array(ref, parent, pndx, alloc);
+        m_array = new Array(MemRef(header, ref), parent, pndx, alloc);
     }
 }
 
@@ -73,7 +74,7 @@ inline std::size_t BasicColumn<T>::size() const TIGHTDB_NOEXCEPT
 template<class T>
 void BasicColumn<T>::clear()
 {
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         static_cast<BasicArray<T>*>(m_array)->clear(); // Throws
         return;
     }
@@ -94,14 +95,6 @@ void BasicColumn<T>::clear()
     delete m_array;
 
     m_array = array;
-}
-
-template<class T>
-void BasicColumn<T>::resize(std::size_t ndx)
-{
-    TIGHTDB_ASSERT(root_is_leaf()); // currently only available on leaf level (used by b-tree code)
-    TIGHTDB_ASSERT(ndx < size());
-    static_cast<BasicArray<T>*>(m_array)->resize(ndx);
 }
 
 template<class T>
@@ -150,7 +143,7 @@ public:
 template<class T>
 void BasicColumn<T>::set(std::size_t ndx, T value)
 {
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         static_cast<BasicArray<T>*>(m_array)->set(ndx, value); // Throws
         return;
     }
@@ -171,18 +164,6 @@ void BasicColumn<T>::insert(std::size_t ndx, T value)
     TIGHTDB_ASSERT(ndx <= size());
     if (size() <= ndx) ndx = npos;
     do_insert(ndx, value);
-}
-
-template<class T>
-void BasicColumn<T>::fill(std::size_t count)
-{
-    TIGHTDB_ASSERT(is_empty());
-
-    // Fill column with default values
-    // TODO: this is a very naive approach
-    // we could speedup by creating full nodes directly
-    for (std::size_t i = 0; i < count; ++i)
-        add(T());
 }
 
 template<class T>
@@ -249,7 +230,7 @@ void BasicColumn<T>::erase(std::size_t ndx, bool is_last)
     TIGHTDB_ASSERT(ndx < size());
     TIGHTDB_ASSERT(is_last == (ndx == size()-1));
 
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         static_cast<BasicArray<T>*>(m_array)->erase(ndx); // Throws
         return;
     }
@@ -257,6 +238,24 @@ void BasicColumn<T>::erase(std::size_t ndx, bool is_last)
     size_t ndx_2 = is_last ? npos : ndx;
     EraseLeafElem erase_leaf_elem(*this);
     Array::erase_bptree_elem(m_array, ndx_2, erase_leaf_elem); // Throws
+}
+
+
+template<class T> class BasicColumn<T>::CreateHandler: public ColumnBase::CreateHandler {
+public:
+    CreateHandler(Allocator& alloc): m_alloc(alloc) {}
+    ref_type create_leaf(std::size_t size) TIGHTDB_OVERRIDE
+    {
+        return BasicArray<T>::create_array(size, m_alloc);
+    }
+private:
+    Allocator& m_alloc;
+};
+
+template<class T> ref_type BasicColumn<T>::create(std::size_t size, Allocator& alloc)
+{
+    CreateHandler handler(alloc);
+    return ColumnBase::create(size, alloc, handler);
 }
 
 

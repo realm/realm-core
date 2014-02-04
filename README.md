@@ -41,7 +41,7 @@ each of our major platforms:
     sudo apt-get install libunittest++-dev
     sudo apt-get install libprocps0-dev
 
-### Fedora 17, 18, 19, Amazon Linux 2012.09
+### Fedora 17, 18, 19, 20, Amazon Linux 2012.09
 
     sudo yum install gcc gcc-c++
     sudo yum install python-cheetah
@@ -202,6 +202,15 @@ available for installation to the end-user:
 
     TIGHTDB_ENABLE_REPLICATION=1 sh build.sh bin-dist all
 
+### Memory debugging
+
+TightDB currently allows for uninitialized data to be written to a
+database file. This is not an error (technically), but it does cause
+Valgrind to report errors. To avoid these 'false positives' during
+testing and debugging, set `TIGHTDB_ENABLE_ALLOC_SET_ZERO` to a
+nonempty value during configuration as in the following example:
+
+    TIGHTDB_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config
 
 
 Packaging
@@ -262,7 +271,7 @@ to a nonempty value to disable the conversion to PDF.
 
     sudo yum install pandoc-markdown2pdf
 
-### Fedora 18, 19
+### Fedora 18, 19, 20
 
     sudo yum install pandoc-pdf texlive
 

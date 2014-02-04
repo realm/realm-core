@@ -44,21 +44,19 @@ namespace util {
 /// object, but a common use is 'reference counting'. See RefCountBase
 /// for an example of that.
 ///
-/// A restricted notion of move semantics (as defined by C++11) is
-/// provided. Instead of calling `std::move()` one must call `move()`
-/// without the `std::` qualifier. The effectiveness of this
-/// 'emulation' relies on 'return value optimization' being enabled in
-/// the compiler.
+/// This class provides a form of move semantics that is compatible
+/// with C++03. It is similar to, but not as powerful as what is
+/// provided natively by C++11. Instead of using `std::move()` (in
+/// C++11), one must use `move()` without qualification. This will
+/// call a special function that is a friend of this class. The
+/// effectiveness of this form of move semantics relies on 'return
+/// value optimization' being enabled in the compiler.
 ///
 /// This smart pointer implementation assumes that the target object
 /// destructor never throws.
 template<class T> class bind_ptr {
 public:
-#ifdef TIGHTDB_HAVE_CXX11_CONSTEXPR
-    constexpr bind_ptr() TIGHTDB_NOEXCEPT: m_ptr(0) {}
-#else
-    bind_ptr() TIGHTDB_NOEXCEPT: m_ptr(0) {}
-#endif
+    TIGHTDB_CONSTEXPR bind_ptr() TIGHTDB_NOEXCEPT: m_ptr(0) {}
     explicit bind_ptr(T* p) TIGHTDB_NOEXCEPT { bind(p); }
     template<class U> explicit bind_ptr(U* p) TIGHTDB_NOEXCEPT { bind(p); }
     ~bind_ptr() TIGHTDB_NOEXCEPT { unbind(); }
@@ -150,11 +148,10 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const b
 
 
 
-#ifdef TIGHTDB_HAVE_CXX11_ATOMIC
 /// Polymorphic convenience base class for reference counting objects.
 ///
 /// Together with bind_ptr, this class delivers simple instrusive
-/// thread-safe reference counting.
+/// reference counting.
 ///
 /// \sa bind_ptr
 class RefCountBase {
@@ -162,15 +159,38 @@ public:
     RefCountBase() TIGHTDB_NOEXCEPT: m_ref_count(0) {}
     virtual ~RefCountBase() TIGHTDB_NOEXCEPT {}
 
-private:
-    mutable std::atomic<unsigned long> m_ref_count;
+protected:
+    void bind_ref() const TIGHTDB_NOEXCEPT { ++m_ref_count; }
+    void unbind_ref() const TIGHTDB_NOEXCEPT { if (--m_ref_count == 0) delete this; }
 
+private:
+    mutable unsigned long m_ref_count;
+
+    template<class> friend class bind_ptr;
+};
+
+
+#ifdef TIGHTDB_HAVE_CXX11_ATOMIC
+/// Same as RefCountBase, but this one makes the copying of, and the
+/// destruction of counted references thread-safe.
+///
+/// \sa RefCountBase
+/// \sa bind_ptr
+class AtomicRefCountBase {
+public:
+    AtomicRefCountBase() TIGHTDB_NOEXCEPT: m_ref_count(0) {}
+    virtual ~AtomicRefCountBase() TIGHTDB_NOEXCEPT {}
+
+protected:
     // FIXME: Operators ++ and -- as used below use
     // std::memory_order_seq_cst. I'm not sure whether this is the
     // choice that leads to maximum efficiency, but at least it is
     // safe.
     void bind_ref() const TIGHTDB_NOEXCEPT { ++m_ref_count; }
     void unbind_ref() const TIGHTDB_NOEXCEPT { if (--m_ref_count == 0) delete this; }
+
+private:
+    mutable std::atomic<unsigned long> m_ref_count;
 
     template<class> friend class bind_ptr;
 };
