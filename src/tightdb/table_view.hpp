@@ -111,9 +111,8 @@ public:
     void row_to_string(std::size_t row_ndx, std::ostream& out) const;
 
 protected:
-
-    mutable TableRef m_table;
     // Null if, and only if, the view is detached
+    mutable TableRef m_table;
     Array m_refs;
 
 
@@ -319,7 +318,7 @@ private:
 
 inline TableViewBase::~TableViewBase() TIGHTDB_NOEXCEPT
 {
-    if (m_table != NULL) {
+    if (m_table) {
         m_table->unregister_view(this);
         m_table = TableRef();
     }
