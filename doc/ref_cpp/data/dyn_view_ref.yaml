@@ -21,15 +21,15 @@ DESCR      : &g_dyn_view_intro_descr
              To some degree this also applies in the opposite direction.
              Updates to values in the table will be visible through views
              linked to the table, while deletion and insertions of rows in
-             a table cause invalidation of any views linked to the table.
-             Access to invalidated vies are undefined, except for the is_valid method.
+             a table cause any views linked to the table to become detached.
+             Access to detached views are undefined, except for the is_attached() method.
 
              It is possible to create multiple views for the table as
              long as you do not change the original table. Updates to one
              view propagates to the original table and is visible from other
              views linked to the same table. Deletion of rows through a view
-             propagates to the original table and invalidates any other view
-             linked to the same table.
+             propagates to the original table and cause any other views
+             linked to the same table to become detached.
 
              NOTICE:
              For all methods which takes row and column index as parameters,
@@ -72,19 +72,19 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_is_empty
         DESCR  :
-  - g_dyn_view_is_valid:
-      NAME     : is_valid
-      SUMMARY  : &g_dyn_view_is_valid_summary
-                 Is view valid?
-      DESCR    : &g_dyn_view_is_valid_descr
-                 The method checks if the view is valid. A view becomes invalid
+  - g_dyn_view_is_attached:
+      NAME     : is_attached
+      SUMMARY  : &g_dyn_view_is_attached_summary
+                 Is view attached?
+      DESCR    : &g_dyn_view_is_attached_descr
+                 The method checks if the view is attached. A view becomes detached
                  if rows are added to or removed from the table it originates from.
       CONST    : True
       RETURN:
         TYPES  : bool
         DESCR  : <code>true</code> if valid, <code>false</code> otherwise.
       EXAMPLES:
-      - CODE   : ex_cpp_dyn_view_is_valid
+      - CODE   : ex_cpp_dyn_view_is_attached
         DESCR  :
 - View:
   METHODS:

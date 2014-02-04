@@ -34,7 +34,7 @@ using std::size_t;
 class TableViewBase {
 public:
     bool is_empty() const TIGHTDB_NOEXCEPT { return m_refs.is_empty(); }
-    bool is_valid() const TIGHTDB_NOEXCEPT { return m_table != NULL; }
+    bool is_attached() const TIGHTDB_NOEXCEPT { return m_table != NULL; }
     std::size_t size() const TIGHTDB_NOEXCEPT { return m_refs.size(); }
 
     // Column information

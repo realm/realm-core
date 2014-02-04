@@ -37,7 +37,7 @@ public:
     typedef Tab table_type;
 
     bool is_empty() const TIGHTDB_NOEXCEPT { return m_impl.is_empty(); }
-    bool is_valid() const TIGHTDB_NOEXCEPT { return m_impl.is_valid(); }
+    bool is_attached() const TIGHTDB_NOEXCEPT { return m_impl.is_attached(); }
     size_t size() const TIGHTDB_NOEXCEPT { return m_impl.size(); }
 
     // Get row index in the source table this view is "looking" at.
