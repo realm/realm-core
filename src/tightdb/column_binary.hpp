@@ -62,6 +62,8 @@ public:
 
     static ref_type create(std::size_t size, Allocator&);
 
+    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) TIGHTDB_NOEXCEPT;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
@@ -197,6 +199,24 @@ inline void ColumnBinary::insert_string(std::size_t ndx, StringData value)
     bool add_zero_term = true;
     do_insert(ndx, bin, add_zero_term);
 }
+
+inline std::size_t ColumnBinary::get_size_from_ref(ref_type root_ref,
+                                                   Allocator& alloc) TIGHTDB_NOEXCEPT
+{
+    const char* root_header = alloc.translate(root_ref);
+    bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
+    if (root_is_leaf) {
+        bool is_big = Array::get_context_bit_from_header(root_header);
+        if (!is_big) {
+            // Small blobs leaf
+            return ArrayBinary::get_size_from_header(root_header, alloc);
+        }
+        // Big blobs leaf
+        return ArrayBigBlobs::get_size_from_header(root_header);
+    }
+    return Array::get_bptree_size_from_header(root_header);
+}
+
 
 } // namespace tightdb
 

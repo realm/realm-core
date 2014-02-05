@@ -25,6 +25,7 @@
 
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/array.hpp>
+#include <tightdb/column_type.hpp>
 #include <tightdb/query_conditions.hpp>
 
 namespace tightdb {
@@ -60,6 +61,8 @@ public:
     /// Move the last element to the specified index. This reduces the
     /// number of elements by one.
     virtual void move_last_over(std::size_t ndx) = 0;
+
+    virtual void adjust_column_index(int diff) TIGHTDB_NOEXCEPT;
 
     virtual bool IsIntColumn() const TIGHTDB_NOEXCEPT { return false; }
 
@@ -112,6 +115,13 @@ public:
     const Array* GetBlock(std::size_t ndx, Array& arr, std::size_t& off,
                           bool use_retval = false) const TIGHTDB_NOEXCEPT;
 
+    static std::size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&) TIGHTDB_NOEXCEPT;
+
+    // These assume that the right column compile-time type has been
+    // figured out.
+    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&);
+    static std::size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref, Allocator&);
+
 #ifdef TIGHTDB_DEBUG
     // Must be upper case to avoid conflict with macro in Objective-C
     virtual void Verify() const = 0;
@@ -146,9 +156,6 @@ protected:
 
     // Node functions
     bool root_is_leaf() const TIGHTDB_NOEXCEPT { return !m_array->is_inner_bptree_node(); }
-
-    static std::size_t get_size_from_ref(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
-    static bool root_is_leaf_from_ref(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
 
     template <class T, class R, Action action, class condition>
     R aggregate(T target, std::size_t start, std::size_t end, size_t limit = size_t(-1)) const;
@@ -217,6 +224,7 @@ public:
     ref_type get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     int64_t back() const TIGHTDB_NOEXCEPT { return get(size()-1); }
     void set(std::size_t ndx, int64_t value);
+    void adjust(std::size_t ndx, int64_t diff);
     void insert(std::size_t ndx) TIGHTDB_OVERRIDE { insert(ndx, 0); }
     void insert(std::size_t ndx, int64_t value);
     void add() TIGHTDB_OVERRIDE { add(0); }
@@ -296,6 +304,10 @@ private:
 
 // Implementation:
 
+inline void ColumnBase::adjust_column_index(int) TIGHTDB_NOEXCEPT
+{
+}
+
 inline void ColumnBase::destroy() TIGHTDB_NOEXCEPT
 {
     if (m_array)
@@ -329,6 +341,15 @@ inline const Array* ColumnBase::GetBlock(std::size_t ndx, Array& arr, std::size_
                                          bool use_retval) const TIGHTDB_NOEXCEPT
 {
     return m_array->GetBlock(ndx, arr, off, use_retval);
+}
+
+inline std::size_t ColumnBase::get_size_from_ref(ref_type root_ref, Allocator& alloc)
+{
+    const char* root_header = alloc.translate(root_ref);
+    bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
+    if (root_is_leaf)
+        return Array::get_size_from_header(root_header);
+    return Array::get_bptree_size_from_header(root_header);
 }
 
 template<class L, class T>
@@ -369,23 +390,6 @@ std::size_t ColumnBase::upper_bound(const L& list, T value) const TIGHTDB_NOEXCE
         }
     }
     return i;
-}
-
-inline std::size_t ColumnBase::get_size_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
-{
-    const char* header = alloc.translate(ref);
-    std::size_t size = Array::get_size_from_header(header);
-    bool is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
-    if (is_leaf)
-        return size;
-    int_fast64_t v = Array::get(header, size-1);
-    return std::size_t(v / 2); // v = 1 + 2*total_elems_in_tree
-}
-
-inline bool ColumnBase::root_is_leaf_from_ref(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
-{
-    const char* header = alloc.translate(ref);
-    return !Array::get_is_inner_bptree_node_from_header(header);
 }
 
 

@@ -497,7 +497,7 @@ template<class T> inline bool Group::has_table(StringData name) const
     if (ndx == not_found)
         return false;
     const Table* table = get_table_by_ndx(ndx);
-    return T::matches_dynamic_spec(&table->get_spec());
+    return T::matches_dynamic_spec(_impl::TableFriend::get_spec(*table));
 }
 
 inline Table* Group::get_table_ptr(StringData name, SpecSetter spec_setter, bool& was_created)
@@ -538,7 +538,7 @@ template<class T> inline T* Group::get_table_ptr(StringData name)
     SpecSetter spec_setter = &T::set_dynamic_spec;
     bool was_created; // Dummy
     Table* table = get_table_ptr(name, spec_setter, was_created);
-    TIGHTDB_ASSERT(T::matches_dynamic_spec(&table->get_spec()));
+    TIGHTDB_ASSERT(T::matches_dynamic_spec(_impl::TableFriend::get_spec(*table)));
     return static_cast<T*>(table);
 }
 
@@ -546,7 +546,7 @@ template<class T> inline const T* Group::get_table_ptr(StringData name) const
 {
     TIGHTDB_STATIC_ASSERT(IsBasicTable<T>::value, "Invalid table type");
     const Table* table = get_table_ptr(name); // Throws
-    TIGHTDB_ASSERT(!table || T::matches_dynamic_spec(&table->get_spec()));
+    TIGHTDB_ASSERT(!table || T::matches_dynamic_spec(_impl::TableFriend::get_spec(*table)));
     return static_cast<const T*>(table);
 }
 

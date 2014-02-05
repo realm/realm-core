@@ -240,6 +240,28 @@ TEST(TableViewSumNegative)
     CHECK_EQUAL(-9, sum);
 }
 
+TEST(TableViewIsAttached)
+{
+    TestTableInt table;
+
+    table.add(0);
+    table.add(0);
+    table.add(0);
+
+    TestTableInt::View v = table.column().first.find_all(0);
+    TestTableInt::View v2 = table.column().first.find_all(0);
+    v[0].first = 11;
+    CHECK_EQUAL(true, v.is_attached());
+    CHECK_EQUAL(true, v2.is_attached());
+    v.remove_last();
+    CHECK_EQUAL(true, v.is_attached());
+    CHECK_EQUAL(false, v2.is_attached());
+
+    table.remove_last();
+    CHECK_EQUAL(false, v.is_attached());
+    CHECK_EQUAL(false, v2.is_attached());
+}
+
 TEST(TableViewMax)
 {
     TestTableInt table;
@@ -890,5 +912,56 @@ TEST(TableView_ref_counting)
     string s = tv2.get_string(0, 0);
     CHECK_EQUAL(s, "just a test string");
 }
+
+TEST(TableView_dyn_pivot)
+{
+    TableRef table = Table::create();
+    size_t column_ndx_sex = table->add_column(type_String, "sex");
+    size_t column_ndx_age = table->add_column(type_Int,    "age");
+    table->add_column(type_Bool, "hired");
+
+    size_t count = 5000;
+    for (size_t i = 0; i < count; ++i) {
+        StringData sex = i % 2 ? "Male" : "Female";
+        table->insert_string(0, i, sex);
+        table->insert_int(1, i, 20 + (i%20));
+        table->insert_bool(2, i, true);
+        table->insert_done();
+    }
+
+    TableView tv = table->where().find_all();
+
+    Table result_count;
+    tv.aggregate(0, 1, Table::aggr_count, result_count);
+    int64_t half = count/2;
+    CHECK_EQUAL(2, result_count.get_column_count());
+    CHECK_EQUAL(2, result_count.size());
+    CHECK_EQUAL(half, result_count.get_int(1, 0));
+    CHECK_EQUAL(half, result_count.get_int(1, 1));
+
+    Table result_sum;
+    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_sum, result_sum);
+
+    Table result_avg;
+    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_avg, result_avg);
+
+    Table result_min;
+    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_min, result_min);
+
+    Table result_max;
+    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_max, result_max);
+
+
+    // Test with enumerated strings
+    table->optimize();
+
+    Table result_count2;
+    tv.aggregate(column_ndx_sex, column_ndx_age, Table::aggr_count, result_count2);
+    CHECK_EQUAL(2, result_count2.get_column_count());
+    CHECK_EQUAL(2, result_count2.size());
+    CHECK_EQUAL(half, result_count2.get_int(1, 0));
+    CHECK_EQUAL(half, result_count2.get_int(1, 1));
+}
+
 
 #endif // TEST_TABLE_VIEW

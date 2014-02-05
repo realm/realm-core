@@ -169,16 +169,16 @@ void ArrayStringLong::find_all(Array& result, StringData value, size_t add_offse
 
 StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    pair<size_t, size_t> p = get_size_pair(header, 0);
-    ref_type offsets_ref = p.first;
-    ref_type blob_ref    = p.second;
+    pair<int_least64_t, int_least64_t> p = get_two(header, 0);
+    ref_type offsets_ref = to_ref(p.first);
+    ref_type blob_ref    = to_ref(p.second);
 
     const char* offsets_header = alloc.translate(offsets_ref);
     size_t begin, end;
     if (0 < ndx) {
-        p = get_size_pair(offsets_header, ndx-1);
-        begin = p.first;
-        end   = p.second;
+        p = get_two(offsets_header, ndx-1);
+        begin = to_size_t(p.first);
+        end   = to_size_t(p.second);
     }
     else {
         begin = 0;

@@ -9,10 +9,8 @@
 
 #include <UnitTest++.h>
 
-#include <tightdb/table_macros.hpp>
+#include <tightdb.hpp>
 #include <tightdb/lang_bind_helper.hpp>
-#include <tightdb/alloc_slab.hpp>
-#include <tightdb/group.hpp>
 
 #include "testsettings.hpp"
 #include "util/misc.hpp"
@@ -109,6 +107,7 @@ ONLY(ManyColumnsCrash) {
             {
                 // create the event
 #if 1
+
                 PatientTableType::Ref table = group->get_table<PatientTableType>("events");
                 table->add(obfuscatedYear, daysSinceLastVisit, conceptId);
 #else
@@ -461,19 +460,22 @@ namespace {
 void setup_multi_table(Table& table, size_t rows, size_t sub_rows)
 {
     // Create table with all column types
-    table.add_column(type_Int,      "int");
-    table.add_column(type_Bool,     "bool");
-    table.add_column(type_DateTime, "date");
-    table.add_column(type_Float,    "float");
-    table.add_column(type_Double,   "double");
-    table.add_column(type_String,   "string");
-    table.add_column(type_String,   "string_long");
-    table.add_column(type_String,   "string_enum"); // becomes ColumnStringEnum
-    table.add_column(type_Binary,   "binary");
-    table.add_column(type_Mixed,    "mixed");
-    table.add_column(type_Table,    "tables");
-    table.add_subcolumn(tuple(10), type_Int,    "sub_first");
-    table.add_subcolumn(tuple(10), type_String, "sub_second");
+    {
+        DescriptorRef sub1;
+        table.add_column(type_Int,      "int");
+        table.add_column(type_Bool,     "bool");
+        table.add_column(type_DateTime, "date");
+        table.add_column(type_Float,    "float");
+        table.add_column(type_Double,   "double");
+        table.add_column(type_String,   "string");
+        table.add_column(type_String,   "string_long");
+        table.add_column(type_String,   "string_enum"); // becomes ColumnStringEnum
+        table.add_column(type_Binary,   "binary");
+        table.add_column(type_Mixed,    "mixed");
+        table.add_column(type_Table,    "tables", &sub1);
+        sub1->add_column(type_Int,        "sub_first");
+        sub1->add_column(type_String,     "sub_second");
+    }
 
     // Add some rows
     for (size_t i = 0; i < rows; ++i) {
@@ -617,17 +619,20 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     Table parent;
 
     // Add all column types
-    parent.add_column(type_Table, "child");
-    parent.add_subcolumn(tuple(0), type_Int,      "int");    // 0
-    parent.add_subcolumn(tuple(0), type_Bool,     "bool");   // 1
-    parent.add_subcolumn(tuple(0), type_Float,    "float");  // 2
-    parent.add_subcolumn(tuple(0), type_Double,   "double"); // 3
-    parent.add_subcolumn(tuple(0), type_DateTime, "date");   // 4
-    parent.add_subcolumn(tuple(0), type_String,   "string"); // 5
-    parent.add_subcolumn(tuple(0), type_Binary,   "binary"); // 6
-    parent.add_subcolumn(tuple(0), type_Table,    "table");  // 7
-    parent.add_subcolumn(tuple(0), type_Mixed,    "mixed");  // 8
-    parent.add_subcolumn(tuple(0,7), type_Int, "i");
+    {
+        DescriptorRef sub_1, sub_2;
+        parent.add_column(type_Table,  "child", &sub_1);
+        sub_1->add_column(type_Int,      "int");           // 0
+        sub_1->add_column(type_Bool,     "bool");          // 1
+        sub_1->add_column(type_Float,    "float");         // 2
+        sub_1->add_column(type_Double,   "double");        // 3
+        sub_1->add_column(type_DateTime, "date");          // 4
+        sub_1->add_column(type_String,   "string");        // 5
+        sub_1->add_column(type_Binary,   "binary");        // 6
+        sub_1->add_column(type_Table,    "table", &sub_2); // 7
+        sub_1->add_column(type_Mixed,    "mixed");         // 8
+        sub_2->add_column(type_Int,        "i");
+    }
 
     parent.add_empty_row(); // Create a degenerate subtable
 
@@ -756,12 +761,12 @@ TEST(Table_range)
     Table table;
     table.add_column(type_Int, "int");
     table.add_empty_row(100);
-    for (int i = 0 ; i < 100; ++i)
+    for (size_t i = 0 ; i < 100; ++i)
         table.set_int(0, i, i);
     TableView tv = table.get_range_view(10, 20);
     CHECK_EQUAL(10, tv.size());
-    for (size_t i = 0; i<tv.size(); ++i)
-        CHECK_EQUAL(i+10, tv.get_int(0, i));
+    for (size_t i = 0; i < tv.size(); ++i)
+        CHECK_EQUAL(int64_t(i+10), tv.get_int(0, i));
 }
 
 TEST(Table_range_const)
@@ -1497,11 +1502,14 @@ TEST(Table_Spec)
     TableRef table = group.get_table("test");
 
     // Create specification with sub-table
-    table->add_column(type_Int,    "first");
-    table->add_column(type_String, "second");
-    table->add_column(type_Table,   "third");
-    table->add_subcolumn(tuple(2), type_Int,    "sub_first");
-    table->add_subcolumn(tuple(2), type_String, "sub_second");
+    {
+        DescriptorRef sub_1;
+        table->add_column(type_Int,    "first");
+        table->add_column(type_String, "second");
+        table->add_column(type_Table,  "third", &sub_1);
+        sub_1->add_column(type_Int,      "sub_first");
+        sub_1->add_column(type_String,   "sub_second");
+    }
 
     CHECK_EQUAL(3, table->get_column_count());
 
@@ -1634,8 +1642,7 @@ TEST(Table_Spec_RenameColumns)
     CHECK_EQUAL(0, table->get_column_index("1st"));
 
     // Rename sub-column
-    column_path.push_back(0); // third
-    table->rename_subcolumn(column_path, "sub_1st");
+    table->rename_subcolumn(column_path, 0, "sub_1st"); // third
 
     // Get the sub-table
     {
@@ -1726,10 +1733,9 @@ TEST(Table_Spec_DeleteColumns)
     // Create path to column in sub-table
     column_path.clear();
     column_path.push_back(1); // third
-    column_path.push_back(1); // sub_second
 
     // Remove a column in sub-table
-    table->remove_subcolumn(column_path);
+    table->remove_subcolumn(column_path, 1);  // sub_second
 
     // Get the sub-table again and see if the values
     // still match.
@@ -1970,7 +1976,7 @@ TEST(Table_Spec_DeleteColumnsBug)
 TEST(Table_Mixed)
 {
     Table table;
-    table.add_column(type_Int, "first");
+    table.add_column(type_Int,   "first");
     table.add_column(type_Mixed, "second");
 
     CHECK_EQUAL(type_Int, table.get_column_type(0));
@@ -2150,9 +2156,10 @@ TEST(Table_Mixed2)
 TEST(Table_SubtableSizeAndClear)
 {
     Table table;
-    table.add_column(type_Table, "subtab");
+    DescriptorRef subdesc;
+    table.add_column(type_Table, "subtab", &subdesc);
     table.add_column(type_Mixed, "mixed");
-    table.add_subcolumn(tuple(0), type_Int, "int");
+    subdesc->add_column(type_Int,  "int");
 
     table.insert_subtable(0, 0);
     table.insert_mixed(1, 0, false);
@@ -2504,11 +2511,12 @@ TEST(Table_Test_Clear_With_Subtable_AND_Group)
 {
     Group group;
     TableRef table = group.get_table("test");
+    DescriptorRef sub_1;
 
     // Create specification with sub-table
     table->add_column(type_String, "name");
-    table->add_column(type_Table,  "sub");
-    table->add_subcolumn(tuple(1), type_Int, "num");
+    table->add_column(type_Table,  "sub", &sub_1);
+    sub_1->add_column(type_Int,      "num");
 
     CHECK_EQUAL(2, table->get_column_count());
 
@@ -2694,24 +2702,24 @@ TEST(Table_SubtableWithParentChange)
 TEST(Table_HasSharedSpec)
 {
     MyTable2 table1;
-    CHECK(!table1.has_shared_spec());
+    CHECK(!table1.has_shared_type());
     Group g;
     MyTable2::Ref table2 = g.get_table<MyTable2>("foo");
-    CHECK(!table2->has_shared_spec());
+    CHECK(!table2->has_shared_type());
     table2->add();
-    CHECK(table2[0].subtab->has_shared_spec());
+    CHECK(table2[0].subtab->has_shared_type());
 
     // Subtable in mixed column
     TestTableMX::Ref table3 = g.get_table<TestTableMX>("bar");
-    CHECK(!table3->has_shared_spec());
+    CHECK(!table3->has_shared_type());
     table3->add();
     table3[0].first.set_subtable<MyTable2>();
     MyTable2::Ref table4 = table3[0].first.get_subtable<MyTable2>();
     CHECK(table4);
-    CHECK(!table4->has_shared_spec());
+    CHECK(!table4->has_shared_type());
     table4->add();
-    CHECK(!table4->has_shared_spec());
-    CHECK(table4[0].subtab->has_shared_spec());
+    CHECK(!table4->has_shared_type());
+    CHECK(table4[0].subtab->has_shared_type());
 }
 
 
@@ -2828,11 +2836,98 @@ TEST(Table_FormerLeakCase)
     sub.add_column(type_Int, "a");
 
     Table root;
-    root.add_column(type_Table, "b");
-    root.add_subcolumn(tuple(0), type_Int, "a");
+    DescriptorRef subdesc;
+    root.add_column(type_Table, "b", &subdesc);
+    subdesc->add_column(type_Int,  "a");
     root.add_empty_row(1);
     root.set_subtable(0, 0, &sub);
     root.set_subtable(0, 0, 0);
+}
+
+
+namespace {
+
+TIGHTDB_TABLE_3(TablePivotAgg,
+                sex,   String,
+                age,   Int,
+                hired, Bool)
+
+} // anonymous namespace
+
+TEST(Table_pivot)
+{
+    size_t count = 1717;
+    TablePivotAgg table;
+    int64_t age_sum[2] = {0, 0};
+    int64_t age_cnt[2] = {0, 0};
+    int64_t age_min[2];
+    int64_t age_max[2];
+    double age_avg[2];
+
+    for (size_t i = 0; i < count; ++i) {
+        size_t sex = i % 2;
+        int64_t age =  3 + (i%117);
+        table.add((sex==0) ? "Male" : "Female", age, true);
+
+        age_sum[sex] += age;
+        age_cnt[sex] += 1;
+        if ((i < 2) || age < age_min[sex])
+            age_min[sex] = age;
+        if ((i < 2) || age > age_max[sex])
+            age_max[sex] = age;
+    }
+    for (size_t sex = 0; sex < 2; ++sex) {
+        age_avg[sex] = double(age_sum[sex]) / double(age_cnt[sex]);
+    }
+
+
+    for (int i = 0; i < 2; ++i) {
+        Table result_count;
+        table.aggregate(0, 1, Table::aggr_count, result_count);
+        CHECK_EQUAL(2, result_count.get_column_count());
+        CHECK_EQUAL(2, result_count.size());
+        for (size_t sex = 0; sex < 2; ++sex) {
+            CHECK_EQUAL(age_cnt[sex], result_count.get_int(1, sex));
+        }
+
+        Table result_sum;
+        table.aggregate(0, 1, Table::aggr_sum, result_sum);
+        for (size_t sex = 0; sex < 2; ++sex) {
+            CHECK_EQUAL(age_sum[sex], result_sum.get_int(1, sex));
+        }
+
+        Table result_avg;
+        table.aggregate(0, 1, Table::aggr_avg, result_avg);
+        if (false) {
+            ostringstream ss;
+            result_avg.to_string(ss);
+            std::cerr << "\nMax:\n" << ss.str();
+        }
+        CHECK_EQUAL(2, result_avg.get_column_count());
+        CHECK_EQUAL(2, result_avg.size());
+        for (size_t sex = 0; sex < 2; ++sex) {
+            CHECK_EQUAL(age_avg[sex], result_avg.get_double(1, sex));
+        }
+
+        Table result_min;
+        table.aggregate(0, 1, Table::aggr_min, result_min);
+        CHECK_EQUAL(2, result_min.get_column_count());
+        CHECK_EQUAL(2, result_min.size());
+        for (size_t sex = 0; sex < 2; ++sex) {
+            CHECK_EQUAL(age_min[sex], result_min.get_int(1, sex));
+        }
+
+        Table result_max;
+        table.aggregate(0, 1, Table::aggr_max, result_max);
+        CHECK_EQUAL(2, result_max.get_column_count());
+        CHECK_EQUAL(2, result_max.size());
+        for (size_t sex = 0; sex < 2; ++sex) {
+            CHECK_EQUAL(age_max[sex], result_max.get_int(1, sex));
+        }
+
+        // Test with enumerated strings in second loop
+        table.optimize();
+    }
 }
 
 #endif // TEST_TABLE

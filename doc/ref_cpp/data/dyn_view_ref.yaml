@@ -18,14 +18,17 @@ DESCR      : &g_dyn_view_intro_descr
              propagate to the original table. This includes operations
              like updating values and deleting rows.
 
-             Notice that this does not imply that it will work the
-             opposite direction. Any change that adds or removes rows
-             in the original table will invalidate the view, and you
-             must not use the view, as this could possibly lead to data
-             corruption.
+             To some degree this also applies in the opposite direction.
+             Updates to values in the table will be visible through views
+             linked to the table, while deletion and insertions of rows in
+             a table cause any views linked to the table to become detached.
+             Access to detached views are undefined, except for the is_attached() method.
 
-             It is possible to create multiple views for the table as
-             long as you do not change the original table.
+             It is possible to create multiple views for one table. Updates to one
+             view propagates to the original table and is visible from other
+             views linked to the same table. Deletion of rows through a view
+             propagates to the original table and cause any other views
+             linked to the same table to become detached.
 
              NOTICE:
              For all methods which takes row and column index as parameters,
@@ -67,6 +70,20 @@ CATEGORIES :
         DESCR  : <code>true</code> if empty, <code>false</code> otherwise.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_is_empty
+        DESCR  :
+  - g_dyn_view_is_attached:
+      NAME     : is_attached
+      SUMMARY  : &g_dyn_view_is_attached_summary
+                 Is view attached?
+      DESCR    : &g_dyn_view_is_attached_descr
+                 The method checks if the view is attached. A view becomes detached
+                 if rows are added to or removed from the table it originates from.
+      CONST    : True
+      RETURN:
+        TYPES  : bool
+        DESCR  : <code>true</code> if valid, <code>false</code> otherwise.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_view_is_attached
         DESCR  :
 - View:
   METHODS:
