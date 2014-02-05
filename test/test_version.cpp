@@ -1,7 +1,7 @@
 #include "testsettings.hpp"
 
 #include <string>
-#include <ostream>
+#include <iostream>
 #include <UnitTest++.h>
 
 #include <tightdb/version.hpp>
