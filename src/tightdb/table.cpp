@@ -608,6 +608,9 @@ void Table::detach() TIGHTDB_NOEXCEPT
     detach_views_except(NULL);
 }
 
+// Note about exception safety:
+// This function must be called with a view that is either 0, OR
+// already present in the view registry, Otherwise it may throw.
 void Table::detach_views_except(const TableViewBase* view) TIGHTDB_NOEXCEPT
 {
     std::vector<const TableViewBase*>::iterator end = m_views.end();
@@ -619,8 +622,12 @@ void Table::detach_views_except(const TableViewBase* view) TIGHTDB_NOEXCEPT
         ++it;
     }
     m_views.clear();
-    if (view)
+    if (view) {
+        // can NOT except, because if the view is not 0, it must
+        // have been in the registry before  AND since clear does
+        // not release memory, no new memory is needed for push_back:
         m_views.push_back(view);
+    }
 }
 
 void Table::detach_subtable_accessors() TIGHTDB_NOEXCEPT
