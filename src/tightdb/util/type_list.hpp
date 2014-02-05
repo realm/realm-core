@@ -24,33 +24,29 @@ namespace tightdb {
 namespace util {
 
 
-/**
- * The 'cons' operator for building lists of types.
- *
- * \tparam H The head of the list, that is, the first type in the
- * list.
- *
- * \tparam T The tail of the list, that is, the list of types
- * following the head. It is 'void' if nothing follows the head,
- * otherwise it matches TypeCons<H2,T2>.
- *
- * Note that 'void' is interpreted as a zero-length list.
- */
+/// The 'cons' operator for building lists of types.
+///
+/// \tparam H The head of the list, that is, the first type in the
+/// list.
+///
+/// \tparam T The tail of the list, that is, the list of types
+/// following the head. It is 'void' if nothing follows the head,
+/// otherwise it matches TypeCons<H2,T2>.
+///
+/// Note that 'void' is interpreted as a zero-length list.
 template<class H, class T> struct TypeCons {
     typedef H head;
     typedef T tail;
 };
 
 
-/**
- * Append a type the the end of a type list. The resulting type list
- * is available as TypeAppend<List, T>::type.
- *
- * \tparam List A list of types constructed using TypeCons<>. Note
- * that 'void' is interpreted as a zero-length list.
- *
- * \tparam T The new type to be appended.
- */
+/// Append a type the the end of a type list. The resulting type list
+/// is available as TypeAppend<List, T>::type.
+///
+/// \tparam List A list of types constructed using TypeCons<>. Note
+/// that 'void' is interpreted as a zero-length list.
+///
+/// \tparam T The new type to be appended.
 template<class List, class T> struct TypeAppend {
     typedef TypeCons<typename List::head, typename TypeAppend<typename List::tail, T>::type> type;
 };
@@ -59,40 +55,34 @@ template<class T> struct TypeAppend<void, T> {
 };
 
 
-/**
- * Get an element from the specified list of types. The
- * result is available as TypeAt<List, i>::type.
- *
- * \tparam List A list of types constructed using TypeCons<>. Note
- * that 'void' is interpreted as a zero-length list.
- *
- * \tparam i The index of the list element to get.
- */
+/// Get an element from the specified list of types. The result is
+/// available as TypeAt<List, i>::type.
+///
+/// \tparam List A list of types constructed using TypeCons<>. Note
+/// that 'void' is interpreted as a zero-length list.
+///
+/// \tparam i The index of the list element to get.
 template<class List, int i> struct TypeAt {
     typedef typename TypeAt<typename List::tail, i-1>::type type;
 };
 template<class List> struct TypeAt<List, 0> { typedef typename List::head type; };
 
 
-/**
- * Count the number of elements in the specified list of types. The
- * result is available as TypeCount<List>::value.
- *
- * \tparam List The list of types constructed using TypeCons<>. Note
- * that 'void' is interpreted as a zero-length list.
- */
+/// Count the number of elements in the specified list of types. The
+/// result is available as TypeCount<List>::value.
+///
+/// \tparam List The list of types constructed using TypeCons<>. Note
+/// that 'void' is interpreted as a zero-length list.
 template<class List> struct TypeCount {
     static const int value = 1 + TypeCount<typename List::tail>::value;
 };
 template<> struct TypeCount<void> { static const int value = 0; };
 
 
-/**
- * Execute an action for each element in the specified list of types.
- *
- * \tparam List The list of types constructed using TypeCons<>. Note
- * that 'void' is interpreted as a zero-length list.
- */
+/// Execute an action for each element in the specified list of types.
+///
+/// \tparam List The list of types constructed using TypeCons<>. Note
+/// that 'void' is interpreted as a zero-length list.
 template<class List, template<class T, int i> class Op, int i=0> struct ForEachType {
     static void exec()
     {
@@ -123,14 +113,12 @@ template<template<class T, int i> class Op, int i> struct ForEachType<void, Op, 
 };
 
 
-/**
- * Execute a predicate for each element in the specified list of
- * types, and return true if, and only if the predicate returns true
- * for at least one of those elements.
- *
- * \tparam List The list of types constructed using TypeCons<>. Note
- * that 'void' is interpreted as a zero-length list.
- */
+/// Execute a predicate for each element in the specified list of
+/// types, and return true if, and only if the predicate returns true
+/// for at least one of those elements.
+///
+/// \tparam List The list of types constructed using TypeCons<>. Note
+/// that 'void' is interpreted as a zero-length list.
 template<class List, template<class T, int i> class Pred, int i=0> struct HasType {
     static bool exec()
     {
