@@ -2537,22 +2537,22 @@ void Table::aggregate(size_t group_by_column, size_t aggr_column, AggrType op, T
 }
 
 
-TableView Table::get_range_view(size_t start, size_t end)
+TableView Table::get_range_view(size_t begin, size_t end)
 {
     TIGHTDB_ASSERT(!m_columns.is_attached() || end < size());
 
     TableView ctv(*this);
     if (m_columns.is_attached()) {
         Array& refs = ctv.get_ref_column();
-        for (size_t i = start; i < end; ++i)
+        for (size_t i = begin; i < end; ++i)
             refs.add(i);
     }
     return ctv;
 }
 
-ConstTableView Table::get_range_view(size_t start, size_t end) const
+ConstTableView Table::get_range_view(size_t begin, size_t end) const
 {
-    return const_cast<Table*>(this)->get_range_view(start, end);
+    return const_cast<Table*>(this)->get_range_view(begin, end);
 }
 
 

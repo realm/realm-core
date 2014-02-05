@@ -415,8 +415,8 @@ public:
     TableView      get_sorted_view(std::size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(std::size_t column_ndx, bool ascending = true) const;
 
-    TableView      get_range_view(std::size_t start, std::size_t end);
-    ConstTableView get_range_view(std::size_t start, std::size_t end) const;
+    TableView      get_range_view(std::size_t begin, std::size_t end);
+    ConstTableView get_range_view(std::size_t begin, std::size_t end) const;
 
     // Pivot / aggregate operation types. Experimental! Please do not document method publicly.
     enum AggrType {

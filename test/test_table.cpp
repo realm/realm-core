@@ -769,6 +769,23 @@ TEST(Table_range)
         CHECK_EQUAL(int64_t(i+10), tv.get_int(0, i));
 }
 
+TEST(Table_range_const)
+{
+    Group group;
+    {
+        TableRef table = group.get_table("test");
+        table->add_column(type_Int, "int");
+        table->add_empty_row(100);
+        for (int i = 0 ; i < 100; ++i)
+            table->set_int(0, i, i);
+    }
+    ConstTableRef ctable = group.get_table("test");
+    ConstTableView tv = ctable->get_range_view(10, 20);
+    CHECK_EQUAL(10, tv.size());
+    for (size_t i = 0; i<tv.size(); ++i)
+        CHECK_EQUAL(i+10, tv.get_int(0, i));
+}
+
 
 // enable to generate testfiles for to_string and json below
 #define GENERATE 0
