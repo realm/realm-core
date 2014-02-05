@@ -74,8 +74,8 @@ public:
     static void bind_table_ref(const Table*) TIGHTDB_NOEXCEPT;
 
     /// Calls parent.insert_subtable(col_ndx, row_ndx, &source). Note
-    /// that the source table must have a spec that is compatible with
-    /// the target subtable column.
+    /// that the source table must have a descriptor that is
+    /// compatible with the target subtable column.
     static void insert_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
                                 const Table& source);
 
@@ -87,12 +87,6 @@ public:
     /// Calls parent.set_mixed_subtable(col_ndx, row_ndx, &source).
     static void set_mixed_subtable(Table& parent, std::size_t col_ndx, std::size_t row_ndx,
                                    const Table& source);
-
-    /// This is an alternative to Table::get_spec() that may be
-    /// legally called even for a table with shared spec. It is then
-    /// the responsibility of the language binding to ensure that
-    /// modification is only done through it when it is not shared.
-    static Spec& get_spec(Table&) TIGHTDB_NOEXCEPT;
 
     /// Returns the name of the specified data type as follows:
     ///
@@ -111,6 +105,8 @@ public:
     /// </pre>
     static const char* get_data_type_name(DataType) TIGHTDB_NOEXCEPT;
 };
+
+
 
 
 // Implementation:
@@ -216,11 +212,6 @@ inline void LangBindHelper::set_mixed_subtable(Table& parent, std::size_t col_nd
                                                std::size_t row_ndx, const Table& source)
 {
     parent.set_mixed_subtable(col_ndx, row_ndx, &source);
-}
-
-inline Spec& LangBindHelper::get_spec(Table& t) TIGHTDB_NOEXCEPT
-{
-    return t.m_spec;
 }
 
 

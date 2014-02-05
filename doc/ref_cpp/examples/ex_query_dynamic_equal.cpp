@@ -10,14 +10,11 @@ int main()
 {
     Group group;
     TableRef table = group.get_table("test");
-
-    Spec& s = table->get_spec();
-    s.add_column(type_String, "name");
-    s.add_column(type_Int,    "age");
-    s.add_column(type_Bool,   "male");
-    s.add_column(type_DateTime,   "hired");
-    s.add_column(type_Binary, "photo");
-    table->update_from_spec();
+    table->add_column(type_String,   "name");
+    table->add_column(type_Int,      "age");
+    table->add_column(type_Bool,     "male");
+    table->add_column(type_DateTime, "hired");
+    table->add_column(type_Binary,   "photo");
 
 // @@EndFold@@
     table->add_empty_row(2);

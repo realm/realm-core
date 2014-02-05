@@ -28,7 +28,7 @@ void ColumnMixed::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 }
 
 
-void ColumnMixed::create(Allocator& alloc, const Table* table, size_t column_ndx)
+void ColumnMixed::create(Allocator& alloc, Table* table, size_t column_ndx)
 {
     m_array = new Array(Array::type_HasRefs, 0, 0, alloc);
 
@@ -42,7 +42,7 @@ void ColumnMixed::create(Allocator& alloc, const Table* table, size_t column_ndx
     m_data->set_parent(m_array, 1);
 }
 
-void ColumnMixed::create(Allocator& alloc, const Table* table, size_t column_ndx,
+void ColumnMixed::create(Allocator& alloc, Table* table, size_t column_ndx,
                          ArrayParent* parent, size_t ndx_in_parent, ref_type ref)
 {
     m_array = new Array(ref, parent, ndx_in_parent, alloc);
@@ -347,7 +347,7 @@ void ColumnMixed::Verify() const
         int64_t v = m_data->get(i);
         if (v == 0 || v & 0x1)
             continue;
-        ConstTableRef subtable = m_data->get_subtable(i);
+        ConstTableRef subtable = m_data->get_subtable_ptr(i)->get_table_ref();
         subtable->Verify();
     }
 }
@@ -373,7 +373,7 @@ void ColumnMixed::to_dot(ostream& out, StringData title) const
         MixedColType type = MixedColType(m_types->get(i));
         if (type != mixcol_Table)
             continue;
-        ConstTableRef subtable = m_data->get_subtable(i);
+        ConstTableRef subtable = m_data->get_subtable_ptr(i)->get_table_ref();
         subtable->to_dot(out);
     }
 

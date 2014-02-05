@@ -94,6 +94,9 @@ public:
     // Sort the view according to the specified column and the
     // specified direction.
     void sort(size_t column_ndx, bool ascending = true);
+    
+    // Simple pivot aggregate method. Experimental! Please do not document method publicly.
+    void aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const;
 
     // Get row index in the source table this view is "looking" at.
     size_t get_source_ndx(size_t row_ndx) const TIGHTDB_NOEXCEPT
@@ -163,17 +166,17 @@ class ConstTableView;
 ///
 /// You should use 'return tv' whenever the type of 'tv' matches the
 /// return type in the function signature exactly, such as
-/// ´T fun() { return T(...); }´ or ´T fun() { T tv; return tv }´ to
+/// `T fun() { return T(...); }` or `T fun() { T tv; return tv }` to
 /// enable return-value-optimization and named-return-value-optimization
 /// respectively.
 ///
 /// You should use 'return move(tv)' whenever the type of 'tv' mismatch
 /// the signature (where 'tv' needs conversion to return type), such as
-/// ´ConstTableView fun() {TableView tv; return move(tv);}´ to enable
+/// `ConstTableView fun() {TableView tv; return move(tv);}` to enable
 /// move-semantics.
 ///
 /// Avoid return(tv) whenever possible because it inhibits rvo and nrvo.
-/// ´return tv´ has been benchmarked to be slower than ´return move(tv)´
+/// `return tv` has been benchmarked to be slower than `return move(tv)`
 /// for both VC2012 and GCC 4.7 in many cases but never the opposite.
 //
 /// Note that move(tv) removes the contents from tv and leaves it
@@ -233,7 +236,6 @@ public:
 private:
     TableView(Table& parent): TableViewBase(&parent) {}
     TableView(TableView* tv) TIGHTDB_NOEXCEPT: TableViewBase(tv) {}
-    TableView(ConstTableView tv);
 
     TableView find_all_integer(size_t column_ndx, int64_t value);
     ConstTableView find_all_integer(size_t column_ndx, int64_t value) const;

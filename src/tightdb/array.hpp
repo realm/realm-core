@@ -371,9 +371,13 @@ public:
     /// be initialized to the specified value.
     static ref_type create_array(Type, std::size_t size, int_fast64_t value, Allocator&);
 
+    /// Construct an empty array of the specified type, and return
+    /// just the reference to the underlying memory.
+    static ref_type create_empty_array(Type, Allocator&);
+
     // Parent tracking
-    bool has_parent() const TIGHTDB_NOEXCEPT { return m_parent != 0; }
-    ArrayParent* get_parent() const TIGHTDB_NOEXCEPT { return m_parent; }
+    bool has_parent() const TIGHTDB_NOEXCEPT;
+    ArrayParent* get_parent() const TIGHTDB_NOEXCEPT;
 
     /// Setting a new parent affects ownership of the attached array
     /// node, if any. If a non-null parent is specified, and there was
@@ -383,17 +387,17 @@ public:
     /// list of children in the affected parents.
     void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
 
-    std::size_t get_ndx_in_parent() const TIGHTDB_NOEXCEPT { return m_ndx_in_parent; }
-    void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT { m_ndx_in_parent += diff; }
+    std::size_t get_ndx_in_parent() const TIGHTDB_NOEXCEPT;
+    void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT;
 
-    bool is_attached() const TIGHTDB_NOEXCEPT { return m_data != 0; }
+    bool is_attached() const TIGHTDB_NOEXCEPT;
 
     /// Detach from the underlying array node. This method has no
     /// effect if the accessor is currently unattached (idempotency).
-    void detach() TIGHTDB_NOEXCEPT { m_data = 0; }
+    void detach() TIGHTDB_NOEXCEPT;
 
     std::size_t size() const TIGHTDB_NOEXCEPT;
-    bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
+    bool is_empty() const TIGHTDB_NOEXCEPT;
     Type get_type() const TIGHTDB_NOEXCEPT;
 
     void insert(std::size_t ndx, int_fast64_t value);
@@ -423,8 +427,11 @@ public:
     /// Erase the element at the specified index, and move elements at
     /// succeeding indexes to the next lower index.
     ///
-    /// This function is guaranteed not to throw if
-    /// get_alloc().is_read_only(get_ref()) returns false.
+    /// This function is guaranteed to *never* throw if
+    /// `get_alloc().is_read_only(get_ref())` returns false. This is
+    /// automatically guaranteed if the array is used in a
+    /// non-transactional context, or if the array has already been
+    /// successfully modified within the current write transaction.
     ///
     /// FIXME: Carefull with this one. It does not destroy/deallocate
     /// subarrays as clear() does. This difference is surprising and
@@ -694,6 +701,9 @@ public:
     /// efficiency when inserting after, and erasing the last element.
     std::size_t get_bptree_size() const TIGHTDB_NOEXCEPT;
 
+    /// The root must not be a leaf.
+    static std::size_t get_bptree_size_from_header(const char* root_header) TIGHTDB_NOEXCEPT;
+
 
     /// Find the leaf node corresponding to the specified tree-level
     /// index. This function must be called on an inner B+-tree node,
@@ -790,7 +800,12 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static int64_t get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+    static int_fast64_t get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+
+    /// Like get(const char*, std::size_t) but gets two consecutive
+    /// elements.
+    static std::pair<int_least64_t, int_least64_t> get_two(const char* header,
+                                                           std::size_t ndx) TIGHTDB_NOEXCEPT;
 
     /// The meaning of 'width' depends on the context in which this
     /// array is used.
@@ -932,9 +947,6 @@ protected:
     void set_width(std::size_t) TIGHTDB_NOEXCEPT;
     void alloc(std::size_t count, std::size_t width);
     void copy_on_write();
-
-    static std::pair<std::size_t, std::size_t> get_size_pair(const char* header,
-                                                             std::size_t ndx) TIGHTDB_NOEXCEPT;
 
 private:
     std::size_t m_ref;
@@ -1250,13 +1262,6 @@ inline void Array::create(Type type)
     int_fast64_t value = 0;
     ref_type ref = create_array(type, size, value, m_alloc); // Throws
     init_from_ref(ref);
-}
-
-
-inline std::size_t Array::size() const TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(is_attached());
-    return m_size;
 }
 
 
@@ -1852,6 +1857,63 @@ inline ref_type Array::create_array(Type type, std::size_t size, int_fast64_t va
     return create_array(type, wtype_Bits, size, value, alloc); // Throws
 }
 
+inline ref_type Array::create_empty_array(Type type, Allocator& alloc)
+{
+    std::size_t size = 0;
+    int_fast64_t value = 0;
+    return create_array(type, size, value, alloc); // Throws
+}
+
+inline bool Array::has_parent() const TIGHTDB_NOEXCEPT
+{
+    return m_parent != 0;
+}
+
+inline ArrayParent* Array::get_parent() const TIGHTDB_NOEXCEPT
+{
+    return m_parent;
+}
+
+inline void Array::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT
+{
+    m_parent = parent;
+    m_ndx_in_parent = ndx_in_parent;
+}
+
+inline std::size_t Array::get_ndx_in_parent() const TIGHTDB_NOEXCEPT
+{
+    return m_ndx_in_parent;
+}
+
+inline void Array::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
+{
+    // Note that `diff` is promoted to an unsigned type, and that
+    // C++03 still guarantees the expected result regardless of the
+    // sizes of `int` and `decltype(m_ndx_in_parent)`.
+    m_ndx_in_parent += diff;
+}
+
+inline bool Array::is_attached() const TIGHTDB_NOEXCEPT
+{
+    return m_data != 0;
+}
+
+inline void Array::detach() TIGHTDB_NOEXCEPT
+{
+    m_data = 0;
+}
+
+inline std::size_t Array::size() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    return m_size;
+}
+
+inline bool Array::is_empty() const TIGHTDB_NOEXCEPT
+{
+    return size() == 0;
+}
+
 inline std::size_t Array::get_max_byte_size(std::size_t num_elems) TIGHTDB_NOEXCEPT
 {
     int max_bytes_per_elem = 8;
@@ -1880,6 +1942,14 @@ inline std::size_t Array::get_bptree_size() const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(is_inner_bptree_node());
     int_fast64_t v = back();
     return std::size_t(v / 2); // v = 1 + 2*total_elems_in_tree
+}
+
+inline std::size_t Array::get_bptree_size_from_header(const char* root_header) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(get_is_inner_bptree_node_from_header(root_header));
+    size_t root_size = get_size_from_header(root_header);
+    int_fast64_t v = get(root_header, root_size-1);
+    return size_t(v / 2); // v = 1 + 2*total_elems_in_tree
 }
 
 inline void Array::ensure_bptree_offsets(Array& offsets)

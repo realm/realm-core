@@ -7,6 +7,8 @@
 #include <iomanip>
 
 #include <tightdb/column.hpp>
+#include <tightdb/column_table.hpp>
+#include <tightdb/column_mixed.hpp>
 #include <tightdb/query_engine.hpp>
 
 using namespace std;
@@ -215,14 +217,69 @@ void merge_references(Array* valuelist, Array* indexlists, Array** indexresult)
 } // anonymous namespace
 
 
-void ColumnBase::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
-{
-    m_array->adjust_ndx_in_parent(diff);
-}
-
 void ColumnBase::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     m_array->update_from_parent(old_baseline);
+}
+
+
+namespace {
+
+struct GetSizeFromRef {
+    const ref_type m_ref;
+    Allocator& m_alloc;
+    size_t m_size;
+    GetSizeFromRef(ref_type r, Allocator& a): m_ref(r), m_alloc(a), m_size(0) {}
+    template<class Col> void call() TIGHTDB_NOEXCEPT
+    {
+        m_size = Col::get_size_from_ref(m_ref, m_alloc);
+    }
+};
+
+template<class Op> void col_type_deleg(Op& op, ColumnType type)
+{
+    switch (type) {
+        case col_type_Int:
+        case col_type_Bool:
+        case col_type_DateTime:
+            op.template call<Column>();
+            return;
+        case col_type_String:
+            op.template call<AdaptiveStringColumn>();
+            return;
+        case col_type_StringEnum:
+            op.template call<ColumnStringEnum>();
+            return;
+        case col_type_Binary:
+            op.template call<ColumnBinary>();
+            return;
+        case col_type_Table:
+            op.template call<ColumnTable>();
+            return;
+        case col_type_Mixed:
+            op.template call<ColumnMixed>();
+            return;
+        case col_type_Float:
+            op.template call<ColumnFloat>();
+            return;
+        case col_type_Double:
+            op.template call<ColumnDouble>();
+            return;
+        case col_type_Reserved1:
+        case col_type_Reserved4:
+            break;
+    }
+    TIGHTDB_ASSERT(false);
+}
+
+} // anonymous namespace
+
+size_t ColumnBase::get_size_from_type_and_ref(ColumnType type, ref_type ref,
+                                              Allocator& alloc) TIGHTDB_NOEXCEPT
+{
+    GetSizeFromRef op(ref, alloc);
+    col_type_deleg(op, type);
+    return op.m_size;
 }
 
 
@@ -351,6 +408,20 @@ struct SetLeafElem: Array::UpdateHandler {
     }
 };
 
+struct AdjustLeafElem: Array::UpdateHandler {
+    Array m_leaf;
+    const int_fast64_t m_value;
+    AdjustLeafElem(Allocator& alloc, int_fast64_t value) TIGHTDB_NOEXCEPT:
+    m_leaf(alloc), m_value(value) {}
+    void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
+                size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
+    {
+        m_leaf.init_from_mem(mem);
+        m_leaf.set_parent(parent, ndx_in_parent);
+        m_leaf.adjust(elem_ndx_in_leaf, m_value); // Throws
+    }
+};
+
 } // anonymous namespace
 
 void Column::set(size_t ndx, int64_t value)
@@ -365,6 +436,20 @@ void Column::set(size_t ndx, int64_t value)
     SetLeafElem set_leaf_elem(m_array->get_alloc(), value);
     m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
+
+void Column::adjust(size_t ndx, int64_t diff)
+{
+    TIGHTDB_ASSERT(ndx < size());
+
+    if (!m_array->is_inner_bptree_node()) {
+        m_array->adjust(ndx, diff); // Throws
+        return;
+    }
+
+    AdjustLeafElem set_leaf_elem(m_array->get_alloc(), diff);
+    m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
+}
+
 
 // int64_t specific:
 

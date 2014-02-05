@@ -8,14 +8,12 @@
 
 #include <tightdb.hpp>
 #include <tightdb/lang_bind_helper.hpp>
-
-#include "testsettings.hpp"
-
 #include <tightdb/column.hpp>
 #include <tightdb/query_engine.hpp>
 
-using namespace tightdb;
 using namespace std;
+using namespace tightdb;
+using namespace tightdb::util;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
@@ -486,7 +484,7 @@ TEST(NextGenSyntaxMonkey)
     for(int iter = 1; iter < 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++)
     {
         // Keep at least '* 20' else some tests will give 0 matches and bad coverage
-        const size_t rows = 1 + ((size_t)rand() * (size_t)rand()) 
+        const size_t rows = 1 + ((size_t)rand() * (size_t)rand())
             % (TIGHTDB_MAX_LIST_SIZE * 20 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
         table.add_column(type_Int, "first");
@@ -1410,10 +1408,7 @@ TEST(TestQueryStrIndexCrash)
     for(int iter = 0; iter < 5; ++iter) {
         Group group;
         TableRef table = group.get_table("test");
-
-        Spec& s = table->get_spec();
-        s.add_column(type_String, "first");
-        table->update_from_spec();
+        table->add_column(type_String, "first");
 
         size_t eights = 0;
 
@@ -2057,7 +2052,7 @@ TEST(Group_GameAnalytics)
             t->add("10", "US", "1.0", r1, r2);
         }
         t->optimize();
-        util::File::try_remove("ga_test.tightdb");
+        File::try_remove("ga_test.tightdb");
         g.write("ga_test.tightdb");
     }
 
@@ -2678,13 +2673,13 @@ TEST(TestQuerySubtable)
     TableRef table = group.get_table("test");
 
     // Create specification with sub-table
-    Spec& s = table->get_spec();
-    s.add_column(type_Int,    "first");
-    s.add_column(type_String, "second");
-    Spec sub = s.add_subtable_column("third");
-        sub.add_column(type_Int,    "sub_first");
-        sub.add_column(type_String, "sub_second");
-    table->update_from_spec();
+    DescriptorRef sub_1;
+    table->add_column(type_Int,    "first");
+    table->add_column(type_String, "second");
+    table->add_column(type_Table,  "third", &sub_1);
+    sub_1->add_column(type_Int,      "sub_first");
+    sub_1->add_column(type_String,   "sub_second");
+    sub_1.reset();
 
     CHECK_EQUAL(3, table->get_column_count());
 
@@ -3856,6 +3851,86 @@ TEST(TestQuerySyntaxCheck)
 */
 }
 
+TEST(TestQuerySubtableSyntaxCheck)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+    string s;
+
+    // Create specification with sub-table
+    DescriptorRef subdesc;
+    table->add_column(type_Int,    "first");
+    table->add_column(type_String, "second");
+    table->add_column(type_Table,  "third", &subdesc);
+    subdesc->add_column(type_Int,    "sub_first");
+    subdesc->add_column(type_String, "sub_second");
+
+    // Main table
+    table->insert_int(0, 0, 111);
+    table->insert_string(1, 0, "this");
+    table->insert_subtable(2, 0);
+    table->insert_done();
+
+    table->insert_int(0, 1, 222);
+    table->insert_string(1, 1, "is");
+    table->insert_subtable(2, 1);
+    table->insert_done();
+
+    table->insert_int(0, 2, 333);
+    table->insert_string(1, 2, "a test");
+    table->insert_subtable(2, 2);
+    table->insert_done();
+
+    table->insert_int(0, 3, 444);
+    table->insert_string(1, 3, "of queries");
+    table->insert_subtable(2, 3);
+    table->insert_done();
+
+
+    // Sub tables
+    TableRef subtable = table->get_subtable(2, 0);
+    subtable->insert_int(0, 0, 11);
+    subtable->insert_string(1, 0, "a");
+    subtable->insert_done();
+
+    subtable = table->get_subtable(2, 1);
+    subtable->insert_int(0, 0, 22);
+    subtable->insert_string(1, 0, "b");
+    subtable->insert_done();
+    subtable->insert_int(0, 1, 33);
+    subtable->insert_string(1, 1, "c");
+    subtable->insert_done();
+
+    subtable = table->get_subtable(2, 2);
+    subtable->insert_int(0, 0, 44);
+    subtable->insert_string(1, 0, "d");
+    subtable->insert_done();
+
+    subtable = table->get_subtable(2, 3);
+    subtable->insert_int(0, 0, 55);
+    subtable->insert_string(1, 0, "e");
+    subtable->insert_done();
+
+    Query q1 = table->where();
+    q1.subtable(2);
+    q1.greater(0, 50);
+    s = q1.validate();
+    CHECK(s != "");
+
+    Query q2 = table->where();
+    q2.subtable(2);
+    q2.greater(0, 50);
+    q2.end_subtable();
+    s = q2.validate();
+    CHECK(s == "");
+
+    Query q3 = table->where();
+    q3.greater(0, 50);
+    q3.end_subtable();
+    s = q3.validate();
+    CHECK(s != "");
+}
+
 TEST(TestTV)
 {
     TupleTableType t;
@@ -4061,22 +4136,18 @@ TEST(TestQuery_Subtables_Typed)
 TEST(TestQuery_AllTypes_DynamicallyTyped)
 {
     Table table;
-    {
-        Spec& spec = table.get_spec();
-        spec.add_column(type_Bool,     "boo");
-        spec.add_column(type_Int,      "int");
-        spec.add_column(type_Float,    "flt");
-        spec.add_column(type_Double,   "dbl");
-        spec.add_column(type_String,   "str");
-        spec.add_column(type_Binary,   "bin");
-        spec.add_column(type_DateTime, "dat");
-        {
-            Spec subspec = spec.add_subtable_column("tab");
-            subspec.add_column(type_Int, "sub_int");
-        }
-        spec.add_column(type_Mixed,  "mix");
-    }
-    table.update_from_spec();
+    DescriptorRef sub1;
+    table.add_column(type_Bool,     "boo");
+    table.add_column(type_Int,      "int");
+    table.add_column(type_Float,    "flt");
+    table.add_column(type_Double,   "dbl");
+    table.add_column(type_String,   "str");
+    table.add_column(type_Binary,   "bin");
+    table.add_column(type_DateTime, "dat");
+    table.add_column(type_Table,    "tab", &sub1);
+    table.add_column(type_Mixed,    "mix");
+    sub1->add_column(type_Int,        "sub_int");
+    sub1.reset();
 
     const char bin[4] = { 0, 1, 2, 3 };
     BinaryData bin1(bin, sizeof bin / 2);
