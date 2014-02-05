@@ -10,7 +10,7 @@ using namespace std;
 using namespace tightdb;
 
 
-ONLY(VERSION)
+TEST(VERSION)
 {
 #if 1
     cout << "TightDB version: " << Version::get_version();

@@ -47,8 +47,8 @@ TIGHTDB_TABLE_7(MainTableType,
 
 TEST(ManyColumnsCrash2)
 {
-    // Trying to reproduce Java crash. It currently fails to trigger the bug, though.
-    for(int a = 0; a < 10; a++)
+    // Trying to reproduce Java crash.
+    for (int a = 0; a < 10; a++)
     {
         Group group;
 
@@ -80,57 +80,6 @@ TEST(ManyColumnsCrash2)
     }
 }
 
-#if 0
-ONLY(ManyColumnsCrash) {
-    // Trying to reproduce crash in Java code. This test has been disabled because it fails to crash, and because a
-    // much simpler Java snippet also makes it crash (see above test).
-    for(int a = 0; a < 100; a++)
-    {
-
-        Group* group = new Group("d:/master/pfm.tightdb");
-        TableRef dynPatientTable = group->get_table("PatientTable");
-
-        for (int counter =0;counter<70000;  counter++)
-        {
-
-            int obfuscatedYear = (counter % 5);
-            int daysSinceLastVisit = (counter % 5);
-            char buf[100];
-            sprintf(buf, "CC%d", counter % 1000);
-            StringData conceptId = buf;
-
-
-            // check if the patient exists
-            size_t patient = counter % 100;
-            size_t t = dynPatientTable->get_column_index(conceptId);
-            if(t == -1)
-            {
-                // create the event
-#if 1
-
-                PatientTableType::Ref table = group->get_table<PatientTableType>("events");
-                table->add(obfuscatedYear, daysSinceLastVisit, conceptId);
-#else
-                TableRef subtable = dynPatientTable->get_subtable(6, patient);
-                size_t subrow = subtable->add_empty_row();
-
-                subtable->set_int(0, subrow, obfuscatedYear);
-                subtable->set_int(1, subrow, daysSinceLastVisit);
-                subtable->set_string(2, subrow, conceptId);
-#endif
-            }
-
-            // update the patient bitmap
-            size_t conceptColIndex = dynPatientTable->add_column(type_Bool, conceptId);
-
-            if((counter % 1000) == 0){
-                cerr << counter << "\n";
-            }
-        }
-
-    }
-}
-#endif
 #endif
 
 TEST(DeleteCrash)

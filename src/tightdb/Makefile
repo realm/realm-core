@@ -9,7 +9,7 @@ array_string.hpp data_type.hpp column_type.hpp column_fwd.hpp spec.hpp datetime.
 string_data.hpp binary_data.hpp mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp \
 table_accessors.hpp table_basic.hpp table_view.hpp table_view_basic.hpp table_macros.hpp \
 descriptor_fwd.hpp descriptor.hpp group.hpp group_shared.hpp $(REPLICATION_HPP) query.hpp \
-query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h importer.hpp
+query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h importer.hpp version.hpp
 
 nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp
 
@@ -32,7 +32,7 @@ util/utf8.cpp utilities.cpp alloc.cpp alloc_slab.cpp array.cpp array_string.cpp 
 array_string_long.cpp array_binary.cpp array_blob.cpp array_blobs_big.cpp column.cpp \
 column_string.cpp column_string_enum.cpp column_binary.cpp column_table.cpp column_mixed.cpp \
 spec.cpp table.cpp table_view.cpp descriptor.cpp group.cpp group_writer.cpp group_shared.cpp \
-$(REPLICATION_CPP) index_string.cpp query.cpp lang_bind_helper.cpp importer.cpp
+$(REPLICATION_CPP) index_string.cpp query.cpp lang_bind_helper.cpp importer.cpp version.cpp
 
 # Format: CURRENT[:REVISION[:AGE]]
 #
