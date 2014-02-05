@@ -65,11 +65,18 @@ gcovr: check-cover
 	gcovr --filter='.*src/tightdb.*' -x >gcovr.xml
 
 # Build and run whatever is in test/experiements/testcase.cpp
+.PHONY: check-testcase check-testcase-debug memcheck-testcase memcheck-testcase-debug
+check-testcase: check-norun/subdir/src
+	@$(MAKE) -C test check-testcase
+check-testcase-debug: check-debug-norun/subdir/src
+	@$(MAKE) -C test check-testcase-debug
+memcheck-testcase: check-norun/subdir/src
+	@$(MAKE) -C test memcheck-testcase
+memcheck-testcase-debug: check-debug-norun/subdir/src
+	@$(MAKE) -C test memcheck-testcase-debug
 .PHONY: testcase testcase-debug
-testcase: check-norun/subdir/src
-	@$(MAKE) -C test testcase
-testcase-debug: check-debug-norun/subdir/src
-	@$(MAKE) -C test testcase-debug
+testcase: check-testcase
+testcase-debug: check-testcase-debug
 
 # Used by build.sh
 .PHONY: get-exec-prefix get-includedir get-bindir get-libdir get-libexecdir

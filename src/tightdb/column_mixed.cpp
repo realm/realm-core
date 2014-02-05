@@ -28,7 +28,7 @@ void ColumnMixed::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 }
 
 
-void ColumnMixed::create(Allocator& alloc, const Table* table, size_t column_ndx)
+void ColumnMixed::create(Allocator& alloc, Table* table, size_t column_ndx)
 {
     m_array = new Array(Array::type_HasRefs, 0, 0, alloc);
 
@@ -42,7 +42,7 @@ void ColumnMixed::create(Allocator& alloc, const Table* table, size_t column_ndx
     m_data->set_parent(m_array, 1);
 }
 
-void ColumnMixed::create(Allocator& alloc, const Table* table, size_t column_ndx,
+void ColumnMixed::create(Allocator& alloc, Table* table, size_t column_ndx,
                          ArrayParent* parent, size_t ndx_in_parent, ref_type ref)
 {
     m_array = new Array(ref, parent, ndx_in_parent, alloc);
