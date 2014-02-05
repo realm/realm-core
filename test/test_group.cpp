@@ -95,7 +95,7 @@ TEST(Group_Permissions)
 #endif
 
     {
-        Group group2;
+        Group group2((Group::unattached_tag()));
         CHECK_THROW(group2.open("test.tightdb", Group::mode_ReadOnly), util::File::PermissionDenied);
         CHECK(!group2.has_table("table1"));  // is not attached
     }
