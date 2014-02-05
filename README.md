@@ -217,7 +217,7 @@ Packaging for Fedora
 --------------------
 
 Fedora is distributing binary packages as `.rpm` files. In order to create
-packages for Fedora, should you install a few packages:
+packages for Fedora, you need to install a few packages:
 
     sudo yum install rpmdevtools rpmbuild
 
