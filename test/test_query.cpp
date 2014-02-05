@@ -2782,7 +2782,6 @@ TEST(TestQuerySubtable)
     CHECK_EQUAL(2, t4.get_source_ndx(1));
 }
 
-
 TEST(TestQuerySubtable_bug)
 {
     Group group;
@@ -2790,10 +2789,11 @@ TEST(TestQuerySubtable_bug)
     
     // Create specification with sub-table
     table->add_column(type_Int,   "col 0");
-    table->add_column(type_Table, "col 1");
-    table->add_subcolumn(tuple(1), type_Int,    "sub 0");
-    table->add_subcolumn(tuple(1), type_String, "sub 1");
-    table->add_subcolumn(tuple(1), type_Bool,   "sub 2");
+    DescriptorRef sub;
+    table->add_column(type_Table, "col 1", &sub);
+    sub->add_column(type_Int, "sub 0");
+    sub->add_column(type_String, "sub 1");
+    sub->add_column(type_Bool,   "sub 2");
     CHECK_EQUAL(2, table->get_column_count());
 
     for (int i=0; i<5; i++) {
