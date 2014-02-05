@@ -626,10 +626,33 @@ private:
     void cache_columns();
     void destroy_column_accessors() TIGHTDB_NOEXCEPT;
 
-    // A degenerate table is a subtable which isn't instantiated in the
-    // database file yet because there has not yet been write-access to
-    // it. Avoiding instantiation is an optimization to save space, etc.
-    bool is_degenerate() const TIGHTDB_NOEXCEPT { return m_columns.m_data == null_ptr; }
+    /// A subtable column (a column of type `type_table`) is
+    /// essentially just a column of 'refs' pointing to the root node
+    /// of each subtable.
+    ///
+    /// To save space in the database file, a subtable in such a
+    /// column always starts out in a degenerate form where nothing is
+    /// allocated on its behalf, and a null 'ref' is stored in the
+    /// corresponding slot of the column. A subtable remains in this
+    /// degenrate state until the first row is added to the subtable.
+    ///
+    /// For this scheme to work, it must be (and is) possible to
+    /// create a table accessor that refers to a degenerate
+    /// subtable. A table accessor (instance of `Table`) refers to a
+    /// degenerate subtable if, and only if the 'columns' array
+    /// accessor member (`Table::m_columns`) is attached.
+    ///
+    /// This function returns true if, and only if `Table::m_columns`
+    /// in detached.
+    ///
+    /// FIXME: The fact that `Table::m_columns` may be detached means
+    /// that many functions (even non-modifying functions) need to
+    /// check for that before accessing the contents of the
+    /// table. This incurs a runtime overhead. Consider whether this
+    /// overhead can be eliminated by having `Table::m_columns` always
+    /// attached to something, and then detect the degenerate state in
+    /// a different way.
+    bool is_degenerate() const TIGHTDB_NOEXCEPT;
 
     /// Called in the context of Group::commit() to ensure that
     /// attached table accessors stay valid across a commit. Please
@@ -1017,9 +1040,6 @@ inline void Table::set_enum(std::size_t column_ndx, std::size_t row_ndx, E value
     set_int(column_ndx, row_ndx, value);
 }
 
-// The subtable returned may be degenerate. 
-// FIXME: Consider if we should return a "dummy" degenerate object in that case,
-// such that the caller don't have to check before accessing the subtable.
 inline TableRef Table::get_subtable(std::size_t column_ndx, std::size_t row_ndx)
 {
     return TableRef(get_subtable_ptr(column_ndx, row_ndx));
@@ -1061,6 +1081,11 @@ inline std::size_t Table::get_size_from_ref(ref_type top_ref, Allocator& alloc) 
     std::pair<int_least64_t, int_least64_t> p = Array::get_two(top_header, 0);
     ref_type spec_ref = to_ref(p.first), columns_ref = to_ref(p.second);
     return get_size_from_ref(spec_ref, columns_ref, alloc);
+}
+
+inline bool Table::is_degenerate() const TIGHTDB_NOEXCEPT
+{
+    return !m_columns.is_attached();
 }
 
 inline std::size_t* Table::record_subspec_path(const Spec& spec, std::size_t* begin,
