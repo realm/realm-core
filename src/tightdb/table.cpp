@@ -417,8 +417,26 @@ void Table::remove_root_column(size_t column_ndx)
     adjust_column_index(column_ndx, diff, diff_in_parent);
 
     // If there are no columns left, mark the table as empty
-    if (get_column_count() == 0)
+    if (get_column_count() == 0) {
+        detach_views_except(NULL);
         m_size = 0;
+    }
+}
+
+
+void Table::unregister_view(const TableViewBase* view) TIGHTDB_NOEXCEPT
+{
+    // Fixme: O(n) may be unacceptable - if so, put and maintain
+    // iterator or index in TableViewBase.
+    std::vector<const TableViewBase*>::iterator it;
+    std::vector<const TableViewBase*>::iterator end = m_views.end();
+    for (it = m_views.begin(); it != end; ++it) {
+        if (*it == view) {
+            *it = m_views.back();
+            m_views.pop_back();
+            break;
+        }
+    }
 }
 
 
@@ -587,8 +605,30 @@ void Table::detach() TIGHTDB_NOEXCEPT
     detach_subtable_accessors();
 
     destroy_column_accessors();
+    detach_views_except(NULL);
 }
 
+// Note about exception safety:
+// This function must be called with a view that is either 0, OR
+// already present in the view registry, Otherwise it may throw.
+void Table::detach_views_except(const TableViewBase* view) TIGHTDB_NOEXCEPT
+{
+    std::vector<const TableViewBase*>::iterator end = m_views.end();
+    std::vector<const TableViewBase*>::iterator it = m_views.begin();
+    while (it != end) {
+        const TableViewBase* v = *it;
+        if (v != view)
+            v->detach();
+        ++it;
+    }
+    m_views.clear();
+    if (view) {
+        // can NOT except, because if the view is not 0, it must
+        // have been in the registry before  AND since clear does
+        // not release memory, no new memory is needed for push_back:
+        m_views.push_back(view);
+    }
+}
 
 void Table::detach_subtable_accessors() TIGHTDB_NOEXCEPT
 {
@@ -1143,6 +1183,7 @@ void Table::insert_empty_row(size_t ndx, size_t num_rows)
 
 void Table::clear()
 {
+    detach_views_except(NULL);
     size_t n = get_column_count();
     for (size_t i = 0; i != n; ++i) {
         ColumnBase& column = get_column_base(i);
@@ -1155,10 +1196,9 @@ void Table::clear()
 #endif
 }
 
-void Table::remove(size_t ndx)
+void Table::do_remove(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx < m_size);
-
     bool is_last = ndx == m_size - 1;
 
     size_t n = get_column_count();
@@ -1176,6 +1216,7 @@ void Table::remove(size_t ndx)
 void Table::move_last_over(size_t ndx)
 {
     TIGHTDB_ASSERT(ndx+1 < m_size);
+    detach_views_except(NULL);
 
     size_t n = get_column_count();
     for (size_t i = 0; i != n; ++i) {
@@ -1740,6 +1781,7 @@ void Table::insert_mixed(size_t column_ndx, size_t ndx, Mixed value)
 
 void Table::insert_done()
 {
+    detach_views_except(NULL);
     ++m_size;
 
 #ifdef TIGHTDB_ENABLE_REPLICATION

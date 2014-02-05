@@ -37,6 +37,7 @@
 namespace tightdb {
 
 class TableView;
+class TableViewBase;
 class ConstTableView;
 class StringIndex;
 
@@ -291,7 +292,6 @@ public:
     /// specified index must be strictly less than `N-1`, where `N` is
     /// the number of rows in the table.
     void move_last_over(std::size_t ndx);
-
     // Insert row
     // NOTE: You have to insert values in ALL columns followed by insert_done().
     void insert_int(std::size_t column_ndx, std::size_t row_ndx, int64_t value);
@@ -544,6 +544,11 @@ protected:
     void set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
 
 private:
+    // view management support:
+    void from_view_remove(std::size_t row_ndx, TableViewBase* view);
+
+    void do_remove(std::size_t row_ndx);
+
     // Number of rows in this table
     std::size_t m_size;
 
@@ -557,6 +562,9 @@ private:
     mutable std::size_t m_ref_count;
     mutable const StringIndex* m_lookup_index;
     mutable Descriptor* m_descriptor;
+
+    // Table view instances
+    mutable std::vector<const TableViewBase*> m_views;
 
     /// Disable copying assignment.
     ///
@@ -688,6 +696,10 @@ private:
     void bind_ref() const TIGHTDB_NOEXCEPT { ++m_ref_count; }
     void unbind_ref() const TIGHTDB_NOEXCEPT { if (--m_ref_count == 0) delete this; }
 
+    void register_view(const TableViewBase* view);
+    void unregister_view(const TableViewBase* view) TIGHTDB_NOEXCEPT;
+    void detach_views_except(const TableViewBase* view) TIGHTDB_NOEXCEPT;
+
     class UnbindGuard;
 
     ColumnType get_real_column_type(std::size_t column_ndx) const TIGHTDB_NOEXCEPT;
@@ -768,10 +780,35 @@ private:
     template<class> friend class util::bind_ptr;
     friend class LangBindHelper;
     friend class TableViewBase;
+    friend class TableView;
     template<class T> friend class Columns;
     friend class ParentNode;
     template<class> friend class SequentialGetter;
 };
+
+
+inline void Table::remove(std::size_t row_ndx) 
+{ 
+    detach_views_except(NULL);
+    do_remove(row_ndx); 
+}
+
+inline void Table::from_view_remove(std::size_t row_ndx, TableViewBase* view) 
+{ 
+    detach_views_except(view);
+    do_remove(row_ndx); 
+}
+
+inline void Table::remove_last() 
+{ 
+    if (!is_empty())
+        remove(size()-1); 
+}
+
+inline void Table::register_view(const TableViewBase* view)
+{
+    m_views.push_back(view);
+}
 
 
 
@@ -982,12 +1019,6 @@ inline bool Table::is_empty() const TIGHTDB_NOEXCEPT
 inline std::size_t Table::size() const TIGHTDB_NOEXCEPT
 {
     return m_size;
-}
-
-inline void Table::remove_last()
-{
-    if (!is_empty())
-        remove(m_size-1);
 }
 
 inline void Table::insert_bool(std::size_t column_ndx, std::size_t row_ndx, bool value)

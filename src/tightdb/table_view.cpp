@@ -336,7 +336,7 @@ void TableView::remove(size_t ndx)
 
     // Delete row in source table
     const size_t real_ndx = size_t(m_refs.get(ndx));
-    m_table->remove(real_ndx);
+    m_table->from_view_remove(real_ndx, this);
 
     // Update refs
     m_refs.erase(ndx);
@@ -360,7 +360,7 @@ void TableView::clear()
     const size_t count = m_refs.size();
     for (size_t i = count; i; --i) {
         const size_t ndx = size_t(m_refs.get(i-1));
-        m_table->remove(ndx);
+        m_table->from_view_remove(ndx, this);
     }
 
     m_refs.clear();
