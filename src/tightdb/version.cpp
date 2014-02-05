@@ -25,8 +25,7 @@ bool Version::is_at_least(int major, int minor, int patch)
 
 bool Version::has_feature(Feature feature)
 {
-    switch (feature)
-    {
+    switch (feature) {
         case feature_Debug:
 #ifdef TIGHTDB_DEBUG
             return true;

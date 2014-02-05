@@ -34,8 +34,7 @@ enum Feature {
     feature_Replication
 };
 
-class Version
-{
+class Version {
 public:
     static int get_major() { return TIGHTDB_VER_MAJOR; }
     static int get_minor() { return TIGHTDB_VER_MINOR; }
