@@ -3,6 +3,16 @@
 
 #include <algorithm>
 #include <fstream>
+#include <sys/stat.h>
+
+// File permissions for Windows
+// http://stackoverflow.com/questions/592448/c-how-to-set-file-permissions-cross-platform
+#ifdef _WIN32
+#include <io.h>
+typedef int mode_t;
+static const mode_t S_IWUSR = mode_t(_S_IWRITE);
+static const mode_t MS_MODE_MASK = 0x0000ffff;
+#endif
 
 #include <UnitTest++.h>
 
@@ -60,6 +70,38 @@ TEST(Group_OpenFile)
 
     File::remove("test.tightdb");
 }
+
+
+TEST(Group_Permissions)
+{
+    util::File::try_remove("test.tightdb");
+    {
+        Group group1;
+        TableRef t1 = group1.get_table("table1");
+        t1->add_column(type_String, "s");
+        t1->add_column(type_Int,    "i");
+        for(size_t i=0; i<4; ++i) {
+            t1->insert_string(0, i, "a");
+            t1->insert_int(1, i, 3);
+            t1->insert_done();
+        }
+        group1.write("test.tightdb");
+    }
+
+#ifdef _WIN32
+    _chmod("test.tightdb", S_IWUSR & MS_MODE_MASK);
+#else
+    chmod("test.tightdb", S_IWUSR);
+#endif
+
+    {
+        Group group2;
+        CHECK_THROW(group2.open("test.tightdb", Group::mode_ReadOnly), util::File::PermissionDenied);
+        CHECK(!group2.has_table("table1"));  // is not attached
+    }
+    util::File::try_remove("test.tightdb");
+}
+
 
 
 TEST(Group_BadFile)
