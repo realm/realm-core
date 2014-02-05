@@ -529,9 +529,24 @@ EOF
         tightdb_ver_major="$(echo $tightdb_version | cut -f1 -d.)"
         tightdb_ver_minor="$(echo $tightdb_version | cut -f2 -d.)"
         tightdb_ver_patch="$(echo $tightdb_version | cut -f3 -d.)"
+
+        now="$(date --rfc-822)"
+        relman_user="$(git config --get user.name)"
+        relman_mail="$(git config --get user.email)"
+
+        # update version.hpp
         sed -i -e "s/\#define TIGHTDB_VER_MAJOR .*/\#define TIGHTDB_VER_MAJOR $tightdb_ver_major/" $version_file
         sed -i -e "s/\#define TIGHTDB_VER_MINOR .*/\#define TIGHTDB_VER_MINOR $tightdb_ver_minor/" $version_file
         sed -i -e "s/\#define TIGHTDB_VER_PATCH .*/\#define TIGHTDB_VER_PATCH $tightdb_ver_patch/" $version_file
+
+        # create a new entry in the debian changelog - in reverse order
+        sed -s -i '1i\\' debian/changelog.in
+        sed -s -i '1i\\' debian/changelog.in
+        sed -i -e "1i\ -- $relman_user <$relman_mail>  $now" debian/changelog.in
+        sed -s -i '1i\\' debian/changelog.in
+        sed -i -e '1i\ \ * Tracking upstream release.' debian/changelog.in
+        sed -s -i '1i\\' debian/changelog.in
+        sed -i -e "1i libtightdb ($tightdb_version~@CODENAME@-1) UNRELEASED; urgency=low" debian/changelog.in
         exit 0
         ;;
 
