@@ -240,6 +240,28 @@ TEST(TableViewSumNegative)
     CHECK_EQUAL(-9, sum);
 }
 
+TEST(TableViewIsAttached)
+{
+    TestTableInt table;
+
+    table.add(0);
+    table.add(0);
+    table.add(0);
+
+    TestTableInt::View v = table.column().first.find_all(0);
+    TestTableInt::View v2 = table.column().first.find_all(0);
+    v[0].first = 11;
+    CHECK_EQUAL(true, v.is_attached());
+    CHECK_EQUAL(true, v2.is_attached());
+    v.remove_last();
+    CHECK_EQUAL(true, v.is_attached());
+    CHECK_EQUAL(false, v2.is_attached());
+
+    table.remove_last();
+    CHECK_EQUAL(false, v.is_attached());
+    CHECK_EQUAL(false, v2.is_attached());
+}
+
 TEST(TableViewMax)
 {
     TestTableInt table;

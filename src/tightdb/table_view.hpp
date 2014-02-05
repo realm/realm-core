@@ -34,6 +34,7 @@ using std::size_t;
 class TableViewBase {
 public:
     bool is_empty() const TIGHTDB_NOEXCEPT { return m_refs.is_empty(); }
+    bool is_attached() const TIGHTDB_NOEXCEPT { return m_table; }
     std::size_t size() const TIGHTDB_NOEXCEPT { return m_refs.size(); }
 
     // Column information
@@ -110,7 +111,8 @@ public:
     void row_to_string(std::size_t row_ndx, std::ostream& out) const;
 
 protected:
-    TableRef m_table;
+    // Null if, and only if, the view is detached
+    mutable TableRef m_table;
     Array m_refs;
 
 
@@ -119,11 +121,18 @@ protected:
     TableViewBase(): m_refs(Allocator::get_default()) {}
 
     /// Construct empty view, ready for addition of row indices.
-    TableViewBase(Table* parent): m_table(parent->get_table_ref()) {}
+    TableViewBase(Table* parent): m_table(parent->get_table_ref()) 
+    {
+        parent->register_view(this);
+    }
 
     /// Copy constructor.
     TableViewBase(const TableViewBase& tv):
-        m_table(tv.m_table), m_refs(tv.m_refs, Allocator::get_default()) {}
+        m_table(tv.m_table), m_refs(tv.m_refs, Allocator::get_default()) 
+    {
+        if (m_table)
+            m_table->register_view(this);
+    }
 
     /// Moving constructor.
     TableViewBase(TableViewBase*) TIGHTDB_NOEXCEPT;
@@ -141,12 +150,18 @@ protected:
     template <class R, class V> static R find_all_string(V*, std::size_t, StringData);
 
 private:
+    void detach() const TIGHTDB_NOEXCEPT;
     std::size_t find_first_integer(std::size_t column_ndx, int64_t value) const;
 
     friend class Table;
     friend class Query;
 };
 
+
+inline void TableViewBase::detach() const TIGHTDB_NOEXCEPT 
+{ 
+    m_table = TableRef(); 
+}
 
 
 class ConstTableView;
@@ -303,6 +318,10 @@ private:
 
 inline TableViewBase::~TableViewBase() TIGHTDB_NOEXCEPT
 {
+    if (m_table) {
+        m_table->unregister_view(this);
+        m_table = TableRef();
+    }
     m_refs.destroy();
 }
 
@@ -310,6 +329,11 @@ inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
     m_table(tv->m_table),
     m_refs(tv->m_refs) // Note: This is a moving copy
 {
+    if (m_table) {
+        m_table->unregister_view(tv);
+        // exception safe, because register_view cannot except if called right after unregister:
+        m_table->register_view(this);
+    }
     tv->m_table = TableRef();
     tv->m_refs.detach();
 }
@@ -317,6 +341,11 @@ inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
 inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
 {
     m_table = tv->m_table;
+    if (m_table) {
+        m_table->unregister_view(tv);
+        // exception safe, because register_view cannot except if called right after unregister:
+        m_table->register_view(this);
+    }
     tv->m_table = TableRef();
     m_refs.move_assign(tv->m_refs);
 }
