@@ -514,6 +514,27 @@ EOF
         exit 0
         ;;
 
+    "get-version")
+        version_file="src/tightdb/version.hpp"
+        tightdb_ver_major="$(grep ^"#define TIGHTDB_VER_MAJOR" $version_file | awk '{print $3}')" || exit 1
+        tightdb_ver_minor="$(grep ^"#define TIGHTDB_VER_MINOR" $version_file | awk '{print $3}')" || exit 1
+        tightdb_ver_patch="$(grep ^"#define TIGHTDB_VER_PATCH" $version_file | awk '{print $3}')" || exit 1
+        echo "$tightdb_ver_major.$tightdb_ver_minor.$tightdb_ver_patch"
+        exit 0
+        ;;
+
+    "set-version")
+        tightdb_version=$1
+        version_file="src/tightdb/version.hpp"
+        tightdb_ver_major="$(echo $tightdb_version | cut -f1 -d.)"
+        tightdb_ver_minor="$(echo $tightdb_version | cut -f2 -d.)"
+        tightdb_ver_patch="$(echo $tightdb_version | cut -f3 -d.)"
+        sed -i -e "s/\#define TIGHTDB_VER_MAJOR .*/\#define TIGHTDB_VER_MAJOR $tightdb_ver_major/" $version_file
+        sed -i -e "s/\#define TIGHTDB_VER_MINOR .*/\#define TIGHTDB_VER_MINOR $tightdb_ver_minor/" $version_file
+        sed -i -e "s/\#define TIGHTDB_VER_PATCH .*/\#define TIGHTDB_VER_PATCH $tightdb_ver_patch/" $version_file
+        exit 0
+        ;;
+
     "install")
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
@@ -2110,6 +2131,7 @@ EOF
         echo "As well as: install-prod install-devel uninstall-prod uninstall-devel dist-copy" 1>&2
         echo "As well as: src-dist bin-dist dist-deb dist-status dist-pull dist-checkout" 1>&2
         echo "As well as: dist-config dist-clean dist-build dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall dist-test-installed" 1>&2
+        echo "As well as: get-version set-versio" 1>&2
         exit 1
         ;;
 esac
