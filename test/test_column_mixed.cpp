@@ -322,6 +322,7 @@ TEST(ColumnMixed_Mixed)
     c.destroy();
 }
 
+
 TEST(ColumnMixed_Subtable_Size)
 {
     ColumnMixed c;
@@ -334,39 +335,38 @@ TEST(ColumnMixed_Subtable_Size)
     // No table instantiated yet (zero ref)
     CHECK_EQUAL( 0, c.get_subtable_size(0));
 
-    // Empty table (no columns)
-    Table* const t1 = c.get_subtable_ptr(1);
-    CHECK(t1->is_empty());
-    delete t1;
-    CHECK_EQUAL( 0, c.get_subtable_size(1));
+    {    // Empty table (no columns)
+        TableRef const t1 = c.get_subtable_ptr(1)->get_table_ref();
+        CHECK(t1->is_empty());
+        CHECK_EQUAL( 0, c.get_subtable_size(1));
+    }
 
-    // Empty table (1 column, no rows)
-    Table* const t2 = c.get_subtable_ptr(2);
-    CHECK(t2->is_empty());
-    t2->add_column(type_Int, "col1");
-    delete t2;
-    CHECK_EQUAL( 0, c.get_subtable_size(2));
+    {   // Empty table (1 column, no rows)
+        TableRef const t2 = c.get_subtable_ptr(2)->get_table_ref();
+        CHECK(t2->is_empty());
+        t2->add_column(type_Int, "col1");
+        CHECK_EQUAL( 0, c.get_subtable_size(2));
+    }
+    
+    {   // Table with rows
+        TableRef const t3 = c.get_subtable_ptr(3)->get_table_ref();
+        CHECK(t3->is_empty());
+        t3->add_column(type_Int, "col1");
+        t3->add_empty_row(10);
+        CHECK_EQUAL(10, c.get_subtable_size(3));
+    }
 
-    // Table with rows
-    Table* const t3 = c.get_subtable_ptr(3);
-    CHECK(t3->is_empty());
-    t3->add_column(type_Int, "col1");
-    t3->add_empty_row(10);
-    delete t3;
-    CHECK_EQUAL(10, c.get_subtable_size(3));
-
-    // Table with mixed column first
-    /*Table* const t4 = c.get_subtable_ptr(4);
-    CHECK(t4->is_empty());
-    t4->add_column(type_Mixed, "col1");
-    t4->add_empty_row(10);
-    delete t4;
-    // FAILS because it tries to manually get size from first column
-    // which is topped by a node with two subentries.
-    CHECK_EQUAL(10, c.get_subtable_size(4));*/
+    {   // Table with mixed column first
+        TableRef const t4 = c.get_subtable_ptr(4)->get_table_ref();
+        CHECK(t4->is_empty());
+        t4->add_column(type_Mixed, "col1");
+        t4->add_empty_row(10);
+        // FAILS because it tries to manually get size from first column
+        // which is topped by a node with two subentries.
+        CHECK_EQUAL(10, c.get_subtable_size(4));
+    }
 
     c.destroy();
 }
-
 
 #endif // TEST_COLUMN_MIXED
