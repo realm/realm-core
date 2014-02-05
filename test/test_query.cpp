@@ -2719,10 +2719,7 @@ TEST(TestQuerySubtable)
     subtable->insert_string(1, 1, "c");
     subtable->insert_done();
 
-    subtable = table->get_subtable(2, 2);
-    subtable->insert_int(0, 0, 44);
-    subtable->insert_string(1, 0, "d");
-    subtable->insert_done();
+    //  Intentioally have empty (degenerate) subtable at 2,2
 
     subtable = table->get_subtable(2, 3);
     subtable->insert_int(0, 0, 55);
@@ -2741,10 +2738,8 @@ TEST(TestQuerySubtable)
     q1.less(0, val50);
     q1.end_subtable();
     TableView t1 = q1.find_all(0, size_t(-1));
-    CHECK_EQUAL(2, t1.size());
+    CHECK_EQUAL(1, t1.size());
     CHECK_EQUAL(1, t1.get_source_ndx(0));
-    CHECK_EQUAL(2, t1.get_source_ndx(1));
-
 
     Query q2 = table->where();
     q2.subtable(2);
@@ -2753,10 +2748,8 @@ TEST(TestQuerySubtable)
     q2.less(0, val20);
     q2.end_subtable();
     TableView t2 = q2.find_all(0, size_t(-1));
-    CHECK_EQUAL(2, t2.size());
+    CHECK_EQUAL(1, t2.size());
     CHECK_EQUAL(0, t2.get_source_ndx(0));
-    CHECK_EQUAL(3, t2.get_source_ndx(1));
-
 
     Query q3 = table->where();
     q3.subtable(2);
@@ -2779,10 +2772,44 @@ TEST(TestQuerySubtable)
     q4.less(0, val20);
     q4.end_subtable();
     TableView t4 = q4.find_all(0, size_t(-1));
-    CHECK_EQUAL(3, t4.size());
+    CHECK_EQUAL(2, t4.size());
     CHECK_EQUAL(0, t4.get_source_ndx(0));
     CHECK_EQUAL(2, t4.get_source_ndx(1));
-    CHECK_EQUAL(3, t4.get_source_ndx(2));
+}
+
+TEST(TestQuerySubtable_bug)
+{
+    Group group;
+    TableRef table = group.get_table("test");
+    
+    // Create specification with sub-table
+    table->add_column(type_Int,   "col 0");
+    DescriptorRef sub;
+    table->add_column(type_Table, "col 1", &sub);
+    sub->add_column(type_Int, "sub 0");
+    sub->add_column(type_String, "sub 1");
+    sub->add_column(type_Bool,   "sub 2");
+    CHECK_EQUAL(2, table->get_column_count());
+
+    for (int i=0; i<5; i++) {
+        table->insert_int(0, i, 100);
+        table->insert_subtable(1, i);
+        table->insert_done();
+    }
+    TableRef subtable = table->get_subtable(1, 0);
+    subtable->insert_int(0, 0, 11);
+    subtable->insert_string(1, 0, "a");
+    subtable->insert_bool(2, 0, true);
+    subtable->insert_done();
+
+    Query q1 = table->where();
+    q1.subtable(1);
+    q1.equal(2, true);
+    q1.end_subtable();
+    string s = q1.validate();
+
+    TableView t1 = q1.find_all(0, size_t(-1));
+    CHECK_EQUAL(1, t1.size());
 }
 
 /*
@@ -4249,6 +4276,8 @@ TEST(TestQuery_AllTypes_StaticallyTyped)
     CHECK_EQUAL(1, table.where().date_col.equal(0).count());
 //    CHECK_EQUAL(1, table.where().table_col.equal(subtab).count());
 //    CHECK_EQUAL(1, table.where().mixed_col.equal(mix_int).count());
+// FIXME: It's not possible to construct a subtable query. .table_col.subtable() does not return an object with 'age':
+//    CHECK_EQUAL(1, table.where().table_col.subtable().age.end_subtable().count());
 
     TestQueryAllTypes::Query query = table.where().bool_col.equal(false);
 

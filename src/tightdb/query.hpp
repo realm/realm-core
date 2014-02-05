@@ -161,8 +161,8 @@ public:
     // Grouping
     Query& group();
     Query& end_group();
-    void subtable(size_t column);
-    void end_subtable();
+    Query& subtable(size_t column);
+    Query& end_subtable();
     Query& Or();
 
     Query& and_query(Query q);
