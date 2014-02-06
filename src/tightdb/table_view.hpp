@@ -343,7 +343,16 @@ inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
     m_table = move(tv->m_table);
     if (m_table) {
         m_table->unregister_view(tv);
-        // exception safe, because register_view cannot except if called right after unregister:
+        // Table::register_view() is guaranteed to now throw an
+        // exception below. Since the capacity of the underlying STL
+        // vector (Table::m_views) remains unchanged across element
+        // removal, the preceeding unregistration guarantees that the
+        // vector has enough capacity to store the new element.
+        //
+        // FIXME: Consider adding a Table::replace_registered_view(),
+        // and using it here to avoid the "fragile" relationship
+        // between the assumptions of TableViewBase::move_assign() and
+        // the implementation of the registry of view in Table.
         m_table->register_view(this);
     }
     m_refs.move_assign(tv->m_refs);
