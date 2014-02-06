@@ -115,8 +115,6 @@ protected:
     mutable TableRef m_table;
     Array m_refs;
 
-
-/// Copy constructor.
     /// Construct null view (no memory allocated).
     TableViewBase(): m_refs(Allocator::get_default()) {}
 
