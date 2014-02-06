@@ -340,6 +340,8 @@ inline TableViewBase::TableViewBase(TableViewBase* tv) TIGHTDB_NOEXCEPT:
 
 inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
 {
+    if (m_table)
+        m_table->unregister_view(this);
     m_table = tv->m_table;
     if (m_table) {
         m_table->unregister_view(tv);
