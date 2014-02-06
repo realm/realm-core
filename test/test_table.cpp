@@ -732,7 +732,7 @@ TEST(Table_range_const)
     ConstTableView tv = ctable->get_range_view(10, 20);
     CHECK_EQUAL(10, tv.size());
     for (size_t i = 0; i<tv.size(); ++i)
-        CHECK_EQUAL(i+10, tv.get_int(0, i));
+        CHECK_EQUAL(int64_t(i+10), tv.get_int(0, i));
 }
 
 
