@@ -138,6 +138,7 @@ CATEGORIES:
       SUMMARY  : &g_table_optimize_summary
                  Optimize a table.
       DESCR    : &g_table_optimize_descr
+                 >
                  This method will optimize the internal data structures of a table.
                  The result is that the table may consume less memory and queries might
                  become faster.
