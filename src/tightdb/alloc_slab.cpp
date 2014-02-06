@@ -150,7 +150,7 @@ MemRef SlabAlloc::alloc(size_t size)
 #endif
 
                 char* addr = translate(ref);
-#ifdef TIGHTDB_ALLOC_SET_ZERO
+#ifdef TIGHTDB_ENABLE_ALLOC_SET_ZERO
                 fill(addr, addr+size, 0);
 #endif
 #ifdef TIGHTDB_SLAB_ALLOC_DEBUG
@@ -205,7 +205,7 @@ MemRef SlabAlloc::alloc(size_t size)
         cerr << "Alloc ref: " << ref << " size: " << size << "\n";
 #endif
 
-#ifdef TIGHTDB_ALLOC_SET_ZERO
+#ifdef TIGHTDB_ENABLE_ALLOC_SET_ZERO
     fill(addr, addr+size, 0);
 #endif
 #ifdef TIGHTDB_SLAB_ALLOC_DEBUG
@@ -305,7 +305,7 @@ MemRef SlabAlloc::realloc_(size_t ref, const char* addr, size_t old_size, size_t
 
     // FIXME: Check if we can extend current space. In that case,
     // remember to check m_free_space_invalid. Also remember to fill
-    // with zero if TIGHTDB_ALLOC_SET_ZERO is defined.
+    // with zero if TIGHTDB_ENABLE_ALLOC_SET_ZERO is defined.
 
     // Allocate new space
     MemRef new_mem = alloc(new_size); // Throws
