@@ -143,7 +143,7 @@ CATEGORIES:
                  The result is that the table may consume less memory and queries might
                  become faster.
 
-                 This should be called whenever there is a representative amount of
+                 This should be called as soon as there is a representative amount of
                  data in the table. The table will then reorganize itself into the most
                  efficient format.
 
