@@ -539,6 +539,26 @@ EOF
         exit 0
         ;;
 
+    "copy-tools")
+        repo="$1"
+        if [ -z "$repo" ]; then
+            echo "No path to repository set: sh build.sh copy-tools <path-to-repo>"
+            exit 1
+        fi
+        if ! [ -e "$repo" ]; then
+            echo "Repository $repo does not exist"
+            exit 1
+        fi
+        mkdir -p $repo/tools || exit 1
+
+        tools="add-deb-changelog.sh"
+        for t in $tools; do
+            cp tools/$t $repo/tools || exit 1
+            sed -i -e "1i # Do not edit here - go to core repository" $repo/tools/$t || exit 1
+        done
+        exit 0
+        ;;
+
     "install")
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
@@ -2135,7 +2155,7 @@ EOF
         echo "As well as: install-prod install-devel uninstall-prod uninstall-devel dist-copy" 1>&2
         echo "As well as: src-dist bin-dist dist-deb dist-status dist-pull dist-checkout" 1>&2
         echo "As well as: dist-config dist-clean dist-build dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall dist-test-installed" 1>&2
-        echo "As well as: get-version set-version" 1>&2
+        echo "As well as: get-version set-version copy-tools" 1>&2
         exit 1
         ;;
 esac
