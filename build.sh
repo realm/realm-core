@@ -524,29 +524,18 @@ EOF
         ;;
 
     "set-version")
-        tightdb_version=$1
+        tightdb_version="$1"
         version_file="src/tightdb/version.hpp"
-        tightdb_ver_major="$(echo $tightdb_version | cut -f1 -d.)"
-        tightdb_ver_minor="$(echo $tightdb_version | cut -f2 -d.)"
-        tightdb_ver_patch="$(echo $tightdb_version | cut -f3 -d.)"
-
-        now="$(date --rfc-822)"
-        relman_user="$(git config --get user.name)"
-        relman_mail="$(git config --get user.email)"
+        tightdb_ver_major="$(echo "$tightdb_version" | cut -f1 -d.)" || exit 1
+        tightdb_ver_minor="$(echo "$tightdb_version" | cut -f2 -d.)" || exit 1
+        tightdb_ver_patch="$(echo "$tightdb_version" | cut -f3 -d.)" || exit 1
 
         # update version.hpp
-        sed -i -e "s/\#define TIGHTDB_VER_MAJOR .*/\#define TIGHTDB_VER_MAJOR $tightdb_ver_major/" $version_file
-        sed -i -e "s/\#define TIGHTDB_VER_MINOR .*/\#define TIGHTDB_VER_MINOR $tightdb_ver_minor/" $version_file
-        sed -i -e "s/\#define TIGHTDB_VER_PATCH .*/\#define TIGHTDB_VER_PATCH $tightdb_ver_patch/" $version_file
+        sed -i -e "s/\#define TIGHTDB_VER_MAJOR .*/\#define TIGHTDB_VER_MAJOR $tightdb_ver_major/" $version_file || exit 1
+        sed -i -e "s/\#define TIGHTDB_VER_MINOR .*/\#define TIGHTDB_VER_MINOR $tightdb_ver_minor/" $version_file || exit 1
+        sed -i -e "s/\#define TIGHTDB_VER_PATCH .*/\#define TIGHTDB_VER_PATCH $tightdb_ver_patch/" $version_file || exit 1
 
-        # create a new entry in the debian changelog - in reverse order
-        sed -s -i '1i\\' debian/changelog.in
-        sed -s -i '1i\\' debian/changelog.in
-        sed -i -e "1i\ -- $relman_user <$relman_mail>  $now" debian/changelog.in
-        sed -s -i '1i\\' debian/changelog.in
-        sed -i -e '1i\ \ * Tracking upstream release.' debian/changelog.in
-        sed -s -i '1i\\' debian/changelog.in
-        sed -i -e "1i libtightdb ($tightdb_version~@CODENAME@-1) UNRELEASED; urgency=low" debian/changelog.in
+        sh tools/add-deb-changelog.sh "$tightdb_version" "$(pwd)/debian/changelog.in" libtightdb || exit 1
         exit 0
         ;;
 
@@ -2146,7 +2135,7 @@ EOF
         echo "As well as: install-prod install-devel uninstall-prod uninstall-devel dist-copy" 1>&2
         echo "As well as: src-dist bin-dist dist-deb dist-status dist-pull dist-checkout" 1>&2
         echo "As well as: dist-config dist-clean dist-build dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall dist-test-installed" 1>&2
-        echo "As well as: get-version set-versio" 1>&2
+        echo "As well as: get-version set-version" 1>&2
         exit 1
         ;;
 esac
