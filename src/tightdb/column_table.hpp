@@ -23,6 +23,7 @@
 #include <vector>
 
 #include <tightdb/util/features.h>
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/table.hpp>
 
@@ -363,21 +364,22 @@ inline Table* ColumnTable::get_subtable_ptr(std::size_t subtable_ndx) const
 {
     TIGHTDB_ASSERT(subtable_ndx < size());
 
-    Table* subtable = m_subtable_map.find(subtable_ndx);
-    if (!subtable) {
-        typedef _impl::TableFriend tf;
-        const Spec* spec = tf::get_spec(*m_table);
-        std::size_t subspec_ndx = get_subspec_ndx();
-        ConstSubspecRef shared_subspec = spec->get_subspec_by_ndx(subspec_ndx);
-        ref_type columns_ref = get_as_ref(subtable_ndx);
-        ColumnTable* parent = const_cast<ColumnTable*>(this);
-        subtable = tf::create_ref_counted(shared_subspec, columns_ref, parent, subtable_ndx);
-        bool was_empty = m_subtable_map.empty();
-        m_subtable_map.add(subtable_ndx, subtable);
-        if (was_empty && m_table)
-            tf::bind_ref(*m_table);
-    }
-    return subtable;
+    if (Table* subtable = m_subtable_map.find(subtable_ndx))
+        return subtable;
+
+    typedef _impl::TableFriend tf;
+    const Spec* spec = tf::get_spec(*m_table);
+    std::size_t subspec_ndx = get_subspec_ndx();
+    ConstSubspecRef shared_subspec = spec->get_subspec_by_ndx(subspec_ndx);
+    ref_type columns_ref = get_as_ref(subtable_ndx);
+    ColumnTable* parent = const_cast<ColumnTable*>(this);
+    util::UniquePtr<Table> subtable(tf::create_ref_counted(shared_subspec, columns_ref,
+                                                           parent, subtable_ndx)); // Throws
+    bool was_empty = m_subtable_map.empty();
+    m_subtable_map.add(subtable_ndx, subtable.get()); // Throws
+    if (was_empty && m_table)
+        tf::bind_ref(*m_table);
+    return subtable.release();
 }
 
 inline void ColumnTable::add(const Table* subtable)
