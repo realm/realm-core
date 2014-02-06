@@ -340,13 +340,12 @@ inline void TableViewBase::move_assign(TableViewBase* tv) TIGHTDB_NOEXCEPT
 {
     if (m_table)
         m_table->unregister_view(this);
-    m_table = tv->m_table;
+    m_table = move(tv->m_table);
     if (m_table) {
         m_table->unregister_view(tv);
         // exception safe, because register_view cannot except if called right after unregister:
         m_table->register_view(this);
     }
-    tv->m_table = TableRef();
     m_refs.move_assign(tv->m_refs);
 }
 
