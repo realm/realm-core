@@ -95,7 +95,7 @@ public:
     // Sort the view according to the specified column and the
     // specified direction.
     void sort(size_t column_ndx, bool ascending = true);
-    
+
     // Simple pivot aggregate method. Experimental! Please do not document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const;
 
@@ -121,14 +121,14 @@ protected:
     TableViewBase(): m_refs(Allocator::get_default()) {}
 
     /// Construct empty view, ready for addition of row indices.
-    TableViewBase(Table* parent): m_table(parent->get_table_ref()) 
+    TableViewBase(Table* parent): m_table(parent->get_table_ref())
     {
         parent->register_view(this);
     }
 
     /// Copy constructor.
     TableViewBase(const TableViewBase& tv):
-        m_table(tv.m_table), m_refs(tv.m_refs, Allocator::get_default()) 
+        m_table(tv.m_table), m_refs(tv.m_refs, Allocator::get_default())
     {
         if (m_table)
             m_table->register_view(this);
@@ -158,9 +158,9 @@ private:
 };
 
 
-inline void TableViewBase::detach() const TIGHTDB_NOEXCEPT 
-{ 
-    m_table = TableRef(); 
+inline void TableViewBase::detach() const TIGHTDB_NOEXCEPT
+{
+    m_table = TableRef();
 }
 
 
