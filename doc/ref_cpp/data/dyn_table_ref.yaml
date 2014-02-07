@@ -136,19 +136,8 @@ CATEGORIES :
 
   - g_dyn_table_optimize:
       NAME     : optimize
-      SUMMARY  : &g_dyn_table_optimize_summary
-                 Optimize a table.
-      DESCR    : &g_dyn_table_optimize_descr
-                 This method will optimize the internal data structures of a table.
-                 The result is that the table will consume less memory and queries might
-                 be faster.
-
-                 This should be called as soon as there is an representative amount of
-                 data in the table. The table will then reorganize itself into the most
-                 effective format.
-
-                 What is learned about the contents will be used in all future operations,
-                 so you only need to call optimize once for each table.
+      SUMMARY  : *g_table_optimize_summary
+      DESCR    : *g_table_optimize_descr
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_optimize
         DESCR  :
