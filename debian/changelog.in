@@ -1,3 +1,10 @@
+libtightdb (0.1.6~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Kenneth Geisshirt <kg@tightdb.com>  Fri, 07 Feb 2014 09:15:12 +0100
+
+
 libtightdb (0.1.5~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.
