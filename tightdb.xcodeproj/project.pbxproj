@@ -223,7 +223,6 @@
 		80ADCCEB18A23DD00049D472 /* version.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 80ADCCE818A23DD00049D472 /* version.hpp */; };
 		80ADCCEC18A23DD00049D472 /* version.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 80ADCCE818A23DD00049D472 /* version.hpp */; };
 		80ADCCEE18A23E2D0049D472 /* test_version.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 80ADCCED18A23E2D0049D472 /* test_version.cpp */; };
-		80ADCCEF18A23E2D0049D472 /* test_version.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 80ADCCED18A23E2D0049D472 /* test_version.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1325,7 +1324,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				80ADCCEF18A23E2D0049D472 /* test_version.cpp in Sources */,
 				36E608681459976700CCC3E8 /* test-tightdb.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

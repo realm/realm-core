@@ -136,19 +136,8 @@ CATEGORIES :
 
   - g_dyn_table_optimize:
       NAME     : optimize
-      SUMMARY  : &g_dyn_table_optimize_summary
-                 Optimize a table.
-      DESCR    : &g_dyn_table_optimize_descr
-                 This method will optimize the internal data structures of a table.
-                 The result is that the table will consume less memory and queries might
-                 be faster.
-
-                 This should be called as soon as there is an representative amount of
-                 data in the table. The table will then reorganize itself into the most
-                 effective format.
-
-                 What is learned about the contents will be used in all future operations,
-                 so you only need to call optimize once for each table.
+      SUMMARY  : *g_table_optimize_summary
+      DESCR    : *g_table_optimize_descr
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_optimize
         DESCR  :
@@ -692,9 +681,10 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_set_index_summary
                  Add an index to a column.
       DESCR    : &g_dyn_table_set_index_descr
-                 This method adds an index to a column, and queries will be faster. But the table
-                 will require more memory and inserts will be slower. This method is idempotent.
-                 Currently only String columns can be indexed. Note, index cannot be removed.
+                 This method adds an index to a column, making lookups in this column faster.
+                 However, the table will use more space and inserts will be slower.
+                 This method is idempotent, and indices cannot be removed.
+                 Currently only String columns can be indexed.
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
@@ -972,11 +962,11 @@ CATEGORIES :
   - g_dyn_table_get_sorted_view_const:
       NAMES    : [get_sorted_view, get_sorted_view]
       SUMMARY  : &g_dyn_table_get_sorted_view_summary
-                 Sort the table.
+                 Get a sorted view.
       DESCR    : &g_dyn_table_get_sorted_view_desc
-                 This method will sort the rows by using values of a given column.
+                 This method returns a view of the table sorted by the given column.
                  The rows are returned as a {@link class_dyn_tableview} object.
-                 Currently sort is only supported on Integer, Boolean and Date ColumnTypes.
+                 Currently sort is only supported on Integer, Boolean and Date column types.
       SIGNATURE: |
                  TableView      get_sorted_view(size_t column_ndx, bool ascending=true);
                  ConstTableView get_sorted_view(size_t column_ndx, bool ascending=true) const;
@@ -992,7 +982,7 @@ CATEGORIES :
       RETURN:
         TYPES  : TableView
         DESCR  : &g_dyn_table_get_sorted_view_return_descr
-                 A view.
+                 A view sorted by the given column.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_sorted_view
         DESCR  :
