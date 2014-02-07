@@ -973,11 +973,11 @@ CATEGORIES :
   - g_dyn_table_get_sorted_view_const:
       NAMES    : [get_sorted_view, get_sorted_view]
       SUMMARY  : &g_dyn_table_get_sorted_view_summary
-                 Sort the table.
+                 Get a sorted view.
       DESCR    : &g_dyn_table_get_sorted_view_desc
-                 This method will sort the rows by using values of a given column.
+                 This method returns a view of the table sorted by the given column.
                  The rows are returned as a {@link class_dyn_tableview} object.
-                 Currently sort is only supported on Integer, Boolean and Date ColumnTypes.
+                 Currently sort is only supported on Integer, Boolean and Date column types.
       SIGNATURE: |
                  TableView      get_sorted_view(size_t column_ndx, bool ascending=true);
                  ConstTableView get_sorted_view(size_t column_ndx, bool ascending=true) const;
@@ -993,7 +993,7 @@ CATEGORIES :
       RETURN:
         TYPES  : TableView
         DESCR  : &g_dyn_table_get_sorted_view_return_descr
-                 A view.
+                 A view sorted by the given column.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_sorted_view
         DESCR  :
