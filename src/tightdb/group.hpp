@@ -607,7 +607,7 @@ template<class S> std::size_t Group::write_to_stream(S& out) const
     Array top(Array::type_HasRefs); // Throws
     // FIXME: Dangerous cast: unsigned -> signed
     top.ensure_minimum_width(1 + 2*max_final_file_size); // Throws
-    // FIXME: We really an alternative to Array::truncate() that is able to expand.
+    // FIXME: We really need an alternative to Array::truncate() that is able to expand.
     // FIXME: Dangerous cast: unsigned -> signed
     top.add(names_pos); // Throws
     top.add(tables_pos); // Throws
