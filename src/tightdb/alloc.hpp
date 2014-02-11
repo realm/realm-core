@@ -37,20 +37,16 @@ class Replication;
 
 typedef std::size_t ref_type;
 
-inline ref_type to_ref(int64_t v) TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(!util::int_cast_has_overflow<ref_type>(v));
-    // Check that v is divisible by 8 (64-bit aligned).
-    TIGHTDB_ASSERT(v % 8 == 0);
-    return ref_type(v);
-}
+inline ref_type to_ref(int64_t) TIGHTDB_NOEXCEPT;
 
-struct MemRef {
-    MemRef(): m_addr(0), m_ref(0) {}
-    MemRef(char* addr, ref_type ref): m_addr(addr), m_ref(ref) {}
-    MemRef(ref_type ref, Allocator& alloc);
+class MemRef {
+public:
     char* m_addr;
     ref_type m_ref;
+
+    MemRef();
+    MemRef(char* addr, ref_type ref);
+    MemRef(ref_type ref, Allocator& alloc);
 };
 
 
@@ -83,7 +79,7 @@ public:
     ///
     /// Note: The underscore has been added because the name `realloc`
     /// would conflict with a macro on the Windows platform.
-    virtual MemRef realloc_(ref_type ref, const char* addr, std::size_t old_size,
+    virtual MemRef realloc_(ref_type, const char* addr, std::size_t old_size,
                             std::size_t new_size) = 0;
 
     /// Release the specified chunk of memory.
@@ -93,7 +89,7 @@ public:
     virtual void free_(ref_type, const char* addr) TIGHTDB_NOEXCEPT = 0;
 
     /// Shorthand for free_(mem.m_ref, mem.m_addr).
-    void free_(MemRef mem) TIGHTDB_NOEXCEPT { free_(mem.m_ref, mem.m_addr); }
+    void free_(MemRef mem) TIGHTDB_NOEXCEPT;
 
     /// Map the specified \a ref to the corresponding memory
     /// address. Note that if is_read_only(ref) returns true, then the
@@ -115,15 +111,15 @@ public:
     /// therefore, is not part of an actual database.
     static Allocator& get_default() TIGHTDB_NOEXCEPT;
 
-    virtual ~Allocator() TIGHTDB_NOEXCEPT {}
+    virtual ~Allocator() TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
     virtual void Verify() const = 0;
 #endif
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    Allocator() TIGHTDB_NOEXCEPT: m_replication(0) {}
-    Replication* get_replication() TIGHTDB_NOEXCEPT { return m_replication; }
+    Allocator() TIGHTDB_NOEXCEPT;
+    Replication* get_replication() TIGHTDB_NOEXCEPT;
 #endif
 
 protected:
@@ -138,8 +134,34 @@ protected:
 
 // Implementation:
 
+inline ref_type to_ref(int64_t v) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(!util::int_cast_has_overflow<ref_type>(v));
+    // Check that v is divisible by 8 (64-bit aligned).
+    TIGHTDB_ASSERT(v % 8 == 0);
+    return ref_type(v);
+}
+
+inline MemRef::MemRef():
+    m_addr(0),
+    m_ref(0)
+{
+}
+
+inline MemRef::MemRef(char* addr, ref_type ref):
+    m_addr(addr),
+    m_ref(ref)
+{
+}
+
 inline MemRef::MemRef(ref_type ref, Allocator& alloc): m_addr(alloc.translate(ref)), m_ref(ref)
 {
+}
+
+
+inline void Allocator::free_(MemRef mem) TIGHTDB_NOEXCEPT
+{
+    free_(mem.m_ref, mem.m_addr);
 }
 
 inline bool Allocator::is_read_only(ref_type ref) const TIGHTDB_NOEXCEPT
@@ -148,6 +170,24 @@ inline bool Allocator::is_read_only(ref_type ref) const TIGHTDB_NOEXCEPT
     TIGHTDB_ASSERT(m_baseline != 0); // Attached SlabAlloc
     return ref < m_baseline;
 }
+
+inline Allocator::~Allocator() TIGHTDB_NOEXCEPT
+{
+}
+
+#ifdef TIGHTDB_ENABLE_REPLICATION
+
+inline Allocator::Allocator() TIGHTDB_NOEXCEPT:
+    m_replication(0)
+{
+}
+
+inline Replication* Allocator::get_replication() TIGHTDB_NOEXCEPT
+{
+    return m_replication;
+}
+
+#endif // TIGHTDB_ENABLE_REPLICATION
 
 
 } // namespace tightdb
