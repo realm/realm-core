@@ -571,8 +571,6 @@ public:
 
     static void destroy(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
 
-    class DestroyGuard;
-
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_alloc; }
 
     // Serialization
@@ -1402,36 +1400,6 @@ inline void Array::destroy(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
     array.init_from_ref(ref);
     array.destroy();
 }
-
-
-class Array::DestroyGuard {
-public:
-    DestroyGuard(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT: m_ref(ref), m_alloc(alloc)
-    {
-    }
-
-    ~DestroyGuard() TIGHTDB_NOEXCEPT
-    {
-        if (m_ref)
-            destroy(m_ref, m_alloc);
-    }
-
-    ref_type get() const TIGHTDB_NOEXCEPT
-    {
-        return m_ref;
-    }
-
-    ref_type release() TIGHTDB_NOEXCEPT
-    {
-        ref_type ref = m_ref;
-        m_ref = 0;
-        return ref;
-    }
-
-private:
-    ref_type m_ref;
-    Allocator& m_alloc;
-};
 
 
 inline void Array::adjust(std::size_t ndx, int_fast64_t diff)

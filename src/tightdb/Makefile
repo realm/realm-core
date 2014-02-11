@@ -5,11 +5,11 @@ nobase_subinclude_HEADERS = util/features.h util/meta.hpp util/assert.hpp util/t
 util/type_list.hpp util/tuple.hpp util/bind.hpp util/safe_int_ops.hpp util/unique_ptr.hpp \
 util/bind_ptr.hpp util/buffer.hpp util/string_buffer.hpp util/logger.hpp util/thread.hpp \
 util/file.hpp util/utf8.hpp exceptions.hpp utilities.hpp alloc.hpp alloc_slab.hpp array.hpp \
-array_string.hpp data_type.hpp column_type.hpp column_fwd.hpp spec.hpp datetime.hpp \
-string_data.hpp binary_data.hpp mixed.hpp table.hpp table_ref.hpp table_basic_fwd.hpp \
-table_accessors.hpp table_basic.hpp table_view.hpp table_view_basic.hpp table_macros.hpp \
-descriptor_fwd.hpp descriptor.hpp group.hpp group_shared.hpp $(REPLICATION_HPP) query.hpp \
-query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h importer.hpp version.hpp
+array_string.hpp impl/destroy_guard.hpp data_type.hpp column_type.hpp column_fwd.hpp spec.hpp \
+datetime.hpp string_data.hpp binary_data.hpp mixed.hpp table.hpp table_ref.hpp \
+table_basic_fwd.hpp table_accessors.hpp table_basic.hpp table_view.hpp table_view_basic.hpp \
+table_macros.hpp descriptor_fwd.hpp descriptor.hpp group.hpp group_shared.hpp $(REPLICATION_HPP) \
+query.hpp query_conditions.hpp lang_bind_helper.hpp tightdb_nmmintrin.h importer.hpp version.hpp
 
 nobase_subinclude_HEADERS_EXTRA_UNINSTALL = *.h *.hpp util/*.h util/*.hpp
 

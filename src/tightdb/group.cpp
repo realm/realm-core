@@ -6,6 +6,7 @@
 #include <fstream>
 
 #include <tightdb/util/thread.hpp>
+#include <tightdb/impl/destroy_guard.hpp>
 #include <tightdb/utilities.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group.hpp>
@@ -388,7 +389,8 @@ ref_type Group::create_new_table(StringData name)
     // side-effects when it throws, at least not in any way that
     // matters.
 
-    Array::DestroyGuard ref_dg(_impl::TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
+    using namespace _impl;
+    RefDestroyGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
     size_t ndx = m_tables.size();
     TIGHTDB_ASSERT(ndx == m_table_names.size());
     m_tables.insert(ndx, ref_dg.get()); // Throws
@@ -434,19 +436,20 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
         repl->new_top_level_table(name); // Throws
 #endif
 
-    Array::DestroyGuard ref_dg(_impl::TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
-    typedef _impl::TableFriend::UnbindGuard TableUnbindGuard;
-    TableUnbindGuard table_ug(_impl::TableFriend::create_ref_counted(m_alloc, ref_dg.get(),
-                                                                     null_ptr, 0)); // Throws
+    using namespace _impl;
+    RefDestroyGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
+    typedef TableFriend::UnbindGuard TableUnbindGuard;
+    TableUnbindGuard table_ug(TableFriend::create_ref_counted(m_alloc, ref_dg.get(),
+                                                              null_ptr, 0)); // Throws
 
     // The table accessor owns the ref until the point below where a
     // parent is set in Table::m_top.
     ref_type ref = ref_dg.release();
-    _impl::TableFriend::bind_ref(*table_ug); // Increase reference count from 0 to 1
+    TableFriend::bind_ref(*table_ug); // Increase reference count from 0 to 1
 
     size_t ndx = m_tables.size();
     m_table_accessors.resize(ndx+1); // Throws
-    _impl::TableFriend::set_top_parent(*table_ug, this, ndx);
+    TableFriend::set_top_parent(*table_ug, this, ndx);
     try {
         if (spec_setter)
             (*spec_setter)(*table_ug); // Throws
@@ -466,7 +469,7 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
         }
     }
     catch (...) {
-        _impl::TableFriend::set_top_parent(*table_ug, 0, 0);
+        TableFriend::set_top_parent(*table_ug, 0, 0);
         throw;
     }
 }
