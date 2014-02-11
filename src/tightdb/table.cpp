@@ -7,6 +7,7 @@
 
 #include <tightdb/util/features.h>
 #include <tightdb/util/unique_ptr.hpp>
+#include <tightdb/impl/destroy_guard.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/descriptor.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -211,7 +212,7 @@ struct Table::InsertSubtableColumns: Table::SubtableUpdater {
         size_t subtable_size = subtables.get_subtable_size(row_ndx);
         Allocator& alloc = subcolumns.get_alloc();
         ref_type column_ref = create_column(m_type, subtable_size, alloc); // Throws
-        Array::DestroyGuard dg(column_ref, alloc);
+        _impl::RefDestroyGuard dg(column_ref, alloc);
         subcolumns.insert(m_column_ndx, column_ref); // Throws
         dg.release();
     }
