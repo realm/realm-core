@@ -65,6 +65,7 @@ public:
         TIGHTDB_ASSERT(i != m_map.end());
         char* addr_2 = i->second;
         TIGHTDB_ASSERT(addr_2 == addr);
+        static_cast<void>(addr_2);
         m_map.erase(i);
         delete[] addr;
     }
@@ -81,6 +82,17 @@ public:
     bool empty()
     {
         return m_map.empty();
+    }
+
+    void clear()
+    {
+        typedef map<ref_type, char*>::const_iterator iter;
+        iter end = m_map.end();
+        for (iter i = m_map.begin(); i != end; ++i) {
+            char* addr = i->second;
+            delete[] addr;
+        }
+        m_map.clear();
     }
 
 #ifdef TIGHTDB_DEBUG
@@ -159,6 +171,7 @@ TEST(RefDestroyGuard)
             CHECK_EQUAL(ref, dg.release());
         }
         CHECK(!alloc.empty());
+        alloc.clear();
     }
     // Reset
     {
