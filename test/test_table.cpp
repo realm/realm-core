@@ -404,6 +404,57 @@ TEST(Table_HighLevelCopy)
 }
 
 
+TEST(Table_GetName)
+{
+    // Freestanding tables have no names
+    {
+        Table table;
+        CHECK_EQUAL("", table.get_name());
+    }
+    // ... regardless of how they are created
+    {
+        TableRef table = Table::create();
+        CHECK_EQUAL("", table->get_name());
+    }
+
+    // Direct members of groups do have names
+    {
+        Group group;
+        TableRef table = group.get_table("table");
+        CHECK_EQUAL("table", table->get_name());
+    }
+    {
+        Group group;
+        TableRef foo = group.get_table("foo");
+        TableRef bar = group.get_table("bar");
+        CHECK_EQUAL("foo", foo->get_name());
+        CHECK_EQUAL("bar", bar->get_name());
+    }
+
+    // Subtables should never have names
+    {
+        Table table;
+        DescriptorRef subdesc;
+        table.add_column(type_Table, "sub", &subdesc);
+        table.add_empty_row();
+        TableRef subtab = table.get_subtable(0,0);
+        CHECK_EQUAL("", table.get_name());
+        CHECK_EQUAL("", subtab->get_name());
+    }
+    // ... not even when the parent is a member of a group
+    {
+        Group group;
+        TableRef table = group.get_table("table");
+        DescriptorRef subdesc;
+        table->add_column(type_Table, "sub", &subdesc);
+        table->add_empty_row();
+        TableRef subtab = table->get_subtable(0,0);
+        CHECK_EQUAL("table", table->get_name());
+        CHECK_EQUAL("", subtab->get_name());
+    }
+}
+
+
 namespace {
 
 void setup_multi_table(Table& table, size_t rows, size_t sub_rows)

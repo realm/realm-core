@@ -121,6 +121,21 @@ CATEGORIES :
       - CODE   : ex_cpp_dyn_table_is_attached
         DESCR  :
 
+  - g_dyn_table_get_name:
+      NAME     : get_name
+      SUMMARY  : &g_dyn_table_get_name_summary
+                 Get the name of this table, if it has any.
+      DESCR    : &g_dyn_table_get_name_descr
+                 Tables have names when, and only when they are direct
+                 members of groups. For a table of any other kind,
+                 this function returns the empty string.
+      CONST    : true
+      RETURN:
+        TYPES  : StringData
+        DESCR  : &g_dyn_table_get_name_return_descr
+                 The name of the table, or the empty string if the
+                 table is not a direct member of a group.
+
 
 - Table:
   METHODS:

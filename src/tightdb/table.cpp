@@ -3278,6 +3278,12 @@ pair<const Array*, const Array*> Table::get_string_column_roots(size_t col_ndx) 
 }
 
 
+StringData Table::Parent::get_child_name(size_t) const TIGHTDB_NOEXCEPT
+{
+    return StringData();
+}
+
+
 Table* Table::Parent::get_parent_table(size_t*) const TIGHTDB_NOEXCEPT
 {
     return 0;

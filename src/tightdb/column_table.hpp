@@ -92,10 +92,17 @@ protected:
     /// a TableRef.
     Table* get_subtable_ptr(std::size_t subtable_ndx) const;
 
-    void update_child_ref(std::size_t subtable_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
-    ref_type get_child_ref(std::size_t subtable_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    void child_accessor_destroyed(std::size_t subtable_ndx) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    // Overriding method in ArrayParent
+    void update_child_ref(std::size_t, ref_type) TIGHTDB_OVERRIDE;
+
+    // Overriding method in ArrayParent
+    ref_type get_child_ref(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    // Overriding method in Table::Parent
     Table* get_parent_table(std::size_t*) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    // Overriding method in Table::Parent
+    void child_accessor_destroyed(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     /// Assumes that the two tables have the same spec.
     static bool compare_subtable_rows(const Table&, const Table&);
@@ -296,14 +303,14 @@ inline ColumnSubtableParent::ColumnSubtableParent(Allocator& alloc,
 {
 }
 
-inline void ColumnSubtableParent::update_child_ref(std::size_t subtable_ndx, ref_type new_ref)
+inline void ColumnSubtableParent::update_child_ref(std::size_t child_ndx, ref_type new_ref)
 {
-    set(subtable_ndx, new_ref);
+    set(child_ndx, new_ref);
 }
 
-inline ref_type ColumnSubtableParent::get_child_ref(std::size_t subtable_ndx) const TIGHTDB_NOEXCEPT
+inline ref_type ColumnSubtableParent::get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT
 {
-    return get_as_ref(subtable_ndx);
+    return get_as_ref(child_ndx);
 }
 
 inline void ColumnSubtableParent::detach_subtable_accessors() TIGHTDB_NOEXCEPT
