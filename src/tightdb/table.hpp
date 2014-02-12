@@ -130,6 +130,11 @@ public:
     /// that even Table::is_attached() is disallowed in this case.
     bool is_attached() const TIGHTDB_NOEXCEPT;
 
+    /// Get the name of this table, if it has any. Tables have names
+    /// when, and only when they are direct members of groups. For a
+    /// table of any other kind, this function returns the empty
+    /// string.
+    StringData get_name() const TIGHTDB_NOEXCEPT;
 
     //@{
     /// Conventience methods for inspecting the dynamic table type.
@@ -810,22 +815,22 @@ private:
 };
 
 
-inline void Table::remove(std::size_t row_ndx) 
-{ 
+inline void Table::remove(std::size_t row_ndx)
+{
     detach_views_except(NULL);
-    do_remove(row_ndx); 
+    do_remove(row_ndx);
 }
 
-inline void Table::from_view_remove(std::size_t row_ndx, TableViewBase* view) 
-{ 
+inline void Table::from_view_remove(std::size_t row_ndx, TableViewBase* view)
+{
     detach_views_except(view);
-    do_remove(row_ndx); 
+    do_remove(row_ndx);
 }
 
-inline void Table::remove_last() 
-{ 
+inline void Table::remove_last()
+{
     if (!is_empty())
-        remove(size()-1); 
+        remove(size()-1);
 }
 
 inline void Table::register_view(const TableViewBase* view)
@@ -840,6 +845,8 @@ public:
     ~Parent() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
 protected:
+    virtual StringData get_child_name(std::size_t child_ndx) const TIGHTDB_NOEXCEPT;
+
     // If this table parent is a column in a parent table, this
     // function must return the pointer to the parent table, otherwise
     // it must return null.
@@ -853,7 +860,8 @@ protected:
     // Must be called whenever a child table accessor is destroyed.
     virtual void child_accessor_destroyed(std::size_t child_ndx) TIGHTDB_NOEXCEPT = 0;
 
-    virtual std::size_t* record_subtable_path(std::size_t* begin, std::size_t* end) TIGHTDB_NOEXCEPT;
+    virtual std::size_t* record_subtable_path(std::size_t* begin,
+                                              std::size_t* end) TIGHTDB_NOEXCEPT;
 
     friend class Table;
 };
@@ -878,6 +886,18 @@ inline bool Table::is_attached() const TIGHTDB_NOEXCEPT
     // degenerate subtables, m_columns is initialized with the correct
     // parent pointer.
     return m_columns.has_parent();
+}
+
+inline StringData Table::get_name() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    const Array& real_top = m_top.is_attached() ? m_top : m_columns;
+    ArrayParent* parent = real_top.get_parent();
+    if (!parent)
+        return StringData();
+    std::size_t index_in_parent = real_top.get_ndx_in_parent();
+    TIGHTDB_ASSERT(dynamic_cast<Parent*>(parent));
+    return static_cast<Parent*>(parent)->get_child_name(index_in_parent);
 }
 
 inline std::size_t Table::get_column_count() const TIGHTDB_NOEXCEPT

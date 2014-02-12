@@ -983,8 +983,11 @@ protected:
     // Undefined behavior if array is in immutable memory
     static std::size_t get_capacity_from_header(const char*) TIGHTDB_NOEXCEPT;
 
-    void update_child_ref(std::size_t child_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
-    ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    // Overriding method in ArrayParent
+    void update_child_ref(std::size_t, ref_type) TIGHTDB_OVERRIDE;
+
+    // Overriding method in ArrayParent
+    ref_type get_child_ref(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     void destroy_children() TIGHTDB_NOEXCEPT;
 

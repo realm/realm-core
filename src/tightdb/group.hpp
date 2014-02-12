@@ -339,17 +339,17 @@ private:
 
     void update_from_shared(ref_type new_top_ref, std::size_t new_file_size);
 
-    void update_child_ref(std::size_t subtable_ndx, ref_type new_ref) TIGHTDB_OVERRIDE
-    {
-        m_tables.set(subtable_ndx, new_ref);
-    }
+    // Overriding method in ArrayParent
+    void update_child_ref(std::size_t, ref_type) TIGHTDB_OVERRIDE;
 
-    void child_accessor_destroyed(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {} // Ignore
+    // Overriding method in ArrayParent
+    ref_type get_child_ref(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    ref_type get_child_ref(std::size_t subtable_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
-    {
-        return m_tables.get_as_ref(subtable_ndx);
-    }
+    // Overriding method in Table::Parent
+    StringData get_child_name(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    // Overriding method in Table::Parent
+    void child_accessor_destroyed(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
     // May throw WriteError
     template<class S> std::size_t write_to_stream(S& out) const;
@@ -581,6 +581,26 @@ template<class T> inline typename T::ConstRef Group::get_table(StringData name) 
 inline const Table* Group::get_table_by_ndx(std::size_t ndx) const
 {
     return const_cast<Group*>(this)->get_table_by_ndx(ndx);
+}
+
+inline void Group::update_child_ref(std::size_t child_ndx, ref_type new_ref)
+{
+    m_tables.set(child_ndx, new_ref);
+}
+
+inline ref_type Group::get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT
+{
+    return m_tables.get_as_ref(child_ndx);
+}
+
+inline StringData Group::get_child_name(std::size_t child_ndx) const TIGHTDB_NOEXCEPT
+{
+    return m_table_names.get(child_ndx);
+}
+
+inline void Group::child_accessor_destroyed(std::size_t) TIGHTDB_NOEXCEPT
+{
+    // Ignore
 }
 
 template<class S> std::size_t Group::write_to_stream(S& out) const

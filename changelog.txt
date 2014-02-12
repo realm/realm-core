@@ -10,8 +10,14 @@ Format:
 - Removed/deprecated feature/method .... (user visible removed feature - passed on to release notes)
 . Any other notes ....                   (internal changes)
 
+
+2014-02-11 (Kristian Spangsege)
++ Adding Table::get_name() which returns the name of the table when the table is a direct member of a group.
+
+
 2014-02-05 (Kenneth Geisshirt)
 + Two new targets in build.sh: get_version and set_version.
+
 
 2014-02-04 (Kristian Spangsege)
 + Introducing Table::get_parent_table() with allows a subtable to know its parent table.
