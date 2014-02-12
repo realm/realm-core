@@ -461,6 +461,17 @@ CATEGORIES  :
 
 - Serialization:
   METHODS:
+  - g_group_write_to_stream:
+      NAME     : write
+      SUMMARY  : &g_group_write_to_stream_summary
+                 Write this database to the specified output stream.
+      CONST    : true
+      PARAMS:
+      - NAME   : out
+        TYPES  : std::ostream&
+        DESCR  : &g_group_write_to_stream_parm1_descr
+                 The tareget stream.
+
   - g_group_write_to_file:
       NAME     : write
       SUMMARY  : &g_group_write_to_file_summary

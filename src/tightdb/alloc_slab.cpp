@@ -518,7 +518,7 @@ void SlabAlloc::do_prepare_for_update(char* mutable_data)
 }
 
 
-size_t SlabAlloc::get_total_size() const
+size_t SlabAlloc::get_total_size() const TIGHTDB_NOEXCEPT
 {
     return m_slabs.is_empty() ? m_baseline : to_size_t(m_slabs.back().ref_end);
 }

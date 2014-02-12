@@ -197,7 +197,7 @@ public:
     ///
     /// It is an error to call this function on a detached
     /// allocator. Doing so will result in undefined behavior.
-    std::size_t get_total_size() const;
+    std::size_t get_total_size() const TIGHTDB_NOEXCEPT;
 
     /// Mark all managed memory (except the attached file) as free
     /// space.

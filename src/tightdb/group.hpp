@@ -26,6 +26,7 @@
 
 #include <tightdb/util/features.h>
 #include <tightdb/exceptions.hpp>
+#include <tightdb/impl/output_stream.hpp>
 #include <tightdb/table.hpp>
 #include <tightdb/table_basic_fwd.hpp>
 #include <tightdb/alloc_slab.hpp>
@@ -244,6 +245,9 @@ public:
 
     // Serialization
 
+    /// Write this database to the specified output stream.
+    void write(std::ostream&) const;
+
     /// Write this database to a new file. It is an error to specify a
     /// file that already exists. This is to protect against
     /// overwriting a database file that is currently open, which
@@ -351,8 +355,7 @@ private:
     // Overriding method in Table::Parent
     void child_accessor_destroyed(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    // May throw WriteError
-    template<class S> std::size_t write_to_stream(S& out) const;
+    void write(_impl::OutputStream&) const;
 
     /// Create a new underlying node structure and attach this
     /// accessor instance to it
@@ -601,60 +604,6 @@ inline StringData Group::get_child_name(std::size_t child_ndx) const TIGHTDB_NOE
 inline void Group::child_accessor_destroyed(std::size_t) TIGHTDB_NOEXCEPT
 {
     // Ignore
-}
-
-template<class S> std::size_t Group::write_to_stream(S& out) const
-{
-    // Write the file header
-    const char* data = reinterpret_cast<const char*>(&SlabAlloc::streaming_header);
-    out.write(data, sizeof SlabAlloc::streaming_header);
-
-    // Because we need to include the total logical file size in the
-    // top-array, we have to start by writing everything except the
-    // top-array, and then finally compute and write a correct version
-    // of the top-array. The free-space information of the group will
-    // not be included, as it is not needed in the streamed format.
-    std::size_t names_pos  = m_table_names.write(out); // Throws
-    std::size_t tables_pos = m_tables.write(out); // Throws
-    std::size_t top_pos = out.get_pos();
-
-    // Produce a preliminary version of the top array whose
-    // representation is guaranteed to be able to hold the final file
-    // size
-    int top_size = 3;
-    std::size_t max_top_byte_size = Array::get_max_byte_size(top_size);
-    uint64_t max_final_file_size = top_pos + max_top_byte_size;
-    Array top(Array::type_HasRefs); // Throws
-    // FIXME: Dangerous cast: unsigned -> signed
-    top.ensure_minimum_width(1 + 2*max_final_file_size); // Throws
-    // FIXME: We really need an alternative to Array::truncate() that is able to expand.
-    // FIXME: Dangerous cast: unsigned -> signed
-    top.add(names_pos); // Throws
-    top.add(tables_pos); // Throws
-    top.add(0); // Throws
-
-    // Finalize the top array by adding the projected final file size
-    // to it
-    std::size_t top_byte_size = top.get_byte_size();
-    std::size_t final_file_size = top_pos + top_byte_size;
-    // FIXME: Dangerous cast: unsigned -> signed
-    top.set(2, 1 + 2*final_file_size);
-
-    // Write the top array
-    bool recurse = false;
-    top.write(out, recurse); // Throws
-    TIGHTDB_ASSERT(out.get_pos() == final_file_size);
-
-    top.truncate(0); // Avoid recursive destruction
-    top.destroy();
-
-    // Write streaming footer
-    SlabAlloc::StreamingFooter footer;
-    footer.m_top_ref = top_pos;
-    footer.m_magic_cookie = SlabAlloc::footer_magic_cookie;
-    out.write(reinterpret_cast<const char*>(&footer), sizeof footer);
-
-    return final_file_size + sizeof footer;
 }
 
 template<class S> void Group::to_json(S& out) const
