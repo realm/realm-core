@@ -507,10 +507,8 @@ CATEGORIES :
       DESCR    :
       - TEXT   : &g_dyn_view_average_descr
                  Calculates the average of a column.
-      - TEXT   : >
-                 As the sum of many <code>int64_t</code> or <code>float</code>
-                 values can be greater than the average value of the type, a <code>double</code>
-                 is returned.
+      - TEXT   : *g_dyn_table_average_descr_notes
+      - TEXT   : *g_dyn_table_average_descr_double
       CONST    : True
       SIGNATURE: |
                  double  average_int(size_t column_ndx) const;
