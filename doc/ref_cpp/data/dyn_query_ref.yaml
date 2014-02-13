@@ -498,7 +498,7 @@ CATEGORIES :
   - g_dyn_query_count:
       NAME     : count
       DESCR    : &g_dyn_query_size_descr
-                 The method executes the query and return the number of matching rows.
+                 The method executes the query and returns the number of matching rows.
       SUMMARY  : &g_dyn_query_size_summary
                  Number of matching rows.
       CONST    : true
