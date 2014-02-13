@@ -529,7 +529,7 @@ CATEGORIES :
   - g_dyn_query_remove:
       NAME     : remove
       DESCR    : &g_dyn_query_remove_descr
-                 This method executes the query and removes all matching rows in the source table.
+                 This method executes the query and removes all matching rows from the source table.
       SUMMARY  : &g_dyn_query_remove_summary
                  Remove rows.
       CONST    : true
