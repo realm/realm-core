@@ -556,12 +556,10 @@ CATEGORIES :
   - g_dyn_query_sum_double:
       TITLE    : sum*
       NAMES    : [sum_int, sum_float, sum_double]
-      DESCR    : &g_dyn_query_sum_descr
-                 |
+      DESCR    :
+      - TEXT   : &g_dyn_query_sum_descr
                  This methods calculates the sum of the values in a specific column.
-
-                 Note: <code>sum()</code> can overflow depending on the values stored. Nothing will indicate this.
-                 Note: Adding many floats or doubles can accumulate representation imprecisions.
+      - TEXT   : *g_dyn_table_sum_descr_notes
       SUMMARY  : &g_dyn_query_sum_summary
                  Calculate sum.
       CONST    : true
