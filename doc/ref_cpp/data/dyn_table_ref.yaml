@@ -1100,7 +1100,7 @@ CATEGORIES :
       - TEXT   : &g_dyn_table_sum_descr
                  This method calculates the sum of all values in the specified column.
       - TEXT   : &g_dyn_table_sum_descr_notes
-                 >
+                 |
                  Note: <code>sum()</code> can overflow depending on the values stored. Nothing will indicate this.
                  Note: Adding many floats or doubles can accumulate representation imprecisions.
       - TEXT   : >
