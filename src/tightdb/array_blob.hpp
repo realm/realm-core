@@ -48,8 +48,9 @@ public:
     /// slower.
     static const char* get(const char* header, std::size_t pos) TIGHTDB_NOEXCEPT;
 
-    /// Create a new empty blob (binary) array and attach to it. This
-    /// does not modify the parent reference information.
+    /// Create a new empty blob (binary) array and attach this
+    /// accessor to it. This does not modify the parent reference
+    /// information of this accessor.
     ///
     /// Note that the caller assumes ownership of the allocated
     /// underlying node. It is not owned by the accessor.

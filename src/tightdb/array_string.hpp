@@ -63,8 +63,9 @@ public:
 
     ref_type bptree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase& state);
 
-    /// Create a new empty string array and attach to it. This does
-    /// not modify the parent reference information.
+    /// Create a new empty string array and attach this accessor to
+    /// it. This does not modify the parent reference information of
+    /// this accessor.
     ///
     /// Note that the caller assumes ownership of the allocated
     /// underlying node. It is not owned by the accessor.

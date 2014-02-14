@@ -88,16 +88,24 @@
 //
 //   --> |  .  | r_1 | r_2 | ... | r_N | N_t |  (main array node)
 //          |
-//           --> | o_1 | o_2 | ... | o_M |  (offsets array node)
+//           ------> | o_2 | ... | o_N |  (offsets array node)
 //
 // Here,
 //   `r_i` is the i'th child ref,
-//   `o_i` is the number of elements in the i'th child plus the number
-//         of elements in preceeding children,
+//   `o_i` is the total number of elements preceeding the i'th child,
 //   `N`   is the number of children,
 //   'M'   is one less than the number of children,
 //   `N_c` is the fixed number of elements per child, and
 //   `N_t` is the total number of elements in the subtree.
+//
+// `N_c` must always be a power of `TIGHTDB_MAX_LIST_SIZE`.
+//
+// The last child of an inner node on the compact form, may have fewer
+// elements than `N_c`. All other children must have exactly `N_c`
+// elements in them.
+//
+// When an inner node is on the general form, and has only one child,
+// it has an empty `offsets` array.
 //
 //
 // B+-tree invariants:
