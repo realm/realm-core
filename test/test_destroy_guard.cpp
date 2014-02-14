@@ -142,12 +142,12 @@ TEST(DestroyGuard_General)
 
 TEST(DestroyGuard_ArrayShallow)
 {
-    // Test that when DestroyGuard<> is used with Array, it works in a
-    // shallow fashion.
+    // Test that when DestroyGuard<> is used with Array
+    // (`ShallowArrayDestroyGuard`), it works in a shallow fashion.
     FooAlloc alloc;
     Array root(alloc);
     {
-        DestroyGuard<Array> dg(&root);
+        ShallowArrayDestroyGuard dg(&root);
         root.create(Array::type_HasRefs);
         {
             ref_type child_ref = Array::create_empty_array(Array::type_Normal, alloc);
@@ -169,7 +169,7 @@ TEST(DestroyGuard_ArrayDeep)
         {
             Array arr(alloc);
             arr.create(Array::type_Normal);
-            ArrayDestroyDeepGuard dg(&arr);
+            DeepArrayDestroyGuard dg(&arr);
             CHECK_EQUAL(&arr, dg.get());
         }
         CHECK(alloc.empty());
@@ -180,7 +180,7 @@ TEST(DestroyGuard_ArrayDeep)
         {
             Array arr(alloc);
             arr.create(Array::type_Normal);
-            ArrayDestroyDeepGuard dg(&arr);
+            DeepArrayDestroyGuard dg(&arr);
             CHECK_EQUAL(&arr, dg.release());
         }
         CHECK(!alloc.empty());
@@ -191,7 +191,7 @@ TEST(DestroyGuard_ArrayDeep)
         FooAlloc alloc;
         {
             Array arr_1(alloc), arr_2(alloc);
-            ArrayDestroyDeepGuard dg;
+            DeepArrayDestroyGuard dg;
             arr_1.create(Array::type_Normal);
             dg.reset(&arr_1);
             arr_2.create(Array::type_Normal);
@@ -204,7 +204,7 @@ TEST(DestroyGuard_ArrayDeep)
         FooAlloc alloc;
         Array root(alloc);
         {
-            ArrayDestroyDeepGuard dg(&root);
+            DeepArrayDestroyGuard dg(&root);
             root.create(Array::type_HasRefs);
             {
                 ref_type child_ref = Array::create_empty_array(Array::type_Normal, alloc);
@@ -225,7 +225,7 @@ TEST(DestroyGuard_ArrayRefDeep)
         FooAlloc alloc;
         {
             ref_type ref = Array::create_empty_array(Array::type_Normal, alloc);
-            ArrayRefDestroyDeepGuard dg(ref, alloc);
+            DeepArrayRefDestroyGuard dg(ref, alloc);
             CHECK_EQUAL(ref, dg.get());
         }
         CHECK(alloc.empty());
@@ -235,7 +235,7 @@ TEST(DestroyGuard_ArrayRefDeep)
         FooAlloc alloc;
         {
             ref_type ref = Array::create_empty_array(Array::type_Normal, alloc);
-            ArrayRefDestroyDeepGuard dg(ref, alloc);
+            DeepArrayRefDestroyGuard dg(ref, alloc);
             CHECK_EQUAL(ref, dg.release());
         }
         CHECK(!alloc.empty());
@@ -245,7 +245,7 @@ TEST(DestroyGuard_ArrayRefDeep)
     {
         FooAlloc alloc;
         {
-            ArrayRefDestroyDeepGuard dg(alloc);
+            DeepArrayRefDestroyGuard dg(alloc);
             ref_type ref_1 = Array::create_empty_array(Array::type_Normal, alloc);
             dg.reset(ref_1);
             ref_type ref_2 = Array::create_empty_array(Array::type_Normal, alloc);
@@ -266,7 +266,7 @@ TEST(DestroyGuard_ArrayRefDeep)
                 root.add(v);
                 root_ref = root.get_ref();
             }
-            ArrayRefDestroyDeepGuard dg(root_ref, alloc);
+            DeepArrayRefDestroyGuard dg(root_ref, alloc);
         }
         CHECK(alloc.empty());
     }

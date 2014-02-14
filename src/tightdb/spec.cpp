@@ -128,7 +128,7 @@ void Spec::insert_column(size_t column_ndx, DataType type, StringData name, Colu
         // `m_subspecs` array is only present when the spec contains a subtable column
         if (!m_subspecs.is_attached()) {
             ref_type subspecs_ref = Array::create_empty_array(Array::type_HasRefs, alloc); // Throws
-            _impl::ArrayRefDestroyDeepGuard dg(subspecs_ref, alloc);
+            _impl::DeepArrayRefDestroyGuard dg(subspecs_ref, alloc);
             if (m_top.size() == 3) {
                 m_top.add(subspecs_ref); // Throws
             }
@@ -143,7 +143,7 @@ void Spec::insert_column(size_t column_ndx, DataType type, StringData name, Colu
         // Add a new empty spec to `m_subspecs`
         {
             ref_type subspec_ref = create_empty_spec(alloc); // Throws
-            _impl::ArrayRefDestroyDeepGuard dg(subspec_ref, alloc);
+            _impl::DeepArrayRefDestroyGuard dg(subspec_ref, alloc);
             size_t subspec_ndx = column_ndx == get_column_count() ?
                 get_num_subspecs() : get_subspec_ndx(column_ndx);
             m_subspecs.insert(subspec_ndx, subspec_ref); // Throws

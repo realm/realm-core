@@ -279,7 +279,7 @@ ref_type Group::create_new_table(StringData name)
     // matters.
 
     using namespace _impl;
-    ArrayRefDestroyDeepGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
+    DeepArrayRefDestroyGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
     size_t ndx = m_tables.size();
     TIGHTDB_ASSERT(ndx == m_table_names.size());
     m_tables.insert(ndx, ref_dg.get()); // Throws
@@ -326,7 +326,7 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
 #endif
 
     using namespace _impl;
-    ArrayRefDestroyDeepGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
+    DeepArrayRefDestroyGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
     typedef TableFriend::UnbindGuard TableUnbindGuard;
     TableUnbindGuard table_ug(TableFriend::create_ref_counted(m_alloc, ref_dg.get(),
                                                               null_ptr, 0)); // Throws

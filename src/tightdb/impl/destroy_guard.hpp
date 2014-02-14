@@ -31,7 +31,7 @@ namespace _impl {
 /// Calls `ptr->destroy()` if the guarded pointer (`ptr`) is not null
 /// when the guard is destroyed. For arrays (`T` = `Array`) this means
 /// that the array is destroyed in a shallow fashion. See
-/// `ArrayDestroyDeepGuard` for an alternative.
+/// `DeepArrayDestroyGuard` for an alternative.
 template<class T> class DestroyGuard {
 public:
     DestroyGuard() TIGHTDB_NOEXCEPT;
@@ -50,16 +50,18 @@ private:
     T* m_ptr;
 };
 
+typedef DestroyGuard<Array> ShallowArrayDestroyGuard;
+
 
 /// Calls `ptr->destroy_deep()` if the guarded Array pointer (`ptr`)
 /// is not null when the guard is destroyed.
-class ArrayDestroyDeepGuard {
+class DeepArrayDestroyGuard {
 public:
-    ArrayDestroyDeepGuard() TIGHTDB_NOEXCEPT;
+    DeepArrayDestroyGuard() TIGHTDB_NOEXCEPT;
 
-    ArrayDestroyDeepGuard(Array*) TIGHTDB_NOEXCEPT;
+    DeepArrayDestroyGuard(Array*) TIGHTDB_NOEXCEPT;
 
-    ~ArrayDestroyDeepGuard() TIGHTDB_NOEXCEPT;
+    ~DeepArrayDestroyGuard() TIGHTDB_NOEXCEPT;
 
     void reset(Array*) TIGHTDB_NOEXCEPT;
 
@@ -74,13 +76,13 @@ private:
 
 /// Calls `Array::destroy_deep(ref, alloc)` if the guarded 'ref'
 /// (`ref`) is not zero when the guard is destroyed.
-class ArrayRefDestroyDeepGuard {
+class DeepArrayRefDestroyGuard {
 public:
-    ArrayRefDestroyDeepGuard(Allocator&) TIGHTDB_NOEXCEPT;
+    DeepArrayRefDestroyGuard(Allocator&) TIGHTDB_NOEXCEPT;
 
-    ArrayRefDestroyDeepGuard(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
+    DeepArrayRefDestroyGuard(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
 
-    ~ArrayRefDestroyDeepGuard() TIGHTDB_NOEXCEPT;
+    ~DeepArrayRefDestroyGuard() TIGHTDB_NOEXCEPT;
 
     void reset(ref_type) TIGHTDB_NOEXCEPT;
 
@@ -137,37 +139,37 @@ template<class T> inline T* DestroyGuard<T>::release() TIGHTDB_NOEXCEPT
 }
 
 
-// ArrayDestroyDeepGuard
+// DeepArrayDestroyGuard
 
-inline ArrayDestroyDeepGuard::ArrayDestroyDeepGuard() TIGHTDB_NOEXCEPT:
+inline DeepArrayDestroyGuard::DeepArrayDestroyGuard() TIGHTDB_NOEXCEPT:
     m_ptr(0)
 {
 }
 
-inline ArrayDestroyDeepGuard::ArrayDestroyDeepGuard(Array* ptr) TIGHTDB_NOEXCEPT:
+inline DeepArrayDestroyGuard::DeepArrayDestroyGuard(Array* ptr) TIGHTDB_NOEXCEPT:
     m_ptr(ptr)
 {
 }
 
-inline ArrayDestroyDeepGuard::~ArrayDestroyDeepGuard() TIGHTDB_NOEXCEPT
+inline DeepArrayDestroyGuard::~DeepArrayDestroyGuard() TIGHTDB_NOEXCEPT
 {
     if (m_ptr)
         m_ptr->destroy_deep();
 }
 
-inline void ArrayDestroyDeepGuard::reset(Array* ptr) TIGHTDB_NOEXCEPT
+inline void DeepArrayDestroyGuard::reset(Array* ptr) TIGHTDB_NOEXCEPT
 {
     if (m_ptr)
         m_ptr->destroy_deep();
     m_ptr = ptr;
 }
 
-inline Array* ArrayDestroyDeepGuard::get() const TIGHTDB_NOEXCEPT
+inline Array* DeepArrayDestroyGuard::get() const TIGHTDB_NOEXCEPT
 {
     return m_ptr;
 }
 
-inline Array* ArrayDestroyDeepGuard::release() TIGHTDB_NOEXCEPT
+inline Array* DeepArrayDestroyGuard::release() TIGHTDB_NOEXCEPT
 {
     Array* ptr = m_ptr;
     m_ptr = 0;
@@ -175,40 +177,40 @@ inline Array* ArrayDestroyDeepGuard::release() TIGHTDB_NOEXCEPT
 }
 
 
-// ArrayRefDestroyDeepGuard
+// DeepArrayRefDestroyGuard
 
-inline ArrayRefDestroyDeepGuard::ArrayRefDestroyDeepGuard(Allocator& alloc) TIGHTDB_NOEXCEPT:
+inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(Allocator& alloc) TIGHTDB_NOEXCEPT:
     m_ref(0),
     m_alloc(alloc)
 {
 }
 
-inline ArrayRefDestroyDeepGuard::ArrayRefDestroyDeepGuard(ref_type ref,
+inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(ref_type ref,
                                                           Allocator& alloc) TIGHTDB_NOEXCEPT:
     m_ref(ref),
     m_alloc(alloc)
 {
 }
 
-inline ArrayRefDestroyDeepGuard::~ArrayRefDestroyDeepGuard() TIGHTDB_NOEXCEPT
+inline DeepArrayRefDestroyGuard::~DeepArrayRefDestroyGuard() TIGHTDB_NOEXCEPT
 {
     if (m_ref)
         Array::destroy_deep(m_ref, m_alloc);
 }
 
-inline void ArrayRefDestroyDeepGuard::reset(ref_type ref) TIGHTDB_NOEXCEPT
+inline void DeepArrayRefDestroyGuard::reset(ref_type ref) TIGHTDB_NOEXCEPT
 {
     if (m_ref)
         Array::destroy_deep(m_ref, m_alloc);
     m_ref = ref;
 }
 
-inline ref_type ArrayRefDestroyDeepGuard::get() const TIGHTDB_NOEXCEPT
+inline ref_type DeepArrayRefDestroyGuard::get() const TIGHTDB_NOEXCEPT
 {
     return m_ref;
 }
 
-inline ref_type ArrayRefDestroyDeepGuard::release() TIGHTDB_NOEXCEPT
+inline ref_type DeepArrayRefDestroyGuard::release() TIGHTDB_NOEXCEPT
 {
     ref_type ref = m_ref;
     m_ref = 0;
