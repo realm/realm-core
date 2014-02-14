@@ -133,7 +133,7 @@ void ColumnTable::destroy_subtable(size_t ndx)
     // Delete sub-tree
     Allocator& alloc = get_alloc();
     Array columns(columns_ref, 0, 0, alloc);
-    columns.destroy();
+    columns.destroy_deep();
 }
 
 bool ColumnTable::compare_table(const ColumnTable& c) const

@@ -29,7 +29,7 @@ class ArrayBigBlobs: public Array {
 public:
     typedef BinaryData value_type;
 
-    explicit ArrayBigBlobs(ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
+    explicit ArrayBigBlobs(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                          Allocator& = Allocator::get_default());
     ArrayBigBlobs(MemRef, ArrayParent*, std::size_t ndx_in_parent,
                 Allocator&) TIGHTDB_NOEXCEPT;
@@ -41,6 +41,9 @@ public:
     void add(BinaryData value, bool add_zero_term = false);
     void insert(std::size_t ndx, BinaryData value, bool add_zero_term = false);
     void erase(std::size_t ndx);
+    void truncate(std::size_t size);
+    void clear();
+    void destroy();
 
     std::size_t count(BinaryData value, bool is_string = false, std::size_t begin = 0,
                       std::size_t end = npos) const TIGHTDB_NOEXCEPT;
@@ -72,6 +75,7 @@ public:
     //@}
 
 #ifdef TIGHTDB_DEBUG
+    void Verify() const;
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
 #endif
 };
@@ -123,8 +127,23 @@ inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
 inline void ArrayBigBlobs::erase(std::size_t ndx)
 {
     ref_type blob_ref = Array::get_as_ref(ndx);
-    Array::destroy(blob_ref, get_alloc());
+    Array::destroy(blob_ref, get_alloc()); // Shallow
     Array::erase(ndx);
+}
+
+inline void ArrayBigBlobs::truncate(std::size_t size)
+{
+    Array::truncate_and_destroy_children(size);
+}
+
+inline void ArrayBigBlobs::clear()
+{
+    Array::clear_and_destroy_children();
+}
+
+inline void ArrayBigBlobs::destroy()
+{
+    Array::destroy_deep();
 }
 
 inline StringData ArrayBigBlobs::get_string(std::size_t ndx) const TIGHTDB_NOEXCEPT

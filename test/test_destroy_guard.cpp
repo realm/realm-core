@@ -40,7 +40,7 @@ public:
     {
     }
 
-    MemRef alloc(size_t size) TIGHTDB_OVERRIDE
+    MemRef do_alloc(size_t size) TIGHTDB_OVERRIDE
     {
         ref_type ref = m_offset;
         char*& addr = m_map[ref]; // Throws
@@ -50,15 +50,7 @@ public:
         return MemRef(addr, ref);
     }
 
-    MemRef realloc_(ref_type ref, const char* addr, size_t old_size,
-                    size_t new_size) TIGHTDB_OVERRIDE
-    {
-        static_cast<void>(old_size);
-        free_(ref, addr);
-        return alloc(new_size);
-    }
-
-    void free_(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    void do_free(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         typedef map<ref_type, char*>::iterator iter;
         iter i = m_map.find(ref);
@@ -70,7 +62,7 @@ public:
         delete[] addr;
     }
 
-    char* translate(ref_type ref) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
+    char* do_translate(ref_type ref) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
     {
         typedef map<ref_type, char*>::const_iterator iter;
         iter i = m_map.find(ref);
@@ -96,11 +88,9 @@ public:
     }
 
 #ifdef TIGHTDB_DEBUG
-
     void Verify() const TIGHTDB_OVERRIDE
     {
     }
-
 #endif
 
 private:
@@ -111,7 +101,7 @@ private:
 } // anonymous namespace
 
 
-TEST(DestroyGuard)
+TEST(DestroyGuard_General)
 {
     // Destroy
     {
@@ -150,14 +140,92 @@ TEST(DestroyGuard)
 }
 
 
-TEST(RefDestroyGuard)
+TEST(DestroyGuard_ArrayShallow)
+{
+    // Test that when DestroyGuard<> is used with Array, it works in a
+    // shallow fashion.
+    FooAlloc alloc;
+    Array root(alloc);
+    {
+        DestroyGuard<Array> dg(&root);
+        root.create(Array::type_HasRefs);
+        {
+            ref_type child_ref = Array::create_empty_array(Array::type_Normal, alloc);
+            int_fast64_t v(child_ref);
+            root.add(v);
+        }
+    }
+    CHECK(!root.is_attached());
+    CHECK(!alloc.empty());
+    alloc.clear();
+}
+
+
+TEST(DestroyGuard_ArrayDeep)
+{
+    // Destroy
+    {
+        FooAlloc alloc;
+        {
+            Array arr(alloc);
+            arr.create(Array::type_Normal);
+            ArrayDestroyDeepGuard dg(&arr);
+            CHECK_EQUAL(&arr, dg.get());
+        }
+        CHECK(alloc.empty());
+    }
+    // Release
+    {
+        FooAlloc alloc;
+        {
+            Array arr(alloc);
+            arr.create(Array::type_Normal);
+            ArrayDestroyDeepGuard dg(&arr);
+            CHECK_EQUAL(&arr, dg.release());
+        }
+        CHECK(!alloc.empty());
+        alloc.clear();
+    }
+    // Reset
+    {
+        FooAlloc alloc;
+        {
+            Array arr_1(alloc), arr_2(alloc);
+            ArrayDestroyDeepGuard dg;
+            arr_1.create(Array::type_Normal);
+            dg.reset(&arr_1);
+            arr_2.create(Array::type_Normal);
+            dg.reset(&arr_2);
+        }
+        CHECK(alloc.empty());
+    }
+    // Deep
+    {
+        FooAlloc alloc;
+        Array root(alloc);
+        {
+            ArrayDestroyDeepGuard dg(&root);
+            root.create(Array::type_HasRefs);
+            {
+                ref_type child_ref = Array::create_empty_array(Array::type_Normal, alloc);
+                int_fast64_t v(child_ref);
+                root.add(v);
+            }
+        }
+        CHECK(!root.is_attached());
+        CHECK(alloc.empty());
+    }
+}
+
+
+TEST(DestroyGuard_ArrayRefDeep)
 {
     // Destroy
     {
         FooAlloc alloc;
         {
             ref_type ref = Array::create_empty_array(Array::type_Normal, alloc);
-            RefDestroyGuard dg(ref, alloc);
+            ArrayRefDestroyDeepGuard dg(ref, alloc);
             CHECK_EQUAL(ref, dg.get());
         }
         CHECK(alloc.empty());
@@ -167,7 +235,7 @@ TEST(RefDestroyGuard)
         FooAlloc alloc;
         {
             ref_type ref = Array::create_empty_array(Array::type_Normal, alloc);
-            RefDestroyGuard dg(ref, alloc);
+            ArrayRefDestroyDeepGuard dg(ref, alloc);
             CHECK_EQUAL(ref, dg.release());
         }
         CHECK(!alloc.empty());
@@ -177,11 +245,28 @@ TEST(RefDestroyGuard)
     {
         FooAlloc alloc;
         {
-            RefDestroyGuard dg(alloc);
+            ArrayRefDestroyDeepGuard dg(alloc);
             ref_type ref_1 = Array::create_empty_array(Array::type_Normal, alloc);
             dg.reset(ref_1);
             ref_type ref_2 = Array::create_empty_array(Array::type_Normal, alloc);
             dg.reset(ref_2);
+        }
+        CHECK(alloc.empty());
+    }
+    // Deep
+    {
+        FooAlloc alloc;
+        {
+            ref_type root_ref;
+            {
+                Array root(alloc);
+                root.create(Array::type_HasRefs);
+                ref_type child_ref = Array::create_empty_array(Array::type_Normal, alloc);
+                int_fast64_t v(child_ref);
+                root.add(v);
+                root_ref = root.get_ref();
+            }
+            ArrayRefDestroyDeepGuard dg(root_ref, alloc);
         }
         CHECK(alloc.empty());
     }

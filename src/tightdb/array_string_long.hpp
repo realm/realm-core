@@ -47,6 +47,7 @@ public:
     void erase(std::size_t ndx);
     void truncate(std::size_t size);
     void clear();
+    void destroy();
 
     std::size_t count(StringData value, std::size_t begin = 0,
                       std::size_t end = npos) const TIGHTDB_NOEXCEPT;
@@ -106,6 +107,29 @@ inline StringData ArrayStringLong::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     }
     --end; // Discount the terminating zero
     return StringData(m_blob.get(begin), end-begin);
+}
+
+inline void ArrayStringLong::truncate(std::size_t size)
+{
+    TIGHTDB_ASSERT(size < m_offsets.size());
+
+    std::size_t blob_size = size ? to_size_t(m_offsets.get(size-1)) : 0;
+
+    m_offsets.truncate(size);
+    m_blob.truncate(blob_size);
+}
+
+inline void ArrayStringLong::clear()
+{
+    m_blob.clear();
+    m_offsets.clear();
+}
+
+inline void ArrayStringLong::destroy()
+{
+    m_blob.destroy();
+    m_offsets.destroy();
+    Array::destroy();
 }
 
 inline std::size_t ArrayStringLong::get_size_from_header(const char* header,

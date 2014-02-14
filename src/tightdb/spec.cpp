@@ -75,7 +75,8 @@ ref_type Spec::create_empty_spec(Allocator& alloc)
         size_t size = 0;
         int_fast64_t value = 0;
         // One type for each column
-        ref_type types_ref = Array::create_array(Array::type_Normal, size, value, alloc); // Throws
+        ref_type types_ref =
+            Array::create_array(Array::type_Normal, size, value, alloc); // Throws
         try {
             int_fast64_t v = types_ref; // FIXME: Dangerous case: unsigned -> signed
             spec_set.add(v); // Throws
@@ -95,7 +96,8 @@ ref_type Spec::create_empty_spec(Allocator& alloc)
             throw;
         }
         // One attrib set for each column
-        ref_type attribs_ref = ArrayString::create_array(size, alloc); // Throws
+        ref_type attribs_ref =
+            Array::create_array(Array::type_Normal, size, value, alloc); // Throws
         try {
             int_fast64_t v = attribs_ref; // FIXME: Dangerous case: unsigned -> signed
             spec_set.add(v); // Throws
@@ -106,7 +108,7 @@ ref_type Spec::create_empty_spec(Allocator& alloc)
         }
     }
     catch (...) {
-        spec_set.destroy();
+        spec_set.destroy_deep();
         throw;
     }
     return spec_set.get_ref();
@@ -126,7 +128,7 @@ void Spec::insert_column(size_t column_ndx, DataType type, StringData name, Colu
         // `m_subspecs` array is only present when the spec contains a subtable column
         if (!m_subspecs.is_attached()) {
             ref_type subspecs_ref = Array::create_empty_array(Array::type_HasRefs, alloc); // Throws
-            _impl::RefDestroyGuard dg(subspecs_ref, alloc);
+            _impl::ArrayRefDestroyDeepGuard dg(subspecs_ref, alloc);
             if (m_top.size() == 3) {
                 m_top.add(subspecs_ref); // Throws
             }
@@ -141,7 +143,7 @@ void Spec::insert_column(size_t column_ndx, DataType type, StringData name, Colu
         // Add a new empty spec to `m_subspecs`
         {
             ref_type subspec_ref = create_empty_spec(alloc); // Throws
-            _impl::RefDestroyGuard dg(subspec_ref, alloc);
+            _impl::ArrayRefDestroyDeepGuard dg(subspec_ref, alloc);
             size_t subspec_ndx = column_ndx == get_column_count() ?
                 get_num_subspecs() : get_subspec_ndx(column_ndx);
             m_subspecs.insert(subspec_ndx, subspec_ref); // Throws
@@ -162,7 +164,7 @@ void Spec::remove_column(size_t column_ndx)
         ref_type subspec_ref = m_subspecs.get_as_ref(subspec_ndx);
 
         Array subspec_top(subspec_ref, 0, 0, m_top.get_alloc());
-        subspec_top.destroy(); // recursively delete entire subspec
+        subspec_top.destroy_deep(); // recursively delete entire subspec
         m_subspecs.erase(subspec_ndx); // Throws
     }
     else if (type == col_type_StringEnum) {
@@ -171,7 +173,7 @@ void Spec::remove_column(size_t column_ndx)
         ref_type keys_ref = m_enumkeys.get_as_ref(keys_ndx);
 
         Array keys_top(keys_ref, 0, 0, m_top.get_alloc());
-        keys_top.destroy();
+        keys_top.destroy_deep();
         m_enumkeys.erase(keys_ndx); // Throws
     }
 

@@ -41,8 +41,6 @@ public:
     void replace(std::size_t begin, std::size_t end, const char* data, std::size_t size,
                  bool add_zero_term = false);
     void erase(std::size_t begin, std::size_t end);
-    void truncate(std::size_t size);
-    void clear();
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
@@ -63,6 +61,7 @@ public:
     static ref_type create_array(std::size_t size, Allocator&);
 
 #ifdef TIGHTDB_DEBUG
+    void Verify() const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
 
@@ -118,25 +117,6 @@ inline void ArrayBlob::erase(std::size_t begin, std::size_t end)
 {
     const char* data = 0;
     std::size_t size = 0;
-    replace(begin, end, data, size);
-}
-
-inline void ArrayBlob::truncate(std::size_t size)
-{
-    TIGHTDB_ASSERT(size <= m_size);
-    std::size_t begin  = size;
-    std::size_t end    = m_size;
-    const char* data   = 0;
-    std::size_t size_2 = 0;
-    replace(begin, end, data, size_2);
-}
-
-inline void ArrayBlob::clear()
-{
-    std::size_t begin = 0;
-    std::size_t end   = m_size;
-    const char* data  = 0;
-    std::size_t size  = 0;
     replace(begin, end, data, size);
 }
 

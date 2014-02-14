@@ -550,7 +550,7 @@ protected:
 
 private:
     // view management support:
-    void from_view_remove(std::size_t row_ndx, TableViewBase* view);
+    void from_view_remove(std::size_t row_ndx, TableViewBase* view); // FIXME: Please rename to remove_by_view()
 
     void do_remove(std::size_t row_ndx);
 

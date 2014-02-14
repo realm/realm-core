@@ -84,7 +84,7 @@ void ColumnBinary::clear()
     ArrayBinary* array = new ArrayBinary(parent, ndx_in_parent, alloc); // Throws
 
     // Remove original node
-    m_array->destroy();
+    m_array->destroy_deep();
     delete m_array;
 
     m_array = array;
@@ -187,7 +187,7 @@ public:
         ArrayParent* parent = 0;
         size_t ndx_in_parent = 0;
         Array leaf(leaf_mem, parent, ndx_in_parent, get_alloc());
-        leaf.destroy();
+        leaf.destroy_deep(); // This works for any kind of leaf
     }
     void replace_root_by_leaf(MemRef leaf_mem) TIGHTDB_OVERRIDE
     {

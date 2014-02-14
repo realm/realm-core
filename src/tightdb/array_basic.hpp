@@ -42,7 +42,6 @@ public:
     void set(std::size_t ndx, T value);
     void insert(std::size_t ndx, T value);
     void erase(std::size_t ndx);
-    void clear();
 
     std::size_t find_first(T value, std::size_t begin = 0 , std::size_t end = npos) const;
     void find_all(Array& result, T value, std::size_t add_offset = 0,

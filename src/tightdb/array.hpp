@@ -424,30 +424,78 @@ public:
     int64_t front() const TIGHTDB_NOEXCEPT;
     int64_t back() const TIGHTDB_NOEXCEPT;
 
-    /// Erase the element at the specified index, and move elements at
-    /// succeeding indexes to the next lower index.
+    /// Remove the element at the specified index, and move elements
+    /// at higher indexes to the next lower index.
     ///
-    /// This function is guaranteed to *never* throw if
-    /// `get_alloc().is_read_only(get_ref())` returns false. This is
-    /// automatically guaranteed if the array is used in a
-    /// non-transactional context, or if the array has already been
-    /// successfully modified within the current write transaction.
+    /// This function does **not** destroy removed subarrays. That is,
+    /// if the erased element is a 'ref' pointing to a subarray, then
+    /// that subarray will not be destroyed automatically.
     ///
-    /// FIXME: Carefull with this one. It does not destroy/deallocate
-    /// subarrays as clear() does. This difference is surprising and
-    /// highly counterintuitive.
+    /// This function guarantees that no exceptions will be thrown if
+    /// get_alloc().is_read_only(get_ref()) would return false before
+    /// the call. This is automatically guaranteed if the array is
+    /// used in a non-transactional context, or if the array has
+    /// already been successfully modified within the current write
+    /// transaction.
     void erase(std::size_t ndx);
 
-    /// Same as erase(std::size_t), but erase all elements in the
+    /// Same as erase(std::size_t), but remove all elements in the
     /// specified range.
+    ///
+    /// Please note that this function does **not** destroy removed
+    /// subarrays.
+    ///
+    /// This function guarantees that no exceptions will be thrown if
+    /// get_alloc().is_read_only(get_ref()) would return false before
+    /// the call.
     void erase(std::size_t begin, std::size_t end);
 
-    /// Erase every element in this array. Subarrays will be destroyed
-    /// recursively, and space allocated for subarrays will be freed.
+    /// Reduce the size of this array to the specified number of
+    /// elements. It is an error to specify a size that is greater
+    /// than the current size of this array. The effect of doing so is
+    /// undefined. This is just a shorthand / for calling the ranged
+    /// erase() function with appropriate / arguments.
+    ///
+    /// Please note that this function does **not** destroy removed
+    /// subarrays. See clear_and_destroy_children() for an
+    /// alternative.
+    ///
+    /// This function guarantees that no exceptions will be thrown if
+    /// get_alloc().is_read_only(get_ref()) would return false before
+    /// the call.
+    void truncate(std::size_t size);
+
+    /// Reduce the size of this array to the specified number of
+    /// elements. It is an error to specify a size that is greater
+    /// than the current size of this array. The effect of doing so is
+    /// undefined. Subarrays will be destroyed recursively, as if by a
+    /// call to `destroy_deep(ubarray_ref, alloc)`.
     ///
     /// This function is guaranteed not to throw if
     /// get_alloc().is_read_only(get_ref()) returns false.
+    void truncate_and_destroy_children(std::size_t size);
+
+    /// Remove every element from this array. This is just a shorthand
+    /// for calling truncate(0).
+    ///
+    /// Please note that this function does **not** destroy removed
+    /// subarrays. See clear_and_destroy_children() for an
+    /// alternative.
+    ///
+    /// This function guarantees that no exceptions will be thrown if
+    /// get_alloc().is_read_only(get_ref()) would return false before
+    /// the call.
     void clear();
+
+    /// Remove every element in this array. Subarrays will be
+    /// destroyed recursively, as if by a call to
+    /// `destroy_deep(ubarray_ref, alloc)`. This is just a shorthand
+    /// for calling truncate_and_destroy_children(0).
+    ///
+    /// This function guarantees that no exceptions will be thrown if
+    /// get_alloc().is_read_only(get_ref()) would return false before
+    /// the call.
+    void clear_and_destroy_children();
 
     /// If neccessary, expand the representation so that it can store
     /// the specified value.
@@ -536,19 +584,6 @@ public:
     void sort();
     void ReferenceSort(Array& ref);
 
-    // Reduce the size of this array to the specified number of
-    // elements. It is an error to specify a size that is greater than
-    // the current size of this array. The effect of doing so is
-    // undefined.
-    ///
-    /// This function is guaranteed to not throw if
-    /// get_alloc().is_read_only(get_ref()) returns false.
-    ///
-    /// FIXME: Carefull with this one. It does not destroy/deallocate
-    /// subarrays as clear() does. This difference is surprising and
-    /// highly counterintuitive.
-    void truncate(std::size_t size);
-
     bool is_inner_bptree_node() const TIGHTDB_NOEXCEPT { return m_is_inner_bptree_node; }
 
     /// Returns true if type is either type_HasRefs or type_InnerColumnNode
@@ -563,13 +598,30 @@ public:
     ref_type get_ref() const TIGHTDB_NOEXCEPT { return m_ref; }
     MemRef get_mem() const TIGHTDB_NOEXCEPT { return MemRef(get_header_from_data(m_data), m_ref); }
 
-    /// Recursively destroy children (as if calling clear()), then
-    /// transition to the detached state (as if calling detach()),
-    /// then free the allocated memory. For an unattached accessor,
-    /// this function has no effect (idempotency).
+    /// Destroy only the array that this accessor is attached to, not
+    /// the children of that array. See non-static destroy_deep() for
+    /// an alternative. If this accessor is already in the detached
+    /// state, this function has no effect (idempotency).
     void destroy() TIGHTDB_NOEXCEPT;
 
+    /// Recursively destroy children (as if calling
+    /// clear_and_destroy_children()), then put this accessor into the
+    /// detached state (as if calling detach()), then free the
+    /// allocated memory. If this accessor is already in the detached
+    /// state, this function has no effect (idempotency).
+    void destroy_deep() TIGHTDB_NOEXCEPT;
+
+    /// Destroy only the array pointed to be the specified 'ref', not
+    /// its children. See static destroy_deep() for an alternative.
     static void destroy(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
+
+    /// Destroy the array pointed to be the specified 'ref' and all of
+    /// its children recursively.
+    ///
+    /// This is done by freeing the array node pointed to by the
+    /// specified 'ref' after calling destroy_deep() on every
+    /// contained 'ref' element.
+    static void destroy_deep(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_alloc; }
 
@@ -989,7 +1041,7 @@ protected:
     // Overriding method in ArrayParent
     ref_type get_child_ref(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void destroy_children() TIGHTDB_NOEXCEPT;
+    void destroy_children(std::size_t offset = 0) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
     std::pair<ref_type, std::size_t>
@@ -1333,7 +1385,17 @@ inline bool Array::is_index_node(ref_type ref, const Allocator& alloc)
     return get_indexflag_from_header(alloc.translate(ref));
 }
 
+
 inline void Array::destroy() TIGHTDB_NOEXCEPT
+{
+    if (!is_attached())
+        return;
+    char* header = get_header_from_data(m_data);
+    m_alloc.free_(m_ref, header);
+    m_data = 0;
+}
+
+inline void Array::destroy_deep() TIGHTDB_NOEXCEPT
 {
     if (!is_attached())
         return;
@@ -1377,31 +1439,32 @@ inline void Array::erase(std::size_t begin, std::size_t end)
     set_header_size(m_size);
 }
 
-
 inline void Array::clear()
 {
-    TIGHTDB_ASSERT(is_attached());
+    truncate(0);
+}
 
-    copy_on_write(); // Throws
-
-    if (m_has_refs)
-        destroy_children();
-
-    // Truncate size to zero (but keep capacity)
-    m_size = 0;
-    m_capacity = CalcItemCount(get_capacity_from_header(), 0);
-    set_width(0);
-
-    // Update header
-    set_header_size(0);
-    set_header_width(0);
+inline void Array::clear_and_destroy_children()
+{
+    truncate_and_destroy_children(0);
 }
 
 inline void Array::destroy(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
+    MemRef mem(ref, alloc);
+    alloc.free_(mem);
+}
+
+inline void Array::destroy_deep(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
+{
+    MemRef mem(ref, alloc);
+    if (!get_hasrefs_from_header(mem.m_addr)) {
+        alloc.free_(mem);
+        return;
+    }
     Array array(alloc);
-    array.init_from_ref(ref);
-    array.destroy();
+    array.init_from_mem(mem);
+    array.destroy_deep();
 }
 
 
@@ -1783,8 +1846,7 @@ template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) c
         std::size_t refs_pos = new_refs.write(out, false, persist);
 
         // Clean-up
-        new_refs.set_type(type_Normal); // avoid recursive del
-        new_refs.destroy();
+        new_refs.destroy(); // Shallow
 
         return refs_pos; // Return position
     }
@@ -1817,7 +1879,7 @@ inline void Array::move_assign(Array& a) TIGHTDB_NOEXCEPT
     // the referenced data. This is important because TableView efficiency, for
     // example, relies on long chains of moves to be optimized away
     // completely. This change should be a 'no-brainer'.
-    destroy();
+    destroy_deep();
     init_from_ref(a.get_ref());
     a.detach();
 }

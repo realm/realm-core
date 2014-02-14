@@ -212,7 +212,7 @@ struct Table::InsertSubtableColumns: Table::SubtableUpdater {
         size_t subtable_size = subtables.get_subtable_size(row_ndx);
         Allocator& alloc = subcolumns.get_alloc();
         ref_type column_ref = create_column(m_type, subtable_size, alloc); // Throws
-        _impl::RefDestroyGuard dg(column_ref, alloc);
+        _impl::ArrayRefDestroyDeepGuard dg(column_ref, alloc);
         subcolumns.insert(m_column_ndx, column_ref); // Throws
         dg.release();
     }
@@ -230,7 +230,7 @@ struct Table::RemoveSubtableColumns: Table::SubtableUpdater {
     {
         ref_type column_ref = subcolumns.get(m_column_ndx);
         subcolumns.erase(m_column_ndx); // Throws
-        Array::destroy(column_ref, subcolumns.get_alloc());
+        Array::destroy_deep(column_ref, subcolumns.get_alloc());
     }
 private:
     const size_t m_column_ndx;
@@ -383,7 +383,7 @@ void Table::insert_root_column(size_t column_ndx, DataType type, StringData name
     }
     catch (...) {
         if (ref != 0)
-            Array::destroy(ref, alloc);
+            Array::destroy_deep(ref, alloc);
         throw;
     }
 }
@@ -399,13 +399,13 @@ void Table::remove_root_column(size_t column_ndx)
 
     // Remove and destroy the ref from m_columns
     ref_type column_ref = m_columns.get_as_ref(info.m_column_ref_ndx);
-    Array::destroy(column_ref, m_columns.get_alloc());
+    Array::destroy_deep(column_ref, m_columns.get_alloc());
     m_columns.erase(info.m_column_ref_ndx);
 
     // If the column had an index we have to remove that as well
     if (info.m_has_index) {
         ref_type index_ref = m_columns.get_as_ref(info.m_column_ref_ndx);
-        Array::destroy(index_ref, m_columns.get_alloc());
+        Array::destroy_deep(index_ref, m_columns.get_alloc());
         m_columns.erase(info.m_column_ref_ndx);
     }
 
@@ -849,7 +849,7 @@ Table::~Table() TIGHTDB_NOEXCEPT
     else {
         destroy_column_accessors();
     }
-    m_top.destroy();
+    m_top.destroy_deep();
 }
 
 bool Table::has_index(size_t column_ndx) const TIGHTDB_NOEXCEPT
@@ -963,7 +963,7 @@ ref_type Table::create_empty_table(Allocator& alloc)
             top.add(v); // Throws
         }
         catch (...) {
-            Array::destroy(spec_ref, alloc);
+            Array::destroy_deep(spec_ref, alloc);
             throw;
         }
         size_t size = 0;
@@ -975,12 +975,12 @@ ref_type Table::create_empty_table(Allocator& alloc)
             top.add(v); // Throws
         }
         catch (...) {
-            Array::destroy(columns_ref, alloc);
+            Array::destroy_deep(columns_ref, alloc);
             throw;
         }
     }
     catch (...) {
-        top.destroy();
+        top.destroy_deep();
         throw;
     }
     return top.get_ref();

@@ -283,7 +283,7 @@ bool Array::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 // Allocates space for 'count' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
 void Array::Preset(size_t bitwidth, size_t count)
 {
-    clear();
+    clear_and_destroy_children();
     set_width(bitwidth);
     alloc(count, bitwidth); // Throws
     m_size = count;
@@ -298,9 +298,9 @@ void Array::Preset(int64_t min, int64_t max, size_t count)
 }
 
 
-void Array::destroy_children() TIGHTDB_NOEXCEPT
+void Array::destroy_children(size_t offset) TIGHTDB_NOEXCEPT
 {
-    for (size_t i = 0; i < m_size; ++i) {
+    for (size_t i = offset; i != m_size; ++i) {
         int64_t v = get(i);
 
         // Null-refs indicate empty sub-trees
@@ -313,8 +313,8 @@ void Array::destroy_children() TIGHTDB_NOEXCEPT
         if (v % 2 != 0)
             continue;
 
-        Array sub(to_ref(v), this, i, m_alloc);
-        sub.destroy();
+        ref_type ref = to_ref(v);
+        destroy_deep(ref, m_alloc);
     }
 }
 
@@ -484,14 +484,52 @@ void Array::insert(size_t ndx, int_fast64_t value)
 
 void Array::truncate(size_t size)
 {
+    TIGHTDB_ASSERT(is_attached());
     TIGHTDB_ASSERT(size <= m_size);
 
     copy_on_write(); // Throws
 
-    // Update size (also in header)
+    // Update size in accessor and in header. This leaves the capacity
+    // unchanged.
     m_size = size;
     set_header_size(size);
+
+    // If the array is completely cleared, we take the opportunity to
+    // drop the width back to zero.
+    if (size == 0) {
+        m_capacity = CalcItemCount(get_capacity_from_header(), 0);
+        set_width(0);
+        set_header_width(0);
+    }
 }
+
+
+void Array::truncate_and_destroy_children(size_t size)
+{
+    TIGHTDB_ASSERT(is_attached());
+    TIGHTDB_ASSERT(size <= m_size);
+
+    copy_on_write(); // Throws
+
+    if (m_has_refs) {
+        size_t offset = size;
+        destroy_children(offset);
+    }
+
+    // Update size in accessor and in header. This leaves the capacity
+    // unchanged.
+    m_size = size;
+    set_header_size(size);
+
+    // If the array is completely cleared, we take the opportunity to
+    // drop the width back to zero.
+    if (size == 0) {
+        m_capacity = CalcItemCount(get_capacity_from_header(), 0);
+        set_width(0);
+        set_header_width(0);
+    }
+}
+
 
 void Array::ensure_minimum_width(int64_t value)
 {

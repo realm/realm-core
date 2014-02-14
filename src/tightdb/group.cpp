@@ -114,8 +114,8 @@ void Group::create(bool add_free_versions)
         m_free_lengths.destroy();
         m_free_positions.destroy();
         m_table_names.destroy();
-        m_tables.destroy();
-        m_top.destroy();
+        m_tables.destroy_deep();
+        m_top.destroy(); // Shallow!
         throw;
     }
 }
@@ -210,7 +210,7 @@ Group::~Group() TIGHTDB_NOEXCEPT
 #ifdef TIGHTDB_DEBUG
     // Recursively deletes entire tree. The destructor in
     // the allocator will verify that all has been deleted.
-    m_top.destroy();
+    m_top.destroy_deep();
 #else
     // Just allow the allocator to release all mem in one chunk
     // without having to traverse the entire tree first
@@ -279,7 +279,7 @@ ref_type Group::create_new_table(StringData name)
     // matters.
 
     using namespace _impl;
-    RefDestroyGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
+    ArrayRefDestroyDeepGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
     size_t ndx = m_tables.size();
     TIGHTDB_ASSERT(ndx == m_table_names.size());
     m_tables.insert(ndx, ref_dg.get()); // Throws
@@ -326,7 +326,7 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
 #endif
 
     using namespace _impl;
-    RefDestroyGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
+    ArrayRefDestroyDeepGuard ref_dg(TableFriend::create_empty_table(m_alloc), m_alloc); // Throws
     typedef TableFriend::UnbindGuard TableUnbindGuard;
     TableUnbindGuard table_ug(TableFriend::create_ref_counted(m_alloc, ref_dg.get(),
                                                               null_ptr, 0)); // Throws
@@ -451,8 +451,7 @@ void Group::write(_impl::OutputStream& out) const
     top.write(out, recurse); // Throws
     TIGHTDB_ASSERT(out.get_pos() == final_file_size);
 
-    top.truncate(0); // Avoid recursive destruction
-    top.destroy();
+    top.destroy(); // Shallow
 
     // Write streaming footer
     SlabAlloc::StreamingFooter footer;

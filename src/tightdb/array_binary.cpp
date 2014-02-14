@@ -104,22 +104,6 @@ void ArrayBinary::erase(size_t ndx)
     m_offsets.adjust(ndx, m_offsets.size(), int64_t(start) - end);
 }
 
-void ArrayBinary::truncate(size_t size)
-{
-    TIGHTDB_ASSERT(size < m_offsets.size());
-
-    size_t blob_size = size ? to_size_t(m_offsets.get(size-1)) : 0;
-
-    m_offsets.truncate(size);
-    m_blob.truncate(blob_size);
-}
-
-void ArrayBinary::clear()
-{
-    m_blob.clear();
-    m_offsets.clear();
-}
-
 BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
     pair<int_least64_t, int_least64_t> p = get_two(header, 0);
@@ -196,7 +180,7 @@ ref_type ArrayBinary::create_array(std::size_t size, Allocator& alloc)
         return top.get_ref();
     }
     catch (...) {
-        top.destroy();
+        top.destroy_deep();
         throw;
     }
 }

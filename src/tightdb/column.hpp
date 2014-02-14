@@ -311,7 +311,7 @@ inline void ColumnBase::adjust_column_index(int) TIGHTDB_NOEXCEPT
 inline void ColumnBase::destroy() TIGHTDB_NOEXCEPT
 {
     if (m_array)
-        m_array->destroy();
+        m_array->destroy_deep();
 }
 
 inline void ColumnBase::detach_subtable_accessors() TIGHTDB_NOEXCEPT

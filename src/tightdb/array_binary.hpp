@@ -47,6 +47,7 @@ public:
     void erase(std::size_t ndx);
     void truncate(std::size_t size);
     void clear();
+    void destroy();
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
@@ -96,6 +97,29 @@ inline BinaryData ArrayBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     std::size_t begin = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
     std::size_t end   = to_size_t(m_offsets.get(ndx));
     return BinaryData(m_blob.get(begin), end-begin);
+}
+
+inline void ArrayBinary::truncate(std::size_t size)
+{
+    TIGHTDB_ASSERT(size < m_offsets.size());
+
+    std::size_t blob_size = size ? to_size_t(m_offsets.get(size-1)) : 0;
+
+    m_offsets.truncate(size);
+    m_blob.truncate(blob_size);
+}
+
+inline void ArrayBinary::clear()
+{
+    m_blob.clear();
+    m_offsets.clear();
+}
+
+inline void ArrayBinary::destroy()
+{
+    m_blob.destroy();
+    m_offsets.destroy();
+    Array::destroy();
 }
 
 inline std::size_t ArrayBinary::get_size_from_header(const char* header,

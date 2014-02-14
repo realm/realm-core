@@ -85,11 +85,11 @@ TEST(ArrayBlob)
 
 TEST(AdaptiveStringLeak)
 {
-    AdaptiveStringColumn asc;
-    for(size_t t = 0; t < 2 * TIGHTDB_MAX_LIST_SIZE; t++)
-        asc.insert(0, std::string(100, 'a'));  // use constant larger than 'medium_string_max_size'
+    AdaptiveStringColumn col;
+    for (size_t i = 0; i != 2 * TIGHTDB_MAX_LIST_SIZE; ++i)
+        col.insert(0, string(100, 'a'));  // use constant larger than 'medium_string_max_size'
 
-    asc.destroy();
+    col.destroy();
 }
 
 #endif // TEST_ARRAY_BLOB
