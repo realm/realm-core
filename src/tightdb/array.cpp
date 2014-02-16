@@ -220,9 +220,9 @@ void Array::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
 // at least document the rules governing the use of
 // CreateFromHeaderDirect().
 //
-// FIXME: If we want to keep this methid, we should formally define
+// FIXME: If we want to keep this method, we should formally define
 // what can be termed 'direct read-only' use of an Array instance, and
-// wat rules apply in this case. Currently Array::clone() just passes
+// what rules apply in this case. Currently Array::clone() just passes
 // zero for the 'ref' argument.
 //
 // FIXME: Assuming that this method is only used for what can be
@@ -1269,7 +1269,7 @@ size_t Array::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
     return total_bits / width;
 }
 
-ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_alloc)
+ref_type Array::clone(const char* header, Allocator& alloc, Allocator& target_alloc)
 {
     if (!get_hasrefs_from_header(header)) {
         // This array has no subarrays, so we can make a byte-for-byte
@@ -1279,7 +1279,7 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
         size_t size = get_byte_size_from_header(header);
 
         // Create the new array
-        MemRef mem_ref = clone_alloc.alloc(size); // Throws
+        MemRef mem_ref = target_alloc.alloc(size); // Throws
         char* clone_header = mem_ref.m_addr;
 
         // Copy contents
@@ -1301,7 +1301,7 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
     array.CreateFromHeaderDirect(const_cast<char*>(header));
 
     // Create new empty array of refs
-    MemRef mem_ref = clone_alloc.alloc(initial_capacity); // Throws
+    MemRef mem_ref = target_alloc.alloc(initial_capacity); // Throws
     char* clone_header = mem_ref.m_addr;
     {
         bool is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
@@ -1313,7 +1313,7 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
                     initial_capacity);
     }
 
-    Array new_array(clone_alloc);
+    Array new_array(target_alloc);
     new_array.init_from_mem(mem_ref);
 
     size_t n = array.size();
@@ -1327,7 +1327,7 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
         if (is_subarray) {
             ref_type ref = to_ref(value);
             const char* subheader = alloc.translate(ref);
-            ref_type new_ref = clone(subheader, alloc, clone_alloc);
+            ref_type new_ref = clone(subheader, alloc, target_alloc);
             value = new_ref;
         }
 

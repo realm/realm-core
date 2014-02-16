@@ -1035,7 +1035,7 @@ ref_type Table::clone_columns(Allocator& alloc) const
         }
         else {
             const Array& root = *col->get_root_array();
-            new_col_ref = root.clone(alloc); // Throws
+            new_col_ref = root.clone_deep(alloc); // Throws
         }
         new_columns.add(new_col_ref);
     }
@@ -1046,11 +1046,11 @@ ref_type Table::clone_columns(Allocator& alloc) const
 ref_type Table::clone(Allocator& alloc) const
 {
     if (m_top.is_attached())
-        return m_top.clone(alloc); // Throws
+        return m_top.clone_deep(alloc); // Throws
 
     Array new_top(Array::type_HasRefs, null_ptr, 0, alloc); // Throws
-    new_top.add(m_spec.m_top.clone(alloc)); // Throws
-    new_top.add(m_columns.clone(alloc)); // Throws
+    new_top.add(m_spec.m_top.clone_deep(alloc)); // Throws
+    new_top.add(m_columns.clone_deep(alloc)); // Throws
     return new_top.get_ref();
 }
 

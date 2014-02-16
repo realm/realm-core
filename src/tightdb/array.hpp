@@ -363,7 +363,7 @@ public:
     /// Construct a complete copy of this array (including its
     /// subarrays) using the specified allocator and return just the
     /// ref to the new array.
-    ref_type clone(Allocator&) const;
+    ref_type clone_deep(Allocator& target_alloc) const;
 
     void move_assign(Array&) TIGHTDB_NOEXCEPT; // Move semantics for assignment
 
@@ -1300,7 +1300,7 @@ inline Array::Array(const Array& array, Allocator& alloc):
     m_data(0), m_size(0), m_capacity(0), m_width(0), m_is_inner_bptree_node(false),
     m_has_refs(false), m_parent(0), m_ndx_in_parent(0), m_alloc(alloc), m_lbound(0), m_ubound(0)
 {
-    ref_type ref = array.clone(alloc); // Throws
+    ref_type ref = array.clone_deep(alloc); // Throws
     init_from_ref(ref);
 }
 
@@ -1864,10 +1864,10 @@ template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) c
     return array_pos;
 }
 
-inline ref_type Array::clone(Allocator& clone_alloc) const
+inline ref_type Array::clone_deep(Allocator& target_alloc) const
 {
     const char* header = get_header_from_data(m_data);
-    return clone(header, m_alloc, clone_alloc); // Throws
+    return clone(header, m_alloc, target_alloc); // Throws
 }
 
 inline void Array::move_assign(Array& a) TIGHTDB_NOEXCEPT
