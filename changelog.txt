@@ -11,6 +11,11 @@ Format:
 . Any other notes ....                   (internal changes)
 
 
+2014-02-14 (Kristian Spangsege)
++ The StringData class now distinguishes `null` from the empty string.
++ Adding StringData::is_null().
+
+
 2014-02-11 (Kristian Spangsege)
 + Group::write(std::ostream&) added. This allows general online streaming of TightDB databases in memory for the first time.
 + Adding Table::get_name() which returns the name of the table when the table is a direct member of a group.
