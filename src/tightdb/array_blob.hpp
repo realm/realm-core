@@ -155,8 +155,10 @@ inline void ArrayBlob::create()
 
 inline ref_type ArrayBlob::create_array(std::size_t size, Allocator& alloc)
 {
+    bool contest_flag = false;
     int_fast64_t value = 0;
-    return Array::create_array(type_Normal, wtype_Ignore, size, value, alloc); // Throws
+    return Array::create_array(type_Normal, contest_flag, wtype_Ignore,
+                               size, value, alloc); // Throws
 }
 
 inline std::size_t ArrayBlob::CalcByteLen(std::size_t count, std::size_t) const
