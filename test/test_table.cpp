@@ -338,72 +338,6 @@ TEST(Table_Delete)
 }
 
 
-TEST(Table_LowLevelCopy)
-{
-    Table table;
-    table.add_column(type_Int, "i1");
-    table.add_column(type_Int, "i2");
-    table.add_column(type_Int, "xxxxxxxxxxxxxxxxxxxxxxx");
-
-    table.insert_int(0, 0, 10);
-    table.insert_int(1, 0, 120);
-    table.insert_int(2, 0, 1230);
-    table.insert_done();
-    table.insert_int(0, 1, 12);
-    table.insert_int(1, 1, 100);
-    table.insert_int(2, 1, 1300);
-    table.insert_done();
-
-#ifdef TIGHTDB_DEBUG
-    table.Verify();
-#endif
-
-    Table table2 = table;
-
-#ifdef TIGHTDB_DEBUG
-    table2.Verify();
-#endif
-
-    CHECK(table2 == table);
-
-    TableRef table3 = table.copy();
-
-#ifdef TIGHTDB_DEBUG
-    table3->Verify();
-#endif
-
-    CHECK(*table3 == table);
-}
-
-
-TEST(Table_HighLevelCopy)
-{
-    TestTable table;
-    table.add(10, 120, false, Mon);
-    table.add(12, 100, true,  Tue);
-
-#ifdef TIGHTDB_DEBUG
-    table.Verify();
-#endif
-
-    TestTable table2 = table;
-
-#ifdef TIGHTDB_DEBUG
-    table2.Verify();
-#endif
-
-    CHECK(table2 == table);
-
-    TestTable::Ref table3 = table.copy();
-
-#ifdef TIGHTDB_DEBUG
-    table3->Verify();
-#endif
-
-    CHECK(*table3 == table);
-}
-
-
 TEST(Table_GetName)
 {
     // Freestanding tables have no names
@@ -462,17 +396,18 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows)
     // Create table with all column types
     {
         DescriptorRef sub1;
-        table.add_column(type_Int,      "int");
-        table.add_column(type_Bool,     "bool");
-        table.add_column(type_DateTime, "date");
-        table.add_column(type_Float,    "float");
-        table.add_column(type_Double,   "double");
-        table.add_column(type_String,   "string");
-        table.add_column(type_String,   "string_long");
-        table.add_column(type_String,   "string_enum"); // becomes ColumnStringEnum
-        table.add_column(type_Binary,   "binary");
-        table.add_column(type_Mixed,    "mixed");
-        table.add_column(type_Table,    "tables", &sub1);
+        table.add_column(type_Int,      "int");              //  0
+        table.add_column(type_Bool,     "bool");             //  1
+        table.add_column(type_DateTime, "date");             //  2
+        table.add_column(type_Float,    "float");            //  3
+        table.add_column(type_Double,   "double");           //  4
+        table.add_column(type_String,   "string");           //  5
+        table.add_column(type_String,   "string_long");      //  6
+        table.add_column(type_String,   "string_big_blobs"); //  7
+        table.add_column(type_String,   "string_enum");      //  8 - becomes ColumnStringEnum
+        table.add_column(type_Binary,   "binary");           //  9
+        table.add_column(type_Table,    "tables", &sub1);    // 10
+        table.add_column(type_Mixed,    "mixed");            // 11
         sub1->add_column(type_Int,        "sub_first");
         sub1->add_column(type_String,     "sub_second");
     }
@@ -493,58 +428,70 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows)
         ss << " very long string.........";
         table.insert_string(6, i, ss.str().c_str());
 
-        switch (i % 3) {
+        switch (i % 2) {
             case 0:
-                table.insert_string(7, i, "enum1");
+                for (int j = 0; j != 4; ++j)
+                    ss << " big blobs big blobs big blobs"; // +30
+                table.insert_string(7, i, ss.str().c_str());
                 break;
             case 1:
-                table.insert_string(7, i, "enum2");
-                break;
-            case 2:
-                table.insert_string(7, i, "enum3");
+                table.insert_string(7, i, "");
                 break;
         }
 
-        table.insert_binary(8, i, BinaryData("binary", 7));
+        switch (i % 3) {
+            case 0:
+                table.insert_string(8, i, "enum1");
+                break;
+            case 1:
+                table.insert_string(8, i, "enum2");
+                break;
+            case 2:
+                table.insert_string(8, i, "enum3");
+                break;
+        }
+
+        table.insert_binary(9, i, BinaryData("binary", 7));
+
+        table.insert_subtable(10, i);
 
         switch (i % 8) {
             case 0:
-                table.insert_mixed(9, i, false);
+                table.insert_mixed(11, i, false);
                 break;
             case 1:
-                table.insert_mixed(9, i, int64_t(i*i*sign));
+                table.insert_mixed(11, i, int64_t(i*i*sign));
                 break;
             case 2:
-                table.insert_mixed(9, i, "string");
+                table.insert_mixed(11, i, "string");
                 break;
             case 3:
-                table.insert_mixed(9, i, DateTime(123456789));
+                table.insert_mixed(11, i, DateTime(123456789));
                 break;
             case 4:
-                table.insert_mixed(9, i, BinaryData("binary", 7));
+                table.insert_mixed(11, i, BinaryData("binary", 7));
                 break;
             case 5:
             {
                 // Add subtable to mixed column
                 // We can first set schema and contents when the entire
                 // row has been inserted
-                table.insert_mixed(9, i, Mixed::subtable_tag());
+                table.insert_mixed(11, i, Mixed::subtable_tag());
                 break;
             }
             case 6:
-                table.insert_mixed(9, i, float(123.1*i*sign));
+                table.insert_mixed(11, i, float(123.1*i*sign));
                 break;
             case 7:
-                table.insert_mixed(9, i, double(987.65*i*sign));
+                table.insert_mixed(11, i, double(987.65*i*sign));
                 break;
         }
 
-        table.insert_subtable(10, i);
         table.insert_done();
 
         // Add subtable to mixed column
         if (i % 8 == 5) {
-            TableRef subtable = table.get_subtable(9, i);
+            TableRef subtable = table.get_subtable(11, i);
             subtable->add_column(type_Int,    "first");
             subtable->add_column(type_String, "second");
             for (size_t j=0; j<2; j++) {
@@ -568,6 +515,61 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows)
 }
 
 } // anonymous namespace
+
+
+TEST(Table_LowLevelCopy)
+{
+    Table table;
+    setup_multi_table(table, 15, 2);
+
+#ifdef TIGHTDB_DEBUG
+    table.Verify();
+#endif
+
+    Table table2 = table;
+
+#ifdef TIGHTDB_DEBUG
+    table2.Verify();
+#endif
+
+    CHECK(table2 == table);
+
+    TableRef table3 = table.copy();
+
+#ifdef TIGHTDB_DEBUG
+    table3->Verify();
+#endif
+
+    CHECK(*table3 == table);
+}
+
+
+TEST(Table_HighLevelCopy)
+{
+    TestTable table;
+    table.add(10, 120, false, Mon);
+    table.add(12, 100, true,  Tue);
+
+#ifdef TIGHTDB_DEBUG
+    table.Verify();
+#endif
+
+    TestTable table2 = table;
+
+#ifdef TIGHTDB_DEBUG
+    table2.Verify();
+#endif
+
+    CHECK(table2 == table);
+
+    TestTable::Ref table3 = table.copy();
+
+#ifdef TIGHTDB_DEBUG
+    table3->Verify();
+#endif
+
+    CHECK(*table3 == table);
+}
 
 
 TEST(Table_Delete_All_Types)
