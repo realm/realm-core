@@ -3159,7 +3159,7 @@ bool Table::compare_rows(const Table& t) const
 
     size_t n = get_column_count();
     TIGHTDB_ASSERT(t.get_column_count() == n);
-    for (size_t i=0; i<n; ++i) {
+    for (size_t i = 0; i != n; ++i) {
         ColumnType type = get_real_column_type(i);
         TIGHTDB_ASSERT(type == col_type_String     ||
                        type == col_type_StringEnum ||
