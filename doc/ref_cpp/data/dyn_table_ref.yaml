@@ -1099,6 +1099,10 @@ CATEGORIES :
       DESCR    :
       - TEXT   : &g_dyn_table_sum_descr
                  This method calculates the sum of all values in the specified column.
+      - TEXT   : &g_dyn_table_sum_descr_notes
+                 |
+                 Note: The summation can overflow depending on the values stored. Nothing will indicate this.
+                 Note: Adding many floats or doubles can accumulate representation imprecisions.
       - TEXT   : >
                  As the sum of many <code>float</code>
                  values can be greater than the maximum value of the type, a <code>double</code>
@@ -1181,8 +1185,18 @@ CATEGORIES :
       NAMES    : [average_int, average_float, average_double]
       SUMMARY  : &g_dyn_table_average_summary
                  Calculate the average value.
-      DESCR    : &g_dyn_table_average_descr
+      DESCR    :
+      - TEXT   : &g_dyn_table_average_descr
                  This method calculates the average value in the specified column.
+      - TEXT   : &g_dyn_table_average_descr_notes
+                 |
+                 Note: The method performs a summation, which can overflow depending on the values stored. Nothing will indicate this.
+                 Note: Averaging many floats or doubles can accumulate representation imprecisions.
+      - TEXT   : &g_dyn_table_average_descr_double
+                 >
+                 As the sum of many <code>int64_t</code> or <code>float</code>
+                 values can be greater than the average value of the type, a <code>double</code>
+                 is returned.
       CONST    : True
       SIGNATURE: |
                  double  average_int(size_t column_ndx) const;

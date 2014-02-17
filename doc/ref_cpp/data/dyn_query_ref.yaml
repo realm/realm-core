@@ -477,7 +477,7 @@ CATEGORIES :
       NAME     : find
       DESCR    : &g_dyn_query_find_descr
                  >
-                 This will find the first row that fulfils the query condition. Use the return
+                 This will find the first row index that fulfils the query condition. Use the return
                  value + 1 as parameter for successive calls to iterate through
                  matching rows.
       SUMMARY  : &g_dyn_query_find_summary
@@ -498,7 +498,7 @@ CATEGORIES :
   - g_dyn_query_count:
       NAME     : count
       DESCR    : &g_dyn_query_size_descr
-                 The method executes the query and return the number of matching rows.
+                 The method executes the query and returns the number of matching rows.
       SUMMARY  : &g_dyn_query_size_summary
                  Number of matching rows.
       CONST    : true
@@ -529,7 +529,7 @@ CATEGORIES :
   - g_dyn_query_remove:
       NAME     : remove
       DESCR    : &g_dyn_query_remove_descr
-                 This method executes the query and removes all matching rows in the source table.
+                 This method executes the query and removes all matching rows from the source table.
       SUMMARY  : &g_dyn_query_remove_summary
                  Remove rows.
       CONST    : true
@@ -556,12 +556,10 @@ CATEGORIES :
   - g_dyn_query_sum_double:
       TITLE    : sum*
       NAMES    : [sum_int, sum_float, sum_double]
-      DESCR    : &g_dyn_query_sum_descr
-                 |
+      DESCR    :
+      - TEXT   : &g_dyn_query_sum_descr
                  This methods calculates the sum of the values in a specific column.
-
-                 Note: <code>sum()</code> can overflow depending on the values stored. Nothing will indicate this.
-                 Note: Adding many floats or doubles can accumulate representation imprecisions.
+      - TEXT   : *g_dyn_table_sum_descr_notes
       SUMMARY  : &g_dyn_query_sum_summary
                  Calculate sum.
       CONST    : true
@@ -686,12 +684,12 @@ CATEGORIES :
       NAMES    : [average_int, average_float, average_double]
       SUMMARY  : &g_dyn_query_average_summary
                  Calculates the average.
-      DESCR    : &g_dyn_query_average_descr
+      DESCR    :
+      - TEXT   : &g_dyn_query_average_descr
                  |
                  The method calculates the average of a specific column.
-
-                 Note: <code>average()</code> uses <code>sum()</code> which can overflow depending on the values stored. Nothing will indicate this.
-                 Note: Averaging many floats or doubles can accumulate representation imprecisions.
+      - TEXT   : *g_dyn_table_average_descr_notes
+      - TEXT   : *g_dyn_table_average_descr_double
       CONST    : true
       SIGNATURE: |
                  double average_int(size_t column_ndx, size_t* resultcount=NULL, size_t start=0, size_t end = size_t(-1), size_t limit=size_t(-1)) const;
