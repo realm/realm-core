@@ -113,7 +113,7 @@ private:
 inline std::size_t ColumnBinary::size() const  TIGHTDB_NOEXCEPT
 {
     if (root_is_leaf()) {
-        bool is_big = m_array->context_bit();
+        bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
             ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
@@ -131,7 +131,7 @@ inline BinaryData ColumnBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < size());
     if (root_is_leaf()) {
-        bool is_big = m_array->context_bit();
+        bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
             ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
@@ -147,7 +147,7 @@ inline BinaryData ColumnBinary::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
     const char* leaf_header = p.first.m_addr;
     std::size_t ndx_in_leaf = p.second;
     Allocator& alloc = m_array->get_alloc();
-    bool is_big = Array::get_context_bit_from_header(leaf_header);
+    bool is_big = Array::get_context_flag_from_header(leaf_header);
     if (!is_big) {
         // Small blobs
         return ArrayBinary::get(leaf_header, ndx_in_leaf, alloc);
@@ -206,7 +206,7 @@ inline std::size_t ColumnBinary::get_size_from_ref(ref_type root_ref,
     const char* root_header = alloc.translate(root_ref);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
     if (root_is_leaf) {
-        bool is_big = Array::get_context_bit_from_header(root_header);
+        bool is_big = Array::get_context_flag_from_header(root_header);
         if (!is_big) {
             // Small blobs leaf
             return ArrayBinary::get_size_from_header(root_header, alloc);

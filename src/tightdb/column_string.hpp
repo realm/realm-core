@@ -149,7 +149,7 @@ inline std::size_t AdaptiveStringColumn::size() const TIGHTDB_NOEXCEPT
             ArrayString* leaf = static_cast<ArrayString*>(m_array);
             return leaf->size();
         }
-        bool is_big = m_array->context_bit();
+        bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Medium strings root leaf
             ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
@@ -194,7 +194,7 @@ inline std::size_t AdaptiveStringColumn::get_size_from_ref(ref_type root_ref,
             // Small strings leaf
             return ArrayString::get_size_from_header(root_header);
         }
-        bool is_big = Array::get_context_bit_from_header(root_header);
+        bool is_big = Array::get_context_flag_from_header(root_header);
         if (!is_big) {
             // Medium strings leaf
             return ArrayStringLong::get_size_from_header(root_header, alloc);

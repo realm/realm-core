@@ -1260,11 +1260,12 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& clone_all
     {
         bool is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
         bool has_refs = true;
+        bool context_flag = get_context_flag_from_header(header);
         WidthType width_type = wtype_Bits;
         int width = 0;
         size_t size = 0;
-        init_header(clone_header, is_inner_bptree_node, has_refs, width_type, width, size,
-                    initial_capacity);
+        init_header(clone_header, is_inner_bptree_node, has_refs, context_flag, width_type,
+                    width, size, initial_capacity);
     }
 
     Array new_array(clone_alloc);
@@ -1405,8 +1406,8 @@ void fill_direct(char* data, size_t begin, size_t end, int_fast64_t value) TIGHT
 
 } // anonymous namespace
 
-ref_type Array::create_array(Type type, WidthType width_type, size_t size, int_fast64_t value,
-                             Allocator& alloc)
+ref_type Array::create_array(Type type, bool context_flag, WidthType width_type, size_t size,
+                             int_fast64_t value, Allocator& alloc)
 {
     bool is_inner_bptree_node = false, has_refs = false;
     switch (type) {
@@ -1433,7 +1434,8 @@ ref_type Array::create_array(Type type, WidthType width_type, size_t size, int_f
     MemRef mem_ref = alloc.alloc(byte_size); // Throws
     char* header = mem_ref.m_addr;
 
-    init_header(header, is_inner_bptree_node, has_refs, width_type, width, size, byte_size);
+    init_header(header, is_inner_bptree_node, has_refs, context_flag, width_type,
+                width, size, byte_size);
 
     if (value != 0) {
         char* data = get_data_from_header(header);
@@ -2824,7 +2826,7 @@ top:
         }
 
         const char* sub_header = m_alloc.translate(to_ref(ref));
-        const bool sub_isindex = get_indexflag_from_header(sub_header);
+        const bool sub_isindex = get_context_flag_from_header(sub_header);
 
         // List of matching row indexes
         if (!sub_isindex) {
@@ -2937,7 +2939,7 @@ top:
         }
 
         const char* sub_header = m_alloc.translate(to_ref(ref));
-        const bool sub_isindex = get_indexflag_from_header(sub_header);
+        const bool sub_isindex = get_context_flag_from_header(sub_header);
 
         // List of matching row indexes
         if (!sub_isindex) {
@@ -3071,7 +3073,7 @@ top:
         }
 
         const char* sub_header  = m_alloc.translate(to_ref(ref));
-        const bool  sub_isindex = get_indexflag_from_header(sub_header);
+        const bool  sub_isindex = get_context_flag_from_header(sub_header);
 
         // List of matching row indexes
         if (!sub_isindex) {
@@ -3189,7 +3191,7 @@ top:
         }
 
         const char* sub_header = m_alloc.translate(to_ref(ref));
-        const bool sub_isindex = get_indexflag_from_header(sub_header);
+        const bool sub_isindex = get_context_flag_from_header(sub_header);
 
         // List of matching row indexes
         if (!sub_isindex) {
