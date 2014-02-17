@@ -39,7 +39,7 @@ ColumnBinary::ColumnBinary(ref_type ref, ArrayParent* parent, size_t ndx_in_pare
     MemRef mem(header, ref);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
     if (root_is_leaf) {
-        bool is_big = Array::get_context_bit_from_header(header);
+        bool is_big = Array::get_context_flag_from_header(header);
         if (!is_big) {
             // Small blobs root leaf
             m_array = new ArrayBinary(mem, parent, ndx_in_parent, alloc);
@@ -64,7 +64,7 @@ void ColumnBinary::clear()
 {
     bool root_is_leaf = !m_array->is_inner_bptree_node();
     if (root_is_leaf) {
-        bool is_big = m_array->context_bit();
+        bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
             ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
@@ -102,7 +102,7 @@ struct SetLeafElem: Array::UpdateHandler {
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
                 size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
     {
-        bool is_big = Array::get_context_bit_from_header(mem.m_addr);
+        bool is_big = Array::get_context_flag_from_header(mem.m_addr);
         if (is_big) {
             ArrayBigBlobs leaf(mem, parent, ndx_in_parent, m_alloc);
             leaf.set(elem_ndx_in_leaf, m_value, m_add_zero_term); // Throws
@@ -156,7 +156,7 @@ public:
                          size_t leaf_ndx_in_parent,
                          size_t elem_ndx_in_leaf) TIGHTDB_OVERRIDE
     {
-        bool is_big = Array::get_context_bit_from_header(leaf_mem.m_addr);
+        bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
         if (!is_big) {
             // Small blobs
             ArrayBinary leaf(leaf_mem, parent, leaf_ndx_in_parent, get_alloc());
@@ -194,7 +194,7 @@ public:
         UniquePtr<Array> leaf;
         ArrayParent* parent = 0;
         size_t ndx_in_parent = 0;
-        bool is_big = Array::get_context_bit_from_header(leaf_mem.m_addr);
+        bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
         if (!is_big) {
             // Small blobs
             leaf.reset(new ArrayBinary(leaf_mem, parent, ndx_in_parent, get_alloc())); // Throws
@@ -222,7 +222,7 @@ void ColumnBinary::erase(size_t ndx, bool is_last)
 
     bool root_is_leaf = !m_array->is_inner_bptree_node();
     if (root_is_leaf) {
-        bool is_big = m_array->context_bit();
+        bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
             ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
@@ -331,7 +331,7 @@ ref_type ColumnBinary::leaf_insert(MemRef leaf_mem, ArrayParent& parent,
                                    Array::TreeInsert<ColumnBinary>& state)
 {
     InsertState& state_2 = static_cast<InsertState&>(state);
-    bool is_big = Array::get_context_bit_from_header(leaf_mem.m_addr);
+    bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
     if (is_big) {
         ArrayBigBlobs leaf(leaf_mem, &parent, ndx_in_parent, alloc);
         return leaf.bptree_leaf_insert(insert_ndx, state_2.m_value, state_2.m_add_zero_term,
@@ -354,7 +354,7 @@ bool ColumnBinary::upgrade_root_leaf(size_t value_size)
 {
     TIGHTDB_ASSERT(root_is_leaf());
 
-    bool is_big = m_array->context_bit();
+    bool is_big = m_array->get_context_flag();
     if (is_big)
         return true; // Big
     if (value_size <= small_blob_max_size)
@@ -398,7 +398,7 @@ namespace {
 
 size_t verify_leaf(MemRef mem, Allocator& alloc)
 {
-    bool is_big = Array::get_context_bit_from_header(mem.m_addr);
+    bool is_big = Array::get_context_flag_from_header(mem.m_addr);
     if (!is_big) {
         // Small blobs
         ArrayBinary leaf(mem, 0, 0, alloc);
@@ -416,7 +416,7 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 void ColumnBinary::Verify() const
 {
     if (root_is_leaf()) {
-        bool is_big = m_array->context_bit();
+        bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Small blobs root leaf
             ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
@@ -449,7 +449,7 @@ void ColumnBinary::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_
                                ostream& out) const
 {
     bool is_strings = false; // FIXME: Not necessarily the case
-    bool is_big = Array::get_context_bit_from_header(leaf_mem.m_addr);
+    bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
     if (!is_big) {
         // Small blobs
         ArrayBinary leaf(leaf_mem, parent, ndx_in_parent, m_array->get_alloc());
@@ -468,7 +468,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, ostream& out, int level)
 {
     size_t leaf_size;
     const char* leaf_type;
-    bool is_big = Array::get_context_bit_from_header(mem.m_addr);
+    bool is_big = Array::get_context_flag_from_header(mem.m_addr);
     if (!is_big) {
         // Small blobs
         ArrayBinary leaf(mem, 0, 0, alloc);

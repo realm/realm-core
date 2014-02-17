@@ -137,8 +137,10 @@ inline void ArrayString::create()
 
 inline ref_type ArrayString::create_array(std::size_t size, Allocator& alloc)
 {
+    bool context_flag = false;
     int_fast64_t value = 0;
-    return Array::create_array(type_Normal, wtype_Multiply, size, value, alloc); // Throws
+    return Array::create_array(type_Normal, context_flag, wtype_Multiply,
+                               size, value, alloc); // Throws
 }
 
 inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT

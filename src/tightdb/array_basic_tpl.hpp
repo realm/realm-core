@@ -83,9 +83,10 @@ inline ref_type BasicArray<T>::create_array(std::size_t size, Allocator& alloc)
 
     bool is_inner_bptree_node = false;
     bool has_refs = false;
+    bool context_flag = false;
     int width = sizeof (T);
-    init_header(mem_ref.m_addr, is_inner_bptree_node, has_refs, wtype_Multiply, width, size,
-                byte_size);
+    init_header(mem_ref.m_addr, is_inner_bptree_node, has_refs, context_flag, wtype_Multiply,
+                width, size, byte_size);
 
     return mem_ref.m_ref;
 }

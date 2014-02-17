@@ -591,10 +591,10 @@ public:
     bool has_refs() const TIGHTDB_NOEXCEPT { return m_has_refs; }
 
     // Columns and indexes can use the context bit to diffentiate leaf types
-    bool context_bit() const TIGHTDB_NOEXCEPT { return get_indexflag_from_header(); }
-    void set_context_bit(bool value) { set_header_indexflag(value); }
-    bool is_index_node() const  TIGHTDB_NOEXCEPT { return get_indexflag_from_header(); }
-    void set_is_index_node(bool value) { set_header_indexflag(value); }
+    bool get_context_flag() const TIGHTDB_NOEXCEPT { return get_context_flag_from_header(); }
+    void set_context_flag(bool value) { set_header_context_flag(value); }
+    bool is_index_node() const  TIGHTDB_NOEXCEPT { return get_context_flag_from_header(); }
+    void set_is_index_node(bool value) { set_header_context_flag(value); }
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT { return m_ref; }
     MemRef get_mem() const TIGHTDB_NOEXCEPT { return MemRef(get_header_from_data(m_data), m_ref); }
@@ -880,8 +880,7 @@ public:
 
     static bool get_is_inner_bptree_node_from_header(const char*) TIGHTDB_NOEXCEPT;
     static bool get_hasrefs_from_header(const char*) TIGHTDB_NOEXCEPT;
-    static bool get_context_bit_from_header(const char*) TIGHTDB_NOEXCEPT;
-    static bool get_indexflag_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static bool get_context_flag_from_header(const char*) TIGHTDB_NOEXCEPT;
     static WidthType get_wtype_from_header(const char*) TIGHTDB_NOEXCEPT;
     static int get_width_from_header(const char*) TIGHTDB_NOEXCEPT;
     static std::size_t get_size_from_header(const char*) TIGHTDB_NOEXCEPT;
@@ -966,7 +965,7 @@ protected:
 
     bool get_is_inner_bptree_node_from_header() const TIGHTDB_NOEXCEPT;
     bool get_hasrefs_from_header() const TIGHTDB_NOEXCEPT;
-    bool get_indexflag_from_header() const TIGHTDB_NOEXCEPT;
+    bool get_context_flag_from_header() const TIGHTDB_NOEXCEPT;
     WidthType get_wtype_from_header() const TIGHTDB_NOEXCEPT;
     int get_width_from_header() const TIGHTDB_NOEXCEPT;
     std::size_t get_size_from_header() const TIGHTDB_NOEXCEPT;
@@ -976,7 +975,7 @@ protected:
 
     void set_header_is_inner_bptree_node(bool value) TIGHTDB_NOEXCEPT;
     void set_header_hasrefs(bool value) TIGHTDB_NOEXCEPT;
-    void set_header_indexflag(bool value) TIGHTDB_NOEXCEPT;
+    void set_header_context_flag(bool value) TIGHTDB_NOEXCEPT;
     void set_header_wtype(WidthType value) TIGHTDB_NOEXCEPT;
     void set_header_width(int value) TIGHTDB_NOEXCEPT;
     void set_header_size(std::size_t value) TIGHTDB_NOEXCEPT;
@@ -984,15 +983,15 @@ protected:
 
     static void set_header_is_inner_bptree_node(bool value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_hasrefs(bool value, char* header) TIGHTDB_NOEXCEPT;
-    static void set_header_indexflag(bool value, char* header) TIGHTDB_NOEXCEPT;
+    static void set_header_context_flag(bool value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_wtype(WidthType value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_width(int value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_size(std::size_t value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_capacity(std::size_t value, char* header) TIGHTDB_NOEXCEPT;
 
     static void init_header(char* header, bool is_inner_bptree_node, bool has_refs,
-                            WidthType width_type, int width, std::size_t size,
-                            std::size_t capacity) TIGHTDB_NOEXCEPT;
+                            bool context_flag, WidthType width_type, int width,
+                            std::size_t size, std::size_t capacity) TIGHTDB_NOEXCEPT;
 
     template<std::size_t width> void set_width() TIGHTDB_NOEXCEPT;
     void set_width(std::size_t) TIGHTDB_NOEXCEPT;
@@ -1023,8 +1022,8 @@ protected:
     /// array. Must be a multiple of 8 (i.e., 64-bit aligned).
     static const std::size_t initial_capacity = 128;
 
-    static ref_type create_array(Type, WidthType, std::size_t size, int_fast64_t value,
-                                 Allocator&);
+    static ref_type create_array(Type, bool context_flag, WidthType, std::size_t size,
+                                 int_fast64_t value, Allocator&);
     static ref_type clone(const char* header, Allocator& alloc, Allocator& clone_alloc);
 
     /// Get the address of the header of this array.
@@ -1383,7 +1382,7 @@ inline ref_type Array::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
 inline bool Array::is_index_node(ref_type ref, const Allocator& alloc)
 {
     TIGHTDB_ASSERT(ref);
-    return get_indexflag_from_header(alloc.translate(ref));
+    return get_context_flag_from_header(alloc.translate(ref));
 }
 
 
@@ -1510,15 +1509,11 @@ inline bool Array::get_hasrefs_from_header(const char* header) TIGHTDB_NOEXCEPT
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (int(h[4]) & 0x40) != 0;
 }
-inline bool Array::get_indexflag_from_header(const char* header) TIGHTDB_NOEXCEPT
+inline bool Array::get_context_flag_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (int(h[4]) & 0x20) != 0;
-}
-inline bool Array::get_context_bit_from_header(const char* header) TIGHTDB_NOEXCEPT
-{
-    return get_indexflag_from_header(header);
 }
 inline Array::WidthType Array::get_wtype_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
@@ -1568,9 +1563,9 @@ inline bool Array::get_hasrefs_from_header() const TIGHTDB_NOEXCEPT
 {
     return get_hasrefs_from_header(get_header_from_data(m_data));
 }
-inline bool Array::get_indexflag_from_header() const TIGHTDB_NOEXCEPT
+inline bool Array::get_context_flag_from_header() const TIGHTDB_NOEXCEPT
 {
-    return get_indexflag_from_header(get_header_from_data(m_data));
+    return get_context_flag_from_header(get_header_from_data(m_data));
 }
 inline Array::WidthType Array::get_wtype_from_header() const TIGHTDB_NOEXCEPT
 {
@@ -1604,7 +1599,7 @@ inline void Array::set_header_hasrefs(bool value, char* header) TIGHTDB_NOEXCEPT
     h[4] = uchar((int(h[4]) & ~0x40) | int(value) << 6);
 }
 
-inline void Array::set_header_indexflag(bool value, char* header) TIGHTDB_NOEXCEPT
+inline void Array::set_header_context_flag(bool value, char* header) TIGHTDB_NOEXCEPT
 {
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
@@ -1668,9 +1663,9 @@ inline void Array::set_header_hasrefs(bool value) TIGHTDB_NOEXCEPT
 {
     set_header_hasrefs(value, get_header_from_data(m_data));
 }
-inline void Array::set_header_indexflag(bool value) TIGHTDB_NOEXCEPT
+inline void Array::set_header_context_flag(bool value) TIGHTDB_NOEXCEPT
 {
-    set_header_indexflag(value, get_header_from_data(m_data));
+    set_header_context_flag(value, get_header_from_data(m_data));
 }
 inline void Array::set_header_wtype(WidthType value) TIGHTDB_NOEXCEPT
 {
@@ -1788,8 +1783,8 @@ inline std::size_t Array::get_byte_size_from_header(const char* header) TIGHTDB_
 
 
 inline void Array::init_header(char* header, bool is_inner_bptree_node, bool has_refs,
-                               WidthType width_type, int width, std::size_t size,
-                               std::size_t capacity) TIGHTDB_NOEXCEPT
+                               bool context_flag, WidthType width_type, int width,
+                               std::size_t size, std::size_t capacity) TIGHTDB_NOEXCEPT
 {
     // Note: Since the header layout contains unallocated bit and/or
     // bytes, it is important that we put the entire header into a
@@ -1797,6 +1792,7 @@ inline void Array::init_header(char* header, bool is_inner_bptree_node, bool has
     std::fill(header, header + header_size, 0);
     set_header_is_inner_bptree_node(is_inner_bptree_node, header);
     set_header_hasrefs(has_refs, header);
+    set_header_context_flag(context_flag, header);
     set_header_wtype(width_type, header);
     set_header_width(width, header);
     set_header_size(size, header);
@@ -1888,7 +1884,8 @@ inline void Array::move_assign(Array& a) TIGHTDB_NOEXCEPT
 inline ref_type Array::create_array(Type type, std::size_t size, int_fast64_t value,
                                     Allocator& alloc)
 {
-    return create_array(type, wtype_Bits, size, value, alloc); // Throws
+    bool context_flag = false;
+    return create_array(type, context_flag, wtype_Bits, size, value, alloc); // Throws
 }
 
 inline ref_type Array::create_empty_array(Type type, Allocator& alloc)

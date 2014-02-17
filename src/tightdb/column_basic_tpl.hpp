@@ -172,10 +172,10 @@ bool BasicColumn<T>::compare(const BasicColumn& c) const
     std::size_t n = size();
     if (c.size() != n)
         return false;
-    for (std::size_t i=0; i<n; ++i) {
-        T v1 = get(i);
-        T v2 = c.get(i);
-        if (v1 == v2)
+    for (std::size_t i = 0; i != n; ++i) {
+        T v_1 = get(i);
+        T v_2 = c.get(i);
+        if (v_1 != v_2)
             return false;
     }
     return true;
