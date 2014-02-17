@@ -113,8 +113,7 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType new_type)
             case mixcol_Table: {
                 // Delete entire table
                 ref_type ref = m_data->get_as_ref(ndx);
-                Array top(ref, 0, 0, m_array->get_alloc());
-                top.destroy();
+                Array::destroy_deep(ref, m_data->get_alloc());
                 break;
             }
             default:
@@ -314,13 +313,13 @@ ref_type ColumnMixed::create(size_t size, Allocator& alloc)
             top.add(v); // Throws
         }
         catch (...) {
-            Array::destroy(data_ref, alloc);
+            Array::destroy_deep(data_ref, alloc);
             throw;
         }
         return top.get_ref();
     }
     catch (...) {
-        top.destroy();
+        top.destroy_deep();
         throw;
     }
 }

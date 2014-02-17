@@ -290,7 +290,7 @@ inline void Spec::init(SubspecRef r) TIGHTDB_NOEXCEPT
 
 inline void Spec::destroy() TIGHTDB_NOEXCEPT
 {
-    m_top.destroy();
+    m_top.destroy_deep();
 }
 
 inline ref_type Spec::get_ref() const TIGHTDB_NOEXCEPT

@@ -359,7 +359,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                         new_inner_node.add(v); // Throws
                     }
                     catch (...) {
-                        Array::destroy(child, alloc);
+                        Array::destroy_deep(child, alloc);
                         throw;
                     }
                     if (rest_size == 0 || ++num_children == TIGHTDB_MAX_LIST_SIZE)
@@ -369,7 +369,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                 new_inner_node.add(1 + 2*v); // Throws
             }
             catch (...) {
-                new_inner_node.destroy();
+                new_inner_node.destroy_deep();
                 throw;
             }
             node = new_inner_node.get_ref();
@@ -378,7 +378,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
     }
     catch (...) {
         if (node != 0)
-            Array::destroy(node, alloc);
+            Array::destroy_deep(node, alloc);
         throw;
     }
 }
@@ -386,7 +386,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
 
 void Column::clear()
 {
-    m_array->clear();
+    m_array->clear_and_destroy_children();
     if (m_array->is_inner_bptree_node())
         m_array->set_type(Array::type_Normal);
 }

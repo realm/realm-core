@@ -91,7 +91,7 @@ void BasicColumn<T>::clear()
         parent->update_child_ref(pndx, array->get_ref()); // Throws
 
     // Remove original node
-    m_array->destroy();
+    m_array->destroy_deep();
     delete m_array;
 
     m_array = array;

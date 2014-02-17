@@ -24,6 +24,7 @@
 #include <cstddef>
 
 #include <tightdb/util/features.h>
+#include <tightdb/util/terminate.hpp>
 #include <tightdb/util/assert.hpp>
 #include <tightdb/util/safe_int_ops.hpp>
 
@@ -70,33 +71,26 @@ public:
     /// zero.
     ///
     /// \throw std::bad_alloc If insufficient memory was available.
-    virtual MemRef alloc(std::size_t size) = 0;
+    MemRef alloc(std::size_t size);
 
-    /// The specified size must be divisible by 8, and must not be
-    /// zero.
-    ///
-    /// \throw std::bad_alloc If insufficient memory was available.
+    /// Calls do_realloc().
     ///
     /// Note: The underscore has been added because the name `realloc`
     /// would conflict with a macro on the Windows platform.
-    virtual MemRef realloc_(ref_type, const char* addr, std::size_t old_size,
-                            std::size_t new_size) = 0;
+    MemRef realloc_(ref_type, const char* addr, std::size_t old_size,
+                    std::size_t new_size);
 
-    /// Release the specified chunk of memory.
+    /// Calls do_free().
     ///
     /// Note: The underscore has been added because the name `free
     /// would conflict with a macro on the Windows platform.
-    virtual void free_(ref_type, const char* addr) TIGHTDB_NOEXCEPT = 0;
+    void free_(ref_type, const char* addr) TIGHTDB_NOEXCEPT;
 
     /// Shorthand for free_(mem.m_ref, mem.m_addr).
     void free_(MemRef mem) TIGHTDB_NOEXCEPT;
 
-    /// Map the specified \a ref to the corresponding memory
-    /// address. Note that if is_read_only(ref) returns true, then the
-    /// referenced object is to be considered immutable, and it is
-    /// then entirely the responsibility of the caller that the memory
-    /// is not modified by way of the returned memory pointer.
-    virtual char* translate(ref_type ref) const TIGHTDB_NOEXCEPT = 0;
+    /// Calls do_translate().
+    char* translate(ref_type ref) const TIGHTDB_NOEXCEPT;
 
     /// Returns true if, and only if the object at the specified 'ref'
     /// is in the immutable part of the memory managed by this
@@ -115,10 +109,16 @@ public:
 
 #ifdef TIGHTDB_DEBUG
     virtual void Verify() const = 0;
+
+    /// Terminate the program precisely when the specified 'ref' is
+    /// freed (or reallocated). You can use this to detect whether the
+    /// ref is freed (or reallocated), and even to get a stacktrace at
+    /// the point where it happens. Call watch(0) to stop watching
+    /// that ref.
+    void watch(ref_type);
 #endif
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-    Allocator() TIGHTDB_NOEXCEPT;
     Replication* get_replication() TIGHTDB_NOEXCEPT;
 #endif
 
@@ -128,7 +128,41 @@ protected:
 #ifdef TIGHTDB_ENABLE_REPLICATION
     Replication* m_replication;
 #endif
+
+#ifdef TIGHTDB_DEBUG
+    ref_type m_watch;
+#endif
+
+    /// The specified size must be divisible by 8, and must not be
+    /// zero.
+    ///
+    /// \throw std::bad_alloc If insufficient memory was available.
+    virtual MemRef do_alloc(std::size_t size) = 0;
+
+    /// The specified size must be divisible by 8, and must not be
+    /// zero.
+    ///
+    /// The default version of this function simply allocates a new
+    /// chunk of memory, copies over the old contents, and then frees
+    /// the old chunk.
+    ///
+    /// \throw std::bad_alloc If insufficient memory was available.
+    virtual MemRef do_realloc(ref_type, const char* addr, std::size_t old_size,
+                              std::size_t new_size);
+
+    /// Release the specified chunk of memory.
+    virtual void do_free(ref_type, const char* addr) TIGHTDB_NOEXCEPT = 0;
+
+    /// Map the specified \a ref to the corresponding memory
+    /// address. Note that if is_read_only(ref) returns true, then the
+    /// referenced object is to be considered immutable, and it is
+    /// then entirely the responsibility of the caller that the memory
+    /// is not modified by way of the returned memory pointer.
+    virtual char* do_translate(ref_type ref) const TIGHTDB_NOEXCEPT = 0;
+
+    Allocator() TIGHTDB_NOEXCEPT;
 };
+
 
 
 
@@ -159,9 +193,38 @@ inline MemRef::MemRef(ref_type ref, Allocator& alloc): m_addr(alloc.translate(re
 }
 
 
+inline MemRef Allocator::alloc(std::size_t size)
+{
+    return do_alloc(size);
+}
+
+inline MemRef Allocator::realloc_(ref_type ref, const char* addr, std::size_t old_size,
+                                  std::size_t new_size)
+{
+#ifdef TIGHTDB_DEBUG
+    if (ref == m_watch)
+        TIGHTDB_TERMINATE("Allocator watch: Ref was reallocated");
+#endif
+    return do_realloc(ref, addr, old_size, new_size);
+}
+
+inline void Allocator::free_(ref_type ref, const char* addr) TIGHTDB_NOEXCEPT
+{
+#ifdef TIGHTDB_DEBUG
+    if (ref == m_watch)
+        TIGHTDB_TERMINATE("Allocator watch: Ref was freed");
+#endif
+    return do_free(ref, addr);
+}
+
 inline void Allocator::free_(MemRef mem) TIGHTDB_NOEXCEPT
 {
     free_(mem.m_ref, mem.m_addr);
+}
+
+inline char* Allocator::translate(ref_type ref) const TIGHTDB_NOEXCEPT
+{
+    return do_translate(ref);
 }
 
 inline bool Allocator::is_read_only(ref_type ref) const TIGHTDB_NOEXCEPT
@@ -171,23 +234,33 @@ inline bool Allocator::is_read_only(ref_type ref) const TIGHTDB_NOEXCEPT
     return ref < m_baseline;
 }
 
+inline Allocator::Allocator() TIGHTDB_NOEXCEPT
+{
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    m_replication = 0;
+#endif
+#ifdef TIGHTDB_DEBUG
+    m_watch = 0;
+#endif
+}
+
 inline Allocator::~Allocator() TIGHTDB_NOEXCEPT
 {
 }
 
 #ifdef TIGHTDB_ENABLE_REPLICATION
-
-inline Allocator::Allocator() TIGHTDB_NOEXCEPT:
-    m_replication(0)
-{
-}
-
 inline Replication* Allocator::get_replication() TIGHTDB_NOEXCEPT
 {
     return m_replication;
 }
+#endif
 
-#endif // TIGHTDB_ENABLE_REPLICATION
+#ifdef TIGHTDB_DEBUG
+inline void Allocator::watch(ref_type ref)
+{
+    m_watch = ref;
+}
+#endif
 
 
 } // namespace tightdb

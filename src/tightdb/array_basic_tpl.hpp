@@ -93,16 +93,6 @@ inline ref_type BasicArray<T>::create_array(std::size_t size, Allocator& alloc)
 
 
 template<class T>
-inline void BasicArray<T>::clear()
-{
-    copy_on_write(); // Throws
-
-    // Truncate size to zero (but keep capacity and width)
-    m_size = 0;
-    set_header_size(0);
-}
-
-template<class T>
 inline void BasicArray<T>::add(T value)
 {
     insert(m_size, value);

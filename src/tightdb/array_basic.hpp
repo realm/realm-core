@@ -42,7 +42,6 @@ public:
     void set(std::size_t ndx, T value);
     void insert(std::size_t ndx, T value);
     void erase(std::size_t ndx);
-    void clear();
 
     std::size_t find_first(T value, std::size_t begin = 0 , std::size_t end = npos) const;
     void find_all(Array& result, T value, std::size_t add_offset = 0,
@@ -66,8 +65,9 @@ public:
     std::size_t lower_bound(T value) const TIGHTDB_NOEXCEPT;
     std::size_t upper_bound(T value) const TIGHTDB_NOEXCEPT;
 
-    /// Create a new empty string array and attach to it. This does
-    /// not modify the parent reference information.
+    /// Create a new empty array and attach this accessor to it. This
+    /// does not modify the parent reference information of this
+    /// accessor.
     ///
     /// Note that the caller assumes ownership of the allocated
     /// underlying node. It is not owned by the accessor.

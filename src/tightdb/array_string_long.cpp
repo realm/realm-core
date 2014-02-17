@@ -99,22 +99,6 @@ void ArrayStringLong::erase(size_t ndx)
     m_offsets.adjust(ndx, m_offsets.size(), int64_t(begin) - int64_t(end));
 }
 
-void ArrayStringLong::truncate(size_t size)
-{
-    TIGHTDB_ASSERT(size < m_offsets.size());
-
-    size_t blob_size = size ? to_size_t(m_offsets.get(size-1)) : 0;
-
-    m_offsets.truncate(size);
-    m_blob.truncate(blob_size);
-}
-
-void ArrayStringLong::clear()
-{
-    m_blob.clear();
-    m_offsets.clear();
-}
-
 size_t ArrayStringLong::count(StringData value, size_t begin,
                               size_t end) const TIGHTDB_NOEXCEPT
 {
