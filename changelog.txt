@@ -11,6 +11,11 @@ Format:
 . Any other notes ....                   (internal changes)
 
 
+2014-02-17 (Kristian Spangsege)
+! Fixing table copy bug. The error occured when the table contained strings longer than 64 bytes.
+! Fixing table comparison bug. The error occured when the table has a `float` or a `double` column.
+
+
 2014-02-11 (Kristian Spangsege)
 + Group::write(std::ostream&) added. This allows general online streaming of TightDB databases in memory for the first time.
 + Adding Table::get_name() which returns the name of the table when the table is a direct member of a group.
