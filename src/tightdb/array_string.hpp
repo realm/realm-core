@@ -28,15 +28,16 @@ class ArrayString: public Array {
 public:
     typedef StringData value_type;
 
-    explicit ArrayString(ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
-                         Allocator& = Allocator::get_default());
-    ArrayString(MemRef, ArrayParent*, std::size_t ndx_in_parent,
-                Allocator&) TIGHTDB_NOEXCEPT;
-    ArrayString(ref_type, ArrayParent*, std::size_t ndx_in_parent,
-                Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
     explicit ArrayString(Allocator&) TIGHTDB_NOEXCEPT;
+    ArrayString(MemRef,   ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
+    ArrayString(ref_type, ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
     explicit ArrayString(no_prealloc_tag) TIGHTDB_NOEXCEPT;
     ~ArrayString() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+
+    /// FIXME: Deprecated. The constructor must not allocate anything
+    /// that the destructor does not deallocate.
+    explicit ArrayString(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                         Allocator& = Allocator::get_default());
 
     StringData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add();
@@ -53,7 +54,7 @@ public:
                   std::size_t begin = 0, std::size_t end = npos);
 
     /// Compare two string arrays for equality.
-    bool compare_string(const ArrayString&) const;
+    bool compare_string(const ArrayString&) const TIGHTDB_NOEXCEPT;
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
@@ -63,6 +64,11 @@ public:
 
     ref_type bptree_leaf_insert(std::size_t ndx, StringData, TreeInsertBase& state);
 
+    /// Construct a string array of the specified size and return just
+    /// the reference to the underlying memory. All elements will be
+    /// initialized to the empty string.
+    static MemRef create_array(std::size_t size, Allocator&);
+
     /// Create a new empty string array and attach this accessor to
     /// it. This does not modify the parent reference information of
     /// this accessor.
@@ -70,11 +76,6 @@ public:
     /// Note that the caller assumes ownership of the allocated
     /// underlying node. It is not owned by the accessor.
     void create();
-
-    /// Construct a string array of the specified size and return just
-    /// the reference to the underlying memory. All elements will be
-    /// initialized to the empty string.
-    static ref_type create_array(std::size_t size, Allocator&);
 
 #ifdef TIGHTDB_DEBUG
     void string_stats() const;
@@ -92,10 +93,19 @@ private:
 
 // Implementation:
 
+// Creates new array (but invalid, call init_from_ref() to init)
+inline ArrayString::ArrayString(Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(alloc)
+{
+}
+
 // Fastest way to instantiate an Array. For use with GetDirect() that only fills out m_width, m_data
 // and a few other basic things needed for read-only access. Or for use if you just want a way to call
 // some methods written in ArrayString.*
-inline ArrayString::ArrayString(no_prealloc_tag) TIGHTDB_NOEXCEPT: Array(*static_cast<Allocator*>(0)) {}
+inline ArrayString::ArrayString(no_prealloc_tag) TIGHTDB_NOEXCEPT:
+    Array(*static_cast<Allocator*>(0))
+{
+}
 
 inline ArrayString::ArrayString(ArrayParent* parent, std::size_t ndx_in_parent,
                                 Allocator& alloc): Array(alloc)
@@ -123,30 +133,25 @@ inline ArrayString::ArrayString(ref_type ref, ArrayParent* parent, std::size_t n
     set_parent(parent, ndx_in_parent);
 }
 
-// Creates new array (but invalid, call init_from_ref() to init)
-inline ArrayString::ArrayString(Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
-{
-}
-
 inline void ArrayString::create()
 {
     std::size_t size = 0;
-    ref_type ref = create_array(size, get_alloc()); // Throws
-    init_from_ref(ref);
+    MemRef mem = create_array(size, get_alloc()); // Throws
+    init_from_mem(mem);
 }
 
-inline ref_type ArrayString::create_array(std::size_t size, Allocator& alloc)
+inline MemRef ArrayString::create_array(std::size_t size, Allocator& alloc)
 {
     bool context_flag = false;
     int_fast64_t value = 0;
-    return Array::create_array(type_Normal, context_flag, wtype_Multiply,
-                               size, value, alloc); // Throws
+    return Array::create(type_Normal, context_flag, wtype_Multiply, size, value, alloc); // Throws
 }
 
 inline StringData ArrayString::get(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(ndx < m_size);
-    if (m_width == 0) return StringData("", 0);
+    if (m_width == 0)
+        return StringData("", 0);
     const char* data = m_data + (ndx * m_width);
     std::size_t size = (m_width-1) - data[m_width-1];
     return StringData(data, size);
@@ -166,7 +171,8 @@ inline StringData ArrayString::get(const char* header, std::size_t ndx) TIGHTDB_
 {
     TIGHTDB_ASSERT(ndx < get_size_from_header(header));
     std::size_t width = get_width_from_header(header);
-    if (width == 0) return StringData("", 0);
+    if (width == 0)
+        return StringData("", 0);
     const char* data = get_data_from_header(header) + (ndx * width);
     std::size_t size = (width-1) - data[width-1];
     return StringData(data, size);

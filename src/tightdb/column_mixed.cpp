@@ -63,7 +63,7 @@ void ColumnMixed::create(Allocator& alloc, Table* table, size_t column_ndx,
     }
 }
 
-void ColumnMixed::init_data_column()
+void ColumnMixed::init_binary_data_column()
 {
     if (m_binary_data)
         return;
@@ -175,7 +175,7 @@ void ColumnMixed::set_string(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
     detach_subtable_accessors();
-    init_data_column();
+    init_binary_data_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
 
@@ -209,7 +209,7 @@ void ColumnMixed::set_binary(size_t ndx, BinaryData value)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
     detach_subtable_accessors();
-    init_data_column();
+    init_binary_data_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
 
@@ -294,34 +294,29 @@ void ColumnMixed::do_detach_subtable_accessors() TIGHTDB_NOEXCEPT
 ref_type ColumnMixed::create(size_t size, Allocator& alloc)
 {
     Array top(alloc);
+    _impl::DeepArrayDestroyGuard dg(&top);
     top.create(Array::type_HasRefs); // Throws
-    try {
+
+    _impl::DeepArrayRefDestroyGuard dg_2(alloc);
+    {
         int_fast64_t v = mixcol_Int;
-        ref_type types_ref = Column::create(Array::type_Normal, size, v, alloc); // Throws
-        try {
-            v = types_ref; // FIXME: Dangerous cast: unsigned -> signed
-            top.add(v); // Throws
-        }
-        catch (...) {
-            Array::destroy(types_ref, alloc);
-            throw;
-        }
-        v = 1; // 1 + 2*value where value is 0
-        ref_type data_ref = Column::create(Array::type_HasRefs, size, v, alloc); // Throws
-        try {
-            v = data_ref; // FIXME: Dangerous cast: unsigned -> signed
-            top.add(v); // Throws
-        }
-        catch (...) {
-            Array::destroy_deep(data_ref, alloc);
-            throw;
-        }
-        return top.get_ref();
+        ref_type ref = Column::create(Array::type_Normal, size, v, alloc); // Throws
+        dg_2.reset(ref);
+        v = int_fast64_t(ref); // FIXME: Dangerous cast (unsigned -> signed)
+        top.add(v); // Throws
+        dg_2.release();
     }
-    catch (...) {
-        top.destroy_deep();
-        throw;
+    {
+        int_fast64_t v = 1; // 1 + 2*value where value is 0
+        ref_type ref = Column::create(Array::type_HasRefs, size, v, alloc); // Throws
+        dg_2.reset(ref);
+        v = int_fast64_t(ref); // FIXME: Dangerous cast (unsigned -> signed)
+        top.add(v); // Throws
+        dg_2.release();
     }
+
+    dg.release();
+    return top.get_ref();
 }
 
 

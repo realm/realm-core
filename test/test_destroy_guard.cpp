@@ -150,8 +150,9 @@ TEST(DestroyGuard_ArrayShallow)
         ShallowArrayDestroyGuard dg(&root);
         root.create(Array::type_HasRefs);
         {
-            ref_type child_ref = Array::create_empty_array(Array::type_Normal, alloc);
-            int_fast64_t v(child_ref);
+            bool context_flag = false;
+            MemRef child_mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
+            int_fast64_t v(child_mem.m_ref);
             root.add(v);
         }
     }
@@ -207,8 +208,10 @@ TEST(DestroyGuard_ArrayDeep)
             DeepArrayDestroyGuard dg(&root);
             root.create(Array::type_HasRefs);
             {
-                ref_type child_ref = Array::create_empty_array(Array::type_Normal, alloc);
-                int_fast64_t v(child_ref);
+                bool context_flag = false;
+                MemRef child_mem =
+                    Array::create_empty_array(Array::type_Normal, context_flag, alloc);
+                int_fast64_t v(child_mem.m_ref);
                 root.add(v);
             }
         }
@@ -224,9 +227,10 @@ TEST(DestroyGuard_ArrayRefDeep)
     {
         FooAlloc alloc;
         {
-            ref_type ref = Array::create_empty_array(Array::type_Normal, alloc);
-            DeepArrayRefDestroyGuard dg(ref, alloc);
-            CHECK_EQUAL(ref, dg.get());
+            bool context_flag = false;
+            MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
+            DeepArrayRefDestroyGuard dg(mem.m_ref, alloc);
+            CHECK_EQUAL(mem.m_ref, dg.get());
         }
         CHECK(alloc.empty());
     }
@@ -234,9 +238,10 @@ TEST(DestroyGuard_ArrayRefDeep)
     {
         FooAlloc alloc;
         {
-            ref_type ref = Array::create_empty_array(Array::type_Normal, alloc);
-            DeepArrayRefDestroyGuard dg(ref, alloc);
-            CHECK_EQUAL(ref, dg.release());
+            bool context_flag = false;
+            MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
+            DeepArrayRefDestroyGuard dg(mem.m_ref, alloc);
+            CHECK_EQUAL(mem.m_ref, dg.release());
         }
         CHECK(!alloc.empty());
         alloc.clear();
@@ -245,11 +250,12 @@ TEST(DestroyGuard_ArrayRefDeep)
     {
         FooAlloc alloc;
         {
+            bool context_flag = false;
             DeepArrayRefDestroyGuard dg(alloc);
-            ref_type ref_1 = Array::create_empty_array(Array::type_Normal, alloc);
-            dg.reset(ref_1);
-            ref_type ref_2 = Array::create_empty_array(Array::type_Normal, alloc);
-            dg.reset(ref_2);
+            MemRef mem_1 = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
+            dg.reset(mem_1.m_ref);
+            MemRef mem_2 = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
+            dg.reset(mem_2.m_ref);
         }
         CHECK(alloc.empty());
     }
@@ -261,8 +267,10 @@ TEST(DestroyGuard_ArrayRefDeep)
             {
                 Array root(alloc);
                 root.create(Array::type_HasRefs);
-                ref_type child_ref = Array::create_empty_array(Array::type_Normal, alloc);
-                int_fast64_t v(child_ref);
+                bool context_flag = false;
+                MemRef child_mem =
+                    Array::create_empty_array(Array::type_Normal, context_flag, alloc);
+                int_fast64_t v(child_mem.m_ref);
                 root.add(v);
                 root_ref = root.get_ref();
             }

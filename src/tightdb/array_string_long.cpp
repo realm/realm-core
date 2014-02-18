@@ -4,22 +4,12 @@
 
 #include <tightdb/array_string_long.hpp>
 #include <tightdb/array_blob.hpp>
+#include <tightdb/impl/destroy_guard.hpp>
 #include <tightdb/column.hpp>
 
 using namespace std;
 using namespace tightdb;
 
-
-ArrayStringLong::ArrayStringLong(ArrayParent* parent, size_t pndx, Allocator& alloc):
-    Array(type_HasRefs, parent, pndx, alloc),
-    m_offsets(type_Normal, 0, 0, alloc), m_blob(0, 0, alloc)
-{
-    // Add subarrays for long string
-    Array::add(m_offsets.get_ref());
-    Array::add(m_blob.get_ref());
-    m_offsets.set_parent(this, 0);
-    m_blob.set_parent(this, 1);
-}
 
 ArrayStringLong::ArrayStringLong(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
                                  Allocator& alloc) TIGHTDB_NOEXCEPT:
@@ -50,6 +40,16 @@ ArrayStringLong::ArrayStringLong(ref_type ref, ArrayParent* parent, size_t ndx_i
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
 }
+
+
+void ArrayStringLong::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
+{
+    Array::init_from_mem(mem);
+    ref_type offsets_ref = get_as_ref(0), blob_ref = get_as_ref(1);
+    m_offsets.init_from_ref(offsets_ref);
+    m_blob.init_from_ref(blob_ref);
+}
+
 
 void ArrayStringLong::add(StringData value)
 {
@@ -177,32 +177,64 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
 }
 
 
+// FIXME: Not exception safe (leaks are possible).
 ref_type ArrayStringLong::bptree_leaf_insert(size_t ndx, StringData value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
     TIGHTDB_ASSERT(leaf_size <= TIGHTDB_MAX_LIST_SIZE);
-    if (leaf_size < ndx) ndx = leaf_size;
+    if (leaf_size < ndx)
+        ndx = leaf_size;
     if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_LIST_SIZE)) {
-        insert(ndx, value);
+        insert(ndx, value); // Throws
         return 0; // Leaf was not split
     }
 
     // Split leaf node
-    ArrayStringLong new_leaf(0, 0, get_alloc());
+    ArrayStringLong new_leaf(get_alloc());
+    new_leaf.create(); // Throws
     if (ndx == leaf_size) {
-        new_leaf.add(value);
+        new_leaf.add(value); // Throws
         state.m_split_offset = ndx;
     }
     else {
-        for (size_t i = ndx; i != leaf_size; ++i) {
-            new_leaf.add(get(i));
-        }
-        truncate(ndx);
-        add(value);
+        for (size_t i = ndx; i != leaf_size; ++i)
+            new_leaf.add(get(i)); // Throws
+        truncate(ndx); // Throws
+        add(value); // Throws
         state.m_split_offset = ndx + 1;
     }
     state.m_split_size = leaf_size + 1;
     return new_leaf.get_ref();
+}
+
+
+MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc)
+{
+    Array top(alloc);
+    _impl::DeepArrayDestroyGuard dg(&top);
+    top.create(type_HasRefs); // Throws
+
+    _impl::DeepArrayRefDestroyGuard dg_2(alloc);
+    {
+        bool context_flag = false;
+        int_fast64_t value = 0;
+        MemRef mem = Array::create_array(type_Normal, context_flag, size, value, alloc); // Throws
+        dg_2.reset(mem.m_ref);
+        int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        top.add(v); // Throws
+        dg_2.release();
+    }
+    {
+        size_t blobs_size = 0;
+        MemRef mem = ArrayBlob::create_array(blobs_size, alloc); // Throws
+        dg_2.reset(mem.m_ref);
+        int_fast64_t v(mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        top.add(v); // Throws
+        dg_2.release();
+    }
+
+    dg.release();
+    return top.get_mem();
 }
 
 

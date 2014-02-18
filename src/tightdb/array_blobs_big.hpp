@@ -29,12 +29,14 @@ class ArrayBigBlobs: public Array {
 public:
     typedef BinaryData value_type;
 
+    explicit ArrayBigBlobs(Allocator&) TIGHTDB_NOEXCEPT;
+    ArrayBigBlobs(MemRef,   ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
+    ArrayBigBlobs(ref_type, ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
+
+    /// FIXME: Deprecated. The constructor must not allocate anything
+    /// that the destructor does not deallocate.
     explicit ArrayBigBlobs(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                         Allocator& = Allocator::get_default());
-    ArrayBigBlobs(MemRef, ArrayParent*, std::size_t ndx_in_parent,
-                Allocator&) TIGHTDB_NOEXCEPT;
-    ArrayBigBlobs(ref_type, ArrayParent*, std::size_t ndx_in_parent,
-                Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
+                           Allocator& = Allocator::get_default());
 
     BinaryData get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void set(std::size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -74,6 +76,14 @@ public:
     ref_type bptree_leaf_insert_string(std::size_t ndx, StringData, TreeInsertBase& state);
     //@}
 
+    /// Create a new empty big blobs array and attach this accessor to
+    /// it. This does not modify the parent reference information of
+    /// this accessor.
+    ///
+    /// Note that the caller assumes ownership of the allocated
+    /// underlying node. It is not owned by the accessor.
+    void create();
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const;
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
@@ -84,11 +94,18 @@ public:
 
 // Implementation:
 
+inline ArrayBigBlobs::ArrayBigBlobs(Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(alloc)
+{
+}
+
 inline ArrayBigBlobs::ArrayBigBlobs(ArrayParent* parent, std::size_t ndx_in_parent,
                                     Allocator& alloc):
-    Array(type_HasRefs, parent, ndx_in_parent, alloc)
+    Array(alloc)
 {
-    set_context_flag(true);
+    create(); // Throws
+    set_parent(parent, ndx_in_parent);
+    update_parent(); // Throws
 }
 
 inline ArrayBigBlobs::ArrayBigBlobs(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
@@ -186,6 +203,12 @@ inline ref_type ArrayBigBlobs::bptree_leaf_insert_string(std::size_t ndx, String
     BinaryData bin(value.data(), value.size());
     bool add_zero_term = true;
     return bptree_leaf_insert(ndx, bin, add_zero_term, state);
+}
+
+inline void ArrayBigBlobs::create()
+{
+    bool context_flag = true;
+    Array::create(type_HasRefs, context_flag); // Throws
 }
 
 

@@ -28,14 +28,16 @@ namespace tightdb {
 /// types like float, double.
 template<class T> class BasicArray: public Array {
 public:
-    explicit BasicArray(ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
-                        Allocator& = Allocator::get_default());
-    BasicArray(MemRef, ArrayParent*, std::size_t ndx_in_parent,
-               Allocator&) TIGHTDB_NOEXCEPT;
-    BasicArray(ref_type, ArrayParent*, std::size_t ndx_in_parent,
-               Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
+    explicit BasicArray(Allocator&) TIGHTDB_NOEXCEPT;
+    BasicArray(MemRef,   ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
+    BasicArray(ref_type, ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
     explicit BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT;
     ~BasicArray() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+
+    /// FIXME: Deprecated. The constructor must not allocate anything
+    /// that the destructor does not deallocate.
+    explicit BasicArray(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                        Allocator& = Allocator::get_default());
 
     T get(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void add(T value);
@@ -65,6 +67,11 @@ public:
     std::size_t lower_bound(T value) const TIGHTDB_NOEXCEPT;
     std::size_t upper_bound(T value) const TIGHTDB_NOEXCEPT;
 
+    /// Construct a basic array of the specified size and return just
+    /// the reference to the underlying memory. All elements will be
+    /// initialized to `T()`.
+    static MemRef create_array(std::size_t size, Allocator&);
+
     /// Create a new empty array and attach this accessor to it. This
     /// does not modify the parent reference information of this
     /// accessor.
@@ -72,11 +79,6 @@ public:
     /// Note that the caller assumes ownership of the allocated
     /// underlying node. It is not owned by the accessor.
     void create();
-
-    /// Construct a basic array of the specified size and return just
-    /// the reference to the underlying memory. All elements will be
-    /// initialized to `T()`.
-    static ref_type create_array(std::size_t size, Allocator&);
 
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, StringData title = StringData()) const;

@@ -1074,7 +1074,8 @@ public:
     CreateHandler(Allocator& alloc): m_alloc(alloc) {}
     ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
     {
-        return ArrayString::create_array(size, m_alloc);
+        MemRef mem = ArrayString::create_array(size, m_alloc); // Throws
+        return mem.m_ref;
     }
 private:
     Allocator& m_alloc;

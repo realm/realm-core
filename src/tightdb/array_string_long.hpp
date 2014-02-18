@@ -29,12 +29,34 @@ class ArrayStringLong: public Array {
 public:
     typedef StringData value_type;
 
-    explicit ArrayStringLong(ArrayParent* = null_ptr, std::size_t ndx_in_parent = 0,
-                             Allocator& = Allocator::get_default());
-    ArrayStringLong(MemRef, ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
+    explicit ArrayStringLong(Allocator&) TIGHTDB_NOEXCEPT;
+    ArrayStringLong(MemRef, ArrayParent*, std::size_t ndx_in_parent,
+                    Allocator&) TIGHTDB_NOEXCEPT;
     ArrayStringLong(ref_type, ArrayParent*, std::size_t ndx_in_parent,
-                    Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
+                    Allocator&) TIGHTDB_NOEXCEPT;
     ~ArrayStringLong() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+
+    /// FIXME: Deprecated. The constructor must not allocate anything
+    /// that the destructor does not deallocate.
+    explicit ArrayStringLong(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
+                             Allocator& = Allocator::get_default());
+
+    /// Create a new empty long string array and attach this accessor to
+    /// it. This does not modify the parent reference information of
+    /// this accessor.
+    ///
+    /// Note that the caller assumes ownership of the allocated
+    /// underlying node. It is not owned by the accessor.
+    void create();
+
+    /// Reinitialize this array accessor to point to the specified new
+    /// underlying memory. This does not modify the parent reference
+    /// information of this accessor.
+    void init_from_ref(ref_type) TIGHTDB_NOEXCEPT;
+
+    /// Same as init_from_ref(ref_type) but avoid the mapping of 'ref'
+    /// to memory pointer.
+    void init_from_mem(MemRef) TIGHTDB_NOEXCEPT;
 
     bool is_empty() const TIGHTDB_NOEXCEPT;
     std::size_t size() const TIGHTDB_NOEXCEPT;
@@ -66,6 +88,11 @@ public:
 
     static std::size_t get_size_from_header(const char*, Allocator&) TIGHTDB_NOEXCEPT;
 
+    /// Construct a long string array of the specified size and return
+    /// just the reference to the underlying memory. All elements will
+    /// be initialized to zero size blobs.
+    static MemRef create_array(std::size_t size, Allocator&);
+
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
@@ -79,6 +106,38 @@ private:
 
 
 // Implementation:
+
+inline ArrayStringLong::ArrayStringLong(Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(alloc), m_offsets(alloc), m_blob(alloc)
+{
+    m_offsets.set_parent(this, 0);
+    m_blob.set_parent(this, 1);
+}
+
+inline ArrayStringLong::ArrayStringLong(ArrayParent* parent, std::size_t ndx_in_parent,
+                                        Allocator& alloc):
+    Array(alloc), m_offsets(alloc), m_blob(alloc)
+{
+    create(); // Throws
+    set_parent(parent, ndx_in_parent);
+    update_parent(); // Throws
+    m_offsets.set_parent(this, 0);
+    m_blob.set_parent(this, 1);
+}
+
+inline void ArrayStringLong::create()
+{
+    std::size_t size = 0;
+    MemRef mem = create_array(size, get_alloc()); // Throws
+    init_from_mem(mem);
+}
+
+inline void ArrayStringLong::init_from_ref(ref_type ref) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ref);
+    char* header = get_alloc().translate(ref);
+    init_from_mem(MemRef(header, ref));
+}
 
 inline bool ArrayStringLong::is_empty() const TIGHTDB_NOEXCEPT
 {

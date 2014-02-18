@@ -27,12 +27,14 @@ namespace tightdb {
 
 class ArrayBlob: public Array {
 public:
+    explicit ArrayBlob(Allocator&) TIGHTDB_NOEXCEPT;
+    ArrayBlob(ref_type, ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
+    ~ArrayBlob() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+
+    /// FIXME: Deprecated. The constructor must not allocate anything
+    /// that the destructor does not deallocate.
     explicit ArrayBlob(ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                        Allocator& = Allocator::get_default());
-    ArrayBlob(ref_type, ArrayParent*, std::size_t ndx_in_parent,
-              Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
-    explicit ArrayBlob(Allocator&) TIGHTDB_NOEXCEPT;
-    ~ArrayBlob() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
 
     const char* get(std::size_t pos) const TIGHTDB_NOEXCEPT;
 
@@ -59,7 +61,7 @@ public:
     /// Construct a blob of the specified size and return just the
     /// reference to the underlying memory. All bytes will be
     /// initialized to zero.
-    static ref_type create_array(std::size_t size, Allocator&);
+    static MemRef create_array(std::size_t size, Allocator&);
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const;
@@ -78,6 +80,12 @@ private:
 
 // Implementation:
 
+// Creates new array (but invalid, call init_from_ref() to init)
+inline ArrayBlob::ArrayBlob(Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(alloc)
+{
+}
+
 inline ArrayBlob::ArrayBlob(ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
     Array(type_Normal, parent, ndx_in_parent, alloc)
 {
@@ -87,16 +95,14 @@ inline ArrayBlob::ArrayBlob(ArrayParent* parent, std::size_t ndx_in_parent, Allo
 }
 
 inline ArrayBlob::ArrayBlob(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
-                            Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
+                            Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(alloc)
 {
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
     init_from_ref(ref);
     set_parent(parent, ndx_in_parent);
 }
-
-// Creates new array (but invalid, call init_from_ref() to init)
-inline ArrayBlob::ArrayBlob(Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc) {}
 
 inline const char* ArrayBlob::get(std::size_t pos) const TIGHTDB_NOEXCEPT
 {
@@ -130,16 +136,15 @@ inline const char* ArrayBlob::get(const char* header, std::size_t pos) TIGHTDB_N
 inline void ArrayBlob::create()
 {
     std::size_t size = 0;
-    ref_type ref = create_array(size, get_alloc()); // Throws
-    init_from_ref(ref);
+    MemRef mem = create_array(size, get_alloc()); // Throws
+    init_from_mem(mem);
 }
 
-inline ref_type ArrayBlob::create_array(std::size_t size, Allocator& alloc)
+inline MemRef ArrayBlob::create_array(std::size_t size, Allocator& alloc)
 {
-    bool contest_flag = false;
+    bool context_flag = false;
     int_fast64_t value = 0;
-    return Array::create_array(type_Normal, contest_flag, wtype_Ignore,
-                               size, value, alloc); // Throws
+    return Array::create(type_Normal, context_flag, wtype_Ignore, size, value, alloc); // Throws
 }
 
 inline std::size_t ArrayBlob::CalcByteLen(std::size_t count, std::size_t) const

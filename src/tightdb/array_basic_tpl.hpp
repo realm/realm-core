@@ -25,7 +25,15 @@
 #include <stdexcept>
 #include <iomanip>
 
+#include <tightdb/impl/destroy_guard.hpp>
+
 namespace tightdb {
+
+template<class T>
+inline BasicArray<T>::BasicArray(Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(alloc)
+{
+}
 
 template<class T>
 inline BasicArray<T>::BasicArray(ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
@@ -38,7 +46,8 @@ inline BasicArray<T>::BasicArray(ArrayParent* parent, std::size_t ndx_in_parent,
 
 template<class T>
 inline BasicArray<T>::BasicArray(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
-                                 Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
+                                 Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(alloc)
 {
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
@@ -48,7 +57,8 @@ inline BasicArray<T>::BasicArray(MemRef mem, ArrayParent* parent, std::size_t nd
 
 template<class T>
 inline BasicArray<T>::BasicArray(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
-                                 Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
+                                 Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(alloc)
 {
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
@@ -57,8 +67,30 @@ inline BasicArray<T>::BasicArray(ref_type ref, ArrayParent* parent, std::size_t 
 }
 
 template<class T>
-inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT: Array(no_prealloc_tag())
+inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT:
+    Array(no_prealloc_tag())
 {
+}
+
+
+template<class T>
+inline MemRef BasicArray<T>::create_array(std::size_t size, Allocator& alloc)
+{
+    std::size_t byte_size_0 = calc_aligned_byte_size(size); // Throws
+    // Adding zero to Array::initial_capacity to avoid taking the
+    // address of that member
+    std::size_t byte_size = std::max(byte_size_0, Array::initial_capacity+0); // Throws
+
+    MemRef mem = alloc.alloc(byte_size); // Throws
+
+    bool is_inner_bptree_node = false;
+    bool has_refs = false;
+    bool context_flag = false;
+    int width = sizeof (T);
+    init_header(mem.m_addr, is_inner_bptree_node, has_refs, context_flag, wtype_Multiply,
+                width, size, byte_size);
+
+    return mem;
 }
 
 
@@ -66,29 +98,8 @@ template<class T>
 inline void BasicArray<T>::create()
 {
     std::size_t size = 0;
-    ref_type ref = create_array(size, get_alloc()); // Throws
-    init_from_ref(ref);
-}
-
-
-template<class T>
-inline ref_type BasicArray<T>::create_array(std::size_t size, Allocator& alloc)
-{
-    std::size_t byte_size_0 = calc_aligned_byte_size(size); // Throws
-    // Adding zero to Array::initial_capacity to avoid taking the
-    // address of that member
-    std::size_t byte_size = std::max(byte_size_0, Array::initial_capacity+0); // Throws
-
-    MemRef mem_ref = alloc.alloc(byte_size); // Throws
-
-    bool is_inner_bptree_node = false;
-    bool has_refs = false;
-    bool context_flag = false;
-    int width = sizeof (T);
-    init_header(mem_ref.m_addr, is_inner_bptree_node, has_refs, context_flag, wtype_Multiply,
-                width, size, byte_size);
-
-    return mem_ref.m_ref;
+    MemRef mem = create_array(size, get_alloc()); // Throws
+    init_from_mem(mem);
 }
 
 

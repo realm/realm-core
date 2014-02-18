@@ -6,6 +6,7 @@
 #include <iostream>
 #include <iomanip>
 
+#include <tightdb/impl/destroy_guard.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/column_table.hpp>
 #include <tightdb/column_mixed.hpp>
@@ -274,6 +275,8 @@ template<class Op> void col_type_deleg(Op& op, ColumnType type)
 
 } // anonymous namespace
 
+
+
 size_t ColumnBase::get_size_from_type_and_ref(ColumnType type, ref_type ref,
                                               Allocator& alloc) TIGHTDB_NOEXCEPT
 {
@@ -288,9 +291,9 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
 {
     // At this point the original root and its new sibling is either
     // both leaves, or both inner nodes on the same form, compact or
-    // general. Due to invar:bptree-node-form, the new root may be on
-    // the compact form if is_append is true and both are either
-    // leaves or inner nodes on the compact form.
+    // general. Due to invar:bptree-node-form, the new root is allowed
+    // to be on the compact form if is_append is true and both
+    // siblings are either leaves or inner nodes on the compact form.
 
     Array* orig_root = m_array;
     Allocator& alloc = orig_root->get_alloc();
@@ -299,7 +302,7 @@ void ColumnBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
     UniquePtr<Array> new_root(new Array(Array::type_InnerBptreeNode,
                                         parent, ndx_in_parent, alloc)); // Throws
     bool compact_form =
-        is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 == 1);
+        is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 != 0);
     // Something is wrong if we were not appending and the original
     // root is still on the compact form.
     TIGHTDB_ASSERT(!compact_form || is_append);
@@ -751,7 +754,10 @@ public:
         m_leaf_type(leaf_type), m_value(value), m_alloc(alloc) {}
     ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
     {
-        return Array::create_array(m_leaf_type, size, m_value, m_alloc);
+        bool context_flag = false;
+        MemRef mem = Array::create_array(m_leaf_type, context_flag, size,
+                                         m_value, m_alloc); // Throws
+        return mem.m_ref;
     }
 private:
     const Array::Type m_leaf_type;

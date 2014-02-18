@@ -391,7 +391,8 @@ TEST(Table_GetName)
 
 namespace {
 
-void setup_multi_table(Table& table, size_t rows, size_t sub_rows)
+void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
+                       bool fixed_subtab_sizes = false)
 {
     // Create table with all column types
     {
@@ -412,97 +413,71 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows)
         sub1->add_column(type_String,     "sub_second");
     }
 
+    table.add_empty_row(rows);
+
     // Add some rows
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i%2 == 0) ? 1 : -1;
-        table.insert_int(0, i, int64_t(i*sign));
-        table.insert_bool(1, i, (i % 2 ? true : false));
-        table.insert_datetime(2, i, 12345);
-        table.insert_float(3, i, 123.456f*sign);
-        table.insert_double(4, i, 9876.54321*sign);
-
-        stringstream ss;
-        ss << "string" << i;
-        table.insert_string(5, i, ss.str().c_str());
-
-        ss << " very long string.........";
-        table.insert_string(6, i, ss.str().c_str());
-
+        table.set_int(0, i, int64_t(i*sign));
+    }
+    for (size_t i = 0; i < rows; ++i)
+        table.set_bool(1, i, (i % 2 ? true : false));
+    for (size_t i = 0; i < rows; ++i)
+        table.set_datetime(2, i, 12345);
+    for (size_t i = 0; i < rows; ++i) {
+        int64_t sign = (i%2 == 0) ? 1 : -1;
+        table.set_float(3, i, 123.456f*sign);
+    }
+    for (size_t i = 0; i < rows; ++i) {
+        int64_t sign = (i%2 == 0) ? 1 : -1;
+        table.set_double(4, i, 9876.54321*sign);
+    }
+    vector<string> strings;
+    for (size_t i = 0; i < rows; ++i) {
+        stringstream out;
+        out << "string" << i;
+        strings.push_back(out.str());
+    }
+    for (size_t i = 0; i < rows; ++i)
+        table.set_string(5, i, strings[i]);
+    for (size_t i = 0; i < rows; ++i)
+        table.set_string(6, i, strings[i] + " very long string.........");
+    for (size_t i = 0; i < rows; ++i) {
         switch (i % 2) {
-            case 0:
+            case 0: {
+                string s = strings[i];
+                s += " very long string.........";
                 for (int j = 0; j != 4; ++j)
-                    ss << " big blobs big blobs big blobs"; // +30
-                table.insert_string(7, i, ss.str().c_str());
+                    s += " big blobs big blobs big blobs"; // +30
+                table.set_string(7, i, s);
                 break;
+            }
             case 1:
-                table.insert_string(7, i, "");
+                table.set_string(7, i, "");
                 break;
         }
-
+    }
+    for (size_t i = 0; i < rows; ++i) {
         switch (i % 3) {
             case 0:
-                table.insert_string(8, i, "enum1");
+                table.set_string(8, i, "enum1");
                 break;
             case 1:
-                table.insert_string(8, i, "enum2");
+                table.set_string(8, i, "enum2");
                 break;
             case 2:
-                table.insert_string(8, i, "enum3");
+                table.set_string(8, i, "enum3");
                 break;
         }
-
-        table.insert_binary(9, i, BinaryData("binary", 7));
-
-        table.insert_subtable(10, i);
-
-        switch (i % 8) {
-            case 0:
-                table.insert_mixed(11, i, false);
-                break;
-            case 1:
-                table.insert_mixed(11, i, int64_t(i*i*sign));
-                break;
-            case 2:
-                table.insert_mixed(11, i, "string");
-                break;
-            case 3:
-                table.insert_mixed(11, i, DateTime(123456789));
-                break;
-            case 4:
-                table.insert_mixed(11, i, BinaryData("binary", 7));
-                break;
-            case 5:
-            {
-                // Add subtable to mixed column
-                // We can first set schema and contents when the entire
-                // row has been inserted
-                table.insert_mixed(11, i, Mixed::subtable_tag());
-                break;
-            }
-            case 6:
-                table.insert_mixed(11, i, float(123.1*i*sign));
-                break;
-            case 7:
-                table.insert_mixed(11, i, double(987.65*i*sign));
-                break;
-        }
-
-        table.insert_done();
-
-        // Add subtable to mixed column
-        if (i % 8 == 5) {
-            TableRef subtable = table.get_subtable(11, i);
-            subtable->add_column(type_Int,    "first");
-            subtable->add_column(type_String, "second");
-            for (size_t j=0; j<2; j++) {
-                subtable->insert_int(0, j, i*i*j*sign);
-                subtable->insert_string(1, j, "mixed sub");
-                subtable->insert_done();
-            }
-        }
-
-        // Add sub-tables to table column
-        for (size_t j = 0; j != sub_rows+i; ++j) {
+    }
+    for (size_t i = 0; i < rows; ++i)
+        table.set_binary(9, i, BinaryData("binary", 7));
+    for (size_t i = 0; i < rows; ++i) {
+        int64_t sign = (i%2 == 0) ? 1 : -1;
+        size_t n = sub_rows;
+        if (!fixed_subtab_sizes)
+            n += i;
+        for (size_t j = 0; j != n; ++j) {
             TableRef subtable = table.get_subtable(10, i);
             int64_t val = -123+i*j*1234*sign;
             subtable->insert_int(0, j, val);
@@ -510,6 +485,48 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows)
             subtable->insert_done();
         }
     }
+    for (size_t i = 0; i < rows; ++i) {
+        int64_t sign = (i%2 == 0) ? 1 : -1;
+        switch (i % 8) {
+            case 0:
+                table.set_mixed(11, i, false);
+                break;
+            case 1:
+                table.set_mixed(11, i, int64_t(i*i*sign));
+                break;
+            case 2:
+                table.set_mixed(11, i, "string");
+                break;
+            case 3:
+                table.set_mixed(11, i, DateTime(123456789));
+                break;
+            case 4:
+                table.set_mixed(11, i, BinaryData("binary", 7));
+                break;
+            case 5: {
+                // Add subtable to mixed column
+                // We can first set schema and contents when the entire
+                // row has been inserted
+                table.set_mixed(11, i, Mixed::subtable_tag());
+                TableRef subtable = table.get_subtable(11, i);
+                subtable->add_column(type_Int,    "first");
+                subtable->add_column(type_String, "second");
+                for (size_t j = 0; j != 2; ++j) {
+                    subtable->insert_int(0, j, i*i*j*sign);
+                    subtable->insert_string(1, j, "mixed sub");
+                    subtable->insert_done();
+                }
+                break;
+            }
+            case 6:
+                table.set_mixed(11, i, float(123.1*i*sign));
+                break;
+            case 7:
+                table.set_mixed(11, i, double(987.65*i*sign));
+                break;
+        }
+    }
+
     // We also want a ColumnStringEnum
     table.optimize();
 }
@@ -2931,5 +2948,6 @@ TEST(Table_pivot)
         table.optimize();
     }
 }
+
 
 #endif // TEST_TABLE

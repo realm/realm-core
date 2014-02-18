@@ -26,6 +26,7 @@
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/array.hpp>
 #include <tightdb/column_type.hpp>
+#include <tightdb/impl/output_stream.hpp>
 #include <tightdb/query_conditions.hpp>
 
 namespace tightdb {
@@ -85,12 +86,19 @@ public:
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
 
+    /// Returns the 'ref' of the root array.
     ref_type get_ref() const TIGHTDB_NOEXCEPT { return m_array->get_ref(); }
 
     void set_parent(ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
 
+    //@{
+    /// Returns the array node at the root of this column, but note
+    /// that there is no guarantee that this node is an inner B+-tree
+    /// node or a leaf. This is the case for a MixedColumn in
+    /// particular.
     Array* get_root_array() TIGHTDB_NOEXCEPT { return m_array; }
     const Array* get_root_array() const TIGHTDB_NOEXCEPT { return m_array; }
+    //@}
 
     /// Provides access to the leaf that contains the element at the
     /// specified index. Upon return \a ndx_in_leaf will be set to the
@@ -142,9 +150,6 @@ protected:
 
     virtual void do_detach_subtable_accessors() TIGHTDB_NOEXCEPT {}
 
-    // Tree functions
-    template<class T, class C, class S> std::size_t TreeWrite(S& out, size_t& pos) const;
-
     //@{
     /// \tparam L Any type with an appropriate `value_type`, %size(),
     /// and %get() members.
@@ -170,6 +175,7 @@ protected:
     class CreateHandler {
     public:
         virtual ref_type create_leaf(std::size_t size) = 0;
+        ~CreateHandler() TIGHTDB_NOEXCEPT {}
     };
 
     static ref_type create(std::size_t size, Allocator&, CreateHandler&);

@@ -5,8 +5,9 @@
 #include <iomanip>
 
 #include <tightdb/utilities.hpp>
-#include <tightdb/column.hpp>
 #include <tightdb/array_string.hpp>
+#include <tightdb/impl/destroy_guard.hpp>
+#include <tightdb/column.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -319,7 +320,7 @@ void ArrayString::find_all(Array& result, StringData value, size_t add_offset,
     }
 }
 
-bool ArrayString::compare_string(const ArrayString& c) const
+bool ArrayString::compare_string(const ArrayString& c) const TIGHTDB_NOEXCEPT
 {
     if (c.size() != size())
         return false;

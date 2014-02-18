@@ -355,7 +355,10 @@ private:
     // Overriding method in Table::Parent
     void child_accessor_destroyed(std::size_t) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
-    void write(_impl::OutputStream&) const;
+    class TableWriter;
+    class DefaultTableWriter;
+
+    static void write(std::ostream&, TableWriter&);
 
     /// Create a new underlying node structure and attach this
     /// accessor instance to it
@@ -391,6 +394,7 @@ private:
     void set_replication(Replication* r) TIGHTDB_NOEXCEPT { m_alloc.set_replication(r); }
 #endif
 
+    friend class Table;
     friend class GroupWriter;
     friend class SharedGroup;
     friend class LangBindHelper;
@@ -605,6 +609,13 @@ inline void Group::child_accessor_destroyed(std::size_t) TIGHTDB_NOEXCEPT
 {
     // Ignore
 }
+
+class Group::TableWriter {
+public:
+    virtual std::size_t write_names(_impl::OutputStream&) = 0;
+    virtual std::size_t write_tables(_impl::OutputStream&) = 0;
+    virtual ~TableWriter() TIGHTDB_NOEXCEPT {}
+};
 
 template<class S> void Group::to_json(S& out) const
 {

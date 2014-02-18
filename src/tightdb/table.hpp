@@ -562,8 +562,7 @@ private:
     Array m_columns;
     Spec m_spec;
 
-    // Column accessor instances
-    Array m_cols;
+    Array m_cols; // Column accessors
     mutable std::size_t m_ref_count;
     mutable const StringIndex* m_lookup_index;
     mutable Descriptor* m_descriptor;
@@ -1113,7 +1112,7 @@ inline bool Table::operator==(const Table& t) const
 
 inline bool Table::operator!=(const Table& t) const
 {
-    return m_spec != t.m_spec || !compare_rows(t); // Throws
+    return !(*this == t); // Throws
 }
 
 inline void Table::insert_into(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const

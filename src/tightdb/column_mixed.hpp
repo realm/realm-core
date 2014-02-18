@@ -177,7 +177,7 @@ private:
     void create(Allocator&, Table*, std::size_t column_ndx);
     void create(Allocator&, Table*, std::size_t column_ndx,
                 ArrayParent*, std::size_t ndx_in_parent, ref_type);
-    void init_data_column();
+    void init_binary_data_column();
 
     void clear_value(std::size_t ndx, MixedColType new_type);
 
