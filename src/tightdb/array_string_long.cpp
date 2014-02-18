@@ -238,6 +238,24 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc)
 }
 
 
+MemRef ArrayStringLong::slice(size_t offset, size_t size, Allocator& target_alloc) const
+{
+    TIGHTDB_ASSERT(is_attached());
+
+    ArrayStringLong slice(target_alloc);
+    _impl::ShallowArrayDestroyGuard dg(&slice);
+    slice.create(); // Throws
+    size_t begin = offset;
+    size_t end   = offset + size;
+    for (size_t i = begin; i != end; ++i) {
+        StringData value = get(i);
+        slice.add(value); // Throws
+    }
+    dg.release();
+    return slice.get_mem();
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 void ArrayStringLong::to_dot(ostream& out, StringData title) const

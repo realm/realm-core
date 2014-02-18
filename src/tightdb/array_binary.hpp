@@ -84,6 +84,10 @@ public:
     /// initialized to zero size blobs.
     static MemRef create_array(std::size_t size, Allocator&);
 
+    /// Construct a copy of the specified slice of this binary array
+    /// using the specified target allocator.
+    MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
+
 #ifdef TIGHTDB_DEBUG
     void to_dot(std::ostream&, bool is_strings, StringData title = StringData()) const;
 #endif

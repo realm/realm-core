@@ -64,6 +64,10 @@ public:
 
     static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) TIGHTDB_NOEXCEPT;
 
+    // Overrriding method in ColumnBase
+    ref_type write(std::size_t, std::size_t, std::size_t,
+                   _impl::OutputStream&) const TIGHTDB_OVERRIDE;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;
@@ -90,6 +94,7 @@ private:
 
     class EraseLeafElem;
     class CreateHandler;
+    class SliceHandler;
 
     /// Root must be a leaf. Upgrades the root leaf if
     /// necessary. Returns true if, and only if the root is a 'big

@@ -385,6 +385,21 @@ public:
     /// FIXME: Belongs in IntegerArray
     static MemRef create_empty_array(Type, bool context_flag, Allocator&);
 
+    /// Construct a shallow copy of the specified slice of this array
+    /// using the specified target allocator. Subarrays will **not**
+    /// be cloned. See slice_and_clone_children() for an alternative.
+    ///
+    /// FIXME: Belongs in IntegerArray
+    MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
+
+    /// Construct a deep copy of the specified slice of this array
+    /// using the specified target allocator. Subarrays will be
+    /// cloned.
+    ///
+    /// FIXME: Belongs in IntegerArray
+    MemRef slice_and_clone_children(std::size_t offset, std::size_t size,
+                                    Allocator& target_alloc) const;
+
     // Parent tracking
     bool has_parent() const TIGHTDB_NOEXCEPT;
     ArrayParent* get_parent() const TIGHTDB_NOEXCEPT;

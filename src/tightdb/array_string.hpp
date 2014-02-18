@@ -77,6 +77,10 @@ public:
     /// underlying node. It is not owned by the accessor.
     void create();
 
+    /// Construct a copy of the specified slice of this string array
+    /// using the specified target allocator.
+    MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
+
 #ifdef TIGHTDB_DEBUG
     void string_stats() const;
     void to_dot(std::ostream&, StringData title = StringData()) const;

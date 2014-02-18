@@ -290,6 +290,66 @@ bool Array::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 }
 
 
+MemRef Array::slice(size_t offset, size_t size, Allocator& target_alloc) const
+{
+    TIGHTDB_ASSERT(is_attached());
+
+    Array slice(target_alloc);
+    _impl::DeepArrayDestroyGuard dg(&slice);
+    Type type = get_type();
+    bool context_flag = get_context_flag();
+    slice.create(type, context_flag); // Throws
+    size_t begin = offset;
+    size_t end   = offset + size;
+    for (size_t i = begin; i != end; ++i) {
+        int_fast64_t value = get(i);
+        slice.add(value); // Throws
+    }
+    dg.release();
+    return slice.get_mem();
+}
+
+
+MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& target_alloc) const
+{
+    TIGHTDB_ASSERT(is_attached());
+    if (!has_refs())
+        return slice(offset, size, target_alloc); // Throws
+
+    Array slice(target_alloc);
+    _impl::DeepArrayDestroyGuard dg(&slice);
+    Type type = get_type();
+    bool context_flag = get_context_flag();
+    slice.create(type, context_flag); // Throws
+    _impl::DeepArrayRefDestroyGuard dg_2(target_alloc);
+    size_t begin = offset;
+    size_t end   = offset + size;
+    for (size_t i = begin; i != end; ++i) {
+        int_fast64_t value = get(i);
+
+        // Null-refs signify empty subtrees. Also, all refs are
+        // 8-byte aligned, so the lowest bits cannot be set. If they
+        // are, it means that it should not be interpreted as a ref.
+        bool is_subarray = value != 0 && value % 2 == 0;
+        if (!is_subarray) {
+            slice.add(value); // Throws
+            continue;
+        }
+
+        ref_type ref = to_ref(value);
+        Allocator& alloc = get_alloc();
+        const char* subheader = alloc.translate(ref);
+        MemRef new_mem = clone(subheader, alloc, target_alloc); // Throws
+        dg_2.reset(new_mem.m_ref);
+        value = new_mem.m_ref; // FIXME: Dangerous cast (unsigned -> signed)
+        slice.add(value); // Throws
+        dg_2.release();
+    }
+    dg.release();
+    return slice.get_mem();
+}
+
+
 // Allocates space for 'count' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
 void Array::Preset(size_t width, size_t size)
 {
