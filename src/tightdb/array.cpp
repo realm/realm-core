@@ -350,7 +350,7 @@ MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& ta
 }
 
 
-// Allocates space for 'count' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
+// Allocates space for 'size' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
 void Array::Preset(size_t width, size_t size)
 {
     clear_and_destroy_children();
