@@ -507,8 +507,8 @@ public:
     /// the same name as the source table (see get_name()). Indexes
     /// (see set_index()) will not be carried over to the new table.
     ///
-    /// \param offset Index of first row to include (if \a size >
-    /// 0). Must be less than, or equal to size().
+    /// \param offset Index of first row to include (if `size >
+    /// 0`). Must be less than, or equal to size().
     ///
     /// \param size Number of rows to include. May be zero. If `size >
     /// size() - offset`, then the effective size of the written slice
