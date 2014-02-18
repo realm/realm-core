@@ -2,18 +2,44 @@
 #include <string>
 #include <iostream>
 
-#include <tightdb/column_basic.hpp>
 #include <tightdb/column_mixed.hpp>
-#include <tightdb/group.hpp>
+#include <tightdb.hpp>
 
 using namespace std;
 using namespace tightdb;
+
+/*
+
+NB: Currently, no conversion is done! This code just shows how to go
+about handling conversion when it becomes necessary.
+
+The main idea is to allow the incoming file format older version to be
+older than the one supported by the current version of the core
+library.
+
+This is handled by accessing the incoming database in a low-level way,
+where version differences can be incorporated as alternative
+branches. The new copy is built using the high-level API which will
+ensure that the new copy uses the current format.
+
+Testing:
+
+To be able to test this, we need a repository of datbase files using
+older file format versions. Each file must contain data that expresses
+all important variations of the file format: Tables of various size
+such that there at least a 0, 1, and 2 level B+-tree. Tables with all
+column types, including string enumerations. Strings and binrary data
+of various sizes to trigger each leaf type.
+
+*/
+
 
 // FIXME: Command line switch to optimize output group
 
 namespace {
 
-template<class A> struct Wrap {
+template<class A> class Wrap {
+public:
     A m_array;
     bool m_must_destroy;
     Wrap(Allocator& alloc): m_array(alloc), m_must_destroy(false) {}
@@ -24,7 +50,8 @@ template<class A> struct Wrap {
 };
 
 
-struct Converter {
+class Converter {
+public:
     Converter(SlabAlloc& alloc, ref_type top_ref, int version, Group& group):
         m_alloc(alloc), m_top_ref(top_ref), m_version(version), m_new_group(group) {}
 
@@ -48,10 +75,10 @@ private:
         init(table_names, top.get_as_ref(0));
         init(table_refs,  top.get_as_ref(1));
         size_t n = table_refs.size();
-        for (size_t i=0; i<n; ++i) {
-            string name = table_names.m_array.get(i); // FIXME: Explicit string length
+        for (size_t i = 0; i != n; ++i) {
+            StringData name = table_names.m_array.get(i);
             cout << "Converting table: '" << name << "'\n";
-            TableRef new_table = new_group.get_table(name.c_str()); // FIXME: Explicit string length
+            TableRef new_table = new_group.get_table(name);
             convert_table_and_spec(table_refs.m_array.get(i), *new_table);
         }
     }
@@ -60,12 +87,12 @@ private:
     {
         Wrap<Array> top(m_alloc);
         init(top, ref);
-        convert_spec(top.get_as_ref(0), new_table.get_spec());
-        new_table.update_from_spec();
+        DescriptorRef new_desc = new_table.get_descriptor();
+        convert_spec(top.get_as_ref(0), *new_desc);
         convert_columns(top.get_as_ref(0), top.get_as_ref(1), new_table);
     }
 
-    void convert_spec(ref_type ref, Spec& new_spec)
+    void convert_spec(ref_type ref, Descriptor& new_desc)
     {
         Wrap<Array> top(m_alloc);
         init(top, ref);
@@ -77,11 +104,11 @@ private:
         init(column_types, top.get_as_ref(0));
         init(column_names, top.get_as_ref(1));
         if (2 < top.size())
-            init(column_subspecs, top.get_as_ref(2));
+            init(column_subspecs, top.get_as_ref(3));
         size_t name_ndx    = 0;
         size_t subspec_ndx = 0;
         size_t n = column_types.size();
-        for (size_t i=0; i<n; ++i) {
+        for (size_t i = 0; i != n; ++i) {
             ColumnType type = ColumnType(column_types.m_array.get(i));
             DataType new_type = DataType();
             switch (type) {
@@ -103,16 +130,14 @@ private:
                 case col_type_Reserved4:
                     throw runtime_error("Unexpected column type");
             }
-            string name = column_names.m_array.get(name_ndx); // FIXME: Explicit string length
+            StringData name = column_names.m_array.get(name_ndx);
             ++name_ndx;
             cout << "col name: " << name << "\n";
+            DescriptorRef subdesc;
+            new_desc.add_column(new_type, name, &subdesc);
             if (new_type == type_Table) {
-                Spec subspec = new_spec.add_subtable_column(name.c_str()); // FIXME: Explicit string length
-                convert_spec(column_subspecs.get_as_ref(subspec_ndx), subspec);
+                convert_spec(column_subspecs.get_as_ref(subspec_ndx), *subdesc);
                 ++subspec_ndx;
-            }
-            else {
-                new_spec.add_column(new_type, name.c_str());
             }
         }
     }
@@ -143,27 +168,102 @@ private:
         // Determine number of rows
         size_t num_rows = 0;
         if (0 < num_cols) {
-            Wrap<Array> column_root(m_alloc);
-            init(column_root, column_refs.m_array.get(0));
-            if (column_root.m_array.is_leaf()) {
-                num_rows = column_root.size();
+            ref_type ref = column_refs.m_array.front();
+            ColumnType type = ColumnType(column_types.m_array.front());
+            if (type == col_type_Mixed) {
+                Array top(m_alloc);
+                top.init_from_ref(ref);
+                ref = top.get_as_ref(0);
+                type = col_type_Int;
+            }
+            MemRef mem(ref, m_alloc);
+            bool is_inner_node = Array::get_hasrefs_from_header(mem.m_addr);
+            if (is_inner_node) {
+                Wrap<Array> inner_node(m_alloc);
+                init(inner_node, mem);
+                if (inner_node.size() < 3)
+                    throw runtime_error("Too few elements in inner B+-tree node");
+                int_fast64_t v = inner_node.m_array.back();
+                if (v % 2 == 0)
+                    throw runtime_error("Unexpected ref at back of inner B+-tree node");
+                num_rows = to_ref(v / 2);
             }
             else {
-                Wrap<Array> root_offsets(m_alloc);
-                init(root_offsets, column_root.get_as_ref(0));
-                if (root_offsets.empty())
-                    throw runtime_error("Unexpected empty non-leaf node");
-                num_rows = size_t(root_offsets.m_array.back());
+                switch (type) {
+                    case col_type_Int:
+                    case col_type_Bool:
+                    case col_type_DateTime:
+                    case col_type_StringEnum:
+                    case col_type_Table: {
+                        Array leaf(m_alloc);
+                        leaf.init_from_mem(mem);
+                        num_rows = leaf.size();
+                        break;
+                    }
+                    case col_type_Float: {
+                        ArrayFloat leaf(m_alloc);
+                        leaf.init_from_mem(mem);
+                        num_rows = leaf.size();
+                        break;
+                    }
+                    case col_type_Double: {
+                        ArrayDouble leaf(m_alloc);
+                        leaf.init_from_mem(mem);
+                        num_rows = leaf.size();
+                        break;
+                    }
+                    case col_type_String: {
+                        bool long_strings = Array::get_hasrefs_from_header(mem.m_addr);
+                        if (!long_strings) {
+                            // Small strings
+                            ArrayString leaf(m_alloc);
+                            leaf.init_from_mem(mem);
+                            num_rows = leaf.size();
+                            break;
+                        }
+                        bool is_big = Array::get_context_flag_from_header(mem.m_addr);
+                        if (!is_big) {
+                            // Medium strings
+                            ArrayStringLong leaf(m_alloc);
+                            leaf.init_from_mem(mem);
+                            num_rows = leaf.size();
+                            break;
+                        }
+                        // Big strings
+                        ArrayBigBlobs leaf(m_alloc);
+                        leaf.init_from_mem(mem);
+                        num_rows = leaf.size();
+                        break;
+                    }
+                    case col_type_Binary: {
+                        bool is_big = Array::get_context_flag_from_header(mem.m_addr);
+                        if (!is_big) {
+                            // Small blobs
+                            ArrayBinary leaf(m_alloc);
+                            leaf.init_from_mem(mem);
+                            num_rows = leaf.size();
+                            break;
+                        }
+                        // Big blobs
+                        ArrayBigBlobs leaf(m_alloc);
+                        leaf.init_from_mem(mem);
+                        num_rows = leaf.size();
+                        break;
+                    }
+                    case col_type_Mixed:
+                    case col_type_Reserved1:
+                    case col_type_Reserved4:
+                        throw runtime_error("Unexpected column type");
+                }
             }
         }
 
         new_table.add_empty_row(num_rows);
 
-        // FIXME: Handle stuff in `column_enumkeys`
-
-        size_t column_ref_ndx     = 0;
-        size_t column_subspec_ndx = 0;
-        for (size_t i=0; i<num_cols; ++i) {
+        size_t column_ref_ndx      = 0;
+        size_t column_subspec_ndx  = 0;
+        size_t column_enumkeys_ndx = 0;
+        for (size_t i = 0; i != num_cols; ++i) {
             ref_type column_ref = column_refs.m_array.get(column_ref_ndx);
             ++column_ref_ndx;
             ColumnType type = ColumnType(column_types.m_array.get(i));
@@ -187,10 +287,9 @@ private:
                     convert_string_column(column_ref, new_table, i);
                     break;
                 case col_type_StringEnum: {
-                    ref_type strings_ref = column_ref;
-                    ref_type refs_ref    = column_refs.m_array.get(column_ref_ndx);;
-                    ++column_ref_ndx;
-                    convert_string_enum_column(strings_ref, refs_ref, new_table, i);
+                    ref_type strings_ref = column_enumkeys.m_array.get(column_enumkeys_ndx);
+                    ++column_enumkeys_ndx;
+                    convert_string_enum_column(strings_ref, column_ref, new_table, i);
                     break;
                 }
                 case col_type_Binary:
@@ -214,6 +313,7 @@ private:
                 case col_attr_None:
                     break;
                 case col_attr_Indexed:
+                    ++column_ref_ndx;
                     new_table.set_index(i);
                     break;
                 case col_attr_Unique:
@@ -279,34 +379,92 @@ private:
     }
 
 
-    struct HandleStringsLeaf {
-        HandleStringsLeaf(const Converter& c, Table& t, size_t i):
-            m_conv(c), m_new_table(t), m_col_ndx(i), m_row_ndx(0) {}
-
-        void operator()(ref_type ref) const
+    template<class ElemHandler> class IntegerLeafHandler {
+    public:
+        IntegerLeafHandler(const Converter& conv, ElemHandler& elem_handler):
+            m_conv(conv),
+            m_elem_handler(elem_handler)
         {
-            // FIXME: Handle big_blobs leafs
-            const char* header = static_cast<char*>(m_conv.m_alloc.translate(ref));
-            switch (Array::get_type_from_header(header)) {
-                case Array::type_InnerColumnNode:
-                    throw runtime_error("Unexpected leaf type");
-                case Array::type_HasRefs: {
-                    Wrap<ArrayStringLong> leaf(m_conv.m_alloc);
-                    m_conv.init(leaf.m_array, ref);
-                    size_t n = leaf.size();
-                    for (size_t i=0; i<n; ++i)
-                        m_new_table.set_string(m_conv.convert_long_string());
-                    break;
-                }
-                case Array::type_Normal:
-                    m_array = new ArrayString(ref, parent, pndx, alloc);
-                    break;
+        }
+        void operator()(MemRef mem)
+        {
+            Array leaf(m_conv.m_alloc);
+            leaf.init_from_mem(mem);
+            size_t n = leaf.size();
+            for (size_t i = 0; i != n; ++i) {
+                int_fast64_t value = leaf.get(i);
+                m_elem_handler(value);
             }
         }
-
     private:
         const Converter& m_conv;
-        Table& m_new_table;
+        ElemHandler& m_elem_handler;
+    };
+
+
+    template<class ElemHandler> class StringLeafHandler {
+    public:
+        StringLeafHandler(const Converter& conv, ElemHandler& elem_handler):
+            m_conv(conv),
+            m_elem_handler(elem_handler)
+        {
+        }
+        void operator()(MemRef mem)
+        {
+            bool long_strings = Array::get_hasrefs_from_header(mem.m_addr);
+            if (!long_strings) {
+                // Small strings
+                ArrayString leaf(m_conv.m_alloc);
+                leaf.init_from_mem(mem);
+                size_t n = leaf.size();
+                for (size_t i = 0; i != n; ++i) {
+                    StringData str = leaf.get(i);
+                    m_elem_handler(str);
+                }
+                return;
+            }
+            bool is_big = Array::get_context_flag_from_header(mem.m_addr);
+            if (!is_big) {
+                // Medium strings
+                ArrayStringLong leaf(m_conv.m_alloc);
+                leaf.init_from_mem(mem);
+                size_t n = leaf.size();
+                for (size_t i = 0; i != n; ++i) {
+                    StringData str = leaf.get(i);
+                    m_elem_handler(str);
+                }
+                return;
+            }
+            // Big strings
+            ArrayBigBlobs leaf(m_conv.m_alloc);
+            leaf.init_from_mem(mem);
+            size_t n = leaf.size();
+            for (size_t i = 0; i != n; ++i) {
+                StringData str = leaf.get_string(i);
+                m_elem_handler(str);
+            }
+        }
+    private:
+        const Converter& m_conv;
+        ElemHandler& m_elem_handler;
+    };
+
+
+    class StringSetter {
+    public:
+        StringSetter(Table& table, size_t col_ndx):
+            m_table(table),
+            m_col_ndx(col_ndx),
+            m_row_ndx(0)
+        {
+        }
+        void operator()(StringData str)
+        {
+            m_table.set_string(m_col_ndx, m_row_ndx, str);
+            ++m_row_ndx;
+        }
+    private:
+        Table& m_table;
         const size_t m_col_ndx;
         size_t m_row_ndx;
     };
@@ -314,44 +472,56 @@ private:
     void convert_string_column(ref_type ref, Table& new_table, size_t col_ndx)
     {
         cout << "string_column_ref = " << ref << "\n";
-        HandleStringsLeaf handler(new_table, col_ndx)
-        for_each_leaf(ref, handler);
+        StringSetter elem_handler(new_table, col_ndx);
+        StringLeafHandler<StringSetter> leaf_handler(*this, elem_handler);
+        foreach_bptree_leaf(ref, leaf_handler);
     }
 
 
-    struct HandleEnumStringsLeaf {
-        HandleEnumStringsLeaf(vector<string>& s): m_strings(s) {}
-        void operator()(ref_type ref) const
+    class StringCollector {
+    public:
+        StringCollector(vector<StringData>& strings):
+            m_strings(strings)
         {
         }
-    private:
-        vector<string>& m_strings;
-    };
-
-    struct HandleEnumRefsLeaf {
-        HandleEnumRefsLeaf(const vector<string>& s, Table& t, size_t i): m_strings(s), m_new_table(t), m_col_ndx(i) {}
-        void operator()(ref_type ref) const
+        void operator()(StringData str)
         {
+            m_strings.push_back(str);
         }
     private:
-        const vector<string>& m_strings;
-        Table& m_new_table;
-        size_t m_col_ndx;
-
+        vector<StringData>& m_strings;
     };
 
-    void convert_string_enum_column(ref_type strings_ref, ref_type refs_ref, Table& new_table, size_t col_ndx)
+    class StringEnumSetter: StringSetter {
+    public:
+        StringEnumSetter(Table& table, size_t col_ndx, const vector<StringData>& strings):
+            StringSetter(table, col_ndx),
+            m_strings(strings)
+        {
+        }
+        void operator()(int_fast64_t index)
+        {
+            StringData str = m_strings[index];
+            StringSetter::operator()(str);
+        }
+    private:
+        const vector<StringData>& m_strings;
+    };
+
+    void convert_string_enum_column(ref_type strings_ref, ref_type indexes_ref, Table& new_table, size_t col_ndx)
     {
         cout << "string_enum_column_strings_ref = " << strings_ref << "\n";
-        cout << "string_enum_column_refs_ref    = " << refs_ref << "\n";
-        vector<string> strings;
+        cout << "string_enum_column_indexes_ref = " << indexes_ref << "\n";
+        vector<StringData> strings;
         {
-            HandleEnumStringsLeaf handler(strings);
-            for_each_leaf(strings_ref, handler);
+            StringCollector elem_handler(strings);
+            StringLeafHandler<StringCollector> leaf_handler(*this, elem_handler);
+            foreach_bptree_leaf(strings_ref, leaf_handler);
         }
         {
-            HandleEnumRefsLeaf handler(strings, new_table, col_ndx);
-            for_each_leaf(refs_ref, handler);
+            StringEnumSetter elem_handler(new_table, col_ndx, strings);
+            IntegerLeafHandler<StringEnumSetter> leaf_handler(*this, elem_handler);
+            foreach_bptree_leaf(indexes_ref, leaf_handler);
         }
     }
 
@@ -415,38 +585,43 @@ private:
         }
     }
 
-    template<class A> void init(Wrap<A>& array, ref_type ref)
+    template<class A> void init(Wrap<A>& array, MemRef mem)
     {
-        if (init(array.m_array, ref))
+        if (init(array.m_array, mem))
             array.m_must_destroy = true;
     }
 
-    bool init(Array& array, ref_type ref)
+    template<class A> void init(Wrap<A>& array, ref_type ref)
+    {
+        MemRef mem(ref, m_alloc);
+        init(array, mem);
+    }
+
+    bool init(Array& array, MemRef mem)
     {
         // If conversion of the array is needed (a decision which may
         // be based on m_version) then that conversion should be done
         // here. When converting, allocate space for a new array, and
         // return true.
-        array.init_from_ref(ref);
+        array.init_from_mem(mem);
         return false;
     }
 
-    template<class H> void for_each_leaf(ref_type ref, H& handler)
+    template<class H> void foreach_bptree_leaf(ref_type ref, H& handler)
     {
-        Wrap<Array> node(m_alloc);
-        init(node, ref);
-        if (node.m_array.is_leaf()) {
-            handler(ref);
+        MemRef mem(ref, m_alloc);
+        if (!Array::get_is_inner_bptree_node_from_header(mem.m_addr)) {
+            handler(mem);
             return;
         }
 
-        if (node.size() < 2)
-            throw runtime_error("Too few elements in non-leaf node array");
-        Wrap<Array> children(m_alloc);
-        init(children, node.get_as_ref(1));
-        size_t n = children.size();
-        for (size_t i=0; i<n; ++i)
-            for_each_leaf(children.get_as_ref(i), handler);
+        Wrap<Array> inner_node(m_alloc);
+        init(inner_node, mem);
+        if (inner_node.size() < 3)
+            throw runtime_error("Too few elements in inner B+-tree node");
+        size_t n = inner_node.size() - 2;
+        for (size_t i = 0; i != n; ++i)
+            foreach_bptree_leaf(inner_node.get_as_ref(1 + i), handler);
     }
 };
 

@@ -1,6 +1,6 @@
 SUBDIRS = src test convert
-test_DEPS = src
 convert_DEPS = src
+test_DEPS = src convert
 
 PASSIVE_SUBDIRS = doc/ref_cpp/examples
 doc_ref_cpp_examples_DEPS = src
