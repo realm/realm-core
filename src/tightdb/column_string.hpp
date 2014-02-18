@@ -62,13 +62,12 @@ public:
                   std::size_t end = npos) const;
 
     //@{
-
     /// Find the lower/upper bound for the specified value assuming
     /// that the elements are already sorted in ascending order
     /// according to StringData::operator<().
     std::size_t lower_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
     std::size_t upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
-    //@{
+    //@}
 
     FindRes find_all_indexref(StringData value, std::size_t& dst) const;
 
