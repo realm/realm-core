@@ -364,11 +364,29 @@ Table* Group::create_new_table_and_accessor(StringData name, SpecSetter spec_set
 }
 
 
+class Group::DefaultTableWriter: public Group::TableWriter {
+public:
+    DefaultTableWriter(const Group& group):
+        m_group(group)
+    {
+    }
+    size_t write_names(_impl::OutputStream& out) TIGHTDB_OVERRIDE
+    {
+        return m_group.m_table_names.write(out); // Throws
+    }
+    size_t write_tables(_impl::OutputStream& out) TIGHTDB_OVERRIDE
+    {
+        return m_group.m_tables.write(out); // Throws
+    }
+private:
+    const Group& m_group;
+};
+
 void Group::write(ostream& out) const
 {
     TIGHTDB_ASSERT(is_attached());
-    _impl::OutputStream out_2(out);
-    write(out_2); // Throws
+    DefaultTableWriter table_writer(*this);
+    write(out, table_writer); // Throws
 }
 
 void Group::write(const string& path) const
@@ -409,20 +427,22 @@ BinaryData Group::write_to_mem() const
 }
 
 
-void Group::write(_impl::OutputStream& out) const
+void Group::write(ostream& out, TableWriter& table_writer)
 {
+    _impl::OutputStream out_2(out);
+
     // Write the file header
     const char* data = reinterpret_cast<const char*>(&SlabAlloc::streaming_header);
-    out.write(data, sizeof SlabAlloc::streaming_header);
+    out_2.write(data, sizeof SlabAlloc::streaming_header);
 
     // Because we need to include the total logical file size in the
     // top-array, we have to start by writing everything except the
     // top-array, and then finally compute and write a correct version
     // of the top-array. The free-space information of the group will
     // not be included, as it is not needed in the streamed format.
-    size_t names_pos  = m_table_names.write(out); // Throws
-    size_t tables_pos = m_tables.write(out); // Throws
-    size_t top_pos = out.get_pos();
+    size_t names_pos  = table_writer.write_names(out_2); // Throws
+    size_t tables_pos = table_writer.write_tables(out_2); // Throws
+    size_t top_pos = out_2.get_pos();
 
     // Produce a preliminary version of the top array whose
     // representation is guaranteed to be able to hold the final file
@@ -448,8 +468,8 @@ void Group::write(_impl::OutputStream& out) const
 
     // Write the top array
     bool recurse = false;
-    top.write(out, recurse); // Throws
-    TIGHTDB_ASSERT(out.get_pos() == final_file_size);
+    top.write(out_2, recurse); // Throws
+    TIGHTDB_ASSERT(out_2.get_pos() == final_file_size);
 
     top.destroy(); // Shallow
 
@@ -457,7 +477,7 @@ void Group::write(_impl::OutputStream& out) const
     SlabAlloc::StreamingFooter footer;
     footer.m_top_ref = top_pos;
     footer.m_magic_cookie = SlabAlloc::footer_magic_cookie;
-    out.write(reinterpret_cast<const char*>(&footer), sizeof footer);
+    out_2.write(reinterpret_cast<const char*>(&footer), sizeof footer);
 }
 
 

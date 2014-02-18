@@ -19,9 +19,9 @@ Spec::~Spec() TIGHTDB_NOEXCEPT
 #endif
 }
 
-void Spec::init(ref_type ref, ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT
+void Spec::init(MemRef mem, ArrayParent* parent, size_t ndx_in_parent) TIGHTDB_NOEXCEPT
 {
-    m_top.init_from_ref(ref);
+    m_top.init_from_mem(mem);
     m_top.set_parent(parent, ndx_in_parent);
     size_t top_size = m_top.size();
     TIGHTDB_ASSERT(top_size >= 3 && top_size <= 5);
@@ -65,53 +65,45 @@ void Spec::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
         m_enumkeys.update_from_parent(old_baseline);
 }
 
-ref_type Spec::create_empty_spec(Allocator& alloc)
+MemRef Spec::create_empty_spec(Allocator& alloc)
 {
     // The 'spec_set' contains the specification (types and names) of
     // all columns and sub-tables
     Array spec_set(alloc);
+    _impl::DeepArrayDestroyGuard dg(&spec_set);
     spec_set.create(Array::type_HasRefs); // Throws
-    try {
-        size_t size = 0;
-        int_fast64_t value = 0;
+
+    _impl::DeepArrayRefDestroyGuard dg_2(alloc);
+    {
         // One type for each column
-        ref_type types_ref =
-            Array::create_array(Array::type_Normal, size, value, alloc); // Throws
-        try {
-            int_fast64_t v = types_ref; // FIXME: Dangerous case: unsigned -> signed
-            spec_set.add(v); // Throws
-        }
-        catch (...) {
-            Array::destroy(types_ref, alloc);
-            throw;
-        }
+        bool context_flag = false;
+        MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc); // Throws
+        dg_2.reset(mem.m_ref);
+        int_fast64_t v(mem.m_ref); // FIXME: Dangerous case: unsigned -> signed
+        spec_set.add(v); // Throws
+        dg_2.release();
+    }
+    {
+        size_t size = 0;
         // One name for each column
-        ref_type names_ref = ArrayString::create_array(size, alloc); // Throws
-        try {
-            int_fast64_t v = names_ref; // FIXME: Dangerous case: unsigned -> signed
-            spec_set.add(v); // Throws
-        }
-        catch (...) {
-            Array::destroy(names_ref, alloc);
-            throw;
-        }
+        MemRef mem = ArrayString::create_array(size, alloc); // Throws
+        dg_2.reset(mem.m_ref);
+        int_fast64_t v = mem.m_ref; // FIXME: Dangerous case: unsigned -> signed
+        spec_set.add(v); // Throws
+        dg_2.release();
+    }
+    {
         // One attrib set for each column
-        ref_type attribs_ref =
-            Array::create_array(Array::type_Normal, size, value, alloc); // Throws
-        try {
-            int_fast64_t v = attribs_ref; // FIXME: Dangerous case: unsigned -> signed
-            spec_set.add(v); // Throws
-        }
-        catch (...) {
-            Array::destroy(attribs_ref, alloc);
-            throw;
-        }
+        bool context_flag = false;
+        MemRef mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc); // Throws
+        dg_2.reset(mem.m_ref);
+        int_fast64_t v = mem.m_ref; // FIXME: Dangerous case: unsigned -> signed
+        spec_set.add(v); // Throws
+        dg_2.release();
     }
-    catch (...) {
-        spec_set.destroy_deep();
-        throw;
-    }
-    return spec_set.get_ref();
+
+    dg.release();
+    return spec_set.get_mem();
 }
 
 void Spec::insert_column(size_t column_ndx, DataType type, StringData name, ColumnAttr attr)
@@ -127,26 +119,31 @@ void Spec::insert_column(size_t column_ndx, DataType type, StringData name, Colu
         Allocator& alloc = m_top.get_alloc();
         // `m_subspecs` array is only present when the spec contains a subtable column
         if (!m_subspecs.is_attached()) {
-            ref_type subspecs_ref = Array::create_empty_array(Array::type_HasRefs, alloc); // Throws
-            _impl::DeepArrayRefDestroyGuard dg(subspecs_ref, alloc);
+            bool context_flag = false;
+            MemRef subspecs_mem =
+                Array::create_empty_array(Array::type_HasRefs, context_flag, alloc); // Throws
+            _impl::DeepArrayRefDestroyGuard dg(subspecs_mem.m_ref, alloc);
             if (m_top.size() == 3) {
-                m_top.add(subspecs_ref); // Throws
+                int_fast64_t v(subspecs_mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+                m_top.add(v); // Throws
             }
             else {
-                m_top.set(3, subspecs_ref); // Throws
+                int_fast64_t v(subspecs_mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+                m_top.set(3, v); // Throws
             }
-            m_subspecs.init_from_ref(subspecs_ref);
+            m_subspecs.init_from_ref(subspecs_mem.m_ref);
             m_subspecs.set_parent(&m_top, 3);
             dg.release();
         }
 
         // Add a new empty spec to `m_subspecs`
         {
-            ref_type subspec_ref = create_empty_spec(alloc); // Throws
-            _impl::DeepArrayRefDestroyGuard dg(subspec_ref, alloc);
+            MemRef subspec_mem = create_empty_spec(alloc); // Throws
+            _impl::DeepArrayRefDestroyGuard dg(subspec_mem.m_ref, alloc);
             size_t subspec_ndx = column_ndx == get_column_count() ?
                 get_num_subspecs() : get_subspec_ndx(column_ndx);
-            m_subspecs.insert(subspec_ndx, subspec_ref); // Throws
+            int_fast64_t v(subspec_mem.m_ref); // FIXME: Dangerous cast (unsigned -> signed)
+            m_subspecs.insert(subspec_ndx, v); // Throws
             dg.release();
         }
     }
@@ -308,7 +305,7 @@ size_t* Spec::record_subspec_path(const Array& root_subspecs, size_t* begin,
 }
 
 
-bool Spec::operator==(const Spec& spec) const
+bool Spec::operator==(const Spec& spec) const TIGHTDB_NOEXCEPT
 {
     if (!m_spec.compare_int(spec.m_spec))
         return false;
@@ -351,7 +348,8 @@ void Spec::to_dot(ostream& out, StringData) const
         size_t count = m_subspecs.size();
         for (size_t i = 0; i < count; ++i) {
             ref_type ref = m_subspecs.get_as_ref(i);
-            Spec s(alloc, ref, const_cast<Array*>(&m_subspecs), i);
+            MemRef mem(ref, alloc);
+            Spec s(alloc, mem, const_cast<Array*>(&m_subspecs), i);
             s.to_dot(out);
         }
     }

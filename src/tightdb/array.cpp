@@ -12,6 +12,7 @@
 #include <tightdb/util/tuple.hpp>
 #include <tightdb/utilities.hpp>
 #include <tightdb/array.hpp>
+#include <tightdb/impl/destroy_guard.hpp>
 #include <tightdb/column.hpp>
 #include <tightdb/query_conditions.hpp>
 #include <tightdb/column_string.hpp>
@@ -37,7 +38,7 @@
 //
 //  2: 'has_refs' (elements whose first bit is zero are refs to subarrays).
 //
-//  3: 'index_flag'
+//  3: 'context_flag' (meaning depends on context)
 //
 //  4: 'width_scheme' (2 bits)
 //
@@ -95,10 +96,16 @@
 //   `o_i` is the total number of elements preceeding the i'th child,
 //   `N`   is the number of children,
 //   'M'   is one less than the number of children,
-//   `N_c` is the fixed number of elements per child, and
-//   `N_t` is the total number of elements in the subtree.
+//   `N_c` is the fixed number of elements per child
+//         (`elems_per_child`), and
+//   `N_t` is the total number of elements in the subtree
+//         (`total_elems_in_subtree`).
 //
 // `N_c` must always be a power of `TIGHTDB_MAX_LIST_SIZE`.
+//
+// It is expected that `N_t` will be removed in a future version of
+// the file format. This will make it much more efficient to append
+// elements to the B+-tree (or remove elements from the end).
 //
 // The last child of an inner node on the compact form, may have fewer
 // elements than `N_c`. All other children must have exactly `N_c`
@@ -173,13 +180,6 @@ size_t bit_width(int64_t v)
 
 } // anonymous namespace
 
-
-void Array::init_from_ref(ref_type ref) TIGHTDB_NOEXCEPT
-{
-    TIGHTDB_ASSERT(ref);
-    char* header = m_alloc.translate(ref);
-    init_from_mem(MemRef(header, ref));
-}
 
 void Array::init_from_mem(MemRef mem) TIGHTDB_NOEXCEPT
 {
@@ -268,6 +268,7 @@ void Array::set_type(Type type)
     set_header_hasrefs(has_refs);
 }
 
+
 bool Array::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
@@ -288,15 +289,76 @@ bool Array::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
     return true; // Might have changed
 }
 
-// Allocates space for 'count' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
-void Array::Preset(size_t bitwidth, size_t count)
+
+MemRef Array::slice(size_t offset, size_t size, Allocator& target_alloc) const
+{
+    TIGHTDB_ASSERT(is_attached());
+
+    Array slice(target_alloc);
+    _impl::DeepArrayDestroyGuard dg(&slice);
+    Type type = get_type();
+    bool context_flag = get_context_flag();
+    slice.create(type, context_flag); // Throws
+    size_t begin = offset;
+    size_t end   = offset + size;
+    for (size_t i = begin; i != end; ++i) {
+        int_fast64_t value = get(i);
+        slice.add(value); // Throws
+    }
+    dg.release();
+    return slice.get_mem();
+}
+
+
+MemRef Array::slice_and_clone_children(size_t offset, size_t size, Allocator& target_alloc) const
+{
+    TIGHTDB_ASSERT(is_attached());
+    if (!has_refs())
+        return slice(offset, size, target_alloc); // Throws
+
+    Array slice(target_alloc);
+    _impl::DeepArrayDestroyGuard dg(&slice);
+    Type type = get_type();
+    bool context_flag = get_context_flag();
+    slice.create(type, context_flag); // Throws
+    _impl::DeepArrayRefDestroyGuard dg_2(target_alloc);
+    size_t begin = offset;
+    size_t end   = offset + size;
+    for (size_t i = begin; i != end; ++i) {
+        int_fast64_t value = get(i);
+
+        // Null-refs signify empty subtrees. Also, all refs are
+        // 8-byte aligned, so the lowest bits cannot be set. If they
+        // are, it means that it should not be interpreted as a ref.
+        bool is_subarray = value != 0 && value % 2 == 0;
+        if (!is_subarray) {
+            slice.add(value); // Throws
+            continue;
+        }
+
+        ref_type ref = to_ref(value);
+        Allocator& alloc = get_alloc();
+        const char* subheader = alloc.translate(ref);
+        MemRef new_mem = clone(subheader, alloc, target_alloc); // Throws
+        dg_2.reset(new_mem.m_ref);
+        value = new_mem.m_ref; // FIXME: Dangerous cast (unsigned -> signed)
+        slice.add(value); // Throws
+        dg_2.release();
+    }
+    dg.release();
+    return slice.get_mem();
+}
+
+
+// Allocates space for 'size' items being between min and min in size, both inclusive. Crashes! Why? Todo/fixme
+void Array::Preset(size_t width, size_t size)
 {
     clear_and_destroy_children();
-    set_width(bitwidth);
-    alloc(count, bitwidth); // Throws
-    m_size = count;
-    for (size_t n = 0; n < count; n++)
-        set(n, 0);
+    set_width(width);
+    alloc(size, width); // Throws
+    m_size = size;
+    for (size_t i = 0; i != size; ++i)
+        set(i, 0);
 }
 
 void Array::Preset(int64_t min, int64_t max, size_t count)
@@ -309,19 +371,19 @@ void Array::Preset(int64_t min, int64_t max, size_t count)
 void Array::destroy_children(size_t offset) TIGHTDB_NOEXCEPT
 {
     for (size_t i = offset; i != m_size; ++i) {
-        int64_t v = get(i);
+        int64_t value = get(i);
 
         // Null-refs indicate empty sub-trees
-        if (v == 0)
+        if (value == 0)
             continue;
 
         // A ref is always 8-byte aligned, so the lowest bit
         // cannot be set. If it is, it means that it should not be
         // interpreted as a ref.
-        if (v % 2 != 0)
+        if (value % 2 != 0)
             continue;
 
-        ref_type ref = to_ref(v);
+        ref_type ref = to_ref(value);
         destroy_deep(ref, m_alloc);
     }
 }
@@ -1269,7 +1331,7 @@ size_t Array::CalcItemCount(size_t bytes, size_t width) const TIGHTDB_NOEXCEPT
     return total_bits / width;
 }
 
-ref_type Array::clone(const char* header, Allocator& alloc, Allocator& target_alloc)
+MemRef Array::clone(const char* header, Allocator& alloc, Allocator& target_alloc)
 {
     if (!get_hasrefs_from_header(header)) {
         // This array has no subarrays, so we can make a byte-for-byte
@@ -1279,8 +1341,8 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& target_al
         size_t size = get_byte_size_from_header(header);
 
         // Create the new array
-        MemRef mem_ref = target_alloc.alloc(size); // Throws
-        char* clone_header = mem_ref.m_addr;
+        MemRef mem = target_alloc.alloc(size); // Throws
+        char* clone_header = mem.m_addr;
 
         // Copy contents
         const char* src_begin = header;
@@ -1291,7 +1353,7 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& target_al
         // Update with correct capacity
         set_header_capacity(size, clone_header);
 
-        return mem_ref.m_ref;
+        return mem;
     }
 
     // Refs are integers, and integers arrays use wtype_Bits.
@@ -1301,8 +1363,8 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& target_al
     array.CreateFromHeaderDirect(const_cast<char*>(header));
 
     // Create new empty array of refs
-    MemRef mem_ref = target_alloc.alloc(initial_capacity); // Throws
-    char* clone_header = mem_ref.m_addr;
+    MemRef mem = target_alloc.alloc(initial_capacity); // Throws
+    char* clone_header = mem.m_addr;
     {
         bool is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
         bool has_refs = true;
@@ -1315,27 +1377,34 @@ ref_type Array::clone(const char* header, Allocator& alloc, Allocator& target_al
     }
 
     Array new_array(target_alloc);
-    new_array.init_from_mem(mem_ref);
+    _impl::DeepArrayDestroyGuard dg(&new_array);
+    new_array.init_from_mem(mem);
 
+    _impl::DeepArrayRefDestroyGuard dg_2(target_alloc);
     size_t n = array.size();
-    for (size_t i = 0; i < n; ++i) {
-        int64_t value = array.get(i);
+    for (size_t i = 0; i != n; ++i) {
+        int_fast64_t value = array.get(i);
 
-        // Null-refs signify empty sub-trees. Also, all refs are
+        // Null-refs signify empty subtrees. Also, all refs are
         // 8-byte aligned, so the lowest bits cannot be set. If they
         // are, it means that it should not be interpreted as a ref.
-        bool is_subarray = value != 0 && (value & 0x1) == 0;
-        if (is_subarray) {
-            ref_type ref = to_ref(value);
-            const char* subheader = alloc.translate(ref);
-            ref_type new_ref = clone(subheader, alloc, target_alloc);
-            value = new_ref;
+        bool is_subarray = value != 0 && value % 2 == 0;
+        if (!is_subarray) {
+            new_array.add(value); // Throws
+            continue;
         }
 
-        new_array.add(value);
+        ref_type ref = to_ref(value);
+        const char* subheader = alloc.translate(ref);
+        MemRef new_mem = clone(subheader, alloc, target_alloc); // Throws
+        dg_2.reset(new_mem.m_ref);
+        value = new_mem.m_ref; // FIXME: Dangerous cast (unsigned -> signed)
+        new_array.add(value); // Throws
+        dg_2.release();
     }
 
-    return mem_ref.m_ref;
+    dg.release();
+    return new_array.get_mem();
 }
 
 void Array::copy_on_write()
@@ -1452,9 +1521,12 @@ void fill_direct(char* data, size_t begin, size_t end, int_fast64_t value) TIGHT
 
 } // anonymous namespace
 
-ref_type Array::create_array(Type type, bool context_flag, WidthType width_type, size_t size,
-                             int_fast64_t value, Allocator& alloc)
+MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t size,
+                     int_fast64_t value, Allocator& alloc)
 {
+    TIGHTDB_ASSERT(value == 0 || width_type == wtype_Bits);
+    TIGHTDB_ASSERT(size  == 0 || width_type != wtype_Ignore);
+
     bool is_inner_bptree_node = false, has_refs = false;
     switch (type) {
         case type_Normal:
@@ -1477,8 +1549,8 @@ ref_type Array::create_array(Type type, bool context_flag, WidthType width_type,
     // Adding zero to Array::initial_capacity to avoid taking the
     // address of that member
     size_t byte_size = max(byte_size_0, initial_capacity+0);
-    MemRef mem_ref = alloc.alloc(byte_size); // Throws
-    char* header = mem_ref.m_addr;
+    MemRef mem = alloc.alloc(byte_size); // Throws
+    char* header = mem.m_addr;
 
     init_header(header, is_inner_bptree_node, has_refs, context_flag, width_type,
                 width, size, byte_size);
@@ -1489,7 +1561,7 @@ ref_type Array::create_array(Type type, bool context_flag, WidthType width_type,
         TIGHTDB_TEMPEX(fill_direct, width, (data, begin, end, value));
     }
 
-    return mem_ref.m_ref;
+    return mem;
 }
 
 
@@ -1957,7 +2029,7 @@ vector<int64_t> Array::ToVector() const
     return v;
 }
 
-bool Array::compare_int(const Array& a) const
+bool Array::compare_int(const Array& a) const TIGHTDB_NOEXCEPT
 {
     if (a.size() != size())
         return false;
@@ -2076,6 +2148,7 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
 }
 
 
+// FIXME: Not exception safe (leaks are possible).
 ref_type Array::bptree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& state)
 {
     size_t leaf_size = size();
@@ -2083,22 +2156,22 @@ ref_type Array::bptree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& st
     if (leaf_size < ndx)
         ndx = leaf_size;
     if (TIGHTDB_LIKELY(leaf_size < TIGHTDB_MAX_LIST_SIZE)) {
-        insert(ndx, value);
+        insert(ndx, value); // Throws
         return 0; // Leaf was not split
     }
 
     // Split leaf node
     Array new_leaf(m_alloc);
-    new_leaf.create(has_refs() ? type_HasRefs : type_Normal);
+    new_leaf.create(has_refs() ? type_HasRefs : type_Normal); // Throws
     if (ndx == leaf_size) {
-        new_leaf.add(value);
+        new_leaf.add(value); // Throws
         state.m_split_offset = ndx;
     }
     else {
         for (size_t i = ndx; i != leaf_size; ++i)
-            new_leaf.add(get(i));
-        truncate(ndx);
-        add(value);
+            new_leaf.add(get(i)); // Throws
+        truncate(ndx); // Throws
+        add(value); // Throws
         state.m_split_offset = ndx + 1;
     }
     state.m_split_size = leaf_size + 1;
@@ -2217,7 +2290,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
     TIGHTDB_ASSERT(leaf_level_of_children != -1);
     {
         int_fast64_t last_value = node.back();
-        TIGHTDB_ASSERT(last_value % 2 == 1);
+        TIGHTDB_ASSERT(last_value % 2 != 0);
         size_t total_elems = 0;
         TIGHTDB_ASSERT(!int_cast_with_overflow_detect(last_value/2, total_elems));
         TIGHTDB_ASSERT(num_elems == total_elems);
@@ -2247,7 +2320,7 @@ void Array::dump_bptree_structure(ostream& out, int level, LeafDumper leaf_dumpe
     out << setw(indent) << "" << "  Number of elements in subtree: "
         ""<<num_elems_in_subtree<<"\n";
 
-    bool compact_form = front() % 2 == 1;
+    bool compact_form = front() % 2 != 0;
     if (compact_form) {
         size_t elems_per_child = size_t(front() / 2);
         out << setw(indent) << "" << "  Compact form (elements per child: "
@@ -3323,7 +3396,7 @@ inline pair<size_t, size_t> find_bptree_child(int_fast64_t first_value, size_t n
 {
     size_t child_ndx;
     size_t ndx_in_child;
-    if (first_value % 2 == 1) {
+    if (first_value % 2 != 0) {
         // Case 1/2: No offsets array (compact form)
         size_t elems_per_child = to_size_t(first_value/2);
         child_ndx    = ndx / elems_per_child;
@@ -3367,54 +3440,167 @@ inline pair<ref_type, size_t> find_bptree_child(const char* data, size_t ndx,
     return make_pair(child_ref, ndx_in_child);
 }
 
-// handler(MemRef leaf_mem, ArrayParent* leafs_parent, size_t leaf_ndx_in_parent)
-template<class Handler> void foreach_bptree_leaf(Array& node, Handler handler)
-    TIGHTDB_NOEXCEPT_IF(noexcept(handler(MemRef(), 0, 0)))
+
+// Visit leaves of the B+-tree rooted at this inner node, starting
+// with the leaf that contains the element at the specified global
+// index start offset (`start_offset`), and ending when the handler
+// returns false.
+//
+// The specified node must be an inner node, and the specified handler
+// must have the follewing signature:
+//
+//     bool handler(const Array::NodeInfo& leaf_info)
+//
+// `node_offset` is the global index of the first element in this
+// subtree, and `node_size` is the number of elements in it.
+//
+// This function returns true if, and only if the handler has returned
+// true for all handled leafs.
+//
+// This function is designed work without the presence of the `N_t`
+// field in the inner B+-tree node
+// (a.k.a. `total_elems_in_subtree`). This was done in anticipation of
+// the removal of the deprecated field in a future version of the
+// TightDB file format.
+//
+// This function is also designed in anticipation of a change in the
+// way column accessors work. Some aspects of the implementation of
+// this function are not yet as they are intended to be, due the fact
+// that column accessors cache the root node rather than the last used
+// leaf node. When the behaviour of the column accessors is changed,
+// the signature of this function should be changed to
+// foreach_bptree_leaf(const array::NodeInfo&, Handler, size_t
+// start_offset). This will allow for a number of minor (but
+// important) improvements.
+template<class Handler>
+bool foreach_bptree_leaf(Array& node, size_t node_offset, size_t node_size,
+                         Handler handler, size_t start_offset)
+    TIGHTDB_NOEXCEPT_IF(noexcept(handler(Array::NodeInfo())))
 {
     TIGHTDB_ASSERT(node.is_inner_bptree_node());
 
+    Allocator& alloc = node.get_alloc();
+    Array offsets(alloc);
+    size_t child_ndx = 0, child_offset = node_offset;
+    size_t elems_per_child = 0;
+    {
+        TIGHTDB_ASSERT(node.size() >= 1);
+        int_fast64_t first_value = node.get(0);
+        bool is_compact = first_value % 2 != 0;
+        if (is_compact) {
+            // Compact form
+            elems_per_child = to_size_t(first_value/2);
+            if (start_offset > node_offset) {
+                size_t local_start_offset = start_offset - node_offset;
+                child_ndx = local_start_offset / elems_per_child;
+                child_offset += child_ndx * elems_per_child;
+            }
+        }
+        else {
+            // General form
+            ref_type offsets_ref = to_ref(first_value);
+            offsets.init_from_ref(offsets_ref);
+            if (start_offset > node_offset) {
+                size_t local_start_offset = start_offset - node_offset;
+                child_ndx = offsets.upper_bound_int(local_start_offset);
+                if (child_ndx > 0)
+                    child_offset += to_size_t(offsets.get(child_ndx-1));
+            }
+        }
+    }
     TIGHTDB_ASSERT(node.size() >= 2);
     size_t num_children = node.size() - 2;
     TIGHTDB_ASSERT(num_children >= 1); // invar:bptree-nonempty-inner
-    size_t child_ref_ndx = 1;
-    size_t child_ref_end = child_ref_ndx + num_children;
-    Allocator& alloc = node.get_alloc();
-    ref_type child_ref = node.get_as_ref(child_ref_ndx);
-    char* child_header = alloc.translate(child_ref);
-    bool children_are_leaves = !Array::get_is_inner_bptree_node_from_header(child_header);
-    if (children_are_leaves) {
-        for (;;) {
-            MemRef child_mem(child_header, child_ref);
-            handler(child_mem, &node, child_ref_ndx); // Throws if handler throws
-            if (++child_ref_ndx == child_ref_end)
-                break;
-            child_ref = node.get_as_ref(child_ref_ndx);
-            child_header = alloc.translate(child_ref);
+    Array::NodeInfo child_info;
+    child_info.m_parent = &node;
+    child_info.m_ndx_in_parent = 1 + child_ndx;
+    child_info.m_mem = MemRef(node.get_as_ref(child_info.m_ndx_in_parent), alloc);
+    child_info.m_offset = child_offset;
+    bool children_are_leaves =
+        !Array::get_is_inner_bptree_node_from_header(child_info.m_mem.m_addr);
+    for (;;) {
+        child_info.m_size = elems_per_child;
+        bool is_last_child = child_ndx == num_children - 1;
+        if (!is_last_child) {
+            bool is_compact = elems_per_child != 0;
+            if (!is_compact) {
+                size_t next_child_offset = node_offset + to_size_t(offsets.get(child_ndx-1 + 1));
+                child_info.m_size = next_child_offset - child_info.m_offset;
+            }
         }
-    }
-    else {
-        for (;;) {
+        else {
+            size_t next_child_offset = node_offset + node_size;
+            child_info.m_size = next_child_offset - child_info.m_offset;
+        }
+        bool go_on;
+        if (children_are_leaves) {
+            const Array::NodeInfo& const_child_info = child_info;
+            go_on = handler(const_child_info);
+        }
+        else {
             Array child(alloc);
-            child.init_from_mem(MemRef(child_header, child_ref));
-            child.set_parent(&node, child_ref_ndx);
-            foreach_bptree_leaf(child, handler); // Throws if handler throws
-            if (++child_ref_ndx == child_ref_end)
-                break;
-            child_ref = node.get_as_ref(child_ref_ndx);
-            child_header = alloc.translate(child_ref);
+            child.init_from_mem(child_info.m_mem);
+            child.set_parent(child_info.m_parent, child_info.m_ndx_in_parent);
+            go_on = foreach_bptree_leaf(child, child_info.m_offset, child_info.m_size,
+                                        handler, start_offset);
         }
+        if (!go_on)
+            return false;
+        if (is_last_child)
+            break;
+        ++child_ndx;
+        child_info.m_ndx_in_parent = 1 + child_ndx;
+        child_info.m_mem = MemRef(node.get_as_ref(child_info.m_ndx_in_parent), alloc);
+        child_info.m_offset += child_info.m_size;
+    }
+    return true;
+}
+
+
+// Same as foreach_bptree_leaf() except that this version is faster
+// and has no support for slicing. That also means that the return
+// value of the handler is ignored. Finally,
+// `Array::NodeInfo::m_offset` and `Array::NodeInfo::m_size` are not
+// calculated. With these simplification it is possible to avoid any
+// access to the `offsets` array.
+template<class Handler> void simplified_foreach_bptree_leaf(Array& node, Handler handler)
+    TIGHTDB_NOEXCEPT_IF(noexcept(handler(Array::NodeInfo())))
+{
+    TIGHTDB_ASSERT(node.is_inner_bptree_node());
+
+    Allocator& alloc = node.get_alloc();
+    size_t child_ndx = 0;
+    TIGHTDB_ASSERT(node.size() >= 2);
+    size_t num_children = node.size() - 2;
+    TIGHTDB_ASSERT(num_children >= 1); // invar:bptree-nonempty-inner
+    Array::NodeInfo child_info;
+    child_info.m_parent = &node;
+    child_info.m_ndx_in_parent = 1 + child_ndx;
+    child_info.m_mem = MemRef(node.get_as_ref(child_info.m_ndx_in_parent), alloc);
+    child_info.m_offset = 0;
+    child_info.m_size   = 0;
+    bool children_are_leaves =
+        !Array::get_is_inner_bptree_node_from_header(child_info.m_mem.m_addr);
+    for (;;) {
+        if (children_are_leaves) {
+            const Array::NodeInfo& const_child_info = child_info;
+            handler(const_child_info);
+        }
+        else {
+            Array child(alloc);
+            child.init_from_mem(child_info.m_mem);
+            child.set_parent(child_info.m_parent, child_info.m_ndx_in_parent);
+            simplified_foreach_bptree_leaf(child, handler);
+        }
+        bool is_last_child = child_ndx == num_children - 1;
+        if (is_last_child)
+            break;
+        ++child_ndx;
+        child_info.m_ndx_in_parent = 1 + child_ndx;
+        child_info.m_mem = MemRef(node.get_as_ref(child_info.m_ndx_in_parent), alloc);
     }
 }
 
-struct UpdateAdapter {
-    Array::UpdateHandler& m_handler;
-    UpdateAdapter(Array::UpdateHandler& handler) TIGHTDB_NOEXCEPT: m_handler(handler) {}
-    void operator()(MemRef mem, ArrayParent* parent, size_t leaf_ndx_in_parent)
-    {
-        size_t elem_ndx_in_leaf = 0;
-        m_handler.update(mem, parent, leaf_ndx_in_parent, elem_ndx_in_leaf); // Throws
-    }
-};
 
 inline void destroy_inner_bptree_node(MemRef mem, int_fast64_t first_value,
                                       Allocator& alloc) TIGHTDB_NOEXCEPT
@@ -3543,10 +3729,60 @@ pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const TIGHTDB_NOEXCEPT
 }
 
 
+namespace {
+
+class VisitAdapter {
+public:
+    VisitAdapter(Array::VisitHandler& handler) TIGHTDB_NOEXCEPT:
+        m_handler(handler)
+    {
+    }
+    bool operator()(const Array::NodeInfo& leaf_info)
+    {
+        return m_handler.visit(leaf_info); // Throws
+    }
+private:
+    Array::VisitHandler& m_handler;
+};
+
+} // anonymous namespace
+
+// Throws only if handler throws.
+bool Array::visit_bptree_leaves(size_t elem_ndx_offset, size_t elems_in_tree,
+                                VisitHandler& handler)
+{
+    TIGHTDB_ASSERT(elem_ndx_offset < elems_in_tree);
+    size_t root_offset = 0, root_size = elems_in_tree;
+    VisitAdapter adapter(handler);
+    size_t start_offset = elem_ndx_offset;
+    return foreach_bptree_leaf(*this, root_offset, root_size, adapter, start_offset); // Throws
+}
+
+
+namespace {
+
+class UpdateAdapter {
+public:
+    UpdateAdapter(Array::UpdateHandler& handler) TIGHTDB_NOEXCEPT:
+        m_handler(handler)
+    {
+    }
+    void operator()(const Array::NodeInfo& leaf_info)
+    {
+        size_t elem_ndx_in_leaf = 0;
+        m_handler.update(leaf_info.m_mem, leaf_info.m_parent, leaf_info.m_ndx_in_parent,
+                         elem_ndx_in_leaf); // Throws
+    }
+private:
+    Array::UpdateHandler& m_handler;
+};
+
+} // anonymous namespace
+
 void Array::update_bptree_leaves(UpdateHandler& handler)
 {
     UpdateAdapter adapter(handler);
-    foreach_bptree_leaf(*this, adapter); // Throws
+    simplified_foreach_bptree_leaf(*this, adapter); // Throws
 }
 
 

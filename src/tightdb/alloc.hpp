@@ -45,9 +45,10 @@ public:
     char* m_addr;
     ref_type m_ref;
 
-    MemRef();
-    MemRef(char* addr, ref_type ref);
-    MemRef(ref_type ref, Allocator& alloc);
+    MemRef() TIGHTDB_NOEXCEPT;
+    ~MemRef() TIGHTDB_NOEXCEPT;
+    MemRef(char* addr, ref_type ref) TIGHTDB_NOEXCEPT;
+    MemRef(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT;
 };
 
 
@@ -176,19 +177,25 @@ inline ref_type to_ref(int64_t v) TIGHTDB_NOEXCEPT
     return ref_type(v);
 }
 
-inline MemRef::MemRef():
+inline MemRef::MemRef() TIGHTDB_NOEXCEPT:
     m_addr(0),
     m_ref(0)
 {
 }
 
-inline MemRef::MemRef(char* addr, ref_type ref):
+inline MemRef::~MemRef() TIGHTDB_NOEXCEPT
+{
+}
+
+inline MemRef::MemRef(char* addr, ref_type ref) TIGHTDB_NOEXCEPT:
     m_addr(addr),
     m_ref(ref)
 {
 }
 
-inline MemRef::MemRef(ref_type ref, Allocator& alloc): m_addr(alloc.translate(ref)), m_ref(ref)
+inline MemRef::MemRef(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT:
+    m_addr(alloc.translate(ref)),
+    m_ref(ref)
 {
 }
 

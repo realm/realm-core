@@ -26,6 +26,7 @@
 #include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/array.hpp>
 #include <tightdb/column_type.hpp>
+#include <tightdb/impl/output_stream.hpp>
 #include <tightdb/query_conditions.hpp>
 
 namespace tightdb {
@@ -85,12 +86,19 @@ public:
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_array->get_alloc(); }
 
+    /// Returns the 'ref' of the root array.
     ref_type get_ref() const TIGHTDB_NOEXCEPT { return m_array->get_ref(); }
 
     void set_parent(ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
 
+    //@{
+    /// Returns the array node at the root of this column, but note
+    /// that there is no guarantee that this node is an inner B+-tree
+    /// node or a leaf. This is the case for a MixedColumn in
+    /// particular.
     Array* get_root_array() TIGHTDB_NOEXCEPT { return m_array; }
     const Array* get_root_array() const TIGHTDB_NOEXCEPT { return m_array; }
+    //@}
 
     /// Provides access to the leaf that contains the element at the
     /// specified index. Upon return \a ndx_in_leaf will be set to the
@@ -122,6 +130,10 @@ public:
     static std::size_t get_size_from_ref(ref_type root_ref, Allocator&);
     static std::size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref, Allocator&);
 
+    /// Write a slice of this column to the specified output stream.
+    virtual ref_type write(std::size_t slice_offset, std::size_t slice_size,
+                           std::size_t table_size, _impl::OutputStream&) const = 0;
+
 #ifdef TIGHTDB_DEBUG
     // Must be upper case to avoid conflict with macro in Objective-C
     virtual void Verify() const = 0;
@@ -141,9 +153,6 @@ protected:
     virtual std::size_t do_get_size() const TIGHTDB_NOEXCEPT = 0;
 
     virtual void do_detach_subtable_accessors() TIGHTDB_NOEXCEPT {}
-
-    // Tree functions
-    template<class T, class C, class S> std::size_t TreeWrite(S& out, size_t& pos) const;
 
     //@{
     /// \tparam L Any type with an appropriate `value_type`, %size(),
@@ -170,9 +179,20 @@ protected:
     class CreateHandler {
     public:
         virtual ref_type create_leaf(std::size_t size) = 0;
+        ~CreateHandler() TIGHTDB_NOEXCEPT {}
     };
 
     static ref_type create(std::size_t size, Allocator&, CreateHandler&);
+
+    class SliceHandler {
+    public:
+        virtual MemRef slice_leaf(MemRef leaf_mem, std::size_t offset, std::size_t size,
+                                  Allocator& target_alloc) = 0;
+        ~SliceHandler() TIGHTDB_NOEXCEPT {}
+    };
+
+    static ref_type write(const Array* root, std::size_t slice_offset, std::size_t slice_size,
+                          std::size_t table_size, SliceHandler&, _impl::OutputStream&);
 
 #ifdef TIGHTDB_DEBUG
     class LeafToDot;
@@ -182,6 +202,8 @@ protected:
 #endif
 
 private:
+    class WriteSliceHandler;
+
     static ref_type build(std::size_t* rest_size_ptr, std::size_t fixed_height,
                           Allocator&, CreateHandler&);
 
@@ -264,6 +286,10 @@ public:
     static ref_type create(Array::Type leaf_type, std::size_t size, int_fast64_t value,
                            Allocator&);
 
+    // Overrriding method in ColumnBase
+    ref_type write(std::size_t, std::size_t, std::size_t,
+                   _impl::OutputStream&) const TIGHTDB_OVERRIDE;
+
     // Debug
 #ifdef TIGHTDB_DEBUG
     virtual void Verify() const TIGHTDB_OVERRIDE;
@@ -294,6 +320,7 @@ private:
 
     class EraseLeafElem;
     class CreateHandler;
+    class SliceHandler;
 
     friend class Array;
     friend class ColumnBase;

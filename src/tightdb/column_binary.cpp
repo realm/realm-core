@@ -379,7 +379,8 @@ public:
     CreateHandler(Allocator& alloc): m_alloc(alloc) {}
     ref_type create_leaf(size_t size) TIGHTDB_OVERRIDE
     {
-        return ArrayBinary::create_array(size, m_alloc);
+        MemRef mem = ArrayBinary::create_array(size, m_alloc); // Throws
+        return mem.m_ref;
     }
 private:
     Allocator& m_alloc;
@@ -389,6 +390,61 @@ ref_type ColumnBinary::create(size_t size, Allocator& alloc)
 {
     CreateHandler handler(alloc);
     return ColumnBase::create(size, alloc, handler);
+}
+
+
+class ColumnBinary::SliceHandler: public ColumnBase::SliceHandler {
+public:
+    SliceHandler(Allocator& alloc): m_alloc(alloc) {}
+    MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
+                      Allocator& target_alloc) TIGHTDB_OVERRIDE
+    {
+        bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
+        if (!is_big) {
+            // Small blobs
+            ArrayBinary leaf(m_alloc);
+            leaf.init_from_mem(leaf_mem);
+            return leaf.slice(offset, size, target_alloc); // Throws
+        }
+        // Big blobs
+        ArrayBigBlobs leaf(m_alloc);
+        leaf.init_from_mem(leaf_mem);
+        return leaf.slice(offset, size, target_alloc); // Throws
+    }
+private:
+    Allocator& m_alloc;
+};
+
+ref_type ColumnBinary::write(size_t slice_offset, size_t slice_size,
+                             size_t table_size, _impl::OutputStream& out) const
+{
+    ref_type ref;
+    if (root_is_leaf()) {
+        Allocator& alloc = Allocator::get_default();
+        MemRef mem;
+        bool is_big = m_array->get_context_flag();
+        if (!is_big) {
+            // Small blobs
+            ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array);
+            mem = leaf->slice(slice_offset, slice_size, alloc); // Throws
+        }
+        else {
+            // Big blobs
+            ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+            mem = leaf->slice(slice_offset, slice_size, alloc); // Throws
+        }
+        Array slice(alloc);
+        _impl::DeepArrayDestroyGuard dg(&slice);
+        slice.init_from_mem(mem);
+        size_t pos = slice.write(out); // Throws
+        ref = pos;
+    }
+    else {
+        SliceHandler handler(get_alloc());
+        ref = ColumnBase::write(m_array, slice_offset, slice_size,
+                                table_size, handler, out); // Throws
+    }
+    return ref;
 }
 
 

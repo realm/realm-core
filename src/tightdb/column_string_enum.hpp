@@ -31,8 +31,8 @@ class ColumnStringEnum: public Column {
 public:
     typedef StringData value_type;
 
-    ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* column_parent = null_ptr,
-                     size_t column_ndx_in_parent = 0, ArrayParent* keys_parent = null_ptr,
+    ColumnStringEnum(ref_type keys, ref_type values, ArrayParent* column_parent = 0,
+                     size_t column_ndx_in_parent = 0, ArrayParent* keys_parent = 0,
                      size_t keys_ndx_in_parent = 0, Allocator& = Allocator::get_default());
     ~ColumnStringEnum() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
     void destroy() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
