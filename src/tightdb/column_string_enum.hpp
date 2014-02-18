@@ -65,7 +65,7 @@ public:
     /// according to StringData::operator<().
     std::size_t lower_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
     std::size_t upper_bound_string(StringData value) const TIGHTDB_NOEXCEPT;
-    //@{
+    //@}
 
     void adjust_keys_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT;
     void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
