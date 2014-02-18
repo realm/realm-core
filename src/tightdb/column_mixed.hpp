@@ -51,7 +51,7 @@ public:
     /// \param column_ndx If this column is used as part of a table
     /// you must pass the logical index of the column within that
     /// table. Otherwise you should pass zero.
-    ColumnMixed(Allocator&, const Table* table, std::size_t column_ndx);
+    ColumnMixed(Allocator&, Table* table, std::size_t column_ndx);
 
     /// Create a mixed column wrapper and attach it to a preexisting
     /// underlying structure of arrays.
@@ -63,7 +63,7 @@ public:
     /// \param column_ndx If this column is used as part of a table
     /// you must pass the logical index of the column within that
     /// table. Otherwise you should pass zero.
-    ColumnMixed(Allocator&, const Table* table, std::size_t column_ndx,
+    ColumnMixed(Allocator&, Table* table, std::size_t column_ndx,
                 ArrayParent*, std::size_t ndx_in_parent, ref_type);
 
     ~ColumnMixed() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
@@ -118,7 +118,6 @@ public:
     void clear() TIGHTDB_OVERRIDE;
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
-    void fill(std::size_t count);
 
     /// Compare two mixed columns for equality.
     bool compare_mixed(const ColumnMixed&) const;
@@ -126,6 +125,12 @@ public:
     void detach_subtable_accessors() TIGHTDB_NOEXCEPT;
 
     static ref_type create(std::size_t num_default_values, Allocator&);
+
+    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) TIGHTDB_NOEXCEPT;
+
+    // Overrriding method in ColumnBase
+    ref_type write(std::size_t, std::size_t, std::size_t,
+                   _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
@@ -162,25 +167,25 @@ private:
 
     /// Stores the data for each entry. For a subtable, the stored
     /// value is the ref of the subtable. For string and binary data,
-    /// the stored value is an index within `m_data`. For other types
-    /// the stored value is itself. Since we only have 63 bits
+    /// the stored value is an index within `m_binary_data`. For other
+    /// types the stored value is itself. Since we only have 63 bits
     /// available for a non-ref value, the sign of numeric values is
     /// encoded as part of the type in `m_types`.
-    RefsColumn* m_refs; // FIXME: Should be renamed to m_data
+    RefsColumn* m_data;
 
     /// For string and binary data types, the bytes are stored here.
-    ColumnBinary* m_data; // FIXME: Should be renamed to m_binary_data
+    ColumnBinary* m_binary_data;
 
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
 
-    void create(Allocator&, const Table*, std::size_t column_ndx);
-    void create(Allocator&, const Table*, std::size_t column_ndx,
+    void create(Allocator&, Table*, std::size_t column_ndx);
+    void create(Allocator&, Table*, std::size_t column_ndx,
                 ArrayParent*, std::size_t ndx_in_parent, ref_type);
-    void init_data_column();
+    void init_binary_data_column();
 
     void clear_value(std::size_t ndx, MixedColType new_type);
 
-    // Get/set/insert 64-bit values in m_refs/m_types
+    // Get/set/insert 64-bit values in m_data/m_types
     int64_t get_value(std::size_t ndx) const TIGHTDB_NOEXCEPT;
     void set_value(std::size_t ndx, int64_t value, MixedColType);
     void insert_int64(std::size_t ndx, int64_t value, MixedColType pos_type, MixedColType neg_type);
@@ -197,14 +202,13 @@ private:
 
 class ColumnMixed::RefsColumn: public ColumnSubtableParent {
 public:
-    RefsColumn(Allocator& alloc, const Table* table, std::size_t column_ndx):
+    RefsColumn(Allocator& alloc, Table* table, std::size_t column_ndx):
         ColumnSubtableParent(alloc, table, column_ndx) {}
-    RefsColumn(Allocator& alloc, const Table* table, std::size_t column_ndx,
+    RefsColumn(Allocator& alloc, Table* table, std::size_t column_ndx,
                ArrayParent* parent, std::size_t ndx_in_parent, ref_type ref):
         ColumnSubtableParent(alloc, table, column_ndx, parent, ndx_in_parent, ref) {}
     ~RefsColumn() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
     using ColumnSubtableParent::get_subtable_ptr;
-    using ColumnSubtableParent::get_subtable;
 };
 
 

@@ -3,7 +3,7 @@
 #include <string>
 #include <iostream>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 
 #define TO_STR(x) TO_STR2(x)
 #define TO_STR2(x) #x
@@ -54,6 +54,10 @@ void emit_flags()
     if (emit_cflags) {
 #ifdef TIGHTDB_HAVE_CONFIG
         emit_flags("-DTIGHTDB_HAVE_CONFIG");
+#else
+#  ifdef TIGHTDB_ENABLE_REPLICATION
+        emit_flags("-DTIGHTDB_ENABLE_REPLICATION");
+#  endif
 #endif
 
         if (TIGHTDB_MAX_LIST_SIZE != TIGHTDB_DEFAULT_MAX_LIST_SIZE)

@@ -1,10 +1,18 @@
 /*.d
 /*.o
+/util/*.d
+/util/*.o
+/impl/*.d
+/impl/*.o
 /*.libdeps
 
 # Coverage data
 /*.gcno
 /*.gcda
+/util/*.gcno
+/util/*.gcda
+/impl/*.gcno
+/impl/*.gcda
 
 /libtightdb.a
 /libtightdb.so
@@ -46,4 +54,4 @@
 /tightdb-config-ios
 /tightdb-config-ios-dbg
 
-/build_config.h
+/util/config.h

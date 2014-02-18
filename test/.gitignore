@@ -1,9 +1,13 @@
 /*.d
 /*.o
+/large_tests/*.d
+/large_tests/*.o
 
 # Coverage data
 /*.gcno
 /*.gcda
+/large_tests/*.gcno
+/large_tests/*.gcda
 
 /UnitTest++/libUnitTest++.a
 /UnitTest++/TestUnitTest++
@@ -24,3 +28,6 @@
 # Transient databases
 *.tightdb
 *.tightdb.lock
+
+# Jenkins unit test reports
+unit-test-report.xml

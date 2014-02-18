@@ -58,8 +58,6 @@ public:
     void insert(std::size_t ndx, T value);
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
-    void resize(std::size_t ndx);
-    void fill(std::size_t count);
     // Experimental. Overwrites the row at ndx with the last row and removes the last row. For unordered tables.
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
 
@@ -68,11 +66,11 @@ public:
     typedef typename AggReturnType<T>::sum_type SumType;
     SumType sum(std::size_t begin = 0, std::size_t end = npos,
                 std::size_t limit = std::size_t(-1)) const;
-    double average(std::size_t begin = 0, std::size_t end = npos, 
+    double average(std::size_t begin = 0, std::size_t end = npos,
                    std::size_t limit = std::size_t(-1)) const;
-    T maximum(std::size_t begin = 0, std::size_t end = npos, 
+    T maximum(std::size_t begin = 0, std::size_t end = npos,
               std::size_t limit = std::size_t(-1)) const;
-    T minimum(std::size_t begin = 0, std::size_t end = npos, 
+    T minimum(std::size_t begin = 0, std::size_t end = npos,
               std::size_t limit = std::size_t(-1)) const;
     std::size_t find_first(T value, std::size_t begin = 0 , std::size_t end = npos) const;
     void find_all(Array& result, T value, std::size_t begin = 0, std::size_t end = npos) const;
@@ -86,6 +84,12 @@ public:
 
     /// Compare two columns for equality.
     bool compare(const BasicColumn&) const;
+
+    static ref_type create(std::size_t size, Allocator&);
+
+    // Overrriding method in ColumnBase
+    ref_type write(std::size_t, std::size_t, std::size_t,
+                   _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
@@ -109,6 +113,8 @@ private:
 
     class SetLeafElem;
     class EraseLeafElem;
+    class CreateHandler;
+    class SliceHandler;
 
 #ifdef TIGHTDB_DEBUG
     static std::size_t verify_leaf(MemRef, Allocator&);

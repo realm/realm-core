@@ -10,8 +10,8 @@ using namespace tightdb;
 ColumnMixed::~ColumnMixed() TIGHTDB_NOEXCEPT
 {
     delete m_types;
-    delete m_refs;
     delete m_data;
+    delete m_binary_data;
     delete m_array;
 }
 
@@ -22,27 +22,27 @@ void ColumnMixed::update_from_parent(size_t old_baseline) TIGHTDB_NOEXCEPT
         return;
 
     m_types->update_from_parent(old_baseline);
-    m_refs->update_from_parent(old_baseline);
-    if (m_data)
-        m_data->update_from_parent(old_baseline);
+    m_data->update_from_parent(old_baseline);
+    if (m_binary_data)
+        m_binary_data->update_from_parent(old_baseline);
 }
 
 
-void ColumnMixed::create(Allocator& alloc, const Table* table, size_t column_ndx)
+void ColumnMixed::create(Allocator& alloc, Table* table, size_t column_ndx)
 {
     m_array = new Array(Array::type_HasRefs, 0, 0, alloc);
 
     m_types = new Column(Array::type_Normal, alloc);
-    m_refs  = new RefsColumn(alloc, table, column_ndx);
+    m_data  = new RefsColumn(alloc, table, column_ndx);
 
     m_array->add(m_types->get_ref());
-    m_array->add(m_refs->get_ref());
+    m_array->add(m_data->get_ref());
 
     m_types->set_parent(m_array, 0);
-    m_refs->set_parent(m_array, 1);
+    m_data->set_parent(m_array, 1);
 }
 
-void ColumnMixed::create(Allocator& alloc, const Table* table, size_t column_ndx,
+void ColumnMixed::create(Allocator& alloc, Table* table, size_t column_ndx,
                          ArrayParent* parent, size_t ndx_in_parent, ref_type ref)
 {
     m_array = new Array(ref, parent, ndx_in_parent, alloc);
@@ -52,30 +52,30 @@ void ColumnMixed::create(Allocator& alloc, const Table* table, size_t column_ndx
     ref_type refs_ref  = m_array->get_as_ref(1);
 
     m_types = new Column(types_ref, m_array, 0, alloc);
-    m_refs  = new RefsColumn(alloc, table, column_ndx, m_array, 1, refs_ref);
-    TIGHTDB_ASSERT(m_types->size() == m_refs->size());
+    m_data  = new RefsColumn(alloc, table, column_ndx, m_array, 1, refs_ref);
+    TIGHTDB_ASSERT(m_types->size() == m_data->size());
 
     // Binary column with values that does not fit in refs
     // is only there if needed
     if (m_array->size() == 3) {
         ref_type data_ref = m_array->get_as_ref(2);
-        m_data = new ColumnBinary(data_ref, m_array, 2, alloc);
+        m_binary_data = new ColumnBinary(data_ref, m_array, 2, alloc);
     }
 }
 
-void ColumnMixed::init_data_column()
+void ColumnMixed::init_binary_data_column()
 {
-    if (m_data)
+    if (m_binary_data)
         return;
 
     TIGHTDB_ASSERT(m_array->size() == 2);
 
     // Create new data column for items that do not fit in refs
-    m_data = new ColumnBinary(m_array->get_alloc());
-    ref_type ref = m_data->get_ref();
+    m_binary_data = new ColumnBinary(m_array->get_alloc());
+    ref_type ref = m_binary_data->get_ref();
 
     m_array->add(ref);
-    m_data->set_parent(m_array, 2);
+    m_binary_data->set_parent(m_array, 2);
 }
 
 void ColumnMixed::clear_value(size_t ndx, MixedColType new_type)
@@ -97,24 +97,23 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType new_type)
                 // If item is in middle of the column, we just clear
                 // it to avoid having to adjust refs to following items
                 // FIXME: this is a leak. We should adjust
-                size_t data_ndx = size_t(uint64_t(m_refs->get(ndx)) >> 1);
-                if (data_ndx == m_data->size()-1) {
+                size_t data_ndx = size_t(uint64_t(m_data->get(ndx)) >> 1);
+                if (data_ndx == m_binary_data->size()-1) {
                     bool is_last = true;
-                    m_data->erase(data_ndx, is_last);
+                    m_binary_data->erase(data_ndx, is_last);
                 }
                 else {
                     // FIXME: But this will lead to unbounded in-file
                     // leaking in for(;;) { insert_binary(i, ...);
                     // erase(i); }
-                    m_data->set(data_ndx, BinaryData());
+                    m_binary_data->set(data_ndx, BinaryData());
                 }
                 break;
             }
             case mixcol_Table: {
                 // Delete entire table
-                ref_type ref = m_refs->get_as_ref(ndx);
-                Array top(ref, 0, 0, m_array->get_alloc());
-                top.destroy();
+                ref_type ref = m_data->get_as_ref(ndx);
+                Array::destroy_deep(ref, m_data->get_alloc());
                 break;
             }
             default:
@@ -123,7 +122,7 @@ void ColumnMixed::clear_value(size_t ndx, MixedColType new_type)
     }
     if (type != new_type)
         m_types->set(ndx, new_type);
-    m_refs->set(ndx, 0);
+    m_data->set(ndx, 0);
 }
 
 void ColumnMixed::erase(size_t ndx, bool is_last)
@@ -136,7 +135,7 @@ void ColumnMixed::erase(size_t ndx, bool is_last)
     clear_value(ndx, mixcol_Int);
 
     m_types->erase(ndx, is_last);
-    m_refs->erase(ndx, is_last);
+    m_data->erase(ndx, is_last);
 }
 
 void ColumnMixed::move_last_over(size_t ndx)
@@ -148,16 +147,16 @@ void ColumnMixed::move_last_over(size_t ndx)
     clear_value(ndx, mixcol_Int);
 
     m_types->move_last_over(ndx);
-    m_refs->move_last_over(ndx);
+    m_data->move_last_over(ndx);
 }
 
 void ColumnMixed::clear()
 {
     detach_subtable_accessors();
     m_types->clear();
-    m_refs->clear();
-    if (m_data)
-        m_data->clear();
+    m_data->clear();
+    if (m_binary_data)
+        m_binary_data->clear();
 }
 
 DataType ColumnMixed::get_type(size_t ndx) const TIGHTDB_NOEXCEPT
@@ -171,36 +170,23 @@ DataType ColumnMixed::get_type(size_t ndx) const TIGHTDB_NOEXCEPT
     }
 }
 
-void ColumnMixed::fill(size_t count)
-{
-    TIGHTDB_ASSERT(is_empty());
-
-    // Fill column with default values
-    // TODO: this is a very naive approach
-    // we could speedup by creating full nodes directly
-    for (size_t i = 0; i < count; ++i)
-        m_types->insert(i, mixcol_Int);
-    for (size_t i = 0; i < count; ++i)
-        m_refs->insert(i, 1); // 1 is zero shifted one and low bit set;
-}
-
 
 void ColumnMixed::set_string(size_t ndx, StringData value)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
     detach_subtable_accessors();
-    init_data_column();
+    init_binary_data_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
 
     // See if we can reuse data position
     if (type == mixcol_String) {
-        size_t data_ndx = size_t(uint64_t(m_refs->get(ndx)) >> 1);
-        m_data->set_string(data_ndx, value);
+        size_t data_ndx = size_t(uint64_t(m_data->get(ndx)) >> 1);
+        m_binary_data->set_string(data_ndx, value);
     }
     else if (type == mixcol_Binary) {
-        size_t data_ndx = size_t(uint64_t(m_refs->get(ndx)) >> 1);
-        m_data->set_string(data_ndx, value);
+        size_t data_ndx = size_t(uint64_t(m_data->get(ndx)) >> 1);
+        m_binary_data->set_string(data_ndx, value);
         m_types->set(ndx, mixcol_String);
     }
     else {
@@ -208,14 +194,14 @@ void ColumnMixed::set_string(size_t ndx, StringData value)
         clear_value(ndx, mixcol_String);
 
         // Add value to data column
-        size_t data_ndx = m_data->size();
-        m_data->add_string(value);
+        size_t data_ndx = m_binary_data->size();
+        m_binary_data->add_string(value);
 
         // Shift value one bit and set lowest bit to indicate that this is not a ref
         int64_t v = int64_t((uint64_t(data_ndx) << 1) + 1);
 
         m_types->set(ndx, mixcol_String);
-        m_refs->set(ndx, v);
+        m_data->set(ndx, v);
     }
 }
 
@@ -223,33 +209,33 @@ void ColumnMixed::set_binary(size_t ndx, BinaryData value)
 {
     TIGHTDB_ASSERT(ndx < m_types->size());
     detach_subtable_accessors();
-    init_data_column();
+    init_binary_data_column();
 
     MixedColType type = MixedColType(m_types->get(ndx));
 
     // See if we can reuse data position
     if (type == mixcol_String) {
-        size_t data_ndx = size_t(uint64_t(m_refs->get(ndx)) >> 1);
-        m_data->set(data_ndx, value);
+        size_t data_ndx = size_t(uint64_t(m_data->get(ndx)) >> 1);
+        m_binary_data->set(data_ndx, value);
         m_types->set(ndx, mixcol_Binary);
     }
     else if (type == mixcol_Binary) {
-        size_t data_ndx = size_t(uint64_t(m_refs->get(ndx)) >> 1);
-        m_data->set(data_ndx, value);
+        size_t data_ndx = size_t(uint64_t(m_data->get(ndx)) >> 1);
+        m_binary_data->set(data_ndx, value);
     }
     else {
         // Remove refs or binary data
         clear_value(ndx, mixcol_Binary);
 
         // Add value to data column
-        size_t data_ndx = m_data->size();
-        m_data->add(value);
+        size_t data_ndx = m_binary_data->size();
+        m_binary_data->add(value);
 
         // Shift value one bit and set lowest bit to indicate that this is not a ref
         int64_t v = int64_t((uint64_t(data_ndx) << 1) + 1);
 
         m_types->set(ndx, mixcol_Binary);
-        m_refs->set(ndx, v);
+        m_data->set(ndx, v);
     }
 }
 
@@ -305,6 +291,106 @@ void ColumnMixed::do_detach_subtable_accessors() TIGHTDB_NOEXCEPT
     detach_subtable_accessors();
 }
 
+ref_type ColumnMixed::create(size_t size, Allocator& alloc)
+{
+    Array top(alloc);
+    _impl::DeepArrayDestroyGuard dg(&top);
+    top.create(Array::type_HasRefs); // Throws
+
+    _impl::DeepArrayRefDestroyGuard dg_2(alloc);
+    {
+        int_fast64_t v = mixcol_Int;
+        ref_type ref = Column::create(Array::type_Normal, size, v, alloc); // Throws
+        dg_2.reset(ref);
+        v = int_fast64_t(ref); // FIXME: Dangerous cast (unsigned -> signed)
+        top.add(v); // Throws
+        dg_2.release();
+    }
+    {
+        int_fast64_t v = 1; // 1 + 2*value where value is 0
+        ref_type ref = Column::create(Array::type_HasRefs, size, v, alloc); // Throws
+        dg_2.reset(ref);
+        v = int_fast64_t(ref); // FIXME: Dangerous cast (unsigned -> signed)
+        top.add(v); // Throws
+        dg_2.release();
+    }
+
+    dg.release();
+    return top.get_ref();
+}
+
+
+ref_type ColumnMixed::write(size_t slice_offset, size_t slice_size,
+                            size_t table_size, _impl::OutputStream& out) const
+{
+    // FIXME: Oops, there is no reasonably efficient way to implement
+    // this. The problem is that we have no guarantees about how the
+    // order of entries in m_binary_data relate to the order of
+    // entries in the column.
+    //
+    // It seems that we would have to change m_binary_data to always
+    // contain one entry for each entry in the column, and at the
+    // corresponding index.
+    //
+    // An even better solution will probably be to change a mixed
+    // column into an ordinary column of mixed leafs. ColumnBinary can
+    // serve as a model of how to place multime subarrays into a
+    // single leaf.
+    //
+    // There are other options such as storing a ref to a ArrayBlob in
+    // m_data if the type is 'string'.
+    //
+    // Unfortunately this will break the file format compatibility.
+    //
+    // The fact that the current design has other serious flaws (se
+    // FIXMEs in ColumnMixed::clear_value()) makes it even more urgent
+    // to change the representation and implementation of ColumnMixed.
+    //
+    // In fact, there is yet another problem with the current design,
+    // it relies on the ability of a column to know its own
+    // size. While this is not an urgent problem, it is in conflict
+    // with the desire to drop the `N_t` field from the B+-tree inner
+    // node (a.k.a. `total_elems_in_subtree`).
+
+    ref_type types_ref = m_types->write(slice_offset, slice_size, table_size, out); // Throws
+    ref_type data_ref = m_data->write(slice_offset, slice_size, table_size, out); // Throws
+
+    // FIXME: This is far from good enough. See comments above.
+    ref_type binary_data_ref = 0;
+    if (m_binary_data) {
+        size_t pos = m_binary_data->get_root_array()->write(out); // Throws
+        binary_data_ref = pos;
+    }
+
+    // build new top array
+    Array top(Allocator::get_default());
+    _impl::ShallowArrayDestroyGuard dg(&top);
+    top.create(Array::type_HasRefs); // Throws
+    {
+        int_fast64_t v(types_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        top.add(v); // Throws
+    }
+    {
+        int_fast64_t v(data_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        top.add(v); // Throws
+    }
+    if (binary_data_ref != 0) {
+        int_fast64_t v(binary_data_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        top.add(v); // Throws
+    }
+
+    // Write new top array
+    {
+        bool recurse = false;
+        size_t pos = top.write(out, recurse);
+        ref_type ref = pos;
+        return ref;
+    }
+
+    dg.release();
+    return top.get_ref();
+}
+
 
 #ifdef TIGHTDB_DEBUG
 
@@ -312,22 +398,22 @@ void ColumnMixed::Verify() const
 {
     m_array->Verify();
     m_types->Verify();
-    m_refs->Verify();
-    if (m_data)
-        m_data->Verify();
+    m_data->Verify();
+    if (m_binary_data)
+        m_binary_data->Verify();
 
     // types and refs should be in sync
     size_t types_len = m_types->size();
-    size_t refs_len  = m_refs->size();
+    size_t refs_len  = m_data->size();
     TIGHTDB_ASSERT(types_len == refs_len);
 
     // Verify each sub-table
     size_t count = size();
     for (size_t i = 0; i < count; ++i) {
-        int64_t v = m_refs->get(i);
+        int64_t v = m_data->get(i);
         if (v == 0 || v & 0x1)
             continue;
-        ConstTableRef subtable = m_refs->get_subtable(i);
+        ConstTableRef subtable = m_data->get_subtable_ptr(i)->get_table_ref();
         subtable->Verify();
     }
 }
@@ -343,9 +429,9 @@ void ColumnMixed::to_dot(ostream& out, StringData title) const
 
     m_array->to_dot(out, "mixed_top");
     m_types->to_dot(out, "types");
-    m_refs->to_dot(out, "refs");
+    m_data->to_dot(out, "refs");
     if (m_array->size() > 2)
-        m_data->to_dot(out, "data");
+        m_binary_data->to_dot(out, "data");
 
     // Write sub-tables
     size_t n = size();
@@ -353,7 +439,7 @@ void ColumnMixed::to_dot(ostream& out, StringData title) const
         MixedColType type = MixedColType(m_types->get(i));
         if (type != mixcol_Table)
             continue;
-        ConstTableRef subtable = m_refs->get_subtable(i);
+        ConstTableRef subtable = m_data->get_subtable_ptr(i)->get_table_ref();
         subtable->to_dot(out);
     }
 

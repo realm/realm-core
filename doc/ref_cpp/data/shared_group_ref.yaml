@@ -44,10 +44,10 @@ DESCR      :
 
              Read transactions are significantly faster than write
              transactions. Multiple read transactions may occur concurrently
-             with each other or with write transactions, while write transactions 
+             with each other or with write transactions, while write transactions
              are serialized with respect to each other.
-             Transactions are fully isolated: throughout a read transaction it will see 
-             the state of the data as it was when the read transactions started, 
+             Transactions are fully isolated: throughout a read transaction it will see
+             the state of the data as it was when the read transactions started,
              regardless of any concurrent commits from write transactions.
 
 - TEXT     : The scoped transaction objects {@link g_write_trans_begin_write}
@@ -88,7 +88,7 @@ CATEGORIES:
                  By default the shared group will be fully durable, so that
                  each commit writes its changes to disk in an atomic manner
                  that guarantees that the file is always consistent.
-                 The transaction will complete when the write has been done 
+                 The transaction will complete when the write has been done
                  to disk (depending on your disk, it might return when the
                  disk has received the data to it's cache).
 
@@ -101,13 +101,13 @@ CATEGORIES:
 
                  If your data is transient, and does not need to persist to disk
                  (like for caching or shared state between processes). You can
-                 open the shared group in memory-only mode. Then the file will 
+                 open the shared group in memory-only mode. Then the file will
                  just be used for identification and backing; it will be removed
                  when there are no more processes using it.
 
                  When used with asynchronous durability level, a process running
                  in the background (the "commit daemon") may continue to update
-                 the database after the application has terminated. The lock file will 
+                 the database after the application has terminated. The lock file will
                  be removed and the commit daemon will terminate once the update is
                  complete. As long as the lock file is present, new shared
                  groups can only be created with asynchronous durability level.
@@ -115,8 +115,8 @@ CATEGORIES:
                  In case of abnormal termination or a machine crash, the lock file
                  may be left in an inconsistent state. SharedGroup tries to detect
                  and remedy this problem when it is opened, but it is not possible
-                 to safely handle all scenarios. If safety cannot be ensured, 
-                 SharedGroup will give up and throw a PresumablyStaleLockFile exception. 
+                 to safely handle all scenarios. If safety cannot be ensured,
+                 SharedGroup will give up and throw a PresumablyStaleLockFile exception.
                  In this case, the stale lock file must be removed manually. In all
                  cases the database file itself will be in a consistent state, even though
                  updates still pending at the time of crash will be lost.
@@ -138,7 +138,7 @@ CATEGORIES:
       - NAME   : no_create
         TYPES  : bool
         DESCR  : &g_shared_group_constructor_parm2_descr
-                 If set to <tt>true</tt>, File::NotFound will be thrown
+                 If set to <tt>true</tt>, util::File::NotFound will be thrown
                  if the file does not already exist.
       - NAME   : dlevel
         TYPES  : DurabilityLevel
@@ -150,13 +150,13 @@ CATEGORIES:
         DESCR  : &g_shared_group_constructor_return1_descr
                  A shared group.
       THROWS:
-      - EXCEPT : File::AccessError
+      - EXCEPT : util::File::AccessError
         DESCR  : *g_group_constructor_memory_throws_descr
-      - EXCEPT : File::PermissionDenied
+      - EXCEPT : util::File::PermissionDenied
         DESCR  : *g_group_exc_perm
-      - EXCEPT : File::NotFound
+      - EXCEPT : util::File::NotFound
         DESCR  : *g_group_exc_notfound
-      - EXCEPT : File::Exists
+      - EXCEPT : util::File::Exists
         DESCR  : *g_group_exc_exists
       - EXCEPT : InvalidDatabase
         DESCR  : *g_group_exc_invalid_db
@@ -189,7 +189,7 @@ CATEGORIES:
                  Create a write transaction.
       DESCR    : &g_write_trans_begin_write_descr
                  >
-                 Create an object of type WriteTransaction. These objects provide 
+                 Create an object of type WriteTransaction. These objects provide
                  <a href="http://en.wikipedia.org/wiki/Resource_Acquisition_Is_Initialization">
                  RAII</a> for write
                  transactions. Write transactions are committed by calling
@@ -331,7 +331,7 @@ CATEGORIES:
       SUMMARY  : &g_shared_group_end_read_summary
                  Terminate read transaction.
       DESCR    : &g_shared_group_end_read_descr
-                 This method terminates a read transaction which was started with 
+                 This method terminates a read transaction which was started with
                  {@link g_shared_group_begin_read}.
                  It is ok to call end_read multiple times, the first call will terminate the transaction.
                  Any additional calls are treated as no-ops.
@@ -356,7 +356,7 @@ CATEGORIES:
 
                  If the database file does not already exist, it will
                  be created (unless <tt>no_create</tt> is set to
-                 true.) 
+                 true.)
 
        - TEXT  : *g_shared_group_durability_modes
 
@@ -369,20 +369,20 @@ CATEGORIES:
       - NAME   : no_create
         TYPES  : bool
         DESCR  : &g_shared_group_open_parm2_descr
-                 If set to <tt>true</tt>, File::NotFound will be thrown
+                 If set to <tt>true</tt>, util::File::NotFound will be thrown
                  if the file does not already exist.
       - NAME   : dlevel
         TYPES  : DurabilityLevel
         DESCR  : &g_shared_group_open_parm3_descr
                  Durability Level (durability_Full or durability_MemOnly).
       THROWS:
-      - EXCEPT : File::AccessError
+      - EXCEPT : util::File::AccessError
         DESCR  : *g_group_constructor_memory_throws_descr
-      - EXCEPT : File::PermissionDenied
+      - EXCEPT : util::File::PermissionDenied
         DESCR  : *g_group_exc_perm
-      - EXCEPT : File::NotFound
+      - EXCEPT : util::File::NotFound
         DESCR  : *g_group_exc_notfound
-      - EXCEPT : File::Exists
+      - EXCEPT : util::File::Exists
         DESCR  : *g_group_exc_exists
       - EXCEPT : InvalidDatabase
         DESCR  : *g_group_exc_invalid_db
@@ -434,7 +434,7 @@ CATEGORIES:
                  specified size. On systems that do not support
                  preallocation, this function has no effect. To know
                  whether preallocation is supported by TightDB on your
-                 platform, call File::is_prealloc_supported().
+                 platform, call util::File::is_prealloc_supported().
 
                  It is an error to call this function on an unattached
                  shared group. Doing so will result in undefined

@@ -21,9 +21,19 @@
 #define TIGHTDB_ARRAY_BASIC_TPL_HPP
 
 #include <algorithm>
+#include <limits>
+#include <stdexcept>
 #include <iomanip>
 
+#include <tightdb/impl/destroy_guard.hpp>
+
 namespace tightdb {
+
+template<class T>
+inline BasicArray<T>::BasicArray(Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(alloc)
+{
+}
 
 template<class T>
 inline BasicArray<T>::BasicArray(ArrayParent* parent, std::size_t ndx_in_parent, Allocator& alloc):
@@ -36,7 +46,8 @@ inline BasicArray<T>::BasicArray(ArrayParent* parent, std::size_t ndx_in_parent,
 
 template<class T>
 inline BasicArray<T>::BasicArray(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
-                                 Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
+                                 Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(alloc)
 {
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
@@ -46,7 +57,8 @@ inline BasicArray<T>::BasicArray(MemRef mem, ArrayParent* parent, std::size_t nd
 
 template<class T>
 inline BasicArray<T>::BasicArray(ref_type ref, ArrayParent* parent, std::size_t ndx_in_parent,
-                                 Allocator& alloc) TIGHTDB_NOEXCEPT: Array(alloc)
+                                 Allocator& alloc) TIGHTDB_NOEXCEPT:
+    Array(alloc)
 {
     // Manually create array as doing it in initializer list
     // will not be able to call correct virtual functions
@@ -55,44 +67,62 @@ inline BasicArray<T>::BasicArray(ref_type ref, ArrayParent* parent, std::size_t 
 }
 
 template<class T>
-inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT: Array(no_prealloc_tag())
+inline BasicArray<T>::BasicArray(no_prealloc_tag) TIGHTDB_NOEXCEPT:
+    Array(no_prealloc_tag())
 {
+}
+
+
+template<class T>
+inline MemRef BasicArray<T>::create_array(std::size_t size, Allocator& alloc)
+{
+    std::size_t byte_size_0 = calc_aligned_byte_size(size); // Throws
+    // Adding zero to Array::initial_capacity to avoid taking the
+    // address of that member
+    std::size_t byte_size = std::max(byte_size_0, Array::initial_capacity+0); // Throws
+
+    MemRef mem = alloc.alloc(byte_size); // Throws
+
+    bool is_inner_bptree_node = false;
+    bool has_refs = false;
+    bool context_flag = false;
+    int width = sizeof (T);
+    init_header(mem.m_addr, is_inner_bptree_node, has_refs, context_flag, wtype_Multiply,
+                width, size, byte_size);
+
+    return mem;
 }
 
 
 template<class T>
 inline void BasicArray<T>::create()
 {
-    ref_type ref = create_empty_array(get_alloc()); // Throws
-    init_from_ref(ref);
-}
-
-
-template<class T>
-inline ref_type BasicArray<T>::create_empty_array(Allocator& alloc)
-{
-    std::size_t capacity = Array::initial_capacity;
-    MemRef mem_ref = alloc.alloc(capacity); // Throws
-
-    bool is_leaf = true;
-    bool has_refs = false;
-    int width = sizeof (T);
     std::size_t size = 0;
-    init_header(mem_ref.m_addr, is_leaf, has_refs, wtype_Multiply, width, size, capacity);
-
-    return mem_ref.m_ref;
+    MemRef mem = create_array(size, get_alloc()); // Throws
+    init_from_mem(mem);
 }
 
 
 template<class T>
-inline void BasicArray<T>::clear()
+MemRef BasicArray<T>::slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const
 {
-    copy_on_write(); // Throws
+    TIGHTDB_ASSERT(is_attached());
 
-    // Truncate size to zero (but keep capacity and width)
-    m_size = 0;
-    set_header_size(0);
+    // FIXME: This can be optimized as a single contiguous copy
+    // operation.
+    BasicArray slice(target_alloc);
+    _impl::ShallowArrayDestroyGuard dg(&slice);
+    slice.create(); // Throws
+    size_t begin = offset;
+    size_t end   = offset + size;
+    for (size_t i = begin; i != end; ++i) {
+        T value = get(i);
+        slice.add(value); // Throws
+    }
+    dg.release();
+    return slice.get_mem();
 }
+
 
 template<class T>
 inline void BasicArray<T>::add(T value)
@@ -194,10 +224,15 @@ bool BasicArray<T>::compare(const BasicArray<T>& a) const
 
 
 template<class T>
-std::size_t BasicArray<T>::CalcByteLen(std::size_t count, std::size_t) const
+std::size_t BasicArray<T>::CalcByteLen(std::size_t size, std::size_t) const
 {
-    // FIXME: This arithemtic could overflow. Consider using <tightdb/safe_int_ops.hpp>
-    return header_size + (count * sizeof (T));
+    // FIXME: Consider calling `calc_aligned_byte_size(size)`
+    // instead. Note however, that CalcByteLen() is supposed to return
+    // the unaligned byte size. It is probably the case that no harm
+    // is done by returning the aligned version, and most callers of
+    // CalcByteLen() will actually benefit if CalcByteLen() was
+    // changed to always return the aligned byte size.
+    return header_size + size * sizeof (T); // FIXME: Prone to overflow
 }
 
 template<class T>
@@ -318,7 +353,7 @@ ref_type BasicArray<T>::bptree_leaf_insert(size_t ndx, T value, TreeInsertBase& 
         // array, then copy elements with std::copy().
         for (size_t i = ndx; i != leaf_size; ++i)
             new_leaf.add(get(i));
-        resize(ndx);
+        truncate(ndx);
         add(value);
         state.m_split_offset = ndx + 1;
     }
@@ -340,6 +375,19 @@ inline std::size_t BasicArray<T>::upper_bound(T value) const TIGHTDB_NOEXCEPT
     const T* begin = reinterpret_cast<const T*>(m_data);
     const T* end = begin + size();
     return std::upper_bound(begin, end, value) - begin;
+}
+
+template<class T>
+inline std::size_t BasicArray<T>::calc_aligned_byte_size(std::size_t size)
+{
+    std::size_t max = std::numeric_limits<std::size_t>::max();
+    std::size_t max_2 = max & ~size_t(7); // Allow for upwards 8-byte alignment
+    if (size > (max_2 - header_size) / sizeof (T))
+        throw std::runtime_error("Byte size overflow");
+    size_t byte_size = header_size + size * sizeof (T);
+    TIGHTDB_ASSERT(byte_size > 0);
+    size_t aligned_byte_size = ((byte_size-1) | 7) + 1; // 8-byte alignment
+    return aligned_byte_size;
 }
 
 

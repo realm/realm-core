@@ -23,8 +23,8 @@
 #include <stdint.h> // unint8_t etc
 #include <string>
 
-#include <tightdb/config.h>
-#include <tightdb/file.hpp>
+#include <tightdb/util/features.h>
+#include <tightdb/util/file.hpp>
 #include <tightdb/table_macros.hpp>
 
 namespace tightdb {
@@ -38,8 +38,8 @@ class GroupWriter;
 /// Thrown by Group and SharedGroup constructors if the specified file
 /// (or memory buffer) does not appear to contain a valid TightDB
 /// database.
-struct InvalidDatabase: File::AccessError {
-    InvalidDatabase(): File::AccessError("Invalid database") {}
+struct InvalidDatabase: util::File::AccessError {
+    InvalidDatabase(): util::File::AccessError("Invalid database") {}
 };
 
 
@@ -93,7 +93,7 @@ public:
     ///
     /// \return The `ref` of the root node, or zero if there is none.
     ///
-    /// \throw File::AccessError
+    /// \throw util::File::AccessError
     ref_type attach_file(const std::string& path, bool is_shared, bool read_only, bool no_create,
                          bool skip_validate, int* get_version = 0);
 
@@ -180,7 +180,7 @@ public:
     /// specified size. On systems that do not support preallocation,
     /// this function has no effect. To know whether preallocation is
     /// supported by TightDB on your platform, call
-    /// File::is_prealloc_supported().
+    /// util::File::is_prealloc_supported().
     ///
     /// It is an error to call this function on an allocator that is
     /// not attached to a file. Doing so will result in undefined
@@ -202,7 +202,7 @@ public:
     ///
     /// It is an error to call this function on a detached
     /// allocator. Doing so will result in undefined behavior.
-    std::size_t get_total_size() const;
+    std::size_t get_total_size() const TIGHTDB_NOEXCEPT;
 
     /// Mark all managed memory (except the attached file) as free
     /// space.
@@ -220,19 +220,20 @@ public:
     /// mapped byte has changed.
     bool remap(std::size_t file_size);
 
-    MemRef alloc(std::size_t size) TIGHTDB_OVERRIDE;
-    MemRef realloc_(ref_type, const char*, std::size_t old_size,
-                    std::size_t new_size) TIGHTDB_OVERRIDE;
-    // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
-    void free_(ref_type, const char*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-    char* translate(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
-
 #ifdef TIGHTDB_DEBUG
     void enable_debug(bool enable) { m_debug_out = enable; }
-    void Verify() const;
+    void Verify() const TIGHTDB_OVERRIDE;
     bool is_all_free() const;
     void print() const;
 #endif
+
+protected:
+    MemRef do_alloc(std::size_t size) TIGHTDB_OVERRIDE;
+    MemRef do_realloc(ref_type, const char*, std::size_t old_size,
+                    std::size_t new_size) TIGHTDB_OVERRIDE;
+    // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
+    void do_free(ref_type, const char*) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    char* do_translate(ref_type) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 private:
     enum AttachMode {
@@ -275,7 +276,7 @@ private:
 
     static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
 
-    File m_file;
+    util::File m_file;
     char* m_data;
     AttachMode m_attach_mode;
 

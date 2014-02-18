@@ -24,8 +24,8 @@
 #include <string>
 #include <iostream>
 
-#include <tightdb/thread.hpp>
-#include <tightdb/bind.hpp>
+#include <tightdb/util/bind.hpp>
+#include <tightdb/util/thread.hpp>
 
 namespace tightdb {
 namespace test_util {
@@ -67,7 +67,7 @@ public:
     }
 
 private:
-    Thread m_thread;
+    util::Thread m_thread;
     bool m_except;
     std::string m_except_msg;
 

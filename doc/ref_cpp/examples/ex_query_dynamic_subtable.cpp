@@ -9,8 +9,8 @@ using namespace std;
 int main()
 {
 // @@EndFold@@
-    /* 
-    Create following dynamically typed table with below subtables, 
+    /*
+    Create following dynamically typed table with below subtables,
     and then find Names who have at least 1 Score greater than 500
     (Peter and Bob).
 
@@ -25,7 +25,7 @@ int main()
     Bob             223
                     160
                     912
-    
+
     Alice           123
                     111
     */
@@ -36,9 +36,9 @@ int main()
     table->add_column(type_String, "Names");
     table->add_column(type_Table, "Scores");
 
-    Spec tablespec = table->get_spec();
-    Spec subspec = tablespec.get_subtable_spec(1);
-    subspec.add_column(type_Int, "Score");
+    vector<size_t> path;
+    path.push_back(1);
+    table->add_subcolumn(path, type_Int, "Score");
 
     table->add_empty_row();
     table->set_string(0, 0, "Peter");

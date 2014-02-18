@@ -121,6 +121,21 @@ CATEGORIES :
       - CODE   : ex_cpp_dyn_table_is_attached
         DESCR  :
 
+  - g_dyn_table_get_name:
+      NAME     : get_name
+      SUMMARY  : &g_dyn_table_get_name_summary
+                 Get the name of this table, if it has any.
+      DESCR    : &g_dyn_table_get_name_descr
+                 Tables have names when, and only when they are direct
+                 members of groups. For a table of any other kind,
+                 this function returns the empty string.
+      CONST    : true
+      RETURN:
+        TYPES  : StringData
+        DESCR  : &g_dyn_table_get_name_return_descr
+                 The name of the table, or the empty string if the
+                 table is not a direct member of a group.
+
 
 - Table:
   METHODS:
@@ -136,19 +151,8 @@ CATEGORIES :
 
   - g_dyn_table_optimize:
       NAME     : optimize
-      SUMMARY  : &g_dyn_table_optimize_summary
-                 Optimize a table.
-      DESCR    : &g_dyn_table_optimize_descr
-                 This method will optimize the internal data structures of a table.
-                 The result is that the table will consume less memory and queries might
-                 be faster.
-
-                 This should be called as soon as there is an representative amount of
-                 data in the table. The table will then reorganize itself into the most
-                 effective format.
-
-                 What is learned about the contents will be used in all future operations,
-                 so you only need to call optimize once for each table.
+      SUMMARY  : *g_table_optimize_summary
+      DESCR    : *g_table_optimize_descr
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_optimize
         DESCR  :
@@ -408,7 +412,7 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_add_empty_row_summary
                  Append empty rows.
       DESCR    : &g_dyn_table_add_empty_row_descr
-                 This method adds one or more empty rows at the end of the table. 
+                 This method adds one or more empty rows at the end of the table.
                  The default cell values are 0, null, or "", as appropriate to the column types.
                  The table is required to have at least one column.
       SIGNATURE: |
@@ -692,9 +696,10 @@ CATEGORIES :
       SUMMARY  : &g_dyn_table_set_index_summary
                  Add an index to a column.
       DESCR    : &g_dyn_table_set_index_descr
-                 This method adds an index to a column, and queries will be faster. But the table
-                 will require more memory and inserts will be slower. This method is idempotent.
-                 Currently only String columns can be indexed. Note, index cannot be removed.
+                 This method adds an index to a column, making lookups in this column faster.
+                 However, the table will use more space and inserts will be slower.
+                 This method is idempotent, and indices cannot be removed.
+                 Currently only String columns can be indexed.
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
@@ -940,15 +945,43 @@ CATEGORIES :
       - CODE   : ex_cpp_dyn_table_lower_upper_bound
         DESCR  :
 
+  - g_dyn_table_get_range_view:
+  - g_dyn_table_get_range_view_const:
+      NAMES    : [get_range_view, get_range_view]
+      SUMMARY  : &g_dyn_table_get_range_view_summary
+                 Get range (subset) of rows in the table.
+      DESCR    : &g_dyn_table_get_range_view_descr
+                 This method will return a range of rows of the table. The
+                 rows are returned as a {@link class_dyn_tableview} object.
+      SIGNATURE: |
+                 TableView      get_range_view(std::size_t start, std::size_t end);
+                 ConstTableView get_range_view(std::size_t start, std::size_t end) const;
+      PARAMS:
+      - NAME   : start
+        TYPES  : size_t
+        DESCR  : &g_dyn_table_get_range_view_parm1_descr
+                 The starting row index (inclusive).
+      - NAME   : end
+        TYPES  : size_t
+        DESCR  : &g_dyn_table_get_range_view_parm2_descr
+                 The ending row index (exclusive).
+      RETURN:
+        TYPES  : TableView
+        DESCR  : &g_dyn_table_get_range_view_return_descr
+                 A view with a subset of rows.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_table_get_range_view
+        DESCR  :
+
   - g_dyn_table_get_sorted_view:
   - g_dyn_table_get_sorted_view_const:
       NAMES    : [get_sorted_view, get_sorted_view]
       SUMMARY  : &g_dyn_table_get_sorted_view_summary
-                 Sort the table.
+                 Get a sorted view.
       DESCR    : &g_dyn_table_get_sorted_view_desc
-                 This method will sort the rows by using values of a given column.
+                 This method returns a view of the table sorted by the given column.
                  The rows are returned as a {@link class_dyn_tableview} object.
-                 Currently sort is only supported on Integer, Boolean and Date ColumnTypes.
+                 Currently sort is only supported on Integer, Boolean and Date column types.
       SIGNATURE: |
                  TableView      get_sorted_view(size_t column_ndx, bool ascending=true);
                  ConstTableView get_sorted_view(size_t column_ndx, bool ascending=true) const;
@@ -964,7 +997,7 @@ CATEGORIES :
       RETURN:
         TYPES  : TableView
         DESCR  : &g_dyn_table_get_sorted_view_return_descr
-                 A view.
+                 A view sorted by the given column.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_table_get_sorted_view
         DESCR  :
@@ -1027,21 +1060,24 @@ CATEGORIES :
       DESCR    : &g_dyn_table_count_descr
                  This method counts the number of rows matching a specified value
                  in the specified column.
-                 It is convinient to determine the number briefly compared to using
+                 It is convinient to determine the number briefly, compared to using
                  a {@link class_dyn_query} object.
       SIGNATURE: |
-                 size_t count_int(size_t column_ndx, int64_t target) const;
-                 size_t count_float(size_t column_ndx, float target) const;
-                 size_t count_double(size_t column_ndx, double target) const;
-                 size_t count_string(size_t column_ndx, StringData target) const;
+                 size_t count_int(size_t column_ndx, int64_t value) const;
+                 size_t count_float(size_t column_ndx, float value) const;
+                 size_t count_double(size_t column_ndx, double value) const;
+                 size_t count_string(size_t column_ndx, StringData value) const;
       CONST    : True
       PARAMS:
       - NAME   : column_ndx
         TYPES  : size_t
-        DESCR  : &g_dyn_table_count_parm1_descr
+        DESCR  :
+        - TEXT : &g_dyn_table_count_parm1_descr0
                  The column index (starting from 0).
-                 The data type in the column must match the type of the <code>target</code> value.
-      - NAME   : target
+        - TEXT : &g_dyn_table_count_parm1_descr1
+                 The data type in the column must match the type of the <code>value</code> value.
+      - NAME   : &g_dyn_table_count_parm2_name
+                 value
         TYPES  : [int64_t, float, double, StringData]
         DESCR  : &g_dyn_table_count_parm2_descr
                  The value to count.
@@ -1059,10 +1095,14 @@ CATEGORIES :
       TITLE    : sum_*
       NAMES    : [sum_int, sum_float, sum_double]
       SUMMARY  : &g_dyn_table_sum_summary
-                 Calculates the sum.
+                 Sum the values in a column.
       DESCR    :
       - TEXT   : &g_dyn_table_sum_descr
                  This method calculates the sum of all values in the specified column.
+      - TEXT   : &g_dyn_table_sum_descr_notes
+                 |
+                 Note: The summation can overflow depending on the values stored. Nothing will indicate this.
+                 Note: Adding many floats or doubles can accumulate representation imprecisions.
       - TEXT   : >
                  As the sum of many <code>float</code>
                  values can be greater than the maximum value of the type, a <code>double</code>
@@ -1076,7 +1116,7 @@ CATEGORIES :
       - NAME   : column_ndx
         TYPES  : size_t
         DESCR  : &g_dyn_table_sum_parm1_descr
-                 The column index (starting from 0) to summarize.
+                 The index (starting from 0) of the column to sum.
       RETURN:
         TYPES  : [int64_t, double, double]
         DESCR  : &g_dyn_table_sum_return_descr
@@ -1091,9 +1131,9 @@ CATEGORIES :
       TITLE    : maximum_*
       NAMES    : [maximum_int, maximum_float, maximum_double]
       SUMMARY  : &g_dyn_table_maximum_summary
-                 Find highest value.
+                 Find the maximum value.
       DESCR    : &g_dyn_table_maximum_descr
-                 The method finds the highest value in the specified column.
+                 The method finds the maximum value in the specified column.
       SIGNATURE: |
                  int64_t maximum_int(size_t column_ndx) const;
                  float   maximum_float(size_t column_ndx) const;
@@ -1118,9 +1158,9 @@ CATEGORIES :
       TITLE    : minimum_*
       NAMES    : [minimum_int, minimum_float, minimum_double]
       SUMMARY  : &g_dyn_table_minimum_summary
-                 Find lowest value.
+                 Find the minimum value.
       DESCR    : &g_dyn_table_minimum_descr
-                 The method finds the lowest value in the specified column.
+                 The method finds the minimum value in the specified column.
       CONST    : True
       SIGNATURE: |
                  int64_t minimum_int(size_t column_ndx) const;
@@ -1144,9 +1184,19 @@ CATEGORIES :
       TITLE    : average_*
       NAMES    : [average_int, average_float, average_double]
       SUMMARY  : &g_dyn_table_average_summary
-                 Calculates the average.
-      DESCR    : &g_dyn_table_average_descr
+                 Calculate the average value.
+      DESCR    :
+      - TEXT   : &g_dyn_table_average_descr
                  This method calculates the average value in the specified column.
+      - TEXT   : &g_dyn_table_average_descr_notes
+                 |
+                 Note: The method performs a summation, which can overflow depending on the values stored. Nothing will indicate this.
+                 Note: Averaging many floats or doubles can accumulate representation imprecisions.
+      - TEXT   : &g_dyn_table_average_descr_double
+                 >
+                 As the sum of many <code>int64_t</code> or <code>float</code>
+                 values can be greater than the average value of the type, a <code>double</code>
+                 is returned.
       CONST    : True
       SIGNATURE: |
                  double  average_int(size_t column_ndx) const;

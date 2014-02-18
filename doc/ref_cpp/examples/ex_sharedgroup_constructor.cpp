@@ -2,7 +2,7 @@
 // @@Fold@@
 #include <cassert>
 #include <tightdb.hpp>
-#include <tightdb/file.hpp>
+#include <tightdb/util/file.hpp>
 
 using namespace tightdb;
 
@@ -55,7 +55,7 @@ void func()
 int main()
 {
     func();
-    File::remove("shared_db.tightdb");
+    util::File::remove("shared_db.tightdb");
 }
 // @@EndFold@@
 // @@EndExample@@

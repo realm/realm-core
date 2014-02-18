@@ -22,21 +22,42 @@
 
 #include <limits>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/group.hpp>
 
 namespace tightdb {
 
 
-/// When two threads or processes want to access the same database
-/// file, they must each create their own instance of SharedGroup.
+/// A SharedGroup facilitates transactions.
 ///
-/// Processes that share a database file must reside on the same host.
+/// When multiple threads or processes need to access a database
+/// concurrently, they must do so using transactions. By design,
+/// TightDB does not allow for multiple threads (or processes) to
+/// share a single instance of SharedGroup. Instead, each concurrently
+/// executing thread or process must use a separate instance of
+/// SharedGroup.
+///
+/// Each instance of SharedGroup manages a single transaction at a
+/// time. That transaction can be either a read transaction, or a
+/// write transaction.
+///
+/// Utility classes ReadTransaction and WriteTransaction are provided
+/// to make it safe and easy to work with transactions in a scoped
+/// manner (by means of the RAII idiom). However, transactions can
+/// also be explicitly started (begin_read(), begin_write()) and
+/// stopped (end_read(), commit(), rollback()).
+///
+/// If a transaction is active when the SharedGroup is destroyed, that
+/// transaction is implicitely terminated, either by a call to
+/// end_read() or rollback().
+///
+/// Two processes that want to share a database file must reside on
+/// the same host.
 class SharedGroup {
 public:
     enum DurabilityLevel {
-        durability_Full
-        , durability_MemOnly
+        durability_Full,
+        durability_MemOnly
 #ifndef _WIN32
         // Async commits are not yet supported on windows
         , durability_Async
@@ -83,11 +104,11 @@ public:
     ///
     /// \param file Filesystem path to a TightDB database file.
     ///
-    /// \throw File::AccessError If the file could not be opened. If
-    /// the reason corresponds to one of the exception types that are
-    /// derived from File::AccessError, the derived exception type is
-    /// thrown. Note that InvalidDatabase is among these derived
-    /// exception types.
+    /// \throw util::File::AccessError If the file could not be
+    /// opened. If the reason corresponds to one of the exception
+    /// types that are derived from util::File::AccessError, the
+    /// derived exception type is thrown. Note that InvalidDatabase is
+    /// among these derived exception types.
     void open(const std::string& file, bool no_create = false,
               DurabilityLevel dlevel = durability_Full,
               bool is_backend = false);
@@ -128,7 +149,7 @@ public:
     /// specified size. On systems that do not support preallocation,
     /// this function has no effect. To know whether preallocation is
     /// supported by TightDB on your platform, call
-    /// File::is_prealloc_supported().
+    /// util::File::is_prealloc_supported().
     ///
     /// It is an error to call this function on an unattached shared
     /// group. Doing so will result in undefined behavior.
@@ -176,22 +197,19 @@ private:
     struct SharedInfo;
 
     // Member variables
-    Group                 m_group;
-    uint64_t              m_version;
-    File                  m_file;
-    File::Map<SharedInfo> m_file_map; // Never remapped
-    File::Map<SharedInfo> m_reader_map;
-    std::string           m_file_path;
+    Group      m_group;
+    uint64_t   m_version;
+    util::File m_file;
+    util::File::Map<SharedInfo> m_file_map; // Never remapped
+    util::File::Map<SharedInfo> m_reader_map;
+    std::string m_file_path;
 
-#ifdef TIGHTDB_DEBUG
-    // In debug mode we want to track transaction stages
     enum TransactStage {
         transact_Ready,
         transact_Reading,
         transact_Writing
     };
     TransactStage m_transact_stage;
-#endif
 
     struct ReadCount;
 
@@ -207,6 +225,8 @@ private:
     ReadCount&  ringbuf_get_last() TIGHTDB_NOEXCEPT;
     void        ringbuf_put(const ReadCount& v);
     void        ringbuf_expand();
+
+    void do_begin_write();
 
     // Must be called only by someone that has a lock on the write
     // mutex.
@@ -320,6 +340,27 @@ inline SharedGroup::SharedGroup(unattached_tag) TIGHTDB_NOEXCEPT:
 inline bool SharedGroup::is_attached() const TIGHTDB_NOEXCEPT
 {
     return m_file_map.is_attached();
+}
+
+inline Group& SharedGroup::begin_write()
+{
+#ifdef TIGHTDB_ENABLE_REPLICATION
+    if (Replication* repl = m_group.get_replication()) {
+        repl->begin_write_transact(*this); // Throws
+        try {
+            do_begin_write();
+        }
+        catch (...) {
+            repl->rollback_write_transact(*this);
+            throw;
+        }
+        return m_group;
+    }
+#endif
+
+    do_begin_write();
+
+    return m_group;
 }
 
 

@@ -18,14 +18,17 @@ DESCR      : &g_dyn_view_intro_descr
              propagate to the original table. This includes operations
              like updating values and deleting rows.
 
-             Notice that this does not imply that it will work the
-             opposite direction. Any change that adds or removes rows
-             in the original table will invalidate the view, and you
-             must not use the view, as this could possibly lead to data
-             corruption.
+             To some degree this also applies in the opposite direction.
+             Updates to values in the table will be visible through views
+             linked to the table, while deletion and insertions of rows in
+             a table cause any views linked to the table to become detached.
+             Access to detached views are undefined, except for the is_attached() method.
 
-             It is possible to create multiple views for the table as
-             long as you do not change the original table.
+             It is possible to create multiple views for one table. Updates to one
+             view propagates to the original table and is visible from other
+             views linked to the same table. Deletion of rows through a view
+             propagates to the original table and cause any other views
+             linked to the same table to become detached.
 
              NOTICE:
              For all methods which takes row and column index as parameters,
@@ -45,8 +48,8 @@ CATEGORIES :
   METHODS:
   - g_dyn_view_size:
       NAME     : size
-      SUMMARY  : *g_dyn_table_size_summary
-      DESCR    : *g_dyn_table_size_descr
+      SUMMARY  : *g_typed_view_size_summary
+      DESCR    : *g_typed_view_size_descr
       CONST    : True
       RETURN:
         TYPES  : size_t
@@ -67,6 +70,20 @@ CATEGORIES :
         DESCR  : <code>true</code> if empty, <code>false</code> otherwise.
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_is_empty
+        DESCR  :
+  - g_dyn_view_is_attached:
+      NAME     : is_attached
+      SUMMARY  : &g_dyn_view_is_attached_summary
+                 Is view attached?
+      DESCR    : &g_dyn_view_is_attached_descr
+                 The method checks if the view is attached. A view becomes detached
+                 if rows are added to or removed from the table it originates from.
+      CONST    : True
+      RETURN:
+        TYPES  : bool
+        DESCR  : <code>true</code> if valid, <code>false</code> otherwise.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_view_is_attached
         DESCR  :
 - View:
   METHODS:
@@ -457,7 +474,8 @@ CATEGORIES :
                  Calculates the sum.
       DESCR    :
       - TEXT   : &g_dyn_view_sum_descr
-                 Calculates the sum of a column.
+                 Calculates the sum of the values in the selected column.
+      - TEXT   : *g_dyn_table_sum_descr_notes
       - TEXT   : >
                  As the sum of many <code>float</code>
                  values can be greater than the maximum value of the type, a <code>double</code>
@@ -478,6 +496,37 @@ CATEGORIES :
       EXAMPLES:
       - CODE   : ex_cpp_dyn_view_sum
         DESCR  :
+
+  - g_dyn_view_average_int:
+  - g_dyn_view_average_float:
+  - g_dyn_view_average_double:
+      TITLE    : average*
+      NAMES    : [average_int, average_float, average_double]
+      SUMMARY  : &g_dyn_view_average_summary
+                 Calculates the average.
+      DESCR    :
+      - TEXT   : &g_dyn_view_average_descr
+                 Calculates the average of a column.
+      - TEXT   : *g_dyn_table_average_descr_notes
+      - TEXT   : *g_dyn_table_average_descr_double
+      CONST    : True
+      SIGNATURE: |
+                 double  average_int(size_t column_ndx) const;
+                 double  average_float(size_t column_ndx) const;
+                 double  average_double(size_t column_ndx) const;
+      PARAMS:
+      - NAME   : column_ndx
+        TYPES  : size_t
+        DESCR  : *g_dyn_view_column_index_descr
+      RETURN:
+        TYPES  : [double, double, double]
+        DESCR  : >
+                 The average of values of the cells.
+      EXAMPLES:
+      - CODE   : ex_cpp_dyn_view_average
+        DESCR  :
+
+
   - g_dyn_view_maximum_int:
   - g_dyn_view_maximum_float:
   - g_dyn_view_maximum_double:

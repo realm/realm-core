@@ -25,7 +25,7 @@
 #include <string>
 #include <ostream>
 
-#include <tightdb/config.h>
+#include <tightdb/util/features.h>
 #include <tightdb/utilities.hpp>
 
 namespace tightdb {
@@ -64,24 +64,63 @@ namespace tightdb {
 /// assume that the referenced string is followed by a null character
 /// unless there is an externally provided guarantee.
 ///
+/// This class makes it possible to distinguish between a 'null'
+/// reference and a reference to the empty string (see
+/// is_null()). However, most functions of the TightDB API do not care
+/// about this distinction. In particular, the comparison operators of
+/// this class make no distinction between a null reference and a
+/// reference to the empty string. This is possible because in both
+/// cases, size() returns zero.
+///
 /// \sa BinaryData
 /// \sa Mixed
 class StringData {
 public:
-    StringData() TIGHTDB_NOEXCEPT: m_data(0), m_size(0) {}
-    StringData(const char* d, std::size_t s) TIGHTDB_NOEXCEPT: m_data(d), m_size(s) {}
+    /// Construct a null reference.
+    StringData() TIGHTDB_NOEXCEPT;
+
+    /// If \a data is 'null', \a size must be zero.
+    StringData(const char* data, std::size_t size) TIGHTDB_NOEXCEPT;
 
     template<class T, class A> StringData(const std::basic_string<char, T, A>&);
     template<class T, class A> operator std::basic_string<char, T, A>() const;
 
-    /// Initialize from a zero terminated C style string.
+    /// Initialize from a zero terminated C style string. Pass null to
+    /// construct a null reference.
     StringData(const char* c_str) TIGHTDB_NOEXCEPT;
-    ~StringData() TIGHTDB_NOEXCEPT {}
 
-    char operator[](std::size_t i) const TIGHTDB_NOEXCEPT { return m_data[i]; }
+    ~StringData() TIGHTDB_NOEXCEPT;
 
-    const char* data() const TIGHTDB_NOEXCEPT { return m_data; }
-    std::size_t size() const TIGHTDB_NOEXCEPT { return m_size; }
+    char operator[](std::size_t i) const TIGHTDB_NOEXCEPT;
+
+    const char* data() const TIGHTDB_NOEXCEPT;
+    std::size_t size() const TIGHTDB_NOEXCEPT;
+
+    /// Is this a null reference?
+    ///
+    /// An instance of StringData is a null reference when, and only
+    /// when the stored size is zero (size()) and the stored pointer
+    /// is the null pointer (data()).
+    ///
+    /// In the case of the empty string, the stored size is still
+    /// zero, but the stored pointer is **not** the null pointer. It
+    /// could for example point to the empty string literal. Note that
+    /// the actual value of the pointer is immaterial in this case (as
+    /// long as it is not zero), because when the size is zero, it is
+    /// an error to dereference the pointer.
+    ///
+    /// Conversion of a StringData object to `bool` yields the logical
+    /// negation of the result of calling this function. In other
+    /// words, a StringData is converted to true if it is not the null
+    /// reference, otherwise it is converted to false.
+    ///
+    /// It is important to understand that all of the functions and
+    /// operator in this class, and most of the functions in the
+    /// TightDB API in general makes no distinction between a null
+    /// reference and a reference to the empty string. These functions
+    /// and operators never look at the stored pointer if the stored
+    /// size is zero.
+    bool is_null() const TIGHTDB_NOEXCEPT;
 
     friend bool operator==(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
     friend bool operator!=(const StringData&, const StringData&) TIGHTDB_NOEXCEPT;
@@ -110,6 +149,13 @@ public:
     template<class C, class T>
     friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const StringData&);
 
+#ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+    explicit operator bool() const TIGHTDB_NOEXCEPT;
+#else
+    typedef const char* StringData::*unspecified_bool_type;
+    operator unspecified_bool_type() const TIGHTDB_NOEXCEPT;
+#endif
+
 private:
     const char* m_data;
     std::size_t m_size;
@@ -119,8 +165,24 @@ private:
 
 // Implementation:
 
+inline StringData::StringData() TIGHTDB_NOEXCEPT:
+    m_data(0),
+    m_size(0)
+{
+}
+
+inline StringData::StringData(const char* data, std::size_t size) TIGHTDB_NOEXCEPT:
+    m_data(data),
+    m_size(size)
+{
+    TIGHTDB_ASSERT(data || size == 0);
+}
+
 template<class T, class A> inline StringData::StringData(const std::basic_string<char, T, A>& s):
-    m_data(s.data()), m_size(s.size()) {}
+    m_data(s.data()),
+    m_size(s.size())
+{
+}
 
 template<class T, class A> inline StringData::operator std::basic_string<char, T, A>() const
 {
@@ -128,8 +190,36 @@ template<class T, class A> inline StringData::operator std::basic_string<char, T
 }
 
 inline StringData::StringData(const char* c_str) TIGHTDB_NOEXCEPT:
-    m_data(c_str), m_size(std::char_traits<char>::length(c_str)) {}
+    m_data(c_str),
+    m_size(0)
+{
+    if (c_str)
+        m_size = std::char_traits<char>::length(c_str);
+}
 
+inline StringData::~StringData() TIGHTDB_NOEXCEPT
+{
+}
+
+inline char StringData::operator[](std::size_t i) const TIGHTDB_NOEXCEPT
+{
+    return m_data[i];
+}
+
+inline const char* StringData::data() const TIGHTDB_NOEXCEPT
+{
+    return m_data;
+}
+
+inline std::size_t StringData::size() const TIGHTDB_NOEXCEPT
+{
+    return m_size;
+}
+
+inline bool StringData::is_null() const TIGHTDB_NOEXCEPT
+{
+    return !m_data;
+}
 
 inline bool operator==(const StringData& a, const StringData& b) TIGHTDB_NOEXCEPT
 {
@@ -205,6 +295,18 @@ inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const S
         out << *i;
     return out;
 }
+
+#ifdef TIGHTDB_HAVE_CXX11_EXPLICIT_CONV_OPERATORS
+inline StringData::operator bool() const TIGHTDB_NOEXCEPT
+{
+    return !is_null();
+}
+#else
+inline StringData::operator unspecified_bool_type() const TIGHTDB_NOEXCEPT
+{
+    return is_null() ? 0 : &StringData::m_data;
+}
+#endif
 
 } // namespace tightdb
 

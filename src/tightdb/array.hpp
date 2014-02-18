@@ -47,10 +47,10 @@ Searching: The main finding function is:
 
 #include <stdint.h> // unint8_t etc
 
-#include <tightdb/meta.hpp>
-#include <tightdb/assert.hpp>
-#include <tightdb/alloc.hpp>
+#include <tightdb/util/meta.hpp>
+#include <tightdb/util/assert.hpp>
 #include <tightdb/utilities.hpp>
+#include <tightdb/alloc.hpp>
 #include <tightdb/string_data.hpp>
 #include <tightdb/query_conditions.hpp>
 
@@ -259,12 +259,35 @@ public:
 //    void state_init(int action, QueryState *state);
 //    bool match(int action, std::size_t index, int64_t value, QueryState *state);
 
+    /// Create an array in the unattached state.
+    explicit Array(Allocator&) TIGHTDB_NOEXCEPT;
+
+    /// Initialize an array wrapper from the specified memory
+    /// reference.
+    Array(MemRef, ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
+
+    /// Initialize an array wrapper from the specified memory
+    /// reference. Note that the version taking a MemRef argument is
+    /// slightly faster, because it does not need to map the 'ref' to
+    /// a memory pointer.
+    Array(ref_type, ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
+
+    /// Create a new array as a copy of the specified array using the
+    /// specified allocator.
+    Array(const Array&, Allocator&);
+
+    // Fastest way to instantiate an array, if you just want to utilize its methods
+    struct no_prealloc_tag {};
+    explicit Array(no_prealloc_tag) TIGHTDB_NOEXCEPT;
+
+    ~Array() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
+
     enum Type {
         type_Normal,
 
         /// This array is the main array of an innner node of a
         /// B+-tree as used in table columns.
-        type_InnerColumnNode,
+        type_InnerBptreeNode,
 
         /// This array may contain refs to subarrays. An element whose
         /// least significant bit is zero, is a ref pointing to a
@@ -277,6 +300,9 @@ public:
         type_HasRefs
     };
 
+    /// FIXME: Deprecated. The constructor must not allocate anything
+    /// that the destructor does not deallocate.
+    ///
     /// Create a new array, and if \a parent and \a ndx_in_parent are
     /// specified, update the parent to point to this new array.
     ///
@@ -296,47 +322,26 @@ public:
     explicit Array(Type type = type_Normal, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
                    Allocator& = Allocator::get_default());
 
-    /// Initialize an array wrapper from the specified memory
-    /// reference.
-    Array(MemRef, ArrayParent*, std::size_t ndx_in_parent, Allocator&) TIGHTDB_NOEXCEPT;
-
-    /// Initialize an array wrapper from the specified memory
-    /// reference. Note that the version taking a MemRef argument is
-    /// slightly faster, because it does not need to map the 'ref' to
-    /// a memory pointer.
-    explicit Array(ref_type, ArrayParent* = 0, std::size_t ndx_in_parent = 0,
-                   Allocator& = Allocator::get_default()) TIGHTDB_NOEXCEPT;
-
-    /// Create an array in the unattached state.
-    explicit Array(Allocator&) TIGHTDB_NOEXCEPT;
-
-    /// Create a new array as a copy of the specified array using the
-    /// specified allocator.
-    Array(const Array&, Allocator&);
-
-    // Fastest way to instantiate an array, if you just want to utilize its methods
-    struct no_prealloc_tag {};
-    explicit Array(no_prealloc_tag) TIGHTDB_NOEXCEPT;
-
-    ~Array() TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE {}
-
-    /// Create a new empty array of the specified type and attach to
-    /// it. This does not modify the parent reference information.
+    /// Create a new empty array of the specified type and attach this
+    /// accessor to it. This does not modify the parent reference
+    /// information of this accessor.
     ///
     /// Note that the caller assumes ownership of the allocated
     /// underlying node. It is not owned by the accessor.
-    void create(Type);
+    ///
+    /// FIXME: Belongs in IntegerArray
+    void create(Type, bool context_flag = false);
 
     /// Reinitialize this array accessor to point to the specified new
-    /// underlying array. This does not modify the parent reference
-    /// information.
+    /// underlying memory. This does not modify the parent reference
+    /// information of this accessor.
     void init_from_ref(ref_type) TIGHTDB_NOEXCEPT;
 
     /// Same as init_from_ref(ref_type) but avoid the mapping of 'ref'
     /// to memory pointer.
     void init_from_mem(MemRef) TIGHTDB_NOEXCEPT;
 
-    /// Update the parents reference to this child. The requires, of
+    /// Update the parents reference to this child. This requires, of
     /// course, that the parent information stored in this child is up
     /// to date. If the parent pointer is set to null, this function
     /// has no effect.
@@ -360,19 +365,44 @@ public:
     void set_type(Type);
 
     /// Construct a complete copy of this array (including its
-    /// subarrays) using the specified allocator and return just the
-    /// ref to the new array.
-    ref_type clone(Allocator&) const;
+    /// subarrays) using the specified target allocator and return
+    /// just the reference to the underlying memory.
+    MemRef clone_deep(Allocator& target_alloc) const;
 
     void move_assign(Array&) TIGHTDB_NOEXCEPT; // Move semantics for assignment
 
-    /// Construct an empty array of the specified type and return just
-    /// the reference to the underlying memory.
-    static ref_type create_empty_array(Type, Allocator&);
+    /// Construct an array of the specified type and size, and return
+    /// just the reference to the underlying memory. All elements will
+    /// be initialized to the specified value.
+    ///
+    /// FIXME: Belongs in IntegerArray
+    static MemRef create_array(Type, bool context_flag, std::size_t size, int_fast64_t value,
+                               Allocator&);
+
+    /// Construct an empty array of the specified type, and return
+    /// just the reference to the underlying memory.
+    ///
+    /// FIXME: Belongs in IntegerArray
+    static MemRef create_empty_array(Type, bool context_flag, Allocator&);
+
+    /// Construct a shallow copy of the specified slice of this array
+    /// using the specified target allocator. Subarrays will **not**
+    /// be cloned. See slice_and_clone_children() for an alternative.
+    ///
+    /// FIXME: Belongs in IntegerArray
+    MemRef slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const;
+
+    /// Construct a deep copy of the specified slice of this array
+    /// using the specified target allocator. Subarrays will be
+    /// cloned.
+    ///
+    /// FIXME: Belongs in IntegerArray
+    MemRef slice_and_clone_children(std::size_t offset, std::size_t size,
+                                    Allocator& target_alloc) const;
 
     // Parent tracking
-    bool has_parent() const TIGHTDB_NOEXCEPT { return m_parent != 0; }
-    ArrayParent* get_parent() const TIGHTDB_NOEXCEPT { return m_parent; }
+    bool has_parent() const TIGHTDB_NOEXCEPT;
+    ArrayParent* get_parent() const TIGHTDB_NOEXCEPT;
 
     /// Setting a new parent affects ownership of the attached array
     /// node, if any. If a non-null parent is specified, and there was
@@ -382,26 +412,28 @@ public:
     /// list of children in the affected parents.
     void set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT;
 
-    std::size_t get_ndx_in_parent() const TIGHTDB_NOEXCEPT { return m_ndx_in_parent; }
-    void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT { m_ndx_in_parent += diff; }
+    std::size_t get_ndx_in_parent() const TIGHTDB_NOEXCEPT;
+    void adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT;
 
-    bool is_attached() const TIGHTDB_NOEXCEPT { return m_data != 0; }
+    bool is_attached() const TIGHTDB_NOEXCEPT;
 
     /// Detach from the underlying array node. This method has no
     /// effect if the accessor is currently unattached (idempotency).
-    void detach() TIGHTDB_NOEXCEPT { m_data = 0; }
+    void detach() TIGHTDB_NOEXCEPT;
 
     std::size_t size() const TIGHTDB_NOEXCEPT;
-    bool is_empty() const TIGHTDB_NOEXCEPT { return size() == 0; }
+    bool is_empty() const TIGHTDB_NOEXCEPT;
     Type get_type() const TIGHTDB_NOEXCEPT;
 
-    void insert(std::size_t ndx, int64_t value);
-    void add(int64_t value);
+    void insert(std::size_t ndx, int_fast64_t value);
+    void add(int_fast64_t value);
 
-    /// This function is guaranteed not to throw if
-    /// ensure_minimum_width(value) has been called and
+    /// This function is guaranteed to not throw if the current width
+    /// is sufficient for the specified value (e.g. if you have called
+    /// ensure_minimum_width(value)) and
     /// get_alloc().is_read_only(get_ref()) returns false
-    /// (noexcept:array-set).
+    /// (noexcept:array-set). Note that for a value of zero, the first
+    /// criterion is trivially satisfied.
     void set(std::size_t ndx, int64_t value);
 
     template<std::size_t w> void Set(std::size_t ndx, int64_t value);
@@ -417,27 +449,78 @@ public:
     int64_t front() const TIGHTDB_NOEXCEPT;
     int64_t back() const TIGHTDB_NOEXCEPT;
 
-    /// Erase the element at the specified index, and move elements at
-    /// succeeding indexes to the next lower index.
+    /// Remove the element at the specified index, and move elements
+    /// at higher indexes to the next lower index.
     ///
-    /// This function is guaranteed not to throw if
-    /// get_alloc().is_read_only(get_ref()) returns false.
+    /// This function does **not** destroy removed subarrays. That is,
+    /// if the erased element is a 'ref' pointing to a subarray, then
+    /// that subarray will not be destroyed automatically.
     ///
-    /// FIXME: Carefull with this one. It does not destroy/deallocate
-    /// subarrays as clear() does. This difference is surprising and
-    /// highly counterintuitive.
+    /// This function guarantees that no exceptions will be thrown if
+    /// get_alloc().is_read_only(get_ref()) would return false before
+    /// the call. This is automatically guaranteed if the array is
+    /// used in a non-transactional context, or if the array has
+    /// already been successfully modified within the current write
+    /// transaction.
     void erase(std::size_t ndx);
 
-    /// Same as erase(std::size_t), but erase all elements in the
+    /// Same as erase(std::size_t), but remove all elements in the
     /// specified range.
+    ///
+    /// Please note that this function does **not** destroy removed
+    /// subarrays.
+    ///
+    /// This function guarantees that no exceptions will be thrown if
+    /// get_alloc().is_read_only(get_ref()) would return false before
+    /// the call.
     void erase(std::size_t begin, std::size_t end);
 
-    /// Erase every element in this array. Subarrays will be destroyed
-    /// recursively, and space allocated for subarrays will be freed.
+    /// Reduce the size of this array to the specified number of
+    /// elements. It is an error to specify a size that is greater
+    /// than the current size of this array. The effect of doing so is
+    /// undefined. This is just a shorthand / for calling the ranged
+    /// erase() function with appropriate / arguments.
+    ///
+    /// Please note that this function does **not** destroy removed
+    /// subarrays. See clear_and_destroy_children() for an
+    /// alternative.
+    ///
+    /// This function guarantees that no exceptions will be thrown if
+    /// get_alloc().is_read_only(get_ref()) would return false before
+    /// the call.
+    void truncate(std::size_t size);
+
+    /// Reduce the size of this array to the specified number of
+    /// elements. It is an error to specify a size that is greater
+    /// than the current size of this array. The effect of doing so is
+    /// undefined. Subarrays will be destroyed recursively, as if by a
+    /// call to `destroy_deep(ubarray_ref, alloc)`.
     ///
     /// This function is guaranteed not to throw if
     /// get_alloc().is_read_only(get_ref()) returns false.
+    void truncate_and_destroy_children(std::size_t size);
+
+    /// Remove every element from this array. This is just a shorthand
+    /// for calling truncate(0).
+    ///
+    /// Please note that this function does **not** destroy removed
+    /// subarrays. See clear_and_destroy_children() for an
+    /// alternative.
+    ///
+    /// This function guarantees that no exceptions will be thrown if
+    /// get_alloc().is_read_only(get_ref()) would return false before
+    /// the call.
     void clear();
+
+    /// Remove every element in this array. Subarrays will be
+    /// destroyed recursively, as if by a call to
+    /// `destroy_deep(ubarray_ref, alloc)`. This is just a shorthand
+    /// for calling truncate_and_destroy_children(0).
+    ///
+    /// This function guarantees that no exceptions will be thrown if
+    /// get_alloc().is_read_only(get_ref()) would return false before
+    /// the call.
+    void clear_and_destroy_children();
 
     /// If neccessary, expand the representation so that it can store
     /// the specified value.
@@ -473,7 +556,7 @@ public:
     /// in the range [`begin`,`end`), and \a dest_end must not be in
     /// the range (`begin`,`end`].
     ///
-    /// These functions are guaranteed not to throw if
+    /// These functions are guaranteed to not throw if
     /// get_alloc().is_read_only(get_ref()) returns false.
     void move(std::size_t begin, std::size_t end, std::size_t dest_begin);
     void move_backward(std::size_t begin, std::size_t end, std::size_t dest_end);
@@ -526,39 +609,44 @@ public:
     void sort();
     void ReferenceSort(Array& ref);
 
-    // FIXME: Carefull with this one. It handles only shortening
-    // operations. Either rename to truncate() or implement expanding
-    // case.
-    ///
-    /// FIXME: Carefull with this one. It does not destroy/deallocate
-    /// subarrays as clear() does. This difference is surprising and
-    /// highly counterintuitive.
-    void resize(std::size_t count);
-
-    /// Returns true if type is not type_InnerColumnNode
-    bool is_leaf() const TIGHTDB_NOEXCEPT { return !m_isNode; }
+    bool is_inner_bptree_node() const TIGHTDB_NOEXCEPT { return m_is_inner_bptree_node; }
 
     /// Returns true if type is either type_HasRefs or type_InnerColumnNode
-    bool has_refs() const TIGHTDB_NOEXCEPT { return m_hasRefs; }
+    bool has_refs() const TIGHTDB_NOEXCEPT { return m_has_refs; }
 
     // Columns and indexes can use the context bit to diffentiate leaf types
-    bool context_bit() const TIGHTDB_NOEXCEPT { return get_indexflag_from_header(); }
-    void set_context_bit(bool value) { set_header_indexflag(value); }
-    bool is_index_node() const  TIGHTDB_NOEXCEPT { return get_indexflag_from_header(); }
-    void set_is_index_node(bool value) { set_header_indexflag(value); }
+    bool get_context_flag() const TIGHTDB_NOEXCEPT { return get_context_flag_from_header(); }
+    void set_context_flag(bool value) { set_header_context_flag(value); }
+    bool is_index_node() const  TIGHTDB_NOEXCEPT { return get_context_flag_from_header(); }
+    void set_is_index_node(bool value) { set_header_context_flag(value); }
 
     ref_type get_ref() const TIGHTDB_NOEXCEPT { return m_ref; }
     MemRef get_mem() const TIGHTDB_NOEXCEPT { return MemRef(get_header_from_data(m_data), m_ref); }
 
-    /// Recursively destroy children (as if calling clear()), then
-    /// transition to the detached state (as if calling detach()),
-    /// then free the allocated memory. For an unattached accessor,
-    /// this function has no effect (idempotency).
+    /// Destroy only the array that this accessor is attached to, not
+    /// the children of that array. See non-static destroy_deep() for
+    /// an alternative. If this accessor is already in the detached
+    /// state, this function has no effect (idempotency).
     void destroy() TIGHTDB_NOEXCEPT;
 
+    /// Recursively destroy children (as if calling
+    /// clear_and_destroy_children()), then put this accessor into the
+    /// detached state (as if calling detach()), then free the
+    /// allocated memory. If this accessor is already in the detached
+    /// state, this function has no effect (idempotency).
+    void destroy_deep() TIGHTDB_NOEXCEPT;
+
+    /// Destroy only the array pointed to be the specified 'ref', not
+    /// its children. See static destroy_deep() for an alternative.
     static void destroy(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
 
-    class DestroyGuard;
+    /// Destroy the array pointed to be the specified 'ref' and all of
+    /// its children recursively.
+    ///
+    /// This is done by freeing the array node pointed to by the
+    /// specified 'ref' after calling destroy_deep() on every
+    /// contained 'ref' element.
+    static void destroy_deep(ref_type, Allocator&) TIGHTDB_NOEXCEPT;
 
     Allocator& get_alloc() const TIGHTDB_NOEXCEPT { return m_alloc; }
 
@@ -570,54 +658,61 @@ public:
     /// The number of bytes that will be written by a non-recursive
     /// invocation of this function is exactly the number returned by
     /// get_byte_size().
-    template<class S> std::size_t write(S& target, bool recurse = true, bool persist = false) const;
+    template<class S>
+    std::size_t write(S& target, bool recurse = true, bool persist = false) const;
 
     std::vector<int64_t> ToVector() const;
 
     /// Compare two arrays for equality.
-    bool compare_int(const Array&) const;
+    bool compare_int(const Array&) const TIGHTDB_NOEXCEPT;
 
     // Main finding function - used for find_first, find_all, sum, max, min, etc.
     bool find(int cond, Action action, int64_t value, size_t start, size_t end, size_t baseindex,
               QueryState<int64_t>* state) const;
 
     template<class cond, Action action, size_t bitwidth, class Callback>
-    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-              Callback callback) const;
+    bool find(int64_t value, size_t start, size_t end, size_t baseindex,
+              QueryState<int64_t>* state, Callback callback) const;
 
     // This is the one installed into the m_finder slots.
     template<class cond, Action action, size_t bitwidth>
-    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state) const;
+    bool find(int64_t value, size_t start, size_t end, size_t baseindex,
+              QueryState<int64_t>* state) const;
 
     template<class cond, Action action, class Callback>
-    bool find(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-              Callback callback) const;
+    bool find(int64_t value, size_t start, size_t end, size_t baseindex,
+              QueryState<int64_t>* state, Callback callback) const;
 
     // Optimized implementation for release mode
     template<class cond2, Action action, size_t bitwidth, class Callback>
-    bool find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                        Callback callback) const;
+    bool find_optimized(int64_t value, size_t start, size_t end, size_t baseindex,
+                        QueryState<int64_t>* state, Callback callback) const;
 
     // Called for each search result
     template<Action action, class Callback>
-    bool find_action(size_t index, int64_t value, QueryState<int64_t>* state, Callback callback) const;
+    bool find_action(size_t index, int64_t value,
+                     QueryState<int64_t>* state, Callback callback) const;
 
     template<Action action, class Callback>
-    bool find_action_pattern(size_t index, uint64_t pattern, QueryState<int64_t>* state,
-                             Callback callback) const;
+    bool find_action_pattern(size_t index, uint64_t pattern,
+                             QueryState<int64_t>* state, Callback callback) const;
 
-    // Wrappers for backwards compatibility and for simple use without setting up state initialization etc
-    template<class cond> std::size_t find_first(int64_t value, std::size_t start = 0,
-                                                std::size_t end = std::size_t(-1)) const;
-    void find_all(Array& result, int64_t value, std::size_t col_offset = 0, std::size_t begin = 0,
-                  std::size_t end = std::size_t(-1)) const;
+    // Wrappers for backwards compatibility and for simple use without
+    // setting up state initialization etc
+    template<class cond>
+    std::size_t find_first(int64_t value, std::size_t start = 0,
+                           std::size_t end = std::size_t(-1)) const;
+
+    void find_all(Array& result, int64_t value, std::size_t col_offset = 0,
+                  std::size_t begin = 0, std::size_t end = std::size_t(-1)) const;
+
     std::size_t find_first(int64_t value, std::size_t begin = 0,
                            std::size_t end = size_t(-1)) const;
 
     // Non-SSE find for the four functions Equal/NotEqual/Less/Greater
     template<class cond2, Action action, size_t bitwidth, class Callback>
-    bool Compare(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                 Callback callback) const;
+    bool Compare(int64_t value, size_t start, size_t end, size_t baseindex,
+                 QueryState<int64_t>* state, Callback callback) const;
 
     // Non-SSE find for Equal/NotEqual
     template<bool eq, Action action, size_t width, class Callback>
@@ -626,34 +721,35 @@ public:
 
     // Non-SSE find for Less/Greater
     template<bool gt, Action action, size_t bitwidth, class Callback>
-    bool CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                         Callback callback) const;
+    bool CompareRelation(int64_t value, size_t start, size_t end, size_t baseindex,
+                         QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, size_t foreign_width, class Callback, size_t width>
-    bool CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                       Callback callback) const;
+    bool CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t baseindex,
+                       QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, class Callback, size_t bitwidth, size_t foreign_bitwidth>
-    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                      Callback callback) const;
+    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
+                      QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, class Callback>
-    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                      Callback callback) const;
+    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
+                      QueryState<int64_t>* state, Callback callback) const;
 
     template<class cond, Action action, size_t width, class Callback>
-    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state,
-                      Callback callback) const;
+    bool CompareLeafs(const Array* foreign, size_t start, size_t end, size_t baseindex,
+                      QueryState<int64_t>* state, Callback callback) const;
 
     // SSE find for the four functions Equal/NotEqual/Less/Greater
 #ifdef TIGHTDB_COMPILER_SSE
     template<class cond2, Action action, size_t width, class Callback>
-    bool FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state, size_t baseindex,
-                 Callback callback) const;
+    bool FindSSE(int64_t value, __m128i *data, size_t items, QueryState<int64_t>* state,
+                 size_t baseindex, Callback callback) const;
 
     template<class cond2, Action action, size_t width, class Callback>
     TIGHTDB_FORCEINLINE bool FindSSE_intern(__m128i* action_data, __m128i* data, size_t items,
-                                            QueryState<int64_t>* state, size_t baseindex, Callback callback) const;
+                                            QueryState<int64_t>* state, size_t baseindex,
+                                            Callback callback) const;
 
 #endif
 
@@ -688,15 +784,19 @@ public:
     /// efficiency when inserting after, and erasing the last element.
     std::size_t get_bptree_size() const TIGHTDB_NOEXCEPT;
 
+    /// The root must not be a leaf.
+    static std::size_t get_bptree_size_from_header(const char* root_header) TIGHTDB_NOEXCEPT;
 
-    /// Find the leaf node corresponding to the specified tree-level
-    /// index. This function must be called on an inner B+-tree node,
-    /// never a leaf. This implies, of course, that the tree must not
-    /// be empty.
+
+    /// Find the leaf node corresponding to the specified element
+    /// index index. The specified element index must refer to an
+    /// element that exists in the tree. This function must be called
+    /// on an inner B+-tree node, never a leaf. Note that according to
+    /// invar:bptree-nonempty-inner and invar:bptree-nonempty-leaf, an
+    /// inner B+-tree node can never be empty.
     ///
-    /// The identified leaf is passed as a memory reference, and this
-    /// function may not instantiate intermediate array accessors
-    /// either. For this reason, this function cannot be used for
+    /// This function is not obliged to instantiate intermediate array
+    /// accessors. For this reason, this function cannot be used for
     /// operations that modify the tree, as that requires an unbroken
     /// chain of parent array accessors between the root and the
     /// leaf. Thus, despite the fact that the returned MemRef object
@@ -707,8 +807,29 @@ public:
     /// \return (`leaf_header`, `ndx_in_leaf`) where `leaf_header`
     /// points to the the header of the located leaf, and
     /// `ndx_in_leaf` is the local index within that leaf
-    /// corresponding to the specified tree-level index.
+    /// corresponding to the specified element index.
     std::pair<MemRef, std::size_t> get_bptree_leaf(std::size_t elem_ndx) const TIGHTDB_NOEXCEPT;
+
+
+    class NodeInfo;
+    class VisitHandler;
+
+    /// Visit leaves of the B+-tree rooted at this inner node,
+    /// starting with the leaf that contains the element at the
+    /// specified element index start offset, and ending when the
+    /// handler returns false. The specified element index offset must
+    /// refer to an element that exists in the tree. This function
+    /// must be called on an inner B+-tree node, never a leaf. Note
+    /// that according to invar:bptree-nonempty-inner and
+    /// invar:bptree-nonempty-leaf, an inner B+-tree node can never be
+    /// empty.
+    ///
+    /// \param elems_in_tree The total number of element in the tree.
+    ///
+    /// \return True if, and only if the handler has returned true for
+    /// all visited leafs.
+    bool visit_bptree_leaves(std::size_t elem_ndx_offset, std::size_t elems_in_tree,
+                             VisitHandler&);
 
 
     class UpdateHandler;
@@ -784,7 +905,12 @@ public:
     /// array instance. If an array instance is already available, or
     /// you need to get multiple values, then this method will be
     /// slower.
-    static int64_t get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+    static int_fast64_t get(const char* header, std::size_t ndx) TIGHTDB_NOEXCEPT;
+
+    /// Like get(const char*, std::size_t) but gets two consecutive
+    /// elements.
+    static std::pair<int_least64_t, int_least64_t> get_two(const char* header,
+                                                           std::size_t ndx) TIGHTDB_NOEXCEPT;
 
     /// The meaning of 'width' depends on the context in which this
     /// array is used.
@@ -806,10 +932,9 @@ public:
         wtype_Ignore   = 2
     };
 
-    static bool get_isleaf_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static bool get_is_inner_bptree_node_from_header(const char*) TIGHTDB_NOEXCEPT;
     static bool get_hasrefs_from_header(const char*) TIGHTDB_NOEXCEPT;
-    static bool get_context_bit_from_header(const char*) TIGHTDB_NOEXCEPT;
-    static bool get_indexflag_from_header(const char*) TIGHTDB_NOEXCEPT;
+    static bool get_context_flag_from_header(const char*) TIGHTDB_NOEXCEPT;
     static WidthType get_wtype_from_header(const char*) TIGHTDB_NOEXCEPT;
     static int get_width_from_header(const char*) TIGHTDB_NOEXCEPT;
     static std::size_t get_size_from_header(const char*) TIGHTDB_NOEXCEPT;
@@ -830,6 +955,9 @@ public:
     /// specified number of elements, that is, the maximum value that
     /// can be returned by get_byte_size().
     static std::size_t get_max_byte_size(std::size_t num_elems) TIGHTDB_NOEXCEPT;
+
+    /// FIXME: Belongs in IntegerArray
+    static std::size_t calc_aligned_byte_size(std::size_t size, int width);
 
 #ifdef TIGHTDB_DEBUG
     void print() const;
@@ -884,13 +1012,15 @@ protected:
 
     void CreateFromHeaderDirect(char* header, ref_type = 0) TIGHTDB_NOEXCEPT;
 
-    virtual std::size_t CalcByteLen(std::size_t count, std::size_t width) const; // Not 8-byte aligned
+    // Includes array header. Not necessarily 8-byte aligned.
+    virtual std::size_t CalcByteLen(std::size_t size, std::size_t width) const;
+
     virtual std::size_t CalcItemCount(std::size_t bytes, std::size_t width) const TIGHTDB_NOEXCEPT;
     virtual WidthType GetWidthType() const { return wtype_Bits; }
 
-    bool get_isleaf_from_header() const TIGHTDB_NOEXCEPT;
+    bool get_is_inner_bptree_node_from_header() const TIGHTDB_NOEXCEPT;
     bool get_hasrefs_from_header() const TIGHTDB_NOEXCEPT;
-    bool get_indexflag_from_header() const TIGHTDB_NOEXCEPT;
+    bool get_context_flag_from_header() const TIGHTDB_NOEXCEPT;
     WidthType get_wtype_from_header() const TIGHTDB_NOEXCEPT;
     int get_width_from_header() const TIGHTDB_NOEXCEPT;
     std::size_t get_size_from_header() const TIGHTDB_NOEXCEPT;
@@ -898,32 +1028,30 @@ protected:
     // Undefined behavior if m_alloc.is_read_only(m_ref) returns true
     std::size_t get_capacity_from_header() const TIGHTDB_NOEXCEPT;
 
-    void set_header_isleaf(bool value) TIGHTDB_NOEXCEPT;
+    void set_header_is_inner_bptree_node(bool value) TIGHTDB_NOEXCEPT;
     void set_header_hasrefs(bool value) TIGHTDB_NOEXCEPT;
-    void set_header_indexflag(bool value) TIGHTDB_NOEXCEPT;
+    void set_header_context_flag(bool value) TIGHTDB_NOEXCEPT;
     void set_header_wtype(WidthType value) TIGHTDB_NOEXCEPT;
     void set_header_width(int value) TIGHTDB_NOEXCEPT;
     void set_header_size(std::size_t value) TIGHTDB_NOEXCEPT;
     void set_header_capacity(std::size_t value) TIGHTDB_NOEXCEPT;
 
-    static void set_header_isleaf(bool value, char* header) TIGHTDB_NOEXCEPT;
+    static void set_header_is_inner_bptree_node(bool value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_hasrefs(bool value, char* header) TIGHTDB_NOEXCEPT;
-    static void set_header_indexflag(bool value, char* header) TIGHTDB_NOEXCEPT;
+    static void set_header_context_flag(bool value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_wtype(WidthType value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_width(int value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_size(std::size_t value, char* header) TIGHTDB_NOEXCEPT;
     static void set_header_capacity(std::size_t value, char* header) TIGHTDB_NOEXCEPT;
 
-    static void init_header(char* header, bool is_leaf, bool has_refs, WidthType width_type,
-                            int width, std::size_t size, std::size_t capacity) TIGHTDB_NOEXCEPT;
+    static void init_header(char* header, bool is_inner_bptree_node, bool has_refs,
+                            bool context_flag, WidthType width_type, int width,
+                            std::size_t size, std::size_t capacity) TIGHTDB_NOEXCEPT;
 
     template<std::size_t width> void set_width() TIGHTDB_NOEXCEPT;
     void set_width(std::size_t) TIGHTDB_NOEXCEPT;
     void alloc(std::size_t count, std::size_t width);
     void copy_on_write();
-
-    static std::pair<std::size_t, std::size_t> get_size_pair(const char* header,
-                                                             std::size_t ndx) TIGHTDB_NOEXCEPT;
 
 private:
     std::size_t m_ref;
@@ -935,8 +1063,8 @@ protected:
     std::size_t m_capacity; // Number of elements that fit inside the allocated memory.
 // FIXME: m_width Should be an 'int'
     std::size_t m_width;    // Size of an element (meaning depend on type of array).
-    bool m_isNode;          // This array is an inner node of B+-tree.
-    bool m_hasRefs;         // Elements whose first bit is zero are refs to subarrays.
+    bool m_is_inner_bptree_node; // This array is an inner node of B+-tree.
+    bool m_has_refs;        // Elements whose first bit is zero are refs to subarrays.
 
 private:
     ArrayParent* m_parent;
@@ -949,8 +1077,13 @@ protected:
     /// array. Must be a multiple of 8 (i.e., 64-bit aligned).
     static const std::size_t initial_capacity = 128;
 
-    static ref_type create_empty_array(Type, WidthType, Allocator&);
-    static ref_type clone(const char* header, Allocator& alloc, Allocator& clone_alloc);
+    /// It is an error to specify a non-zero value unless the width
+    /// type is wtype_Bits. It is also an error to specify a non-zero
+    /// size if the width type is wtype_Ignore.
+    static MemRef create(Type, bool context_flag, WidthType, std::size_t size,
+                         int_fast64_t value, Allocator&);
+
+    static MemRef clone(const char* header, Allocator& alloc, Allocator& target_alloc);
 
     /// Get the address of the header of this array.
     char* get_header() TIGHTDB_NOEXCEPT;
@@ -961,10 +1094,13 @@ protected:
     // Undefined behavior if array is in immutable memory
     static std::size_t get_capacity_from_header(const char*) TIGHTDB_NOEXCEPT;
 
-    void update_child_ref(std::size_t child_ndx, ref_type new_ref) TIGHTDB_OVERRIDE;
-    ref_type get_child_ref(std::size_t child_ndx) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+    // Overriding method in ArrayParent
+    void update_child_ref(std::size_t, ref_type) TIGHTDB_OVERRIDE;
 
-    void destroy_children() TIGHTDB_NOEXCEPT;
+    // Overriding method in ArrayParent
+    ref_type get_child_ref(std::size_t) const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
+
+    void destroy_children(std::size_t offset = 0) TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
     std::pair<ref_type, std::size_t>
@@ -992,6 +1128,21 @@ protected:
     friend class AdaptiveStringColumn;
 };
 
+
+
+class Array::NodeInfo {
+public:
+    MemRef m_mem;
+    Array* m_parent;
+    std::size_t m_ndx_in_parent;
+    std::size_t m_offset, m_size;
+};
+
+class Array::VisitHandler {
+public:
+    virtual bool visit(const NodeInfo& leaf_info) = 0;
+    virtual ~VisitHandler() TIGHTDB_NOEXCEPT {}
+};
 
 
 class Array::UpdateHandler {
@@ -1088,7 +1239,7 @@ public:
             if (action == act_Count) {
                 // If we are close to 'limit' argument in query, we cannot count-up a complete chunk. Count up single
                 // elements instead
-                if(m_match_count + 64 >= m_limit)
+                if (m_match_count + 64 >= m_limit)
                     return false;
 
                 m_state += fast_popcount64(indexpattern);
@@ -1142,7 +1293,8 @@ public:
 
     void init(Action action, Array*, size_t limit)
     {
-        TIGHTDB_STATIC_ASSERT((SameType<R, float>::value || SameType<R, double>::value), "");
+        TIGHTDB_STATIC_ASSERT((util::SameType<R, float>::value ||
+                               util::SameType<R, double>::value), "");
         m_match_count = 0;
         m_limit = limit;
 
@@ -1184,9 +1336,19 @@ public:
 
 
 
+// FIXME: Only members m_data, m_parent, m_ndx_in_parent, and m_alloc
+// should be initialized here. All other members must be initialized
+// by create() and init_from_*().
+inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
+    m_data(0), m_ref(0), m_size(0), m_capacity(0), m_width(std::size_t(-1)),
+    m_is_inner_bptree_node(false), m_parent(0), m_ndx_in_parent(0), m_alloc(alloc)
+{
+}
+
 inline Array::Array(Type type, ArrayParent* parent, std::size_t pndx, Allocator& alloc):
-    m_data(0), m_size(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
-    m_parent(parent), m_ndx_in_parent(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
+    m_data(0), m_size(0), m_capacity(0), m_width(0), m_is_inner_bptree_node(false),
+    m_has_refs(false), m_parent(parent), m_ndx_in_parent(pndx), m_alloc(alloc),
+    m_lbound(0), m_ubound(0)
 {
     create(type); // Throws
     update_parent(); // Throws
@@ -1194,61 +1356,60 @@ inline Array::Array(Type type, ArrayParent* parent, std::size_t pndx, Allocator&
 
 inline Array::Array(MemRef mem, ArrayParent* parent, std::size_t ndx_in_parent,
                     Allocator& alloc) TIGHTDB_NOEXCEPT:
-    m_data(0), m_size(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
-    m_parent(parent), m_ndx_in_parent(ndx_in_parent), m_alloc(alloc), m_lbound(0), m_ubound(0)
+    m_data(0), m_size(0), m_capacity(0), m_width(0), m_is_inner_bptree_node(false),
+    m_has_refs(false), m_parent(parent), m_ndx_in_parent(ndx_in_parent), m_alloc(alloc),
+    m_lbound(0), m_ubound(0)
 {
     init_from_mem(mem);
 }
 
 inline Array::Array(ref_type ref, ArrayParent* parent, std::size_t pndx,
                     Allocator& alloc) TIGHTDB_NOEXCEPT:
-    m_data(0), m_size(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
-    m_parent(parent), m_ndx_in_parent(pndx), m_alloc(alloc), m_lbound(0), m_ubound(0)
+    m_data(0), m_size(0), m_capacity(0), m_width(0), m_is_inner_bptree_node(false),
+    m_has_refs(false), m_parent(parent), m_ndx_in_parent(pndx), m_alloc(alloc),
+    m_lbound(0), m_ubound(0)
 {
     init_from_ref(ref);
 }
 
-// Creates new unattached accessor (call create() or init_from_ref() to
-// attach).
-inline Array::Array(Allocator& alloc) TIGHTDB_NOEXCEPT:
-    m_data(0), m_ref(0), m_size(0), m_capacity(0), m_width(std::size_t(-1)), m_isNode(false),
-    m_parent(0), m_ndx_in_parent(0), m_alloc(alloc) {}
-
 inline Array::Array(const Array& array, Allocator& alloc):
-    m_data(0), m_size(0), m_capacity(0), m_width(0), m_isNode(false), m_hasRefs(false),
-    m_parent(0), m_ndx_in_parent(0), m_alloc(alloc), m_lbound(0), m_ubound(0)
+    m_data(0), m_size(0), m_capacity(0), m_width(0), m_is_inner_bptree_node(false),
+    m_has_refs(false), m_parent(0), m_ndx_in_parent(0), m_alloc(alloc), m_lbound(0), m_ubound(0)
 {
-    ref_type ref = array.clone(alloc); // Throws
-    init_from_ref(ref);
+    MemRef mem = array.clone_deep(alloc); // Throws
+    init_from_mem(mem);
 }
 
 // Fastest way to instantiate an Array. For use with GetDirect() that only fills out m_width, m_data
 // and a few other basic things needed for read-only access. Or for use if you just want a way to call
 // some methods written in Array.*
-inline Array::Array(no_prealloc_tag) TIGHTDB_NOEXCEPT: m_alloc(*static_cast<Allocator*>(0)) {}
-
-
-inline void Array::create(Type type)
+inline Array::Array(no_prealloc_tag) TIGHTDB_NOEXCEPT:
+    m_alloc(*static_cast<Allocator*>(0))
 {
-    ref_type ref = create_empty_array(type, m_alloc); // Throws
-    init_from_ref(ref);
 }
 
 
-inline std::size_t Array::size() const TIGHTDB_NOEXCEPT
+inline void Array::create(Type type, bool context_flag)
 {
-    TIGHTDB_ASSERT(is_attached());
-    return m_size;
+    MemRef mem = create_empty_array(type, context_flag, m_alloc); // Throws
+    init_from_mem(mem);
+}
+
+inline void Array::init_from_ref(ref_type ref) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(ref);
+    char* header = m_alloc.translate(ref);
+    init_from_mem(MemRef(header, ref));
 }
 
 
 inline Array::Type Array::get_type() const TIGHTDB_NOEXCEPT
 {
-    if (m_isNode) {
-        TIGHTDB_ASSERT(m_hasRefs);
-        return type_InnerColumnNode;
+    if (m_is_inner_bptree_node) {
+        TIGHTDB_ASSERT(m_has_refs);
+        return type_InnerBptreeNode;
     }
-    if (m_hasRefs)
+    if (m_has_refs)
         return type_HasRefs;
     return type_Normal;
 }
@@ -1297,7 +1458,7 @@ inline int64_t Array::back() const TIGHTDB_NOEXCEPT
 inline ref_type Array::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
 {
     TIGHTDB_ASSERT(is_attached());
-    TIGHTDB_ASSERT(m_hasRefs);
+    TIGHTDB_ASSERT(m_has_refs);
     int64_t v = get(ndx);
     return to_ref(v);
 }
@@ -1306,20 +1467,36 @@ inline ref_type Array::get_as_ref(std::size_t ndx) const TIGHTDB_NOEXCEPT
 inline bool Array::is_index_node(ref_type ref, const Allocator& alloc)
 {
     TIGHTDB_ASSERT(ref);
-    return get_indexflag_from_header(alloc.translate(ref));
+    return get_context_flag_from_header(alloc.translate(ref));
 }
+
 
 inline void Array::destroy() TIGHTDB_NOEXCEPT
 {
     if (!is_attached())
         return;
+    char* header = get_header_from_data(m_data);
+    m_alloc.free_(m_ref, header);
+    m_data = 0;
+}
 
-    if (m_hasRefs)
+inline void Array::destroy_deep() TIGHTDB_NOEXCEPT
+{
+    if (!is_attached())
+        return;
+
+    if (m_has_refs)
         destroy_children();
 
     char* header = get_header_from_data(m_data);
     m_alloc.free_(m_ref, header);
     m_data = 0;
+}
+
+
+inline void Array::add(int_fast64_t value)
+{
+    insert(m_size, value);
 }
 
 
@@ -1347,62 +1524,33 @@ inline void Array::erase(std::size_t begin, std::size_t end)
     set_header_size(m_size);
 }
 
-
 inline void Array::clear()
 {
-    TIGHTDB_ASSERT(is_attached());
+    truncate(0);
+}
 
-    copy_on_write(); // Throws
-
-    if (m_hasRefs)
-        destroy_children();
-
-    // Truncate size to zero (but keep capacity)
-    m_size = 0;
-    m_capacity = CalcItemCount(get_capacity_from_header(), 0);
-    set_width(0);
-
-    // Update header
-    set_header_size(0);
-    set_header_width(0);
+inline void Array::clear_and_destroy_children()
+{
+    truncate_and_destroy_children(0);
 }
 
 inline void Array::destroy(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
 {
-    Array array(alloc);
-    array.init_from_ref(ref);
-    array.destroy();
+    MemRef mem(ref, alloc);
+    alloc.free_(mem);
 }
 
-
-class Array::DestroyGuard {
-public:
-    DestroyGuard(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT: m_ref(ref), m_alloc(alloc)
-    {
+inline void Array::destroy_deep(ref_type ref, Allocator& alloc) TIGHTDB_NOEXCEPT
+{
+    MemRef mem(ref, alloc);
+    if (!get_hasrefs_from_header(mem.m_addr)) {
+        alloc.free_(mem);
+        return;
     }
-
-    ~DestroyGuard() TIGHTDB_NOEXCEPT
-    {
-        if (m_ref)
-            destroy(m_ref, m_alloc);
-    }
-
-    ref_type get() const TIGHTDB_NOEXCEPT
-    {
-        return m_ref;
-    }
-
-    ref_type release() TIGHTDB_NOEXCEPT
-    {
-        ref_type ref = m_ref;
-        m_ref = 0;
-        return ref;
-    }
-
-private:
-    ref_type m_ref;
-    Allocator& m_alloc;
-};
+    Array array(alloc);
+    array.init_from_mem(mem);
+    array.destroy_deep();
+}
 
 
 inline void Array::adjust(std::size_t ndx, int_fast64_t diff)
@@ -1434,11 +1582,11 @@ inline void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 
 //-------------------------------------------------
 
-inline bool Array::get_isleaf_from_header(const char* header) TIGHTDB_NOEXCEPT
+inline bool Array::get_is_inner_bptree_node_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
-    return (int(h[4]) & 0x80) == 0;
+    return (int(h[4]) & 0x80) != 0;
 }
 inline bool Array::get_hasrefs_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
@@ -1446,15 +1594,11 @@ inline bool Array::get_hasrefs_from_header(const char* header) TIGHTDB_NOEXCEPT
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (int(h[4]) & 0x40) != 0;
 }
-inline bool Array::get_indexflag_from_header(const char* header) TIGHTDB_NOEXCEPT
+inline bool Array::get_context_flag_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (int(h[4]) & 0x20) != 0;
-}
-inline bool Array::get_context_bit_from_header(const char* header) TIGHTDB_NOEXCEPT
-{
-    return get_indexflag_from_header(header);
 }
 inline Array::WidthType Array::get_wtype_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
@@ -1496,17 +1640,17 @@ inline const char* Array::get_data_from_header(const char* header) TIGHTDB_NOEXC
 }
 
 
-inline bool Array::get_isleaf_from_header() const TIGHTDB_NOEXCEPT
+inline bool Array::get_is_inner_bptree_node_from_header() const TIGHTDB_NOEXCEPT
 {
-    return get_isleaf_from_header(get_header_from_data(m_data));
+    return get_is_inner_bptree_node_from_header(get_header_from_data(m_data));
 }
 inline bool Array::get_hasrefs_from_header() const TIGHTDB_NOEXCEPT
 {
     return get_hasrefs_from_header(get_header_from_data(m_data));
 }
-inline bool Array::get_indexflag_from_header() const TIGHTDB_NOEXCEPT
+inline bool Array::get_context_flag_from_header() const TIGHTDB_NOEXCEPT
 {
-    return get_indexflag_from_header(get_header_from_data(m_data));
+    return get_context_flag_from_header(get_header_from_data(m_data));
 }
 inline Array::WidthType Array::get_wtype_from_header() const TIGHTDB_NOEXCEPT
 {
@@ -1526,11 +1670,11 @@ inline std::size_t Array::get_capacity_from_header() const TIGHTDB_NOEXCEPT
 }
 
 
-inline void Array::set_header_isleaf(bool value, char* header) TIGHTDB_NOEXCEPT
+inline void Array::set_header_is_inner_bptree_node(bool value, char* header) TIGHTDB_NOEXCEPT
 {
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
-    h[4] = uchar((int(h[4]) & ~0x80) | int(!value) << 7);
+    h[4] = uchar((int(h[4]) & ~0x80) | int(value) << 7);
 }
 
 inline void Array::set_header_hasrefs(bool value, char* header) TIGHTDB_NOEXCEPT
@@ -1540,7 +1684,7 @@ inline void Array::set_header_hasrefs(bool value, char* header) TIGHTDB_NOEXCEPT
     h[4] = uchar((int(h[4]) & ~0x40) | int(value) << 6);
 }
 
-inline void Array::set_header_indexflag(bool value, char* header) TIGHTDB_NOEXCEPT
+inline void Array::set_header_context_flag(bool value, char* header) TIGHTDB_NOEXCEPT
 {
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
@@ -1596,17 +1740,17 @@ inline void Array::set_header_capacity(std::size_t value, char* header) TIGHTDB_
 
 
 
-inline void Array::set_header_isleaf(bool value) TIGHTDB_NOEXCEPT
+inline void Array::set_header_is_inner_bptree_node(bool value) TIGHTDB_NOEXCEPT
 {
-    set_header_isleaf(value, get_header_from_data(m_data));
+    set_header_is_inner_bptree_node(value, get_header_from_data(m_data));
 }
 inline void Array::set_header_hasrefs(bool value) TIGHTDB_NOEXCEPT
 {
     set_header_hasrefs(value, get_header_from_data(m_data));
 }
-inline void Array::set_header_indexflag(bool value) TIGHTDB_NOEXCEPT
+inline void Array::set_header_context_flag(bool value) TIGHTDB_NOEXCEPT
 {
-    set_header_indexflag(value, get_header_from_data(m_data));
+    set_header_context_flag(value, get_header_from_data(m_data));
 }
 inline void Array::set_header_wtype(WidthType value) TIGHTDB_NOEXCEPT
 {
@@ -1628,8 +1772,8 @@ inline void Array::set_header_capacity(std::size_t value) TIGHTDB_NOEXCEPT
 
 inline Array::Type Array::get_type_from_header(const char* header) TIGHTDB_NOEXCEPT
 {
-    if (!get_isleaf_from_header(header))
-        return type_InnerColumnNode;
+    if (get_is_inner_bptree_node_from_header(header))
+        return type_InnerBptreeNode;
     if (get_hasrefs_from_header(header))
         return type_HasRefs;
     return type_Normal;
@@ -1723,15 +1867,17 @@ inline std::size_t Array::get_byte_size_from_header(const char* header) TIGHTDB_
 }
 
 
-inline void Array::init_header(char* header, bool is_leaf, bool has_refs, WidthType width_type,
-                               int width, std::size_t size, std::size_t capacity) TIGHTDB_NOEXCEPT
+inline void Array::init_header(char* header, bool is_inner_bptree_node, bool has_refs,
+                               bool context_flag, WidthType width_type, int width,
+                               std::size_t size, std::size_t capacity) TIGHTDB_NOEXCEPT
 {
     // Note: Since the header layout contains unallocated bit and/or
     // bytes, it is important that we put the entire header into a
     // well defined state initially.
     std::fill(header, header + header_size, 0);
-    set_header_isleaf(is_leaf, header);
+    set_header_is_inner_bptree_node(is_inner_bptree_node, header);
     set_header_hasrefs(has_refs, header);
+    set_header_context_flag(context_flag, header);
     set_header_wtype(width_type, header);
     set_header_width(width, header);
     set_header_size(size, header);
@@ -1749,61 +1895,68 @@ template<class S> std::size_t Array::write(S& out, bool recurse, bool persist) c
     if (persist && m_alloc.is_read_only(m_ref))
         return m_ref;
 
-    if (recurse && m_hasRefs) {
-        // Temp array for updated refs
-        Array new_refs(m_isNode ? type_InnerColumnNode : type_HasRefs);
+    if (!recurse || !m_has_refs) {
+        // FIXME: Replace capacity with checksum
 
-        // Make sure that all flags are retained
-        if (is_index_node())
-            new_refs.set_is_index_node(true);
+        // Write flat array
+        const char* header = get_header_from_data(m_data);
+        std::size_t size = get_byte_size();
+        uint_fast32_t dummy_checksum = 0x01010101UL;
+        std::size_t array_pos = out.write_array(header, size, dummy_checksum);
+        TIGHTDB_ASSERT(array_pos % 8 == 0); // 8-byte alignment
 
+        return array_pos;
+    }
+
+    // Temp array for updated refs
+    Array new_refs(Allocator::get_default());
+    Type type = m_is_inner_bptree_node ? type_InnerBptreeNode : type_HasRefs;
+    bool context_flag = get_context_flag();
+    new_refs.create(type, context_flag); // Throws
+
+    try {
         // First write out all sub-arrays
         std::size_t n = size();
-        for (std::size_t i = 0; i < n; ++i) {
-            int64_t ref = get(i);
-            if (ref == 0 || ref & 0x1) {
-                // zero-refs and refs that are not 64-aligned do not point to sub-trees
-                new_refs.add(ref);
+        for (std::size_t i = 0; i != n; ++i) {
+            int_fast64_t value = get(i);
+            if (value == 0 || value % 2 != 0) {
+                // Zero-refs and values that are not 8-byte aligned do
+                // not point to subarrays.
+                new_refs.add(value); // Throws
             }
-            else if (persist && m_alloc.is_read_only(to_ref(ref))) {
+            else if (persist && m_alloc.is_read_only(to_ref(value))) {
                 // Ignore un-changed arrays when persisting
-                new_refs.add(ref);
+                new_refs.add(value); // Throws
             }
             else {
-                Array sub(to_ref(ref), 0, 0, get_alloc());
-                std::size_t sub_pos = sub.write(out, true, persist);
-                TIGHTDB_ASSERT((sub_pos & 0x7) == 0); // 64bit alignment
-                new_refs.add(sub_pos);
+                Array sub(get_alloc());
+                sub.init_from_ref(to_ref(value));
+                bool subrecurse = true;
+                std::size_t sub_pos = sub.write(out, subrecurse, persist); // Throws
+                TIGHTDB_ASSERT(sub_pos % 8 == 0); // 8-byte alignment
+                new_refs.add(sub_pos); // Throws
             }
         }
 
         // Write out the replacement array
         // (but don't write sub-tree as it has alredy been written)
-        std::size_t refs_pos = new_refs.write(out, false, persist);
+        bool subrecurse = false;
+        std::size_t refs_pos = new_refs.write(out, subrecurse, persist); // Throws
 
-        // Clean-up
-        new_refs.set_type(type_Normal); // avoid recursive del
-        new_refs.destroy();
+        new_refs.destroy(); // Shallow
 
         return refs_pos; // Return position
     }
-
-    // FIXME: Replace capacity with checksum
-
-    // Write array
-    const char* header = get_header_from_data(m_data);
-    std::size_t size = get_byte_size();
-    uint_fast32_t dummy_checksum = 0x01010101UL;
-    std::size_t array_pos = out.write_array(header, size, dummy_checksum);
-    TIGHTDB_ASSERT((array_pos & 0x7) == 0); /// 64-bit alignment
-
-    return array_pos;
+    catch (...) {
+        new_refs.destroy(); // Shallow
+        throw;
+    }
 }
 
-inline ref_type Array::clone(Allocator& clone_alloc) const
+inline MemRef Array::clone_deep(Allocator& target_alloc) const
 {
     const char* header = get_header_from_data(m_data);
-    return clone(header, m_alloc, clone_alloc); // Throws
+    return clone(header, m_alloc, target_alloc); // Throws
 }
 
 inline void Array::move_assign(Array& a) TIGHTDB_NOEXCEPT
@@ -1816,14 +1969,72 @@ inline void Array::move_assign(Array& a) TIGHTDB_NOEXCEPT
     // the referenced data. This is important because TableView efficiency, for
     // example, relies on long chains of moves to be optimized away
     // completely. This change should be a 'no-brainer'.
-    destroy();
+    destroy_deep();
     init_from_ref(a.get_ref());
     a.detach();
 }
 
-inline ref_type Array::create_empty_array(Type type, Allocator& alloc)
+inline MemRef Array::create_array(Type type, bool context_flag, std::size_t size,
+                                  int_fast64_t value, Allocator& alloc)
 {
-    return create_empty_array(type, wtype_Bits, alloc); // Throws
+    return create(type, context_flag, wtype_Bits, size, value, alloc); // Throws
+}
+
+inline MemRef Array::create_empty_array(Type type, bool context_flag, Allocator& alloc)
+{
+    std::size_t size = 0;
+    int_fast64_t value = 0;
+    return create_array(type, context_flag, size, value, alloc); // Throws
+}
+
+inline bool Array::has_parent() const TIGHTDB_NOEXCEPT
+{
+    return m_parent != 0;
+}
+
+inline ArrayParent* Array::get_parent() const TIGHTDB_NOEXCEPT
+{
+    return m_parent;
+}
+
+inline void Array::set_parent(ArrayParent* parent, std::size_t ndx_in_parent) TIGHTDB_NOEXCEPT
+{
+    m_parent = parent;
+    m_ndx_in_parent = ndx_in_parent;
+}
+
+inline std::size_t Array::get_ndx_in_parent() const TIGHTDB_NOEXCEPT
+{
+    return m_ndx_in_parent;
+}
+
+inline void Array::adjust_ndx_in_parent(int diff) TIGHTDB_NOEXCEPT
+{
+    // Note that `diff` is promoted to an unsigned type, and that
+    // C++03 still guarantees the expected result regardless of the
+    // sizes of `int` and `decltype(m_ndx_in_parent)`.
+    m_ndx_in_parent += diff;
+}
+
+inline bool Array::is_attached() const TIGHTDB_NOEXCEPT
+{
+    return m_data != 0;
+}
+
+inline void Array::detach() TIGHTDB_NOEXCEPT
+{
+    m_data = 0;
+}
+
+inline std::size_t Array::size() const TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(is_attached());
+    return m_size;
+}
+
+inline bool Array::is_empty() const TIGHTDB_NOEXCEPT
+{
+    return size() == 0;
 }
 
 inline std::size_t Array::get_max_byte_size(std::size_t num_elems) TIGHTDB_NOEXCEPT
@@ -1851,9 +2062,17 @@ inline ref_type Array::get_child_ref(size_t child_ndx) const TIGHTDB_NOEXCEPT
 
 inline std::size_t Array::get_bptree_size() const TIGHTDB_NOEXCEPT
 {
-    TIGHTDB_ASSERT(!is_leaf());
+    TIGHTDB_ASSERT(is_inner_bptree_node());
     int_fast64_t v = back();
     return std::size_t(v / 2); // v = 1 + 2*total_elems_in_tree
+}
+
+inline std::size_t Array::get_bptree_size_from_header(const char* root_header) TIGHTDB_NOEXCEPT
+{
+    TIGHTDB_ASSERT(get_is_inner_bptree_node_from_header(root_header));
+    size_t root_size = get_size_from_header(root_header);
+    int_fast64_t v = get(root_header, root_size-1);
+    return size_t(v / 2); // v = 1 + 2*total_elems_in_tree
 }
 
 inline void Array::ensure_bptree_offsets(Array& offsets)
@@ -1906,7 +2125,7 @@ ref_type Array::bptree_append(TreeInsert<TreeTraits>& state)
     ref_type child_ref = get_as_ref(child_ref_ndx), new_sibling_ref;
     char* child_header = static_cast<char*>(m_alloc.translate(child_ref));
 
-    bool child_is_leaf = get_isleaf_from_header(child_header);
+    bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
         std::size_t elem_ndx_in_child = npos; // Append
         new_sibling_ref =
@@ -1970,7 +2189,7 @@ ref_type Array::bptree_insert(std::size_t elem_ndx, TreeInsert<TreeTraits>& stat
     std::size_t child_ref_ndx = child_ndx + 1;
     ref_type child_ref = get_as_ref(child_ref_ndx), new_sibling_ref;
     char* child_header = static_cast<char*>(m_alloc.translate(child_ref));
-    bool child_is_leaf = get_isleaf_from_header(child_header);
+    bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
     if (child_is_leaf) {
         TIGHTDB_ASSERT(elem_ndx_in_child <= TIGHTDB_MAX_LIST_SIZE);
         new_sibling_ref =
@@ -2067,7 +2286,7 @@ template<Action action, class Callback>
 bool Array::find_action_pattern(size_t index, uint64_t pattern, QueryState<int64_t>* state, Callback callback) const
 {
     static_cast<void>(callback);
-    if(action == act_CallbackIdx) {
+    if (action == act_CallbackIdx) {
         // Possible future optimization: call callback(index) like in above find_action(), in a loop for each bit set in 'pattern'
         return false;
     }
@@ -2176,7 +2395,8 @@ template<size_t width> uint64_t Array::cascade(uint64_t a) const
 }
 
 // This is the main finding function for Array. Other finding functions are just wrappers around this one.
-// Search for 'value' using condition cond2 (Equal, NotEqual, Less, etc) and call find_action() or find_action_pattern() for each match. Break and return if find_action() returns false or 'end' is reached.
+// Search for 'value' using condition cond2 (Equal, NotEqual, Less, etc) and call find_action() or find_action_pattern()
+// for each match. Break and return if find_action() returns false or 'end' is reached.
 template<class cond2, Action action, size_t bitwidth, class Callback> bool Array::find_optimized(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
     cond2 c;
@@ -2227,12 +2447,12 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     if (c.will_match(value, m_lbound, m_ubound)) {
         size_t end2;
 
-        if(action == act_CallbackIdx)
+        if (action == act_CallbackIdx)
             end2 = end;
         else {
             TIGHTDB_ASSERT(state->m_match_count < state->m_limit);
             size_t process = state->m_limit - state->m_match_count;
-            end2 = end - start > process ? start + process : end;        
+            end2 = end - start > process ? start + process : end;
         }
         if (action == act_Sum || action == act_Max || action == act_Min) {
             int64_t res;
@@ -2262,8 +2482,8 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
     TIGHTDB_ASSERT(m_width != 0);
 
 #if defined(TIGHTDB_COMPILER_SSE)
-    if ((cpuid_sse<42>() &&                                  (end - start >= sizeof (__m128i) && m_width >= 8))
-    ||  (cpuid_sse<30>() && (SameType<cond2, Equal>::value && end - start >= sizeof (__m128i) && m_width >= 8 && m_width < 64))) {
+    if ((sseavx<42>() &&                                        (end - start >= sizeof (__m128i) && m_width >= 8))
+    ||  (sseavx<30>() && (util::SameType<cond2, Equal>::value && end - start >= sizeof (__m128i) && m_width >= 8 && m_width < 64))) {
 
         // FindSSE() must start at 16-byte boundary, so search area before that using CompareEquality()
         __m128i* const a = reinterpret_cast<__m128i*>(round_up(m_data + start * bitwidth / 8, sizeof (__m128i)));
@@ -2274,11 +2494,11 @@ template<class cond2, Action action, size_t bitwidth, class Callback> bool Array
 
         // Search aligned area with SSE
         if (b > a) {
-            if (cpuid_sse<42>()) {
+            if (sseavx<42>()) {
                 if (!FindSSE<cond2, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
                     return false;
                 }
-                else if (cpuid_sse<30>()) {
+                else if (sseavx<30>()) {
 
                 if (!FindSSE<Equal, action, bitwidth, Callback>(value, a, b - a, state, baseindex + ((reinterpret_cast<char*>(a) - m_data) * 8 / no0(bitwidth)), callback))
                     return false;
@@ -2768,7 +2988,7 @@ bool Array::CompareLeafs(const Array* foreign, size_t start, size_t end, size_t 
 {
     cond c;
     TIGHTDB_ASSERT(start <= end);
-    if(start == end)
+    if (start == end)
         return true;
 
 
@@ -2842,7 +3062,7 @@ bool Array::CompareLeafs4(const Array* foreign, size_t start, size_t end, size_t
 
 
 #if defined(TIGHTDB_COMPILER_SSE)
-    if (cpuid_sse<42>() && width == foreign_width && (width == 8 || width == 16 || width == 32)) {
+    if (sseavx<42>() && width == foreign_width && (width == 8 || width == 16 || width == 32)) {
         // We can only use SSE if both bitwidths are equal and above 8 bits and all values are signed
         while (start < end && (((reinterpret_cast<size_t>(m_data) & 0xf) * 8 + start * width) % (128) != 0)) {
             int64_t v = GetUniversal<width>(m_data, start);
@@ -3085,7 +3305,7 @@ template<class cond> size_t Array::find_first(int64_t value, size_t start, size_
 {
     TIGHTDB_ASSERT(start <= m_size && (end <= m_size || end == std::size_t(-1)) && start <= end);
     QueryState<int64_t> state;
-    state.init(act_ReturnFirst, NULL, 1); // todo, would be nice to avoid this in order to speed up find_first loops
+    state.init(act_ReturnFirst, null_ptr, 1); // todo, would be nice to avoid this in order to speed up find_first loops
     Finder finder = m_finder[cond::condition];
     (this->*finder)(value, start, end, 0, &state);
 

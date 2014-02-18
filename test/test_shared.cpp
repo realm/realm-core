@@ -4,10 +4,10 @@
 #include <UnitTest++.h>
 
 #include <tightdb.hpp>
-#include <tightdb/file.hpp>
-#include <tightdb/thread.hpp>
-#include <tightdb/bind.hpp>
-#include <tightdb/terminate.hpp>
+#include <tightdb/util/bind.hpp>
+#include <tightdb/util/terminate.hpp>
+#include <tightdb/util/file.hpp>
+#include <tightdb/util/thread.hpp>
 
 #include "testsettings.hpp"
 
@@ -23,6 +23,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 // Note: You can now temporarely declare unit tests with the ONLY(TestName) macro instead of TEST(TestName). This
 // will disable all unit tests except these. Remember to undo your temporary changes before committing.
@@ -55,7 +56,7 @@ TEST(Shared_no_create_cleanup_lock_file_after_failure)
         CHECK(false);
     }
     catch (runtime_error &) {
-        ok = true; 
+        ok = true;
     }
     CHECK(ok);
 
@@ -76,7 +77,7 @@ TEST(Shared_no_create_cleanup_lock_file_after_failure_2)
         CHECK(false);
     }
     catch (runtime_error &) {
-        ok = true; 
+        ok = true;
     }
     CHECK(ok);
 
@@ -88,7 +89,7 @@ TEST(Shared_no_create_cleanup_lock_file_after_failure_2)
             SharedGroup sg("test_shared.tightdb", false, SharedGroup::durability_Full);
         }
         catch (runtime_error &) {
-            CHECK(false); 
+            CHECK(false);
         }
     }
     CHECK( !File::exists("test_shared.tightdb.lock") );
@@ -523,6 +524,130 @@ TEST(Shared_Writes)
     CHECK(!File::exists("test_shared.tightdb.lock"));
 }
 
+
+TEST(Shared_AddColumnToSubspec)
+{
+    File::try_remove("test.tightdb");
+    File::try_remove("test.tightdb.lock");
+
+    {
+        SharedGroup sg("test.tightdb");
+
+        // Create table with a non-empty subtable
+        {
+            WriteTransaction wt(sg);
+            TableRef table = wt.get_table("table");
+            DescriptorRef sub_1;
+            table->add_column(type_Table, "subtable", &sub_1);
+            sub_1->add_column(type_Int,   "int");
+            table->add_empty_row();
+            TableRef subtable = table->get_subtable(0,0);
+            subtable->add_empty_row();
+            subtable->set_int(0, 0, 789);
+            wt.commit();
+        }
+
+        // Modify subtable spec, then access the subtable. This is to
+        // see that the subtable column accessor continues to work
+        // after the subspec has been modified.
+        {
+            WriteTransaction wt(sg);
+            TableRef table = wt.get_table("table");
+            DescriptorRef subdesc = table->get_subdescriptor(0);
+            subdesc->add_column(type_Int, "int_2");
+            TableRef subtable = table->get_subtable(0,0);
+            CHECK_EQUAL(2, subtable->get_column_count());
+            CHECK_EQUAL(type_Int, subtable->get_column_type(0));
+            CHECK_EQUAL(type_Int, subtable->get_column_type(1));
+            CHECK_EQUAL(1, subtable->size());
+            CHECK_EQUAL(789, subtable->get_int(0,0));
+            subtable->add_empty_row();
+            CHECK_EQUAL(2, subtable->size());
+            subtable->set_int(1, 1, 654);
+            CHECK_EQUAL(654, subtable->get_int(1,1));
+            wt.commit();
+        }
+
+        // Check that the subtable continues to have the right
+        // contents
+        {
+            ReadTransaction rt(sg);
+            ConstTableRef table = rt.get_table("table");
+            ConstTableRef subtable = table->get_subtable(0,0);
+            CHECK_EQUAL(2, subtable->get_column_count());
+            CHECK_EQUAL(type_Int, subtable->get_column_type(0));
+            CHECK_EQUAL(type_Int, subtable->get_column_type(1));
+            CHECK_EQUAL(2, subtable->size());
+            CHECK_EQUAL(789, subtable->get_int(0,0));
+            CHECK_EQUAL(0,   subtable->get_int(0,1));
+            CHECK_EQUAL(0,   subtable->get_int(1,0));
+            CHECK_EQUAL(654, subtable->get_int(1,1));
+        }
+    }
+
+    File::remove("test.tightdb");
+}
+
+
+TEST(Shared_RemoveColumnBeforeSubtableColumn)
+{
+    File::try_remove("test.tightdb");
+    File::try_remove("test.tightdb.lock");
+
+    {
+        SharedGroup sg("test.tightdb");
+
+        // Create table with a non-empty subtable in a subtable column
+        // that is preceded by another column
+        {
+            WriteTransaction wt(sg);
+            DescriptorRef sub_1;
+            TableRef table = wt.get_table("table");
+            table->add_column(type_Int,   "int");
+            table->add_column(type_Table, "subtable", &sub_1);
+            sub_1->add_column(type_Int,   "int");
+            table->add_empty_row();
+            TableRef subtable = table->get_subtable(1,0);
+            subtable->add_empty_row();
+            subtable->set_int(0, 0, 789);
+            wt.commit();
+        }
+
+        // Remove a column that precedes the subtable column
+        {
+            WriteTransaction wt(sg);
+            TableRef table = wt.get_table("table");
+            table->remove_column(0);
+            TableRef subtable = table->get_subtable(0,0);
+            CHECK_EQUAL(1, subtable->get_column_count());
+            CHECK_EQUAL(type_Int, subtable->get_column_type(0));
+            CHECK_EQUAL(1, subtable->size());
+            CHECK_EQUAL(789, subtable->get_int(0,0));
+            subtable->add_empty_row();
+            CHECK_EQUAL(2, subtable->size());
+            subtable->set_int(0, 1, 654);
+            CHECK_EQUAL(654, subtable->get_int(0,1));
+            wt.commit();
+        }
+
+        // Check that the subtable continues to have the right
+        // contents
+        {
+            ReadTransaction rt(sg);
+            ConstTableRef table = rt.get_table("table");
+            ConstTableRef subtable = table->get_subtable(0,0);
+            CHECK_EQUAL(1, subtable->get_column_count());
+            CHECK_EQUAL(type_Int, subtable->get_column_type(0));
+            CHECK_EQUAL(2, subtable->size());
+            CHECK_EQUAL(789, subtable->get_int(0,0));
+            CHECK_EQUAL(654, subtable->get_int(0,1));
+        }
+    }
+
+    File::remove("test.tightdb");
+}
+
+
 #if TEST_DURATION > 0
 
 TEST(Shared_ManyReaders)
@@ -881,7 +1006,7 @@ TEST(Shared_WriterThreads)
 
         // Create all threads
         for (size_t i = 0; i < thread_count; ++i) {
-            threads[i].start(util::bind(&increment_entry_thread, i));
+            threads[i].start(bind(&increment_entry_thread, i));
         }
 
         // Wait for all threads to complete
@@ -984,28 +1109,21 @@ TEST(Shared_FormerErrorCase1)
     File::try_remove("test_shared.tightdb.lock");
     SharedGroup sg("test_shared.tightdb");
     {
+        DescriptorRef sub_1, sub_2;
         WriteTransaction wt(sg);
         wt.get_group().Verify();
         TableRef table = wt.get_table("my_table");
-        {
-            Spec& spec = table->get_spec();
-            spec.add_column(type_Int, "alpha");
-            spec.add_column(type_Bool, "beta");
-            spec.add_column(type_Int, "gamma");
-            spec.add_column(type_DateTime, "delta");
-            spec.add_column(type_String, "epsilon");
-            spec.add_column(type_Binary, "zeta");
-            {
-                Spec subspec = spec.add_subtable_column("eta");
-                subspec.add_column(type_Int, "foo");
-                {
-                    Spec subsubspec = subspec.add_subtable_column("bar");
-                    subsubspec.add_column(type_Int, "value");
-                }
-            }
-            spec.add_column(type_Mixed, "theta");
-        }
-        table->update_from_spec();
+        table->add_column(type_Int,      "alpha");
+        table->add_column(type_Bool,     "beta");
+        table->add_column(type_Int,      "gamma");
+        table->add_column(type_DateTime, "delta");
+        table->add_column(type_String,   "epsilon");
+        table->add_column(type_Binary,   "zeta");
+        table->add_column(type_Table,    "eta", &sub_1);
+        table->add_column(type_Mixed,    "theta");
+        sub_1->add_column(type_Int,        "foo");
+        sub_1->add_column(type_Table,      "bar", &sub_2);
+        sub_2->add_column(type_Int,          "value");
         table->insert_empty_row(0, 1);
         wt.commit();
     }

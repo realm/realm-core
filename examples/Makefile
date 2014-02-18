@@ -1,4 +1,4 @@
-NOINST_PROGRAMS = tutorial mini_tutorial
+noinst_PROGRAMS = tutorial mini_tutorial
 
 tutorial_SOURCES = tutorial.cpp
 tutorial_LDFLAGS =
@@ -8,4 +8,4 @@ mini_tutorial_SOURCES = mini_tutorial.cpp
 mini_tutorial_LDFLAGS =
 mini_tutorial_LIBS = ../src/tightdb/libtightdb.a
 
-include ../generic.mk
+include ../src/generic.mk

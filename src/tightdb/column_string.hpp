@@ -20,7 +20,7 @@
 #ifndef TIGHTDB_COLUMN_STRING_HPP
 #define TIGHTDB_COLUMN_STRING_HPP
 
-#include <tightdb/unique_ptr.hpp>
+#include <tightdb/util/unique_ptr.hpp>
 #include <tightdb/array_string.hpp>
 #include <tightdb/array_string_long.hpp>
 #include <tightdb/array_blobs_big.hpp>
@@ -53,8 +53,6 @@ public:
     void insert(std::size_t ndx, StringData);
     void erase(std::size_t ndx, bool is_last) TIGHTDB_OVERRIDE;
     void clear() TIGHTDB_OVERRIDE;
-    void resize(std::size_t ndx);
-    void fill(std::size_t count);
     void move_last_over(std::size_t ndx) TIGHTDB_OVERRIDE;
 
     std::size_t count(StringData value) const;
@@ -78,7 +76,7 @@ public:
     bool has_index() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return m_index != 0; }
     void set_index_ref(ref_type, ArrayParent*, std::size_t ndx_in_parent) TIGHTDB_OVERRIDE;
     const StringIndex& get_index() const { return *m_index; }
-    StringIndex* release_index() TIGHTDB_NOEXCEPT { StringIndex* i = m_index; m_index = 0; return i;}
+    StringIndex* release_index() TIGHTDB_NOEXCEPT;
     StringIndex& create_index();
 
     // Optimizing data layout
@@ -95,6 +93,14 @@ public:
 
     LeafType GetBlock(std::size_t ndx, ArrayParent**, std::size_t& off,
                       bool use_retval = false) const;
+
+    static ref_type create(std::size_t size, Allocator&);
+
+    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) TIGHTDB_NOEXCEPT;
+
+    // Overrriding method in ColumnBase
+    ref_type write(std::size_t, std::size_t, std::size_t,
+                   _impl::OutputStream&) const TIGHTDB_OVERRIDE;
 
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE;
@@ -116,6 +122,8 @@ private:
                                 Array::TreeInsert<AdaptiveStringColumn>& state);
 
     class EraseLeafElem;
+    class CreateHandler;
+    class SliceHandler;
 
     /// Root must be a leaf. Upgrades the root leaf as
     /// necessary. Returns the type of the root leaf as it is upon
@@ -146,7 +154,7 @@ inline std::size_t AdaptiveStringColumn::size() const TIGHTDB_NOEXCEPT
             ArrayString* leaf = static_cast<ArrayString*>(m_array);
             return leaf->size();
         }
-        bool is_big = m_array->context_bit();
+        bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Medium strings root leaf
             ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
@@ -172,6 +180,36 @@ inline void AdaptiveStringColumn::insert(size_t ndx, StringData value)
         ndx = npos;
     do_insert(ndx, value);
 }
+
+inline StringIndex* AdaptiveStringColumn::release_index() TIGHTDB_NOEXCEPT
+{
+    StringIndex* i = m_index;
+    m_index = 0;
+    return i;
+}
+
+inline std::size_t AdaptiveStringColumn::get_size_from_ref(ref_type root_ref,
+                                                           Allocator& alloc) TIGHTDB_NOEXCEPT
+{
+    const char* root_header = alloc.translate(root_ref);
+    bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
+    if (root_is_leaf) {
+        bool long_strings = Array::get_hasrefs_from_header(root_header);
+        if (!long_strings) {
+            // Small strings leaf
+            return ArrayString::get_size_from_header(root_header);
+        }
+        bool is_big = Array::get_context_flag_from_header(root_header);
+        if (!is_big) {
+            // Medium strings leaf
+            return ArrayStringLong::get_size_from_header(root_header, alloc);
+        }
+        // Big strings leaf
+        return ArrayBigBlobs::get_size_from_header(root_header);
+    }
+    return Array::get_bptree_size_from_header(root_header);
+}
+
 
 } // namespace tightdb
 

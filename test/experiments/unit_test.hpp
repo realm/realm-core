@@ -24,8 +24,8 @@
 #include <string>
 #include <sstream>
 
-#include <tightdb/meta.hpp>
-#include <tightdb/safe_int_ops.hpp>
+#include <tightdb/util/meta.hpp>
+#include <tightdb/util/safe_int_ops.hpp>
 
 
 #define CHECK(cond) tightdb::unit_test::do_cond((cond), __FILE__, __LINE__, #cond)
@@ -72,12 +72,12 @@ template<class A, class B, bool both_are_integral> struct Cmp {
     bool operator()(const A& a, const B& b) { return a == b; }
 };
 template<class A, class B> struct Cmp<A, B, true> {
-    bool operator()(const A& a, const B& b) { return int_equal_to(a,b); }
+    bool operator()(const A& a, const B& b) { return util::int_equal_to(a,b); }
 };
 
 template<class A, class B> inline bool cmp(const A& a, const B& b)
 {
-    const bool both_are_integral = IsIntegral<A>::value && IsIntegral<B>::value;
+    const bool both_are_integral = util::IsIntegral<A>::value && util::IsIntegral<B>::value;
     Cmp<A, B, both_are_integral> cmp;
     return cmp(a,b);
 }

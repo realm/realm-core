@@ -1,11 +1,11 @@
-#include <fcntl.h>
-#include <errno.h>
 #include <algorithm>
+#include <cerrno>
 
-#include <tightdb/config.h>
-#include <tightdb/safe_int_ops.hpp>
-#include <tightdb/terminate.hpp>
-#include <tightdb/thread.hpp>
+#include <fcntl.h>
+
+#include <tightdb/util/features.h>
+#include <tightdb/util/safe_int_ops.hpp>
+#include <tightdb/util/thread.hpp>
 #include <tightdb/group_writer.hpp>
 #include <tightdb/group_shared.hpp>
 #include <tightdb/group_writer.hpp>
@@ -24,6 +24,7 @@
 
 using namespace std;
 using namespace tightdb;
+using namespace tightdb::util;
 
 
 namespace {
@@ -166,7 +167,11 @@ void spawn_daemon(const string& file)
 
         // if we continue here, exec has failed so return error
         // if exec succeeds, we don't come back here.
+#ifndef ANDROID        
         _Exit(1);
+#else
+        _exit(1);
+#endif
         // child process ends here
 
     }
@@ -255,11 +260,12 @@ void SharedGroup::open(const string& path, bool no_create_file,
             // Make sure to initialize the file in such a way, that when it reaches the
             // size of SharedInfo, it contains just zeroes.
             char empty_buf[sizeof (SharedInfo)];
-            std::fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
+            fill(empty_buf, empty_buf+sizeof(SharedInfo), 0);
             m_file.write(empty_buf, info_size);
             need_init = true;
         }
 
+        using namespace tightdb::util;
         File::CloseGuard fcg(m_file);
         int time_left = max_wait_for_ok_filesize;
         while (1) {
@@ -426,7 +432,7 @@ void SharedGroup::open(const string& path, bool no_create_file,
             bool skip_validate = true; // To avoid race conditions
             try {
                 alloc.attach_file(path, is_shared, read_only, no_create, skip_validate); // Throws
-            } 
+            }
             catch (File::NotFound) {
                 throw LockFileButNoData(path);
             }
@@ -439,9 +445,8 @@ void SharedGroup::open(const string& path, bool no_create_file,
     }
     while (must_retry);
 
-#ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
-#endif
+
 #ifndef _WIN32
     if (dlevel == durability_Async) {
         if (is_backend) {
@@ -469,7 +474,16 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     if (!is_attached())
         return;
 
-    TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
+    switch (m_transact_stage) {
+        case transact_Ready:
+            break;
+        case transact_Reading:
+            end_read();
+            break;
+        case transact_Writing:
+            rollback();
+            break;
+    }
 
     SharedInfo* info = m_file_map.get_addr();
 
@@ -497,7 +511,7 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
             size_t path_len = m_file_path.size()-5; // remove ".lock"
             string db_path = m_file_path.substr(0, path_len); // Throws
             m_group.m_alloc.detach();
-            File::remove(db_path.c_str());
+            util::File::remove(db_path.c_str());
         }
         catch(...) {} // ignored on purpose.
     }
@@ -508,7 +522,7 @@ SharedGroup::~SharedGroup() TIGHTDB_NOEXCEPT
     m_file_map.unmap();
     m_reader_map.unmap();
     try {
-        File::remove(m_file_path.c_str());
+        util::File::remove(m_file_path.c_str());
     }
     catch (...) {} // ignored on purpose
 }
@@ -591,9 +605,8 @@ void SharedGroup::do_async_commits()
 #endif
             // Get a read lock on the (current) version that we want
             // to commit to disk.
-#ifdef TIGHTDB_DEBUG
             m_transact_stage = transact_Ready;
-#endif
+
             begin_read();
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "(version " << m_version << " from "
@@ -625,7 +638,7 @@ void SharedGroup::do_async_commits()
             cerr << "Removing coordination file" << endl;
 #endif
             if (!file_already_removed)
-                File::remove(m_file_path);
+                util::File::remove(m_file_path);
 #ifdef TIGHTDB_ENABLE_LOGFILE
             cerr << "Daemon exiting nicely" << endl << endl;
 #endif
@@ -647,7 +660,7 @@ void SharedGroup::do_async_commits()
             timespec ts;
             timeval tv;
             // clock_gettime(CLOCK_REALTIME, &ts); <- would like to use this, but not there on mac
-            gettimeofday(&tv, NULL);
+            gettimeofday(&tv, null_ptr);
             ts.tv_sec = tv.tv_sec;
             ts.tv_nsec = tv.tv_usec * 1000;
             ts.tv_nsec += 10000000; // 10 msec
@@ -680,7 +693,7 @@ const Group& SharedGroup::begin_read()
         Mutex::Lock lock(info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
-            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize); // Throws
+            m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
 
         // Get the current top ref
         new_top_ref   = to_size_t(info->current_top);
@@ -704,9 +717,7 @@ const Group& SharedGroup::begin_read()
         }
     }
 
-#ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Reading;
-#endif
 
     // Make sure the group is up-to-date.
     // A zero ref means that the file has just been created.
@@ -735,7 +746,7 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
         Mutex::Lock lock(info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
-            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize);
+            m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize);
 
         // Find entry for current version
         size_t ndx = ringbuf_find(m_version);
@@ -757,13 +768,11 @@ void SharedGroup::end_read() TIGHTDB_NOEXCEPT
     // The read may have allocated some temporary state
     m_group.detach();
 
-#ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
-#endif
 }
 
 
-Group& SharedGroup::begin_write()
+void SharedGroup::do_begin_write()
 {
     TIGHTDB_ASSERT(m_transact_stage == transact_Ready);
 
@@ -802,23 +811,7 @@ Group& SharedGroup::begin_write()
     // zero ref means that the file has just been created
     m_group.update_from_shared(new_top_ref, new_file_size); // Throws
 
-#ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Writing;
-#endif
-
-#ifdef TIGHTDB_ENABLE_REPLICATION
-    if (Replication* repl = m_group.get_replication()) {
-        try {
-            repl->begin_write_transact(*this); // Throws
-        }
-        catch (...) {
-            rollback();
-            throw;
-        }
-    }
-#endif
-
-    return m_group;
 }
 
 
@@ -869,9 +862,7 @@ void SharedGroup::commit()
 
     m_group.detach();
 
-#ifdef TIGHTDB_DEBUG
     m_transact_stage = transact_Ready;
-#endif
 }
 
 
@@ -897,9 +888,7 @@ void SharedGroup::rollback() TIGHTDB_NOEXCEPT
         // Clear all changes made during transaction
         m_group.detach();
 
-#ifdef TIGHTDB_DEBUG
         m_transact_stage = transact_Ready;
-#endif
     }
 }
 
@@ -1004,7 +993,7 @@ void SharedGroup::ringbuf_expand()
 
     // Extend lock file
     m_file.prealloc(0, new_file_size); // Throws
-    m_reader_map.remap(m_file, File::access_ReadWrite, new_file_size); // Throws
+    m_reader_map.remap(m_file, util::File::access_ReadWrite, new_file_size); // Throws
     info = m_reader_map.get_addr();
 
     // If the contents of the ring buffer crosses the end of the
@@ -1139,11 +1128,11 @@ void SharedGroup::zero_free_space()
         file_size = to_size_t(info->filesize);
 
         if (ringbuf_is_empty()) {
-            readlock_version = current_version;//FIXME:vs2012 warning  warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
+            readlock_version = current_version;//FIXME:vs2012 32bit warning  warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
         }
         else {
             const ReadCount& r = ringbuf_get_first();
-            readlock_version = r.version;//FIXME:vs2012 warning C4244: '=' : conversion from 'const uint64_t' to 'size_t', possible loss of data
+            readlock_version = r.version;//FIXME:vs2012 32bit warning C4244: '=' : conversion from 'const uint64_t' to 'size_t', possible loss of data
         }
     }
 
@@ -1167,7 +1156,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
         Mutex::Lock lock(info->readmutex);
 
         if (TIGHTDB_UNLIKELY(info->infosize > m_reader_map.get_size()))
-            m_reader_map.remap(m_file, File::access_ReadWrite, info->infosize); // Throws
+            m_reader_map.remap(m_file, util::File::access_ReadWrite, info->infosize); // Throws
 
         if (ringbuf_is_empty()) {
             readlock_version = new_version;
@@ -1182,7 +1171,7 @@ void SharedGroup::low_level_commit(uint64_t new_version)
     TIGHTDB_ASSERT(m_group.m_top.is_attached());
     TIGHTDB_ASSERT(readlock_version <= new_version);
     GroupWriter out(m_group); // Throws
-    //FIXME: VS2012 warning:  src\tightdb\group_shared.cpp(1087): warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
+    //FIXME: VS2012 32bit warning:  src\tightdb\group_shared.cpp(1087): warning C4244: '=' : conversion from 'uint64_t' to 'size_t', possible loss of data
     m_group.m_readlock_version = readlock_version;
     out.set_versions(new_version, readlock_version);
     // Recursively write all changed arrays to end of file
@@ -1215,8 +1204,8 @@ void SharedGroup::reserve(size_t size)
     // FIXME: There is currently no synchronization between this and
     // concurrent commits in progress. This is so because it is
     // believed that the OS guarantees race free behavior when
-    // File::prealloc_if_supported() (posix_fallocate() on Linux) runs
-    // concurrently with modfications via a memory map of the
-    // file. This assumption must be verified though.
+    // util::File::prealloc_if_supported() (posix_fallocate() on
+    // Linux) runs concurrently with modfications via a memory map of
+    // the file. This assumption must be verified though.
     m_group.m_alloc.reserve(size);
 }

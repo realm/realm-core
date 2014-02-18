@@ -121,28 +121,27 @@ CATEGORIES  :
                  group, and in case the buffer needs to be deallocated
                  afterwards, that is your responsibility too.
 
-                 If an exception is signalled, the caller retains ownership 
+                 If an exception is signalled, the caller retains ownership
                  and must free the buffer, even if <tt>take_ownership</tt> was true.
       RETURN:
         TYPES  : Group
         DESCR  : &g_group_constructor_memory_return1_descr
                  A - possibly empty - group.
       THROWS:
-      - EXCEPT : File::AccessError
+      - EXCEPT : util::File::AccessError
         DESCR  : &g_group_constructor_memory_throws_descr
                  Thrown if the file (or buffer) could not be opened. If the reason
                  corresponds to one of the following exception types which are
-                 derived from File::AccessError, the derived exception
-                 type is thrown. Note that InvalidDatabase is among
-                 these derived exception types.
-      - EXCEPT : File::PermissionDenied
+                 derived from util::File::AccessError, the derived exception
+                 type is thrown.
+      - EXCEPT : util::File::PermissionDenied
         DESCR  : &g_group_exc_perm
                  Thrown if the user haven't got sufficient permissions
                  to open the database file in the desired mode.
-      - EXCEPT : File::NotFound
+      - EXCEPT : util::File::NotFound
         DESCR  : &g_group_exc_notfound
                  Thrown if the database file cannot be found.
-      - EXCEPT : File::Exists
+      - EXCEPT : util::File::Exists
         DESCR  : &g_group_exc_exists
                  Thrown if create_Never was specified and the database file exists.
       - EXCEPT : InvalidDatabase
@@ -222,8 +221,8 @@ CATEGORIES  :
 
                  Specifying a memory buffer is equivalent to
                  specifying a file except that (a) in this case the
-                 database is assumed to be stored in that buffer instead 
-                 of a file and (b) it is not possible to use commit or in 
+                 database is assumed to be stored in that buffer instead
+                 of a file and (b) it is not possible to use commit or in
                  other ways change the buffer. If you change the contents
                  of the group and want to persist your changes you must
                  use one of the functions for serialization.
@@ -253,13 +252,13 @@ CATEGORIES  :
         TYPES  : bool
         DESCR  : *g_group_take_ownership_desc
       THROWS:
-      - EXCEPT : File::AccessError
+      - EXCEPT : util::File::AccessError
         DESCR  : *g_group_constructor_memory_throws_descr
-      - EXCEPT : File::PermissionDenied
+      - EXCEPT : util::File::PermissionDenied
         DESCR  : *g_group_exc_perm
-      - EXCEPT : File::NotFound
+      - EXCEPT : util::File::NotFound
         DESCR  : *g_group_exc_notfound
-      - EXCEPT : File::Exists
+      - EXCEPT : util::File::Exists
         DESCR  : *g_group_exc_exists
       - EXCEPT : InvalidDatabase
         DESCR  : *g_group_exc_invalid_db
@@ -462,6 +461,17 @@ CATEGORIES  :
 
 - Serialization:
   METHODS:
+  - g_group_write_to_stream:
+      NAME     : write
+      SUMMARY  : &g_group_write_to_stream_summary
+                 Write this database to the specified output stream.
+      CONST    : true
+      PARAMS:
+      - NAME   : out
+        TYPES  : std::ostream&
+        DESCR  : &g_group_write_to_stream_parm1_descr
+                 The tareget stream.
+
   - g_group_write_to_file:
       NAME     : write
       SUMMARY  : &g_group_write_to_file_summary
@@ -481,16 +491,16 @@ CATEGORIES  :
         DESCR  : &g_group_write_to_file_parm1_descr
                  A filesystem path to write to.
       THROWS:
-      - EXCEPT : File::AccessError
+      - EXCEPT : util::File::AccessError
         DESCR  : &g_group_write_to_file_throws_descr
                  Thrown if the file could not be opened. If the reason
                  corresponds to one of the exception types that are
-                 derived from File::AccessError, the derived exception
-                 type is thrown. In particular, File::Exists will be
+                 derived from util::File::AccessError, the derived exception
+                 type is thrown. In particular, util::File::Exists will be
                  thrown if the file exists already.
-      - EXCEPT : File::PermissionDenied
+      - EXCEPT : util::File::PermissionDenied
         DESCR  : *g_group_exc_perm
-      - EXCEPT : File::Exists
+      - EXCEPT : util::File::Exists
         DESCR  : *g_group_exc_exists
       EXAMPLES:
       - DESCR  :
@@ -500,10 +510,10 @@ CATEGORIES  :
       NAME     : write_to_mem
       SUMMARY  : &g_group_write_to_mem_summary
                  Write a group to an in-memory buffer.
-      DESCR    : 
+      DESCR    :
       - TEXT   : &g_group_write_to_mem_descr
                  This method will write the group to an in-memory buffer. This may be useful if you
-                 want to transfer a group over a network connection. 
+                 want to transfer a group over a network connection.
       - TEXT   : The returned buffer will have been
                  allocated using std::malloc(). The ownership of the buffer is passed to the caller.
       CONST    : true
@@ -518,9 +528,9 @@ CATEGORIES  :
       NAME     : to_string
       SUMMARY  : &g_group_to_string_summary
                  Get a string representation of the group.
-      DESCR:    
+      DESCR:
       - TEXT   : &g_group_to_string_descr
-                 This method provides a string representation of the group. 
+                 This method provides a string representation of the group.
       - TEXT   : The string representation is added to an output stream.
       CONST    : true
       PARAMS:
@@ -537,7 +547,7 @@ CATEGORIES  :
       SUMMARY  : &g_group_to_json_summary
                  Get a JSON representation of the group.
       SIGNATURE: template<class S> void to_json(S& out) const
-      DESCR    : 
+      DESCR    :
       - TEXT   : &g_group_to_json_descr
                  This methods provides a JSON representation of the group.
                  The group is represented as an JSON object where the tables are

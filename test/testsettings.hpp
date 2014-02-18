@@ -33,6 +33,7 @@
 #define TEST_COLUMN_MIXED
 #define TEST_COLUMN_STRING
 #define TEST_FILE
+#define TEST_FILE_LOCKS
 #define TEST_GROUP
 #define TEST_INDEX_STRING
 #define TEST_LANG_BIND_HELPER
@@ -54,6 +55,6 @@
 
 // Takes a long time. Also currently fails to reproduce the Java bug, but once it has been identified, this
 // test could perhaps be modified to trigger it (unless it's a language binding problem).
-//#define JAVA_MANY_COLUMNS_CRASH 
+//#define JAVA_MANY_COLUMNS_CRASH
 
 #endif

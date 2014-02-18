@@ -21,7 +21,7 @@
 #define TIGHTDB_COLUMN_BASIC_TPL_HPP
 
 // Todo: It's bad design (headers are entangled) that a Column uses query_engine.hpp which again uses Column.
-// It's the aggregate() method that calls query_engine, and a quick fix (still not optimal) could be to create 
+// It's the aggregate() method that calls query_engine, and a quick fix (still not optimal) could be to create
 // the call and include inside float and double's .cpp files.
 #include <tightdb/query_engine.hpp>
 
@@ -29,7 +29,7 @@ namespace tightdb {
 
 // Predeclarations from query_engine.hpp
 class ParentNode;
-template<class T, class F> class BasicNode;
+template<class T, class F> class FloatDoubleNode;
 template<class T> class SequentialGetter;
 
 
@@ -42,12 +42,13 @@ BasicColumn<T>::BasicColumn(Allocator& alloc)
 template<class T>
 BasicColumn<T>::BasicColumn(ref_type ref, ArrayParent* parent, std::size_t pndx, Allocator& alloc)
 {
-    bool root_is_leaf = root_is_leaf_from_ref(ref, alloc);
+    char* header = alloc.translate(ref);
+    bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(header);
     if (root_is_leaf) {
-        m_array = new BasicArray<T>(ref, parent, pndx, alloc);
+        m_array = new BasicArray<T>(MemRef(header, ref), parent, pndx, alloc);
     }
     else {
-        m_array = new Array(ref, parent, pndx, alloc);
+        m_array = new Array(MemRef(header, ref), parent, pndx, alloc);
     }
 }
 
@@ -73,7 +74,7 @@ inline std::size_t BasicColumn<T>::size() const TIGHTDB_NOEXCEPT
 template<class T>
 void BasicColumn<T>::clear()
 {
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         static_cast<BasicArray<T>*>(m_array)->clear(); // Throws
         return;
     }
@@ -90,18 +91,10 @@ void BasicColumn<T>::clear()
         parent->update_child_ref(pndx, array->get_ref()); // Throws
 
     // Remove original node
-    m_array->destroy();
+    m_array->destroy_deep();
     delete m_array;
 
     m_array = array;
-}
-
-template<class T>
-void BasicColumn<T>::resize(std::size_t ndx)
-{
-    TIGHTDB_ASSERT(root_is_leaf()); // currently only available on leaf level (used by b-tree code)
-    TIGHTDB_ASSERT(ndx < size());
-    static_cast<BasicArray<T>*>(m_array)->resize(ndx);
 }
 
 template<class T>
@@ -150,7 +143,7 @@ public:
 template<class T>
 void BasicColumn<T>::set(std::size_t ndx, T value)
 {
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         static_cast<BasicArray<T>*>(m_array)->set(ndx, value); // Throws
         return;
     }
@@ -174,27 +167,15 @@ void BasicColumn<T>::insert(std::size_t ndx, T value)
 }
 
 template<class T>
-void BasicColumn<T>::fill(std::size_t count)
-{
-    TIGHTDB_ASSERT(is_empty());
-
-    // Fill column with default values
-    // TODO: this is a very naive approach
-    // we could speedup by creating full nodes directly
-    for (std::size_t i = 0; i < count; ++i)
-        add(T());
-}
-
-template<class T>
 bool BasicColumn<T>::compare(const BasicColumn& c) const
 {
     std::size_t n = size();
     if (c.size() != n)
         return false;
-    for (std::size_t i=0; i<n; ++i) {
-        T v1 = get(i);
-        T v2 = c.get(i);
-        if (v1 == v2)
+    for (std::size_t i = 0; i != n; ++i) {
+        T v_1 = get(i);
+        T v_2 = c.get(i);
+        if (v_1 != v_2)
             return false;
     }
     return true;
@@ -229,16 +210,16 @@ public:
     {
         ArrayParent* parent = 0;
         std::size_t ndx_in_parent = 0;
-        UniquePtr<Array> leaf(new BasicArray<T>(leaf_mem, parent, ndx_in_parent,
-                                                get_alloc())); // Throws
+        util::UniquePtr<Array> leaf(new BasicArray<T>(leaf_mem, parent, ndx_in_parent,
+                                                      get_alloc())); // Throws
         replace_root(leaf); // Throws
     }
     void replace_root_by_empty_leaf() TIGHTDB_OVERRIDE
     {
         ArrayParent* parent = 0;
         std::size_t ndx_in_parent = 0;
-        UniquePtr<Array> leaf(new BasicArray<T>(parent, ndx_in_parent,
-                                                get_alloc())); // Throws
+        util::UniquePtr<Array> leaf(new BasicArray<T>(parent, ndx_in_parent,
+                                                      get_alloc())); // Throws
         replace_root(leaf); // Throws
     }
 };
@@ -249,7 +230,7 @@ void BasicColumn<T>::erase(std::size_t ndx, bool is_last)
     TIGHTDB_ASSERT(ndx < size());
     TIGHTDB_ASSERT(is_last == (ndx == size()-1));
 
-    if (m_array->is_leaf()) {
+    if (!m_array->is_inner_bptree_node()) {
         static_cast<BasicArray<T>*>(m_array)->erase(ndx); // Throws
         return;
     }
@@ -257,6 +238,61 @@ void BasicColumn<T>::erase(std::size_t ndx, bool is_last)
     size_t ndx_2 = is_last ? npos : ndx;
     EraseLeafElem erase_leaf_elem(*this);
     Array::erase_bptree_elem(m_array, ndx_2, erase_leaf_elem); // Throws
+}
+
+
+template<class T> class BasicColumn<T>::CreateHandler: public ColumnBase::CreateHandler {
+public:
+    CreateHandler(Allocator& alloc): m_alloc(alloc) {}
+    ref_type create_leaf(std::size_t size) TIGHTDB_OVERRIDE
+    {
+        MemRef mem = BasicArray<T>::create_array(size, m_alloc); // Throws
+        return mem.m_ref;
+    }
+private:
+    Allocator& m_alloc;
+};
+
+template<class T> ref_type BasicColumn<T>::create(std::size_t size, Allocator& alloc)
+{
+    CreateHandler handler(alloc);
+    return ColumnBase::create(size, alloc, handler);
+}
+
+
+template<class T> class BasicColumn<T>::SliceHandler: public ColumnBase::SliceHandler {
+public:
+    SliceHandler(Allocator& alloc): m_leaf(alloc) {}
+    MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
+                      Allocator& target_alloc) TIGHTDB_OVERRIDE
+    {
+        m_leaf.init_from_mem(leaf_mem);
+        return m_leaf.slice(offset, size, target_alloc); // Throws
+    }
+private:
+    BasicArray<T> m_leaf;
+};
+
+template<class T> ref_type BasicColumn<T>::write(size_t slice_offset, size_t slice_size,
+                                                 size_t table_size, _impl::OutputStream& out) const
+{
+    ref_type ref;
+    if (root_is_leaf()) {
+        Allocator& alloc = Allocator::get_default();
+        BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array);
+        MemRef mem = leaf->slice(slice_offset, slice_size, alloc); // Throws
+        Array slice(alloc);
+        _impl::DeepArrayDestroyGuard dg(&slice);
+        slice.init_from_mem(mem);
+        size_t pos = slice.write(out); // Throws
+        ref = pos;
+    }
+    else {
+        SliceHandler handler(get_alloc());
+        ref = ColumnBase::write(m_array, slice_offset, slice_size,
+                                table_size, handler, out); // Throws
+    }
+    return ref;
 }
 
 

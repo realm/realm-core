@@ -5,40 +5,110 @@ Format:
 
 2012-mm-dd
 ----------
-! Fixed bug [github issuenr]: .... 		 (user visible bug fixed       - passed on to release notes)
-+ Added feature ....				     (user visible new feature     - passed on to release notes)
+! Fixed bug [github issuenr]: ....       (user visible bug fixed       - passed on to release notes)
++ Added feature ....                     (user visible new feature     - passed on to release notes)
 - Removed/deprecated feature/method .... (user visible removed feature - passed on to release notes)
-. Any other notes .... 				     (internal changes)
+. Any other notes ....                   (internal changes)
+
+
+2014-02-17 (Kristian Spangsege)
++ Adding Table::write() as a means to effieciently serialize a table, or part of a table.
+! Fixing table copy bug. The error occured when the table contained strings longer than 64 bytes.
+! Fixing table comparison bug. The error occured when the table has a `float` or a `double` column.
+
+
+2014-02-14 (Kristian Spangsege)
++ The StringData class now distinguishes `null` from the empty string.
++ Adding StringData::is_null().
+
+
+2014-02-11 (Kristian Spangsege)
++ Group::write(std::ostream&) added. This allows general online streaming of TightDB databases in memory for the first time.
++ Adding Table::get_name() which returns the name of the table when the table is a direct member of a group.
+
+
+2014-02-05 (Kenneth Geisshirt)
++ Two new targets in build.sh: get_version and set_version.
+
+
+2014-02-04 (Kristian Spangsege)
++ Introducing Table::get_parent_table() with allows a subtable to know its parent table.
++ Table::rename_subcolumn() and Table::remove_subcolumn() now take an extra argument which is the index of the column to rename. Before the index was specified as part of the path.
++ Introducing Table::insert_column() and Table::insert_subcolumn() for inserting new columns at arbitrary positions.
++ New class `Descriptor` introduced into the public API. It plays the role that `Spec` played before. Class `Spec` is no longer to be considered part of the public API.
++ Table::add_column() now takes a third optinal argument `DescriptorRef* subdesc`.
++ Introducing Table::get_descriptor() and Table::get_subdescriptor()
+- Table::get_spec() and Table::update_from_spec() removed from public API since are part of the now non-public `Spec` API.
+. Table::has_shared_spec() renamed to Table::has_shared_type().
+
+
+2014-01-27 (Brian Munkholm)
+! Fixed bug in Query with subtables. Whith empty subtables query returned incorrect results.
+  In debug mode it could assert when querying a subtable with more columns than the base table.
+
+
+2014-01-23 (Kenneth Geisshirt)
+! Fixed bug: Subtable queries is validated by Query::validate(). An invalid subtable query can lead to a segfault.
+
+
+2014-01-07 (Kenneth Geisshirt)
++ Table::range() added. The method returns a set of rows as a TableView.
+
+
+2014-01-06 (Kristian Spangsege)
+! 'No parent info in shared specs' conflicts with implementation of `Group::commit()`.
+! `ColumnTable::m_spec_ref` not updated when Spec object is reallocated.
+! `ColumnSubtableParent::m_index` not updated when preceeding columns are removed.
++ Addition of `template<class L> std::size_t Table::add_subcolumn(const util::Tuple<L>&, DataType, StringData)`. This makes it much easier to add columns to subtable specs.
+. `Spec::get_subtable_spec()` now returns `SubspecRef` or `ConstSubspecRef`. This fixes a design bug relating to propagation of constness to subspecs, and it improves the efficiency of access to subspecs by avoiding expensive copying of `Spec` objects.
+. Elimination of `Spec::m_table` and `ColumnTable::m_spec_ref`.
+. `Spec::add_column()` and `Spec::add_subcolumn()` now take a `Table*` as argument.
+
+
+2013-12-17 (Kristian Spangsege)
++ Implicit termination of active transaction when SharedGroup is destroyed.
+. Class `File` and related exceptions such as `File::AccessError` moved to namespace `tightdb::util`.
+. Table::add_column() optimized. For integer columns, the speedup is by more than a factor of 1000 for large tables.
+
 
 2013-11-07 (Alexander Stigsen)
 . BREAKING CHANGE: Schema now handles attributes separately for better performance when there are many colummns.
 
+
 2013-11-07 (Lasse Reinhold)
 + Added power() operator for next-generation-queries
+
 
 2013-11-07 (Lasse Reinhold)
 ! Fixed bug: ng-queries could segfault to bug in Array::get_chunk(). Normal queries and everything else not affected.
 
+
 2013-10-10 (Kenneth Geisshirt)
 . Adding INTERACTIVE mode for the dist-config target in build.sh
 
+
 2013-10-09 (Kenneth Geisshirt)
 . Adding dist-deb target in build.sh for building debian/ubuntu/mint packages. Moreover, the ubuntu/mint version is part of package name so maintaining repositories is easier.
+
 
 2013-09-26 (Brian Munkholm)
 +/- Renamed Table::distinct() to Table::get_distinct_view()
 +/- Renamed class Date to DateTime. Renamed DataType::type_Date to type_DateTime
 +/- Renamed suffix of all methods operating on DateTime from '_date' to '_datetime'.
 
+
 2013-09-26 (Kristian Spangsege)
 + File format support for streaming of output from Group::write() (not yet suported by API.)
 + Support for internal null characters in strings. This applies to table and column names as well.
 
+
 2013-09-19 (Kristian Spangsege)
 . CRUD performance has been greatly improved for large tables, as long as they are kept on the "compact" form. A table is kept on the compact form when every row insertion and removal, since the creation of that table, has occured, and continues to occur at the end (i.e., insert after last row, and remove last row).
 
+
 2013-10-02 (Lasse Reinhold)
 - Renamed find_next(lastmatch) into find(begin_at_table_row) for queries and typed tables.
+
 
 2013-09-12 (Brian Munkholm)
 + Added TableView::row_to_string() and testcases for to_string() and row_to_string()
@@ -389,14 +459,14 @@ Format:
 - Removed Table::find_pos_int(...) from public API
 
 + Added a the following methods to a TableView:
-	template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
-	ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const;
-	size_t      get_subtable_size(size_t column_ndx, size_t row_ndx) const;
-	void        clear_subtable(size_t column_ndx, size_t row_ndx);
-	size_t      find_first_bool(size_t column_ndx, bool value) const;
+    template<class E> void set_enum(size_t column_ndx, size_t row_ndx, E value);
+    ColumnType  get_mixed_type(size_t column_ndx, size_t row_ndx) const;
+    size_t      get_subtable_size(size_t column_ndx, size_t row_ndx) const;
+    void        clear_subtable(size_t column_ndx, size_t row_ndx);
+    size_t      find_first_bool(size_t column_ndx, bool value) const;
     size_t      find_first_date(size_t column_ndx, time_t value) const;
-	void		add_int(size_t column_ndx, int64_t value);
-	TableView      find_all_bool(size_t column_ndx, bool value);
+    void        add_int(size_t column_ndx, int64_t value);
+    TableView      find_all_bool(size_t column_ndx, bool value);
     ConstTableView find_all_bool(size_t column_ndx, bool value) const; (for class TableView and ConstTableView)
     TableView      find_all_date(size_t column_ndx, time_t value);
     ConstTableView find_all_date(size_t column_ndx, time_t value) const; (for class TableView and ConstTableView)

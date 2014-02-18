@@ -8,7 +8,7 @@ SUMMARY    : &g_typed_table_summary
              Typed table.
 DESCR      : &g_typed_table_descr
              >
-             NOTE: The current documentation of Typed Table is under construction, 
+             NOTE: The current documentation of Typed Table is under construction,
              and not completely correct yet.
 
              The Table class is the core class of the TightDB framework. It allows you
@@ -135,20 +135,20 @@ CATEGORIES:
 
   - g_typed_table_optimize:
       NAME     : optimize
-      SUMMARY  : &g_typed_table_optimize_summary
+      SUMMARY  : &g_table_optimize_summary
                  Optimize a table.
-      DESCR    : &g_typed_table_optimize_descr
+      DESCR    : &g_table_optimize_descr
                  >
                  This method will optimize the internal data structures of a table.
-                 The result is that the table will consume less memory and queries might
-                 be faster.
+                 The result is that the table may consume less memory and queries might
+                 become faster.
 
-                 This should be called as soon as there is an representative amount of
+                 This should be called as soon as there is a representative amount of
                  data in the table. The table will then reorganize itself into the most
-                 effective format.
+                 efficient format.
 
-                 What is learned about the contents will be used in all future operations,
-                 so you only need to call optimize once.
+                 It is assumed that this format is the most efficient until
+                 optimize is called again.
       EXAMPLES:
       - CODE   : ex_cpp_typed_table_optimize
         DESCR  :
@@ -545,9 +545,10 @@ CATEGORIES:
       SIGNATURE: |
                  Query       where()
                  const Query where() const
-      SUMMARY  : &g_typed_table_where_summery
+      SUMMARY  : &g_typed_table_where_summary
                  Query table.
-      DESCR    : This method initiates a query. See {@link class_typed_query}.
+      DESCR    : &g_typed_table_where_descr
+                 This method initiates a query. See {@link class_typed_query}.
       RETURN:
         TYPES  : [Query, const Query]
         DESCR  : &g_typed_table_where_return1_descr
