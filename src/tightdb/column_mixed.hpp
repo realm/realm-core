@@ -128,6 +128,10 @@ public:
 
     static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) TIGHTDB_NOEXCEPT;
 
+    // Overrriding method in ColumnBase
+    ref_type write(std::size_t, std::size_t, std::size_t,
+                   _impl::OutputStream&) const TIGHTDB_OVERRIDE;
+
 #ifdef TIGHTDB_DEBUG
     void Verify() const TIGHTDB_OVERRIDE; // Must be upper case to avoid conflict with macro in ObjC
     void to_dot(std::ostream&, StringData title) const TIGHTDB_OVERRIDE;

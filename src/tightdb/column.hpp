@@ -130,6 +130,10 @@ public:
     static std::size_t get_size_from_ref(ref_type root_ref, Allocator&);
     static std::size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref, Allocator&);
 
+    /// Write a slice of this column to the specified output stream.
+    virtual ref_type write(std::size_t slice_offset, std::size_t slice_size,
+                           std::size_t table_size, _impl::OutputStream&) const = 0;
+
 #ifdef TIGHTDB_DEBUG
     // Must be upper case to avoid conflict with macro in Objective-C
     virtual void Verify() const = 0;
@@ -180,6 +184,16 @@ protected:
 
     static ref_type create(std::size_t size, Allocator&, CreateHandler&);
 
+    class SliceHandler {
+    public:
+        virtual MemRef slice_leaf(MemRef leaf_mem, std::size_t offset, std::size_t size,
+                                  Allocator& target_alloc) = 0;
+        ~SliceHandler() TIGHTDB_NOEXCEPT {}
+    };
+
+    static ref_type write(const Array* root, std::size_t slice_offset, std::size_t slice_size,
+                          std::size_t table_size, SliceHandler&, _impl::OutputStream&);
+
 #ifdef TIGHTDB_DEBUG
     class LeafToDot;
     virtual void leaf_to_dot(MemRef, ArrayParent*, std::size_t ndx_in_parent,
@@ -188,6 +202,8 @@ protected:
 #endif
 
 private:
+    class WriteSliceHandler;
+
     static ref_type build(std::size_t* rest_size_ptr, std::size_t fixed_height,
                           Allocator&, CreateHandler&);
 
@@ -270,6 +286,10 @@ public:
     static ref_type create(Array::Type leaf_type, std::size_t size, int_fast64_t value,
                            Allocator&);
 
+    // Overrriding method in ColumnBase
+    ref_type write(std::size_t, std::size_t, std::size_t,
+                   _impl::OutputStream&) const TIGHTDB_OVERRIDE;
+
     // Debug
 #ifdef TIGHTDB_DEBUG
     virtual void Verify() const TIGHTDB_OVERRIDE;
@@ -300,6 +320,7 @@ private:
 
     class EraseLeafElem;
     class CreateHandler;
+    class SliceHandler;
 
     friend class Array;
     friend class ColumnBase;

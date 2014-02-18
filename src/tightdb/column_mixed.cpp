@@ -320,6 +320,78 @@ ref_type ColumnMixed::create(size_t size, Allocator& alloc)
 }
 
 
+ref_type ColumnMixed::write(size_t slice_offset, size_t slice_size,
+                            size_t table_size, _impl::OutputStream& out) const
+{
+    // FIXME: Oops, there is no reasonably efficient way to implement
+    // this. The problem is that we have no guarantees about how the
+    // order of entries in m_binary_data relate to the order of
+    // entries in the column.
+    //
+    // It seems that we would have to change m_binary_data to always
+    // contain one entry for each entry in the column, and at the
+    // corresponding index.
+    //
+    // An even better solution will probably be to change a mixed
+    // column into an ordinary column of mixed leafs. ColumnBinary can
+    // serve as a model of how to place multime subarrays into a
+    // single leaf.
+    //
+    // There are other options such as storing a ref to a ArrayBlob in
+    // m_data if the type is 'string'.
+    //
+    // Unfortunately this will break the file format compatibility.
+    //
+    // The fact that the current design has other serious flaws (se
+    // FIXMEs in ColumnMixed::clear_value()) makes it even more urgent
+    // to change the representation and implementation of ColumnMixed.
+    //
+    // In fact, there is yet another problem with the current design,
+    // it relies on the ability of a column to know its own
+    // size. While this is not an urgent problem, it is in conflict
+    // with the desire to drop the `N_t` field from the B+-tree inner
+    // node (a.k.a. `total_elems_in_subtree`).
+
+    ref_type types_ref = m_types->write(slice_offset, slice_size, table_size, out); // Throws
+    ref_type data_ref = m_data->write(slice_offset, slice_size, table_size, out); // Throws
+
+    // FIXME: This is far from good enough. See comments above.
+    ref_type binary_data_ref = 0;
+    if (m_binary_data) {
+        size_t pos = m_binary_data->get_root_array()->write(out); // Throws
+        binary_data_ref = pos;
+    }
+
+    // build new top array
+    Array top(Allocator::get_default());
+    _impl::ShallowArrayDestroyGuard dg(&top);
+    top.create(Array::type_HasRefs); // Throws
+    {
+        int_fast64_t v(types_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        top.add(v); // Throws
+    }
+    {
+        int_fast64_t v(data_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        top.add(v); // Throws
+    }
+    if (binary_data_ref != 0) {
+        int_fast64_t v(binary_data_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        top.add(v); // Throws
+    }
+
+    // Write new top array
+    {
+        bool recurse = false;
+        size_t pos = top.write(out, recurse);
+        ref_type ref = pos;
+        return ref;
+    }
+
+    dg.release();
+    return top.get_ref();
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 void ColumnMixed::Verify() const

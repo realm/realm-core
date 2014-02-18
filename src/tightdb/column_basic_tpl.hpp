@@ -260,6 +260,42 @@ template<class T> ref_type BasicColumn<T>::create(std::size_t size, Allocator& a
 }
 
 
+template<class T> class BasicColumn<T>::SliceHandler: public ColumnBase::SliceHandler {
+public:
+    SliceHandler(Allocator& alloc): m_leaf(alloc) {}
+    MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
+                      Allocator& target_alloc) TIGHTDB_OVERRIDE
+    {
+        m_leaf.init_from_mem(leaf_mem);
+        return m_leaf.slice(offset, size, target_alloc); // Throws
+    }
+private:
+    BasicArray<T> m_leaf;
+};
+
+template<class T> ref_type BasicColumn<T>::write(size_t slice_offset, size_t slice_size,
+                                                 size_t table_size, _impl::OutputStream& out) const
+{
+    ref_type ref;
+    if (root_is_leaf()) {
+        Allocator& alloc = Allocator::get_default();
+        BasicArray<T>* leaf = static_cast<BasicArray<T>*>(m_array);
+        MemRef mem = leaf->slice(slice_offset, slice_size, alloc); // Throws
+        Array slice(alloc);
+        _impl::DeepArrayDestroyGuard dg(&slice);
+        slice.init_from_mem(mem);
+        size_t pos = slice.write(out); // Throws
+        ref = pos;
+    }
+    else {
+        SliceHandler handler(get_alloc());
+        ref = ColumnBase::write(m_array, slice_offset, slice_size,
+                                table_size, handler, out); // Throws
+    }
+    return ref;
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 template<class T>

@@ -362,6 +362,26 @@ ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInser
 }
 
 
+MemRef ArrayString::slice(size_t offset, size_t size, Allocator& target_alloc) const
+{
+    TIGHTDB_ASSERT(is_attached());
+
+    // FIXME: This can be optimized as a single contiguous copy
+    // operation.
+    ArrayString slice(target_alloc);
+    _impl::ShallowArrayDestroyGuard dg(&slice);
+    slice.create(); // Throws
+    size_t begin = offset;
+    size_t end   = offset + size;
+    for (size_t i = begin; i != end; ++i) {
+        StringData value = get(i);
+        slice.add(value); // Throws
+    }
+    dg.release();
+    return slice.get_mem();
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 void ArrayString::string_stats() const

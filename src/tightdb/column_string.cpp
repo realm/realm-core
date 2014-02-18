@@ -1088,6 +1088,76 @@ ref_type AdaptiveStringColumn::create(size_t size, Allocator& alloc)
 }
 
 
+class AdaptiveStringColumn::SliceHandler: public ColumnBase::SliceHandler {
+public:
+    SliceHandler(Allocator& alloc): m_alloc(alloc) {}
+    MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
+                      Allocator& target_alloc) TIGHTDB_OVERRIDE
+    {
+        bool long_strings = Array::get_hasrefs_from_header(leaf_mem.m_addr);
+        if (!long_strings) {
+            // Small strings
+            ArrayString leaf(m_alloc);
+            leaf.init_from_mem(leaf_mem);
+            return leaf.slice(offset, size, target_alloc); // Throws
+        }
+        bool is_big = Array::get_context_flag_from_header(leaf_mem.m_addr);
+        if (!is_big) {
+            // Medium strings
+            ArrayStringLong leaf(m_alloc);
+            leaf.init_from_mem(leaf_mem);
+            return leaf.slice(offset, size, target_alloc); // Throws
+        }
+        // Big strings
+        ArrayBigBlobs leaf(m_alloc);
+        leaf.init_from_mem(leaf_mem);
+        return leaf.slice(offset, size, target_alloc); // Throws
+    }
+private:
+    Allocator& m_alloc;
+};
+
+ref_type AdaptiveStringColumn::write(size_t slice_offset, size_t slice_size,
+                                     size_t table_size, _impl::OutputStream& out) const
+{
+    ref_type ref;
+    if (root_is_leaf()) {
+        Allocator& alloc = Allocator::get_default();
+        MemRef mem;
+        bool long_strings = m_array->has_refs();
+        if (!long_strings) {
+            // Small strings
+            ArrayString* leaf = static_cast<ArrayString*>(m_array);
+            mem = leaf->slice(slice_offset, slice_size, alloc); // Throws
+        }
+        else {
+            bool is_big = m_array->get_context_flag();
+            if (!is_big) {
+                // Medium strings
+                ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
+                mem = leaf->slice(slice_offset, slice_size, alloc); // Throws
+            }
+            else {
+                // Big strings
+                ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array);
+                mem = leaf->slice(slice_offset, slice_size, alloc); // Throws
+            }
+        }
+        Array slice(alloc);
+        _impl::DeepArrayDestroyGuard dg(&slice);
+        slice.init_from_mem(mem);
+        size_t pos = slice.write(out); // Throws
+        ref = pos;
+    }
+    else {
+        SliceHandler handler(get_alloc());
+        ref = ColumnBase::write(m_array, slice_offset, slice_size,
+                                table_size, handler, out); // Throws
+    }
+    return ref;
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 namespace {

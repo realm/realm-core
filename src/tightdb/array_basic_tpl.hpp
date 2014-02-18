@@ -104,6 +104,27 @@ inline void BasicArray<T>::create()
 
 
 template<class T>
+MemRef BasicArray<T>::slice(std::size_t offset, std::size_t size, Allocator& target_alloc) const
+{
+    TIGHTDB_ASSERT(is_attached());
+
+    // FIXME: This can be optimized as a single contiguous copy
+    // operation.
+    BasicArray slice(target_alloc);
+    _impl::ShallowArrayDestroyGuard dg(&slice);
+    slice.create(); // Throws
+    size_t begin = offset;
+    size_t end   = offset + size;
+    for (size_t i = begin; i != end; ++i) {
+        T value = get(i);
+        slice.add(value); // Throws
+    }
+    dg.release();
+    return slice.get_mem();
+}
+
+
+template<class T>
 inline void BasicArray<T>::add(T value)
 {
     insert(m_size, value);

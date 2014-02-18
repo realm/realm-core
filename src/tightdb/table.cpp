@@ -2718,6 +2718,120 @@ void Table::optimize()
 }
 
 
+class Table::SliceWriter: public Group::TableWriter {
+public:
+    SliceWriter(const Table& table, StringData table_name,
+                size_t offset, size_t size) TIGHTDB_NOEXCEPT:
+        m_table(table),
+        m_table_name(table_name),
+        m_offset(offset),
+        m_size(size)
+    {
+    }
+
+    size_t write_names(_impl::OutputStream& out) TIGHTDB_OVERRIDE
+    {
+        Allocator& alloc = Allocator::get_default();
+        ArrayString table_names(alloc);
+        table_names.create(); // Throws
+        _impl::DestroyGuard<ArrayString> dg(&table_names);
+        table_names.add(m_table_name); // Throws
+        size_t pos = table_names.write(out); // Throws
+        return pos;
+    }
+
+    size_t write_tables(_impl::OutputStream& out) TIGHTDB_OVERRIDE
+    {
+        Allocator& alloc = Allocator::get_default();
+
+        // Make a copy of the spec of this table, modify it, and then
+        // write it to the output stream
+        ref_type spec_ref;
+        {
+            MemRef mem = m_table.m_spec.m_top.clone_deep(alloc); // Throws
+            ArrayParent* parent = 0;
+            size_t ndx_in_parent = 0;
+            Spec spec(alloc);
+            spec.init(mem, parent, ndx_in_parent); // Throws
+            _impl::DestroyGuard<Spec> dg(&spec);
+            size_t n = spec.get_column_count();
+            for (size_t i = 0; i != n; ++i) {
+                ColumnAttr attr = spec.get_column_attr(i);
+                attr = ColumnAttr(attr & ~col_attr_Indexed); // Remove any index specifying attributes
+                spec.set_column_attr(i, attr); // Throws
+            }
+            size_t pos = spec.m_top.write(out); // Throws
+            spec_ref = pos;
+        }
+
+        // Make a copy of the selected slice of each column
+        ref_type columns_ref;
+        {
+            Array column_refs(alloc);
+            column_refs.create(Array::type_HasRefs); // Throws
+            _impl::ShallowArrayDestroyGuard dg(&column_refs);
+            size_t table_size = m_table.size();
+            size_t n = m_table.m_cols.size();
+            for (size_t i = 0; i != n; ++i) {
+                ColumnBase* column = reinterpret_cast<ColumnBase*>(m_table.m_cols.get(i));
+                ref_type ref = column->write(m_offset, m_size, table_size, out); // Throws
+                int_fast64_t ref_2(ref); // FIXME: Dangerous cast (unsigned -> signed)
+                column_refs.add(ref_2); // Throws
+            }
+            bool recurse = false; // Shallow
+            size_t pos = column_refs.write(out, recurse); // Throws
+            columns_ref = pos;
+        }
+
+        // Create a new top array for the table
+        ref_type table_top_ref;
+        {
+            Array table_top(alloc);
+            table_top.create(Array::type_HasRefs); // Throws
+            _impl::ShallowArrayDestroyGuard dg(&table_top);
+            int_fast64_t spec_ref_2(spec_ref); // FIXME: Dangerous cast (unsigned -> signed)
+            table_top.add(spec_ref_2); // Throws
+            int_fast64_t columns_ref_2(columns_ref); // FIXME: Dangerous cast (unsigned -> signed)
+            table_top.add(columns_ref_2); // Throws
+            bool recurse = false; // Shallow
+            size_t pos = table_top.write(out, recurse); // Throws
+            table_top_ref = pos;
+        }
+
+        // Create the array of tables of size one
+        Array tables(alloc);
+        tables.create(Array::type_HasRefs); // Throws
+        _impl::ShallowArrayDestroyGuard dg(&tables);
+        int_fast64_t table_top_ref_2(table_top_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        tables.add(table_top_ref_2); // Throws
+        bool recurse = false; // Shallow
+        size_t pos = tables.write(out, recurse); // Throws
+        return pos;
+    }
+
+private:
+    const Table& m_table;
+    const StringData m_table_name;
+    const size_t m_offset, m_size;
+};
+
+void Table::write(ostream& out, size_t offset, size_t size, StringData override_table_name) const
+{
+    size_t table_size = this->size();
+    if (offset > table_size)
+        throw out_of_range("Offset is out of range");
+    size_t remaining_size = table_size - offset;
+    size_t size_2 = size;
+    if (size_2 > remaining_size)
+        size_2 = remaining_size;
+    StringData table_name = override_table_name;
+    if (!table_name)
+        table_name = get_name();
+    SliceWriter writer(*this, table_name, offset, size_2);
+    Group::write(out, writer); // Throws
+}
+
+
 void Table::adjust_column_index(size_t column_ndx_begin, int diff, int diff_in_parent)
     TIGHTDB_NOEXCEPT
 {

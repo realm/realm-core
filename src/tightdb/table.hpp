@@ -492,6 +492,38 @@ public:
     // Optimizing
     void optimize();
 
+    /// Write this table (or a slice of this table) to the specified
+    /// output stream.
+    ///
+    /// The output will have the same format as any other TightDB
+    /// database file, such as those produced by Group::write(). In
+    /// this case, however, the resulting database file will contain
+    /// exactly one table, and that table will contain only the
+    /// specified slice of the source table (this table).
+    ///
+    /// The new table will always have the same dynamic type (see
+    /// Descriptor) as the source table (this table), and unless it is
+    /// overridden (\a override_table_name), the new table will have
+    /// the same name as the source table (see get_name()). Indexes
+    /// (see set_index()) will not be carried over to the new table.
+    ///
+    /// \param offset Index of first row to include (if \a size >
+    /// 0). Must be less than, or equal to size().
+    ///
+    /// \param size Number of rows to include. May be zero. If `size >
+    /// size() - offset`, then the effective size of the written slice
+    /// will be `size() - offset`.
+    ///
+    /// \throw std::out_of_range If `offset > size()`.
+    ///
+    /// FIXME: While this function does provided a maximally efficient
+    /// way of serializing part of a table, it offers little in terms
+    /// of general utility. This is unfortunate, because it pulls
+    /// quite a large amount of code into the core library to support
+    /// it.
+    void write(std::ostream&, std::size_t offset = 0, std::size_t size = npos,
+               StringData override_table_name = StringData()) const;
+
     // Conversion
     void to_json(std::ostream& out) const;
     void to_string(std::ostream& out, std::size_t limit = 500) const;
@@ -549,6 +581,8 @@ protected:
     void set_into_mixed(Table* parent, std::size_t col_ndx, std::size_t row_ndx) const;
 
 private:
+    class SliceWriter;
+
     // view management support:
     void from_view_remove(std::size_t row_ndx, TableViewBase* view); // FIXME: Please rename to remove_by_view()
 

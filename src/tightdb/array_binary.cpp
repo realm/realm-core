@@ -184,6 +184,24 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc)
 }
 
 
+MemRef ArrayBinary::slice(size_t offset, size_t size, Allocator& target_alloc) const
+{
+    TIGHTDB_ASSERT(is_attached());
+
+    ArrayBinary slice(target_alloc);
+    _impl::ShallowArrayDestroyGuard dg(&slice);
+    slice.create(); // Throws
+    size_t begin = offset;
+    size_t end   = offset + size;
+    for (size_t i = begin; i != end; ++i) {
+        BinaryData value = get(i);
+        slice.add(value); // Throws
+    }
+    dg.release();
+    return slice.get_mem();
+}
+
+
 #ifdef TIGHTDB_DEBUG
 
 void ArrayBinary::to_dot(ostream& out, bool, StringData title) const
