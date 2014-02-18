@@ -1363,22 +1363,11 @@ MemRef Array::clone(const char* header, Allocator& alloc, Allocator& target_allo
     array.CreateFromHeaderDirect(const_cast<char*>(header));
 
     // Create new empty array of refs
-    MemRef mem = target_alloc.alloc(initial_capacity); // Throws
-    char* clone_header = mem.m_addr;
-    {
-        bool is_inner_bptree_node = get_is_inner_bptree_node_from_header(header);
-        bool has_refs = true;
-        bool context_flag = get_context_flag_from_header(header);
-        WidthType width_type = wtype_Bits;
-        int width = 0;
-        size_t size = 0;
-        init_header(clone_header, is_inner_bptree_node, has_refs, context_flag, width_type,
-                    width, size, initial_capacity);
-    }
-
     Array new_array(target_alloc);
     _impl::DeepArrayDestroyGuard dg(&new_array);
-    new_array.init_from_mem(mem);
+    Type type = get_type_from_header(header);
+    bool context_flag = get_context_flag_from_header(header);
+    new_array.create(type, context_flag); // Throws
 
     _impl::DeepArrayRefDestroyGuard dg_2(target_alloc);
     size_t n = array.size();
