@@ -5,8 +5,9 @@
 #include <iomanip>
 
 #include <tightdb/utilities.hpp>
-#include <tightdb/column.hpp>
 #include <tightdb/array_string.hpp>
+#include <tightdb/impl/destroy_guard.hpp>
+#include <tightdb/column.hpp>
 
 using namespace std;
 using namespace tightdb;
@@ -319,7 +320,7 @@ void ArrayString::find_all(Array& result, StringData value, size_t add_offset,
     }
 }
 
-bool ArrayString::compare_string(const ArrayString& c) const
+bool ArrayString::compare_string(const ArrayString& c) const TIGHTDB_NOEXCEPT
 {
     if (c.size() != size())
         return false;
@@ -382,6 +383,26 @@ void ArrayString::foreach(const Array* a, ForEachOp<StringData>* op) TIGHTDB_NOE
         data += stride;
     }
     op->handle_chunk(buf, buf + n);
+}
+
+
+MemRef ArrayString::slice(size_t offset, size_t size, Allocator& target_alloc) const
+{
+    TIGHTDB_ASSERT(is_attached());
+
+    // FIXME: This can be optimized as a single contiguous copy
+    // operation.
+    ArrayString slice(target_alloc);
+    _impl::ShallowArrayDestroyGuard dg(&slice);
+    slice.create(); // Throws
+    size_t begin = offset;
+    size_t end   = offset + size;
+    for (size_t i = begin; i != end; ++i) {
+        StringData value = get(i);
+        slice.add(value); // Throws
+    }
+    dg.release();
+    return slice.get_mem();
 }
 
 

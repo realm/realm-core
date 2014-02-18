@@ -87,6 +87,10 @@ public:
 
     static ref_type create(std::size_t size, Allocator&);
 
+    // Overrriding method in ColumnBase
+    ref_type write(std::size_t, std::size_t, std::size_t,
+                   _impl::OutputStream&) const TIGHTDB_OVERRIDE;
+
     void foreach(Array::ForEachOp<T>*) const TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
@@ -112,6 +116,7 @@ private:
     class SetLeafElem;
     class EraseLeafElem;
     class CreateHandler;
+    class SliceHandler;
 
     static void foreach(const Array* parent, Array::ForEachOp<T>*) TIGHTDB_NOEXCEPT;
 

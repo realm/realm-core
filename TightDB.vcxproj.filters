@@ -208,6 +208,21 @@
     <ClCompile Include="src\tightdb\importer.cpp">
       <Filter>csv importer</Filter>
     </ClCompile>
+    <ClCompile Include="test\test_file_locks.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\descriptor.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_descriptor.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tightdb\version.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="test\test_version.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\win32\pthread\pthread.h">
@@ -410,6 +425,15 @@
     </ClInclude>
     <ClInclude Include="src\tightdb\importer.hpp">
       <Filter>csv importer</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\descriptor.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\descriptor_fwd.hpp">
+      <Filter>src\include</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tightdb\version.hpp">
+      <Filter>src\include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

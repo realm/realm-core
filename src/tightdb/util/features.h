@@ -167,6 +167,11 @@
     TIGHTDB_HAVE_CLANG_FEATURE(cxx_constexpr)
 #  define TIGHTDB_HAVE_CXX11_CONSTEXPR 1
 #endif
+#if TIGHTDB_HAVE_CXX11_CONSTEXPR
+#  define TIGHTDB_CONSTEXPR constexpr
+#else
+#  define TIGHTDB_CONSTEXPR
+#endif
 
 
 /* Support for the C++11 'noexcept' specifier.
@@ -184,14 +189,14 @@
 #  define TIGHTDB_NOEXCEPT
 #endif
 #if TIGHTDB_HAVE_CXX11_NOEXCEPT
-#  define TIGHTDB_NOEXCEPT_IF(cond) noexcept(cond)
+#  define TIGHTDB_NOEXCEPT_IF(cond) noexcept (cond)
 #else
 #  define TIGHTDB_NOEXCEPT_IF(cond)
 #endif
 #if TIGHTDB_HAVE_CXX11_NOEXCEPT
 #  define TIGHTDB_NOEXCEPT_OR_NOTHROW noexcept
 #else
-#  define TIGHTDB_NOEXCEPT_OR_NOTHROW throw()
+#  define TIGHTDB_NOEXCEPT_OR_NOTHROW throw ()
 #endif
 
 

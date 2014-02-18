@@ -309,9 +309,14 @@ case "$MODE" in
             tightdb_version="$(printf "%s\n" "$value" | sed 's/^v//')" || exit 1
         fi
 
-        enable_replication=""
+        enable_replication="no"
         if [ "$TIGHTDB_ENABLE_REPLICATION" ]; then
             enable_replication="yes"
+        fi
+
+        enable_alloc_set_zero="no"
+        if [ "$TIGHTDB_ENABLE_ALLOC_SET_ZERO" ]; then
+            enable_alloc_set_zero="yes"
         fi
 
         xcode_home="none"
@@ -359,17 +364,18 @@ case "$MODE" in
         fi
 
         cat >"$CONFIG_MK" <<EOF
-TIGHTDB_VERSION     = $tightdb_version
-INSTALL_PREFIX      = $install_prefix
-INSTALL_EXEC_PREFIX = $install_exec_prefix
-INSTALL_INCLUDEDIR  = $install_includedir
-INSTALL_BINDIR      = $install_bindir
-INSTALL_LIBDIR      = $install_libdir
-INSTALL_LIBEXECDIR  = $install_libexecdir
-ENABLE_REPLICATION  = $enable_replication
-XCODE_HOME          = $xcode_home
-IPHONE_SDKS         = ${iphone_sdks:-none}
-IPHONE_SDKS_AVAIL   = $iphone_sdks_avail
+TIGHTDB_VERSION       = $tightdb_version
+INSTALL_PREFIX        = $install_prefix
+INSTALL_EXEC_PREFIX   = $install_exec_prefix
+INSTALL_INCLUDEDIR    = $install_includedir
+INSTALL_BINDIR        = $install_bindir
+INSTALL_LIBDIR        = $install_libdir
+INSTALL_LIBEXECDIR    = $install_libexecdir
+ENABLE_REPLICATION    = $enable_replication
+ENABLE_ALLOC_SET_ZERO = $enable_alloc_set_zero
+XCODE_HOME            = $xcode_home
+IPHONE_SDKS           = ${iphone_sdks:-none}
+IPHONE_SDKS_AVAIL     = $iphone_sdks_avail
 EOF
         if ! [ "$INTERACTIVE" ]; then
             echo "New configuration in $CONFIG_MK:"
@@ -480,6 +486,22 @@ EOF
         exit 0
         ;;
 
+    "memtest")
+        require_config || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE memcheck || exit 1
+        echo "Test passed"
+        exit 0
+        ;;
+
+    "memtest-debug")
+        require_config || exit 1
+        export TIGHTDB_HAVE_CONFIG="1"
+        $MAKE memcheck-debug || exit 1
+        echo "Test passed"
+        exit 0
+        ;;
+
     "show-install")
         temp_dir="$(mktemp -d /tmp/tightdb.show-install.XXXX)" || exit 1
         mkdir "$temp_dir/fake-root" || exit 1
@@ -489,6 +511,51 @@ EOF
         rm -fr "$temp_dir/fake-root" || exit 1
         rm "$temp_dir/list" || exit 1
         rmdir "$temp_dir" || exit 1
+        exit 0
+        ;;
+
+    "get-version")
+        version_file="src/tightdb/version.hpp"
+        tightdb_ver_major="$(grep ^"#define TIGHTDB_VER_MAJOR" $version_file | awk '{print $3}')" || exit 1
+        tightdb_ver_minor="$(grep ^"#define TIGHTDB_VER_MINOR" $version_file | awk '{print $3}')" || exit 1
+        tightdb_ver_patch="$(grep ^"#define TIGHTDB_VER_PATCH" $version_file | awk '{print $3}')" || exit 1
+        echo "$tightdb_ver_major.$tightdb_ver_minor.$tightdb_ver_patch"
+        exit 0
+        ;;
+
+    "set-version")
+        tightdb_version="$1"
+        version_file="src/tightdb/version.hpp"
+        tightdb_ver_major="$(echo "$tightdb_version" | cut -f1 -d.)" || exit 1
+        tightdb_ver_minor="$(echo "$tightdb_version" | cut -f2 -d.)" || exit 1
+        tightdb_ver_patch="$(echo "$tightdb_version" | cut -f3 -d.)" || exit 1
+
+        # update version.hpp
+        sed -i -e "s/\#define TIGHTDB_VER_MAJOR .*/\#define TIGHTDB_VER_MAJOR $tightdb_ver_major/" $version_file || exit 1
+        sed -i -e "s/\#define TIGHTDB_VER_MINOR .*/\#define TIGHTDB_VER_MINOR $tightdb_ver_minor/" $version_file || exit 1
+        sed -i -e "s/\#define TIGHTDB_VER_PATCH .*/\#define TIGHTDB_VER_PATCH $tightdb_ver_patch/" $version_file || exit 1
+
+        sh tools/add-deb-changelog.sh "$tightdb_version" "$(pwd)/debian/changelog.in" libtightdb || exit 1
+        exit 0
+        ;;
+
+    "copy-tools")
+        repo="$1"
+        if [ -z "$repo" ]; then
+            echo "No path to repository set: sh build.sh copy-tools <path-to-repo>"
+            exit 1
+        fi
+        if ! [ -e "$repo" ]; then
+            echo "Repository $repo does not exist"
+            exit 1
+        fi
+        mkdir -p $repo/tools || exit 1
+
+        tools="add-deb-changelog.sh"
+        for t in $tools; do
+            cp tools/$t $repo/tools || exit 1
+            sed -i -e "1i # Do not edit here - go to core repository" $repo/tools/$t || exit 1
+        done
         exit 0
         ;;
 
@@ -1085,6 +1152,7 @@ EOF
                 cat >"$TEMP_DIR/transfer/include" <<EOF
 /README.*
 /build.sh
+/libtightdb.spec
 /config
 /Makefile
 /src/generic.mk
@@ -2087,6 +2155,7 @@ EOF
         echo "As well as: install-prod install-devel uninstall-prod uninstall-devel dist-copy" 1>&2
         echo "As well as: src-dist bin-dist dist-deb dist-status dist-pull dist-checkout" 1>&2
         echo "As well as: dist-config dist-clean dist-build dist-build-iphone dist-test dist-test-debug dist-install dist-uninstall dist-test-installed" 1>&2
+        echo "As well as: get-version set-version copy-tools" 1>&2
         exit 1
         ;;
 esac

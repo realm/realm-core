@@ -536,10 +536,8 @@ void StringIndex::clear()
     values.clear();
     values.ensure_minimum_width(0x7FFFFFFF); // This ensures 31 bits plus a sign bit
 
-    m_array->set(0, 1); // Don't delete values
-    m_array->clear();
-    m_array->add(values.get_ref());
-    m_array->set_type(Array::type_HasRefs);
+    size_t size = 1;
+    m_array->truncate_and_destroy_children(size); // Don't touch `values` array
 }
 
 void StringIndex::erase(size_t row_ndx, StringData value, bool is_last)
@@ -553,8 +551,8 @@ void StringIndex::erase(size_t row_ndx, StringData value, bool is_last)
             break;
 
         ref_type ref = m_array->get_as_ref(1);
-        m_array->erase(1); // avoid deleting subtree
-        m_array->destroy();
+        m_array->set(1,1); // avoid destruction of the extracted ref
+        m_array->destroy_deep();
         m_array->init_from_ref(ref);
         m_array->update_parent();
     }

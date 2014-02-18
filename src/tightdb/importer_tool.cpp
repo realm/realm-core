@@ -48,7 +48,7 @@ const char* legend =
     "  csv <.csv file | -stdin> <.tightdb file>\n"
     "\n"
     "Advanced auto-detection of scheme:\n"
-    "  csv [-a=N] [-n=N] [-e] [-f] [-q] <.csv file | -stdin> <.tightdb file>\n"
+    "  csv [-a=N] [-n=N] [-e] [-f] [-q] [-l tablename] <.csv file | -stdin> <.tightdb file>\n"
     "\n"
     "Manual specification of scheme:\n"
     "  csv -t={s|i|b|f|d}{s|i|b|f|d}... name1 name2 ... [-s=N] [-n=N] <.csv file | -stdin> <.tightdb file>\n"
@@ -61,6 +61,7 @@ const char* legend =
     " -s: Skip first N rows (can be used to skip headers)\n"
     " -q: Quiet, only print upon errors\n"
     " -f: Overwrite destination file if existing (default is to abort)\n"
+    " -l: Name of the resulting table (default is 'table')\n"
     "\n"
     "Examples:\n"
     "  csv file.csv file.tightdb\n"
@@ -104,9 +105,10 @@ int main(int argc, char* argv[])
 
     vector<DataType> scheme;
     vector<string> column_names;
+    string tablename = "table";
 
     // Parse from 1'st argument until before source and destination args
-    for(int a = 1; a < argc - 2; a++) {
+    for(int a = 1; a < argc - 2; ++a) {
         abort2(strlen(argv[a]) == 0 || argv[a][strlen(argv[a]) - 1] == '=' || argv[a + 1][0] == '=', "Please remove space characters before and after '=' signs in command line flags");
 
         if(strncmp(argv[a], "-a=", 3) == 0)
@@ -150,6 +152,10 @@ int main(int argc, char* argv[])
                 a++;
             }
         }
+        else if(strncmp(argv[a], "-l", 2) == 0) {
+            abort2(a >= argc-4 , "Too few arguments");
+            tablename = argv[++a];
+        }
         else {
             abort2(true, legend);
         }
@@ -168,7 +174,7 @@ int main(int argc, char* argv[])
     in_file = open_files(argv[argc - 2]);
     string path = argv[argc - 1];
     Group group;
-    TableRef table2 = group.get_table("table");
+    TableRef table2 = group.get_table(tablename);
     Table &table = *table2;
 
     size_t imported_rows;
@@ -201,7 +207,7 @@ int main(int argc, char* argv[])
     group.write(path);
 
     if(!quiet_flag)
-        cout << "Imported " << imported_rows << " rows into table named 'table'\n";
+        cout << "Imported " << imported_rows << " rows into table named '" << tablename << "'\n";
 
     return 0;
 

@@ -35,11 +35,13 @@ namespace tightdb {
 
 
 namespace _impl {
-    template<class Type, int col_idx> struct AddCol;
-    template<class Type, int col_idx> struct DiffColType;
-    template<class Type, int col_idx> struct InsertIntoCol;
-    template<class Type, int col_idx> struct AssignIntoCol;
-}
+
+template<class Type, int col_idx> struct AddCol;
+template<class Type, int col_idx> struct CmpColType;
+template<class Type, int col_idx> struct InsertIntoCol;
+template<class Type, int col_idx> struct AssignIntoCol;
+
+} // namespace _impl
 
 
 
@@ -65,7 +67,7 @@ public:
     typedef BasicTableView<const BasicTable> ConstView;
 
     using Table::is_attached;
-    using Table::has_shared_spec;
+    using Table::has_shared_type;
     using Table::is_empty;
     using Table::size;
     using Table::clear;
@@ -75,6 +77,7 @@ public:
     using Table::lookup;
     using Table::add_empty_row;
     using Table::insert_empty_row;
+    using Table::aggregate;
 
     BasicTable(Allocator& alloc = Allocator::get_default()): Table(alloc)
     {
@@ -279,12 +282,12 @@ private:
     static void set_dynamic_spec(Table& table)
     {
         using namespace tightdb::util;
-        tightdb::Spec& spec = table.get_spec();
+        tightdb::Spec* spec = _impl::TableFriend::get_spec(table);
         const int num_cols = TypeCount<typename Spec::Columns>::value;
         StringData dyn_col_names[num_cols];
         Spec::dyn_col_names(dyn_col_names);
-        ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&spec, dyn_col_names);
-        table.update_from_spec();
+        ForEachType<typename Spec::Columns, _impl::AddCol>::exec(&table, spec, dyn_col_names);
+        _impl::TableFriend::update_table_from_spec(table);
     }
 
     static bool matches_dynamic_spec(const tightdb::Spec* spec) TIGHTDB_NOEXCEPT
@@ -294,7 +297,7 @@ private:
         StringData dyn_col_names[num_cols];
         Spec::dyn_col_names(dyn_col_names);
         return !HasType<typename Spec::Columns,
-                        _impl::DiffColType>::exec(spec, dyn_col_names);
+                        _impl::CmpColType>::exec(spec, dyn_col_names);
     }
 
     // This one allows a BasicTable to know that BasicTables with
@@ -315,7 +318,7 @@ private:
     friend class BasicTableView<BasicTable>;
     friend class BasicTableView<const BasicTable>;
 
-    template<class, int> friend struct _impl::DiffColType;
+    template<class, int> friend struct _impl::CmpColType;
     template<class, int> friend struct _impl::InsertIntoCol;
     template<class, int, class, bool> friend class _impl::FieldAccessor;
     template<class, int, class> friend class _impl::MixedFieldAccessorBase;
@@ -334,7 +337,7 @@ private:
 template<class Spec> class BasicTable<Spec>::Query:
         public Spec::template ColNames<QueryCol, Query*> {
 public:
-    Query(const Query&q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
+    Query(const Query& q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
     ~Query() TIGHTDB_NOEXCEPT {}
 
     Query& tableview(const Array& arr) { m_impl.tableview(arr); return *this; }
@@ -415,250 +418,254 @@ private:
 
 // Implementation:
 
-namespace _impl
-{
-    template<class T> struct GetColumnTypeId;
+namespace _impl {
 
-    template<> struct GetColumnTypeId<int64_t> {
-        static const DataType id = type_Int;
-    };
-    template<class E> struct GetColumnTypeId<SpecBase::Enum<E> > {
-        static const DataType id = type_Int;
-    };
-    template<> struct GetColumnTypeId<bool> {
-        static const DataType id = type_Bool;
-    };
-    template<> struct GetColumnTypeId<float> {
-        static const DataType id = type_Float;
-    };
-    template<> struct GetColumnTypeId<double> {
-        static const DataType id = type_Double;
-    };
-    template<> struct GetColumnTypeId<StringData> {
-        static const DataType id = type_String;
-    };
-    template<> struct GetColumnTypeId<BinaryData> {
-        static const DataType id = type_Binary;
-    };
-    template<> struct GetColumnTypeId<DateTime> {
-        static const DataType id = type_DateTime;
-    };
-    template<> struct GetColumnTypeId<Mixed> {
-        static const DataType id = type_Mixed;
-    };
+template<class T> struct GetColumnTypeId;
 
-
-    template<class Type, int col_idx> struct AddCol {
-        static void exec(Spec* spec, const StringData* col_names)
-        {
-            TIGHTDB_ASSERT(col_idx == spec->get_column_count());
-            spec->add_column(GetColumnTypeId<Type>::id, col_names[col_idx]);
-        }
-    };
-
-    // AddCol specialization for subtables
-    template<class Subtab, int col_idx> struct AddCol<SpecBase::Subtable<Subtab>, col_idx> {
-        static void exec(Spec* spec, const StringData* col_names)
-        {
-            using namespace tightdb::util;
-            TIGHTDB_ASSERT(col_idx == spec->get_column_count());
-            typedef typename Subtab::Columns Subcolumns;
-            Spec subspec = spec->add_subtable_column(col_names[col_idx]);
-            const int num_cols = TypeCount<typename Subtab::spec_type::Columns>::value;
-            StringData dyn_col_names[num_cols];
-            Subtab::spec_type::dyn_col_names(dyn_col_names);
-            ForEachType<Subcolumns, _impl::AddCol>::exec(&subspec, dyn_col_names);
-        }
-    };
+template<> struct GetColumnTypeId<int64_t> {
+    static const DataType id = type_Int;
+};
+template<class E> struct GetColumnTypeId<SpecBase::Enum<E> > {
+    static const DataType id = type_Int;
+};
+template<> struct GetColumnTypeId<bool> {
+    static const DataType id = type_Bool;
+};
+template<> struct GetColumnTypeId<float> {
+    static const DataType id = type_Float;
+};
+template<> struct GetColumnTypeId<double> {
+    static const DataType id = type_Double;
+};
+template<> struct GetColumnTypeId<StringData> {
+    static const DataType id = type_String;
+};
+template<> struct GetColumnTypeId<BinaryData> {
+    static const DataType id = type_Binary;
+};
+template<> struct GetColumnTypeId<DateTime> {
+    static const DataType id = type_DateTime;
+};
+template<> struct GetColumnTypeId<Mixed> {
+    static const DataType id = type_Mixed;
+};
 
 
+template<class Type, int col_idx> struct AddCol {
+    static void exec(Table* table, Spec* spec, const StringData* col_names)
+    {
+        TIGHTDB_ASSERT(col_idx == spec->get_column_count());
+        _impl::TableFriend::add_column_to_spec(*table, *spec, GetColumnTypeId<Type>::id,
+                                               col_names[col_idx]); // Throws
+    }
+};
 
-    template<class Type, int col_idx> struct DiffColType {
-        static bool exec(const Spec* spec, const StringData* col_names)
-        {
-            return GetColumnTypeId<Type>::id != spec->get_column_type(col_idx) ||
-                col_names[col_idx] != spec->get_column_name(col_idx);
-        }
-    };
-
-    // DiffColType specialization for subtables
-    template<class Subtab, int col_idx> struct DiffColType<SpecBase::Subtable<Subtab>, col_idx> {
-        static bool exec(const Spec* spec, const StringData* col_names)
-        {
-            if (spec->get_column_type(col_idx) != type_Table ||
-                col_names[col_idx] != spec->get_column_name(col_idx)) return true;
-            Spec subspec = spec->get_subtable_spec(col_idx);
-            return !Subtab::matches_dynamic_spec(&subspec);
-        }
-    };
+// AddCol specialization for subtables
+template<class Subtab, int col_idx> struct AddCol<SpecBase::Subtable<Subtab>, col_idx> {
+    static void exec(Table* table, Spec* spec, const StringData* col_names)
+    {
+        using namespace tightdb::util;
+        TIGHTDB_ASSERT(col_idx == spec->get_column_count());
+        _impl::TableFriend::add_column_to_spec(*table, *spec, type_Table,
+                                               col_names[col_idx]); // Throws
+        Spec subspec = spec->get_subtable_spec(col_idx);
+        const int num_cols = TypeCount<typename Subtab::spec_type::Columns>::value;
+        StringData dyn_col_names[num_cols];
+        Subtab::spec_type::dyn_col_names(dyn_col_names);
+        typedef typename Subtab::Columns Subcolumns;
+        ForEachType<Subcolumns, _impl::AddCol>::exec(table, &subspec, dyn_col_names);
+    }
+};
 
 
 
-    // InsertIntoCol specialization for integers
-    template<int col_idx> struct InsertIntoCol<int64_t, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->insert_int(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
+template<class Type, int col_idx> struct CmpColType {
+    static bool exec(const Spec* spec, const StringData* col_names)
+    {
+        return GetColumnTypeId<Type>::id != spec->get_column_type(col_idx) ||
+            col_names[col_idx] != spec->get_column_name(col_idx);
+    }
+};
 
-    // InsertIntoCol specialization for float
-    template<int col_idx> struct InsertIntoCol<float, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->insert_float(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
-
-    // InsertIntoCol specialization for double
-    template<int col_idx> struct InsertIntoCol<double, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->insert_double(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
-
-    // InsertIntoCol specialization for booleans
-    template<int col_idx> struct InsertIntoCol<bool, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->insert_bool(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
-
-    // InsertIntoCol specialization for strings
-    template<int col_idx> struct InsertIntoCol<StringData, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->insert_string(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
-
-    // InsertIntoCol specialization for enumerations
-    template<class E, int col_idx> struct InsertIntoCol<SpecBase::Enum<E>, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->insert_enum(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
-
-    // InsertIntoCol specialization for dates
-    template<int col_idx> struct InsertIntoCol<DateTime, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->insert_datetime(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
-
-    // InsertIntoCol specialization for binary data
-    template<int col_idx> struct InsertIntoCol<BinaryData, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->insert_binary(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
-
-    // InsertIntoCol specialization for subtables
-    template<class T, int col_idx> struct InsertIntoCol<SpecBase::Subtable<T>, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            static_cast<const T*>(util::at<col_idx>(tuple))->insert_into(t, col_idx, row_idx);
-        }
-    };
-
-    // InsertIntoCol specialization for mixed type
-    template<int col_idx> struct InsertIntoCol<Mixed, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->insert_mixed(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
+// CmpColType specialization for subtables
+template<class Subtab, int col_idx> struct CmpColType<SpecBase::Subtable<Subtab>, col_idx> {
+    static bool exec(const Spec* spec, const StringData* col_names)
+    {
+        if (spec->get_column_type(col_idx) != type_Table ||
+            col_names[col_idx] != spec->get_column_name(col_idx)) return true;
+        const Spec subspec = const_cast<Spec*>(spec)->get_subtable_spec(col_idx);
+        return !Subtab::matches_dynamic_spec(&subspec);
+    }
+};
 
 
 
-    // AssignIntoCol specialization for integers
-    template<int col_idx> struct AssignIntoCol<int64_t, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->set_int(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
+// InsertIntoCol specialization for integers
+template<int col_idx> struct InsertIntoCol<int64_t, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->insert_int(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
 
-    // AssignIntoCol specialization for floats
-    template<int col_idx> struct AssignIntoCol<float, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->set_float(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
+// InsertIntoCol specialization for float
+template<int col_idx> struct InsertIntoCol<float, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->insert_float(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
 
-    // AssignIntoCol specialization for doubles
-    template<int col_idx> struct AssignIntoCol<double, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->set_double(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
+// InsertIntoCol specialization for double
+template<int col_idx> struct InsertIntoCol<double, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->insert_double(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
 
-    // AssignIntoCol specialization for booleans
-    template<int col_idx> struct AssignIntoCol<bool, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->set_bool(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
+// InsertIntoCol specialization for booleans
+template<int col_idx> struct InsertIntoCol<bool, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->insert_bool(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
 
-    // AssignIntoCol specialization for strings
-    template<int col_idx> struct AssignIntoCol<StringData, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->set_string(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
+// InsertIntoCol specialization for strings
+template<int col_idx> struct InsertIntoCol<StringData, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->insert_string(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
 
-    // AssignIntoCol specialization for enumerations
-    template<class E, int col_idx> struct AssignIntoCol<SpecBase::Enum<E>, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->set_enum(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
+// InsertIntoCol specialization for enumerations
+template<class E, int col_idx> struct InsertIntoCol<SpecBase::Enum<E>, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->insert_enum(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
 
-    // AssignIntoCol specialization for dates
-    template<int col_idx> struct AssignIntoCol<DateTime, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->set_datetime(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
+// InsertIntoCol specialization for dates
+template<int col_idx> struct InsertIntoCol<DateTime, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->insert_datetime(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
 
-    // AssignIntoCol specialization for binary data
-    template<int col_idx> struct AssignIntoCol<BinaryData, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->set_binary(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
+// InsertIntoCol specialization for binary data
+template<int col_idx> struct InsertIntoCol<BinaryData, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->insert_binary(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
 
-    // AssignIntoCol specialization for subtables
-    template<class T, int col_idx> struct AssignIntoCol<SpecBase::Subtable<T>, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->clear_subtable(col_idx, row_idx);
-            // FIXME: Implement table copy when specified!
-            TIGHTDB_ASSERT(!static_cast<const T*>(util::at<col_idx>(tuple)));
-            static_cast<void>(tuple);
-        }
-    };
+// InsertIntoCol specialization for subtables
+template<class T, int col_idx> struct InsertIntoCol<SpecBase::Subtable<T>, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        static_cast<const T*>(util::at<col_idx>(tuple))->insert_into(t, col_idx, row_idx);
+    }
+};
 
-    // AssignIntoCol specialization for mixed type
-    template<int col_idx> struct AssignIntoCol<Mixed, col_idx> {
-        template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
-        {
-            t->set_mixed(col_idx, row_idx, util::at<col_idx>(tuple));
-        }
-    };
-}
+// InsertIntoCol specialization for mixed type
+template<int col_idx> struct InsertIntoCol<Mixed, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->insert_mixed(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
+
+
+
+// AssignIntoCol specialization for integers
+template<int col_idx> struct AssignIntoCol<int64_t, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->set_int(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
+
+// AssignIntoCol specialization for floats
+template<int col_idx> struct AssignIntoCol<float, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->set_float(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
+
+// AssignIntoCol specialization for doubles
+template<int col_idx> struct AssignIntoCol<double, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->set_double(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
+
+// AssignIntoCol specialization for booleans
+template<int col_idx> struct AssignIntoCol<bool, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->set_bool(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
+
+// AssignIntoCol specialization for strings
+template<int col_idx> struct AssignIntoCol<StringData, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->set_string(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
+
+// AssignIntoCol specialization for enumerations
+template<class E, int col_idx> struct AssignIntoCol<SpecBase::Enum<E>, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->set_enum(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
+
+// AssignIntoCol specialization for dates
+template<int col_idx> struct AssignIntoCol<DateTime, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->set_datetime(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
+
+// AssignIntoCol specialization for binary data
+template<int col_idx> struct AssignIntoCol<BinaryData, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->set_binary(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
+
+// AssignIntoCol specialization for subtables
+template<class T, int col_idx> struct AssignIntoCol<SpecBase::Subtable<T>, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->clear_subtable(col_idx, row_idx);
+        // FIXME: Implement table copy when specified!
+        TIGHTDB_ASSERT(!static_cast<const T*>(util::at<col_idx>(tuple)));
+        static_cast<void>(tuple);
+    }
+};
+
+// AssignIntoCol specialization for mixed type
+template<int col_idx> struct AssignIntoCol<Mixed, col_idx> {
+    template<class L> static void exec(Table* t, std::size_t row_idx, util::Tuple<L> tuple)
+    {
+        t->set_mixed(col_idx, row_idx, util::at<col_idx>(tuple));
+    }
+};
+
+} // namespace _impl
 
 
 template<class Spec>
@@ -679,7 +686,7 @@ inline typename BasicTable<Spec>::Ref BasicTable<Spec>::copy(Allocator& alloc) c
 
 template<class T> inline bool is_a(const Table& t) TIGHTDB_NOEXCEPT
 {
-    return T::matches_dynamic_spec(&t.get_spec());
+    return T::matches_dynamic_spec(_impl::TableFriend::get_spec(t));
 }
 
 

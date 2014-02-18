@@ -96,6 +96,12 @@ public:
 
     static ref_type create(std::size_t size, Allocator&);
 
+    static std::size_t get_size_from_ref(ref_type root_ref, Allocator&) TIGHTDB_NOEXCEPT;
+
+    // Overrriding method in ColumnBase
+    ref_type write(std::size_t, std::size_t, std::size_t,
+                   _impl::OutputStream&) const TIGHTDB_OVERRIDE;
+
     void foreach(Array::ForEachOp<StringData>*) const TIGHTDB_NOEXCEPT;
 
 #ifdef TIGHTDB_DEBUG
@@ -119,6 +125,7 @@ private:
 
     class EraseLeafElem;
     class CreateHandler;
+    class SliceHandler;
 
     /// Root must be a leaf. Upgrades the root leaf as
     /// necessary. Returns the type of the root leaf as it is upon
@@ -151,7 +158,7 @@ inline std::size_t AdaptiveStringColumn::size() const TIGHTDB_NOEXCEPT
             ArrayString* leaf = static_cast<ArrayString*>(m_array);
             return leaf->size();
         }
-        bool is_big = m_array->context_bit();
+        bool is_big = m_array->get_context_flag();
         if (!is_big) {
             // Medium strings root leaf
             ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array);
@@ -186,6 +193,27 @@ inline StringIndex* AdaptiveStringColumn::release_index() TIGHTDB_NOEXCEPT
     return i;
 }
 
+inline std::size_t AdaptiveStringColumn::get_size_from_ref(ref_type root_ref,
+                                                           Allocator& alloc) TIGHTDB_NOEXCEPT
+{
+    const char* root_header = alloc.translate(root_ref);
+    bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
+    if (root_is_leaf) {
+        bool long_strings = Array::get_hasrefs_from_header(root_header);
+        if (!long_strings) {
+            // Small strings leaf
+            return ArrayString::get_size_from_header(root_header);
+        }
+        bool is_big = Array::get_context_flag_from_header(root_header);
+        if (!is_big) {
+            // Medium strings leaf
+            return ArrayStringLong::get_size_from_header(root_header, alloc);
+        }
+        // Big strings leaf
+        return ArrayBigBlobs::get_size_from_header(root_header);
+    }
+    return Array::get_bptree_size_from_header(root_header);
+}
 
 inline void AdaptiveStringColumn::foreach(Array::ForEachOp<StringData>* op) const TIGHTDB_NOEXCEPT
 {
