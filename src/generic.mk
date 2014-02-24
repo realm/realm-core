@@ -15,7 +15,7 @@
 # clean ........ Delete targets and other files that are produced
 #                while building.
 #
-# build (default) . Build convenience libraries (`noinst_LIBRARIES`)
+# build (default) Build convenience libraries (`noinst_LIBRARIES`)
 #                plus everything that `install-only` wants to install
 #                (when disregarding `INSTALL_FILTER`). If necessary,
 #                the convenience libraries will also be built in
@@ -62,10 +62,10 @@
 #
 # check-cover ... Same as `check`, but in 'code coverage' mode.
 #
-# memcheck, memcheck-debug . Same as `check` and `check-debug`
+# memcheck, memcheck-debug Same as `check` and `check-debug`
 #                 respectively, but runs each program under Valgrind.
 #
-# check-norun, check-debug-norun . Same as `check` and `check-debug`
+# check-norun, check-debug-norun Same as `check` and `check-debug`
 #                 respectively, but stop after building.
 #
 #

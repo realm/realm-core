@@ -573,7 +573,7 @@ EOF
     "install-prod")
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE install-only DESTDIR="$DESTDIR" INSTALL_FILTER=shared-libs,progs || exit 1
+        $MAKE install-only DESTDIR="$DESTDIR" INSTALL_FILTER="shared-libs,progs" || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
@@ -584,7 +584,7 @@ EOF
     "install-devel")
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE install-only DESTDIR="$DESTDIR" INSTALL_FILTER=static-libs,dev-progs,headers || exit 1
+        $MAKE install-only DESTDIR="$DESTDIR" INSTALL_FILTER="static-libs,dev-progs,headers" || exit 1
         echo "Done installing"
         exit 0
         ;;
@@ -603,7 +603,7 @@ EOF
     "uninstall-prod")
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE uninstall INSTALL_FILTER=shared-libs,progs || exit 1
+        $MAKE uninstall INSTALL_FILTER="shared-libs,progs" || exit 1
         if [ "$USER" = "root" ] && which ldconfig >/dev/null 2>&1; then
             ldconfig || exit 1
         fi
@@ -614,7 +614,7 @@ EOF
     "uninstall-devel")
         require_config || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
-        $MAKE uninstall INSTALL_FILTER=static-libs,dev-progs,headers || exit 1
+        $MAKE uninstall INSTALL_FILTER="static-libs,dev-progs,headers" || exit 1
         echo "Done uninstalling"
         exit 0
         ;;
