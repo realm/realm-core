@@ -3,7 +3,7 @@
 #
 # Author: Kristian Spangsege
 #
-# Version: 1.0.0
+# Version: 1.0.1
 #
 # This makefile requires GNU Make. It has been tested with version
 # 3.81, and it is known to work well on both Linux and OS X.
@@ -65,8 +65,9 @@
 # memcheck, memcheck-debug Same as `check` and `check-debug`
 #                 respectively, but runs each program under Valgrind.
 #
-# check-norun, check-debug-norun Same as `check` and `check-debug`
-#                 respectively, but stop after building.
+# check-norun, check-debug-norun, check-cover-norun Same as `check`,
+#                 `check-debug`, and `check-cover` respectively, but
+#                 stop after building.
 #
 #
 # Building installable programs and libraries
@@ -1167,7 +1168,8 @@ TARGETS := $(TARGETS_LIB_STATIC) $(TARGETS_LIB_SHARED_ALIASES) $(TARGETS_INST_LI
 TARGETS += $(TARGETS_NOINST_LIB) $(TARGETS_NOINST_LIB_LIBDEPS)
 TARGETS += $(TARGETS_CHECK_LIB) $(TARGETS_CHECK_LIB_LIBDEPS) $(TARGETS_PROG_ALL)
 
-RECURSIVE_GOALS = build release nodebug debug cover everything clean install-only uninstall check-norun check-debug-norun check check-debug check-cover memcheck memcheck-debug
+RECURSIVE_GOALS = build release nodebug debug cover everything clean install-only uninstall \
+check-norun check-debug-norun check-cover-norun check check-debug check-cover memcheck memcheck-debug
 
 .DEFAULT_GOAL :=
 
@@ -1182,6 +1184,7 @@ cover/local:             $(TARGETS_COVER)
 everything/local:        $(TARGETS_EVERYTHING)
 check-norun/local:       $(TARGETS_CHECK)
 check-debug-norun/local: $(TARGETS_CHECK_DEBUG)
+check-cover-norun/local: $(TARGETS_CHECK_COVER)
 
 
 # Update everything if any makefile or any generated source has changed
