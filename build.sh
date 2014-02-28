@@ -320,9 +320,22 @@ case "$MODE" in
         fi
 
         xcode_home="none"
+        arm64_supported=""
         if [ "$OS" = "Darwin" ]; then
             if path="$(xcode-select --print-path 2>/dev/null)"; then
                 xcode_home="$path"
+            fi
+            xcodebuild="$xcode_home/usr/bin/xcodebuild"
+            version="$("$xcodebuild" -version)" || exit 1
+            version="$(printf "%s" "$version" | grep -E '^Xcode +[0-9]+\.[0-9]' | head -n1)"
+            version="$(printf "%s" "$version" | sed 's/^Xcode *\([0-9A-Z_.-]*\).*$/\1/')" || exit 1
+            if ! printf "%s" "$version" | grep -q -E '^[0-9]+(\.[0-9]+)+$'; then
+                echo "Failed to determine Xcode version using \`$xcodebuild -version\`" 1>&2
+                exit 1
+            fi
+            major="$(printf "%s" "$version" | cut -d. -f1)" || exit 1
+            if [ "$major" -ge "5" ]; then
+                arm64_supported="1"
             fi
         fi
 
@@ -343,21 +356,16 @@ case "$MODE" in
                         iphone_sdks_avail="no"
                     else
                         if [ "$x" = "iPhoneSimulator" ]; then
-                            arch="i386"
-                        else
-                            type="$(defaults read-type "$platform_home/Info" "DefaultProperties")" || exit 1
-                            if [ "$type" != "Type is dictionary" ]; then
-                                echo "Unexpected type of value of key 'DefaultProperties' in '$platform_home/Info.plist'" 1>&2
-                                exit 1
+                            archs="i386:x86_64"
+                        elif [  "$x" = "iPhoneOS" ]; then
+                            archs="armv6"
+                            if [ "$arm64_supported" ]; then
+                                archs="$archs:arm64"
                             fi
-                            temp_dir="$(mktemp -d "/tmp/tmp.XXXXXXXXXX")" || exit 1
-                            chunk="$temp_dir/chunk.plist"
-                            defaults read "$platform_home/Info" "DefaultProperties" >"$chunk" || exit 1
-                            arch="$(defaults read "$chunk" NATIVE_ARCH)" || exit 1
-                            rm -f "$chunk" || exit 1
-                            rmdir "$temp_dir" || exit 1
+                        else
+                            continue
                         fi
-                        word_list_append "iphone_sdks" "$x:$sdk:$arch" || exit 1
+                        word_list_append "iphone_sdks" "$x:$sdk:$archs" || exit 1
                     fi
                 fi
             done
@@ -441,9 +449,14 @@ EOF
         for x in $iphone_sdks; do
             platform="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
             sdk="$(printf "%s\n" "$x" | cut -d: -f2)" || exit 1
-            arch="$(printf "%s\n" "$x" | cut -d: -f3)" || exit 1
+            archs="$(printf "%s\n" "$x" | cut -d: -f3- | sed 's/:/ /g')" || exit 1
+            cflags_arch=""
+            for y in $archs; do
+                word_list_append "cflags_arch" "-arch $y" || exit 1
+            done
             sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
-            $MAKE -C "src/tightdb" "libtightdb-$platform.a" "libtightdb-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="-arch $arch -isysroot $sdk_root" || exit 1
+            word_list_append "cflags_arch" "-isysroot $sdk_root" || exit 1
+            $MAKE -C "src/tightdb" "libtightdb-$platform.a" "libtightdb-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch" || exit 1
             mkdir "$temp_dir/platforms/$platform" || exit 1
             cp "src/tightdb/libtightdb-$platform.a"     "$temp_dir/platforms/$platform/libtightdb.a"     || exit 1
             cp "src/tightdb/libtightdb-$platform-dbg.a" "$temp_dir/platforms/$platform/libtightdb-dbg.a" || exit 1
