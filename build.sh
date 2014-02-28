@@ -319,6 +319,7 @@ case "$MODE" in
             enable_alloc_set_zero="yes"
         fi
 
+        # Find Xcode
         xcode_home="none"
         arm64_supported=""
         if [ "$OS" = "Darwin" ]; then
@@ -339,6 +340,7 @@ case "$MODE" in
             fi
         fi
 
+        # Find iPhone SDKs
         iphone_sdks=""
         iphone_sdks_avail="no"
         if [ "$xcode_home" != "none" ]; then
@@ -455,8 +457,7 @@ EOF
                 word_list_append "cflags_arch" "-arch $y" || exit 1
             done
             sdk_root="$xcode_home/Platforms/$platform.platform/Developer/SDKs/$sdk"
-            word_list_append "cflags_arch" "-isysroot $sdk_root" || exit 1
-            $MAKE -C "src/tightdb" "libtightdb-$platform.a" "libtightdb-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch" || exit 1
+            $MAKE -C "src/tightdb" "libtightdb-$platform.a" "libtightdb-$platform-dbg.a" BASE_DENOM="$platform" CFLAGS_ARCH="$cflags_arch -isysroot $sdk_root" || exit 1
             mkdir "$temp_dir/platforms/$platform" || exit 1
             cp "src/tightdb/libtightdb-$platform.a"     "$temp_dir/platforms/$platform/libtightdb.a"     || exit 1
             cp "src/tightdb/libtightdb-$platform-dbg.a" "$temp_dir/platforms/$platform/libtightdb-dbg.a" || exit 1
