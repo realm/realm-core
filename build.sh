@@ -485,7 +485,7 @@ EOF
         ;;
 
     "test")
-        require_config || exit 1
+        auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
         $MAKE check || exit 1
         echo "Test passed"
@@ -493,7 +493,7 @@ EOF
         ;;
 
     "test-debug")
-        require_config || exit 1
+        auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
         $MAKE check-debug || exit 1
         echo "Test passed"
@@ -501,7 +501,7 @@ EOF
         ;;
 
     "memtest")
-        require_config || exit 1
+        auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
         $MAKE memcheck || exit 1
         echo "Test passed"
@@ -509,7 +509,7 @@ EOF
         ;;
 
     "memtest-debug")
-        require_config || exit 1
+        auto_configure || exit 1
         export TIGHTDB_HAVE_CONFIG="1"
         $MAKE memcheck-debug || exit 1
         echo "Test passed"
