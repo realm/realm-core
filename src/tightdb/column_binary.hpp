@@ -74,7 +74,7 @@ public:
     void dump_node_structure(std::ostream&, int level) const TIGHTDB_OVERRIDE;
     using ColumnBase::dump_node_structure;
 #endif
-    virtual void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT;
+    void update_from_parent(std::size_t old_baseline) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE;
 
 private:
     std::size_t do_get_size() const TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE { return size(); }
@@ -226,7 +226,7 @@ inline void ColumnBinary::insert_string(std::size_t ndx, StringData value)
 }
 
 inline std::size_t ColumnBinary::get_size_from_ref(ref_type root_ref,
-                                                   Allocator& alloc) TIGHTDB_NOEXCEPT
+                                                   Allocator& alloc) TIGHTDB_NOEXCEPT TIGHTDB_OVERRIDE
 {
     const char* root_header = alloc.translate(root_ref);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
